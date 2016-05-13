@@ -1,0 +1,12 @@
+Package: exploratoryR
+Type: Package
+Title: What the Package Does (Title Case)
+Version: 0.1
+Date: 2016-05-13
+Authors@R: c(person("Yosuke", "Yasuda", email = "double.y.919.quick@gmail.com", role = c("aut", "cre")))
+URL: https://github.com/exploratory-io/exploratory_func
+Description: Functions for Exploratory
+License: What license is it under?
+LazyData: TRUE
+Import:
+    dplyr
