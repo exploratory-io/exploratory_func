@@ -51,6 +51,6 @@ do_kmeans <- function(df, ..., centers=3, keep.source = TRUE, seed=0){
     )
   }
   # Add a class for Exploratyry to recognize the type of .model
-  class(output$.model) <- ".model.kmeans"
+  class(output$.model) <- c("list",".model.kmeans")
   output
 }
