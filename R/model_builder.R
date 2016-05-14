@@ -12,7 +12,7 @@ do_data <- function(funcname) {
       output <- df  %>%  dplyr::do(.model= do.call(funcname, list(data = ., ...)))
     }
     # Add a class for Exploratyry to recognize the type of .model
-    class(output$.model) <- c("list", paste0(".model.", funcname))
+    class(output$.model) <- c("list", ".model", paste0(".model.", funcname))
     output
   }
   ret
@@ -51,6 +51,6 @@ do_kmeans <- function(df, ..., centers=3, keep.source = TRUE, seed=0){
     )
   }
   # Add a class for Exploratyry to recognize the type of .model
-  class(output$.model) <- c("list",".model.kmeans")
+  class(output$.model) <- c("list", ".model", ".model.kmeans")
   output
 }
