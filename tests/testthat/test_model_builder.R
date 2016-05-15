@@ -28,3 +28,20 @@ test_that("test do_kmeans and broom::tidy", {
     expect_equal(dim(result)[[1]], 2)
   }
 })
+
+test_that("test do_kmeans with invalid argument", {
+  if(requireNamespace("broom")){
+    tryCatch({
+      result <- (
+        test_df
+        %>%
+          do_kmeans(vec1, vec2, rand, groups=2)
+        %>%
+          broom::tidy(.model)
+      )
+    }, error=function(e){
+      expect_equal(e$message, "groups is undefined in the data frame and argument")
+      return
+    })
+  }
+})

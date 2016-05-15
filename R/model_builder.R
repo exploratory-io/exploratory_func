@@ -34,7 +34,22 @@ do_kmeans <- function(df, ..., centers=3, keep.source = FALSE, seed=0){
   } else {
     grouped_cname = colnames(labels)
   }
-  selected_df <- dplyr::select(df, ...)
+  tryCatch({
+    selected_df <- dplyr::select(df, ...)
+    # check if dots are all about column selection
+    if(!all(colnames(selected_df) %in% colnames(df))){
+      # columns which were not in original data frame
+      no_column <- colnames(selected_df)[!colnames(selected_df) %in% colnames(df)]
+      stop(paste(no_column, "is undefined in the data frame and argument", collapse = " "))
+    }
+  }, error=function(e){
+    if(e$message=="undefined columns selected"){
+      # in case dplyr::select emits error
+      stop("There is invalid column name or argument")
+    } else {
+      stop(e$message)
+    }
+  })
   selected_cnames <- colnames(selected_df)
   selected_cnames <- selected_cnames[!selected_cnames %in% grouped_cname]
   if(keep.source){
