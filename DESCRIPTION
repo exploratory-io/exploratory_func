@@ -9,7 +9,7 @@ Description: Functions for Exploratory
 License: What license is it under?
 LazyData: TRUE
 Import:
-    dplyr
-Suggests:
-    testthat,
+    dplyr,
     broom
+Suggests:
+    testthat

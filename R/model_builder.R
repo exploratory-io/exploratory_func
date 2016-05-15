@@ -2,7 +2,7 @@
 #'
 #'@return do wrapper function
 do_data <- function(funcname) {
-  ret <- function(df, ..., keep.source = TRUE){
+  ret <- function(df, ..., keep.source = FALSE){
     loadNamespace("dplyr")
     if (keep.source) {
       output <- df  %>%  dplyr::do(.model = do.call(funcname, list(data = ., ...)), .source.data = (.))
@@ -25,7 +25,7 @@ do_lm <- do_data("lm")
 do_glm <- do_data("glm")
 
 #'@export
-do_kmeans <- function(df, ..., centers=3, keep.source = TRUE, seed=0){
+do_kmeans <- function(df, ..., centers=3, keep.source = FALSE, seed=0){
   loadNamespace("dplyr")
   set.seed(seed)
   labels <- attr(df, "labels")
