@@ -54,7 +54,6 @@ do_kmeans <- function(df, ..., centers=3, keep.source = FALSE, seed=0){
   selected_cnames <- selected_cnames[!selected_cnames %in% grouped_cname]
   # expression to find NA row (ex. is.na(df[[\"vec1\"]] ) | is.na(df[[\"vec2\"]] ))
   exp = paste(paste("is.na(df[[\"",selected_cnames, collapse="\"]] ) | ", sep=""), "\"]])", sep="")
-  browser()
   na_row = eval(parse(text=exp))
   if(all(na_row)){
     stop("all rows contain NA")
