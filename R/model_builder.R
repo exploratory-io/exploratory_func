@@ -52,17 +52,25 @@ do_kmeans <- function(df, ..., centers=3, keep.source = FALSE, seed=0){
   })
   selected_cnames <- colnames(selected_df)
   selected_cnames <- selected_cnames[!selected_cnames %in% grouped_cname]
+  # expression to find NA row (ex. is.na(df[[\"vec1\"]] ) | is.na(df[[\"vec2\"]] ))
+  exp = paste(paste("is.na(df[[\"",selected_cnames, collapse="\"]] ) | ", sep=""), "\"]])", sep="")
+  na_row = eval(parse(text=exp))
+  if(all(na_row)){
+    # All rows has at least one NA. If we filter them out, no row is left.
+    stop("No data left after filtering rows that have NA")
+  }
+
   if(keep.source){
     output <- (
       df
-      %>%  dplyr::do(.model= kmeans(.[,selected_cnames], centers), .source.data=(.))
+      %>%  dplyr::do(.model= kmeans(.[!na_row,selected_cnames], centers), .source.data=(.[!na_row,]))
     )
     # Add a class for Exploratyry to recognize the type of .source.data
     class(output$.source.data) <- c("list", ".source.data")
   } else {
     output <- (
       df
-      %>%  dplyr::do(.model= kmeans(.[,selected_cnames], centers))
+      %>%  dplyr::do(.model= kmeans(.[!na_row,selected_cnames], centers))
     )
   }
   # Add a class for Exploratyry to recognize the type of .model
