@@ -1,6 +1,6 @@
 Package: exploratory
 Type: Package
-Title: What the Package Does (Title Case)
+Title: R package for Exploratory
 Version: 0.1.1
 Date: 2016-05-13
 Authors@R: c(person("Yosuke", "Yasuda", email = "double.y.919.quick@gmail.com", role = c("aut", "cre")))
