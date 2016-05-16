@@ -56,7 +56,8 @@ do_kmeans <- function(df, ..., centers=3, keep.source = FALSE, seed=0){
   exp = paste(paste("is.na(df[[\"",selected_cnames, collapse="\"]] ) | ", sep=""), "\"]])", sep="")
   na_row = eval(parse(text=exp))
   if(all(na_row)){
-    stop("all rows contain NA")
+    # All rows has at least one NA. If we filter them out, no row is left.
+    stop("No data left after filtering rows that have NA")
   }
 
   if(keep.source){
