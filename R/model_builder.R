@@ -62,15 +62,15 @@ do_kmeans <- function(df, ..., centers=3, keep.source = FALSE, seed=0){
 
   if(keep.source){
     output <- (
-      df
-      %>%  dplyr::do(.model= kmeans(.[!na_row,selected_cnames], centers), .source.data=(.[!na_row,]))
+      df[!na_row,]
+      %>%  dplyr::do(.model= kmeans(.[,selected_cnames], centers), .source.data=(.))
     )
     # Add a class for Exploratyry to recognize the type of .source.data
     class(output$.source.data) <- c("list", ".source.data")
   } else {
     output <- (
-      df
-      %>%  dplyr::do(.model= kmeans(.[!na_row,selected_cnames], centers))
+      df[!na_row,]
+      %>%  dplyr::do(.model= kmeans(.[,selected_cnames], centers))
     )
   }
   # Add a class for Exploratyry to recognize the type of .model

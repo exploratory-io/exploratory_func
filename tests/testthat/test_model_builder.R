@@ -5,7 +5,8 @@ test_df <- data.frame(
   vec1=seq(10),
   vec2=10-seq(10),
   rand=runif(10, min = 0, max=10),
-  na=as.vector(replicate(5,c(NA,5))))
+  na=as.vector(replicate(5,c(NA,5))),
+  group=paste("group",c(rep(1,5), rep(2, 5)), sep=""))
 
 test_that("test do_glm and broom tidy", {
   if(requireNamespace("broom")){
@@ -57,5 +58,29 @@ test_that("test do_kmeans ignore NA rows", {
       %>%  do_kmeans(vec1, vec2, na, centers=2, keep.source=TRUE)
       %>%  broom::augment(.model, data=.source.data))
     expect_equal(dim(result)[[1]], 5)
+  }
+})
+
+test_that("test do_kmeans ignore NA rows with grouped", {
+  if(requireNamespace("broom")){
+    loadNamespace("dplyr")
+    result <- (
+      test_df
+      %>%  dplyr::group_by(group)
+      %>%  do_kmeans(vec1, vec2, na, centers=1, keep.source=TRUE)
+      %>%  broom::tidy(.model))
+    expect_equal(dim(result)[[1]], 2)
+  }
+})
+
+test_that("test do_kmeans ignore NA rows with grouped and keep.source=FALSE", {
+  if(requireNamespace("broom")){
+    loadNamespace("dplyr")
+    result <- (
+      test_df
+      %>%  dplyr::group_by(group)
+      %>%  do_kmeans(vec1, vec2, na, centers=1, keep.source=FALSE)
+      %>%  broom::tidy(.model))
+    expect_equal(dim(result)[[1]], 2)
   }
 })
