@@ -10,6 +10,8 @@ License: What license is it under?
 LazyData: TRUE
 Import:
     dplyr,
-    broom
+    broom,
+    tibble,
+    jsonlite
 Suggests:
     testthat
