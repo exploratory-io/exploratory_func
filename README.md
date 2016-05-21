@@ -9,3 +9,9 @@ install.packages("devtools")
 devtools::install_github("exploratory-io/exploratory_func")
 library(exporatory)
 ```
+
+## How to develop your own functions
+
+Take a look at 
+[How to Develop](https://github.com/exploratory-io/exploratory_func/wiki/How-to-Develop) document.
+
