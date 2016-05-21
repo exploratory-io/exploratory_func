@@ -5,7 +5,10 @@
 \usage{
 maxmind_closure(type)
 }
+\arguments{
+\item{type}{Returning data type from maxmind. This can be "continent_name", "country_name", "country_code", "region_name", "city_name", "city_geoname_id", "timezone", "longitude", "latitude" and "connection"}
+}
 \value{
-maxmind function with closure
+Vector output from maxmind
 }
 
