@@ -12,5 +12,7 @@ test_that("ip to country", {
       %>%  dplyr::mutate(country = get_country(ip))
     )
     expect_equal(result[["country"]], c("Japan", "Japan", "Republic of Korea", "Australia"))
+  } else {
+    skip("skip get_country")
   }
 })
