@@ -16,4 +16,4 @@ maxmind_closure <- function(type){
 #' @param ip IP address
 #' @return Country name
 #' @export
-get_country <- maxmind_closure("country_name")
+ip_to_country <- maxmind_closure("country_name")
