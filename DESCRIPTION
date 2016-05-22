@@ -8,10 +8,11 @@ URL: https://github.com/exploratory-io/exploratory_func
 Description: Functions for Exploratory
 License: What license is it under?
 LazyData: TRUE
-Import:
-    dplyr,
+Import: dplyr,
     broom,
     tibble,
-    jsonlite
+    jsonlite,
+    rgeolocate
 Suggests:
     testthat
+RoxygenNote: 5.0.1
