@@ -13,7 +13,9 @@ Import: dplyr,
     tibble,
     jsonlite,
     tidytext,
-    rgeolocate
+    rgeolocate,
+    reshape2,
+    lazyeval
 Suggests:
     testthat
 RoxygenNote: 5.0.1

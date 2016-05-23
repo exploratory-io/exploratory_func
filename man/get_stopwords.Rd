@@ -3,12 +3,10 @@
 \name{get_stopwords}
 \alias{get_stopwords}
 \usage{
-get_stopwords(type = "snowball", stem = NULL)
+get_stopwords(lexicon = "snowball")
 }
 \arguments{
-\item{type}{Type of stopwords. One of "snowball", "onix" and "SMART".}
-
-\item{stem}{Stem function or "porter" if you want to stem the stopwords.}
+\item{lexicon}{Type of stopwords. One of "snowball", "onix" and "SMART".}
 }
 \value{
 vector of stop word.
