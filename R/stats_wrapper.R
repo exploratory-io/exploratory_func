@@ -4,23 +4,24 @@
 #'
 #' Calculate correlation among categories and output the result in tidy format
 #' @param df data frame in tidy format
-#' @param category_col A name of column which contains values of categories
-#' @param dimention_col A name of column which has dimentions of vectors
-#' @param value_col A name of column which has values
+#' @param category_col A column you want to calculate the correlations for.
+#' @param dimension_col A column you want to use as a dimension to calculate the correlations.
+#' @param value_col A column for the values you want to use to calculate the correlations.
 #' @param use Operation type for dealing with missing values. This can be one of "everything", "all.obs", "complete.obs", "na.or.complete", or "pairwise.complete.obs"
 #' @param method Method of calculation. This can be one of "pearson", "kendall", or "spearman".
+#' @param fun.aggregate  Set an aggregate function when there are multiple entries for the key column per each category.
 #' @return correlations between pairs of categories
 #' @export
 calc_cor_cat <- function(df,
                          category_col,
-                         dimention_col,
+                         dimension_col,
                          value_col,
                          use="pairwise.complete.obs",
                          method="pearson",
                          fun.aggregate=mean){
   loadNamespace("reshape2")
   loadNamespace("dplyr")
-  row <- as.character(substitute(dimention_col))
+  row <- as.character(substitute(dimension_col))
   col <- as.character(substitute(category_col))
   val <- as.character(substitute(value_col))
   fml <- as.formula(paste(row, col, sep = "~"))

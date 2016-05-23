@@ -1,20 +1,11 @@
-#' @param type Type of stopwords. One of "snowball", "onix" and "SMART".
-#' @param stem Stem function or "porter" if you want to stem the stopwords.
+#' @param lexicon Type of stopwords. One of "snowball", "onix" and "SMART".
 #' @return vector of stop word.
 #' @export
-get_stopwords <- function(type="snowball", stem=NULL){
+get_stopwords <- function(lexicon="snowball"){
   loadNamespace("tidytext")
   data("stop_words", package = "tidytext", envir = environment())
-  type_check <- stop_words$lexicon %in% type
+  type_check <- stop_words$lexicon %in% lexicon
   words <- stop_words$word[type_check]
-  if(!is.null(stem)){
-    if(stem == "porter"){
-      loadNamespace("quanteda")
-      words <- quanteda::wordstem(words)
-    } else {
-      words <- stem(words)
-    }
-  }
   unique(words)
 }
 
