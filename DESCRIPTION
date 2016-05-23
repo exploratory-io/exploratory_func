@@ -12,6 +12,7 @@ Import:
     dplyr,
     broom,
     tibble,
-    jsonlite
+    jsonlite,
+    tidytext
 Suggests:
     testthat
