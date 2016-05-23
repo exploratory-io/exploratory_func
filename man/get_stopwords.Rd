@@ -2,6 +2,7 @@
 % Please edit documentation in R/string_operation.R
 \name{get_stopwords}
 \alias{get_stopwords}
+\title{Get vector of stopwords}
 \usage{
 get_stopwords(lexicon = "snowball")
 }
@@ -10,5 +11,8 @@ get_stopwords(lexicon = "snowball")
 }
 \value{
 vector of stop word.
+}
+\description{
+Get vector of stopwords
 }
 

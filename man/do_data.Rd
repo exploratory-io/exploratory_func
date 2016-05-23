@@ -2,10 +2,14 @@
 % Please edit documentation in R/model_builder.R
 \name{do_data}
 \alias{do_data}
+\title{Create do wrapper function with source data}
 \usage{
 do_data(funcname)
 }
 \value{
 do wrapper function
+}
+\description{
+Create do wrapper function with source data
 }
 

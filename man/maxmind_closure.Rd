@@ -2,6 +2,7 @@
 % Please edit documentation in R/geolocation.R
 \name{maxmind_closure}
 \alias{maxmind_closure}
+\title{Create maxmind wrapper function}
 \usage{
 maxmind_closure(type)
 }
@@ -10,5 +11,8 @@ maxmind_closure(type)
 }
 \value{
 Vector output from maxmind
+}
+\description{
+Create maxmind wrapper function
 }
 

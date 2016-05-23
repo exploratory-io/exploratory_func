@@ -1,3 +1,4 @@
+#' Get vector of stopwords
 #' @param lexicon Type of stopwords. One of "snowball", "onix" and "SMART".
 #' @return vector of stop word.
 #' @export
@@ -9,6 +10,7 @@ get_stopwords <- function(lexicon="snowball"){
   unique(words)
 }
 
+#' Get sentiments of words
 #' @param words Vector of words to check sentiment.
 #' @param lexicon Type of sentiment. One of "nrc" "bing" "AFINN".
 #' @return Vector of sentiment.

@@ -2,6 +2,7 @@
 % Please edit documentation in R/string_operation.R
 \name{get_sentiment}
 \alias{get_sentiment}
+\title{Get sentiments of words}
 \usage{
 get_sentiment(words, lexicon = "bing")
 }
@@ -12,5 +13,8 @@ get_sentiment(words, lexicon = "bing")
 }
 \value{
 Vector of sentiment.
+}
+\description{
+Get sentiments of words
 }
 

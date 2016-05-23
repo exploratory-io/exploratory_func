@@ -1,6 +1,8 @@
 #'
 #'
-#'@return do wrapper function
+
+#' Create do wrapper function with source data
+#' @return do wrapper function
 do_data <- function(funcname) {
   ret <- function(df, ..., keep.source = FALSE){
     loadNamespace("dplyr")
@@ -18,13 +20,16 @@ do_data <- function(funcname) {
   ret
 }
 
-#'@export
+#' lm wrapper with do
+#' @export
 do_lm <- do_data("lm")
 
-#'@export
+#' glm wrapper with do
+#' @export
 do_glm <- do_data("glm")
 
-#'@export
+#' kmeans wrapper with do
+#' @export
 do_kmeans <- function(df, ..., centers=3, keep.source = FALSE, seed=0){
   loadNamespace("dplyr")
   set.seed(seed)

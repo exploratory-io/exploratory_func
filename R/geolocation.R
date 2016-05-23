@@ -1,7 +1,7 @@
 #'
 #'
 
-#'
+#'Create maxmind wrapper function
 #'@param type Returning data type from maxmind. This can be "continent_name", "country_name", "country_code", "region_name", "city_name", "city_geoname_id", "timezone", "longitude", "latitude" and "connection"
 #'@return Vector output from maxmind
 maxmind_closure <- function(type){
@@ -13,7 +13,8 @@ maxmind_closure <- function(type){
   }
 }
 
-#' @param ip IP address
-#' @return Country name
-#' @export
+#'Convert IP address to country name
+#'@param ip IP address
+#'@return Country name
+#'@export
 ip_to_country <- maxmind_closure("country_name")

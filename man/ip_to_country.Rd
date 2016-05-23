@@ -2,6 +2,7 @@
 % Please edit documentation in R/geolocation.R
 \name{ip_to_country}
 \alias{ip_to_country}
+\title{Convert IP address to country name}
 \usage{
 ip_to_country(ip)
 }
@@ -10,5 +11,8 @@ ip_to_country(ip)
 }
 \value{
 Country name
+}
+\description{
+Convert IP address to country name
 }
 
