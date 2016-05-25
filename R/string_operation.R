@@ -27,6 +27,15 @@ get_sentiment <- function(words, lexicon="bing"){
   } else {
     joined_df$sentiment
   }
-
 }
 
+#' Tokenize text and unnest
+#' @param df Data frame
+#' @param input Input column name
+#' @param output Output column name
+#' @return Data frame with tokenized column
+#' @export
+do_tokenize <- function(df, input, output=.token, ...){
+  loadNamespace("tidytext")
+  tidytext::unnest_tokens_(df, col_name(substitute(output)), col_name(substitute(input)), ...)
+}
