@@ -39,3 +39,17 @@ do_tokenize <- function(df, input, output=.token, ...){
   loadNamespace("tidytext")
   tidytext::unnest_tokens_(df, col_name(substitute(output)), col_name(substitute(input)), ...)
 }
+
+#' Get idf for terms
+calc_idf <- function(document, terms, log_scale = log, smooth_idf = TRUE){
+  loadNamespace("Matrix")
+  loadNamespace("text2vec")
+  if(length(document)!=length(terms)){
+    stop("length of document and terms have to be the same")
+  }
+  doc_fact <- as.factor(document)
+  terms_fact <- as.factor(terms)
+  sparseMat <- Matrix::sparseMatrix(i = as.numeric(doc_fact), j = as.numeric(terms_fact))
+  idf <- text2vec::get_idf(sparseMat, log_scale=log_scale, smooth_idf=smooth_idf)
+  ret <- idf@x[terms_fact]
+}

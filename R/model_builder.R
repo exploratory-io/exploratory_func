@@ -82,3 +82,28 @@ do_kmeans <- function(df, ..., centers=3, keep.source = FALSE, seed=0){
   class(output$.model) <- c("list", ".model", ".model.kmeans")
   output
 }
+
+# Compress dimension
+compress_dimension <- function(tbl, group, dimension, value, type="group", fill=0, fun.aggregate=mean){
+  loadNamespace("reshape2")
+  group_col <- col_name(substitute(group))
+  dimension_col <- col_name(substitute(dimension))
+  value_col <- col_name(substitute(value))
+  fml <- as.formula(paste(group_col, dimension_col, sep="~"))
+  matrix <- reshape2::acast(tbl, fml, value.var=value_col, fill=fill, fun.aggregate=fun.aggregate)
+  model <- prcomp(matrix)
+  if(type=="group"){
+    mat <- model$x
+    colnames(mat) <- NULL
+    result <- reshape2::melt(mat)
+    colnames(result) <- c("group", "component", "value")
+  } else if (type=="dimension") {
+    mat <- model$rotation
+    colnames(mat) <- NULL
+    result <- reshape2::melt(mat)
+    colnames(result) <- c("dimension", "component", "value")
+  }
+  sdev <- rep(model$sdev, each=nrow(result)/length(model$sdev))
+  result$stdev <- sdev
+  result
+}

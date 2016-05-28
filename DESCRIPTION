@@ -18,7 +18,10 @@ Import: dplyr,
     lazyeval,
     pdftools,
     purrr,
-    httr
+    httr,
+    text2vec,
+    quanteda,
+    Matrix
 Suggests:
     testthat
 RoxygenNote: 5.0.1
