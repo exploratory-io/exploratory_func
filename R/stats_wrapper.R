@@ -24,11 +24,10 @@ calc_cor_cat <- function(df,
   row <- as.character(substitute(dimension_col))
   col <- as.character(substitute(category_col))
   val <- as.character(substitute(value_col))
-  fml <- as.formula(paste(row, col, sep = "~"))
   result <- (
     df
     # this spreads the data frame into matrix
-    %>%  reshape2::acast(fml, value.var=val, fun.aggregate=fun.aggregate)
+    %>%  simple_cast(row, col, val, fun.aggregate=fun.aggregate, fill=NA_real_)
     %>%  cor(use = use, method = method)
     # this gathers the matrix into data frame
     %>%  reshape2::melt())

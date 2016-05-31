@@ -4,7 +4,8 @@ spread_test_df <- data.frame(var1 = c(1, 3, 2, NA), var2 = c(1, 3, 2, 10))
 tidy_test_df <- data.frame(
   cat=rep(c("cat1", "cat2"), 20),
   dim = sort(rep(paste0("dim", seq(4)), 5)),
-  val=seq(20))
+  val=seq(20),
+  dim_na=c(paste0("dim", seq(10)), paste0("dim", seq(10)+3)))
 
 test_that("test calc_cor_var", {
   result <- (
@@ -30,4 +31,8 @@ test_that("test calc_cor_cat for duplicated pair", {
   result <- tidy_test_df %>%  calc_cor_cat(cat, dim, val)
   expect_equal(ncol(result), 3)
   expect_equal(result[["cor.value"]], replicate(4, 1))
+})
+
+test_that("test calc_cor_cat for empty value", {
+  result <- tidy_test_df %>%  calc_cor_cat(cat, dim_na, val)
 })

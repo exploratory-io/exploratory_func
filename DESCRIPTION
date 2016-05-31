@@ -17,11 +17,13 @@ Import: dplyr,
     reshape2,
     lazyeval,
     pdftools,
+    qlcMatrix
     purrr,
     httr,
     text2vec,
     quanteda,
-    Matrix
+    Matrix,
+    proxy
 Suggests:
     testthat
 RoxygenNote: 5.0.1
