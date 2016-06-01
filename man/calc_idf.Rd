@@ -4,7 +4,7 @@
 \alias{calc_idf}
 \title{Get idf for terms}
 \usage{
-calc_idf(document, terms, log_scale = log, smooth_idf = TRUE)
+calc_idf(document, term, log_scale = log, smooth_idf = FALSE)
 }
 \description{
 Get idf for terms

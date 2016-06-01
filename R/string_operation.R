@@ -41,15 +41,47 @@ do_tokenize <- function(df, input, output=.token, ...){
 }
 
 #' Get idf for terms
-calc_idf <- function(document, terms, log_scale = log, smooth_idf = TRUE){
+calc_idf <- function(document, term, log_scale = log, smooth_idf = FALSE){
   loadNamespace("Matrix")
   loadNamespace("text2vec")
-  if(length(document)!=length(terms)){
+  if(length(document)!=length(term)){
     stop("length of document and terms have to be the same")
   }
   doc_fact <- as.factor(document)
-  terms_fact <- as.factor(terms)
-  sparseMat <- Matrix::sparseMatrix(i = as.numeric(doc_fact), j = as.numeric(terms_fact))
+  term_fact <- as.factor(term)
+  sparseMat <- Matrix::sparseMatrix(i = as.numeric(doc_fact), j = as.numeric(term_fact))
   idf <- text2vec::get_idf(sparseMat, log_scale=log_scale, smooth_idf=smooth_idf)
-  ret <- idf@x[terms_fact]
+  idf <- idf@x[term_fact]
+  df <- Matrix::colSums(sparseMat)[term_fact]
+  data.frame(.df=df, .idf=idf)
+}
+
+#' Caluculate tf for non-standard evaluation
+calc_tf <- function(tbl, document, term){
+  document_col <- col_name(substitute(document))
+  term_col <- col_name(substitute(term))
+  calc_tf_(tbl, document_col, term_col)
+}
+
+#' Caluculate tf for standard evaluation
+calc_tf_ <- function(tbl, document_col, term_col){
+  loadNamespace("dplyr")
+  tbl[,colnames(tbl) == document_col | colnames(tbl)==term_col] %>%
+    dplyr::group_by_(document_col, term_col) %>%
+    dplyr::summarise(.tf = n()) %>%
+    dplyr::ungroup()
+}
+
+#' Caluculate tfidf
+calc_tfidf <- function(tbl, document, term, log_scale = log, smooth_idf = FALSE){
+  loadNamespace("tidytext")
+  loadNamespace("dplyr")
+  document_col <- col_name(substitute(document))
+  term_col <- col_name(substitute(term))
+  count_tbl <- calc_tf_(tbl, document_col, term_col)
+  mat <- tidytext::cast_sparse_(count_tbl, document_col, term_col, ".tf")
+  tfidf <- calc_idf(count_tbl[[document_col]], count_tbl[[term_col]], log_scale = log_scale, smooth_idf = smooth_idf)
+  count_tbl$.df <- tfidf$.df
+  count_tbl$.tfidf <- tfidf$.idf * count_tbl$.tf
+  count_tbl
 }
