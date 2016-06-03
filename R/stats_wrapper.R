@@ -98,3 +98,35 @@ calc_cor_var <- function(df, ..., use="pairwise.complete.obs", method="pearson")
   result <- do.call(rbind, df_list)
   tibble::repair_names(result, sep="_")
 }
+
+# Compress dimension
+compress_dimension <- function(tbl, group, dimension, value, type="group", fill=0, fun.aggregate=mean, dim=NULL){
+  loadNamespace("reshape2")
+  group_col <- col_name(substitute(group))
+  dimension_col <- col_name(substitute(dimension))
+  value_col <- col_name(substitute(value))
+  fml <- as.formula(paste(group_col, dimension_col, sep="~"))
+  matrix <- reshape2::acast(tbl, fml, value.var=value_col, fill=fill, fun.aggregate=fun.aggregate)
+  dim <- min(dim, ncol(matrix))
+  if(type=="group"){
+    result <- svd(sweep(matrix, 2, colMeans(matrix), "-"), nu=dim, nv=0)
+    stdev <- result$d[seq(dim)]
+    stdev[is.na(stdev)] <- 0
+    mat <- result$u %*% diag(result$d[seq(dim)])
+    rownames(mat) <- rownames(matrix)
+    result <- reshape2::melt(mat)
+    colnames(result) <- c("group", "component", "value")
+  } else if (type=="dimension") {
+    result <- svd(sweep(matrix, 2, colMeans(matrix), "-"), nv=dim, nu=0)
+    mat <- result$v
+    stdev <- result$d[seq(dim)]
+    stdev[is.na(stdev)] <- 0
+    rownames(mat) <- colnames(matrix)
+    result <- reshape2::melt(mat)
+    colnames(result) <- c("dimension", "component", "value")
+  }
+  rep_sdev <- rep(stdev, each=nrow(result)/length(stdev))
+  result$stdev <- rep_sdev
+  result
+}
+
