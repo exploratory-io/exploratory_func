@@ -2,11 +2,30 @@
 % Please edit documentation in R/string_operation.R
 \name{calc_tf}
 \alias{calc_tf}
-\title{Caluculate tf for non-standard evaluation}
+\title{Calculate term frequency}
 \usage{
-calc_tf(tbl, document, term)
+calc_tf(tbl, document, term, ...)
+}
+\arguments{
+\item{tbl}{Data frame}
+
+\item{document}{Column to be considered as a document id}
+
+\item{term}{Column to be considered as term}
+
+\item{weight}{Type of weight calculation.
+"ratio" is default and it's count/(total number of terms in the document).
+This can be "raw_frequency", "binary", "log_normalization" and "k_normalization"
+"raw_frequency" is count of the term in the document.
+"binary" is logic if the term is in the document or not.
+"log_normalization" is logic if the term is in the document or not.}
+
+\item{term}{Column to be considered as term}
+}
+\value{
+Data frame with document, term and .tf column
 }
 \description{
-Caluculate tf for non-standard evaluation
+Calculate term frequency
 }
 

@@ -4,7 +4,7 @@
 \alias{calc_tf_}
 \title{Caluculate tf for standard evaluation}
 \usage{
-calc_tf_(tbl, document_col, term_col)
+calc_tf_(tbl, document_col, term_col, weight = "ratio", k = 0.5)
 }
 \description{
 Caluculate tf for standard evaluation

@@ -42,6 +42,9 @@ test_that("calc_tf weight binary", {
   test_df <- data.frame(id=rep(c(1,2), 5), word=c("this", "this", letters[1:8]))
   result <- calc_tf(test_df, id,word, weight="binary")
   expect_true(is.logical(result$.tf))
+  expect_equal(colnames(result)[[1]], "id")
+  expect_equal(colnames(result)[[2]], "word")
+  expect_equal(colnames(result)[[3]], ".tf")
 })
 
 test_that("calc_tfidf smooth_idf FALSE", {

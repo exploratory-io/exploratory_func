@@ -1,5 +1,5 @@
 #' Calc similarity similarity
-pairwise_sim <- function(tbl, group, dimention, value, upper=FALSE, diag=FALSE, method="correlation"){
+calc_sim <- function(tbl, group, dimention, value, upper=FALSE, diag=FALSE, method="correlation"){
   group_col <- col_name(substitute(group))
   dimention_col <- col_name(substitute(dimention))
   value_col <- col_name(substitute(value))
@@ -29,7 +29,7 @@ pairwise_sim <- function(tbl, group, dimention, value, upper=FALSE, diag=FALSE, 
 }
 
 #' Calc cosine similarity
-pairwise_dist <- function(tbl, group, dimention, value, upper=FALSE, diag=FALSE, method="Euclidean"){
+calc_dist <- function(tbl, group, dimention, value, upper=FALSE, diag=FALSE, method="Euclidean"){
   loadNamespace("proxy")
   group_col <- col_name(substitute(group))
   dimention_col <- col_name(substitute(dimention))

@@ -12,7 +12,7 @@
 #' @param fun.aggregate  Set an aggregate function when there are multiple entries for the key column per each category.
 #' @return correlations between pairs of categories
 #' @export
-calc_cor_cat <- function(df,
+calc_cor <- function(df,
                          category_col,
                          dimension_col,
                          value_col,
@@ -32,10 +32,10 @@ calc_cor_cat <- function(df,
     # this gathers the matrix into data frame
     %>%  reshape2::melt())
   colnames(result) <- c("pair.name.1", "pair.name.2", "cor.value")
-  if(is.factor(result$.name.1)){
+  if(is.factor(result[,1])){
     # if names are facters, it should be converted to character
-    result$.name.1 <- as.character(result$pair.name.1)
-    result$.name.2 <- as.character(result$pair.name.2)
+    result[,1] <- as.character(result[,1])
+    result[,2] <- as.character(result[,2])
   }
   dplyr::arrange(result,pair.name.1)
 }
@@ -129,4 +129,3 @@ compress_dimension <- function(tbl, group, dimension, value, type="group", fill=
   result$stdev <- rep_sdev
   result
 }
-

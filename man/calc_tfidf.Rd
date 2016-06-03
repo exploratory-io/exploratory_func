@@ -4,7 +4,8 @@
 \alias{calc_tfidf}
 \title{Caluculate tfidf}
 \usage{
-calc_tfidf(tbl, document, term, log_scale = log, smooth_idf = FALSE)
+calc_tfidf(tbl, document, term, idf_log_scale = log, smooth_idf = FALSE,
+  tf_weight = "ratio", tf_k = 0.5)
 }
 \description{
 Caluculate tfidf

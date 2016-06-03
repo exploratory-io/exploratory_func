@@ -97,8 +97,8 @@ calc_tf_ <- function(tbl, document_col, term_col, weight="ratio", k=0.5){
       stop(paste0(weight, " is not recognized as weight argument"))
     }
 
-    output <- data.frame(.tf = val)
-    output[[term_col]] <- df[[term_col]]
+    output <- data.frame(term=df[[term_col]], .tf = val)
+    colnames(output) <- c(term_col, ".tf")
     output
   }
   count <- (

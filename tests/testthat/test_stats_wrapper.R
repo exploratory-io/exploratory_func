@@ -27,14 +27,16 @@ test_that("test calc_cor_var for grouped df", {
   expect_equal(dim(result), c(8, 4))
 })
 
-test_that("test calc_cor_cat for duplicated pair", {
-  result <- tidy_test_df %>%  calc_cor_cat(cat, dim, val)
+test_that("test calc_cor for duplicated pair", {
+  result <- tidy_test_df %>%  calc_cor(cat, dim, val)
   expect_equal(ncol(result), 3)
+  expect_equal(result[["pair.name.1"]], c("cat1", "cat1", "cat2", "cat2"))
+  expect_equal(result[["pair.name.2"]], c("cat1", "cat2", "cat1", "cat2"))
   expect_equal(result[["cor.value"]], replicate(4, 1))
 })
 
 test_that("test calc_cor_cat for empty value", {
-  result <- tidy_test_df %>%  calc_cor_cat(cat, dim_na, val)
+  result <- tidy_test_df %>%  calc_cor(cat, dim_na, val)
 })
 
 test_that("test compress_dimension", {
