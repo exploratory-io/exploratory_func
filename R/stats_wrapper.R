@@ -2,28 +2,28 @@
 #'
 
 #'
-#' Calculate correlation among categories and output the result in tidy format
+#' Calculate correlation among groups and output the correlation of each pair
 #' @param df data frame in tidy format
-#' @param category_col A column you want to calculate the correlations for.
-#' @param dimension_col A column you want to use as a dimension to calculate the correlations.
-#' @param value_col A column for the values you want to use to calculate the correlations.
+#' @param group A column you want to calculate the correlations for.
+#' @param dimension A column you want to use as a dimension to calculate the correlations.
+#' @param value A column for the values you want to use to calculate the correlations.
 #' @param use Operation type for dealing with missing values. This can be one of "everything", "all.obs", "complete.obs", "na.or.complete", or "pairwise.complete.obs"
 #' @param method Method of calculation. This can be one of "pearson", "kendall", or "spearman".
 #' @param fun.aggregate  Set an aggregate function when there are multiple entries for the key column per each category.
-#' @return correlations between pairs of categories
+#' @return correlations between pairs of groups
 #' @export
 calc_cor <- function(df,
-                         category_col,
-                         dimension_col,
-                         value_col,
+                         group,
+                         dimension,
+                         value,
                          use="pairwise.complete.obs",
                          method="pearson",
                          fun.aggregate=mean){
   loadNamespace("reshape2")
   loadNamespace("dplyr")
-  row <- as.character(substitute(dimension_col))
-  col <- as.character(substitute(category_col))
-  val <- as.character(substitute(value_col))
+  row <- col_name(substitute(dimension))
+  col <- col_name(substitute(group))
+  val <- col_name(substitute(value))
   result <- (
     df
     # this spreads the data frame into matrix
@@ -41,7 +41,7 @@ calc_cor <- function(df,
 }
 
 #'
-#' Calculate correlation among columns and output the result in tidy format
+#' Calculate correlation among columns and output the correlation of each pair
 #' @param df data frame in tidy format
 #' @param ... Arguments to select columns to calculate correlation.
 #' @param use Operation type for dealing with missing values. This can be one of "everything", "all.obs", "complete.obs", "na.or.complete", or "pairwise.complete.obs"
@@ -99,18 +99,24 @@ calc_cor_var <- function(df, ..., use="pairwise.complete.obs", method="pearson")
   tibble::repair_names(result, sep="_")
 }
 
-# Compress dimension
-compress_dimension <- function(tbl, group, dimension, value, type="group", fill=0, fun.aggregate=mean, dim=NULL){
+#' Compress dimension using svd algorithm
+#' @param df
+#' @param group Column to be regarded as groups
+#' @param dimension Column to be regarded as original dimensions
+#' @param value Column to be regarded as values
+#' @param value Column to be regarded as values
+#' Compress dimension
+reduce_dimension <- function(df, group, dimension, value, type="group", fill=0, fun.aggregate=mean, dim=NULL){
   loadNamespace("reshape2")
   group_col <- col_name(substitute(group))
   dimension_col <- col_name(substitute(dimension))
   value_col <- col_name(substitute(value))
   fml <- as.formula(paste(group_col, dimension_col, sep="~"))
-  matrix <- reshape2::acast(tbl, fml, value.var=value_col, fill=fill, fun.aggregate=fun.aggregate)
+  matrix <- reshape2::acast(df, fml, value.var=value_col, fill=fill, fun.aggregate=fun.aggregate)
   dim <- min(dim, ncol(matrix))
   if(type=="group"){
     result <- svd(sweep(matrix, 2, colMeans(matrix), "-"), nu=dim, nv=0)
-    stdev <- result$d[seq(dim)]
+    stdev <- result$d[seq(min(dim, length(result$d)))]
     stdev[is.na(stdev)] <- 0
     mat <- result$u %*% diag(result$d[seq(dim)])
     rownames(mat) <- rownames(matrix)
@@ -119,7 +125,7 @@ compress_dimension <- function(tbl, group, dimension, value, type="group", fill=
   } else if (type=="dimension") {
     result <- svd(sweep(matrix, 2, colMeans(matrix), "-"), nv=dim, nu=0)
     mat <- result$v
-    stdev <- result$d[seq(dim)]
+    stdev <- result$d[seq(max(dim, length(result$d)))]
     stdev[is.na(stdev)] <- 0
     rownames(mat) <- colnames(matrix)
     result <- reshape2::melt(mat)
@@ -129,3 +135,8 @@ compress_dimension <- function(tbl, group, dimension, value, type="group", fill=
   result$stdev <- rep_sdev
   result
 }
+
+# is_digit only numbers
+# is_alphabet only numbers
+# is_stopword
+#

@@ -2,19 +2,19 @@
 % Please edit documentation in R/stats_wrapper.R
 \name{calc_cor}
 \alias{calc_cor}
-\title{Calculate correlation among categories and output the result in tidy format}
+\title{Calculate correlation among groups and output the correlation of each pair}
 \usage{
-calc_cor(df, category_col, dimension_col, value_col,
-  use = "pairwise.complete.obs", method = "pearson", fun.aggregate = mean)
+calc_cor(df, group, dimension, value, use = "pairwise.complete.obs",
+  method = "pearson", fun.aggregate = mean)
 }
 \arguments{
 \item{df}{data frame in tidy format}
 
-\item{category_col}{A column you want to calculate the correlations for.}
+\item{group}{A column you want to calculate the correlations for.}
 
-\item{dimension_col}{A column you want to use as a dimension to calculate the correlations.}
+\item{dimension}{A column you want to use as a dimension to calculate the correlations.}
 
-\item{value_col}{A column for the values you want to use to calculate the correlations.}
+\item{value}{A column for the values you want to use to calculate the correlations.}
 
 \item{use}{Operation type for dealing with missing values. This can be one of "everything", "all.obs", "complete.obs", "na.or.complete", or "pairwise.complete.obs"}
 
@@ -23,9 +23,9 @@ calc_cor(df, category_col, dimension_col, value_col,
 \item{fun.aggregate}{Set an aggregate function when there are multiple entries for the key column per each category.}
 }
 \value{
-correlations between pairs of categories
+correlations between pairs of groups
 }
 \description{
-Calculate correlation among categories and output the result in tidy format
+Calculate correlation among groups and output the correlation of each pair
 }
 

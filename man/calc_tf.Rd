@@ -2,12 +2,15 @@
 % Please edit documentation in R/string_operation.R
 \name{calc_tf}
 \alias{calc_tf}
+\alias{calc_tf_}
 \title{Calculate term frequency}
 \usage{
-calc_tf(tbl, document, term, ...)
+calc_tf(df, document, term, ...)
+
+calc_tf_(df, document_col, term_col, weight = "ratio", k = 0.5)
 }
 \arguments{
-\item{tbl}{Data frame}
+\item{df}{Data frame}
 
 \item{document}{Column to be considered as a document id}
 

@@ -4,7 +4,7 @@
 \alias{calc_dist}
 \title{Calc cosine similarity}
 \usage{
-calc_dist(tbl, group, dimention, value, upper = FALSE, diag = FALSE,
+calc_dist(df, group, dimention, value, upper = FALSE, diag = FALSE,
   method = "Euclidean")
 }
 \description{

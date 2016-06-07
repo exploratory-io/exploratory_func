@@ -4,7 +4,7 @@
 \alias{calc_sim}
 \title{Calc similarity similarity}
 \usage{
-calc_sim(tbl, group, dimention, value, upper = FALSE, diag = FALSE,
+calc_sim(df, group, dimention, value, upper = FALSE, diag = FALSE,
   method = "correlation")
 }
 \description{

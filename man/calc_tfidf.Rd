@@ -4,8 +4,18 @@
 \alias{calc_tfidf}
 \title{Caluculate tfidf}
 \usage{
-calc_tfidf(tbl, document, term, idf_log_scale = log, smooth_idf = FALSE,
-  tf_weight = "ratio", tf_k = 0.5)
+calc_tfidf(df, document, term, idf_log_scale = log, tf_weight = "ratio",
+  tf_k = 0.5)
+}
+\arguments{
+\item{df}{Data frame which has columns of documents and their terms}
+
+\item{document}{Column of document names}
+
+\item{term}{Column of terms}
+
+\item{idf_log_scale}{Function to scale IDF. It might be worth trying log2 or log10.
+log10 has stronger suppression of increase of idf values and log2 has weaker.}
 }
 \description{
 Caluculate tfidf

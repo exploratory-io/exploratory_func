@@ -51,7 +51,7 @@ test_that("test compress_dimension", {
     loadNamespace("dplyr")
     result <- (
       test_df
-      %>%  compress_dimension(group, col, rand, dim=3))
+      %>%  reduce_dimension(group, col, rand, dim=3))
     expect_true(any(result[,1]=="group1"))
     expect_true(any(result[,2]==1))
   }
@@ -70,7 +70,7 @@ test_that("test compress_dimension of dimension", {
       col=rep(seq(5),4))
     result <- (
       test_df
-      %>%  compress_dimension(group, col, rand, type="dimension"))
+      %>%  reduce_dimension(group, col, rand, type="dimension"))
     expect_true(any(result[,1]==1))
     expect_true(any(result[,2]==1))
   }

@@ -50,8 +50,8 @@ test_that("calc_tf weight binary", {
 test_that("calc_tfidf smooth_idf FALSE", {
   loadNamespace("dplyr")
   test_df <- data.frame(id=rep(c(1,2), 5), word=c("this", "this", letters[1:8]))
-  result <- result <- calc_idf(test_df$id, test_df$word, smooth_idf = TRUE)
-  expect_equal(head(result$.idf,2), c(log(2/3), log(2/3)))
+  result <- result <- calc_idf(test_df$id, test_df$word)
+  expect_equal(head(result$.idf,2), c(0, 0))
 })
 
 test_that("calc_tfidf", {
@@ -62,4 +62,10 @@ test_that("calc_tfidf", {
       calc_tfidf(id, word)
   )
   expect_equal(head(result$.tfidf,2), c(log(2/1)/5, log(2/1)/5))
+})
+
+test_that("generate_ngrams", {
+  loadNamespace("dplyr")
+  df <- readRDS("~/Downloads/100_text_sample_filter_3.rds")
+  df %>%  generate_ngrams(name, .token)
 })
