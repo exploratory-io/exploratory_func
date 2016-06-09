@@ -1,3 +1,25 @@
+#' Check if the token is in stopwords.
+#' @param token Character to be checked if it's stopword.
+#' @param lexicon Type of stopwords. One of "snowball", "onix" and "SMART".
+#' @return Logical vector if the token is in stopwords or not.
+is_stopword <- function(token, lexicon="snowball"){
+  token %in% get_stopwords(lexicon)
+}
+
+#' Check if the word is digits.
+#' @param word Character to be checked if it's digits.
+#' @return Logical vector if the word is digits or not.
+is_digit <- function(word){
+  grepl("^[[:digit:]]+$", word)
+}
+
+#' Check if the word is digits.
+#' @param word Character to be checked if it's digits.
+#' @return Logical vector if the word is digits or not.
+is_alphabet <- function(word, lexicon="snowball"){
+  grepl("^[[:alpha:]]+$",word)
+}
+
 #' Get vector of stopwords
 #' @param lexicon Type of stopwords. One of "snowball", "onix" and "SMART".
 #' @return vector of stop word.
@@ -31,13 +53,35 @@ get_sentiment <- function(words, lexicon="bing"){
 
 #' Tokenize text and unnest
 #' @param df Data frame
-#' @param input Input column name
-#' @param output Output column name
+#' @param input Set a column of which you want to split the text or tokenize.
+#' @param output Set a column name for the new column to store the tokenized values.
+#' @param token Select the unit of token from "characters", "words", "sentences", "lines", "paragraphs", and "regex".
+#' @param sentence_id If there should be ids of sentences in output. This works when token is "words".
+#' @param drop Whether input column should be removed.
+#' @param to_lower Whether output should be lower cased.
 #' @return Data frame with tokenized column
 #' @export
-do_tokenize <- function(df, input, output=.token, ...){
-  loadNamespace("tidytext")
-  tidytext::unnest_tokens_(df, col_name(substitute(output)), col_name(substitute(input)), ...)
+do_tokenize <- function(df, input, output=.token, token="words", sentence_id = FALSE, ...){
+  loadNamespace("dplyr")
+  loadNamespace("tidyr")
+  loadNamespace("lazyeval")
+  loadNamespace("tokenizers")
+
+  input_col <- col_name(substitute(input))
+  output_col <- col_name(substitute(output))
+  # prevent encode error
+  df[[input_col]] <- stringr::str_conv(df[[input_col]], "utf-8")
+  if(token=="words" && sentence_id){
+
+    # split into sentences
+    df[[output_col]] <- tokenizers::tokenize_sentences(df[[input_col]])
+    df <- tidyr::unnest_(df, output_col)
+    # put numbers
+    df <- dplyr::mutate(df, .sentence_id=row_number())
+    tidytext::unnest_tokens_(df, col_name(substitute(output)), col_name(substitute(input)),token=token, ...)
+  } else {
+    tidytext::unnest_tokens_(df, col_name(substitute(output)), col_name(substitute(input)),token=token, ...)
+  }
 }
 
 #' Get idf for terms
@@ -132,20 +176,24 @@ calc_tfidf <- function(df, document, term, idf_log_scale = log, tf_weight="ratio
   count_tbl
 }
 
-generate_ngrams <- function(df, group, token, n=1:2, skip=0){
+wordstem <- function(...){
+  loadNamespace("quanteda")
+  quanteda::wordstem(...)
+}
+
+#' Generate ngrams
+generate_ngrams <- function(df, token, sentence, n=1:2, skip=0){
   loadNamespace("dplyr")
   loadNamespace("tidyr")
   loadNamespace("quanteda")
-  group_col <- col_name(substitute(group))
   token_col <- col_name(substitute(token))
-  grouped <- (
-    df
-    %>%  dplyr::group_by_(group_col))
+  sentence_col <- col_name(substitute(sentence))
+  df <- dplyr::group_by_(df, .dots=sentence_col, add =TRUE)
 
-  indices <- attr(grouped, "indices")
-  labels <- attr(grouped, "labels")
+  indices <- attr(df, "indices")
+  labels <- attr(df, "labels")
   labels[[token_col]] <- lapply(indices, function(index){
     quanteda::skipgrams(as.character(df[[token_col]][index+1]), n=n, skip=skip)
   })
-  unnested <- tidyr::unnest_(labels, token_col)
+  tidyr::unnest_(labels, token_col)
 }

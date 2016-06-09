@@ -7,6 +7,9 @@
 calc_sim(df, group, dimention, value, upper = FALSE, diag = FALSE,
   method = "correlation")
 }
+\arguments{
+\item{method}{"Euclidean", "Jaccard", "eJaccard", "fJaccard"}
+}
 \description{
 Calc similarity similarity
 }

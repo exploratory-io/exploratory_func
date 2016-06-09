@@ -62,3 +62,13 @@ upper_gather <- function(mat, names=NULL, diag=NULL){
       value=val)
   }
 }
+
+#' group by other columns
+group_exclude <- function(df, ...){
+  loadNamespace("dplyr")
+  cols <- as.character(substitute(list(...)))[-1]
+  excluded <- setdiff(colnames(df), cols)
+  # exclude list column
+  target <- excluded[!sapply(df[,excluded], is.list)]
+  dplyr::group_by_(df, .dots=target)
+}

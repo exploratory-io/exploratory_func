@@ -116,27 +116,25 @@ reduce_dimension <- function(df, group, dimension, value, type="group", fill=0, 
   dim <- min(dim, ncol(matrix))
   if(type=="group"){
     result <- svd(sweep(matrix, 2, colMeans(matrix), "-"), nu=dim, nv=0)
-    stdev <- result$d[seq(min(dim, length(result$d)))]
-    stdev[is.na(stdev)] <- 0
-    mat <- result$u %*% diag(result$d[seq(dim)])
+    mat <- result$u
     rownames(mat) <- rownames(matrix)
     result <- reshape2::melt(mat)
     colnames(result) <- c("group", "component", "value")
+    result
   } else if (type=="dimension") {
     result <- svd(sweep(matrix, 2, colMeans(matrix), "-"), nv=dim, nu=0)
     mat <- result$v
-    stdev <- result$d[seq(max(dim, length(result$d)))]
-    stdev[is.na(stdev)] <- 0
     rownames(mat) <- colnames(matrix)
     result <- reshape2::melt(mat)
     colnames(result) <- c("dimension", "component", "value")
+    result
+  } else if (type=="variance"){
+    variance <- svd(sweep(matrix, 2, colMeans(matrix), "-"))$d
+    result <- data.frame(component <- seq(length(variance)), variance <- variance)
   }
-  rep_sdev <- rep(stdev, each=nrow(result)/length(stdev))
-  result$stdev <- rep_sdev
-  result
 }
 
 # is_digit only numbers
 # is_alphabet only numbers
 # is_stopword
-#
+# tf natural number

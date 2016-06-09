@@ -2,6 +2,12 @@ context("test string operation functions")
 
 test_df <- data.frame(char = c("Hello world!", "This is a data frame for test. This is second sentence."), stringsAsFactors = FALSE)
 
+test_that("is_stopword", {
+  test_vec <- c("the", "yourself", "Test", "test")
+  result <- is_stopword(test_vec)
+  expect_equal(result, c(T, T, F, F))
+})
+
 test_that("test get_stop_words", {
   result <- get_stopwords()
   expect_true(any(result == "a"))
@@ -19,8 +25,23 @@ test_that("test get_sentiment", {
 
 test_that("do_tokenize should work", {
   result <- test_df %>%
-    do_tokenize(char)
+    do_tokenize(char, drop=F)
   expect_equal(result$.token[[1]], "hello")
+  expect_equal(ncol(result), 2)
+})
+
+test_that("do_tokenize with token=words", {
+  result <- test_df %>%
+    do_tokenize(char, token="words")
+  expect_equal(result$.token[[1]], "hello")
+  expect_equal(ncol(result), 1)
+})
+
+test_that("do_tokenize with token=sentence", {
+  result <- test_df %>%
+    do_tokenize(char, token="sentences")
+  expect_equal(result$.token[[1]], "hello world!")
+  expect_equal(ncol(result), 1)
 })
 
 test_that("do_tokenize should work with output", {
@@ -66,6 +87,14 @@ test_that("calc_tfidf", {
 
 test_that("generate_ngrams", {
   loadNamespace("dplyr")
-  df <- readRDS("~/Downloads/100_text_sample_filter_3.rds")
-  df %>%  generate_ngrams(name, .token)
+  df <- data.frame(
+    doc=paste("doc", rep(c(1,2), each=10)) ,
+    sentence=rep(seq(5), each=4),
+    token=paste("token",rep(c(1,2),10), sep=""),
+    stringsAsFactors = F)
+
+  ungrouped <- df %>%  generate_ngrams(token, sentence)
+  grouped <- df %>%  dplyr::group_by(doc, sentence) %>%  generate_ngrams(token, sentence)
+  expect_equal(ncol(ungrouped), 2)
+  expect_equal(ncol(grouped), 3)
 })

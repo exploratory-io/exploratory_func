@@ -29,9 +29,11 @@ do_lm <- do_data("lm")
 do_glm <- do_data("glm")
 
 #' t.test wrapper with do
+#' @export
 do_t.test <- do_data("t.test")
 
 #' var.test wrapper with do
+#' @export
 do_var.test <- do_data("var.test")
 
 #' kmeans wrapper with do

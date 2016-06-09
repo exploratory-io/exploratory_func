@@ -4,14 +4,23 @@
 \alias{do_tokenize}
 \title{Tokenize text and unnest}
 \usage{
-do_tokenize(df, input, output = .token, ...)
+do_tokenize(df, input, output = .token, token = "words",
+  sentence_id = FALSE, ...)
 }
 \arguments{
 \item{df}{Data frame}
 
-\item{input}{Input column name}
+\item{input}{Set a column of which you want to split the text or tokenize.}
 
-\item{output}{Output column name}
+\item{output}{Set a column name for the new column to store the tokenized values.}
+
+\item{token}{Select the unit of token from "characters", "words", "sentences", "lines", "paragraphs", and "regex".}
+
+\item{sentence_id}{If there should be ids of sentences in output. This works when token is "words".}
+
+\item{drop}{Whether input column should be removed.}
+
+\item{to_lower}{Whether output should be lower cased.}
 }
 \value{
 Data frame with tokenized column

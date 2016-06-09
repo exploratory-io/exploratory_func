@@ -1,4 +1,5 @@
 #' Calc similarity similarity
+#' @param method "Euclidean", "Jaccard", "eJaccard", "fJaccard"
 calc_sim <- function(df, group, dimention, value, upper=FALSE, diag=FALSE, method="correlation"){
   group_col <- col_name(substitute(group))
   dimention_col <- col_name(substitute(dimention))
