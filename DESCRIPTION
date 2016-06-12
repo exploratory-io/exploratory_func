@@ -18,7 +18,9 @@ Import: dplyr,
     lazyeval,
     pdftools,
     purrr,
-    httr
+    httr,
+    stringr,
+    evaluate
 Suggests:
     testthat
 RoxygenNote: 5.0.1

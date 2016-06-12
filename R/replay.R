@@ -1,7 +1,6 @@
-#' replay function that outputs all messages to stdout 
-#'  
-#' Original version is from evaluate package
-#' https://github.com/hadley/evaluate
+#' replay function that outputs all messages to stdout.
+#' Original version is from evaluate package.
+#' https://github.com/hadley/evaluate/blob/master/R/replay.r
 #' 
 #' 
 #' Replay a list of evaluated results.
