@@ -1,3 +1,9 @@
+#' replay function that outputs all messages to stdout 
+#'  
+#' Original version is from evaluate package
+#' https://github.com/hadley/evaluate
+#' 
+#' 
 #' Replay a list of evaluated results.
 #'
 #' Replay a list of evaluated results, as if you'd run them in an R
