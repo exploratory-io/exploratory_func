@@ -36,21 +36,21 @@ replay.source <- function(x) {
 
 #' @export
 replay.warning <- function(x) {
-  message("Warning message:\n", x$message)
+  cat("Warning message:\n", x$message, "\n")
 }
 
 #' @export
 replay.message <- function(x) {
-  message(str_replace(x$message, "\n$", ""))
+  cat(x$message)
 }
 
 #' @export
 replay.error <- function(x) {
   if (is.null(x$call)) {
-    message("Error: ", x$message)
+    cat("Error: ", x$message, "\n")
   } else {
     call <- deparse(x$call)
-    message("Error in ", call, ": ", x$message)
+    cat("Error in ", call, ": ", x$message, "\n")
   }
 }
 
