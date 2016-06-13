@@ -13,6 +13,11 @@ test_that("test upper_gather with vector", {
   names <- paste("entity", seq(4))
   result <- upper_gather(mat,names)
   expect_equal(result$Var1, sort(result$Var1))
+  expect_equal(result[result[,1]=="entity 1" & result[,2]=="entity 3",3], 2)
+  expect_equal(result[result[,1]=="entity 1" & result[,2]=="entity 4",3], 3)
+  expect_equal(result[result[,1]=="entity 2" & result[,2]=="entity 3",3], 4)
+  expect_equal(result[result[,1]=="entity 2" & result[,2]=="entity 4",3], 5)
+  expect_equal(result[result[,1]=="entity 3" & result[,2]=="entity 4",3], 6)
   expect_equal(nrow(result), 6)
 })
 

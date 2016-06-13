@@ -19,13 +19,14 @@ simple_cast <- function(data, row, col, val, fun.aggregate=mean, fill=0){
 }
 
 #' Gather only upper half
-upper_gather <- function(mat, names=NULL, diag=NULL, cnames = NULL){
+upper_gather <- function(mat, names=NULL, diag=NULL, cnames = c("Var1", "Var2", "value")){
   if(is.vector(mat)){
     # This is basically for dist function
     # It provides numeric vector of upper half
+
+    # Calculate the side of matrix
     dim_size <- sqrt(2*length(mat)+1/4)+1/2
     if(is.null(names)){
-      # detect dimension
       names <- seq(dim_size)
     } else {
       if(length(names) != dim_size){
@@ -35,17 +36,15 @@ upper_gather <- function(mat, names=NULL, diag=NULL, cnames = NULL){
     loadNamespace("Matrix")
     # create a triangler matrix to melt
     trimat <- matrix(nrow=length(names), ncol=length(names))
-    trimat[row(trimat)<col(trimat)] <- as.numeric(mat)
+    # fill only upper half of the matrix
+    trimat[row(trimat)>col(trimat)] <- as.numeric(mat)
     colnames(trimat) <- names
     rownames(trimat) <- names
     if(!is.null(diag)){
+      # fill diagonal elements
       trimat[row(trimat)==col(trimat)] = rep(diag, length(names))
     }
-    # transpose to show younger numbers in the first column
-    if(is.null(cnames)){
-      cnames <- c("Var1", "Var2", "value")
-    }
-    mat_to_df(t(trimat), na.rm=TRUE, cnames=cnames)
+    mat_to_df(trimat, na.rm=TRUE, cnames=cnames)
   }else{
     # diag can be NULL or FALSE
     if(is.null(diag)){
@@ -66,9 +65,7 @@ upper_gather <- function(mat, names=NULL, diag=NULL, cnames = NULL){
       Var1=r_names[ind[,1]],
       Var2=c_names[ind[,2]],
       value=val)
-    if(!is.null(cnames)){
-      colnames(df) <- cnames
-    }
+    colnames(df) <- cnames
     df
   }
 }
