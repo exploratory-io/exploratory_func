@@ -6,6 +6,16 @@
 \usage{
 do_kmeans(df, ..., centers = 3, keep.source = FALSE, seed = 0)
 }
+\arguments{
+\item{centers}{Set an integer number to decide how many clusters (groups) to build.}
+
+\item{keep.source}{It will make .source.data column to preserve source data.}
+
+\item{seed}{This is random seed. You can change the result if you change this number.}
+}
+\value{
+deta frame which has kmeans model
+}
 \description{
 kmeans wrapper with do
 }

@@ -4,8 +4,8 @@
 \alias{do_tokenize}
 \title{Tokenize text and unnest}
 \usage{
-do_tokenize(df, input, output = .token, token = "words",
-  sentence_id = FALSE, ...)
+do_tokenize(df, input, output = .token, token = "words", drop = TRUE,
+  with_id = TRUE, ...)
 }
 \arguments{
 \item{df}{Data frame}
@@ -16,9 +16,9 @@ do_tokenize(df, input, output = .token, token = "words",
 
 \item{token}{Select the unit of token from "characters", "words", "sentences", "lines", "paragraphs", and "regex".}
 
-\item{sentence_id}{If there should be ids of sentences in output. This works when token is "words".}
-
 \item{drop}{Whether input column should be removed.}
+
+\item{with_id}{Whether output should contain original document id and sentence id in each document.}
 
 \item{to_lower}{Whether output should be lower cased.}
 }

@@ -12,7 +12,7 @@ test_that("test upper_gather with vector", {
   mat <- seq(6)
   names <- paste("entity", seq(4))
   result <- upper_gather(mat,names)
-  expect_equal(result$value, sort(result$value))
+  expect_equal(result$Var1, sort(result$Var1))
   expect_equal(nrow(result), 6)
 })
 
@@ -40,4 +40,35 @@ test_that("test group_exclude one col", {
   )
   ret <- group_exclude(test_df, col1)
   expect_equal(attr(ret, "label"), NULL)
+})
+
+test_that("test avoid_conflict", {
+  origin <- c("name1", "name1.new", "name2")
+  new <- c("name1", "name2")
+  ret <- avoid_conflict(origin, new)
+  expect_equal(ret, c("name1.new.new", "name2.new"))
+})
+
+test_that("test grouped_by", {
+  loadNamespace("dplyr")
+  test_df <- data.frame(
+    col1=rep(paste("col1", seq(2)), 5),
+    col2=rep(paste("col2", seq(2)), each=5),
+    col3=paste("col3", seq(10))
+  )
+  df <- dplyr::group_by(test_df, col1, col2)
+  ret <- grouped_by(df)
+  expect_equal(ret, c("col1", "col2"))
+})
+
+test_that("test mat_to_df", {
+  nc <- 4
+  nr <- 5
+  mat <- matrix(seq(nc*nr), ncol=nc, nrow=nr)
+  colnames(mat) <- paste("cname", seq(nc))
+  rownames(mat) <- paste("rname", seq(nr))
+  ret <- mat_to_df(mat, c("aa", "bb", "value"))
+  expect_true(is.character(ret[,1]))
+  expect_true(is.character(ret[,2]))
+  expect_true(!is.unsorted(ret[,1]))
 })

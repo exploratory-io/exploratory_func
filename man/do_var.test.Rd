@@ -6,6 +6,9 @@
 \usage{
 do_var.test(df, ..., keep.source = FALSE)
 }
+\value{
+deta frame which has var.test model
+}
 \description{
 var.test wrapper with do
 }

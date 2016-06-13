@@ -13,31 +13,39 @@
 #' @return correlations between pairs of groups
 #' @export
 calc_cor <- function(df,
-                         group,
-                         dimension,
-                         value,
-                         use="pairwise.complete.obs",
-                         method="pearson",
-                         fun.aggregate=mean){
+                     group,
+                     dimension,
+                     value,
+                     use="pairwise.complete.obs",
+                     method="pearson",
+                     distinct = FALSE,
+                     diag = FALSE,
+                     fun.aggregate=mean)
+{
   loadNamespace("reshape2")
   loadNamespace("dplyr")
   row <- col_name(substitute(dimension))
   col <- col_name(substitute(group))
   val <- col_name(substitute(value))
-  result <- (
-    df
-    # this spreads the data frame into matrix
-    %>%  simple_cast(row, col, val, fun.aggregate=fun.aggregate, fill=NA_real_)
-    %>%  cor(use = use, method = method)
-    # this gathers the matrix into data frame
-    %>%  reshape2::melt())
-  colnames(result) <- c("pair.name.1", "pair.name.2", "cor.value")
-  if(is.factor(result[,1])){
-    # if names are facters, it should be converted to character
-    result[,1] <- as.character(result[,1])
-    result[,2] <- as.character(result[,2])
+  mat <- simple_cast(df, row, col, val, fun.aggregate=fun.aggregate, fill=NA_real_)
+
+  cor_mat <- cor(mat, use = use, method = method)
+
+  if(distinct){
+    gathered <- upper_gather(cor_mat, diag=diag)
+  }else{
+    gathered <-  reshape2::melt(cor_mat)
+    if(!diag){
+      gathered <- dplyr::filter(gathered, Var1!=Var2)
+    }
   }
-  dplyr::arrange(result,pair.name.1)
+  colnames(gathered) <- c("pair.name.1", "pair.name.2", "cor.value")
+  if(is.factor(gathered[,1])){
+    # if names are facters, it should be converted to character
+    gathered[,1] <- as.character(gathered[,1])
+    gathered[,2] <- as.character(gathered[,2])
+  }
+  dplyr::arrange(gathered, pair.name.1)
 }
 
 #'
@@ -99,42 +107,143 @@ calc_cor_var <- function(df, ..., use="pairwise.complete.obs", method="pearson")
   tibble::repair_names(result, sep="_")
 }
 
-#' Compress dimension using svd algorithm
-#' @param df
+#' Calculate svd from tidy format. This can be used to calculate coordinations by reducing dimensionality.
+#' @param df Data frame which has group and dimension
 #' @param group Column to be regarded as groups
 #' @param dimension Column to be regarded as original dimensions
 #' @param value Column to be regarded as values
-#' @param value Column to be regarded as values
-#' Compress dimension
-reduce_dimension <- function(df, group, dimension, value, type="group", fill=0, fun.aggregate=mean, dim=NULL){
-  loadNamespace("reshape2")
+#' @param type "group" to see the coordinations in reduced dimension.
+#' "dimension" to see the direction of new axes from original ones.
+#' "variance" to see how much the data is distributed in the direction of new axes.
+#' @param fill Value to fill where value doesn't exist.
+#' @param fun.aggregate Value to fill where value doesn't exist.
+#' @param n_component Number of dimensions to return.
+#' @return Tidy format of data frame.
+#' @export
+do_svd <- function(df,
+                   group,
+                   dimension,
+                   value,
+                   type="group",
+                   fill=0,
+                   fun.aggregate=mean,
+                   n_component=3,
+                   centering=TRUE){
+  loadNamespace("dplyr")
+  loadNamespace("tibble")
+  loadNamespace("tidyr")
   group_col <- col_name(substitute(group))
   dimension_col <- col_name(substitute(dimension))
   value_col <- col_name(substitute(value))
-  fml <- as.formula(paste(group_col, dimension_col, sep="~"))
-  matrix <- reshape2::acast(df, fml, value.var=value_col, fill=fill, fun.aggregate=fun.aggregate)
-  dim <- min(dim, ncol(matrix))
-  if(type=="group"){
-    result <- svd(sweep(matrix, 2, colMeans(matrix), "-"), nu=dim, nv=0)
-    mat <- result$u
-    rownames(mat) <- rownames(matrix)
-    result <- reshape2::melt(mat)
-    colnames(result) <- c("group", "component", "value")
-    result
-  } else if (type=="dimension") {
-    result <- svd(sweep(matrix, 2, colMeans(matrix), "-"), nv=dim, nu=0)
-    mat <- result$v
-    rownames(mat) <- colnames(matrix)
-    result <- reshape2::melt(mat)
-    colnames(result) <- c("dimension", "component", "value")
-    result
-  } else if (type=="variance"){
-    variance <- svd(sweep(matrix, 2, colMeans(matrix), "-"))$d
-    result <- data.frame(component <- seq(length(variance)), variance <- variance)
+
+  do_svd_each <- function(df){
+    mat <-simple_cast(df, group_col, dimension_col, value_col, fun.aggregate = fun.aggregate, fill=fill)
+    cast_df <- as.data.frame(mat)
+    do_svd_var_(cast_df, colnames(cast_df), type=type, n_component=n_component, centering=centering)
   }
+
+  ret <- (df
+          %>%  dplyr::do(svd.value=do_svd_each(.))
+          %>%  tidyr::unnest(svd.value)
+          )
+
+  ret
 }
 
-# is_digit only numbers
-# is_alphabet only numbers
-# is_stopword
-# tf natural number
+#' Calculate svd from spread format. This can be used to calculate coordinations by reducing dimensionality.
+do_svd_var <- function(df, ..., label = NULL, fill=0, n_component = 3, centering = TRUE, type = "group"){
+  loadNamespace("dplyr")
+  loadNamespace("tidyr")
+  loadNamespace("lazyeval")
+  if(!is.null(substitute(label))){
+    label_col <- col_name(substitute(label))
+  } else {
+    label_col <- NULL
+  }
+  # select columns using dplyr::select logic
+  selected_df <- dplyr::select_(df, .dots = lazyeval::lazy_dots(...))
+  grouped_by <- as.character(attr(selected_df, "vars"))
+  columns <- setdiff(colnames(selected_df), grouped_by)
+  do_svd_var_(df, columns, label_col = label_col, n_component=n_component, centering = centering, type=type)
+}
+
+#' SE version of do_svd_var
+do_svd_var_ <- function(df, columns, label_col=NULL, n_component=3, centering=TRUE, type="group"){
+  loadNamespace("dplyr")
+  loadNamespace("tidyr")
+
+  group <- grouped_by(df)
+
+  # this is executed to each group
+  do_svd_var_each <- function(df){
+    origin_matrix <- as.matrix(df[,columns])
+    # convert to numeric
+    origin_matrix <- matrix(as.numeric(origin_matrix), nrow=nrow(origin_matrix), dimnames = dimnames(origin_matrix))
+    #remove na rows and columns
+    na_elem <- is.na(origin_matrix)
+    col_no_na <- colSums(na_elem) == 0
+    row_no_na <- rowSums(na_elem) == 0
+    matrix <- origin_matrix[row_no_na, col_no_na]
+    if(nrow(matrix) == 0){
+      stop("all rows and columns have NA")
+    }
+    if(centering){
+      # move the origin to center of data
+      matrix <- sweep(matrix, 2, colMeans(matrix), "-")
+    }
+    if(type=="group"){
+      result <- svd(matrix, nu=n_component, nv=0)
+      mat <- result$u
+
+      if(!all(row_no_na)){
+        full_mat <- matrix(data=NA_real_, nrow=nrow(origin_matrix), ncol=ncol(mat))
+        full_mat[row_no_na,] <- mat
+        mat <- full_mat
+      }
+      rownames(mat) <- rownames(origin_matrix)
+      if(!is.null(label_col)){
+        rownames(mat) <- df[[label_col]]
+      }
+      # t() to sort by group
+      result <- reshape2::melt(t(mat))
+
+      c_names <- avoid_conflict(group, c("component", "group", "svd.value"))
+      colnames(result) <- c_names
+      # swap column order
+      result <- result[,c_names[c(2,1,3)]]
+      if(is.factor(result[,1])){
+        result[,1] <- as.character(result[,1])
+      }
+      result
+    } else if (type=="dimension") {
+      result <- svd(matrix, nv=n_component, nu=0)
+      mat <- result$v
+      if(!all(row_no_na)){
+        full_mat <- matrix(data=NA_real_, nrow=nrow(mat), ncol=ncol(origin_matrix))
+        full_mat[,col_no_na] <- mat
+        mat <- full_mat
+      }
+      rownames(mat) <- colnames(matrix)
+      # t() to sort by dimension_origin
+      result <- reshape2::melt(t(mat))
+      c_names <- avoid_conflict(group, c("component", "dimension", "svd.value"))
+      colnames(result) <- c_names
+      # swap column order
+      result <- result[,c_names[c(2,1,3)]]
+      if(is.factor(result[,1])){
+        result[,1] <- as.character(result[,1])
+      }
+      result
+    } else if (type=="variance"){
+      variance <- svd(matrix, nu=0, nv=0)$d
+      component <- seq(min(length(variance), n_component))
+      result <- data.frame(component = component, svd.value = variance[component])
+      colnames(result) <- c_names <- avoid_conflict(group, c("component", "svd.value"))
+      result
+    } else {
+      stop(paste(type, "is not supported as type argument."))
+    }
+  }
+  (df %>%  dplyr::do(svd.value = do_svd_var_each(.)) %>%  tidyr::unnest(svd.value))
+
+}

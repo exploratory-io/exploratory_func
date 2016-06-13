@@ -6,6 +6,9 @@
 \usage{
 do_t.test(df, ..., keep.source = FALSE)
 }
+\value{
+deta frame which has t.test model
+}
 \description{
 t.test wrapper with do
 }

@@ -1,7 +1,7 @@
 Package: exploratory
 Type: Package
 Title: R package for Exploratory
-Version: 0.1.7
+Version: 0.1.8
 Date: 2016-05-13
 Authors@R: c(person("Yosuke", "Yasuda", email = "double.y.919.quick@gmail.com", role = c("aut", "cre")))
 URL: https://github.com/exploratory-io/exploratory_func
@@ -22,8 +22,7 @@ Import: dplyr,
     httr,
     text2vec,
     quanteda,
-    Matrix,
-    proxy
+    Matrix
 Suggests:
     testthat
 RoxygenNote: 5.0.1

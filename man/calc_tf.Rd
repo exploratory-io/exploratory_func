@@ -5,28 +5,28 @@
 \alias{calc_tf_}
 \title{Calculate term frequency}
 \usage{
-calc_tf(df, document, term, ...)
+calc_tf(df, group, term, ...)
 
-calc_tf_(df, document_col, term_col, weight = "ratio", k = 0.5)
+calc_tf_(df, group_col, term_col, weight = "ratio", k = 0.5)
 }
 \arguments{
 \item{df}{Data frame}
 
-\item{document}{Column to be considered as a document id}
+\item{group}{Column to be considered as a group id}
 
 \item{term}{Column to be considered as term}
 
 \item{weight}{Type of weight calculation.
-"ratio" is default and it's count/(total number of terms in the document).
+"ratio" is default and it's count/(total number of terms in the group).
 This can be "raw_frequency", "binary", "log_normalization" and "k_normalization"
-"raw_frequency" is count of the term in the document.
-"binary" is logic if the term is in the document or not.
-"log_normalization" is logic if the term is in the document or not.}
+"raw_frequency" is the count of the term in the group.
+"binary" is logic if the term is in the group or not.
+"log_normalization" is logic if the term is in the group or not.}
 
 \item{term}{Column to be considered as term}
 }
 \value{
-Data frame with document, term and .tf column
+Data frame with group, term and .tf column
 }
 \description{
 Calculate term frequency

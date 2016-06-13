@@ -6,6 +6,9 @@
 \usage{
 do_lm(df, ..., keep.source = FALSE)
 }
+\value{
+deta frame which has lm model
+}
 \description{
 lm wrapper with do
 }

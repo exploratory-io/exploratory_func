@@ -8,6 +8,18 @@ test_that("is_stopword", {
   expect_equal(result, c(T, T, F, F))
 })
 
+test_that("is_digit", {
+  test_vec <- c("the", "333", "T est", "1.23", "22_22")
+  result <- is_digit(test_vec)
+  expect_equal(result, c(F, T, F, F, F))
+})
+
+test_that("is_alphabet", {
+  test_vec <- c("the", "333", "T est", "1.23", "22_22")
+  result <- is_alphabet(test_vec)
+  expect_equal(result, c(T, F, F, F, F))
+})
+
 test_that("test get_stop_words", {
   result <- get_stopwords()
   expect_true(any(result == "a"))
@@ -23,18 +35,18 @@ test_that("test get_sentiment", {
   expect_equal(result, -3)
 })
 
-test_that("do_tokenize should work", {
+test_that("do_tokenize with drop=F", {
   result <- test_df %>%
     do_tokenize(char, drop=F)
   expect_equal(result$.token[[1]], "hello")
-  expect_equal(ncol(result), 2)
+  expect_equal(ncol(result), 4)
 })
 
 test_that("do_tokenize with token=words", {
   result <- test_df %>%
     do_tokenize(char, token="words")
   expect_equal(result$.token[[1]], "hello")
-  expect_equal(ncol(result), 1)
+  expect_equal(ncol(result), 3)
 })
 
 test_that("do_tokenize with token=sentence", {
@@ -65,7 +77,8 @@ test_that("calc_tf weight binary", {
   expect_true(is.logical(result$.tf))
   expect_equal(colnames(result)[[1]], "id")
   expect_equal(colnames(result)[[2]], "word")
-  expect_equal(colnames(result)[[3]], ".tf")
+  expect_equal(colnames(result)[[3]], ".count_per_doc")
+  expect_equal(colnames(result)[[4]], ".tf")
 })
 
 test_that("calc_tfidf smooth_idf FALSE", {
@@ -85,7 +98,7 @@ test_that("calc_tfidf", {
   expect_equal(head(result$.tfidf,2), c(log(2/1)/5, log(2/1)/5))
 })
 
-test_that("generate_ngrams", {
+test_that("do_ngram", {
   loadNamespace("dplyr")
   df <- data.frame(
     doc=paste("doc", rep(c(1,2), each=10)) ,
@@ -93,8 +106,19 @@ test_that("generate_ngrams", {
     token=paste("token",rep(c(1,2),10), sep=""),
     stringsAsFactors = F)
 
-  ungrouped <- df %>%  generate_ngrams(token, sentence)
-  grouped <- df %>%  dplyr::group_by(doc, sentence) %>%  generate_ngrams(token, sentence)
-  expect_equal(ncol(ungrouped), 2)
+  ungrouped <- df %>%  do_ngram(token)
+  grouped <- df %>%  dplyr::group_by(doc, sentence) %>%  do_ngram(token)
+  expect_equal(ncol(ungrouped), 1)
   expect_equal(ncol(grouped), 3)
+})
+
+test_that("sentimentr", {
+  if(requireNamespace("sentimentr")){
+    sentences <- c(
+      "I feel bad.",
+      "I'm not so happy",
+      "You look very cheerful."
+    )
+    ret <- sentimentr::sentiment(sentences)
+  }
 })

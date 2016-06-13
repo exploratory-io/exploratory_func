@@ -2,22 +2,22 @@
 % Please edit documentation in R/string_operation.R
 \name{calc_tfidf}
 \alias{calc_tfidf}
-\title{Caluculate tfidf}
+\title{Calculate tfidf, which shows how much particular the token is in a group.}
 \usage{
-calc_tfidf(df, document, term, idf_log_scale = log, tf_weight = "ratio",
+calc_tfidf(df, group, term, idf_log_scale = log, tf_weight = "ratio",
   tf_k = 0.5)
 }
 \arguments{
-\item{df}{Data frame which has columns of documents and their terms}
+\item{df}{Data frame which has columns of groups and their terms}
 
-\item{document}{Column of document names}
+\item{group}{Column of group names}
 
 \item{term}{Column of terms}
 
 \item{idf_log_scale}{Function to scale IDF. It might be worth trying log2 or log10.
-log10 has stronger suppression of increase of idf values and log2 has weaker.}
+log10 strongly suppress the increase of idf values and log2 does it more weakly.}
 }
 \description{
-Caluculate tfidf
+Calculate tfidf, which shows how much particular the token is in a group.
 }
 

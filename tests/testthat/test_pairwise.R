@@ -18,65 +18,76 @@ test_df$rand <- vapply(seq(nrow(test_df)), function(x){
   }
 }, FUN.VALUE=1)
 
-test_that("test pairwise_sim", {
+test_that("test calc_doc_sim", {
   loadNamespace("dplyr")
   result <- (
     test_df %>%
-      calc_sim(row, col, val)
+      calc_doc_sim(row, col, val)
   )
   expect_equal(nrow(result), 12)
 })
 
-test_that("test pairwise_sim with NA value", {
+test_that("test calc_doc_sim with NA value", {
   loadNamespace("dplyr")
   result <- (
     test_df %>%
-      calc_sim(row, col, with_na)
+      calc_doc_sim(row, col, with_na)
   )
   expect_equal(nrow(result), 12)
 })
 
-test_that("test pairwise_sim diag TRUE", {
+test_that("test calc_doc_sim diag TRUE", {
   loadNamespace("dplyr")
   result <- (
     test_df %>%
-      calc_sim(row, col, val, diag=FALSE, method="Euclidean")
+      calc_doc_sim(row, col, val, diag=TRUE)
   )
-  expect_equal(nrow(result), 12)
+  expect_equal(nrow(result), 16)
 })
 
-test_that("test pairwise_sim method cosine", {
+test_that("test calc_doc_sim method cosine", {
   loadNamespace("dplyr")
   result <- (
     test_df %>%
-      calc_sim(row, col, val, upper=TRUE, method="cosine")
+      calc_doc_sim(row, col, val, distinct=TRUE)
   )
   expect_equal(nrow(result), 6)
 })
 
-test_that("test pairwise_sim method cosine diag TRUE", {
+test_that("test calc_doc_sim method cosine diag TRUE", {
   loadNamespace("dplyr")
   result <- (
     test_df %>%
-      calc_sim(row, col, val, method="cosine", diag=TRUE)
+      calc_doc_sim(row, col, val, diag=TRUE)
+  )
+  expect_equal(nrow(result), 16)
+  expect_equal(result[1,3], 1)
+})
+
+test_that("test calc_doc_sim diag TRUE", {
+  loadNamespace("dplyr")
+  result <- (
+    test_df %>%
+      calc_doc_sim(row, col, val, diag=TRUE)
   )
   expect_equal(nrow(result), 16)
 })
 
-test_that("test pairwise_dist diag TRUE", {
-  loadNamespace("dplyr")
-  result <- (
-    test_df %>%
-      calc_sim(row, col, val, diag=TRUE)
-  )
-  expect_equal(nrow(result), 16)
-})
-
-test_that("test pairwise_dist diag TRUE", {
+test_that("test calc_dist diag TRUE", {
   loadNamespace("dplyr")
   result <- (
     test_df %>%
       calc_dist(row, col, val, diag=TRUE)
   )
   expect_equal(nrow(result), 16)
+  expect_equal(result[1,3], 0)
+})
+
+test_that("test calc_dist distinct TRUE", {
+  loadNamespace("dplyr")
+  result <- (
+    test_df %>%
+      calc_dist(row, col, val, distinct=TRUE)
+  )
+  expect_equal(nrow(result), 6)
 })

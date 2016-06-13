@@ -5,7 +5,8 @@
 \title{Calculate correlation among groups and output the correlation of each pair}
 \usage{
 calc_cor(df, group, dimension, value, use = "pairwise.complete.obs",
-  method = "pearson", fun.aggregate = mean)
+  method = "pearson", distinct = FALSE, diag = FALSE,
+  fun.aggregate = mean)
 }
 \arguments{
 \item{df}{data frame in tidy format}
