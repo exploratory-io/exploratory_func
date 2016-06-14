@@ -4,7 +4,7 @@
 \alias{do_tokenize}
 \title{Tokenize text and unnest}
 \usage{
-do_tokenize(df, input, output = .token, token = "words", drop = TRUE,
+do_tokenize(df, input, output = token, token = "words", drop = TRUE,
   with_id = TRUE, ...)
 }
 \arguments{

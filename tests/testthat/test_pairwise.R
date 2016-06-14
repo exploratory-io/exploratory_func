@@ -61,7 +61,7 @@ test_that("test calc_doc_sim method cosine diag TRUE", {
       calc_doc_sim(row, col, val, diag=TRUE)
   )
   expect_equal(nrow(result), 16)
-  expect_equal(result[1,3], 1)
+  expect_equal(result[[3]][[1]], 1)
 })
 
 test_that("test calc_doc_sim diag TRUE", {
@@ -80,7 +80,7 @@ test_that("test calc_dist diag TRUE", {
       calc_dist(row, col, val, diag=TRUE)
   )
   expect_equal(nrow(result), 16)
-  expect_equal(result[1,3], 0)
+  expect_equal(result[[3]][1], 0)
 })
 
 test_that("test calc_dist distinct TRUE", {

@@ -65,12 +65,12 @@ get_sentiment <- function(words, lexicon="bing"){
 #' @param with_id Whether output should contain original document id and sentence id in each document.
 #' @return Data frame with tokenized column
 #' @export
-do_tokenize <- function(df, input, output=.token, token="words", drop=TRUE, with_id=TRUE, ...){
+do_tokenize <- function(df, input, output=token, token="words", drop=TRUE, with_id=TRUE, ...){
   loadNamespace("tidytext")
   loadNamespace("stringr")
 
   input_col <- col_name(substitute(input))
-  output_col <- col_name(substitute(output))
+  output_col <- avoid_conflict(colnames(df), col_name(substitute(output)))
   # This is to prevent encoding error
   df[[input_col]] <- stringr::str_conv(df[[input_col]], "utf-8")
   if(token=="words" && with_id){

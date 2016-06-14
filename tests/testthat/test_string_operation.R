@@ -38,14 +38,14 @@ test_that("test get_sentiment", {
 test_that("do_tokenize with drop=F", {
   result <- test_df %>%
     do_tokenize(char, drop=F)
-  expect_equal(result$.token[[1]], "hello")
+  expect_equal(result$token[[1]], "hello")
   expect_equal(ncol(result), 4)
 })
 
 test_that("do_tokenize with token=words", {
   result <- test_df %>%
     do_tokenize(char, token="words")
-  expect_equal(result$.token[[1]], "hello")
+  expect_equal(result$token[[1]], "hello")
   expect_equal(ncol(result), 3)
 })
 
@@ -54,16 +54,15 @@ test_that("do_tokenize when names conflict", {
   df$document_id <- seq(nrow(df))
   result <- df %>%
     do_tokenize(char, token="words")
-  expect_equal(result$.token[[1]], "hello")
+  expect_equal(result$token[[1]], "hello")
   expect_equal(ncol(result), 4)
-  browser()
   expect_equal(colnames(result)[[2]],"document_id.new")
 })
 
 test_that("do_tokenize with token=sentence", {
   result <- test_df %>%
     do_tokenize(char, token="sentences")
-  expect_equal(result$.token[[1]], "hello world!")
+  expect_equal(result$token[[1]], "hello world!")
   expect_equal(ncol(result), 1)
 })
 

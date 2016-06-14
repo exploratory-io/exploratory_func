@@ -4,7 +4,8 @@
 \alias{upper_gather}
 \title{Gather only upper half}
 \usage{
-upper_gather(mat, names = NULL, diag = NULL, cnames = NULL)
+upper_gather(mat, names = NULL, diag = NULL, cnames = c("Var1", "Var2",
+  "value"))
 }
 \description{
 Gather only upper half
