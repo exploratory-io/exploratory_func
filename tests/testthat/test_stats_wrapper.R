@@ -53,7 +53,7 @@ test_that("test do_svd", {
       test_df
       %>%  do_svd(group, col, rand, n_component=3))
     expect_true(!is.unsorted(result[,1]))
-    expect_equal(colnames(result), c("group","component", "svd.value"))
+    expect_equal(colnames(result), c("group","component", "value.svd"))
     expect_true(any(result[,1]=="group1"))
     expect_true(any(result[,2]==1))
   }
@@ -75,7 +75,7 @@ test_that("test do_svd with group_by", {
       %>%  dplyr::group_by(group2)
       %>%  do_svd(group, col, rand, n_component=3))
     expect_true(!is.unsorted(result[,1]))
-    expect_equal(colnames(result), c("group2","group","component", "svd.value"))
+    expect_equal(colnames(result), c("group2","group","component", "value.svd"))
     expect_true(any(result[,1]=="group2"))
     expect_true(any(result[,3]==1))
   }
@@ -96,7 +96,7 @@ test_that("test do_svd of dimension", {
       test_df
       %>%  do_svd(group, col, rand, type="dimension"))
     expect_true(!is.unsorted(result[,1]))
-    expect_equal(colnames(result), c("dimension","component", "svd.value"))
+    expect_equal(colnames(result), c("dimension","component", "value.svd"))
     expect_true(any(result[,1]==1))
     expect_true(any(result[,2]==1))
   }
@@ -117,7 +117,7 @@ test_that("test do_svd_var of dimension", {
       test_df
       %>%  dplyr::group_by(group)
       %>%  do_svd_var(col, rand,na))
-    expect_equal(colnames(result), c("group","group.new", "component", "svd.value"))
+    expect_equal(colnames(result), c("group","group.new", "component", "value.svd"))
   }
 })
 
@@ -136,7 +136,7 @@ test_that("test do_svd_var of dimension", {
       test_df
       %>%  dplyr::group_by(group)
       %>%  do_svd_var(col, rand,na, type="dimension"))
-    expect_equal(colnames(result), c("group","dimension", "component", "svd.value"))
+    expect_equal(colnames(result), c("group","dimension", "component", "value.svd"))
   }
 })
 
@@ -153,7 +153,7 @@ test_that("test do_svd of variance", {
     result <- (
       test_df
       %>%  do_svd(group, col, rand, type="variance", n_component=2))
-    expect_equal(colnames(result), c("component", "svd.value"))
+    expect_equal(colnames(result), c("component", "value.svd"))
     expect_equal(nrow(result),2)
   }
 })

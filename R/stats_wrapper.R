@@ -172,7 +172,7 @@ do_svd_var_ <- function(df, columns, label_col=NULL, n_component=3, centering=TR
 
   group <- grouped_by(df)
 
-  value_cname <- avoid_conflict(group, "svd.value")
+  value_cname <- avoid_conflict(group, "value.svd")
 
   # this is executed to each group
   do_svd_var_each <- function(df){
