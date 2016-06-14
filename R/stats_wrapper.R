@@ -137,56 +137,11 @@ do_svd <- function(df,
   value_col <- col_name(substitute(value))
 
   grouped_col <- grouped_by(df)
-  value_cname <- avoid_conflict(grouped_col, "svd.value")
+  axis_prefix <- "axis"
+  data_column <- avoid_conflict(colnames(df), "data.source")
 
   do_svd_each <- function(df){
-    mat <-simple_cast(df, group_col, dimension_col, value_col, fun.aggregate = fun.aggregate, fill=fill)
-    cast_df <- as.data.frame(mat)
-    do_svd_var_(cast_df, colnames(cast_df), type=type, n_component=n_component, centering=centering)
-  }
-
-  (df %>%  dplyr::do_(.dots=setNames(list(~do_svd_each(.)),value_cname)) %>%  tidyr::unnest_(value_cname))
-}
-
-#' Calculate svd from spread format. This can be used to calculate coordinations by reducing dimensionality.
-do_svd_var <- function(df, ..., label = NULL, fill=0, n_component = 3, centering = TRUE, type = "group"){
-  loadNamespace("dplyr")
-  loadNamespace("tidyr")
-  loadNamespace("lazyeval")
-  if(!is.null(substitute(label))){
-    label_col <- col_name(substitute(label))
-  } else {
-    label_col <- NULL
-  }
-  # select columns using dplyr::select logic
-  selected_df <- dplyr::select_(df, .dots = lazyeval::lazy_dots(...))
-  grouped_by <- grouped_by(selected_df)
-  columns <- setdiff(colnames(selected_df), grouped_by)
-  do_svd_var_(df, columns, label_col = label_col, n_component=n_component, centering = centering, type=type)
-}
-
-#' SE version of do_svd_var
-do_svd_var_ <- function(df, columns, label_col=NULL, n_component=3, centering=TRUE, type="group"){
-  loadNamespace("dplyr")
-  loadNamespace("tidyr")
-
-  group <- grouped_by(df)
-
-  value_cname <- avoid_conflict(group, "value.svd")
-
-  # this is executed to each group
-  do_svd_var_each <- function(df){
-    origin_matrix <- as.matrix(df[,columns])
-    # convert to numeric
-    origin_matrix <- matrix(as.numeric(origin_matrix), nrow=nrow(origin_matrix), dimnames = dimnames(origin_matrix))
-    #remove na rows and columns
-    na_elem <- is.na(origin_matrix)
-    col_no_na <- colSums(na_elem) == 0
-    row_no_na <- rowSums(na_elem) == 0
-    matrix <- origin_matrix[row_no_na, col_no_na]
-    if(nrow(matrix) == 0){
-      stop("all rows and columns have NA")
-    }
+    matrix <-simple_cast(df, group_col, dimension_col, value_col, fun.aggregate = fun.aggregate, fill=fill)
     if(centering){
       # move the origin to center of data
       matrix <- sweep(matrix, 2, colMeans(matrix), "-")
@@ -194,36 +149,16 @@ do_svd_var_ <- function(df, columns, label_col=NULL, n_component=3, centering=TR
     if(type=="group"){
       result <- svd(matrix, nu=n_component, nv=0)
       mat <- result$u
+      ret <- as.data.frame(mat)
+      colnames(ret) <- avoid_conflict(c(grouped_col, group_col), paste("axis", seq(ncol(mat)), sep=""))
 
-      if(!all(row_no_na)){
-        full_mat <- matrix(data=NA_real_, nrow=nrow(origin_matrix), ncol=ncol(mat))
-        full_mat[row_no_na,] <- mat
-        mat <- full_mat
-      }
-      rownames(mat) <- rownames(origin_matrix)
-      if(!is.null(label_col)){
-        rownames(mat) <- df[[label_col]]
-      }
-      # t() to sort by group
-      result <- reshape2::melt(t(mat))
-
-      c_names <- avoid_conflict(group, c("component", "group", value_cname))
-      colnames(result) <- c_names
+      colnames(mat) <- c_names
       # swap column order
-      result <- result[,c_names[c(2,1,3)]]
-      if(is.factor(result[,1])){
-        result[,1] <- as.character(result[,1])
-      }
-      result
     } else if (type=="dimension") {
       result <- svd(matrix, nv=n_component, nu=0)
       mat <- result$v
-      if(!all(row_no_na)){
-        full_mat <- matrix(data=NA_real_, nrow=nrow(mat), ncol=ncol(origin_matrix))
-        full_mat[,col_no_na] <- mat
-        mat <- full_mat
-      }
       rownames(mat) <- colnames(matrix)
+
       # t() to sort by dimension_origin
       result <- reshape2::melt(t(mat))
       c_names <- avoid_conflict(group, c("component", "dimension", value_cname))
@@ -244,6 +179,7 @@ do_svd_var_ <- function(df, columns, label_col=NULL, n_component=3, centering=TR
       stop(paste(type, "is not supported as type argument."))
     }
   }
-  (df %>%  dplyr::do_(.dots=setNames(list(~do_svd_var_each(.)),value_cname)) %>%  tidyr::unnest_(value_cname))
+  }
 
+  (df %>%  dplyr::do_(.dots=setNames(list(~do_svd_each(.), ~.), value_cname, data_column)) %>%  tidyr::unnest_(value_cname, data_column))
 }
