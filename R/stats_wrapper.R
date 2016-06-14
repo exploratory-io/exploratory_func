@@ -128,7 +128,8 @@ do_svd <- function(df,
                    fill=0,
                    fun.aggregate=mean,
                    n_component=3,
-                   centering=TRUE){
+                   centering=TRUE,
+                   output ="wide"){
   loadNamespace("dplyr")
   loadNamespace("tibble")
   loadNamespace("tidyr")
@@ -138,7 +139,7 @@ do_svd <- function(df,
 
   grouped_col <- grouped_by(df)
   axis_prefix <- "axis"
-  data_column <- avoid_conflict(colnames(df), "data.source")
+  value_cname <- avoid_conflict(colnames(df), "svd.value")
 
   do_svd_each <- function(df){
     matrix <-simple_cast(df, group_col, dimension_col, value_col, fun.aggregate = fun.aggregate, fill=fill)
@@ -149,37 +150,54 @@ do_svd <- function(df,
     if(type=="group"){
       result <- svd(matrix, nu=n_component, nv=0)
       mat <- result$u
-      ret <- as.data.frame(mat)
-      colnames(ret) <- avoid_conflict(c(grouped_col, group_col), paste("axis", seq(ncol(mat)), sep=""))
 
-      colnames(mat) <- c_names
-      # swap column order
+      if (output=="wide") {
+        ret <- as.data.frame(mat)
+        colnames(ret) <- avoid_conflict(c(grouped_col, group_col), paste("axis", seq(ncol(mat)), sep=""))
+        df <- setNames(data.frame(a=as.character(rownames(matrix)), stringsAsFactors = FALSE), group_col)
+        ret <- cbind(df, ret)
+      } else if (output=="long") {
+        cnames <- avoid_conflict(grouped_col, c("group", "component", value_cname))
+        rownames(mat) <- rownames(matrix)
+        ret <- mat_to_df(mat, cnames)
+      } else {
+        stop(paste(output, "is not supported as output"))
+      }
     } else if (type=="dimension") {
+
       result <- svd(matrix, nv=n_component, nu=0)
       mat <- result$v
       rownames(mat) <- colnames(matrix)
 
-      # t() to sort by dimension_origin
-      result <- reshape2::melt(t(mat))
-      c_names <- avoid_conflict(group, c("component", "dimension", value_cname))
-      colnames(result) <- c_names
-      # swap column order
-      result <- result[,c_names[c(2,1,3)]]
-      if(is.factor(result[,1])){
-        result[,1] <- as.character(result[,1])
+      if (output=="wide") {
+        ret <- as.data.frame(mat)
+        colnames(ret) <- avoid_conflict(c(dimension_col, group_col), paste("axis", seq(ncol(mat)), sep=""))
+        df <- setNames(data.frame(a=as.character(rownames(mat)), stringsAsFactors = FALSE), dimension_col)
+        ret <- cbind(df, ret)
+      } else if (output=="long") {
+        cnames <- avoid_conflict(grouped_col, c("dimension", "component", value_cname))
+        ret <- mat_to_df(mat, cnames)
+      } else {
+        stop(paste(output, "is not supported as output"))
       }
-      result
     } else if (type=="variance"){
       variance <- svd(matrix, nu=0, nv=0)$d
       component <- seq(min(length(variance), n_component))
-      result <- data.frame(component = component, svd.value = variance[component])
-      colnames(result) <- avoid_conflict(group, c("component", value_cname))
-      result
+      if (output=="wide") {
+        mat <- matrix(variance[component], ncol=length(component))
+        ret <- as.data.frame(mat)
+        colnames(ret) <- avoid_conflict(c(group_col), paste("axis", seq(ncol(mat)), sep=""))
+      } else if (output=="long") {
+        ret <- data.frame(component = component, svd.value = variance[component])
+        colnames(ret) <- avoid_conflict(group_col, c("component", value_cname))
+      } else {
+        stop(paste(output, "is not supported as output"))
+      }
     } else {
       stop(paste(type, "is not supported as type argument."))
     }
-  }
+    ret
   }
 
-  (df %>%  dplyr::do_(.dots=setNames(list(~do_svd_each(.), ~.), value_cname, data_column)) %>%  tidyr::unnest_(value_cname, data_column))
+  (df %>%  dplyr::do_(.dots=setNames(list(~do_svd_each(.)), value_cname)) %>%  tidyr::unnest_(value_cname))
 }

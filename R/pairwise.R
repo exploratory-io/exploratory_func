@@ -17,7 +17,7 @@ calc_doc_sim <- function(df, group, dimention, value, distinct=FALSE, diag=FALSE
 
   grouped_column <- grouped_by(df)
 
-  cnames <- avoid_conflict(grouped_column, c("pair.name.1", "pair.name.2", "value.sim"))
+  cnames <- avoid_conflict(grouped_column, c("pair.name.1", "pair.name.2", "sim.value"))
 
   # this is executed to each group
   calc_doc_sim_each <- function(df){
@@ -62,7 +62,7 @@ calc_dist <- function(df, group, dimention, value, fill=0, fun.aggregate=mean, d
 
   grouped_column <- grouped_by(df)
 
-  cnames <- avoid_conflict(grouped_column, c("pair.name.1", "pair.name.2", "value.dist"))
+  cnames <- avoid_conflict(grouped_column, c("pair.name.1", "pair.name.2", "dist.value"))
 
   # this is executed to each group
   calc_dist_each <- function(df){

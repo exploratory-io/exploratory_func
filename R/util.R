@@ -44,7 +44,7 @@ upper_gather <- function(mat, names=NULL, diag=NULL, cnames = c("Var1", "Var2", 
       # fill diagonal elements
       trimat[row(trimat)==col(trimat)] = rep(diag, length(names))
     }
-    mat_to_df(trimat, na.rm=TRUE, cnames=cnames)
+    mat_to_df(t(trimat), na.rm=TRUE, cnames=cnames)
   }else{
     # diag can be NULL or FALSE
     if(is.null(diag)){
@@ -98,7 +98,7 @@ grouped_by <- function(df){
 #' matrix to dataframe with gathered form
 mat_to_df <- function(mat, cnames=NULL, na.rm=TRUE){
   loadNamespace("reshape2")
-  df <- reshape2::melt(mat, na.rm=na.rm)
+  df <- reshape2::melt(t(mat), na.rm=na.rm)
   # make the first column to be sorted
   df <- df[,c(2,1,3)]
   if(!is.null(colnames)){

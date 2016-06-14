@@ -87,8 +87,8 @@ test_that("calc_tf weight binary", {
   expect_true(is.logical(result$tf))
   expect_equal(colnames(result)[[1]], "id")
   expect_equal(colnames(result)[[2]], "word")
-  expect_equal(colnames(result)[[3]], ".count_per_doc")
-  expect_equal(colnames(result)[[4]], ".tf")
+  expect_equal(colnames(result)[[3]], "count_per_doc")
+  expect_equal(colnames(result)[[4]], "tf")
 })
 
 test_that("calc_tfidf smooth_idf FALSE", {

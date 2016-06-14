@@ -42,24 +42,52 @@ test_that("test calc_cor_cat for empty value", {
 test_that("test do_svd", {
   if(requireNamespace("broom")){
     test_df <- data.frame(
-      vec1=seq(20),
-      vec2=20-seq(20),
       rand=runif(20, min = 0, max=10),
-      na=as.vector(replicate(5,c(NA,5))),
-      group=paste("group",c(rep(1,5), rep(2, 5), rep(3, 5), rep(4, 5)), sep=""),
+      axis2=paste("group",c(rep(1,5), rep(2, 5), rep(3, 5), rep(4, 5)), sep=""),
       col=rep(seq(5),4))
     loadNamespace("dplyr")
     result <- (
       test_df
-      %>%  do_svd(group, col, rand, n_component=3))
-    expect_true(!is.unsorted(result[,1]))
-    expect_equal(colnames(result), c("group","component", "value.svd"))
+      %>%  do_svd(axis2, col, rand, n_component=3))
+    expect_equal(colnames(result), c("axis2","axis1", "axis2.new", "axis3"))
     expect_true(any(result[,1]=="group1"))
-    expect_true(any(result[,2]==1))
+  }
+})
+
+test_that("test do_svd type long", {
+  if(requireNamespace("broom")){
+    test_df <- data.frame(
+      rand=runif(20, min = 0, max=10),
+      axis2=paste("group",c(rep(1,5), rep(2, 5), rep(3, 5), rep(4, 5)), sep=""),
+      col=rep(seq(5),4))
+    loadNamespace("dplyr")
+    result <- (
+      test_df
+      %>%  do_svd(axis2, col, rand, n_component=3, output="long"))
+    expect_equal(colnames(result), c("group","component", "svd.value"))
+    expect_true(any(result[[1]]=="group1"))
+    expect_true(any(result[[2]]==1))
   }
 })
 
 test_that("test do_svd with group_by", {
+  if(requireNamespace("broom")){
+    test_df <- data.frame(
+      rand=runif(20, min = 0, max=10),
+      group=paste("group",c(rep(1,5), rep(2, 5), rep(3, 5), rep(4, 5)), sep=""),
+      axis1=paste("group",c(rep(1,10), rep(2, 10)), sep=""),
+      col=rep(seq(5),4), stringsAsFactors = FALSE)
+    loadNamespace("dplyr")
+    result <- (
+      test_df
+      %>%  dplyr::group_by(axis1)
+      %>%  do_svd(group, col, rand))
+    expect_equal(colnames(result), c("axis1","group","axis1.new", "axis2"))
+    expect_true(any(result[[1]]=="group2"))
+  }
+})
+
+test_that("test do_svd with group_by output=long", {
   if(requireNamespace("broom")){
     test_df <- data.frame(
       vec1=seq(20),
@@ -73,9 +101,9 @@ test_that("test do_svd with group_by", {
     result <- (
       test_df
       %>%  dplyr::group_by(group2)
-      %>%  do_svd(group, col, rand, n_component=3))
+      %>%  do_svd(group, col, rand, n_component=3, output="long"))
     expect_true(!is.unsorted(result[,1]))
-    expect_equal(colnames(result), c("group2","group","component", "value.svd"))
+    expect_equal(colnames(result), c("group2","group","component", "svd.value"))
     expect_true(any(result[,1]=="group2"))
     expect_true(any(result[,3]==1))
   }
@@ -96,47 +124,27 @@ test_that("test do_svd of dimension", {
       test_df
       %>%  do_svd(group, col, rand, type="dimension"))
     expect_true(!is.unsorted(result[,1]))
-    expect_equal(colnames(result), c("dimension","component", "value.svd"))
-    expect_true(any(result[,1]==1))
-    expect_true(any(result[,2]==1))
+    expect_equal(colnames(result), c("col","axis1", "axis2", "axis3"))
+    expect_true(any(result[[1]]=="1"))
   }
 })
 
-test_that("test do_svd_var of dimension", {
+test_that("test do_svd of dimension output long", {
   if(requireNamespace("broom")){
     loadNamespace("dplyr")
     test_df <- data.frame(
       vec1=seq(20),
       vec2=20-seq(20),
       rand=runif(20, min = 0, max=10),
-      na=as.vector(replicate(4,c(NA,5,3,2,9))),
-      group=paste("group",c(rep(1,5), rep(2, 5), rep(3, 5), rep(4, 5)), sep=""),
-      col=rep(seq(5),4))
-
-    result <- (
-      test_df
-      %>%  dplyr::group_by(group)
-      %>%  do_svd_var(col, rand,na))
-    expect_equal(colnames(result), c("group","group.new", "component", "value.svd"))
-  }
-})
-
-
-test_that("test do_svd_var of dimension", {
-  if(requireNamespace("broom")){
-    loadNamespace("dplyr")
-    test_df <- data.frame(
-      vec1=seq(20),
-      vec2=20-seq(20),
-      rand=runif(20, min = 0, max=10),
-      na=as.vector(replicate(4,c(NA,5,3,2,9))),
+      na=as.vector(replicate(5,c(NA,5))),
       group=paste("group",c(rep(1,5), rep(2, 5), rep(3, 5), rep(4, 5)), sep=""),
       col=rep(seq(5),4))
     result <- (
       test_df
-      %>%  dplyr::group_by(group)
-      %>%  do_svd_var(col, rand,na, type="dimension"))
-    expect_equal(colnames(result), c("group","dimension", "component", "value.svd"))
+      %>%  do_svd(group, col, rand, type="dimension", output="long"))
+    expect_equal(colnames(result), c("dimension","component", "svd.value"))
+    expect_true(any(result[[1]]==1))
+    expect_true(any(result[[2]]==1))
   }
 })
 
@@ -153,8 +161,27 @@ test_that("test do_svd of variance", {
     result <- (
       test_df
       %>%  do_svd(group, col, rand, type="variance", n_component=2))
-    expect_equal(colnames(result), c("component", "value.svd"))
+    expect_equal(colnames(result),c("axis1", "axis2"))
+    expect_equal(nrow(result),1)
+  }
+})
+
+test_that("test do_svd of variance output long", {
+  if(requireNamespace("broom")){
+    loadNamespace("dplyr")
+    test_df <- data.frame(
+      vec1=seq(20),
+      vec2=20-seq(20),
+      rand=runif(20, min = 0, max=10),
+      na=as.vector(replicate(5,c(NA,5))),
+      group=paste("group",c(rep(1,5), rep(2, 5), rep(3, 5), rep(4, 5)), sep=""),
+      col=rep(seq(5),4))
+    result <- (
+      test_df
+      %>%  do_svd(group, col, rand, type="variance", n_component=2, output="long"))
+    expect_equal(colnames(result), c("component", "svd.value"))
     expect_equal(nrow(result),2)
   }
 })
+
 

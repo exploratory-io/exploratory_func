@@ -5,7 +5,8 @@
 \title{Calculate svd from tidy format. This can be used to calculate coordinations by reducing dimensionality.}
 \usage{
 do_svd(df, group, dimension, value, type = "group", fill = 0,
-  fun.aggregate = mean, n_component = 3, centering = TRUE)
+  fun.aggregate = mean, n_component = 3, centering = TRUE,
+  output = "wide")
 }
 \arguments{
 \item{df}{Data frame which has group and dimension}
