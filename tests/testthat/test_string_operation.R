@@ -49,6 +49,17 @@ test_that("do_tokenize with token=words", {
   expect_equal(ncol(result), 3)
 })
 
+test_that("do_tokenize when names conflict", {
+  df <- test_df
+  df$document_id <- seq(nrow(df))
+  result <- df %>%
+    do_tokenize(char, token="words")
+  expect_equal(result$.token[[1]], "hello")
+  expect_equal(ncol(result), 4)
+  browser()
+  expect_equal(colnames(result)[[2]],"document_id.new")
+})
+
 test_that("do_tokenize with token=sentence", {
   result <- test_df %>%
     do_tokenize(char, token="sentences")

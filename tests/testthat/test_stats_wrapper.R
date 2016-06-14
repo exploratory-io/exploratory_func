@@ -140,7 +140,7 @@ test_that("test do_svd_var of dimension", {
   }
 })
 
-test_that("test do_svd of dimension", {
+test_that("test do_svd of variance", {
   if(requireNamespace("broom")){
     loadNamespace("dplyr")
     test_df <- data.frame(
