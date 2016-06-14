@@ -10,7 +10,6 @@ is_stopword <- function(token, lexicon="snowball"){
 #' Check if the word is digits.
 #' @param word Character to be checked if it's digits.
 #' @return Logical vector if the word is digits or not.
-#' @export
 is_digit <- function(word){
   loadNamespace("stringr")
   stringr::str_detect(word, "^[[:digit:]]+$")
@@ -72,29 +71,31 @@ do_tokenize <- function(df, input, output=.token, token="words", drop=TRUE, with
 
   input_col <- col_name(substitute(input))
   output_col <- col_name(substitute(output))
+  # This is to prevent encoding error
   df[[input_col]] <- stringr::str_conv(df[[input_col]], "utf-8")
   if(token=="words" && with_id){
     loadNamespace("dplyr")
 
     # split into sentences
     func <- get("unnest_tokens_", asNamespace("tidytext"))
-    df <- dplyr::mutate(df, .document_id=row_number())
-    tokenize_df <- df[,c(".document_id", input_col)]
-    args <- list(tokenize_df, output_col, input_col, token="sentences", drop=TRUE, ...)
-    sentences <- do.call(func, args)
-    grouped <- dplyr::group_by(sentences, .document_id)
+    doc_id <- avoid_conflict(colnames(df), "document_id")
+    df <- dplyr::mutate_(df, .dots=setNames(list(~row_number()),doc_id))
+    tokenize_df <- df[,c(doc_id, input_col)]
+    sentences <- tidytext::unnest_tokens_(tokenize_df, output_col, input_col, token="sentences", drop=TRUE, ...)
+    grouped <- dplyr::group_by_(sentences, doc_id)
+
+    sentence_id <- avoid_conflict(colnames(df), "sentence_id")
 
     # split into tokens
-    tokenize_df <- dplyr::mutate(grouped, .sentence_id=row_number())
+    tokenize_df <- dplyr::mutate_(grouped, .dots=setNames(list(~row_number()), sentence_id))
     tokenize_df <- dplyr::ungroup(tokenize_df)
-    args <- list(tokenize_df, output_col, output_col, token="words", drop=TRUE, ...)
-    tokenized <- do.call(func, args)
+    tokenized <- tidytext::unnest_tokens_(tokenize_df, output_col, output_col, token="words", drop=TRUE, ...)
 
     if(drop){
       df[[input_col]] <- NULL
     }
 
-    dplyr::right_join(df, tokenized, by=".document_id")
+    dplyr::right_join(df, tokenized, by=doc_id)
   } else {
     tidytext::unnest_tokens_(df, col_name(substitute(output)), col_name(substitute(input)),token=token, drop=drop, ...)
   }

@@ -136,18 +136,16 @@ do_svd <- function(df,
   dimension_col <- col_name(substitute(dimension))
   value_col <- col_name(substitute(value))
 
+  grouped_col <- grouped_by(df)
+  value_cname <- avoid_conflict(grouped_col, "svd.value")
+
   do_svd_each <- function(df){
     mat <-simple_cast(df, group_col, dimension_col, value_col, fun.aggregate = fun.aggregate, fill=fill)
     cast_df <- as.data.frame(mat)
     do_svd_var_(cast_df, colnames(cast_df), type=type, n_component=n_component, centering=centering)
   }
 
-  ret <- (df
-          %>%  dplyr::do(svd.value=do_svd_each(.))
-          %>%  tidyr::unnest(svd.value)
-          )
-
-  ret
+  (df %>%  dplyr::do_(.dots=setNames(list(~do_svd_each(.)),value_cname)) %>%  tidyr::unnest_(value_cname))
 }
 
 #' Calculate svd from spread format. This can be used to calculate coordinations by reducing dimensionality.
@@ -162,7 +160,7 @@ do_svd_var <- function(df, ..., label = NULL, fill=0, n_component = 3, centering
   }
   # select columns using dplyr::select logic
   selected_df <- dplyr::select_(df, .dots = lazyeval::lazy_dots(...))
-  grouped_by <- as.character(attr(selected_df, "vars"))
+  grouped_by <- grouped_by(selected_df)
   columns <- setdiff(colnames(selected_df), grouped_by)
   do_svd_var_(df, columns, label_col = label_col, n_component=n_component, centering = centering, type=type)
 }
@@ -173,6 +171,8 @@ do_svd_var_ <- function(df, columns, label_col=NULL, n_component=3, centering=TR
   loadNamespace("tidyr")
 
   group <- grouped_by(df)
+
+  value_cname <- avoid_conflict(group, "svd.value")
 
   # this is executed to each group
   do_svd_var_each <- function(df){
@@ -207,7 +207,7 @@ do_svd_var_ <- function(df, columns, label_col=NULL, n_component=3, centering=TR
       # t() to sort by group
       result <- reshape2::melt(t(mat))
 
-      c_names <- avoid_conflict(group, c("component", "group", "svd.value"))
+      c_names <- avoid_conflict(group, c("component", "group", value_cname))
       colnames(result) <- c_names
       # swap column order
       result <- result[,c_names[c(2,1,3)]]
@@ -226,7 +226,7 @@ do_svd_var_ <- function(df, columns, label_col=NULL, n_component=3, centering=TR
       rownames(mat) <- colnames(matrix)
       # t() to sort by dimension_origin
       result <- reshape2::melt(t(mat))
-      c_names <- avoid_conflict(group, c("component", "dimension", "svd.value"))
+      c_names <- avoid_conflict(group, c("component", "dimension", value_cname))
       colnames(result) <- c_names
       # swap column order
       result <- result[,c_names[c(2,1,3)]]
@@ -238,12 +238,12 @@ do_svd_var_ <- function(df, columns, label_col=NULL, n_component=3, centering=TR
       variance <- svd(matrix, nu=0, nv=0)$d
       component <- seq(min(length(variance), n_component))
       result <- data.frame(component = component, svd.value = variance[component])
-      colnames(result) <- c_names <- avoid_conflict(group, c("component", "svd.value"))
+      colnames(result) <- avoid_conflict(group, c("component", value_cname))
       result
     } else {
       stop(paste(type, "is not supported as type argument."))
     }
   }
-  (df %>%  dplyr::do(svd.value = do_svd_var_each(.)) %>%  tidyr::unnest(svd.value))
+  (df %>%  dplyr::do_(.dots=setNames(list(~do_svd_var_each(.)),value_cname)) %>%  tidyr::unnest_(value_cname))
 
 }
