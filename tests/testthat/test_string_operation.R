@@ -84,7 +84,7 @@ test_that("calc_tf weight binary", {
   loadNamespace("dplyr")
   test_df <- data.frame(id=rep(c(1,2), 5), word=c("this", "this", letters[1:8]))
   result <- calc_tf(test_df, id,word, weight="binary")
-  expect_true(is.logical(result$.tf))
+  expect_true(is.logical(result$tf))
   expect_equal(colnames(result)[[1]], "id")
   expect_equal(colnames(result)[[2]], "word")
   expect_equal(colnames(result)[[3]], ".count_per_doc")
@@ -105,7 +105,7 @@ test_that("calc_tfidf", {
     test_df %>%
       calc_tfidf(id, word)
   )
-  expect_equal(head(result$.tfidf,2), c(log(2/1)/5, log(2/1)/5))
+  expect_equal(head(result$tfidf,2), c(log(2/1)/5, log(2/1)/5))
 })
 
 test_that("do_ngram", {

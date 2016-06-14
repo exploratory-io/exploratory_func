@@ -140,6 +140,8 @@ calc_tf_ <- function(df, group_col, term_col, weight="ratio", k=0.5){
   loadNamespace("dplyr")
   loadNamespace("tidyr")
 
+  cnames <- avoid_conflict(c(group_col, term_col), c("count_per_doc", "tf"))
+
   calc_weight <- function(raw){
     if(weight=="ratio"){
       val <- raw/sum(raw)
@@ -157,10 +159,13 @@ calc_tf_ <- function(df, group_col, term_col, weight="ratio", k=0.5){
     }
     val
   }
+
+  weight_fml <- as.formula(paste("~calc_weight(",cnames[[1]],")", sep=""))
+
   ret <- (df[,colnames(df) == group_col | colnames(df)==term_col] %>%
             dplyr::group_by_(group_col, term_col) %>%
-            dplyr::summarise(.count_per_doc = n()) %>%
-            dplyr::mutate(.tf = calc_weight(.count_per_doc)) %>%
+            dplyr::summarise_(.dots=setNames(list(~n()), cnames[[1]])) %>%
+            dplyr::mutate_(.dots=setNames(list(weight_fml), cnames[[2]])) %>%
             dplyr::ungroup()
   )
 }
@@ -176,13 +181,17 @@ calc_tf_ <- function(df, group_col, term_col, weight="ratio", k=0.5){
 calc_tfidf <- function(df, group, term, idf_log_scale = log, tf_weight="ratio", tf_k=0.5){
   loadNamespace("tidytext")
   loadNamespace("dplyr")
+
   group_col <- col_name(substitute(group))
   term_col <- col_name(substitute(term))
+
+  cnames <- avoid_conflict(c(group_col, term_col), c("count_of_docs", "tfidf", "tf"))
+
   count_tbl <- calc_tf_(df, group_col, term_col, weight=tf_weight, k=tf_k)
   tfidf <- calc_idf(count_tbl[[group_col]], count_tbl[[term_col]], log_scale = idf_log_scale, smooth_idf = FALSE)
-  count_tbl$.count_of_docs <- tfidf$.df
-  count_tbl$.tfidf <- tfidf$.idf * count_tbl$.tf
-  count_tbl$.tf <- NULL
+  count_tbl[[cnames[[1]]]] <- tfidf$.df
+  count_tbl[[cnames[[2]]]] <- tfidf$.idf * count_tbl[[cnames[[3]]]]
+  count_tbl[[cnames[[3]]]] <- NULL
   count_tbl
 }
 
