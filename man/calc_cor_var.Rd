@@ -2,7 +2,7 @@
 % Please edit documentation in R/stats_wrapper.R
 \name{calc_cor_var}
 \alias{calc_cor_var}
-\title{Calculate correlation among columns and output the result in tidy format}
+\title{Calculate correlation among columns and output the correlation of each pair}
 \usage{
 calc_cor_var(df, ..., use = "pairwise.complete.obs", method = "pearson")
 }
@@ -19,6 +19,6 @@ calc_cor_var(df, ..., use = "pairwise.complete.obs", method = "pearson")
 correlations between pairs of columns
 }
 \description{
-Calculate correlation among columns and output the result in tidy format
+Calculate correlation among columns and output the correlation of each pair
 }
 

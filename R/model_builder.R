@@ -21,14 +21,30 @@ do_data <- function(funcname) {
 }
 
 #' lm wrapper with do
+#' @return deta frame which has lm model
 #' @export
 do_lm <- do_data("lm")
 
 #' glm wrapper with do
+#' @return deta frame which has glm model
 #' @export
 do_glm <- do_data("glm")
 
+#' t.test wrapper with do
+#' @return deta frame which has t.test model
+#' @export
+do_t.test <- do_data("t.test")
+
+#' var.test wrapper with do
+#' @return deta frame which has var.test model
+#' @export
+do_var.test <- do_data("var.test")
+
 #' kmeans wrapper with do
+#' @param centers Set an integer number to decide how many clusters (groups) to build.
+#' @param keep.source It will make .source.data column to preserve source data.
+#' @param seed This is random seed. You can change the result if you change this number.
+#' @return deta frame which has kmeans model
 #' @export
 do_kmeans <- function(df, ..., centers=3, keep.source = FALSE, seed=0){
   loadNamespace("dplyr")

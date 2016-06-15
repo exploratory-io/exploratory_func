@@ -2,47 +2,54 @@
 #'
 
 #'
-#' Calculate correlation among categories and output the result in tidy format
+#' Calculate correlation among groups and output the correlation of each pair
 #' @param df data frame in tidy format
-#' @param category_col A column you want to calculate the correlations for.
-#' @param dimension_col A column you want to use as a dimension to calculate the correlations.
-#' @param value_col A column for the values you want to use to calculate the correlations.
+#' @param group A column you want to calculate the correlations for.
+#' @param dimension A column you want to use as a dimension to calculate the correlations.
+#' @param value A column for the values you want to use to calculate the correlations.
 #' @param use Operation type for dealing with missing values. This can be one of "everything", "all.obs", "complete.obs", "na.or.complete", or "pairwise.complete.obs"
 #' @param method Method of calculation. This can be one of "pearson", "kendall", or "spearman".
 #' @param fun.aggregate  Set an aggregate function when there are multiple entries for the key column per each category.
-#' @return correlations between pairs of categories
+#' @return correlations between pairs of groups
 #' @export
-calc_cor_cat <- function(df,
-                         category_col,
-                         dimension_col,
-                         value_col,
-                         use="pairwise.complete.obs",
-                         method="pearson",
-                         fun.aggregate=mean){
+calc_cor <- function(df,
+                     group,
+                     dimension,
+                     value,
+                     use="pairwise.complete.obs",
+                     method="pearson",
+                     distinct = FALSE,
+                     diag = FALSE,
+                     fun.aggregate=mean)
+{
   loadNamespace("reshape2")
   loadNamespace("dplyr")
-  row <- as.character(substitute(dimension_col))
-  col <- as.character(substitute(category_col))
-  val <- as.character(substitute(value_col))
-  fml <- as.formula(paste(row, col, sep = "~"))
-  result <- (
-    df
-    # this spreads the data frame into matrix
-    %>%  reshape2::acast(fml, value.var=val, fun.aggregate=fun.aggregate)
-    %>%  cor(use = use, method = method)
-    # this gathers the matrix into data frame
-    %>%  reshape2::melt())
-  colnames(result) <- c("pair.name.1", "pair.name.2", "cor.value")
-  if(is.factor(result$.name.1)){
-    # if names are facters, it should be converted to character
-    result$.name.1 <- as.character(result$pair.name.1)
-    result$.name.2 <- as.character(result$pair.name.2)
+  row <- col_name(substitute(dimension))
+  col <- col_name(substitute(group))
+  val <- col_name(substitute(value))
+  mat <- simple_cast(df, row, col, val, fun.aggregate=fun.aggregate, fill=NA_real_)
+
+  cor_mat <- cor(mat, use = use, method = method)
+
+  if(distinct){
+    gathered <- upper_gather(cor_mat, diag=diag)
+  }else{
+    gathered <-  reshape2::melt(cor_mat)
+    if(!diag){
+      gathered <- dplyr::filter(gathered, Var1!=Var2)
+    }
   }
-  dplyr::arrange(result,pair.name.1)
+  colnames(gathered) <- c("pair.name.1", "pair.name.2", "cor.value")
+  if(is.factor(gathered[,1])){
+    # if names are facters, it should be converted to character
+    gathered[,1] <- as.character(gathered[,1])
+    gathered[,2] <- as.character(gathered[,2])
+  }
+  dplyr::arrange(gathered, pair.name.1)
 }
 
 #'
-#' Calculate correlation among columns and output the result in tidy format
+#' Calculate correlation among columns and output the correlation of each pair
 #' @param df data frame in tidy format
 #' @param ... Arguments to select columns to calculate correlation.
 #' @param use Operation type for dealing with missing values. This can be one of "everything", "all.obs", "complete.obs", "na.or.complete", or "pairwise.complete.obs"
@@ -98,4 +105,100 @@ calc_cor_var <- function(df, ..., use="pairwise.complete.obs", method="pearson")
   })
   result <- do.call(rbind, df_list)
   tibble::repair_names(result, sep="_")
+}
+
+#' Calculate svd from tidy format. This can be used to calculate coordinations by reducing dimensionality.
+#' @param df Data frame which has group and dimension
+#' @param group Column to be regarded as groups
+#' @param dimension Column to be regarded as original dimensions
+#' @param value Column to be regarded as values
+#' @param type "group" to see the coordinations in reduced dimension.
+#' "dimension" to see the direction of new axes from original ones.
+#' "variance" to see how much the data is distributed in the direction of new axes.
+#' @param fill Value to fill where value doesn't exist.
+#' @param fun.aggregate Value to fill where value doesn't exist.
+#' @param n_component Number of dimensions to return.
+#' @return Tidy format of data frame.
+#' @export
+do_svd <- function(df,
+                   group,
+                   dimension,
+                   value,
+                   type="group",
+                   fill=0,
+                   fun.aggregate=mean,
+                   n_component=3,
+                   centering=TRUE,
+                   output ="wide"){
+  loadNamespace("dplyr")
+  loadNamespace("tibble")
+  loadNamespace("tidyr")
+  group_col <- col_name(substitute(group))
+  dimension_col <- col_name(substitute(dimension))
+  value_col <- col_name(substitute(value))
+
+  grouped_col <- grouped_by(df)
+  axis_prefix <- "axis"
+  value_cname <- avoid_conflict(colnames(df), "svd.value")
+
+  # this is executed on each group
+  do_svd_each <- function(df){
+    matrix <-simple_cast(df, group_col, dimension_col, value_col, fun.aggregate = fun.aggregate, fill=fill)
+    if(centering){
+      # move the origin to center of data
+      matrix <- sweep(matrix, 2, colMeans(matrix), "-")
+    }
+    if(type=="group"){
+      result <- svd(matrix, nu=n_component, nv=0)
+      mat <- result$u
+
+      if (output=="wide") {
+        ret <- as.data.frame(mat)
+        colnames(ret) <- avoid_conflict(c(grouped_col, group_col), paste("axis", seq(ncol(mat)), sep=""))
+        df <- setNames(data.frame(a=as.character(rownames(matrix)), stringsAsFactors = FALSE), group_col)
+        ret <- cbind(df, ret)
+      } else if (output=="long") {
+        cnames <- avoid_conflict(grouped_col, c("group", "component", value_cname))
+        rownames(mat) <- rownames(matrix)
+        ret <- mat_to_df(mat, cnames)
+      } else {
+        stop(paste(output, "is not supported as output"))
+      }
+    } else if (type=="dimension") {
+
+      result <- svd(matrix, nv=n_component, nu=0)
+      mat <- result$v
+      rownames(mat) <- colnames(matrix)
+
+      if (output=="wide") {
+        ret <- as.data.frame(mat)
+        colnames(ret) <- avoid_conflict(c(dimension_col, group_col), paste("axis", seq(ncol(mat)), sep=""))
+        df <- setNames(data.frame(a=as.character(rownames(mat)), stringsAsFactors = FALSE), dimension_col)
+        ret <- cbind(df, ret)
+      } else if (output=="long") {
+        cnames <- avoid_conflict(grouped_col, c("dimension", "component", value_cname))
+        ret <- mat_to_df(mat, cnames)
+      } else {
+        stop(paste(output, "is not supported as output"))
+      }
+    } else if (type=="variance"){
+      variance <- svd(matrix, nu=0, nv=0)$d
+      component <- seq(min(length(variance), n_component))
+      if (output=="wide") {
+        mat <- matrix(variance[component], ncol=length(component))
+        ret <- as.data.frame(mat)
+        colnames(ret) <- avoid_conflict(c(group_col), paste("axis", seq(ncol(mat)), sep=""))
+      } else if (output=="long") {
+        ret <- data.frame(component = component, svd.value = variance[component])
+        colnames(ret) <- avoid_conflict(group_col, c("component", value_cname))
+      } else {
+        stop(paste(output, "is not supported as output"))
+      }
+    } else {
+      stop(paste(type, "is not supported as type argument."))
+    }
+    ret
+  }
+
+  (df %>%  dplyr::do_(.dots=setNames(list(~do_svd_each(.)), value_cname)) %>%  tidyr::unnest_(value_cname))
 }

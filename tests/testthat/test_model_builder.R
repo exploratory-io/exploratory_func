@@ -6,7 +6,8 @@ test_df <- data.frame(
   vec2=10-seq(10),
   rand=runif(10, min = 0, max=10),
   na=as.vector(replicate(5,c(NA,5))),
-  group=paste("group",c(rep(1,5), rep(2, 5)), sep=""))
+  group=paste("group",c(rep(1,5), rep(2, 5)), sep=""),
+  col=rep(seq(5),2))
 
 test_that("test do_glm and broom tidy", {
   if(requireNamespace("broom")){

@@ -6,6 +6,9 @@
 \usage{
 do_glm(df, ..., keep.source = FALSE)
 }
+\value{
+deta frame which has glm model
+}
 \description{
 glm wrapper with do
 }
