@@ -158,7 +158,7 @@ do_svd <- function(df,
         df <- setNames(data.frame(a=as.character(rownames(matrix)), stringsAsFactors = FALSE), group_col)
         ret <- cbind(df, ret)
       } else if (output=="long") {
-        cnames <- avoid_conflict(grouped_col, c("group", "component", value_cname))
+        cnames <- avoid_conflict(grouped_col, c(group_col, "new.dimension", value_cname))
         rownames(mat) <- rownames(matrix)
         ret <- mat_to_df(mat, cnames)
       } else {
@@ -172,11 +172,11 @@ do_svd <- function(df,
 
       if (output=="wide") {
         ret <- as.data.frame(mat)
-        colnames(ret) <- avoid_conflict(c(dimension_col, group_col), paste("axis", seq(ncol(mat)), sep=""))
+        colnames(ret) <- avoid_conflict(c(grouped_col, dimension_col), paste("axis", seq(ncol(mat)), sep=""))
         df <- setNames(data.frame(a=as.character(rownames(mat)), stringsAsFactors = FALSE), dimension_col)
         ret <- cbind(df, ret)
       } else if (output=="long") {
-        cnames <- avoid_conflict(grouped_col, c("dimension", "component", value_cname))
+        cnames <- avoid_conflict(grouped_col, c(dimension_col, "new.dimension", value_cname))
         ret <- mat_to_df(mat, cnames)
       } else {
         stop(paste(output, "is not supported as output"))
@@ -190,7 +190,7 @@ do_svd <- function(df,
         colnames(ret) <- avoid_conflict(c(group_col), paste("axis", seq(ncol(mat)), sep=""))
       } else if (output=="long") {
         ret <- data.frame(component = component, svd.value = variance[component])
-        colnames(ret) <- avoid_conflict(group_col, c("component", value_cname))
+        colnames(ret) <- avoid_conflict(group_col, c("new.dimension", value_cname))
       } else {
         stop(paste(output, "is not supported as output"))
       }
