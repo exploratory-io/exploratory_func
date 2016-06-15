@@ -77,3 +77,8 @@ test_that("test mat_to_df", {
   expect_true(is.character(ret[,2]))
   expect_true(!is.unsorted(ret[,1]))
 })
+
+test_that("test %nin%", {
+  ret <- c(1,3,NA,2) %nin% c(3, NA)
+  expect_equal(ret, c(T,F,F,T))
+})
