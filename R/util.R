@@ -72,12 +72,12 @@ upper_gather <- function(mat, names=NULL, diag=NULL, cnames = c("Var1", "Var2", 
   }
 }
 
-#' group by other columns
+#' group by other columns so that next action can preserve as many columns as possible
 group_exclude <- function(df, ...){
   loadNamespace("dplyr")
   cols <- as.character(substitute(list(...)))[-1]
   excluded <- setdiff(colnames(df), cols)
-  # exclude list column
+  # exclude list column to avoid error from dplyr::group_by
   target <- excluded[!sapply(df[,excluded], is.list)]
   dplyr::group_by_(df, .dots=target)
 }

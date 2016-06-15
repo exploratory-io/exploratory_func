@@ -2,11 +2,11 @@
 % Please edit documentation in R/util.R
 \name{group_exclude}
 \alias{group_exclude}
-\title{group by other columns}
+\title{group by other columns so that next action can preserve as many columns as possible}
 \usage{
 group_exclude(df, ...)
 }
 \description{
-group by other columns
+group by other columns so that next action can preserve as many columns as possible
 }
 
