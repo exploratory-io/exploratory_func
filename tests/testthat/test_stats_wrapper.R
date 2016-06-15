@@ -64,7 +64,7 @@ test_that("test do_svd", {
     result <- (
       test_df
       %>%  do_svd(axis2, col, rand, n_component=3))
-    expect_equal(colnames(result), c("group","component", "svd.value"))
+    expect_equal(colnames(result), c("axis2","new.dimension", "svd.value"))
     expect_true(any(result[[1]]=="group1"))
     expect_true(any(result[[2]]==1))
   }
@@ -103,7 +103,7 @@ test_that("test do_svd with group_by output=long", {
       %>%  dplyr::group_by(group2)
       %>%  do_svd(group, col, rand, n_component=3))
     expect_true(!is.unsorted(result[,1]))
-    expect_equal(colnames(result), c("group2","group","component", "svd.value"))
+    expect_equal(colnames(result), c("group2","group","new.dimension", "svd.value"))
     expect_true(any(result[,1]=="group2"))
     expect_true(any(result[,3]==1))
   }
@@ -142,7 +142,7 @@ test_that("test do_svd of dimension output long", {
     result <- (
       test_df
       %>%  do_svd(group, col, rand, type="dimension"))
-    expect_equal(colnames(result), c("dimension","component", "svd.value"))
+    expect_equal(colnames(result), c("col","new.dimension", "svd.value"))
     expect_true(any(result[[1]]==1))
     expect_true(any(result[[2]]==1))
   }
@@ -179,7 +179,7 @@ test_that("test do_svd of variance output", {
     result <- (
       test_df
       %>%  do_svd(group, col, rand, type="variance", n_component=2))
-    expect_equal(colnames(result), c("component", "svd.value"))
+    expect_equal(colnames(result), c("new.dimension", "svd.value"))
     expect_equal(nrow(result),2)
   }
 })
