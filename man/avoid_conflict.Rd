@@ -2,11 +2,11 @@
 % Please edit documentation in R/util.R
 \name{avoid_conflict}
 \alias{avoid_conflict}
-\title{prevent name conflict}
+\title{prevent conflict of 2 character vectors and avoid it by adding .new to elements in the second}
 \usage{
 avoid_conflict(origin, new)
 }
 \description{
-prevent name conflict
+prevent conflict of 2 character vectors and avoid it by adding .new to elements in the second
 }
 

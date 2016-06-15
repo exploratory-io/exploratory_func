@@ -59,7 +59,9 @@ upper_gather <- function(mat, names=NULL, diag=NULL, cnames = c("Var1", "Var2", 
     if(is.null(r_names)){
       r_names <- seq(nrow(mat))
     }
+    # this creates pairs of row and column indices
     ind <- which( upper_tri , arr.ind = TRUE )
+    # make a vector of upper half of matrix
     val <- mat[upper_tri]
     df <- data.frame(
       Var1=r_names[ind[,1]],
@@ -80,7 +82,7 @@ group_exclude <- function(df, ...){
   dplyr::group_by_(df, .dots=target)
 }
 
-#' prevent name conflict
+#' prevent conflict of 2 character vectors and avoid it by adding .new to elements in the second
 avoid_conflict <- function(origin, new){
   conflict <- new %in% origin
   while(any(conflict)){
