@@ -11,14 +11,14 @@ col_name <- function(x, default = stop("Please supply column name", call. = FALS
   stop("Invalid column specification", call. = FALSE)
 }
 
-#' Simple cast wrapper
+#' Simple cast wrapper that spreads columns which is choosed as row and col into matrix
 simple_cast <- function(data, row, col, val, fun.aggregate=mean, fill=0){
   loadNamespace("reshape2")
   fml <- as.formula(paste(row, col, sep = "~"))
   data %>%  reshape2::acast(fml, value.var=val, fun.aggregate=fun.aggregate, fill=fill)
 }
 
-#' Gather only upper half
+#' Gather only right upper half of matrix - where row_num > col_num
 upper_gather <- function(mat, names=NULL, diag=NULL, cnames = c("Var1", "Var2", "value")){
   if(is.vector(mat)){
     # This is basically for dist function
@@ -36,7 +36,7 @@ upper_gather <- function(mat, names=NULL, diag=NULL, cnames = c("Var1", "Var2", 
     loadNamespace("Matrix")
     # create a triangler matrix to melt
     trimat <- matrix(nrow=length(names), ncol=length(names))
-    # fill only upper half of the matrix
+    # fill only lower half of the matrix (transpose later to keep the order)
     trimat[row(trimat)>col(trimat)] <- as.numeric(mat)
     colnames(trimat) <- names
     rownames(trimat) <- names

@@ -141,6 +141,7 @@ do_svd <- function(df,
   axis_prefix <- "axis"
   value_cname <- avoid_conflict(colnames(df), "svd.value")
 
+  # this is executed on each group
   do_svd_each <- function(df){
     matrix <-simple_cast(df, group_col, dimension_col, value_col, fun.aggregate = fun.aggregate, fill=fill)
     if(centering){

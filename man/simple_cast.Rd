@@ -2,11 +2,11 @@
 % Please edit documentation in R/util.R
 \name{simple_cast}
 \alias{simple_cast}
-\title{Simple cast wrapper}
+\title{Simple cast wrapper that spreads columns which is choosed as row and col into matrix}
 \usage{
 simple_cast(data, row, col, val, fun.aggregate = mean, fill = 0)
 }
 \description{
-Simple cast wrapper
+Simple cast wrapper that spreads columns which is choosed as row and col into matrix
 }
 

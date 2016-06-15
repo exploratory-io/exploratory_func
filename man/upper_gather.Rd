@@ -2,12 +2,12 @@
 % Please edit documentation in R/util.R
 \name{upper_gather}
 \alias{upper_gather}
-\title{Gather only upper half}
+\title{Gather only right upper half of matrix - where row_num > col_num}
 \usage{
 upper_gather(mat, names = NULL, diag = NULL, cnames = c("Var1", "Var2",
   "value"))
 }
 \description{
-Gather only upper half
+Gather only right upper half of matrix - where row_num > col_num
 }
 
