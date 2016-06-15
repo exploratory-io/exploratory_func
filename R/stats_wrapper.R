@@ -129,7 +129,7 @@ do_svd <- function(df,
                    fun.aggregate=mean,
                    n_component=3,
                    centering=TRUE,
-                   output ="wide"){
+                   output ="long"){
   loadNamespace("dplyr")
   loadNamespace("tibble")
   loadNamespace("tidyr")

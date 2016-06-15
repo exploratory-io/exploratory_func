@@ -6,7 +6,7 @@
 \usage{
 do_svd(df, group, dimension, value, type = "group", fill = 0,
   fun.aggregate = mean, n_component = 3, centering = TRUE,
-  output = "wide")
+  output = "long")
 }
 \arguments{
 \item{df}{Data frame which has group and dimension}
