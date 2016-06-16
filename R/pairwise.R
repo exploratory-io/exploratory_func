@@ -8,7 +8,7 @@
 #' @param diag If similarity between itself should be returned or not.
 #' @param method Type of calculation. https://cran.r-project.org/web/packages/proxy/vignettes/overview.pdf
 #' @export
-calc_doc_sim <- function(df, group, dimention, value, distinct=FALSE, diag=FALSE){
+calc_cosine_sim <- function(df, group, dimention, value, distinct=FALSE, diag=FALSE){
   loadNamespace("qlcMatrix")
   loadNamespace("tidytext")
   group_col <- col_name(substitute(group))

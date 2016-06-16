@@ -18,57 +18,57 @@ test_df$rand <- vapply(seq(nrow(test_df)), function(x){
   }
 }, FUN.VALUE=1)
 
-test_that("test calc_doc_sim", {
+test_that("test calc_cosine_sim", {
   loadNamespace("dplyr")
   result <- (
     test_df %>%
-      calc_doc_sim(row, col, val)
+      calc_cosine_sim(row, col, val)
   )
   expect_equal(nrow(result), 12)
 })
 
-test_that("test calc_doc_sim with NA value", {
+test_that("test calc_cosine_sim with NA value", {
   loadNamespace("dplyr")
   result <- (
     test_df %>%
-      calc_doc_sim(row, col, with_na)
+      calc_cosine_sim(row, col, with_na)
   )
   expect_equal(nrow(result), 12)
 })
 
-test_that("test calc_doc_sim diag TRUE", {
+test_that("test calc_cosine_sim diag TRUE", {
   loadNamespace("dplyr")
   result <- (
     test_df %>%
-      calc_doc_sim(row, col, val, diag=TRUE)
+      calc_cosine_sim(row, col, val, diag=TRUE)
   )
   expect_equal(nrow(result), 16)
 })
 
-test_that("test calc_doc_sim method cosine", {
+test_that("test calc_cosine_sim method cosine", {
   loadNamespace("dplyr")
   result <- (
     test_df %>%
-      calc_doc_sim(row, col, val, distinct=TRUE)
+      calc_cosine_sim(row, col, val, distinct=TRUE)
   )
   expect_equal(nrow(result), 6)
 })
 
-test_that("test calc_doc_sim method cosine diag TRUE", {
+test_that("test calc_cosine_sim method cosine diag TRUE", {
   loadNamespace("dplyr")
   result <- (
     test_df %>%
-      calc_doc_sim(row, col, val, diag=TRUE)
+      calc_cosine_sim(row, col, val, diag=TRUE)
   )
   expect_equal(nrow(result), 16)
   expect_equal(result[[3]][[1]], 1)
 })
 
-test_that("test calc_doc_sim diag TRUE", {
+test_that("test calc_cosine_sim diag TRUE", {
   loadNamespace("dplyr")
   result <- (
     test_df %>%
-      calc_doc_sim(row, col, val, diag=TRUE)
+      calc_cosine_sim(row, col, val, diag=TRUE)
   )
   expect_equal(nrow(result), 16)
 })
