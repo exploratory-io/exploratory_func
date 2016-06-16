@@ -119,4 +119,5 @@ mat_to_df <- function(mat, cnames=NULL, na.rm=TRUE){
 }
 
 #' Not %in% function
+#' @export
 `%nin%` <- function (x, table) match(x, table, nomatch = 0L) == 0L
