@@ -28,3 +28,20 @@ test_that("test if tidy_lm arguments work", {
   expect_equal(ncol(result_), 2)
 })
 
+test_that("do_kmeans.kv augment", {
+  loadNamespace("dplyr")
+  test_df <- data.frame(
+    group=rep(paste("group", seq(2)), each=9),
+    subject=rep(paste("sub", rep(seq(3), each=3)), each=2),
+    key=rep(paste("dim", rep(seq(3))), each=2),
+    value=seq(3), stringsAsFactors = F
+  )
+  result <- (
+    test_df
+    %>%  dplyr::group_by(group)
+    %>%  build_kmeans.kv(subject, key, value, keep.source=TRUE, centers=1)
+    %>%  augment_kmeans(model, source.data)
+  )
+  expect_true(all(result[[".cluster"]] == 1))
+})
+
