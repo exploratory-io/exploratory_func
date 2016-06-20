@@ -85,8 +85,7 @@ build_kmeans.kv <- function(df,
     mat <- simple_cast(df, row_col, col_col, value_col, fun.aggregate = fun.aggregate, fill=fill)
     kmeans_ret <- kmeans(mat, centers = centers, iter.max = 10, nstart = nstart, algorithm = algorithm, trace = trace)
     if(augment){
-      df <- setNames(data.frame(rownames(mat), stringsAsFactors = FALSE), row_col)
-      df <- cbind(df, as.data.frame(mat))
+      df <- as.data.frame(mat)
       broom::augment(kmeans_ret, df)
     } else {
       kmeans_ret
@@ -95,8 +94,7 @@ build_kmeans.kv <- function(df,
 
   create_source <- function(df){
     mat <- simple_cast(df, row_col, col_col, value_col, fun.aggregate = fun.aggregate, fill=fill)
-    df <- setNames(data.frame(rownames(mat), stringsAsFactors = FALSE), row_col)
-    df <- cbind(df, as.data.frame(mat))
+    df <- as.data.frame(mat)
     df
   }
 
