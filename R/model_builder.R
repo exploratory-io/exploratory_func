@@ -85,15 +85,21 @@ build_kmeans.kv <- function(df,
     mat <- simple_cast(df, row_col, col_col, value_col, fun.aggregate = fun.aggregate, fill=fill)
     kmeans_ret <- kmeans(mat, centers = centers, iter.max = 10, nstart = nstart, algorithm = algorithm, trace = trace)
     if(augment){
-      if(length(kmeans_ret$cluster) == nrow(df)){
-        broom::augment(kmeans_ret, df)
-      } else {
-        broom::augment(kmeans_ret, setNames(data.frame(rownames(mat),stringsAsFactors = F), row_col))
-      }
+      df <- setNames(data.frame(rownames(mat), stringsAsFactors = FALSE), row_col)
+      df <- cbind(df, as.data.frame(mat))
+      broom::augment(kmeans_ret, df)
     } else {
       kmeans_ret
     }
   }
+
+  create_source <- function(df){
+    mat <- simple_cast(df, row_col, col_col, value_col, fun.aggregate = fun.aggregate, fill=fill)
+    df <- setNames(data.frame(rownames(mat), stringsAsFactors = FALSE), row_col)
+    df <- cbind(df, as.data.frame(mat))
+    df
+  }
+
   grouped_column <- grouped_by(df)
   model_column <- avoid_conflict(grouped_column, "model")
   source_column <- avoid_conflict(grouped_column, "source.data")
@@ -101,7 +107,7 @@ build_kmeans.kv <- function(df,
   if(keep.source & !augment){
     output <- (
       df
-      %>%  dplyr::do_(.dots=setNames(list(~build_kmeans_each(.), ~(.)), c(model_column, source_column)))
+      %>%  dplyr::do_(.dots=setNames(list(~build_kmeans_each(.), ~create_source(.)), c(model_column, source_column)))
     )
     # Add a class for Exploratyry to recognize the type of .source.data
     class(output[[source_column]]) <- c("list", ".source.data")
