@@ -126,7 +126,7 @@ build_kmeans.kv <- function(df,
 
 #' kmeans wrapper with do with variable columns as input
 #' @export
-build_kmeans.variables <- function(df, ...,
+build_kmeans.cols <- function(df, ...,
                             centers=3,
                             iter.max = 10,
                             nstart = 1,

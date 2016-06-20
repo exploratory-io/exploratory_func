@@ -34,12 +34,12 @@ test_that("test build_glm and broom", {
   }
 })
 
-test_that("test build_kmeans.variables and broom::tidy", {
+test_that("test build_kmeans.cols and broom::tidy", {
   if(requireNamespace("broom")){
     result <- (
       test_df
       %>%
-        build_kmeans.variables(vec1, vec2, rand, centers=2)
+        build_kmeans.cols(vec1, vec2, rand, centers=2)
       %>%
         broom::tidy(model)
     )
@@ -47,70 +47,52 @@ test_that("test build_kmeans.variables and broom::tidy", {
   }
 })
 
-test_that("test build_kmeans.variables augment=T", {
+test_that("test build_kmeans.cols augment=T", {
   if(requireNamespace("broom")){
     result <- (
       test_df
       %>%
-        build_kmeans.variables(vec1, vec2, rand, centers=2, augment=T)
+        build_kmeans.cols(vec1, vec2, rand, centers=2, augment=T)
     )
     expect_equal(nrow(result), 10)
   }
 })
 
-test_that("test build_kmeans.variables with invalid argument", {
-  if(requireNamespace("broom")){
-    tryCatch({
-      result <- (
-        test_df
-        %>%
-          build_kmeans.variables(vec1, vec2, rand, groups=2)
-        %>%
-          broom::tidy(model)
-      )
-    }, error=function(e){
-      expect_equal(e$message, "groups is undefined in the data frame and argument")
-      return
-    })
-  }
-})
-
-test_that("test build_kmeans.variables ignore NA rows", {
+test_that("test build_kmeans.cols ignore NA rows", {
   if(requireNamespace("broom")){
     result <- (
       test_df
-      %>%  build_kmeans.variables(vec1, vec2, na, centers=2, keep.source=TRUE)
+      %>%  build_kmeans.cols(vec1, vec2, na, centers=2, keep.source=TRUE)
       %>%  broom::augment(model, data=source.data))
     expect_equal(dim(result)[[1]], 5)
   }
 })
 
-test_that("test build_kmeans.variables ignore NA rows with grouped", {
+test_that("test build_kmeans.cols ignore NA rows with grouped", {
   if(requireNamespace("broom")){
     loadNamespace("dplyr")
     result <- (
       test_df
       %>%  dplyr::group_by(group)
-      %>%  build_kmeans.variables(vec1, vec2, na, centers=1, keep.source=TRUE)
+      %>%  build_kmeans.cols(vec1, vec2, na, centers=1, keep.source=TRUE)
       %>%  broom::tidy(model))
     expect_equal(dim(result)[[1]], 2)
   }
 })
 
-test_that("test build_kmeans.variables ignore NA rows with grouped and keep.source=FALSE", {
+test_that("test build_kmeans.cols ignore NA rows with grouped and keep.source=FALSE", {
   if(requireNamespace("broom")){
     loadNamespace("dplyr")
     result <- (
       test_df
       %>%  dplyr::group_by(group)
-      %>%  build_kmeans.variables(vec1, vec2, na, centers=1, keep.source=FALSE)
+      %>%  build_kmeans.cols(vec1, vec2, na, centers=1, keep.source=FALSE)
       %>%  broom::tidy(model))
     expect_equal(dim(result)[[1]], 2)
   }
 })
 
-test_that("test build_kmeans.variables", {
+test_that("test build_kmeans.cols", {
   df <- readRDS("~/Downloads/123flight_source_0.rds")
-  browser()
-  build_kmeans.variables(df, DISTANCE)
+  build_kmeans.cols(df, DISTANCE)
 })

@@ -7,14 +7,14 @@ tidy_test_df <- data.frame(
   val=seq(20),
   dim_na=c(paste0("dim", seq(10)), paste0("dim", seq(10)+3)))
 
-test_that("test do_cor.variables", {
+test_that("test do_cor.cols", {
   result <- (
     spread_test_df
-    %>%  do_cor.variables(starts_with("var")))
+    %>%  do_cor.cols(starts_with("var")))
   expect_equal(result[["cor.value"]], rep(1, 2))
 })
 
-test_that("test do_cor.variables for grouped df", {
+test_that("test do_cor.cols for grouped df", {
   loadNamespace("dplyr")
   group1 <- cbind(spread_test_df, data.frame(group=rep("group1", 4)))
   group2 <- cbind(spread_test_df, data.frame(group=rep("group2", 4)))
@@ -23,7 +23,7 @@ test_that("test do_cor.variables for grouped df", {
   result <- (
     test_df
     %>%  dplyr::group_by(group)
-    %>%  do_cor.variables(starts_with("var")))
+    %>%  do_cor.cols(starts_with("var")))
   expect_equal(dim(result), c(4, 4))
 })
 
