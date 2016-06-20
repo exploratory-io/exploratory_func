@@ -51,7 +51,7 @@ build_t.test <- build_data("t.test")
 #' @export
 build_var.test <- build_data("var.test")
 
-#' kmeans wrapper with do
+#' kmeans wrapper with do with key-value columns as input
 #' @param centers Set an integer number to decide how many clusters (groups) to build.
 #' @param keep.source It will make .source.data column to preserve source data.
 #' @param seed This is random seed. You can change the result if you change this number.
@@ -120,6 +120,8 @@ build_kmeans.kv <- function(df,
   output
 }
 
+#' kmeans wrapper with do with variable columns as input
+#' @export
 build_kmeans.variables <- function(df, ...,
                             centers=3,
                             iter.max = 10,
