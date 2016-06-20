@@ -18,8 +18,23 @@ simple_cast <- function(data, row, col, val, fun.aggregate=mean, fill=0){
   data %>%  reshape2::acast(fml, value.var=val, fun.aggregate=fun.aggregate, fill=fill)
 }
 
+#' as.matrix from select argument or cast by three columns
+to_matrix <- function(df, select_dots, by_col=NULL, key_col=NULL, value_col=NULL, fill=0, fun.aggregate=mean){
+  should_cast <- !(is.null(by_col) & is.null(key_col) & is.null(value_col))
+  if(should_cast){
+    if(is.null(by_col) | is.null(key_col) | is.null(value_col)){
+      stop("all by, key and value should be defined")
+    }
+    simple_cast(df, by_col, key_col, value_col, fun.aggregate = fun.aggregate, fill=fill)
+  } else {
+    loadNamespace("dplyr")
+    dplyr::select_(df, .dots=select_dots) %>%  as.matrix()
+  }
+}
+
 #' Gather only right upper half of matrix - where row_num > col_num
 upper_gather <- function(mat, names=NULL, diag=NULL, cnames = c("Var1", "Var2", "value")){
+  loadNamespace("Matrix")
   if(is.vector(mat)){
     # This is basically for dist function
     # It provides numeric vector of upper half
@@ -33,9 +48,10 @@ upper_gather <- function(mat, names=NULL, diag=NULL, cnames = c("Var1", "Var2", 
         stop("number of names doesn't match matrix dimension")
       }
     }
-    loadNamespace("Matrix")
+
     # create a triangler matrix to melt
-    trimat <- matrix(nrow=length(names), ncol=length(names))
+    # use NA_real_ for performance
+    trimat <- matrix(data=NA_real_, nrow=length(names), ncol=length(names))
     # fill only lower half of the matrix (transpose later to keep the order)
     trimat[row(trimat)>col(trimat)] <- as.numeric(mat)
     colnames(trimat) <- names
@@ -50,23 +66,31 @@ upper_gather <- function(mat, names=NULL, diag=NULL, cnames = c("Var1", "Var2", 
     if(is.null(diag)){
       diag <- FALSE
     }
-    upper_tri <- upper.tri(mat, diag=diag)
-    c_names <- colnames(mat)
-    r_names <- rownames(mat)
+    # use transpose and lower tri to make output order clean
+    tmat <- Matrix::t(mat)
+    lower_tri <- lower.tri(tmat, diag=diag)
+    c_names <- colnames(tmat)
+    r_names <- rownames(tmat)
     if(is.null(c_names)){
-      c_names <- seq(ncol(mat))
+      c_names <- seq(ncol(tmat))
+    } else {
+      c_names <- sort(c_names)
     }
     if(is.null(r_names)){
-      r_names <- seq(nrow(mat))
+      r_names <- seq(nrow(tmat))
+    } else {
+      r_names <- sort(r_names)
     }
     # this creates pairs of row and column indices
-    ind <- which( upper_tri , arr.ind = TRUE )
+    ind <- which( lower_tri , arr.ind = TRUE )
     # make a vector of upper half of matrix
-    val <- mat[upper_tri]
+    row <- r_names[ind[,1]]
+    col <- c_names[ind[,2]]
+    val <- tmat[lower_tri]
     df <- data.frame(
-      Var1=r_names[ind[,1]],
-      Var2=c_names[ind[,2]],
-      value=val)
+      Var1=col,
+      Var2=row,
+      value=val, stringsAsFactors = F)
     colnames(df) <- cnames
     df
   }
@@ -98,9 +122,14 @@ grouped_by <- function(df){
 }
 
 #' matrix to dataframe with gathered form
-mat_to_df <- function(mat, cnames=NULL, na.rm=TRUE){
+mat_to_df <- function(mat, cnames=NULL, na.rm=TRUE, diag=TRUE){
   loadNamespace("reshape2")
   df <- reshape2::melt(t(mat), na.rm=na.rm)
+
+  if(!diag){
+    df <- df[df[[1]]!=df[[2]],]
+  }
+
   # make the first column to be sorted
   df <- df[,c(2,1,3)]
   if(!is.null(colnames)){
@@ -117,6 +146,24 @@ mat_to_df <- function(mat, cnames=NULL, na.rm=TRUE){
 
   df
 }
+
+#' match the type of two vector
+same_type <- function(vector, original){
+  if(is.factor(original)){
+    as.factor(vector)
+  } else if(is.integer(original)){
+    as.integer(vector)
+  } else if(is.numeric.Date(original)) {
+    as.Date(vector)
+  } else if(is.numeric.POSIXt(original)){
+    as.POSIXct(vector)
+  } else if (is.numeric(original)){
+    as.numeric(vector)
+  } else if(is.character(original)) {
+    as.character(vector)
+  }
+}
+
 
 #' Not %in% function
 #' @export

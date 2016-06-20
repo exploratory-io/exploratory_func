@@ -3,18 +3,29 @@
 
 #' Create do wrapper function with source data
 #' @return do wrapper function
-do_data <- function(funcname) {
-  ret <- function(df, ..., keep.source = FALSE){
+build_data <- function(funcname) {
+  ret <- function(df, ..., keep.source = FALSE, augment=FALSE){
     loadNamespace("dplyr")
-    if (keep.source) {
-      output <- df  %>%  dplyr::do(.model = do.call(funcname, list(data = ., ...)), .source.data = (.))
+    grouped_column <- grouped_by(df)
+    model_column <- avoid_conflict(grouped_column, "model")
+    source_column <- avoid_conflict(grouped_column, "source.data")
+    if (keep.source | augment) {
+      output <- df  %>%  dplyr::do_(.dots=setNames(list(~do.call(funcname, list(data = ., ...)), ~(.)), c(model_column, source_column)))
       # Add a class for Exploratyry to recognize the type of .source.data
-      class(output$.source.data) <- c("list", ".source.data")
+      class(output[[source_column]]) <- c("list", ".source.data")
     } else {
-      output <- df  %>%  dplyr::do(.model= do.call(funcname, list(data = ., ...)))
+      output <- df  %>%  dplyr::do_(.dots=setNames(list(~do.call(funcname, list(data = ., ...))), model_column))
     }
-    # Add a class for Exploratyry to recognize the type of .model
-    class(output$.model) <- c("list", ".model", paste0(".model.", funcname))
+
+    if(augment){
+      # use do.call for non standard evaluation
+      augment_func <- get("augment", asNamespace("broom"))
+      output <- do.call(augment_func, list(output, model_column, data=source_column))
+    } else {
+      # Add a class for Exploratyry to recognize the type of .model
+      class(output[[model_column]]) <- c("list", ".model", paste0(".model.", funcname))
+      output
+    }
     output
   }
   ret
@@ -23,22 +34,22 @@ do_data <- function(funcname) {
 #' lm wrapper with do
 #' @return deta frame which has lm model
 #' @export
-do_lm <- do_data("lm")
+build_lm <- build_data("lm")
 
 #' glm wrapper with do
 #' @return deta frame which has glm model
 #' @export
-do_glm <- do_data("glm")
+build_glm <- build_data("glm")
 
 #' t.test wrapper with do
 #' @return deta frame which has t.test model
 #' @export
-do_t.test <- do_data("t.test")
+build_t.test <- build_data("t.test")
 
 #' var.test wrapper with do
 #' @return deta frame which has var.test model
 #' @export
-do_var.test <- do_data("var.test")
+build_var.test <- build_data("var.test")
 
 #' kmeans wrapper with do
 #' @param centers Set an integer number to decide how many clusters (groups) to build.
@@ -46,55 +57,119 @@ do_var.test <- do_data("var.test")
 #' @param seed This is random seed. You can change the result if you change this number.
 #' @return deta frame which has kmeans model
 #' @export
-do_kmeans <- function(df, ..., centers=3, keep.source = FALSE, seed=0){
+build_kmeans.kv <- function(df,
+                            subject,
+                            key,
+                            value,
+                            centers=3,
+                            iter.max = 10,
+                            nstart = 1,
+                            algorithm = "Hartigan-Wong",
+                            trace = FALSE,
+                            keep.source = FALSE,
+                            seed=0,
+                            augment=FALSE,
+                            fun.aggregate=mean,
+                            fill=0){
   loadNamespace("dplyr")
+  loadNamespace("lazyeval")
+  loadNamespace("tidyr")
+  loadNamespace("broom")
   set.seed(seed)
-  labels <- attr(df, "labels")
-  if(is.null(labels)){
-    grouped_cname = NULL
-  } else {
-    grouped_cname = colnames(labels)
-  }
-  tryCatch({
-    selected_df <- dplyr::select(df, ...)
-    # check if dots are all about column selection
-    if(!all(colnames(selected_df) %in% colnames(df))){
-      # columns which were not in original data frame
-      no_column <- colnames(selected_df)[!colnames(selected_df) %in% colnames(df)]
-      stop(paste(no_column, "is undefined in the data frame and argument", collapse = " "))
-    }
-  }, error=function(e){
-    if(e$message=="undefined columns selected"){
-      # in case dplyr::select emits error
-      stop("There is invalid column name or argument")
-    } else {
-      stop(e$message)
-    }
-  })
-  selected_cnames <- colnames(selected_df)
-  selected_cnames <- selected_cnames[!selected_cnames %in% grouped_cname]
-  # expression to find NA row (ex. is.na(df[[\"vec1\"]] ) | is.na(df[[\"vec2\"]] ))
-  exp = paste(paste("is.na(df[[\"",selected_cnames, collapse="\"]] ) | ", sep=""), "\"]])", sep="")
-  na_row = eval(parse(text=exp))
-  if(all(na_row)){
-    # All rows has at least one NA. If we filter them out, no row is left.
-    stop("No data left after filtering rows that have NA")
-  }
 
-  if(keep.source){
+  row_col <- col_name(substitute(subject))
+  col_col <- col_name(substitute(key))
+  value_col <- col_name(substitute(value))
+
+  build_kmeans_each <- function(df){
+    mat <- simple_cast(df, row_col, col_col, value_col, fun.aggregate = fun.aggregate, fill=fill)
+    kmeans_ret <- kmeans(mat, centers = centers, iter.max = 10, nstart = nstart, algorithm = algorithm, trace = trace)
+    if(augment){
+      if(length(kmeans_ret$cluster) == nrow(df)){
+        broom::augment(kmeans_ret, df)
+      } else {
+        broom::augment(kmeans_ret, setNames(data.frame(rownames(mat),stringsAsFactors = F), row_col))
+      }
+    } else {
+      kmeans_ret
+    }
+  }
+  grouped_column <- grouped_by(df)
+  model_column <- avoid_conflict(grouped_column, "model")
+  source_column <- avoid_conflict(grouped_column, "source.data")
+
+  if(keep.source & !augment){
     output <- (
-      df[!na_row,]
-      %>%  dplyr::do(.model= kmeans(.[,selected_cnames], centers), .source.data=(.))
+      df
+      %>%  dplyr::do_(.dots=setNames(list(~build_kmeans_each(.), ~(.)), c(model_column, source_column)))
     )
     # Add a class for Exploratyry to recognize the type of .source.data
-    class(output$.source.data) <- c("list", ".source.data")
+    class(output[[source_column]]) <- c("list", ".source.data")
   } else {
     output <- (
-      df[!na_row,]
-      %>%  dplyr::do(.model= kmeans(.[,selected_cnames], centers))
+      df
+      %>%  dplyr::do_(.dots=setNames(list(~build_kmeans_each(.)), model_column))
     )
   }
   # Add a class for Exploratyry to recognize the type of .model
-  class(output$.model) <- c("list", ".model", ".model.kmeans")
+  if(augment){
+    output <- tidyr::unnest_(output, model_column)
+  } else {
+    class(output[[model_column]]) <- c("list", ".model", ".model.kmeans")
+  }
+  output
+}
+
+build_kmeans.variables <- function(df, ...,
+                            centers=3,
+                            iter.max = 10,
+                            nstart = 1,
+                            algorithm = "Hartigan-Wong",
+                            trace = FALSE,
+                            keep.source = FALSE,
+                            seed=0,
+                            augment=FALSE){
+  loadNamespace("dplyr")
+  loadNamespace("lazyeval")
+  loadNamespace("tidyr")
+  loadNamespace("broom")
+  set.seed(seed)
+
+  select_dots <- lazyeval::lazy_dots(...)
+  grouped_column <- grouped_by(df)
+  model_column <- avoid_conflict(grouped_column, "model")
+  source_column <- avoid_conflict(grouped_column, "source.data")
+  cluster_column <- avoid_conflict(colnames(df), ".cluster")
+
+  build_kmeans_each <- function(df){
+    df <- na.omit(df)
+    mat <- dplyr::select_(df, .dots=select_dots) %>%  as.matrix() %>%  na.omit()
+    kmeans_ret <- kmeans(mat, centers = centers, iter.max = 10, nstart = nstart, algorithm = algorithm, trace = trace)
+    if(augment){
+      broom::augment(kmeans_ret, df)
+    } else {
+      kmeans_ret
+    }
+  }
+
+  if(keep.source & !augment){
+    output <- (
+      df
+      %>%  dplyr::do_(.dots=setNames(list(~build_kmeans_each(.), ~(na.omit(.))), c(model_column, source_column)))
+    )
+    # Add a class for Exploratyry to recognize the type of .source.data
+    class(output[[source_column]]) <- c("list", ".source.data")
+  } else {
+    output <- (
+      df
+      %>%  dplyr::do_(.dots=setNames(list(~build_kmeans_each(.)), model_column))
+    )
+  }
+  if(augment){
+    output <- tidyr::unnest_(output, model_column)
+  } else {
+    # Add a class for Exploratyry to recognize the type of .model
+    class(output[[model_column]]) <- c("list", ".model", ".model.kmeans")
+  }
   output
 }

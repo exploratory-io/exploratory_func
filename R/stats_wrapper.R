@@ -12,40 +12,40 @@
 #' @param fun.aggregate  Set an aggregate function when there are multiple entries for the key column per each category.
 #' @return correlations between pairs of groups
 #' @export
-calc_cor <- function(df,
-                     group,
-                     dimension,
-                     value,
-                     use="pairwise.complete.obs",
-                     method="pearson",
-                     distinct = FALSE,
-                     diag = FALSE,
-                     fun.aggregate=mean)
+do_cor.kv <- function(df,
+                   subject,
+                   key,
+                   value,
+                   use="pairwise.complete.obs",
+                   method="pearson",
+                   distinct = FALSE,
+                   diag = FALSE,
+                   fill = 0,
+                   fun.aggregate=mean)
 {
   loadNamespace("reshape2")
   loadNamespace("dplyr")
-  row <- col_name(substitute(dimension))
-  col <- col_name(substitute(group))
+  loadNamespace("tidyr")
+  loadNamespace("lazyeval")
+
+  row <- col_name(substitute(key))
+  col <- col_name(substitute(subject))
   val <- col_name(substitute(value))
-  mat <- simple_cast(df, row, col, val, fun.aggregate=fun.aggregate, fill=NA_real_)
 
-  cor_mat <- cor(mat, use = use, method = method)
+  grouped_col <- grouped_by(df)
+  output_cols <- avoid_conflict(grouped_col, c("pair.name.1", "pair.name.2", "cor.value"))
 
-  if(distinct){
-    gathered <- upper_gather(cor_mat, diag=diag)
-  }else{
-    gathered <-  reshape2::melt(cor_mat)
-    if(!diag){
-      gathered <- dplyr::filter(gathered, Var1!=Var2)
+  do_cor_each <- function(df){
+    mat <- simple_cast(df, row, col, val, fun.aggregate=fun.aggregate, fill=fill)
+    cor_mat <- cor(mat, use = use, method = method)
+    if(distinct){
+      ret <- upper_gather(cor_mat, diag=diag, cnames=output_cols)
+    } else {
+      ret <- mat_to_df(cor_mat, cnames=output_cols, diag=diag)
     }
   }
-  colnames(gathered) <- c("pair.name.1", "pair.name.2", "cor.value")
-  if(is.factor(gathered[,1])){
-    # if names are facters, it should be converted to character
-    gathered[,1] <- as.character(gathered[,1])
-    gathered[,2] <- as.character(gathered[,2])
-  }
-  dplyr::arrange(gathered, pair.name.1)
+
+  (df %>%  dplyr::do_(.dots=setNames(list(~do_cor_each(.)), output_cols[[1]])) %>%  tidyr::unnest_(output_cols[[1]]))
 }
 
 #'
@@ -56,55 +56,26 @@ calc_cor <- function(df,
 #' @param method Method of calculation. This can be one of "pearson", "kendall", or "spearman".
 #' @return correlations between pairs of columns
 #' @export
-calc_cor_var <- function(df, ..., use="pairwise.complete.obs", method="pearson"){
+do_cor.variables <- function(df, ..., use="pairwise.complete.obs", method="pearson", distinct=FALSE, diag=FALSE){
   loadNamespace("dplyr")
   loadNamespace("lazyeval")
   loadNamespace("tibble")
   # select columns using dplyr::select logic
-  selected_df <- dplyr::select_(df, .dots = lazyeval::lazy_dots(...))
+  select_dots <- lazyeval::lazy_dots(...)
+  grouped_col <- grouped_by(df)
+  output_cols <- avoid_conflict(grouped_col, c("pair.name.1", "pair.name.2", "cor.value"))
   # check if the df's grouped
-  indices <- attr(selected_df, "indices")
-  labels <- attr(selected_df, "labels")
-  if(is.null(indices)){
-    # not grouped case
-    indices <- list(seq(nrow(df))-1)
-    calc_df <- selected_df
-    label_df <- NULL
-  } else {
-    # grouped case: split data column and label column
-    calc_df <- selected_df[,!colnames(selected_df) %in% colnames(labels)]
-    label_df <- selected_df[,colnames(selected_df) %in% colnames(labels)]
-  }
-  df_list <- lapply(indices, function(index){
-    input_df <- calc_df[index+1, ]
-    # "pairwise.complete.obs" is to ignore NA. Range is the area of df columns to calculate
-    cor_result <- as.data.frame(cor(input_df, use = use, method=method))
-    # put label to recognize row names
-    rownames(cor_result) <- colnames(input_df)
-    df_list <- lapply(colnames(input_df), function(name){
-      # get values for each column
-      val <- cor_result[,name]
-      data.frame(pair.name.1 = rep(name, length(val)), pair.name.2 = colnames(input_df), cor.value=val, stringsAsFactors = FALSE)
-    })
-    output_df <- do.call(rbind, df_list)
-    if(is.null(label_df)){
-      # not grouped case
-      output_df
+  do_cor_each <- function(df){
+    mat <- dplyr::select_(df, .dots = select_dots) %>%  as.matrix()
+    cor_mat <- cor(mat, use = use, method = method)
+    if(distinct){
+      ret <- upper_gather(cor_mat, diag=diag, cnames=output_cols)
     } else {
-      # grouped case: create group label column
-      cols <- lapply(colnames(label_df), function(colname){
-        df <- data.frame(unlist(replicate(nrow(output_df), label_df[index[[1]]+1, colname])), stringsAsFactors = FALSE)
-        colnames(df) <- colname
-        df
-      })
-      label <- do.call(rbind, replicate(nrow(output_df), label_df[1,]))
-      group_df <- do.call(cbind, cols)
-
-      cbind(group_df, output_df)
+      ret <- mat_to_df(cor_mat, cnames=output_cols,diag=diag)
     }
-  })
-  result <- do.call(rbind, df_list)
-  tibble::repair_names(result, sep="_")
+  }
+
+  (df %>%  dplyr::do_(.dots=setNames(list(~do_cor_each(.)), output_cols[[1]])) %>%  tidyr::unnest_(output_cols[[1]]))
 }
 
 #' Calculate svd from tidy format. This can be used to calculate coordinations by reducing dimensionality.
@@ -120,9 +91,9 @@ calc_cor_var <- function(df, ..., use="pairwise.complete.obs", method="pearson")
 #' @param n_component Number of dimensions to return.
 #' @return Tidy format of data frame.
 #' @export
-do_svd <- function(df,
-                   group,
-                   dimension,
+do_svd.kv <- function(df,
+                   subject,
+                   key,
                    value,
                    type="group",
                    fill=0,
@@ -133,8 +104,8 @@ do_svd <- function(df,
   loadNamespace("dplyr")
   loadNamespace("tibble")
   loadNamespace("tidyr")
-  group_col <- col_name(substitute(group))
-  dimension_col <- col_name(substitute(dimension))
+  subject_col <- col_name(substitute(subject))
+  dimension_col <- col_name(substitute(key))
   value_col <- col_name(substitute(value))
 
   grouped_col <- grouped_by(df)
@@ -143,7 +114,7 @@ do_svd <- function(df,
 
   # this is executed on each group
   do_svd_each <- function(df){
-    matrix <-simple_cast(df, group_col, dimension_col, value_col, fun.aggregate = fun.aggregate, fill=fill)
+    matrix <-simple_cast(df, subject_col, dimension_col, value_col, fun.aggregate = fun.aggregate, fill=fill)
     if(centering){
       # move the origin to center of data
       matrix <- sweep(matrix, 2, colMeans(matrix), "-")
@@ -154,11 +125,12 @@ do_svd <- function(df,
 
       if (output=="wide") {
         ret <- as.data.frame(mat)
-        colnames(ret) <- avoid_conflict(c(grouped_col, group_col), paste("axis", seq(ncol(mat)), sep=""))
-        df <- setNames(data.frame(a=as.character(rownames(matrix)), stringsAsFactors = FALSE), group_col)
+        colnames(ret) <- avoid_conflict(c(grouped_col, subject_col), paste("axis", seq(ncol(mat)), sep=""))
+        rnames <- same_type(rownames(matrix), df[[subject_col]])
+        df <- setNames(data.frame(rnames, stringsAsFactors = FALSE), subject_col)
         ret <- cbind(df, ret)
       } else if (output=="long") {
-        cnames <- avoid_conflict(grouped_col, c(group_col, "new.dimension", value_cname))
+        cnames <- avoid_conflict(grouped_col, c(subject_col, "new.dimension", value_cname))
         rownames(mat) <- rownames(matrix)
         ret <- mat_to_df(mat, cnames)
       } else {
@@ -173,7 +145,8 @@ do_svd <- function(df,
       if (output=="wide") {
         ret <- as.data.frame(mat)
         colnames(ret) <- avoid_conflict(c(grouped_col, dimension_col), paste("axis", seq(ncol(mat)), sep=""))
-        df <- setNames(data.frame(a=as.character(rownames(mat)), stringsAsFactors = FALSE), dimension_col)
+        rnames <- same_type(rownames(mat), df[[subject_col]])
+        df <- setNames(data.frame(rnames, stringsAsFactors = FALSE), dimension_col)
         ret <- cbind(df, ret)
       } else if (output=="long") {
         cnames <- avoid_conflict(grouped_col, c(dimension_col, "new.dimension", value_cname))
@@ -187,10 +160,10 @@ do_svd <- function(df,
       if (output=="wide") {
         mat <- matrix(variance[component], ncol=length(component))
         ret <- as.data.frame(mat)
-        colnames(ret) <- avoid_conflict(c(group_col), paste("axis", seq(ncol(mat)), sep=""))
+        colnames(ret) <- avoid_conflict(c(subject_col), paste("axis", seq(ncol(mat)), sep=""))
       } else if (output=="long") {
         ret <- data.frame(component = component, svd.value = variance[component])
-        colnames(ret) <- avoid_conflict(group_col, c("new.dimension", value_cname))
+        colnames(ret) <- avoid_conflict(subject_col, c("new.dimension", value_cname))
       } else {
         stop(paste(output, "is not supported as output"))
       }

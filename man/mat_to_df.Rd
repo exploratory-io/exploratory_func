@@ -4,7 +4,7 @@
 \alias{mat_to_df}
 \title{matrix to dataframe with gathered form}
 \usage{
-mat_to_df(mat, cnames = NULL, na.rm = TRUE)
+mat_to_df(mat, cnames = NULL, na.rm = TRUE, diag = TRUE)
 }
 \description{
 matrix to dataframe with gathered form
