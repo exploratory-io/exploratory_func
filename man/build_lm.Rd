@@ -4,7 +4,7 @@
 \alias{build_lm}
 \title{lm wrapper with do}
 \usage{
-build_lm(df, ..., keep.source = FALSE, augment = F)
+build_lm(df, ..., keep.source = FALSE, augment = FALSE)
 }
 \value{
 deta frame which has lm model

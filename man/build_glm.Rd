@@ -4,7 +4,7 @@
 \alias{build_glm}
 \title{glm wrapper with do}
 \usage{
-build_glm(df, ..., keep.source = FALSE, augment = F)
+build_glm(df, ..., keep.source = FALSE, augment = FALSE)
 }
 \value{
 deta frame which has glm model

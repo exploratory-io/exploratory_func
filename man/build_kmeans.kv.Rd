@@ -2,11 +2,11 @@
 % Please edit documentation in R/model_builder.R
 \name{build_kmeans.kv}
 \alias{build_kmeans.kv}
-\title{kmeans wrapper with do}
+\title{kmeans wrapper with do with key-value columns as input}
 \usage{
 build_kmeans.kv(df, subject, key, value, centers = 3, iter.max = 10,
   nstart = 1, algorithm = "Hartigan-Wong", trace = FALSE,
-  keep.source = FALSE, seed = 0, augment = F, fun.aggregate = mean,
+  keep.source = FALSE, seed = 0, augment = FALSE, fun.aggregate = mean,
   fill = 0)
 }
 \arguments{
@@ -20,6 +20,6 @@ build_kmeans.kv(df, subject, key, value, centers = 3, iter.max = 10,
 deta frame which has kmeans model
 }
 \description{
-kmeans wrapper with do
+kmeans wrapper with do with key-value columns as input
 }
 

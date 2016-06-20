@@ -54,7 +54,7 @@ test_that("test build_kmeans.variables augment=T", {
       %>%
         build_kmeans.variables(vec1, vec2, rand, centers=2, augment=T)
     )
-    expect_equal(nrow(result), 5)
+    expect_equal(nrow(result), 10)
   }
 })
 
@@ -107,4 +107,10 @@ test_that("test build_kmeans.variables ignore NA rows with grouped and keep.sour
       %>%  broom::tidy(model))
     expect_equal(dim(result)[[1]], 2)
   }
+})
+
+test_that("test build_kmeans.variables", {
+  df <- readRDS("~/Downloads/123flight_source_0.rds")
+  browser()
+  build_kmeans.variables(df, DISTANCE)
 })

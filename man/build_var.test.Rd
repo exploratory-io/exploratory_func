@@ -4,7 +4,7 @@
 \alias{build_var.test}
 \title{var.test wrapper with do}
 \usage{
-build_var.test(df, ..., keep.source = FALSE, augment = F)
+build_var.test(df, ..., keep.source = FALSE, augment = FALSE)
 }
 \value{
 deta frame which has var.test model

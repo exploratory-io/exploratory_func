@@ -146,7 +146,7 @@ build_kmeans.variables <- function(df, ...,
   omit_df <- na.omit(df[,selected_column])
   omit_row <- attr(omit_df, "na.action")
   if(!is.null(omit_row)){
-    df <- df[omit_row, ]
+    df <- df[setdiff(seq(nrow(df)), omit_row), ]
   }
 
   build_kmeans_each <- function(df){
