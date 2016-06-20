@@ -141,11 +141,16 @@ build_kmeans.variables <- function(df, ...,
   grouped_column <- grouped_by(df)
   model_column <- avoid_conflict(grouped_column, "model")
   source_column <- avoid_conflict(grouped_column, "source.data")
-  cluster_column <- avoid_conflict(colnames(df), ".cluster")
+  selected_column <- setdiff(colnames(dplyr::select_(df, .dots=select_dots)), grouped_column)
+
+  omit_df <- na.omit(df[,selected_column])
+  omit_row <- attr(omit_df, "na.action")
+  if(!is.null(omit_row)){
+    df <- df[omit_row, ]
+  }
 
   build_kmeans_each <- function(df){
-    df <- na.omit(df)
-    mat <- dplyr::select_(df, .dots=select_dots) %>%  as.matrix() %>%  na.omit()
+    mat <- dplyr::select_(df, .dots=select_dots) %>% as.matrix()
     kmeans_ret <- kmeans(mat, centers = centers, iter.max = 10, nstart = nstart, algorithm = algorithm, trace = trace)
     if(augment){
       broom::augment(kmeans_ret, df)
@@ -157,7 +162,7 @@ build_kmeans.variables <- function(df, ...,
   if(keep.source & !augment){
     output <- (
       df
-      %>%  dplyr::do_(.dots=setNames(list(~build_kmeans_each(.), ~(na.omit(.))), c(model_column, source_column)))
+      %>%  dplyr::do_(.dots=setNames(list(~build_kmeans_each(.), ~(.)), c(model_column, source_column)))
     )
     # Add a class for Exploratyry to recognize the type of .source.data
     class(output[[source_column]]) <- c("list", ".source.data")
