@@ -91,19 +91,19 @@ test_that("calc_tf weight binary", {
   expect_equal(colnames(result)[[4]], "tf")
 })
 
-test_that("calc_tfidf smooth_idf FALSE", {
+test_that("calc_idf smooth_idf FALSE", {
   loadNamespace("dplyr")
   test_df <- data.frame(id=rep(c(1,2), 5), word=c("this", "this", letters[1:8]))
   result <- result <- calc_idf(test_df$id, test_df$word)
   expect_equal(head(result$.idf,2), c(0, 0))
 })
 
-test_that("calc_tfidf", {
+test_that("do_tfidf", {
   loadNamespace("dplyr")
   test_df <- data.frame(id=rep(c(1,2), 5), word=c("this", "this", "this", letters[1:7]))
   result <- (
     test_df %>%
-      calc_tfidf(id, word)
+      do_tfidf(id, word)
   )
   expect_equal(head(result$tfidf,2), c(log(2/1)/5, log(2/1)/5))
 })

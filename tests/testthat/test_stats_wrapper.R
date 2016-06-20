@@ -7,14 +7,14 @@ tidy_test_df <- data.frame(
   val=seq(20),
   dim_na=c(paste0("dim", seq(10)), paste0("dim", seq(10)+3)))
 
-test_that("test calc_cor_var", {
+test_that("test do_cor.variables", {
   result <- (
     spread_test_df
-    %>%  calc_cor_var(starts_with("var")))
-  expect_equal(result[["cor.value"]], rep(1, 4))
+    %>%  do_cor.variables(starts_with("var")))
+  expect_equal(result[["cor.value"]], rep(1, 2))
 })
 
-test_that("test calc_cor_var for grouped df", {
+test_that("test do_cor.variables for grouped df", {
   loadNamespace("dplyr")
   group1 <- cbind(spread_test_df, data.frame(group=rep("group1", 4)))
   group2 <- cbind(spread_test_df, data.frame(group=rep("group2", 4)))
@@ -23,23 +23,23 @@ test_that("test calc_cor_var for grouped df", {
   result <- (
     test_df
     %>%  dplyr::group_by(group)
-    %>%  calc_cor_var(starts_with("var")))
-  expect_equal(dim(result), c(8, 4))
+    %>%  do_cor.variables(starts_with("var")))
+  expect_equal(dim(result), c(4, 4))
 })
 
-test_that("test calc_cor for duplicated pair", {
-  result <- tidy_test_df %>%  calc_cor(cat, dim, val)
+test_that("test do_cor.kv for duplicated pair", {
+  result <- tidy_test_df %>%  do_cor.kv(cat, dim, val)
   expect_equal(ncol(result), 3)
   expect_equal(result[["pair.name.1"]], c("cat1", "cat2"))
   expect_equal(result[["pair.name.2"]], c("cat2", "cat1"))
   expect_equal(result[["cor.value"]], replicate(2, 1))
 })
 
-test_that("test calc_cor_cat for empty value", {
-  result <- tidy_test_df %>%  calc_cor(cat, dim_na, val)
+test_that("test do_cor.kv for empty value", {
+  result <- tidy_test_df %>%  do_cor.kv(cat, dim_na, val)
 })
 
-test_that("test do_svd output wide", {
+test_that("test do_svd.kv output wide", {
   if(requireNamespace("broom")){
     test_df <- data.frame(
       rand=runif(20, min = 0, max=10),
@@ -48,13 +48,13 @@ test_that("test do_svd output wide", {
     loadNamespace("dplyr")
     result <- (
       test_df
-      %>%  do_svd(axis2, col, rand, n_component=3, output="wide"))
+      %>%  do_svd.kv(axis2, col, rand, n_component=3, output="wide"))
     expect_equal(colnames(result), c("axis2","axis1", "axis2.new", "axis3"))
     expect_true(any(result[,1]=="group1"))
   }
 })
 
-test_that("test do_svd", {
+test_that("test do_svd.kv", {
   if(requireNamespace("broom")){
     test_df <- data.frame(
       rand=runif(20, min = 0, max=10),
@@ -63,31 +63,32 @@ test_that("test do_svd", {
     loadNamespace("dplyr")
     result <- (
       test_df
-      %>%  do_svd(axis2, col, rand, n_component=3))
+      %>%  do_svd.kv(axis2, col, rand, n_component=3))
     expect_equal(colnames(result), c("axis2","new.dimension", "svd.value"))
     expect_true(any(result[[1]]=="group1"))
     expect_true(any(result[[2]]==1))
   }
 })
 
-test_that("test do_svd with group_by, output=wide", {
+test_that("test do_svd.kv with group_by, output=wide", {
   if(requireNamespace("broom")){
     test_df <- data.frame(
       rand=runif(20, min = 0, max=10),
-      group=paste("group",c(rep(1,5), rep(2, 5), rep(3, 5), rep(4, 5)), sep=""),
+      group=c(rep(1,5), rep(2, 5), rep(3, 5), rep(4, 5)),
       axis1=paste("group",c(rep(1,10), rep(2, 10)), sep=""),
       col=rep(seq(5),4), stringsAsFactors = FALSE)
     loadNamespace("dplyr")
     result <- (
       test_df
       %>%  dplyr::group_by(axis1)
-      %>%  do_svd(group, col, rand, output="wide"))
+      %>%  do_svd.kv(group, col, rand, output="wide"))
     expect_equal(colnames(result), c("axis1","group","axis1.new", "axis2"))
     expect_true(any(result[[1]]=="group2"))
+    expect_equal(result[[2]], c(1, 2, 3, 4))
   }
 })
 
-test_that("test do_svd with group_by output=long", {
+test_that("test do_svd.kv with group_by output=long", {
   if(requireNamespace("broom")){
     test_df <- data.frame(
       vec1=seq(20),
@@ -101,7 +102,7 @@ test_that("test do_svd with group_by output=long", {
     result <- (
       test_df
       %>%  dplyr::group_by(group2)
-      %>%  do_svd(group, col, rand, n_component=3))
+      %>%  do_svd.kv(group, col, rand, n_component=3))
     expect_true(!is.unsorted(result[,1]))
     expect_equal(colnames(result), c("group2","group","new.dimension", "svd.value"))
     expect_true(any(result[,1]=="group2"))
@@ -122,7 +123,7 @@ test_that("test do_svd of dimension, output=wide", {
       col=rep(seq(5),4))
     result <- (
       test_df
-      %>%  do_svd(group, col, rand, type="dimension", output="wide"))
+      %>%  do_svd.kv(group, col, rand, type="dimension", output="wide"))
     expect_true(!is.unsorted(result[,1]))
     expect_equal(colnames(result), c("col","axis1", "axis2", "axis3"))
     expect_true(any(result[[1]]=="1"))
@@ -141,7 +142,7 @@ test_that("test do_svd of dimension output long", {
       col=rep(seq(5),4))
     result <- (
       test_df
-      %>%  do_svd(group, col, rand, type="dimension"))
+      %>%  do_svd.kv(group, col, rand, type="dimension"))
     expect_equal(colnames(result), c("col","new.dimension", "svd.value"))
     expect_true(any(result[[1]]==1))
     expect_true(any(result[[2]]==1))
@@ -160,7 +161,7 @@ test_that("test do_svd of variance output=wide", {
       col=rep(seq(5),4))
     result <- (
       test_df
-      %>%  do_svd(group, col, rand, type="variance", n_component=2, output="wide"))
+      %>%  do_svd.kv(group, col, rand, type="variance", n_component=2, output="wide"))
     expect_equal(colnames(result),c("axis1", "axis2"))
     expect_equal(nrow(result),1)
   }
@@ -178,10 +179,19 @@ test_that("test do_svd of variance output", {
       col=rep(seq(5),4))
     result <- (
       test_df
-      %>%  do_svd(group, col, rand, type="variance", n_component=2))
+      %>%  do_svd.kv(group, col, rand, type="variance", n_component=2))
     expect_equal(colnames(result), c("new.dimension", "svd.value"))
     expect_equal(nrow(result),2)
   }
+})
+
+test_that("test do_cmdscale", {
+  sample <- readRDS("~/Downloads/Signup_ungroup_19_mutate_8.rds")
+  mat <- simple_cast(sample, "tool", "email", "num")
+  distance <- dist(mat, method="binary")
+  mds <- cmdscale(distance)
+  df <- setNames(data.frame(attr(distance, "Labels"), stringsAsFactors = F ), "tool")
+  ret <- cbind(df, as.data.frame(mds))
 })
 
 

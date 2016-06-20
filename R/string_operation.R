@@ -178,7 +178,7 @@ calc_tf_ <- function(df, group_col, term_col, weight="ratio", k=0.5){
 #' Function to scale IDF. It might be worth trying log2 or log10.
 #' log10 strongly suppress the increase of idf values and log2 does it more weakly.
 #' @export
-calc_tfidf <- function(df, group, term, idf_log_scale = log, tf_weight="ratio", tf_k=0.5){
+do_tfidf <- function(df, group, term, idf_log_scale = log, tf_weight="ratio", tf_k=0.5){
   loadNamespace("tidytext")
   loadNamespace("dplyr")
 
@@ -231,4 +231,10 @@ do_ngram <- function(df, token, n=1:2, skip=0){
     })
     tidyr::unnest_(labels, token_col)
   }
+}
+
+#' Calculate sentiment
+calc_sentiment <- function(text){
+  loadNamespace("sentimentr")
+  sentimentr::sentiment_by(text)$ave_sentiment
 }
