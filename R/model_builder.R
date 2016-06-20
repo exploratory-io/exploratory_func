@@ -4,7 +4,7 @@
 #' Create do wrapper function with source data
 #' @return do wrapper function
 build_data <- function(funcname) {
-  ret <- function(df, ..., keep.source = FALSE, augment=F){
+  ret <- function(df, ..., keep.source = FALSE, augment=FALSE){
     loadNamespace("dplyr")
     grouped_column <- grouped_by(df)
     model_column <- avoid_conflict(grouped_column, "model")
@@ -68,7 +68,7 @@ build_kmeans.kv <- function(df,
                             trace = FALSE,
                             keep.source = FALSE,
                             seed=0,
-                            augment=F,
+                            augment=FALSE,
                             fun.aggregate=mean,
                             fill=0){
   loadNamespace("dplyr")
@@ -98,7 +98,7 @@ build_kmeans.kv <- function(df,
   model_column <- avoid_conflict(grouped_column, "model")
   source_column <- avoid_conflict(grouped_column, "source.data")
 
-  if(keep.source){
+  if(keep.source & !augment){
     output <- (
       df
       %>%  dplyr::do_(.dots=setNames(list(~build_kmeans_each(.), ~(.)), c(model_column, source_column)))
@@ -110,12 +110,11 @@ build_kmeans.kv <- function(df,
       df
       %>%  dplyr::do_(.dots=setNames(list(~build_kmeans_each(.)), model_column))
     )
-    if(augment){
-      output <- tidyr::unnest_(output, model_column)
-    }
   }
   # Add a class for Exploratyry to recognize the type of .model
-  if(!augment){
+  if(augment){
+    output <- tidyr::unnest_(output, model_column)
+  } else {
     class(output[[model_column]]) <- c("list", ".model", ".model.kmeans")
   }
   output
@@ -129,7 +128,7 @@ build_kmeans.variables <- function(df, ...,
                             trace = FALSE,
                             keep.source = FALSE,
                             seed=0,
-                            augment=F){
+                            augment=FALSE){
   loadNamespace("dplyr")
   loadNamespace("lazyeval")
   loadNamespace("tidyr")
@@ -153,7 +152,7 @@ build_kmeans.variables <- function(df, ...,
     }
   }
 
-  if(keep.source){
+  if(keep.source & !augment){
     output <- (
       df
       %>%  dplyr::do_(.dots=setNames(list(~build_kmeans_each(.), ~(na.omit(.))), c(model_column, source_column)))
@@ -165,12 +164,11 @@ build_kmeans.variables <- function(df, ...,
       df
       %>%  dplyr::do_(.dots=setNames(list(~build_kmeans_each(.)), model_column))
     )
-    if(augment){
-      output <- tidyr::unnest_(output, model_column)
-    }
   }
-  # Add a class for Exploratyry to recognize the type of .model
-  if(!augment){
+  if(augment){
+    output <- tidyr::unnest_(output, model_column)
+  } else {
+    # Add a class for Exploratyry to recognize the type of .model
     class(output[[model_column]]) <- c("list", ".model", ".model.kmeans")
   }
   output

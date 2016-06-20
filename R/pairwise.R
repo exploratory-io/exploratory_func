@@ -118,7 +118,6 @@ do_dist.variables <- function(df, ..., label=NULL, fill=0, fun.aggregate=mean, d
   # this is executed on each group
   calc_dist_each <- function(df){
     mat <- df %>%  dplyr::select_(.dots=select_dots) %>%  as.matrix()
-    browser()
     if(!is.null(label_col)){
       rownames(mat) <- df[[label_col]]
     }
