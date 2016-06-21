@@ -32,6 +32,12 @@ augment_glm <- broom::augment
 augment_kmeans <- function(df, model, data){
   model_col <- col_name(substitute(model))
   data_col <- col_name(substitute(data))
+  if(!model_col %in% colnames(df)){
+    stop(paste(model_col, "is not in column names"), sep=" ")
+  }
+  if(!data_col %in% colnames(df)){
+    stop(paste(data_col, "is not in column names"), sep=" ")
+  }
   tryCatch({
     # use do.call to evaluate data_col from a variable
     augment_func <- get("augment", asNamespace("broom"))
@@ -48,6 +54,11 @@ augment_kmeans <- function(df, model, data){
       augment_each <- function(df_each){
         source_data <- df_each[[data_col]]
         kmeans_obj <- df_each[[model_col]]
+        if(!is.data.frame(source_data)){
+          source_data <- source_data[[1]]
+          kmeans_obj <- kmeans_obj[[1]]
+        }
+
         subject_colname <- attr(kmeans_obj, "subject_colname")
         index <- as.factor(source_data[[subject_colname]])
         source_data[[cluster_col]] <- kmeans_obj$cluster[index]
@@ -55,6 +66,8 @@ augment_kmeans <- function(df, model, data){
       }
 
       (df %>%  dplyr::do_(.dots=setNames(list(~augment_each(.)), model_col)) %>%  tidyr::unnest_(model_col))
+    } else {
+      stop(e)
     }
   })
 }
