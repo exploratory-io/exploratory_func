@@ -101,7 +101,7 @@ do_dist.kv <- function(df, subject, key, value, fill=0, fun.aggregate=mean, dist
 #' @param diag If similarity between itself should be returned or not.
 #' @param method Type of calculation. https://cran.r-project.org/web/packages/proxy/vignettes/overview.pdf
 #' @export
-do_dist.variables <- function(df, ..., label=NULL, fill=0, fun.aggregate=mean, distinct=FALSE, diag=FALSE, method="euclidean", p=2 ){
+do_dist.cols <- function(df, ..., label=NULL, fill=0, fun.aggregate=mean, distinct=FALSE, diag=FALSE, method="euclidean", p=2 ){
   loadNamespace("dplyr")
   loadNamespace("tidyr")
   loadNamespace("reshape2")

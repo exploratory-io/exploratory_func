@@ -56,7 +56,7 @@ do_cor.kv <- function(df,
 #' @param method Method of calculation. This can be one of "pearson", "kendall", or "spearman".
 #' @return correlations between pairs of columns
 #' @export
-do_cor.variables <- function(df, ..., use="pairwise.complete.obs", method="pearson", distinct=FALSE, diag=FALSE){
+do_cor.cols <- function(df, ..., use="pairwise.complete.obs", method="pearson", distinct=FALSE, diag=FALSE){
   loadNamespace("dplyr")
   loadNamespace("lazyeval")
   loadNamespace("tibble")

@@ -4,7 +4,7 @@
 \alias{build_t.test}
 \title{t.test wrapper with do}
 \usage{
-build_t.test(df, ..., keep.source = FALSE, augment = F)
+build_t.test(df, ..., keep.source = FALSE, augment = FALSE)
 }
 \value{
 deta frame which has t.test model

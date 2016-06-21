@@ -4,7 +4,7 @@
 \alias{augment_kmeans}
 \title{augment for kmeans}
 \usage{
-augment_kmeans(x, ...)
+augment_kmeans(df, model, data)
 }
 \description{
 augment for kmeans
