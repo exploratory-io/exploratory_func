@@ -186,12 +186,29 @@ test_that("test do_svd of variance output", {
 })
 
 test_that("test do_cmdscale", {
-  sample <- readRDS("~/Downloads/Signup_ungroup_19_mutate_8.rds")
-  mat <- simple_cast(sample, "tool", "email", "num")
-  distance <- dist(mat, method="binary")
-  mds <- cmdscale(distance)
-  df <- setNames(data.frame(attr(distance, "Labels"), stringsAsFactors = F ), "tool")
-  ret <- cbind(df, as.data.frame(mds))
+  loadNamespace("reshape2")
+  mat <- matrix(c(1,2,3,3,4,5,5,6,6,8,1,2), nrow=4)
+  rownames(mat) <- paste("row", seq(nrow(mat)))
+  distance <- dist(mat)
+  mds_result <- cmdscale(distance, eig=TRUE)
+  points <- mds_result$points
+  eig <- mds_result$eig
+
+  test_df <- reshape2::melt(mat)
+
+  df_tt <- calc_dist(test_df, Var1, Var2, value, distinct=TRUE ,diag=TRUE)
+  df_tf <- calc_dist(test_df, Var1, Var2, value, distinct=TRUE ,diag=FALSE)
+  df_ft <- calc_dist(test_df, Var1, Var2, value, distinct=FALSE ,diag=TRUE)
+  df_ff <- calc_dist(test_df, Var1, Var2, value, distinct=FALSE ,diag=FALSE)
+  ret_tt <- do_cmdscale(df_tt, pair.name.1, pair.name.2, dist.value)
+  ret_tf <- do_cmdscale(df_tf, pair.name.1, pair.name.2, dist.value)
+  ret_ft <- do_cmdscale(df_ft, pair.name.1, pair.name.2, dist.value)
+  ret_ff <- do_cmdscale(df_ff, pair.name.1, pair.name.2, dist.value)
+  expect_equal(c(ret_tt[[2]], ret_tf[[2]], ret_ft[[2]], ret_ff[[2]]), setNames(rep(points[,1], 4), NULL))
+
+  half_df <- distance %>% as.vector()  %>%  upper_gather(attr(distance, "Labels"), diag=TRUE)
+  result_half <- do_cmdscale(half_df, Var1, Var2, value)
+
 })
 
 
