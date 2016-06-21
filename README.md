@@ -7,7 +7,7 @@ Install the R package using the following commands on the R console:
 ``` r
 install.packages("devtools")
 devtools::install_github("exploratory-io/exploratory_func")
-library(exporatory)
+library(exploratory)
 ```
 
 ## How to develop your own functions
