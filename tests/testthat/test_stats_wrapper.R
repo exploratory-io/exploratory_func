@@ -1,5 +1,5 @@
 context("tests for wrappers of stats package")
-options(warn=2)
+
 spread_test_df <- data.frame(var1 = c(1, 3, 2, NA), var2 = c(1, 3, 2, 10))
 tidy_test_df <- data.frame(
   cat=rep(c("cat1", "cat2"), 20),
@@ -196,10 +196,10 @@ test_that("test do_cmdscale", {
 
   test_df <- reshape2::melt(mat)
 
-  df_tt <- calc_dist(test_df, Var1, Var2, value, distinct=TRUE ,diag=TRUE)
-  df_tf <- calc_dist(test_df, Var1, Var2, value, distinct=TRUE ,diag=FALSE)
-  df_ft <- calc_dist(test_df, Var1, Var2, value, distinct=FALSE ,diag=TRUE)
-  df_ff <- calc_dist(test_df, Var1, Var2, value, distinct=FALSE ,diag=FALSE)
+  df_tt <- do_dist.kv(test_df, Var1, Var2, value, distinct=TRUE ,diag=TRUE)
+  df_tf <- do_dist.kv(test_df, Var1, Var2, value, distinct=TRUE ,diag=FALSE)
+  df_ft <- do_dist.kv(test_df, Var1, Var2, value, distinct=FALSE ,diag=TRUE)
+  df_ff <- do_dist.kv(test_df, Var1, Var2, value, distinct=FALSE ,diag=FALSE)
   ret_tt <- do_cmdscale(df_tt, pair.name.1, pair.name.2, dist.value)
   ret_tf <- do_cmdscale(df_tf, pair.name.1, pair.name.2, dist.value)
   ret_ft <- do_cmdscale(df_ft, pair.name.1, pair.name.2, dist.value)

@@ -25,13 +25,13 @@ test_that("test get_stop_words", {
   expect_true(any(result == "a"))
 })
 
-test_that("test get_sentiment", {
-  result <- get_sentiment("good")
+test_that("test word_to_sentiment", {
+  result <- word_to_sentiment("good")
   expect_equal(result, "positive")
 })
 
-test_that("test get_sentiment", {
-  result <- get_sentiment("bad", lexicon = "AFINN")
+test_that("test word_to_sentiment", {
+  result <- word_to_sentiment("bad", lexicon = "AFINN")
   expect_equal(result, -3)
 })
 

@@ -4,8 +4,8 @@
 \alias{do_cmdscale}
 \title{Calculate svd from tidy format. This can be used to calculate coordinations by reducing dimensionality.}
 \usage{
-do_cmdscale(df, pair_name1, pair_name2, value, k = 2, eig = FALSE,
-  fun.aggregate = mean, fill = 0)
+do_cmdscale(df, pair_name1, pair_name2, value, k = 2, fun.aggregate = mean,
+  fill = 0)
 }
 \arguments{
 \item{df}{Data frame which has group and dimension}

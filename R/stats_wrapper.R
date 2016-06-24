@@ -185,7 +185,6 @@ do_cmdscale <- function(df,
                         pair_name2,
                         value,
                         k=2,
-                        eig=FALSE,
                         fun.aggregate=mean,
                         fill=0){
   loadNamespace("dplyr")
@@ -193,6 +192,9 @@ do_cmdscale <- function(df,
   pair1_col <- col_name(substitute(pair_name1))
   pair2_col <- col_name(substitute(pair_name2))
   value_col <- col_name(substitute(value))
+  grouped_col <- grouped_by(df)
+
+  name_col <- avoid_conflict(grouped_col, "name")
 
   do_cmdscale_each <- function(df){
     mat <- simple_cast(df, pair1_col, pair2_col, value_col, fun.aggregate = fun.aggregate, fill=fill)
@@ -202,21 +204,17 @@ do_cmdscale <- function(df,
       diffcol <- setdiff(rnames, cnames)
       diffrow <- setdiff(cnames, rnames)
       if(!(length(diffcol)==1 & length(diffrow)==1)){
-        stop(paste("Can't create dist matrix from ", pair_name1, " and ", pair_name2), collapse=" ")
+        stop(paste("Can't create dist matrix from ", pair1_col, " and ", pair2_col), collapse=" ")
       } else {
+        # Create diagonal elements to be recognized as dist matrix
         mat <- cbind(matrix(0, nrow=nrow(mat), ncol=1, dimnames = list(NULL, diffcol)), mat)
         mat <- rbind(mat, matrix(0, nrow=1, ncol=ncol(mat), dimnames = list(diffrow, NULL)))
       }
     }
-    if(eig){
-      mds <- cmdscale(as.dist(t(mat)), eig=TRUE)
-      points <- mds$points
-      result_df <- cbind(as.data.frame(points), setNames(data.frame(mds$eig),"eig"))
-    } else {
-      points <- cmdscale(as.dist(t(mat)), eig=FALSE)
-      result_df <- as.data.frame(points)
-    }
-    df <- setNames(data.frame(rownames(points), stringsAsFactors = F ), "tool")
+    points <- cmdscale(as.dist(t(mat)), eig=FALSE, k=k)
+    result_df <- as.data.frame(points)
+
+    df <- setNames(data.frame(rownames(points), stringsAsFactors=FALSE), name_col)
     ret <- cbind(df, result_df)
     ret
   }
