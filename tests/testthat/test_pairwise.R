@@ -96,3 +96,16 @@ test_that("test do_dist.kv distinct TRUE", {
 
   expect_equal(nrow(result), 6)
 })
+
+test_that("test do_dist.cols", {
+  loadNamespace("dplyr")
+
+  test_df <- data.frame(var1=c(1,2,2,2), var2=c(2,1,1,1))
+
+  result <- (
+    test_df %>%
+      do_dist.cols(starts_with("var"))
+  )
+
+  expect_equal(result$dist.value, c(2,2))
+})
