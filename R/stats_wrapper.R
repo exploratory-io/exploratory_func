@@ -196,6 +196,7 @@ do_cmdscale <- function(df,
 
   name_col <- avoid_conflict(grouped_col, "name")
 
+  # this is executed on each group
   do_cmdscale_each <- function(df){
     mat <- simple_cast(df, pair1_col, pair2_col, value_col, fun.aggregate = fun.aggregate, fill=fill)
     cnames <- colnames(mat)
