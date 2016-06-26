@@ -41,7 +41,7 @@ get_stopwords <- function(lexicon="snowball"){
 #' @param lexicon Type of sentiment. One of "nrc" "bing" "AFINN".
 #' @return Vector of sentiment.
 #' @export
-get_sentiment <- function(words, lexicon="bing"){
+word_to_sentiment <- function(words, lexicon="bing"){
   loadNamespace("tidytext")
   loadNamespace("dplyr")
   data("sentiments", package = "tidytext", envir = environment())
@@ -234,7 +234,8 @@ do_ngram <- function(df, token, n=1:2, skip=0){
 }
 
 #' Calculate sentiment
-calc_sentiment <- function(text){
+#' @export
+get_sentiment <- function(text){
   loadNamespace("sentimentr")
   sentimentr::sentiment_by(text)$ave_sentiment
 }

@@ -118,11 +118,9 @@ do_dist.cols <- function(df, ..., label=NULL, fill=0, fun.aggregate=mean, distin
   # this is executed on each group
   calc_dist_each <- function(df){
     mat <- df %>%  dplyr::select_(.dots=select_dots) %>%  as.matrix()
-    if(!is.null(label_col)){
-      rownames(mat) <- df[[label_col]]
-    }
+
     # Dist is actually an atomic vector of upper half so upper and diag arguments don't matter
-    dist <- stats::dist(mat, method=method, diag=FALSE, p=p)
+    dist <- stats::dist(t(mat), method=method, diag=FALSE, p=p)
     if(distinct){
       if(diag){
         diag <- 0

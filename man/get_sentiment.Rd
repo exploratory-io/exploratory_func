@@ -2,19 +2,11 @@
 % Please edit documentation in R/string_operation.R
 \name{get_sentiment}
 \alias{get_sentiment}
-\title{Get sentiments of words}
+\title{Calculate sentiment}
 \usage{
-get_sentiment(words, lexicon = "bing")
-}
-\arguments{
-\item{words}{Vector of words to check sentiment.}
-
-\item{lexicon}{Type of sentiment. One of "nrc" "bing" "AFINN".}
-}
-\value{
-Vector of sentiment.
+get_sentiment(text)
 }
 \description{
-Get sentiments of words
+Calculate sentiment
 }
 
