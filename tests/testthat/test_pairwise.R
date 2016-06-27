@@ -104,7 +104,7 @@ test_that("test do_dist.cols", {
 
   result <- (
     test_df %>%
-      do_dist.cols(starts_with("var"))
+      do_dist.cols(dplyr::starts_with("var"))
   )
 
   expect_equal(result$dist.value, c(2,2))
