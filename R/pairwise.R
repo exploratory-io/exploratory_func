@@ -11,6 +11,7 @@
 do_cosine_sim.kv <- function(df, subject, key, value, distinct=FALSE, diag=FALSE){
   loadNamespace("qlcMatrix")
   loadNamespace("tidytext")
+  loadNamespace("Matrix")
   subject_col <- col_name(substitute(subject))
   key_col <- col_name(substitute(key))
   value_col <- col_name(substitute(value))
@@ -21,7 +22,10 @@ do_cosine_sim.kv <- function(df, subject, key, value, distinct=FALSE, diag=FALSE
 
   # this is executed on each group
   calc_doc_sim_each <- function(df){
-    mat <- df %>%  tidytext::cast_sparse_(key_col, subject_col, value_col)
+    key_fact <- as.factor(df[[key_col]])
+    subject_fact <- as.factor(df[[subject_col]])
+    mat <- Matrix::sparseMatrix(i=as.integer(key_fact), j=as.integer(subject_fact), x=df[[value_col]])
+    colnames(mat) <- levels(subject_fact)
     sim <- qlcMatrix::cosSparse(mat)
     if(distinct){
       if(!diag){
