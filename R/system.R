@@ -89,7 +89,7 @@ getGithubIssues <- function(username, password, owner, repository){
     if(is.null(res$headers$link)){
       is_next <- FALSE
     } else {
-      is_next <- httr::str_detect(res$headers$link, "rel=\"next\"")
+      is_next <- stringr::str_detect(res$headers$link, "rel=\"next\"")
       i <- i + 1
     }
   }
@@ -218,10 +218,10 @@ getGoogleSheet <- function(title, sheetNumber, skipNRows, treatTheseAsNA, firstR
 # API to get a list of available google sheets
 #' @export
 getGoogleSheetList <- function(tokenFileId){
-  require(googlesheets)
+  if(!requireNamespace("googlesheets")){stop("package googlesheets must be installed.")}
   token = getGoogleTokenForSheet(tokenFileId)
-  gs_auth(token)
-  gs_ls()
+  googlesheets::gs_auth(token)
+  googlesheets::gs_ls()
 }
 
 #' @export
