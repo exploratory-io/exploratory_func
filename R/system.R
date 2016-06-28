@@ -28,20 +28,22 @@ saveOrReadPassword = function(source, username, password){
 # password file is consturcted with <source>_<username>.rds format_
 savePasswordRDS = function(sourceName, userName, password){
   loadNamespace("sodium")
+  loadNamespace("stringr")
   cryptoKeyPhrase = getOption("tam.crypto_key")
   key <- sodium::hash(charToRaw(cryptoKeyPhrase))
   noncePhrase = getOption("tam.nonce")
   nonce <- sodium::hash(charToRaw(noncePhrase), size=24)
   msg <- serialize(password, NULL)
   cipher <- sodium::data_encrypt(msg, key, nonce)
-  saveRDS(cipher, file= str_c("../rdata/", sourceName, "_", userName, ".rds"))
+  saveRDS(cipher, file= stringr::str_c("../rdata/", sourceName, "_", userName, ".rds"))
 }
 
 # API to read a password from RDS
 # password file is consturcted with <source>_<username>.rds format_
 readPasswordRDS = function(sourceName, userName){
   loadNamespace("sodium")
-  passwordFlePath <- str_c("../rdata/", sourceName, "_", userName, ".rds")
+  loadNamespace("stringr")
+  passwordFlePath <- stringr::str_c("../rdata/", sourceName, "_", userName, ".rds")
   password <- NULL
   if(file.exists(passwordFlePath)){
     # tryCatch so that we can handle decription failure
@@ -65,18 +67,21 @@ readPasswordRDS = function(sourceName, userName){
 #' @export
 getGithubIssues <- function(username, password, owner, repository){
   # read stored password
+  loadNamespace("stringr")
+  loadNamespace("httr")
+  loadNamespace("dplyr")
   pass = saveOrReadPassword("github", username, password)
 
   # Body
-  endpoint <- str_c("https://api.github.com/repos/", owner, "/", repository, "/issues")
+  endpoint <- stringr::str_c("https://api.github.com/repos/", owner, "/", repository, "/issues")
   pages <- list()
   is_next <- TRUE
   i <- 1
   while(is_next){
-    res <- GET(endpoint,
+    res <- httr::GET(endpoint,
                query = list(state = "all", per_page = 100, page = i),
                authenticate(username, pass))
-    jsondata <- content(res, type = "text", encoding = "UTF-8")
+    jsondata <- httr::content(res, type = "text", encoding = "UTF-8")
     github_df <- jsonlite::fromJSON(jsondata, flatten = TRUE)
     pages[[i]] <- github_df
 
@@ -84,19 +89,19 @@ getGithubIssues <- function(username, password, owner, repository){
     if(is.null(res$headers$link)){
       is_next <- FALSE
     } else {
-      is_next <- str_detect(res$headers$link, "rel=\"next\"")
+      is_next <- httr::str_detect(res$headers$link, "rel=\"next\"")
       i <- i + 1
     }
   }
-  issues <- bind_rows(pages)
+  issues <- dplyr::bind_rows(pages)
 }
 
 # tokenFileId is a unique value per data farme and is used to create a token cache file
 #' @export
 getGoogleTokenForAnalytics <- function(tokenFileId, useCache=TRUE){
-  require(RGoogleAnalytics)
-  require(lubridate)
-  require(stringr)
+  if(!requireNamespace("RGoogleAnalytics")){stop("package RGoogleAnalytics must be installed")}
+  loadNamespace("httr")
+  loadNamespace("stringr")
   # As per Kan, this can be hard coded since Google limits acces per ViewID (tableID) and
   # not by clientID
   clientId <- "1066595427418-aeppbdhi7bj7g0osn8jpj4p6r9vus7ci.apps.googleusercontent.com"
@@ -105,24 +110,24 @@ getGoogleTokenForAnalytics <- function(tokenFileId, useCache=TRUE){
   # tam.oauth_token_cache is RDS file path (~/.exploratory/projects/<projectid>/rdata/placeholder.rds)
   # for each data frame, create token cache as
   # ~/.exploratory/projects/<projectid>/rdata/<tokenFileId_per_dataframe>_ga_token.rds
-  tokenPath = str_replace(cacheOption, "placeholder.rds", str_c(tokenFileId, "_ga_token.rds"))
+  tokenPath = stringr::str_replace(cacheOption, "placeholder.rds", stringr::str_c(tokenFileId, "_ga_token.rds"))
   # since Auth from RGoogleAnalytics does not work well
   # switch to use oauth_app and oauth2.0_token
   token <- NULL
   if(useCache == TRUE && file.exists(tokenPath)){
     token <- readRDS(tokenPath)
   } else {
-    myapp <- oauth_app("google", clientId, secret)
+    myapp <- httr::oauth_app("google", clientId, secret)
     if(useCache == FALSE){
       # set cacheOption as FALSE so that it forces to creaet a new token
       cacheOption = FALSE
     }
-    token <- oauth2.0_token(oauth_endpoints("google"), myapp,
+    token <- httr::oauth2.0_token(httr::oauth_endpoints("google"), myapp,
                             scope = "https://www.googleapis.com/auth/analytics.readonly", cache = FALSE)
     # Save the token object for future sessions
     saveRDS(token, file=tokenPath)
   }
-  ValidateToken(token)
+  RGoogleAnalytics::ValidateToken(token)
   token
 }
 
@@ -135,32 +140,31 @@ refreshGoogleTokenForAnalysis <- function(tokenFileId){
 # API to get profile for current oauth token
 #' @export
 getGoogleProfile <- function(tokenFileId){
-  require(RGoogleAnalytics)
-  require(lubridate)
+  if(!requireNamespace("RGoogleAnalytics")){stop("package RGoogleAnalytics must be installed.")}
   try({
     token <- getGoogleTokenForAnalytics(tokenFileId);
-    GetProfiles(token);
+    RGoogleAnalytics::GetProfiles(token);
   })
 }
 
 #' @export
 getGoogleAnalytics <- function(tableId, lastNDays, dimensions, metrics, tokenFileId){
-  require(RGoogleAnalytics)
-  require(lubridate)
+  if(!requireNamespace("RGoogleAnalytics")){stop("package RGoogleAnalytics must be installed.")}
+  loadNamespace("lubridate")
 
   token <- getGoogleTokenForAnalytics(tokenFileId)
-  start_date <- as.character(today() - days(lastNDays))
-  #end_date <- as.character(today() - days(1))
-  end_date <- as.character(today())
-  query.list <- Init(start.date = start_date,
+  start_date <- as.character(lubridate::today() - lubridate::days(lastNDays))
+  #end_date <- as.character(lubridate::today() - lubridate::days(1))
+  end_date <- as.character(lubridate::today())
+  query.list <- RGoogleAnalytics::Init(start.date = start_date,
                      end.date = end_date,
                      dimensions = dimensions,
                      metrics = metrics,
                      max.results = 10000,
                      table.id = tableId)
 
-  ga.query <- QueryBuilder(query.list)
-  ga.data <- GetReportData(ga.query, token)
+  ga.query <- RGoogleAnalytics::QueryBuilder(query.list)
+  ga.data <- RGoogleAnalytics::GetReportData(ga.query, token)
   ga.data
 }
 
@@ -168,8 +172,8 @@ getGoogleAnalytics <- function(tableId, lastNDays, dimensions, metrics, tokenFil
 # tokenFileId is a unique value per data farme and is used to create a token cache file
 #' @export
 getGoogleTokenForSheet <- function(tokenFileId, useCache=TRUE){
-  require(httr)
-  require(stringr)
+  loadNamespace("httr")
+  loadNamespace("stringr")
   # As per Kan, this can be hard coded since Google limits acces per ViewID (tableID) and
   # not by clientID
   clientId <- "1066595427418-aeppbdhi7bj7g0osn8jpj4p6r9vus7ci.apps.googleusercontent.com"
@@ -178,16 +182,16 @@ getGoogleTokenForSheet <- function(tokenFileId, useCache=TRUE){
   # tam.oauth_token_cache is path ~/.exploratory/projects/<projectid>/rdata/placeholder.rds is the rds file templatettr cache
   # for each data set, create token cache as
   # ~/.exploratory/projects/<projectid>/rdata/<tokenFileId_per_dataframe>_gs_token.rds
-  tokenPath = str_replace(cacheOption, "placeholder.rds", str_c(tokenFileId, "_gs_token.rds"))
+  tokenPath = stringr::str_replace(cacheOption, "placeholder.rds", stringr::str_c(tokenFileId, "_gs_token.rds"))
   # use oauth_app and oauth2.0_token
   token <- NULL
   if(useCache == TRUE && file.exists(tokenPath)){
     token <- readRDS(tokenPath)
   } else {
-    myapp <- oauth_app("google", clientId, secret)
+    myapp <- httr::oauth_app("google", clientId, secret)
     # scope is same as gs_auth does
     scope_list <- c("https://spreadsheets.google.com/feeds","https://www.googleapis.com/auth/drive")
-    token <- oauth2.0_token(oauth_endpoints("google"), myapp,
+    token <- httr::oauth2.0_token(httr::oauth_endpoints("google"), myapp,
                             scope = scope_list, cache = FALSE)
     # Save the token object for future sessions
     saveRDS(token, file=tokenPath)
@@ -203,11 +207,11 @@ refreshGoogleTokenForSheet <- function(tokenFileId){
 
 #' @export
 getGoogleSheet <- function(title, sheetNumber, skipNRows, treatTheseAsNA, firstRowAsHeader, commentChar, tokenFileId){
-  require(googlesheets)
+  if(!requireNamespace("googlesheets")){stop("package googlesheets must be installed.")}
   token <- getGoogleTokenForSheet(tokenFileId)
-  gs_auth(token)
-  gsheet <- gs_title(title)
-  df <- gsheet %>% gs_read(ws = sheetNumber, skip = skipNRows, na = treatTheseAsNA, col_names = firstRowAsHeader, comment = commentChar)
+  googlesheets::gs_auth(token)
+  gsheet <- googlesheets::gs_title(title)
+  df <- gsheet %>% googlesheets::gs_read(ws = sheetNumber, skip = skipNRows, na = treatTheseAsNA, col_names = firstRowAsHeader, comment = commentChar)
   df
 }
 
@@ -222,21 +226,22 @@ getGoogleSheetList <- function(tokenFileId){
 
 #' @export
 queryMongoDB <- function(host, port, database, collection, username, password, query = "{}", isFlatten){
-  library(mongolite)
-  require(stringr)
+  if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
+  loadNamespace("stringr")
+  loadNamespace("jsonlite")
   # read stored password
   pass = saveOrReadPassword("mongodb", username, password)
-  if (str_length(username) > 0) {
-    url = str_c("mongodb://", username, ":", pass, "@", host, ":", as.character(port), "/", database)
+  if (stringr::str_length(username) > 0) {
+    url = stringr::str_c("mongodb://", username, ":", pass, "@", host, ":", as.character(port), "/", database)
   }
   else {
-    url = str_c("mongodb://", host, ":", as.character(port), "/", database)
+    url = stringr::str_c("mongodb://", host, ":", as.character(port), "/", database)
   }
-  con <- mongo(collection, url = url)
+  con <- mongolite::mongo(collection, url = url)
   data <- con$find(query = query)
   result <-data
   if (isFlatten) {
-    result <- flatten(data)
+    result <- jsonlite::flatten(data)
   }
   if (nrow(result)==0) {
     stop("No Data Found");
@@ -247,55 +252,60 @@ queryMongoDB <- function(host, port, database, collection, username, password, q
 
 #' @export
 queryMySQL <- function(host, port, databaseName, username, password, numOfRows = -1, query){
-  library(RMySQL)
+  if(!requireNamespace("RMySQL")){stop("package RMySQL must be installed.")}
+  if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
+
   # read stored password
   pass = saveOrReadPassword("mysql", username, password)
 
-  drv <- dbDriver("MySQL")
-  conn = dbConnect(drv, dbname = databaseName, username = username,
+  drv <- DBI::dbDriver("MySQL")
+  conn = RMySQL::dbConnect(drv, dbname = databaseName, username = username,
                    password = pass, host = host, port = port)
-  resultSet <- dbSendQuery(conn, query)
-  df <- dbFetch(resultSet, n = numOfRows)
-  dbClearResult(resultSet)
-  dbDisconnect(conn)
+  resultSet <- RMySQL::dbSendQuery(conn, query)
+  df <- RMySQL::dbFetch(resultSet, n = numOfRows)
+  RMySQL::dbClearResult(resultSet)
+  RMySQL::dbDisconnect(conn)
   df
 }
 
 #' @export
 queryPostgres <- function(host, port, databaseName, username, password, numOfRows = -1, query){
-  library(RPostgreSQL)
+  if(!requireNamespace("RPostgreSQL")){stop("package RPostgreSQL must be installed.")}
+  if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
   # read stored password
   pass = saveOrReadPassword("postgres", username, password)
 
-  drv <- dbDriver("PostgreSQL")
-  conn = dbConnect(drv, dbname = databaseName, user = username,
+  drv <- DBI::dbDriver("PostgreSQL")
+  conn = RPostgreSQL::dbConnect(drv, dbname = databaseName, user = username,
                    password = pass, host = host, port = port)
-  resultSet <- dbSendQuery(conn, query)
-  df <- dbFetch(resultSet, n = numOfRows)
-  dbClearResult(resultSet)
-  dbDisconnect(conn)
+  resultSet <- RPostgreSQL::dbSendQuery(conn, query)
+  df <- DBI::dbFetch(resultSet, n = numOfRows)
+  RPostgreSQL::dbClearResult(resultSet)
+  RPostgreSQL::dbDisconnect(conn)
   df
 }
 
 queryRedshift <- function(host, port, databaseName, username, password, numOfRows = -1, query){
-  library(RPostgreSQL)
+  if(!requireNamespace("RPostgreSQL")){stop("package RPostgreSQL must be installed.")}
+  if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
   # read stored password
   pass = saveOrReadPassword("redshift", username, password)
 
-  drv <- dbDriver("PostgreSQL")
-  conn = dbConnect(drv, dbname = databaseName, user = username,
+  drv <- DBI::dbDriver("PostgreSQL")
+  conn = RPostgreSQL::dbConnect(drv, dbname = databaseName, user = username,
                    password = pass, host = host, port = port)
-  resultSet <- dbSendQuery(conn, query)
-  df <- dbFetch(resultSet, n = numOfRows)
-  dbClearResult(resultSet)
-  dbDisconnect(conn)
+  resultSet <- RPostgreSQL::dbSendQuery(conn, query)
+  df <- DBI::dbFetch(resultSet, n = numOfRows)
+  RPostgreSQL::dbClearResult(resultSet)
+  RPostgreSQL::dbDisconnect(conn)
   df
 }
 
 # tokenFileId is a unique value per data farme and is used to create a token cache file
 getTwitterToken <- function(tokenFileId, useCache=TRUE){
-  require(twitteR)
-  require(httr)
+  if(!requireNamespace("twitteR")){stop("package twitteR must be installed.")}
+  loadNamespace("httr")
+  loadNamespace("stringr")
 
   consumer_key = "0lWpnop0HLfWRbpkDEJ0XA"
   consumer_secret = "xYNUMALkRnvuT3vls48LW7k2XK1l9xjZTLnRv2JaFaM"
@@ -304,15 +314,15 @@ getTwitterToken <- function(tokenFileId, useCache=TRUE){
   # tam.oauth_token_cache is RDS file path (~/.exploratory/projects/<projectid>/rdata/placeholder.rds)
   # for each data frame, create token cache as
   # ~/.exploratory/projects/<projectid>/rdata/<tokenFileId_per_dataframe>_ga_token.rds
-  tokenPath = str_replace(cacheOption, "placeholder.rds", str_c(tokenFileId, "_twitter_token.rds"))
+  tokenPath = stringr::str_replace(cacheOption, "placeholder.rds", stringr::str_c(tokenFileId, "_twitter_token.rds"))
 
   twitter_token <- NULL
   if(useCache == TRUE && file.exists(tokenPath)){
     twitter_token <- readRDS(tokenPath)
   } else {
-    myapp <- oauth_app("twitter", key = consumer_key, secret = consumer_secret)
+    myapp <- httr::oauth_app("twitter", key = consumer_key, secret = consumer_secret)
     # Get OAuth credentials (For twitter use OAuth1.0)
-    twitter_token <- oauth1.0_token(oauth_endpoints("twitter"), myapp, cache = FALSE)
+    twitter_token <- httr::oauth1.0_token(httr::oauth_endpoints("twitter"), myapp, cache = FALSE)
     # Save the token object for future sessions
     saveRDS(twitter_token, file=tokenPath)
   }
@@ -326,15 +336,15 @@ refreshTwitterToken <- function(tokenFileId){
 
 #' @export
 getTwitter <- function(n=200, lang=NULL,  lastNDays=30, searchString, tokenFileId){
-  require(twitteR)
-  require(lubridate)
+  if(!requireNamespace("twitteR")){stop("package twitteR must be installed.")}
+  loadNamespace("lubridate")
 
   twitter_token = getTwitterToken(tokenFileId)
-  use_oauth_token(twitter_token)
+  twitteR::use_oauth_token(twitter_token)
   # this parameter needs to be character with YYYY-MM-DD format
   # to get the latest tweets, pass NULL for until
   until = NULL
-  since = as.character(today() - days(lastNDays))
+  since = as.character(lubridate::today() - lubridate::days(lastNDays))
   locale = NULL
   geocode = NULL
   sinceID = NULL
@@ -343,10 +353,10 @@ getTwitter <- function(n=200, lang=NULL,  lastNDays=30, searchString, tokenFileI
   resultType = "recent"
   retryOnRateLimit = 120
 
-  tweetList <- searchTwitter(searchString, n, lang, since, until, locale, geocode, sinceID, maxID, resultType, retryOnRateLimit)
+  tweetList <- twitteR::searchTwitter(searchString, n, lang, since, until, locale, geocode, sinceID, maxID, resultType, retryOnRateLimit)
   # conver list to data frame
   if(length(tweetList)>0){
-    twListToDF(tweetList)
+    twitteR::twListToDF(tweetList)
   } else {
     stop('No Tweets found.')
   }
