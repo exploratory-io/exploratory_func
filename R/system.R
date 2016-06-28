@@ -1,3 +1,66 @@
+# Set cache path for oauth token cachefile
+`_tam_setOAuthTokenCacheOptions` <- function(path){
+  options(tam.oauth_token_cache = path)
+}
+
+# API to take care of read/save password for each plugin type and user name combination
+# if password argument is null, it means we need to retrieve password from RDS file
+# so the return value is password from RDS file.
+# if password argument is not null, then it means it creates a new password or updates existing one
+# so the password is saved to RDS file and the password is returned to caller
+`_tam_saveOrReadPassword` = function(source, username, password){
+  # read stored password
+  pass = `_tam_readPasswordRDS`(source, username)
+  # if stored password is null (i.e. new cteation) or stored password is different from previous (updating password from UI)
+  if(is.null(pass)) {
+    #if not stored yet, get it from UI
+    pass = password
+    `_tam_savePasswordRDS`(source, username, pass)
+  } else if (!is.null(pass) & password != "" & pass != password) {
+    #if passord is different from previous one, then  update it
+    pass = password
+    `_tam_savePasswordRDS`(source, username, pass)
+  }
+  pass
+}
+
+# API to save a psssword to RDS file
+# password file is consturcted with <source>_<username>.rds format_
+`_tam_savePasswordRDS` = function(sourceName, userName, password){
+  loadNamespace("sodium")
+  cryptoKeyPhrase = getOption("tam.crypto_key")
+  key <- sodium::hash(charToRaw(cryptoKeyPhrase))
+  noncePhrase = getOption("tam.nonce")
+  nonce <- sodium::hash(charToRaw(noncePhrase), size=24)
+  msg <- serialize(password, NULL)
+  cipher <- sodium::data_encrypt(msg, key, nonce)
+  saveRDS(cipher, file= str_c("../rdata/", sourceName, "_", userName, ".rds"))
+}
+
+# API to read a password from RDS
+# password file is consturcted with <source>_<username>.rds format_
+`_tam_readPasswordRDS` = function(sourceName, userName){
+  loadNamespace("sodium")
+  passwordFlePath <- str_c("../rdata/", sourceName, "_", userName, ".rds")
+  password <- NULL
+  if(file.exists(passwordFlePath)){
+    # tryCatch so that we can handle decription failure
+    tryCatch({
+      cryptoKeyPhrase = getOption("tam.crypto_key")
+      key <- sodium::hash(charToRaw(cryptoKeyPhrase))
+      noncePhrase = getOption("tam.nonce")
+      nonce <- sodium::hash(charToRaw(noncePhrase), size=24)
+
+      cipher <- readRDS(passwordFlePath)
+      msg <- sodium::data_decrypt(cipher, key, nonce)
+      password <-unserialize(msg)
+    }, warning = function(w) {
+    }, error = function(e) {
+    })
+  }
+  password
+}
+
 #' github issues plugin script
 #' @export
 getGithubIssues <- function(username, password, owner, repository){
