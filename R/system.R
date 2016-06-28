@@ -1,5 +1,5 @@
 # Set cache path for oauth token cachefile
-`_tam_setOAuthTokenCacheOptions` <- function(path){
+setOAuthTokenCacheOptions <- function(path){
   options(tam.oauth_token_cache = path)
 }
 
@@ -8,25 +8,25 @@
 # so the return value is password from RDS file.
 # if password argument is not null, then it means it creates a new password or updates existing one
 # so the password is saved to RDS file and the password is returned to caller
-`_tam_saveOrReadPassword` = function(source, username, password){
+saveOrReadPassword = function(source, username, password){
   # read stored password
-  pass = `_tam_readPasswordRDS`(source, username)
+  pass = readPasswordRDS(source, username)
   # if stored password is null (i.e. new cteation) or stored password is different from previous (updating password from UI)
   if(is.null(pass)) {
     #if not stored yet, get it from UI
     pass = password
-    `_tam_savePasswordRDS`(source, username, pass)
+    savePasswordRDS(source, username, pass)
   } else if (!is.null(pass) & password != "" & pass != password) {
     #if passord is different from previous one, then  update it
     pass = password
-    `_tam_savePasswordRDS`(source, username, pass)
+    savePasswordRDS(source, username, pass)
   }
   pass
 }
 
 # API to save a psssword to RDS file
 # password file is consturcted with <source>_<username>.rds format_
-`_tam_savePasswordRDS` = function(sourceName, userName, password){
+savePasswordRDS = function(sourceName, userName, password){
   loadNamespace("sodium")
   cryptoKeyPhrase = getOption("tam.crypto_key")
   key <- sodium::hash(charToRaw(cryptoKeyPhrase))
@@ -39,7 +39,7 @@
 
 # API to read a password from RDS
 # password file is consturcted with <source>_<username>.rds format_
-`_tam_readPasswordRDS` = function(sourceName, userName){
+readPasswordRDS = function(sourceName, userName){
   loadNamespace("sodium")
   passwordFlePath <- str_c("../rdata/", sourceName, "_", userName, ".rds")
   password <- NULL
@@ -65,7 +65,7 @@
 #' @export
 getGithubIssues <- function(username, password, owner, repository){
   # read stored password
-  pass = `_tam_saveOrReadPassword`("github", username, password)
+  pass = saveOrReadPassword("github", username, password)
 
   # Body
   endpoint <- str_c("https://api.github.com/repos/", owner, "/", repository, "/issues")
@@ -225,7 +225,7 @@ queryMongoDB <- function(host, port, database, collection, username, password, q
   library(mongolite)
   require(stringr)
   # read stored password
-  pass = `_tam_saveOrReadPassword`("mongodb", username, password)
+  pass = saveOrReadPassword("mongodb", username, password)
   if (str_length(username) > 0) {
     url = str_c("mongodb://", username, ":", pass, "@", host, ":", as.character(port), "/", database)
   }
@@ -249,7 +249,7 @@ queryMongoDB <- function(host, port, database, collection, username, password, q
 queryMySQL <- function(host, port, databaseName, username, password, numOfRows = -1, query){
   library(RMySQL)
   # read stored password
-  pass = `_tam_saveOrReadPassword`("mysql", username, password)
+  pass = saveOrReadPassword("mysql", username, password)
 
   drv <- dbDriver("MySQL")
   conn = dbConnect(drv, dbname = databaseName, username = username,
@@ -265,7 +265,7 @@ queryMySQL <- function(host, port, databaseName, username, password, numOfRows =
 queryPostgres <- function(host, port, databaseName, username, password, numOfRows = -1, query){
   library(RPostgreSQL)
   # read stored password
-  pass = `_tam_saveOrReadPassword`("postgres", username, password)
+  pass = saveOrReadPassword("postgres", username, password)
 
   drv <- dbDriver("PostgreSQL")
   conn = dbConnect(drv, dbname = databaseName, user = username,
@@ -280,7 +280,7 @@ queryPostgres <- function(host, port, databaseName, username, password, numOfRow
 queryRedshift <- function(host, port, databaseName, username, password, numOfRows = -1, query){
   library(RPostgreSQL)
   # read stored password
-  pass = `_tam_saveOrReadPassword`("redshift", username, password)
+  pass = saveOrReadPassword("redshift", username, password)
 
   drv <- dbDriver("PostgreSQL")
   conn = dbConnect(drv, dbname = databaseName, user = username,
@@ -293,7 +293,7 @@ queryRedshift <- function(host, port, databaseName, username, password, numOfRow
 }
 
 # tokenFileId is a unique value per data farme and is used to create a token cache file
-`_tam_getTwitterToken` <- function(tokenFileId, useCache=TRUE){
+getTwitterToken <- function(tokenFileId, useCache=TRUE){
   require(twitteR)
   require(httr)
 
@@ -320,8 +320,8 @@ queryRedshift <- function(host, port, databaseName, username, password, numOfRow
 }
 
 # API to refresh token
-`_tam_refreshTwitterToken` <- function(tokenFileId){
-  `_tam_getTwitterToken`(tokenFileId, FALSE)
+refreshTwitterToken <- function(tokenFileId){
+  getTwitterToken(tokenFileId, FALSE)
 }
 
 #' @export
@@ -329,7 +329,7 @@ getTwitter <- function(n=200, lang=NULL,  lastNDays=30, searchString, tokenFileI
   require(twitteR)
   require(lubridate)
 
-  twitter_token = `_tam_getTwitterToken`(tokenFileId)
+  twitter_token = getTwitterToken(tokenFileId)
   use_oauth_token(twitter_token)
   # this parameter needs to be character with YYYY-MM-DD format
   # to get the latest tweets, pass NULL for until
