@@ -10,7 +10,7 @@ tidy_test_df <- data.frame(
 test_that("test do_cor.cols", {
   result <- (
     spread_test_df
-    %>%  do_cor.cols(starts_with("var")))
+    %>%  do_cor.cols(dplyr::starts_with("var")))
   expect_equal(result[["cor.value"]], rep(1, 2))
 })
 
@@ -23,7 +23,7 @@ test_that("test do_cor.cols for grouped df", {
   result <- (
     test_df
     %>%  dplyr::group_by(group)
-    %>%  do_cor.cols(starts_with("var")))
+    %>%  do_cor.cols(dplyr::starts_with("var")))
   expect_equal(dim(result), c(4, 4))
 })
 
