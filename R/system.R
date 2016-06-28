@@ -92,7 +92,8 @@ getGithubIssues <- function(username, password, owner, repository){
 }
 
 # tokenFileId is a unique value per data farme and is used to create a token cache file
-`_tam_getGoogleTokenForAnalytics` <- function(tokenFileId, useCache=TRUE){
+#' @export
+getGoogleTokenForAnalytics <- function(tokenFileId, useCache=TRUE){
   require(RGoogleAnalytics)
   require(lubridate)
   require(stringr)
@@ -126,16 +127,18 @@ getGithubIssues <- function(username, password, owner, repository){
 }
 
 # API to refresh token
-`_tam_refreshGoogleTokenForAnalysis` <- function(tokenFileId){
-  `_tam_getGoogleTokenForAnalytics`(tokenFileId, FALSE)
+#' @export
+refreshGoogleTokenForAnalysis <- function(tokenFileId){
+  getGoogleTokenForAnalytics(tokenFileId, FALSE)
 }
 
 # API to get profile for current oauth token
-`_tam_getGoogleProfile` <- function(tokenFileId){
+#' @export
+getGoogleProfile <- function(tokenFileId){
   require(RGoogleAnalytics)
   require(lubridate)
   try({
-    token <- `_tam_getGoogleTokenForAnalytics`(tokenFileId);
+    token <- getGoogleTokenForAnalytics(tokenFileId);
     GetProfiles(token);
   })
 }
@@ -145,7 +148,7 @@ getGoogleAnalytics <- function(tableId, lastNDays, dimensions, metrics, tokenFil
   require(RGoogleAnalytics)
   require(lubridate)
 
-  token <- `_tam_getGoogleTokenForAnalytics`(tokenFileId)
+  token <- getGoogleTokenForAnalytics(tokenFileId)
   start_date <- as.character(today() - days(lastNDays))
   #end_date <- as.character(today() - days(1))
   end_date <- as.character(today())
