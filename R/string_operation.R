@@ -56,7 +56,7 @@ word_to_sentiment <- function(words, lexicon="bing"){
   } else {
     sentiments <- sentiments[check,]
   }
-  joined_df <- dplyr::left_join(data.frame(word=words, stringsAsFactors = FALSE), sentiments[check,], by="word")
+  joined_df <- dplyr::left_join(data.frame(word=words, stringsAsFactors = FALSE), sentiments, by="word")
   if(lexicon=="AFINN"){
     joined_df$score
   } else {
