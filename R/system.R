@@ -285,23 +285,8 @@ queryPostgres <- function(host, port, databaseName, username, password, numOfRow
   df
 }
 
-queryRedshift <- function(host, port, databaseName, username, password, numOfRows = -1, query){
-  if(!requireNamespace("RPostgreSQL")){stop("package RPostgreSQL must be installed.")}
-  if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
-  # read stored password
-  pass = saveOrReadPassword("redshift", username, password)
-
-  drv <- DBI::dbDriver("PostgreSQL")
-  conn = RPostgreSQL::dbConnect(drv, dbname = databaseName, user = username,
-                   password = pass, host = host, port = port)
-  resultSet <- RPostgreSQL::dbSendQuery(conn, query)
-  df <- DBI::dbFetch(resultSet, n = numOfRows)
-  RPostgreSQL::dbClearResult(resultSet)
-  RPostgreSQL::dbDisconnect(conn)
-  df
-}
-
 # tokenFileId is a unique value per data farme and is used to create a token cache file
+#' @export
 getTwitterToken <- function(tokenFileId, useCache=TRUE){
   if(!requireNamespace("twitteR")){stop("package twitteR must be installed.")}
   loadNamespace("httr")
@@ -330,6 +315,7 @@ getTwitterToken <- function(tokenFileId, useCache=TRUE){
 }
 
 # API to refresh token
+#' @export
 refreshTwitterToken <- function(tokenFileId){
   getTwitterToken(tokenFileId, FALSE)
 }
