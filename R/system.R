@@ -30,12 +30,16 @@ savePasswordRDS = function(sourceName, userName, password){
   loadNamespace("sodium")
   loadNamespace("stringr")
   cryptoKeyPhrase = getOption("tam.crypto_key")
-  key <- sodium::hash(charToRaw(cryptoKeyPhrase))
   noncePhrase = getOption("tam.nonce")
-  nonce <- sodium::hash(charToRaw(noncePhrase), size=24)
-  msg <- serialize(password, NULL)
-  cipher <- sodium::data_encrypt(msg, key, nonce)
-  saveRDS(cipher, file= stringr::str_c("../rdata/", sourceName, "_", userName, ".rds"))
+  if(is.null(cryptoKeyPhrase) | is.null(noncePhrase)){
+    NULL
+  } else {
+    key <- sodium::hash(charToRaw(cryptoKeyPhrase))
+    nonce <- sodium::hash(charToRaw(noncePhrase), size=24)
+    msg <- serialize(password, NULL)
+    cipher <- sodium::data_encrypt(msg, key, nonce)
+    saveRDS(cipher, file= stringr::str_c("../rdata/", sourceName, "_", userName, ".rds"))
+  }
 }
 
 # API to read a password from RDS
