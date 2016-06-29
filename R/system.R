@@ -361,3 +361,114 @@ handleLabelledColumns = function(df){
   df[is_labelled] <- lapply(df[is_labelled], as_factor)
   df
 }
+
+# Checks and tells the given data is whether in ndjson format
+# by looking at that the first line is a valid json or not.
+# x - URL or file path
+isNDJSON <- function(x) {
+  loadNamespace("jsonlite")
+  con <- getConnectionObject(x)
+  line <- readLines(con, n=1, warn=FALSE)
+  close(con)
+  tryCatch (
+    {
+      # It errors out if the line is invalid json.
+      obj <- jsonlite::fromJSON(line)
+      return (TRUE)
+    },
+    error=function(cond){
+      return (FALSE)
+    }
+  )
+}
+
+# Construct a data frame from json or ndjson data
+# ndjson stands for "Newline Delimited JSON" and
+# each line of ndjson data is a valid json value.
+# http://ndjson.org/
+#
+# ndjson format is popular and used in many places such as
+# Yelp academic data is based on.
+#
+# jsonlite::fromJSON can read standard json but not ndjson.
+# jsonlite::stream_in can read ndjson but not standard json.
+# This function internally detects the data type and
+# calls the appropriate function to read the data
+# and construct a data from either json or ndjson data.
+#
+# x: URL or file path to json/ndjson file
+# flatten: TRUE or FALSE. Used only json case
+# limit: Should limit the number of rows to retrieve. Not used now
+# since underlying technology (jsonlite) doesn't support it.
+#' @export
+convertFromJSON <- function(x, flatten=TRUE, limit=0) {
+  loadNamespace("jsonlite")
+  if (isNDJSON(x) == TRUE) {
+    con2 <- getConnectionObject(x)
+    df <- jsonlite::stream_in(con2, pagesize=1000, verbose=FALSE)
+
+    # In case of connectinng to url, the following close call may fail with;
+    # Error in close.connection(con2) : invalid connection
+    # so here we catch the error here not to block the process.
+    tryCatch (
+      {
+        close(con2)
+      },
+      error=function(cond){
+      }
+    )
+    if (flatten == TRUE) {
+      df <- jsonlite::flatten(df)
+    }
+    return (df)
+  } else {
+    df <- jsonlite::fromJSON(x, flatten=flatten)
+    return (df)
+  }
+}
+
+# This function converts the given data frame object to JSON.
+# The benefit of using this function is that it can converts
+# the column data types that cannot be serialized by toJSON
+# to safe ones.
+convertToJSON  <- function(x) {
+  loadNamespace("jsonlite")
+  .tmp.tojson <- x
+  isdifftime <- sapply(.tmp.tojson, is.difftime)
+  .tmp.tojson[isdifftime] <- lapply(.tmp.tojson[isdifftime], function(y) as.numeric(y))
+  isperiod <- sapply(.tmp.tojson, is.period)
+  .tmp.tojson[isperiod] <- lapply(.tmp.tojson[isperiod], function(y) as.character(y))
+  jsonlite::toJSON(.tmp.tojson)
+}
+
+# Gives you a connection object based on the given
+# file locator string. It supports file path or URL now.
+# x - URL or file path
+getConnectionObject <- function(x) {
+  loadNamespace("stringr")
+  if (stringr::str_detect(x, "://")) {
+    return(url(x))
+  } else {
+    return(file(x, open = "r"))
+  }
+}
+
+# Run the type convert if it is a data frame.
+typeConvert <- function(x) {
+  loadNamespace("readr")
+  if (is.data.frame(x))  readr::type_convert(x) else x
+}
+
+# Create a data frame from the given object that can be transformed to data frame.
+#' @export
+toDataFrame <- function(x) {
+  if(is.data.frame(x)) {
+    df <- x
+  } else if (is.matrix(x)) {
+    df <- as.data.frame(x, stringsAsFactors = FALSE)
+  } else {
+    # just in case for other data type case in future
+    df <- as.data.frame(x, stringsAsFactors = FALSE)
+  }
+  return(typeConvert(df))
+}
