@@ -85,7 +85,7 @@ getGithubIssues <- function(username, password, owner, repository){
   while(is_next){
     res <- httr::GET(endpoint,
                query = list(state = "all", per_page = 100, page = i),
-               authenticate(username, pass))
+               httr::authenticate(username, pass))
     jsondata <- httr::content(res, type = "text", encoding = "UTF-8")
     github_df <- jsonlite::fromJSON(jsondata, flatten = TRUE)
     pages[[i]] <- github_df
