@@ -352,3 +352,12 @@ getTwitter <- function(n=200, lang=NULL,  lastNDays=30, searchString, tokenFileI
     stop('No Tweets found.')
   }
 }
+
+# function to convert labelled class to factoror
+# see https://github.com/exploratory-io/tam/issues/1481
+#' @export
+handleLabelledColumns = function(df){
+  is_labelled <- which(lapply(df, class) == "labelled")
+  df[is_labelled] <- lapply(df[is_labelled], as_factor)
+  df
+}
