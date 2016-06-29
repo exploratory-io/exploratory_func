@@ -31,6 +31,7 @@ savePasswordRDS = function(sourceName, userName, password){
   loadNamespace("stringr")
   cryptoKeyPhrase = getOption("tam.crypto_key")
   noncePhrase = getOption("tam.nonce")
+  # These might be null if it's called from outside of desktop
   if(is.null(cryptoKeyPhrase) | is.null(noncePhrase)){
     NULL
   } else {
