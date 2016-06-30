@@ -18,3 +18,6 @@ maxmind_closure <- function(type){
 #'@return Country name
 #'@export
 ip_to_country <- maxmind_closure("country_name")
+
+#' @export
+countrycode <- countrycode::countrycode
