@@ -1,4 +1,4 @@
-context("test generic functions")
+context("test system functions")
 
 test_that("test clean_data_frame",{
   # create df with dupicated columns names and data frame type column 
