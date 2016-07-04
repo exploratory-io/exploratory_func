@@ -35,5 +35,6 @@ Suggests:
     mongolite,
     DBI,
     RPostgreSQL,
-    mongolite
+    mongolite,
+    bigrquery
 RoxygenNote: 5.0.1

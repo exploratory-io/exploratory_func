@@ -353,6 +353,65 @@ getTwitter <- function(n=200, lang=NULL,  lastNDays=30, searchString, tokenFileI
   }
 }
 
+#' @export
+# tokenFileId is a unique value per data farme and is used to create a token cache file
+getGoogleTokenForBigQuery <- function(tokenFileId, useCache=TRUE){
+  if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
+  loadNamespace("stringr")
+  loadNamespace("httr")
+  clientId <- "465736758727.apps.googleusercontent.com"
+  secret <- "fJbIIyoIag0oA6p114lwsV2r"
+  cacheOption = getOption("tam.oauth_token_cache")
+  # tam.oauth_token_cache is RDS file path (~/.exploratory/projects/<projectid>/rdata/placeholder.rds)
+  # for each data frame, create token cache as
+  # ~/.exploratory/projects/<projectid>/rdata/<tokenFileId_per_dataframe>_ga_token.rds
+  tokenPath = stringr::str_replace(cacheOption, "placeholder.rds", str_c(tokenFileId, "_bigquery_token.rds"))
+  # since Auth from RGoogleAnalytics does not work well
+  # switch to use oauth_app and oauth2.0_token
+  token <- NULL
+  if(useCache == TRUE && file.exists(tokenPath)){
+    token <- readRDS(tokenPath)
+  } else {
+    myapp <- httr::oauth_app("google", clientId, secret)
+    if(useCache == FALSE){
+      # set cacheOption as FALSE so that it forces to creaet a new token
+      cacheOption = FALSE
+    }
+    token <- httr::oauth2.0_token(httr::oauth_endpoints("google"), myapp,
+                                  scope = c("https://www.googleapis.com/auth/bigquery", "https://www.googleapis.com/auth/cloud-platform"), cache = FALSE)
+    # Save the token object for future sessions
+    saveRDS(token, file=tokenPath)
+  }
+  token
+}
+
+#' @export
+# API to refresh token
+refreshGoogleTokenForBigQuery <- function(tokenFileId){
+  getGoogleTokenForBigQuery(tokenFileId, FALSE)
+}
+
+#' @export
+executeGoogleBigQuery <- function(project, sqlquery, tokenFileId){
+  if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
+  token <- getGoogleTokenForBigQuery(tokenFileId)
+  bigrquery::set_access_cred(token)
+  bigrquery::query_exec(sqlquery, project = project)
+
+}
+
+#' @export
+# API to get projects for current oauth token
+getGoogleProjects <- function(tokenFileId){
+  if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
+  try({
+    token <- getGoogleTokenForBigQuery(tokenFileId);
+    bigrquery::set_access_cred(token)
+    bigrquery::list_projects();
+  })
+}
+
+
 # function to convert labelled class to factoror
 # see https://github.com/exploratory-io/tam/issues/1481
 #' @export
