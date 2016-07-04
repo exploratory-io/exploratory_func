@@ -168,3 +168,61 @@ same_type <- function(vector, original){
 #' Not %in% function
 #' @export
 `%nin%` <- function (x, table) match(x, table, nomatch = 0L) == 0L
+
+#' get number of elements in list data type column for each row
+#' @export
+list_n <- function(column){
+  sapply(column, length)
+}
+
+#' extract elements from each row of list type column or data frame type column
+#' @export
+list_extract <- function(column, position = 1, rownum = 1){
+  if(is.data.frame(column[[1]])){
+   sapply(column, function(column) column[rownum, position])
+  } else {
+    sapply(column, function(column) column[position])
+  }
+}
+
+#' convert list column into text column
+#' @export
+list_to_text <- function(column, sep = ", "){
+  text <- sapply(column, function(x) str_c(x, collapse = sep))
+  as.character(text)
+}
+
+#' concat vectors in a list column
+#' @export
+list_concat <- function(list){
+  list(unlist(list))
+}
+
+#' replace sequence of spaces or periods with
+#' single space or period, then trim spaces on both ends.
+#' @export
+str_clean <- function(words){
+  # change \n, \t into space
+  words <- stringr::str_replace_all(words, "\n|\t", " ")
+  # change continuous spaces into one space
+  words <- stringr::str_replace_all(words, " +", " ")
+  # change continuous period into one period
+  words <- stringr::str_replace_all(words, "\\.\\.+", ".")
+  # remove spaces on the both side
+  words <- stringr::str_trim(words)
+}
+
+#' count word patterns
+#' @export
+str_count_all <- function(text, patterns, remove.zero = TRUE){
+  # string count for each pattern list
+  lapply(text, function(text_elem){
+    countList <- lapply(patterns, function(pattern){
+      stringr::str_count(text_elem, pattern)
+    })
+    count <- as.numeric(countList)
+    # if remove.zero is FALSE, it returns all element
+    return_elem <- (!remove.zero | count > 0)
+    data.frame(.count=count[return_elem], .pattern=patterns[return_elem], stringsAsFactors = FALSE)
+  })
+}
