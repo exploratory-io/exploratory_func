@@ -23,7 +23,8 @@ Import: dplyr,
     httr,
     text2vec,
     quanteda,
-    Matrix
+    Matrix,
+    rvest
 Suggests:
     testthat,
     twitteR,

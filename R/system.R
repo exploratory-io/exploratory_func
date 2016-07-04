@@ -353,6 +353,21 @@ getTwitter <- function(n=200, lang=NULL,  lastNDays=30, searchString, tokenFileI
   }
 }
 
+
+# Scrape one of html tables from the web page specified by the url, 
+# and returns a data frame as a result.
+#' @param web page url to scrape
+#' @param table index number 
+#' @param either use the 1st row as a header or not. TRUE or FALSE
+#' @export
+scrape_html_table <- function(url, index, heading) {
+  loadNamespace("rvest"); 
+  loadNamespace("xml2"); 
+  loadNamespace("tibble"); 
+  .htmltables <- rvest::html_nodes(xml2::read_html(url) ,"table")
+  tibble::repair_names(rvest::html_table(.htmltables[[index]], fill=TRUE ,header=heading))
+}
+
 # function to convert labelled class to factoror
 # see https://github.com/exploratory-io/tam/issues/1481
 #' @export
