@@ -355,6 +355,7 @@ getTwitter <- function(n=200, lang=NULL,  lastNDays=30, searchString, tokenFileI
 
 # Parses all the 'scrapable' html tables from the web page.
 #' @param web page url to scrape
+#' @return html nodes
 #' @export
 parse_html_tables <- function(url) {
   loadNamespace("rvest"); 

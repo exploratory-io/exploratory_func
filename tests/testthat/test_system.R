@@ -13,6 +13,11 @@ test_that("test clean_data_frame",{
 })
 
 
+test_that("test parse_html_tables",{
+  result <- parse_html_tables('https://www.cbinsights.com/research-unicorn-companies')
+  expect_equal(length(result), 1)
+})
+
 test_that("test scrape_html_table",{
   result <- scrape_html_table('https://www.cbinsights.com/research-unicorn-companies', 1, TRUE)
   expect_equal(ncol(result), 6)
