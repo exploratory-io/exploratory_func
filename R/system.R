@@ -411,6 +411,28 @@ getGoogleProjects <- function(tokenFileId){
   })
 }
 
+#' @export
+# API to get datasets for a project
+getGoogleDataSets <- function(project, tokenFileId){
+  if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
+  try({
+    token <- getGoogleTokenForBigQuery(tokenFileId);
+    bigrquery::set_access_cred(token)
+    bigrquery::list_datasets(project);
+  })
+}
+
+
+#' @export
+# API to get tables for current project, data set
+getGoogleTables <- function(project, dataset, tokenFileId){
+  if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
+  try({
+    token <- getGoogleTokenForBigQuery(tokenFileId);
+    bigrquery::set_access_cred(token)
+    bigrquery::list_tables(project, dataset);
+  })
+}
 
 # function to convert labelled class to factoror
 # see https://github.com/exploratory-io/tam/issues/1481
