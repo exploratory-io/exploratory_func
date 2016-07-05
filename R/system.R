@@ -392,7 +392,7 @@ refreshGoogleTokenForBigQuery <- function(tokenFileId){
 }
 
 #' @export
-executeGoogleBigQuery <- function(project, sqlquery, tokenFileId){
+executeGoogleBigQuery <- function(project, dataset, table, sqlquery, tokenFileId){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   token <- getGoogleTokenForBigQuery(tokenFileId)
   bigrquery::set_access_cred(token)
