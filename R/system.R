@@ -404,10 +404,13 @@ executeGoogleBigQuery <- function(project, dataset, table, sqlquery, tokenFileId
 # API to get projects for current oauth token
 getGoogleProjects <- function(tokenFileId){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
-  try({
+  tryCatch({
     token <- getGoogleTokenForBigQuery(tokenFileId);
     bigrquery::set_access_cred(token)
-    bigrquery::list_projects();
+    projects <- bigrquery::list_projects();
+    ifelse(is.null(projects), c(""), projects)
+  }, error = function(err){
+    c("")
   })
 }
 
@@ -415,10 +418,13 @@ getGoogleProjects <- function(tokenFileId){
 # API to get datasets for a project
 getGoogleDataSets <- function(project, tokenFileId){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
-  try({
+  tryCatch({
     token <- getGoogleTokenForBigQuery(tokenFileId);
     bigrquery::set_access_cred(token)
-    bigrquery::list_datasets(project);
+    resultdatasets <- bigrquery::list_datasets(project);
+    ifelse(is.null(resultdatasets), c(""), resultdatasets)
+  }, error = function(err){
+     c("")
   })
 }
 
@@ -427,10 +433,13 @@ getGoogleDataSets <- function(project, tokenFileId){
 # API to get tables for current project, data set
 getGoogleTables <- function(project, dataset, tokenFileId){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
-  try({
+  tryCatch({
     token <- getGoogleTokenForBigQuery(tokenFileId);
     bigrquery::set_access_cred(token)
-    bigrquery::list_tables(project, dataset);
+    tables <- bigrquery::list_tables(project, dataset);
+    ifelse(is.null(tables), c(""), tables)
+  }, error = function(err){
+    c("")
   })
 }
 
