@@ -353,6 +353,32 @@ getTwitter <- function(n=200, lang=NULL,  lastNDays=30, searchString, tokenFileI
   }
 }
 
+# Parses all the 'scrapable' html tables from the web page.
+#' @param web page url to scrape
+#' @return html nodes
+#' @export
+parse_html_tables <- function(url) {
+  loadNamespace("rvest"); 
+  loadNamespace("xml2"); 
+  rvest::html_nodes(xml2::read_html(url) ,"table")
+}
+
+# Scrapes one of html tables from the web page specified by the url, 
+# and returns a data frame as a result.
+#' @param web page url to scrape
+#' @param table index number 
+#' @param either use the 1st row as a header or not. TRUE or FALSE
+#' @export
+scrape_html_table <- function(url, index, heading) {
+  loadNamespace("rvest"); 
+  loadNamespace("tibble"); 
+  .htmltables <- parse_html_tables(url)
+  tibble::repair_names(rvest::html_table(.htmltables[[index]], fill=TRUE ,header=heading))
+}
+
+
+
+
 # function to convert labelled class to factoror
 # see https://github.com/exploratory-io/tam/issues/1481
 #' @export
@@ -471,4 +497,17 @@ toDataFrame <- function(x) {
     df <- as.data.frame(x, stringsAsFactors = FALSE)
   }
   return(typeConvert(df))
+}
+
+
+#' This function can clean the given data frame. It actually does 
+#' 1) split a column with a data.frame vector into seprate columns 
+#' 2) repair column names such as columns with NA for column names, 
+#' or duplicate column names. 
+#'
+#' @param x data frame
+#' @return cleaned data frame
+#' @export
+clean_data_frame <- function(x) {
+  tibble::repair_names(jsonlite::flatten(x)) 
 }
