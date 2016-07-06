@@ -18,6 +18,27 @@ simple_cast <- function(data, row, col, val, fun.aggregate=mean, fill=0){
   data %>%  reshape2::acast(fml, value.var=val, fun.aggregate=fun.aggregate, fill=fill)
 }
 
+#' Spreads columns which is choosed as row and col into sparse matrix
+sparse_cast <- function(df, row, col, val=NULL) {
+  if(!is.null(val)){
+    value <- as.numeric(df[[val]])
+    not_na <- !is.na(value)
+    df <- df[not_na,]
+    row_fact <- as.factor(df[[row]])
+    col_fact <- as.factor(df[[col]])
+    sparseMat <- Matrix::sparseMatrix(i = as.integer(row_fact), j = as.integer(col_fact), x=value[not_na])
+  } else {
+    row_fact <- as.factor(df[[row]])
+    col_fact <- as.factor(df[[col]])
+    sparseMat <- Matrix::sparseMatrix(i = as.integer(row_fact), j = as.integer(col_fact))
+  }
+
+
+  rownames(sparseMat) <- levels(row_fact)
+  colnames(sparseMat) <- levels(col_fact)
+  sparseMat
+}
+
 #' as.matrix from select argument or cast by three columns
 to_matrix <- function(df, select_dots, by_col=NULL, key_col=NULL, value_col=NULL, fill=0, fun.aggregate=mean){
   should_cast <- !(is.null(by_col) & is.null(key_col) & is.null(value_col))
