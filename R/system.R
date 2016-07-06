@@ -586,6 +586,46 @@ toDataFrame <- function(x) {
   return(typeConvert(df))
 }
 
+# API to create a temporary environment for RDATA staging
+#' @export
+createTempEnvironment <- function(){
+  new.env(parent = globalenv())
+}
+
+# API to get a list of data frames from a RDATA
+#' @export
+getObjectListFromRdata <- function(rdata_path, temp.space){
+  # load RDATA to temporary env to prevent the polluation on global objects
+  temp.object <- load(rdata_path,temp.space)
+  # get list of ojbect loaded to temporary env
+  objectlist <- ls(envir=temp.space)
+  result <- lapply(objectlist, function(x){
+    # only get a object whose class is data.frame
+    if("data.frame" %in% class(get(x,temp.space))){
+      x
+    }
+  })
+  if(!is.null(result) & length(result)>0){
+    unlist(result)
+  } else {
+    c("");
+  }
+}
+
+# API to get a data frame object from RDATA
+#' @export
+getObjectFromRdata <- function(rdata_path, object_name){
+  # load RDATA to temporary env to prevent the polluation on global objects
+  temp.space = createTempEnvironment()
+  load(rdata_path,temp.space)
+  # get list of ojbect loaded to temporary env
+  obj <- get(object_name,temp.space)
+  # remote temporary env
+  rm(temp.space)
+  obj
+}
+
+
 
 #' This function can clean the given data frame. It actually does 
 #' 1) split a column with a data.frame vector into seprate columns 
