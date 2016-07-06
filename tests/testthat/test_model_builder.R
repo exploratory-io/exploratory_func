@@ -113,3 +113,14 @@ test_that("test build_kmeans.cols", {
   df <- readRDS("~/Downloads/123flight_source_0.rds")
   (df %>%  build_kmeans.kv(CARRIER, DEST_CITY_NAME,DISTANCE,keep.source=TRUE) %>%  augment_kmeans(model, data=source.data))
 })
+
+test_that("build_lda.kv", {
+  loadNamespace("dplyr")
+  input_df <- data.frame(
+    document_title=c(rep("The War of the Worlds", 4), rep("Pride and Prejudice", 4)),
+    token = c("this", "was", "the", "deputation", "this", "was", "invitation", "enough"),
+    count = rep(1, 8)
+  )
+  ret <- build_lda.kv(input_df, document_title, token, count, k=2, augment=TRUE)
+  expect_equal(colnames(ret), c(colnames(input_df), "topic"))
+})

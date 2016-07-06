@@ -182,3 +182,48 @@ build_kmeans.cols <- function(df, ...,
   }
   output
 }
+
+#' @export
+build_lda.kv <- function(df, subject, key, value, k, keep.source = FALSE, augment=FALSE){
+  loadNamespace("dplyr")
+  loadNamespace("lazyeval")
+  loadNamespace("tidyr")
+  loadNamespace("broom")
+  loadNamespace("slam")
+  loadNamespace("topicmodels")
+
+  row_col <- col_name(substitute(subject))
+  col_col <- col_name(substitute(key))
+  value_col <- col_name(substitute(value))
+
+  grouped_column <- grouped_by(df)
+  model_column <- avoid_conflict(grouped_column, "model")
+  source_column <- avoid_conflict(grouped_column, "source.data")
+
+  build_lda_each <- function(df){
+    mat <- sparse_cast(df, row_col, col_col, value_col) %>%  slam::as.simple_triplet_matrix()
+    lda_ret <- topicmodels::LDA(mat, k)
+  }
+
+  if(keep.source | augment){
+    output <- (
+      df
+      %>%  dplyr::do_(.dots=setNames(list(~build_lda_each(.), ~(.)), c(model_column, source_column)))
+    )
+    # Add a class for Exploratyry to recognize the type of .source.data
+    class(output[[source_column]]) <- c("list", ".source.data")
+  } else {
+    output <- (
+      df
+      %>%  dplyr::do_(.dots=setNames(list(~build_lda_each(.)), model_column))
+    )
+  }
+  # Add a class for Exploratyry to recognize the type of .model
+  if(augment){
+    output <- do.call("augment_lda", list(output, model_column, source_column))
+  } else {
+    class(output[[model_column]]) <- c("list", ".model", ".model.lda")
+  }
+  output
+}
+

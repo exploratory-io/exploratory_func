@@ -71,3 +71,25 @@ augment_kmeans <- function(df, model, data){
     }
   })
 }
+
+#' augment for lda
+#' @export
+augment_lda <- function(df, model, data){
+  model_col <- col_name(substitute(model))
+  data_col <- col_name(substitute(data))
+  if(!model_col %in% colnames(df)){
+    stop(paste(model_col, "is not in column names"), sep=" ")
+  }
+  if(!data_col %in% colnames(df)){
+    stop(paste(data_col, "is not in column names"), sep=" ")
+  }
+  # use do.call to evaluate data_col from a variable
+  augment_func <- get("augment", asNamespace("broom"))
+  ret <- do.call(augment_func, list(df, model_col))
+
+  orig_data <- tidyr::unnest_(df, data_col)
+
+  topic_cname <- avoid_conflict(c(colnames(df), orig_data), "topic")
+  orig_data[[topic_cname]] <- ret$.topic
+  orig_data
+}
