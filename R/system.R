@@ -353,6 +353,119 @@ getTwitter <- function(n=200, lang=NULL,  lastNDays=30, searchString, tokenFileI
   }
 }
 
+#' @export
+# tokenFileId is a unique value per data farme and is used to create a token cache file
+getGoogleTokenForBigQuery <- function(tokenFileId, useCache=TRUE){
+  if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
+  loadNamespace("stringr")
+  loadNamespace("httr")
+  clientId <- "465736758727.apps.googleusercontent.com"
+  secret <- "fJbIIyoIag0oA6p114lwsV2r"
+  cacheOption = getOption("tam.oauth_token_cache")
+  # tam.oauth_token_cache is RDS file path (~/.exploratory/projects/<projectid>/rdata/placeholder.rds)
+  # for each data frame, create token cache as
+  # ~/.exploratory/projects/<projectid>/rdata/<tokenFileId_per_dataframe>_ga_token.rds
+  tokenPath = stringr::str_replace(cacheOption, "placeholder.rds", str_c(tokenFileId, "_bigquery_token.rds"))
+  # since Auth from RGoogleAnalytics does not work well
+  # switch to use oauth_app and oauth2.0_token
+  token <- NULL
+  if(useCache == TRUE && file.exists(tokenPath)){
+    token <- readRDS(tokenPath)
+  } else {
+    myapp <- httr::oauth_app("google", clientId, secret)
+    if(useCache == FALSE){
+      # set cacheOption as FALSE so that it forces to creaet a new token
+      cacheOption = FALSE
+    }
+    token <- httr::oauth2.0_token(httr::oauth_endpoints("google"), myapp,
+                                  scope = c("https://www.googleapis.com/auth/bigquery", "https://www.googleapis.com/auth/cloud-platform"), cache = FALSE)
+    # Save the token object for future sessions
+    saveRDS(token, file=tokenPath)
+  }
+  token
+}
+
+#' @export
+# API to refresh token
+refreshGoogleTokenForBigQuery <- function(tokenFileId){
+  getGoogleTokenForBigQuery(tokenFileId, FALSE)
+}
+
+#' @export
+executeGoogleBigQuery <- function(project, dataset, table, sqlquery, tokenFileId){
+  if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
+  token <- getGoogleTokenForBigQuery(tokenFileId)
+  bigrquery::set_access_cred(token)
+  bigrquery::query_exec(sqlquery, project = project)
+
+}
+
+#' @export
+# API to get projects for current oauth token
+getGoogleProjects <- function(tokenFileId){
+  if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
+  tryCatch({
+    token <- getGoogleTokenForBigQuery(tokenFileId);
+    bigrquery::set_access_cred(token)
+    projects <- bigrquery::list_projects();
+    ifelse(is.null(projects), c(""), projects)
+  }, error = function(err){
+    c("")
+  })
+}
+
+#' @export
+# API to get datasets for a project
+getGoogleDataSets <- function(project, tokenFileId){
+  if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
+  tryCatch({
+    token <- getGoogleTokenForBigQuery(tokenFileId);
+    bigrquery::set_access_cred(token)
+    resultdatasets <- bigrquery::list_datasets(project);
+    ifelse(is.null(resultdatasets), c(""), resultdatasets)
+  }, error = function(err){
+     c("")
+  })
+}
+
+
+#' @export
+# API to get tables for current project, data set
+getGoogleTables <- function(project, dataset, tokenFileId){
+  if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
+  tryCatch({
+    token <- getGoogleTokenForBigQuery(tokenFileId);
+    bigrquery::set_access_cred(token)
+    tables <- bigrquery::list_tables(project, dataset);
+    ifelse(is.null(tables), c(""), tables)
+  }, error = function(err){
+    c("")
+  })
+}
+# Parses all the 'scrapable' html tables from the web page.
+#' @param web page url to scrape
+#' @return html nodes
+#' @export
+parse_html_tables <- function(url) {
+  loadNamespace("rvest"); 
+  loadNamespace("xml2"); 
+  rvest::html_nodes(xml2::read_html(url) ,"table")
+}
+
+# Scrapes one of html tables from the web page specified by the url, 
+# and returns a data frame as a result.
+#' @param web page url to scrape
+#' @param table index number 
+#' @param either use the 1st row as a header or not. TRUE or FALSE
+#' @export
+scrape_html_table <- function(url, index, heading) {
+  loadNamespace("rvest"); 
+  loadNamespace("tibble"); 
+  .htmltables <- parse_html_tables(url)
+  tibble::repair_names(rvest::html_table(.htmltables[[index]], fill=TRUE ,header=heading))
+}
+
+
 # function to convert labelled class to factoror
 # see https://github.com/exploratory-io/tam/issues/1481
 #' @export
@@ -512,3 +625,16 @@ getObjectFromRdata <- function(rdata_path, object_name){
   obj
 }
 
+
+
+#' This function can clean the given data frame. It actually does 
+#' 1) split a column with a data.frame vector into seprate columns 
+#' 2) repair column names such as columns with NA for column names, 
+#' or duplicate column names. 
+#'
+#' @param x data frame
+#' @return cleaned data frame
+#' @export
+clean_data_frame <- function(x) {
+  tibble::repair_names(jsonlite::flatten(x)) 
+}
