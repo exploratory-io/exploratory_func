@@ -234,6 +234,8 @@ queryMongoDB <- function(host, port, database, collection, username, password, q
   if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
   loadNamespace("stringr")
   loadNamespace("jsonlite")
+  if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
+
   # read stored password
   pass = saveOrReadPassword("mongodb", username, password)
   if (stringr::str_length(username) > 0) {
@@ -243,7 +245,7 @@ queryMongoDB <- function(host, port, database, collection, username, password, q
     url = stringr::str_c("mongodb://", host, ":", as.character(port), "/", database)
   }
   con <- mongolite::mongo(collection, url = url)
-  data <- con$find(query = query)
+  data <- con$find(query = GetoptLong::qq(query))
   result <-data
   if (isFlatten) {
     result <- jsonlite::flatten(data)
@@ -259,6 +261,7 @@ queryMongoDB <- function(host, port, database, collection, username, password, q
 queryMySQL <- function(host, port, databaseName, username, password, numOfRows = -1, query){
   if(!requireNamespace("RMySQL")){stop("package RMySQL must be installed.")}
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
+  if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
 
   # read stored password
   pass = saveOrReadPassword("mysql", username, password)
@@ -266,7 +269,7 @@ queryMySQL <- function(host, port, databaseName, username, password, numOfRows =
   drv <- DBI::dbDriver("MySQL")
   conn = RMySQL::dbConnect(drv, dbname = databaseName, username = username,
                    password = pass, host = host, port = port)
-  resultSet <- RMySQL::dbSendQuery(conn, query)
+  resultSet <- RMySQL::dbSendQuery(conn, GetoptLong::qq(query))
   df <- RMySQL::dbFetch(resultSet, n = numOfRows)
   RMySQL::dbClearResult(resultSet)
   RMySQL::dbDisconnect(conn)
@@ -277,13 +280,15 @@ queryMySQL <- function(host, port, databaseName, username, password, numOfRows =
 queryPostgres <- function(host, port, databaseName, username, password, numOfRows = -1, query){
   if(!requireNamespace("RPostgreSQL")){stop("package RPostgreSQL must be installed.")}
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
+  if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
+
   # read stored password
   pass = saveOrReadPassword("postgres", username, password)
 
   drv <- DBI::dbDriver("PostgreSQL")
   conn = RPostgreSQL::dbConnect(drv, dbname = databaseName, user = username,
                    password = pass, host = host, port = port)
-  resultSet <- RPostgreSQL::dbSendQuery(conn, query)
+  resultSet <- RPostgreSQL::dbSendQuery(conn, GetoptLong::qq(query))
   df <- DBI::dbFetch(resultSet, n = numOfRows)
   RPostgreSQL::dbClearResult(resultSet)
   RPostgreSQL::dbDisconnect(conn)
@@ -394,9 +399,11 @@ refreshGoogleTokenForBigQuery <- function(tokenFileId){
 #' @export
 executeGoogleBigQuery <- function(project, dataset, table, sqlquery, tokenFileId){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
+  if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
+
   token <- getGoogleTokenForBigQuery(tokenFileId)
   bigrquery::set_access_cred(token)
-  bigrquery::query_exec(sqlquery, project = project)
+  bigrquery::query_exec(GetoptLong::qq(sqlquery), project = project)
 
 }
 
