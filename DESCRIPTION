@@ -18,7 +18,7 @@ Import: dplyr,
     reshape2,
     lazyeval,
     pdftools,
-    qlcMatrix
+    qlcMatrix,
     purrr,
     httr,
     text2vec,
