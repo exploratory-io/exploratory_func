@@ -70,6 +70,17 @@ test_that("test grouped_by", {
   expect_equal(ret, c("col1", "col2"))
 })
 
+test_that("test simple_cast colnames are sorted", {
+  test_df <- data.frame(
+    rowname = rep(c("row1", "row02", "row3", "row004"), each=3),
+    colname = rep(c("col1", "col2", "col03"), 4),
+    val = seq(12),
+    stringsAsFactors = FALSE
+  )
+  mat <- simple_cast(test_df, "rowname", "colname", "val")
+  expect_equal(test_df[test_df$rowname=="row3" & test_df$colname=="col03",3][[1]], mat["row3", "col03"])
+})
+
 test_that("test mat_to_df", {
   nc <- 4
   nr <- 5
