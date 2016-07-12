@@ -449,7 +449,7 @@ getGoogleTables <- function(project, dataset, tokenFileId){
     c("")
   })
 }
-# Parses all the 'scrapable' html tables from the web page.
+#' Parses all the 'scrapable' html tables from the web page.
 #' @param web page url to scrape
 #' @return html nodes
 #' @export
@@ -459,10 +459,10 @@ parse_html_tables <- function(url) {
   rvest::html_nodes(xml2::read_html(url) ,"table")
 }
 
-# Scrapes one of html tables from the web page specified by the url, 
-# and returns a data frame as a result.
+#' Scrapes one of html tables from the web page specified by the url,
+#' and returns a data frame as a result.
 #' @param web page url to scrape
-#' @param table index number 
+#' @param table index number
 #' @param either use the 1st row as a header or not. TRUE or FALSE
 #' @export
 scrape_html_table <- function(url, index, heading) {
