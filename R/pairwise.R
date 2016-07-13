@@ -123,7 +123,8 @@ do_dist.cols <- function(df, ..., label=NULL, fill=0, fun.aggregate=mean, distin
   calc_dist_each <- function(df){
     mat <- df %>%  dplyr::select_(.dots=select_dots) %>%  as.matrix()
 
-    # sort the column name so that the output of pair.name will be sorted
+    # sort the column name so that the output of pair.name.1 and pair.name.2 will be sorted
+    # it's better to be sorted so that heatmap in exploratory can be triangle if distinct is TRUE
     sortedNames <- sort(colnames(mat))
     mat <- t(mat)
     mat <- mat[sortedNames, ]
