@@ -122,6 +122,8 @@ do_dist.cols <- function(df, ..., label=NULL, fill=0, fun.aggregate=mean, distin
   # this is executed on each group
   calc_dist_each <- function(df){
     mat <- df %>%  dplyr::select_(.dots=select_dots) %>%  as.matrix()
+
+    # sort the column name so that the output of pair.name will be sorted
     sortedNames <- sort(colnames(mat))
     mat <- t(mat)
     mat <- mat[sortedNames, ]

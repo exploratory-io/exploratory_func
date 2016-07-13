@@ -67,6 +67,7 @@ do_cor.cols <- function(df, ..., use="pairwise.complete.obs", method="pearson", 
   # check if the df's grouped
   do_cor_each <- function(df){
     mat <- dplyr::select_(df, .dots = select_dots) %>%  as.matrix()
+    # sort the column name so that the output of pair.name will be sorted
     mat <- mat[,sort(colnames(mat))]
 
     cor_mat <- cor(mat, use = use, method = method)
