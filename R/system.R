@@ -443,25 +443,31 @@ getGoogleTables <- function(project, dataset, tokenFileId){
   })
 }
 # Parses all the 'scrapable' html tables from the web page.
-#' @param web page url to scrape
+#' @param {string} web page url to scrape
+#' @param {string} web page encoding 
 #' @return html nodes
 #' @export
-parse_html_tables <- function(url) {
+parse_html_tables <- function(url, encoding = NULL) {
   loadNamespace("rvest"); 
   loadNamespace("xml2"); 
-  rvest::html_nodes(xml2::read_html(url) ,"table")
+  if (is.null(encoding)) {
+    rvest::html_nodes(xml2::read_html(url) ,"table")
+  } else {
+    rvest::html_nodes(xml2::read_html(url, encoding=encoding) ,"table")
+  }
 }
 
 # Scrapes one of html tables from the web page specified by the url, 
 # and returns a data frame as a result.
 #' @param web page url to scrape
-#' @param table index number 
-#' @param either use the 1st row as a header or not. TRUE or FALSE
+#' @param {string} table index number 
+#' @param {string} either use the 1st row as a header or not. TRUE or FALSE
+#' @param {string} web page encoding 
 #' @export
-scrape_html_table <- function(url, index, heading) {
+scrape_html_table <- function(url, index, heading, encoding = NULL) {
   loadNamespace("rvest"); 
   loadNamespace("tibble"); 
-  .htmltables <- parse_html_tables(url)
+  .htmltables <- parse_html_tables(url, encoding)
   tibble::repair_names(rvest::html_table(.htmltables[[index]], fill=TRUE ,header=heading))
 }
 
