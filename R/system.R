@@ -153,7 +153,7 @@ getGoogleProfile <- function(tokenFileId){
 }
 
 #' @export
-getGoogleAnalytics <- function(tableId, lastNDays, dimensions, metrics, tokenFileId){
+getGoogleAnalytics <- function(tableId, lastNDays, paginate_query=FALSE, dimensions, metrics, tokenFileId){
   if(!requireNamespace("RGoogleAnalytics")){stop("package RGoogleAnalytics must be installed.")}
   loadNamespace("lubridate")
 
@@ -169,7 +169,7 @@ getGoogleAnalytics <- function(tableId, lastNDays, dimensions, metrics, tokenFil
                      table.id = tableId)
 
   ga.query <- RGoogleAnalytics::QueryBuilder(query.list)
-  ga.data <- RGoogleAnalytics::GetReportData(ga.query, token)
+  ga.data <- RGoogleAnalytics::GetReportData(ga.query, token, paginate_query = paginate_query)
   ga.data
 }
 
