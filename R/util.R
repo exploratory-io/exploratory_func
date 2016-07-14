@@ -73,14 +73,11 @@ upper_gather <- function(mat, names=NULL, diag=NULL, cnames = c("Var1", "Var2", 
     r_names <- rownames(tmat)
     if(is.null(c_names)){
       c_names <- seq(ncol(tmat))
-    } else {
-      c_names <- sort(c_names)
     }
     if(is.null(r_names)){
       r_names <- seq(nrow(tmat))
-    } else {
-      r_names <- sort(r_names)
     }
+
     # this creates pairs of row and column indices
     ind <- which( lower_tri , arr.ind = TRUE )
     # make a vector of upper half of matrix

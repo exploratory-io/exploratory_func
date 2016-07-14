@@ -2,12 +2,13 @@ context("check util functions")
 
 test_that("test upper_gather", {
   mat <- matrix(seq(20),nrow=5, ncol=4)
-  colnames(mat) <- paste("col", seq(4))
+  # use col03 to break sorted state
+  colnames(mat) <- c("col1","col2","col03", "col4")
   result <- upper_gather(mat)
   expect_equal( typeof(result[[2]]), "character")
   expect_equal(result[[1]], sort(result[[1]]))
-  expect_equal(result[result[[1]]==3 & result[[2]]=="col 4", 3][[1]], 18)
-  expect_equal(result[result[[1]]==2 & result[[2]]=="col 3", 3][[1]], 12)
+  expect_equal(result[result[[1]]==3 & result[[2]]=="col4", 3][[1]], 18)
+  expect_equal(result[result[[1]]==2 & result[[2]]=="col03", 3][[1]], 12)
   expect_equal(nrow(result), 6)
 })
 
@@ -67,6 +68,17 @@ test_that("test grouped_by", {
   df <- dplyr::group_by(test_df, col1, col2)
   ret <- grouped_by(df)
   expect_equal(ret, c("col1", "col2"))
+})
+
+test_that("test simple_cast colnames are sorted", {
+  test_df <- data.frame(
+    rowname = rep(c("row1", "row02", "row3", "row004"), each=3),
+    colname = rep(c("col1", "col2", "col03"), 4),
+    val = seq(12),
+    stringsAsFactors = FALSE
+  )
+  mat <- simple_cast(test_df, "rowname", "colname", "val")
+  expect_equal(test_df[test_df$rowname=="row3" & test_df$colname=="col03",3][[1]], mat["row3", "col03"])
 })
 
 test_that("test mat_to_df", {
