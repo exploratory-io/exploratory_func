@@ -97,3 +97,41 @@ test_that("test %nin%", {
   ret <- c(1,3,NA,2) %nin% c(3, NA)
   expect_equal(ret, c(T,F,F,T))
 })
+
+test_that("list_extract", {
+  test_list <- list(seq(1), seq(2), seq(3))
+  def_ret <- list_extract(test_list)
+  expect_equal(def_ret, c(1, 1, 1))
+
+  # index over
+  over_ret <- list_extract(test_list, 3)
+  expect_equal(over_ret, c(NA, NA, 3))
+
+  # index minus
+  minus_ret <- list_extract(test_list, -2)
+  expect_equal(minus_ret, c(NA, 1, 2))
+
+  # index minus over
+  minus_ret <- list_extract(test_list, -5)
+  expect_equal(minus_ret, c(NA, NA, NA))
+
+  test_df_list <- list(data.frame(1), data.frame(1, second=2), data.frame(1, 2, 3))
+  def_ret <- list_extract(test_df_list)
+  expect_equal(def_ret, c(1, 1, 1))
+
+  # index over
+  over_ret <- list_extract(test_df_list, 3)
+  expect_equal(over_ret, c(NA, NA, 3))
+
+  # index minus
+  minus_ret <- list_extract(test_df_list, -2)
+  expect_equal(minus_ret, c(NA, 1, 2))
+
+  # index minus over
+  minus_ret <- list_extract(test_df_list, -5)
+  expect_equal(minus_ret, c(NA, NA, NA))
+
+  # index text
+  minus_ret <- list_extract(test_df_list, "second")
+  expect_equal(minus_ret, c(NA, 2, NA))
+})

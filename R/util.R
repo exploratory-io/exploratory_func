@@ -175,10 +175,47 @@ list_n <- function(column){
 #' extract elements from each row of list type column or data frame type column
 #' @export
 list_extract <- function(column, position = 1, rownum = 1){
+
+  if(position==0){
+    stop("position 0 is not supported")
+  }
+
   if(is.data.frame(column[[1]])){
-   sapply(column, function(column) column[rownum, position])
+    if(position<0){
+      sapply(column, function(column){
+        index <- ncol(column) + position + 1
+        if(is.null(column[rownum, index]) | index <= 0){
+          # column[rownum, position] still returns data frame if it's minus, so position < 0 should be caught here
+          NA
+        } else {
+          column[rownum, index][[1]]
+        }
+      })
+    } else {
+      sapply(column, function(column){
+        if(is.null(column[rownum, position])){
+          NA
+        } else {
+          column[rownum, position][[1]]
+        }
+      })
+    }
   } else {
-    sapply(column, function(column) column[position])
+    if(position<0){
+      sapply(column, function(column){
+        index <- length(column) + position + 1
+        if(index <= 0){
+          # column[rownum, position] still returns data frame if it's minus, so position < 0 should be caught here
+          NA
+        } else {
+          column[index]
+        }
+      })
+    } else {
+      sapply(column, function(column){
+        column[position]
+      })
+    }
   }
 }
 
