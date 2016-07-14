@@ -51,7 +51,7 @@ test_that("test scrape_html_table with japanese shift_jis table",{
 })
 
 test_that("test source check conflict case", {
-  ret <- checkSourceConflict("../../R/model_builder.R")
-  expect_true(any(ret %in% "build_data"))
+  ret <- checkSourceConflict("../../R/model_builder.R", "../../R/broom_wraper.R")
+  expect_true(any(ret[["../../R/model_builder.R"]] %in% "build_data"))
 })
 
