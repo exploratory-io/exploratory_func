@@ -153,7 +153,7 @@ getGoogleProfile <- function(tokenFileId){
 }
 
 #' @export
-getGoogleAnalytics <- function(tableId, lastNDays, dimensions, metrics, tokenFileId){
+getGoogleAnalytics <- function(tableId, lastNDays, paginate_query=FALSE, dimensions, metrics, tokenFileId){
   if(!requireNamespace("RGoogleAnalytics")){stop("package RGoogleAnalytics must be installed.")}
   loadNamespace("lubridate")
 
@@ -169,7 +169,7 @@ getGoogleAnalytics <- function(tableId, lastNDays, dimensions, metrics, tokenFil
                      table.id = tableId)
 
   ga.query <- RGoogleAnalytics::QueryBuilder(query.list)
-  ga.data <- RGoogleAnalytics::GetReportData(ga.query, token)
+  ga.data <- RGoogleAnalytics::GetReportData(ga.query, token, paginate_query = paginate_query)
   ga.data
 }
 
@@ -234,6 +234,8 @@ queryMongoDB <- function(host, port, database, collection, username, password, q
   if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
   loadNamespace("stringr")
   loadNamespace("jsonlite")
+  if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
+
   # read stored password
   pass = saveOrReadPassword("mongodb", username, password)
   if (stringr::str_length(username) > 0) {
@@ -243,7 +245,7 @@ queryMongoDB <- function(host, port, database, collection, username, password, q
     url = stringr::str_c("mongodb://", host, ":", as.character(port), "/", database)
   }
   con <- mongolite::mongo(collection, url = url)
-  data <- con$find(query = query)
+  data <- con$find(query = GetoptLong::qq(query))
   result <-data
   if (isFlatten) {
     result <- jsonlite::flatten(data)
@@ -259,6 +261,7 @@ queryMongoDB <- function(host, port, database, collection, username, password, q
 queryMySQL <- function(host, port, databaseName, username, password, numOfRows = -1, query){
   if(!requireNamespace("RMySQL")){stop("package RMySQL must be installed.")}
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
+  if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
 
   # read stored password
   pass = saveOrReadPassword("mysql", username, password)
@@ -266,7 +269,7 @@ queryMySQL <- function(host, port, databaseName, username, password, numOfRows =
   drv <- DBI::dbDriver("MySQL")
   conn = RMySQL::dbConnect(drv, dbname = databaseName, username = username,
                    password = pass, host = host, port = port)
-  resultSet <- RMySQL::dbSendQuery(conn, query)
+  resultSet <- RMySQL::dbSendQuery(conn, GetoptLong::qq(query))
   df <- RMySQL::dbFetch(resultSet, n = numOfRows)
   RMySQL::dbClearResult(resultSet)
   RMySQL::dbDisconnect(conn)
@@ -277,13 +280,15 @@ queryMySQL <- function(host, port, databaseName, username, password, numOfRows =
 queryPostgres <- function(host, port, databaseName, username, password, numOfRows = -1, query){
   if(!requireNamespace("RPostgreSQL")){stop("package RPostgreSQL must be installed.")}
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
+  if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
+
   # read stored password
   pass = saveOrReadPassword("postgres", username, password)
 
   drv <- DBI::dbDriver("PostgreSQL")
   conn = RPostgreSQL::dbConnect(drv, dbname = databaseName, user = username,
                    password = pass, host = host, port = port)
-  resultSet <- RPostgreSQL::dbSendQuery(conn, query)
+  resultSet <- RPostgreSQL::dbSendQuery(conn, GetoptLong::qq(query))
   df <- DBI::dbFetch(resultSet, n = numOfRows)
   RPostgreSQL::dbClearResult(resultSet)
   RPostgreSQL::dbDisconnect(conn)
@@ -394,9 +399,11 @@ refreshGoogleTokenForBigQuery <- function(tokenFileId){
 #' @export
 executeGoogleBigQuery <- function(project, dataset, table, sqlquery, tokenFileId){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
+  if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
+
   token <- getGoogleTokenForBigQuery(tokenFileId)
   bigrquery::set_access_cred(token)
-  bigrquery::query_exec(sqlquery, project = project)
+  bigrquery::query_exec(GetoptLong::qq(sqlquery), project = project)
 
 }
 
@@ -457,8 +464,8 @@ parse_html_tables <- function(url, encoding = NULL) {
   }
 }
 
-# Scrapes one of html tables from the web page specified by the url, 
-# and returns a data frame as a result.
+#' Scrapes one of html tables from the web page specified by the url,
+#' and returns a data frame as a result.
 #' @param web page url to scrape
 #' @param {string} table index number 
 #' @param {string} either use the 1st row as a header or not. TRUE or FALSE
@@ -591,6 +598,46 @@ toDataFrame <- function(x) {
   }
   return(typeConvert(df))
 }
+
+# API to create a temporary environment for RDATA staging
+#' @export
+createTempEnvironment <- function(){
+  new.env(parent = globalenv())
+}
+
+# API to get a list of data frames from a RDATA
+#' @export
+getObjectListFromRdata <- function(rdata_path, temp.space){
+  # load RDATA to temporary env to prevent the polluation on global objects
+  temp.object <- load(rdata_path,temp.space)
+  # get list of ojbect loaded to temporary env
+  objectlist <- ls(envir=temp.space)
+  result <- lapply(objectlist, function(x){
+    # only get a object whose class is data.frame
+    if("data.frame" %in% class(get(x,temp.space))){
+      x
+    }
+  })
+  if(!is.null(result) & length(result)>0){
+    unlist(result)
+  } else {
+    c("");
+  }
+}
+
+# API to get a data frame object from RDATA
+#' @export
+getObjectFromRdata <- function(rdata_path, object_name){
+  # load RDATA to temporary env to prevent the polluation on global objects
+  temp.space = createTempEnvironment()
+  load(rdata_path,temp.space)
+  # get list of ojbect loaded to temporary env
+  obj <- get(object_name,temp.space)
+  # remote temporary env
+  rm(temp.space)
+  obj
+}
+
 
 
 #' This function can clean the given data frame. It actually does 
