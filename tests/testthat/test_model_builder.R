@@ -110,6 +110,7 @@ test_that("test build_kmeans.cols ignore NA rows with grouped and keep.source=FA
 })
 
 test_that("test build_kmeans.cols", {
-  df <- readRDS("~/Downloads/123flight_source_0.rds")
-  (df %>%  build_kmeans.kv(CARRIER, DEST_CITY_NAME,DISTANCE,keep.source=TRUE) %>%  augment_kmeans(model, data=source.data))
+  df <- data.frame(number = seq(4), number2 = seq(4)-4)
+  ret <- (df %>%  build_kmeans.cols(number, number2, keep.source=TRUE) %>%  augment_kmeans(model, data=source.data))
+  expect_true(is.factor(ret$.cluster))
 })
