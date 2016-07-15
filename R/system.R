@@ -654,18 +654,17 @@ clean_data_frame <- function(x) {
 
 #' This checks name conflict and attach the file if there isn't any conflict
 #' @export
-checkSourceConflict <- function(...){
-  files <- list(...)
+checkSourceConflict <- function(files){
+  ret <- list()
   for (file in files){
-    env <- new.env()
-    source(file, local=env)
-    attached_objects <- ls(env)
-    global_objects <- ls(globalenv())
-    conflict <- attached_objects %in% global_objects
-    if(length(attached_objects[conflict]) != 0){
-      return(setNames(list(attached_objects[conflict]), file))
-    }
+    ret[[file]] <- tryCatch({
+      env <- new.env()
+      source(file, local=env)
+      attached_objects <- ls(env)
+      list(names = attached_objects)
+    }, error = function(e){
+      list(error = e[["message"]])
+    })
   }
-  # No conflict
-  list()
+  ret
 }
