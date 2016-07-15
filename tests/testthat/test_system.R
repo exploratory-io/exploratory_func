@@ -49,3 +49,15 @@ test_that("test scrape_html_table with japanese shift_jis table",{
   expect_equal(ncol(result), 2)
   expect_equal(nrow(result), 3)
 })
+
+test_that("test source check conflict case", {
+  filenames <- c("../../R/model_builder.R", "../../R/don't_exist.R")
+
+  # suppress file doesn't exist warning
+  suppressWarnings({ret <- checkSourceConflict(filenames)})
+  expect_true(!is.null(ret[[filenames[[1]]]]$names))
+  expect_true(is.null(ret[[filenames[[2]]]]$names))
+
+  expect_true(is.null(ret[[filenames[[1]]]]$error))
+  expect_true(!is.null(ret[[filenames[[2]]]]$error))
+})
