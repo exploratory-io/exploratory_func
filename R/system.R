@@ -449,7 +449,7 @@ getGoogleTables <- function(project, dataset, tokenFileId){
     c("")
   })
 }
-# Parses all the 'scrapable' html tables from the web page.
+#' Parses all the 'scrapable' html tables from the web page.
 #' @param {string} web page url to scrape
 #' @param {string} web page encoding 
 #' @return html nodes
