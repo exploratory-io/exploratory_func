@@ -397,6 +397,44 @@ refreshGoogleTokenForBigQuery <- function(tokenFileId){
 }
 
 #' @export
+# API to submit a Google Big Query Job
+submitGoogleBigQueryJob <- function(project, sqlquery, tokenFieldId){
+  if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
+  if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
+  #GetoptLong uses stringr and str_c is called without stringr:: so need to use "require" instead of "requireNamespace"
+  if(!require("stringr")){stop("package stringr must be installed.")}
+
+  token <- getGoogleTokenForBigQuery(tokenFieldId)
+  bigrquery::set_access_cred(token)
+  job <- bigrquery::insert_query_job(GetoptLong::qq(sqlquery), project)
+  job <- bigrquery::wait_for(job)
+  isCacheHit <- job$statistics$query$cacheHit
+  # if cache hit case, totalBytesProcessed info is not available. So set is as -1
+  totalBytesProcessed <- ifelse(isCacheHit, -1, job$statistics$totalBytesProcessed)
+  # if cache hit case, recordsWritten info is not avalable. So set it as -1
+  numOfRowsProcessed <- ifelse(isCacheHit, -1, job$statistics$query$queryPlan[[1]]$recordsWritten)
+  dest <- job$configuration$query$destinationTable
+  result <- data.frame(tabldId = dest$tableId, datasetId = dest$datasetId, numOfRows = numOfRowsProcessed, totalBytesProcessed = totalBytesProcessed)
+}
+
+#' @export
+# API to get a data from google BigQuery table
+getDataFromGoogleBigQueryTable <- function(project, dataset, table, page_size = 10000, max_page){
+  if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
+  bigrquery::list_tabledata(project, dataset, table, page_size = page_size,
+                 table_info = NULL, max_pages = max_page)
+}
+
+#' @export
+# API to get a data from google BigQuery table
+saveGoogleBigQueryResultAs <- function(projectId, sourceDatasetId, sourceTableId, targetDatasetId, targetTableId){
+  if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
+  src <- list(project_id = projectId, dataset_id = sourceDatasetId, table_id = sourceTableId)
+  dest <- list(project_id = projectId, dataset_id = targetDatasetId, table_id = targetTableId)
+  bigrquery::copy_table(src, dest)
+}
+
+#' @export
 executeGoogleBigQuery <- function(project, dataset, table, sqlquery, tokenFileId){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
@@ -404,7 +442,6 @@ executeGoogleBigQuery <- function(project, dataset, table, sqlquery, tokenFileId
   token <- getGoogleTokenForBigQuery(tokenFileId)
   bigrquery::set_access_cred(token)
   bigrquery::query_exec(GetoptLong::qq(sqlquery), project = project)
-
 }
 
 #' @export
