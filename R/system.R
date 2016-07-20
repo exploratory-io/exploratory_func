@@ -415,7 +415,7 @@ submitGoogleBigQueryJob <- function(project, sqlquery, tokenFieldId){
   # if cache hit case, recordsWritten info is not avalable. So set it as -1
   numOfRowsProcessed <- ifelse(isCacheHit, -1, job$statistics$query$queryPlan[[1]]$recordsWritten)
   dest <- job$configuration$query$destinationTable
-  result <- data.frame(tabldId = dest$tableId, datasetId = dest$datasetId, numOfRows = numOfRowsProcessed, totalBytesProcessed = totalBytesProcessed)
+  result <- data.frame(tableId = dest$tableId, datasetId = dest$datasetId, numOfRows = numOfRowsProcessed, totalBytesProcessed = totalBytesProcessed)
 }
 
 #' @export
