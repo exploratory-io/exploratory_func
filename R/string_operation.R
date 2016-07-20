@@ -132,10 +132,10 @@ calc_idf <- function(group, term, log_scale = log, smooth_idf = FALSE){
 #' @param term Column to be considered as term
 #' @param weight Type of weight calculation.
 #' "ratio" is default and it's count/(total number of terms in the group).
-#' This can be "raw_frequency", "binary", "log_normalization" and "k_normalization"
-#' "raw_frequency" is the count of the term in the group.
+#' This can be "raw", "binary" and "log_scale"
+#' "raw" is the count of the term in the group.
 #' "binary" is logic if the term is in the group or not.
-#' "log_normalization" is logic if the term is in the group or not.
+#' "log_scale" is logic if the term is in the group or not.
 #' @param term Column to be considered as term
 #' @return Data frame with group, term and .tf column
 calc_tf <- function(df, group, term, ...){
@@ -152,16 +152,12 @@ calc_tf_ <- function(df, group_col, term_col, weight="ratio", k=0.5){
   cnames <- avoid_conflict(c(group_col, term_col), c("count_per_doc", "tf"))
 
   calc_weight <- function(raw){
-    if(weight=="ratio"){
-      val <- raw/sum(raw)
-    } else if(weight=="raw_frequency"){
+    if(weight=="raw"){
       val <- raw
     } else if (weight=="binary"){
       val <- as.logical(raw)
-    } else if (weight=="log_normalization"){
+    } else if (weight=="log_scale"){
       val <- 1+log(raw)
-    } else if (weight=="k_normalization"){
-      val <- k + (1-k)*raw/max(raw)
     }
     else{
       stop(paste0(weight, " is not recognized as weight argument"))
@@ -187,9 +183,13 @@ calc_tf_ <- function(df, group_col, term_col, weight="ratio", k=0.5){
 #' Function to scale IDF. It might be worth trying log2 or log10.
 #' log10 strongly suppress the increase of idf values and log2 does it more weakly.
 #' @export
-do_tfidf <- function(df, group, term, idf_log_scale = log, tf_weight="ratio", tf_k=0.5){
+do_tfidf <- function(df, group, term, idf_log_scale = log, tf_weight="raw", tf_k=0.5, norm="l2"){
   loadNamespace("tidytext")
   loadNamespace("dplyr")
+
+  if(!(norm %in% c("l1", "l2") | norm == FALSE)){
+    stop("norm argument must be l1, l2 or FALSE")
+  }
 
   group_col <- col_name(substitute(group))
   term_col <- col_name(substitute(term))
@@ -201,6 +201,22 @@ do_tfidf <- function(df, group, term, idf_log_scale = log, tf_weight="ratio", tf
   count_tbl[[cnames[[1]]]] <- tfidf$.df
   count_tbl[[cnames[[2]]]] <- tfidf$.idf * count_tbl[[cnames[[3]]]]
   count_tbl[[cnames[[3]]]] <- NULL
+
+  if(norm == "l2"){
+    val <- lazyeval::interp(~x/sqrt(sum(x^2)), x=as.symbol(cnames[[2]]))
+    count_tbl <- (count_tbl %>%
+      dplyr::group_by_(group_col) %>%
+      dplyr::mutate_(.dots=setNames(list(val), cnames[[2]])) %>%
+      dplyr::ungroup())
+  } else if(norm == "l1"){
+    val <- lazyeval::interp(~x/sum(x), x=as.symbol(cnames[[2]]))
+    count_tbl <- (count_tbl %>%
+      dplyr::group_by_(group_col) %>%
+      dplyr::mutate_(.dots=setNames(list(val), cnames[[2]])) %>%
+      dplyr::ungroup())
+  }
+  # if NULL, no normalization
+
   count_tbl
 }
 
