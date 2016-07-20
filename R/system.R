@@ -453,7 +453,7 @@ executeGoogleBigQuery <- function(project, sqlquery, page_size = 10000, max_page
 
 #' @export
 # API to get projects for current oauth token
-getGoogleProjects <- function(tokenFileId){
+getGoogleBigQueryProjects <- function(tokenFileId){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   tryCatch({
     token <- getGoogleTokenForBigQuery(tokenFileId);
@@ -467,7 +467,7 @@ getGoogleProjects <- function(tokenFileId){
 
 #' @export
 # API to get datasets for a project
-getGoogleDataSets <- function(project, tokenFileId){
+getGoogleBigQueryDataSets <- function(project, tokenFileId){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   tryCatch({
     token <- getGoogleTokenForBigQuery(tokenFileId);
@@ -482,7 +482,7 @@ getGoogleDataSets <- function(project, tokenFileId){
 
 #' @export
 # API to get tables for current project, data set
-getGoogleTables <- function(project, dataset, tokenFileId){
+getGoogleBigQueryTables <- function(project, dataset, tokenFileId){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   tryCatch({
     token <- getGoogleTokenForBigQuery(tokenFileId);
