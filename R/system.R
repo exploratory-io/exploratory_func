@@ -406,6 +406,7 @@ submitGoogleBigQueryJob <- function(project, sqlquery, tokenFieldId){
 
   token <- getGoogleTokenForBigQuery(tokenFieldId)
   bigrquery::set_access_cred(token)
+
   job <- bigrquery::insert_query_job(GetoptLong::qq(sqlquery), project)
   job <- bigrquery::wait_for(job)
   isCacheHit <- job$statistics$query$cacheHit
@@ -419,29 +420,35 @@ submitGoogleBigQueryJob <- function(project, sqlquery, tokenFieldId){
 
 #' @export
 # API to get a data from google BigQuery table
-getDataFromGoogleBigQueryTable <- function(project, dataset, table, page_size = 10000, max_page){
+getDataFromGoogleBigQueryTable <- function(project, dataset, table, page_size = 10000, max_page, tokenFileId){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
+  token <- getGoogleTokenForBigQuery(tokenFileId)
+  bigrquery::set_access_cred(token)
+
   bigrquery::list_tabledata(project, dataset, table, page_size = page_size,
                  table_info = NULL, max_pages = max_page)
 }
 
 #' @export
 # API to get a data from google BigQuery table
-saveGoogleBigQueryResultAs <- function(projectId, sourceDatasetId, sourceTableId, targetDatasetId, targetTableId){
+saveGoogleBigQueryResultAs <- function(projectId, sourceDatasetId, sourceTableId, targetDatasetId, targetTableId, tokenFileId){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
+  token <- getGoogleTokenForBigQuery(tokenFileId)
+  bigrquery::set_access_cred(token)
+
   src <- list(project_id = projectId, dataset_id = sourceDatasetId, table_id = sourceTableId)
   dest <- list(project_id = projectId, dataset_id = targetDatasetId, table_id = targetTableId)
   bigrquery::copy_table(src, dest)
 }
 
 #' @export
-executeGoogleBigQuery <- function(project, dataset, table, sqlquery, tokenFileId){
+executeGoogleBigQuery <- function(project, sqlquery, page_size = 10000, max_page = 10, tokenFileId){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
 
   token <- getGoogleTokenForBigQuery(tokenFileId)
   bigrquery::set_access_cred(token)
-  bigrquery::query_exec(GetoptLong::qq(sqlquery), project = project)
+  bigrquery::query_exec(GetoptLong::qq(sqlquery), project = project, page_size = page_size, max_page = max_page)
 }
 
 #' @export
