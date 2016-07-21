@@ -442,13 +442,13 @@ saveGoogleBigQueryResultAs <- function(projectId, sourceDatasetId, sourceTableId
 }
 
 #' @export
-executeGoogleBigQuery <- function(project, sqlquery, page_size = 10000, max_page = 10, tokenFileId){
+executeGoogleBigQuery <- function(project, sqlquery, destination_table = "exploratory_query_result", page_size = 10000, max_page = 10, tokenFileId){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
 
   token <- getGoogleTokenForBigQuery(tokenFileId)
   bigrquery::set_access_cred(token)
-  bigrquery::query_exec(GetoptLong::qq(sqlquery), project = project, page_size = page_size, max_page = max_page)
+  bigrquery::query_exec(GetoptLong::qq(sqlquery), project = project, destination_table = destination_table, page_size = page_size, max_page = max_page)
 }
 
 #' @export
