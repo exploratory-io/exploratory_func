@@ -493,6 +493,16 @@ getGoogleBigQueryTables <- function(project, dataset, tokenFileId){
     c("")
   })
 }
+
+#' @export
+# API to get tables for current project, data set
+deleteGoogleBigQueryTable <- function(project, dataset, table, tokenFileId){
+  if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
+  token <- getGoogleTokenForBigQuery(tokenFileId);
+  bigrquery::set_access_cred(token)
+  bigrquery::delete_table(project, dataset, table);
+}
+
 #' Parses all the 'scrapable' html tables from the web page.
 #' @param {string} web page url to scrape
 #' @param {string} web page encoding 
