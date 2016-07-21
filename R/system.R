@@ -398,7 +398,7 @@ refreshGoogleTokenForBigQuery <- function(tokenFileId){
 
 #' @export
 # API to submit a Google Big Query Job
-submitGoogleBigQueryJob <- function(project, sqlquery, tokenFieldId){
+submitGoogleBigQueryJob <- function(project, sqlquery, destination_table, tokenFieldId){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
   #GetoptLong uses stringr and str_c is called without stringr:: so need to use "require" instead of "requireNamespace"
@@ -406,8 +406,8 @@ submitGoogleBigQueryJob <- function(project, sqlquery, tokenFieldId){
 
   token <- getGoogleTokenForBigQuery(tokenFieldId)
   bigrquery::set_access_cred(token)
-
-  job <- bigrquery::insert_query_job(GetoptLong::qq(sqlquery), project)
+  # pass desitiona_table to support large data
+  job <- bigrquery::insert_query_job(GetoptLong::qq(sqlquery), project, destination_table = destination_table)
   job <- bigrquery::wait_for(job)
   isCacheHit <- job$statistics$query$cacheHit
   # if cache hit case, totalBytesProcessed info is not available. So set is as -1
@@ -442,7 +442,7 @@ saveGoogleBigQueryResultAs <- function(projectId, sourceDatasetId, sourceTableId
 }
 
 #' @export
-executeGoogleBigQuery <- function(project, sqlquery, destination_table = "exploratory_query_result", page_size = 10000, max_page = 10, tokenFileId){
+executeGoogleBigQuery <- function(project, sqlquery, destination_table, page_size = 10000, max_page = 10, tokenFileId){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
 
