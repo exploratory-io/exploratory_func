@@ -459,7 +459,6 @@ getGoogleBigQueryProjects <- function(tokenFileId){
     token <- getGoogleTokenForBigQuery(tokenFileId);
     bigrquery::set_access_cred(token)
     projects <- bigrquery::list_projects();
-    ifelse(is.null(projects), c(""), projects)
   }, error = function(err){
     c("")
   })
@@ -473,7 +472,6 @@ getGoogleBigQueryDataSets <- function(project, tokenFileId){
     token <- getGoogleTokenForBigQuery(tokenFileId);
     bigrquery::set_access_cred(token)
     resultdatasets <- bigrquery::list_datasets(project);
-    ifelse(is.null(resultdatasets), c(""), resultdatasets)
   }, error = function(err){
      c("")
   })
@@ -488,7 +486,6 @@ getGoogleBigQueryTables <- function(project, dataset, tokenFileId){
     token <- getGoogleTokenForBigQuery(tokenFileId);
     bigrquery::set_access_cred(token)
     tables <- bigrquery::list_tables(project, dataset);
-    ifelse(is.null(tables), c(""), tables)
   }, error = function(err){
     c("")
   })
