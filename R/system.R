@@ -369,7 +369,7 @@ getGoogleTokenForBigQuery <- function(tokenFileId, useCache=TRUE){
   cacheOption = getOption("tam.oauth_token_cache")
   # tam.oauth_token_cache is RDS file path (~/.exploratory/projects/<projectid>/rdata/placeholder.rds)
   # for each data frame, create token cache as
-  # ~/.exploratory/projects/<projectid>/rdata/<tokenFileId_per_dataframe>_ga_token.rds
+  # ~/.exploratory/projects/<projectid>/rdata/<tokenFileId_per_dataframe>_bigquery_token.rds
   tokenPath = stringr::str_replace(cacheOption, "placeholder.rds", str_c(tokenFileId, "_bigquery_token.rds"))
   # since Auth from RGoogleAnalytics does not work well
   # switch to use oauth_app and oauth2.0_token
@@ -410,7 +410,7 @@ submitGoogleBigQueryJob <- function(project, sqlquery, destination_table, write_
   job <- bigrquery::insert_query_job(GetoptLong::qq(sqlquery), project, destination_table = destination_table, write_disposition = write_disposition)
   job <- bigrquery::wait_for(job)
   isCacheHit <- job$statistics$query$cacheHit
-  # if cache hit case, totalBytesProcessed info is not available. So set is as -1
+  # if cache hit case, totalBytesProcessed info is not available. So set it as -1
   totalBytesProcessed <- ifelse(isCacheHit, -1, job$statistics$totalBytesProcessed)
   # if cache hit case, recordsWritten info is not avalable. So set it as -1
   numOfRowsProcessed <- ifelse(isCacheHit, -1, job$statistics$query$queryPlan[[1]]$recordsWritten)
