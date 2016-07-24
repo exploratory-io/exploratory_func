@@ -145,7 +145,7 @@ calc_tf <- function(df, group, term, ...){
 }
 
 #' @rdname calc_tf
-calc_tf_ <- function(df, group_col, term_col, weight="ratio", k=0.5){
+calc_tf_ <- function(df, group_col, term_col, weight="ratio"){
   loadNamespace("dplyr")
   loadNamespace("tidyr")
 
@@ -183,7 +183,7 @@ calc_tf_ <- function(df, group_col, term_col, weight="ratio", k=0.5){
 #' Function to scale IDF. It might be worth trying log2 or log10.
 #' log10 strongly suppress the increase of idf values and log2 does it more weakly.
 #' @export
-do_tfidf <- function(df, group, term, idf_log_scale = log, tf_weight="raw", tf_k=0.5, norm="l2"){
+do_tfidf <- function(df, group, term, idf_log_scale = log, tf_weight="raw", norm="l2"){
   loadNamespace("tidytext")
   loadNamespace("dplyr")
 
@@ -196,7 +196,7 @@ do_tfidf <- function(df, group, term, idf_log_scale = log, tf_weight="raw", tf_k
 
   cnames <- avoid_conflict(c(group_col, term_col), c("count_of_docs", "tfidf", "tf"))
 
-  count_tbl <- calc_tf_(df, group_col, term_col, weight=tf_weight, k=tf_k)
+  count_tbl <- calc_tf_(df, group_col, term_col, weight=tf_weight)
   tfidf <- calc_idf(count_tbl[[group_col]], count_tbl[[term_col]], log_scale = idf_log_scale, smooth_idf = FALSE)
   count_tbl[[cnames[[1]]]] <- tfidf$.df
   count_tbl[[cnames[[2]]]] <- tfidf$.idf * count_tbl[[cnames[[3]]]]
@@ -232,30 +232,30 @@ stem_word <- function(...){
 #' @param df Data frame which has tokens.
 #' @param token Column name of token data.
 #' @param n How many tokens should be together as new tokens. This should be numeric vector.
-#' @param skip How many tokens can be skipped when connecting them.
 #' @export
-do_ngram <- function(df, token, n=1:2, skip=0){
+do_ngram <- function(df, token, sentence, document, maxn=2, sep="_"){
   loadNamespace("dplyr")
   loadNamespace("tidyr")
-  loadNamespace("quanteda")
+  loadNamespace("stringr")
+  loadNamespace("lazyeval")
   token_col <- col_name(substitute(token))
+  sentence_col <- col_name(substitute(sentence))
+  document_col <- col_name(substitute(document))
 
-  indices <- attr(df, "indices")
-  quanteda::ngrams
-  if(is.null(indices)){
-    # not grouped case
-    skipgrams <- quanteda::skipgrams(as.character(df[[token_col]]), n=n, skip=skip)
-    ret <- data.frame(skipgram=skipgrams, stringsAsFactors = F)
-    colnames(ret) <- token_col
-    ret
-  } else {
-    # grouped case
-    labels <- attr(df, "labels")
-    labels[[token_col]] <- lapply(indices, function(index){
-      quanteda::skipgrams(as.character(df[[token_col]][index+1]), n=n, skip=skip)
-    })
-    tidyr::unnest_(labels, token_col)
+  grouped <- (df %>%
+            dplyr::group_by_(document_col, sentence_col))
+  prev_cname <- token_col
+  for(n in seq(maxn)[-1]){
+    cname <- avoid_conflict(colnames(df), stringr::str_c("gram", n, sep=""))
+    lead_fml <- lazyeval::interp(~dplyr::lead(x, y), x=as.symbol(token_col), y=n-1)
+    str_c_fml <- lazyeval::interp(~stringr::str_c(x, y, sep=z), x=as.symbol(prev_cname), y=as.symbol(cname), z=sep)
+    grouped <- (grouped %>%
+              dplyr::mutate_(.dots=setNames(list(lead_fml), cname)) %>%
+              dplyr::mutate_(.dots=setNames(list(str_c_fml), cname))
+              )
+    prev_cname <- cname
   }
+  dplyr::ungroup(grouped)
 }
 
 #' Calculate sentiment

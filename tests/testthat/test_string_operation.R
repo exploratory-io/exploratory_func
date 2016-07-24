@@ -180,10 +180,8 @@ test_that("do_ngram", {
     token=paste("token",rep(c(1,2),10), sep=""),
     stringsAsFactors = F)
 
-  ungrouped <- df %>%  do_ngram(token)
-  grouped <- df %>%  dplyr::group_by(doc, sentence) %>%  do_ngram(token)
-  expect_equal(ncol(ungrouped), 1)
-  expect_equal(ncol(grouped), 3)
+  ret <- df %>%  do_ngram(token, sentence, doc, maxn = 3)
+  expect_equal(ncol(ret), ncol(df)+2)
 })
 
 test_that("sentimentr", {
