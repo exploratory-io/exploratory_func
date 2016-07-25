@@ -246,9 +246,10 @@ do_ngram <- function(df, token, sentence, document, maxn=2, sep="_"){
             dplyr::group_by_(document_col, sentence_col))
   prev_cname <- token_col
   for(n in seq(maxn)[-1]){
-    # lead the token n-1 position and connect it to n-1 gram in the group
     cname <- avoid_conflict(colnames(df), stringr::str_c("gram", n, sep=""))
+    # lead the token to n-1 position
     lead_fml <- lazyeval::interp(~dplyr::lead(x, y), x=as.symbol(token_col), y=n-1)
+    # connect the lead token to the ngram created previously
     str_c_fml <- lazyeval::interp(~stringr::str_c(x, y, sep=z), x=as.symbol(prev_cname), y=as.symbol(cname), z=sep)
     grouped <- (grouped %>%
               dplyr::mutate_(.dots=setNames(list(lead_fml), cname)) %>%
