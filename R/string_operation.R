@@ -242,19 +242,31 @@ do_ngram <- function(df, token, sentence, document, maxn=2, sep="_"){
   sentence_col <- col_name(substitute(sentence))
   document_col <- col_name(substitute(document))
 
+  # this is executed for ngrams not to be connected over sentences
   grouped <- (df %>%
             dplyr::group_by_(document_col, sentence_col))
   prev_cname <- token_col
+  # create gram2, gram3, gram4, ... columns in this iteration
   for(n in seq(maxn)[-1]){
+    # create a column name that doesn't conflict with the existing column names
     cname <- avoid_conflict(colnames(df), stringr::str_c("gram", n, sep=""))
+
+    # Use following non-standard evaluation formulas to use token_col, prev_cname and cname variables
+
     # lead the token to n-1 position
+    # if n is 3 and a token is in 5th token in a group, it goes to 3rd row in the group
     lead_fml <- lazyeval::interp(~dplyr::lead(x, y), x=as.symbol(token_col), y=n-1)
     # connect the lead token to the ngram created previously
+    # if n is 3 and the token is 5th token in a group, the token is connected with 3rd and 4th token in the group
     str_c_fml <- lazyeval::interp(~stringr::str_c(x, y, sep=z), x=as.symbol(prev_cname), y=as.symbol(cname), z=sep)
+
+    # execute the formulas
     grouped <- (grouped %>%
               dplyr::mutate_(.dots=setNames(list(lead_fml), cname)) %>%
               dplyr::mutate_(.dots=setNames(list(str_c_fml), cname))
               )
+
+    # preserve the cname to be used in next iteration
     prev_cname <- cname
   }
   dplyr::ungroup(grouped)
