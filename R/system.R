@@ -1,13 +1,13 @@
-# Set cache path for oauth token cachefile
+#' Set cache path for oauth token cachefile
 setOAuthTokenCacheOptions <- function(path){
   options(tam.oauth_token_cache = path)
 }
 
-# API to take care of read/save password for each plugin type and user name combination
-# if password argument is null, it means we need to retrieve password from RDS file
-# so the return value is password from RDS file.
-# if password argument is not null, then it means it creates a new password or updates existing one
-# so the password is saved to RDS file and the password is returned to caller
+#' API to take care of read/save password for each plugin type and user name combination
+#' if password argument is null, it means we need to retrieve password from RDS file
+#' so the return value is password from RDS file.
+#' if password argument is not null, then it means it creates a new password or updates existing one
+#' so the password is saved to RDS file and the password is returned to caller
 saveOrReadPassword = function(source, username, password){
   # read stored password
   pass = readPasswordRDS(source, username)
@@ -24,8 +24,8 @@ saveOrReadPassword = function(source, username, password){
   pass
 }
 
-# API to save a psssword to RDS file
-# password file is consturcted with <source>_<username>.rds format_
+#' API to save a psssword to RDS file
+#' password file is consturcted with <source>_<username>.rds format_
 savePasswordRDS = function(sourceName, userName, password){
   loadNamespace("sodium")
   loadNamespace("stringr")
@@ -43,8 +43,8 @@ savePasswordRDS = function(sourceName, userName, password){
   }
 }
 
-# API to read a password from RDS
-# password file is consturcted with <source>_<username>.rds format_
+#' API to read a password from RDS
+#' password file is consturcted with <source>_<username>.rds format_
 readPasswordRDS = function(sourceName, userName){
   loadNamespace("sodium")
   loadNamespace("stringr")
@@ -101,7 +101,7 @@ getGithubIssues <- function(username, password, owner, repository){
   issues <- dplyr::bind_rows(pages)
 }
 
-# tokenFileId is a unique value per data farme and is used to create a token cache file
+#' tokenFileId is a unique value per data farme and is used to create a token cache file
 #' @export
 getGoogleTokenForAnalytics <- function(tokenFileId, useCache=TRUE){
   if(!requireNamespace("RGoogleAnalytics")){stop("package RGoogleAnalytics must be installed")}
@@ -136,13 +136,13 @@ getGoogleTokenForAnalytics <- function(tokenFileId, useCache=TRUE){
   token
 }
 
-# API to refresh token
+#' API to refresh token
 #' @export
 refreshGoogleTokenForAnalysis <- function(tokenFileId){
   getGoogleTokenForAnalytics(tokenFileId, FALSE)
 }
 
-# API to get profile for current oauth token
+#' API to get profile for current oauth token
 #' @export
 getGoogleProfile <- function(tokenFileId){
   if(!requireNamespace("RGoogleAnalytics")){stop("package RGoogleAnalytics must be installed.")}
@@ -174,7 +174,7 @@ getGoogleAnalytics <- function(tableId, lastNDays, dimensions, metrics, tokenFil
 }
 
 
-# tokenFileId is a unique value per data farme and is used to create a token cache file
+#' tokenFileId is a unique value per data farme and is used to create a token cache file
 #' @export
 getGoogleTokenForSheet <- function(tokenFileId, useCache=TRUE){
   loadNamespace("httr")
@@ -204,7 +204,7 @@ getGoogleTokenForSheet <- function(tokenFileId, useCache=TRUE){
   token
 }
 
-# API to refresh token
+#' API to refresh token
 #' @export
 refreshGoogleTokenForSheet <- function(tokenFileId){
   getGoogleTokenForSheet(tokenFileId, FALSE)
@@ -220,7 +220,7 @@ getGoogleSheet <- function(title, sheetNumber, skipNRows, treatTheseAsNA, firstR
   df
 }
 
-# API to get a list of available google sheets
+#' API to get a list of available google sheets
 #' @export
 getGoogleSheetList <- function(tokenFileId){
   if(!requireNamespace("googlesheets")){stop("package googlesheets must be installed.")}
@@ -295,7 +295,7 @@ queryPostgres <- function(host, port, databaseName, username, password, numOfRow
   df
 }
 
-# tokenFileId is a unique value per data farme and is used to create a token cache file
+#' tokenFileId is a unique value per data farme and is used to create a token cache file
 #' @export
 getTwitterToken <- function(tokenFileId, useCache=TRUE){
   if(!requireNamespace("twitteR")){stop("package twitteR must be installed.")}
@@ -324,7 +324,7 @@ getTwitterToken <- function(tokenFileId, useCache=TRUE){
   twitter_token
 }
 
-# API to refresh token
+#' API to refresh token
 #' @export
 refreshTwitterToken <- function(tokenFileId){
   getTwitterToken(tokenFileId, FALSE)
@@ -358,8 +358,8 @@ getTwitter <- function(n=200, lang=NULL,  lastNDays=30, searchString, tokenFileI
   }
 }
 
+#' tokenFileId is a unique value per data farme and is used to create a token cache file
 #' @export
-# tokenFileId is a unique value per data farme and is used to create a token cache file
 getGoogleTokenForBigQuery <- function(tokenFileId, useCache=TRUE){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   loadNamespace("stringr")
@@ -390,14 +390,14 @@ getGoogleTokenForBigQuery <- function(tokenFileId, useCache=TRUE){
   token
 }
 
+#' API to refresh token
 #' @export
-# API to refresh token
 refreshGoogleTokenForBigQuery <- function(tokenFileId){
   getGoogleTokenForBigQuery(tokenFileId, FALSE)
 }
 
+#' API to submit a Google Big Query Job
 #' @export
-# API to submit a Google Big Query Job
 submitGoogleBigQueryJob <- function(project, sqlquery, destination_table, write_disposition = "WRITE_TRUNCATE", tokenFieldId){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
@@ -418,8 +418,8 @@ submitGoogleBigQueryJob <- function(project, sqlquery, destination_table, write_
   result <- data.frame(tableId = dest$tableId, datasetId = dest$datasetId, numOfRows = numOfRowsProcessed, totalBytesProcessed = totalBytesProcessed)
 }
 
+#' API to get a data from google BigQuery table
 #' @export
-# API to get a data from google BigQuery table
 getDataFromGoogleBigQueryTable <- function(project, dataset, table, page_size = 10000, max_page, tokenFileId){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   token <- getGoogleTokenForBigQuery(tokenFileId)
@@ -429,8 +429,8 @@ getDataFromGoogleBigQueryTable <- function(project, dataset, table, page_size = 
                  table_info = NULL, max_pages = max_page)
 }
 
+#' API to get a data from google BigQuery table
 #' @export
-# API to get a data from google BigQuery table
 saveGoogleBigQueryResultAs <- function(projectId, sourceDatasetId, sourceTableId, targetDatasetId, targetTableId, tokenFileId){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   token <- getGoogleTokenForBigQuery(tokenFileId)
@@ -451,8 +451,8 @@ executeGoogleBigQuery <- function(project, sqlquery, destination_table, page_siz
   bigrquery::query_exec(GetoptLong::qq(sqlquery), project = project, destination_table = destination_table, page_size = page_size, max_page = max_page, write_disposition = write_disposition)
 }
 
+#' API to get projects for current oauth token
 #' @export
-# API to get projects for current oauth token
 getGoogleBigQueryProjects <- function(tokenFileId){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   tryCatch({
@@ -464,8 +464,8 @@ getGoogleBigQueryProjects <- function(tokenFileId){
   })
 }
 
+#' API to get datasets for a project
 #' @export
-# API to get datasets for a project
 getGoogleBigQueryDataSets <- function(project, tokenFileId){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   tryCatch({
@@ -477,9 +477,8 @@ getGoogleBigQueryDataSets <- function(project, tokenFileId){
   })
 }
 
-
+#' API to get tables for current project, data set
 #' @export
-# API to get tables for current project, data set
 getGoogleBigQueryTables <- function(project, dataset, tokenFileId){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   tryCatch({
@@ -491,8 +490,8 @@ getGoogleBigQueryTables <- function(project, dataset, tokenFileId){
   })
 }
 
-#' @export
 #' API to get table info
+#' @export
 getGoogleBigQueryTable <- function(project, dataset, table, tokenFileId){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   token <- getGoogleTokenForBigQuery(tokenFileId);
@@ -500,9 +499,8 @@ getGoogleBigQueryTable <- function(project, dataset, table, tokenFileId){
   tables <- bigrquery::get_table(project, dataset, table);
 }
 
-
+#' API to get tables for current project, data set
 #' @export
-# API to get tables for current project, data set
 deleteGoogleBigQueryTable <- function(project, dataset, table, tokenFileId){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   token <- getGoogleTokenForBigQuery(tokenFileId);
@@ -512,12 +510,12 @@ deleteGoogleBigQueryTable <- function(project, dataset, table, tokenFileId){
 
 #' Parses all the 'scrapable' html tables from the web page.
 #' @param {string} web page url to scrape
-#' @param {string} web page encoding 
+#' @param {string} web page encoding
 #' @return html nodes
 #' @export
 parse_html_tables <- function(url, encoding = NULL) {
-  loadNamespace("rvest"); 
-  loadNamespace("xml2"); 
+  loadNamespace("rvest");
+  loadNamespace("xml2");
   if (is.null(encoding)) {
     rvest::html_nodes(xml2::read_html(url) ,"table")
   } else {
@@ -528,20 +526,20 @@ parse_html_tables <- function(url, encoding = NULL) {
 #' Scrapes one of html tables from the web page specified by the url,
 #' and returns a data frame as a result.
 #' @param web page url to scrape
-#' @param {string} table index number 
+#' @param {string} table index number
 #' @param {string} either use the 1st row as a header or not. TRUE or FALSE
-#' @param {string} web page encoding 
+#' @param {string} web page encoding
 #' @export
 scrape_html_table <- function(url, index, heading, encoding = NULL) {
-  loadNamespace("rvest"); 
-  loadNamespace("tibble"); 
+  loadNamespace("rvest");
+  loadNamespace("tibble");
   .htmltables <- parse_html_tables(url, encoding)
   tibble::repair_names(rvest::html_table(.htmltables[[index]], fill=TRUE ,header=heading))
 }
 
 
-# function to convert labelled class to factoror
-# see https://github.com/exploratory-io/tam/issues/1481
+#' function to convert labelled class to factoror
+#' see https://github.com/exploratory-io/tam/issues/1481
 #' @export
 handleLabelledColumns = function(df){
   is_labelled <- which(lapply(df, class) == "labelled")
@@ -549,9 +547,9 @@ handleLabelledColumns = function(df){
   df
 }
 
-# Checks and tells the given data is whether in ndjson format
-# by looking at that the first line is a valid json or not.
-# x - URL or file path
+#' Checks and tells the given data is whether in ndjson format
+#' by looking at that the first line is a valid json or not.
+#' x - URL or file path
 isNDJSON <- function(x) {
   loadNamespace("jsonlite")
   con <- getConnectionObject(x)
@@ -569,24 +567,24 @@ isNDJSON <- function(x) {
   )
 }
 
-# Construct a data frame from json or ndjson data
-# ndjson stands for "Newline Delimited JSON" and
-# each line of ndjson data is a valid json value.
-# http://ndjson.org/
-#
-# ndjson format is popular and used in many places such as
-# Yelp academic data is based on.
-#
-# jsonlite::fromJSON can read standard json but not ndjson.
-# jsonlite::stream_in can read ndjson but not standard json.
-# This function internally detects the data type and
-# calls the appropriate function to read the data
-# and construct a data from either json or ndjson data.
-#
-# x: URL or file path to json/ndjson file
-# flatten: TRUE or FALSE. Used only json case
-# limit: Should limit the number of rows to retrieve. Not used now
-# since underlying technology (jsonlite) doesn't support it.
+#' Construct a data frame from json or ndjson data
+#' ndjson stands for "Newline Delimited JSON" and
+#' each line of ndjson data is a valid json value.
+#' http://ndjson.org/
+#'
+#' ndjson format is popular and used in many places such as
+#' Yelp academic data is based on.
+#'
+#' jsonlite::fromJSON can read standard json but not ndjson.
+#' jsonlite::stream_in can read ndjson but not standard json.
+#' This function internally detects the data type and
+#' calls the appropriate function to read the data
+#' and construct a data from either json or ndjson data.
+#'
+#' x: URL or file path to json/ndjson file
+#' flatten: TRUE or FALSE. Used only json case
+#' limit: Should limit the number of rows to retrieve. Not used now
+#' since underlying technology (jsonlite) doesn't support it.
 #' @export
 convertFromJSON <- function(x, flatten=TRUE, limit=0) {
   loadNamespace("jsonlite")
@@ -614,10 +612,10 @@ convertFromJSON <- function(x, flatten=TRUE, limit=0) {
   }
 }
 
-# This function converts the given data frame object to JSON.
-# The benefit of using this function is that it can converts
-# the column data types that cannot be serialized by toJSON
-# to safe ones.
+#' This function converts the given data frame object to JSON.
+#' The benefit of using this function is that it can converts
+#' the column data types that cannot be serialized by toJSON
+#' to safe ones.
 convertToJSON  <- function(x) {
   loadNamespace("jsonlite")
   .tmp.tojson <- x
@@ -628,9 +626,9 @@ convertToJSON  <- function(x) {
   jsonlite::toJSON(.tmp.tojson)
 }
 
-# Gives you a connection object based on the given
-# file locator string. It supports file path or URL now.
-# x - URL or file path
+#' Gives you a connection object based on the given
+#' file locator string. It supports file path or URL now.
+#' x - URL or file path
 getConnectionObject <- function(x) {
   loadNamespace("stringr")
   if (stringr::str_detect(x, "://")) {
@@ -640,13 +638,13 @@ getConnectionObject <- function(x) {
   }
 }
 
-# Run the type convert if it is a data frame.
+#' Run the type convert if it is a data frame.
 typeConvert <- function(x) {
   loadNamespace("readr")
   if (is.data.frame(x))  readr::type_convert(x) else x
 }
 
-# Create a data frame from the given object that can be transformed to data frame.
+#' Create a data frame from the given object that can be transformed to data frame.
 #' @export
 toDataFrame <- function(x) {
   if(is.data.frame(x)) {
@@ -660,13 +658,13 @@ toDataFrame <- function(x) {
   return(typeConvert(df))
 }
 
-# API to create a temporary environment for RDATA staging
+#' API to create a temporary environment for RDATA staging
 #' @export
 createTempEnvironment <- function(){
   new.env(parent = globalenv())
 }
 
-# API to get a list of data frames from a RDATA
+#' API to get a list of data frames from a RDATA
 #' @export
 getObjectListFromRdata <- function(rdata_path, temp.space){
   # load RDATA to temporary env to prevent the polluation on global objects
@@ -686,7 +684,7 @@ getObjectListFromRdata <- function(rdata_path, temp.space){
   }
 }
 
-# API to get a data frame object from RDATA
+#' API to get a data frame object from RDATA
 #' @export
 getObjectFromRdata <- function(rdata_path, object_name){
   # load RDATA to temporary env to prevent the polluation on global objects
@@ -701,16 +699,16 @@ getObjectFromRdata <- function(rdata_path, object_name){
 
 
 
-#' This function can clean the given data frame. It actually does 
-#' 1) split a column with a data.frame vector into seprate columns 
-#' 2) repair column names such as columns with NA for column names, 
-#' or duplicate column names. 
+#' This function can clean the given data frame. It actually does
+#' 1) split a column with a data.frame vector into seprate columns
+#' 2) repair column names such as columns with NA for column names,
+#' or duplicate column names.
 #'
 #' @param x data frame
 #' @return cleaned data frame
 #' @export
 clean_data_frame <- function(x) {
-  tibble::repair_names(jsonlite::flatten(x)) 
+  tibble::repair_names(jsonlite::flatten(x))
 }
 
 #' This checks name conflict and attach the file if there isn't any conflict
