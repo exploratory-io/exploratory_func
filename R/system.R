@@ -431,13 +431,13 @@ getDataFromGoogleBigQueryTable <- function(project, dataset, table, page_size = 
 
 #' API to get a data from google BigQuery table
 #' @export
-saveGoogleBigQueryResultAs <- function(projectId, sourceDatasetId, sourceTableId, targetDatasetId, targetTableId, tokenFileId){
+saveGoogleBigQueryResultAs <- function(projectId, sourceDatasetId, sourceTableId, targetProjectId, targetDatasetId, targetTableId, tokenFileId){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   token <- getGoogleTokenForBigQuery(tokenFileId)
   bigrquery::set_access_cred(token)
 
   src <- list(project_id = projectId, dataset_id = sourceDatasetId, table_id = sourceTableId)
-  dest <- list(project_id = projectId, dataset_id = targetDatasetId, table_id = targetTableId)
+  dest <- list(project_id = targetProjectId, dataset_id = targetDatasetId, table_id = targetTableId)
   bigrquery::copy_table(src, dest)
 }
 
