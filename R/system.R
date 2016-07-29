@@ -284,10 +284,23 @@ queryPostgres <- function(host, port, databaseName, username, password, numOfRow
 
   # read stored password
   pass = saveOrReadPassword("postgres", username, password)
-
   drv <- DBI::dbDriver("PostgreSQL")
-  conn = RPostgreSQL::dbConnect(drv, dbname = databaseName, user = username,
+  conn = NULL
+  try({
+    postgreCAPath = getOption("tam.cert_file_dir")
+    cert = paste0(postgreCAPath, 'rds-comnbined-ca-bundle.pem')
+    pg_dsn = paste0(
+      'dbname=', databaseName, ' ',
+      'sslrootcert=', cert, ' ',
+      'sslmode=prefer'
+    )
+    conn = RPostgreSQL::dbConnect(drv, dbname=pg_dsn, user = username,
                    password = pass, host = host, port = port)
+  })
+  if(is.null(conn)){
+    conn = RPostgreSQL::dbConnect(drv, dbname = databaseName, user = username,
+                                    password = pass, host = host, port = port)
+  }
   resultSet <- RPostgreSQL::dbSendQuery(conn, GetoptLong::qq(query))
   df <- DBI::dbFetch(resultSet, n = numOfRows)
   RPostgreSQL::dbClearResult(resultSet)
@@ -726,4 +739,9 @@ checkSourceConflict <- function(files){
     })
   }
   ret
+}
+#' This sets SSL CA file path
+#' @export
+setSSLCertFilesDirPath <- function(path){
+  options(tam.cert_file_dir = path)
 }
