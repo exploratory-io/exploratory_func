@@ -292,7 +292,7 @@ queryPostgres <- function(host, port, databaseName, username, password, numOfRow
     pg_dsn = paste0(
       'dbname=', databaseName, ' ',
       'sslrootcert=', cert, ' ',
-      'sslmode=prefer'
+      'sslmode=require'
     )
     conn = RPostgreSQL::dbConnect(drv, dbname=pg_dsn, user = username,
                    password = pass, host = host, port = port)
