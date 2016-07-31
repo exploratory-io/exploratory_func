@@ -377,8 +377,8 @@ getGoogleTokenForBigQuery <- function(tokenFileId, useCache=TRUE){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   loadNamespace("stringr")
   loadNamespace("httr")
-  clientId <- "465736758727.apps.googleusercontent.com"
-  secret <- "fJbIIyoIag0oA6p114lwsV2r"
+  clientId <- "1066595427418-aeppbdhi7bj7g0osn8jpj4p6r9vus7ci.apps.googleusercontent.com"
+  secret <-  "wGVbD4fttv_shYreB3PXcjDY"
   cacheOption = getOption("tam.oauth_token_cache")
   # tam.oauth_token_cache is RDS file path (~/.exploratory/projects/<projectid>/rdata/placeholder.rds)
   # for each data frame, create token cache as
