@@ -287,12 +287,9 @@ queryPostgres <- function(host, port, databaseName, username, password, numOfRow
   drv <- DBI::dbDriver("PostgreSQL")
   conn = NULL
   try({
-    postgreCAPath = getOption("tam.cert_file_dir")
-    cert = paste0(postgreCAPath, 'rds-comnbined-ca-bundle.pem')
     pg_dsn = paste0(
       'dbname=', databaseName, ' ',
-      'sslrootcert=', cert, ' ',
-      'sslmode=require'
+      'sslmode=prefer'
     )
     conn = RPostgreSQL::dbConnect(drv, dbname=pg_dsn, user = username,
                    password = pass, host = host, port = port)
