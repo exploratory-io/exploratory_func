@@ -284,9 +284,12 @@ queryPostgres <- function(host, port, databaseName, username, password, numOfRow
 
   # read stored password
   pass = saveOrReadPassword("postgres", username, password)
-
   drv <- DBI::dbDriver("PostgreSQL")
-  conn = RPostgreSQL::dbConnect(drv, dbname = databaseName, user = username,
+  pg_dsn = paste0(
+    'dbname=', databaseName, ' ',
+    'sslmode=prefer'
+  )
+  conn = RPostgreSQL::dbConnect(drv, dbname=pg_dsn, user = username,
                    password = pass, host = host, port = port)
   resultSet <- RPostgreSQL::dbSendQuery(conn, GetoptLong::qq(query))
   df <- DBI::dbFetch(resultSet, n = numOfRows)
