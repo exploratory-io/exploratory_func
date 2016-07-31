@@ -737,8 +737,3 @@ checkSourceConflict <- function(files){
   }
   ret
 }
-#' This sets SSL CA file path
-#' @export
-setSSLCertFilesDirPath <- function(path){
-  options(tam.cert_file_dir = path)
-}
