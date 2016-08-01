@@ -103,7 +103,7 @@ test_that("do_tfidf", {
   test_df <- data.frame(id=rep(c(1,2), 5), word=c("this", "this", "this", letters[1:7]))
   result <- (
     test_df %>%
-      do_tfidf(id, word)
+      do_tfidf(word, id)
   )
   expect_equal(result$tfidf[c(1,5)], c(2/(sqrt(2^2*3)), 2/(sqrt(2^2*4))))
 })
@@ -112,7 +112,7 @@ test_that("do_tfidf no norm", {
   test_df <- data.frame(id=rep(c(1,2), 5), word=c("this", "this", "this", letters[1:7]))
   result <- (
     test_df %>%
-      do_tfidf(id, word, norm = FALSE, tf_weight="raw")
+      do_tfidf(word, id, norm = FALSE, tf_weight="raw")
   )
   expect_equal(head(result$tfidf,2), c(log(2/1), log(2/1)))
 })
@@ -122,7 +122,7 @@ test_that("do_tfidf l2", {
   test_df <- data.frame(id=rep(c(1,2), 5), word=c("this", "this", "this", letters[1:7]))
   result <- (
     test_df %>%
-      do_tfidf(id, word, norm="l2")
+      do_tfidf(word, id, norm="l2")
   )
   ret <- (result %>%  dplyr::group_by(id)  %>%  dplyr::summarize(l=sqrt(sum(tfidf^2))))
   expect_true(all(ret$l==1))
@@ -133,7 +133,7 @@ test_that("do_tfidf l1", {
   test_df <- data.frame(id=rep(c(1,2), 5), word=c("this", "this", "this", letters[1:7]))
   result <- (
     test_df %>%
-      do_tfidf(id, word, norm="l1")
+      do_tfidf(word, id, norm="l1")
   )
   ret <- (result %>%  dplyr::group_by(id)  %>%  dplyr::summarize(l=sum(tfidf)))
   expect_true(all(ret$l==1))
@@ -144,7 +144,7 @@ test_that("do_tfidf tf_weight=raw", {
   test_df <- data.frame(id=rep(c(1,2), 5), word=c("this", "this", "this", letters[1:7]))
   result <- (
     test_df %>%
-      do_tfidf(id, word, tf_weight="raw")
+      do_tfidf(word, id, tf_weight="raw")
   )
   ret <- (result %>%  dplyr::group_by(id)  %>%  dplyr::summarize(l=sqrt(sum(tfidf^2))))
   expect_true(all(ret$l==1))
@@ -155,7 +155,7 @@ test_that("do_tfidf tf_weight=log_scale", {
   test_df <- data.frame(id=rep(c(1,2), 5), word=c("this", "this", "this", letters[1:7]))
   result <- (
     test_df %>%
-      do_tfidf(id, word, tf_weight="log_scale")
+      do_tfidf(word, id, tf_weight="log_scale")
   )
   ret <- (result %>%  dplyr::group_by(id)  %>%  dplyr::summarize(l=sqrt(sum(tfidf^2))))
   expect_true(all(ret$l==1))
@@ -166,7 +166,7 @@ test_that("do_tfidf tf_weight=binary", {
   test_df <- data.frame(id=rep(c(1,2), 5), word=c("this", "this", "this", letters[1:7]))
   result <- (
     test_df %>%
-      do_tfidf(id, word, tf_weight="binary")
+      do_tfidf(word,id, tf_weight="binary")
   )
   ret <- (result %>%  dplyr::group_by(id)  %>%  dplyr::summarize(l=sqrt(sum(tfidf^2))))
   expect_true(all(ret$l==1))

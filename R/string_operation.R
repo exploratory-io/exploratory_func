@@ -183,7 +183,7 @@ calc_tf_ <- function(df, group_col, term_col, weight="ratio"){
 #' Function to scale IDF. It might be worth trying log2 or log10.
 #' log10 strongly suppress the increase of idf values and log2 does it more weakly.
 #' @export
-do_tfidf <- function(df, group, term, idf_log_scale = log, tf_weight="raw", norm="l2"){
+do_tfidf <- function(df, term, group, idf_log_scale = log, tf_weight="raw", norm="l2"){
   loadNamespace("tidytext")
   loadNamespace("dplyr")
 
