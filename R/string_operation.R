@@ -91,7 +91,7 @@ do_tokenize <- function(df, input, output=token, token="words", drop=TRUE, with_
     df <- dplyr::mutate_(df, .dots=setNames(list(~row_number()),doc_id))
     tokenize_df <- df[,c(doc_id, input_col)]
     sentences <- tidytext::unnest_tokens_(tokenize_df, output_col, input_col, token="sentences", drop=TRUE, ...)
-    grouped <- dplyr::group_by_(sentences, .dots=list( as.symbol(doc_id)))
+    grouped <- dplyr::group_by_(sentences, .dots=list( as.symbol(doc_id))) # convert the column name to symbol for colum names with backticks
 
     sentence_id <- avoid_conflict(colnames(df), "sentence_id")
 
@@ -168,7 +168,7 @@ calc_tf_ <- function(df, group_col, term_col, weight="ratio"){
   weight_fml <- as.formula(paste("~calc_weight(",cnames[[1]],")", sep=""))
 
   ret <- (df[,colnames(df) == group_col | colnames(df)==term_col] %>%
-            dplyr::group_by_(.dots=list(as.symbol(group_col), as.symbol(term_col))) %>%
+            dplyr::group_by_(.dots=list(as.symbol(group_col), as.symbol(term_col))) %>% # convert the column name to symbol for colum names with backticks
             dplyr::summarise_(.dots=setNames(list(~n()), cnames[[1]])) %>%
             dplyr::mutate_(.dots=setNames(list(weight_fml), cnames[[2]])) %>%
             dplyr::ungroup()
@@ -205,13 +205,13 @@ do_tfidf <- function(df, group, term, idf_log_scale = log, tf_weight="raw", norm
   if(norm == "l2"){
     val <- lazyeval::interp(~x/sqrt(sum(x^2)), x=as.symbol(cnames[[2]]))
     count_tbl <- (count_tbl %>%
-      dplyr::group_by_(.dots=list(as.symbol(group_col))) %>%
+      dplyr::group_by_(.dots=list(as.symbol(group_col))) %>% # convert the column name to symbol for colum names with backticks
       dplyr::mutate_(.dots=setNames(list(val), cnames[[2]])) %>%
       dplyr::ungroup())
   } else if(norm == "l1"){
     val <- lazyeval::interp(~x/sum(x), x=as.symbol(cnames[[2]]))
     count_tbl <- (count_tbl %>%
-      dplyr::group_by_(.dots=list(as.symbol(group_col))) %>%
+      dplyr::group_by_(.dots=list(as.symbol(group_col))) %>% # convert the column name to symbol for colum names with backticks
       dplyr::mutate_(.dots=setNames(list(val), cnames[[2]])) %>%
       dplyr::ungroup())
   }
@@ -244,7 +244,7 @@ do_ngram <- function(df, token, sentence, document, maxn=2, sep="_"){
 
   # this is executed for ngrams not to be connected over sentences
   grouped <- (df %>%
-            dplyr::group_by_(.dots=list(as.symbol(document_col), as.symbol(sentence_col))))
+            dplyr::group_by_(.dots=list(as.symbol(document_col), as.symbol(sentence_col)))) # convert the column name to symbol for colum names with backticks
   prev_cname <- token_col
   # create gram2, gram3, gram4, ... columns in this iteration
   for(n in seq(maxn)[-1]){
