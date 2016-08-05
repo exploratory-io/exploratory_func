@@ -108,6 +108,16 @@ test_that("do_tfidf", {
   expect_equal(result$tfidf[c(1,5)], c(2/(sqrt(2^2*3)), 2/(sqrt(2^2*4))))
 })
 
+
+test_that("do_tfidf with bach tick arg", {
+  test_df <- setNames(data.frame(rep(c(1,2), 5), c("this", "this", "this", letters[1:7])), c("id", "cname with space"))
+  result <- (
+    test_df %>%
+      do_tfidf(id, `cname with space`, norm = FALSE, tf_weight="raw")
+  )
+  expect_equal(head(result$tfidf,2), c(log(2/1), log(2/1)))
+})
+
 test_that("do_tfidf no norm", {
   test_df <- data.frame(id=rep(c(1,2), 5), word=c("this", "this", "this", letters[1:7]))
   result <- (
