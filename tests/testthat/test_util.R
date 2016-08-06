@@ -81,6 +81,16 @@ test_that("test simple_cast colnames are sorted", {
   expect_equal(test_df[test_df$rowname=="row3" & test_df$colname=="col03",3][[1]], mat["row3", "col03"])
 })
 
+test_that("test simple_cast larger than max int (2^31)", {
+  test_df <- data.frame(
+    rval = seq(2^16),
+    cval = seq(2^16),
+    val = rep(0, 2^16),
+    stringsAsFactors = FALSE
+  )
+  expect_error(simple_cast(test_df, "rval", "cval", "val"), "Data is too large to make a matrix for calculation.")
+})
+
 test_that("test mat_to_df", {
   nc <- 4
   nr <- 5

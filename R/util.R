@@ -14,6 +14,17 @@ col_name <- function(x, default = stop("Please supply column name", call. = FALS
 #' Simple cast wrapper that spreads columns which is choosed as row and col into matrix
 simple_cast <- function(data, row, col, val, fun.aggregate=mean, fill=0){
   loadNamespace("reshape2")
+  # validation
+  uniq_row <- unique(data[[row]], na.rm=TRUE)
+  uniq_col <- unique(data[[col]], na.rm=TRUE)
+  suppressWarnings({
+    # length(uniq_row)*length(uniq_col) become NA if it exceeds 2^31
+    if(is.na(length(uniq_row)*length(uniq_col))){
+      # The number of data is supported under 2^31 by reshape2::acast
+      stop("Data is too large to make a matrix for calculation.")
+    }
+  })
+
   fml <- as.formula(paste(row, col, sep = "~"))
   data %>%  reshape2::acast(fml, value.var=val, fun.aggregate=fun.aggregate, fill=fill)
 }
