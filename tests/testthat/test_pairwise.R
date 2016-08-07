@@ -77,6 +77,18 @@ test_that("test do_cosine_sim.kv diag TRUE", {
   expect_equal(nrow(result), 16)
 })
 
+test_that("test do_cosine_sim.kv for grouped data frame as subject error", {
+  data <- data.frame(group=rep(c(1,2,3), each=6),
+                     row = rep(c(1, 1, 2, 2, 3,3), 3),
+                     col = rep(c(1,2), 9),
+                     val = rep(0, 18))
+  expect_error({
+    ret <- data %>%
+      dplyr::group_by(group) %>%
+      do_cosine_sim.kv(group, col, val)
+  }, "group is a gruoping column\\. You can use ungroup\\(\\) to solve this\\.")
+})
+
 test_that("test do_dist.kv diag TRUE", {
   loadNamespace("dplyr")
   result <- (
@@ -108,4 +120,16 @@ test_that("test do_dist.cols", {
   )
 
   expect_equal(result$dist.value, c(2,2))
+})
+
+test_that("test do_dist.kv for grouped data frame as subject error", {
+  data <- data.frame(group=rep(c(1,2,3), each=6),
+                     row = rep(c(1, 1, 2, 2, 3,3), 3),
+                     col = rep(c(1,2), 9),
+                     val = rep(0, 18))
+  expect_error({
+    ret <- data %>%
+      dplyr::group_by(group) %>%
+      do_dist.kv(group, col, val)
+  }, "group is a gruoping column\\. You can use ungroup\\(\\) to solve this\\.")
 })

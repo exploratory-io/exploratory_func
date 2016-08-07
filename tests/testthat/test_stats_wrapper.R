@@ -35,6 +35,18 @@ test_that("test do_cor.kv for duplicated pair", {
   expect_equal(result[["cor.value"]], replicate(2, 1))
 })
 
+test_that("test do_cor.kv for grouped data frame as subject error", {
+  data <- data.frame(group=rep(c(1,2,3), each=6),
+                     row = rep(c(1, 1, 2, 2, 3,3), 3),
+                     col = rep(c(1,2), 9),
+                     val = rep(0, 18))
+  expect_error({
+    ret <- data %>%
+      dplyr::group_by(group) %>%
+      do_cor.kv(group, col, val)
+  }, "group is a gruoping column\\. You can use ungroup\\(\\) to solve this\\.")
+})
+
 test_that("test do_cor.kv for empty value", {
   result <- tidy_test_df %>%  do_cor.kv(cat, dim_na, val)
 })
@@ -185,6 +197,19 @@ test_that("test do_svd of variance output", {
   }
 })
 
+test_that("test do_svd.kv for grouped data frame as subject error", {
+  data <- data.frame(group=rep(c(1,2,3), each=6),
+                     row = rep(c(1, 1, 2, 2, 3,3), 3),
+                     col = rep(c(1,2), 9),
+                     val = rep(0, 18))
+
+  expect_error({
+    ret <- data %>%
+      dplyr::group_by(group) %>%
+      do_svd.kv(group, col, val)
+  }, "group is a gruoping column\\. You can use ungroup\\(\\) to solve this\\.")
+})
+
 test_that("test do_cmdscale", {
   loadNamespace("reshape2")
   mat <- matrix(c(1,2,3,3,4,5,5,6,6,8,1,2), nrow=4)
@@ -210,5 +235,4 @@ test_that("test do_cmdscale", {
   result_half <- do_cmdscale(half_df, Var1, Var2, value)
 
 })
-
 
