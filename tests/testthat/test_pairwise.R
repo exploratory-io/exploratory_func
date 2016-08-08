@@ -86,7 +86,7 @@ test_that("test do_cosine_sim.kv for grouped data frame as subject error", {
     ret <- data %>%
       dplyr::group_by(group) %>%
       do_cosine_sim.kv(group, col, val)
-  }, "group is a gruoping column\\. You can use ungroup\\(\\) to solve this\\.")
+  }, "group is a grouping column\\. ungroup\\(\\) may be necessary before this operation\\.")
 })
 
 test_that("test do_dist.kv diag TRUE", {
@@ -131,5 +131,5 @@ test_that("test do_dist.kv for grouped data frame as subject error", {
     ret <- data %>%
       dplyr::group_by(group) %>%
       do_dist.kv(group, col, val)
-  }, "group is a gruoping column\\. You can use ungroup\\(\\) to solve this\\.")
+  }, "group is a grouping column\\. ungroup\\(\\) may be necessary before this operation\\.")
 })

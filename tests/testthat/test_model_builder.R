@@ -105,7 +105,7 @@ test_that("test build_kmeans.kv for grouped data frame as subject error", {
     ret <- data %>%
       dplyr::group_by(group) %>%
       build_kmeans.kv(group, col, val)
-  }, "group is a gruoping column\\. You can use ungroup\\(\\) to solve this\\.")
+  }, "group is a grouping column\\. ungroup\\(\\) may be necessary before this operation\\.")
 })
 
 test_that("test build_kmeans.cols ignore NA rows with grouped and keep.source=FALSE", {

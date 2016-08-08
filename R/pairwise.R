@@ -19,7 +19,7 @@ do_cosine_sim.kv <- function(df, subject, key, value, distinct=FALSE, diag=FALSE
   grouped_column <- grouped_by(df)
 
   if(subject_col %in% grouped_column){
-    stop(paste0(subject_col, " is a gruoping column. You can use ungroup() to solve this."))
+    stop(paste0(subject_col, " is a grouping column. ungroup() may be necessary before this operation."))
   }
 
   cnames <- avoid_conflict(grouped_column, c("pair.name.1", "pair.name.2", "sim.value"))
@@ -74,7 +74,7 @@ do_dist.kv <- function(df, subject, key, value, fill=0, fun.aggregate=mean, dist
   grouped_column <- grouped_by(df)
 
   if(subject_col %in% grouped_column){
-    stop(paste0(subject_col, " is a gruoping column. You can use ungroup() to solve this."))
+    stop(paste0(subject_col, " is a grouping column. ungroup() may be necessary before this operation."))
   }
 
   cnames <- avoid_conflict(grouped_column, c("pair.name.1", "pair.name.2", "dist.value"))

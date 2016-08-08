@@ -86,7 +86,7 @@ build_kmeans.kv <- function(df,
   source_column <- avoid_conflict(grouped_column, "source.data")
 
   if(row_col %in% grouped_column){
-    stop(paste0(row_col, " is a gruoping column. You can use ungroup() to solve this."))
+    stop(paste0(row_col, " is a grouping column. ungroup() may be necessary before this operation."))
   }
 
   build_kmeans_each <- function(df){

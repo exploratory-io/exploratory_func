@@ -44,7 +44,7 @@ test_that("test do_cor.kv for grouped data frame as subject error", {
     ret <- data %>%
       dplyr::group_by(group) %>%
       do_cor.kv(group, col, val)
-  }, "group is a gruoping column\\. You can use ungroup\\(\\) to solve this\\.")
+  }, "group is a grouping column\\. ungroup\\(\\) may be necessary before this operation\\.")
 })
 
 test_that("test do_cor.kv for empty value", {
@@ -207,7 +207,7 @@ test_that("test do_svd.kv for grouped data frame as subject error", {
     ret <- data %>%
       dplyr::group_by(group) %>%
       do_svd.kv(group, col, val)
-  }, "group is a gruoping column\\. You can use ungroup\\(\\) to solve this\\.")
+  }, "group is a grouping column\\. ungroup\\(\\) may be necessary before this operation\\.")
 })
 
 test_that("test do_cmdscale", {
