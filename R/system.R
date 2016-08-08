@@ -1,13 +1,13 @@
-# Set cache path for oauth token cachefile
+#' Set cache path for oauth token cachefile
 setOAuthTokenCacheOptions <- function(path){
   options(tam.oauth_token_cache = path)
 }
 
-# API to take care of read/save password for each plugin type and user name combination
-# if password argument is null, it means we need to retrieve password from RDS file
-# so the return value is password from RDS file.
-# if password argument is not null, then it means it creates a new password or updates existing one
-# so the password is saved to RDS file and the password is returned to caller
+#' API to take care of read/save password for each plugin type and user name combination
+#' if password argument is null, it means we need to retrieve password from RDS file
+#' so the return value is password from RDS file.
+#' if password argument is not null, then it means it creates a new password or updates existing one
+#' so the password is saved to RDS file and the password is returned to caller
 saveOrReadPassword = function(source, username, password){
   # read stored password
   pass = readPasswordRDS(source, username)
@@ -24,8 +24,8 @@ saveOrReadPassword = function(source, username, password){
   pass
 }
 
-# API to save a psssword to RDS file
-# password file is consturcted with <source>_<username>.rds format_
+#' API to save a psssword to RDS file
+#' password file is consturcted with <source>_<username>.rds format_
 savePasswordRDS = function(sourceName, userName, password){
   loadNamespace("sodium")
   loadNamespace("stringr")
@@ -43,8 +43,8 @@ savePasswordRDS = function(sourceName, userName, password){
   }
 }
 
-# API to read a password from RDS
-# password file is consturcted with <source>_<username>.rds format_
+#' API to read a password from RDS
+#' password file is consturcted with <source>_<username>.rds format_
 readPasswordRDS = function(sourceName, userName){
   loadNamespace("sodium")
   loadNamespace("stringr")
@@ -101,7 +101,7 @@ getGithubIssues <- function(username, password, owner, repository){
   issues <- dplyr::bind_rows(pages)
 }
 
-# tokenFileId is a unique value per data farme and is used to create a token cache file
+#' tokenFileId is a unique value per data farme and is used to create a token cache file
 #' @export
 getGoogleTokenForAnalytics <- function(tokenFileId, useCache=TRUE){
   if(!requireNamespace("RGoogleAnalytics")){stop("package RGoogleAnalytics must be installed")}
@@ -136,13 +136,13 @@ getGoogleTokenForAnalytics <- function(tokenFileId, useCache=TRUE){
   token
 }
 
-# API to refresh token
+#' API to refresh token
 #' @export
 refreshGoogleTokenForAnalysis <- function(tokenFileId){
   getGoogleTokenForAnalytics(tokenFileId, FALSE)
 }
 
-# API to get profile for current oauth token
+#' API to get profile for current oauth token
 #' @export
 getGoogleProfile <- function(tokenFileId){
   if(!requireNamespace("RGoogleAnalytics")){stop("package RGoogleAnalytics must be installed.")}
@@ -153,7 +153,7 @@ getGoogleProfile <- function(tokenFileId){
 }
 
 #' @export
-getGoogleAnalytics <- function(tableId, lastNDays, dimensions, metrics, tokenFileId){
+getGoogleAnalytics <- function(tableId, lastNDays, dimensions, metrics, tokenFileId, paginate_query=FALSE){
   if(!requireNamespace("RGoogleAnalytics")){stop("package RGoogleAnalytics must be installed.")}
   loadNamespace("lubridate")
 
@@ -169,12 +169,12 @@ getGoogleAnalytics <- function(tableId, lastNDays, dimensions, metrics, tokenFil
                      table.id = tableId)
 
   ga.query <- RGoogleAnalytics::QueryBuilder(query.list)
-  ga.data <- RGoogleAnalytics::GetReportData(ga.query, token)
+  ga.data <- RGoogleAnalytics::GetReportData(ga.query, token, paginate_query = paginate_query)
   ga.data
 }
 
 
-# tokenFileId is a unique value per data farme and is used to create a token cache file
+#' tokenFileId is a unique value per data farme and is used to create a token cache file
 #' @export
 getGoogleTokenForSheet <- function(tokenFileId, useCache=TRUE){
   loadNamespace("httr")
@@ -204,7 +204,7 @@ getGoogleTokenForSheet <- function(tokenFileId, useCache=TRUE){
   token
 }
 
-# API to refresh token
+#' API to refresh token
 #' @export
 refreshGoogleTokenForSheet <- function(tokenFileId){
   getGoogleTokenForSheet(tokenFileId, FALSE)
@@ -220,7 +220,7 @@ getGoogleSheet <- function(title, sheetNumber, skipNRows, treatTheseAsNA, firstR
   df
 }
 
-# API to get a list of available google sheets
+#' API to get a list of available google sheets
 #' @export
 getGoogleSheetList <- function(tokenFileId){
   if(!requireNamespace("googlesheets")){stop("package googlesheets must be installed.")}
@@ -230,10 +230,12 @@ getGoogleSheetList <- function(tokenFileId){
 }
 
 #' @export
-queryMongoDB <- function(host, port, database, collection, username, password, query = "{}", isFlatten){
+queryMongoDB <- function(host, port, database, collection, username, password, query = "{}", isFlatten, limit=100000){
   if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
   loadNamespace("stringr")
   loadNamespace("jsonlite")
+  if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
+
   # read stored password
   pass = saveOrReadPassword("mongodb", username, password)
   if (stringr::str_length(username) > 0) {
@@ -243,7 +245,7 @@ queryMongoDB <- function(host, port, database, collection, username, password, q
     url = stringr::str_c("mongodb://", host, ":", as.character(port), "/", database)
   }
   con <- mongolite::mongo(collection, url = url)
-  data <- con$find(query = query)
+  data <- con$find(query = GetoptLong::qq(query), limit=limit)
   result <-data
   if (isFlatten) {
     result <- jsonlite::flatten(data)
@@ -259,6 +261,7 @@ queryMongoDB <- function(host, port, database, collection, username, password, q
 queryMySQL <- function(host, port, databaseName, username, password, numOfRows = -1, query){
   if(!requireNamespace("RMySQL")){stop("package RMySQL must be installed.")}
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
+  if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
 
   # read stored password
   pass = saveOrReadPassword("mysql", username, password)
@@ -266,7 +269,7 @@ queryMySQL <- function(host, port, databaseName, username, password, numOfRows =
   drv <- DBI::dbDriver("MySQL")
   conn = RMySQL::dbConnect(drv, dbname = databaseName, username = username,
                    password = pass, host = host, port = port)
-  resultSet <- RMySQL::dbSendQuery(conn, query)
+  resultSet <- RMySQL::dbSendQuery(conn, GetoptLong::qq(query))
   df <- RMySQL::dbFetch(resultSet, n = numOfRows)
   RMySQL::dbClearResult(resultSet)
   RMySQL::dbDisconnect(conn)
@@ -277,20 +280,25 @@ queryMySQL <- function(host, port, databaseName, username, password, numOfRows =
 queryPostgres <- function(host, port, databaseName, username, password, numOfRows = -1, query){
   if(!requireNamespace("RPostgreSQL")){stop("package RPostgreSQL must be installed.")}
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
+  if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
+
   # read stored password
   pass = saveOrReadPassword("postgres", username, password)
-
   drv <- DBI::dbDriver("PostgreSQL")
-  conn = RPostgreSQL::dbConnect(drv, dbname = databaseName, user = username,
+  pg_dsn = paste0(
+    'dbname=', databaseName, ' ',
+    'sslmode=prefer'
+  )
+  conn = RPostgreSQL::dbConnect(drv, dbname=pg_dsn, user = username,
                    password = pass, host = host, port = port)
-  resultSet <- RPostgreSQL::dbSendQuery(conn, query)
+  resultSet <- RPostgreSQL::dbSendQuery(conn, GetoptLong::qq(query))
   df <- DBI::dbFetch(resultSet, n = numOfRows)
   RPostgreSQL::dbClearResult(resultSet)
   RPostgreSQL::dbDisconnect(conn)
   df
 }
 
-# tokenFileId is a unique value per data farme and is used to create a token cache file
+#' tokenFileId is a unique value per data farme and is used to create a token cache file
 #' @export
 getTwitterToken <- function(tokenFileId, useCache=TRUE){
   if(!requireNamespace("twitteR")){stop("package twitteR must be installed.")}
@@ -319,7 +327,7 @@ getTwitterToken <- function(tokenFileId, useCache=TRUE){
   twitter_token
 }
 
-# API to refresh token
+#' API to refresh token
 #' @export
 refreshTwitterToken <- function(tokenFileId){
   getTwitterToken(tokenFileId, FALSE)
@@ -353,18 +361,18 @@ getTwitter <- function(n=200, lang=NULL,  lastNDays=30, searchString, tokenFileI
   }
 }
 
+#' tokenFileId is a unique value per data farme and is used to create a token cache file
 #' @export
-# tokenFileId is a unique value per data farme and is used to create a token cache file
 getGoogleTokenForBigQuery <- function(tokenFileId, useCache=TRUE){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   loadNamespace("stringr")
   loadNamespace("httr")
-  clientId <- "465736758727.apps.googleusercontent.com"
-  secret <- "fJbIIyoIag0oA6p114lwsV2r"
+  clientId <- "1066595427418-aeppbdhi7bj7g0osn8jpj4p6r9vus7ci.apps.googleusercontent.com"
+  secret <-  "wGVbD4fttv_shYreB3PXcjDY"
   cacheOption = getOption("tam.oauth_token_cache")
   # tam.oauth_token_cache is RDS file path (~/.exploratory/projects/<projectid>/rdata/placeholder.rds)
   # for each data frame, create token cache as
-  # ~/.exploratory/projects/<projectid>/rdata/<tokenFileId_per_dataframe>_ga_token.rds
+  # ~/.exploratory/projects/<projectid>/rdata/<tokenFileId_per_dataframe>_bigquery_token.rds
   tokenPath = stringr::str_replace(cacheOption, "placeholder.rds", str_c(tokenFileId, "_bigquery_token.rds"))
   # since Auth from RGoogleAnalytics does not work well
   # switch to use oauth_app and oauth2.0_token
@@ -385,89 +393,156 @@ getGoogleTokenForBigQuery <- function(tokenFileId, useCache=TRUE){
   token
 }
 
+#' API to refresh token
 #' @export
-# API to refresh token
 refreshGoogleTokenForBigQuery <- function(tokenFileId){
   getGoogleTokenForBigQuery(tokenFileId, FALSE)
 }
 
+#' API to submit a Google Big Query Job
 #' @export
-executeGoogleBigQuery <- function(project, dataset, table, sqlquery, tokenFileId){
+submitGoogleBigQueryJob <- function(project, sqlquery, destination_table, write_disposition = "WRITE_TRUNCATE", tokenFieldId){
+  if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
+  if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
+  #GetoptLong uses stringr and str_c is called without stringr:: so need to use "require" instead of "requireNamespace"
+  if(!require("stringr")){stop("package stringr must be installed.")}
+
+  token <- getGoogleTokenForBigQuery(tokenFieldId)
+  bigrquery::set_access_cred(token)
+  # pass desitiona_table to support large data
+  job <- bigrquery::insert_query_job(GetoptLong::qq(sqlquery), project, destination_table = destination_table, write_disposition = write_disposition)
+  job <- bigrquery::wait_for(job)
+  isCacheHit <- job$statistics$query$cacheHit
+  # if cache hit case, totalBytesProcessed info is not available. So set it as -1
+  totalBytesProcessed <- ifelse(isCacheHit, -1, job$statistics$totalBytesProcessed)
+  # if cache hit case, recordsWritten info is not avalable. So set it as -1
+  numOfRowsProcessed <- ifelse(isCacheHit, -1, job$statistics$query$queryPlan[[1]]$recordsWritten)
+  dest <- job$configuration$query$destinationTable
+  result <- data.frame(tableId = dest$tableId, datasetId = dest$datasetId, numOfRows = numOfRowsProcessed, totalBytesProcessed = totalBytesProcessed)
+}
+
+#' API to get a data from google BigQuery table
+#' @export
+getDataFromGoogleBigQueryTable <- function(project, dataset, table, page_size = 10000, max_page, tokenFileId){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   token <- getGoogleTokenForBigQuery(tokenFileId)
   bigrquery::set_access_cred(token)
-  bigrquery::query_exec(sqlquery, project = project)
 
+  bigrquery::list_tabledata(project, dataset, table, page_size = page_size,
+                 table_info = NULL, max_pages = max_page)
+}
+
+#' API to get a data from google BigQuery table
+#' @export
+saveGoogleBigQueryResultAs <- function(projectId, sourceDatasetId, sourceTableId, targetProjectId, targetDatasetId, targetTableId, tokenFileId){
+  if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
+  token <- getGoogleTokenForBigQuery(tokenFileId)
+  bigrquery::set_access_cred(token)
+
+  src <- list(project_id = projectId, dataset_id = sourceDatasetId, table_id = sourceTableId)
+  dest <- list(project_id = targetProjectId, dataset_id = targetDatasetId, table_id = targetTableId)
+  bigrquery::copy_table(src, dest)
 }
 
 #' @export
-# API to get projects for current oauth token
-getGoogleProjects <- function(tokenFileId){
+executeGoogleBigQuery <- function(project, sqlquery, destination_table, page_size = 10000, max_page = 10, write_disposition = "WRITE_TRUNCATE", tokenFileId){
+  if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
+  if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
+
+  token <- getGoogleTokenForBigQuery(tokenFileId)
+  bigrquery::set_access_cred(token)
+  bigrquery::query_exec(GetoptLong::qq(sqlquery), project = project, destination_table = destination_table, page_size = page_size, max_page = max_page, write_disposition = write_disposition)
+}
+
+#' API to get projects for current oauth token
+#' @export
+getGoogleBigQueryProjects <- function(tokenFileId){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   tryCatch({
     token <- getGoogleTokenForBigQuery(tokenFileId);
     bigrquery::set_access_cred(token)
     projects <- bigrquery::list_projects();
-    ifelse(is.null(projects), c(""), projects)
   }, error = function(err){
     c("")
   })
 }
 
+#' API to get datasets for a project
 #' @export
-# API to get datasets for a project
-getGoogleDataSets <- function(project, tokenFileId){
+getGoogleBigQueryDataSets <- function(project, tokenFileId){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   tryCatch({
     token <- getGoogleTokenForBigQuery(tokenFileId);
     bigrquery::set_access_cred(token)
     resultdatasets <- bigrquery::list_datasets(project);
-    ifelse(is.null(resultdatasets), c(""), resultdatasets)
   }, error = function(err){
      c("")
   })
 }
 
-
+#' API to get tables for current project, data set
 #' @export
-# API to get tables for current project, data set
-getGoogleTables <- function(project, dataset, tokenFileId){
+getGoogleBigQueryTables <- function(project, dataset, tokenFileId){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   tryCatch({
     token <- getGoogleTokenForBigQuery(tokenFileId);
     bigrquery::set_access_cred(token)
     tables <- bigrquery::list_tables(project, dataset);
-    ifelse(is.null(tables), c(""), tables)
   }, error = function(err){
     c("")
   })
 }
-# Parses all the 'scrapable' html tables from the web page.
-#' @param web page url to scrape
-#' @return html nodes
+
+#' API to get table info
 #' @export
-parse_html_tables <- function(url) {
-  loadNamespace("rvest"); 
-  loadNamespace("xml2"); 
-  rvest::html_nodes(xml2::read_html(url) ,"table")
+getGoogleBigQueryTable <- function(project, dataset, table, tokenFileId){
+  if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
+  token <- getGoogleTokenForBigQuery(tokenFileId);
+  bigrquery::set_access_cred(token)
+  tables <- bigrquery::get_table(project, dataset, table);
 }
 
-# Scrapes one of html tables from the web page specified by the url, 
-# and returns a data frame as a result.
-#' @param web page url to scrape
-#' @param table index number 
-#' @param either use the 1st row as a header or not. TRUE or FALSE
+#' API to get tables for current project, data set
 #' @export
-scrape_html_table <- function(url, index, heading) {
-  loadNamespace("rvest"); 
-  loadNamespace("tibble"); 
-  .htmltables <- parse_html_tables(url)
+deleteGoogleBigQueryTable <- function(project, dataset, table, tokenFileId){
+  if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
+  token <- getGoogleTokenForBigQuery(tokenFileId);
+  bigrquery::set_access_cred(token)
+  bigrquery::delete_table(project, dataset, table);
+}
+
+#' Parses all the 'scrapable' html tables from the web page.
+#' @param {string} web page url to scrape
+#' @param {string} web page encoding
+#' @return html nodes
+#' @export
+parse_html_tables <- function(url, encoding = NULL) {
+  loadNamespace("rvest");
+  loadNamespace("xml2");
+  if (is.null(encoding)) {
+    rvest::html_nodes(xml2::read_html(url) ,"table")
+  } else {
+    rvest::html_nodes(xml2::read_html(url, encoding=encoding) ,"table")
+  }
+}
+
+#' Scrapes one of html tables from the web page specified by the url,
+#' and returns a data frame as a result.
+#' @param web page url to scrape
+#' @param {string} table index number
+#' @param {string} either use the 1st row as a header or not. TRUE or FALSE
+#' @param {string} web page encoding
+#' @export
+scrape_html_table <- function(url, index, heading, encoding = NULL) {
+  loadNamespace("rvest");
+  loadNamespace("tibble");
+  .htmltables <- parse_html_tables(url, encoding)
   tibble::repair_names(rvest::html_table(.htmltables[[index]], fill=TRUE ,header=heading))
 }
 
 
-# function to convert labelled class to factoror
-# see https://github.com/exploratory-io/tam/issues/1481
+#' function to convert labelled class to factoror
+#' see https://github.com/exploratory-io/tam/issues/1481
 #' @export
 handleLabelledColumns = function(df){
   is_labelled <- which(lapply(df, class) == "labelled")
@@ -475,9 +550,9 @@ handleLabelledColumns = function(df){
   df
 }
 
-# Checks and tells the given data is whether in ndjson format
-# by looking at that the first line is a valid json or not.
-# x - URL or file path
+#' Checks and tells the given data is whether in ndjson format
+#' by looking at that the first line is a valid json or not.
+#' x - URL or file path
 isNDJSON <- function(x) {
   loadNamespace("jsonlite")
   con <- getConnectionObject(x)
@@ -495,24 +570,24 @@ isNDJSON <- function(x) {
   )
 }
 
-# Construct a data frame from json or ndjson data
-# ndjson stands for "Newline Delimited JSON" and
-# each line of ndjson data is a valid json value.
-# http://ndjson.org/
-#
-# ndjson format is popular and used in many places such as
-# Yelp academic data is based on.
-#
-# jsonlite::fromJSON can read standard json but not ndjson.
-# jsonlite::stream_in can read ndjson but not standard json.
-# This function internally detects the data type and
-# calls the appropriate function to read the data
-# and construct a data from either json or ndjson data.
-#
-# x: URL or file path to json/ndjson file
-# flatten: TRUE or FALSE. Used only json case
-# limit: Should limit the number of rows to retrieve. Not used now
-# since underlying technology (jsonlite) doesn't support it.
+#' Construct a data frame from json or ndjson data
+#' ndjson stands for "Newline Delimited JSON" and
+#' each line of ndjson data is a valid json value.
+#' http://ndjson.org/
+#'
+#' ndjson format is popular and used in many places such as
+#' Yelp academic data is based on.
+#'
+#' jsonlite::fromJSON can read standard json but not ndjson.
+#' jsonlite::stream_in can read ndjson but not standard json.
+#' This function internally detects the data type and
+#' calls the appropriate function to read the data
+#' and construct a data from either json or ndjson data.
+#'
+#' x: URL or file path to json/ndjson file
+#' flatten: TRUE or FALSE. Used only json case
+#' limit: Should limit the number of rows to retrieve. Not used now
+#' since underlying technology (jsonlite) doesn't support it.
 #' @export
 convertFromJSON <- function(x, flatten=TRUE, limit=0) {
   loadNamespace("jsonlite")
@@ -540,10 +615,10 @@ convertFromJSON <- function(x, flatten=TRUE, limit=0) {
   }
 }
 
-# This function converts the given data frame object to JSON.
-# The benefit of using this function is that it can converts
-# the column data types that cannot be serialized by toJSON
-# to safe ones.
+#' This function converts the given data frame object to JSON.
+#' The benefit of using this function is that it can converts
+#' the column data types that cannot be serialized by toJSON
+#' to safe ones.
 convertToJSON  <- function(x) {
   loadNamespace("jsonlite")
   .tmp.tojson <- x
@@ -554,9 +629,9 @@ convertToJSON  <- function(x) {
   jsonlite::toJSON(.tmp.tojson)
 }
 
-# Gives you a connection object based on the given
-# file locator string. It supports file path or URL now.
-# x - URL or file path
+#' Gives you a connection object based on the given
+#' file locator string. It supports file path or URL now.
+#' x - URL or file path
 getConnectionObject <- function(x) {
   loadNamespace("stringr")
   if (stringr::str_detect(x, "://")) {
@@ -566,13 +641,13 @@ getConnectionObject <- function(x) {
   }
 }
 
-# Run the type convert if it is a data frame.
+#' Run the type convert if it is a data frame.
 typeConvert <- function(x) {
   loadNamespace("readr")
   if (is.data.frame(x))  readr::type_convert(x) else x
 }
 
-# Create a data frame from the given object that can be transformed to data frame.
+#' Create a data frame from the given object that can be transformed to data frame.
 #' @export
 toDataFrame <- function(x) {
   if(is.data.frame(x)) {
@@ -586,13 +661,13 @@ toDataFrame <- function(x) {
   return(typeConvert(df))
 }
 
-# API to create a temporary environment for RDATA staging
+#' API to create a temporary environment for RDATA staging
 #' @export
 createTempEnvironment <- function(){
   new.env(parent = globalenv())
 }
 
-# API to get a list of data frames from a RDATA
+#' API to get a list of data frames from a RDATA
 #' @export
 getObjectListFromRdata <- function(rdata_path, temp.space){
   # load RDATA to temporary env to prevent the polluation on global objects
@@ -612,7 +687,7 @@ getObjectListFromRdata <- function(rdata_path, temp.space){
   }
 }
 
-# API to get a data frame object from RDATA
+#' API to get a data frame object from RDATA
 #' @export
 getObjectFromRdata <- function(rdata_path, object_name){
   # load RDATA to temporary env to prevent the polluation on global objects
@@ -627,14 +702,31 @@ getObjectFromRdata <- function(rdata_path, object_name){
 
 
 
-#' This function can clean the given data frame. It actually does 
-#' 1) split a column with a data.frame vector into seprate columns 
-#' 2) repair column names such as columns with NA for column names, 
-#' or duplicate column names. 
+#' This function can clean the given data frame. It actually does
+#' 1) split a column with a data.frame vector into seprate columns
+#' 2) repair column names such as columns with NA for column names,
+#' or duplicate column names.
 #'
 #' @param x data frame
 #' @return cleaned data frame
 #' @export
 clean_data_frame <- function(x) {
-  tibble::repair_names(jsonlite::flatten(x)) 
+  tibble::repair_names(jsonlite::flatten(x))
+}
+
+#' This checks name conflict and attach the file if there isn't any conflict
+#' @export
+checkSourceConflict <- function(files){
+  ret <- list()
+  for (file in files){
+    ret[[file]] <- tryCatch({
+      env <- new.env()
+      source(file, local=env)
+      attached_objects <- ls(env)
+      list(names = attached_objects)
+    }, error = function(e){
+      list(error = e[["message"]])
+    })
+  }
+  ret
 }

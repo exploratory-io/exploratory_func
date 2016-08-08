@@ -2,12 +2,13 @@ context("check util functions")
 
 test_that("test upper_gather", {
   mat <- matrix(seq(20),nrow=5, ncol=4)
-  colnames(mat) <- paste("col", seq(4))
+  # use col03 to break sorted state
+  colnames(mat) <- c("col1","col2","col03", "col4")
   result <- upper_gather(mat)
   expect_equal( typeof(result[[2]]), "character")
   expect_equal(result[[1]], sort(result[[1]]))
-  expect_equal(result[result[[1]]==3 & result[[2]]=="col 4", 3][[1]], 18)
-  expect_equal(result[result[[1]]==2 & result[[2]]=="col 3", 3][[1]], 12)
+  expect_equal(result[result[[1]]==3 & result[[2]]=="col4", 3][[1]], 18)
+  expect_equal(result[result[[1]]==2 & result[[2]]=="col03", 3][[1]], 12)
   expect_equal(nrow(result), 6)
 })
 
@@ -84,6 +85,27 @@ test_that("test grouped_by", {
   expect_equal(ret, c("col1", "col2"))
 })
 
+test_that("test simple_cast colnames are sorted", {
+  test_df <- data.frame(
+    rowname = rep(c("row1", "row02", "row3", "row004"), each=3),
+    colname = rep(c("col1", "col2", "col03"), 4),
+    val = seq(12),
+    stringsAsFactors = FALSE
+  )
+  mat <- simple_cast(test_df, "rowname", "colname", "val")
+  expect_equal(test_df[test_df$rowname=="row3" & test_df$colname=="col03",3][[1]], mat["row3", "col03"])
+})
+
+test_that("test simple_cast larger than max int (2^31)", {
+  test_df <- data.frame(
+    rval = seq(2^16),
+    cval = seq(2^16),
+    val = rep(0, 2^16),
+    stringsAsFactors = FALSE
+  )
+  expect_error(simple_cast(test_df, "rval", "cval", "val"), "Data is too large to make a matrix for calculation.")
+})
+
 test_that("test mat_to_df", {
   nc <- 4
   nr <- 5
@@ -99,4 +121,42 @@ test_that("test mat_to_df", {
 test_that("test %nin%", {
   ret <- c(1,3,NA,2) %nin% c(3, NA)
   expect_equal(ret, c(T,F,F,T))
+})
+
+test_that("list_extract", {
+  test_list <- list(seq(1), seq(2), seq(3))
+  def_ret <- list_extract(test_list)
+  expect_equal(def_ret, c(1, 1, 1))
+
+  # index over
+  over_ret <- list_extract(test_list, 3)
+  expect_equal(over_ret, c(NA, NA, 3))
+
+  # index minus
+  minus_ret <- list_extract(test_list, -2)
+  expect_equal(minus_ret, c(NA, 1, 2))
+
+  # index minus over
+  minus_ret <- list_extract(test_list, -5)
+  expect_equal(minus_ret, c(NA, NA, NA))
+
+  test_df_list <- list(data.frame(1), data.frame(1, second=2), data.frame(1, 2, 3))
+  def_ret <- list_extract(test_df_list)
+  expect_equal(def_ret, c(1, 1, 1))
+
+  # index over
+  over_ret <- list_extract(test_df_list, 3)
+  expect_equal(over_ret, c(NA, NA, 3))
+
+  # index minus
+  minus_ret <- list_extract(test_df_list, -2)
+  expect_equal(minus_ret, c(NA, 1, 2))
+
+  # index minus over
+  minus_ret <- list_extract(test_df_list, -5)
+  expect_equal(minus_ret, c(NA, NA, NA))
+
+  # index text
+  minus_ret <- list_extract(test_df_list, "second")
+  expect_equal(minus_ret, c(NA, 2, NA))
 })

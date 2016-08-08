@@ -33,6 +33,10 @@ do_cor.kv <- function(df,
   val <- col_name(substitute(value))
 
   grouped_col <- grouped_by(df)
+  if(col %in% grouped_col){
+    stop(paste0(col, " is a grouping column. ungroup() may be necessary before this operation."))
+  }
+
   output_cols <- avoid_conflict(grouped_col, c("pair.name.1", "pair.name.2", "cor.value"))
 
   do_cor_each <- function(df){
@@ -67,6 +71,10 @@ do_cor.cols <- function(df, ..., use="pairwise.complete.obs", method="pearson", 
   # check if the df's grouped
   do_cor_each <- function(df){
     mat <- dplyr::select_(df, .dots = select_dots) %>%  as.matrix()
+    # sort the column name so that the output of pair.name.1 and pair.name.2 will be sorted
+    # it's better to be sorted so that heatmap in exploratory can be triangle if distinct is TRUE
+    mat <- mat[,sort(colnames(mat))]
+
     cor_mat <- cor(mat, use = use, method = method)
     if(distinct){
       ret <- upper_gather(cor_mat, diag=diag, cnames=output_cols)
@@ -109,6 +117,12 @@ do_svd.kv <- function(df,
   value_col <- col_name(substitute(value))
 
   grouped_col <- grouped_by(df)
+
+  if(subject_col %in% grouped_col){
+    stop(paste0(subject_col, " is a grouping column. ungroup() may be necessary before this operation."))
+  }
+
+
   axis_prefix <- "axis"
   value_cname <- avoid_conflict(colnames(df), "svd.value")
 

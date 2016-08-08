@@ -14,6 +14,17 @@ col_name <- function(x, default = stop("Please supply column name", call. = FALS
 #' Simple cast wrapper that spreads columns which is choosed as row and col into matrix
 simple_cast <- function(data, row, col, val, fun.aggregate=mean, fill=0){
   loadNamespace("reshape2")
+  # validation
+  uniq_row <- unique(data[[row]], na.rm=TRUE)
+  uniq_col <- unique(data[[col]], na.rm=TRUE)
+  suppressWarnings({
+    # length(uniq_row)*length(uniq_col) become NA if it exceeds 2^31
+    if(is.na(length(uniq_row)*length(uniq_col))){
+      # The number of data is supported under 2^31 by reshape2::acast
+      stop("Data is too large to make a matrix for calculation.")
+    }
+  })
+
   fml <- as.formula(paste(row, col, sep = "~"))
   data %>%  reshape2::acast(fml, value.var=val, fun.aggregate=fun.aggregate, fill=fill)
 }
@@ -94,14 +105,11 @@ upper_gather <- function(mat, names=NULL, diag=NULL, cnames = c("Var1", "Var2", 
     r_names <- rownames(tmat)
     if(is.null(c_names)){
       c_names <- seq(ncol(tmat))
-    } else {
-      c_names <- sort(c_names)
     }
     if(is.null(r_names)){
       r_names <- seq(nrow(tmat))
-    } else {
-      r_names <- sort(r_names)
     }
+
     # this creates pairs of row and column indices
     ind <- which( lower_tri , arr.ind = TRUE )
     # make a vector of upper half of matrix
@@ -199,10 +207,47 @@ list_n <- function(column){
 #' extract elements from each row of list type column or data frame type column
 #' @export
 list_extract <- function(column, position = 1, rownum = 1){
+
+  if(position==0){
+    stop("position 0 is not supported")
+  }
+
   if(is.data.frame(column[[1]])){
-   sapply(column, function(column) column[rownum, position])
+    if(position<0){
+      sapply(column, function(column){
+        index <- ncol(column) + position + 1
+        if(is.null(column[rownum, index]) | index <= 0){
+          # column[rownum, position] still returns data frame if it's minus, so position < 0 should be caught here
+          NA
+        } else {
+          column[rownum, index][[1]]
+        }
+      })
+    } else {
+      sapply(column, function(column){
+        if(is.null(column[rownum, position])){
+          NA
+        } else {
+          column[rownum, position][[1]]
+        }
+      })
+    }
   } else {
-    sapply(column, function(column) column[position])
+    if(position<0){
+      sapply(column, function(column){
+        index <- length(column) + position + 1
+        if(index <= 0){
+          # column[rownum, position] still returns data frame if it's minus, so position < 0 should be caught here
+          NA
+        } else {
+          column[index]
+        }
+      })
+    } else {
+      sapply(column, function(column){
+        column[position]
+      })
+    }
   }
 }
 

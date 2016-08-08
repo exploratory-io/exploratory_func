@@ -96,6 +96,17 @@ test_that("build_kmeans.kv augment=TRUE", {
   expect_true(all(result[[".cluster"]] == 1))
 })
 
+test_that("test build_kmeans.kv for grouped data frame as subject error", {
+  data <- data.frame(group=rep(c(1,2,3), each=6),
+                     row = rep(c(1, 1, 2, 2, 3,3), 3),
+                     col = rep(c(1,2), 9),
+                     val = rep(0, 18))
+  expect_error({
+    ret <- data %>%
+      dplyr::group_by(group) %>%
+      build_kmeans.kv(group, col, val)
+  }, "group is a grouping column\\. ungroup\\(\\) may be necessary before this operation\\.")
+})
 
 test_that("test build_kmeans.cols ignore NA rows with grouped and keep.source=FALSE", {
   if(requireNamespace("broom")){
@@ -110,6 +121,7 @@ test_that("test build_kmeans.cols ignore NA rows with grouped and keep.source=FA
 })
 
 test_that("test build_kmeans.cols", {
-  df <- readRDS("~/Downloads/123flight_source_0.rds")
-  (df %>%  build_kmeans.kv(CARRIER, DEST_CITY_NAME,DISTANCE,keep.source=TRUE) %>%  augment_kmeans(model, data=source.data))
+  df <- data.frame(number = seq(4), number2 = seq(4)-4)
+  ret <- (df %>%  build_kmeans.cols(number, number2, keep.source=TRUE) %>%  augment_kmeans(model, data=source.data))
+  expect_true(is.factor(ret$.cluster))
 })

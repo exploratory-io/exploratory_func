@@ -18,6 +18,10 @@ do_cosine_sim.kv <- function(df, subject, key, value, distinct=FALSE, diag=FALSE
 
   grouped_column <- grouped_by(df)
 
+  if(subject_col %in% grouped_column){
+    stop(paste0(subject_col, " is a grouping column. ungroup() may be necessary before this operation."))
+  }
+
   cnames <- avoid_conflict(grouped_column, c("pair.name.1", "pair.name.2", "sim.value"))
 
   # this is executed on each group
@@ -68,6 +72,10 @@ do_dist.kv <- function(df, subject, key, value, fill=0, fun.aggregate=mean, dist
   value_col <- col_name(substitute(value))
 
   grouped_column <- grouped_by(df)
+
+  if(subject_col %in% grouped_column){
+    stop(paste0(subject_col, " is a grouping column. ungroup() may be necessary before this operation."))
+  }
 
   cnames <- avoid_conflict(grouped_column, c("pair.name.1", "pair.name.2", "dist.value"))
 
@@ -123,8 +131,14 @@ do_dist.cols <- function(df, ..., label=NULL, fill=0, fun.aggregate=mean, distin
   calc_dist_each <- function(df){
     mat <- df %>%  dplyr::select_(.dots=select_dots) %>%  as.matrix()
 
+    # sort the column name so that the output of pair.name.1 and pair.name.2 will be sorted
+    # it's better to be sorted so that heatmap in exploratory can be triangle if distinct is TRUE
+    sortedNames <- sort(colnames(mat))
+    mat <- t(mat)
+    mat <- mat[sortedNames, ]
+
     # Dist is actually an atomic vector of upper half so upper and diag arguments don't matter
-    dist <- stats::dist(t(mat), method=method, diag=FALSE, p=p)
+    dist <- stats::dist(mat, method=method, diag=FALSE, p=p)
     if(distinct){
       if(diag){
         diag <- 0

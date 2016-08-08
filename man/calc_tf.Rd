@@ -18,10 +18,10 @@ calc_tf_(df, group_col, term_col, weight = "ratio", k = 0.5)
 
 \item{weight}{Type of weight calculation.
 "ratio" is default and it's count/(total number of terms in the group).
-This can be "raw_frequency", "binary", "log_normalization" and "k_normalization"
-"raw_frequency" is the count of the term in the group.
+This can be "raw", "binary" and "log_scale"
+"raw" is the count of the term in the group.
 "binary" is logic if the term is in the group or not.
-"log_normalization" is logic if the term is in the group or not.}
+"log_scale" is logic if the term is in the group or not.}
 
 \item{term}{Column to be considered as term}
 }

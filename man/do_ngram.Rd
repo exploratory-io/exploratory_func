@@ -4,7 +4,7 @@
 \alias{do_ngram}
 \title{Generate ngram in groups.}
 \usage{
-do_ngram(df, token, n = 1:2, skip = 0)
+do_ngram(df, token, sentence, document, maxn = 2, sep = "_")
 }
 \arguments{
 \item{df}{Data frame which has tokens.}
@@ -12,8 +12,6 @@ do_ngram(df, token, n = 1:2, skip = 0)
 \item{token}{Column name of token data.}
 
 \item{n}{How many tokens should be together as new tokens. This should be numeric vector.}
-
-\item{skip}{How many tokens can be skipped when connecting them.}
 }
 \description{
 Generate ngram in groups.

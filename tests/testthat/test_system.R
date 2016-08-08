@@ -18,9 +18,46 @@ test_that("test parse_html_tables",{
   expect_equal(length(result), 1)
 })
 
+test_that("test parse_html_tables with japanese euc-jp table",{
+  result <- parse_html_tables('http://download.exploratory.io/test/table_eucjp.html', 'EUC-JP')
+  expect_equal(length(result), 1)
+})
+
+test_that("test parse_html_tables with japanese shift_jis table",{
+  result <- parse_html_tables('http://download.exploratory.io/test/table_sjis.html', 'SHIFT_JIS')
+  expect_equal(length(result), 1)
+})
+
+
 test_that("test scrape_html_table",{
   result <- scrape_html_table('https://www.cbinsights.com/research-unicorn-companies', 1, TRUE)
   expect_equal(ncol(result), 6)
   # may change if the web page is updated
-  expect_equal(nrow(result), 166)
+  # seems it changes quite often, excluding this check.
+  #expect_equal(nrow(result), 166)
+})
+
+
+test_that("test scrape_html_table with japanese euc-jp table",{
+  result <- scrape_html_table('http://download.exploratory.io/test/table_eucjp.html', 1, TRUE, 'EUC-JP')
+  expect_equal(ncol(result), 2)
+  expect_equal(nrow(result), 3)
+})
+
+test_that("test scrape_html_table with japanese shift_jis table",{
+  result <- scrape_html_table('http://download.exploratory.io/test/table_sjis.html', 1, TRUE, 'SHIFT_JIS')
+  expect_equal(ncol(result), 2)
+  expect_equal(nrow(result), 3)
+})
+
+test_that("test source check conflict case", {
+  filenames <- c("../../R/model_builder.R", "../../R/don't_exist.R")
+
+  # suppress file doesn't exist warning
+  suppressWarnings({ret <- checkSourceConflict(filenames)})
+  expect_true(!is.null(ret[[filenames[[1]]]]$names))
+  expect_true(is.null(ret[[filenames[[2]]]]$names))
+
+  expect_true(is.null(ret[[filenames[[1]]]]$error))
+  expect_true(!is.null(ret[[filenames[[2]]]]$error))
 })

@@ -85,6 +85,10 @@ build_kmeans.kv <- function(df,
   model_column <- avoid_conflict(grouped_column, "model")
   source_column <- avoid_conflict(grouped_column, "source.data")
 
+  if(row_col %in% grouped_column){
+    stop(paste0(row_col, " is a grouping column. ungroup() may be necessary before this operation."))
+  }
+
   build_kmeans_each <- function(df){
     mat <- simple_cast(df, row_col, col_col, value_col, fun.aggregate = fun.aggregate, fill=fill)
     kmeans_ret <- kmeans(mat, centers = centers, iter.max = 10, nstart = nstart, algorithm = algorithm, trace = trace)

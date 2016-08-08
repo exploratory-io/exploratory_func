@@ -4,8 +4,8 @@
 \alias{do_tfidf}
 \title{Calculate tfidf, which shows how much particular the token is in a group.}
 \usage{
-do_tfidf(df, group, term, idf_log_scale = log, tf_weight = "ratio",
-  tf_k = 0.5)
+do_tfidf(df, group, term, idf_log_scale = log, tf_weight = "raw",
+  tf_k = 0.5, norm = "l2")
 }
 \arguments{
 \item{df}{Data frame which has columns of groups and their terms}
