@@ -8,7 +8,7 @@
 #' @param diag If similarity between itself should be returned or not.
 #' @param method Type of calculation. https://cran.r-project.org/web/packages/proxy/vignettes/overview.pdf
 #' @export
-do_cosine_sim.kv <- function(df, subject, key, value, distinct=FALSE, diag=FALSE){
+do_cosine_sim.kv <- function(df, subject, key, value, distinct=FALSE, diag=FALSE, fun.aggregate=mean){
   loadNamespace("qlcMatrix")
   loadNamespace("tidytext")
   loadNamespace("Matrix")
@@ -22,10 +22,7 @@ do_cosine_sim.kv <- function(df, subject, key, value, distinct=FALSE, diag=FALSE
 
   # this is executed on each group
   calc_doc_sim_each <- function(df){
-    key_fact <- as.factor(df[[key_col]])
-    subject_fact <- as.factor(df[[subject_col]])
-    mat <- Matrix::sparseMatrix(i=as.integer(key_fact), j=as.integer(subject_fact), x=df[[value_col]])
-    colnames(mat) <- levels(subject_fact)
+    mat <- sparse_cast(df, key_col, subject_col, val = value_col, fun.aggregate = fun.aggregate)
     sim <- qlcMatrix::cosSparse(mat)
     if(distinct){
       if(!diag){

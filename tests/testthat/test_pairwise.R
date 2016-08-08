@@ -24,7 +24,8 @@ test_that("test do_cosine_sim.kv", {
     test_df %>%
       do_cosine_sim.kv(row, col, val)
   )
-  expect_equal(nrow(result), 12)
+  # row1 and row2 pair result
+  expect_equal(result[1, "sim.value"][[1]], (1*4+2*5+3*6)/sqrt(1^2+2^2+3^2)/sqrt(4^2+5^2+6^2))
 })
 
 test_that("test do_cosine_sim.kv with NA value", {
@@ -47,7 +48,7 @@ test_that("test do_cosine_sim.kv diag TRUE", {
   expect_equal(nrow(result), 16)
 })
 
-test_that("test do_cosine_sim.kv ", {
+test_that("test do_cosine_sim.kv with distinct", {
   loadNamespace("dplyr")
   result <- (
     test_df %>%
