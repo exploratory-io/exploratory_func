@@ -33,6 +33,10 @@ do_cor.kv <- function(df,
   val <- col_name(substitute(value))
 
   grouped_col <- grouped_by(df)
+  if(col %in% grouped_col){
+    stop(paste0(col, " is a grouping column. ungroup() may be necessary before this operation."))
+  }
+
   output_cols <- avoid_conflict(grouped_col, c("pair.name.1", "pair.name.2", "cor.value"))
 
   do_cor_each <- function(df){
@@ -113,6 +117,12 @@ do_svd.kv <- function(df,
   value_col <- col_name(substitute(value))
 
   grouped_col <- grouped_by(df)
+
+  if(subject_col %in% grouped_col){
+    stop(paste0(subject_col, " is a grouping column. ungroup() may be necessary before this operation."))
+  }
+
+
   axis_prefix <- "axis"
   value_cname <- avoid_conflict(colnames(df), "svd.value")
 
