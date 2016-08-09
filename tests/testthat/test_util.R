@@ -91,6 +91,50 @@ test_that("test simple_cast larger than max int (2^31)", {
   expect_error(simple_cast(test_df, "rval", "cval", "val"), "Data is too large to make a matrix for calculation.")
 })
 
+test_that("test sparse_cast", {
+  test_df <- data.frame(
+    rowname = rep(c("row1", "row02", "row3"), each=3),
+    colname = c("col1", "col02", "col5", "col02", "col3", "col1", "col02", "col4", "col5"),
+    val = seq(9),
+    stringsAsFactors = FALSE
+  )
+  mat <- sparse_cast(test_df, "rowname", "colname", "val")
+
+  for(rindex in seq(9)){
+    row <- test_df[rindex, "rowname"]
+    col <- test_df[rindex, "colname"]
+    val <- test_df[rindex, "val"]
+    expect_equal(mat[row, col], val)
+  }
+})
+
+test_that("test sparse_cast without val", {
+  test_df <- data.frame(
+    rowname = rep(c("row1", "row02", "row3"), each=3),
+    colname = c("col1", "col02", "col5", "col02", "col3", "col1", "col02", "col4", "col5"),
+    stringsAsFactors = FALSE
+  )
+  mat <- sparse_cast(test_df, "rowname", "colname")
+
+  for(rindex in seq(9)){
+    row <- test_df[rindex, "rowname"]
+    col <- test_df[rindex, "colname"]
+    expect_equal(mat[row, col], TRUE)
+  }
+})
+
+test_that("test sparse_cast with fun.aggregate", {
+  test_df <- data.frame(
+    rowname = rep(c("row1", "row02", "row3"), each=3),
+    colname = c("col1", "col1", "col5", "col02", "col3", "col1", "col02", "col4", "col5"),
+    val = seq(9),
+    stringsAsFactors = FALSE
+  )
+  mat <- sparse_cast(test_df, "rowname", "colname", "val", fun.aggregate=mean)
+
+  expect_equal(mat["row1", "col1"], 1.5)
+})
+
 test_that("test mat_to_df", {
   nc <- 4
   nr <- 5
