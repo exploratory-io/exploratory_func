@@ -1,12 +1,13 @@
 #' Calculate similarity of each pair of groups.
 #' @param df data frame in tidy format
-#' @param group A column you want to calculate the correlations for.
-#' @param dimension A column you want to use as a dimension to calculate the correlations.
+#' @param subject A column you want to calculate the correlations for.
+#' @param key A column you want to use as a dimension to calculate the correlations.
 #' @param value A column for the values you want to use to calculate the correlations.
 #' @param distinct The returned pair should be duplicated in swapped order or not.
 #' TRUE makes it easy to filter group names.
 #' @param diag If similarity between itself should be returned or not.
 #' @param method Type of calculation. https://cran.r-project.org/web/packages/proxy/vignettes/overview.pdf
+#' @param fun.aggregate Set an aggregate function when there are multiple entries for the key column per each category.
 #' @export
 do_cosine_sim.kv <- function(df, subject, key, value, distinct=FALSE, diag=FALSE, fun.aggregate=mean){
   loadNamespace("qlcMatrix")
