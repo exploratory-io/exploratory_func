@@ -29,6 +29,7 @@ simple_cast <- function(data, row, col, val, fun.aggregate=mean, fill=0){
   data %>%  reshape2::acast(fml, value.var=val, fun.aggregate=fun.aggregate, fill=fill)
 }
 
+#' Cast data to sparse matrix by choosing row and column from a data frame
 sparse_cast <- function(data, row, col, val=NULL, fun.aggregate=sum){
   loadNamespace("dplyr")
   loadNamespace("Matrix")
