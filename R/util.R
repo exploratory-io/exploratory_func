@@ -29,21 +29,35 @@ simple_cast <- function(data, row, col, val, fun.aggregate=mean, fill=0){
   data %>%  reshape2::acast(fml, value.var=val, fun.aggregate=fun.aggregate, fill=fill)
 }
 
-#' Spreads columns which is choosed as row and col into sparse matrix
-sparse_cast <- function(df, row, col, val=NULL) {
-  if(!is.null(val)){
-    value <- as.numeric(df[[val]])
-    not_na <- !is.na(value)
-    df <- df[not_na,]
-    row_fact <- as.factor(df[[row]])
-    col_fact <- as.factor(df[[col]])
-    sparseMat <- Matrix::sparseMatrix(i = as.integer(row_fact), j = as.integer(col_fact), x=value[not_na])
-  } else {
-    row_fact <- as.factor(df[[row]])
-    col_fact <- as.factor(df[[col]])
-    sparseMat <- Matrix::sparseMatrix(i = as.integer(row_fact), j = as.integer(col_fact))
-  }
+#' Cast data to sparse matrix by choosing row and column from a data frame
+sparse_cast <- function(data, row, col, val=NULL, fun.aggregate=sum){
+  loadNamespace("dplyr")
+  loadNamespace("Matrix")
 
+  if(is.null(val)){
+    # if there's no value column, it creates binary sparse matrix.
+    row_fact <- as.factor(data[[row]])
+    col_fact <- as.factor(data[[col]])
+    sparseMat <- Matrix::sparseMatrix(i = as.integer(row_fact), j = as.integer(col_fact))
+  }else{
+    # Basic behaviour of Matrix::sparseMatrix is sum.
+    # If fun.aggregate is different, it should be aggregated by it.
+    if(!identical(fun.aggregate, sum)){
+      # create a formula to aggregate duplicated row and col pairs
+      # ex: ~mean(val)
+      fml <- as.formula(paste0("~", as.character(substitute(fun.aggregate)), "(", val, ")"))
+
+      # execute the formula to each row and col pair
+      data <- dplyr::group_by_(data, .dots=list(as.symbol(row), as.symbol(col))) %>%
+        dplyr::summarise_(.dots=setNames(list(fml), val)) %>%
+        dplyr::ungroup()
+    }
+
+    row_fact <- as.factor(data[[row]])
+    col_fact <- as.factor(data[[col]])
+
+    sparseMat <- Matrix::sparseMatrix(i = as.integer(row_fact), j = as.integer(col_fact), x = as.numeric(data[[val]]))
+  }
 
   rownames(sparseMat) <- levels(row_fact)
   colnames(sparseMat) <- levels(col_fact)

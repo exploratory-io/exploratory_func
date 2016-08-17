@@ -24,7 +24,22 @@ test_that("test do_cosine_sim.kv", {
     test_df %>%
       do_cosine_sim.kv(row, col, val)
   )
-  expect_equal(nrow(result), 12)
+  # row1 and row2 pair result
+  expect_equal(result[1, "sim.value"][[1]], (1*4+2*5+3*6)/sqrt(1^2+2^2+3^2)/sqrt(4^2+5^2+6^2))
+})
+
+test_that("test sparse_cast with duplicate", {
+  test_df <- data.frame(
+    rowname = rep(c("row1", "row02", "row3"), each=3),
+    colname = c("col1", "col1", "col5", "col02", "col3", "col1", "col02", "col4", "col5"),
+    val = seq(9),
+    stringsAsFactors = FALSE
+  )
+  result <- (
+    test_df %>%
+      do_cosine_sim.kv(rowname, colname, val, fun.aggregate=min)
+  )
+  expect_equal(result[1, 3][[1]], (1*6)/sqrt(1^2+3^2)/sqrt(4^2+5^2+6^2))
 })
 
 test_that("test do_cosine_sim.kv with NA value", {
@@ -47,7 +62,7 @@ test_that("test do_cosine_sim.kv diag TRUE", {
   expect_equal(nrow(result), 16)
 })
 
-test_that("test do_cosine_sim.kv ", {
+test_that("test do_cosine_sim.kv with distinct", {
   loadNamespace("dplyr")
   result <- (
     test_df %>%
