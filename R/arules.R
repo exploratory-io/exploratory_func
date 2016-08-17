@@ -9,8 +9,7 @@ do_apriori <- function(df, subject, key, minlen=1, maxlen=10, min_support=0.1, m
 
   subject_col <- col_name(substitute(subject))
   key_col <- col_name(substitute(key))
-
-  if(!subject_col %in% colnames(df)){
+  if(subject_col %nin% colnames(df)){
     stop(paste(subject_col, "is not in colums", sep=" "))
   }
 
@@ -29,50 +28,68 @@ do_apriori <- function(df, subject, key, minlen=1, maxlen=10, min_support=0.1, m
     # create appearance list
     if(is.null(lhs)){
       if(is.null(rhs)){
+        # lhs and rhs are both NULL
         appearance <- NULL
       } else {
-        rhs <- as.character(unique(df[[subject_col]][stringr::str_detect(df[[subject_col]], rhs)]))
+        # lhs is NULL and rhs is not NULL
+        # find matched values by stringr::str_detect in subject_col to limit rhs
         appearance <- list(rhs = rhs, default = "lhs")
       }
     } else {
       if(is.null(rhs)){
-        lhs <- as.character(unique(df[[subject_col]][stringr::str_detect(df[[subject_col]], lhs)]))
+        # rhs is NULL and lhs is not NULL
         appearance <- list(lhs = lhs, default = "rhs")
       } else {
-        lhs <- as.character(unique(df[[subject_col]][stringr::str_detect(df[[subject_col]], lhs)]))
-        rhs <- as.character(unique(df[[subject_col]][stringr::str_detect(df[[subject_col]], rhs)]))
+        # rhs are both not NULL
         appearance <- list(lhs = lhs, rhs = rhs, default = "none")
       }
     }
+    rules <- NULL
+    capture.output({
+      rules <- arules::apriori(
+        mat,
+        parameter = list(
+          minlen=minlen,
+          maxlen=maxlen,
+          support=min_support,
+          confidence = min_confidence,
+          target="rules",
+          smax=max_support
+        ),
+        appearance = appearance)
+    })
+    lhs_val <- vapply(arules::LIST(rules@lhs), function(items){
+      paste(items, collapse=", ")
+    }, FUN.VALUE = "")
+    rhs_val <- vapply(arules::LIST(rules@rhs), function(items){
+      paste(items, collapse=", ")
+    }, FUN.VALUE = "")
 
-    rules <- arules::apriori(
-      mat,
-      parameter = list(
-        minlen=minlen,
-        maxlen=maxlen,
-        support=min_support,
-        confidence = min_confidence,
-        target="rules",
-        smax=max_support
-      ),
-      appearance = appearance)
-    lhs <- vapply(arules::LIST(rules@lhs), function(items){
-      paste(items, collapse=",")
-    }, FUN.VALUE = "")
-    rhs <- vapply(arules::LIST(rules@rhs), function(items){
-      paste(items, collapse=",")
-    }, FUN.VALUE = "")
+    # remove empty strings if lhs or rhs is indicated
+    if(!is.null(lhs) & !is.null(rhs)){
+      filtered <- lhs_val != "" & rhs_val != ""
+    } else if(!is.null(lhs)){
+      filtered <- lhs_val != ""
+    } else if(!is.null(rhs)){
+      filtered <- rhs_val != ""
+    } else {
+      filtered <- TRUE
+    }
+
     quality <- rules@quality
     ret <- data.frame(
-      lhs,
-      rhs,
-      quality$support,
-      quality$confidence,
-      quality$lift)
+      lhs_val[filtered],
+      rhs_val[filtered],
+      quality$support[filtered],
+      quality$confidence[filtered],
+      quality$lift[filtered], stringsAsFactors = FALSE)
     colnames(ret) <- cnames
     ret
   }
 
-  (df %>%  dplyr::do_(.dots = setNames(~do_apriori_each(.), cnames[[5]])) %>%  tidyr::unnest_(cnames[[5]]))
+  ret <- (df %>%  dplyr::do_(.dots = setNames(~do_apriori_each(.), cnames[[5]])) %>%  tidyr::unnest_(cnames[[5]]))
+  if(is.na(ret[[1]]) & nrow(ret)==1){
+    stop("No rule was found. Adjusting arguments might work.")
+  }
+  ret
 }
-
