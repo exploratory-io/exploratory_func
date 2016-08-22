@@ -9,6 +9,13 @@ test_df$list_c <- as.list(seq(20))
 
 test_df[["with space"]] <- seq(20)
 
+test_that("test two sample t-test", {
+  result <- test_df %>%
+    dplyr::group_by(dim) %>%
+    do_t.test(`with space`, cat)
+  expect_equal(ncol(result), 11)
+})
+
 test_that("test two sample t-test more than 2 levels", {
   expect_error({
     result <- test_df %>%
@@ -30,4 +37,11 @@ test_that("test one sample t-test", {
     dplyr::group_by(dim) %>%
     do_t.test("with space", mu=3)
   expect_equal(result[result[["dim"]]=="dim1", "p.value"][[1]], 1)
+})
+
+test_that("test f-test", {
+  result <- test_df %>%
+    dplyr::group_by(dim) %>%
+    do_var.test(`with space`, cat)
+  expect_equal(ncol(result), 10)
 })
