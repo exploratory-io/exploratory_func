@@ -10,9 +10,8 @@ do_t.test <- function(df, value, key=NULL, ...){
     key_col <- col_name(substitute(key))
     # this creates a formula like `val`~`group key`
     fml <- as.formula(paste(paste("`", value_col, "`", sep=""), paste("`", key_col, "`", sep=""), sep="~"))
-
-    # otherwise, one sample t-test from values in value_col is executed
   }
+  # otherwise, one sample t-test from values in value_col is executed
 
   grouped_col <- grouped_by(df)
 
@@ -21,8 +20,10 @@ do_t.test <- function(df, value, key=NULL, ...){
   # this is executed on each group
   do_t.test_each <- function(df, ...){
     if(with_key){
+      # use formula (`value_col`~`key_col`) for two sample t-test
       model <- t.test(data=df, fml, ...)
     } else {
+      # use df[[value_col]] for one sample t-test (comparison with indicated normal distribution)
       model <- t.test(df[[value_col]], ...)
     }
     ret <- broom::tidy(model)
