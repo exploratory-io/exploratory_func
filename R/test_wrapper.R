@@ -1,3 +1,4 @@
+#' wrapper for t.test, which compares means
 do_t.test <- function(df, value, key=NULL, ...){
   value_col <- col_name(substitute(value))
   with_key <- !is.null(substitute(key))
@@ -45,6 +46,7 @@ do_t.test <- function(df, value, key=NULL, ...){
   df %>% dplyr::do_(.dots=setNames(list(~do_t.test_each(df = ., ...)), model_col)) %>% tidyr::unnest_(model_col)
 }
 
+#' wrapper for var.test, which compares variances
 do_var.test <- function(df, value, key, ...){
   value_col <- col_name(substitute(value))
   key_col <- col_name(substitute(key))
