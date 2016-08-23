@@ -6,10 +6,13 @@ do_t.test <- function(df, value, key=NULL, ...){
 
   if(with_key){
     # make a formula for two sample t-test
+    # value_col is values and key_col is labels in which grouop the values are in
     key_col <- col_name(substitute(key))
+    # this creates a formula like `val`~`group key`
     fml <- as.formula(paste(paste("`", value_col, "`", sep=""), paste("`", key_col, "`", sep=""), sep="~"))
+
+    # otherwise, one sample t-test from values in value_col is executed
   }
-  # otherwise, one sample t-test from value_col
 
   grouped_col <- grouped_by(df)
 
