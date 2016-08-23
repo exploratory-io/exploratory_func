@@ -45,6 +45,7 @@ do_apriori <- function(df, subject, key, minlen=1, maxlen=10, min_support=0.1, m
       }
     }
     rules <- NULL
+    # capture.output suppress summary output from arules::apriori function
     capture.output({
       rules <- arules::apriori(
         mat,
