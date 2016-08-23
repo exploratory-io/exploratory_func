@@ -1,4 +1,5 @@
 #' wrapper for t.test, which compares means
+#' @export
 do_t.test <- function(df, value, key=NULL, ...){
   value_col <- col_name(substitute(value))
   with_key <- !is.null(substitute(key))
@@ -47,6 +48,7 @@ do_t.test <- function(df, value, key=NULL, ...){
 }
 
 #' wrapper for var.test, which compares variances
+#' @export
 do_var.test <- function(df, value, key, ...){
   value_col <- col_name(substitute(value))
   key_col <- col_name(substitute(key))
@@ -70,7 +72,6 @@ do_var.test <- function(df, value, key, ...){
               estimate = "variance_ratio",
               num.df = "numerator_degrees_of_freedom",
               denom.df = "denominator_degrees_of_freedom",
-              estimate2 = "mean2",
               statistic = "f.value",
               name
       )
