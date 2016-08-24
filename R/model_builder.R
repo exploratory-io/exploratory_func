@@ -41,16 +41,6 @@ build_lm <- build_data("lm")
 #' @export
 build_glm <- build_data("glm")
 
-#' t.test wrapper with do
-#' @return deta frame which has t.test model
-#' @export
-build_t.test <- build_data("t.test")
-
-#' var.test wrapper with do
-#' @return deta frame which has var.test model
-#' @export
-build_var.test <- build_data("var.test")
-
 #' kmeans wrapper with do with key-value columns as input
 #' @param centers Set an integer number to decide how many clusters (groups) to build.
 #' @param keep.source It will make .source.data column to preserve source data.
