@@ -37,5 +37,6 @@ Suggests:
     RPostgreSQL,
     mongolite,
     bigrquery,
-    GetoptLong
+    GetoptLong,
+    arules
 RoxygenNote: 5.0.1
