@@ -230,7 +230,7 @@ getGoogleSheetList <- function(tokenFileId){
 }
 
 #' @export
-queryMongoDB <- function(host, port, database, collection, username, password, query = "{}", isFlatten, limit=100000){
+queryMongoDB <- function(host, port, database, collection, username, password, query = "{}", isFlatten, limit=100000, isSSL=FALSE){
   if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
   loadNamespace("stringr")
   loadNamespace("jsonlite")
@@ -243,6 +243,9 @@ queryMongoDB <- function(host, port, database, collection, username, password, q
   }
   else {
     url = stringr::str_c("mongodb://", host, ":", as.character(port), "/", database)
+  }
+  if(isSSL){
+    url = stringr::str_c(url, "?ssl=true")
   }
   con <- mongolite::mongo(collection, url = url)
   data <- con$find(query = GetoptLong::qq(query), limit=limit)
