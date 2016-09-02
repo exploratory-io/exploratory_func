@@ -41,35 +41,61 @@ build_lm <- build_data("lm")
 #' @export
 build_glm <- build_data("glm")
 
+#' integrated build_kmeans
+#' @export
+build_kmeans <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0){
+  if (!is.null(skv)) {
+    #.kv pattern
+    if (length(skv) != 3) {
+      stop("length of skv has to be 3")
+    }
+    build_kmeans.kv_(df, skv[[1]], skv[[2]], skv[[3]], fun.aggregate = fun.aggregate, fill = fill, ...)
+  } else {
+    #.cols pattern
+    build_kmeans.cols(df, ...)
+  }
+}
+
 #' kmeans wrapper with do with key-value columns as input
 #' @param centers Set an integer number to decide how many clusters (groups) to build.
 #' @param keep.source It will make .source.data column to preserve source data.
 #' @param seed This is random seed. You can change the result if you change this number.
 #' @return deta frame which has kmeans model
 #' @export
-build_kmeans.kv <- function(df,
-                            subject,
-                            key,
-                            value,
-                            centers=3,
-                            iter.max = 10,
-                            nstart = 1,
-                            algorithm = "Hartigan-Wong",
-                            trace = FALSE,
-                            keep.source = FALSE,
-                            seed=0,
-                            augment=FALSE,
-                            fun.aggregate=mean,
-                            fill=0){
-  loadNamespace("dplyr")
-  loadNamespace("lazyeval")
-  loadNamespace("tidyr")
-  loadNamespace("broom")
-  set.seed(seed)
+build_kmeans.kv <- function(df, subject, key, value, ...){
 
   row_col <- col_name(substitute(subject))
   col_col <- col_name(substitute(key))
   value_col <- col_name(substitute(value))
+
+  build_kmeans.kv_(df, row_col, col_col, value_col, ...)
+}
+
+#' SE version of build_kmeans.kv
+build_kmeans.kv_ <- function(df,
+                             subject_col,
+                             key_col,
+                             value_col,
+                             centers=3,
+                             iter.max = 10,
+                             nstart = 1,
+                             algorithm = "Hartigan-Wong",
+                             trace = FALSE,
+                             keep.source = FALSE,
+                             seed=0,
+                             augment=FALSE,
+                             fun.aggregate=mean,
+                             fill=0){
+  loadNamespace("dplyr")
+  loadNamespace("lazyeval")
+  loadNamespace("tidyr")
+  loadNamespace("broom")
+
+  set.seed(seed)
+
+  row_col <- subject_col
+  col_col <- key_col
+  value_col <- value_col
 
   grouped_column <- grouped_by(df)
   model_column <- avoid_conflict(grouped_column, "model")
