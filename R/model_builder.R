@@ -72,6 +72,7 @@ build_kmeans.kv <- function(df, subject, key, value, ...){
 }
 
 #' SE version of build_kmeans.kv
+#' @export
 build_kmeans.kv_ <- function(df,
                              subject_col,
                              key_col,
