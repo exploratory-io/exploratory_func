@@ -1,6 +1,21 @@
 #'
 #'
 
+#' integrated do_dist
+#' @export
+do_cor <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0){
+  if (!is.null(skv)) {
+    #.kv pattern
+    if (length(skv) != 3) {
+      stop("length of skv has to be 3")
+    }
+    do_cor.kv_(df, skv[[1]], skv[[2]], skv[[3]], fun.aggregate = fun.aggregate, fill = fill, ...)
+  } else {
+    #.cols pattern
+    do_cor.cols(df, ...)
+  }
+}
+
 #'
 #' Calculate correlation among groups and output the correlation of each pair
 #' @param df data frame in tidy format
@@ -16,12 +31,7 @@ do_cor.kv <- function(df,
                    subject,
                    key,
                    value,
-                   use="pairwise.complete.obs",
-                   method="pearson",
-                   distinct = FALSE,
-                   diag = FALSE,
-                   fill = 0,
-                   fun.aggregate=mean)
+                   ...)
 {
   loadNamespace("reshape2")
   loadNamespace("dplyr")
@@ -31,6 +41,31 @@ do_cor.kv <- function(df,
   row <- col_name(substitute(key))
   col <- col_name(substitute(subject))
   val <- col_name(substitute(value))
+
+  do_cor.kv_(df, col, row, val, ...)
+}
+
+#' SE version of do_cor.kv
+#' @export
+do_cor.kv_ <- function(df,
+                      subject_col,
+                      key_col,
+                      value_col,
+                      use="pairwise.complete.obs",
+                      method="pearson",
+                      distinct = FALSE,
+                      diag = FALSE,
+                      fill = 0,
+                      fun.aggregate=mean)
+{
+  loadNamespace("reshape2")
+  loadNamespace("dplyr")
+  loadNamespace("tidyr")
+  loadNamespace("lazyeval")
+
+  row <- key_col
+  col <- subject_col
+  val <- value_col
 
   grouped_col <- grouped_by(df)
   if(col %in% grouped_col){

@@ -49,6 +49,21 @@ do_cosine_sim.kv <- function(df, subject, key, value, distinct=FALSE, diag=FALSE
 
 }
 
+#' integrated do_dist
+#' @export
+do_dist <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0){
+  if (!is.null(skv)) {
+    #.kv pattern
+    if (length(skv) != 3) {
+      stop("length of skv has to be 3")
+    }
+    do_dist.kv_(df, skv[[1]], skv[[2]], skv[[3]], fun.aggregate = fun.aggregate, fill = fill, ...)
+  } else {
+    #.cols pattern
+    do_dist.cols(df, ...)
+  }
+}
+
 #' Calculate distance of each pair of groups.
 #' @param df data frame in tidy format
 #' @param group A column you want to calculate the correlations for.
@@ -59,15 +74,21 @@ do_cosine_sim.kv <- function(df, subject, key, value, distinct=FALSE, diag=FALSE
 #' @param diag If similarity between itself should be returned or not.
 #' @param method Type of calculation. https://cran.r-project.org/web/packages/proxy/vignettes/overview.pdf
 #' @export
-do_dist.kv <- function(df, subject, key, value, fill=0, fun.aggregate=mean, distinct=FALSE, diag=FALSE, method="euclidean", p=2 ){
+do_dist.kv <- function(df, subject, key, value, ...){
+  subject_col <- col_name(substitute(subject))
+  key_col <- col_name(substitute(key))
+  value_col <- col_name(substitute(value))
+
+  do_dist.kv_(df, subject_col, key_col, value_col, ...)
+}
+
+#' SE version of do_dist
+#' @export
+do_dist.kv_ <- function(df, subject_col, key_col, value_col, fill=0, fun.aggregate=mean, distinct=FALSE, diag=FALSE, method="euclidean", p=2 ){
   loadNamespace("dplyr")
   loadNamespace("tidyr")
   loadNamespace("reshape2")
   loadNamespace("stats")
-
-  subject_col <- col_name(substitute(subject))
-  key_col <- col_name(substitute(key))
-  value_col <- col_name(substitute(value))
 
   grouped_column <- grouped_by(df)
 
