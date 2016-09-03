@@ -100,10 +100,12 @@ test_that("calc_idf smooth_idf FALSE", {
 
 test_that("do_tfidf", {
   loadNamespace("dplyr")
-  test_df <- data.frame(id=rep(c(1,2), 5), word=c("this", "this", "this", letters[1:7]))
+  test_df <- data.frame(id=rep(c(1,2), 5))
+  test_df["doc id"] <- rep(c(1,2), 5)
+  test_df["colname with space"] <- c("this", "this", "this", letters[1:7])
   result <- (
     test_df %>%
-      do_tfidf(id, word)
+      do_tfidf(`doc id`, `colname with space`)
   )
   expect_equal(result$tfidf[c(1,5)], c(2/(sqrt(2^2*3)), 2/(sqrt(2^2*4))))
 })

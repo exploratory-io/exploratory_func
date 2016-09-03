@@ -25,9 +25,12 @@ simple_cast <- function(data, row, col, val = NULL, fun.aggregate=mean, fill=0){
     }
   })
 
-  fml <- as.formula(paste(row, col, sep = "~"))
+  fml <- as.formula(paste0("`", row, "`~`", col, "`"))
   if(is.null(val)){
-    table(as.factor(data[[row]]), as.factor(data[[col]]))
+    # use sparse = TRUE and as.matrix because xtabs returns table object with occurance and it causes error in kmeans
+    mat <- xtabs(as.formula(paste0("~", "`", row , "`", "+", "`", col, "`")), data = data, sparse = TRUE) %>%  as.matrix()
+    mat[mat == 0] <- fill
+    mat
   }else{
     data %>%  reshape2::acast(fml, value.var=val, fun.aggregate=fun.aggregate, fill=fill)
   }

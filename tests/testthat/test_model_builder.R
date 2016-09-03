@@ -84,14 +84,16 @@ test_that("build_kmeans.kv augment=TRUE", {
   loadNamespace("dplyr")
   test_df <- data.frame(
     group=rep(paste("group", seq(2)), each=9),
-    subject=rep(paste("sub", rep(seq(3), each=3)), each=2),
     key=rep(paste("dim", rep(seq(3))), each=2),
     value=seq(3), stringsAsFactors = F
   )
+
+  test_df[["subject with space"]] <- rep(paste("sub", rep(seq(3), each=3)), each=2)
+
   result <- (
     test_df
     %>%  dplyr::group_by(group)
-    %>%  build_kmeans.kv(subject, key, value, center=1, augment=TRUE)
+    %>%  build_kmeans.kv(`subject with space`, key, value, center=1, augment=TRUE)
   )
   expect_true(all(result[[".cluster"]] == 1))
 })
@@ -130,6 +132,11 @@ test_that("test build_kmeans", {
   result <- (
     test_df
     %>%
-      build_kmeans(vec1, vec2, centers=2)
+      build_kmeans(skv = c("vec1", "vec2"), centers=2)
   )
+})
+
+test_that("",{
+  data <- readRDS("~/Downloads/flight.rds")
+  data %>% build_kmeans(skv = c("CARRIER", "ORIGIN_CITY_NAME"), keep.source = TRUE, augment = FALSE)
 })
