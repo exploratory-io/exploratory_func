@@ -125,3 +125,11 @@ test_that("test build_kmeans.cols", {
   ret <- (df %>%  build_kmeans.cols(number, number2, keep.source=TRUE) %>%  augment_kmeans(model, data=source.data))
   expect_true(is.factor(ret$.cluster))
 })
+
+test_that("test build_kmeans", {
+  result <- (
+    test_df
+    %>%
+      build_kmeans(vec1, vec2, centers=2)
+  )
+})

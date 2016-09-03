@@ -46,10 +46,11 @@ build_glm <- build_data("glm")
 build_kmeans <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0){
   if (!is.null(skv)) {
     #.kv pattern
-    if (length(skv) != 3) {
-      stop("length of skv has to be 3")
+    if (!(length(skv) %in% c(2, 3))) {
+      stop("length of skv has to be 2 or 3")
     }
-    build_kmeans.kv_(df, skv[[1]], skv[[2]], skv[[3]], fun.aggregate = fun.aggregate, fill = fill, ...)
+    value <- if(length(skv) == 2) NULL else skv[[3]]
+    build_kmeans.kv_(df, skv[[1]], skv[[2]], value, fun.aggregate = fun.aggregate, fill = fill, ...)
   } else {
     #.cols pattern
     build_kmeans.cols(df, ...)
@@ -62,11 +63,11 @@ build_kmeans <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0){
 #' @param seed This is random seed. You can change the result if you change this number.
 #' @return deta frame which has kmeans model
 #' @export
-build_kmeans.kv <- function(df, subject, key, value, ...){
+build_kmeans.kv <- function(df, subject, key, value = NULL, ...){
 
   row_col <- col_name(substitute(subject))
   col_col <- col_name(substitute(key))
-  value_col <- col_name(substitute(value))
+  value_col <- if(is.null(substitute(value))) NULL else col_name(substitute(value))
 
   build_kmeans.kv_(df, row_col, col_col, value_col, ...)
 }
@@ -76,7 +77,7 @@ build_kmeans.kv <- function(df, subject, key, value, ...){
 build_kmeans.kv_ <- function(df,
                              subject_col,
                              key_col,
-                             value_col,
+                             value_col = NULL,
                              centers=3,
                              iter.max = 10,
                              nstart = 1,
@@ -96,7 +97,6 @@ build_kmeans.kv_ <- function(df,
 
   row_col <- subject_col
   col_col <- key_col
-  value_col <- value_col
 
   grouped_column <- grouped_by(df)
   model_column <- avoid_conflict(grouped_column, "model")
