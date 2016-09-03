@@ -124,6 +124,36 @@ test_that("test do_dist.kv distinct TRUE", {
   expect_equal(nrow(result), 6)
 })
 
+test_that("test do_dist.kv without val", {
+  loadNamespace("dplyr")
+
+  test_df <- data.frame(
+    subject = paste0("subject", rep(4-seq(3), each=3)),
+    key = paste0("key", c(rep(3-seq(2), 4), 1)))
+
+  result <- (
+    test_df %>%
+      do_dist.kv(subject, key)
+  )
+
+  expect_equal(result[[3]][1:2], c(0, sqrt(2)))
+})
+
+test_that("test do_dist without val", {
+  loadNamespace("dplyr")
+
+  test_df <- data.frame(
+    subject = paste0("subject", rep(4-seq(3), each=3)),
+    key = paste0("key", c(rep(3-seq(2), 4), 1)))
+
+  result <- (
+    test_df %>%
+      do_dist( skv = c("subject", "key") )
+  )
+
+  expect_equal(result[[3]][1:2], c(0, sqrt(2)))
+})
+
 test_that("test do_dist.cols", {
   loadNamespace("dplyr")
 

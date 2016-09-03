@@ -12,7 +12,7 @@ col_name <- function(x, default = stop("Please supply column name", call. = FALS
 }
 
 #' Simple cast wrapper that spreads columns which is choosed as row and col into matrix
-simple_cast <- function(data, row, col, val, fun.aggregate=mean, fill=0){
+simple_cast <- function(data, row, col, val = NULL, fun.aggregate=mean, fill=0){
   loadNamespace("reshape2")
   # validation
   uniq_row <- unique(data[[row]], na.rm=TRUE)
@@ -26,7 +26,11 @@ simple_cast <- function(data, row, col, val, fun.aggregate=mean, fill=0){
   })
 
   fml <- as.formula(paste(row, col, sep = "~"))
-  data %>%  reshape2::acast(fml, value.var=val, fun.aggregate=fun.aggregate, fill=fill)
+  if(is.null(val)){
+    table(as.factor(data[[row]]), as.factor(data[[col]]))
+  }else{
+    data %>%  reshape2::acast(fml, value.var=val, fun.aggregate=fun.aggregate, fill=fill)
+  }
 }
 
 #' Cast data to sparse matrix by choosing row and column from a data frame
