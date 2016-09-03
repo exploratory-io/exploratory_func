@@ -34,7 +34,7 @@ simple_cast <- function(data, row, col, val = NULL, fun.aggregate=mean, fill=0){
 }
 
 #' Cast data to sparse matrix by choosing row and column from a data frame
-sparse_cast <- function(data, row, col, val=NULL, fun.aggregate=sum){
+sparse_cast <- function(data, row, col, val=NULL, fun.aggregate=sum, count = FALSE){
   loadNamespace("dplyr")
   loadNamespace("Matrix")
 
@@ -42,7 +42,12 @@ sparse_cast <- function(data, row, col, val=NULL, fun.aggregate=sum){
     # if there's no value column, it creates binary sparse matrix.
     row_fact <- as.factor(data[[row]])
     col_fact <- as.factor(data[[col]])
-    sparseMat <- Matrix::sparseMatrix(i = as.integer(row_fact), j = as.integer(col_fact))
+    if(count){
+      sparseMat <- xtabs(as.formula(paste0("~", "`", row , "`", "+", "`", col, "`")), data = data, sparse = TRUE)
+    } else {
+      sparseMat <- Matrix::sparseMatrix(i = as.integer(row_fact), j = as.integer(col_fact))
+    }
+
   }else{
     # Basic behaviour of Matrix::sparseMatrix is sum.
     # If fun.aggregate is different, it should be aggregated by it.

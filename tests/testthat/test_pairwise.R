@@ -28,6 +28,21 @@ test_that("test do_cosine_sim.kv", {
   expect_equal(result[1, "sim.value"][[1]], (1*4+2*5+3*6)/sqrt(1^2+2^2+3^2)/sqrt(4^2+5^2+6^2))
 })
 
+test_that("test do_cosine_sim.kv without val", {
+  loadNamespace("dplyr")
+
+  test_df <- data.frame(
+    subject = paste0("subject", rep(4-seq(3), each=3)),
+    key = paste0("key", c(rep(3-seq(2), 4), 1)))
+
+  result <- (
+    test_df %>%
+      do_cosine_sim.kv( subject, key)
+  )
+
+  expect_equal(result[[3]][1:2], c(1, 4/5))
+})
+
 test_that("test sparse_cast with duplicate", {
   test_df <- data.frame(
     rowname = rep(c("row1", "row02", "row3"), each=3),

@@ -9,13 +9,13 @@
 #' @param method Type of calculation. https://cran.r-project.org/web/packages/proxy/vignettes/overview.pdf
 #' @param fun.aggregate Set an aggregate function when there are multiple entries for the key column per each category.
 #' @export
-do_cosine_sim.kv <- function(df, subject, key, value, distinct=FALSE, diag=FALSE, fun.aggregate=mean){
+do_cosine_sim.kv <- function(df, subject, key, value = NULL, distinct=FALSE, diag=FALSE, fun.aggregate=mean){
   loadNamespace("qlcMatrix")
   loadNamespace("tidytext")
   loadNamespace("Matrix")
   subject_col <- col_name(substitute(subject))
   key_col <- col_name(substitute(key))
-  value_col <- col_name(substitute(value))
+  value_col <- if(is.null(substitute(value))) NULL else col_name(substitute(value))
 
   grouped_column <- grouped_by(df)
 
@@ -27,7 +27,7 @@ do_cosine_sim.kv <- function(df, subject, key, value, distinct=FALSE, diag=FALSE
 
   # this is executed on each group
   calc_doc_sim_each <- function(df){
-    mat <- sparse_cast(df, key_col, subject_col, val = value_col, fun.aggregate = fun.aggregate)
+    mat <- sparse_cast(df, key_col, subject_col, val = value_col, fun.aggregate = fun.aggregate, count = TRUE)
     sim <- qlcMatrix::cosSparse(mat)
     if(distinct){
       if(!diag){
