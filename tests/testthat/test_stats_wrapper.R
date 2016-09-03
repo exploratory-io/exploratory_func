@@ -51,6 +51,21 @@ test_that("test do_cor.kv for empty value", {
   result <- tidy_test_df %>%  do_cor.kv(cat, dim_na, val)
 })
 
+test_that("test do_cor without val", {
+  loadNamespace("dplyr")
+
+  test_df <- data.frame(
+    subject = paste0("subject", rep(4-seq(3), each=3)),
+    key = paste0("key", c(rep(3-seq(2), 4), 1)))
+
+  result <- (
+    test_df %>%
+      do_cor( skv = c("subject", "key") )
+  )
+
+  expect_equal(result[[3]][1:2], c(1, -1))
+})
+
 test_that("test do_svd.kv output wide", {
   if(requireNamespace("broom")){
     test_df <- data.frame(

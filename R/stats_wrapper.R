@@ -6,10 +6,11 @@
 do_cor <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0){
   if (!is.null(skv)) {
     #.kv pattern
-    if (length(skv) != 3) {
-      stop("length of skv has to be 3")
+    if (!(length(skv) %in% c(2, 3))) {
+      stop("length of skv has to be 2 or 3")
     }
-    do_cor.kv_(df, skv[[1]], skv[[2]], skv[[3]], fun.aggregate = fun.aggregate, fill = fill, ...)
+    value <- if(length(skv) == 2) NULL else skv[[3]]
+    do_cor.kv_(df, skv[[1]], skv[[2]], value, fun.aggregate = fun.aggregate, fill = fill, ...)
   } else {
     #.cols pattern
     do_cor.cols(df, ...)
@@ -30,7 +31,7 @@ do_cor <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0){
 do_cor.kv <- function(df,
                    subject,
                    key,
-                   value,
+                   value = NULL,
                    ...)
 {
   loadNamespace("reshape2")
@@ -40,7 +41,7 @@ do_cor.kv <- function(df,
 
   row <- col_name(substitute(key))
   col <- col_name(substitute(subject))
-  val <- col_name(substitute(value))
+  val <- if(is.null(substitute(value))) NULL else col_name(substitute(value))
 
   do_cor.kv_(df, col, row, val, ...)
 }
@@ -50,7 +51,7 @@ do_cor.kv <- function(df,
 do_cor.kv_ <- function(df,
                       subject_col,
                       key_col,
-                      value_col,
+                      value_col = NULL,
                       use="pairwise.complete.obs",
                       method="pearson",
                       distinct = FALSE,
