@@ -83,6 +83,6 @@ score <- function(df, model, ...){
   if(any(class(df[[model_col]]) %in% ".model.kmeans")){
     augment_kmeans(df, model, ...)
   } else {
-    augment(df, model)
+    augment(df, model, ...)
   }
 }
