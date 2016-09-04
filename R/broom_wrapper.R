@@ -72,6 +72,8 @@ augment_kmeans <- function(df, model, data){
   })
 }
 
+#' augment wrapper
+#' @export
 score <- function(df, model, ...){
   model_col <- col_name(substitute(model))
   data_col <- col_name(substitute(data))
