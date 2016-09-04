@@ -74,7 +74,7 @@ augment_kmeans <- function(df, model, data){
 
 #' augment wrapper
 #' @export
-score <- function(df, model, ...){
+predict <- function(df, model, ...){
   model_col <- col_name(substitute(model))
   data_col <- col_name(substitute(data))
   if(!model_col %in% colnames(df)){
@@ -83,6 +83,6 @@ score <- function(df, model, ...){
   if(any(class(df[[model_col]]) %in% ".model.kmeans")){
     augment_kmeans(df, model, ...)
   } else {
-    augment(df, model)
+    augment(df, model, ...)
   }
 }
