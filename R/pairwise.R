@@ -9,13 +9,13 @@
 #' @param method Type of calculation. https://cran.r-project.org/web/packages/proxy/vignettes/overview.pdf
 #' @param fun.aggregate Set an aggregate function when there are multiple entries for the key column per each category.
 #' @export
-do_cosine_sim.kv <- function(df, subject, key, value, distinct=FALSE, diag=FALSE, fun.aggregate=mean){
+do_cosine_sim.kv <- function(df, subject, key, value = NULL, distinct=FALSE, diag=FALSE, fun.aggregate=mean){
   loadNamespace("qlcMatrix")
   loadNamespace("tidytext")
   loadNamespace("Matrix")
   subject_col <- col_name(substitute(subject))
   key_col <- col_name(substitute(key))
-  value_col <- col_name(substitute(value))
+  value_col <- if(is.null(substitute(value))) NULL else col_name(substitute(value))
 
   grouped_column <- grouped_by(df)
 
@@ -27,7 +27,7 @@ do_cosine_sim.kv <- function(df, subject, key, value, distinct=FALSE, diag=FALSE
 
   # this is executed on each group
   calc_doc_sim_each <- function(df){
-    mat <- sparse_cast(df, key_col, subject_col, val = value_col, fun.aggregate = fun.aggregate)
+    mat <- sparse_cast(df, key_col, subject_col, val = value_col, fun.aggregate = fun.aggregate, count = TRUE)
     sim <- qlcMatrix::cosSparse(mat)
     if(distinct){
       if(!diag){
@@ -54,10 +54,11 @@ do_cosine_sim.kv <- function(df, subject, key, value, distinct=FALSE, diag=FALSE
 do_dist <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0){
   if (!is.null(skv)) {
     #.kv pattern
-    if (length(skv) != 3) {
-      stop("length of skv has to be 3")
+    if (!length(skv) %in% c(2, 3)) {
+      stop("length of skv has to be 2 or 3")
     }
-    do_dist.kv_(df, skv[[1]], skv[[2]], skv[[3]], fun.aggregate = fun.aggregate, fill = fill, ...)
+    value <- if(length(skv) == 2)  NULL else skv[[3]]
+    do_dist.kv_(df, skv[[1]], skv[[2]], value, fun.aggregate = fun.aggregate, fill = fill, ...)
   } else {
     #.cols pattern
     do_dist.cols(df, ...)
@@ -74,17 +75,21 @@ do_dist <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0){
 #' @param diag If similarity between itself should be returned or not.
 #' @param method Type of calculation. https://cran.r-project.org/web/packages/proxy/vignettes/overview.pdf
 #' @export
-do_dist.kv <- function(df, subject, key, value, ...){
+do_dist.kv <- function(df, subject, key, value = NULL, ...){
   subject_col <- col_name(substitute(subject))
   key_col <- col_name(substitute(key))
-  value_col <- col_name(substitute(value))
+  if(!is.null(substitute(value))){
+    value_col <- col_name(substitute(value))
+  } else {
+    value_col <- NULL
+  }
 
   do_dist.kv_(df, subject_col, key_col, value_col, ...)
 }
 
 #' SE version of do_dist
 #' @export
-do_dist.kv_ <- function(df, subject_col, key_col, value_col, fill=0, fun.aggregate=mean, distinct=FALSE, diag=FALSE, method="euclidean", p=2 ){
+do_dist.kv_ <- function(df, subject_col, key_col, value_col = NULL, fill=0, fun.aggregate=mean, distinct=FALSE, diag=FALSE, method="euclidean", p=2 ){
   loadNamespace("dplyr")
   loadNamespace("tidyr")
   loadNamespace("reshape2")
