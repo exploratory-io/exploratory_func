@@ -81,7 +81,10 @@ predict <- function(df, model, ...){
     stop(paste(model_col, "is not in column names"), sep=" ")
   }
   if(any(class(df[[model_col]]) %in% ".model.kmeans")){
-    augment_kmeans(df, model, ...)
+    ret <- augment_kmeans(df, model, ...)
+    # update .cluster to cluster or cluster.new if it exists
+    colnames(ret)[[ncol(ret)]] <- avoid_conflict(colnames(ret), "cluster")
+    ret
   } else {
     augment(df, model, ...)
   }

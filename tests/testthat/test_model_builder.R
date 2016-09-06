@@ -129,14 +129,13 @@ test_that("test build_kmeans.cols", {
 })
 
 test_that("test build_kmeans", {
+  test_df[["cluster"]] <- rep(1, nrow(test_df))
   result <- (
-    test_df
-    %>%
-      build_kmeans(skv = c("vec1", "vec2"), centers=2)
+    test_df %>%
+      build_kmeans(skv = c("vec1", "vec2"), centers=2) %>%
+      predict(model, data = source.data)
   )
-})
 
-test_that("",{
-  data <- readRDS("~/Downloads/flight.rds")
-  data %>% build_kmeans(skv = c("CARRIER", "ORIGIN_CITY_NAME"), keep.source = TRUE, augment = FALSE)
+  expect_equal(length(colnames(result)[colnames(result) == "cluster"]), 1)
+  expect_equal(length(colnames(result)[colnames(result) == "cluster.new"]), 1)
 })
