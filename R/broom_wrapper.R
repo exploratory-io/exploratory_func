@@ -38,7 +38,7 @@ augment_kmeans <- function(df, model, data){
   if(!data_col %in% colnames(df)){
     stop(paste(data_col, "is not in column names"), sep=" ")
   }
-  tryCatch({
+  ret <- tryCatch({
     # use do.call to evaluate data_col from a variable
     augment_func <- get("augment", asNamespace("broom"))
     do.call(augment_func, list(df, model_col, data=data_col))
@@ -70,6 +70,9 @@ augment_kmeans <- function(df, model, data){
       stop(e)
     }
   })
+  # update .cluster to cluster or cluster.new if it exists
+  colnames(ret)[[ncol(ret)]] <- avoid_conflict(colnames(ret), "cluster")
+  ret
 }
 
 #' augment wrapper
@@ -81,10 +84,7 @@ predict <- function(df, model, ...){
     stop(paste(model_col, "is not in column names"), sep=" ")
   }
   if(any(class(df[[model_col]]) %in% ".model.kmeans")){
-    ret <- augment_kmeans(df, model, ...)
-    # update .cluster to cluster or cluster.new if it exists
-    colnames(ret)[[ncol(ret)]] <- avoid_conflict(colnames(ret), "cluster")
-    ret
+    augment_kmeans(df, model, ...)
   } else {
     augment(df, model, ...)
   }
