@@ -125,18 +125,17 @@ test_that("test build_kmeans.cols ignore NA rows with grouped and keep.source=FA
 test_that("test build_kmeans.cols", {
   df <- data.frame(number = seq(4), number2 = seq(4)-4)
   ret <- (df %>%  build_kmeans.cols(number, number2, keep.source=TRUE) %>%  augment_kmeans(model, data=source.data))
-  expect_true(is.factor(ret$.cluster))
+  expect_true(is.factor(ret$cluster))
 })
 
 test_that("test build_kmeans", {
+  test_df[["cluster"]] <- rep(1, nrow(test_df))
   result <- (
-    test_df
-    %>%
-      build_kmeans(skv = c("vec1", "vec2"), centers=2)
+    test_df %>%
+      build_kmeans(skv = c("vec1", "vec2"), centers=2) %>%
+      predict(model, data = source.data)
   )
-})
 
-test_that("",{
-  data <- readRDS("~/Downloads/flight.rds")
-  data %>% build_kmeans(skv = c("CARRIER", "ORIGIN_CITY_NAME"), keep.source = TRUE, augment = FALSE)
+  expect_equal(length(colnames(result)[colnames(result) == "cluster"]), 1)
+  expect_equal(length(colnames(result)[colnames(result) == "cluster.new"]), 1)
 })

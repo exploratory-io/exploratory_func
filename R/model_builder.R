@@ -4,7 +4,7 @@
 #' Create do wrapper function with source data
 #' @return do wrapper function
 build_data <- function(funcname) {
-  ret <- function(df, ..., keep.source = FALSE, augment=FALSE){
+  ret <- function(df, ..., keep.source = TRUE, augment=FALSE){
     loadNamespace("dplyr")
     grouped_column <- grouped_by(df)
     model_column <- avoid_conflict(grouped_column, "model")
@@ -83,7 +83,7 @@ build_kmeans.kv_ <- function(df,
                              nstart = 1,
                              algorithm = "Hartigan-Wong",
                              trace = FALSE,
-                             keep.source = FALSE,
+                             keep.source = TRUE,
                              seed=0,
                              augment=FALSE,
                              fun.aggregate=mean,
@@ -151,7 +151,7 @@ build_kmeans.cols <- function(df, ...,
                             nstart = 1,
                             algorithm = "Hartigan-Wong",
                             trace = FALSE,
-                            keep.source = FALSE,
+                            keep.source = TRUE,
                             seed=0,
                             augment=FALSE){
   loadNamespace("dplyr")
