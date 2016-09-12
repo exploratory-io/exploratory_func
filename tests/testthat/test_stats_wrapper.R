@@ -67,18 +67,15 @@ test_that("test do_cor without val", {
 })
 
 test_that("test do_svd.kv output wide", {
-  if(requireNamespace("broom")){
-    test_df <- data.frame(
-      rand=runif(20, min = 0, max=10),
-      axis2=paste("group",c(rep(1,5), rep(2, 5), rep(3, 5), rep(4, 5)), sep=""),
-      col=rep(seq(5),4))
-    loadNamespace("dplyr")
-    result <- (
-      test_df
-      %>%  do_svd.kv(axis2, col, rand, n_component=3, output="wide"))
-    expect_equal(colnames(result), c("axis2","axis1", "axis2.new", "axis3"))
-    expect_true(any(result[,1]=="group1"))
-  }
+  test_df <- data.frame(
+    rand=runif(20, min = 0, max=10),
+    axis2=paste("group",c(rep(1,5), rep(2, 5), rep(3, 5), rep(4, 5)), sep=""),
+    col=rep(seq(5),4))
+  loadNamespace("dplyr")
+  result <- test_df  %>%
+      do_svd.kv(axis2, col, rand, n_component=3, output="wide")
+  expect_equal(colnames(result), c("axis2","axis1", "axis2.new", "axis3"))
+  expect_true(any(result[,1]=="group1"))
 })
 
 test_that("test do_svd.kv", {
@@ -122,6 +119,22 @@ test_that("test do_svd.kv", {
     test_df  %>%
       do_svd.kv(axis2, col, n_component=3)
     )
+  expect_equal(colnames(result), c("axis2","new.dimension", "svd.value"))
+  expect_true(any(result[[1]]=="group1"))
+  expect_true(any(result[[2]]==1))
+
+})
+
+test_that("test do_svd.kv with fill", {
+  test_df <- data.frame(
+    rand=runif(20, min = 0, max=10),
+    axis2=paste("group",c(rep(1,5), rep(2, 5), rep(3, 5), rep(4, 5)), sep=""),
+    col=rep(seq(5),4))
+  loadNamespace("dplyr")
+  result <- (
+    test_df  %>%
+      do_svd.kv(axis2, col, n_component=3, fill = 1)
+  )
   expect_equal(colnames(result), c("axis2","new.dimension", "svd.value"))
   expect_true(any(result[[1]]=="group1"))
   expect_true(any(result[[2]]==1))
