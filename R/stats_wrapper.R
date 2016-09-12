@@ -167,7 +167,7 @@ do_svd.kv <- function(df,
   do_svd_each <- function(df){
     tryCatch({
       if(fill == 0){
-        data_mat <- sparse_cast(df, subject_col, dimension_col, value_col, fun.aggregate = fun.aggregate)
+        data_mat <- sparse_cast(df, subject_col, dimension_col, value_col, fun.aggregate = fun.aggregate, count = TRUE)
       } else {
         data_mat <- simple_cast(df, subject_col, dimension_col, value_col, fun.aggregate = fun.aggregate, fill=fill)
       }
