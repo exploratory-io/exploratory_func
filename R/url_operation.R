@@ -58,7 +58,7 @@ get_url_subdomain <- function(url) {
   urltools::suffix_extract(urltools::url_parse(url)$domain)$subdomain
 }
 
-#' get suffix from url string
+#' get top-level domain from url string
 #' @export
 get_url_tld <- function(url) {
   loadNamespace("urltools")
