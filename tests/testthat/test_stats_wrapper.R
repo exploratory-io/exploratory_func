@@ -100,9 +100,8 @@ test_that("test do_svd.kv without value", {
       axis2=paste("group",c(rep(1,5), rep(2, 5), rep(3, 5), rep(4, 5)), sep=""),
       col=rep(seq(5),4))
     loadNamespace("dplyr")
-    result <- (
-      test_df
-      %>%  do_svd.kv(axis2, col, n_component=3))
+    result <- test_df  %>%
+      do_svd.kv(axis2, col, n_component=3)
     expect_equal(colnames(result), c("axis2","new.dimension", "svd.value"))
     expect_true(any(result[[1]]=="group1"))
     expect_true(any(result[[2]]==1))
@@ -293,4 +292,3 @@ test_that("test do_cmdscale", {
   result_half <- do_cmdscale(half_df, Var1, Var2, value)
 
 })
-
