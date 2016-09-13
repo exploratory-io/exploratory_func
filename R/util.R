@@ -49,9 +49,13 @@ sparse_cast <- function(data, row, col, val=NULL, fun.aggregate=sum, count = FAL
     if(count){
       sparseMat <- xtabs(as.formula(paste0("~", "`", row , "`", "+", "`", col, "`")), data = data, sparse = TRUE)
     } else {
-      sparseMat <- Matrix::sparseMatrix(i = as.integer(row_fact), j = as.integer(col_fact))
+      sparseMat <- Matrix::sparseMatrix(
+        i = as.integer(row_fact),
+        j = as.integer(col_fact),
+        dims = c(length(levels(row_fact)), length(levels(col_fact))),
+        dimnames = list(levels(row_fact), levels(col_fact))
+        )
     }
-
   }else{
     # Basic behaviour of Matrix::sparseMatrix is sum.
     # If fun.aggregate is different, it should be aggregated by it.
@@ -69,11 +73,20 @@ sparse_cast <- function(data, row, col, val=NULL, fun.aggregate=sum, count = FAL
     row_fact <- as.factor(data[[row]])
     col_fact <- as.factor(data[[col]])
 
-    sparseMat <- Matrix::sparseMatrix(i = as.integer(row_fact), j = as.integer(col_fact), x = as.numeric(data[[val]]))
+    na_index <- is.na(data[[val]])
+    zero_index <- data[[val]] == 0
+
+    valid_index <- na_index | !zero_index
+
+    sparseMat <- Matrix::sparseMatrix(
+      i = as.integer(row_fact[valid_index]),
+      j = as.integer(col_fact[valid_index]),
+      x = as.numeric(data[[val]][valid_index]),
+      dims = c(length(levels(row_fact)), length(levels(col_fact))),
+      dimnames = list(levels(row_fact), levels(col_fact))
+      )
   }
 
-  rownames(sparseMat) <- levels(row_fact)
-  colnames(sparseMat) <- levels(col_fact)
   sparseMat
 }
 
