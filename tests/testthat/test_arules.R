@@ -28,7 +28,7 @@ test_that("test do_apriori with lhs", {
   expect_true(all(ret[, "lhs"] == "name1"))
 })
 
-test_that("test do_apriori with lhs", {
+test_that("test do_apriori with lhs and rhs", {
   test_df <- data.frame(
     name = rep(paste("name",seq(20), sep=""), each=3),
     product = rep(paste("product",seq(5), sep=""), 12),
@@ -36,6 +36,6 @@ test_that("test do_apriori with lhs", {
   )
 
   expect_error({
-    do_apriori(test_df, name, product, min_support=0.9)
-  })
+    do_apriori(test_df, name, product, min_support=0.9, lhs="name1", rhs="name2")
+  }, "No matching rule was found")
 })
