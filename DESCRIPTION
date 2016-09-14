@@ -38,6 +38,5 @@ Suggests:
     mongolite,
     bigrquery,
     GetoptLong,
-    arules,
-    irlba
+    arules
 RoxygenNote: 5.0.1

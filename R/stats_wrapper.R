@@ -136,19 +136,18 @@ do_cor.cols <- function(df, ..., use="pairwise.complete.obs", method="pearson", 
 #' @return Tidy format of data frame.
 #' @export
 do_svd.kv <- function(df,
-                   subject,
-                   key,
-                   value = NULL,
-                   type="group",
-                   fill=0,
-                   fun.aggregate=mean,
-                   n_component=3,
-                   centering=TRUE,
-                   output ="long"){
+                      subject,
+                      key,
+                      value = NULL,
+                      type="group",
+                      fill=0,
+                      fun.aggregate=mean,
+                      n_component=3,
+                      centering=TRUE,
+                      output ="long"){
   loadNamespace("dplyr")
   loadNamespace("tibble")
   loadNamespace("tidyr")
-  loadNamespace("irlba")
   subject_col <- col_name(substitute(subject))
   dimension_col <- col_name(substitute(key))
   value_col <- col_name(substitute(value))
@@ -165,103 +164,68 @@ do_svd.kv <- function(df,
 
   # this is executed on each group
   do_svd_each <- function(df){
-    tryCatch({
-      if(fill == 0){
-        data_mat <- sparse_cast(df, subject_col, dimension_col, value_col, fun.aggregate = fun.aggregate, count = TRUE)
+    matrix <-simple_cast(df, subject_col, dimension_col, value_col, fun.aggregate = fun.aggregate, fill=fill)
+    if(centering){
+      # move the origin to center of data
+      matrix <- sweep(matrix, 2, colMeans(matrix), "-")
+    }
+    if(type=="group"){
+      result <- svd(matrix, nu=n_component, nv=0)
+      mat <- result$u
+
+      if (output=="wide") {
+        ret <- as.data.frame(mat)
+        colnames(ret) <- avoid_conflict(c(grouped_col, subject_col), paste("axis", seq(ncol(mat)), sep=""))
+        rnames <- same_type(rownames(matrix), df[[subject_col]])
+        df <- setNames(data.frame(rnames, stringsAsFactors = FALSE), subject_col)
+        ret <- cbind(df, ret)
+      } else if (output=="long") {
+        cnames <- avoid_conflict(grouped_col, c(subject_col, "new.dimension", value_cname))
+        rownames(mat) <- rownames(matrix)
+        ret <- mat_to_df(mat, cnames)
       } else {
-        data_mat <- simple_cast(df, subject_col, dimension_col, value_col, fun.aggregate = fun.aggregate, fill=fill)
+        stop(paste(output, "is not supported as output"))
       }
+    } else if (type=="dimension") {
 
-      if(type=="group"){
-        # this part may output warning for large n_component
-        result <- suppressWarnings({
-          if(centering){
-            # move the origin to center of data
-            irlba::irlba(data_mat, nv = 0, nu = n_component, center = Matrix::colMeans(data_mat, na.rm = TRUE))
-          } else {
-            irlba::irlba(data_mat, nv = 0, nu = n_component)
-          }
-        })
+      result <- svd(matrix, nv=n_component, nu=0)
+      mat <- result$v
+      rownames(mat) <- colnames(matrix)
 
-        mat <- result$u
-
-        if (output=="wide") {
-          ret <- as.data.frame(mat)
-          colnames(ret) <- avoid_conflict(c(grouped_col, subject_col), paste("axis", seq(ncol(mat)), sep=""))
-          rnames <- same_type(rownames(data_mat), df[[subject_col]])
-          df <- setNames(data.frame(rnames, stringsAsFactors = FALSE), subject_col)
-          ret <- cbind(df, ret)
-        } else if (output=="long") {
-          cnames <- avoid_conflict(grouped_col, c(subject_col, "new.dimension", value_cname))
-          rownames(mat) <- rownames(data_mat)
-          ret <- mat_to_df(mat, cnames)
-        } else {
-          stop(paste(output, "is not supported as output"))
-        }
-      } else if (type=="dimension") {
-        # this part may output warning for large n_component
-        result <- suppressWarnings({
-          if(centering){
-            # move the origin to center of data
-            irlba::irlba(data_mat, nv = n_component, center = Matrix::colMeans(data_mat, na.rm = TRUE), right_only = TRUE)
-          } else {
-            irlba::irlba(data_mat, nv = n_component, right_only = TRUE)
-          }
-        })
-
-        mat <- result$v
-        rownames(mat) <- colnames(data_mat)
-
-        if (output=="wide") {
-          ret <- as.data.frame(mat)
-          colnames(ret) <- avoid_conflict(c(grouped_col, dimension_col), paste("axis", seq(ncol(mat)), sep=""))
-          cnames <- same_type(colnames(data_mat), df[[dimension_col]])
-          df <- setNames(data.frame(cnames, stringsAsFactors = FALSE), dimension_col)
-          ret <- cbind(df, ret)
-        } else if (output=="long") {
-          cnames <- avoid_conflict(grouped_col, c(dimension_col, "new.dimension", value_cname))
-          ret <- mat_to_df(mat, cnames)
-        } else {
-          stop(paste(output, "is not supported as output"))
-        }
-      } else if (type=="variance"){
-        # this part may output warning for large n_component
-        result <- suppressWarnings({
-          if(centering){
-            # move the origin to center of data
-            irlba::irlba(data_mat, nv = n_component, center = Matrix::colMeans(data_mat, na.rm = TRUE), right_only = TRUE)
-          } else {
-            irlba::irlba(data_mat, nv = n_component, right_only = TRUE)
-          }
-        })
-        variance <- result$d
-        component <- seq(min(length(variance), n_component))
-        if (output=="wide") {
-          mat <- matrix(variance[component], ncol=length(component))
-          ret <- as.data.frame(mat)
-          colnames(ret) <- avoid_conflict(c(subject_col), paste("axis", seq(ncol(mat)), sep=""))
-        } else if (output=="long") {
-          ret <- data.frame(component = component, svd.value = variance[component])
-          colnames(ret) <- avoid_conflict(subject_col, c("new.dimension", value_cname))
-        } else {
-          stop(paste(output, "is not supported as output"))
-        }
+      if (output=="wide") {
+        ret <- as.data.frame(mat)
+        colnames(ret) <- avoid_conflict(c(grouped_col, dimension_col), paste("axis", seq(ncol(mat)), sep=""))
+        rnames <- same_type(rownames(mat), df[[subject_col]])
+        df <- setNames(data.frame(rnames, stringsAsFactors = FALSE), dimension_col)
+        ret <- cbind(df, ret)
+      } else if (output=="long") {
+        cnames <- avoid_conflict(grouped_col, c(dimension_col, "new.dimension", value_cname))
+        ret <- mat_to_df(mat, cnames)
       } else {
-        stop(paste(type, "is not supported as type argument."))
+        stop(paste(output, "is not supported as output"))
       }
-      ret
-    },
-    error = function(e){
-      if(e$message == "max(nu, nv) must be strictly less than min(nrow(A), ncol(A))"){
-        stop("n_component should be less than the number of subjects and keys")
+    } else if (type=="variance"){
+      variance <- svd(matrix, nu=0, nv=0)$d
+      component <- seq(min(length(variance), n_component))
+      if (output=="wide") {
+        mat <- matrix(variance[component], ncol=length(component))
+        ret <- as.data.frame(mat)
+        colnames(ret) <- avoid_conflict(c(subject_col), paste("axis", seq(ncol(mat)), sep=""))
+      } else if (output=="long") {
+        ret <- data.frame(component = component, svd.value = variance[component])
+        colnames(ret) <- avoid_conflict(subject_col, c("new.dimension", value_cname))
       } else {
-        stop(e$message)
+        stop(paste(output, "is not supported as output"))
       }
-    })
+    } else {
+      stop(paste(type, "is not supported as type argument."))
+    }
+    ret
   }
 
   (df %>%  dplyr::do_(.dots=setNames(list(~do_svd_each(.)), value_cname)) %>%  tidyr::unnest_(value_cname))
 }
+
 
 #' Calculate svd from tidy format. This can be used to calculate coordinations by reducing dimensionality.
 #' @param df Data frame which has group and dimension
