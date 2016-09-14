@@ -1,7 +1,7 @@
 #'
 #'
 
-#' integrated do_dist
+#' integrated do_cor
 #' @export
 do_cor <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0){
   if (!is.null(skv)) {
