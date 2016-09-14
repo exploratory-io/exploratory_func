@@ -88,7 +88,14 @@ do_apriori <- function(df, subject, key, minlen=1, maxlen=10, min_support=0.1, m
     ret
   }
 
-  ret <- (df %>%  dplyr::do_(.dots = setNames(~do_apriori_each(.), cnames[[5]])) %>%  tidyr::unnest_(cnames[[5]]))
+  ret <- (df %>%  dplyr::do_(.dots = setNames(~do_apriori_each(.), cnames[[5]])))
+
+  # this happens when lhs and rhs are indicated and no matching rule was found
+  if(nrow(ret) == 0){
+    stop("No matching rule was found.")
+  }
+
+  ret <- (ret %>%  tidyr::unnest_(cnames[[5]]))
   if(all(is.na(ret[[1]])) & nrow(ret)==1){
     stop("No rule was found. Adjusting arguments might work.")
   }
