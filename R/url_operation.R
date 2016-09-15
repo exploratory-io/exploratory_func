@@ -1,20 +1,20 @@
 #' get domain from url string
 #' @export
-get_url_domain <- function(url) {
+url_domain <- function(url) {
   loadNamespace("urltools")
   urltools::domain(url)
 }
 
 #' get fragment from url string
 #' @export
-get_url_fragment <- function(url) {
+url_fragment <- function(url) {
   loadNamespace("urltools")
   urltools::fragment(url)
 }
 
 #' get decoded query parameters from url string
 #' @export
-get_url_parameters <- function(url) {
+url_parameters <- function(url) {
   loadNamespace("urltools")
   params <- urltools::parameters(url)
   # if NA is passed to URLdecode, it is removed, so only not NA values should be used
@@ -25,49 +25,49 @@ get_url_parameters <- function(url) {
 
 #' get path from url string
 #' @export
-get_url_path <- function(url) {
+url_path <- function(url) {
   loadNamespace("urltools")
   urltools::path(url)
 }
 
 #' get port from url string
 #' @export
-get_url_port <- function(url) {
+url_port <- function(url) {
   loadNamespace("urltools")
   urltools::port(url)
 }
 
 #' get scheme from url string
 #' @export
-get_url_scheme <- function(url) {
+url_scheme <- function(url) {
   loadNamespace("urltools")
   urltools::scheme(url)
 }
 
 #' get suffix from url string
 #' @export
-get_url_suffix <- function(url) {
+url_suffix <- function(url) {
   loadNamespace("urltools")
   urltools::suffix_extract(urltools::url_parse(url)$domain)$suffix
 }
 
 #' get subdomain from url string
 #' @export
-get_url_subdomain <- function(url) {
+url_subdomain <- function(url) {
   loadNamespace("urltools")
   urltools::suffix_extract(urltools::url_parse(url)$domain)$subdomain
 }
 
 #' get top-level domain from url string
 #' @export
-get_url_tld <- function(url) {
+url_tld <- function(url) {
   loadNamespace("urltools")
   urltools::tld_extract(urltools::url_parse(url)$domain)$tld
 }
 
 #' get decoded query parameter from url string
 #' @export
-get_url_param <- function(url, parameter_name){
+url_param <- function(url, parameter_name){
   loadNamespace("urltools")
   param <- urltools::param_get(url, parameter_name)[[parameter_name]]
   # if NA is passed to URLdecode, it is removed, so only not NA values should be used
