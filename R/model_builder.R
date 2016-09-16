@@ -19,7 +19,7 @@ build_data <- function(funcname) {
 
     if(augment){
       # use do.call for non standard evaluation
-      augment_func <- get("augment", asNamespace("broom"))
+      augment_func <- get("predict", asNamespace("exploratory"))
       output <- do.call(augment_func, list(output, model_column, data=source_column))
     } else {
       # Add a class for Exploratyry to recognize the type of .model
@@ -110,7 +110,7 @@ build_kmeans.kv_ <- function(df,
     mat <- simple_cast(df, row_col, col_col, value_col, fun.aggregate = fun.aggregate, fill=fill)
     kmeans_ret <- kmeans(mat, centers = centers, iter.max = 10, nstart = nstart, algorithm = algorithm, trace = trace)
     if(augment){
-      cluster_column <- avoid_conflict(grouped_column, ".cluster")
+      cluster_column <- avoid_conflict(grouped_column, "cluster")
       row_fact <- as.factor(df[[row_col]])
       df[[cluster_column]] <- kmeans_ret$cluster[row_fact]
       df
@@ -176,7 +176,10 @@ build_kmeans.cols <- function(df, ...,
     mat <- dplyr::select_(df, .dots=select_dots) %>% as.matrix()
     kmeans_ret <- kmeans(mat, centers = centers, iter.max = 10, nstart = nstart, algorithm = algorithm, trace = trace)
     if(augment){
-      broom::augment(kmeans_ret, df)
+      ret <- broom::augment(kmeans_ret, df)
+      colnames(ret)[[ncol(ret)]] <- avoid_conflict(grouped_column, "cluster")
+      ret[[ncol(ret)]] <- as.integer(ret[[ncol(ret)]])
+      ret
     } else {
       kmeans_ret
     }

@@ -41,7 +41,9 @@ augment_kmeans <- function(df, model, data){
   ret <- tryCatch({
     # use do.call to evaluate data_col from a variable
     augment_func <- get("augment", asNamespace("broom"))
-    do.call(augment_func, list(df, model_col, data=data_col))
+    ret <- do.call(augment_func, list(df, model_col, data=data_col))
+    ret[[ncol(ret)]] <- as.integer(ret[[ncol(ret)]])
+    ret
   },
   error = function(e){
     loadNamespace("dplyr")
@@ -86,6 +88,6 @@ predict <- function(df, model, ...){
   if(any(class(df[[model_col]]) %in% ".model.kmeans")){
     augment_kmeans(df, model, ...)
   } else {
-    augment(df, model, ...)
+    broom::augment(df, model, ...)
   }
 }
