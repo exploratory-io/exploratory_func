@@ -183,7 +183,7 @@ build_kmeans.cols <- function(df, ...,
   grouped_column <- grouped_by(df)
   model_column <- avoid_conflict(grouped_column, "model")
   source_column <- avoid_conflict(grouped_column, "source.data")
-  selected_column <- setdiff(colnames(dplyr::select_(df, .dots=select_dots)), grouped_column)
+  selected_column <- evaluate_select(df, dots=select_dots, grouped_column)
 
   omit_df <- na.omit(df[,selected_column])
   omit_row <- attr(omit_df, "na.action")

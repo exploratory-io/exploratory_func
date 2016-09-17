@@ -247,3 +247,26 @@ test_that("as_numeric_matrix", {
   ret <- as_numeric_matrix_(test_df, colnames = c("dplyr::everything()"))
   expect_true(all(!is.na(ret)))
 })
+
+test_that("evaluate_select", {
+  test_df <- data.frame(
+    col1 = as.character(seq(10)),
+    col2 = as.character(0 - seq(10))
+  )
+  ret <- evaluate_select(test_df, c("dplyr::starts_with('col')"))
+  expect_equal(ret, c("col1", "col2"))
+})
+
+test_that("evaluate_select negative test", {
+  test_df <- data.frame(
+    col1 = as.character(seq(10)),
+    col2 = as.character(0 - seq(10))
+  )
+  expect_error({
+    evaluate_select(test_df, c("co1"))
+  }, "undefined columns selected")
+  expect_error({
+    evaluate_select(test_df, c("dplyr::starts_with('something')"))
+    browser()
+  }, "no column selected")
+})

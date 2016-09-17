@@ -193,12 +193,28 @@ test_that("test build_kmeans.cols", {
 
 test_that("test build_kmeans", {
   test_df[["cluster"]] <- rep(1, nrow(test_df))
-  result <- (
-    test_df %>%
-      build_kmeans(skv = c("vec1", "vec2"), centers=2) %>%
-      predict(model, data = source.data)
-  )
+  result <- test_df %>%
+    build_kmeans(skv = c("vec1", "vec2"), centers=2) %>%
+    predict(model, data = source.data)
   expect_true(is.integer(result[["cluster.new"]]))
   expect_equal(length(colnames(result)[colnames(result) == "cluster"]), 1)
   expect_equal(length(colnames(result)[colnames(result) == "cluster.new"]), 1)
+})
+
+test_that("test build_kmeans skv with wrong column name", {
+  test_df[["cluster"]] <- rep(1, nrow(test_df))
+  expect_error({
+    test_df %>%
+      build_kmeans(skv = c("vec1", "vec"), centers=2) %>%
+      predict(model, data = source.data)
+  }, "undefined columns selected")
+})
+
+test_that("test build_kmeans cols with wrong column name", {
+  test_df[["cluster"]] <- rep(1, nrow(test_df))
+  expect_error({
+    test_df %>%
+      build_kmeans(vec, vec10, centers=2) %>%
+      predict(model, data = source.data)
+  }, "undefined columns selected")
 })
