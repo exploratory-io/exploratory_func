@@ -9,12 +9,42 @@ test_df <- data.frame(
   group=paste("group",c(rep(1,5), rep(2, 5)), sep=""),
   col=rep(seq(5),2))
 
+test_that("test with 2 groups with 3 centers", {
+  test_df <- data.frame(
+    na=as.vector(rep(c(1,5), 5)),
+    group=paste("group",rep(c(1, 2), each = 5), sep=""),
+    col=rep(seq(5),2))
+  expect_error({
+    build_kmeans(test_df, skv = c("group", "col", "na"), centers = 3)
+  }, "Centers should be less than unique subjects\\.")
+})
+
 test_that("test with na values", {
   test_df <- data.frame(
     na=rep(c(NA, 5, 1, 4), 5),
     group=paste("group",rep(c(1, 2, 3, 4), each=5), sep=""),
     col=rep(seq(5), 4))
   ret <- build_kmeans(test_df, skv = c("group", "col", "na"))
+})
+
+test_that("test with too small subject", {
+  test_df <- data.frame(
+    val=rep(c(1, 5), 5),
+    group=paste("group",rep(c(1, 2), each=5), sep=""),
+    col=rep(seq(5), 2))
+  expect_error({
+    build_kmeans(test_df, skv = c("group", "col", "val"), centers = 3)
+  }, "Centers should be less than unique subjects\\.")
+})
+
+test_that("test with too small key", {
+  test_df <- data.frame(
+    val=rep(c(1, 5), 5),
+    group=paste("group",rep(c(1, 2), each=5), sep=""),
+    col=rep(seq(5), 2))
+  expect_error({
+    build_kmeans(test_df, skv = c("col", "group", "val"))
+  }, "Centers should be less than distinct data points\\.")
 })
 
 test_that("test build_glm and broom tidy", {

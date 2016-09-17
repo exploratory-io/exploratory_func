@@ -108,7 +108,29 @@ build_kmeans.kv_ <- function(df,
 
   build_kmeans_each <- function(df){
     mat <- simple_cast(df, row_col, col_col, value_col, fun.aggregate = fun.aggregate, fill=fill)
-    kmeans_ret <- kmeans(mat, centers = centers, iter.max = 10, nstart = nstart, algorithm = algorithm, trace = trace)
+    kmeans_ret <- tryCatch({
+      kmeans(mat, centers = centers, iter.max = 10, nstart = nstart, algorithm = algorithm, trace = trace)},
+      error = function(e){
+        if(e$message == "cannot take a sample larger than the population when 'replace = FALSE'"){
+          # this matrix falls into here when centers = 3 and mat is
+          #        1 2 3 4 5
+          # group1 1 5 1 5 1
+          # group2 5 1 5 1 5
+          stop("Centers should be less than unique subjects.")
+        }
+        # number of unique values among subjects should be more than centers
+        if(e$message == "more cluster centers than distinct data points."){
+          stop("Centers should be less than distinct data points.")
+        }
+        if(e$message == "number of cluster centres must lie between 1 and nrow(x)"){
+          stop("Centers should be less than unique subjects.")
+        }
+        if(e$message == "NA/NaN/Inf in foreign function call (arg 1)"){
+          stop("There is NA in the data.")
+        }
+        stop(e$message)
+      }
+    )
     if(augment){
       cluster_column <- avoid_conflict(grouped_column, "cluster")
       row_fact <- as.factor(df[[row_col]])
@@ -187,17 +209,13 @@ build_kmeans.cols <- function(df, ...,
   }
 
   if(keep.source & !augment){
-    output <- (
-      df
-      %>%  dplyr::do_(.dots=setNames(list(~build_kmeans_each(.), ~(.)), c(model_column, source_column)))
-    )
+    output <- df %>%
+        dplyr::do_(.dots=setNames(list(~build_kmeans_each(.), ~(.)), c(model_column, source_column)))
     # Add a class for Exploratyry to recognize the type of .source.data
     class(output[[source_column]]) <- c("list", ".source.data")
   } else {
-    output <- (
-      df
-      %>%  dplyr::do_(.dots=setNames(list(~build_kmeans_each(.)), model_column))
-    )
+    output <- df %>%
+      dplyr::do_(.dots=setNames(list(~build_kmeans_each(.)), model_column))
   }
   if(augment){
     output <- tidyr::unnest_(output, model_column)
