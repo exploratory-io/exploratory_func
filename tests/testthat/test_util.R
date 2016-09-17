@@ -135,6 +135,17 @@ test_that("test sparse_cast", {
   }
 })
 
+test_that("test sparse_cast with na label", {
+  test_df <- data.frame(
+    rowname = rep(c("row1", "row02", NA), each=3),
+    colname = c("col1", "col02", NA, "col02", "col3", "col1", "col02", "col4", "col5"),
+    val = seq(9),
+    stringsAsFactors = FALSE
+  )
+  mat <- sparse_cast(test_df, "rowname", "colname", "val")
+  expect_equal(dim(mat), c(2, 3))
+})
+
 test_that("test sparse_cast without val", {
   test_df <- data.frame(
     rowname = rep(c("row1", "row02", "row3"), each=3),

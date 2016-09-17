@@ -45,7 +45,11 @@ simple_cast <- function(data, row, col, val = NULL, fun.aggregate=mean, fill=0){
 #' @param count If val is NULL and count is TRUE, the value becomes count of the row and col set. Otherwise, it's binary data of row and col set.
 sparse_cast <- function(data, row, col, val=NULL, fun.aggregate=sum, count = FALSE){
   loadNamespace("dplyr")
+  loadNamespace("tidyr")
   loadNamespace("Matrix")
+
+  # remove NA from row and col
+  data <- tidyr::drop_na_(data, c(row, col))
 
   if(is.null(val)){
     # if there's no value column, it creates binary sparse matrix.
