@@ -9,6 +9,14 @@ test_df <- data.frame(
   group=paste("group",c(rep(1,5), rep(2, 5)), sep=""),
   col=rep(seq(5),2))
 
+test_that("test with na values", {
+  test_df <- data.frame(
+    na=rep(c(NA, 5, 1, 4), 5),
+    group=paste("group",rep(c(1, 2, 3, 4), each=5), sep=""),
+    col=rep(seq(5), 4))
+  ret <- build_kmeans(test_df, skv = c("group", "col", "na"))
+})
+
 test_that("test build_glm and broom tidy", {
   if(requireNamespace("broom")){
     result <- (
