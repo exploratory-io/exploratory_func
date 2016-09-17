@@ -14,6 +14,11 @@ col_name <- function(x, default = stop("Please supply column name", call. = FALS
 #' Simple cast wrapper that spreads columns which is choosed as row and col into matrix
 simple_cast <- function(data, row, col, val = NULL, fun.aggregate=mean, fill=0){
   loadNamespace("reshape2")
+  loadNamespace("tidyr")
+
+  # remove NA from row and column
+  data <- tidyr::drop_na_(data, c(row, col))
+
   # validation
   uniq_row <- unique(data[[row]], na.rm=TRUE)
   uniq_col <- unique(data[[col]], na.rm=TRUE)

@@ -96,6 +96,18 @@ test_that("test simple_cast colnames are sorted", {
   expect_equal(test_df[test_df$rowname=="row3" & test_df$colname=="col03",3][[1]], mat["row3", "col03"])
 })
 
+test_that("test simple_cast colnames, rownames with na", {
+  test_df <- data.frame(
+    rowname = rep(c("row1", "row02", NA, "row004"), each=3),
+    colname = rep(c("col1", NA, "col03"), 4),
+    val = seq(12),
+    stringsAsFactors = FALSE
+  )
+  mat <- simple_cast(test_df, "rowname", "colname", "val")
+  expect_equal(dim(mat), c(3, 2))
+  expect_equal(test_df[test_df$rowname=="row02" & test_df$colname=="col1",3][[1]], mat["row02", "col1"])
+})
+
 test_that("test simple_cast larger than max int (2^31)", {
   test_df <- data.frame(
     rval = seq(2^16),
