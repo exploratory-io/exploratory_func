@@ -99,12 +99,24 @@ test_that("test build_kmeans.cols augment=T", {
 
 test_that("test build_kmeans.cols ignore NA rows", {
   if(requireNamespace("broom")){
-    result <- (
-      test_df
-      %>%  build_kmeans.cols(vec1, vec2, na, centers=2, keep.source=TRUE)
-      %>%  broom::augment(model, data=source.data))
+    result <- test_df %>%
+      build_kmeans.cols(vec1, vec2, na, centers=2, keep.source=TRUE) %>%
+      predict(model, data=source.data)
     expect_equal(dim(result)[[1]], 5)
   }
+})
+
+test_that("test build_kmeans.cols ignore NA rows", {
+  na_char <- as.character(seq(10))
+  na_char[[3]] <- NA
+  test_df <- data.frame(
+    na_char,
+    n_char = as.character(10 - seq(10)), stringsAsFactors = FALSE
+  )
+  result <- test_df %>%
+    build_kmeans.cols(na_char, n_char, centers=2, keep.source=TRUE) %>%
+    predict(model, data=source.data)
+  expect_equal(dim(result)[[1]], 9)
 })
 
 test_that("test build_kmeans.cols ignore NA rows with grouped", {

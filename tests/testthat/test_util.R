@@ -227,3 +227,23 @@ test_that("list_extract", {
   minus_ret <- list_extract(test_df_list, "second")
   expect_equal(minus_ret, c(NA, 2, NA))
 })
+
+test_that("as_numeric_matrix", {
+  test_df <- data.frame(
+    date1 = lubridate::ymd("1990:10:11") + seq(10),
+    date2 = lubridate::ymd("1991:08:11") - seq(10)
+  )
+  expect_warning({
+    ret <- as_numeric_matrix_(test_df, colnames = c("dplyr::everything()"))
+    expect_true(all(is.na(ret)))
+  })
+})
+
+test_that("as_numeric_matrix", {
+  test_df <- data.frame(
+    date1 = as.character(seq(10)),
+    date2 = as.character(0 - seq(10))
+  )
+  ret <- as_numeric_matrix_(test_df, colnames = c("dplyr::everything()"))
+  expect_true(all(!is.na(ret)))
+})

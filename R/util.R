@@ -341,3 +341,14 @@ str_count_all <- function(text, patterns, remove.zero = TRUE){
     data.frame(.count=count[return_elem], .pattern=patterns[return_elem], stringsAsFactors = FALSE)
   })
 }
+
+#' convert df to numeric matrix
+#' @param colnames Lazy dot for select arg
+as_numeric_matrix_ <- function(df, colnames){
+  loadNamespace("dplyr")
+  selected <- dplyr::select_(df, .dots=colnames)
+  selected %>%
+    as.matrix() %>%
+    as.numeric() %>%
+    matrix(nrow = nrow(selected))
+}

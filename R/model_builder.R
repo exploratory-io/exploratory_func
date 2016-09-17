@@ -146,17 +146,13 @@ build_kmeans.kv_ <- function(df,
   }
 
   if(keep.source & !augment){
-    output <- (
-      df
-      %>%  dplyr::do_(.dots=setNames(list(~build_kmeans_each(.), ~(.)), c(model_column, source_column)))
-    )
+    output <- df %>%
+      dplyr::do_(.dots=setNames(list(~build_kmeans_each(.), ~(.)), c(model_column, source_column)))
     # Add a class for Exploratyry to recognize the type of .source.data
     class(output[[source_column]]) <- c("list", ".source.data")
   } else {
-    output <- (
-      df
-      %>%  dplyr::do_(.dots=setNames(list(~build_kmeans_each(.)), model_column))
-    )
+    output <- df %>%
+      dplyr::do_(.dots=setNames(list(~build_kmeans_each(.)), model_column))
   }
   # Add a class for Exploratyry to recognize the type of .model
   if(augment){
@@ -183,7 +179,6 @@ build_kmeans.cols <- function(df, ...,
   loadNamespace("tidyr")
   loadNamespace("broom")
   set.seed(seed)
-
   select_dots <- lazyeval::lazy_dots(...)
   grouped_column <- grouped_by(df)
   model_column <- avoid_conflict(grouped_column, "model")
@@ -197,7 +192,7 @@ build_kmeans.cols <- function(df, ...,
   }
 
   build_kmeans_each <- function(df){
-    mat <- dplyr::select_(df, .dots=select_dots) %>% as.matrix()
+    mat <- as_numeric_matrix_(df, colnames = select_dots)
     kmeans_ret <- kmeans(mat, centers = centers, iter.max = 10, nstart = nstart, algorithm = algorithm, trace = trace)
     if(augment){
       ret <- broom::augment(kmeans_ret, df)
