@@ -193,7 +193,34 @@ build_kmeans.cols <- function(df, ...,
 
   build_kmeans_each <- function(df){
     mat <- as_numeric_matrix_(df, colnames = select_dots)
-    kmeans_ret <- kmeans(mat, centers = centers, iter.max = 10, nstart = nstart, algorithm = algorithm, trace = trace)
+    kmeans_ret <- tryCatch({
+      if(nrow(mat) == 0 | ncol(mat) == 0){
+        stop("No data after removing NA")
+      }
+      kmeans(mat, centers = centers, iter.max = 10, nstart = nstart, algorithm = algorithm, trace = trace)
+    }, error = function(e){
+      if(e$message == "invalid first argument"){
+        stop("Created matrix is invalid")
+      }
+      if(e$message == "cannot take a sample larger than the population when 'replace = FALSE'"){
+        # this matrix falls into here when centers = 3 and mat is
+        #        1 2 3 4 5
+        # group1 1 5 1 5 1
+        # group2 5 1 5 1 5
+        stop("Centers should be less than rows.")
+      }
+      # number of unique values among subjects should be more than centers
+      if(e$message == "more cluster centers than distinct data points."){
+        stop("Centers should be less than distinct data points.")
+      }
+      if(e$message == "number of cluster centres must lie between 1 and nrow(x)"){
+        stop("Centers should be less than rows.")
+      }
+      if(e$message == "NA/NaN/Inf in foreign function call (arg 1)"){
+        stop("There is NA in the data.")
+      }
+      stop(e$message)
+    })
     if(augment){
       ret <- broom::augment(kmeans_ret, df)
       colnames(ret)[[ncol(ret)]] <- avoid_conflict(grouped_column, "cluster")

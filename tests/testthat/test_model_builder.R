@@ -97,6 +97,17 @@ test_that("test build_kmeans.cols augment=T", {
   }
 })
 
+test_that("test build_kmeans all na", {
+  test_df <- data.frame(
+    all_na = rep(NA, 10),
+    val = seq(10)
+  )
+  expect_error({
+    test_df %>%
+      build_kmeans(all_na, val, centers=2, augment=T)
+  }, "No data after removing NA")
+})
+
 test_that("test build_kmeans.cols ignore NA rows", {
   if(requireNamespace("broom")){
     result <- test_df %>%
