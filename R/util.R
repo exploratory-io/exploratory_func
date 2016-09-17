@@ -344,22 +344,21 @@ str_count_all <- function(text, patterns, remove.zero = TRUE){
 
 #' convert df to numeric matrix
 #' @param colnames Vector of column names or lazy dot for select arg. ex:lazyeval::lazy_dots(...)
-as_numeric_matrix_ <- function(df, colnames){
+as_numeric_matrix_ <- function(df, columns){
   loadNamespace("dplyr")
-  selected <- dplyr::select_(df, .dots=colnames)
-  selected %>%
+  df[,columns] %>%
     as.matrix() %>%
     as.numeric() %>%
-    matrix(nrow = nrow(selected))
+    matrix(nrow = nrow(df))
 }
 
 #' evaluate select argument
 #' @param dots Lazy dot for select arg. ex:lazyeval::lazy_dots(...)
 #' @param excluded Excluded column names
-evaluate_select <- function(df, dots, excluded = NULL){
+evaluate_select <- function(df, .dots, excluded = NULL){
   loadNamespace("dplyr")
   tryCatch({
-    ret <- setdiff(colnames(dplyr::select_(df, .dots=dots)), excluded)
+    ret <- setdiff(colnames(dplyr::select_(df, .dots=.dots)), excluded)
     if(length(ret) == 0){
       stop("no column selected")
     }

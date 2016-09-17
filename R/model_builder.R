@@ -183,16 +183,18 @@ build_kmeans.cols <- function(df, ...,
   grouped_column <- grouped_by(df)
   model_column <- avoid_conflict(grouped_column, "model")
   source_column <- avoid_conflict(grouped_column, "source.data")
-  selected_column <- evaluate_select(df, dots=select_dots, grouped_column)
+  selected_column <- evaluate_select(df, .dots=select_dots, grouped_column)
 
-  omit_df <- na.omit(df[,selected_column])
+  omit_df <- df[,selected_column] %>%
+    as_numeric_matrix_(selected_column) %>%
+    na.omit()
   omit_row <- attr(omit_df, "na.action")
   if(!is.null(omit_row)){
     df <- df[setdiff(seq(nrow(df)), omit_row), ]
   }
 
   build_kmeans_each <- function(df){
-    mat <- as_numeric_matrix_(df, colnames = select_dots)
+    mat <- as_numeric_matrix_(df, columns = selected_column)
     kmeans_ret <- tryCatch({
       if(nrow(mat) == 0 | ncol(mat) == 0){
         stop("No data after removing NA")
