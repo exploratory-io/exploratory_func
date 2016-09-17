@@ -279,6 +279,5 @@ test_that("evaluate_select negative test", {
   }, "undefined columns selected")
   expect_error({
     evaluate_select(test_df, c("dplyr::starts_with('something')"))
-    browser()
   }, "no column selected")
 })
