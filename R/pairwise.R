@@ -13,6 +13,7 @@ do_cosine_sim.kv <- function(df, subject, key, value = NULL, distinct=FALSE, dia
   loadNamespace("qlcMatrix")
   loadNamespace("tidytext")
   loadNamespace("Matrix")
+  loadNamespace("stringr")
   subject_col <- col_name(substitute(subject))
   key_col <- col_name(substitute(key))
   value_col <- if(is.null(substitute(value))) NULL else col_name(substitute(value))
@@ -23,7 +24,11 @@ do_cosine_sim.kv <- function(df, subject, key, value = NULL, distinct=FALSE, dia
     stop(paste0(subject_col, " is a grouping column. ungroup() may be necessary before this operation."))
   }
 
-  cnames <- avoid_conflict(grouped_column, c("pair.name.1", "pair.name.2", "sim.value"))
+  # column names are "{subject}.x", "{subject}.y", "value"
+  cnames <- avoid_conflict(grouped_column,
+                            c(stringr::str_c(subject_col, c(".x", ".y")),
+                            "value")
+                           )
 
   # this is executed on each group
   calc_doc_sim_each <- function(df){
@@ -101,7 +106,11 @@ do_dist.kv_ <- function(df, subject_col, key_col, value_col = NULL, fill=0, fun.
     stop(paste0(subject_col, " is a grouping column. ungroup() may be necessary before this operation."))
   }
 
-  cnames <- avoid_conflict(grouped_column, c("pair.name.1", "pair.name.2", "dist.value"))
+  # column names are "{subject}.x", "{subject}.y", "value"
+  cnames <- avoid_conflict(grouped_column,
+                           c(stringr::str_c(subject_col, c(".x", ".y")),
+                             "value")
+                           )
 
   # this is executed on each group
   calc_dist_each <- function(df){
@@ -149,7 +158,7 @@ do_dist.cols <- function(df, ..., label=NULL, fill=0, fun.aggregate=mean, distin
 
   select_dots <- lazyeval::lazy_dots(...)
 
-  cnames <- avoid_conflict(grouped_column, c("pair.name.1", "pair.name.2", "dist.value"))
+  cnames <- avoid_conflict(grouped_column, c("pair.name.1", "pair.name.2", "value"))
 
   # this is executed on each group
   calc_dist_each <- function(df){
