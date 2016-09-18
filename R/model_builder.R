@@ -114,10 +114,7 @@ build_kmeans.kv_ <- function(df,
       kmeans(mat, centers = centers, iter.max = 10, nstart = nstart, algorithm = algorithm, trace = trace)},
       error = function(e){
         if(e$message == "cannot take a sample larger than the population when 'replace = FALSE'"){
-          # this matrix falls into here when centers = 3 and mat is
-          #        1 2 3 4 5
-          # group1 1 5 1 5 1
-          # group2 5 1 5 1 5
+          # falls into here when group is 2 and centers > 2
           stop("Centers should be less than unique subjects.")
         }
         # number of unique values among subjects should be more than centers

@@ -11,11 +11,11 @@ test_df <- data.frame(
 
 test_that("test with 2 groups with 3 centers", {
   test_df <- data.frame(
-    na=as.vector(rep(c(1,5), 5)),
-    group=paste("group",rep(c(1, 2), each = 5), sep=""),
-    col=rep(seq(5),2))
+    val = as.vector(rep(c(1,5), 3)),
+    group = paste("group",rep(c(1, 2), each = 3), sep = ""),
+    col = rep(seq(3), 2))
   expect_error({
-    build_kmeans(test_df, skv = c("group", "col", "na"), centers = 3)
+    build_kmeans(test_df, skv = c("group", "col", "val"), centers = 2)
   }, "Centers should be less than unique subjects\\.")
 })
 
