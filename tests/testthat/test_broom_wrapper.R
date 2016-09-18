@@ -42,7 +42,8 @@ test_that("do_kmeans.kv augment", {
     %>%  build_kmeans.kv(subject, key, value, keep.source=TRUE, centers=1)
     %>%  predict(model, source.data)
   )
-  expect_true(all(result[[".cluster"]] == 1))
+  expect_true(is.integer(result[["cluster"]]))
+  expect_true(all(result[["cluster"]] == 1))
 })
 
 test_that("do_kmeans.kv augment", {
@@ -59,7 +60,6 @@ test_that("do_kmeans.kv augment", {
     %>%  build_kmeans.kv(subject, key, value, keep.source=TRUE, centers=1)
     %>%  augment_kmeans(model, source.data)
   )
-  expect_true(all(result[[".cluster"]] == 1))
+  expect_true(is.integer(result[["cluster"]]))
+  expect_true(all(result[["cluster"]] == 1))
 })
-
-

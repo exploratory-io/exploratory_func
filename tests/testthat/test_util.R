@@ -96,6 +96,18 @@ test_that("test simple_cast colnames are sorted", {
   expect_equal(test_df[test_df$rowname=="row3" & test_df$colname=="col03",3][[1]], mat["row3", "col03"])
 })
 
+test_that("test simple_cast colnames, rownames with na", {
+  test_df <- data.frame(
+    rowname = rep(c("row1", "row02", NA, "row004"), each=3),
+    colname = rep(c("col1", NA, "col03"), 4),
+    val = seq(12),
+    stringsAsFactors = FALSE
+  )
+  mat <- simple_cast(test_df, "rowname", "colname", "val")
+  expect_equal(dim(mat), c(3, 2))
+  expect_equal(test_df[test_df$rowname=="row02" & test_df$colname=="col1",3][[1]], mat["row02", "col1"])
+})
+
 test_that("test simple_cast larger than max int (2^31)", {
   test_df <- data.frame(
     rval = seq(2^16),
@@ -121,6 +133,17 @@ test_that("test sparse_cast", {
     val <- test_df[rindex, "val"]
     expect_equal(mat[row, col], val)
   }
+})
+
+test_that("test sparse_cast with na label", {
+  test_df <- data.frame(
+    rowname = rep(c("row1", "row02", NA), each=3),
+    colname = c("col1", "col02", NA, "col02", "col3", "col1", "col02", "col4", "col5"),
+    val = seq(9),
+    stringsAsFactors = FALSE
+  )
+  mat <- sparse_cast(test_df, "rowname", "colname", "val")
+  expect_equal(dim(mat), c(2, 3))
 })
 
 test_that("test sparse_cast without val", {
@@ -203,4 +226,58 @@ test_that("list_extract", {
   # index text
   minus_ret <- list_extract(test_df_list, "second")
   expect_equal(minus_ret, c(NA, 2, NA))
+})
+
+test_that("as_numeric_matrix", {
+  test_df <- data.frame(
+    date1 = lubridate::ymd("1990:10:11") + seq(10),
+    date2 = lubridate::ymd("1991:08:11") - seq(10)
+  )
+  expect_warning({
+    ret <- as_numeric_matrix_(test_df, columns = c("date1", "date2"))
+    expect_true(all(is.na(ret)))
+  })
+})
+
+test_that("as_numeric_matrix", {
+  test_df <- data.frame(
+    char1 = as.character(seq(10)),
+    char2 = as.character(0 - seq(10))
+  )
+  ret <- as_numeric_matrix_(test_df, columns = c("char1", "char2"))
+  expect_true(all(!is.na(ret)))
+})
+
+test_that("as_numeric_matrix to group", {
+  test_df <- data.frame(
+    date1 = as.character(seq(20)),
+    date2 = as.character(0 - seq(20)),
+    group = paste(rep(c(1, 2), each = 10))
+  )
+  ret <- test_df %>%
+    dplyr::group_by(group) %>%
+    as_numeric_matrix_(columns = c("date1", "date2"))
+  expect_equal(dim(ret), c(20, 2))
+})
+
+test_that("evaluate_select", {
+  test_df <- data.frame(
+    col1 = as.character(seq(10)),
+    col2 = as.character(0 - seq(10))
+  )
+  ret <- evaluate_select(test_df, c("dplyr::starts_with('col')"))
+  expect_equal(ret, c("col1", "col2"))
+})
+
+test_that("evaluate_select negative test", {
+  test_df <- data.frame(
+    col1 = as.character(seq(10)),
+    col2 = as.character(0 - seq(10))
+  )
+  expect_error({
+    evaluate_select(test_df, c("co1"))
+  }, "undefined columns selected")
+  expect_error({
+    evaluate_select(test_df, c("dplyr::starts_with('something')"))
+  }, "no column selected")
 })

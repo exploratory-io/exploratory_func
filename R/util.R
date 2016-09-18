@@ -14,6 +14,11 @@ col_name <- function(x, default = stop("Please supply column name", call. = FALS
 #' Simple cast wrapper that spreads columns which is choosed as row and col into matrix
 simple_cast <- function(data, row, col, val = NULL, fun.aggregate=mean, fill=0){
   loadNamespace("reshape2")
+  loadNamespace("tidyr")
+
+  # remove NA from row and column
+  data <- tidyr::drop_na_(data, c(row, col))
+
   # validation
   uniq_row <- unique(data[[row]], na.rm=TRUE)
   uniq_col <- unique(data[[col]], na.rm=TRUE)
@@ -40,7 +45,11 @@ simple_cast <- function(data, row, col, val = NULL, fun.aggregate=mean, fill=0){
 #' @param count If val is NULL and count is TRUE, the value becomes count of the row and col set. Otherwise, it's binary data of row and col set.
 sparse_cast <- function(data, row, col, val=NULL, fun.aggregate=sum, count = FALSE){
   loadNamespace("dplyr")
+  loadNamespace("tidyr")
   loadNamespace("Matrix")
+
+  # remove NA from row and col
+  data <- tidyr::drop_na_(data, c(row, col))
 
   if(is.null(val)){
     # if there's no value column, it creates binary sparse matrix.
@@ -330,5 +339,35 @@ str_count_all <- function(text, patterns, remove.zero = TRUE){
     # if remove.zero is FALSE, it returns all element
     return_elem <- (!remove.zero | count > 0)
     data.frame(.count=count[return_elem], .pattern=patterns[return_elem], stringsAsFactors = FALSE)
+  })
+}
+
+#' convert df to numeric matrix
+#' @param colnames Vector of column names or lazy dot for select arg. ex:lazyeval::lazy_dots(...)
+as_numeric_matrix_ <- function(df, columns){
+  loadNamespace("dplyr")
+  df[,columns] %>%
+    as.matrix() %>%
+    as.numeric() %>%
+    matrix(nrow = nrow(df))
+}
+
+#' evaluate select argument
+#' @param dots Lazy dot for select arg. ex:lazyeval::lazy_dots(...)
+#' @param excluded Excluded column names
+evaluate_select <- function(df, .dots, excluded = NULL){
+  loadNamespace("dplyr")
+  tryCatch({
+    ret <- setdiff(colnames(dplyr::select_(df, .dots=.dots)), excluded)
+    if(length(ret) == 0){
+      stop("no column selected")
+    }
+    ret
+  }, error = function(e){
+    loadNamespace("stringr")
+    if(stringr::str_detect(e$message, "not found")){
+      stop("undefined columns selected")
+    }
+    stop(e$message)
   })
 }
