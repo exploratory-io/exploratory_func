@@ -1,6 +1,32 @@
 context("tests for wrappers of stats package")
 
 spread_test_df <- data.frame(var1 = c(1, 3, 2, NA), var2 = c(1, 3, 2, 10))
+
+test_that("do_cor with NA values", {
+  loadNamespace("reshape2")
+  nrow <- 10
+  ncol <- 20
+  vec <- rnorm(nrow * ncol)
+  vec[[3]] <- NA
+  vec[[30]] <- NA
+  vec[[55]] <- NA
+  mat <- matrix(vec, nrow = nrow)
+  melt_mat <- reshape2::melt(mat)
+
+  ret <- do_cor(melt_mat, skv = c("Var2", "Var1", "value"), diag = TRUE)
+
+  cor_ret <- cor(mat, use = "pairwise.complete.obs")
+  melt_ret <- reshape2::melt(cor_ret)
+
+  for(i in seq(ncol)){
+    for(j in seq(ncol)){
+      mat_answer <- cor_ret[i, j]
+      df_answer <- ret[ret[[1]] == i & ret[[2]] == j, 3][[1]]
+      expect_equal(mat_answer, df_answer)
+    }
+  }
+})
+
 tidy_test_df <- data.frame(
   cat=rep(c("cat1", "cat2"), 20),
   dim = sort(rep(paste0("dim", seq(4)), 5)),
