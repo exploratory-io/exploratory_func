@@ -16,6 +16,11 @@ simple_cast <- function(data, row, col, val = NULL, fun.aggregate=mean, fill=0){
   loadNamespace("reshape2")
   loadNamespace("tidyr")
 
+  # noraml na causes error in reshape2::acast so it has to be NA_real_
+  if(is.na(fill)){
+    fill <- NA_real_
+  }
+
   # remove NA from row and column
   data <- tidyr::drop_na_(data, c(row, col))
 
