@@ -180,6 +180,7 @@ build_kmeans.cols <- function(df, ...,
   grouped_column <- grouped_by(df)
   model_column <- avoid_conflict(grouped_column, "model")
   source_column <- avoid_conflict(grouped_column, "source.data")
+  # this gets a vector of column names which are selected by dots argument
   selected_column <- evaluate_select(df, .dots=select_dots, grouped_column)
 
   omit_df <- df[,selected_column] %>%
