@@ -19,7 +19,7 @@ build_data <- function(funcname) {
 
     if(augment){
       # use do.call for non standard evaluation
-      augment_func <- get("augment", asNamespace("broom"))
+      augment_func <- get("predict", asNamespace("exploratory"))
       output <- do.call(augment_func, list(output, model_column, data=source_column))
     } else {
       # Add a class for Exploratyry to recognize the type of .model
@@ -102,15 +102,36 @@ build_kmeans.kv_ <- function(df,
   model_column <- avoid_conflict(grouped_column, "model")
   source_column <- avoid_conflict(grouped_column, "source.data")
 
+  df <- tidyr::drop_na_(df, c(subject_col, key_col, value_col))
+
   if(row_col %in% grouped_column){
     stop(paste0(row_col, " is a grouping column. ungroup() may be necessary before this operation."))
   }
 
   build_kmeans_each <- function(df){
     mat <- simple_cast(df, row_col, col_col, value_col, fun.aggregate = fun.aggregate, fill=fill)
-    kmeans_ret <- kmeans(mat, centers = centers, iter.max = 10, nstart = nstart, algorithm = algorithm, trace = trace)
+    kmeans_ret <- tryCatch({
+      kmeans(mat, centers = centers, iter.max = 10, nstart = nstart, algorithm = algorithm, trace = trace)},
+      error = function(e){
+        if(e$message == "cannot take a sample larger than the population when 'replace = FALSE'"){
+          # falls into here when group is 2 and centers > 2
+          stop("Centers should be less than unique subjects.")
+        }
+        # number of unique values among subjects should be more than centers
+        if(e$message == "more cluster centers than distinct data points."){
+          stop("Centers should be less than distinct data points.")
+        }
+        if(e$message == "number of cluster centres must lie between 1 and nrow(x)"){
+          stop("Centers should be less than unique subjects.")
+        }
+        if(e$message == "NA/NaN/Inf in foreign function call (arg 1)"){
+          stop("There is NA in the data.")
+        }
+        stop(e$message)
+      }
+    )
     if(augment){
-      cluster_column <- avoid_conflict(grouped_column, ".cluster")
+      cluster_column <- avoid_conflict(grouped_column, "cluster")
       row_fact <- as.factor(df[[row_col]])
       df[[cluster_column]] <- kmeans_ret$cluster[row_fact]
       df
@@ -122,17 +143,13 @@ build_kmeans.kv_ <- function(df,
   }
 
   if(keep.source & !augment){
-    output <- (
-      df
-      %>%  dplyr::do_(.dots=setNames(list(~build_kmeans_each(.), ~(.)), c(model_column, source_column)))
-    )
+    output <- df %>%
+      dplyr::do_(.dots=setNames(list(~build_kmeans_each(.), ~(.)), c(model_column, source_column)))
     # Add a class for Exploratyry to recognize the type of .source.data
     class(output[[source_column]]) <- c("list", ".source.data")
   } else {
-    output <- (
-      df
-      %>%  dplyr::do_(.dots=setNames(list(~build_kmeans_each(.)), model_column))
-    )
+    output <- df %>%
+      dplyr::do_(.dots=setNames(list(~build_kmeans_each(.)), model_column))
   }
   # Add a class for Exploratyry to recognize the type of .model
   if(augment){
@@ -159,41 +176,70 @@ build_kmeans.cols <- function(df, ...,
   loadNamespace("tidyr")
   loadNamespace("broom")
   set.seed(seed)
-
   select_dots <- lazyeval::lazy_dots(...)
   grouped_column <- grouped_by(df)
   model_column <- avoid_conflict(grouped_column, "model")
   source_column <- avoid_conflict(grouped_column, "source.data")
-  selected_column <- setdiff(colnames(dplyr::select_(df, .dots=select_dots)), grouped_column)
+  # this gets a vector of column names which are selected by dots argument
+  selected_column <- evaluate_select(df, .dots=select_dots, grouped_column)
 
-  omit_df <- na.omit(df[,selected_column])
+  omit_df <- df[,selected_column] %>%
+    as_numeric_matrix_(selected_column) %>%
+    na.omit()
   omit_row <- attr(omit_df, "na.action")
   if(!is.null(omit_row)){
     df <- df[setdiff(seq(nrow(df)), omit_row), ]
   }
 
   build_kmeans_each <- function(df){
-    mat <- dplyr::select_(df, .dots=select_dots) %>% as.matrix()
-    kmeans_ret <- kmeans(mat, centers = centers, iter.max = 10, nstart = nstart, algorithm = algorithm, trace = trace)
+    mat <- as_numeric_matrix_(df, columns = selected_column)
+    kmeans_ret <- tryCatch({
+      if(nrow(mat) == 0 | ncol(mat) == 0){
+        stop("No data after removing NA")
+      }
+      kmeans(mat, centers = centers, iter.max = 10, nstart = nstart, algorithm = algorithm, trace = trace)
+    }, error = function(e){
+      if(e$message == "invalid first argument"){
+        stop("Created matrix is invalid")
+      }
+      if(e$message == "cannot take a sample larger than the population when 'replace = FALSE'"){
+        # this matrix falls into here when centers = 3 and mat is
+        #        1 2 3 4 5
+        # group1 1 5 1 5 1
+        # group2 5 1 5 1 5
+        stop("Centers should be less than rows.")
+      }
+      # number of unique values among subjects should be more than centers
+      if(e$message == "more cluster centers than distinct data points."){
+        stop("Centers should be less than distinct data points.")
+      }
+      if(e$message == "number of cluster centres must lie between 1 and nrow(x)"){
+        stop("Centers should be less than rows.")
+      }
+      if(e$message == "NA/NaN/Inf in foreign function call (arg 1)"){
+        stop("There is NA in the data.")
+      }
+      stop(e$message)
+    })
     if(augment){
-      broom::augment(kmeans_ret, df)
+      ret <- broom::augment(kmeans_ret, df)
+      colnames(ret)[[ncol(ret)]] <- avoid_conflict(grouped_column, "cluster")
+      # cluster column is factor labeled "1", "2"..., so convert it to integer to avoid confusion
+      ret[[ncol(ret)]] <- as.integer(ret[[ncol(ret)]])
+      ret
     } else {
       kmeans_ret
     }
   }
 
   if(keep.source & !augment){
-    output <- (
-      df
-      %>%  dplyr::do_(.dots=setNames(list(~build_kmeans_each(.), ~(.)), c(model_column, source_column)))
-    )
+    output <- df %>%
+        dplyr::do_(.dots=setNames(list(~build_kmeans_each(.), ~(.)), c(model_column, source_column)))
     # Add a class for Exploratyry to recognize the type of .source.data
     class(output[[source_column]]) <- c("list", ".source.data")
   } else {
-    output <- (
-      df
-      %>%  dplyr::do_(.dots=setNames(list(~build_kmeans_each(.)), model_column))
-    )
+    output <- df %>%
+      dplyr::do_(.dots=setNames(list(~build_kmeans_each(.)), model_column))
   }
   if(augment){
     output <- tidyr::unnest_(output, model_column)
