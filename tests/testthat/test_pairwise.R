@@ -25,7 +25,8 @@ test_that("test do_cosine_sim.kv", {
       do_cosine_sim.kv(row, col, val)
   )
   # row1 and row2 pair result
-  expect_equal(result[1, "sim.value"][[1]], (1*4+2*5+3*6)/sqrt(1^2+2^2+3^2)/sqrt(4^2+5^2+6^2))
+  expect_equal(colnames(result), c("row.x", "row.y", "value"))
+  expect_equal(result[1, "value"][[1]], (1*4+2*5+3*6)/sqrt(1^2+2^2+3^2)/sqrt(4^2+5^2+6^2))
 })
 
 test_that("test do_cosine_sim.kv without val", {
@@ -119,6 +120,14 @@ test_that("test do_cosine_sim.kv for grouped data frame as subject error", {
   }, "group is a grouping column\\. ungroup\\(\\) may be necessary before this operation\\.")
 })
 
+test_that("test do_dist.kv", {
+  loadNamespace("dplyr")
+  result <- test_df %>%
+    do_dist.kv(row, col, val, diag=TRUE)
+  expect_equal(nrow(result), 16)
+  expect_equal(result[[3]][1], 0)
+})
+
 test_that("test do_dist.kv diag TRUE", {
   loadNamespace("dplyr")
   result <- (
@@ -179,7 +188,7 @@ test_that("test do_dist.cols", {
       do_dist.cols(dplyr::starts_with("var"))
   )
 
-  expect_equal(result$dist.value, c(2,2))
+  expect_equal(result$value, c(2,2))
 })
 
 test_that("test do_dist.kv for grouped data frame as subject error", {

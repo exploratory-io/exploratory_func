@@ -72,8 +72,12 @@ do_cor.kv_ <- function(df,
   if(col %in% grouped_col){
     stop(paste0(col, " is a grouping column. ungroup() may be necessary before this operation."))
   }
+  # column names are "{subject}.x", "{subject}.y", "value"
+  output_cols <- avoid_conflict(grouped_col,
+                           c(stringr::str_c(col, c(".x", ".y")),
+                             "value")
+  )
 
-  output_cols <- avoid_conflict(grouped_col, c("pair.name.1", "pair.name.2", "cor.value"))
 
   do_cor_each <- function(df){
     mat <- simple_cast(df, row, col, val, fun.aggregate=fun.aggregate, fill=fill)
@@ -103,7 +107,7 @@ do_cor.cols <- function(df, ..., use="pairwise.complete.obs", method="pearson", 
   # select columns using dplyr::select logic
   select_dots <- lazyeval::lazy_dots(...)
   grouped_col <- grouped_by(df)
-  output_cols <- avoid_conflict(grouped_col, c("pair.name.1", "pair.name.2", "cor.value"))
+  output_cols <- avoid_conflict(grouped_col, c("pair.name.1", "pair.name.2", "value"))
   # check if the df's grouped
   do_cor_each <- function(df){
     mat <- dplyr::select_(df, .dots = select_dots) %>%  as.matrix()
@@ -160,7 +164,7 @@ do_svd.kv <- function(df,
 
 
   axis_prefix <- "axis"
-  value_cname <- avoid_conflict(colnames(df), "svd.value")
+  value_cname <- avoid_conflict(colnames(df), "value")
 
   # this is executed on each group
   do_svd_each <- function(df){

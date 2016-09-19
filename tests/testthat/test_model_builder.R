@@ -24,7 +24,11 @@ test_that("test with na values", {
     na=rep(c(NA, 5, 1, 4), 5),
     group=paste("group",rep(c(1, 2, 3, 4), each=5), sep=""),
     col=rep(seq(5), 4))
-  ret <- build_kmeans(test_df, skv = c("group", "col", "na"))
+  test_df <- dplyr::filter(test_df, group != "group2" | col != 4)
+  ret <- build_kmeans(test_df, skv = c("group", "col", "na"), fill = 1)
+  expect_error({
+    build_kmeans(test_df, skv = c("group", "col", "na"), fill = NA)
+  }, "There is NA in the data.")
 })
 
 test_that("test with too small subject", {

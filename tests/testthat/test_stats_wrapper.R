@@ -1,6 +1,32 @@
 context("tests for wrappers of stats package")
 
 spread_test_df <- data.frame(var1 = c(1, 3, 2, NA), var2 = c(1, 3, 2, 10))
+
+test_that("do_cor with NA values", {
+  loadNamespace("reshape2")
+  nrow <- 10
+  ncol <- 20
+  vec <- rnorm(nrow * ncol)
+  vec[[3]] <- NA
+  vec[[30]] <- NA
+  vec[[55]] <- NA
+  mat <- matrix(vec, nrow = nrow)
+  melt_mat <- reshape2::melt(mat)
+
+  ret <- do_cor(melt_mat, skv = c("Var2", "Var1", "value"), diag = TRUE)
+
+  cor_ret <- cor(mat, use = "pairwise.complete.obs")
+  melt_ret <- reshape2::melt(cor_ret)
+
+  for(i in seq(ncol)){
+    for(j in seq(ncol)){
+      mat_answer <- cor_ret[i, j]
+      df_answer <- ret[ret[[1]] == i & ret[[2]] == j, 3][[1]]
+      expect_equal(mat_answer, df_answer)
+    }
+  }
+})
+
 tidy_test_df <- data.frame(
   cat=rep(c("cat1", "cat2"), 20),
   dim = sort(rep(paste0("dim", seq(4)), 5)),
@@ -8,10 +34,9 @@ tidy_test_df <- data.frame(
   dim_na=c(paste0("dim", seq(10)), paste0("dim", seq(10)+3)))
 
 test_that("test do_cor.cols", {
-  result <- (
-    spread_test_df
-    %>%  do_cor.cols(dplyr::starts_with("var")))
-  expect_equal(result[["cor.value"]], rep(1, 2))
+  result <- spread_test_df %>%
+    do_cor.cols(dplyr::starts_with("var"))
+  expect_equal(result[["value"]], rep(1, 2))
 })
 
 test_that("test do_cor.cols for grouped df", {
@@ -30,9 +55,9 @@ test_that("test do_cor.cols for grouped df", {
 test_that("test do_cor.kv for duplicated pair", {
   result <- tidy_test_df %>%  do_cor.kv(cat, dim, val)
   expect_equal(ncol(result), 3)
-  expect_equal(result[["pair.name.1"]], c("cat1", "cat2"))
-  expect_equal(result[["pair.name.2"]], c("cat2", "cat1"))
-  expect_equal(result[["cor.value"]], replicate(2, 1))
+  expect_equal(result[["cat.x"]], c("cat1", "cat2"))
+  expect_equal(result[["cat.y"]], c("cat2", "cat1"))
+  expect_equal(result[["value"]], replicate(2, 1))
 })
 
 test_that("test do_cor.kv for grouped data frame as subject error", {
@@ -88,7 +113,7 @@ test_that("test do_svd.kv", {
     result <- (
       test_df
       %>%  do_svd.kv(axis2, col, rand, n_component=3))
-    expect_equal(colnames(result), c("axis2","new.dimension", "svd.value"))
+    expect_equal(colnames(result), c("axis2","new.dimension", "value"))
     expect_true(any(result[[1]]=="group1"))
     expect_true(any(result[[2]]==1))
   }
@@ -102,7 +127,7 @@ test_that("test do_svd.kv without value", {
     loadNamespace("dplyr")
     result <- test_df  %>%
       do_svd.kv(axis2, col, n_component=3)
-    expect_equal(colnames(result), c("axis2","new.dimension", "svd.value"))
+    expect_equal(colnames(result), c("axis2","new.dimension", "value"))
     expect_true(any(result[[1]]=="group1"))
     expect_true(any(result[[2]]==1))
   }
@@ -118,7 +143,7 @@ test_that("test do_svd.kv", {
     test_df  %>%
       do_svd.kv(axis2, col, n_component=3)
     )
-  expect_equal(colnames(result), c("axis2","new.dimension", "svd.value"))
+  expect_equal(colnames(result), c("axis2","new.dimension", "value"))
   expect_true(any(result[[1]]=="group1"))
   expect_true(any(result[[2]]==1))
 
@@ -134,7 +159,7 @@ test_that("test do_svd.kv with fill", {
     test_df  %>%
       do_svd.kv(axis2, col, n_component=3, fill = 1)
   )
-  expect_equal(colnames(result), c("axis2","new.dimension", "svd.value"))
+  expect_equal(colnames(result), c("axis2","new.dimension", "value"))
   expect_true(any(result[[1]]=="group1"))
   expect_true(any(result[[2]]==1))
 
@@ -173,7 +198,7 @@ test_that("test do_svd.kv with group_by output=long", {
       %>%  dplyr::group_by(group2)
       %>%  do_svd.kv(group, col, rand, n_component=1))
     expect_true(!is.unsorted(result[,1]))
-    expect_equal(colnames(result), c("group2","group","new.dimension", "svd.value"))
+    expect_equal(colnames(result), c("group2","group","new.dimension", "value"))
     expect_true(any(result[,1]=="group2"))
     expect_true(any(result[,3]==1))
   }
@@ -212,7 +237,7 @@ test_that("test do_svd of dimension output long", {
     result <- (
       test_df
       %>%  do_svd.kv(group, col, rand, type="dimension"))
-    expect_equal(colnames(result), c("col","new.dimension", "svd.value"))
+    expect_equal(colnames(result), c("col","new.dimension", "value"))
     expect_true(any(result[[1]]==1))
     expect_true(any(result[[2]]==1))
   }
@@ -249,7 +274,7 @@ test_that("test do_svd of variance output", {
     result <- (
       test_df
       %>%  do_svd.kv(group, col, rand, type="variance", n_component=2))
-    expect_equal(colnames(result), c("new.dimension", "svd.value"))
+    expect_equal(colnames(result), c("new.dimension", "value"))
     expect_equal(nrow(result),2)
   }
 })
@@ -282,10 +307,10 @@ test_that("test do_cmdscale", {
   df_tf <- do_dist.kv(test_df, Var1, Var2, value, distinct=TRUE ,diag=FALSE)
   df_ft <- do_dist.kv(test_df, Var1, Var2, value, distinct=FALSE ,diag=TRUE)
   df_ff <- do_dist.kv(test_df, Var1, Var2, value, distinct=FALSE ,diag=FALSE)
-  ret_tt <- do_cmdscale(df_tt, pair.name.1, pair.name.2, dist.value)
-  ret_tf <- do_cmdscale(df_tf, pair.name.1, pair.name.2, dist.value)
-  ret_ft <- do_cmdscale(df_ft, pair.name.1, pair.name.2, dist.value)
-  ret_ff <- do_cmdscale(df_ff, pair.name.1, pair.name.2, dist.value)
+  ret_tt <- do_cmdscale(df_tt, Var1.x, Var1.y, value)
+  ret_tf <- do_cmdscale(df_tf, Var1.x, Var1.y, value)
+  ret_ft <- do_cmdscale(df_ft, Var1.x, Var1.y, value)
+  ret_ff <- do_cmdscale(df_ff, Var1.x, Var1.y, value)
   expect_equal(c(ret_tt[[2]], ret_tf[[2]], ret_ft[[2]], ret_ff[[2]]), setNames(rep(points[,1], 4), NULL))
 
   half_df <- distance %>% as.vector()  %>%  upper_gather(attr(distance, "Labels"), diag=TRUE)
