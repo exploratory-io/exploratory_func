@@ -65,6 +65,14 @@ sparse_cast <- function(data, row, col, val=NULL, fun.aggregate=sum, count = FAL
   loadNamespace("tidyr")
   loadNamespace("Matrix")
 
+  if(!row %in% colnames(data)){
+    stop(paste0(row, " is not in column names"))
+  }
+
+  if(!col %in% colnames(data)){
+    stop(paste0(col, " is not in column names"))
+  }
+
   # remove NA from row and col
   data <- tidyr::drop_na_(data, c(row, col))
 
@@ -83,6 +91,9 @@ sparse_cast <- function(data, row, col, val=NULL, fun.aggregate=sum, count = FAL
         )
     }
   }else{
+    if(!val %in% colnames(data)){
+      stop(paste0(val, " is not in column names"))
+    }
     # Basic behaviour of Matrix::sparseMatrix is sum.
     # If fun.aggregate is different, it should be aggregated by it.
     if(!identical(fun.aggregate, sum)){
