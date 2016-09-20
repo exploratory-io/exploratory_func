@@ -21,7 +21,14 @@ do_t.test <- function(df, value, key=NULL, ...){
   do_t.test_each <- function(df, ...){
     if(with_key){
       # use formula (`value_col`~`key_col`) for two sample t-test
-      model <- t.test(data=df, fml, ...)
+      model <- tryCatch({
+        t.test(data=df, fml, ...)
+      }, error = function(e){
+        if(e$message == "grouping factor must have exactly 2 levels"){
+          stop("grouping column has to have 2 unique values")
+        }
+        stop(e$message)
+      })
     } else {
       # use df[[value_col]] for one sample t-test (comparison with indicated normal distribution)
       model <- t.test(df[[value_col]], ...)
@@ -64,7 +71,14 @@ do_var.test <- function(df, value, key, ...){
 
   # this is executed on each group
   do_var.test_each <- function(df, ...){
-    model <- var.test(data=df, fml, ...)
+    model <- tryCatch({
+      var.test(data=df, fml, ...)
+    }, error = function(e){
+      if(e$message == "grouping factor must have exactly 2 levels"){
+        stop("grouping column has to have 2 unique values")
+      }
+      stop(e$message)
+    })
     ret <- broom::tidy(model)
 
     ret[["method"]] <- as.character(ret[["method"]])

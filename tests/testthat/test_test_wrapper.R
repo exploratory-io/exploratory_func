@@ -39,9 +39,25 @@ test_that("test one sample t-test", {
   expect_equal(result[result[["dim"]]=="dim1", "p.value"][[1]], 1)
 })
 
+test_that("test t-test with 3 groups", {
+  data <- data.frame(val = seq(12), group = rep(c(1,2,3), each = 4))
+  expect_error({
+    result <- data %>%
+      do_t.test(val, group)
+  }, "grouping column has to have 2 unique values")
+})
+
 test_that("test f-test", {
   result <- test_df %>%
     dplyr::group_by(dim) %>%
     do_var.test(`with space`, cat)
   expect_equal(ncol(result), 10)
+})
+
+test_that("test f-test with 3 groups", {
+  data <- data.frame(val = seq(12), group = rep(c(1,2,3), each = 4))
+  expect_error({
+    result <- data %>%
+      do_var.test(val, group)
+  }, "grouping column has to have 2 unique values")
 })
