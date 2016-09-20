@@ -169,6 +169,9 @@ do_svd.kv <- function(df,
   # this is executed on each group
   do_svd_each <- function(df){
     matrix <-simple_cast(df, subject_col, dimension_col, value_col, fun.aggregate = fun.aggregate, fill=fill)
+    if(any(is.na(matrix))){
+      stop("NA is not supported as value.")
+    }
     if(centering){
       # move the origin to center of data
       matrix <- sweep(matrix, 2, colMeans(matrix), "-")
