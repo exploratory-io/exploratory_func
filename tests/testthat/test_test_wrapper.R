@@ -44,7 +44,7 @@ test_that("test t-test with 3 groups", {
   expect_error({
     result <- data %>%
       do_t.test(val, group)
-  }, "grouping column has to have 2 unique values")
+  }, "Group Column has to have 2 unique values")
 })
 
 test_that("test f-test", {
@@ -59,5 +59,5 @@ test_that("test f-test with 3 groups", {
   expect_error({
     result <- data %>%
       do_var.test(val, group)
-  }, "grouping column has to have 2 unique values")
+  }, "Group Column has to have 2 unique values")
 })

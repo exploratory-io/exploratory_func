@@ -25,7 +25,7 @@ do_t.test <- function(df, value, key=NULL, ...){
         t.test(data=df, fml, ...)
       }, error = function(e){
         if(e$message == "grouping factor must have exactly 2 levels"){
-          stop("grouping column has to have 2 unique values")
+          stop("Group Column has to have 2 unique values")
         }
         stop(e$message)
       })
@@ -75,7 +75,7 @@ do_var.test <- function(df, value, key, ...){
       var.test(data=df, fml, ...)
     }, error = function(e){
       if(e$message == "grouping factor must have exactly 2 levels"){
-        stop("grouping column has to have 2 unique values")
+        stop("Group Column has to have 2 unique values")
       }
       stop(e$message)
     })
