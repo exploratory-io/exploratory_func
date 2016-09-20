@@ -91,6 +91,20 @@ test_that("test do_cor without val", {
   expect_equal(result[[3]][1:2], c(1, -1))
 })
 
+test_that("do_svd.kv with NA value", {
+  data <- data.frame(row = c(1, 1, 2, 2, 3,3),
+                     col = rep(c(1,2), 3),
+                     val = seq(6)) %>%
+    dplyr::slice(-3)
+  # this slice creates missing value by removing a row
+
+  # expect no error
+  do_svd.kv(data, row, col, val, fill=0)
+  expect_error({
+    do_svd.kv(data, row, col, val, fill=NA)
+  }, "NA is not supported as value.")
+})
+
 test_that("test do_svd.kv output wide", {
   test_df <- data.frame(
     rand=runif(20, min = 0, max=10),
