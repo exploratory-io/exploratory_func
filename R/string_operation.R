@@ -194,6 +194,9 @@ do_tfidf <- function(df, group, term, idf_log_scale = log, tf_weight="raw", norm
   group_col <- col_name(substitute(group))
   term_col <- col_name(substitute(term))
 
+  # remove NA from group and term column to avoid error
+  df <- tidyr::drop_na_(df, c(group_col, term_col))
+
   cnames <- avoid_conflict(c(group_col, term_col), c("count_of_docs", "tfidf", "tf"))
 
   count_tbl <- calc_tf_(df, group_col, term_col, weight=tf_weight)
