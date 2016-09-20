@@ -331,3 +331,10 @@ test_that("test do_cmdscale", {
   result_half <- do_cmdscale(half_df, Var1, Var2, value)
 
 })
+
+test_that("do_cmdscale undefined column name error", {
+  data <- data.frame(var1 = c(1, 3, 2, NA), var2 = c(1, 3, 2, 10))
+  expect_error({
+    do_cmdscale(data, var1, var2, var3)
+  }, "var3 is not in column names")
+})

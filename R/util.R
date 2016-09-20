@@ -16,6 +16,15 @@ simple_cast <- function(data, row, col, val = NULL, fun.aggregate=mean, fill=0){
   loadNamespace("reshape2")
   loadNamespace("tidyr")
 
+
+  if(!row %in% colnames(data)){
+    stop(paste0(row, " is not in column names"))
+  }
+
+  if(!col %in% colnames(data)){
+    stop(paste0(col, " is not in column names"))
+  }
+
   # noraml na causes error in reshape2::acast so it has to be NA_real_
   if(is.na(fill)){
     fill <- NA_real_
@@ -42,6 +51,9 @@ simple_cast <- function(data, row, col, val = NULL, fun.aggregate=mean, fill=0){
     mat[mat == 0] <- fill
     mat
   }else{
+    if(!val %in% colnames(data)){
+      stop(paste0(val, " is not in column names"))
+    }
     data %>%  reshape2::acast(fml, value.var=val, fun.aggregate=fun.aggregate, fill=fill)
   }
 }
@@ -52,6 +64,14 @@ sparse_cast <- function(data, row, col, val=NULL, fun.aggregate=sum, count = FAL
   loadNamespace("dplyr")
   loadNamespace("tidyr")
   loadNamespace("Matrix")
+
+  if(!row %in% colnames(data)){
+    stop(paste0(row, " is not in column names"))
+  }
+
+  if(!col %in% colnames(data)){
+    stop(paste0(col, " is not in column names"))
+  }
 
   # remove NA from row and col
   data <- tidyr::drop_na_(data, c(row, col))
@@ -71,6 +91,9 @@ sparse_cast <- function(data, row, col, val=NULL, fun.aggregate=sum, count = FAL
         )
     }
   }else{
+    if(!val %in% colnames(data)){
+      stop(paste0(val, " is not in column names"))
+    }
     # Basic behaviour of Matrix::sparseMatrix is sum.
     # If fun.aggregate is different, it should be aggregated by it.
     if(!identical(fun.aggregate, sum)){
