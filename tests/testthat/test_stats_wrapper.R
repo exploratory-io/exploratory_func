@@ -96,6 +96,8 @@ test_that("do_svd.kv with NA value", {
                      col = rep(c(1,2), 3),
                      val = seq(6)) %>%
     dplyr::slice(-3)
+  # this slice creates missing value by removing a row
+
   # expect no error
   do_svd.kv(data, row, col, val, fill=0)
   expect_error({
