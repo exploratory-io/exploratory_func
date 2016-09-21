@@ -34,12 +34,30 @@ build_data <- function(funcname) {
 #' lm wrapper with do
 #' @return deta frame which has lm model
 #' @export
-build_lm <- build_data("lm")
+build_lm <- function(...){
+  tryCatch({
+    build_data("lm")(...)
+  }, error = function(e){
+    if(e$message == "contrasts can be applied only to factors with 2 or more levels"){
+      stop("there are columns that has only one unique categorical value")
+    }
+    stop(e$message)
+  })
+}
 
 #' glm wrapper with do
 #' @return deta frame which has glm model
 #' @export
-build_glm <- build_data("glm")
+build_glm <- function(...){
+  tryCatch({
+    build_data("glm")(...)
+  }, error = function(e){
+    if(e$message == "contrasts can be applied only to factors with 2 or more levels"){
+      stop("more than 2 unique values are needed to create categorical variables")
+    }
+    stop(e$message)
+  })
+}
 
 #' integrated build_kmeans
 #' @export

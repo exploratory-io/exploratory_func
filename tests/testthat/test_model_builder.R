@@ -9,6 +9,24 @@ test_df <- data.frame(
   group=paste("group",c(rep(1,5), rep(2, 5)), sep=""),
   col=rep(seq(5),2))
 
+test_that("test build_lm with NA values", {
+  test_df <- data.frame(
+    val = seq(8),
+    val1 = c("char", "char" ,rep(c(NA,1), each = 3)),
+    val2 = c("char", "char2" ,rep(c(1,NA), each = 3))
+    )
+  build_lm(test_df, val ~ .)
+})
+
+test_that("test build_glm with NA values", {
+  test_df <- data.frame(
+    val = seq(8),
+    val1 = c("char", "char" ,rep(c(NA,1), each = 3)),
+    val2 = c("char", "char2" ,rep(c(1,NA), each = 3))
+  )
+  build_glm(test_df, val ~ .)
+})
+
 test_that("test with 2 groups with 3 centers", {
   test_df <- data.frame(
     val = as.vector(rep(c(1,5), 3)),
