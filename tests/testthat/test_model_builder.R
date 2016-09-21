@@ -9,6 +9,51 @@ test_df <- data.frame(
   group=paste("group",c(rep(1,5), rep(2, 5)), sep=""),
   col=rep(seq(5),2))
 
+test_that("test build_lm with NA values", {
+  test_df <- data.frame(
+    val = seq(8),
+    val1 = c("char", "char" ,rep(c(NA,1), each = 3)),
+    val2 = c("char", "char2" ,rep(c(1,NA), each = 3))
+    )
+  expect_error({
+    build_lm(test_df, val ~ .)
+  }, "more than 2 unique values are needed for categorical predictor columns")
+})
+
+test_that("test build_lm with all NA values", {
+  test_df <- data.frame(
+    val = seq(6),
+    val1 = c(rep(c(NA,1), each = 3)),
+    val2 = c(rep(c(1,NA), each = 3))
+  )
+  expect_error({
+    build_lm(test_df, val ~ .)
+  }, "no data after removing NA")
+})
+
+test_that("test build_glm with NA values", {
+  test_df <- data.frame(
+    val = seq(8),
+    val1 = c("char", "char" ,rep(c(NA,1), each = 3)),
+    val2 = c("char", "char2" ,rep(c(1,NA), each = 3))
+  )
+  expect_error({
+    build_glm(test_df, val ~ .)
+  }, "more than 2 unique values are needed for categorical predictor columns")
+})
+
+# this returns "object 'fit' not found" but yet to understand what this means, so kept commented out
+# test_that("test build_glm with all NA values", {
+#   test_df <- data.frame(
+#     val = seq(6),
+#     val1 = c(rep(c(NA,1), each = 3)),
+#     val2 = c(rep(c(1,NA), each = 3))
+#   )
+#   expect_error({
+#     build_glm(test_df, val ~ .)
+#   }, "no data after removing NA")
+# })
+
 test_that("test with 2 groups with 3 centers", {
   test_df <- data.frame(
     val = as.vector(rep(c(1,5), 3)),
