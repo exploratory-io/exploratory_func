@@ -17,7 +17,7 @@ test_that("test build_lm with NA values", {
     )
   expect_error({
     build_lm(test_df, val ~ .)
-  }, "there are columns that has only one unique categorical value")
+  }, "more than 2 unique values are needed for categorical predictor columns")
 })
 
 test_that("test build_lm with all NA values", {
@@ -39,7 +39,7 @@ test_that("test build_glm with NA values", {
   )
   expect_error({
     build_glm(test_df, val ~ .)
-  }, "there are columns that has only one unique categorical value")
+  }, "more than 2 unique values are needed for categorical predictor columns")
 })
 
 # this returns "object 'fit' not found" but yet to understand what this means, so kept commented out
