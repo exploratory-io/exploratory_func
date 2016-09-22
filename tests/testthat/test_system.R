@@ -78,5 +78,9 @@ test_that("test statecode",{
   expect_equal(abbs, statecode(names, "name", "abb", ignore.case=FALSE))
   # with different cases
   expect_equal(abbs, statecode(namesWithDifferentCases, "name", "abb"))
+  # format test
+  expect_equal(names, statecode(namesWithDifferentCases, "name", "name"))
+
+
   
 })
