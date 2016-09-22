@@ -61,3 +61,22 @@ test_that("test source check conflict case", {
   expect_true(is.null(ret[[filenames[[1]]]]$error))
   expect_true(!is.null(ret[[filenames[[2]]]]$error))
 })
+
+test_that("test statecode",{
+  
+  abbs <- c("NY", "CA", "IL")
+  names <- c("New York","California","Illinois")
+  namesWithDifferentCases <- c("new york","califorNIA","ILLINOIS")
+  divisions <- c("Middle Atlantic","Pacific", "East North Central")
+  regions <- c("Northeast","West","North Central")
+
+  expect_equal(names, statecode(abbs, "abb", "name"))
+  expect_equal(divisions, statecode(abbs, "abb", "division"))
+  expect_equal(regions, statecode(abbs, "abb", "region"))
+  expect_equal(abbs, statecode(names, "name", "abb"))
+  # ignore.case=FASLE test
+  expect_equal(abbs, statecode(names, "name", "abb", ignore.case=FALSE))
+  # with different cases
+  expect_equal(abbs, statecode(namesWithDifferentCases, "name", "abb"))
+  
+})
