@@ -734,3 +734,45 @@ checkSourceConflict <- function(files){
   }
   ret
 }
+
+#' Converts between state name and state code of United States.
+#' 
+#' Example: 
+#' > exploratory::statecode(c("NY","CA", "IL"), "abb", "name")
+#' [1] "New York"   "California" "Illinois"  
+#' > exploratory::statecode(c("New York","California","Illinois"), "name", "abb")
+#' [1] "NY" "CA" "IL"
+#' 
+#' @param sourcevar source variable
+#' @param origin origin code, either "abb" or "name"
+#' @param destination  destination code, one of "abb", "name", "division", or "region"
+#' @param ignore.case Default is TRUE, you can make it FALSE for performance if you already have formatted data.
+#' @return character vector 
+#' @export
+statecode <- function(sourcevar, origin, destination, ignore.case=TRUE) {
+  
+  # supported codes 
+  codes_origin <- c("abb", "name")
+  codes_destination <- c("abb", "name", "division", "region")
+  
+  if (!origin %in% codes_origin){
+    stop("Origin code not supported")
+  }
+  if (!destination %in% codes_destination){
+     stop("Destination code not supported")
+  }
+
+  # state is a part of datasets package which comes with R installation
+  # and available anytime. state.abb is a list of state abbreviation
+  # such as 'CA' or 'NY'. state.name is a list of state name
+  # such as 'California'. Look at the following url for details.
+  # https://stat.ethz.ch/R-manual/R-devel/library/datasets/html/state.html 
+  origin_vector <- get(paste0("state.", origin))
+  destination_vector <- get(paste0("state.", destination))
+
+  if (ignore.case) {
+    return (as.character(destination_vector[match(tolower(sourcevar), tolower(origin_vector))]))
+  } else {
+    return (as.character(destination_vector[match(sourcevar, origin_vector)])) #faster
+  }
+}
