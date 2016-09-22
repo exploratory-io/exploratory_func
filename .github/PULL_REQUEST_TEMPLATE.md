@@ -1,6 +1,5 @@
 ### Description
-Describe your fix here. If it is UI fix, add some screenshots helps. 
-If you have associated issues, describe those too.
+Describe your fix here
 
 ### Checklist
 
