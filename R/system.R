@@ -261,6 +261,38 @@ queryMongoDB <- function(host, port, database, collection, username, password, q
 }
 
 #' @export
+getDBConnection <- function(type, host, port, databaseName, username, password){
+  if(!requireNamespace("RMySQL")){stop("package RMySQL must be installed.")}
+  if(!requireNamespace("RPostgreSQL")){stop("package RPostgreSQL must be installed.")}
+  if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
+  drv = NULL
+  conn = NULL
+  if(type == "mysql" || type == "aurora"){
+    drv <- DBI::dbDriver("MySQL")
+    conn = RMySQL::dbConnect(drv, dbname = databaseName, username = username,
+                             password = password, host = host, port = port)
+  } else if (type == "postgres" || type == "redshift"){
+    drv <- DBI::dbDriver("PostgreSQL")
+    pg_dsn = paste0(
+      'dbname=', databaseName, ' ',
+      'sslmode=prefer'
+    )
+    conn = RPostgreSQL::dbConnect(drv, dbname=pg_dsn, user = username,
+                                  password = password, host = host, port = port)
+  }
+  conn
+}
+
+#' @export
+getListOfTables <- function(type, host, port, databaseName, username, password){
+  if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
+  conn <- exploratory::getDBConnection(type, host, port, databaseName, username, password)
+  tables <- DBI::dbListTables(conn)
+  DBI::dbDisconnect(conn)
+  tables
+}
+
+#' @export
 queryMySQL <- function(host, port, databaseName, username, password, numOfRows = -1, query){
   if(!requireNamespace("RMySQL")){stop("package RMySQL must be installed.")}
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
@@ -736,25 +768,25 @@ checkSourceConflict <- function(files){
 }
 
 #' Converts between state name and state code of United States.
-#' 
-#' Example: 
+#'
+#' Example:
 #' > exploratory::statecode(c("NY","CA", "IL"), "abb", "name")
-#' [1] "New York"   "California" "Illinois"  
+#' [1] "New York"   "California" "Illinois"
 #' > exploratory::statecode(c("New York","California","Illinois"), "name", "abb")
 #' [1] "NY" "CA" "IL"
-#' 
+#'
 #' @param sourcevar source variable
 #' @param origin origin code, either "abb" or "name"
 #' @param destination  destination code, one of "abb", "name", "division", or "region"
 #' @param ignore.case Default is TRUE, you can make it FALSE for performance if you already have formatted data.
-#' @return character vector 
+#' @return character vector
 #' @export
 statecode <- function(sourcevar, origin, destination, ignore.case=TRUE) {
-  
-  # supported codes 
+
+  # supported codes
   codes_origin <- c("abb", "name")
   codes_destination <- c("abb", "name", "division", "region")
-  
+
   if (!origin %in% codes_origin){
     stop("Origin code not supported")
   }
@@ -766,7 +798,7 @@ statecode <- function(sourcevar, origin, destination, ignore.case=TRUE) {
   # and available anytime. state.abb is a list of state abbreviation
   # such as 'CA' or 'NY'. state.name is a list of state name
   # such as 'California'. Look at the following url for details.
-  # https://stat.ethz.ch/R-manual/R-devel/library/datasets/html/state.html 
+  # https://stat.ethz.ch/R-manual/R-devel/library/datasets/html/state.html
   origin_vector <- get(paste0("state.", origin))
   destination_vector <- get(paste0("state.", destination))
 
