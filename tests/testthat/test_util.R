@@ -317,3 +317,19 @@ test_that("evaluate_select negative test", {
     evaluate_select(test_df, c("dplyr::starts_with('something')"))
   }, "no column selected")
 })
+
+test_that("list_to_text should return NA", {
+  test_df <- data.frame(
+    col1 = as.character(seq(10))
+  )
+
+  test_list <- replicate(10, list(replicate(5, letters[2])))
+  test_list[[1]] <- NA
+  test_list[[2]] <- character(0)
+  test_list[[3]] <- c(NA, "b")
+
+  test_df[["test_list"]] <- test_list
+  ret <- dplyr::mutate(test_df, text = list_to_text(test_list) )
+
+  expect_equal(ret[["text"]], c(rep(NA, 3), rep("b, b, b, b, b", 7)))
+})

@@ -331,8 +331,17 @@ list_extract <- function(column, position = 1, rownum = 1){
 #' convert list column into text column
 #' @export
 list_to_text <- function(column, sep = ", "){
-  text <- sapply(column, function(x) str_c(x, collapse = sep))
-  as.character(text)
+  loadNamespace("stringr")
+  ret <- sapply(column, function(x) {
+    ret <- stringr::str_c(x, collapse = sep)
+    if(identical(ret, character(0))){
+      # if it's character(0)
+      NA
+    } else {
+      ret
+    }
+  })
+  as.character(ret)
 }
 
 #' collapse vectors in a list
