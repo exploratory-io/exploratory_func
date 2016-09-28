@@ -335,9 +335,9 @@ list_to_text <- function(column, sep = ", "){
   as.character(text)
 }
 
-#' concat vectors in a list column
+#' collapse vectors in a list
 #' @export
-list_concat <- function(list){
+list_collapse <- function(list){
   list(unlist(list))
 }
 
