@@ -293,6 +293,25 @@ getListOfTables <- function(type, host, port, databaseName, username, password){
 }
 
 #' @export
+queryNeo4j <- function(host, port,  username, password, query, isSSL = FALSE){
+  if(!requireNamespace("RNeo4j")){stop("package RNeo4j must be installed.")}
+  if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
+
+  url <- ifelse(isSSL == TRUE,  "https://" , "http://");
+  url <- stringr::str_c(url, host,":",  port,  "/db/data");
+
+  graph <- NULL
+  if(!is.null(username) && !is.null(password)){
+    graph = RNeo4j::startGraph(url, username = username, password = password)
+  } else {
+    graph = RNeo4j::startGraph(url)
+  }
+  df <- RNeo4j::cypher(graph, query)
+  df
+}
+
+
+#' @export
 queryMySQL <- function(host, port, databaseName, username, password, numOfRows = -1, query){
   if(!requireNamespace("RMySQL")){stop("package RMySQL must be installed.")}
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
