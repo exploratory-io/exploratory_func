@@ -1,7 +1,6 @@
 
 test_that("anomary_detection", {
-  data <- readRDS("~/Downloads/binded.rds")
-  renamed <- dplyr::rename(data, `with space` = date) %>%
-    dplyr::filter(name == "cookpad")
-  do_anomaly_detection(renamed, `with space`, Close, alpha = 0.00001)
+  data("raw_data", package = "AnomalyDetection")
+  do_anomaly_detection(raw_data, count, timestamp, alpha = 0.001)
+  do_anomaly_detection(raw_data, count, alpha = 0.001)
 })
