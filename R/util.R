@@ -346,8 +346,27 @@ list_to_text <- function(column, sep = ", "){
 
 #' concatinate vectors in a list
 #' @export
-list_concat <- function(list){
-  list(unlist(list))
+list_concat <- function(..., collapse = FALSE){
+  lists <- list(...)
+
+  # size of each list
+  lengths <- lapply(lists, function(arg){
+    length(arg)
+  })
+
+  max_index <- which.max(lengths)
+
+  ret <- lapply(seq(lengths[[max_index]]), function(index){
+    val <- unlist(lapply(lists, function(arg){
+      arg[[index]]
+    }))
+  })
+
+  if(collapse){
+    ret <- list(unlist(ret))
+  }
+
+  ret
 }
 
 #' replace sequence of spaces or periods with
