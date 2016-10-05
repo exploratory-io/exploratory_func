@@ -346,7 +346,7 @@ list_to_text <- function(column, sep = ", "){
 
 #' concatinate vectors in a list
 #' @export
-list_concat <- function(..., collapse = TRUE){
+list_concat <- function(..., collapse = FALSE){
   lists <- list(...)
 
   # size of each list
