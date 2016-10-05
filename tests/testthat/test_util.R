@@ -342,7 +342,7 @@ test_that("list_concat", {
     c(3, 5)
   )
 
-  ret <- list_concat(list1)
+  ret <- list_concat(list1, collapse = TRUE)
   expect_equal(length(ret), 1)
   expect_equal(ret[[1]], c(NA, NA, "3", "5"))
 })
