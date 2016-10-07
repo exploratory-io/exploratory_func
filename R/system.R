@@ -309,7 +309,9 @@ queryNeo4j <- function(host, port,  username, password, query, isSSL = FALSE){
 
   graph <- NULL
   if(!is.null(username) && !is.null(password)){
-    graph = RNeo4j::startGraph(url, username = username, password = password)
+    # read stored password
+    pass = saveOrReadPassword("neo4j", username, password)
+    graph = RNeo4j::startGraph(url, username = username, password = pass)
   } else {
     graph = RNeo4j::startGraph(url)
   }
