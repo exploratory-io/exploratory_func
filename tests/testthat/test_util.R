@@ -333,3 +333,51 @@ test_that("list_to_text should return NA", {
 
   expect_equal(ret[["text"]], c(rep(NA, 3), rep("b, b, b, b, b", 7)))
 })
+
+test_that("list_concat", {
+  list1 <- list(
+    NA,
+    NA,
+    character(0),
+    c(3, 5)
+  )
+
+  ret <- list_concat(list1, collapse = TRUE)
+  expect_equal(length(ret), 1)
+  expect_equal(ret[[1]], c(NA, NA, "3", "5"))
+})
+
+test_that("list_concat with multiple list", {
+  list1 <- list(
+    NA,
+    NA,
+    character(0),
+    c(3, 5)
+  )
+
+  list2 <- list(
+    NA,
+    c("a", "c"),
+    character(0),
+    c(6)
+  )
+
+  list3 <- list(
+    NA,
+    c(1, 3),
+    c("a", "c"),
+    c(6)
+  )
+
+  ret1 <- list_concat(list1, list2, list3, collapse = FALSE)
+  expect_equal(ret1[[1]], c(NA, NA, NA))
+  expect_equal(ret1[[2]], c(NA, "a", "c", "1", "3"))
+  expect_equal(ret1[[3]], c("a", "c"))
+  expect_equal(ret1[[4]], c(3, 5, 6, 6))
+
+  ret1_collapse <- list_concat(list1, list2, list3, collapse = TRUE)
+
+  expect_equal(length(ret1_collapse), 1)
+  expect_equal(ret1_collapse[[1]], c(NA, NA, NA, NA, "a", "c", "1", "3", "a", "c", "3", "5", "6", "6"))
+
+})
