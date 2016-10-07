@@ -247,7 +247,7 @@ queryMongoDB <- function(host, port, database, collection, username, password, q
   if(isSSL){
     url = stringr::str_c(url, "?ssl=true")
   }
-  if(!is.na(authSource)){
+  if(!is.null(authSource) && authSource != ""){
     if(isSSL){
       url = stringr::str_c(url, "&authSource=", authSource)
     } else {
