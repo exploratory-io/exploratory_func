@@ -22,3 +22,16 @@ do_anomaly_detection <- function(df, value, time = NULL, ...){
   test <- (df %>%  dplyr::do_(.dots=setNames(list(~do_anomaly_detection_each(.)), result_col)))
   test %>%  tidyr::unnest_(result_col)
 }
+
+#' @export
+detect_anomaly <- function(value, time = NULL, ...){
+  if(is.null(time)){
+    anom <- AnomalyDetection::AnomalyDetectionVec(value, ...)$anom
+    ret <- seq(length(value)) %in% anom$index
+  } else {
+    data <- data.frame(time, value)
+    anom <- AnomalyDetection::AnomalyDetectionTs(data, ...)$anom
+    ret <- time %in% as.POSIXct(anom$timestamp)
+  }
+  ret
+}
