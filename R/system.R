@@ -566,6 +566,12 @@ executeGoogleBigQuery <- function(project, sqlquery, destination_table, page_siz
     dataSetTable = stringr::str_split(stringr::str_replace(destination_table, stringr::str_c(project,":"),""),"\\.")
     dataSet = dataSetTable[[1]][1]
     table = dataSetTable[[1]][2]
+    bqtable <- exploratory::getGoogleBigQueryTable(project = project, dataset = dataSet, table = table, tokenFileId = tokenFileId)
+    if(is.null(bqtable)){
+      # if result table is empty, resubmit query to get a result (for refresh data frame case)
+      result <- exploratory::submitGoogleBigQueryJob(project, sqlquery, destination_table, write_disposition = "WRITE_TRUNCATE", tokenFieldId);
+    }
+
     # submit a job to extract query result to cloud storage
     uri = stringr::str_c('gs://', bucket, "/", folder, "/", "exploratory_temp*.gz")
     job <- exploratory::extractDataFromGoogleBigQueryTableToStorage(project = project, dataset = dataSet, table = table, uri,tokenFileId);
@@ -627,7 +633,7 @@ getGoogleBigQueryTable <- function(project, dataset, table, tokenFileId){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   token <- getGoogleTokenForBigQuery(tokenFileId);
   bigrquery::set_access_cred(token)
-  tables <- bigrquery::get_table(project, dataset, table);
+  table <- bigrquery::get_table(project, dataset, table);
 }
 
 #' API to get tables for current project, data set
