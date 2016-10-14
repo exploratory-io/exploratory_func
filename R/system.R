@@ -554,13 +554,31 @@ saveGoogleBigQueryResultAs <- function(projectId, sourceDatasetId, sourceTableId
 }
 
 #' @export
-executeGoogleBigQuery <- function(project, sqlquery, destination_table, page_size = 10000, max_page = 10, write_disposition = "WRITE_TRUNCATE", tokenFileId){
+executeGoogleBigQuery <- function(project, sqlquery, destination_table, page_size = 10000, max_page = 10, write_disposition = "WRITE_TRUNCATE", tokenFileId, bucketProjectId, bucket=NULL, folder){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
+  if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
 
   token <- getGoogleTokenForBigQuery(tokenFileId)
-  bigrquery::set_access_cred(token)
-  bigrquery::query_exec(GetoptLong::qq(sqlquery), project = project, destination_table = destination_table, page_size = page_size, max_page = max_page, write_disposition = write_disposition)
+  df <- NULL
+  if(!is.na(bucket) && length(bucket) > 1){
+    # destination_table looks like 'exploratory-bigquery-project:exploratory_dataset.exploratory_bq_preview_table'
+    dataSetTable = stringr::str_split(stringr::str_replace(destination_table, stringr::str_c(project,":"),""),".")
+    dataSet = dataSetTable[1]
+    table = dataSetTable[2]
+    # submit a job to extract query result to cloud storage
+    uri = stringr::str_c('gs://', bucket, "/", folder, "/", "exploratory_temp*.gz")
+    job <- exploratory::extractDataFromGoogleBigQueryTableToStorage(project = project, dataset = dataSet, table = table, uri,tokenFileId);
+    # wait for extract to be done
+    bigrquery::wait_for(job)
+    # download tgzip file to client
+    df <- exploratory::downloadDataFromGoogleCloudStorage(bucket = bucket, folder=folder, download_dir = tempdir(), tokenFileId = tokenFileId)
+  } else {
+    # direct import case
+    bigrquery::set_access_cred(token)
+    df <- bigrquery::query_exec(GetoptLong::qq(sqlquery), project = project, destination_table = destination_table, page_size = page_size, max_page = max_page, write_disposition = write_disposition)
+  }
+  df
 }
 
 #' API to get projects for current oauth token
