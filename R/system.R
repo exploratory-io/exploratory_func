@@ -449,7 +449,10 @@ getGoogleTokenForBigQuery <- function(tokenFileId, useCache=TRUE){
       cacheOption = FALSE
     }
     token <- httr::oauth2.0_token(httr::oauth_endpoints("google"), myapp,
-                                  scope = c("https://www.googleapis.com/auth/bigquery", "https://www.googleapis.com/auth/cloud-platform"), cache = FALSE)
+                                  scope = c("https://www.googleapis.com/auth/bigquery",
+                                            "https://www.googleapis.com/auth/cloud-platform",
+                                            "https://www.googleapis.com/auth/devstorage.full_control",
+                                            "https://www.googleapis.com/auth/devstorage.read_write"), cache = FALSE)
     # Save the token object for future sessions
     saveRDS(token, file=tokenPath)
   }
@@ -493,6 +496,49 @@ getDataFromGoogleBigQueryTable <- function(project, dataset, table, page_size = 
 
   bigrquery::list_tabledata(project, dataset, table, page_size = page_size,
                  table_info = NULL, max_pages = max_page)
+}
+
+#' API to extract datafrom google BigQuery table to Google Storage
+#' @export
+extractDataFromGoogleBigQueryTableToStorage <- function(project, dataset, table, destinationUri, tokenFileId){
+  if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
+  token <- getGoogleTokenForBigQuery(tokenFileId)
+  bigrquery::set_access_cred(token)
+
+  job <- bigrquery::insert_extract_job(project, dataset, table, destinationUri,
+                                print_header=TRUE, field_delimiter=",", destination_format="CSV", compression="GZIP")
+  job <- bigrquery::wait_for(job)
+  job
+}
+
+#' API to download datafrom Google Storage to client and create a df from it
+#' @export
+downloadDataFromGoogleCloudStorage <- function(bucket, folder, download_dir, tokenFileId){
+  if(!requireNamespace("googleCloudStorageR")){stop("package googleCloudStorageR must be installed.")}
+  if(!requireNamespace("googleAuthR")){stop("package googleAuthR must be installed.")}
+  token <- getGoogleTokenForBigQuery(tokenFileId)
+  googleAuthR::gar_auth(token = token)
+  googleCloudStorageR::gcs_global_bucket(bucket)
+  objects <- googleCloudStorageR::gcs_list_objects()
+  # set buckt
+  googleCloudStorageR::gcs_global_bucket(bucket)
+  objects <- gcs_list_objects()
+  lapply(objects$name, function(name){
+    if(stringr::str_detect(name,stringr::str_c(folder, "/"))){
+      googleCloudStorageR::gcs_get_object(name, saveToDisk = str_c(download_dir, stringr::str_replace(name, stringr::str_c(folder, "/"),"")))
+      googleCloudStorageR::gcs_delete_object(name, bucket = bucket)
+    }
+  });
+  files <- list.files(path=download_dir, pattern = ".gz");
+  df <- lapply(files, function(file){readr::read_csv(stringr::str_c(download_dir, file))}) %>% dplyr::bind_rows()
+}
+
+listGoogleCloudStorageBuckets <- function(project, tokenFileId){
+  if(!requireNamespace("googleCloudStorageR")){stop("package googleCloudStorageR must be installed.")}
+  if(!requireNamespace("googleAuthR")){stop("package googleAuthR must be installed.")}
+  token <- getGoogleTokenForBigQuery(tokenFileId)
+  googleAuthR::gar_auth(token = token)
+  googleCloudStorageR::gcs_list_buckets(projectId = project, projection = c("full"))
 }
 
 #' API to get a data from google BigQuery table
