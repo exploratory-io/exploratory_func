@@ -522,15 +522,15 @@ downloadDataFromGoogleCloudStorage <- function(bucket, folder, download_dir, tok
   objects <- googleCloudStorageR::gcs_list_objects()
   # set buckt
   googleCloudStorageR::gcs_global_bucket(bucket)
-  objects <- gcs_list_objects()
+  objects <- googleCloudStorageR::gcs_list_objects()
   lapply(objects$name, function(name){
     if(stringr::str_detect(name,stringr::str_c(folder, "/"))){
-      googleCloudStorageR::gcs_get_object(name, saveToDisk = str_c(download_dir, stringr::str_replace(name, stringr::str_c(folder, "/"),"")))
+      googleCloudStorageR::gcs_get_object(name, saveToDisk = str_c(download_dir, "/", stringr::str_replace(name, stringr::str_c(folder, "/"),"")))
       googleCloudStorageR::gcs_delete_object(name, bucket = bucket)
     }
   });
   files <- list.files(path=download_dir, pattern = ".gz");
-  df <- lapply(files, function(file){readr::read_csv(stringr::str_c(download_dir, file))}) %>% dplyr::bind_rows()
+  df <- lapply(files, function(file){readr::read_csv(stringr::str_c(download_dir, "/", file))}) %>% dplyr::bind_rows()
 }
 
 listGoogleCloudStorageBuckets <- function(project, tokenFileId){
@@ -561,16 +561,16 @@ executeGoogleBigQuery <- function(project, sqlquery, destination_table, page_siz
 
   token <- getGoogleTokenForBigQuery(tokenFileId)
   df <- NULL
-  if(!is.na(bucket) && length(bucket) > 1){
+  if(!is.na(bucket) && bucket != ""){
     # destination_table looks like 'exploratory-bigquery-project:exploratory_dataset.exploratory_bq_preview_table'
-    dataSetTable = stringr::str_split(stringr::str_replace(destination_table, stringr::str_c(project,":"),""),".")
-    dataSet = dataSetTable[1]
-    table = dataSetTable[2]
+    dataSetTable = stringr::str_split(stringr::str_replace(destination_table, stringr::str_c(project,":"),""),"\\.")
+    dataSet = dataSetTable[[1]][1]
+    table = dataSetTable[[1]][2]
     # submit a job to extract query result to cloud storage
     uri = stringr::str_c('gs://', bucket, "/", folder, "/", "exploratory_temp*.gz")
     job <- exploratory::extractDataFromGoogleBigQueryTableToStorage(project = project, dataset = dataSet, table = table, uri,tokenFileId);
     # wait for extract to be done
-    bigrquery::wait_for(job)
+    job <- bigrquery::wait_for(job)
     # download tgzip file to client
     df <- exploratory::downloadDataFromGoogleCloudStorage(bucket = bucket, folder=folder, download_dir = tempdir(), tokenFileId = tokenFileId)
   } else {
