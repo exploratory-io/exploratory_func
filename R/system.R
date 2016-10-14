@@ -451,7 +451,6 @@ getGoogleTokenForBigQuery <- function(tokenFileId, useCache=TRUE){
     token <- httr::oauth2.0_token(httr::oauth_endpoints("google"), myapp,
                                   scope = c("https://www.googleapis.com/auth/bigquery",
                                             "https://www.googleapis.com/auth/cloud-platform",
-                                            "https://www.googleapis.com/auth/devstorage.full_control",
                                             "https://www.googleapis.com/auth/devstorage.read_write"), cache = FALSE)
     # Save the token object for future sessions
     saveRDS(token, file=tokenPath)
@@ -498,20 +497,20 @@ getDataFromGoogleBigQueryTable <- function(project, dataset, table, page_size = 
                  table_info = NULL, max_pages = max_page)
 }
 
-#' API to extract datafrom google BigQuery table to Google Storage
+#' API to extract data from google BigQuery table to Google Cloud Storage
 #' @export
-extractDataFromGoogleBigQueryTableToStorage <- function(project, dataset, table, destinationUri, tokenFileId){
+extractDataFromGoogleBigQueryToCloudStorage <- function(project, dataset, table, destinationUri, tokenFileId){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   token <- getGoogleTokenForBigQuery(tokenFileId)
   bigrquery::set_access_cred(token)
-
+  # call forked bigrquery for submitting extract job
   job <- bigrquery::insert_extract_job(project, dataset, table, destinationUri,
                                 print_header=TRUE, field_delimiter=",", destination_format="CSV", compression="GZIP")
   job <- bigrquery::wait_for(job)
   job
 }
 
-#' API to download datafrom Google Storage to client and create a df from it
+#' API to download data from Google Storage to client and create a data frame from it
 #' @export
 downloadDataFromGoogleCloudStorage <- function(bucket, folder, download_dir, tokenFileId){
   if(!requireNamespace("googleCloudStorageR")){stop("package googleCloudStorageR must be installed.")}
@@ -520,9 +519,12 @@ downloadDataFromGoogleCloudStorage <- function(bucket, folder, download_dir, tok
   googleAuthR::gar_auth(token = token)
   googleCloudStorageR::gcs_global_bucket(bucket)
   objects <- googleCloudStorageR::gcs_list_objects()
-  # set buckt
+  # set bucket
   googleCloudStorageR::gcs_global_bucket(bucket)
   objects <- googleCloudStorageR::gcs_list_objects()
+  # for each file extracted from Google BigQuery to Google Cloud Storage,
+  # download the file to local temporary direcotry.
+  # then delete the extracted files from Google Cloud Storage.
   lapply(objects$name, function(name){
     if(stringr::str_detect(name,stringr::str_c(folder, "/"))){
       googleCloudStorageR::gcs_get_object(name, saveToDisk = str_c(download_dir, "/", stringr::str_replace(name, stringr::str_c(folder, "/"),"")))
@@ -554,13 +556,25 @@ saveGoogleBigQueryResultAs <- function(projectId, sourceDatasetId, sourceTableId
 }
 
 #' @export
-executeGoogleBigQuery <- function(project, sqlquery, destination_table, page_size = 10000, max_page = 10, write_disposition = "WRITE_TRUNCATE", tokenFileId, bucketProjectId, bucket=NULL, folder){
+#' @param projectId - Google BigQuery project id
+#' @param sqlquery - SQL query to get data
+#' @param destination_table - Google BigQuery table where query result is saved
+#' @param page_size - Number of items per page.
+#' @param max_page - maximum number of pages to retrieve.
+#' @param write_deposition - controls how your BigQuery write operation applies to an existing table.
+#' @param tokenFileId - file id for auth token
+#' @param bucketProjectId - Id of the Project where Google Cloud Storage Bucket belongs
+#' @param bucket - Google Cloud Storage Bucket
+#' @param folder - Folder under Google Cloud Storage Bucket where temp files are extracted.
+#' @export
+executeGoogleBigQuery <- function(project, sqlquery, destination_table, page_size = 100000, max_page = 10, write_disposition = "WRITE_TRUNCATE", tokenFileId, bucketProjectId, bucket=NULL, folder){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
   if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
 
   token <- getGoogleTokenForBigQuery(tokenFileId)
   df <- NULL
+  # if bucket is set, use Google Cloud Storage for extract and download
   if(!is.na(bucket) && bucket != ""){
     # destination_table looks like 'exploratory-bigquery-project:exploratory_dataset.exploratory_bq_preview_table'
     dataSetTable = stringr::str_split(stringr::str_replace(destination_table, stringr::str_c(project,":"),""),"\\.")
@@ -574,7 +588,7 @@ executeGoogleBigQuery <- function(project, sqlquery, destination_table, page_siz
 
     # submit a job to extract query result to cloud storage
     uri = stringr::str_c('gs://', bucket, "/", folder, "/", "exploratory_temp*.gz")
-    job <- exploratory::extractDataFromGoogleBigQueryTableToStorage(project = project, dataset = dataSet, table = table, uri,tokenFileId);
+    job <- exploratory::extractDataFromGoogleBigQueryToCloudStorage(project = project, dataset = dataSet, table = table, uri,tokenFileId);
     # wait for extract to be done
     job <- bigrquery::wait_for(job)
     # download tgzip file to client
