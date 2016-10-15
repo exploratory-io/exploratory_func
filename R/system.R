@@ -535,6 +535,8 @@ downloadDataFromGoogleCloudStorage <- function(bucket, folder, download_dir, tok
   df <- lapply(files, function(file){readr::read_csv(stringr::str_c(download_dir, "/", file))}) %>% dplyr::bind_rows()
 }
 
+#' API to get a list of buckets from Google Cloud Storage
+#' @export
 listGoogleCloudStorageBuckets <- function(project, tokenFileId){
   if(!requireNamespace("googleCloudStorageR")){stop("package googleCloudStorageR must be installed.")}
   if(!requireNamespace("googleAuthR")){stop("package googleAuthR must be installed.")}
