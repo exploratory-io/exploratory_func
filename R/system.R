@@ -580,10 +580,16 @@ executeGoogleBigQuery <- function(project, sqlquery, destination_table, page_siz
     dataSetTable = stringr::str_split(stringr::str_replace(destination_table, stringr::str_c(project,":"),""),"\\.")
     dataSet = dataSetTable[[1]][1]
     table = dataSetTable[[1]][2]
-    bqtable <- exploratory::getGoogleBigQueryTable(project = project, dataset = dataSet, table = table, tokenFileId = tokenFileId)
+    bqtable <- NULL
+    tryCatch({
+      # if table not found, it raises error so ignore it.
+      bqtable <- exploratory::getGoogleBigQueryTable(project = project, dataset = dataSet, table = table, tokenFileId = tokenFileId)
+    }, error = function(e){
+      # can be ignored
+    })
     if(is.null(bqtable)){
       # if result table is empty, resubmit query to get a result (for refresh data frame case)
-      result <- exploratory::submitGoogleBigQueryJob(project, sqlquery, destination_table, write_disposition = "WRITE_TRUNCATE", tokenFieldId);
+      result <- exploratory::submitGoogleBigQueryJob(project, sqlquery, destination_table, write_disposition = "WRITE_TRUNCATE", tokenFileId);
     }
 
     # submit a job to extract query result to cloud storage
