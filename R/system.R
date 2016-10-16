@@ -274,11 +274,11 @@ getDBConnection <- function(type, host, port, databaseName, username, password){
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
   drv = NULL
   conn = NULL
-  if(type == "mysql" || type == "aurora"){
+  if(type == "mysql" | type == "aurora"){
     drv <- DBI::dbDriver("MySQL")
     conn = RMySQL::dbConnect(drv, dbname = databaseName, username = username,
                              password = password, host = host, port = port)
-  } else if (type == "postgres" || type == "redshift"){
+  } else if (type == "postgres" | type == "redshift" | type == "hp_vertica"){
     drv <- DBI::dbDriver("PostgreSQL")
     pg_dsn = paste0(
       'dbname=', databaseName, ' ',
