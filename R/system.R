@@ -300,6 +300,26 @@ getListOfTables <- function(type, host, port, databaseName, username, password){
 }
 
 #' @export
+getListOfColumns <- function(type, host, port, databaseName, username, password, table){
+  if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
+  conn <- exploratory::getDBConnection(type, host, port, databaseName, username, password)
+  columns <- DBI::dbListFields(conn, table)
+  DBI::dbDisconnect(conn)
+  columns
+}
+
+#' @export
+getNumberOfRowsForQuery <- function(type, host, port, databaseName, username, password, countQuery){
+  if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
+  conn <- exploratory::getDBConnection(type, host, port, databaseName, username, password)
+  resultSet <- DBI::dbSendQuery(conn, countQuery)
+  df <- DBI::dbFetch(resultSet)
+  DBI::dbClearResult(resultSet)
+  DBI::dbDisconnect(conn)
+  df
+}
+
+#' @export
 queryNeo4j <- function(host, port,  username, password, query, isSSL = FALSE){
   if(!requireNamespace("RNeo4j")){stop("package RNeo4j must be installed.")}
   if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
