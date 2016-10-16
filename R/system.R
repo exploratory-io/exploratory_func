@@ -577,7 +577,7 @@ executeGoogleBigQuery <- function(project, sqlquery, destination_table, page_siz
   token <- getGoogleTokenForBigQuery(tokenFileId)
   df <- NULL
   # if bucket is set, use Google Cloud Storage for extract and download
-  if(!is.na(bucket) && bucket != ""){
+  if(!is.null(bucket) && !is.na(bucket) && bucket != ""){
     # destination_table looks like 'exploratory-bigquery-project:exploratory_dataset.exploratory_bq_preview_table'
     dataSetTable = stringr::str_split(stringr::str_replace(destination_table, stringr::str_c(project,":"),""),"\\.")
     dataSet = dataSetTable[[1]][1]
