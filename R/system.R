@@ -557,7 +557,7 @@ saveGoogleBigQueryResultAs <- function(projectId, sourceDatasetId, sourceTableId
   bigrquery::copy_table(src, dest)
 }
 
-#' @export
+#' Get data from google big query
 #' @param projectId - Google BigQuery project id
 #' @param sqlquery - SQL query to get data
 #' @param destination_table - Google BigQuery table where query result is saved
