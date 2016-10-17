@@ -229,15 +229,10 @@ getGoogleSheetList <- function(tokenFileId){
   googlesheets::gs_ls()
 }
 
-#' @export
-queryMongoDB <- function(host, port, database, collection, username, password, query = "{}", isFlatten, limit=0, isSSL=FALSE, authSource=NULL, fields="{}", sort="{}", skip=0){
-  if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
-  loadNamespace("stringr")
-  loadNamespace("jsonlite")
-  if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
 
-  # read stored password
-  pass = saveOrReadPassword("mongodb", username, password)
+getMongoURL <- function(host, port, database, username, pass, isSSL=FALSE, authSource=NULL) {
+  loadNamespace("stringr")
+
   if (stringr::str_length(username) > 0) {
     url = stringr::str_c("mongodb://", username, ":", pass, "@", host, ":", as.character(port), "/", database)
   }
@@ -254,6 +249,19 @@ queryMongoDB <- function(host, port, database, collection, username, password, q
       url = stringr::str_c(url, "?authSource=", authSource)
     }
   }
+  return (url)
+}
+
+
+#' @export
+queryMongoDB <- function(host, port, database, collection, username, password, query = "{}", isFlatten, limit=100000, isSSL=FALSE, authSource=NULL, fields="{}", sort="{}", skip=0){
+  if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
+  loadNamespace("jsonlite")
+  if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
+
+  # read stored password
+  pass = saveOrReadPassword("mongodb", username, password)
+  url = getMongoURL(host, port, database, username, pass, isSSL, authSource)
   con <- mongolite::mongo(collection, url = url)
   if(fields == ""){
     fields = "{}"
@@ -272,6 +280,20 @@ queryMongoDB <- function(host, port, database, collection, username, password, q
     result
   }
 }
+
+#' Returns the total number of rows stored in the target table. 
+#' At this moment only mongdb is supported.
+#' @export
+getMongoCollectionNumberOfRows <- function(host, port, database, username, password, collection, isSSL=FALSE, authSource=NULL){
+  loadNamespace("jsonlite")
+  if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
+  pass = saveOrReadPassword("mongodb", username, password)
+  url = getMongoURL(host, port, database, username, pass, isSSL, authSource)
+  con <- mongolite::mongo(collection, url = url)
+  result <- con$count()
+  return(result)
+}
+
 
 #' @export
 getDBConnection <- function(type, host, port, databaseName, username, password){
