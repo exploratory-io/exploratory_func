@@ -36,9 +36,9 @@ refreshGoogleTokenForConsole <- function(tokenFileId){
 #' Access google search console data
 #' @export
 getGoogleConsole <- function(siteURL,
-                             startDate = "",
-                             endDate = "",
-                             dimensions = "",
+                             startDate = Sys.Date() - 93,
+                             endDate = Sys.Date() - 3,
+                             dimensions = NULL,
                              searchType = 'web',
                              dimensionFilterExp = "",
                              aggregationType = "auto",
@@ -50,19 +50,11 @@ getGoogleConsole <- function(siteURL,
   if(dimensionFilterExp == ""){
     dimensionFilterExp <- NULL
   }
-  if(start_date == ""){
+  if(is.null(start_date)){
     start_date <- Sys.Date() - 93
   }
-  if(end_date == ""){
+  if(is.null(end_date)){
     end_date <- Sys.Date() - 3
-  }
-
-  # multible values from lov editor passes comma separated strings, so split it
-  if(dimensions == ""){
-    dimensions <- NULL
-  } else {
-    loadNamespace("stringr")
-    dimensions <- stringr::str_split(dimensions, ",")[[1]]
   }
 
   searchConsoleR::search_analytics(
