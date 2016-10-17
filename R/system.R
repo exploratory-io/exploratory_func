@@ -278,7 +278,7 @@ getDBConnection <- function(type, host, port, databaseName, username, password){
     drv <- DBI::dbDriver("MySQL")
     conn = RMySQL::dbConnect(drv, dbname = databaseName, username = username,
                              password = password, host = host, port = port)
-  } else if (type == "postgres" || type == "redshift"){
+  } else if (type == "postgres" || type == "redshift" || type == "vertica"){
     drv <- DBI::dbDriver("PostgreSQL")
     pg_dsn = paste0(
       'dbname=', databaseName, ' ',
@@ -557,7 +557,7 @@ saveGoogleBigQueryResultAs <- function(projectId, sourceDatasetId, sourceTableId
   bigrquery::copy_table(src, dest)
 }
 
-#' @export
+#' Get data from google big query
 #' @param projectId - Google BigQuery project id
 #' @param sqlquery - SQL query to get data
 #' @param destination_table - Google BigQuery table where query result is saved
