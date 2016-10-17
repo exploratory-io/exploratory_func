@@ -254,7 +254,7 @@ getMongoURL <- function(host, port, database, username, pass, isSSL=FALSE, authS
 
 
 #' @export
-queryMongoDB <- function(host, port, database, collection, username, password, query = "{}", isFlatten, limit=100000, isSSL=FALSE, authSource=NULL, fields="{}", sort="{}", skip=0){
+queryMongoDB <- function(host, port, database, collection, username, password, query = "{}", isFlatten, limit=0, isSSL=FALSE, authSource=NULL, fields="{}", sort="{}", skip=0){
   if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
   loadNamespace("jsonlite")
   if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
