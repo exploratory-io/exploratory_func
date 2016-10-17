@@ -284,7 +284,7 @@ getDBConnection <- function(type, host, port, databaseName, username, password){
     drv <- DBI::dbDriver("MySQL")
     conn = RMySQL::dbConnect(drv, dbname = databaseName, username = username,
                              password = password, host = host, port = port)
-  } else if (type == "postgres" || type == "redshift"){
+  } else if (type == "postgres" || type == "redshift" || type == "vertica"){
     drv <- DBI::dbDriver("PostgreSQL")
     pg_dsn = paste0(
       'dbname=', databaseName, ' ',
@@ -303,6 +303,27 @@ getListOfTables <- function(type, host, port, databaseName, username, password){
   tables <- DBI::dbListTables(conn)
   DBI::dbDisconnect(conn)
   tables
+}
+
+#' @export
+getListOfColumns <- function(type, host, port, databaseName, username, password, table){
+  if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
+  conn <- exploratory::getDBConnection(type, host, port, databaseName, username, password)
+  columns <- DBI::dbListFields(conn, table)
+  DBI::dbDisconnect(conn)
+  columns
+}
+
+#' @export
+#' API to execute a query that can be handled with DBI
+executeGenericQuery <- function(type, host, port, databaseName, username, password, query){
+  if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
+  conn <- exploratory::getDBConnection(type, host, port, databaseName, username, password)
+  resultSet <- DBI::dbSendQuery(conn, query)
+  df <- DBI::dbFetch(resultSet)
+  DBI::dbClearResult(resultSet)
+  DBI::dbDisconnect(conn)
+  df
 }
 
 #' @export
@@ -563,7 +584,7 @@ saveGoogleBigQueryResultAs <- function(projectId, sourceDatasetId, sourceTableId
   bigrquery::copy_table(src, dest)
 }
 
-#' @export
+#' Get data from google big query
 #' @param projectId - Google BigQuery project id
 #' @param sqlquery - SQL query to get data
 #' @param destination_table - Google BigQuery table where query result is saved
