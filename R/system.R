@@ -309,10 +309,10 @@ getListOfColumns <- function(type, host, port, databaseName, username, password,
 }
 
 #' @export
-getNumberOfRowsForQuery <- function(type, host, port, databaseName, username, password, countQuery){
+executeGenericQuery <- function(type, host, port, databaseName, username, password, query){
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
   conn <- exploratory::getDBConnection(type, host, port, databaseName, username, password)
-  resultSet <- DBI::dbSendQuery(conn, countQuery)
+  resultSet <- DBI::dbSendQuery(conn, query)
   df <- DBI::dbFetch(resultSet)
   DBI::dbClearResult(resultSet)
   DBI::dbDisconnect(conn)
