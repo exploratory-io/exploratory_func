@@ -977,3 +977,24 @@ statecode <- function(sourcevar, origin, destination, ignore.case=TRUE) {
     return (as.character(destination_vector[match(sourcevar, origin_vector)])) #faster
   }
 }
+
+#' It selects the columns that matches with the given strings.
+#' Invalid column names will be just ignored.
+#'
+#' Usage:
+#' > mtcars %>% selectx('mpg', 'abc', 'mt', 'wt')
+#' mpg    wt
+#' Mazda RX4           21.0 2.620
+#' Mazda RX4 Wag       21.0 2.875
+#' Datsun 710          22.8 2.320
+#' Hornet 4 Drive      21.4 3.215
+#'               :
+#'               :
+#'
+#' @param x data frame
+#' @param ... column name strings
+#' @return data frame
+#' @export
+selectx <- function(x, ...) {
+  x[, colnames(x) %in% list(...)]
+}
