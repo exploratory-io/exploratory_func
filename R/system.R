@@ -977,3 +977,25 @@ statecode <- function(sourcevar, origin, destination, ignore.case=TRUE) {
     return (as.character(destination_vector[match(sourcevar, origin_vector)])) #faster
   }
 }
+
+#' Select extended. It selects the columns that matches with the given strings.
+#' Invalid column names will be just ignored.
+#'
+#' Usage:
+#'
+#' > flight %>% selectx('YEAR1','YEAR','YEAR2', 'MONTH', 'MON')
+#' YEAR MONTH
+#' 1 2013    10
+#' 2 2013    10
+#' 3 2013    10
+#' 4 2013    10
+#' 5 2013    10
+#' 6 2013    10
+#'
+#' @param x data frame
+#' @param ... column name strings
+#' @return data frame
+#' @export
+selectx <- function(x, ...) {
+  x[, colnames(x) %in% list(...)]
+}
