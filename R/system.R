@@ -978,19 +978,18 @@ statecode <- function(sourcevar, origin, destination, ignore.case=TRUE) {
   }
 }
 
-#' Select extended. It selects the columns that matches with the given strings.
+#' It selects the columns that matches with the given strings.
 #' Invalid column names will be just ignored.
 #'
 #' Usage:
-#'
-#' > flight %>% selectx('YEAR1','YEAR','YEAR2', 'MONTH', 'MON')
-#' YEAR MONTH
-#' 1 2013    10
-#' 2 2013    10
-#' 3 2013    10
-#' 4 2013    10
-#' 5 2013    10
-#' 6 2013    10
+#' > mtcars %>% selectx('mpg', 'abc', 'mt', 'wt')
+#' mpg    wt
+#' Mazda RX4           21.0 2.620
+#' Mazda RX4 Wag       21.0 2.875
+#' Datsun 710          22.8 2.320
+#' Hornet 4 Drive      21.4 3.215
+#'               :
+#'               :
 #'
 #' @param x data frame
 #' @param ... column name strings
