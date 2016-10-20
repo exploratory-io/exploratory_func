@@ -1,4 +1,9 @@
 #' Get a user's timeline
+#' @param user - User id.
+#' @param n - Maximum number of tweets. Max of n in userTimeline is 3200, so the default is that number.
+#' @param includeRts - Whether retweets should be included in the result.
+#' @param includeReplies - Whether replies should be included in the result.
+#' @param tokenFileId - File id for auth token.
 #' @export
 getTwitterTimeline <- function(user, n=3200, includeRts = FALSE,
                                includeReplies = TRUE, tokenFileId){
