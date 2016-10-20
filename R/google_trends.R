@@ -3,7 +3,7 @@
 #' @param password - Password for the account.
 #' @param query - Vector of queries.
 #' @param type - Output type. Can be "top_regions", "top_cities" or "trends".
-#' @param last - From when the data should be retreived.
+#' @param last - From when the data should be retreived. Currently supported parameters are "1h", "4h", "1d", "7d", "5y", "30d", "90d", "1y" and "all" (from 2004)
 #' @param geo - Region codes. It's listed in countries data set in gtrendsR.
 #' @export
 getGoogleTrends <- function(user, password, query = "", type = "trend", last = "5y", geo = ""){
