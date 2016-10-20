@@ -229,15 +229,10 @@ getGoogleSheetList <- function(tokenFileId){
   googlesheets::gs_ls()
 }
 
-#' @export
-queryMongoDB <- function(host, port, database, collection, username, password, query = "{}", isFlatten, limit=100000, isSSL=FALSE, authSource=NULL){
-  if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
-  loadNamespace("stringr")
-  loadNamespace("jsonlite")
-  if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
 
-  # read stored password
-  pass = saveOrReadPassword("mongodb", username, password)
+getMongoURL <- function(host, port, database, username, pass, isSSL=FALSE, authSource=NULL) {
+  loadNamespace("stringr")
+
   if (stringr::str_length(username) > 0) {
     url = stringr::str_c("mongodb://", username, ":", pass, "@", host, ":", as.character(port), "/", database)
   }
@@ -254,8 +249,27 @@ queryMongoDB <- function(host, port, database, collection, username, password, q
       url = stringr::str_c(url, "?authSource=", authSource)
     }
   }
+  return (url)
+}
+
+
+#' @export
+queryMongoDB <- function(host, port, database, collection, username, password, query = "{}", isFlatten, limit=0, isSSL=FALSE, authSource=NULL, fields="{}", sort="{}", skip=0){
+  if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
+  loadNamespace("jsonlite")
+  if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
+
+  # read stored password
+  pass = saveOrReadPassword("mongodb", username, password)
+  url = getMongoURL(host, port, database, username, pass, isSSL, authSource)
   con <- mongolite::mongo(collection, url = url)
-  data <- con$find(query = GetoptLong::qq(query), limit=limit)
+  if(fields == ""){
+    fields = "{}"
+  }
+  if(sort == ""){
+    sort = "{}"
+  }
+  data <- con$find(query = GetoptLong::qq(query), limit=limit, fields=fields, sort = sort, skip = skip)
   result <-data
   if (isFlatten) {
     result <- jsonlite::flatten(data)
@@ -266,6 +280,20 @@ queryMongoDB <- function(host, port, database, collection, username, password, q
     result
   }
 }
+
+#' Returns the total number of rows stored in the target table. 
+#' At this moment only mongdb is supported.
+#' @export
+getMongoCollectionNumberOfRows <- function(host, port, database, username, password, collection, isSSL=FALSE, authSource=NULL){
+  loadNamespace("jsonlite")
+  if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
+  pass = saveOrReadPassword("mongodb", username, password)
+  url = getMongoURL(host, port, database, username, pass, isSSL, authSource)
+  con <- mongolite::mongo(collection, url = url)
+  result <- con$count()
+  return(result)
+}
+
 
 #' @export
 getDBConnection <- function(type, host, port, databaseName, username, password){
@@ -297,6 +325,27 @@ getListOfTables <- function(type, host, port, databaseName, username, password){
   tables <- DBI::dbListTables(conn)
   DBI::dbDisconnect(conn)
   tables
+}
+
+#' @export
+getListOfColumns <- function(type, host, port, databaseName, username, password, table){
+  if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
+  conn <- exploratory::getDBConnection(type, host, port, databaseName, username, password)
+  columns <- DBI::dbListFields(conn, table)
+  DBI::dbDisconnect(conn)
+  columns
+}
+
+#' @export
+#' API to execute a query that can be handled with DBI
+executeGenericQuery <- function(type, host, port, databaseName, username, password, query){
+  if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
+  conn <- exploratory::getDBConnection(type, host, port, databaseName, username, password)
+  resultSet <- DBI::dbSendQuery(conn, query)
+  df <- DBI::dbFetch(resultSet)
+  DBI::dbClearResult(resultSet)
+  DBI::dbDisconnect(conn)
+  df
 }
 
 #' @export
@@ -927,4 +976,25 @@ statecode <- function(sourcevar, origin, destination, ignore.case=TRUE) {
   } else {
     return (as.character(destination_vector[match(sourcevar, origin_vector)])) #faster
   }
+}
+
+#' It selects the columns that matches with the given strings.
+#' Invalid column names will be just ignored.
+#'
+#' Usage:
+#' > mtcars %>% selectx('mpg', 'abc', 'mt', 'wt')
+#' mpg    wt
+#' Mazda RX4           21.0 2.620
+#' Mazda RX4 Wag       21.0 2.875
+#' Datsun 710          22.8 2.320
+#' Hornet 4 Drive      21.4 3.215
+#'               :
+#'               :
+#'
+#' @param x data frame
+#' @param ... column name strings
+#' @return data frame
+#' @export
+selectx <- function(x, ...) {
+  x[, colnames(x) %in% list(...)]
 }
