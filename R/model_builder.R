@@ -106,7 +106,7 @@ build_kmeans.kv_ <- function(df,
                              trace = FALSE,
                              keep.source = TRUE,
                              seed=0,
-                             augment=FALSE,
+                             augment=TRUE,
                              fun.aggregate=mean,
                              fill=0){
   loadNamespace("dplyr")
@@ -191,7 +191,7 @@ build_kmeans.cols <- function(df, ...,
                             trace = FALSE,
                             keep.source = TRUE,
                             seed=0,
-                            augment=FALSE){
+                            augment=TRUE){
   loadNamespace("dplyr")
   loadNamespace("lazyeval")
   loadNamespace("tidyr")
