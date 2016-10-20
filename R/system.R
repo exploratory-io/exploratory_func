@@ -336,8 +336,8 @@ getListOfColumns <- function(type, host, port, databaseName, username, password,
   columns
 }
 
-#' @export
 #' API to execute a query that can be handled with DBI
+#' @export
 executeGenericQuery <- function(type, host, port, databaseName, username, password, query){
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
   conn <- exploratory::getDBConnection(type, host, port, databaseName, username, password)
