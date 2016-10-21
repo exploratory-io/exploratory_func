@@ -70,22 +70,33 @@ getGoogleTrends <- function(user, password, query = "", type = "trend", last = "
   if(type == "top_regions"){
     key <- keys[startsWith(keys, "Top.regions") | startsWith(keys, "Top.subregions")]
     bind_data <- dplyr::bind_rows(ret[key])
+    # gather columns except for the first column (names of region) to make it easy to visualise
     tidyr::gather_(bind_data, "keyword", "trend", colnames(bind_data)[2:ncol(bind_data)], na.rm = TRUE)
   } else if (type == "top_cities"){
     key <- keys[startsWith(keys, "Top.cities")]
     bind_data <- dplyr::bind_rows(ret[key])
+    # gather columns except for the first column (names of cities) to make it easy to visualise
     tidyr::gather_(bind_data, "keyword", "trend", colnames(bind_data)[2:ncol(bind_data)], na.rm = TRUE)
   } else if (type == "trend"){
     trend <- ret[[type]]
     # use query and geo arguments as column names to prevent garbled characters
-    queries <- stringr::str_replace(stringr::str_trim(query), " ", ".")
+    # spaces should is changed into . by gtrendsR, so doing the same
+    queries <- stringr::str_replace(stringr::str_trim(query), " +", ".")
     cols <- if(!is.null(geo)){
-      paste(queries, geo, sep = "_")
+      # put geo into column names and separate it later
+      # spaces in queries are converted to . by gtrends, so space can be used safely
+      paste(queries, geo, sep = " ")
     } else {
       queries
     }
     colnames(trend)[(ncol(trend)-length(cols)+1):ncol(trend)] <- cols
-    tidyr::gather_(trend, "keyword", "trend", cols, na.rm = TRUE)
+    # gather columns except for time columns to make it easy to visualise
+    ret <- tidyr::gather_(trend, "keyword", "trend", cols, na.rm = TRUE)
+    if(!is.null(geo)){
+      # separates geo and keywords that were column names
+      ret <- tidyr::separate_(ret, "keyword", c("keyword", "geo"), sep = " ")
+    }
+    ret
   } else {
     stop("Currently, type must be top_regions, top_cities or trends")
   }
