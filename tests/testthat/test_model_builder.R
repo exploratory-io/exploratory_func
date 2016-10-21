@@ -160,7 +160,7 @@ test_that("test build_kmeans all na", {
 test_that("test build_kmeans.cols ignore NA rows", {
   if(requireNamespace("broom")){
     result <- test_df %>%
-      build_kmeans.cols(vec1, vec2, na, centers=2, keep.source=TRUE) %>%
+      build_kmeans.cols(vec1, vec2, na, centers=2, keep.source=TRUE, augment = FALSE) %>%
       predict(model, data=source.data)
     expect_equal(dim(result)[[1]], 5)
   }
@@ -174,7 +174,7 @@ test_that("test build_kmeans.cols ignore NA rows", {
     n_char = as.character(10 - seq(10)), stringsAsFactors = FALSE
   )
   result <- test_df %>%
-    build_kmeans.cols(na_char, n_char, centers=2, keep.source=TRUE) %>%
+    build_kmeans.cols(na_char, n_char, centers=2, keep.source=TRUE, augment = FALSE) %>%
     predict(model, data=source.data)
   expect_equal(dim(result)[[1]], 9)
 })
@@ -236,14 +236,14 @@ test_that("test build_kmeans.cols ignore NA rows with grouped and keep.source=FA
 
 test_that("test build_kmeans.cols", {
   df <- data.frame(number = seq(4), number2 = seq(4)-4)
-  ret <- (df %>%  build_kmeans.cols(number, number2, keep.source=TRUE) %>%  predict(model, data=source.data))
+  ret <- (df %>%  build_kmeans.cols(number, number2, keep.source=TRUE, augment = FALSE) %>%  predict(model, data=source.data))
   expect_true(is.integer(ret$cluster))
 })
 
 test_that("test build_kmeans", {
   test_df[["cluster"]] <- rep(1, nrow(test_df))
   result <- test_df %>%
-    build_kmeans(skv = c("vec1", "vec2"), centers=2) %>%
+    build_kmeans(skv = c("vec1", "vec2"), centers=2, augment = FALSE) %>%
     predict(model, data = source.data)
   expect_true(is.integer(result[["cluster.new"]]))
   expect_equal(length(colnames(result)[colnames(result) == "cluster"]), 1)
