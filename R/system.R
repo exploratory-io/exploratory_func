@@ -281,7 +281,7 @@ queryMongoDB <- function(host, port, database, collection, username, password, q
   }
 }
 
-#' Returns the total number of rows stored in the target table. 
+#' Returns the total number of rows stored in the target table.
 #' At this moment only mongdb is supported.
 #' @export
 getMongoCollectionNumberOfRows <- function(host, port, database, username, password, collection, isSSL=FALSE, authSource=NULL){
@@ -628,24 +628,24 @@ executeGoogleBigQuery <- function(project, sqlquery, destination_table, page_siz
   # if bucket is set, use Google Cloud Storage for extract and download
   if(!is.null(bucket) && !is.na(bucket) && bucket != ""){
     # destination_table looks like 'exploratory-bigquery-project:exploratory_dataset.exploratory_bq_preview_table'
-    dataSetTable = stringr::str_split(stringr::str_replace(destination_table, stringr::str_c(project,":"),""),"\\.")
+    dataSetTable = stringr::str_split(stringr::str_replace(destination_table, stringr::str_c(bucketProjectId,":"),""),"\\.")
     dataSet = dataSetTable[[1]][1]
     table = dataSetTable[[1]][2]
     bqtable <- NULL
     tryCatch({
       # if table not found, it raises error so ignore it.
-      bqtable <- exploratory::getGoogleBigQueryTable(project = project, dataset = dataSet, table = table, tokenFileId = tokenFileId)
+      bqtable <- exploratory::getGoogleBigQueryTable(project = bucketProjectId, dataset = dataSet, table = table, tokenFileId = tokenFileId)
     }, error = function(e){
       # can be ignored
     })
     if(is.null(bqtable)){
       # if result table is empty, resubmit query to get a result (for refresh data frame case)
-      result <- exploratory::submitGoogleBigQueryJob(project, sqlquery, destination_table, write_disposition = "WRITE_TRUNCATE", tokenFileId);
+      result <- exploratory::submitGoogleBigQueryJob(bucketProjectId, sqlquery, destination_table, write_disposition = "WRITE_TRUNCATE", tokenFileId);
     }
 
     # submit a job to extract query result to cloud storage
     uri = stringr::str_c('gs://', bucket, "/", folder, "/", "exploratory_temp*.gz")
-    job <- exploratory::extractDataFromGoogleBigQueryToCloudStorage(project = project, dataset = dataSet, table = table, uri,tokenFileId);
+    job <- exploratory::extractDataFromGoogleBigQueryToCloudStorage(project = bucketProjectId, dataset = dataSet, table = table, uri,tokenFileId);
     # wait for extract to be done
     job <- bigrquery::wait_for(job)
     # download tgzip file to client
