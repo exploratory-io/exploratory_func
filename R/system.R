@@ -654,16 +654,8 @@ executeGoogleBigQuery <- function(project, sqlquery, destination_table, page_siz
     dataSet = dataSetTable[[1]][1]
     table = dataSetTable[[1]][2]
     bqtable <- NULL
-    tryCatch({
-      # if table not found, it raises error so ignore it.
-      bqtable <- exploratory::getGoogleBigQueryTable(project = bucketProjectId, dataset = dataSet, table = table, tokenFileId = tokenFileId)
-    }, error = function(e){
-      # can be ignored
-    })
-    if(is.null(bqtable)){
-      # if result table is empty, resubmit query to get a result (for refresh data frame case)
-      result <- exploratory::submitGoogleBigQueryJob(bucketProjectId, sqlquery, destination_table, write_disposition = "WRITE_TRUNCATE", tokenFileId);
-    }
+    # if result table is empty, resubmit query to get a result (for refresh data frame case)
+    result <- exploratory::submitGoogleBigQueryJob(bucketProjectId, sqlquery, destination_table, write_disposition = "WRITE_TRUNCATE", tokenFileId);
     df <- extractThenImportFromGoogleCloudStorage(bucketProjectId, dataSet, table, bucket, folder, tokenFileId)
   } else {
     # direct import case
