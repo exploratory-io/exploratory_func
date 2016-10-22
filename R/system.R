@@ -654,11 +654,12 @@ executeGoogleBigQuery <- function(project, sqlquery, destination_table, page_siz
     dataSet = dataSetTable[[1]][1]
     table = dataSetTable[[1]][2]
     bqtable <- NULL
-    # if result table is empty, resubmit query to get a result (for refresh data frame case)
+    # submit a query to get a result (for refresh data frame case)
     result <- exploratory::submitGoogleBigQueryJob(bucketProjectId, sqlquery, destination_table, write_disposition = "WRITE_TRUNCATE", tokenFileId);
+    # extranct result from Google BigQuery to Google Cloud Storage and import
     df <- extractThenImportFromGoogleCloudStorage(bucketProjectId, dataSet, table, bucket, folder, tokenFileId)
   } else {
-    # direct import case
+    # direct import case (for refresh data frame case)
     bigrquery::set_access_cred(token)
     df <- bigrquery::query_exec(GetoptLong::qq(sqlquery), project = project, destination_table = destination_table, page_size = page_size, max_page = max_page, write_disposition = write_disposition)
   }
