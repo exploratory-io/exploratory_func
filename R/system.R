@@ -607,6 +607,27 @@ saveGoogleBigQueryResultAs <- function(projectId, sourceDatasetId, sourceTableId
 }
 
 #' Get data from google big query
+#' @param bucketProjectId - Google Cloud Storage/BigQuery project id
+#' @param dataSet - Google BigQuery data tht your query result table is associated with
+#' @param table - Google BigQuery table where query result is saved
+#' @param bucket - Google Cloud Storage Bucket
+#' @param folder - Folder under Google Cloud Storage Bucket where temp files are extracted.
+#' @param tokenFileId - file id for auth token
+#' @export
+extractThenImportFromGoogleCloudStorage <- function(bucketProjectId, dataSet, table, bucket, folder, tokenFileId){
+  if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
+  if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
+
+  # submit a job to extract query result to cloud storage
+  uri = stringr::str_c('gs://', bucket, "/", folder, "/", "exploratory_temp*.gz")
+  job <- exploratory::extractDataFromGoogleBigQueryToCloudStorage(project = bucketProjectId, dataset = dataSet, table = table, uri,tokenFileId);
+  # wait for extract to be done
+  job <- bigrquery::wait_for(job)
+  # download tgzip file to client
+  df <- exploratory::downloadDataFromGoogleCloudStorage(bucket = bucket, folder=folder, download_dir = tempdir(), tokenFileId = tokenFileId)
+}
+
+#' Get data from google big query
 #' @param projectId - Google BigQuery project id
 #' @param sqlquery - SQL query to get data
 #' @param destination_table - Google BigQuery table where query result is saved
@@ -624,6 +645,7 @@ executeGoogleBigQuery <- function(project, sqlquery, destination_table, page_siz
   if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
 
   token <- getGoogleTokenForBigQuery(tokenFileId)
+
   df <- NULL
   # if bucket is set, use Google Cloud Storage for extract and download
   if(!is.null(bucket) && !is.na(bucket) && bucket != ""){
@@ -642,14 +664,7 @@ executeGoogleBigQuery <- function(project, sqlquery, destination_table, page_siz
       # if result table is empty, resubmit query to get a result (for refresh data frame case)
       result <- exploratory::submitGoogleBigQueryJob(bucketProjectId, sqlquery, destination_table, write_disposition = "WRITE_TRUNCATE", tokenFileId);
     }
-
-    # submit a job to extract query result to cloud storage
-    uri = stringr::str_c('gs://', bucket, "/", folder, "/", "exploratory_temp*.gz")
-    job <- exploratory::extractDataFromGoogleBigQueryToCloudStorage(project = bucketProjectId, dataset = dataSet, table = table, uri,tokenFileId);
-    # wait for extract to be done
-    job <- bigrquery::wait_for(job)
-    # download tgzip file to client
-    df <- exploratory::downloadDataFromGoogleCloudStorage(bucket = bucket, folder=folder, download_dir = tempdir(), tokenFileId = tokenFileId)
+    df <- extractThenImportFromGoogleCloudStorage(bucketProjectId, dataSet, table, bucket, folder, tokenFileId)
   } else {
     # direct import case
     bigrquery::set_access_cred(token)
