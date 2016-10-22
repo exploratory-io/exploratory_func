@@ -82,10 +82,10 @@ test_that("test statecode",{
   expect_equal(names, statecode(namesWithDifferentCases, "name", "name"))
 })
 
-test_that("test selectx",{
+test_that("test select_columns",{
   df <- data.frame(year=c(2014, 2015, 2016), sales=c(400, 500, 600), profit=c(200, 200, 300))
   # it selects only year and profit
-  df1 <- df %>% exploratory::selectx('year2', 'year1', 'year', 'profit', 'sales1')
+  df1 <- df %>% exploratory::select_columns('year2', 'year1', 'year', 'profit', 'sales1')
   expect_equal(ncol(df1), 2)
   expect_equal(colnames(df1), c('year', 'profit'))
 })

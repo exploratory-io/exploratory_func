@@ -982,7 +982,7 @@ statecode <- function(sourcevar, origin, destination, ignore.case=TRUE) {
 #' Invalid column names will be just ignored.
 #'
 #' Usage:
-#' > mtcars %>% selectx('mpg', 'abc', 'mt', 'wt')
+#' > mtcars %>% select_columns('mpg', 'abc', 'mt', 'wt')
 #' mpg    wt
 #' Mazda RX4           21.0 2.620
 #' Mazda RX4 Wag       21.0 2.875
@@ -995,6 +995,6 @@ statecode <- function(sourcevar, origin, destination, ignore.case=TRUE) {
 #' @param ... column name strings
 #' @return data frame
 #' @export
-selectx <- function(x, ...) {
+select_columns <- function(x, ...) {
   x[, colnames(x) %in% list(...)]
 }
