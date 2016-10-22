@@ -614,7 +614,7 @@ saveGoogleBigQueryResultAs <- function(projectId, sourceDatasetId, sourceTableId
 #' @param folder - Folder under Google Cloud Storage Bucket where temp files are extracted.
 #' @param tokenFileId - file id for auth token
 #' @export
-extractThenImportFromGoogleCloudStorage <- function(bucketProjectId, dataSet, table, bucket, folder, tokenFileId){
+getDataFromGoogleBigQueryTableViaCloudStorage <- function(bucketProjectId, dataSet, table, bucket, folder, tokenFileId){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
 
@@ -657,7 +657,7 @@ executeGoogleBigQuery <- function(project, sqlquery, destination_table, page_siz
     # submit a query to get a result (for refresh data frame case)
     result <- exploratory::submitGoogleBigQueryJob(bucketProjectId, sqlquery, destination_table, write_disposition = "WRITE_TRUNCATE", tokenFileId);
     # extranct result from Google BigQuery to Google Cloud Storage and import
-    df <- extractThenImportFromGoogleCloudStorage(bucketProjectId, dataSet, table, bucket, folder, tokenFileId)
+    df <- getDataFromGoogleBigQueryTableViaCloudStorage(bucketProjectId, dataSet, table, bucket, folder, tokenFileId)
   } else {
     # direct import case (for refresh data frame case)
     bigrquery::set_access_cred(token)
