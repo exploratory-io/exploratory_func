@@ -4,9 +4,11 @@
 #' @param includeRts - Whether retweets should be included in the result.
 #' @param includeReplies - Whether replies should be included in the result.
 #' @param tokenFileId - File id for auth token.
+#' @param maxID - Maximum tweet id.
+#' @param sinceID - Minimum tweet id.
 #' @export
 getTwitterTimeline <- function(user, n=3200, includeRts = FALSE,
-                               includeReplies = TRUE, tokenFileId){
+                               includeReplies = TRUE, maxID = NULL, sinceID = NULL, tokenFileId){
   if(!requireNamespace("twitteR")){stop("package twitteR must be installed.")}
 
   twitter_token = getTwitterToken(tokenFileId)
@@ -15,7 +17,11 @@ getTwitterTimeline <- function(user, n=3200, includeRts = FALSE,
   # use includeReplies and reverse it for excludeReplies argument for argument consistency
   excludeReplies <- !includeReplies
 
-  ret <- twitteR::userTimeline(user, n = n, includeRts = includeRts, excludeReplies = excludeReplies)
+  ret <- twitteR::userTimeline(user, n = n,
+                               includeRts = includeRts,
+                               excludeReplies = excludeReplies,
+                               maxID = maxID,
+                               sinceID = sinceID)
 
   if(length(ret)>0){
     twitteR::twListToDF(ret)
