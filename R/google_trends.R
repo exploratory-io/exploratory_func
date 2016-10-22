@@ -80,7 +80,7 @@ getGoogleTrends <- function(user, password, query = "", type = "trend", last = "
   } else if (type == "trend"){
     trend <- ret[[type]]
     # use query and geo arguments as column names to prevent garbled characters
-    # spaces should is changed into . by gtrendsR, so doing the same
+    # spaces should be changed into . by gtrendsR, so doing the same
     queries <- stringr::str_replace(stringr::str_trim(query), " +", ".")
     cols <- if(!is.null(geo)){
       # put geo into column names and separate it later
