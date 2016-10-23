@@ -36,6 +36,8 @@ Suggests:
     RPostgreSQL,
     mongolite,
     bigrquery,
+    googleCloudStorageR,
+    googleAuthR,
     GetoptLong,
     gtrendsR,
     arules
