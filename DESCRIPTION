@@ -32,7 +32,6 @@ Suggests:
     RGoogleAnalytics,
     lubridate,
     googlesheets,
-    mongolite,
     DBI,
     RPostgreSQL,
     mongolite,
