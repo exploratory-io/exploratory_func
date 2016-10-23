@@ -281,6 +281,26 @@ queryMongoDB <- function(host, port, database, collection, username, password, q
   }
 }
 
+#' Returns a data frame that has names of the collections in its "name" column.
+#' @export
+getMongoCollectionNames <- function(host, port, database, username, password, isSSL=FALSE, authSource=NULL){
+  collection = "test" # dummy collection name. mongo command seems to work even if the collection does not exist.
+  loadNamespace("jsonlite")
+  if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
+  pass = saveOrReadPassword("mongodb", username, password)
+  url = getMongoURL(host, port, database, username, pass, isSSL, authSource)
+  con <- mongolite::mongo(collection, url = url)
+  # command to list collections.
+  # con$command is our addition in our mongolite fork.
+  result <- con$command(command = '{"listCollections":1}')
+  if (!result$ok) {
+    stop("listCollections command failed");
+  }
+  # TODO: does "firstBatch" mean it is possible there are more?
+  # if so, where does it appear in the result?
+  return(as.data.frame(result$cursor$firstBatch))
+}
+
 #' Returns the total number of rows stored in the target table.
 #' At this moment only mongdb is supported.
 #' @export
