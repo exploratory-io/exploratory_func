@@ -659,7 +659,7 @@ getDataFromGoogleBigQueryTableViaCloudStorage <- function(bucketProjectId, dataS
 #' @param bucket - Google Cloud Storage Bucket
 #' @param folder - Folder under Google Cloud Storage Bucket where temp files are extracted.
 #' @export
-executeGoogleBigQuery <- function(project, sqlquery, destination_table, page_size = 100000, max_page = 10, write_disposition = "WRITE_TRUNCATE", tokenFileId, bucketProjectId, bucket=NULL, folder){
+executeGoogleBigQuery <- function(project, sqlquery, destination_table, page_size = 100000, max_page = 10, write_disposition = "WRITE_TRUNCATE", tokenFileId, bucketProjectId, bucket=NULL, folder=NULL){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
   if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
@@ -668,7 +668,7 @@ executeGoogleBigQuery <- function(project, sqlquery, destination_table, page_siz
 
   df <- NULL
   # if bucket is set, use Google Cloud Storage for extract and download
-  if(!is.null(bucket) && !is.na(bucket) && bucket != ""){
+  if(!is.null(bucket) && !is.na(bucket) && bucket != "" && !is.null(folder) && !is.na(folder) && folder != ""){
     # destination_table looks like 'exploratory-bigquery-project:exploratory_dataset.exploratory_bq_preview_table'
     dataSetTable = stringr::str_split(stringr::str_replace(destination_table, stringr::str_c(bucketProjectId,":"),""),"\\.")
     dataSet = dataSetTable[[1]][1]
