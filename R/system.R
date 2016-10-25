@@ -1024,5 +1024,12 @@ statecode <- function(sourcevar, origin, destination, ignore.case=TRUE) {
 #' @return data frame
 #' @export
 select_columns <- function(x, ...) {
-  x[, colnames(x) %in% list(...)]
+  df <- x[, colnames(x) %in% list(...)]
+  # If it selects only 1 column against the normal data.frame
+  # the df becomes a vector, not data.frame. In that case,
+  # we need to cast it. Note that if it is against dplyr tbl dataframe,
+  # it works just fine and returns a data.frame object.
+  if (!is.data.frame(df))
+    df <- data.frame(df)
+  return (df)
 }

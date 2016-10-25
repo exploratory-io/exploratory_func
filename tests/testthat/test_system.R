@@ -1,7 +1,7 @@
 context("test system functions")
 
 test_that("test clean_data_frame",{
-  # create df with dupicated columns names and data frame type column 
+  # create df with dupicated columns names and data frame type column
   df <- data.frame(a = 1:5, a = 2:6)
   colnames(df)<-c("a", "a")
   df$b <- data.frame(c = 3:7, d = 4:8)
@@ -88,4 +88,9 @@ test_that("test select_columns",{
   df1 <- df %>% exploratory::select_columns('year2', 'year1', 'year', 'profit', 'sales1')
   expect_equal(ncol(df1), 2)
   expect_equal(colnames(df1), c('year', 'profit'))
+
+  df2 <- df %>% exploratory::select_columns('year')
+  expect_true(is.data.frame(df2))
 })
+
+
