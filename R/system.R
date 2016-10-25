@@ -281,6 +281,26 @@ queryMongoDB <- function(host, port, database, collection, username, password, q
   }
 }
 
+#' Returns a data frame that has names of the collections in its "name" column.
+#' @export
+getMongoCollectionNames <- function(host, port, database, username, password, isSSL=FALSE, authSource=NULL){
+  collection = "test" # dummy collection name. mongo command seems to work even if the collection does not exist.
+  loadNamespace("jsonlite")
+  if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
+  pass = saveOrReadPassword("mongodb", username, password)
+  url = getMongoURL(host, port, database, username, pass, isSSL, authSource)
+  con <- mongolite::mongo(collection, url = url)
+  # command to list collections.
+  # con$command is our addition in our mongolite fork.
+  result <- con$command(command = '{"listCollections":1}')
+  if (!result$ok) {
+    stop("listCollections command failed");
+  }
+  # TODO: does "firstBatch" mean it is possible there are more?
+  # if so, where does it appear in the result?
+  return(as.data.frame(result$cursor$firstBatch))
+}
+
 #' Returns the total number of rows stored in the target table.
 #' At this moment only mongdb is supported.
 #' @export
@@ -607,6 +627,27 @@ saveGoogleBigQueryResultAs <- function(projectId, sourceDatasetId, sourceTableId
 }
 
 #' Get data from google big query
+#' @param bucketProjectId - Google Cloud Storage/BigQuery project id
+#' @param dataSet - Google BigQuery data tht your query result table is associated with
+#' @param table - Google BigQuery table where query result is saved
+#' @param bucket - Google Cloud Storage Bucket
+#' @param folder - Folder under Google Cloud Storage Bucket where temp files are extracted.
+#' @param tokenFileId - file id for auth token
+#' @export
+getDataFromGoogleBigQueryTableViaCloudStorage <- function(bucketProjectId, dataSet, table, bucket, folder, tokenFileId){
+  if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
+  if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
+
+  # submit a job to extract query result to cloud storage
+  uri = stringr::str_c('gs://', bucket, "/", folder, "/", "exploratory_temp*.gz")
+  job <- exploratory::extractDataFromGoogleBigQueryToCloudStorage(project = bucketProjectId, dataset = dataSet, table = table, uri,tokenFileId);
+  # wait for extract to be done
+  job <- bigrquery::wait_for(job)
+  # download tgzip file to client
+  df <- exploratory::downloadDataFromGoogleCloudStorage(bucket = bucket, folder=folder, download_dir = tempdir(), tokenFileId = tokenFileId)
+}
+
+#' Get data from google big query
 #' @param projectId - Google BigQuery project id
 #' @param sqlquery - SQL query to get data
 #' @param destination_table - Google BigQuery table where query result is saved
@@ -618,40 +659,27 @@ saveGoogleBigQueryResultAs <- function(projectId, sourceDatasetId, sourceTableId
 #' @param bucket - Google Cloud Storage Bucket
 #' @param folder - Folder under Google Cloud Storage Bucket where temp files are extracted.
 #' @export
-executeGoogleBigQuery <- function(project, sqlquery, destination_table, page_size = 100000, max_page = 10, write_disposition = "WRITE_TRUNCATE", tokenFileId, bucketProjectId, bucket=NULL, folder){
+executeGoogleBigQuery <- function(project, sqlquery, destination_table, page_size = 100000, max_page = 10, write_disposition = "WRITE_TRUNCATE", tokenFileId, bucketProjectId, bucket=NULL, folder=NULL){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
   if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
 
   token <- getGoogleTokenForBigQuery(tokenFileId)
+
   df <- NULL
   # if bucket is set, use Google Cloud Storage for extract and download
-  if(!is.null(bucket) && !is.na(bucket) && bucket != ""){
+  if(!is.null(bucket) && !is.na(bucket) && bucket != "" && !is.null(folder) && !is.na(folder) && folder != ""){
     # destination_table looks like 'exploratory-bigquery-project:exploratory_dataset.exploratory_bq_preview_table'
-    dataSetTable = stringr::str_split(stringr::str_replace(destination_table, stringr::str_c(project,":"),""),"\\.")
+    dataSetTable = stringr::str_split(stringr::str_replace(destination_table, stringr::str_c(bucketProjectId,":"),""),"\\.")
     dataSet = dataSetTable[[1]][1]
     table = dataSetTable[[1]][2]
     bqtable <- NULL
-    tryCatch({
-      # if table not found, it raises error so ignore it.
-      bqtable <- exploratory::getGoogleBigQueryTable(project = project, dataset = dataSet, table = table, tokenFileId = tokenFileId)
-    }, error = function(e){
-      # can be ignored
-    })
-    if(is.null(bqtable)){
-      # if result table is empty, resubmit query to get a result (for refresh data frame case)
-      result <- exploratory::submitGoogleBigQueryJob(project, sqlquery, destination_table, write_disposition = "WRITE_TRUNCATE", tokenFileId);
-    }
-
-    # submit a job to extract query result to cloud storage
-    uri = stringr::str_c('gs://', bucket, "/", folder, "/", "exploratory_temp*.gz")
-    job <- exploratory::extractDataFromGoogleBigQueryToCloudStorage(project = project, dataset = dataSet, table = table, uri,tokenFileId);
-    # wait for extract to be done
-    job <- bigrquery::wait_for(job)
-    # download tgzip file to client
-    df <- exploratory::downloadDataFromGoogleCloudStorage(bucket = bucket, folder=folder, download_dir = tempdir(), tokenFileId = tokenFileId)
+    # submit a query to get a result (for refresh data frame case)
+    result <- exploratory::submitGoogleBigQueryJob(bucketProjectId, sqlquery, destination_table, write_disposition = "WRITE_TRUNCATE", tokenFileId);
+    # extranct result from Google BigQuery to Google Cloud Storage and import
+    df <- getDataFromGoogleBigQueryTableViaCloudStorage(bucketProjectId, dataSet, table, bucket, folder, tokenFileId)
   } else {
-    # direct import case
+    # direct import case (for refresh data frame case)
     bigrquery::set_access_cred(token)
     df <- bigrquery::query_exec(GetoptLong::qq(sqlquery), project = project, destination_table = destination_table, page_size = page_size, max_page = max_page, write_disposition = write_disposition)
   }
