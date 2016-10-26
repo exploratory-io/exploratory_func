@@ -9,12 +9,15 @@
 getGoogleTrends <- function(user, password, query = "", type = "trend", last = "5y", geo = ""){
   loadNamespace("gtrendsR")
   loadNamespace("tidyr")
+
+  password <- saveOrReadPassword("googletrends", user, password)
+
   # this doesn't return error even if login fails, so capture the message
   # if it's successful, it's character(0)
   message <- capture.output(gtrendsR::gconnect(user, password))
   if(!identical(message, character(0))){
     if(message == "Google login failed! Check your login information.NULL"){
-      stop("Google login failed. Check Google Account and Password")
+      stop("Google login failed. Please verify username and password. Note that two-factor authentication is not supported.")
     }
     stop(message)
   }
