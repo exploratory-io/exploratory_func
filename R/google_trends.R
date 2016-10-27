@@ -76,17 +76,39 @@ getGoogleTrends <- function(user, password, query = "", type = "trend", last = "
     # So the first result is enough
     key <- keys[startsWith(keys, "Top.regions") | startsWith(keys, "Top.subregions")][[1]]
     # gather columns except for the first column (names of region) to make it easy to visualise
+
+    # If query consists of only one word,
+    # gtrendsR uses regions (e.g. Japan)
+    # for output column name instead of the query word.
+    # So we are replacing it with the query word
+    # so that we can use the query word in subsequent steps.
+    if(length(query) == 1){
+      # The query is lowered and spaces are changed into . by gtrendsR, so doing the same
+      colnames(ret[[key]])[[2]] <- stringr::str_to_lower(stringr::str_replace(stringr::str_trim(query), " +", "."))
+    }
+
     tidyr::gather_(ret[[key]], "keyword", "trend", colnames(ret[[key]])[2:ncol(ret[[key]])], na.rm = TRUE)
   } else if (type == "top_cities"){
     key <- keys[startsWith(keys, "Top.cities")]
     bind_data <- dplyr::bind_rows(ret[key])
+
+    # If query consists of only one word,
+    # gtrendsR uses regions (e.g. Japan)
+    # for output column name instead of the query word.
+    # So we are replacing it with the query word
+    # so that we can use the query word in subsequent steps.
+    if(length(query) == 1){
+      # The query is lowered and spaces are changed into . by gtrendsR, so doing the same
+      colnames(bind_data)[[2]] <- stringr::str_to_lower(stringr::str_replace(stringr::str_trim(query), " +", "."))
+    }
+
     # gather columns except for the first column (names of cities) to make it easy to visualise
     tidyr::gather_(bind_data, "keyword", "trend", colnames(bind_data)[2:ncol(bind_data)], na.rm = TRUE)
   } else if (type == "trend"){
     trend <- ret[[type]]
     # use query and geo arguments as column names to prevent garbled characters
-    # spaces should be changed into . by gtrendsR, so doing the same
-    queries <- stringr::str_replace(stringr::str_trim(query), " +", ".")
+    # The query is lowered and spaces are changed into . by gtrendsR, so doing the same
+    queries <- stringr::str_to_lower(stringr::str_replace(stringr::str_trim(query), " +", "."))
     cols <- if(!is.null(geo)){
       # put geo into column names and separate it later
       # spaces in queries are converted to . by gtrends, so space can be used safely
