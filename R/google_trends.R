@@ -77,7 +77,11 @@ getGoogleTrends <- function(user, password, query = "", type = "trend", last = "
     key <- keys[startsWith(keys, "Top.regions") | startsWith(keys, "Top.subregions")][[1]]
     # gather columns except for the first column (names of region) to make it easy to visualise
 
-    # if query is single, geo is used for a column name, so convert it to the query
+    # If query consists of only one word,
+    # gtrendsR uses regions (e.g. Japan)
+    # for output column name instead of the query word.
+    # So we are replacing it with the query word
+    # so that we can use the query word in subsequent steps.
     if(length(query) == 1){
       # The query is lowered and spaces are changed into . by gtrendsR, so doing the same
       colnames(ret[[key]])[[2]] <- stringr::str_to_lower(stringr::str_replace(stringr::str_trim(query), " +", "."))
@@ -88,7 +92,11 @@ getGoogleTrends <- function(user, password, query = "", type = "trend", last = "
     key <- keys[startsWith(keys, "Top.cities")]
     bind_data <- dplyr::bind_rows(ret[key])
 
-    # if query is single, geo is used for a column name, so convert it to query
+    # If query consists of only one word,
+    # gtrendsR uses regions (e.g. Japan)
+    # for output column name instead of the query word.
+    # So we are replacing it with the query word
+    # so that we can use the query word in subsequent steps.
     if(length(query) == 1){
       # The query is lowered and spaces are changed into . by gtrendsR, so doing the same
       colnames(bind_data)[[2]] <- stringr::str_to_lower(stringr::str_replace(stringr::str_trim(query), " +", "."))
