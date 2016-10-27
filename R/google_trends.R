@@ -71,7 +71,9 @@ getGoogleTrends <- function(user, password, query = "", type = "trend", last = "
   keys <- names(ret)
 
   if(type == "top_regions"){
-    # If it's top regions, the data frames for all the keywords are duplicated for each keyword, so the first one is enough
+    # If it's top regions, the data frames that hold info for all the keywords
+    # are duplicated for each keyword.
+    # So the first result is enough
     key <- keys[startsWith(keys, "Top.regions") | startsWith(keys, "Top.subregions")][[1]]
     # gather columns except for the first column (names of region) to make it easy to visualise
     tidyr::gather_(ret[[key]], "keyword", "trend", colnames(ret[[key]])[2:ncol(ret[[key]])], na.rm = TRUE)
