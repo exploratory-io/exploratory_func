@@ -34,7 +34,7 @@ getIncortaXsrfToken <- function(server, jsessionId){
 getIncortaSchemas <- function(server, jsessionId, xsrfToken){
   loadNamespace("httr")
   loadNamespace("stringr")
-  loadNamespace("dplyr")
+  loadNamespace("jsonlite")
   h <- c(xsrfToken)
   names(h) <- "X-XSRF-TOKEN"
   resSchemas <- httr::GET(url = str_c(server, "/service/schema/getSchemas"),
@@ -53,7 +53,6 @@ getIncortaSchemas <- function(server, jsessionId, xsrfToken){
 getIncortaSchema <- function(server, jsessionId, xsrfToken, schemaId){
   loadNamespace("httr")
   loadNamespace("stringr")
-  loadNamespace("dplyr")
   h <- c(xsrfToken)
   names(h) <- "X-XSRF-TOKEN"
   resSchema <- httr::GET(url = str_c(server, "/service/schema/getSchema", "?schemaId=", schemaId),
