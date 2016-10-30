@@ -62,3 +62,59 @@ getIncortaSchema <- function(server, jsessionId, xsrfToken, schemaId){
   schema <- httr::content(resSchema, type = "text", encoding = "UTF-8")
   schema
 }
+
+#' API to get data (XML string) from Incorta with Token
+#' @param server - incorta server (i.e http://<host>:<port>/incorta)
+#' @param jsessionId - JSESSIONID.
+#' @param xsrfToken - XSRF-TOKEN
+#' @param schemaId - ID of the schema
+#' @export
+getIncortaDataWithToken <- function(server, jsessionId, xsrfToken, query){
+  h <- c(xsrfToken)
+  names(h) <- "X-XSRF-TOKEN"
+  data <- httr::POST(url = str_c(server, "/service/viewer"),
+                     body = list(sample = FALSE, odbc = FALSE, outputFormat = 'json', code = query),
+                     httr::set_cookies(` JSESSIONID` = jsessionId, `XSRF-TOKEN` = xsrfToken),
+                     httr::add_headers(.headers = h))
+  result <- httr::content(data,  as = "parsed", type = "application/json")
+  if(!is.null(result$error)){
+    stop(result$error)
+  }
+  if (is.null(result$comp) | is.null(result$comp[[1]]$rowTree)) {
+    stop("No Data Found");
+  }
+  columnNames <- result$comp[[1]]$labels
+  # In result json,rows are availale under result$comp[[1]]$rowTree[[1]]
+  df <- dplyr::bind_rows(lapply(result$comp[[1]]$rowTree[[1]], exploratory::toDataFrame))
+  colnames(df) <- columnNames
+  df
+}
+
+#' API to get data (XML string) from Incorta with Token
+#' @param server - incorta server (i.e http://<host>:<port>/incorta)
+#' @param jsessionId - JSESSIONID.
+#' @param xsrfToken - XSRF-TOKEN
+#' @param schemaId - ID of the schema
+#' @export
+queryIncorta <- function(server, tenant, user, pass, query){
+  jsessionId <- getIncortaJSessionID(server, tenant = tenant, user = user, pass = pass)
+  xsrfToken <- getIncortaXsrfToken(server = server, jsessionId = jsessionId)
+  h <- c(xsrfToken)
+  names(h) <- "X-XSRF-TOKEN"
+  data <- httr::POST(url = str_c(server, "/service/viewer"),
+                     body = list(sample = FALSE, odbc = FALSE, outputFormat = 'json', code = query),
+                     httr::set_cookies(` JSESSIONID` = jsessionId, `XSRF-TOKEN` = xsrfToken),
+                     httr::add_headers(.headers = h))
+  result <- httr::content(data,  as = "parsed", type = "application/json")
+  if(!is.null(result$error)){
+    stop(result$error)
+  }
+  if (is.null(result$comp) | is.null(result$comp[[1]]$rowTree)) {
+    stop("No Data Found");
+  }
+  columnNames <- result$comp[[1]]$labels
+  # In result json,rows are availale under result$comp[[1]]$rowTree[[1]]
+  df <- dplyr::bind_rows(lapply(result$comp[[1]]$rowTree[[1]], exploratory::toDataFrame))
+  colnames(df) <- columnNames
+  df
+}
