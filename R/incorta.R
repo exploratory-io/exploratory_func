@@ -31,7 +31,7 @@ getIncortaXsrfToken <- function(server, jsessionId){
 #' @param jsessionId - JSESSIONID.
 #' @param xsrfToken - XSRF-TOKEN
 #' @export
-getIncortaSchemas <- function(server, jsessionId, xsrfToken){
+getIncortaSchemasWithToken <- function(server, jsessionId, xsrfToken){
   loadNamespace("httr")
   loadNamespace("stringr")
   loadNamespace("jsonlite")
@@ -40,8 +40,22 @@ getIncortaSchemas <- function(server, jsessionId, xsrfToken){
   resSchemas <- httr::GET(url = str_c(server, "/service/schema/getSchemas"),
                           httr::set_cookies(` JSESSIONID` = jsessionId, `XSRF-TOKEN` = xsrfToken),
                           httr::add_headers(.headers = h))
-  schemas <- httr::content(resSchemas)
-  jsonlite::toJSON(schemas)
+  schemas <- httr::content(resSchemas, as = "parsed", type = "application/json")
+}
+
+#' API to get schemas (JSON format) from Incorta
+#' @param server - incorta server (i.e http://<host>:<port>/incorta)
+#' @param jsessionId - JSESSIONID.
+#' @param xsrfToken - XSRF-TOKEN
+#' @export
+getIncortaSchemas <- function(server, tenant, user, pass){
+  loadNamespace("httr")
+  loadNamespace("stringr")
+  loadNamespace("jsonlite")
+
+  jsessionId <- getIncortaJSessionID(server, tenant = tenant, user = user, pass = pass)
+  xsrfToken <- getIncortaXsrfToken(server = server, jsessionId = jsessionId)
+  getIncortaSchemasWithToken(server, jsessionId, xsrfToken)
 }
 
 #' API to get schema (XML string) from Incorta
@@ -50,7 +64,7 @@ getIncortaSchemas <- function(server, jsessionId, xsrfToken){
 #' @param xsrfToken - XSRF-TOKEN
 #' @param schemaId - ID of the schema
 #' @export
-getIncortaSchema <- function(server, jsessionId, xsrfToken, schemaId){
+getIncortaSchemaWithToken <- function(server, jsessionId, xsrfToken, schemaId){
   loadNamespace("httr")
   loadNamespace("stringr")
   h <- c(xsrfToken)
@@ -63,17 +77,32 @@ getIncortaSchema <- function(server, jsessionId, xsrfToken, schemaId){
   schema
 }
 
+#' API to get schema (XML string) from Incorta
+#' @param server - incorta server (i.e http://<host>:<port>/incorta)
+#' @param jsessionId - JSESSIONID.
+#' @param xsrfToken - XSRF-TOKEN
+#' @param schemaId - ID of the schema
+#' @export
+getIncortaSchema <- function(server, tenant, user, pass, schemaId){
+  loadNamespace("httr")
+  loadNamespace("stringr")
+
+  jsessionId <- getIncortaJSessionID(server, tenant = tenant, user = user, pass = pass)
+  xsrfToken <- getIncortaXsrfToken(server = server, jsessionId = jsessionId)
+  getIncortaSchemaWithToken(server, jsessionId, xsrfToken, schemaId)
+}
+
 #' API to get data (XML string) from Incorta with Token
 #' @param server - incorta server (i.e http://<host>:<port>/incorta)
 #' @param jsessionId - JSESSIONID.
 #' @param xsrfToken - XSRF-TOKEN
 #' @param schemaId - ID of the schema
 #' @export
-getIncortaDataWithToken <- function(server, jsessionId, xsrfToken, query){
+queryIncortaWithToken <- function(server, jsessionId, xsrfToken, query, sample=FALSE){
   h <- c(xsrfToken)
   names(h) <- "X-XSRF-TOKEN"
   data <- httr::POST(url = str_c(server, "/service/viewer"),
-                     body = list(sample = FALSE, odbc = FALSE, outputFormat = 'json', code = query),
+                     body = list(sample = sample, odbc = FALSE, outputFormat = 'json', code = query),
                      httr::set_cookies(` JSESSIONID` = jsessionId, `XSRF-TOKEN` = xsrfToken),
                      httr::add_headers(.headers = h))
   result <- httr::content(data,  as = "parsed", type = "application/json")
@@ -96,25 +125,8 @@ getIncortaDataWithToken <- function(server, jsessionId, xsrfToken, query){
 #' @param xsrfToken - XSRF-TOKEN
 #' @param schemaId - ID of the schema
 #' @export
-queryIncorta <- function(server, tenant, user, pass, query){
+queryIncorta <- function(server, tenant, user, pass, query, sample=FALSE){
   jsessionId <- getIncortaJSessionID(server, tenant = tenant, user = user, pass = pass)
   xsrfToken <- getIncortaXsrfToken(server = server, jsessionId = jsessionId)
-  h <- c(xsrfToken)
-  names(h) <- "X-XSRF-TOKEN"
-  data <- httr::POST(url = str_c(server, "/service/viewer"),
-                     body = list(sample = FALSE, odbc = FALSE, outputFormat = 'json', code = query),
-                     httr::set_cookies(` JSESSIONID` = jsessionId, `XSRF-TOKEN` = xsrfToken),
-                     httr::add_headers(.headers = h))
-  result <- httr::content(data,  as = "parsed", type = "application/json")
-  if(!is.null(result$error)){
-    stop(result$error)
-  }
-  if (is.null(result$comp) | is.null(result$comp[[1]]$rowTree)) {
-    stop("No Data Found");
-  }
-  columnNames <- result$comp[[1]]$labels
-  # In result json,rows are availale under result$comp[[1]]$rowTree[[1]]
-  df <- dplyr::bind_rows(lapply(result$comp[[1]]$rowTree[[1]], exploratory::toDataFrame))
-  colnames(df) <- columnNames
-  df
+  queryIncortaWithToken(server, jsessionId, xsrfToken, query, sample)
 }
