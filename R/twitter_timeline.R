@@ -7,7 +7,7 @@
 #' @param sinceID - Minimum tweet id.
 #' @export
 getTwitterTimeline <- function(user, n=3200,
-                               includeReplies = TRUE, maxID = NULL, sinceID = NULL, tokenFileId){
+                               includeReplies = TRUE, maxID = NULL, sinceID = NULL, tokenFileId, withSentiment = FALSE){
   if(!requireNamespace("twitteR")){stop("package twitteR must be installed.")}
 
   twitter_token = getTwitterToken(tokenFileId)
@@ -24,7 +24,13 @@ getTwitterTimeline <- function(user, n=3200,
                                sinceID = sinceID)
 
   if(length(ret)>0){
-    twitteR::twListToDF(ret)
+    ret <- twitteR::twListToDF(ret)
+    if(withSentiment){
+      ret %>%
+        mutate(sentiment = get_sentiment(text))
+    } else {
+      ret
+    }
   } else {
     stop('No Tweets found.')
   }
