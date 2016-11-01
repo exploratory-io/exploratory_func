@@ -170,6 +170,17 @@ getGoogleAnalytics <- function(tableId, lastNDays, dimensions, metrics, tokenFil
 
   ga.query <- RGoogleAnalytics::QueryBuilder(query.list)
   ga.data <- RGoogleAnalytics::GetReportData(ga.query, token, paginate_query = paginate_query)
+
+  if("date" %in% colnames(ga.data)){
+    loadNamespace("lubridate")
+    ga.data <- ga.data %>% mutate( date = lubridate::ymd(date) )
+  }
+
+  if("dateHour" %in% colnames(ga.data)){
+    loadNamespace("lubridate")
+    ga.data <- ga.data %>% mutate( dateHour = lubridate::ymd_h(dateHour) )
+  }
+
   ga.data
 }
 
