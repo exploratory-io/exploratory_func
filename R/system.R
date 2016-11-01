@@ -476,6 +476,13 @@ refreshTwitterToken <- function(tokenFileId){
   getTwitterToken(tokenFileId, FALSE)
 }
 
+#' Access twitter serch api
+#' @param n - Maximum number of tweets.
+#' @param lang - Language to filter result.
+#' @param lastNDays - From how many days ago tweets should be searched.
+#' @param searchString - Query to search.
+#' @param tokenFileId - File id for aut
+#' @param withSentiment - Whether there should be sentiment column caluculated by get_sentiment.
 #' @export
 getTwitter <- function(n=200, lang=NULL,  lastNDays=30, searchString, tokenFileId, withSentiment = FALSE){
   if(!requireNamespace("twitteR")){stop("package twitteR must be installed.")}
@@ -500,6 +507,7 @@ getTwitter <- function(n=200, lang=NULL,  lastNDays=30, searchString, tokenFileI
   if(length(tweetList)>0){
     ret <- twitteR::twListToDF(tweetList)
     if(withSentiment){
+      # calculate sentiment
       ret %>% mutate(sentiment = get_sentiment(text))
     } else {
       ret
