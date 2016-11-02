@@ -170,6 +170,19 @@ getGoogleAnalytics <- function(tableId, lastNDays, dimensions, metrics, tokenFil
 
   ga.query <- RGoogleAnalytics::QueryBuilder(query.list)
   ga.data <- RGoogleAnalytics::GetReportData(ga.query, token, paginate_query = paginate_query)
+
+  if("date" %in% colnames(ga.data)){
+    # modify date column to Date object from integer like 20140101
+    loadNamespace("lubridate")
+    ga.data <- ga.data %>% mutate( date = lubridate::ymd(date) )
+  }
+
+  if("dateHour" %in% colnames(ga.data)){
+    # modify date column to POSIXct object from integer like 2014010101
+    loadNamespace("lubridate")
+    ga.data <- ga.data %>% mutate( dateHour = lubridate::ymd_h(dateHour) )
+  }
+
   ga.data
 }
 
@@ -465,8 +478,15 @@ refreshTwitterToken <- function(tokenFileId){
   getTwitterToken(tokenFileId, FALSE)
 }
 
+#' Access twitter serch api
+#' @param n - Maximum number of tweets.
+#' @param lang - Language to filter result.
+#' @param lastNDays - From how many days ago tweets should be searched.
+#' @param searchString - Query to search.
+#' @param tokenFileId - File id for aut
+#' @param withSentiment - Whether there should be sentiment column caluculated by get_sentiment.
 #' @export
-getTwitter <- function(n=200, lang=NULL,  lastNDays=30, searchString, tokenFileId){
+getTwitter <- function(n=200, lang=NULL,  lastNDays=30, searchString, tokenFileId, withSentiment = FALSE){
   if(!requireNamespace("twitteR")){stop("package twitteR must be installed.")}
   loadNamespace("lubridate")
 
@@ -487,7 +507,13 @@ getTwitter <- function(n=200, lang=NULL,  lastNDays=30, searchString, tokenFileI
   tweetList <- twitteR::searchTwitter(searchString, n, lang, since, until, locale, geocode, sinceID, maxID, resultType, retryOnRateLimit)
   # conver list to data frame
   if(length(tweetList)>0){
-    twitteR::twListToDF(tweetList)
+    ret <- twitteR::twListToDF(tweetList)
+    if(withSentiment){
+      # calculate sentiment
+      ret %>% mutate(sentiment = get_sentiment(text))
+    } else {
+      ret
+    }
   } else {
     stop('No Tweets found.')
   }

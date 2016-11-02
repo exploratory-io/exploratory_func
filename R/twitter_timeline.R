@@ -2,12 +2,13 @@
 #' @param user - User id.
 #' @param n - Maximum number of tweets. Max of n in userTimeline is 3200, so the default is that number.
 #' @param includeReplies - Whether replies should be included in the result.
-#' @param tokenFileId - File id for auth token.
 #' @param maxID - Maximum tweet id.
 #' @param sinceID - Minimum tweet id.
+#' @param tokenFileId - File id for auth token.
+#' @param withSentiment - Whether there should be sentiment column caluculated by get_sentiment.
 #' @export
 getTwitterTimeline <- function(user, n=3200,
-                               includeReplies = TRUE, maxID = NULL, sinceID = NULL, tokenFileId){
+                               includeReplies = TRUE, maxID = NULL, sinceID = NULL, tokenFileId, withSentiment = FALSE){
   if(!requireNamespace("twitteR")){stop("package twitteR must be installed.")}
 
   twitter_token = getTwitterToken(tokenFileId)
@@ -24,7 +25,13 @@ getTwitterTimeline <- function(user, n=3200,
                                sinceID = sinceID)
 
   if(length(ret)>0){
-    twitteR::twListToDF(ret)
+    ret <- twitteR::twListToDF(ret)
+    if(withSentiment){
+      # calculate sentiment
+      ret %>% mutate(sentiment = get_sentiment(text))
+    } else {
+      ret
+    }
   } else {
     stop('No Tweets found.')
   }
