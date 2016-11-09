@@ -329,7 +329,7 @@ getMongoCollectionNumberOfRows <- function(host, port, database, username, passw
 
 
 #' @export
-getDBConnection <- function(type, host, port, databaseName, username, password){
+getDBConnection <- function(type, host, port, databaseName, username, password, schema = NULL, catalog = NULL){
   if(!requireNamespace("RMySQL")){stop("package RMySQL must be installed.")}
   if(!requireNamespace("RPostgreSQL")){stop("package RPostgreSQL must be installed.")}
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
@@ -347,14 +347,24 @@ getDBConnection <- function(type, host, port, databaseName, username, password){
     )
     conn = RPostgreSQL::dbConnect(drv, dbname=pg_dsn, user = username,
                                   password = password, host = host, port = port)
+  } else if (type == "presto") {
+    loadNamespace("RPresto")
+    drv <- RPresto::Presto()
+    conn <- RPresto::dbConnect(drv, user = username, host = host, port = port, schema = schema, catalog = catalog)
   }
   conn
 }
 
 #' @export
-getListOfTables <- function(type, host, port, databaseName, username, password){
+getListOfTables <- function(type, host, port, databaseName = NULL, username, password, schema = NULL, catalog = NULL){
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
-  conn <- exploratory::getDBConnection(type, host, port, databaseName, username, password)
+  if (type == "presto") {
+    loadNamespace("RPresto")
+    drv <- RPresto::Presto()
+    conn <- RPresto::dbConnect(drv, schema = schema, catalog = catalog, user = username, host = host, port = port)
+  } else {
+    conn <- exploratory::getDBConnection(type, host, port, databaseName, username, password)
+  }
   tables <- DBI::dbListTables(conn)
   DBI::dbDisconnect(conn)
   tables
@@ -371,9 +381,9 @@ getListOfColumns <- function(type, host, port, databaseName, username, password,
 
 #' API to execute a query that can be handled with DBI
 #' @export
-executeGenericQuery <- function(type, host, port, databaseName, username, password, query){
+executeGenericQuery <- function(type, host, port, databaseName, username, password, query, schema = NULL, catalog = NULL){
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
-  conn <- exploratory::getDBConnection(type, host, port, databaseName, username, password)
+  conn <- exploratory::getDBConnection(type, host, port, databaseName, username, password, schema = schema, catalog = catalog)
   resultSet <- DBI::dbSendQuery(conn, query)
   df <- DBI::dbFetch(resultSet)
   DBI::dbClearResult(resultSet)
