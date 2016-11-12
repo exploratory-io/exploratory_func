@@ -48,20 +48,20 @@ word_to_sentiment <- function(words, lexicon="bing"){
   # chosen lexicon and sentiment in words
   check <- sentiments$lexicon == lexicon
   if(lexicon == "nrc"){
-    sentiments <- (
-      sentiments[check,]
-      %>%  dplyr::group_by(word)
-      %>%  dplyr::summarize(sentiment=list(sentiment))
-      )
-  } else {
-    sentiments <- sentiments[check,]
+    sentiment_df <- sentiments[check,] %>%
+      dplyr::group_by(word) %>%
+      dplyr::summarize(sentiment=list(sentiment))
+    sentiment <- sentiment_df[["sentiment"]]
+
+  } else if (lexicon == "AFINN") {
+    sentiment <- sentiments[check,][["score"]]
+  }else {
+    sentiment <- sentiments[check,][["sentiment"]]
   }
-  joined_df <- dplyr::left_join(data.frame(word=words, stringsAsFactors = FALSE), sentiments, by="word")
-  if(lexicon=="AFINN"){
-    joined_df$score
-  } else {
-    joined_df$sentiment
-  }
+  names(sentiment) <- sentiments[check,][["word"]]
+  ret <- sentiment[words]
+  names(ret) <- NULL
+  ret
 }
 
 #' Tokenize text and unnest
