@@ -44,21 +44,8 @@ get_stopwords <- function(lexicon="snowball"){
 word_to_sentiment <- function(words, lexicon="bing"){
   loadNamespace("tidytext")
   loadNamespace("dplyr")
-  data("sentiments", package = "tidytext", envir = environment())
-  # chosen lexicon and sentiment in words
-  check <- sentiments$lexicon == lexicon
-  if(lexicon == "nrc"){
-    sentiment_df <- sentiments[check,] %>%
-      dplyr::group_by(word) %>%
-      dplyr::summarize(sentiment=list(sentiment))
-    sentiment <- sentiment_df[["sentiment"]]
-
-  } else if (lexicon == "AFINN") {
-    sentiment <- sentiments[check,][["score"]]
-  }else {
-    sentiment <- sentiments[check,][["sentiment"]]
-  }
-  names(sentiment) <- sentiments[check,][["word"]]
+  # get data saved internally in this package by chosen lexicon
+  sentiment <- get(paste0("sentiment_", lexicon))
   ret <- sentiment[words]
   names(ret) <- NULL
   ret
