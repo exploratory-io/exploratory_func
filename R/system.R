@@ -940,7 +940,17 @@ createTempEnvironment <- function(){
 #' @export
 getObjectListFromRdata <- function(rdata_path, temp.space){
   # load RDATA to temporary env to prevent the polluation on global objects
-  temp.object <- load(rdata_path,temp.space)
+  path <- rdata_path
+  if (stringr::str_detect(rdata_path, "^https://") ||
+      stringr::str_detect(rdata_path, "^http://") ||
+      stringr::str_detect(rdata_path, "^ftp://")) {
+
+    path <- tempfile(fileext = stringr::str_c(".", ".rdata"))
+    # download file to tempoprary location
+    download.file(rdata_path, destfile = path, mode = "wb")
+  }
+
+  temp.object <- load(path,temp.space)
   # get list of ojbect loaded to temporary env
   objectlist <- ls(envir=temp.space)
   result <- lapply(objectlist, function(x){
@@ -960,8 +970,17 @@ getObjectListFromRdata <- function(rdata_path, temp.space){
 #' @export
 getObjectFromRdata <- function(rdata_path, object_name){
   # load RDATA to temporary env to prevent the polluation on global objects
+  path <- rdata_path
+  if (stringr::str_detect(rdata_path, "^https://") ||
+      stringr::str_detect(rdata_path, "^http://") ||
+      stringr::str_detect(rdata_path, "^ftp://")) {
+
+    path <- tempfile(fileext = stringr::str_c(".", ".rdata"))
+    # download file to tempoprary location
+    download.file(rdata_path, destfile = path, mode = "wb")
+  }
   temp.space = createTempEnvironment()
-  load(rdata_path,temp.space)
+  load(path,temp.space)
   # get list of ojbect loaded to temporary env
   obj <- get(object_name,temp.space)
   # remote temporary env
