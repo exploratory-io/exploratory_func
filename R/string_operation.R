@@ -46,7 +46,11 @@ word_to_sentiment <- function(words, lexicon="bing"){
   loadNamespace("dplyr")
   # get data saved internally in this package by chosen lexicon
   sentiment <- get(paste0("sentiment_", lexicon))
+  # sentiment is named vector (for "bing" and "AFINN")
+  # or named list (for "nrc" because it can have many sentiment types for one word)
+  # this is faster than using left join
   ret <- sentiment[words]
+  # remove the name
   names(ret) <- NULL
   ret
 }
