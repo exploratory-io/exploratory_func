@@ -939,8 +939,15 @@ createTempEnvironment <- function(){
 #' API to get a list of data frames from a RDATA
 #' @export
 getObjectListFromRdata <- function(rdata_path, temp.space){
-  # load RDATA to temporary env to prevent the polluation on global objects
-  temp.object <- load(rdata_path,temp.space)
+  # load RDATA to temporary env to prevent the pollution on global objects
+  path <- rdata_path
+  if (stringr::str_detect(rdata_path, "^https://") ||
+      stringr::str_detect(rdata_path, "^http://") ||
+      stringr::str_detect(rdata_path, "^ftp://")) {
+
+    path <- download_data_file(rdata_path, "rdata")
+  }
+  temp.object <- load(path,temp.space)
   # get list of ojbect loaded to temporary env
   objectlist <- ls(envir=temp.space)
   result <- lapply(objectlist, function(x){
@@ -960,8 +967,15 @@ getObjectListFromRdata <- function(rdata_path, temp.space){
 #' @export
 getObjectFromRdata <- function(rdata_path, object_name){
   # load RDATA to temporary env to prevent the polluation on global objects
+  path <- rdata_path
+  if (stringr::str_detect(rdata_path, "^https://") ||
+      stringr::str_detect(rdata_path, "^http://") ||
+      stringr::str_detect(rdata_path, "^ftp://")) {
+
+    path <- download_data_file(rdata_path, "rdata")
+  }
   temp.space = createTempEnvironment()
-  load(rdata_path,temp.space)
+  load(path,temp.space)
   # get list of ojbect loaded to temporary env
   obj <- get(object_name,temp.space)
   # remote temporary env
@@ -1069,3 +1083,165 @@ select_columns <- function(x, ...) {
     df <- data.frame(df)
   return (df)
 }
+
+#' API to clear excel cache file
+#' @param url
+#' @export
+clear_cache_file <- function(url){
+  options(tam.should.cache.datafile = FALSE)
+  hash <- digest::digest(url, "md5", serialize = FALSE)
+  tryCatch({
+    filepath <- eval(as.name(hash))
+    do.call(rm, c(as.name(hash)),envir = .GlobalEnv)
+    unlink(filepath)
+  }, error = function(e){
+  })
+}
+
+#' API to download remote data file (excel, csv) from URL and cache it if necessary
+#' it uses tempfile https://stat.ethz.ch/R-manual/R-devel/library/base/html/tempfile.html
+#' and a R variable with name of hashed url is assigned to the path given by tempfile.
+#' @param url
+download_data_file <- function(url, type){
+  shouldCacheFile <- getOption("tam.should.cache.datafile")
+  filepath <- NULL
+  hash <- digest::digest(url, "md5", serialize = FALSE)
+  tryCatch({
+    filepath <- eval(as.name(hash))
+  }, error = function(e){
+    # if url hash is not set as global vaiarlbe yet, it raises error that says object not found
+    # which can be ignored
+    filepath <- NULL
+  })
+  # Check if cached excel filepath exists for the URL
+  if(!is.null(shouldCacheFile) && isTRUE(shouldCacheFile) && !is.null(filepath)){
+    filepath
+  } else {
+    ext <- stringr::str_to_lower(tools::file_ext(url))
+    # if no extension, assume the file extension as xlsx
+    if(ext == ""){
+      if(type == "excel"){
+        ext = "xlsx"
+      } else if (type == "csv") {
+        ext = "csv"
+      } else if (type == "rdata") {
+        ext = "rdata"
+      } else if (type == "log") {
+        ext = "log"
+      }
+    }
+    tmp <- tempfile(fileext = stringr::str_c(".", ext))
+    # download file to tempoprary location
+    download.file(url, destfile = tmp, mode = "wb")
+    # cache file
+    if(!is.null(shouldCacheFile) && isTRUE(shouldCacheFile)){
+      assign(hash, tmp, envir = .GlobalEnv)
+    }
+    tmp
+  }
+}
+
+#'Wrapper for readxl::read_excel to support remote file
+#'@export
+read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0){
+  loadNamespace("readxl")
+  loadNamespace("stringr")
+  if (stringr::str_detect(path, "^https://") ||
+      stringr::str_detect(path, "^http://") ||
+      stringr::str_detect(path, "^ftp://")) {
+    tmp <- download_data_file(path, "excel")
+    readxl::read_excel(tmp, sheet, col_names, col_types, na, skip)
+  } else {
+    # if it's local file simply call readxl::read_excel
+    readxl::read_excel(path, sheet, col_names, col_types, na, skip)
+  }
+}
+
+#'Wrapper for readxl::excel_sheets to support remote file
+#'@export
+get_excel_sheets <- function(path){
+  loadNamespace("readxl")
+  loadNamespace("stringr")
+  if (stringr::str_detect(path, "^https://") ||
+      stringr::str_detect(path, "^http://") ||
+      stringr::str_detect(path, "^ftp://")) {
+    tmp <- download_data_file(path, "excel")
+    readxl::excel_sheets(tmp)
+  } else {
+    # if it's local file simply call readxl::read_excel
+    readxl::excel_sheets(path)
+  }
+}
+
+#'Wrapper for readr::read_delim to support remote file
+#'@export
+read_delim_file <- function(file, delim, quote = '"',
+                            escape_backslash = FALSE, escape_double = TRUE,
+                            col_names = TRUE, col_types = NULL,
+                            locale = readr::default_locale(),
+                            na = c("", "NA"), quoted_na = TRUE,
+                            comment = "", trim_ws = FALSE,
+                            skip = 0, n_max = Inf, guess_max = min(1000, n_max), progress = interactive()){
+  loadNamespace("readr")
+  loadNamespace("stringr")
+  if (stringr::str_detect(file, "^https://") ||
+      stringr::str_detect(file, "^http://") ||
+      stringr::str_detect(file, "^ftp://")) {
+    tmp <- download_data_file(file, "csv")
+    readr::read_delim(tmp, delim, quote, escape_backslash, escape_double,col_names, col_types,
+                      locale,na, quoted_na, comment, trim_ws,skip, n_max, guess_max, progress)
+  } else {
+    # if it's local file simply call readr::read_delim
+    readr::read_delim(file, delim, quote, escape_backslash, escape_double,col_names, col_types,
+                      locale,na, quoted_na, comment, trim_ws,skip, n_max, guess_max, progress)
+  }
+}
+
+#'Wrapper for readr::guess_encoding to support remote file
+#'@export
+guess_csv_file_encoding <- function(file,  n_max = 1e4, threshold = 0.20){
+  loadNamespace("readr")
+  loadNamespace("stringr")
+  if (stringr::str_detect(file, "^https://") ||
+      stringr::str_detect(file, "^http://") ||
+      stringr::str_detect(file, "^ftp://")) {
+    tmp <- download_data_file(file, "csv")
+    readr::guess_encoding(tmp, n_max, threshold)
+  } else {
+    # if it's local file simply call readr::read_delim
+    readr::guess_encoding(file, n_max, threshold)
+  }
+}
+
+#'Wrapper for readr::read_log to support remote file
+#'@export
+read_log_file <- function(file, col_names = FALSE, col_types = NULL,
+                          skip = 0, n_max = -1, progress = interactive()){
+  loadNamespace("readr")
+  loadNamespace("stringr")
+  if (stringr::str_detect(file, "^https://") ||
+      stringr::str_detect(file, "^http://") ||
+      stringr::str_detect(file, "^ftp://")) {
+    tmp <- download_data_file(file, "log")
+    readr::read_log(tmp, col_names, col_types, skip, n_max, progress)
+  } else {
+    # if it's local file simply call readr::read_log
+    readr::read_log(file, col_names, col_types, skip, n_max, progress)
+  }
+}
+
+#'Wrapper for readRDS to support remote file
+#'@export
+read_rds_file <- function(file, refhook = NULL){
+  loadNamespace("stringr")
+  if (stringr::str_detect(file, "^https://") ||
+      stringr::str_detect(file, "^http://") ||
+      stringr::str_detect(file, "^ftp://")) {
+    # for remote RDS, need to call url and gzcon before pass it to readRDS
+    readRDS(gzcon(url(file)), refhook)
+  } else {
+    # if it's local file simply call read_rds
+    readRDS(file, refhook)
+  }
+}
+
