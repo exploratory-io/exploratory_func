@@ -1103,7 +1103,7 @@ clear_cache_file <- function(url){
   })
 }
 
-#' API to download excel file from URL and cache it if necessary
+#' API to download remote data file (excel, csv) from URL and cache it if necessary
 #' it uses tempfile https://stat.ethz.ch/R-manual/R-devel/library/base/html/tempfile.html
 #' and a R variable with name of hashed url is assigned to the path given by tempfile.
 #' @param url
