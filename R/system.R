@@ -1089,17 +1089,41 @@ select_columns <- function(x, ...) {
   return (df)
 }
 
+clear_cach_file <- function(url){
+  hash <- digest::digest(url, "md5", serialize = FALSE)
+  tryCatch({
+    do.call(rm, c(as.name(hash)),envir = .GlobalEnv)
+  }, error = function(e){
+  })
+}
+
 #' API to download excel file from URL
 download_excel_file <- function(url){
-  ext <- stringr::str_to_lower(tools::file_ext(url))
-  # if no extension, assume the file extension as xlsx
-  if(ext == ""){
-    ext = "xlsx"
+  shouldCacheExcel <- getOption("tam.should.cache.excel")
+  filepath <- NULL
+  hash <- digest::digest(url, "md5", serialize = FALSE)
+  tryCatch({
+   filepath <- eval(as.name(hash))
+  }, error = function(e){
+    filepath <- NULL
+  })
+  if(!is.null(shouldCacheExcel) && isTRUE(shouldCacheExcel) && !is.null(filepath)){
+    filepath
+  } else {
+    ext <- stringr::str_to_lower(tools::file_ext(url))
+    # if no extension, assume the file extension as xlsx
+    if(ext == ""){
+      ext = "xlsx"
+    }
+    tmp <- tempfile(fileext = stringr::str_c(".", ext))
+    # download file to tempoprary location
+    download.file(url, destfile = tmp, mode = "wb")
+    # cache file
+    if(!is.null(shouldCacheExcel) && isTRUE(shouldCacheExcel)){
+      assign(hash, tmp, envir = .GlobalEnv)
+    }
+    tmp
   }
-  tmp <- tempfile(fileext = stringr::str_c(".", ext))
-  # download file to tempoprary location
-  download.file(url, destfile = tmp, mode = "wb")
-  tmp
 }
 
 #'Wrapper for readxl::read_excel to support remote file
