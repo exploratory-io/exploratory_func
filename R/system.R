@@ -1089,27 +1089,36 @@ select_columns <- function(x, ...) {
   return (df)
 }
 
-# API to clear excel cache file
+#' API to clear excel cache file
+#' @param url
 #' @export
 clear_cache_file <- function(url){
   options(tam.should.cache.excel = FALSE)
   hash <- digest::digest(url, "md5", serialize = FALSE)
   tryCatch({
+    filepath <- eval(as.name(hash))
     do.call(rm, c(as.name(hash)),envir = .GlobalEnv)
+    unlink(filepath)
   }, error = function(e){
   })
 }
 
-#' API to download excel file from URL
+#' API to download excel file from URL and cache it if necessary
+#' it uses tempfile https://stat.ethz.ch/R-manual/R-devel/library/base/html/tempfile.html
+#' and a R variable with name of hashed url is assigned to the path given by tempfile.
+#' @param url
 download_excel_file <- function(url){
   shouldCacheExcel <- getOption("tam.should.cache.excel")
   filepath <- NULL
   hash <- digest::digest(url, "md5", serialize = FALSE)
   tryCatch({
-   filepath <- eval(as.name(hash))
+    filepath <- eval(as.name(hash))
   }, error = function(e){
+    # if url hash is not set as global vaiarlbe yet, it raises error that says object not found
+    # which can be ignored
     filepath <- NULL
   })
+  # Check if cached excel filepath exists for the URL
   if(!is.null(shouldCacheExcel) && isTRUE(shouldCacheExcel) && !is.null(filepath)){
     filepath
   } else {
