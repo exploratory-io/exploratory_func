@@ -36,6 +36,8 @@ test_that("test word_to_sentiment", {
 })
 
 test_that("test word_to_sentiment to groupd_df", {
+  # this is added because this function was once very slow for grouped data
+  # see https://github.com/exploratory-io/exploratory_func/pull/106 for details
   df <- data.frame(
     text = c("good", "sad", letters[1:(10000 * 3 - 2)]),
     group = rep(seq(10000), 3),
