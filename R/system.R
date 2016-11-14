@@ -1089,8 +1089,10 @@ select_columns <- function(x, ...) {
   return (df)
 }
 
+# API to clear excel cache file
+#' @export
 clear_cache_file <- function(url){
-  options("tam.should.cache.excel", FALSE)
+  options(tam.should.cache.excel = FALSE)
   hash <- digest::digest(url, "md5", serialize = FALSE)
   tryCatch({
     do.call(rm, c(as.name(hash)),envir = .GlobalEnv)
