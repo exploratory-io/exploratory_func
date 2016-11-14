@@ -945,11 +945,8 @@ getObjectListFromRdata <- function(rdata_path, temp.space){
       stringr::str_detect(rdata_path, "^http://") ||
       stringr::str_detect(rdata_path, "^ftp://")) {
 
-    path <- tempfile(fileext = stringr::str_c(".", ".rdata"))
-    # download file to tempoprary location
-    download.file(rdata_path, destfile = path, mode = "wb")
+    path <- download_data_file(rdata_path, "rdata")
   }
-
   temp.object <- load(path,temp.space)
   # get list of ojbect loaded to temporary env
   objectlist <- ls(envir=temp.space)
@@ -975,9 +972,7 @@ getObjectFromRdata <- function(rdata_path, object_name){
       stringr::str_detect(rdata_path, "^http://") ||
       stringr::str_detect(rdata_path, "^ftp://")) {
 
-    path <- tempfile(fileext = stringr::str_c(".", ".rdata"))
-    # download file to tempoprary location
-    download.file(rdata_path, destfile = path, mode = "wb")
+    path <- download_data_file(rdata_path, "rdata")
   }
   temp.space = createTempEnvironment()
   load(path,temp.space)
@@ -1129,6 +1124,8 @@ download_data_file <- function(url, type){
         ext = "xlsx"
       } else if (type == "csv") {
         ext = "csv"
+      } else if (type == "rdata") {
+        ext = "rdata"
       }
     }
     tmp <- tempfile(fileext = stringr::str_c(".", ext))
