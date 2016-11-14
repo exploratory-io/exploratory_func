@@ -1070,7 +1070,7 @@ select_columns <- function(x, ...) {
   return (df)
 }
 
-#'Wrapper for readr::read_excel to support remote file
+#'Wrapper for readxl::read_excel to support remote file
 #'@export
 read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0){
   loadNamespace("readxl")
@@ -1093,3 +1093,25 @@ read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL,
   }
 }
 
+#'Wrapper for readxl::excel_sheets to support remote file
+#'@export
+get_excel_sheets <- function(path){
+  loadNamespace("readxl")
+  loadNamespace("stringr")
+  if (stringr::str_detect(path, "^https://") ||
+      stringr::str_detect(path, "^http://") ||
+      stringr::str_detect(path, "^ftp://")) {
+    ext <- stringr::str_to_lower(tools::file_ext(path))
+    # if no extension, assume the file extension as xlsx
+    if(ext == ""){
+      ext = "xlsx"
+    }
+    tmp <- tempfile(fileext = stringr::str_c(".", ext))
+    # download file to tempoprary location
+    download.file(path, destfile = tmp, mode = "wb")
+    readxl::excel_sheets(tmp)
+  } else {
+    # if it's local file simply call readxl::read_excel
+    readxl::excel_sheets(path)
+  }
+}
