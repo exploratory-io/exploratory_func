@@ -939,7 +939,7 @@ createTempEnvironment <- function(){
 #' API to get a list of data frames from a RDATA
 #' @export
 getObjectListFromRdata <- function(rdata_path, temp.space){
-  # load RDATA to temporary env to prevent the polluation on global objects
+  # load RDATA to temporary env to prevent the pollution on global objects
   path <- rdata_path
   if (stringr::str_detect(rdata_path, "^https://") ||
       stringr::str_detect(rdata_path, "^http://") ||
@@ -1227,6 +1227,21 @@ read_log_file <- function(file, col_names = FALSE, col_types = NULL,
   } else {
     # if it's local file simply call readr::read_log
     readr::read_log(file, col_names, col_types, skip, n_max, progress)
+  }
+}
+
+#'Wrapper for readRDS to support remote file
+#'@export
+read_rds_file <- function(file, refhook = NULL){
+  loadNamespace("stringr")
+  if (stringr::str_detect(file, "^https://") ||
+      stringr::str_detect(file, "^http://") ||
+      stringr::str_detect(file, "^ftp://")) {
+    # for remote RDS, need to call url and gzcon before pass it to readRDS
+    readRDS(gzcon(url(file)), refhook)
+  } else {
+    # if it's local file simply call read_rds
+    readRDS(file, refhook)
   }
 }
 
