@@ -44,24 +44,15 @@ get_stopwords <- function(lexicon="snowball"){
 word_to_sentiment <- function(words, lexicon="bing"){
   loadNamespace("tidytext")
   loadNamespace("dplyr")
-  data("sentiments", package = "tidytext", envir = environment())
-  # chosen lexicon and sentiment in words
-  check <- sentiments$lexicon == lexicon
-  if(lexicon == "nrc"){
-    sentiments <- (
-      sentiments[check,]
-      %>%  dplyr::group_by(word)
-      %>%  dplyr::summarize(sentiment=list(sentiment))
-      )
-  } else {
-    sentiments <- sentiments[check,]
-  }
-  joined_df <- dplyr::left_join(data.frame(word=words, stringsAsFactors = FALSE), sentiments, by="word")
-  if(lexicon=="AFINN"){
-    joined_df$score
-  } else {
-    joined_df$sentiment
-  }
+  # get data saved internally in this package by chosen lexicon
+  sentiment <- get(paste0("sentiment_", lexicon))
+  # sentiment is named vector (for "bing" and "AFINN")
+  # or named list (for "nrc" because it can have many sentiment types for one word)
+  # this is faster than using left join
+  ret <- sentiment[words]
+  # remove the name
+  names(ret) <- NULL
+  ret
 }
 
 #' Tokenize text and unnest

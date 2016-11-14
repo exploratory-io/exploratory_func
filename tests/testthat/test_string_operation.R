@@ -35,6 +35,21 @@ test_that("test word_to_sentiment", {
   expect_equal(result, -3)
 })
 
+test_that("test word_to_sentiment to groupd_df", {
+  # this is added because this function was once very slow for grouped data
+  # see https://github.com/exploratory-io/exploratory_func/pull/106 for details
+  df <- data.frame(
+    text = c("good", "sad", letters[1:(10000 * 3 - 2)]),
+    group = rep(seq(10000), 3),
+    stringsAsFactors = FALSE
+  )
+
+  ret <- df %>%
+    dplyr::group_by(group) %>%
+    dplyr::mutate(sent = word_to_sentiment(text))
+  expect_true(is.character(ret[["sent"]]))
+})
+
 test_that("do_tokenize with drop=F", {
   result <- test_df %>%
     do_tokenize(char, drop=F)
