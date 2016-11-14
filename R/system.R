@@ -1126,6 +1126,8 @@ download_data_file <- function(url, type){
         ext = "csv"
       } else if (type == "rdata") {
         ext = "rdata"
+      } else if (type == "log") {
+        ext = "log"
       }
     }
     tmp <- tempfile(fileext = stringr::str_c(".", ext))
@@ -1210,3 +1212,21 @@ guess_csv_file_encoding <- function(file,  n_max = 1e4, threshold = 0.20){
     readr::guess_encoding(file, n_max, threshold)
   }
 }
+
+#'Wrapper for readr::read_log to support remote file
+#'@export
+read_log_file <- function(file, col_names = FALSE, col_types = NULL,
+                          skip = 0, n_max = -1, progress = interactive()){
+  loadNamespace("readr")
+  loadNamespace("stringr")
+  if (stringr::str_detect(file, "^https://") ||
+      stringr::str_detect(file, "^http://") ||
+      stringr::str_detect(file, "^ftp://")) {
+    tmp <- download_data_file(file, "log")
+    readr::read_log(tmp, col_names, col_types, skip, n_max, progress)
+  } else {
+    # if it's local file simply call readr::read_log
+    readr::read_log(file, col_names, col_types, skip, n_max, progress)
+  }
+}
+
