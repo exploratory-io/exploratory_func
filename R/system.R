@@ -1093,7 +1093,7 @@ select_columns <- function(x, ...) {
 #' @param url
 #' @export
 clear_cache_file <- function(url){
-  options(tam.should.cache.excel = FALSE)
+  options(tam.should.cache.datafile = FALSE)
   hash <- digest::digest(url, "md5", serialize = FALSE)
   tryCatch({
     filepath <- eval(as.name(hash))
@@ -1107,8 +1107,8 @@ clear_cache_file <- function(url){
 #' it uses tempfile https://stat.ethz.ch/R-manual/R-devel/library/base/html/tempfile.html
 #' and a R variable with name of hashed url is assigned to the path given by tempfile.
 #' @param url
-download_excel_file <- function(url){
-  shouldCacheExcel <- getOption("tam.should.cache.excel")
+download_data_file <- function(url, type){
+  shouldCacheFile <- getOption("tam.should.cache.datafile")
   filepath <- NULL
   hash <- digest::digest(url, "md5", serialize = FALSE)
   tryCatch({
@@ -1119,19 +1119,23 @@ download_excel_file <- function(url){
     filepath <- NULL
   })
   # Check if cached excel filepath exists for the URL
-  if(!is.null(shouldCacheExcel) && isTRUE(shouldCacheExcel) && !is.null(filepath)){
+  if(!is.null(shouldCacheFile) && isTRUE(shouldCacheFile) && !is.null(filepath)){
     filepath
   } else {
     ext <- stringr::str_to_lower(tools::file_ext(url))
     # if no extension, assume the file extension as xlsx
     if(ext == ""){
-      ext = "xlsx"
+      if(type == "excel"){
+        ext = "xlsx"
+      } else if (type == "csv") {
+        ext = "csv"
+      }
     }
     tmp <- tempfile(fileext = stringr::str_c(".", ext))
     # download file to tempoprary location
     download.file(url, destfile = tmp, mode = "wb")
     # cache file
-    if(!is.null(shouldCacheExcel) && isTRUE(shouldCacheExcel)){
+    if(!is.null(shouldCacheFile) && isTRUE(shouldCacheFile)){
       assign(hash, tmp, envir = .GlobalEnv)
     }
     tmp
@@ -1146,7 +1150,7 @@ read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL,
   if (stringr::str_detect(path, "^https://") ||
       stringr::str_detect(path, "^http://") ||
       stringr::str_detect(path, "^ftp://")) {
-    tmp <- download_excel_file(path)
+    tmp <- download_data_file(path, "excel")
     readxl::read_excel(tmp, sheet, col_names, col_types, na, skip)
   } else {
     # if it's local file simply call readxl::read_excel
@@ -1162,10 +1166,50 @@ get_excel_sheets <- function(path){
   if (stringr::str_detect(path, "^https://") ||
       stringr::str_detect(path, "^http://") ||
       stringr::str_detect(path, "^ftp://")) {
-    tmp <- download_excel_file(path)
+    tmp <- download_data_file(path, "excel")
     readxl::excel_sheets(tmp)
   } else {
     # if it's local file simply call readxl::read_excel
     readxl::excel_sheets(path)
+  }
+}
+
+#'Wrapper for readr::read_delim to support remote file
+#'@export
+read_delim_file <- function(file, delim, quote = '"',
+                            escape_backslash = FALSE, escape_double = TRUE,
+                            col_names = TRUE, col_types = NULL,
+                            locale = readr::default_locale(),
+                            na = c("", "NA"), quoted_na = TRUE,
+                            comment = "", trim_ws = FALSE,
+                            skip = 0, n_max = Inf, guess_max = min(1000, n_max), progress = interactive()){
+  loadNamespace("readr")
+  loadNamespace("stringr")
+  if (stringr::str_detect(file, "^https://") ||
+      stringr::str_detect(file, "^http://") ||
+      stringr::str_detect(file, "^ftp://")) {
+    tmp <- download_data_file(file, "csv")
+    readr::read_delim(tmp, delim, quote, escape_backslash, escape_double,col_names, col_types,
+                      locale,na, quoted_na, comment, trim_ws,skip, n_max, guess_max, progress)
+  } else {
+    # if it's local file simply call readr::read_delim
+    readr::read_delim(file, delim, quote, escape_backslash, escape_double,col_names, col_types,
+                      locale,na, quoted_na, comment, trim_ws,skip, n_max, guess_max, progress)
+  }
+}
+
+#'Wrapper for readr::guess_encoding to support remote file
+#'@export
+guess_csv_file_encoding <- function(file,  n_max = 1e4, threshold = 0.20){
+  loadNamespace("readr")
+  loadNamespace("stringr")
+  if (stringr::str_detect(file, "^https://") ||
+      stringr::str_detect(file, "^http://") ||
+      stringr::str_detect(file, "^ftp://")) {
+    tmp <- download_data_file(file, "csv")
+    readr::guess_encoding(tmp, n_max, threshold)
+  } else {
+    # if it's local file simply call readr::read_delim
+    readr::guess_encoding(file, n_max, threshold)
   }
 }
