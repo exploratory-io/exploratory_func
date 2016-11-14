@@ -1070,6 +1070,19 @@ select_columns <- function(x, ...) {
   return (df)
 }
 
+#' API to download excel file from URL
+download_excel_file <- function(url){
+  ext <- stringr::str_to_lower(tools::file_ext(url))
+  # if no extension, assume the file extension as xlsx
+  if(ext == ""){
+    ext = "xlsx"
+  }
+  tmp <- tempfile(fileext = stringr::str_c(".", ext))
+  # download file to tempoprary location
+  download.file(url, destfile = tmp, mode = "wb")
+  tmp
+}
+
 #'Wrapper for readxl::read_excel to support remote file
 #'@export
 read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0){
@@ -1078,14 +1091,7 @@ read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL,
   if (stringr::str_detect(path, "^https://") ||
       stringr::str_detect(path, "^http://") ||
       stringr::str_detect(path, "^ftp://")) {
-    ext <- stringr::str_to_lower(tools::file_ext(path))
-    # if no extension, assume the file extension as xlsx
-    if(ext == ""){
-      ext = "xlsx"
-    }
-    tmp <- tempfile(fileext = stringr::str_c(".", ext))
-    # download file to tempoprary location
-    download.file(path, destfile = tmp, mode = "wb")
+    tmp <- download_excel_file(path)
     readxl::read_excel(tmp, sheet, col_names, col_types, na, skip)
   } else {
     # if it's local file simply call readxl::read_excel
@@ -1101,14 +1107,7 @@ get_excel_sheets <- function(path){
   if (stringr::str_detect(path, "^https://") ||
       stringr::str_detect(path, "^http://") ||
       stringr::str_detect(path, "^ftp://")) {
-    ext <- stringr::str_to_lower(tools::file_ext(path))
-    # if no extension, assume the file extension as xlsx
-    if(ext == ""){
-      ext = "xlsx"
-    }
-    tmp <- tempfile(fileext = stringr::str_c(".", ext))
-    # download file to tempoprary location
-    download.file(path, destfile = tmp, mode = "wb")
+    tmp <- download_excel_file(path)
     readxl::excel_sheets(tmp)
   } else {
     # if it's local file simply call readxl::read_excel
