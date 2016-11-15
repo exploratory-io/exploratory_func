@@ -12,10 +12,119 @@ col_name <- function(x, default = stop("Please supply column name", call. = FALS
 }
 
 #' Simple cast wrapper that spreads columns which is choosed as row and col into matrix
-simple_cast <- function(data, row, col, val, fun.aggregate=mean, fill=0){
+simple_cast <- function(data, row, col, val = NULL, fun.aggregate=mean, fill=0){
   loadNamespace("reshape2")
-  fml <- as.formula(paste(row, col, sep = "~"))
-  data %>%  reshape2::acast(fml, value.var=val, fun.aggregate=fun.aggregate, fill=fill)
+  loadNamespace("tidyr")
+
+
+  if(!row %in% colnames(data)){
+    stop(paste0(row, " is not in column names"))
+  }
+
+  if(!col %in% colnames(data)){
+    stop(paste0(col, " is not in column names"))
+  }
+
+  # noraml na causes error in reshape2::acast so it has to be NA_real_
+  if(is.na(fill)){
+    fill <- NA_real_
+  }
+
+  # remove NA from row and column
+  data <- tidyr::drop_na_(data, c(row, col))
+
+  # validation
+  uniq_row <- unique(data[[row]], na.rm=TRUE)
+  uniq_col <- unique(data[[col]], na.rm=TRUE)
+  suppressWarnings({
+    # length(uniq_row)*length(uniq_col) become NA if it exceeds 2^31
+    if(is.na(length(uniq_row)*length(uniq_col))){
+      # The number of data is supported under 2^31 by reshape2::acast
+      stop("Data is too large to make a matrix for calculation.")
+    }
+  })
+
+  fml <- as.formula(paste0("`", row, "`~`", col, "`"))
+  if(is.null(val)){
+    # use sparse = TRUE and as.matrix because xtabs returns table object with occurance and it causes error in kmeans
+    mat <- xtabs(as.formula(paste0("~", "`", row , "`", "+", "`", col, "`")), data = data, sparse = TRUE) %>%  as.matrix()
+    mat[mat == 0] <- fill
+    mat
+  }else{
+    if(!val %in% colnames(data)){
+      stop(paste0(val, " is not in column names"))
+    }
+    data %>%  reshape2::acast(fml, value.var=val, fun.aggregate=fun.aggregate, fill=fill)
+  }
+}
+
+#' Cast data to sparse matrix by choosing row and column from a data frame
+#' @param count If val is NULL and count is TRUE, the value becomes count of the row and col set. Otherwise, it's binary data of row and col set.
+sparse_cast <- function(data, row, col, val=NULL, fun.aggregate=sum, count = FALSE){
+  loadNamespace("dplyr")
+  loadNamespace("tidyr")
+  loadNamespace("Matrix")
+
+  if(!row %in% colnames(data)){
+    stop(paste0(row, " is not in column names"))
+  }
+
+  if(!col %in% colnames(data)){
+    stop(paste0(col, " is not in column names"))
+  }
+
+  # remove NA from row and col
+  data <- tidyr::drop_na_(data, c(row, col))
+
+  if(is.null(val)){
+    # if there's no value column, it creates binary sparse matrix.
+    row_fact <- as.factor(data[[row]])
+    col_fact <- as.factor(data[[col]])
+    if(count){
+      sparseMat <- xtabs(as.formula(paste0("~", "`", row , "`", "+", "`", col, "`")), data = data, sparse = TRUE)
+    } else {
+      sparseMat <- Matrix::sparseMatrix(
+        i = as.integer(row_fact),
+        j = as.integer(col_fact),
+        dims = c(length(levels(row_fact)), length(levels(col_fact))),
+        dimnames = list(levels(row_fact), levels(col_fact))
+        )
+    }
+  }else{
+    if(!val %in% colnames(data)){
+      stop(paste0(val, " is not in column names"))
+    }
+    # Basic behaviour of Matrix::sparseMatrix is sum.
+    # If fun.aggregate is different, it should be aggregated by it.
+    if(!identical(fun.aggregate, sum)){
+      # create a formula to aggregate duplicated row and col pairs
+      # ex: ~mean(val)
+      fml <- as.formula(paste0("~", as.character(substitute(fun.aggregate)), "(", val, ")"))
+
+      # execute the formula to each row and col pair
+      data <- dplyr::group_by_(data, .dots=list(as.symbol(row), as.symbol(col))) %>%
+        dplyr::summarise_(.dots=setNames(list(fml), val)) %>%
+        dplyr::ungroup()
+    }
+
+    row_fact <- as.factor(data[[row]])
+    col_fact <- as.factor(data[[col]])
+
+    na_index <- is.na(data[[val]])
+    zero_index <- data[[val]] == 0
+
+    valid_index <- na_index | !zero_index
+
+    sparseMat <- Matrix::sparseMatrix(
+      i = as.integer(row_fact[valid_index]),
+      j = as.integer(col_fact[valid_index]),
+      x = as.numeric(data[[val]][valid_index]),
+      dims = c(length(levels(row_fact)), length(levels(col_fact))),
+      dimnames = list(levels(row_fact), levels(col_fact))
+      )
+  }
+
+  sparseMat
 }
 
 #' as.matrix from select argument or cast by three columns
@@ -73,14 +182,11 @@ upper_gather <- function(mat, names=NULL, diag=NULL, cnames = c("Var1", "Var2", 
     r_names <- rownames(tmat)
     if(is.null(c_names)){
       c_names <- seq(ncol(tmat))
-    } else {
-      c_names <- sort(c_names)
     }
     if(is.null(r_names)){
       r_names <- seq(nrow(tmat))
-    } else {
-      r_names <- sort(r_names)
     }
+
     # this creates pairs of row and column indices
     ind <- which( lower_tri , arr.ind = TRUE )
     # make a vector of upper half of matrix
@@ -178,24 +284,89 @@ list_n <- function(column){
 #' extract elements from each row of list type column or data frame type column
 #' @export
 list_extract <- function(column, position = 1, rownum = 1){
+
+  if(position==0){
+    stop("position 0 is not supported")
+  }
+
   if(is.data.frame(column[[1]])){
-   sapply(column, function(column) column[rownum, position])
+    if(position<0){
+      sapply(column, function(column){
+        index <- ncol(column) + position + 1
+        if(is.null(column[rownum, index]) | index <= 0){
+          # column[rownum, position] still returns data frame if it's minus, so position < 0 should be caught here
+          NA
+        } else {
+          column[rownum, index][[1]]
+        }
+      })
+    } else {
+      sapply(column, function(column){
+        if(is.null(column[rownum, position])){
+          NA
+        } else {
+          column[rownum, position][[1]]
+        }
+      })
+    }
   } else {
-    sapply(column, function(column) column[position])
+    if(position<0){
+      sapply(column, function(column){
+        index <- length(column) + position + 1
+        if(index <= 0){
+          # column[rownum, position] still returns data frame if it's minus, so position < 0 should be caught here
+          NA
+        } else {
+          column[index]
+        }
+      })
+    } else {
+      sapply(column, function(column){
+        column[position]
+      })
+    }
   }
 }
 
 #' convert list column into text column
 #' @export
 list_to_text <- function(column, sep = ", "){
-  text <- sapply(column, function(x) str_c(x, collapse = sep))
-  as.character(text)
+  loadNamespace("stringr")
+  ret <- sapply(column, function(x) {
+    ret <- stringr::str_c(x, collapse = sep)
+    if(identical(ret, character(0))){
+      # if it's character(0)
+      NA
+    } else {
+      ret
+    }
+  })
+  as.character(ret)
 }
 
-#' concat vectors in a list column
+#' concatinate vectors in a list
 #' @export
-list_concat <- function(list){
-  list(unlist(list))
+list_concat <- function(..., collapse = FALSE){
+  lists <- list(...)
+
+  # size of each list
+  lengths <- lapply(lists, function(arg){
+    length(arg)
+  })
+
+  max_index <- which.max(lengths)
+
+  ret <- lapply(seq(lengths[[max_index]]), function(index){
+    val <- unlist(lapply(lists, function(arg){
+      arg[[index]]
+    }))
+  })
+
+  if(collapse){
+    ret <- list(unlist(ret))
+  }
+
+  ret
 }
 
 #' replace sequence of spaces or periods with
@@ -224,5 +395,35 @@ str_count_all <- function(text, patterns, remove.zero = TRUE){
     # if remove.zero is FALSE, it returns all element
     return_elem <- (!remove.zero | count > 0)
     data.frame(.count=count[return_elem], .pattern=patterns[return_elem], stringsAsFactors = FALSE)
+  })
+}
+
+#' convert df to numeric matrix
+#' @param colnames Vector of column names or lazy dot for select arg. ex:lazyeval::lazy_dots(...)
+as_numeric_matrix_ <- function(df, columns){
+  loadNamespace("dplyr")
+  df[,columns] %>%
+    as.matrix() %>%
+    as.numeric() %>%
+    matrix(nrow = nrow(df))
+}
+
+#' evaluate select argument
+#' @param dots Lazy dot for select arg. ex:lazyeval::lazy_dots(...)
+#' @param excluded Excluded column names
+evaluate_select <- function(df, .dots, excluded = NULL){
+  loadNamespace("dplyr")
+  tryCatch({
+    ret <- setdiff(colnames(dplyr::select_(df, .dots=.dots)), excluded)
+    if(length(ret) == 0){
+      stop("no column selected")
+    }
+    ret
+  }, error = function(e){
+    loadNamespace("stringr")
+    if(stringr::str_detect(e$message, "not found")){
+      stop("undefined columns selected")
+    }
+    stop(e$message)
   })
 }

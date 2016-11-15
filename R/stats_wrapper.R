@@ -1,6 +1,22 @@
 #'
 #'
 
+#' integrated do_cor
+#' @export
+do_cor <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0){
+  if (!is.null(skv)) {
+    #.kv pattern
+    if (!(length(skv) %in% c(2, 3))) {
+      stop("length of skv has to be 2 or 3")
+    }
+    value <- if(length(skv) == 2) NULL else skv[[3]]
+    do_cor.kv_(df, skv[[1]], skv[[2]], value, fun.aggregate = fun.aggregate, fill = fill, ...)
+  } else {
+    #.cols pattern
+    do_cor.cols(df, ...)
+  }
+}
+
 #'
 #' Calculate correlation among groups and output the correlation of each pair
 #' @param df data frame in tidy format
@@ -15,13 +31,8 @@
 do_cor.kv <- function(df,
                    subject,
                    key,
-                   value,
-                   use="pairwise.complete.obs",
-                   method="pearson",
-                   distinct = FALSE,
-                   diag = FALSE,
-                   fill = 0,
-                   fun.aggregate=mean)
+                   value = NULL,
+                   ...)
 {
   loadNamespace("reshape2")
   loadNamespace("dplyr")
@@ -30,10 +41,43 @@ do_cor.kv <- function(df,
 
   row <- col_name(substitute(key))
   col <- col_name(substitute(subject))
-  val <- col_name(substitute(value))
+  val <- if(is.null(substitute(value))) NULL else col_name(substitute(value))
+
+  do_cor.kv_(df, col, row, val, ...)
+}
+
+#' SE version of do_cor.kv
+#' @export
+do_cor.kv_ <- function(df,
+                      subject_col,
+                      key_col,
+                      value_col = NULL,
+                      use="pairwise.complete.obs",
+                      method="pearson",
+                      distinct = FALSE,
+                      diag = FALSE,
+                      fill = 0,
+                      fun.aggregate=mean)
+{
+  loadNamespace("reshape2")
+  loadNamespace("dplyr")
+  loadNamespace("tidyr")
+  loadNamespace("lazyeval")
+
+  row <- key_col
+  col <- subject_col
+  val <- value_col
 
   grouped_col <- grouped_by(df)
-  output_cols <- avoid_conflict(grouped_col, c("pair.name.1", "pair.name.2", "cor.value"))
+  if(col %in% grouped_col){
+    stop(paste0(col, " is a grouping column. ungroup() may be necessary before this operation."))
+  }
+  # column names are "{subject}.x", "{subject}.y", "value"
+  output_cols <- avoid_conflict(grouped_col,
+                           c(stringr::str_c(col, c(".x", ".y")),
+                             "value")
+  )
+
 
   do_cor_each <- function(df){
     mat <- simple_cast(df, row, col, val, fun.aggregate=fun.aggregate, fill=fill)
@@ -63,10 +107,14 @@ do_cor.cols <- function(df, ..., use="pairwise.complete.obs", method="pearson", 
   # select columns using dplyr::select logic
   select_dots <- lazyeval::lazy_dots(...)
   grouped_col <- grouped_by(df)
-  output_cols <- avoid_conflict(grouped_col, c("pair.name.1", "pair.name.2", "cor.value"))
+  output_cols <- avoid_conflict(grouped_col, c("pair.name.1", "pair.name.2", "value"))
   # check if the df's grouped
   do_cor_each <- function(df){
     mat <- dplyr::select_(df, .dots = select_dots) %>%  as.matrix()
+    # sort the column name so that the output of pair.name.1 and pair.name.2 will be sorted
+    # it's better to be sorted so that heatmap in exploratory can be triangle if distinct is TRUE
+    mat <- mat[,sort(colnames(mat))]
+
     cor_mat <- cor(mat, use = use, method = method)
     if(distinct){
       ret <- upper_gather(cor_mat, diag=diag, cnames=output_cols)
@@ -92,15 +140,15 @@ do_cor.cols <- function(df, ..., use="pairwise.complete.obs", method="pearson", 
 #' @return Tidy format of data frame.
 #' @export
 do_svd.kv <- function(df,
-                   subject,
-                   key,
-                   value,
-                   type="group",
-                   fill=0,
-                   fun.aggregate=mean,
-                   n_component=3,
-                   centering=TRUE,
-                   output ="long"){
+                      subject,
+                      key,
+                      value = NULL,
+                      type="group",
+                      fill=0,
+                      fun.aggregate=mean,
+                      n_component=3,
+                      centering=TRUE,
+                      output ="long"){
   loadNamespace("dplyr")
   loadNamespace("tibble")
   loadNamespace("tidyr")
@@ -109,12 +157,21 @@ do_svd.kv <- function(df,
   value_col <- col_name(substitute(value))
 
   grouped_col <- grouped_by(df)
+
+  if(subject_col %in% grouped_col){
+    stop(paste0(subject_col, " is a grouping column. ungroup() may be necessary before this operation."))
+  }
+
+
   axis_prefix <- "axis"
-  value_cname <- avoid_conflict(colnames(df), "svd.value")
+  value_cname <- avoid_conflict(colnames(df), "value")
 
   # this is executed on each group
   do_svd_each <- function(df){
     matrix <-simple_cast(df, subject_col, dimension_col, value_col, fun.aggregate = fun.aggregate, fill=fill)
+    if(any(is.na(matrix))){
+      stop("NA is not supported as value.")
+    }
     if(centering){
       # move the origin to center of data
       matrix <- sweep(matrix, 2, colMeans(matrix), "-")
@@ -175,6 +232,7 @@ do_svd.kv <- function(df,
 
   (df %>%  dplyr::do_(.dots=setNames(list(~do_svd_each(.)), value_cname)) %>%  tidyr::unnest_(value_cname))
 }
+
 
 #' Calculate svd from tidy format. This can be used to calculate coordinations by reducing dimensionality.
 #' @param df Data frame which has group and dimension

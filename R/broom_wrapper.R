@@ -38,10 +38,13 @@ augment_kmeans <- function(df, model, data){
   if(!data_col %in% colnames(df)){
     stop(paste(data_col, "is not in column names"), sep=" ")
   }
-  tryCatch({
+  ret <- tryCatch({
     # use do.call to evaluate data_col from a variable
     augment_func <- get("augment", asNamespace("broom"))
-    do.call(augment_func, list(df, model_col, data=data_col))
+    ret <- do.call(augment_func, list(df, model_col, data=data_col))
+    # cluster column is factor labeled "1", "2"..., so convert it to integer to avoid confusion
+    ret[[ncol(ret)]] <- as.integer(ret[[ncol(ret)]])
+    ret
   },
   error = function(e){
     loadNamespace("dplyr")
@@ -70,6 +73,24 @@ augment_kmeans <- function(df, model, data){
       stop(e)
     }
   })
+  # update .cluster to cluster or cluster.new if it exists
+  colnames(ret)[[ncol(ret)]] <- avoid_conflict(colnames(ret), "cluster")
+  ret
+}
+
+#' augment wrapper
+#' @export
+predict <- function(df, model, ...){
+  model_col <- col_name(substitute(model))
+  data_col <- col_name(substitute(data))
+  if(!model_col %in% colnames(df)){
+    stop(paste(model_col, "is not in column names"), sep=" ")
+  }
+  if(any(class(df[[model_col]]) %in% ".model.kmeans")){
+    augment_kmeans(df, model, ...)
+  } else {
+    broom::augment(df, model, ...)
+  }
 }
 
 #' augment for lda

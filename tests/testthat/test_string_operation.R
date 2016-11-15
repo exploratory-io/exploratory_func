@@ -35,6 +35,21 @@ test_that("test word_to_sentiment", {
   expect_equal(result, -3)
 })
 
+test_that("test word_to_sentiment to groupd_df", {
+  # this is added because this function was once very slow for grouped data
+  # see https://github.com/exploratory-io/exploratory_func/pull/106 for details
+  df <- data.frame(
+    text = c("good", "sad", letters[1:(10000 * 3 - 2)]),
+    group = rep(seq(10000), 3),
+    stringsAsFactors = FALSE
+  )
+
+  ret <- df %>%
+    dplyr::group_by(group) %>%
+    dplyr::mutate(sent = word_to_sentiment(text))
+  expect_true(is.character(ret[["sent"]]))
+})
+
 test_that("do_tokenize with drop=F", {
   result <- test_df %>%
     do_tokenize(char, drop=F)
@@ -100,12 +115,88 @@ test_that("calc_idf smooth_idf FALSE", {
 
 test_that("do_tfidf", {
   loadNamespace("dplyr")
+  test_df <- data.frame(id=rep(c(1,2), 5))
+  test_df["doc id"] <- rep(c(1,2), 5)
+  test_df["colname with space"] <- c("this", "this", "this", letters[1:7])
+  result <- (
+    test_df %>%
+      do_tfidf(`doc id`, `colname with space`)
+  )
+  expect_equal(result$tfidf[c(1,5)], c(2/(sqrt(2^2*3)), 2/(sqrt(2^2*4))))
+})
+
+
+test_that("do_tfidf with bach tick arg", {
+  test_df <- setNames(data.frame(rep(c(1,2), 5), c("this", "this", "this", letters[1:7])), c("id", "cname with space"))
+  result <- (
+    test_df %>%
+      do_tfidf(id, `cname with space`, norm = FALSE, tf_weight="raw")
+  )
+  expect_equal(head(result$tfidf,2), c(log(2/1), log(2/1)))
+})
+
+test_that("do_tfidf no norm", {
   test_df <- data.frame(id=rep(c(1,2), 5), word=c("this", "this", "this", letters[1:7]))
   result <- (
     test_df %>%
-      do_tfidf(id, word)
+      do_tfidf(id, word, norm = FALSE, tf_weight="raw")
   )
-  expect_equal(head(result$tfidf,2), c(log(2/1)/5, log(2/1)/5))
+  expect_equal(head(result$tfidf,2), c(log(2/1), log(2/1)))
+})
+
+test_that("do_tfidf l2", {
+  loadNamespace("dplyr")
+  test_df <- data.frame(id=rep(c(1,2), 5), word=c("this", "this", "this", letters[1:7]))
+  result <- (
+    test_df %>%
+      do_tfidf(id, word, norm="l2")
+  )
+  ret <- (result %>%  dplyr::group_by(id)  %>%  dplyr::summarize(l=sqrt(sum(tfidf^2))))
+  expect_true(all(ret$l==1))
+})
+
+test_that("do_tfidf l1", {
+  loadNamespace("dplyr")
+  test_df <- data.frame(id=rep(c(1,2), 5), word=c("this", "this", "this", letters[1:7]))
+  result <- (
+    test_df %>%
+      do_tfidf(id, word, norm="l1")
+  )
+  ret <- (result %>%  dplyr::group_by(id)  %>%  dplyr::summarize(l=sum(tfidf)))
+  expect_true(all(ret$l==1))
+})
+
+test_that("do_tfidf tf_weight=raw", {
+  loadNamespace("dplyr")
+  test_df <- data.frame(id=rep(c(1,2), 5), word=c("this", "this", "this", letters[1:7]))
+  result <- (
+    test_df %>%
+      do_tfidf(id, word, tf_weight="raw")
+  )
+  ret <- (result %>%  dplyr::group_by(id)  %>%  dplyr::summarize(l=sqrt(sum(tfidf^2))))
+  expect_true(all(ret$l==1))
+})
+
+test_that("do_tfidf tf_weight=log_scale", {
+  loadNamespace("dplyr")
+  test_df <- data.frame(id=rep(c(1,2), 5), word=c("this", "this", "this", letters[1:7]))
+  result <- (
+    test_df %>%
+      do_tfidf(id, word, tf_weight="log_scale")
+  )
+  ret <- (result %>%  dplyr::group_by(id)  %>%  dplyr::summarize(l=sqrt(sum(tfidf^2))))
+  expect_true(all(ret$l==1))
+})
+
+test_that("do_tfidf tf_weight=binary", {
+  loadNamespace("dplyr")
+  test_df <- data.frame(id=rep(c(1,2), 5), word=c("this", "this", "this", letters[1:7]))
+  result <- (
+    test_df %>%
+      do_tfidf(id, word, tf_weight="binary")
+  )
+  ret <- (result %>%  dplyr::group_by(id)  %>%  dplyr::summarize(l=sqrt(sum(tfidf^2))))
+  expect_true(all(ret$l==1))
 })
 
 test_that("do_ngram", {
@@ -116,10 +207,8 @@ test_that("do_ngram", {
     token=paste("token",rep(c(1,2),10), sep=""),
     stringsAsFactors = F)
 
-  ungrouped <- df %>%  do_ngram(token)
-  grouped <- df %>%  dplyr::group_by(doc, sentence) %>%  do_ngram(token)
-  expect_equal(ncol(ungrouped), 1)
-  expect_equal(ncol(grouped), 3)
+  ret <- df %>%  do_ngram(token, sentence, doc, maxn = 3)
+  expect_equal(ncol(ret), ncol(df)+2)
 })
 
 test_that("sentimentr", {
