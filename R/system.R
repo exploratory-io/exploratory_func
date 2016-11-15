@@ -267,7 +267,7 @@ getMongoURL <- function(host, port, database, username, pass, isSSL=FALSE, authS
 
 
 #' @export
-queryMongoDB <- function(host, port, database, collection, username, password, query = "{}", isFlatten, limit=0, isSSL=FALSE, authSource=NULL, fields="{}", sort="{}", skip=0){
+queryMongoDB <- function(host, port, database, collection, username, password, query = "{}", isFlatten, limit=0, isSSL=FALSE, authSource=NULL, fields="{}", sort="{}", skip=0, queryType = "find", pipeline="{}"){
   if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
   loadNamespace("jsonlite")
   if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
@@ -282,7 +282,12 @@ queryMongoDB <- function(host, port, database, collection, username, password, q
   if(sort == ""){
     sort = "{}"
   }
-  data <- con$find(query = GetoptLong::qq(query), limit=limit, fields=fields, sort = sort, skip = skip)
+  data <- NULL
+  if(queryType == "aggregate"){
+    data <- con$aggregate(pipeline = GetoptLong::qq(pipeline))
+  } else if (queryType == "find") {
+    data <- con$find(query = GetoptLong::qq(query), limit=limit, fields=fields, sort = sort, skip = skip)
+  }
   result <-data
   if (isFlatten) {
     result <- jsonlite::flatten(data)
