@@ -305,7 +305,7 @@ test_that("build_lda with theta", {
                                           )), .Names = c("LessonId", "Lesson"), row.names = c(102L, 337L,
                                                                                               289L, 1123L, 628L, 1257L, 812L, 1170L, 1616L, 619L), class = "data.frame")
   tokenized <- input_df %>% do_tokenize(Lesson)
-  ret <- build_lda(tokenized, LessonId, token, n_topics=3, output = "theta")
+  ret <- build_lda(tokenized, LessonId, token, n_topics=3, matrix = "theta")
   expect_true(is.integer(ret[["document"]]))
   expect_true(is.integer(ret[["topic"]]))
   expect_true(is.numeric(ret[["value"]]))
@@ -328,7 +328,7 @@ test_that("build_lda with phi", {
                                           )), .Names = c("LessonId", "Lesson"), row.names = c(102L, 337L,
                                                                                               289L, 1123L, 628L, 1257L, 812L, 1170L, 1616L, 619L), class = "data.frame")
   tokenized <- input_df %>% do_tokenize(Lesson)
-  ret <- build_lda(tokenized, LessonId, token, n_topics=2, output = "phi")
+  ret <- build_lda(tokenized, LessonId, token, n_topics=2, matrix = "phi")
 
   expect_true(is.character(ret[["term"]]))
   expect_true(is.integer(ret[["topic"]]))
@@ -353,7 +353,7 @@ test_that("build_lda check name conflict", {
                                           ), seq(10) %% 2), .Names = c("LessonId", "Lesson", "topic"), row.names = c(102L, 337L,
                                                                                              289L, 1123L, 628L, 1257L, 812L, 1170L, 1616L, 619L), class = "data.frame")
   tokenized <- input_df %>% do_tokenize(Lesson) %>% dplyr::group_by(topic)
-  ret <- build_lda(tokenized, LessonId, token, n_topics=2, output = "phi")
+  ret <- build_lda(tokenized, LessonId, token, n_topics=2, matrix = "phi")
 
   expect_true(is.character(ret[["term"]]))
   expect_true(is.integer(ret[["topic.new"]]))

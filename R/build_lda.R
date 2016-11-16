@@ -26,8 +26,8 @@ build_lda <- function(df, subject, key, value = NULL,
   model_column <- avoid_conflict(grouped_column, "model")
   source_column <- avoid_conflict(grouped_column, "source.data")
 
-  if (!output %in% c("model", "phi", "theta")) {
-    stop("output has to be \"model\", \"phi\" or \"theta\"")
+  if (!matrix %in% c("model", "phi", "theta")) {
+    stop("matrix has to be \"model\", \"phi\" or \"theta\"")
   }
 
   build_lda_each <- function(df){
@@ -88,8 +88,8 @@ build_lda <- function(df, subject, key, value = NULL,
   # }
   ret <- df %>%
     dplyr::do_(.dots=setNames(list(~build_lda_each(.)), c(model_column)))
-  if(output != "model"){
-    ret <- ret %>% tidy(model, matrix = output)
+  if(matrix != "model"){
+    ret <- ret %>% tidy(model, matrix = matrix)
   }
   ret
 }
