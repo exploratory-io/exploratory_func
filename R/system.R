@@ -588,6 +588,7 @@ submitGoogleBigQueryJob <- function(project, sqlquery, destination_table, write_
   bigrquery::set_access_cred(token)
   # pass desitiona_table to support large data
   # check if the quer contains special key word for standardSQL
+  # If we do not pass the useLegaySql argument, bigrquery set TRUE for it, so we need to expliclity set it to make standard SQL work.
   isStandardSQL <- stringr::str_detect(sqlquery, "#standardSQL")
   job <- bigrquery::insert_query_job(GetoptLong::qq(sqlquery), project, destination_table = destination_table, write_disposition = write_disposition, useLegacySql = isStandardSQL == FALSE)
   job <- bigrquery::wait_for(job)
@@ -727,6 +728,7 @@ executeGoogleBigQuery <- function(project, sqlquery, destination_table, page_siz
     # direct import case (for refresh data frame case)
     bigrquery::set_access_cred(token)
     # check if the quer contains special key word for standardSQL
+    # If we do not pass the useLegaySql argument, bigrquery set TRUE for it, so we need to expliclity set it to make standard SQL work.
     isStandardSQL <- stringr::str_detect(sqlquery, "#standardSQL")
     df <- bigrquery::query_exec(GetoptLong::qq(sqlquery), project = project, destination_table = destination_table,
                                 page_size = page_size, max_page = max_page, write_disposition = write_disposition, useLegacySql = isStandardSQL == FALSE)
