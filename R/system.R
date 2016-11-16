@@ -726,7 +726,10 @@ executeGoogleBigQuery <- function(project, sqlquery, destination_table, page_siz
   } else {
     # direct import case (for refresh data frame case)
     bigrquery::set_access_cred(token)
-    df <- bigrquery::query_exec(GetoptLong::qq(sqlquery), project = project, destination_table = destination_table, page_size = page_size, max_page = max_page, write_disposition = write_disposition)
+    # check if the quer contains special key word for standardSQL
+    isStandardSQL <- stringr::str_detect(sqlquery, "#standardSQL")
+    df <- bigrquery::query_exec(GetoptLong::qq(sqlquery), project = project, destination_table = destination_table,
+                                page_size = page_size, max_page = max_page, write_disposition = write_disposition, useLegacySql = isStandardSQL == FALSE)
   }
   df
 }
