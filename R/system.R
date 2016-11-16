@@ -579,13 +579,17 @@ refreshGoogleTokenForBigQuery <- function(tokenFileId){
 submitGoogleBigQueryJob <- function(project, sqlquery, destination_table, write_disposition = "WRITE_TRUNCATE", tokenFieldId){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
+  if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
+
   #GetoptLong uses stringr and str_c is called without stringr:: so need to use "require" instead of "requireNamespace"
   if(!require("stringr")){stop("package stringr must be installed.")}
 
   token <- getGoogleTokenForBigQuery(tokenFieldId)
   bigrquery::set_access_cred(token)
   # pass desitiona_table to support large data
-  job <- bigrquery::insert_query_job(GetoptLong::qq(sqlquery), project, destination_table = destination_table, write_disposition = write_disposition)
+  # check if the quer contains special key word for standardSQL
+  isStandardSQL <- stringr::str_detect(sqlquery, "#standardSQL")
+  job <- bigrquery::insert_query_job(GetoptLong::qq(sqlquery), project, destination_table = destination_table, write_disposition = write_disposition, useLegacySql = isStandardSQL == FALSE)
   job <- bigrquery::wait_for(job)
   isCacheHit <- job$statistics$query$cacheHit
   # if cache hit case, totalBytesProcessed info is not available. So set it as -1
