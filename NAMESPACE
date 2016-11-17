@@ -3,6 +3,7 @@
 S3method(augment,modelset)
 S3method(glance,modelset)
 S3method(tidy,LDA_modelset)
+S3method(tidy,glm_modelset)
 S3method(tidy,modelset)
 export("%nin%")
 export(augment)

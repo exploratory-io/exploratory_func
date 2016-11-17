@@ -148,6 +148,26 @@ test_that("test build_glm and glance", {
   }
 })
 
+test_that("test build_glm and anova", {
+  if(requireNamespace("broom")){
+    result <- test_df %>%
+      build_glm(vec1~vec2, output = "anova")
+    expect_equal(nrow(result), 2)
+    expect_equal(ncol(result), 5)
+  }
+})
+
+test_that("test build_glm and anova", {
+  if(requireNamespace("broom")){
+    result <- test_df %>%
+      build_glm(vec1~vec2, output = "model")
+      # tidy(model, matrix = "anova")
+    browser()
+    expect_equal(nrow(result), 2)
+    expect_equal(ncol(result), 5)
+  }
+})
+
 test_that("test build_kmeans.cols and broom::tidy", {
   if(requireNamespace("broom")){
     result <- (
