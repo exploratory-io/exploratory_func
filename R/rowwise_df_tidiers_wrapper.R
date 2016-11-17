@@ -43,8 +43,14 @@ wrap_rowwise_df <- function(func) {
   }
 }
 
-tidy.rowwise_df <- wrap_rowwise_df(tidy_.rowwise_df)
-
 tidy_.rowwise_df <- wrap_rowwise_df_(tidy)
-
+tidy.rowwise_df <- wrap_rowwise_df(tidy_.rowwise_df)
 tidy.tbl_df <- wrap_tbl_df(tidy, tidy.rowwise_df)
+
+glance_.rowwise_df <- wrap_rowwise_df_(glance)
+glance.rowwise_df <- wrap_rowwise_df(glance_.rowwise_df)
+glance.tbl_df <- wrap_tbl_df(glance, glance.rowwise_df)
+
+augment_.rowwise_df <- wrap_rowwise_df_(augment)
+augment.rowwise_df <- wrap_rowwise_df(augment_.rowwise_df)
+augment.tbl_df <- wrap_tbl_df(augment, augment.rowwise_df)

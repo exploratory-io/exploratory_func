@@ -48,20 +48,6 @@ build_lm <- function(...){
   })
 }
 
-#' glm wrapper with do
-#' @return deta frame which has glm model
-#' @export
-build_glm <- function(...){
-  tryCatch({
-    build_data("glm")(...)
-  }, error = function(e){
-    if(e$message == "contrasts can be applied only to factors with 2 or more levels"){
-      stop("more than 2 unique values are needed for categorical predictor columns")
-    }
-    stop(e$message)
-  })
-}
-
 #' integrated build_kmeans
 #' @export
 build_kmeans <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0){
@@ -271,7 +257,30 @@ build_kmeans.cols <- function(df, ...,
   output
 }
 
-#' @importFrom broom tidy
+#' @export
+tidy.modelset <- function(modelset, ...){
+  tidy(modelset$model, ...)
+}
+
+#' @export
+augment.modelset <- function(modelset, ...){
+  if(is.null(modelset$source)){
+    augment(modelset$model, ...)
+  } else {
+    augment(modelset$model, modelset$source, ...)
+  }
+}
+
+#' @export
+glance.modelset <- function(modelset, ...){
+  glance(modelset$model)
+}
+
 #' @export
 tidy <- broom::tidy
 
+#' @export
+augment <- broom::augment
+
+#' @export
+glance <- broom::glance
