@@ -8,7 +8,10 @@
 #' and reuse if you indicate same cache_key
 #' @return deta frame which has glm model
 #' @export
-build_model_glm <- function(data, formula, ..., output = "model", cache_key = NULL){
+build_model_glm <- function(data, formula, ..., output = "model"){
+
+  grouped_column <- grouped_by(data)
+
   # get argument named list (-1 means removing this function name)
   cl <- as.list(match.call())[-1]
   # keep just ... argument
@@ -16,30 +19,22 @@ build_model_glm <- function(data, formula, ..., output = "model", cache_key = NU
   cl[names(nodots)] <- NULL
   # put only formula
   cl$formula <- formula
-  # this is used for cache index in each group
-  group_index <- 1
   modelset_classname <- "glm_modelset"
   build_glm_each <- function(df){
     cl$data <- df
-    ret <- NULL
-    if(!is.null(cache_key)){
-      ret <- getModelSetFromRDS(modelset_classname, cache_key, group_index)
-      group_index <- group_index + 1
-    }
-    if(is.null(ret)){
-      model <- do.call(glm, cl)
-      ret <- list(
-        model = model,
-        source = df
-      )
-      class(ret) <- c(modelset_classname, "modelset")
-      saveModelSetToRDS(ret, modelset_classname, cache_key, group_index)
-    }
+    model <- do.call(glm, cl)
+    ret <- list(
+      model = model,
+      source = df
+    )
+    class(ret) <- c(modelset_classname, "modelset")
     ret
   }
 
+  columnname <- avoid_conflict(grouped_column, "model")
+
   ret <- tryCatch({
-      data %>% dplyr::do_(.dots = setNames(list(~build_glm_each(.)), "model"))
+      data %>% dplyr::do_(.dots = setNames(list(~build_glm_each(.)), columnname))
     }, error = function(e){
     if(e$message == "contrasts can be applied only to factors with 2 or more levels"){
       stop("more than 2 unique values are needed for categorical predictor columns")
@@ -47,17 +42,18 @@ build_model_glm <- function(data, formula, ..., output = "model", cache_key = NU
     stop(e$message)
   })
 
+  # do.call is used to use a variable in non standard evaluation
   ret <- if(output == "augment"){
-    ret <- augment(ret, "model")
+    do.call(augment, list(ret, columnname))
   } else if (output == "tidy") {
-    ret <- tidy(ret, "model")
+    do.call(tidy, list(ret, columnname))
   } else if (output == "glance") {
-    glance(ret, "model")
-  } else if (output == "model") {
-    class(ret[["model"]]) <- c("list", ".model")
+    do.call(glance, list(ret, columnname))
+  } else if (output == columnname) {
+    class(ret[["model"]]) <- c("list", "modelset")
     ret
   } else {
-    tidy(ret, "model", matrix = output)
+    do.call(tidy, list(ret, columnname, matrix = output))
   }
   ret
 }

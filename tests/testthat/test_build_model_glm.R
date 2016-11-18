@@ -11,6 +11,7 @@ test_that("test build_model_glm with subset and weight", {
   ret <- build_model_glm(test_df, val ~ ., subset = subset, weights = log(weight), output = "tidy")
   glm <- glm(val ~ ., data = test_df, subset = subset, weights = log(weight))
   answer <- tidy(glm)
+
   for (cindex in ncol(answer)) {
     expect_equal(ret[[cindex]], answer[[cindex]])
   }
