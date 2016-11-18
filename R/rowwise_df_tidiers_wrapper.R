@@ -18,17 +18,17 @@ apply_rowwise_df <- function(x, object, func, data, ...) {
   groupers <- colnames(x)[sapply(x, function(e) class(e)[1]) != "list"]
   groupers <- setdiff(groupers, object)
   # suppress "group_by" warning
-  x <- suppressWarnings(group_by_(x, .dots = as.list(groupers)))
+  x <- suppressWarnings(dplyr::group_by_(x, .dots = as.list(groupers)))
   # let the "data" argument specify column (for augment)
   if (!missing(data)) {
     if (as.character(substitute(data)) %in% colnames(x)) {
       data_column <- col_name(substitute(data))
-      do(x, func(.[[object]][[1]], data = .[[data_column]][[1]], groupers = groupers, ...))
+      dplyr::do(x, func(.[[object]][[1]], data = .[[data_column]][[1]], groupers = groupers, ...))
     } else {
-      do(x, func(.[[object]][[1]], data = data, groupers = groupers,...))
+      dplyr::do(x, func(.[[object]][[1]], data = data, groupers = groupers,...))
     }
   } else {
-    do(x, func(.[[object]][[1]], groupers = groupers,...))
+    dplyr::do(x, func(.[[object]][[1]], groupers = groupers,...))
   }
 }
 
