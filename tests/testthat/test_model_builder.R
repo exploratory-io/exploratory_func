@@ -42,22 +42,6 @@ test_that("test build_glm with NA values", {
   }, "more than 2 unique values are needed for categorical predictor columns")
 })
 
-test_that("test build_glm with subset and weight", {
-  test_df <- data.frame(
-    val = seq(8),
-    val1 = c("char", "char" ,rep(c(4,1), each = 3)),
-    val2 = c("char", "char2" ,rep(c(1,2), each = 3)),
-    subset = seq(8) %% 2 == 0
-  )
-  weight <- seq(8)
-  ret <- build_glm(test_df, val ~ ., subset = subset, weights = log(weight), output = "tidy")
-  glm <- glm(val ~ ., data = test_df, subset = subset, weights = log(weight))
-  answer <- tidy(glm)
-  for (cindex in ncol(answer)) {
-    expect_equal(ret[[cindex]], answer[[cindex]])
-  }
-})
-
 # this returns "object 'fit' not found" but yet to understand what this means, so kept commented out
 # test_that("test build_glm with all NA values", {
 #   test_df <- data.frame(
@@ -110,62 +94,6 @@ test_that("test with too small key", {
   expect_error({
     build_kmeans(test_df, skv = c("col", "group", "val"))
   }, "Centers should be less than distinct data points\\.")
-})
-
-test_that("test build_glm and broom tidy", {
-  if(requireNamespace("broom")){
-    result <- test_df %>%
-        build_glm(vec1~vec2) %>%
-        broom::tidy(model)
-    expect_equal(dim(result)[[1]], 2)
-  }
-})
-
-test_that("test build_glm and augment", {
-  if(requireNamespace("broom")){
-    result <- test_df %>%
-      build_glm(vec1~vec2, output = "augment")
-    expect_equal(nrow(result), 10)
-    expect_equal(ncol(result), ncol(test_df)+7)
-  }
-})
-
-test_that("test build_glm and tidy", {
-  if(requireNamespace("broom")){
-    result <- test_df %>%
-      build_glm(vec1~vec2, output = "tidy")
-    expect_equal(nrow(result), 2)
-    expect_equal(ncol(result), 5)
-  }
-})
-
-test_that("test build_glm and glance", {
-  if(requireNamespace("broom")){
-    result <- test_df %>%
-      build_glm(vec1~vec2, output = "glance")
-    expect_equal(nrow(result), 1)
-    expect_equal(ncol(result), 7)
-  }
-})
-
-test_that("test build_glm and anova", {
-  if(requireNamespace("broom")){
-    result <- test_df %>%
-      build_glm(vec1~vec2, output = "anova")
-    expect_equal(nrow(result), 2)
-    expect_equal(ncol(result), 5)
-  }
-})
-
-test_that("test build_glm and anova", {
-  if(requireNamespace("broom")){
-    result <- test_df %>%
-      build_glm(vec1~vec2, output = "model")
-      # tidy(model, matrix = "anova")
-    browser()
-    expect_equal(nrow(result), 2)
-    expect_equal(ncol(result), 5)
-  }
 })
 
 test_that("test build_kmeans.cols and broom::tidy", {
