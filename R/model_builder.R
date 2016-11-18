@@ -48,6 +48,20 @@ build_lm <- function(...){
   })
 }
 
+#' glm wrapper with do
+#' @return deta frame which has glm model
+#' @export
+build_glm <- function(...){
+  tryCatch({
+    build_data("glm")(...)
+  }, error = function(e){
+    if(e$message == "contrasts can be applied only to factors with 2 or more levels"){
+      stop("more than 2 unique values are needed for categorical predictor columns")
+    }
+    stop(e$message)
+  })
+}
+
 #' integrated build_kmeans
 #' @export
 build_kmeans <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0){
