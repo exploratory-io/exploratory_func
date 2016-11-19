@@ -70,15 +70,8 @@ do_dist <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0){
   }
 }
 
-#' Calculate distance of each pair of groups.
-#' @param df data frame in tidy format
-#' @param group A column you want to calculate the correlations for.
-#' @param dimension A column you want to use as a dimension to calculate the correlations.
-#' @param value A column for the values you want to use to calculate the correlations.
-#' @param distinct The returned pair should be duplicated in swapped order or not.
-#' TRUE makes it easy to filter group names.
-#' @param diag If similarity between itself should be returned or not.
-#' @param method Type of calculation. https://cran.r-project.org/web/packages/proxy/vignettes/overview.pdf
+#' Non Standard Evaluation version of do_dist
+#' Calculate distance of each pair of groups
 #' @export
 do_dist.kv <- function(df, subject, key, value = NULL, ...){
   subject_col <- col_name(substitute(subject))
@@ -92,9 +85,29 @@ do_dist.kv <- function(df, subject, key, value = NULL, ...){
   do_dist.kv_(df, subject_col, key_col, value_col, ...)
 }
 
-#' SE version of do_dist
+#' Calculate distance of each pair of groups
+#' @param df data frame in tidy format
+#' @param group A column you want to calculate the correlations for.
+#' @param dimension A column you want to use as a dimension to calculate the correlations.
+#' @param value A column for the values you want to use to calculate the correlations.
+#' @param distinct The returned pair should be duplicated in swapped order or not.
+#' TRUE makes it easy to filter group names.
+#' @param diag If similarity between itself should be returned or not.
+#' @param method Type of calculation. https://cran.r-project.org/web/packages/proxy/vignettes/overview.pdf
+#' @param p P parameter for "minkowski" method.
+#' @param cmdscale_k Number of dimention to map the result.
 #' @export
-do_dist.kv_ <- function(df, subject_col, key_col, value_col = NULL, fill=0, fun.aggregate=mean, distinct=FALSE, diag=FALSE, method="euclidean", p=2 ){
+do_dist.kv_ <- function(df,
+                        subject_col,
+                        key_col,
+                        value_col = NULL,
+                        fill=0,
+                        fun.aggregate=mean,
+                        distinct=FALSE,
+                        diag=FALSE,
+                        method="euclidean",
+                        p=2,
+                        cmdscale_k = NULL){
   loadNamespace("dplyr")
   loadNamespace("tidyr")
   loadNamespace("reshape2")
@@ -123,15 +136,18 @@ do_dist.kv_ <- function(df, subject_col, key_col, value_col = NULL, fill=0, fun.
       }else{
         diag <- NULL
       }
-      df <- upper_gather(as.vector(dist), rownames(mat), diag=diag, cnames=cnames)
+      ret <- upper_gather(as.vector(dist), rownames(mat), diag=diag, cnames=cnames)
     }else{
-      df <- dist %>%  as.matrix() %>%  mat_to_df(cnames)
+      ret <- dist %>%  as.matrix() %>%  mat_to_df(cnames)
       if(!diag){
-        df <- df[df[,1] != df[,2],]
+        ret<- ret[ret[,1] != ret[,2],]
       }
     }
-    rownames(df) <- NULL
-    df
+    rownames(ret) <- NULL
+    if (!is.null(cmdscale_k)) {
+      ret <- do_cmdscale_(ret, cnames[[1]], cnames[[2]], cnames[[3]], k = cmdscale_k)
+    }
+    ret
   }
   (df %>% dplyr::do_(.dots=setNames(list(~calc_dist_each(.)), cnames[[1]])) %>%  tidyr::unnest_(cnames[[1]]))
 }
@@ -146,7 +162,16 @@ do_dist.kv_ <- function(df, subject_col, key_col, value_col = NULL, fill=0, fun.
 #' @param diag If similarity between itself should be returned or not.
 #' @param method Type of calculation. https://cran.r-project.org/web/packages/proxy/vignettes/overview.pdf
 #' @export
-do_dist.cols <- function(df, ..., label=NULL, fill=0, fun.aggregate=mean, distinct=FALSE, diag=FALSE, method="euclidean", p=2 ){
+do_dist.cols <- function(df,
+                         ...,
+                         label=NULL,
+                         fill=0,
+                         fun.aggregate=mean,
+                         distinct=FALSE,
+                         diag=FALSE,
+                         method="euclidean",
+                         p=2,
+                         cmdscale_k = NULL){
   loadNamespace("dplyr")
   loadNamespace("tidyr")
   loadNamespace("reshape2")
@@ -178,15 +203,18 @@ do_dist.cols <- function(df, ..., label=NULL, fill=0, fun.aggregate=mean, distin
       }else{
         diag <- NULL
       }
-      df <- upper_gather(as.vector(dist), rownames(mat), diag=diag, cnames=cnames)
+      ret <- upper_gather(as.vector(dist), rownames(mat), diag=diag, cnames=cnames)
     }else{
-      df <- dist %>%  as.matrix() %>%  mat_to_df(cnames)
+      ret <- dist %>%  as.matrix() %>%  mat_to_df(cnames)
       if(!diag){
-        df <- df[df[,1] != df[,2],]
+        ret <- ret[ret[,1] != ret[,2],]
       }
     }
-    rownames(df) <- NULL
-    df
+    rownames(ret) <- NULL
+    if (!is.null(cmdscale_k)) {
+      ret <- do_cmdscale_(ret, cnames[[1]], cnames[[2]], cnames[[3]], k = cmdscale_k)
+    }
+    ret
   }
   (df %>% dplyr::do_(.dots=setNames(list(~calc_dist_each(.)), cnames[[1]])) %>%  tidyr::unnest_(cnames[[1]]))
 }
