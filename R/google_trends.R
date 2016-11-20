@@ -106,7 +106,6 @@ getGoogleTrends <- function(user,
     tidyr::gather_(bind_data, "keyword", "trend", colnames(bind_data)[2:ncol(bind_data)], na.rm = TRUE)
   } else if (type == "trend"){
     trend <- ret[[type]]
-    colnames(trend)[colnames(trend) == "hits"] <- "trend"
     trend
   } else {
     stop("Currently, type must be top_regions, top_cities or trends")
