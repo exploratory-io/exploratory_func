@@ -233,23 +233,35 @@ do_svd.kv <- function(df,
   (df %>%  dplyr::do_(.dots=setNames(list(~do_svd_each(.)), value_cname)) %>%  tidyr::unnest_(value_cname))
 }
 
-
-#' Calculate svd from tidy format. This can be used to calculate coordinations by reducing dimensionality.
-#' @param df Data frame which has group and dimension
+#' Non standard evaluation version for do_cmdscale_
 #' @return Tidy format of data frame.
 #' @export
 do_cmdscale <- function(df,
-                        pair_name1,
-                        pair_name2,
-                        value,
-                        k=2,
-                        fun.aggregate=mean,
-                        fill=0){
+                         pair_name1,
+                         pair_name2,
+                         value,
+                         ...){
   loadNamespace("dplyr")
   loadNamespace("tidyr")
   pair1_col <- col_name(substitute(pair_name1))
   pair2_col <- col_name(substitute(pair_name2))
   value_col <- col_name(substitute(value))
+  do_cmdscale_(df, pair1_col, pair2_col, value_col, ...)
+}
+
+#' Map dist result to k dimensions
+#' @param df Data frame which has group and dimension
+#' @return Tidy format of data frame.
+#' @export
+do_cmdscale_ <- function(df,
+                         pair1_col,
+                         pair2_col,
+                         value_col,
+                         k=2,
+                         fun.aggregate=mean,
+                         fill=0){
+  loadNamespace("dplyr")
+  loadNamespace("tidyr")
   grouped_col <- grouped_by(df)
 
   name_col <- avoid_conflict(grouped_col, "name")
