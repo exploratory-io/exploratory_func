@@ -84,6 +84,7 @@ getGoogleTrends <- function(user,
 
     # Column names should be the same with queries because Japanese character is strangely returned by gtrends package
     # The query is lowered and spaces are changed into . by gtrendsR, so doing the same
+    # This -1 means except the first element because the first element is the name of region and don't have to be changed
     colnames(ret[[key]])[-1] <- stringr::str_to_lower(stringr::str_replace(stringr::str_trim(query), " +", "."))
 
     tidyr::gather_(ret[[key]], "keyword", "trend", colnames(ret[[key]])[2:ncol(ret[[key]])], na.rm = TRUE)
