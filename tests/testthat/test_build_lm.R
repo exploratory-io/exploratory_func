@@ -8,7 +8,7 @@ test_that("test build_lm summary output ", {
     category = rep(letters[1:4], 5),
     with_NA = rep(c(letters[5:6], NA, NA), 5)
   )
-  trial <- build_lm(test_df, num1 ~ num2 + category + with_NA, weights = weights)
+  trial <- test_df %>% build_lm(num1 ~ num2 + category + with_NA, weights = weights)
   res <- capture.output(summary(trial$model[[1]]))
   expect_lt(length(res), 50) # the output of summary should be less than 50 lines
 })
