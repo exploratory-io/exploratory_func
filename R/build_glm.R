@@ -17,14 +17,17 @@ build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, g
   model_col <- avoid_conflict(grouped_col, "model")
   source_col <- avoid_conflict(grouped_col, "source.data")
 
+  # this is used inside build_lm_each function to replace call parameter of the model
   raw_call <- match.call()
   # get named list or arguments (-1 means removing this function name)
-  cl <- as.list(match.call())[-1]
+  cl <- as.list(raw_call)[-1]
   # keep just ... argument
   nodots <- as.list(match.call(expand.dots = FALSE))[-1]
   cl[names(nodots)] <- NULL
   # put only formula
   cl$formula <- formula
+
+  # this is executed on each group
   build_glm_each <- function(df){
     cl$data <- df
     model <- do.call(glm, cl)
@@ -49,6 +52,8 @@ build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, g
     stop(e$message)
   })
   if(augment){
+    # do.call is used because augment tries to regard "model_col" and "source_col"
+    # as column names as non standard evaluation
     ret <- do.call(broom::augment, list(ret, model_col, source_col))
   } else {
     class(ret[[model_col]]) <- c("list", ".model", ".model.glm")
