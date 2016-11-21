@@ -1,7 +1,11 @@
 #' lm wrapper with do
 #' @return deta frame which has lm model
 #' @export
-build_lm <- function(data, formula, ..., output = "model", keep.source = TRUE, augment = FALSE){
+build_lm <- function(data, formula, ..., output = "model", keep.source = TRUE, augment = FALSE, group_cols = NULL){
+  if(!is.null(group_cols)){
+    data <- dplyr::group_by_(data, .dots =  group_cols)
+  }
+
   grouped_col <- grouped_by(data)
 
   model_col <- avoid_conflict(grouped_col, "model")
