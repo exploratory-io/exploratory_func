@@ -31,23 +31,6 @@ build_data <- function(funcname) {
   ret
 }
 
-#' lm wrapper with do
-#' @return deta frame which has lm model
-#' @export
-build_lm <- function(...){
-  tryCatch({
-    build_data("lm")(...)
-  }, error = function(e){
-    if(e$message == "contrasts can be applied only to factors with 2 or more levels"){
-      stop("more than 2 unique values are needed for categorical predictor columns")
-    }
-    if(e$message == "0 (non-NA) cases"){
-      stop("no data after removing NA")
-    }
-    stop(e$message)
-  })
-}
-
 #' glm wrapper with do
 #' @return deta frame which has glm model
 #' @export
