@@ -25,7 +25,7 @@ build_lm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, gr
   cl[names(nodots)] <- NULL
   # put only formula
   cl$formula <- formula
-  build_glm_each <- function(df){
+  build_lm_each <- function(df){
     cl$data <- df
     model <- do.call(lm, cl)
     # do.call expands the argument parameters
@@ -38,9 +38,9 @@ build_lm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, gr
 
   ret <- tryCatch({
     if(keep.source || augment){
-      data %>% dplyr::do_(.dots = setNames(list(~build_glm_each(.), ~(.)), c(model_col, source_col)))
+      data %>% dplyr::do_(.dots = setNames(list(~build_lm_each(.), ~(.)), c(model_col, source_col)))
     } else {
-      data %>% dplyr::do_(.dots = setNames(list(~build_glm_each(.)), model_col))
+      data %>% dplyr::do_(.dots = setNames(list(~build_lm_each(.)), model_col))
     }
   }, error = function(e){
     if(e$message == "contrasts can be applied only to factors with 2 or more levels"){
