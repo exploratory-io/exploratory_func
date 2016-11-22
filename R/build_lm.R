@@ -32,9 +32,10 @@ build_lm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, gr
     cl$data <- df
     model <- do.call(lm, cl)
     # do.call expands the argument parameters
-    # like weights = c(2L, 3L, ...), not using variable names
-    # so call section in summary(model) becomes large.
-    # call parameter is replaced by the input of build_lm
+    # like weights = c(2L, 3L, ...), not using variable names.
+    # This makes call section in summary(model) output large.
+    # To avoid this, we are replacing call parameter
+    # with the smaller call parameter which we got by match.call().
     model$call <- raw_call
     model
   }
