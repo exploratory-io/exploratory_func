@@ -80,15 +80,21 @@ augment_kmeans <- function(df, model, data){
 
 #' augment wrapper
 #' @export
-predict <- function(df, model, ...){
+predict <- function(df, model, ..., model_df = NULL){
   model_col <- col_name(substitute(model))
   data_col <- col_name(substitute(data))
-  if(!model_col %in% colnames(df)){
+  if(! ((model_col %in% colnames(df)) || (model_col %in% colnames(model_df)))){
     stop(paste(model_col, "is not in column names"), sep=" ")
   }
   if(any(class(df[[model_col]]) %in% ".model.kmeans")){
     augment_kmeans(df, model, ...)
+  } else if (!is.null(model_df)) {
+    fml <- as.formula(paste0("~augment(model_df, `", model_col, "`, newdata = .)"))
+    augmented_col <- avoid_conflict(grouped_by(df), "augment")
+    augmented <- df %>% dplyr::do_(.dots = setNames(list(fml), augmented_col))
+    ret <- augmented[, augmented_col] %>% tidyr::unnest_(augmented_col) %>% tibble::repair_names()
+    ret
   } else {
-    broom::augment(df, model, ...)
+    do.call(augment, list(df, model_col, ...))
   }
 }
