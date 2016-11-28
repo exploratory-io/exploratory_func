@@ -51,15 +51,21 @@ test_that("test scrape_html_table with japanese shift_jis table",{
 })
 
 test_that("test source check conflict case", {
-  filenames <- c("../../R/model_builder.R", "../../R/don't_exist.R")
+  # this fails in devtools::check() because it can't find the pass because ../../R/model_builder.R can't be found
+  # but this works in devtools::test(), so this needs condition to check the existance of the file.
+  if(file.exists("../../R/model_builder.R")){
+    filenames <- c("../../R/model_builder.R", "../../R/don't_exist.R")
 
-  # suppress file doesn't exist warning
-  suppressWarnings({ret <- checkSourceConflict(filenames)})
-  expect_true(!is.null(ret[[filenames[[1]]]]$names))
-  expect_true(is.null(ret[[filenames[[2]]]]$names))
+    # suppress file doesn't exist warning
+    suppressWarnings({ret <- checkSourceConflict(filenames)})
+    expect_true(!is.null(ret[[filenames[[1]]]]$names))
+    expect_true(is.null(ret[[filenames[[2]]]]$names))
 
-  expect_true(is.null(ret[[filenames[[1]]]]$error))
-  expect_true(!is.null(ret[[filenames[[2]]]]$error))
+    expect_true(is.null(ret[[filenames[[1]]]]$error))
+    expect_true(!is.null(ret[[filenames[[2]]]]$error))
+  } else {
+    testthat::skip("../../R/model_builder.R doesn't exist")
+  }
 })
 
 test_that("test statecode",{
