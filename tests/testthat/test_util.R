@@ -381,3 +381,21 @@ test_that("list_concat with multiple list", {
   expect_equal(ret1_collapse[[1]], c(NA, NA, NA, NA, "a", "c", "1", "3", "a", "c", "3", "5", "6", "6"))
 
 })
+
+test_that("test expand_args", {
+  func <- function(..., def = "defalut"){
+    caller <- match.call()
+    expand_args(caller, exclude = "def")
+  }
+
+  ret <- func(aaa = "aa\"a",
+              cc_list = list("c", "c"),
+              fml = ~as.formula("~c()"),
+              chars = c("chars", "chars2"),
+              def = "not default")
+
+  expect_equal(ret, "aaa = \"aa\"a\", cc_list = list(\"c\", \"c\"), fml = ~as.formula(\"~c()\"), chars = c(\"chars\", \"chars2\")")
+
+
+
+})

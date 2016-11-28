@@ -24,7 +24,8 @@ Import:
     text2vec,
     quanteda,
     Matrix,
-    rvest
+    rvest,
+    stats
 Suggests:
     testthat,
     twitteR,
