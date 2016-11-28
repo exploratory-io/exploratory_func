@@ -7,7 +7,7 @@
 #' @param augment Whether the result should be augmented immediately
 #' @param group_cols A vector with columns names to be used as group columns
 #' @export
-build_lm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, group_cols = NULL){
+build_lm <- function(data, ..., keep.source = TRUE, augment = FALSE, group_cols = NULL){
   if(!is.null(group_cols)){
     data <- dplyr::group_by_(data, .dots =  group_cols)
   }
@@ -17,34 +17,16 @@ build_lm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, gr
   model_col <- avoid_conflict(grouped_col, "model")
   source_col <- avoid_conflict(grouped_col, "source.data")
 
-  # this is used inside build_lm_each function to replace call parameter of the model
-  raw_call <- match.call()
-  # get named list or arguments (-1 means removing this function name)
-  cl <- as.list(raw_call)[-1]
-  # keep just ... argument
-  nodots <- as.list(match.call(expand.dots = FALSE))[-1]
-  cl[names(nodots)] <- NULL
-  # put only formula
-  cl$formula <- formula
+  caller <- match.call()
+  arg_char <- expand_args(caller, exclude = c("keep.source", "augment", "group_cols"))
 
-  # this is executed on each group
-  build_lm_each <- function(df){
-    cl$data <- df
-    model <- do.call(lm, cl)
-    # do.call expands the argument parameters
-    # like weights = c(2L, 3L, ...), not using variable names.
-    # This makes call section in summary(model) output large.
-    # To avoid this, we are replacing call parameter
-    # with the smaller call parameter which we got by match.call().
-    model$call <- raw_call
-    model
-  }
+  fml <- as.formula(paste0("~stats::lm(", arg_char, ")"))
 
   ret <- tryCatch({
     if(keep.source || augment){
-      data %>% dplyr::do_(.dots = setNames(list(~build_lm_each(.), ~(.)), c(model_col, source_col)))
+      data %>% dplyr::do_(.dots = setNames(list(fml, ~(.)), c(model_col, source_col)))
     } else {
-      data %>% dplyr::do_(.dots = setNames(list(~build_lm_each(.)), model_col))
+      data %>% dplyr::do_(.dots = setNames(list(fml), model_col))
     }
   }, error = function(e){
     if(e$message == "contrasts can be applied only to factors with 2 or more levels"){
