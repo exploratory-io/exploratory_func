@@ -392,9 +392,10 @@ test_that("test expand_args", {
               cc_list = list("c", "c"),
               fml = ~as.formula("~c()"),
               chars = c("chars", "chars2"),
+              "no args",
               def = "not default")
 
-  expect_equal(ret, "aaa = \"aa\"a\", cc_list = list(\"c\", \"c\"), fml = ~as.formula(\"~c()\"), chars = c(\"chars\", \"chars2\")")
+  expect_equal(ret, "aaa = \"aa\"a\", cc_list = list(\"c\", \"c\"), fml = ~as.formula(\"~c()\"), chars = c(\"chars\", \"chars2\"), \"no args\"")
 
 
 

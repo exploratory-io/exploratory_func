@@ -437,10 +437,13 @@ expand_args <- function(call, exclude = c()){
   arg_char <- paste(vapply(seq(length(args)) , function(index){
     arg_name <- names(args)[[index]]
     arg_value <- if(is.character(args[[index]])) paste0('"', as.character(args[index]), '"') else as.character(args[index])
-    if(arg_name != ""){
-      paste0(arg_name, " = ", arg_value , "")
-    } else {
+    if(is.null(arg_name)) {
       arg_value
+    } else if(arg_name == ""){
+      # this have to be separated from is.null because is.null(arg_name) | arg_name == "" returns logical(0)
+      arg_value
+    } else {
+      paste0(arg_name, " = ", arg_value , "")
     }
   }, FUN.VALUE = ""), collapse = ", ")
 }
