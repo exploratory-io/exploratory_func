@@ -1045,8 +1045,8 @@ checkSourceConflict <- function(files){
 statecode <- function(sourcevar, origin, destination, ignore.case=TRUE) {
 
   # supported codes
-  codes_origin <- c("code", "name")
-  codes_destination <- c("code", "name", "division", "region")
+  codes_origin <- c("abb", "code", "name")
+  codes_destination <- c("abb", "code", "name", "division", "region")
 
   if (!origin %in% codes_origin){
     stop("Origin code not supported")
