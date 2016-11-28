@@ -1,4 +1,3 @@
-loadNamespace("broom")
 #' glance for lm
 #' @export
 glance_lm <- broom::glance

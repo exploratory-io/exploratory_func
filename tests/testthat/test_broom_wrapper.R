@@ -1,4 +1,3 @@
-loadNamespace("broom")
 context("test broom wrappers")
 
 set.seed(0)
