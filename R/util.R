@@ -428,6 +428,7 @@ evaluate_select <- function(df, .dots, excluded = NULL){
   })
 }
 
+#' re-build arguments of a function as string
 #' @param call This expects returned value from match.call()
 #' @param exclude Argument names that should be excluded for expansion
 expand_args <- function(call, exclude = c()){
