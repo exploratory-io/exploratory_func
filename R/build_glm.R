@@ -25,7 +25,9 @@ build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, g
 
   ret <- tryCatch({
     if(keep.source || augment){
-      data %>% dplyr::do_(.dots = setNames(list(fml, ~(.)), c(model_col, source_col)))
+      ret <- data %>% dplyr::do_(.dots = setNames(list(fml, ~(.)), c(model_col, source_col)))
+      class(ret[[source_col]]) <- c("list", ".source.data")
+      ret
     } else {
       data %>% dplyr::do_(.dots = setNames(list(fml), model_col))
     }
