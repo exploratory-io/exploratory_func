@@ -79,6 +79,10 @@ augment_kmeans <- function(df, model, data){
 }
 
 #' augment wrapper
+#' @param df Data frame with model or data frame to predict if model_df is indicated.
+#' @param model Column name for model data.
+#' @param ... Column name for model data.
+#' @param model_df If you want to use model objects in model_df to df, this argument should be used.
 #' @export
 predict <- function(df, model, ..., model_df = NULL){
   model_col <- col_name(substitute(model))
