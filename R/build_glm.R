@@ -17,33 +17,17 @@ build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, g
   model_col <- avoid_conflict(grouped_col, "model")
   source_col <- avoid_conflict(grouped_col, "source.data")
 
-  # this is used inside build_lm_each function to replace call parameter of the model
-  raw_call <- match.call()
-  # get named list or arguments (-1 means removing this function name)
-  cl <- as.list(raw_call)[-1]
-  # keep just ... argument
-  nodots <- as.list(match.call(expand.dots = FALSE))[-1]
-  cl[names(nodots)] <- NULL
-  # put only formula
-  cl$formula <- formula
-
-  # this is executed on each group
-  build_glm_each <- function(df){
-    cl$data <- df
-    model <- do.call(glm, cl)
-    # do.call expands the argument parameters
-    # like weights = c(2L, 3L, ...), not using variable names
-    # so call section in summary(model) becomes large.
-    # call parameter is replaced by the input of build_glm
-    model$call <- raw_call
-    model
-  }
+  caller <- match.call()
+  # this expands dots arguemtns to character
+  arg_char <- expand_args(caller, exclude = c("data", "keep.source", "augment", "group_cols"))
+  # put it into a formula
+  fml <- as.formula(paste0("~stats::glm(data = ., ", arg_char, ")"))
 
   ret <- tryCatch({
     if(keep.source || augment){
-      data %>% dplyr::do_(.dots = setNames(list(~build_glm_each(.), ~(.)), c(model_col, source_col)))
+      data %>% dplyr::do_(.dots = setNames(list(fml, ~(.)), c(model_col, source_col)))
     } else {
-      data %>% dplyr::do_(.dots = setNames(list(~build_glm_each(.)), model_col))
+      data %>% dplyr::do_(.dots = setNames(list(fml), model_col))
     }
   }, error = function(e){
     if(e$message == "contrasts can be applied only to factors with 2 or more levels"){

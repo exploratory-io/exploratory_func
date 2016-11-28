@@ -18,9 +18,10 @@ build_lm <- function(data, ..., keep.source = TRUE, augment = FALSE, group_cols 
   source_col <- avoid_conflict(grouped_col, "source.data")
 
   caller <- match.call()
-  arg_char <- expand_args(caller, exclude = c("keep.source", "augment", "group_cols"))
-
-  fml <- as.formula(paste0("~stats::lm(", arg_char, ")"))
+  # this expands dots arguemtns to character
+  arg_char <- expand_args(caller, exclude = c("data", "keep.source", "augment", "group_cols"))
+  # put it into a formula
+  fml <- as.formula(paste0("~stats::lm(data = ., ", arg_char, ")"))
 
   ret <- tryCatch({
     if(keep.source || augment){
