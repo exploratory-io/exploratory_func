@@ -34,9 +34,9 @@ pair_count_ <- function (df,
 
   if(!unique_pair){
     # remove self to avoid duplicate
-    copy <- upper_gather(count_mat, diag = FALSE, cnames = cnames)
+    copy <- upper_gather(count_mat, diag = FALSE, cnames = cnames[c(2,1,3)])
     copy <- copy[copy[[3]] > 0 & !is.na(copy[[3]]), ]
-    ret <- dplyr::bind_rows(ret, copy[, c(2,1,3)])
+    ret <- dplyr::bind_rows(ret, copy)
   }
 
   if (sort) {
