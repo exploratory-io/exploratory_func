@@ -272,6 +272,3 @@ get_sentiment <- function(text){
   loadNamespace("sentimentr")
   sentimentr::sentiment_by(text)$ave_sentiment
 }
-
-#' @export
-pair_count <- tidytext::pair_count
