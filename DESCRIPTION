@@ -42,5 +42,6 @@ Suggests:
     googleAuthR,
     GetoptLong,
     gtrendsR,
-    arules
+    arules,
+    urltools
 RoxygenNote: 5.0.1
