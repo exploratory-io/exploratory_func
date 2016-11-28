@@ -93,7 +93,7 @@ predict <- function(df, model, ..., model_df = NULL){
   if(any(class(df[[model_col]]) %in% ".model.kmeans")){
     augment_kmeans(df, model, ...)
   } else if (!is.null(model_df)) {
-    fml <- as.formula(paste0("~augment(model_df, `", model_col, "`, newdata = .)"))
+    fml <- as.formula(paste0("~broom::augment(model_df, `", model_col, "`, newdata = ., ...)"))
     augmented_col <- avoid_conflict(grouped_by(df), "augment")
     augmented <- df %>% dplyr::do_(.dots = setNames(list(fml), augmented_col))
     ret <- augmented[, augmented_col] %>% tidyr::unnest_(augmented_col) %>% tibble::repair_names()

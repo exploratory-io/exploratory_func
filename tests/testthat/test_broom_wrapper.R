@@ -77,9 +77,9 @@ test_that("predict lm with new data", {
     num2 = 30-seq(20)
   )
 
-  model_data <- fit_df %>% group_by(model) %>% build_lm(num1 ~ num2)
+  model_data <- fit_df %>% dplyr::group_by(model) %>% build_lm(num1 ~ num2)
 
-  fit <- add_df %>% group_by(group) %>% predict(model.new, model_df = model_data)
+  fit <- add_df %>% dplyr::group_by(group) %>% predict(model.new, model_df = model_data)
 
   expect_equal(nrow(fit), 20 * 2)
   expect_equal(names(fit), c("model", "group", "num1", "num2", ".fitted", ".se.fit"))
