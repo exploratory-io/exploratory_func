@@ -427,3 +427,24 @@ evaluate_select <- function(df, .dots, excluded = NULL){
     stop(e$message)
   })
 }
+
+#' re-build arguments of a function as string
+#' @param call This expects returned value from match.call()
+#' @param exclude Argument names that should be excluded for expansion
+expand_args <- function(call, exclude = c()){
+  excluded <- call[!names(call) %in% exclude]
+  args <- excluded[-1]
+  names(args) <- names(excluded[-1])
+  arg_char <- paste(vapply(seq(length(args)) , function(index){
+    arg_name <- names(args)[[index]]
+    arg_value <- if(is.character(args[[index]])) paste0('"', as.character(args[index]), '"') else as.character(args[index])
+    if(is.null(arg_name)) {
+      arg_value
+    } else if(arg_name == ""){
+      # this have to be separated from is.null because is.null(arg_name) | arg_name == "" returns logical(0)
+      arg_value
+    } else {
+      paste0(arg_name, " = ", arg_value , "")
+    }
+  }, FUN.VALUE = ""), collapse = ", ")
+}
