@@ -51,6 +51,8 @@ test_that("test scrape_html_table with japanese shift_jis table",{
 })
 
 test_that("test source check conflict case", {
+  # this fails in devtools::check() because it can't find the pass because ../../R/model_builder.R can't be found
+  # but this works in devtools::test(), so this needs condition to check the existance of the file.
   if(file.exists("../../R/model_builder.R")){
     filenames <- c("../../R/model_builder.R", "../../R/don't_exist.R")
 
