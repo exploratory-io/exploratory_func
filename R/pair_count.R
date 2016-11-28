@@ -1,4 +1,4 @@
-
+#' Clone implementation of now deprecated tidytext::pair_count for backward compatibility in Exploratory.
 #' @export
 pair_count <- function (df,
                         group,
@@ -16,6 +16,7 @@ pair_count <- function (df,
               sort = sort)
 }
 
+#' Clone implementation of now deprecated tidytext::pair_count_ for backward compatibility in Exploratory.
 #' @export
 pair_count_ <- function (df,
                          group_col,
