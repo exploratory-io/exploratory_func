@@ -1031,22 +1031,22 @@ checkSourceConflict <- function(files){
 #' Converts between state name and state code of United States.
 #'
 #' Example:
-#' > exploratory::statecode(c("NY","CA", "IL"), "abb", "name")
+#' > exploratory::statecode(c("NY","CA", "IL"), "code", "name")
 #' [1] "New York"   "California" "Illinois"
-#' > exploratory::statecode(c("New York","California","Illinois"), "name", "abb")
+#' > exploratory::statecode(c("New York","California","Illinois"), "name", "code")
 #' [1] "NY" "CA" "IL"
 #'
 #' @param sourcevar source variable
-#' @param origin origin code, either "abb" or "name"
-#' @param destination  destination code, one of "abb", "name", "division", or "region"
+#' @param origin origin code, either "code" or "name"
+#' @param destination  destination code, one of "code", "name", "division", or "region"
 #' @param ignore.case Default is TRUE, you can make it FALSE for performance if you already have formatted data.
 #' @return character vector
 #' @export
 statecode <- function(sourcevar, origin, destination, ignore.case=TRUE) {
 
   # supported codes
-  codes_origin <- c("abb", "name")
-  codes_destination <- c("abb", "name", "division", "region")
+  codes_origin <- c("abb", "code", "name")
+  codes_destination <- c("abb", "code", "name", "division", "region")
 
   if (!origin %in% codes_origin){
     stop("Origin code not supported")
@@ -1060,6 +1060,15 @@ statecode <- function(sourcevar, origin, destination, ignore.case=TRUE) {
   # such as 'CA' or 'NY'. state.name is a list of state name
   # such as 'California'. Look at the following url for details.
   # https://stat.ethz.ch/R-manual/R-devel/library/datasets/html/state.html
+
+  # convert "code" to "abb" to make it work.
+  if(origin == "code"){
+    origin = "abb"
+  }
+  # convert "code" to "abb" to make it work.
+  if(destination == "code"){
+    destination = "abb"
+  }
   origin_vector <- get(paste0("state.", origin))
   destination_vector <- get(paste0("state.", destination))
 
