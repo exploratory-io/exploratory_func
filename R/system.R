@@ -1099,11 +1099,15 @@ statecode <- function(sourcevar, origin, destination, ignore.case=TRUE) {
 #' @export
 countycode <- function(state, county) {
   loadNamespace("stringr")
+  # lower case and get rid of space, period, apostrophe, and hiphen to normalize inputs.
   state_normalized <- gsub("[ \\.\\'\\-]", "", tolower(state))
   county_normalized <- gsub("[ \\.\\'\\-]", "", tolower(county))
+  # if county starts with "City of ", remove it and suffix with " City" to normalize it.
   county_normalized <- dplyr::if_else(stringr::str_detect(county_normalized, "^cityof"), paste0(stringr::str_sub(county_normalized, 7), "city"), county_normalized)
   county_normalized <- gsub("county$", "", county_normalized)
+  # concatenate state name and county name.
   state_county <- stringr::str_c(state_normalized, " ", county_normalized)
+  # return matching county ID.
   return (county_name_id_map$id[match(state_county, county_name_id_map$name)])
 }
 
