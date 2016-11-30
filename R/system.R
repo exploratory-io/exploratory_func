@@ -1086,16 +1086,29 @@ statecode_orig <- function(sourcevar, origin, destination, ignore.case=TRUE) {
   }
 }
 
+#' Returns US state names, abbreviations, numeric codes, divisions, or regions based on US state data.
+#'
+#' Example:
+#' > exploratory::statecode(c("NY","CA", "IL"), "name")
+#' [1] "New York"   "California" "Illinois"
+#' > exploratory::statecode(c("New York","California","Illinois"), "code")
+#' [1] "NY" "CA" "IL"
+#' > exploratory::statecode(c("New York","California","Illinois"), "num_code")
+#' [1] "36" "06" "17"
+#'
+#' @param input vector of US state names, abbreviations, or numeric codes.
+#' @param output_type one of "alpha_code", "num_code", "name", "division", or "region"
+#' @return character vector
 #' @export
 statecode <- function(input = input, output_type = output_type) {
-  loadNamespace("stringr")
   output_types <- c("alpha_code", "num_code", "name", "division", "region")
-  if (!output_type %in% output_types){
+  if (!output_type %in% output_types) {
      stop("Output type not supported")
   }
   # lower case and get rid of space, period, apostrophe, and hiphen to normalize inputs.
   input_normalized <- gsub("[ \\.\\'\\-]", "", tolower(input))
-  # return matching county ID.
+  # return matching state info.
+  # state_name_id_map data frame has all those state info plus normalized_name as the search key. 
   return (state_name_id_map[[output_type]][match(input_normalized, state_name_id_map$normalized_name)])
 }
 
