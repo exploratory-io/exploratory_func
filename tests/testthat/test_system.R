@@ -76,16 +76,14 @@ test_that("test statecode",{
   divisions <- c("Middle Atlantic","Pacific", "East North Central")
   regions <- c("Northeast","West","North Central")
 
-  expect_equal(names, statecode(abbs, "abb", "name"))
-  expect_equal(divisions, statecode(abbs, "abb", "division"))
-  expect_equal(regions, statecode(abbs, "abb", "region"))
-  expect_equal(abbs, statecode(names, "name", "abb"))
-  # ignore.case=FASLE test
-  expect_equal(abbs, statecode(names, "name", "abb", ignore.case=FALSE))
+  expect_equal(names, statecode(abbs, "name"))
+  expect_equal(divisions, statecode(abbs, "division"))
+  expect_equal(regions, statecode(abbs, "region"))
+  expect_equal(abbs, statecode(names, "alpha_code"))
   # with different cases
-  expect_equal(abbs, statecode(namesWithDifferentCases, "name", "abb"))
+  expect_equal(abbs, statecode(namesWithDifferentCases, "alpha_code"))
   # format test
-  expect_equal(names, statecode(namesWithDifferentCases, "name", "name"))
+  expect_equal(names, statecode(namesWithDifferentCases, "name"))
 })
 
 test_that("test select_columns",{
