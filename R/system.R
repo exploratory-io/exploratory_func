@@ -1099,7 +1099,7 @@ statecode <- function(sourcevar, origin, destination, ignore.case=TRUE) {
 #' @param county county name. For an independent city that has a county with the same name, prefix with "City of " or suffix with " City".
 #' @return character vector
 #' @export
-countycode <- function(state, county) {
+countycode <- function(state = state, county = county) {
   loadNamespace("stringr")
   # lower case and get rid of space, period, apostrophe, and hiphen to normalize inputs.
   state_normalized <- gsub("[ \\.\\'\\-]", "", tolower(state))
