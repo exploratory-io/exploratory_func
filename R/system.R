@@ -1033,17 +1033,19 @@ state.fp_code <- c("01", "02", "04", "05", "06", "08", "09", "10", "12", "13", "
                    "31", "32", "33", "34", "35", "36", "37", "38", "39", "40", "41", "42", "44",
                    "45", "46", "47", "48", "49", "50", "51", "53", "54", "55", "56")
 
-#' Converts between state name and state code of United States.
+#' Converts between state name and state codes of United States.
 #'
 #' Example:
 #' > exploratory::statecode(c("NY","CA", "IL"), "code", "name")
 #' [1] "New York"   "California" "Illinois"
 #' > exploratory::statecode(c("New York","California","Illinois"), "name", "code")
 #' [1] "NY" "CA" "IL"
+#' > exploratory::statecode(c("New York","California","Illinois"), "name", "fp_code")
+#' [1] "36" "06" "17"
 #'
 #' @param sourcevar source variable
-#' @param origin origin code, either "code" or "name"
-#' @param destination  destination code, one of "code", "name", "division", or "region"
+#' @param origin origin code, one of "code", "fp_code", or "name"
+#' @param destination  destination code, one of "code", "fp_code", "name", "division", or "region"
 #' @param ignore.case Default is TRUE, you can make it FALSE for performance if you already have formatted data.
 #' @return character vector
 #' @export
