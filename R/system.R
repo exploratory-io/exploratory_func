@@ -1028,55 +1028,57 @@ checkSourceConflict <- function(files){
   ret
 }
 
-#' Converts between state name and state code of United States.
+#' Returns US state names, abbreviations, numeric codes, divisions, or regions based on US state data.
 #'
 #' Example:
-#' > exploratory::statecode(c("NY","CA", "IL"), "code", "name")
+#' > exploratory::statecode(c("NY","CA", "IL"), "name")
 #' [1] "New York"   "California" "Illinois"
-#' > exploratory::statecode(c("New York","California","Illinois"), "name", "code")
+#' > exploratory::statecode(c("New York","California","Illinois"), "code")
 #' [1] "NY" "CA" "IL"
+#' > exploratory::statecode(c("New York","California","Illinois"), "num_code")
+#' [1] "36" "06" "17"
 #'
-#' @param sourcevar source variable
-#' @param origin origin code, either "code" or "name"
-#' @param destination  destination code, one of "code", "name", "division", or "region"
-#' @param ignore.case Default is TRUE, you can make it FALSE for performance if you already have formatted data.
+#' @param input vector of US state names, abbreviations, or numeric codes.
+#' @param output_type one of "alpha_code", "num_code", "name", "division", or "region"
 #' @return character vector
 #' @export
-statecode <- function(sourcevar, origin, destination, ignore.case=TRUE) {
-
-  # supported codes
-  codes_origin <- c("abb", "code", "name")
-  codes_destination <- c("abb", "code", "name", "division", "region")
-
-  if (!origin %in% codes_origin){
-    stop("Origin code not supported")
+statecode <- function(input = input, output_type = output_type) {
+  output_types <- c("alpha_code", "num_code", "name", "division", "region")
+  if (!output_type %in% output_types) {
+     stop("Output type not supported")
   }
-  if (!destination %in% codes_destination){
-     stop("Destination code not supported")
-  }
+  # lower case and get rid of space, period, apostrophe, and hiphen to normalize inputs.
+  input_normalized <- gsub("[ \\.\\'\\-]", "", tolower(input))
+  # return matching state info.
+  # state_name_id_map data frame has all those state info plus normalized_name as the search key. 
+  return (as.character(state_name_id_map[[output_type]][match(input_normalized, state_name_id_map$normalized_name)]))
+}
 
-  # state is a part of datasets package which comes with R installation
-  # and available anytime. state.abb is a list of state abbreviation
-  # such as 'CA' or 'NY'. state.name is a list of state name
-  # such as 'California'. Look at the following url for details.
-  # https://stat.ethz.ch/R-manual/R-devel/library/datasets/html/state.html
-
-  # convert "code" to "abb" to make it work.
-  if(origin == "code"){
-    origin = "abb"
-  }
-  # convert "code" to "abb" to make it work.
-  if(destination == "code"){
-    destination = "abb"
-  }
-  origin_vector <- get(paste0("state.", origin))
-  destination_vector <- get(paste0("state.", destination))
-
-  if (ignore.case) {
-    return (as.character(destination_vector[match(tolower(sourcevar), tolower(origin_vector))]))
-  } else {
-    return (as.character(destination_vector[match(sourcevar, origin_vector)])) #faster
-  }
+#' Converts pair of state name and county name into county ID,
+#' which is concatenation of FIPS state code and FIPS county code.
+#'
+#' Example:
+#' > countycode(c("California", "CA"),c("San Francisco", "San Francisco"))
+#' [1] "06075" "06075"
+#' > countycode(c("MD", "MD", "MD"),c("Baltimore", "Baltimore City", "City of Baltimore"))
+#' [1] "24005" "24510" "24510"
+#'
+#' @param state state name, or 2 letter state code
+#' @param county county name. For an independent city that has a county with the same name, prefix with "City of " or suffix with " City".
+#' @return character vector
+#' @export
+countycode <- function(state = state, county = county) {
+  loadNamespace("stringr")
+  # lower case and get rid of space, period, apostrophe, and hiphen to normalize inputs.
+  state_normalized <- gsub("[ \\.\\'\\-]", "", tolower(state))
+  county_normalized <- gsub("[ \\.\\'\\-]", "", tolower(county))
+  # if county starts with "City of ", remove it and suffix with " City" to normalize it.
+  county_normalized <- dplyr::if_else(stringr::str_detect(county_normalized, "^cityof"), paste0(stringr::str_sub(county_normalized, 7), "city"), county_normalized)
+  county_normalized <- gsub("county$", "", county_normalized)
+  # concatenate state name and county name.
+  state_county <- stringr::str_c(state_normalized, " ", county_normalized)
+  # return matching county ID.
+  return (county_name_id_map$id[match(state_county, county_name_id_map$name)])
 }
 
 #' It selects the columns that matches with the given strings.
