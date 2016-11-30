@@ -1084,6 +1084,29 @@ statecode <- function(sourcevar, origin, destination, ignore.case=TRUE) {
   }
 }
 
+#' Converts pair of state name and county name into county ID,
+#' which is concatenation of FIPS state code and FIPS county code.
+#'
+#' Example:
+#' > countycode(c("California", "CA"),c("San Francisco", "San Francisco"))
+#' [1] "06075" "06075"
+#' > countycode(c("MD", "MD", "MD"),c("Baltimore", "Baltimore City", "City of Baltimore"))
+#' [1] "24005" "24510" "24510"
+#'
+#' @param state state name, or 2 letter state code
+#' @param county county name. For an independent city that has a county with the same name, prefix with "City of " or suffix with " City".
+#' @return character vector
+#' @export
+countycode <- function(state, county) {
+  loadNamespace("stringr")
+  state_normalized <- gsub("[ \\.\\'\\-]", "", tolower(state))
+  county_normalized <- gsub("[ \\.\\'\\-]", "", tolower(county))
+  county_normalized <- dplyr::if_else(stringr::str_detect(county_normalized, "^cityof"), paste0(stringr::str_sub(county_normalized, 7), "city"), county_normalized)
+  county_normalized <- gsub("county$", "", county_normalized)
+  state_county <- stringr::str_c(state_normalized, " ", county_normalized)
+  return (county_name_id_map$id[match(state_county, county_name_id_map$name)])
+}
+
 #' It selects the columns that matches with the given strings.
 #' Invalid column names will be just ignored.
 #'
