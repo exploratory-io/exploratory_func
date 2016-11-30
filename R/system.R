@@ -1109,7 +1109,7 @@ statecode <- function(input = input, output_type = output_type) {
   input_normalized <- gsub("[ \\.\\'\\-]", "", tolower(input))
   # return matching state info.
   # state_name_id_map data frame has all those state info plus normalized_name as the search key. 
-  return (state_name_id_map[[output_type]][match(input_normalized, state_name_id_map$normalized_name)])
+  return (as.character(state_name_id_map[[output_type]][match(input_normalized, state_name_id_map$normalized_name)]))
 }
 
 #' Converts pair of state name and county name into county ID,
