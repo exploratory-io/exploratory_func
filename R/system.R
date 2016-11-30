@@ -1028,64 +1028,6 @@ checkSourceConflict <- function(files){
   ret
 }
 
-state.fp_code <- c("01", "02", "04", "05", "06", "08", "09", "10", "12", "13", "15", "16", "17",
-                   "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30",
-                   "31", "32", "33", "34", "35", "36", "37", "38", "39", "40", "41", "42", "44",
-                   "45", "46", "47", "48", "49", "50", "51", "53", "54", "55", "56")
-
-#' Converts between state name and state codes of United States.
-#'
-#' Example:
-#' > exploratory::statecode(c("NY","CA", "IL"), "code", "name")
-#' [1] "New York"   "California" "Illinois"
-#' > exploratory::statecode(c("New York","California","Illinois"), "name", "code")
-#' [1] "NY" "CA" "IL"
-#' > exploratory::statecode(c("New York","California","Illinois"), "name", "fp_code")
-#' [1] "36" "06" "17"
-#'
-#' @param sourcevar source variable
-#' @param origin origin code, one of "code", "fp_code", or "name"
-#' @param destination  destination code, one of "code", "fp_code", "name", "division", or "region"
-#' @param ignore.case Default is TRUE, you can make it FALSE for performance if you already have formatted data.
-#' @return character vector
-#' @export
-statecode_orig <- function(sourcevar, origin, destination, ignore.case=TRUE) {
-
-  # supported codes
-  codes_origin <- c("abb", "code", "name", "fp_code")
-  codes_destination <- c("abb", "code", "name", "division", "region", "fp_code")
-
-  if (!origin %in% codes_origin){
-    stop("Origin code not supported")
-  }
-  if (!destination %in% codes_destination){
-     stop("Destination code not supported")
-  }
-
-  # state is a part of datasets package which comes with R installation
-  # and available anytime. state.abb is a list of state abbreviation
-  # such as 'CA' or 'NY'. state.name is a list of state name
-  # such as 'California'. Look at the following url for details.
-  # https://stat.ethz.ch/R-manual/R-devel/library/datasets/html/state.html
-
-  # convert "code" to "abb" to make it work.
-  if(origin == "code"){
-    origin = "abb"
-  }
-  # convert "code" to "abb" to make it work.
-  if(destination == "code"){
-    destination = "abb"
-  }
-  origin_vector <- get(paste0("state.", origin))
-  destination_vector <- get(paste0("state.", destination))
-
-  if (ignore.case) {
-    return (as.character(destination_vector[match(tolower(sourcevar), tolower(origin_vector))]))
-  } else {
-    return (as.character(destination_vector[match(sourcevar, origin_vector)])) #faster
-  }
-}
-
 #' Returns US state names, abbreviations, numeric codes, divisions, or regions based on US state data.
 #'
 #' Example:
