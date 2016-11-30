@@ -1049,7 +1049,7 @@ state.fp_code <- c("01", "02", "04", "05", "06", "08", "09", "10", "12", "13", "
 #' @param ignore.case Default is TRUE, you can make it FALSE for performance if you already have formatted data.
 #' @return character vector
 #' @export
-statecode <- function(sourcevar, origin, destination, ignore.case=TRUE) {
+statecode_orig <- function(sourcevar, origin, destination, ignore.case=TRUE) {
 
   # supported codes
   codes_origin <- c("abb", "code", "name", "fp_code")
@@ -1084,6 +1084,19 @@ statecode <- function(sourcevar, origin, destination, ignore.case=TRUE) {
   } else {
     return (as.character(destination_vector[match(sourcevar, origin_vector)])) #faster
   }
+}
+
+#' @export
+statecode <- function(input = input, output_type = output_type) {
+  loadNamespace("stringr")
+  output_types <- c("alpha_code", "num_code", "name", "division", "region")
+  if (!output_type %in% output_types){
+     stop("Output type not supported")
+  }
+  # lower case and get rid of space, period, apostrophe, and hiphen to normalize inputs.
+  input_normalized <- gsub("[ \\.\\'\\-]", "", tolower(input))
+  # return matching county ID.
+  return (state_name_id_map[[output_type]][match(input_normalized, state_name_id_map$normalized_name)])
 }
 
 #' Converts pair of state name and county name into county ID,
