@@ -239,3 +239,8 @@ build_kmeans.cols <- function(df, ...,
   }
   output
 }
+
+#' @importFrom broom tidy
+#' @export
+tidy <- broom::tidy
+
