@@ -71,6 +71,7 @@ test_that("test source check conflict case", {
 test_that("test statecode",{
 
   abbs <- c("NY", "CA", "IL")
+  num_codes <- c("36", "06", "17")
   names <- c("New York","California","Illinois")
   namesWithDifferentCases <- c("new york","califorNIA","ILLINOIS")
   divisions <- c("Middle Atlantic","Pacific", "East North Central")
@@ -80,6 +81,7 @@ test_that("test statecode",{
   expect_equal(divisions, statecode(abbs, "division"))
   expect_equal(regions, statecode(abbs, "region"))
   expect_equal(abbs, statecode(names, "alpha_code"))
+  expect_equal(num_codes, statecode(names, "num_code"))
   # with different cases
   expect_equal(abbs, statecode(namesWithDifferentCases, "alpha_code"))
   # format test
