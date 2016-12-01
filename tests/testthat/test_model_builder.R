@@ -365,7 +365,12 @@ test_that("build_lda check name conflict", {
   data <- readRDS("~/Downloads/llis_display.rds")
 
   tokenized <- data %>%
-    dplyr::select(LessonId, Lesson)
+    dplyr::select(LessonId, Lesson) %>%
+    do_tokenize(Lesson)
+
+  bench <- microbenchmark::microbenchmark(topicmodel = {build_topicmodel(tokenized, LessonId, token, n_topics=3)}, lda = {build_lda(tokenized, LessonId, token, n_topics=3)})
+  topicmodel_ret <- build_topicmodel(tokenized, LessonId, token, n_topics=3)
+
 
   browser()
 
