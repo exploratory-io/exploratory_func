@@ -268,8 +268,8 @@ do_ngram <- function(df, token, sentence, document, maxn=2, sep="_"){
   # this change original token column name to be 1 (mono-gram)
   colnames(ret)[colnames(ret) == token_col] <- 1
   kv_cnames <- avoid_conflict(c(document_col, sentence_col), c("gram", "token"))
-  # gather columns that have token
-  ret <- tidyr::gather_(ret, kv_cnames[[1]], kv_cnames[[2]], colnames(ret)[(ncol(ret) - maxn + 1):ncol(ret)], na.rm = TRUE, convert = TRUE)
+  # gather columns that have token (1 and newly created columns)
+  ret <- tidyr::gather_(ret, kv_cnames[[1]], kv_cnames[[2]], c("1", colnames(ret)[(ncol(ret) - maxn + 2):ncol(ret)]), na.rm = TRUE, convert = TRUE)
   ret
 }
 
