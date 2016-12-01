@@ -58,6 +58,7 @@ build_lda <- function(df, subject, key, value = NULL,
             n_iter = n_iter,
             convergence_tol = convergence_tol,
             check_convergence_every_n = check_convergence_every_n)
+    class(lda) <- c("text2vec_LDA", class(lda))
 
     model_set <- lda
   }
@@ -120,53 +121,46 @@ build_topicmodel <- function(df, subject, key, value = NULL,
       }
     }
     mat <-  slam::as.simple_triplet_matrix(mat)
-    lda <- topicmodels::LDA(mat, 3)
+    lda <- topicmodels::LDA(mat, n_topics)
     model_set <- lda
   }
 
   ret <- df %>%
     dplyr::do_(.dots=setNames(list(~build_lda_each(.)), c(model_column)))
-  browser()
   ret
 }
 
 #' @export
-tidy.LDA <- function(lda, matrix = "phi", ...){
-  tryCatch({
+tidy.text2vec_LDA <- function(lda, matrix = "phi", ...){
+    # this is a way to access private members
+    # https://github.com/wch/R6/issues/41
+    private_member <- environment(lda$transform)$private
     # this is for LDA object from text2vec
     if (matrix == "phi") {
       model <- lda$get_fitted_LDA_model()
-
-      phi_melt <- lda$get_word_vectors() %>%
+      phi <- (lda$get_word_vectors() + private_member$topic_word_prior) %>%
         t %>%
         text2vec::normalize("l1") %>%
         reshape2::melt()
-      # rename columns avoiding conflict among grouped columns
-      c_names <- avoid_conflict(groupers, c("topic", "term", "value"))
-      colnames(phi_melt) <- c_names
-      # the order of column names is term, topic and value
-      phi <- phi_melt[, c(2, 1, 3)]
+      c_names <- c("topic", "term", "value")
+      colnames(phi) <- c_names
       # convert the type of term column from factor to character
       phi[["term"]] <- as.character(phi[["term"]])
       ret <- phi
+      ret
     } else if (matrix == "theta") {
       model <- lda$get_fitted_LDA_model()
-      theta_mat = model$document_topic_distr %>%
+
+      theta_mat = (model$document_topic_distr + private_member$doc_topic_prior) %>%
         t %>%
         text2vec::normalize("l1")
-      rownames(theta_mat) <- params$documents_name
+      rownames(theta_mat) <- private_member$doc_ids
       theta_melt <- theta_mat %>%
         reshape2::melt()
-      # rename columns avoiding conflict among grouped columns
-      c_names <- avoid_conflict(groupers, c("document", "topic", "value"))
+      c_names <- c("document", "topic", "value")
       colnames(theta_melt) <- c_names
       theta <- theta_melt
       ret <- theta
-    }
     ret
-  }, error = function(e){
-    # this is for LDA object from topicmodels
-    tidytext::tidy(lda, matrix = matrix, ...)
-  })
-
+  }
 }

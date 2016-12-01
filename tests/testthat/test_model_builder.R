@@ -305,8 +305,8 @@ test_that("build_lda with theta", {
                                           )), .Names = c("LessonId", "Lesson"), row.names = c(102L, 337L,
                                                                                               289L, 1123L, 628L, 1257L, 812L, 1170L, 1616L, 619L), class = "data.frame")
   tokenized <- input_df %>% do_tokenize(Lesson)
-  ret <- build_lda(tokenized, LessonId, token, n_topics=3, matrix = "theta")
-  ret <- tidy(ret, model)
+  ret <- build_lda(tokenized, LessonId, token, n_topics=3)
+  ret <- tidy(ret, model, matrix = "theta")
   expect_true(is.integer(ret[["document"]]))
   expect_true(is.integer(ret[["topic"]]))
   expect_true(is.numeric(ret[["value"]]))
@@ -351,17 +351,23 @@ test_that("build_lda check name conflict", {
                                                                                      " Failure to perform vibroacoustic testing could result in payload failures when subjected to the vibroacoustic environments of the mission, particularly the severe acoustic environment of launch. In addition, the simultaneous occurrence of low-frequency random vibration with high-intensity, low-frequency acoustics can cause failure of load-carrying elements. Examples of components that are susceptible to failure due to random vibration excitation are thin films, filaments, electronic circuit boards, and optical elements. ",
                                                                                      " The pneumatic and fliud quick disconnects are the same size and located close enough to easily allow misconnection within APU carrier plates. ",
                                                                                      " OSP planning documents were not sufficiently mature when the decision was made to embark on an accelerated program. Parallel development during program execution deadened the sense of urgency to complete them. Absent these documents, unseen organizational friction and implementation inefficiencies resulted.  \n      \n     Additionally:  \n     a. Program Plan and SEMP The OSP Program Plan, Systems Engineering Management Plan (SEMP) and related foundational plans (Risk Management, Configuration and Data Management, Records Plans, etc.) were not sufficiently mature when the decision was made to embark on an accelerated program. Parallel development during program execution deadened the sense of urgency to complete them  \n      \n    b. Schedule Planning and Implementation A lack of standardization of inputs from various centers and organizations complicated the Integrated Master Schedule baseline and updates. Additionally, in response to acceleration of the program, two separate schedules of ongoing and planned work were being maintained.  \n      \n    c. Flight Test Planning Flight test has a major impact on technical, schedule, and budget planning and should be considered in up-front planning. Schedules leading to verification by flight testing need to be assessed for credibility.  \n      \n     d. Program Shutdown The OSP program ceased abruptly. Some key players were reassigned early, including both managers and administrative personnel thus further complicating the shutdown task. Geographically distant centers relied on web-sites and electronic meeting notices and calendars but, these tools were not updated regularly and then shutdown prior to program's end.  \n      \n     "
-                                          ), seq(10) %% 2), .Names = c("LessonId", "Lesson", "topic"), row.names = c(102L, 337L,
+                                          )), .Names = c("LessonId", "Lesson"), row.names = c(102L, 337L,
                                                                                              289L, 1123L, 628L, 1257L, 812L, 1170L, 1616L, 619L), class = "data.frame")
-  tokenized <- input_df %>% do_tokenize(Lesson) %>% dplyr::group_by(topic)
-  ret <- build_lda(tokenized, LessonId, token, n_topics=2)
+  tokenized <- input_df %>% do_tokenize(Lesson)
+  ret <- build_lda(tokenized, LessonId, token, n_topics=3) %>% tidy(model)
 
   expect_true(is.character(ret[["term"]]))
-  expect_true(is.integer(ret[["topic.new"]]))
   expect_true(is.numeric(ret[["topic"]]))
   expect_true(is.numeric(ret[["value"]]))
 
-  ret2 <- build_topicmodel(tokenized, LessonId, token, n_topics=2)
+  ret2 <- build_topicmodel(tokenized, LessonId, token, n_topics=3) %>% tidy(model)
+
+  data <- readRDS("~/Downloads/llis_display.rds")
+
+  tokenized <- data %>%
+    dplyr::select(LessonId, Lesson)
+
+  browser()
 
 })
 
@@ -373,6 +379,6 @@ test_that("build_lda with no term", {
     count = rep(1, 8)
   )
   expect_error({
-    ret <- build_lda(input_df, document_title, token, count, n_topics=2)
+    ret <- build_lda(input_df, document_title, token, count, n_topics=3)
   }, "There is no term after filtering")
 })
