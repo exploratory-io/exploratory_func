@@ -267,7 +267,8 @@ do_ngram <- function(df, token, sentence, document, maxn=2, sep="_"){
 
   colnames(ret)[colnames(ret) == token_col] <- 1
   kv_cnames <- avoid_conflict(c(document_col, sentence_col), c("gram", "token"))
-  ret <- tidyr::gather_(ret, kv_cnames[[1]], kv_cnames[[2]], colnames(ret)[3:ncol(ret)], na.rm = TRUE, convert = TRUE)
+  # gather columns that have token
+  ret <- tidyr::gather_(ret, kv_cnames[[1]], kv_cnames[[2]], colnames(ret)[(ncol(ret) - maxn + 1):ncol(ret)], na.rm = TRUE, convert = TRUE)
   ret
 }
 
