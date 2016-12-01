@@ -240,9 +240,9 @@ do_ngram <- function(df, token, sentence, document, maxn=2, sep="_"){
   grouped <- df %>%
     dplyr::group_by_(.dots=list(as.symbol(document_col), as.symbol(sentence_col))) # convert the column name to symbol for colum names with backticks
   prev_cname <- token_col
-  # create gram2, gram3, gram4, ... columns in this iteration
+  # create ngram columns in this iteration
   for(n in seq(maxn)[-1]){
-    # create a column name that doesn't conflict with the existing column names
+    # column name is gram number
     cname <- n
 
     # Use following non-standard evaluation formulas to use token_col, prev_cname and cname variables
@@ -265,6 +265,7 @@ do_ngram <- function(df, token, sentence, document, maxn=2, sep="_"){
   }
   ret <- dplyr::ungroup(grouped)
 
+  # this change original token column name to be 1 (mono-gram)
   colnames(ret)[colnames(ret) == token_col] <- 1
   kv_cnames <- avoid_conflict(c(document_col, sentence_col), c("gram", "token"))
   # gather columns that have token
