@@ -208,7 +208,8 @@ test_that("do_ngram", {
     stringsAsFactors = F)
 
   ret <- df %>%  do_ngram(token, sentence, doc, maxn = 3)
-  expect_equal(ncol(ret), ncol(df)+2)
+  expect_equal(colnames(ret), c("doc", "sentence", "gram", "token"))
+  expect_true(is.integer(ret[["gram"]]))
 })
 
 test_that("sentimentr", {
