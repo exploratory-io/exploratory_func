@@ -270,6 +270,8 @@ do_ngram <- function(df, token, sentence, document, maxn=2, sep="_"){
   kv_cnames <- avoid_conflict(c(document_col, sentence_col), c("gram", "token"))
   # gather columns that have token (1 and newly created columns)
   ret <- tidyr::gather_(ret, kv_cnames[[1]], kv_cnames[[2]], c("1", colnames(ret)[(ncol(ret) - maxn + 2):ncol(ret)]), na.rm = TRUE, convert = TRUE)
+  # sort the result
+  ret <- dplyr::arrange_(ret, .dots = c(document_col, sentence_col, kv_cnames[[1]]))
   ret
 }
 
