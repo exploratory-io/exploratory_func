@@ -71,6 +71,7 @@ build_lda <- function(df, subject, key, value = NULL,
 #' @export
 build_topicmodel <- function(df, subject, key, value = NULL,
                       n_topics,
+                      method = "VEM",
                       topic_word_prior = 1 / n_topics,
                       doc_topic_prior = 1 / n_topics,
                       n_iter = 1000,
@@ -79,8 +80,7 @@ build_topicmodel <- function(df, subject, key, value = NULL,
                       min_df = 2,
                       max_df = NULL ,
                       seed = 0,
-                      keep.source = FALSE,
-                      matrix = "model"){
+                      keep.source = FALSE){
   loadNamespace("dplyr")
   loadNamespace("lazyeval")
   loadNamespace("tidyr")
@@ -95,10 +95,6 @@ build_topicmodel <- function(df, subject, key, value = NULL,
   grouped_column <- grouped_by(df)
   model_column <- avoid_conflict(grouped_column, "model")
   source_column <- avoid_conflict(grouped_column, "source.data")
-
-  if (!matrix %in% c("model", "phi", "theta")) {
-    stop("matrix has to be \"model\", \"phi\" or \"theta\"")
-  }
 
   build_lda_each <- function(df){
     mat <- sparse_cast(df, row_col, col_col, value_col, count = TRUE)
@@ -121,7 +117,7 @@ build_topicmodel <- function(df, subject, key, value = NULL,
       }
     }
     mat <-  slam::as.simple_triplet_matrix(mat)
-    lda <- topicmodels::LDA(mat, n_topics)
+    lda <- topicmodels::LDA(mat, n_topics, control = list(seed = seed))
     model_set <- lda
   }
 
@@ -129,6 +125,9 @@ build_topicmodel <- function(df, subject, key, value = NULL,
     dplyr::do_(.dots=setNames(list(~build_lda_each(.)), c(model_column)))
   ret
 }
+
+#' @export
+tidy.LDA <- tidytext::tidy.LDA
 
 #' @export
 tidy.text2vec_LDA <- function(lda, matrix = "phi", ...){
