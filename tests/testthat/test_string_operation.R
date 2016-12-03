@@ -203,12 +203,14 @@ test_that("do_ngram", {
   loadNamespace("dplyr")
   df <- data.frame(
     doc=paste("doc", rep(c(1,2), each=10)) ,
-    sentence=rep(seq(5), each=4),
     token=paste("token",rep(c(1,2),10), sep=""),
+    sentence=rep(seq(5), each=4),
     stringsAsFactors = F)
 
   ret <- df %>%  do_ngram(token, sentence, doc, maxn = 3)
-  expect_equal(ncol(ret), ncol(df)+2)
+  expect_equal(colnames(ret), c("doc", "sentence", "gram", "token"))
+  expect_true(any(ret[["gram"]] == 1))
+  expect_true(is.integer(ret[["gram"]]))
 })
 
 test_that("sentimentr", {

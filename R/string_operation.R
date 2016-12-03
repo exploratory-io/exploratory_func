@@ -237,13 +237,13 @@ do_ngram <- function(df, token, sentence, document, maxn=2, sep="_"){
   document_col <- col_name(substitute(document))
 
   # this is executed for ngrams not to be connected over sentences
-  grouped <- (df %>%
-            dplyr::group_by_(.dots=list(as.symbol(document_col), as.symbol(sentence_col)))) # convert the column name to symbol for colum names with backticks
+  grouped <- df %>%
+    dplyr::group_by_(.dots=list(as.symbol(document_col), as.symbol(sentence_col))) # convert the column name to symbol for colum names with backticks
   prev_cname <- token_col
-  # create gram2, gram3, gram4, ... columns in this iteration
+  # create ngram columns in this iteration
   for(n in seq(maxn)[-1]){
-    # create a column name that doesn't conflict with the existing column names
-    cname <- avoid_conflict(colnames(df), stringr::str_c("gram", n, sep=""))
+    # column name is gram number
+    cname <- n
 
     # Use following non-standard evaluation formulas to use token_col, prev_cname and cname variables
 
@@ -263,7 +263,16 @@ do_ngram <- function(df, token, sentence, document, maxn=2, sep="_"){
     # preserve the cname to be used in next iteration
     prev_cname <- cname
   }
-  dplyr::ungroup(grouped)
+  ret <- dplyr::ungroup(grouped)
+
+  # this change original token column name to be 1 (mono-gram)
+  colnames(ret)[colnames(ret) == token_col] <- 1
+  kv_cnames <- avoid_conflict(c(document_col, sentence_col), c("gram", "token"))
+  # gather columns that have token (1 and newly created columns)
+  ret <- tidyr::gather_(ret, kv_cnames[[1]], kv_cnames[[2]], c("1", colnames(ret)[(ncol(ret) - maxn + 2):ncol(ret)]), na.rm = TRUE, convert = TRUE)
+  # sort the result
+  ret <- dplyr::arrange_(ret, .dots = c(document_col, sentence_col, kv_cnames[[1]]))
+  ret
 }
 
 #' Calculate sentiment
