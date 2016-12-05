@@ -213,10 +213,10 @@ group_exclude <- function(df, ...){
 }
 
 #' prevent conflict of 2 character vectors and avoid it by adding .new to elements in the second
-avoid_conflict <- function(origin, new){
+avoid_conflict <- function(origin, new, suffix = ".new"){
   conflict <- new %in% origin
   while(any(conflict)){
-    new[conflict] <- paste(new[conflict], ".new", sep="")
+    new[conflict] <- paste(new[conflict], suffix, sep="")
     conflict <- new %in% origin
   }
   new
@@ -447,14 +447,4 @@ expand_args <- function(call, exclude = c()){
       paste0(arg_name, " = ", arg_value , "")
     }
   }, FUN.VALUE = ""), collapse = ", ")
-}
-
-
-#' allocate column names in data frame
-alloc_names <- function(df, names, suffix = ".origin"){
-  while(any(colnames(df) %in% names)){
-    colnames(df)[colnames(df) %in% names] <- paste0(colnames(df)[colnames(df) %in% names], sep = suffix)
-    df <- tibble::repair_names(df)
-  }
-  df
 }

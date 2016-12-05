@@ -8,14 +8,33 @@
 #' @param group_cols A vector with columns names to be used as group columns
 #' @export
 build_lm <- function(data, ..., keep.source = TRUE, augment = FALSE, group_cols = NULL){
+  # deal with group columns by index because those names might be changed
+  group_col_index <- colnames(data) %in% group_cols
+
+  # change column names to avoid name conflict when tidy or glance are executed
+  colnames(data)[group_col_index] <- avoid_conflict(
+    c(
+      "model", ".train_index",
+      # for tidy
+      "term", "estimate", "std.error", "statistic", "p.value",
+      # for glance
+      "r.squared", "adj.r.squared", "sigma",
+      "statistic", "p.value", "df", "logLik", "AIC", "BIC", "deviance",
+      "df.residual"
+    ),
+    colnames(data)[group_col_index],
+    ".group"
+    )
+
+  # make column names unique
+  colnames(data) <- make.unique(colnames(data), sep = "")
+
   if(!is.null(group_cols)){
-    data <- dplyr::group_by_(data, .dots =  group_cols)
+    data <- dplyr::group_by_(data, .dots =  colnames(data)[group_col_index])
   }
 
-  grouped_col <- grouped_by(data)
-
-  model_col <- avoid_conflict(grouped_col, "model")
-  source_col <- avoid_conflict(grouped_col, "source.data")
+  model_col <- "model"
+  source_col <- "source.data"
 
   caller <- match.call()
   # this expands dots arguemtns to character
