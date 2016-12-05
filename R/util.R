@@ -448,3 +448,13 @@ expand_args <- function(call, exclude = c()){
     }
   }, FUN.VALUE = ""), collapse = ", ")
 }
+
+
+#' allocate column names in data frame
+alloc_names <- function(df, names, suffix = ".origin"){
+  while(any(colnames(df) %in% names)){
+    colnames(df)[colnames(df) %in% names] <- paste0(colnames(df)[colnames(df) %in% names], sep = suffix)
+    df <- tibble::repair_names(df)
+  }
+  df
+}

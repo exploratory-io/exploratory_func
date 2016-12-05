@@ -396,7 +396,14 @@ test_that("test expand_args", {
               def = "not default")
 
   expect_equal(ret, "aaa = \"aa\"a\", cc_list = list(\"c\", \"c\"), fml = ~as.formula(\"~c()\"), chars = c(\"chars\", \"chars2\"), \"no args\"")
+})
 
-
-
+test_that("test alloc_names", {
+  test_df <- data.frame(
+    rowname = rep(c("row1", "row02", "row3"), each=3),
+    rowname.group = c("col1", "col02", "col5", "col02", "col3", "col1", "col02", "col4", "col5"),
+    stringsAsFactors = FALSE
+  )
+  ret <- alloc_names(test_df, c("rowname", "colname"), ".group")
+  expect_equal(colnames(ret), c("rowname.group", "rowname.group1"))
 })
