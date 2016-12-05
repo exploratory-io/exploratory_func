@@ -7,20 +7,30 @@
 #' @param augment Whether the result should be augmented immediately
 #' @param group_cols A vector with columns names to be used as group columns
 #' @export
-build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, group_cols = NULL){
+build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, group_cols = NULL, train_rate = 1){
   # deal with group columns by index because those names might be changed
   group_col_index <- colnames(data) %in% group_cols
 
   # change column names to avoid name conflict when tidy or glance are executed
+  reserved_names <- c(
+    "model",
+    # for tidy
+    "term", "estimate", "std.error", "statistic", "p.value",
+    # for glance
+    "null.deviance",
+    "df.null", "logLik", "AIC", "BIC", "deviance", "df.residual"
+  )
+
+  if(train_rate < 0 | train_rate > 1){
+    stop("train_rate has to be between 0 and 1")
+  }
+
+  if (!is.null(train_rate)){
+    reserved_names <- c(reserved_names, ".test_index")
+  }
+
   colnames(data)[group_col_index] <- avoid_conflict(
-    c(
-      "model", ".train_index",
-      # for tidy
-      "term", "estimate", "std.error", "statistic", "p.value",
-      # for glance
-      "null.deviance",
-      "df.null", "logLik", "AIC", "BIC", "deviance", "df.residual"
-    ),
+    reserved_names,
     colnames(data)[group_col_index],
     ".group"
   )
@@ -30,6 +40,8 @@ build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, g
 
   if(!is.null(group_cols)){
     data <- dplyr::group_by_(data, .dots =  colnames(data)[group_col_index])
+  } else {
+    data <- dplyr::ungroup(data)
   }
 
   model_col <- "model"
