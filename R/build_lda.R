@@ -71,7 +71,9 @@ build_topicmodel <- function(df, document, token, count = NULL,
                       method = "VEM",
                       topic_word_prior = 1 / n_topics,
                       doc_topic_prior = 1 / n_topics,
-                      n_iter = 1000,
+                      iter = 1000,
+                      burnin = 1000,
+                      keep = 50,
                       convergence_tol = -1,
                       check_convergence_every_n = 0,
                       min_df = 2,
@@ -113,7 +115,7 @@ build_topicmodel <- function(df, document, token, count = NULL,
     #     stop("There is no term after filtering")
     #   }
     # }
-    lda <- topicmodels::LDA(mat, n_topics, control = list(seed = seed))
+    lda <- topicmodels::LDA(mat, method = method, n_topics, control = list(seed = seed, iter = iter, keep = keep))
     model_set <- lda
   }
 
