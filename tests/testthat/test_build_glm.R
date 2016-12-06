@@ -16,6 +16,19 @@ test_that("test build_glm summary output ", {
   expect_lt(length(res), 50) # the output of summary should be less than 50 lines
 })
 
+test_that("test build_glm with keep.source FALSE ", {
+  test_df = data.frame(
+    num1 = seq(20) / 10.0,
+    num2 = seq(20) - 10,
+    weights = seq(20) + 100,
+    category = rep(letters[1:4], 5),
+    with_NA = rep(c(letters[5:6], NA, NA), 5)
+  )
+  trial <- test_df %>% build_glm(num1 ~ num2 + category + with_NA, weights = weights, keep.source = FALSE)
+
+  expect_equal(colnames(trial), c("model"))
+})
+
 test_that("test build_glm with grouped ", {
   test_df = data.frame(
     num1 = seq(20) / 10.0,
