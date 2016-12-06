@@ -44,5 +44,8 @@ Suggests:
     GetoptLong,
     gtrendsR,
     arules,
-    urltools
+    urltools,
+    slam,
+    proxy,
+    topicmodels
 RoxygenNote: 5.0.1

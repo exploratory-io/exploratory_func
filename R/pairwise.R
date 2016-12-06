@@ -152,6 +152,8 @@ do_dist.kv_ <- function(df,
   (df %>% dplyr::do_(.dots=setNames(list(~calc_dist_each(.)), cnames[[1]])) %>%  tidyr::unnest_(cnames[[1]]))
 }
 
+#' A symmetric version of KL-divergence
+#' Ref: https://github.com/cpsievert/LDAvis/blob/master/R/createJSON.R
 #' @export
 do_kl_dist.kv_ <- function(df,
                            subject_col,
@@ -169,6 +171,7 @@ do_kl_dist.kv_ <- function(df,
   loadNamespace("tidyr")
   loadNamespace("reshape2")
   loadNamespace("stats")
+  loadNamespace("proxy")
 
   grouped_column <- grouped_by(df)
 

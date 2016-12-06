@@ -244,36 +244,7 @@ build_kmeans.cols <- function(df, ...,
 tidy <- tidytext::tidy
 
 #' @export
-tidy.text2vec_LDA <- function(x, matrix = "phi", ...){
-  lda <- x$model
-  # this is a way to access private members
-  # https://github.com/wch/R6/issues/41
-  private_member <- environment(lda$transform)$private
-  # this is for LDA object from text2vec
-  if (matrix == "phi") {
-    model <- lda$get_fitted_LDA_model()
-    phi <- (lda$get_word_vectors() + private_member$topic_word_prior) %>%
-      t %>%
-      text2vec::normalize("l1") %>%
-      reshape2::melt()
-    c_names <- c("topic", "term", "value")
-    colnames(phi) <- c_names
-    # convert the type of term column from factor to character
-    phi[["term"]] <- as.character(phi[["term"]])
-    ret <- phi
-    ret
-  } else if (matrix == "theta") {
-    model <- lda$get_fitted_LDA_model()
-    theta_mat = (model$document_topic_distr + private_member$doc_topic_prior) %>%
-      t %>%
-      text2vec::normalize("l1")
-    rownames(theta_mat) <- private_member$doc_ids
-    theta_melt <- theta_mat %>%
-      reshape2::melt()
-    c_names <- c("document", "topic", "value")
-    colnames(theta_melt) <- c_names
-    theta <- theta_melt
-    ret <- theta
-    ret
-  }
-}
+glance <- tidytext::glance
+
+#' @export
+augment <- tidytext::augment

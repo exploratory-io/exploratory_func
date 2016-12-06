@@ -9,9 +9,8 @@ build_lda <- function(df, document, token, count = NULL,
                       keep.source = FALSE,
                       group_cols = NULL){
   loadNamespace("dplyr")
-  loadNamespace("lazyeval")
-  loadNamespace("tidyr")
-  loadNamespace("text2vec")
+  loadNamespace("topicmodels")
+  loadNamespace("slam")
 
   row_col <- col_name(substitute(document))
   col_col <- col_name(substitute(token))
@@ -28,9 +27,7 @@ build_lda <- function(df, document, token, count = NULL,
     # for tidy matrix gamma
     "document", "gamma",
     # for glance
-    "iter", "terms", "alpha",
-    "statistic", "p.value", "df", "logLik", "AIC", "BIC", "deviance",
-    "df.residual"
+    "iter", "terms", "alpha"
   )
 
   # colnames(data)[group_col_index] <- avoid_conflict(
