@@ -7,13 +7,13 @@
 #' @param augment Whether the result should be augmented immediately
 #' @param group_cols A vector with columns names to be used as group columns
 #' @export
-build_lm <- function(data, ..., keep.source = TRUE, augment = FALSE, group_cols = NULL, train_rate = 1){
+build_lm <- function(data, ..., keep.source = TRUE, augment = FALSE, group_cols = NULL, test_rate = 0.0, seed = 0){
   # deal with group columns by index because those names might be changed
   group_col_index <- colnames(data) %in% group_cols
 
   # change column names to avoid name conflict when tidy or glance are executed
   reserved_names <- c(
-    "model",
+    "model", ".test_index",
     # for tidy
     "term", "estimate", "std.error", "statistic", "p.value",
     # for glance
@@ -22,12 +22,10 @@ build_lm <- function(data, ..., keep.source = TRUE, augment = FALSE, group_cols 
     "df.residual"
   )
 
-  if(train_rate < 0 | train_rate > 1){
-    stop("train_rate has to be between 0 and 1")
-  }
-
-  if (!is.null(train_rate)){
-    reserved_names <- c(reserved_names, ".test_index")
+  if(test_rate < 0 | 1 < test_rate){
+    stop("test_rate must be between 0 and 1")
+  } else if (test_rate == 1){
+    stop("test_rate must be less than 1")
   }
 
   colnames(data)[group_col_index] <- avoid_conflict(
@@ -52,15 +50,23 @@ build_lm <- function(data, ..., keep.source = TRUE, augment = FALSE, group_cols 
   # this expands dots arguemtns to character
   arg_char <- expand_args(caller, exclude = c("data", "keep.source", "augment", "group_cols"))
   # put it into a formula
-  fml <- as.formula(paste0("~stats::lm(data = ., ", arg_char, ")"))
+  fml <- as.formula(paste0("~list(stats::lm(data = safe_slice(model, .test_index, remove = TRUE), ", arg_char, "))"))
 
   ret <- tryCatch({
     if(keep.source || augment){
-      ret <- data %>% dplyr::do_(.dots = setNames(list(fml, ~(.)), c(model_col, source_col)))
+      ret <- data %>%
+        dplyr::do(model = (.), .test_index = sample_df_index((.), rate = test_rate)) %>%
+        dplyr::rowwise() %>%
+        dplyr::mutate_(.dots = list(source.data = ~list(safe_slice(model, .test_index, remove = TRUE)), model = fml))
       class(ret[[source_col]]) <- c("list", ".source.data")
       ret
     } else {
-      data %>% dplyr::do_(.dots = setNames(list(fml), model_col))
+      ret <- data %>%
+        dplyr::do(model = (.), .test_index = sample_df_index((.), rate = test_rate)) %>%
+        dplyr::rowwise() %>%
+        dplyr::mutate_(.dots = list(model = fml))
+
+      ret
     }
   }, error = function(e){
     if(e$message == "contrasts can be applied only to factors with 2 or more levels"){
