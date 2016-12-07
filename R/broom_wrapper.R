@@ -99,3 +99,48 @@ predict <- function(df, model_df = NULL, ...){
     }
   }
 }
+
+add_prediction <- function(model_df, df){
+
+}
+
+#' @export
+evaluate <- function(df, source_data, test = TRUE){
+  df_cnames <- colnames(df)
+  grouping_col <- df_cnames[!df_cnames %in% c("model", ".test_index", "source.data")]
+
+  source <- if(any(colnames(source_data) %in% grouping_col)){
+     source_data %>%
+      dplyr::group_by_(.dots = grouping_col) %>%
+      tidyr::nest()
+  } else {
+    source_data %>%
+      dplyr::mutate(data = 1) %>%
+      dplyr::group_by(data) %>%
+      tidyr::nest()
+  }
+
+  df <- dplyr::select(df, .test_index, model)
+
+  if(test){
+    dplyr::bind_cols(df, source) %>%
+      dplyr::mutate(data = purrr::map2(data, .test_index, function(df, index){
+        safe_slice(df, index)
+      })) %>%
+      dplyr::select(-.test_index) %>%
+      dplyr::rowwise() %>%
+      dplyr::mutate(data = list(broom::augment(model, newdata = data))) %>%
+      dplyr::select(-model) %>%
+      tidyr::unnest(data)
+  } else {
+    dplyr::bind_cols(df, source) %>%
+      dplyr::mutate(data = purrr::map2(data, .test_index, function(df, index){
+        safe_slice(df, index, remove = TRUE)
+      })) %>%
+      dplyr::select(-.test_index) %>%
+      dplyr::rowwise() %>%
+      dplyr::mutate(data = list(broom::augment(model, data = data))) %>%
+      dplyr::select(-model) %>%
+      tidyr::unnest(data)
+  }
+}

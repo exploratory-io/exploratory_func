@@ -76,3 +76,23 @@ test_that("test name conflict avoid", {
                                   "term", "estimate", "std.error", "statistic", "p.value"))
 })
 
+test_that("build_lm with evaluation", {
+  test_df = data.frame(
+    num1 = seq(20) / 10.0,
+    num2 = seq(20) - 11,
+    group = rep(letters[1:2], each = 10)
+  )
+
+  lm_model <- test_df %>%
+    build_lm(num1 ~ num2, group_cols = c("group"), test_rate = 0.1)
+
+  evaluated <- lm_model %>%
+    evaluate(test_df)
+
+  expect_equal(colnames(evaluated), c("group", "num1", "num2", ".fitted", ".se.fit"))
+
+  test_eval <- lm_model %>%
+    evaluate(test_df, test = FALSE)
+
+  expect_equal(colnames(evaluated), c("group", "num1", "num2", ".fitted", ".se.fit", ".resid", ".hat", ".sigma", ".cooksd", ".std.resid"))
+})
