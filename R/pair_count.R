@@ -32,7 +32,7 @@ pair_count_ <- function (df,
   count_mat <- Matrix::t(sparse_tab > 0) %*% (sparse_tab > 0)
 
   # gather the matrix
-  cnames <- c("value1", "value2", "n")
+  cnames <- c(stringr::str_c(value_col, c(".x", ".y")), "value")
   ret <- upper_gather(count_mat, diag = diag, cnames = cnames)
   ret <- ret[ret[[3]] > 0, ]
 

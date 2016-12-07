@@ -7,10 +7,10 @@ test_that("pair_count", {
   )
   ret <- test_df %>% pair_count(seq, let)
   expect_equal(nrow(ret), 20)
-  expect_true(all(ret[["n"]] == 2))
+  expect_true(all(ret[["value"]] == 2))
   ret <- test_df %>% pair_count(seq, let, distinct = FALSE,  diag = TRUE, sort = TRUE)
   expect_equal(nrow(ret), 25)
-  expect_true(all(ret[["n"]] == 2))
+  expect_true(all(ret[["value"]] == 2))
 })
 
 test_that("pair_count", {
@@ -25,12 +25,12 @@ test_that("pair_count", {
   )
   ret1 <- pair_count(test_df, group, chars)
 
-  expect_equal(ret1[["value1"]], c("a", "a", "a", "a", "b", "c", "c",
+  expect_equal(ret1[["chars.x"]], c("a", "a", "a", "a", "b", "c", "c",
                                    "d", "b", "c", "d", NA, "d", "d", NA, NA))
-  expect_equal(ret1[["value2"]], c("b", "c",
+  expect_equal(ret1[["chars.y"]], c("b", "c",
                                    "d", NA, "d", "d", NA, NA, "a", "a", "a", "a", "b", "c", "c",
                                    "d"))
-  expect_equal(ret1[["n"]],  c(1, 2, 3, 1, 1, 2, 1, 1, 1, 2, 3, 1, 1, 2, 1, 1))
+  expect_equal(ret1[["value"]],  c(1, 2, 3, 1, 1, 2, 1, 1, 1, 2, 3, 1, 1, 2, 1, 1))
 
   ret2 <- pair_count(test_df, group, chars, diag = TRUE, sort = TRUE, distinct = FALSE)
 
