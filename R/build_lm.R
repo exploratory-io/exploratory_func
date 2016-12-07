@@ -8,12 +8,17 @@
 #' @param group_cols A vector with columns names to be used as group columns
 #' @export
 build_lm <- function(data, ..., keep.source = TRUE, augment = FALSE, group_cols = NULL, test_rate = 0.0, seed = 0){
+
+  if(!is.null(seed)){
+    set.seed(seed)
+  }
+
   # deal with group columns by index because those names might be changed
   group_col_index <- colnames(data) %in% group_cols
 
   # change column names to avoid name conflict when tidy or glance are executed
   reserved_names <- c(
-    "model", ".test_index",
+    "model", ".test_index", "data",
     # for tidy
     "term", "estimate", "std.error", "statistic", "p.value",
     # for glance
@@ -60,9 +65,17 @@ build_lm <- function(data, ..., keep.source = TRUE, augment = FALSE, group_cols 
   ret <- tryCatch({
     if(keep.source || augment){
       ret <- data %>%
-        dplyr::do(model = (.), .test_index = sample_df_index((.), rate = test_rate)) %>%
-        dplyr::rowwise() %>%
-        dplyr::mutate_(.dots = list(source.data = ~list(safe_slice(model, .test_index, remove = TRUE)), model = fml))
+        tidyr::nest() %>%
+        dplyr::mutate(.test_index = purrr::map(data, function(df){
+          sample_df_index(df, rate = test_rate)
+        })) %>%
+        dplyr::mutate(source.data = purrr::map2(data, .test_index, function(df, index){
+          safe_slice(df, index, remove = TRUE)
+        })) %>%
+        dplyr::mutate(model = purrr::map(source.data, function(data){
+          eval(parse(text = paste0("stats::lm(data = data, ", arg_char, ")")))
+        })) %>%
+        dplyr::select(-data)
       class(ret[[source_col]]) <- c("list", ".source.data")
       ret
     } else {
@@ -71,9 +84,13 @@ build_lm <- function(data, ..., keep.source = TRUE, augment = FALSE, group_cols 
         dplyr::mutate(.test_index = purrr::map(data, function(df){
           sample_df_index(df, rate = test_rate)
         })) %>%
-        dplyr::mutate(model = purrr::map2(data, .test_index, function(df, index){
-          eval(parse(text = paste0("stats::lm(data = safe_slice(df, index, remove = TRUE), ", arg_char, ")")))
-        }))
+        dplyr::mutate(data = purrr::map2(data, .test_index, function(df, index){
+          safe_slice(df, index, remove = TRUE)
+        })) %>%
+        dplyr::mutate(model = purrr::map(data, function(df){
+          eval(parse(text = paste0("stats::lm(data = data, ", arg_char, ")")))
+        })) %>%
+        dplyr::select(-data)
       ret
     }
   }, error = function(e){

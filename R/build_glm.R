@@ -7,7 +7,12 @@
 #' @param augment Whether the result should be augmented immediately
 #' @param group_cols A vector with columns names to be used as group columns
 #' @export
-build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, group_cols = NULL, train_rate = 1){
+build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, group_cols = NULL, test_rate = 0, seed = 0){
+
+  if(!is.null(seed)){
+    set.seed(seed)
+  }
+
   # deal with group columns by index because those names might be changed
   group_col_index <- colnames(data) %in% group_cols
 
@@ -21,11 +26,11 @@ build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, g
     "df.null", "logLik", "AIC", "BIC", "deviance", "df.residual"
   )
 
-  if(train_rate < 0 | train_rate > 1){
-    stop("train_rate has to be between 0 and 1")
+  if(test_rate < 0 | test_rate > 1){
+    stop("test_rate has to be between 0 and 1")
   }
 
-  if (!is.null(train_rate)){
+  if (!is.null(test_rate)){
     reserved_names <- c(reserved_names, ".test_index")
   }
 
@@ -41,7 +46,9 @@ build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, g
   if(!is.null(group_cols)){
     data <- dplyr::group_by_(data, .dots =  colnames(data)[group_col_index])
   } else {
-    data <- dplyr::ungroup(data)
+    data <- data %>%
+      dplyr::mutate(.test_index = 1) %>%
+      dplyr::group_by(.test_index)
   }
 
   model_col <- "model"
@@ -50,16 +57,37 @@ build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, g
   caller <- match.call()
   # this expands dots arguemtns to character
   arg_char <- expand_args(caller, exclude = c("data", "keep.source", "augment", "group_cols"))
-  # put it into a formula
-  fml <- as.formula(paste0("~stats::glm(data = ., ", arg_char, ")"))
 
   ret <- tryCatch({
     if(keep.source || augment){
-      ret <- data %>% dplyr::do_(.dots = setNames(list(fml, ~(.)), c(model_col, source_col)))
+      ret <- data %>%
+        tidyr::nest() %>%
+        dplyr::mutate(.test_index = purrr::map(data, function(df){
+          sample_df_index(df, rate = test_rate)
+        })) %>%
+        dplyr::mutate(source.data = purrr::map2(data, .test_index, function(df, index){
+          safe_slice(df, index, remove = TRUE)
+        })) %>%
+        dplyr::mutate(model = purrr::map(source.data, function(data){
+          eval(parse(text = paste0("stats::glm(data = data, ", arg_char, ")")))
+        })) %>%
+        dplyr::select(-data)
       class(ret[[source_col]]) <- c("list", ".source.data")
       ret
     } else {
-      data %>% dplyr::do_(.dots = setNames(list(fml), model_col))
+      ret <- data %>%
+        tidyr::nest() %>%
+        dplyr::mutate(.test_index = purrr::map(data, function(df){
+          sample_df_index(df, rate = test_rate)
+        })) %>%
+        dplyr::mutate(data = purrr::map2(data, .test_index, function(df, index){
+          safe_slice(df, index, remove = TRUE)
+        })) %>%
+        dplyr::mutate(model = purrr::map(data, function(data){
+          eval(parse(text = paste0("stats::glm(data = data, ", arg_char, ")")))
+        })) %>%
+        dplyr::select(-data)
+      ret
     }
   }, error = function(e){
     if(e$message == "contrasts can be applied only to factors with 2 or more levels"){
