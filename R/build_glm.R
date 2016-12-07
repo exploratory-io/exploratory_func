@@ -56,7 +56,7 @@ build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, g
 
   caller <- match.call()
   # this expands dots arguemtns to character
-  arg_char <- expand_args(caller, exclude = c("data", "keep.source", "augment", "group_cols"))
+  arg_char <- expand_args(caller, exclude = c("data", "keep.source", "augment", "group_cols", "test_rate", "seed"))
 
   ret <- tryCatch({
     if(keep.source || augment){
@@ -71,7 +71,8 @@ build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, g
         dplyr::mutate(model = purrr::map(source.data, function(data){
           eval(parse(text = paste0("stats::glm(data = data, ", arg_char, ")")))
         })) %>%
-        dplyr::select(-data)
+        dplyr::select(-data) %>%
+        dplyr::rowwise()
       class(ret[[source_col]]) <- c("list", ".source.data")
       ret
     } else {
@@ -86,7 +87,8 @@ build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, g
         dplyr::mutate(model = purrr::map(data, function(data){
           eval(parse(text = paste0("stats::glm(data = data, ", arg_char, ")")))
         })) %>%
-        dplyr::select(-data)
+        dplyr::select(-data) %>%
+        dplyr::rowwise()
       ret
     }
   }, error = function(e){

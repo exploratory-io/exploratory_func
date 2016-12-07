@@ -85,3 +85,21 @@ test_that("predict lm with new data", {
   expect_equal(nrow(fit), 20 * 2)
   expect_equal(names(fit), c("model.group", "group", "num1", "num2", ".fitted", ".se.fit"))
 })
+
+test_that("predict lm with new data", {
+  loadNamespace("dplyr")
+  fit_df <- data.frame(
+    group = rep(paste("group", seq(2)), each=15),
+    num1 = seq(30),
+    num2 = 10- (seq(30) %% 2)
+  )
+
+  model_data <- fit_df %>% build_lm(num1 ~ num2, group_cols = "group")
+
+  coefficient_ret <- model_data %>% coefficient()
+
+  component_ret <- model_data %>% component()
+
+  anova_ret <- model_data %>% get_anova()
+
+})

@@ -124,6 +124,7 @@ evaluate <- function(df, source_data, test = TRUE){
 
   if(test){
     dplyr::bind_cols(df, source) %>%
+      dplyr::ungroup() %>%
       dplyr::mutate(data = purrr::map2(data, .test_index, function(df, index){
         safe_slice(df, index)
       })) %>%
@@ -134,6 +135,7 @@ evaluate <- function(df, source_data, test = TRUE){
       tidyr::unnest(data)
   } else {
     dplyr::bind_cols(df, source) %>%
+      dplyr::ungroup() %>%
       dplyr::mutate(data = purrr::map2(data, .test_index, function(df, index){
         safe_slice(df, index, remove = TRUE)
       })) %>%
@@ -143,4 +145,19 @@ evaluate <- function(df, source_data, test = TRUE){
       dplyr::select(-model) %>%
       tidyr::unnest(data)
   }
+}
+
+#' @export
+coefficient <- function(df){
+  broom::tidy(df, model)
+}
+
+#' @export
+component <- function(df){
+  broom::glance(df, model)
+}
+
+#' @export
+get_anova <- function(df){
+  df %>% dplyr::mutate(model = list(anova(model))) %>% broom::tidy(model)
 }

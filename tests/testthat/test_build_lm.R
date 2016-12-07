@@ -94,5 +94,5 @@ test_that("build_lm with evaluation", {
   test_eval <- lm_model %>%
     evaluate(test_df, test = FALSE)
 
-  expect_equal(colnames(evaluated), c("group", "num1", "num2", ".fitted", ".se.fit", ".resid", ".hat", ".sigma", ".cooksd", ".std.resid"))
+  expect_equal(colnames(test_eval), c("group", "num1", "num2", ".fitted", ".se.fit", ".resid", ".hat", ".sigma", ".cooksd", ".std.resid"))
 })

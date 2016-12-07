@@ -57,7 +57,8 @@ build_lm <- function(data, ..., keep.source = TRUE, augment = FALSE, group_cols 
 
   caller <- match.call()
   # this expands dots arguemtns to character
-  arg_char <- expand_args(caller, exclude = c("data", "keep.source", "augment", "group_cols"))
+  arg_char <- expand_args(caller, exclude = c("data", "keep.source", "augment", "group_cols", "test_rate", "seed"))
+
   # put it into a formula
   # this will be executed in %>% chain later in mutate
   fml <- as.formula(paste0("~list(stats::lm(data = safe_slice(model, .test_index, remove = TRUE), ", arg_char, "))"))
@@ -75,7 +76,8 @@ build_lm <- function(data, ..., keep.source = TRUE, augment = FALSE, group_cols 
         dplyr::mutate(model = purrr::map(source.data, function(data){
           eval(parse(text = paste0("stats::lm(data = data, ", arg_char, ")")))
         })) %>%
-        dplyr::select(-data)
+        dplyr::select(-data) %>%
+        dplyr::rowwise()
       class(ret[[source_col]]) <- c("list", ".source.data")
       ret
     } else {
@@ -90,7 +92,8 @@ build_lm <- function(data, ..., keep.source = TRUE, augment = FALSE, group_cols 
         dplyr::mutate(model = purrr::map(data, function(df){
           eval(parse(text = paste0("stats::lm(data = data, ", arg_char, ")")))
         })) %>%
-        dplyr::select(-data)
+        dplyr::select(-data) %>%
+        dplyr::rowwise()
       ret
     }
   }, error = function(e){
