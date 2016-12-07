@@ -153,6 +153,7 @@ do_dist.kv_ <- function(df,
 }
 
 #' A symmetric version of KL-divergence
+#' This is often used with topic model to calculate distances between topics
 #' Ref: https://github.com/cpsievert/LDAvis/blob/master/R/createJSON.R
 #' @export
 do_kl_dist.kv_ <- function(df,
