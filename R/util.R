@@ -213,10 +213,10 @@ group_exclude <- function(df, ...){
 }
 
 #' prevent conflict of 2 character vectors and avoid it by adding .new to elements in the second
-avoid_conflict <- function(origin, new){
+avoid_conflict <- function(origin, new, suffix = ".new"){
   conflict <- new %in% origin
   while(any(conflict)){
-    new[conflict] <- paste(new[conflict], ".new", sep="")
+    new[conflict] <- paste(new[conflict], suffix, sep="")
     conflict <- new %in% origin
   }
   new

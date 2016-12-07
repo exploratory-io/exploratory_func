@@ -152,6 +152,71 @@ do_dist.kv_ <- function(df,
   (df %>% dplyr::do_(.dots=setNames(list(~calc_dist_each(.)), cnames[[1]])) %>%  tidyr::unnest_(cnames[[1]]))
 }
 
+#' A symmetric version of KL-divergence
+#' This is often used with topic model to calculate distances between topics
+#' Ref: https://github.com/cpsievert/LDAvis/blob/master/R/createJSON.R
+#' @export
+do_kl_dist.kv_ <- function(df,
+                           subject_col,
+                           key_col,
+                           value_col = NULL,
+                           fill=0,
+                           fun.aggregate=mean,
+                           distinct=FALSE,
+                           diag=FALSE,
+                           method="euclidean",
+                           p=2,
+                           cmdscale_k = NULL){
+
+  loadNamespace("dplyr")
+  loadNamespace("tidyr")
+  loadNamespace("reshape2")
+  loadNamespace("stats")
+  loadNamespace("proxy")
+
+  grouped_column <- grouped_by(df)
+
+  if(subject_col %in% grouped_column){
+    stop(paste0(subject_col, " is a grouping column. ungroup() may be necessary before this operation."))
+  }
+
+  # column names are "{subject}.x", "{subject}.y", "value"
+  cnames <- avoid_conflict(grouped_column,
+                           c(stringr::str_c(subject_col, c(".x", ".y")),
+                             "value")
+  )
+
+  # this is executed on each group
+  calc_dist_each <- function(df){
+    mat <- df %>%  simple_cast(subject_col, key_col, value_col, fill=fill, fun.aggregate=fun.aggregate)
+    # Dist is actually an atomic vector of upper half so upper and diag arguments don't matter
+    jensenShannon <- function(x, y) {
+      m <- 0.5*(x + y)
+      0.5*sum(x*log(x/m)) + 0.5*sum(y*log(y/m))
+    }
+    dist <- proxy::dist(x = mat, method = jensenShannon)
+    if(distinct){
+      if(diag){
+        diag <- 0
+      }else{
+        diag <- NULL
+      }
+      ret <- upper_gather(as.vector(dist), rownames(mat), diag=diag, cnames=cnames)
+    }else{
+      ret <- dist %>%  as.matrix() %>%  mat_to_df(cnames)
+      if(!diag){
+        ret<- ret[ret[,1] != ret[,2],]
+      }
+    }
+    rownames(ret) <- NULL
+    if (!is.null(cmdscale_k)) {
+      ret <- do_cmdscale_(ret, cnames[[1]], cnames[[2]], cnames[[3]], k = cmdscale_k)
+    }
+    ret
+  }
+  (df %>% dplyr::do_(.dots=setNames(list(~calc_dist_each(.)), cnames[[1]])) %>%  tidyr::unnest_(cnames[[1]]))
+}
+
 #' Calculate distance of each pair of groups.
 #' @param df data frame in tidy format
 #' @param group A column you want to calculate the correlations for.
