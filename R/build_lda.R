@@ -1,3 +1,4 @@
+#' Create lda model
 #' @export
 build_lda <- function(df, document, token, count = NULL,
                       n_topics,
@@ -29,12 +30,11 @@ build_lda <- function(df, document, token, count = NULL,
     # for glance
     "iter", "terms", "alpha"
   )
-
-  # colnames(data)[group_col_index] <- avoid_conflict(
-  #   reserved_names,
-  #   colnames(df)[group_col_index],
-  #   ".group"
-  # )
+  colnames(df)[group_col_index] <- avoid_conflict(
+    reserved_names,
+    colnames(df)[group_col_index],
+    ".group"
+  )
 
   # make column names unique
   colnames(df) <- make.unique(colnames(df), sep = "")
@@ -58,7 +58,7 @@ build_lda <- function(df, document, token, count = NULL,
                                                                       burnin = burnin,
                                                                       keep = keep))
     }
-    model_set <- lda
+    lda
   }
 
   # the column names of source data should be modified for augment
