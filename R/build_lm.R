@@ -40,7 +40,11 @@ build_lm <- function(data, ..., keep.source = TRUE, augment = FALSE, group_cols 
   if(!is.null(group_cols)){
     data <- dplyr::group_by_(data, .dots =  colnames(data)[group_col_index])
   } else {
-    data <- dplyr::ungroup(data)
+    # grouping is necessary for tidyr::nest to work so putting one value columns
+    # .test_index is just a place holder for a column that is already taken
+    data <- data %>%
+      dplyr::mutate(.test_index = 1) %>%
+      dplyr::group_by(.test_index)
   }
 
   model_col <- "model"
@@ -50,6 +54,7 @@ build_lm <- function(data, ..., keep.source = TRUE, augment = FALSE, group_cols 
   # this expands dots arguemtns to character
   arg_char <- expand_args(caller, exclude = c("data", "keep.source", "augment", "group_cols"))
   # put it into a formula
+  # this will be executed in %>% chain later in mutate
   fml <- as.formula(paste0("~list(stats::lm(data = safe_slice(model, .test_index, remove = TRUE), ", arg_char, "))"))
 
   ret <- tryCatch({
@@ -62,10 +67,13 @@ build_lm <- function(data, ..., keep.source = TRUE, augment = FALSE, group_cols 
       ret
     } else {
       ret <- data %>%
-        dplyr::do(model = (.), .test_index = sample_df_index((.), rate = test_rate)) %>%
-        dplyr::rowwise() %>%
-        dplyr::mutate_(.dots = list(model = fml))
-
+        tidyr::nest() %>%
+        dplyr::mutate(.test_index = purrr::map(data, function(df){
+          sample_df_index(df, rate = test_rate)
+        })) %>%
+        dplyr::mutate(model = purrr::map2(data, .test_index, function(df, index){
+          eval(parse(text = paste0("stats::lm(data = safe_slice(df, index, remove = TRUE), ", arg_char, ")")))
+        }))
       ret
     }
   }, error = function(e){
