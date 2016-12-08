@@ -91,3 +91,82 @@ predict <- function(df, model, ...){
     broom::augment(df, model, ...)
   }
 }
+
+#' apply data frame with model to a data frame
+#' @export
+add_prediction <- function(df, model_df){
+  broom::augment(model_df, model, newdata = df)
+}
+
+#' augment using source data and test index
+#' @param df Data frame that has model and .test_index
+#' @param source_data Data frame that has model and .test_index
+#' @param test Test data or training data should be used as data
+#' @export
+prediction <- function(df, source_data, test = TRUE){
+  df_cnames <- colnames(df)
+  # columns that are not model related are regarded as grouping column
+  grouping_col <- df_cnames[!df_cnames %in% c("model", ".test_index", "source.data")]
+
+  source <- if(any(colnames(source_data) %in% grouping_col)){
+    # nest the source data by each group
+    source_data %>%
+      dplyr::group_by_(.dots = grouping_col) %>%
+      tidyr::nest()
+  } else {
+    # put one value column so that all data can be nested
+    source_data %>%
+      dplyr::mutate(data = 1) %>%
+      dplyr::group_by(data) %>%
+      tidyr::nest()
+  }
+
+  # drop unnecessary columns
+  df <- dplyr::select(df, .test_index, model)
+
+  if(test){
+    # augment by test data
+    dplyr::bind_cols(df, source) %>%
+      dplyr::ungroup() %>%
+      dplyr::mutate(data = purrr::map2(data, .test_index, function(df, index){
+        # keep data only in test_index
+        safe_slice(df, index)
+      })) %>%
+      dplyr::select(-.test_index) %>%
+      dplyr::rowwise() %>%
+      dplyr::mutate(data = list(broom::augment(model, newdata = data))) %>%
+      dplyr::select(-model) %>%
+      tidyr::unnest(data)
+  } else {
+    # augment by trainig data
+    dplyr::bind_cols(df, source) %>%
+      dplyr::ungroup() %>%
+      dplyr::mutate(data = purrr::map2(data, .test_index, function(df, index){
+        # remove data in test_index
+        safe_slice(df, index, remove = TRUE)
+      })) %>%
+      dplyr::select(-.test_index) %>%
+      dplyr::rowwise() %>%
+      dplyr::mutate(data = list(broom::augment(model, data = data))) %>%
+      dplyr::select(-model) %>%
+      tidyr::unnest(data)
+  }
+}
+
+#' tidy wrapper for lm and glm
+#' @export
+model_coef <- function(df){
+  broom::tidy(df, model)
+}
+
+#' glance wrapper
+#' @export
+model_stats <- function(df){
+  broom::glance(df, model)
+}
+
+#' tidy after converting model to anova
+#' @export
+model_anova <- function(df){
+  df %>% dplyr::mutate(model = list(anova(model))) %>% broom::tidy(model)
+}

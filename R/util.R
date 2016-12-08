@@ -448,3 +448,32 @@ expand_args <- function(call, exclude = c()){
     }
   }, FUN.VALUE = ""), collapse = ", ")
 }
+
+#' get sampled indice from data frame
+sample_df_index <- function(df, rate, seed = NULL){
+  if(!is.null(seed)){
+    set.seed(seed)
+  }
+  sample(seq(nrow(df)), nrow(df) * rate)
+}
+
+#' slice that can handle empty vector
+safe_slice <- function(df, index, remove = FALSE){
+  if(remove){
+    if(is.null(index)){
+      df
+    } else if(length(index) == 0){
+      df
+    } else {
+      df[-index, ]
+    }
+  } else {
+    if(is.null(index)){
+      df[c(), ]
+    } else if(length(index) == 0){
+      df[c(), ]
+    } else {
+      df[index, ]
+    }
+  }
+}
