@@ -6,6 +6,8 @@
 #' @param keep.source Whether source should be kept in source.data column
 #' @param augment Whether the result should be augmented immediately
 #' @param group_cols A vector with columns names to be used as group columns
+#' @param test_rate Ratio of test data
+#' @param seed Random seed to control test data sampling
 #' @export
 build_lm <- function(data, ..., keep.source = TRUE, augment = FALSE, group_cols = NULL, test_rate = 0.0, seed = 0){
 
@@ -46,10 +48,9 @@ build_lm <- function(data, ..., keep.source = TRUE, augment = FALSE, group_cols 
     data <- dplyr::group_by_(data, .dots =  colnames(data)[group_col_index])
   } else {
     # grouping is necessary for tidyr::nest to work so putting one value columns
-    # .test_index is just a place holder for a column that is already taken
     data <- data %>%
-      dplyr::mutate(.test_index = 1) %>%
-      dplyr::group_by(.test_index)
+      dplyr::mutate(data = 1) %>%
+      dplyr::group_by(data)
   }
 
   model_col <- "model"
@@ -59,20 +60,20 @@ build_lm <- function(data, ..., keep.source = TRUE, augment = FALSE, group_cols 
   # this expands dots arguemtns to character
   arg_char <- expand_args(caller, exclude = c("data", "keep.source", "augment", "group_cols", "test_rate", "seed"))
 
-  # put it into a formula
-  # this will be executed in %>% chain later in mutate
-  fml <- as.formula(paste0("~list(stats::lm(data = safe_slice(model, .test_index, remove = TRUE), ", arg_char, "))"))
-
   ret <- tryCatch({
     if(keep.source || augment){
       ret <- data %>%
         tidyr::nest() %>%
+        # create test index
         dplyr::mutate(.test_index = purrr::map(data, function(df){
           sample_df_index(df, rate = test_rate)
         })) %>%
+        # slice training data
+        # use source.data as column name to keep it
         dplyr::mutate(source.data = purrr::map2(data, .test_index, function(df, index){
           safe_slice(df, index, remove = TRUE)
         })) %>%
+        # execute lm
         dplyr::mutate(model = purrr::map(source.data, function(data){
           eval(parse(text = paste0("stats::lm(data = data, ", arg_char, ")")))
         })) %>%
@@ -83,12 +84,15 @@ build_lm <- function(data, ..., keep.source = TRUE, augment = FALSE, group_cols 
     } else {
       ret <- data %>%
         tidyr::nest() %>%
+        # create test index
         dplyr::mutate(.test_index = purrr::map(data, function(df){
           sample_df_index(df, rate = test_rate)
         })) %>%
+        # slice training data
         dplyr::mutate(data = purrr::map2(data, .test_index, function(df, index){
           safe_slice(df, index, remove = TRUE)
         })) %>%
+        # execute lm
         dplyr::mutate(model = purrr::map(data, function(df){
           eval(parse(text = paste0("stats::lm(data = data, ", arg_char, ")")))
         })) %>%

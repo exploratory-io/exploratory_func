@@ -449,6 +449,7 @@ expand_args <- function(call, exclude = c()){
   }, FUN.VALUE = ""), collapse = ", ")
 }
 
+#' get sampled indice from data frame
 sample_df_index <- function(df, rate, seed = NULL){
   if(!is.null(seed)){
     set.seed(seed)

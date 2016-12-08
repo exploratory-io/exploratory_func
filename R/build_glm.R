@@ -6,6 +6,8 @@
 #' @param keep.source Whether source should be kept in source.data column
 #' @param augment Whether the result should be augmented immediately
 #' @param group_cols A vector with columns names to be used as group columns
+#' @param test_rate Ratio of test data
+#' @param seed Random seed to control test data sampling
 #' @export
 build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, group_cols = NULL, test_rate = 0, seed = 0){
 
@@ -18,7 +20,7 @@ build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, g
 
   # change column names to avoid name conflict when tidy or glance are executed
   reserved_names <- c(
-    "model",
+    "model", ".test_index", "data",
     # for tidy
     "term", "estimate", "std.error", "statistic", "p.value",
     # for glance
@@ -28,10 +30,6 @@ build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, g
 
   if(test_rate < 0 | test_rate > 1){
     stop("test_rate has to be between 0 and 1")
-  }
-
-  if (!is.null(test_rate)){
-    reserved_names <- c(reserved_names, ".test_index")
   }
 
   colnames(data)[group_col_index] <- avoid_conflict(
@@ -62,12 +60,16 @@ build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, g
     if(keep.source || augment){
       ret <- data %>%
         tidyr::nest() %>%
+        # create test index
         dplyr::mutate(.test_index = purrr::map(data, function(df){
           sample_df_index(df, rate = test_rate)
         })) %>%
+        # slice training data
+        # use source.data as column name to keep it
         dplyr::mutate(source.data = purrr::map2(data, .test_index, function(df, index){
           safe_slice(df, index, remove = TRUE)
         })) %>%
+        # execute glm
         dplyr::mutate(model = purrr::map(source.data, function(data){
           eval(parse(text = paste0("stats::glm(data = data, ", arg_char, ")")))
         })) %>%
@@ -78,12 +80,16 @@ build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, g
     } else {
       ret <- data %>%
         tidyr::nest() %>%
+        # create test index
         dplyr::mutate(.test_index = purrr::map(data, function(df){
           sample_df_index(df, rate = test_rate)
         })) %>%
+        # slice training data
+        # use source.data as column name to keep it
         dplyr::mutate(data = purrr::map2(data, .test_index, function(df, index){
           safe_slice(df, index, remove = TRUE)
         })) %>%
+        # execute glm
         dplyr::mutate(model = purrr::map(data, function(data){
           eval(parse(text = paste0("stats::glm(data = data, ", arg_char, ")")))
         })) %>%
