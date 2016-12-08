@@ -35,12 +35,10 @@ test_that("do_kmeans.kv augment", {
     key=rep(paste("dim", rep(seq(3))), each=2),
     value=seq(3), stringsAsFactors = F
   )
-  result <- (
-    test_df
-    %>%  dplyr::group_by(group)
-    %>%  build_kmeans.kv(subject, key, value, keep.source=TRUE, centers=1, augment = FALSE)
-    %>%  predict(model, source.data)
-  )
+  result <- test_df %>%
+    dplyr::group_by(group) %>%
+    build_kmeans.kv(subject, key, value, keep.source=TRUE, centers=1, augment = FALSE) %>%
+    predict(model, source.data)
   expect_true(is.integer(result[["cluster"]]))
   expect_true(all(result[["cluster"]] == 1))
 })
@@ -80,7 +78,7 @@ test_that("predict lm with new data", {
 
   model_data <- fit_df %>% dplyr::group_by(model) %>% build_lm(num1 ~ num2, group_cols = "model")
 
-  fit <- add_df %>% dplyr::group_by(group) %>% predict(model, model_df = model_data)
+  fit <- add_df %>% dplyr::group_by(group) %>% add_prediction(model_df = model_data)
 
   expect_equal(nrow(fit), 20 * 2)
   expect_equal(names(fit), c("model.group", "group", "num1", "num2", ".fitted", ".se.fit"))

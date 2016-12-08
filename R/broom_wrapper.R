@@ -78,30 +78,24 @@ augment_kmeans <- function(df, model, data){
 }
 
 #' augment wrapper
-#' @param df Data frame with model or data frame to predict if model_df is indicated.
-#' @param model_df If you want to use model objects in model_df to df, this argument should be used.
 #' @export
-predict <- function(df, model_df = NULL, ...){
+predict <- function(df, model, ...){
   model_col <- col_name(substitute(model))
   data_col <- col_name(substitute(data))
-  if(! ((model_col %in% colnames(df)) || (model_col %in% colnames(model_df)))){
+  if(!model_col %in% colnames(df)){
     stop(paste(model_col, "is not in column names"), sep=" ")
   }
   if(any(class(df[[model_col]]) %in% ".model.kmeans")){
     augment_kmeans(df, model, ...)
-  } else if (!is.null(model_df)) {
-    broom::augment(model_df, model, newdata = df)
   } else {
-    if(any(colnames(df) == "source.data")){
-      broom::augment(df, model, data = source.data, ...)
-    } else {
-      broom::augment(df, model, ...)
-    }
+    broom::augment(df, model, ...)
   }
 }
 
-add_prediction <- function(model_df, df){
-
+#' apply data frame with model to a data frame
+#' @export
+add_prediction <- function(df, model_df){
+  broom::augment(model_df, model, newdata = df)
 }
 
 #' @export
