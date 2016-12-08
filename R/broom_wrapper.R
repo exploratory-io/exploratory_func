@@ -99,7 +99,7 @@ add_prediction <- function(df, model_df){
 }
 
 #' @export
-evaluate <- function(df, source_data, test = TRUE){
+prediction <- function(df, source_data, test = TRUE){
   df_cnames <- colnames(df)
   grouping_col <- df_cnames[!df_cnames %in% c("model", ".test_index", "source.data")]
 
@@ -142,16 +142,16 @@ evaluate <- function(df, source_data, test = TRUE){
 }
 
 #' @export
-coefficient <- function(df){
+model_coef <- function(df){
   broom::tidy(df, model)
 }
 
 #' @export
-component <- function(df){
+model_stats <- function(df){
   broom::glance(df, model)
 }
 
 #' @export
-get_anova <- function(df){
+model_anova <- function(df){
   df %>% dplyr::mutate(model = list(anova(model))) %>% broom::tidy(model)
 }
