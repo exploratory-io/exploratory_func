@@ -87,12 +87,12 @@ test_that("build_lm with evaluation", {
     build_lm(num1 ~ num2, group_cols = c("group"), test_rate = 0.1)
 
   evaluated <- lm_model %>%
-    evaluate(test_df)
+    prediction(test_df)
 
   expect_equal(colnames(evaluated), c("group", "num1", "num2", ".fitted", ".se.fit"))
 
   test_eval <- lm_model %>%
-    evaluate(test_df, test = FALSE)
+    prediction(test_df, test = FALSE)
 
   expect_equal(colnames(test_eval), c("group", "num1", "num2", ".fitted", ".se.fit", ".resid", ".hat", ".sigma", ".cooksd", ".std.resid"))
 })

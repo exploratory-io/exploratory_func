@@ -94,10 +94,13 @@ test_that("predict lm with new data", {
 
   model_data <- fit_df %>% build_lm(num1 ~ num2, group_cols = "group")
 
-  coefficient_ret <- model_data %>% coefficient()
+  coef_ret <- model_data %>% model_coef()
+  expect_equal(colnames(coef_ret), c("group", "term", "estimate", "std.error", "statistic", "p.value"))
 
-  component_ret <- model_data %>% component()
+  stats_ret <- model_data %>% model_stats()
+  expect_equal(colnames(stats_ret), c("group", "r.squared", "adj.r.squared", "sigma", "statistic", "p.value", "df", "logLik", "AIC", "BIC", "deviance", "df.residual"))
 
-  anova_ret <- model_data %>% get_anova()
+  anova_ret <- model_data %>% model_anova()
+  expect_equal(colnames(anova_ret), c("group", "term", "df", "sumsq", "meansq", "statistic", "p.value"))
 
 })
