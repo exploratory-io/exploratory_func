@@ -109,7 +109,7 @@ prediction <- function(df, source_data, test = TRUE){
   grouping_col <- df_cnames[!df_cnames %in% c("model", ".test_index", "source.data")]
 
   source <- if(any(colnames(source_data) %in% grouping_col)){
-    # nest the soruce data by each group
+    # nest the source data by each group
     source_data %>%
       dplyr::group_by_(.dots = grouping_col) %>%
       tidyr::nest()
