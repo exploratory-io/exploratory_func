@@ -7,7 +7,6 @@
 #' @param method "VEM" or "Gibbs". Algorithm of LDA.
 #' @param iter Number of iteration.
 #' @param burnin How many iterations should be omitted in Gibbs iteration.
-#' @param keep In how many each iterations, the log-likelihood should be saved.
 #' @param keep.source If nested source data should be in the result.
 #' @param group_cols Grouping columns.
 #' @export
@@ -16,9 +15,8 @@ build_lda <- function(df, document, token, count = NULL,
                       method = "VEM",
                       iter = 2000,
                       burnin = 0,
-                      keep = 50,
                       seed = 0,
-                      keep.source = FALSE,
+                      keep.source = TRUE,
                       group_cols = NULL){
   loadNamespace("dplyr")
   loadNamespace("topicmodels")
@@ -62,12 +60,11 @@ build_lda <- function(df, document, token, count = NULL,
   build_lda_each <- function(df){
     mat <- sparse_cast(df, row = row_col, col = col_col, val = value_col, count = TRUE) %>% slam::as.simple_triplet_matrix()
     lda <- if(method == "VEM"){
-      topicmodels::LDA(mat, method = method, n_topics, control = list(seed = seed, keep = keep))
+      topicmodels::LDA(mat, method = method, n_topics, control = list(seed = seed))
     } else {
       topicmodels::LDA(mat, method = method, n_topics, control = list(seed = seed,
                                                                       iter = iter,
-                                                                      burnin = burnin,
-                                                                      keep = keep))
+                                                                      burnin = burnin))
     }
     lda
   }
