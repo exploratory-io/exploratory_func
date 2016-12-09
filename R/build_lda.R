@@ -1,4 +1,15 @@
 #' Create lda model
+#' @param df Tokenized data frame
+#' @param document A column regarded as document id.
+#' @param token A column that has token.
+#' @param count Count of tokens in the document. If NULL, counts of token in a document.
+#' @param n_topics Number of topics
+#' @param method "VEM" or "Gibbs". Algorithm of LDA.
+#' @param iter Number of iteration.
+#' @param burnin How many iterations should be omitted in Gibbs iteration.
+#' @param keep In how many each iterations, the log-likelihood should be saved.
+#' @param keep.source If nested source data should be in the result.
+#' @param group_cols Grouping columns.
 #' @export
 build_lda <- function(df, document, token, count = NULL,
                       n_topics,
