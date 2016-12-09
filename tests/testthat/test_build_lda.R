@@ -45,8 +45,11 @@ test_that("build_lda by gibbs", {
                                           )), .Names = c("LessonId", "Lesson"), row.names = c(102L, 337L,
                                                                                               289L, 1123L, 628L, 1257L, 812L, 1170L, 1616L, 619L), class = "data.frame")
 
-  tokenized <- input_df %>% do_tokenize(Lesson)
-  ret <- build_lda(tokenized, LessonId, token, n_topics=3, method = "Gibbs")
+  tokenized <- input_df %>%
+    do_tokenize(Lesson) %>%
+    dplyr::group_by(LessonId, token) %>%
+    dplyr::summarise(count = n())
+  ret <- build_lda(tokenized, LessonId, token, count, n_topics=3, method = "Gibbs")
   tidy_ret <- tidy(ret, model)
 
   expect_equal(colnames(tidy_ret), c("topic", "term", "beta"))

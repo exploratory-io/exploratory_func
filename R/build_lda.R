@@ -1,13 +1,22 @@
 #' Create lda model
+#' @param df Tokenized data frame
+#' @param document A column regarded as document id.
+#' @param token A column that has token.
+#' @param count Count of tokens in the document. If NULL, counts of token in a document.
+#' @param n_topics Number of topics
+#' @param method "VEM" or "Gibbs". Algorithm of LDA.
+#' @param iter Number of iteration.
+#' @param burnin How many iterations should be omitted in Gibbs iteration.
+#' @param keep.source If nested source data should be in the result.
+#' @param group_cols Grouping columns.
 #' @export
 build_lda <- function(df, document, token, count = NULL,
                       n_topics,
                       method = "VEM",
                       iter = 2000,
                       burnin = 0,
-                      keep = 50,
                       seed = 0,
-                      keep.source = FALSE,
+                      keep.source = TRUE,
                       group_cols = NULL){
   loadNamespace("dplyr")
   loadNamespace("topicmodels")
@@ -15,7 +24,7 @@ build_lda <- function(df, document, token, count = NULL,
 
   row_col <- col_name(substitute(document))
   col_col <- col_name(substitute(token))
-  value_col <- col_name(substitute(value))
+  value_col <- col_name(substitute(count))
 
   # deal with group columns by index because those names might be changed
   group_col_index <- colnames(df) %in% group_cols
@@ -49,14 +58,13 @@ build_lda <- function(df, document, token, count = NULL,
   source_col <- "source.data"
 
   build_lda_each <- function(df){
-    mat <- sparse_cast(df, row = row_col, col = col_col, count = TRUE) %>% slam::as.simple_triplet_matrix()
+    mat <- sparse_cast(df, row = row_col, col = col_col, val = value_col, count = TRUE) %>% slam::as.simple_triplet_matrix()
     lda <- if(method == "VEM"){
-      topicmodels::LDA(mat, method = method, n_topics, control = list(seed = seed, keep = keep))
+      topicmodels::LDA(mat, method = method, n_topics, control = list(seed = seed))
     } else {
       topicmodels::LDA(mat, method = method, n_topics, control = list(seed = seed,
                                                                       iter = iter,
-                                                                      burnin = burnin,
-                                                                      keep = keep))
+                                                                      burnin = burnin))
     }
     lda
   }
