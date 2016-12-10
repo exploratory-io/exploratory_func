@@ -19,7 +19,7 @@ is_digit <- function(word){
 #' @param word Character to be checked if it's digits.
 #' @return Logical vector if the word is digits or not.
 #' @export
-is_alphabet <- function(word, lexicon="snowball"){
+is_alphabet <- function(word){
   loadNamespace("stringr")
   stringr::str_detect(word, "^[[:alpha:]]+$")
 }
