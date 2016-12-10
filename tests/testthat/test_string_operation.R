@@ -8,7 +8,7 @@ test_that("is_stopword", {
   expect_equal(result, c(FALSE, TRUE, TRUE, FALSE))
 })
 
-test_that("check lexcons", {
+test_that("check lexicons", {
   lexicons <- c(
     "danish",
     "dutch",
