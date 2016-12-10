@@ -39,7 +39,7 @@ devtools::use_data(
   sentiment_AFINN,
   default_stopwords,
   exploratory_stopwords,
-  ja_stopwords,
+  stopwords_japanese,
   stopwords_smart,
   stopwords_onix,
   stopwords_snowball,
