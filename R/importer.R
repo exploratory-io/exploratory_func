@@ -1,0 +1,3 @@
+#' @importFrom dplyr %>%
+#' @export
+dplyr::`%>%`
