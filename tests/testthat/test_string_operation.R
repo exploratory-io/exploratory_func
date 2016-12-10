@@ -4,8 +4,35 @@ test_df <- data.frame(char = c("Hello world!", "This is a data frame for test. T
 
 test_that("is_stopword", {
   test_vec <- c("the", "yourself", "Test", "test")
-  result <- is_stopword(test_vec)
-  expect_equal(result, c(T, T, F, F))
+  result <- is_stopword(test_vec, exclude = "the", include = "Test")
+  expect_equal(result, c(FALSE, TRUE, TRUE, FALSE))
+})
+
+test_that("check lexcons", {
+  lexicons <- c(
+    "danish",
+    "dutch",
+    "english",
+    "finnish",
+    "french",
+    "german",
+    "hungarian",
+    "italian",
+    "norwegian",
+    "portuguese",
+    "russian",
+    "spanish",
+    "swedish",
+    "japanese",
+    "SMART",
+    "snowball",
+    "onix"
+  )
+
+  for (lexicon in lexicons){
+    # this should succeeds without error
+    get_stopwords(lexicon = lexicon)
+  }
 })
 
 test_that("is_digit", {
