@@ -1,10 +1,30 @@
 #' Check if the token is in stopwords.
 #' @param token Character to be checked if it's stopword.
+#' @param lexicon Type of stopwords.
+#' One of
+#' "danish",
+#' "dutch",
+#' "english",
+#' "finnish",
+#' "french",
+#' "german",
+#' "hungarian",
+#' "italian",
+#' "japanese",
+#' "norwegian",
+#' "portuguese",
+#' "russian",
+#' "spanish",
+#' "swedish",
+#' "japanese",
+#' "smart",
+#' "snowball",
+#' "onix"
 #' @param include Values that should be included as stopwords
 #' @param exclude Values that should be excluded from stopwords
 #' @return Logical vector if the token is in stop words or not.
 #' @export
-is_stopword <- function(token, lexicon="snowball", include = c(), exclude = c()){
+is_stopword <- function(token, lexicon="english", include = c(), exclude = c()){
   token %in% get_stopwords(lexicon, include = include, exclude = exclude)
 }
 
@@ -45,13 +65,12 @@ is_alphabet <- function(word){
 #' "japanese",
 #' "smart",
 #' "snowball",
-#' "onix",
-#' "snowball"
+#' "onix"
 #' @param include Values that should be included as stop words
 #' @param exclude Values that should be excluded from stop words
 #' @return vector of stop words.
 #' @export
-get_stopwords <- function(lexicon = "snowball", include = c(), exclude = c()){
+get_stopwords <- function(lexicon = "english", include = c(), exclude = c()){
   lexcon <- tolower(lexicon)
   stopwords <- if (lexicon %in% c(
     "snowball",
