@@ -1,6 +1,7 @@
 #### Generate sentiment data
 
 data("sentiments", package = "tidytext", envir = environment())
+data("stop_words", package = "tidytext", envir = environment())
 
 # only this uses summarize because nrc has many sentiment types, so list is used for one to many relationships among words and sentiments
 # the other two is one to one relationships, so named vector can be used
@@ -20,12 +21,16 @@ exploratory_stopwords <- c("http", "https", "t.co")
 default_stopwords = c(tm::stopwords("english"), exploratory_stopwords)
 
 res <- httr::GET("http://svn.sourceforge.jp/svnroot/slothlib/CSharp/Version1/SlothLib/NLP/Filter/StopWord/word/Japanese.txt")
-ja_stopwords <- httr::content(res) %>% stringr::str_split("\r\n")
+stopwords_japanese <- httr::content(res) %>% stringr::str_split("\r\n")
 # ja_stopwrods is a list whose length is 1
-ja_stopwords <- ja_stopwords[[1]][!is_empty(ja_stopwords[[1]])]
+stopwords_japanese <- stopwords_japanese[[1]][!is_empty(stopwords_japanese[[1]])]
+
+stopwords_smart <- readRDS("data-raw/stopwords_smart.rds")
+stopwords_onix <- readRDS("data-raw/stopwords_onix.rds")
+stopwords_snowball <- readRDS("data-raw/stopwords_snowball.rds")
 
 if(all(!ja_stopwords %in% c("あなた", "いくつ", "いろいろ", "おまえ"))){
-  stop("ja_stopwords seems strange")
+  stop("stopwords_japanese seems strange")
 }
 
 devtools::use_data(
@@ -35,5 +40,8 @@ devtools::use_data(
   default_stopwords,
   exploratory_stopwords,
   ja_stopwords,
+  stopwords_smart,
+  stopwords_onix,
+  stopwords_snowball,
   internal = TRUE,
   overwrite = TRUE)
