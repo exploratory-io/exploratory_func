@@ -19,11 +19,21 @@ names(sentiment_AFINN) <- sentiment_AFINN_df[["word"]]
 exploratory_stopwords <- c("http", "https", "t.co")
 default_stopwords = c(tm::stopwords("english"), exploratory_stopwords)
 
+res <- httr::GET("http://svn.sourceforge.jp/svnroot/slothlib/CSharp/Version1/SlothLib/NLP/Filter/StopWord/word/Japanese.txt")
+ja_stopwords <- httr::content(res) %>% stringr::str_split("\r\n")
+# ja_stopwrods is a list whose length is 1
+ja_stopwords <- ja_stopwords[[1]][!is_empty(ja_stopwords[[1]])]
+
+if(all(!ja_stopwords %in% c("あなた", "いくつ", "いろいろ", "おまえ"))){
+  stop("ja_stopwords seems strange")
+}
+
 devtools::use_data(
   sentiment_nrc,
   sentiment_bing,
   sentiment_AFINN,
   default_stopwords,
   exploratory_stopwords,
+  ja_stopwords,
   internal = TRUE,
   overwrite = TRUE)
