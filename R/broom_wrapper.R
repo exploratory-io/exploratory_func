@@ -199,7 +199,6 @@ model_anova <- function(df){
 model_confint <- function(df, ...){
   caller <- match.call()
   # this expands dots arguemtns to character
-  browser()
   arg_char <- expand_args(caller, exclude = c("df"))
   if (arg_char != "") {
     fml <- as.formula(paste0("~list(stats::confint(model, ", arg_char, "))"))
