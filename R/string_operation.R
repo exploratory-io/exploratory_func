@@ -1,10 +1,30 @@
 #' Check if the token is in stopwords.
 #' @param token Character to be checked if it's stopword.
-#' @param lexicon Type of stopwords. One of "snowball", "onix" and "SMART".
-#' @return Logical vector if the token is in stopwords or not.
+#' @param lexicon Type of stopwords.
+#' One of
+#' "danish",
+#' "dutch",
+#' "english",
+#' "finnish",
+#' "french",
+#' "german",
+#' "hungarian",
+#' "italian",
+#' "japanese",
+#' "norwegian",
+#' "portuguese",
+#' "russian",
+#' "spanish",
+#' "swedish",
+#' "smart",
+#' "snowball",
+#' "onix"
+#' @param include Values that should be included as stopwords
+#' @param exclude Values that should be excluded from stopwords
+#' @return Logical vector if the token is in stop words or not.
 #' @export
-is_stopword <- function(token, lexicon="snowball"){
-  token %in% get_stopwords(lexicon)
+is_stopword <- function(token, lexicon="english", include = c(), exclude = c()){
+  token %in% get_stopwords(lexicon, include = include, exclude = exclude)
 }
 
 #' Check if the word is digits.
@@ -19,21 +39,51 @@ is_digit <- function(word){
 #' @param word Character to be checked if it's digits.
 #' @return Logical vector if the word is digits or not.
 #' @export
-is_alphabet <- function(word, lexicon="snowball"){
+is_alphabet <- function(word){
   loadNamespace("stringr")
   stringr::str_detect(word, "^[[:alpha:]]+$")
 }
 
 #' Get vector of stopwords
-#' @param lexicon Type of stopwords. One of "snowball", "onix" and "SMART".
-#' @return vector of stop word.
+#' @param lexicon Type of stopwords.
+#' One of
+#' "danish",
+#' "dutch",
+#' "english",
+#' "finnish",
+#' "french",
+#' "german",
+#' "hungarian",
+#' "italian",
+#' "japanese",
+#' "norwegian",
+#' "portuguese",
+#' "russian",
+#' "spanish",
+#' "swedish",
+#' "smart",
+#' "snowball",
+#' "onix"
+#' @param include Values that should be included as stop words
+#' @param exclude Values that should be excluded from stop words
+#' @return vector of stop words.
 #' @export
-get_stopwords <- function(lexicon="snowball"){
-  loadNamespace("tidytext")
-  data("stop_words", package = "tidytext", envir = environment())
-  type_check <- stop_words$lexicon %in% lexicon
-  words <- stop_words$word[type_check]
-  unique(words)
+get_stopwords <- function(lexicon = "english", include = c(), exclude = c()){
+  lexcon <- tolower(lexicon)
+  stopwords <- if (lexicon %in% c(
+    "snowball",
+    "onix",
+    "smart",
+    "japanese")){
+    # these data are created from data-raw/create_internal_data.R
+    get(paste0("stopwords_", lexicon))
+  } else {
+    loadNamespace("tm")
+    tm::stopwords(kind = lexicon)
+  }
+
+  ret <- c(stopwords[!stopwords %in% exclude], include)
+  ret
 }
 
 #' Get sentiments of words
