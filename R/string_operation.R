@@ -16,7 +16,6 @@
 #' "russian",
 #' "spanish",
 #' "swedish",
-#' "japanese",
 #' "smart",
 #' "snowball",
 #' "onix"
@@ -62,7 +61,6 @@ is_alphabet <- function(word){
 #' "russian",
 #' "spanish",
 #' "swedish",
-#' "japanese",
 #' "smart",
 #' "snowball",
 #' "onix"
@@ -77,6 +75,7 @@ get_stopwords <- function(lexicon = "english", include = c(), exclude = c()){
     "onix",
     "smart",
     "japanese")){
+    # these data is created from data-raw/create_internal_data.R
     get(paste0("stopwords_", lexicon))
   } else {
     loadNamespace("tm")
