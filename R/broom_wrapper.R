@@ -170,3 +170,13 @@ model_stats <- function(df){
 model_anova <- function(df){
   df %>% dplyr::mutate(model = list(anova(model))) %>% broom::tidy(model)
 }
+
+#' tidy after converting model to confint
+#' @export
+model_confint <- function(df, ...){
+  caller <- match.call()
+  # this expands dots arguemtns to character
+  arg_char <- expand_args(caller, exclude = c("df"))
+  fml <- as.formula(paste0("~list(stats::confint(model, ", arg_char, "))"))
+  df %>% dplyr::mutate_(.dots = list(model = fml)) %>% broom::tidy(model)
+}

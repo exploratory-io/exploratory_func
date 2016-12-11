@@ -103,4 +103,6 @@ test_that("predict lm with new data", {
   anova_ret <- model_data %>% model_anova()
   expect_equal(colnames(anova_ret), c("group", "term", "df", "sumsq", "meansq", "statistic", "p.value"))
 
+  confint_ret <- model_data %>% model_confint(level = 0.99)
+  expect_equal(colnames(confint_ret), c("group", ".rownames", "X0.5..", "X99.5.."))
 })
