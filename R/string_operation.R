@@ -75,7 +75,7 @@ get_stopwords <- function(lexicon = "english", include = c(), exclude = c()){
     "onix",
     "smart",
     "japanese")){
-    # these data is created from data-raw/create_internal_data.R
+    # these data are created from data-raw/create_internal_data.R
     get(paste0("stopwords_", lexicon))
   } else {
     loadNamespace("tm")
