@@ -124,7 +124,7 @@ prediction <- function(df, source_data, test = TRUE){
   # drop unnecessary columns
   df <- dplyr::select(df, .test_index, model)
 
-  if(test){
+  ret <- if(test){
     # augment by test data
     dplyr::bind_cols(df, source) %>%
       dplyr::ungroup() %>%
@@ -151,6 +151,14 @@ prediction <- function(df, source_data, test = TRUE){
       dplyr::select(-model) %>%
       tidyr::unnest(data)
   }
+  colnames(ret)[colnames(ret) == ".fitted"] <- avoid_conflict(colnames(ret), "Fitted")
+  colnames(ret)[colnames(ret) == ".se.fit"] <- avoid_conflict(colnames(ret), "Standard Error")
+  colnames(ret)[colnames(ret) == ".resid"] <- avoid_conflict(colnames(ret), "Residuals")
+  colnames(ret)[colnames(ret) == ".hat"] <- avoid_conflict(colnames(ret), "Hat")
+  colnames(ret)[colnames(ret) == ".sigma"] <- avoid_conflict(colnames(ret), "Residual Standard Deviation")
+  colnames(ret)[colnames(ret) == ".cooksd"] <- avoid_conflict(colnames(ret), "Cooks Distance")
+  colnames(ret)[colnames(ret) == ".std.resid"] <- avoid_conflict(colnames(ret), "Standardised Residuals")
+  ret
 }
 
 #' tidy wrapper for lm and glm
