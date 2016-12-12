@@ -124,7 +124,7 @@ prediction <- function(df, source_data, test = TRUE){
   # drop unnecessary columns
   df <- dplyr::select(df, .test_index, model)
 
-  if(test){
+  ret <- if(test){
     # augment by test data
     dplyr::bind_cols(df, source) %>%
       dplyr::ungroup() %>%
@@ -151,22 +151,73 @@ prediction <- function(df, source_data, test = TRUE){
       dplyr::select(-model) %>%
       tidyr::unnest(data)
   }
+  colnames(ret)[colnames(ret) == ".fitted"] <- avoid_conflict(colnames(ret), "Fitted")
+  colnames(ret)[colnames(ret) == ".se.fit"] <- avoid_conflict(colnames(ret), "Standard Error")
+  colnames(ret)[colnames(ret) == ".resid"] <- avoid_conflict(colnames(ret), "Residuals")
+  colnames(ret)[colnames(ret) == ".hat"] <- avoid_conflict(colnames(ret), "Hat")
+  colnames(ret)[colnames(ret) == ".sigma"] <- avoid_conflict(colnames(ret), "Residual Standard Deviation")
+  colnames(ret)[colnames(ret) == ".cooksd"] <- avoid_conflict(colnames(ret), "Cooks Distance")
+  colnames(ret)[colnames(ret) == ".std.resid"] <- avoid_conflict(colnames(ret), "Standardised Residuals")
+  ret
 }
 
 #' tidy wrapper for lm and glm
 #' @export
 model_coef <- function(df){
-  broom::tidy(df, model)
+  ret <- broom::tidy(df, model)
+  colnames(ret)[colnames(ret) == "term"] <- "Term"
+  colnames(ret)[colnames(ret) == "statistic"] <- "t Ratio"
+  colnames(ret)[colnames(ret) == "p.value"] <- "Prob > |t|"
+  colnames(ret)[colnames(ret) == "std.error"] <- "Std Error"
+  colnames(ret)[colnames(ret) == "estimate"] <- "Estimate"
+  ret
 }
 
 #' glance wrapper
 #' @export
 model_stats <- function(df){
-  broom::glance(df, model)
+  ret <- broom::glance(df, model)
+  colnames(ret)[colnames(ret) == "r.squared"] <- "RSquare"
+  colnames(ret)[colnames(ret) == "adj.r.squared"] <- "RSquare Adj"
+  colnames(ret)[colnames(ret) == "sigma"] <- "Root Mean Square Error"
+  colnames(ret)[colnames(ret) == "statistic"] <- "F Ratio"
+  colnames(ret)[colnames(ret) == "p.value"] <- "Prob > F"
+  colnames(ret)[colnames(ret) == "df"] <- "Degree of Freedom"
+  colnames(ret)[colnames(ret) == "logLik"] <- "Log Likelihood"
+  colnames(ret)[colnames(ret) == "deviance"] <- "Deviance"
+  colnames(ret)[colnames(ret) == "df.residual"] <- "Residual Degree of Freedom"
+  ret
 }
 
 #' tidy after converting model to anova
 #' @export
 model_anova <- function(df){
-  df %>% dplyr::mutate(model = list(anova(model))) %>% broom::tidy(model)
+  ret <- df %>% dplyr::mutate(model = list(anova(model))) %>% broom::tidy(model)
+  colnames(ret)[colnames(ret) == "term"] <- "Term"
+  colnames(ret)[colnames(ret) == "sumsq"] <- "Sum of Squares"
+  colnames(ret)[colnames(ret) == "meansq"] <- "Mean Square"
+  colnames(ret)[colnames(ret) == "statistic"] <- "F Ratio"
+  colnames(ret)[colnames(ret) == "p.value"] <- "Prob > F"
+  colnames(ret)[colnames(ret) == "df"] <- "Degree of Freedom"
+  ret
+}
+
+#' tidy after converting model to confint
+#' @export
+model_confint <- function(df, ...){
+  caller <- match.call()
+  # this expands dots arguemtns to character
+  arg_char <- expand_args(caller, exclude = c("df"))
+  if (arg_char != "") {
+    fml <- as.formula(paste0("~list(stats::confint(model, ", arg_char, "))"))
+  } else {
+    fml <- as.formula(paste0("~list(stats::confint(model))"))
+  }
+  ret <- df %>% dplyr::mutate_(.dots = list(model = fml)) %>% broom::tidy(model)
+  colnames(ret)[colnames(ret) == ".rownames"] <- "Term"
+  # original columns are like X0.5..   X99.5.., so replace X to Prob and remove trailing dots
+  new_p_cnames <- stringr::str_replace(colnames(ret)[(ncol(ret)-1):ncol(ret)], "X", "Prob ") %>%
+    stringr::str_replace("\\.+$", "")
+  colnames(ret)[(ncol(ret)-1):ncol(ret)] <- new_p_cnames
+  ret
 }

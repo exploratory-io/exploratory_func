@@ -22,10 +22,14 @@ build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, g
   reserved_names <- c(
     "model", ".test_index", "data",
     # for tidy
-    "term", "estimate", "std.error", "statistic", "p.value",
+    "term", "estimate", "std.error", "t.ratio", "p.value",
+    "Term", "Estimate", "Std Error", "t Ratio", "Prob > |t|",
     # for glance
     "null.deviance",
-    "df.null", "logLik", "AIC", "BIC", "deviance", "df.residual"
+    "df.null", "logLik", "AIC", "BIC", "deviance", "df.residual",
+    "RSquare", "RSquare Adj", "Root Mean Square Error",
+    "F Ratio", "Prob > F", "Degree of Freedom", "Log Likelihood",
+    "AIC", "BIC", "Deviance", "Residual Degree of Freedom"
   )
 
   if(test_rate < 0 | test_rate > 1){

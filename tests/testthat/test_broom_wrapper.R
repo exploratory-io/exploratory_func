@@ -95,12 +95,18 @@ test_that("predict lm with new data", {
   model_data <- fit_df %>% build_lm(num1 ~ num2, group_cols = "group")
 
   coef_ret <- model_data %>% model_coef()
-  expect_equal(colnames(coef_ret), c("group", "term", "estimate", "std.error", "statistic", "p.value"))
+  expect_equal(colnames(coef_ret), c("group", "Term", "Estimate", "Std Error", "t Ratio", "Prob > |t|"))
 
   stats_ret <- model_data %>% model_stats()
-  expect_equal(colnames(stats_ret), c("group", "r.squared", "adj.r.squared", "sigma", "statistic", "p.value", "df", "logLik", "AIC", "BIC", "deviance", "df.residual"))
+  expect_equal(colnames(stats_ret), c(
+    "group", "RSquare", "RSquare Adj", "Root Mean Square Error",
+    "F Ratio", "Prob > F", "Degree of Freedom", "Log Likelihood",
+    "AIC", "BIC", "Deviance", "Residual Degree of Freedom")
+    )
 
   anova_ret <- model_data %>% model_anova()
-  expect_equal(colnames(anova_ret), c("group", "term", "df", "sumsq", "meansq", "statistic", "p.value"))
+  expect_equal(colnames(anova_ret), c("group", "Term", "Degree of Freedom", "Sum of Squares", "Mean Square", "F Ratio", "Prob > F"))
 
+  confint_ret <- model_data %>% model_confint(level = 0.99)
+  expect_equal(colnames(confint_ret), c("group", "Term", "Prob 0.5", "Prob 99.5"))
 })
