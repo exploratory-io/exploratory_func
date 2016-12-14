@@ -402,12 +402,15 @@ str_count_all <- function(text, patterns, remove.zero = TRUE){
 #' @param colnames Vector of column names or lazy dot for select arg. ex:lazyeval::lazy_dots(...)
 as_numeric_matrix_ <- function(df, columns){
   loadNamespace("dplyr")
-  ret <- df[,columns] %>%
-    as.matrix() %>%
+
+  orig_mat <- df[,columns] %>%
+    as.matrix()
+
+  ret <- orig_mat %>%
     as.numeric() %>%
     matrix(nrow = nrow(df))
 
-  colnames(ret) <- columns
+  colnames(ret) <- colnames(orig_mat)
   ret
 }
 

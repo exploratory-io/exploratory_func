@@ -201,11 +201,11 @@ build_kmeans.cols <- function(df, ...,
   }
 
   build_kmeans_each <- function(df){
-    mat <- as_numeric_matrix_(df, columns = selected_column)
     kmeans_ret <- tryCatch({
-      if(nrow(mat) == 0 | ncol(mat) == 0){
+      if(nrow(df) == 0 | ncol(df) == 0){
         stop("No data after removing NA")
       }
+      mat <- as_numeric_matrix_(df, columns = selected_column)
       kmeans(mat, centers = centers, iter.max = 10, nstart = nstart, algorithm = algorithm, trace = trace)
     }, error = function(e){
       if(e$message == "invalid first argument"){
