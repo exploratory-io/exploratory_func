@@ -33,17 +33,18 @@ build_data <- function(funcname) {
 
 #' integrated build_kmeans
 #' @export
-build_kmeans <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0){
+build_kmeans <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0, with_dim_names = FALSE, group_cols = c()){
+
   if (!is.null(skv)) {
     #.kv pattern
     if (!(length(skv) %in% c(2, 3))) {
       stop("length of skv has to be 2 or 3")
     }
     value <- if(length(skv) == 2) NULL else skv[[3]]
-    build_kmeans.kv_(df, skv[[1]], skv[[2]], value, fun.aggregate = fun.aggregate, fill = fill, ...)
+    build_kmeans.kv_(df, skv[[1]], skv[[2]], value, fun.aggregate = fun.aggregate, fill = fill, with_dim_names = with_dim_names, group_cols = group_cols, ...)
   } else {
     #.cols pattern
-    build_kmeans.cols(df, ...)
+    build_kmeans.cols(df, with_dim_names = with_dim_names, group_cols = group_cols, ...)
   }
 }
 
@@ -77,13 +78,21 @@ build_kmeans.kv_ <- function(df,
                              seed=0,
                              augment=TRUE,
                              fun.aggregate=mean,
-                             fill=0){
+                             fill=0,
+                             with_dim_names = FALSE,
+                             group_cols = c()){
   loadNamespace("dplyr")
   loadNamespace("lazyeval")
   loadNamespace("tidyr")
   loadNamespace("broom")
 
   set.seed(seed)
+
+  if(!is.null(group_cols)){
+    df <- dplyr::group_by_(df, .dots = group_cols)
+  } else {
+    df <- dplyr::ungroup(df)
+  }
 
   row_col <- subject_col
   col_col <- key_col
@@ -100,6 +109,7 @@ build_kmeans.kv_ <- function(df,
 
   build_kmeans_each <- function(df){
     mat <- simple_cast(df, row_col, col_col, value_col, fun.aggregate = fun.aggregate, fill=fill)
+    rownames(mat) <- NULL # this prevents warning about discarding row names of the matrix
     kmeans_ret <- tryCatch({
       kmeans(mat, centers = centers, iter.max = 10, nstart = nstart, algorithm = algorithm, trace = trace)},
       error = function(e){
@@ -160,13 +170,22 @@ build_kmeans.cols <- function(df, ...,
                             trace = FALSE,
                             keep.source = TRUE,
                             seed=0,
-                            augment=TRUE){
+                            augment=TRUE,
+                            with_dim_names = FALSE,
+                            group_cols = c()){
   loadNamespace("dplyr")
   loadNamespace("lazyeval")
   loadNamespace("tidyr")
   loadNamespace("broom")
   set.seed(seed)
   select_dots <- lazyeval::lazy_dots(...)
+
+  if(!is.null(group_cols)){
+    df <- dplyr::group_by_(df, .dots = group_cols)
+  } else {
+    df <- dplyr::ungroup(df)
+  }
+
   grouped_column <- grouped_by(df)
   model_column <- avoid_conflict(grouped_column, "model")
   source_column <- avoid_conflict(grouped_column, "source.data")
