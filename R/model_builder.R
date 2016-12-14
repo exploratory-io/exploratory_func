@@ -33,7 +33,7 @@ build_data <- function(funcname) {
 
 #' integrated build_kmeans
 #' @export
-build_kmeans <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0, with_dim_names = FALSE, group_cols = c()){
+build_kmeans <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0, group_cols = c()){
 
   if (!is.null(skv)) {
     #.kv pattern
@@ -41,10 +41,10 @@ build_kmeans <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0, with_d
       stop("length of skv has to be 2 or 3")
     }
     value <- if(length(skv) == 2) NULL else skv[[3]]
-    build_kmeans.kv_(df, skv[[1]], skv[[2]], value, fun.aggregate = fun.aggregate, fill = fill, with_dim_names = with_dim_names, group_cols = group_cols, ...)
+    build_kmeans.kv_(df, skv[[1]], skv[[2]], value, fun.aggregate = fun.aggregate, fill = fill, group_cols = group_cols, ...)
   } else {
     #.cols pattern
-    build_kmeans.cols(df, with_dim_names = with_dim_names, group_cols = group_cols, ...)
+    build_kmeans.cols(df, group_cols = group_cols, ...)
   }
 }
 
@@ -79,7 +79,6 @@ build_kmeans.kv_ <- function(df,
                              augment=TRUE,
                              fun.aggregate=mean,
                              fill=0,
-                             with_dim_names = FALSE,
                              group_cols = c()){
   loadNamespace("dplyr")
   loadNamespace("lazyeval")
@@ -171,7 +170,6 @@ build_kmeans.cols <- function(df, ...,
                             keep.source = TRUE,
                             seed=0,
                             augment=TRUE,
-                            with_dim_names = FALSE,
                             group_cols = c()){
   loadNamespace("dplyr")
   loadNamespace("lazyeval")

@@ -409,7 +409,7 @@ as_numeric_matrix_ <- function(df, columns){
   ret <- orig_mat %>%
     as.numeric() %>%
     matrix(nrow = nrow(df))
-
+  # set colnames because re-constructing matrix by as.numeric eraces column names
   colnames(ret) <- colnames(orig_mat)
   ret
 }

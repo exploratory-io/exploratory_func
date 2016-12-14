@@ -120,7 +120,8 @@ assign_cluster <- function(df, source_data){
 
   # drop unnecessary columns
   df <- dplyr::select(df, model)
-  # augment by trainig data
+  # augment data by each row
+  # ungroup is needed because grouping is reseted by bind_cols
   dplyr::bind_cols(df, source) %>%
     dplyr::ungroup() %>%
     dplyr::rowwise() %>%
