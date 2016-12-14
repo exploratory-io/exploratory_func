@@ -217,8 +217,7 @@ test_that("test build_kmeans.kv for grouped data frame as subject error", {
                      val = rep(0, 18))
   expect_error({
     ret <- data %>%
-      dplyr::group_by(group) %>%
-      build_kmeans.kv(group, col, val)
+      build_kmeans.kv(group, col, val, group_cols = "group")
   }, "group is a grouping column\\. ungroup\\(\\) may be necessary before this operation\\.")
 })
 

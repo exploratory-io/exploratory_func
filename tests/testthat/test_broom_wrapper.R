@@ -110,3 +110,38 @@ test_that("predict lm with new data", {
   confint_ret <- model_data %>% model_confint(level = 0.99)
   expect_equal(colnames(confint_ret), c("group", "Term", "Prob 0.5", "Prob 99.5"))
 })
+
+test_that("assign_cluster", {
+  test_df <- data.frame(
+    na=rep(c(NA, 5, 1, 4), 5),
+    group=paste("group",rep(c(1, 2, 3, 4), each=5), sep=""),
+    col=rep(seq(5), 4))
+  test_df <- dplyr::filter(test_df, group != "group2" | col != 4)
+  ret <- build_kmeans(test_df, skv = c("group", "col", "na"), fill = 1, augment = FALSE, keep.source = FALSE)
+
+  ret <- assign_cluster(ret, test_df)
+  expect_true(is.numeric(ret[["cluster"]]))
+})
+
+test_that("cluster_data", {
+  test_df_group1 <- data.frame(
+    with_na_group1 = rep(c(NA, 5, 1, 4), 5),
+    with_na_group2 = rep(c(4, 5, 1, 4), 5),
+    g = 1
+  )
+  test_df_group2 <- data.frame(
+    with_na_group1 = rep(c(4, 8, 1, 2), 5),
+    with_na_group2 = rep(c(NA, 5, 1, 4), 5),
+    g = 2
+  )
+  test_df <- dplyr::bind_rows(test_df_group1, test_df_group2)
+  kmeans_ret <- build_kmeans(test_df, with_na_group1, with_na_group2, fill = 1, augment = FALSE, keep.source = FALSE, group_cols = "g")
+  cluster_ret <- cluster_info(kmeans_ret)
+  expect_equal(colnames(cluster_ret), c("g", "Center with_na_group1", "Center with_na_group2", "Size",
+                                "Withinss"))
+
+  ret <- kmeans_info(kmeans_ret)
+  expect_equal(colnames(ret), c("g", "Total Sum of Squares", "Total Sum of Squares within Clusters",
+                                "Total Sum of Squares between Clusters", "Number of Iterations"
+  ))
+})

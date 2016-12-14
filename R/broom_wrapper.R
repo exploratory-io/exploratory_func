@@ -98,6 +98,68 @@ add_prediction <- function(df, model_df){
   broom::augment(model_df, model, newdata = df)
 }
 
+#' assign cluster number to each rows
+#' @export
+assign_cluster <- function(df, source_data){
+  df_cnames <- colnames(df)
+  # columns that are not model related are regarded as grouping column
+  grouping_col <- df_cnames[!df_cnames %in% c("model", "source.data")]
+
+  source <- if(any(colnames(source_data) %in% grouping_col)){
+    # nest the source data by each group
+    source_data %>%
+      dplyr::group_by_(.dots = grouping_col) %>%
+      tidyr::nest()
+  } else {
+    # put one value column so that all data can be nested
+    source_data %>%
+      dplyr::mutate(data = 1) %>%
+      dplyr::group_by(data) %>%
+      tidyr::nest()
+  }
+
+  # drop unnecessary columns
+  df <- dplyr::select(df, model)
+  # augment data by each row
+  # ungroup is needed because grouping is reseted by bind_cols
+  dplyr::bind_cols(df, source) %>%
+    dplyr::ungroup() %>%
+    dplyr::rowwise() %>%
+    predict(model, data = data)
+}
+
+#' tidy wrapper for kmeans
+#' @export
+cluster_info <- function(df){
+  # , col.names = names(model[["cluster"]])
+  ret <- df %>%
+    dplyr::ungroup() %>%
+    dplyr::mutate(model = purrr::map(model, function(m){
+      info <- data.frame(
+        Size = m$size,
+        Withinss = m$withinss
+      )
+      ret <- m$centers %>%
+        as.data.frame()
+      colnames(ret) <- paste("Center", colnames(ret))
+      ret <- ret %>%
+        dplyr::bind_cols(info)
+      ret
+    })) %>%
+    tidyr::unnest(model)
+}
+
+#' glance wrapper for kmeans
+#' @export
+kmeans_info <- function(df){
+  ret <- broom::glance(df, model)
+  colnames(ret)[colnames(ret) == "totss"] <- "Total Sum of Squares"
+  colnames(ret)[colnames(ret) == "tot.withinss"] <- "Total Sum of Squares within Clusters"
+  colnames(ret)[colnames(ret) == "betweenss"] <- "Total Sum of Squares between Clusters"
+  colnames(ret)[colnames(ret) == "iter"] <- "Number of Iterations"
+  ret
+}
+
 #' augment using source data and test index
 #' @param df Data frame that has model and .test_index
 #' @param source_data Data frame that has model and .test_index
