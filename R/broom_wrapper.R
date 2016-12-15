@@ -268,19 +268,29 @@ model_stats <- function(df){
   colnames(ret)[colnames(ret) == "logLik"] <- "Log Likelihood"
   colnames(ret)[colnames(ret) == "deviance"] <- "Deviance"
   colnames(ret)[colnames(ret) == "df.residual"] <- "Residual Degree of Freedom"
+  # for glm
+  colnames(ret)[colnames(ret) == "null.deviance"] <- "Null Deviance"
+  colnames(ret)[colnames(ret) == "df.null"] <- "Degree of Freedom for Null Model"
+
   ret
 }
 
 #' tidy after converting model to anova
 #' @export
 model_anova <- function(df){
-  ret <- df %>% dplyr::mutate(model = list(anova(model))) %>% broom::tidy(model)
+  ret <- suppressWarnings({
+    # this causes warning for Deviance, Resid..Df, Resid..Dev in glm model
+    df %>% dplyr::mutate(model = list(anova(model))) %>% broom::tidy(model)
+  })
   colnames(ret)[colnames(ret) == "term"] <- "Term"
   colnames(ret)[colnames(ret) == "sumsq"] <- "Sum of Squares"
   colnames(ret)[colnames(ret) == "meansq"] <- "Mean Square"
   colnames(ret)[colnames(ret) == "statistic"] <- "F Ratio"
   colnames(ret)[colnames(ret) == "p.value"] <- "Prob > F"
   colnames(ret)[colnames(ret) == "df"] <- "Degree of Freedom"
+  # for glm anova
+  colnames(ret)[colnames(ret) == "Resid..Df"] <- "Residual Degree of Freedom"
+  colnames(ret)[colnames(ret) == "Resid..Dev"] <- "Residual Deviance"
   ret
 }
 
