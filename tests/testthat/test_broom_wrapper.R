@@ -98,11 +98,9 @@ test_that("predict lm with new data", {
   expect_equal(colnames(coef_ret), c("group", "Term", "Estimate", "Std Error", "t Ratio", "Prob > |t|"))
 
   stats_ret <- model_data %>% model_stats()
-  expect_equal(colnames(stats_ret), c(
-    "group", "RSquare", "RSquare Adj", "Root Mean Square Error",
-    "F Ratio", "Prob > F", "Degree of Freedom", "Log Likelihood",
-    "AIC", "BIC", "Deviance", "Residual Degree of Freedom")
-    )
+  expect_equal(colnames(stats_ret), c("group", "RSquare", "RSquare Adj", "Root Mean Square Error",
+                                      "F Ratio", "Prob > F", "Degree of Freedom", "Log Likelihood",
+                                      "AIC", "BIC", "Deviance", "Residual Degree of Freedom"))
 
   anova_ret <- model_data %>% model_anova()
   expect_equal(colnames(anova_ret), c("group", "Term", "Degree of Freedom", "Sum of Squares", "Mean Square", "F Ratio", "Prob > F"))
