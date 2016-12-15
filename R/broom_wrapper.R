@@ -103,12 +103,19 @@ add_prediction <- function(df, model_df){
 assign_cluster <- function(df, source_data){
   df_cnames <- colnames(df)
   # columns that are not model related are regarded as grouping column
-  grouping_col <- df_cnames[!df_cnames %in% c("model", "source.data")]
+  grouping_cols <- df_cnames[!df_cnames %in% c("model", "source.data")]
 
-  source <- if(any(colnames(source_data) %in% grouping_col)){
+  # remove na from selected column (column names from cluster centers)
+  # without this, augment throws an error with different number of data
+  center_cnames <- colnames(df[["model"]][[1]]$centers)
+  for (center_cname in center_cnames) {
+    source_data <- source_data[!is.na(source_data[[center_cname]]), ]
+  }
+
+  source <- if(any(colnames(source_data) %in% grouping_cols)){
     # nest the source data by each group
     source_data %>%
-      dplyr::group_by_(.dots = grouping_col) %>%
+      dplyr::group_by_(.dots = grouping_cols) %>%
       tidyr::nest()
   } else {
     # put one value column so that all data can be nested
@@ -119,13 +126,26 @@ assign_cluster <- function(df, source_data){
   }
 
   # drop unnecessary columns
-  df <- dplyr::select(df, model)
+  df <- dplyr::select_(df, .dots = c("model", grouping_cols))
   # augment data by each row
   # ungroup is needed because grouping is reseted by bind_cols
-  dplyr::bind_cols(df, source) %>%
+
+  joined <- if(length(grouping_cols) > 0) {
+    # need this because do and nest has different row order,
+    # so grouping_col should be used for index
+    dplyr::inner_join(df, source, by = grouping_cols)
+  } else {
+    dplyr::bind_cols(df, source)
+  }
+
+  ret <- joined %>%
     dplyr::ungroup() %>%
     dplyr::rowwise() %>%
-    predict(model, data = data)
+    broom::augment(model, data = data)
+  # change factor to numeric
+  ret[[".cluster"]] <- as.numeric(ret[[".cluster"]])
+  colnames(ret)[colnames(ret) == ".cluster"] <- avoid_conflict(colnames(ret), "cluster")
+  ret
 }
 
 #' tidy wrapper for kmeans

@@ -117,7 +117,7 @@ test_that("assign_cluster", {
     group=paste("group",rep(c(1, 2, 3, 4), each=5), sep=""),
     col=rep(seq(5), 4))
   test_df <- dplyr::filter(test_df, group != "group2" | col != 4)
-  ret <- build_kmeans(test_df, skv = c("group", "col", "na"), fill = 1, augment = FALSE, keep.source = FALSE)
+  ret <- build_kmeans(test_df, na, col, fill = 1, augment = FALSE, keep.source = FALSE)
 
   ret <- assign_cluster(ret, test_df)
   expect_true(is.numeric(ret[["cluster"]]))
@@ -144,4 +144,7 @@ test_that("cluster_data", {
   expect_equal(colnames(ret), c("g", "Total Sum of Squares", "Total Sum of Squares within Clusters",
                                 "Total Sum of Squares between Clusters", "Number of Iterations"
   ))
+
+  assigned_ret <- kmeans_ret %>% assign_cluster(test_df)
+  expect_equal(colnames(assigned_ret), c("g", "with_na_group1", "with_na_group2", "cluster"))
 })
