@@ -334,10 +334,13 @@ getMongoCollectionNumberOfRows <- function(host, port, database, username, passw
 
 
 #' @export
-getDBConnection <- function(type, host, port, databaseName, username, password, catalog = "", schema = ""){
+getDBConnection <- function(type, host, port, databaseName, username, password, catalog = "", schema = "", dsn="", additionalParams = ""){
   if(!requireNamespace("RMySQL")){stop("package RMySQL must be installed.")}
   if(!requireNamespace("RPostgreSQL")){stop("package RPostgreSQL must be installed.")}
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
+  if(!requireNamespace("RPresto")){stop("package Presto must be installed.")}
+  if(!requireNamespace("RODBC")){stop("package RODBC must be installed.")}
+
   drv = NULL
   conn = NULL
   if(type == "mysql" || type == "aurora"){
@@ -356,6 +359,15 @@ getDBConnection <- function(type, host, port, databaseName, username, password, 
     loadNamespace("RPresto")
     drv <- RPresto::Presto()
     conn <- RPresto::dbConnect(drv, user = username, password = password, host = host, port = port, schema = schema, catalog = catalog, session.timezone = Sys.timezone(location = TRUE))
+  } else if (type == "odbc") {
+    loadNamespace("RODBC")
+    connstr <- stringr::str_c("RODBC::odbcConnect(dsn = '",dsn, "',uid = '", username, "', pwd = '", password, "'")
+    if(additionalParams == ""){
+      connstr <- stringr::str_c(connstr, ")")
+    } else {
+      connstr <- stringr::str_c(connstr, ",", additionalParams, ")")
+    }
+    conn <- eval(parse(text=connstr))
   }
   conn
 }
@@ -455,6 +467,27 @@ queryPostgres <- function(host, port, databaseName, username, password, numOfRow
   df <- DBI::dbFetch(resultSet, n = numOfRows)
   RPostgreSQL::dbClearResult(resultSet)
   RPostgreSQL::dbDisconnect(conn)
+  df
+}
+
+#' @export
+queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, query){
+  if(!requireNamespace("RODBC")){stop("package RODBC must be installed.")}
+  if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
+
+  # read stored password
+  pass = saveOrReadPassword("odbc", username, password)
+
+  loadNamespace("RODBC")
+  connstr <- stringr::str_c("RODBC::odbcConnect(dsn = '",dsn, "',uid = '", username, "', pwd = '", password, "'")
+  if(additionalParams == ""){
+    connstr <- stringr::str_c(connstr, ")")
+  } else {
+    connstr <- stringr::str_c(connstr, ",", additionalParams, ")")
+  }
+  conn <- eval(parse(text=connstr))
+  df <- RODBC::sqlQuery(conn, GetoptLong::qq(query), max = numOfRows)
+  RODBC::odbcClose(conn)
   df
 }
 
@@ -1050,7 +1083,7 @@ statecode <- function(input = input, output_type = output_type) {
   # lower case and get rid of space, period, apostrophe, and hiphen to normalize inputs.
   input_normalized <- gsub("[ \\.\\'\\-]", "", tolower(input))
   # return matching state info.
-  # state_name_id_map data frame has all those state info plus normalized_name as the search key. 
+  # state_name_id_map data frame has all those state info plus normalized_name as the search key.
   return (as.character(state_name_id_map[[output_type]][match(input_normalized, state_name_id_map$normalized_name)]))
 }
 
