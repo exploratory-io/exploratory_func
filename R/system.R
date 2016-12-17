@@ -475,9 +475,6 @@ queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, q
   if(!requireNamespace("RODBC")){stop("package RODBC must be installed.")}
   if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
 
-  # read stored password
-  pass = saveOrReadPassword("odbc", username, password)
-
   loadNamespace("RODBC")
   connstr <- stringr::str_c("RODBC::odbcConnect(dsn = '",dsn, "',uid = '", username, "', pwd = '", password, "'")
   if(additionalParams == ""){
