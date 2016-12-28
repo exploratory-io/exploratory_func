@@ -11,6 +11,7 @@ row_as_header <- function(df, row_index = 1, prefix = "", clean_names = TRUE){
   if (prefix != ""){
     names <- stringr::str_c(prefix, names)
   }
+  # remove a row based on row_index
   ret <- safe_slice(df, row_index, remove = TRUE)
   colnames(ret) <- names
   if (clean_names) {
