@@ -48,5 +48,6 @@ Suggests:
     urltools,
     slam,
     proxy,
-    topicmodels
+    topicmodels,
+    janitor
 RoxygenNote: 5.0.1
