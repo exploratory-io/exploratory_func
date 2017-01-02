@@ -2,7 +2,7 @@
 #' @param text Character vector to convert characters
 #' @param to "han" or "zen". "han" is for converting to halfwidth and "zen" is to halfwidth.
 #' @export
-convert_han_zen <- function(text, to = "han") {
+convert_zen_han <- function(text, to = "han") {
   loadNamespace("stringr")
   # list got from http://so-zou.jp/web-app/text/fullwidth-halfwidth/
   df <- data.frame(
