@@ -1,4 +1,5 @@
 #### Generate sentiment data
+library(exploratory)
 
 data("sentiments", package = "tidytext", envir = environment())
 data("stop_words", package = "tidytext", envir = environment())
@@ -25,11 +26,11 @@ stopwords_japanese <- httr::content(res) %>% stringr::str_split("\r\n")
 # ja_stopwrods is a list whose length is 1
 stopwords_japanese <- stopwords_japanese[[1]][!is_empty(stopwords_japanese[[1]])]
 
-stopwords_smart <- readRDS("data-raw/stopwords_smart.rds")
-stopwords_onix <- readRDS("data-raw/stopwords_onix.rds")
-stopwords_snowball <- readRDS("data-raw/stopwords_snowball.rds")
+stopwords_english_smart <- readRDS("data-raw/stopwords_smart.rds")
+stopwords_english_onix <- readRDS("data-raw/stopwords_onix.rds")
+stopwords_english_snowball <- readRDS("data-raw/stopwords_snowball.rds")
 
-if(all(!ja_stopwords %in% c("あなた", "いくつ", "いろいろ", "おまえ"))){
+if(all(!stopwords_japanese %in% c("あなた", "いくつ", "いろいろ", "おまえ"))){
   stop("stopwords_japanese seems strange")
 }
 
@@ -40,8 +41,8 @@ devtools::use_data(
   default_stopwords,
   exploratory_stopwords,
   stopwords_japanese,
-  stopwords_smart,
-  stopwords_onix,
-  stopwords_snowball,
+  stopwords_english_smart,
+  stopwords_english_onix,
+  stopwords_english_snowball,
   internal = TRUE,
   overwrite = TRUE)
