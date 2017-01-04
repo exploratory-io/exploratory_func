@@ -1,6 +1,6 @@
 #' Check if the token is in stopwords.
 #' @param token Character to be checked if it's stopword.
-#' @param lexicon Type of stopwords.
+#' @param lang Type of stopwords.
 #' One of
 #' "danish",
 #' "dutch",
