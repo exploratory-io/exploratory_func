@@ -8,8 +8,8 @@ test_that("is_stopword", {
   expect_equal(result, c(FALSE, TRUE, TRUE, FALSE))
 })
 
-test_that("check lexicons", {
-  lexicons <- c(
+test_that("check languages", {
+  languages <- c(
     "danish",
     "dutch",
     "english",
@@ -24,14 +24,14 @@ test_that("check lexicons", {
     "spanish",
     "swedish",
     "japanese",
-    "SMART",
-    "snowball",
-    "onix"
+    "english_SMART",
+    "english_snowball",
+    "english_onix"
   )
 
-  for (lexicon in lexicons){
+  for (lang in languages){
     # this should succeeds without error
-    get_stopwords(lexicon = lexicon)
+    get_stopwords(lang = lang)
   }
 })
 
