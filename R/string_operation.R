@@ -1,10 +1,13 @@
 #' Check if the token is in stopwords.
 #' @param token Character to be checked if it's stopword.
-#' @param lexicon Type of stopwords.
+#' @param lang Type of stopwords.
 #' One of
 #' "danish",
 #' "dutch",
 #' "english",
+#' "english_snowball",
+#' "english_smart",
+#' "english_onix",
 #' "finnish",
 #' "french",
 #' "german",
@@ -23,8 +26,8 @@
 #' @param exclude Values that should be excluded from stopwords
 #' @return Logical vector if the token is in stop words or not.
 #' @export
-is_stopword <- function(token, lexicon="english", include = c(), exclude = c()){
-  token %in% get_stopwords(lexicon, include = include, exclude = exclude)
+is_stopword <- function(token, lang = "english", include = c(), exclude = c()){
+  token %in% get_stopwords(lang, include = include, exclude = exclude)
 }
 
 #' Check if the word is digits.
@@ -45,11 +48,14 @@ is_alphabet <- function(word){
 }
 
 #' Get vector of stopwords
-#' @param lexicon Type of stopwords.
+#' @param lang Type of stopwords.
 #' One of
 #' "danish",
 #' "dutch",
 #' "english",
+#' "english_snowball",
+#' "english_smart",
+#' "english_onix",
 #' "finnish",
 #' "french",
 #' "german",
@@ -60,26 +66,23 @@ is_alphabet <- function(word){
 #' "portuguese",
 #' "russian",
 #' "spanish",
-#' "swedish",
-#' "smart",
-#' "snowball",
-#' "onix"
+#' "swedish"
 #' @param include Values that should be included as stop words
 #' @param exclude Values that should be excluded from stop words
 #' @return vector of stop words.
 #' @export
-get_stopwords <- function(lexicon = "english", include = c(), exclude = c()){
-  lexcon <- tolower(lexicon)
-  stopwords <- if (lexicon %in% c(
-    "snowball",
-    "onix",
-    "smart",
+get_stopwords <- function(lang = "english", include = c(), exclude = c()){
+  lang <- tolower(lang)
+  stopwords <- if (lang %in% c(
+    "english_snowball",
+    "english_onix",
+    "english_smart",
     "japanese")){
     # these data are created from data-raw/create_internal_data.R
-    get(paste0("stopwords_", lexicon))
+    get(paste0("stopwords_", lang))
   } else {
     loadNamespace("tm")
-    tm::stopwords(kind = lexicon)
+    tm::stopwords(kind = lang)
   }
 
   ret <- c(stopwords[!stopwords %in% exclude], include)
