@@ -215,7 +215,7 @@ prediction <- function(df, source_data, test = TRUE){
         safe_slice(df, index)
       })) %>%
       dplyr::mutate(data = purrr::map2(data, model, function(df, model){
-        # remove rows that has categories that aren't in training data
+        # remove rows that have categories that aren't in training data
         # otherwise, broom::augment causes an error
         filtered_data <- df
         for (cname in colnames(model$model)) {
