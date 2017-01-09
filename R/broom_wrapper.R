@@ -214,6 +214,15 @@ prediction <- function(df, source_data, test = TRUE){
         # keep data only in test_index
         safe_slice(df, index)
       })) %>%
+      dplyr::mutate(data = purrr::map2(data, model, function(df, model){
+        # remove rows that have categories that aren't in training data
+        # otherwise, broom::augment causes an error
+        filtered_data <- df
+        for (cname in colnames(model$model)) {
+          filtered_data <- filtered_data[filtered_data[[cname]] %in% model$model[[cname]], ]
+        }
+        filtered_data
+      })) %>%
       dplyr::select(-.test_index) %>%
       dplyr::rowwise() %>%
       dplyr::mutate(data = list(broom::augment(model, newdata = data))) %>%
