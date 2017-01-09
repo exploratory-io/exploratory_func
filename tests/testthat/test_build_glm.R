@@ -113,7 +113,7 @@ test_that("prediction with categorical columns", {
 
   # duplicate rows to make some predictable data
   # otherwise, the number of rows of the result of prediction becomes 0
-  test_data <- bind_rows(test_data, test_data)
+  test_data <- dplyr::bind_rows(test_data, test_data)
 
   model_data <- build_glm(test_data, CANCELLED ~ `Carrier Name` + CARRIER + DISTANCE, test_rate = 0.6)
 
