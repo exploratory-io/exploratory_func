@@ -12,8 +12,9 @@ test_that("do_cor with NA values", {
   vec[[55]] <- NA
   mat <- matrix(vec, nrow = nrow)
   melt_mat <- reshape2::melt(mat)
+  colnames(melt_mat)[[2]] <- "Var 2"
 
-  ret <- do_cor(melt_mat, skv = c("Var2", "Var1", "value"), diag = TRUE)
+  ret <- do_cor(melt_mat, skv = c("Var 2", "Var1", "value"), diag = TRUE)
 
   cor_ret <- cor(mat, use = "pairwise.complete.obs")
   melt_ret <- reshape2::melt(cor_ret)
