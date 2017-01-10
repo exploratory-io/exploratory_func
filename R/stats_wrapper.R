@@ -293,5 +293,7 @@ do_cmdscale_ <- function(df,
     ret
   }
 
-  (df %>%  dplyr::do_(.dots=setNames(list(~do_cmdscale_each(.)), pair1_col)) %>%  tidyr::unnest_(pair1_col))
+  df %>%
+    dplyr::do_(.dots=setNames(list(~do_cmdscale_each(.)), name_col)) %>%
+    tidyr::unnest_(name_col)
 }
