@@ -237,6 +237,7 @@ test_that("do_dist with NA values", {
   vec[[55]] <- NA
   mat <- matrix(vec, nrow = nrow)
   melt_mat <- reshape2::melt(mat)
+  # test column name with space
   colnames(melt_mat)[[2]] <- "Var 2"
 
   ret <- do_dist(melt_mat, skv = c("Var 2", "Var1", "value"), diag = TRUE)
