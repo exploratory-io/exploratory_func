@@ -145,4 +145,5 @@ test_that("cluster_data", {
 
   assigned_ret <- kmeans_ret %>% assign_cluster(test_df)
   expect_equal(colnames(assigned_ret), c("g", "with_na_group1", "with_na_group2", "cluster"))
+
 })
