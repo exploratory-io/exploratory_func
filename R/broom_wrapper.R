@@ -94,8 +94,33 @@ predict <- function(df, model, ...){
 
 #' apply data frame with model to a data frame
 #' @export
-add_prediction <- function(df, model_df){
-  broom::augment(model_df, model, newdata = df)
+add_prediction <- function(df, model_df, ...){
+
+  tryCatch({
+    broom::augment(model_df, model, newdata = df, ...)
+  }, error = function(e){
+    if (grepl("arguments imply differing number of rows: ", e$message)) {
+      # in this case, df has categories that aren't in model
+
+      filtered_data <- df
+
+      for(model in model_df[["model"]]){
+        # remove rows that have categories that aren't in model
+        # otherwise, broom::augment causes an error
+        for (cname in colnames(model$model)) {
+          filtered_data <- filtered_data[filtered_data[[cname]] %in% model$model[[cname]], ]
+        }
+      }
+
+      if (nrow(filtered_data) == 0) {
+        stop("not enough information to predict in data frame")
+      }
+
+      broom::augment(model_df, model, newdata = filtered_data, ...)
+    } else {
+      stop(e$message)
+    }
+  })
 }
 
 #' assign cluster number to each rows
@@ -210,34 +235,51 @@ prediction <- function(df, source_data, test = TRUE, ...){
 
   ret <- if(test){
     # augment by test data
+    # use formula to support expanded aug_args (especially for type.predict for logistic regression)
     aug_fml <- if(aug_args == ""){
       as.formula(paste0("~list(broom::augment(model, newdata = data))"))
     } else {
       as.formula(paste0("~list(broom::augment(model, newdata = data, ", aug_args, "))"))
     }
-    dplyr::bind_cols(df, source) %>%
+    data_to_augment <- dplyr::bind_cols(df, source) %>%
       dplyr::ungroup() %>%
       dplyr::mutate(data = purrr::map2(data, .test_index, function(df, index){
         # keep data only in test_index
         safe_slice(df, index)
       })) %>%
-      dplyr::mutate(data = purrr::map2(data, model, function(df, model){
-        # remove rows that have categories that aren't in training data
-        # otherwise, broom::augment causes an error
-        filtered_data <- df
-        for (cname in colnames(model$model)) {
-          filtered_data <- filtered_data[filtered_data[[cname]] %in% model$model[[cname]], ]
-        }
-        filtered_data
-      })) %>%
-      dplyr::select(-.test_index) %>%
-      dplyr::rowwise() %>%
-      dplyr::mutate_(.dots = list( data = aug_fml)) %>%
+      dplyr::select(-.test_index)
+
+
+    augmented <- tryCatch({
+      data_to_augment %>%
+        dplyr::rowwise() %>%
+        dplyr::mutate_(.dots = list( data = aug_fml))
+    }, error = function(e){
+      if (grepl("arguments imply differing number of rows: ", e$message)) {
+        data_to_augment %>%
+          dplyr::mutate(data = purrr::map2(data, model, function(df, model){
+            # remove rows that have categories that aren't in training data
+            # otherwise, broom::augment causes an error
+            filtered_data <- df
+            for (cname in colnames(model$model)) {
+              filtered_data <- filtered_data[filtered_data[[cname]] %in% model$model[[cname]], ]
+            }
+            filtered_data
+          })) %>%
+          dplyr::rowwise() %>%
+          dplyr::mutate_(.dots = list( data = aug_fml))
+      } else {
+        stop(e$message)
+      }
+    })
+
+    ret <- augmented %>%
       dplyr::select(-model) %>%
       tidyr::unnest(data)
+
   } else {
     # augment by trainig data
-
+    # use formula to support expanded aug_args (especially for type.predict for logistic regression)
     aug_fml <- if(aug_args == ""){
       as.formula(paste0("~list(broom::augment(model, data = data))"))
     } else {
