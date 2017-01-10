@@ -20,12 +20,15 @@ test_df$rand <- vapply(seq(nrow(test_df)), function(x){
 
 test_that("test do_cosine_sim.kv", {
   loadNamespace("dplyr")
+  df <- test_df
+  # test with a column name with a space
+  colnames(df)[1] <- "ro w"
   result <- (
-    test_df %>%
-      do_cosine_sim.kv(row, col, val)
+    df %>%
+      do_cosine_sim.kv(`ro w`, col, val)
   )
   # row1 and row2 pair result
-  expect_equal(colnames(result), c("row.x", "row.y", "value"))
+  expect_equal(colnames(result), c("ro w.x", "ro w.y", "value"))
   expect_equal(result[1, "value"][[1]], (1*4+2*5+3*6)/sqrt(1^2+2^2+3^2)/sqrt(4^2+5^2+6^2))
 })
 
@@ -222,4 +225,30 @@ test_that("test do_dist.kv for grouped data frame as subject error", {
       dplyr::group_by(group) %>%
       do_dist.kv(group, col, val)
   }, "group is a grouping column\\. ungroup\\(\\) may be necessary before this operation\\.")
+})
+
+test_that("do_dist with NA values", {
+  loadNamespace("reshape2")
+  nrow <- 10
+  ncol <- 20
+  vec <- rnorm(nrow * ncol)
+  vec[[3]] <- NA
+  vec[[30]] <- NA
+  vec[[55]] <- NA
+  mat <- matrix(vec, nrow = nrow)
+  melt_mat <- reshape2::melt(mat)
+  colnames(melt_mat)[[2]] <- "Var 2"
+
+  ret <- do_dist(melt_mat, skv = c("Var 2", "Var1", "value"), diag = TRUE)
+
+  dist_ret <- as.matrix(dist(t(mat)))
+  melt_ret <- reshape2::melt(dist_ret)
+
+  for(i in seq(ncol)){
+    for(j in seq(ncol)){
+      mat_answer <- dist_ret[i, j]
+      df_answer <- ret[ret[[1]] == i & ret[[2]] == j, 3][[1]]
+      expect_equal(mat_answer, df_answer)
+    }
+  }
 })

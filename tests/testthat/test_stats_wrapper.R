@@ -99,10 +99,12 @@ test_that("do_svd.kv with NA value", {
     dplyr::slice(-3)
   # this slice creates missing value by removing a row
 
+  colnames(data)[1] <- "ro w"
+
   # expect no error
-  do_svd.kv(data, row, col, val, fill=0)
+  do_svd.kv(data, `ro w`, col, val, fill=0)
   expect_error({
-    do_svd.kv(data, row, col, val, fill=NA)
+    do_svd.kv(data, `ro w`, col, val, fill=NA)
   }, "NA is not supported as value.")
 })
 

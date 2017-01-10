@@ -88,8 +88,11 @@ do_cor.kv_ <- function(df,
       ret <- mat_to_df(cor_mat, cnames=output_cols, diag=diag)
     }
   }
-
-  (df %>%  dplyr::do_(.dots=setNames(list(~do_cor_each(.)), output_cols[[1]])) %>%  tidyr::unnest_(output_cols[[1]]))
+  # Use cnames[[3]] for temp column name to avoid name conflict with grouped colum name
+  # and spaces in the column name (cnames[[1]] and cnames[[2]] might have them).
+  df %>%
+    dplyr::do_(.dots=setNames(list(~do_cor_each(.)), output_cols[[3]])) %>%
+    tidyr::unnest_(output_cols[[3]])
 }
 
 #'

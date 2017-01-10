@@ -59,8 +59,12 @@ test_that("test with 2 groups with 3 centers", {
     val = as.vector(rep(c(1,5), 3)),
     group = paste("group",rep(c(1, 2), each = 3), sep = ""),
     col = rep(seq(3), 2))
+
+  # test subject column name with a space
+  colnames(test_df)[2] <- "gro up"
+
   expect_error({
-    build_kmeans(test_df, skv = c("group", "col", "val"), centers = 2)
+    build_kmeans(test_df, skv = c("gro up", "col", "val"), centers = 2)
   }, "Centers should be less than unique subjects\\.")
 })
 
