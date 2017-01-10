@@ -103,10 +103,10 @@ add_prediction <- function(df, model_df, ...){
     broom::augment(model_df, model, newdata = df, ...)
   }, error = function(e){
     if (grepl("arguments imply differing number of rows: ", e$message)) {
-      # in this case, df has categories that aren't in model
+      # In this case, df has categories that aren't in model.
+      # For example, a model that was created by "category" column which has "a", "b"
+      # causes an error if df has "category" columnm which has "c".
 
-      # for example, a model that was created by "category" column which has "a", "b"
-      # causes an error if df has "category" columnm which has "c"
       filtered_data <- df
 
       for(model in model_df[["model"]]){
@@ -265,7 +265,8 @@ prediction <- function(df, source_data, test = TRUE, ...){
     augmented <- tryCatch({
       data_to_augment %>%
         dplyr::rowwise() %>%
-        dplyr::mutate_(.dots = list( data = aug_fml))
+        # evaluate the formula of augment and "data" column will have it
+        dplyr::mutate_(.dots = list(data = aug_fml))
     }, error = function(e){
       if (grepl("arguments imply differing number of rows: ", e$message)) {
         data_to_augment %>%
@@ -279,7 +280,8 @@ prediction <- function(df, source_data, test = TRUE, ...){
             filtered_data
           })) %>%
           dplyr::rowwise() %>%
-          dplyr::mutate_(.dots = list( data = aug_fml))
+          # evaluate the formula of augment and "data" column will have it
+          dplyr::mutate_(.dots = list(data = aug_fml))
       } else {
         stop(e$message)
       }
@@ -305,7 +307,8 @@ prediction <- function(df, source_data, test = TRUE, ...){
       })) %>%
       dplyr::select(-.test_index) %>%
       dplyr::rowwise() %>%
-      dplyr::mutate_(.dots = list( data = aug_fml)) %>%
+      # evaluate the formula of augment and "data" column will have it
+      dplyr::mutate_(.dots = list(data = aug_fml)) %>%
       dplyr::select(-model) %>%
       tidyr::unnest(data)
   }
