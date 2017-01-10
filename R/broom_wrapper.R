@@ -102,13 +102,18 @@ add_prediction <- function(df, model_df, ...){
     if (grepl("arguments imply differing number of rows: ", e$message)) {
       # in this case, df has categories that aren't in model
 
+      # for example, a model that was created by "category" column which has "a", "b"
+      # causes an error if df has "category" columnm which has "c"
       filtered_data <- df
 
       for(model in model_df[["model"]]){
         # remove rows that have categories that aren't in model
         # otherwise, broom::augment causes an error
         for (cname in colnames(model$model)) {
-          filtered_data <- filtered_data[filtered_data[[cname]] %in% model$model[[cname]], ]
+          # just filter categorical (not numeric) columns
+          if (!is.numeric(model$model[[cname]])){
+            filtered_data <- filtered_data[filtered_data[[cname]] %in% model$model[[cname]], ]
+          }
         }
       }
 
@@ -207,7 +212,7 @@ kmeans_info <- function(df){
 
 #' augment using source data and test index
 #' @param df Data frame that has model and .test_index
-#' @param source_data Data frame that has model and .test_index
+#' @param source_data Data frame used to create the model data
 #' @param test Test data or training data should be used as data
 #' @export
 prediction <- function(df, source_data, test = TRUE, ...){
@@ -230,14 +235,17 @@ prediction <- function(df, source_data, test = TRUE, ...){
 
   # drop unnecessary columns
   df <- dplyr::select(df, .test_index, model)
+
+  # parsing arguments of prediction and getting optional arguemnt for augment in ...
   cll <- match.call()
   aug_args <- expand_args(cll, exclude = c("df", "source_data", "test"))
 
   ret <- if(test){
     # augment by test data
     # use formula to support expanded aug_args (especially for type.predict for logistic regression)
+    # because ... can't be passed to a function inside mutate directly
     aug_fml <- if(aug_args == ""){
-      as.formula(paste0("~list(broom::augment(model, newdata = data))"))
+      as.formula("~list(broom::augment(model, newdata = data))")
     } else {
       as.formula(paste0("~list(broom::augment(model, newdata = data, ", aug_args, "))"))
     }
@@ -281,7 +289,7 @@ prediction <- function(df, source_data, test = TRUE, ...){
     # augment by trainig data
     # use formula to support expanded aug_args (especially for type.predict for logistic regression)
     aug_fml <- if(aug_args == ""){
-      as.formula(paste0("~list(broom::augment(model, data = data))"))
+      as.formula("~list(broom::augment(model, data = data))")
     } else {
       as.formula(paste0("~list(broom::augment(model, data = data, ", aug_args, "))"))
     }
