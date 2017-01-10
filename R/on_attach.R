@@ -1,15 +1,19 @@
 .onAttach <- function(...){
   # this loads dependency libraries for exploratory
   loading_libs <- c(
+    "haven",
+    "rvest",
+    "readxl",
+    "purrr",
     "janitor",
     "lubridate",
     "hms",
+    "jsonlite",
     "tidyr",
-    "urltools",
     "stringr",
-    "broom",
+    "readr",
     "RcppRoll",
-    "tibble",
+    "evaluate",
     "dplyr"
   )
   for (loading_lib in loading_libs) {
