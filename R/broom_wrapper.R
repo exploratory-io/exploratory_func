@@ -246,8 +246,10 @@ prediction <- function(df, source_data, test = TRUE, ...){
 
   ret <- if(test){
     # augment by test data
-    # use formula to support expanded aug_args (especially for type.predict for logistic regression)
-    # because ... can't be passed to a function inside mutate directly
+
+    # Use formula to support expanded aug_args (especially for type.predict for logistic regression)
+    # because ... can't be passed to a function inside mutate directly.
+    # If test is TRUE, this uses newdata as an argument and if not, uses data as an argument.
     aug_fml <- if(aug_args == ""){
       as.formula("~list(broom::augment(model, newdata = data))")
     } else {
@@ -293,8 +295,10 @@ prediction <- function(df, source_data, test = TRUE, ...){
 
   } else {
     # augment by trainig data
-    # use formula to support expanded aug_args (especially for type.predict for logistic regression)
-    # because ... can't be passed to a function inside mutate directly
+
+    # Use formula to support expanded aug_args (especially for type.predict for logistic regression)
+    # because ... can't be passed to a function inside mutate directly.
+    # If test is FALSE, this uses data as an argument and if not, uses newdata as an argument.
     aug_fml <- if(aug_args == ""){
       as.formula("~list(broom::augment(model, data = data))")
     } else {
