@@ -93,6 +93,9 @@ predict <- function(df, model, ...){
 }
 
 #' apply data frame with model to a data frame
+#' @param df Data frame to predict
+#' @param model_df Data frame that has model
+#' @param ... Additional argument to be passed to broom::augment
 #' @export
 add_prediction <- function(df, model_df, ...){
 
@@ -214,6 +217,7 @@ kmeans_info <- function(df){
 #' @param df Data frame that has model and .test_index
 #' @param source_data Data frame used to create the model data
 #' @param test Test data or training data should be used as data
+#' @param ... Additional argument to be passed to broom::augment
 #' @export
 prediction <- function(df, source_data, test = TRUE, ...){
   df_cnames <- colnames(df)
