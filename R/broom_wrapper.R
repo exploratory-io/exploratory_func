@@ -185,7 +185,7 @@ kmeans_info <- function(df){
 #' @param source_data Data frame that has model and .test_index
 #' @param test Test data or training data should be used as data
 #' @export
-prediction <- function(df, source_data, test = TRUE){
+prediction <- function(df, source_data, test = TRUE, ...){
   df_cnames <- colnames(df)
   # columns that are not model related are regarded as grouping column
   grouping_col <- df_cnames[!df_cnames %in% c("model", ".test_index", "source.data")]
@@ -205,9 +205,16 @@ prediction <- function(df, source_data, test = TRUE){
 
   # drop unnecessary columns
   df <- dplyr::select(df, .test_index, model)
+  cll <- match.call()
+  aug_args <- expand_args(cll, exclude = c("df", "source_data", "test"))
 
   ret <- if(test){
     # augment by test data
+    aug_fml <- if(aug_args == ""){
+      as.formula(paste0("~list(broom::augment(model, newdata = data))"))
+    } else {
+      as.formula(paste0("~list(broom::augment(model, newdata = data, ", aug_args, "))"))
+    }
     dplyr::bind_cols(df, source) %>%
       dplyr::ungroup() %>%
       dplyr::mutate(data = purrr::map2(data, .test_index, function(df, index){
@@ -225,11 +232,17 @@ prediction <- function(df, source_data, test = TRUE){
       })) %>%
       dplyr::select(-.test_index) %>%
       dplyr::rowwise() %>%
-      dplyr::mutate(data = list(broom::augment(model, newdata = data))) %>%
+      dplyr::mutate_(.dots = list( data = aug_fml)) %>%
       dplyr::select(-model) %>%
       tidyr::unnest(data)
   } else {
     # augment by trainig data
+
+    aug_fml <- if(aug_args == ""){
+      as.formula(paste0("~list(broom::augment(model, data = data))"))
+    } else {
+      as.formula(paste0("~list(broom::augment(model, data = data, ", aug_args, "))"))
+    }
     dplyr::bind_cols(df, source) %>%
       dplyr::ungroup() %>%
       dplyr::mutate(data = purrr::map2(data, .test_index, function(df, index){
@@ -238,7 +251,7 @@ prediction <- function(df, source_data, test = TRUE){
       })) %>%
       dplyr::select(-.test_index) %>%
       dplyr::rowwise() %>%
-      dplyr::mutate(data = list(broom::augment(model, data = data))) %>%
+      dplyr::mutate_(.dots = list( data = aug_fml)) %>%
       dplyr::select(-model) %>%
       tidyr::unnest(data)
   }
