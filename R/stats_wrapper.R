@@ -303,7 +303,7 @@ do_cmdscale_ <- function(df,
   # unnesting the result.
   # name_col is not conflicting with grouping columns
   # thanks to avoid_conflict that is used before,
-  # so this won't overwrite grouping columns.
+  # this doesn't overwrite grouping columns.
   df %>%
     dplyr::do_(.dots=setNames(list(~do_cmdscale_each(.)), name_col)) %>%
     tidyr::unnest_(name_col)
