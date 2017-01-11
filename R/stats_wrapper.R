@@ -1,6 +1,15 @@
 #'
 #'
 
+#' scale wrapper that returns a vector as a result
+#' @export
+scale_vec <- function(...) {
+  # scale returns a matrix even if the input is a vector
+  # it should be converted to a numeric vector by as.numeric
+  ret <- scale(...)
+  as.numeric(ret)
+}
+
 #' integrated do_cor
 #' @export
 do_cor <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0){

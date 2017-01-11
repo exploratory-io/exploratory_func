@@ -2,6 +2,13 @@ context("tests for wrappers of stats package")
 
 spread_test_df <- data.frame(var1 = c(1, 3, 2, NA), var2 = c(1, 3, 2, 10))
 
+test_that("test scale_vec", {
+  test_vec <- c(seq(10), NA, 10 - seq(10))
+  ans <- scale(test_vec) %>% as.numeric()
+  ret <- scale_vec(ans)
+  expect_equal(ans, ret)
+})
+
 test_that("do_cor with NA values", {
   loadNamespace("reshape2")
   nrow <- 10
