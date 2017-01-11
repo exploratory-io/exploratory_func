@@ -1,6 +1,13 @@
 #'
 #'
 
+#' scale wrapper that returns a vector as a result
+#' @export
+scale_vec <- function(...) {
+  ret <- scale(...)
+  as.numeric(ret)
+}
+
 #' integrated do_cor
 #' @export
 do_cor <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0){
