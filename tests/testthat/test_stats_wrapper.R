@@ -19,8 +19,9 @@ test_that("do_cor with NA values", {
   vec[[55]] <- NA
   mat <- matrix(vec, nrow = nrow)
   melt_mat <- reshape2::melt(mat)
+  colnames(melt_mat)[[2]] <- "Var 2"
 
-  ret <- do_cor(melt_mat, skv = c("Var2", "Var1", "value"), diag = TRUE)
+  ret <- do_cor(melt_mat, skv = c("Var 2", "Var1", "value"), diag = TRUE)
 
   cor_ret <- cor(mat, use = "pairwise.complete.obs")
   melt_ret <- reshape2::melt(cor_ret)
@@ -105,10 +106,12 @@ test_that("do_svd.kv with NA value", {
     dplyr::slice(-3)
   # this slice creates missing value by removing a row
 
+  colnames(data)[1] <- "ro w"
+
   # expect no error
-  do_svd.kv(data, row, col, val, fill=0)
+  do_svd.kv(data, `ro w`, col, val, fill=0)
   expect_error({
-    do_svd.kv(data, row, col, val, fill=NA)
+    do_svd.kv(data, `ro w`, col, val, fill=NA)
   }, "NA is not supported as value.")
 })
 
@@ -323,15 +326,17 @@ test_that("test do_cmdscale", {
   eig <- mds_result$eig
 
   test_df <- reshape2::melt(mat)
+  # test column name with space
+  colnames(test_df)[1] <- "Var 1"
 
-  df_tt <- do_dist.kv(test_df, Var1, Var2, value, distinct=TRUE ,diag=TRUE)
-  df_tf <- do_dist.kv(test_df, Var1, Var2, value, distinct=TRUE ,diag=FALSE)
-  df_ft <- do_dist.kv(test_df, Var1, Var2, value, distinct=FALSE ,diag=TRUE)
-  df_ff <- do_dist.kv(test_df, Var1, Var2, value, distinct=FALSE ,diag=FALSE)
-  ret_tt <- do_cmdscale(df_tt, Var1.x, Var1.y, value)
-  ret_tf <- do_cmdscale(df_tf, Var1.x, Var1.y, value)
-  ret_ft <- do_cmdscale(df_ft, Var1.x, Var1.y, value)
-  ret_ff <- do_cmdscale(df_ff, Var1.x, Var1.y, value)
+  df_tt <- do_dist.kv(test_df, `Var 1`, Var2, value, distinct=TRUE ,diag=TRUE)
+  df_tf <- do_dist.kv(test_df, `Var 1`, Var2, value, distinct=TRUE ,diag=FALSE)
+  df_ft <- do_dist.kv(test_df, `Var 1`, Var2, value, distinct=FALSE ,diag=TRUE)
+  df_ff <- do_dist.kv(test_df, `Var 1`, Var2, value, distinct=FALSE ,diag=FALSE)
+  ret_tt <- do_cmdscale(df_tt, `Var 1.x`, `Var 1.y`, value)
+  ret_tf <- do_cmdscale(df_tf, `Var 1.x`, `Var 1.y`, value)
+  ret_ft <- do_cmdscale(df_ft, `Var 1.x`, `Var 1.y`, value)
+  ret_ff <- do_cmdscale(df_ff, `Var 1.x`, `Var 1.y`, value)
   expect_equal(c(ret_tt[[2]], ret_tf[[2]], ret_ft[[2]], ret_ff[[2]]), setNames(rep(points[,1], 4), NULL))
 
   half_df <- distance %>% as.vector()  %>%  upper_gather(attr(distance, "Labels"), diag=TRUE)

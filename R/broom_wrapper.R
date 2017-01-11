@@ -93,9 +93,42 @@ predict <- function(df, model, ...){
 }
 
 #' apply data frame with model to a data frame
+#' @param df Data frame to predict
+#' @param model_df Data frame that has model
+#' @param ... Additional argument to be passed to broom::augment
 #' @export
-add_prediction <- function(df, model_df){
-  broom::augment(model_df, model, newdata = df)
+add_prediction <- function(df, model_df, ...){
+
+  tryCatch({
+    broom::augment(model_df, model, newdata = df, ...)
+  }, error = function(e){
+    if (grepl("arguments imply differing number of rows: ", e$message)) {
+      # In this case, df has categories that aren't in model.
+      # For example, a model that was created by "category" column which has "a", "b"
+      # causes an error if df has "category" columnm which has "c".
+
+      filtered_data <- df
+
+      for(model in model_df[["model"]]){
+        # remove rows that have categories that aren't in model
+        # otherwise, broom::augment causes an error
+        for (cname in colnames(model$model)) {
+          # just filter categorical (not numeric) columns
+          if (!is.numeric(model$model[[cname]])){
+            filtered_data <- filtered_data[filtered_data[[cname]] %in% model$model[[cname]], ]
+          }
+        }
+      }
+
+      if (nrow(filtered_data) == 0) {
+        stop("not enough information to predict in data frame")
+      }
+
+      broom::augment(model_df, model, newdata = filtered_data, ...)
+    } else {
+      stop(e$message)
+    }
+  })
 }
 
 #' assign cluster number to each rows
@@ -182,10 +215,11 @@ kmeans_info <- function(df){
 
 #' augment using source data and test index
 #' @param df Data frame that has model and .test_index
-#' @param source_data Data frame that has model and .test_index
+#' @param source_data Data frame used to create the model data
 #' @param test Test data or training data should be used as data
+#' @param ... Additional argument to be passed to broom::augment
 #' @export
-prediction <- function(df, source_data, test = TRUE){
+prediction <- function(df, source_data, test = TRUE, ...){
   df_cnames <- colnames(df)
   # columns that are not model related are regarded as grouping column
   grouping_col <- df_cnames[!df_cnames %in% c("model", ".test_index", "source.data")]
@@ -206,30 +240,70 @@ prediction <- function(df, source_data, test = TRUE){
   # drop unnecessary columns
   df <- dplyr::select(df, .test_index, model)
 
+  # parsing arguments of prediction and getting optional arguemnt for augment in ...
+  cll <- match.call()
+  aug_args <- expand_args(cll, exclude = c("df", "source_data", "test"))
+
   ret <- if(test){
     # augment by test data
-    dplyr::bind_cols(df, source) %>%
+
+    # Use formula to support expanded aug_args (especially for type.predict for logistic regression)
+    # because ... can't be passed to a function inside mutate directly.
+    # If test is TRUE, this uses newdata as an argument and if not, uses data as an argument.
+    aug_fml <- if(aug_args == ""){
+      as.formula("~list(broom::augment(model, newdata = data))")
+    } else {
+      as.formula(paste0("~list(broom::augment(model, newdata = data, ", aug_args, "))"))
+    }
+    data_to_augment <- dplyr::bind_cols(df, source) %>%
       dplyr::ungroup() %>%
       dplyr::mutate(data = purrr::map2(data, .test_index, function(df, index){
         # keep data only in test_index
         safe_slice(df, index)
       })) %>%
-      dplyr::mutate(data = purrr::map2(data, model, function(df, model){
-        # remove rows that have categories that aren't in training data
-        # otherwise, broom::augment causes an error
-        filtered_data <- df
-        for (cname in colnames(model$model)) {
-          filtered_data <- filtered_data[filtered_data[[cname]] %in% model$model[[cname]], ]
-        }
-        filtered_data
-      })) %>%
-      dplyr::select(-.test_index) %>%
-      dplyr::rowwise() %>%
-      dplyr::mutate(data = list(broom::augment(model, newdata = data))) %>%
+      dplyr::select(-.test_index)
+
+
+    augmented <- tryCatch({
+      data_to_augment %>%
+        dplyr::rowwise() %>%
+        # evaluate the formula of augment and "data" column will have it
+        dplyr::mutate_(.dots = list(data = aug_fml))
+    }, error = function(e){
+      if (grepl("arguments imply differing number of rows: ", e$message)) {
+        data_to_augment %>%
+          dplyr::mutate(data = purrr::map2(data, model, function(df, model){
+            # remove rows that have categories that aren't in training data
+            # otherwise, broom::augment causes an error
+            filtered_data <- df
+            for (cname in colnames(model$model)) {
+              filtered_data <- filtered_data[filtered_data[[cname]] %in% model$model[[cname]], ]
+            }
+            filtered_data
+          })) %>%
+          dplyr::rowwise() %>%
+          # evaluate the formula of augment and "data" column will have it
+          dplyr::mutate_(.dots = list(data = aug_fml))
+      } else {
+        stop(e$message)
+      }
+    })
+
+    ret <- augmented %>%
       dplyr::select(-model) %>%
       tidyr::unnest(data)
+
   } else {
     # augment by trainig data
+
+    # Use formula to support expanded aug_args (especially for type.predict for logistic regression)
+    # because ... can't be passed to a function inside mutate directly.
+    # If test is FALSE, this uses data as an argument and if not, uses newdata as an argument.
+    aug_fml <- if(aug_args == ""){
+      as.formula("~list(broom::augment(model, data = data))")
+    } else {
+      as.formula(paste0("~list(broom::augment(model, data = data, ", aug_args, "))"))
+    }
     dplyr::bind_cols(df, source) %>%
       dplyr::ungroup() %>%
       dplyr::mutate(data = purrr::map2(data, .test_index, function(df, index){
@@ -238,7 +312,8 @@ prediction <- function(df, source_data, test = TRUE){
       })) %>%
       dplyr::select(-.test_index) %>%
       dplyr::rowwise() %>%
-      dplyr::mutate(data = list(broom::augment(model, data = data))) %>%
+      # evaluate the formula of augment and "data" column will have it
+      dplyr::mutate_(.dots = list(data = aug_fml)) %>%
       dplyr::select(-model) %>%
       tidyr::unnest(data)
   }

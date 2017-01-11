@@ -115,10 +115,15 @@ test_that("prediction with categorical columns", {
   # otherwise, the number of rows of the result of prediction becomes 0
   test_data <- dplyr::bind_rows(test_data, test_data)
 
-  model_data <- build_glm(test_data, CANCELLED ~ `Carrier Name` + CARRIER + DISTANCE, test_rate = 0.6)
+  model_data <- build_glm(test_data, family = "binomial", CANCELLED ~ `Carrier Name` + CARRIER + DISTANCE, test_rate = 0.6)
 
-  ret <- prediction(model_data, test_data)
+  ret <- prediction(model_data, test_data, type.predict = "response")
   expect_true(nrow(ret) > 0)
+  expect_true(all(ret["Fitted"] >= 0 & ret["Fitted"] <= 1))
   expect_equal(colnames(ret), c("CANCELLED", "Carrier.Name", "CARRIER", "DISTANCE", "Fitted", "Standard Error"))
+
+  add_prediction_ret <- test_data %>% add_prediction(model_data, type.predict = "response")
+  expect_true(all(add_prediction_ret[".fitted"] >= 0 & add_prediction_ret[".fitted"] <= 1))
+
 })
 

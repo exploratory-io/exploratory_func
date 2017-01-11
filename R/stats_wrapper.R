@@ -95,8 +95,16 @@ do_cor.kv_ <- function(df,
       ret <- mat_to_df(cor_mat, cnames=output_cols, diag=diag)
     }
   }
-
-  (df %>%  dplyr::do_(.dots=setNames(list(~do_cor_each(.)), output_cols[[1]])) %>%  tidyr::unnest_(output_cols[[1]]))
+  # Calculation is executed in each group.
+  # Storing the result in this tmp_col and
+  # unnesting the result.
+  # If the original data frame is grouped by "tmp",
+  # overwriting it should be avoided,
+  # so avoid_conflict is used here.
+  tmp_col <- avoid_conflict(grouped_col, "tmp")
+  df %>%
+    dplyr::do_(.dots=setNames(list(~do_cor_each(.)), tmp_col)) %>%
+    tidyr::unnest_(tmp_col)
 }
 
 #'
@@ -297,5 +305,13 @@ do_cmdscale_ <- function(df,
     ret
   }
 
-  (df %>%  dplyr::do_(.dots=setNames(list(~do_cmdscale_each(.)), pair1_col)) %>%  tidyr::unnest_(pair1_col))
+  # Calculation is executed in each group.
+  # Storing the result in this name_col and
+  # unnesting the result.
+  # name_col is not conflicting with grouping columns
+  # thanks to avoid_conflict that is used before,
+  # this doesn't overwrite grouping columns.
+  df %>%
+    dplyr::do_(.dots=setNames(list(~do_cmdscale_each(.)), name_col)) %>%
+    tidyr::unnest_(name_col)
 }
