@@ -50,7 +50,16 @@ do_cosine_sim.kv <- function(df, subject, key, value = NULL, distinct=FALSE, dia
     df
   }
 
-  (df %>% dplyr::do_(.dots=setNames(list(~calc_doc_sim_each(.)), cnames[[1]])) %>%  tidyr::unnest_(cnames[[1]]))
+  # Calculation is executed in each group.
+  # Storing the result in this tmp_col and
+  # unnesting the result.
+  # If the original data frame is grouped by "tmp",
+  # overwriting it should be avoided,
+  # so avoid_conflict is used here.
+  tmp_col <- avoid_conflict(grouped_column, "tmp")
+  df %>%
+    dplyr::do_(.dots=setNames(list(~calc_doc_sim_each(.)), tmp_col)) %>%
+    tidyr::unnest_(tmp_col)
 
 }
 
@@ -149,7 +158,16 @@ do_dist.kv_ <- function(df,
     }
     ret
   }
-  (df %>% dplyr::do_(.dots=setNames(list(~calc_dist_each(.)), cnames[[1]])) %>%  tidyr::unnest_(cnames[[1]]))
+  # Calculation is executed in each group.
+  # Storing the result in this tmp_col and
+  # unnesting the result.
+  # If the original data frame is grouped by "tmp",
+  # overwriting it should be avoided,
+  # so avoid_conflict is used here.
+  tmp_col <- avoid_conflict(grouped_column, "tmp")
+  df %>%
+    dplyr::do_(.dots=setNames(list(~calc_dist_each(.)), tmp_col)) %>%
+    tidyr::unnest_(tmp_col)
 }
 
 #' A symmetric version of KL-divergence
