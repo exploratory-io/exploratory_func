@@ -26,7 +26,8 @@ Imports:
     quanteda,
     Matrix,
     rvest,
-    stats
+    stats,
+    urltools
 Suggests:
     testthat,
     twitteR,
@@ -45,7 +46,6 @@ Suggests:
     GetoptLong,
     gtrendsR,
     arules,
-    urltools,
     slam,
     proxy,
     topicmodels,
