@@ -118,9 +118,14 @@ test_that("prediction with categorical columns", {
   model_data <- build_glm(test_data, family = "binomial", CANCELLED ~ `Carrier Name` + CARRIER + DISTANCE, test_rate = 0.6)
 
   ret <- prediction(model_data, test_data, type.predict = "response")
+  both_ret <- prediction(model_data, test_data)
+
   expect_true(nrow(ret) > 0)
   expect_true(all(ret["Fitted"] >= 0 & ret["Fitted"] <= 1))
   expect_equal(colnames(ret), c("CANCELLED", "Carrier.Name", "CARRIER", "DISTANCE", "Fitted", "Standard Error"))
+
+  expect_true(all(both_ret["Fitted.response"] >= 0 & both_ret["Fitted.response"] <= 1))
+  expect_equal(colnames(both_ret), c("CANCELLED", "Carrier.Name", "CARRIER", "DISTANCE", "Fitted.link", "Fitted.response", "Standard Error"))
 
   add_prediction_ret <- test_data %>% add_prediction(model_data, type.predict = "response")
   expect_true(all(add_prediction_ret[".fitted"] >= 0 & add_prediction_ret[".fitted"] <= 1))
