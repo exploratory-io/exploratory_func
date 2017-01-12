@@ -81,7 +81,7 @@ test_that("predict lm with new data", {
   fit <- add_df %>% dplyr::group_by(group) %>% add_prediction(model_df = model_data)
 
   expect_equal(nrow(fit), 20 * 2)
-  expect_equal(names(fit), c("model.group", "group", "num1", "num2", ".fitted", ".se.fit"))
+  expect_equal(names(fit), c("model.group", "group", "num1", "num2", "fitted", "se.fit"))
 })
 
 test_that("predict lm with new data", {
