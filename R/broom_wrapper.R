@@ -167,6 +167,7 @@ add_prediction <- function(df, model_df, ...){
       stop(e$message)
     }
   })
+  # update column name based on both link and response are there for fitted values
   fitted_label <- if("fitted.response" %in% colnames(ret)){
     "fitted.link"
   } else {
@@ -371,6 +372,7 @@ prediction <- function(df, source_data, test = TRUE, ...){
       dplyr::select(-model) %>%
       tidyr::unnest(data)
   }
+  # update column name based on both link and response are there for fitted values
   fitted_label <- if("Fitted.response" %in% colnames(ret)){
     "Fitted.link"
   } else {
