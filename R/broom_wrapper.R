@@ -289,6 +289,21 @@ prediction <- function(df, source_data, test = TRUE, ...){
       }
     })
 
+    if (!("type.predict" %in% names(cll)) & !is.null(augmented[["model"]][[1]]$family) & !is.null(augmented[["model"]][[1]]$family$linkinv)){
+      augmented <- augmented %>%
+        dplyr::ungroup() %>%
+        dplyr::mutate(data = purrr::map2(data, model, function(d, m){
+          if (!is.null(m$family)) {
+            if(!is.null(m$family$linkinv)) {
+              d[["Fitted.response"]] <- m$family$linkinv(d[[".fitted"]])
+              d <- d[, c(colnames(d)[seq(ncol(d)-2)], "Fitted.response", ".se.fit")]
+            }
+          }
+          d
+        })) %>%
+        dplyr::rowwise()
+    }
+
     ret <- augmented %>%
       dplyr::select(-model) %>%
       tidyr::unnest(data)
@@ -317,7 +332,13 @@ prediction <- function(df, source_data, test = TRUE, ...){
       dplyr::select(-model) %>%
       tidyr::unnest(data)
   }
-  colnames(ret)[colnames(ret) == ".fitted"] <- avoid_conflict(colnames(ret), "Fitted")
+  fitted_label <- if("Fitted.response" %in% colnames(ret)){
+    "Fitted.link"
+  } else {
+    "Fitted"
+  }
+
+  colnames(ret)[colnames(ret) == ".fitted"] <- avoid_conflict(colnames(ret), fitted_label)
   colnames(ret)[colnames(ret) == ".se.fit"] <- avoid_conflict(colnames(ret), "Standard Error")
   colnames(ret)[colnames(ret) == ".resid"] <- avoid_conflict(colnames(ret), "Residuals")
   colnames(ret)[colnames(ret) == ".hat"] <- avoid_conflict(colnames(ret), "Hat")
