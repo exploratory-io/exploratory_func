@@ -122,7 +122,7 @@ add_prediction <- function(df, model_df, ...){
       tidyr::unnest(.test_index)
   }
 
-  # if there is not type.predict argument
+  # if type.predict argument is not indicated in this function
   # and models have $family$linkinv (basically, glm models have it),
   # both fitted link value column and response value column should appear in the result
   with_response <- !("type.predict" %in% names(cll)) & !is.null(model_df[["model"]][[1]]$family) & !is.null(model_df[["model"]][[1]]$family$linkinv)
@@ -337,6 +337,9 @@ prediction <- function(df, source_data, test = TRUE, ...){
       }
     })
 
+    # if type.predict argument is not indicated in this function
+    # and models have $family$linkinv (basically, glm models have it),
+    # both fitted link value column and response value column should appear in the result
     if (!("type.predict" %in% names(cll)) & !is.null(augmented[["model"]][[1]]$family) & !is.null(augmented[["model"]][[1]]$family$linkinv)){
       augmented <- augmented %>%
         dplyr::ungroup() %>%
