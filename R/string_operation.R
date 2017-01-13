@@ -119,7 +119,7 @@ word_to_sentiment <- function(words, lexicon="bing"){
 #' @param keep_cols Whether existing columns should be kept or not
 #' @return Data frame with tokenized column
 #' @export
-do_tokenize <- function(df, input, output = token, token = "words", drop = TRUE, with_id = TRUE, keep_cols = FALSE, ...){
+do_tokenize <- function(df, input, token = "words", keep_cols = FALSE,  drop = TRUE, with_id = TRUE, output = token, ...){
   loadNamespace("tidytext")
   loadNamespace("stringr")
 
