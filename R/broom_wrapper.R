@@ -292,6 +292,11 @@ prediction <- function(df, source_data, test = TRUE, ...){
   cll <- match.call()
   aug_args <- expand_args(cll, exclude = c("df", "source_data", "test"))
 
+  # if type.predict argument is not indicated in this function
+  # and models have $family$linkinv (basically, glm models have it),
+  # both fitted link value column and response value column should appear in the result
+  with_response <- !("type.predict" %in% names(cll)) & !is.null(df[["model"]][[1]]$family) & !is.null(df[["model"]][[1]]$family$linkinv)
+
   ret <- if(test){
     # augment by test data
 
@@ -310,7 +315,6 @@ prediction <- function(df, source_data, test = TRUE, ...){
         safe_slice(df, index)
       })) %>%
       dplyr::select(-.test_index)
-
 
     augmented <- tryCatch({
       data_to_augment %>%
@@ -337,10 +341,7 @@ prediction <- function(df, source_data, test = TRUE, ...){
       }
     })
 
-    # if type.predict argument is not indicated in this function
-    # and models have $family$linkinv (basically, glm models have it),
-    # both fitted link value column and response value column should appear in the result
-    if (!("type.predict" %in% names(cll)) & !is.null(augmented[["model"]][[1]]$family) & !is.null(augmented[["model"]][[1]]$family$linkinv)){
+    if (with_response){
       augmented <- augmented %>%
         dplyr::ungroup() %>%
         dplyr::mutate(data = purrr::map2(data, model, add_response)) %>%
@@ -362,7 +363,7 @@ prediction <- function(df, source_data, test = TRUE, ...){
     } else {
       as.formula(paste0("~list(broom::augment(model, data = data, ", aug_args, "))"))
     }
-    dplyr::bind_cols(df, source) %>%
+    augmented <- dplyr::bind_cols(df, source) %>%
       dplyr::ungroup() %>%
       dplyr::mutate(data = purrr::map2(data, .test_index, function(df, index){
         # remove data in test_index
@@ -371,7 +372,16 @@ prediction <- function(df, source_data, test = TRUE, ...){
       dplyr::select(-.test_index) %>%
       dplyr::rowwise() %>%
       # evaluate the formula of augment and "data" column will have it
-      dplyr::mutate_(.dots = list(data = aug_fml)) %>%
+      dplyr::mutate_(.dots = list(data = aug_fml))
+
+    if (with_response){
+      augmented <- augmented %>%
+        dplyr::ungroup() %>%
+        dplyr::mutate(data = purrr::map2(data, model, add_response)) %>%
+        dplyr::rowwise()
+    }
+
+    augmented %>%
       dplyr::select(-model) %>%
       tidyr::unnest(data)
   }

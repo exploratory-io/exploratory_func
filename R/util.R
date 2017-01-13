@@ -496,7 +496,69 @@ add_response <- function(data, model, response_label = "Fitted.response"){
   # fitted values are converted to response values through inverse link function
   # for example, inverse of logit function is used for logistic regression
   data[[response_label]] <- model$family$linkinv(data[[".fitted"]])
-  # set response_label next to .fitted (swapping response_label and ".se.fit")
-  data <- data[, c(colnames(data)[seq(ncol(data)-2)], response_label, ".se.fit")]
+  # set response_label next to .fitted
+  fitted_posi <- which(colnames(data) == ".fitted")
+  data <- move_col(data, response_label, fitted_posi)
   data
+}
+
+#' move a column to a different index
+#' @param df Data frame whose column will be moved
+#' @param cname Column name to be moved
+#' @param position Column index to move to
+move_col <- function(df, cname, position){
+  # get column index to move
+  cname_posi = which(colnames(df) == cname)
+  if(length(cname_posi) == 0){
+    stop("no column matches cname")
+  }else if (length(cname_posi) > 1){
+    stop("duplicated cname is indicated")
+  }
+
+  if(cname_posi == position){
+    # no change in this case
+    ret <- df
+  } else {
+    # create a new index for columns
+    # for example, suppose 8th column goes to 3rd column in 10 columns
+    # 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
+    # should be
+    # 1, 2, 8, 3, 4, 5, 6, 7, 9, 10
+    # in this case,
+    # 1, 2 are regarded as start below
+    # 8, 3, 4, 5, 6, 7 are regarded as inside below
+    # 9, 10 are regarded as end below
+
+    vec = seq(ncol(df))
+    n <- cname_posi
+    m <- position
+
+    start <- if(n == 1 | m == 1){
+      # start should be empty in this case
+      c()
+    } else {
+      seq(min(c(n, m)) - 1)
+    }
+
+    inside <- if (n>m) {
+      # n comes to left in this case
+      c(n, m:(n-1))
+    } else {
+      # n comes to right in this case
+      c((n+1):m, n)
+    }
+
+    end <- if( n == length(vec) | m == length(vec)){
+      # end should be empty in this case
+      c()
+    } else {
+      (max(c(n, m))+1):length(vec)
+    }
+
+    order <- c(start, inside, end)
+
+    ret <- df[, order]
+  }
+
+  ret
 }
