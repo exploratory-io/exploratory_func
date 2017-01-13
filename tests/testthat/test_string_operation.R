@@ -77,16 +77,38 @@ test_that("test word_to_sentiment to groupd_df", {
   expect_true(is.character(ret[["sent"]]))
 })
 
-test_that("do_tokenize with drop=F", {
+test_that("do_tokenize with drop=FALSE", {
   result <- test_df %>%
     do_tokenize(char, drop=F)
   expect_equal(result$token[[1]], "hello")
   expect_equal(ncol(result), 4)
 })
 
+test_that("do_tokenize with keep_cols = TRUE", {
+  test_df <- data.frame(
+    char = c("Hello world!", "This is a data frame for test. This is second sentence."),
+    extra_col = seq(2),
+    stringsAsFactors = FALSE)
+  result <- test_df %>%
+    do_tokenize(char, keep_cols = TRUE, drop = TRUE)
+  expect_equal(result$token[[1]], "hello")
+  expect_equal(ncol(result), 4)
+})
+
+test_that("do_tokenize with keep_cols = TRUE with sentences", {
+  test_df <- data.frame(
+    char = c("Hello world!", "This is a data frame for test. This is second sentence."),
+    extra_col = seq(2),
+    stringsAsFactors = FALSE)
+  result <- test_df %>%
+    do_tokenize(char, drop=FALSE, token = "sentences", keep_cols = TRUE)
+  expect_equal(result$token[[1]], "hello world!")
+  expect_equal(ncol(result), 3)
+})
+
 test_that("do_tokenize with token=words", {
   result <- test_df %>%
-    do_tokenize(char, token="words")
+    do_tokenize(char, token="words", keep_cols = TRUE)
   expect_equal(result$token[[1]], "hello")
   expect_equal(ncol(result), 3)
 })
@@ -95,7 +117,7 @@ test_that("do_tokenize when names conflict", {
   df <- test_df
   df$document_id <- seq(nrow(df))
   result <- df %>%
-    do_tokenize(char, token="words")
+    do_tokenize(char, token="words", keep_cols = TRUE)
   expect_equal(result$token[[1]], "hello")
   expect_equal(ncol(result), 4)
   expect_equal(colnames(result)[[2]],"document_id.new")

@@ -111,14 +111,15 @@ word_to_sentiment <- function(words, lexicon="bing"){
 #' Tokenize text and unnest
 #' @param df Data frame
 #' @param input Set a column of which you want to split the text or tokenize.
-#' @param output Set a column name for the new column to store the tokenized values.
 #' @param token Select the unit of token from "characters", "words", "sentences", "lines", "paragraphs", and "regex".
+#' @param keep_cols Whether existing columns should be kept or not
 #' @param drop Whether input column should be removed.
-#' @param to_lower Whether output should be lower cased.
 #' @param with_id Whether output should contain original document id and sentence id in each document.
+#' @param output Set a column name for the new column to store the tokenized values.
+#' @param to_lower Whether output should be lower cased.
 #' @return Data frame with tokenized column
 #' @export
-do_tokenize <- function(df, input, output=token, token="words", drop=TRUE, with_id=TRUE, ...){
+do_tokenize <- function(df, input, token = "words", keep_cols = FALSE,  drop = TRUE, with_id = TRUE, output = token, ...){
   loadNamespace("tidytext")
   loadNamespace("stringr")
 
@@ -126,6 +127,11 @@ do_tokenize <- function(df, input, output=token, token="words", drop=TRUE, with_
   output_col <- avoid_conflict(colnames(df), col_name(substitute(output)))
   # This is to prevent encoding error
   df[[input_col]] <- stringr::str_conv(df[[input_col]], "utf-8")
+
+  if(!keep_cols){
+    # keep only a column to tokenize
+    df <- df[input_col]
+  }
   if(token=="words" && with_id){
     loadNamespace("dplyr")
 
