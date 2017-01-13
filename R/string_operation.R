@@ -111,12 +111,12 @@ word_to_sentiment <- function(words, lexicon="bing"){
 #' Tokenize text and unnest
 #' @param df Data frame
 #' @param input Set a column of which you want to split the text or tokenize.
-#' @param output Set a column name for the new column to store the tokenized values.
 #' @param token Select the unit of token from "characters", "words", "sentences", "lines", "paragraphs", and "regex".
-#' @param drop Whether input column should be removed.
-#' @param to_lower Whether output should be lower cased.
-#' @param with_id Whether output should contain original document id and sentence id in each document.
 #' @param keep_cols Whether existing columns should be kept or not
+#' @param drop Whether input column should be removed.
+#' @param with_id Whether output should contain original document id and sentence id in each document.
+#' @param output Set a column name for the new column to store the tokenized values.
+#' @param to_lower Whether output should be lower cased.
 #' @return Data frame with tokenized column
 #' @export
 do_tokenize <- function(df, input, token = "words", keep_cols = FALSE,  drop = TRUE, with_id = TRUE, output = token, ...){
