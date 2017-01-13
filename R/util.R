@@ -565,6 +565,7 @@ move_col <- function(df, cname, position){
 
 #' numeric to date from excel format or unix time
 #' @param data Numeric vector to convert to date
+#' @param type "excel" or "unix". type of numeric date
 #' @param output "date" or "datetime" to return
 #' @param ... Additional parameter to be passed to janitor::excel_numeric_to_date if type is excel
 #' @export
