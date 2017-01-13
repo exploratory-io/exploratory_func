@@ -344,8 +344,7 @@ prediction <- function(df, source_data, test = TRUE, ...){
     if (with_response){
       augmented <- augmented %>%
         dplyr::ungroup() %>%
-        dplyr::mutate(data = purrr::map2(data, model, add_response)) %>%
-        dplyr::rowwise()
+        dplyr::mutate(data = purrr::map2(data, model, add_response))
     }
 
     ret <- augmented %>%
