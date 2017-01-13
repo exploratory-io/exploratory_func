@@ -116,9 +116,10 @@ word_to_sentiment <- function(words, lexicon="bing"){
 #' @param drop Whether input column should be removed.
 #' @param to_lower Whether output should be lower cased.
 #' @param with_id Whether output should contain original document id and sentence id in each document.
+#' @param keep_cols Whether existing columns should be kept or not
 #' @return Data frame with tokenized column
 #' @export
-do_tokenize <- function(df, input, output=token, token="words", drop=TRUE, with_id=TRUE, ...){
+do_tokenize <- function(df, input, output = token, token = "words", drop = TRUE, with_id = TRUE, keep_cols = FALSE, ...){
   loadNamespace("tidytext")
   loadNamespace("stringr")
 
@@ -126,6 +127,9 @@ do_tokenize <- function(df, input, output=token, token="words", drop=TRUE, with_
   output_col <- avoid_conflict(colnames(df), col_name(substitute(output)))
   # This is to prevent encoding error
   df[[input_col]] <- stringr::str_conv(df[[input_col]], "utf-8")
+  if(!keep_cols){
+    df <- df[input_col]
+  }
   if(token=="words" && with_id){
     loadNamespace("dplyr")
 
