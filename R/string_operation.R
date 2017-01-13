@@ -127,7 +127,9 @@ do_tokenize <- function(df, input, output = token, token = "words", drop = TRUE,
   output_col <- avoid_conflict(colnames(df), col_name(substitute(output)))
   # This is to prevent encoding error
   df[[input_col]] <- stringr::str_conv(df[[input_col]], "utf-8")
+
   if(!keep_cols){
+    # keep only a column to tokenize
     df <- df[input_col]
   }
   if(token=="words" && with_id){
