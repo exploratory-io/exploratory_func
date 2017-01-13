@@ -98,9 +98,42 @@ predict <- function(df, model, ...){
 #' @param ... Additional argument to be passed to broom::augment
 #' @export
 add_prediction <- function(df, model_df, ...){
+  # parsing arguments of add_prediction and getting optional arguemnt for augment in ...
+  cll <- match.call()
+  aug_args <- expand_args(cll, exclude = c("df", "model_df"))
 
-  tryCatch({
-    broom::augment(model_df, model, newdata = df, ...)
+  get_result_with_response <- function(model_df, df, aug_args){
+    # Use formula to support expanded aug_args (especially for type.predict for logistic regression)
+    # because ... can't be passed to a function inside mutate directly.
+    aug_fml <- if(aug_args == ""){
+      as.formula("~list(broom::augment(model, newdata = df))")
+    } else {
+      as.formula(paste0("~list(broom::augment(model, newdata = df, ", aug_args, "))"))
+    }
+    model_df %>%
+      # result of aug_fml will be stored in .text_index column
+      # .test_index is used because model_df has it and won't be used here
+      dplyr::mutate_(.dots = list(.test_index = aug_fml)) %>%
+      dplyr::ungroup() %>%
+      dplyr::mutate(.test_index = purrr::map2(.test_index, model, function(d, m){
+        # add fitted.response to the result data frame
+        add_response(d, m, "fitted.response")
+      })) %>%
+      tidyr::unnest(.test_index)
+  }
+
+  # if type.predict argument is not indicated in this function
+  # and models have $family$linkinv (basically, glm models have it),
+  # both fitted link value column and response value column should appear in the result
+  with_response <- !("type.predict" %in% names(cll)) & !is.null(model_df[["model"]][[1]]$family) & !is.null(model_df[["model"]][[1]]$family$linkinv)
+
+  ret <- tryCatch({
+    if(with_response){
+      # this function is defined beforehand to avoid code duplication
+      get_result_with_response(model_df, df, aug_args)
+    } else {
+      broom::augment(model_df, model, newdata = df, ...)
+    }
   }, error = function(e){
     if (grepl("arguments imply differing number of rows: ", e$message)) {
       # In this case, df has categories that aren't in model.
@@ -124,11 +157,26 @@ add_prediction <- function(df, model_df, ...){
         stop("not enough information to predict in data frame")
       }
 
-      broom::augment(model_df, model, newdata = filtered_data, ...)
+      if(with_response){
+        # this function is defined beforehand to avoid code duplication
+        get_result_with_response(model_df, filtered_data, aug_args)
+      } else {
+        broom::augment(model_df, model, newdata = filtered_data, ...)
+      }
     } else {
       stop(e$message)
     }
   })
+  # update column name based on both link and response are there for fitted values
+  fitted_label <- if("fitted.response" %in% colnames(ret)){
+    "fitted.link"
+  } else {
+    "fitted"
+  }
+  colnames(ret)[colnames(ret) == ".fitted"] <- avoid_conflict(colnames(ret), fitted_label)
+  colnames(ret)[colnames(ret) == ".se.fit"] <- avoid_conflict(colnames(ret), "se.fit")
+
+  ret
 }
 
 #' assign cluster number to each rows
@@ -244,6 +292,11 @@ prediction <- function(df, source_data, test = TRUE, ...){
   cll <- match.call()
   aug_args <- expand_args(cll, exclude = c("df", "source_data", "test"))
 
+  # if type.predict argument is not indicated in this function
+  # and models have $family$linkinv (basically, glm models have it),
+  # both fitted link value column and response value column should appear in the result
+  with_response <- !("type.predict" %in% names(cll)) & !is.null(df[["model"]][[1]]$family) & !is.null(df[["model"]][[1]]$family$linkinv)
+
   ret <- if(test){
     # augment by test data
 
@@ -262,7 +315,6 @@ prediction <- function(df, source_data, test = TRUE, ...){
         safe_slice(df, index)
       })) %>%
       dplyr::select(-.test_index)
-
 
     augmented <- tryCatch({
       data_to_augment %>%
@@ -289,6 +341,12 @@ prediction <- function(df, source_data, test = TRUE, ...){
       }
     })
 
+    if (with_response){
+      augmented <- augmented %>%
+        dplyr::ungroup() %>%
+        dplyr::mutate(data = purrr::map2(data, model, add_response))
+    }
+
     ret <- augmented %>%
       dplyr::select(-model) %>%
       tidyr::unnest(data)
@@ -304,7 +362,7 @@ prediction <- function(df, source_data, test = TRUE, ...){
     } else {
       as.formula(paste0("~list(broom::augment(model, data = data, ", aug_args, "))"))
     }
-    dplyr::bind_cols(df, source) %>%
+    augmented <- dplyr::bind_cols(df, source) %>%
       dplyr::ungroup() %>%
       dplyr::mutate(data = purrr::map2(data, .test_index, function(df, index){
         # remove data in test_index
@@ -313,11 +371,27 @@ prediction <- function(df, source_data, test = TRUE, ...){
       dplyr::select(-.test_index) %>%
       dplyr::rowwise() %>%
       # evaluate the formula of augment and "data" column will have it
-      dplyr::mutate_(.dots = list(data = aug_fml)) %>%
+      dplyr::mutate_(.dots = list(data = aug_fml))
+
+    if (with_response){
+      augmented <- augmented %>%
+        dplyr::ungroup() %>%
+        dplyr::mutate(data = purrr::map2(data, model, add_response)) %>%
+        dplyr::rowwise()
+    }
+
+    augmented %>%
       dplyr::select(-model) %>%
       tidyr::unnest(data)
   }
-  colnames(ret)[colnames(ret) == ".fitted"] <- avoid_conflict(colnames(ret), "Fitted")
+  # update column name based on both link and response are there for fitted values
+  fitted_label <- if("Fitted.response" %in% colnames(ret)){
+    "Fitted.link"
+  } else {
+    "Fitted"
+  }
+
+  colnames(ret)[colnames(ret) == ".fitted"] <- avoid_conflict(colnames(ret), fitted_label)
   colnames(ret)[colnames(ret) == ".se.fit"] <- avoid_conflict(colnames(ret), "Standard Error")
   colnames(ret)[colnames(ret) == ".resid"] <- avoid_conflict(colnames(ret), "Residuals")
   colnames(ret)[colnames(ret) == ".hat"] <- avoid_conflict(colnames(ret), "Hat")

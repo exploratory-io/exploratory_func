@@ -397,3 +397,22 @@ test_that("test expand_args", {
 
   expect_equal(ret, "aaa = \"aa\"a\", cc_list = list(\"c\", \"c\"), fml = ~as.formula(\"~c()\"), chars = c(\"chars\", \"chars2\"), \"no args\"")
 })
+
+test_that("move_col", {
+  test_data <- data.frame(
+    a = seq(3),
+    b = seq(3),
+    c = seq(3),
+    d = seq(3),
+    e = seq(3),
+    f = seq(3),
+    g = seq(3)
+  )
+
+  left_to_right <- move_col(test_data, "c", 6)
+  expect_equal(colnames(left_to_right), c("a", "b", "d", "e", "f", "c", "g"))
+
+  right_to_left <- move_col(test_data, "f", 2)
+  expect_equal(colnames(right_to_left), c("a", "f", "b", "c", "d", "e", "g"))
+
+})
