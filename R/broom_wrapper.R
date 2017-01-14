@@ -384,13 +384,19 @@ prediction <- function(df, test = TRUE, ...){
 
 #' tidy wrapper for lm and glm
 #' @export
-model_coef <- function(df){
+model_coef <- function(df, pretty.name = FALSE){
   ret <- broom::tidy(df, model)
-  colnames(ret)[colnames(ret) == "term"] <- "Term"
-  colnames(ret)[colnames(ret) == "statistic"] <- "t Ratio"
-  colnames(ret)[colnames(ret) == "p.value"] <- "Prob > |t|"
-  colnames(ret)[colnames(ret) == "std.error"] <- "Std Error"
-  colnames(ret)[colnames(ret) == "estimate"] <- "Estimate"
+  if (pretty.name){
+    colnames(ret)[colnames(ret) == "term"] <- "Term"
+    colnames(ret)[colnames(ret) == "statistic"] <- "t Ratio"
+    colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
+    colnames(ret)[colnames(ret) == "std.error"] <- "Std Error"
+    colnames(ret)[colnames(ret) == "estimate"] <- "Estimate"
+  } else {
+    colnames(ret)[colnames(ret) == "statistic"] <- "t_ratio"
+    colnames(ret)[colnames(ret) == "p.value"] <- "p_value"
+    colnames(ret)[colnames(ret) == "std.error"] <- "std_error"
+  }
   ret
 }
 

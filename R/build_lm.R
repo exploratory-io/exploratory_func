@@ -91,7 +91,7 @@ build_lm <- function(data, ..., keep.source = TRUE, augment = FALSE, group_cols 
 
           eval(parse(text = paste0("stats::lm(data = data, ", arg_char, ")")))
         })) %>%
-        select(-source.data) %>%
+        dplyr::select(-source.data) %>%
         dplyr::rowwise()
       ret
     }

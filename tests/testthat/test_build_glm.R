@@ -87,7 +87,7 @@ test_that("predict glm with new data", {
   model_data <- fit_df %>% build_glm(num1 ~ num2, family = binomial, group_cols = "group")
 
   coef_ret <- model_data %>% model_coef()
-  expect_equal(colnames(coef_ret), c("group", "Term", "Estimate", "Std Error", "t Ratio", "Prob > |t|"))
+  expect_equal(colnames(coef_ret), c("group", "term", "estimate", "std_error", "t_ratio", "p_value"))
 
   stats_ret <- model_data %>% model_stats()
   expect_equal(colnames(stats_ret), c("group", "Null Deviance", "Degree of Freedom for Null Model", "Log Likelihood",
