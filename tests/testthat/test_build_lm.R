@@ -10,7 +10,7 @@ test_that("test build_lm summary output ", {
   )
   trial <- test_df %>% build_lm(num1 ~ num2 + category + with_NA, weights = weight)
 
-  expect_equal(colnames(trial), c(".test_index", "source.data", "model"))
+  expect_equal(colnames(trial), c("source.data", ".test_index", "model"))
 
   res <- capture.output(summary(trial$model[[1]]))
   expect_lt(length(res), 50) # the output of summary should be less than 50 lines
@@ -65,7 +65,7 @@ test_that("test name conflict avoid", {
   lm_model <- test_df %>%
     build_lm(num1 ~ num2, group_cols = c("estimate", "model", "model.group"))
 
-  expect_equal(colnames(lm_model), c("estimate.group", "model.group", "model.group1", ".test_index", "source.data", "model"))
+  expect_equal(colnames(lm_model), c("estimate.group", "model.group", "model.group1", "source.data", ".test_index", "model"))
 
   trial <- suppressWarnings({
     lm_model %>%
@@ -87,12 +87,12 @@ test_that("build_lm with evaluation", {
     build_lm(num1 ~ num2, group_cols = c("group"), test_rate = 0.1)
 
   evaluated <- lm_model %>%
-    prediction(test_df)
+    prediction()
 
   expect_equal(colnames(evaluated), c("group", "num1", "num2", "Fitted", "Standard Error"))
 
   test_eval <- lm_model %>%
-    prediction(test_df, test = FALSE)
+    prediction(test = FALSE)
 
   expect_equal(colnames(test_eval), c("group", "num1", "num2",
                                       "Fitted", "Standard Error", "Residuals",
@@ -117,7 +117,7 @@ test_that("prediction with categorical columns", {
 
   model_data <- build_lm(test_data, CANCELLED ~ `Carrier Name` + CARRIER + DISTANCE, test_rate = 0.6)
 
-  ret <- prediction(model_data, test_data)
+  ret <- prediction(model_data)
   expect_true(nrow(ret) > 0)
   expect_equal(colnames(ret), c("CANCELLED", "Carrier.Name", "CARRIER", "DISTANCE", "Fitted", "Standard Error"))
 })

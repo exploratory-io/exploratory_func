@@ -263,38 +263,20 @@ kmeans_info <- function(df){
 
 #' augment using source data and test index
 #' @param df Data frame that has model and .test_index
-#' @param source_data Data frame used to create the model data
 #' @param test Test data or training data should be used as data
 #' @param ... Additional argument to be passed to broom::augment
 #' @export
-prediction <- function(df, source_data, test = TRUE, ...){
+prediction <- function(df, test = TRUE, ...){
   df_cnames <- colnames(df)
-  # columns that are not model related are regarded as grouping column
-  grouping_col <- df_cnames[!df_cnames %in% c("model", ".test_index", "source.data")]
-
-  source <- if(any(colnames(source_data) %in% grouping_col)){
-    # nest the source data by each group
-    source_data %>%
-      dplyr::group_by_(.dots = grouping_col) %>%
-      tidyr::nest()
-  } else {
-    # put one value column so that all data can be nested
-    source_data %>%
-      dplyr::mutate(data = 1) %>%
-      dplyr::group_by(data) %>%
-      tidyr::nest()
-  }
-
-  # drop unnecessary columns
-  df <- dplyr::select(df, .test_index, model)
 
   # parsing arguments of prediction and getting optional arguemnt for augment in ...
   cll <- match.call()
-  aug_args <- expand_args(cll, exclude = c("df", "source_data", "test"))
+  aug_args <- expand_args(cll, exclude = c("df", "test"))
 
   # if type.predict argument is not indicated in this function
   # and models have $family$linkinv (basically, glm models have it),
   # both fitted link value column and response value column should appear in the result
+
   with_response <- !("type.predict" %in% names(cll)) & !is.null(df[["model"]][[1]]$family) & !is.null(df[["model"]][[1]]$family$linkinv)
 
   ret <- if(test){
@@ -304,13 +286,13 @@ prediction <- function(df, source_data, test = TRUE, ...){
     # because ... can't be passed to a function inside mutate directly.
     # If test is TRUE, this uses newdata as an argument and if not, uses data as an argument.
     aug_fml <- if(aug_args == ""){
-      as.formula("~list(broom::augment(model, newdata = data))")
+      as.formula("~list(broom::augment(model, newdata = source.data))")
     } else {
-      as.formula(paste0("~list(broom::augment(model, newdata = data, ", aug_args, "))"))
+      as.formula(paste0("~list(broom::augment(model, newdata = source.data, ", aug_args, "))"))
     }
-    data_to_augment <- dplyr::bind_cols(df, source) %>%
+    data_to_augment <- df %>%
       dplyr::ungroup() %>%
-      dplyr::mutate(data = purrr::map2(data, .test_index, function(df, index){
+      dplyr::mutate(source.data = purrr::map2(source.data, .test_index, function(df, index){
         # keep data only in test_index
         safe_slice(df, index)
       })) %>%
@@ -320,11 +302,11 @@ prediction <- function(df, source_data, test = TRUE, ...){
       data_to_augment %>%
         dplyr::rowwise() %>%
         # evaluate the formula of augment and "data" column will have it
-        dplyr::mutate_(.dots = list(data = aug_fml))
+        dplyr::mutate_(.dots = list(source.data = aug_fml))
     }, error = function(e){
       if (grepl("arguments imply differing number of rows: ", e$message)) {
         data_to_augment %>%
-          dplyr::mutate(data = purrr::map2(data, model, function(df, model){
+          dplyr::mutate(source.data = purrr::map2(source.data, model, function(df, model){
             # remove rows that have categories that aren't in training data
             # otherwise, broom::augment causes an error
             filtered_data <- df
@@ -335,7 +317,7 @@ prediction <- function(df, source_data, test = TRUE, ...){
           })) %>%
           dplyr::rowwise() %>%
           # evaluate the formula of augment and "data" column will have it
-          dplyr::mutate_(.dots = list(data = aug_fml))
+          dplyr::mutate_(.dots = list(source.data = aug_fml))
       } else {
         stop(e$message)
       }
@@ -344,12 +326,12 @@ prediction <- function(df, source_data, test = TRUE, ...){
     if (with_response){
       augmented <- augmented %>%
         dplyr::ungroup() %>%
-        dplyr::mutate(data = purrr::map2(data, model, add_response))
+        dplyr::mutate(source.data = purrr::map2(source.data, model, add_response))
     }
 
     ret <- augmented %>%
       dplyr::select(-model) %>%
-      tidyr::unnest(data)
+      tidyr::unnest(source.data)
 
   } else {
     # augment by trainig data
@@ -358,30 +340,30 @@ prediction <- function(df, source_data, test = TRUE, ...){
     # because ... can't be passed to a function inside mutate directly.
     # If test is FALSE, this uses data as an argument and if not, uses newdata as an argument.
     aug_fml <- if(aug_args == ""){
-      as.formula("~list(broom::augment(model, data = data))")
+      as.formula("~list(broom::augment(model, data = source.data))")
     } else {
-      as.formula(paste0("~list(broom::augment(model, data = data, ", aug_args, "))"))
+      as.formula(paste0("~list(broom::augment(model, data = source.data, ", aug_args, "))"))
     }
-    augmented <- dplyr::bind_cols(df, source) %>%
+    augmented <- df %>%
       dplyr::ungroup() %>%
-      dplyr::mutate(data = purrr::map2(data, .test_index, function(df, index){
+      dplyr::mutate(source.data = purrr::map2(source.data, .test_index, function(df, index){
         # remove data in test_index
         safe_slice(df, index, remove = TRUE)
       })) %>%
       dplyr::select(-.test_index) %>%
       dplyr::rowwise() %>%
       # evaluate the formula of augment and "data" column will have it
-      dplyr::mutate_(.dots = list(data = aug_fml))
+      dplyr::mutate_(.dots = list(source.data = aug_fml))
 
     if (with_response){
       augmented <- augmented %>%
         dplyr::ungroup() %>%
-        dplyr::mutate(data = purrr::map2(data, model, add_response))
+        dplyr::mutate(source.data = purrr::map2(source.data, model, add_response))
     }
 
     augmented %>%
       dplyr::select(-model) %>%
-      tidyr::unnest(data)
+      tidyr::unnest(source.data)
   }
   # update column name based on both link and response are there for fitted values
   fitted_label <- if("Fitted.response" %in% colnames(ret)){

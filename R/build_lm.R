@@ -22,16 +22,12 @@ build_lm <- function(data, ..., keep.source = TRUE, augment = FALSE, group_cols 
   reserved_names <- c(
     "model", ".test_index", "data",
     # for tidy
-    "term", "estimate", "std.error", "t.ratio", "p.value",
-    "Term", "Estimate", "Std Error", "t Ratio", "Prob > |t|",
+    "term", "estimate", "std.error", "statistic", "p.value",
     # for glance
-    "r.squared", "adj.r.squared", "sigma",
-    "statistic", "p.value", "df", "logLik", "AIC", "BIC", "deviance",
-    "df.residual",
-    "RSquare", "RSquare Adj", "Root Mean Square Error",
-    "F Ratio", "Prob > F", "Degree of Freedom", "Log Likelihood",
-    "AIC", "BIC", "Deviance", "Residual Degree of Freedom"
+    "r.squared", "adj.r.squared", "sigma", "statistic", "p.value",
+    "df", "logLik", "AIC", "BIC", "deviance", "df.residual"
   )
+
 
   if(test_rate < 0 | 1 < test_rate){
     stop("test_rate must be between 0 and 1")
@@ -50,11 +46,11 @@ build_lm <- function(data, ..., keep.source = TRUE, augment = FALSE, group_cols 
 
   if(!is.null(group_cols)){
     data <- dplyr::group_by_(data, .dots =  colnames(data)[group_col_index])
-  } else {
+  } else if (!dplyr::is.grouped_df(data)) {
     # grouping is necessary for tidyr::nest to work so putting one value columns
     data <- data %>%
-      dplyr::mutate(data = 1) %>%
-      dplyr::group_by(data)
+      dplyr::mutate(source.data = 1) %>%
+      dplyr::group_by(source.data)
   }
 
   model_col <- "model"
@@ -67,40 +63,35 @@ build_lm <- function(data, ..., keep.source = TRUE, augment = FALSE, group_cols 
   ret <- tryCatch({
     if(keep.source || augment){
       ret <- data %>%
-        tidyr::nest() %>%
+        tidyr::nest(.key = "source.data") %>%
         # create test index
-        dplyr::mutate(.test_index = purrr::map(data, function(df){
+        dplyr::mutate(.test_index = purrr::map(source.data, function(df){
           sample_df_index(df, rate = test_rate)
         })) %>%
         # slice training data
         # use source.data as column name to keep it
-        dplyr::mutate(source.data = purrr::map2(data, .test_index, function(df, index){
-          safe_slice(df, index, remove = TRUE)
-        })) %>%
-        # execute lm
-        dplyr::mutate(model = purrr::map(source.data, function(data){
+        dplyr::mutate(model = purrr::map2(source.data, .test_index, function(df, index){
+          data <- safe_slice(df, index, remove = TRUE)
+
           eval(parse(text = paste0("stats::lm(data = data, ", arg_char, ")")))
         })) %>%
-        dplyr::select(-data) %>%
         dplyr::rowwise()
       class(ret[[source_col]]) <- c("list", ".source.data")
       ret
     } else {
       ret <- data %>%
-        tidyr::nest() %>%
+        tidyr::nest(.key = "source.data") %>%
         # create test index
-        dplyr::mutate(.test_index = purrr::map(data, function(df){
+        dplyr::mutate(.test_index = purrr::map(source.data, function(df){
           sample_df_index(df, rate = test_rate)
         })) %>%
         # slice training data
-        dplyr::mutate(data = purrr::map2(data, .test_index, function(df, index){
-          safe_slice(df, index, remove = TRUE)
-        })) %>%
-        # execute lm
-        dplyr::mutate(model = purrr::map(data, function(df){
+        dplyr::mutate(model = purrr::map2(source.data, .test_index, function(df, index){
+          data <- safe_slice(df, index, remove = TRUE)
+
           eval(parse(text = paste0("stats::lm(data = data, ", arg_char, ")")))
         })) %>%
-        dplyr::select(-data) %>%
+        select(-source.data) %>%
         dplyr::rowwise()
       ret
     }
@@ -114,9 +105,11 @@ build_lm <- function(data, ..., keep.source = TRUE, augment = FALSE, group_cols 
     stop(e$message)
   })
   if(augment){
-    # do.call is used because augment tries to regard "model_col" and "source_col"
-    # as column names as non standard evaluation
-    ret <- do.call(broom::augment, list(ret, model_col, source_col))
+    if(test_rate == 0){
+      ret <- prediction(ret, test = FALSE)
+    } else {
+      ret <- prediction(ret, test = TRUE)
+    }
   } else {
     class(ret[[model_col]]) <- c("list", ".model", ".model.lm")
   }
