@@ -94,8 +94,8 @@ test_that("predict lm with new data", {
 
   model_data <- fit_df %>% build_lm(num1 ~ num2, group_cols = "group")
 
-  coef_ret <- model_data %>% model_coef()
-  expect_equal(colnames(coef_ret), c("group", "term", "estimate", "std_error", "t_ratio", "p_value"))
+  coef_ret <- model_data %>% model_coef(conf.int = TRUE)
+  expect_equal(colnames(coef_ret), c("group", "term", "estimate", "std_error", "t_ratio", "p_value", "conf_low", "conf_high"))
 
   stats_ret <- model_data %>% model_stats()
   expect_equal(colnames(stats_ret), c("group", "r_square", "r_square_adj", "root_mean_square_error",
@@ -103,7 +103,7 @@ test_that("predict lm with new data", {
                                       "AIC", "BIC", "deviance", "residual_degree_of_freedom"))
 
   anova_ret <- model_data %>% model_anova()
-  expect_equal(colnames(anova_ret), c("group", "Term", "Degree of Freedom", "Sum of Squares", "Mean Square", "F Ratio", "Prob > F"))
+  expect_equal(colnames(anova_ret), c("group", "term", "degree_of_freedom", "sum_of_squares", "mean_square", "f_ratio", "p_value"))
 
   confint_ret <- model_data %>% model_confint(level = 0.99)
   expect_equal(colnames(confint_ret), c("group", "Term", "Prob 0.5", "Prob 99.5"))

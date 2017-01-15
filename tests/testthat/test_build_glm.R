@@ -94,8 +94,8 @@ test_that("predict glm with new data", {
                                       "AIC", "BIC", "deviance", "residual_degree_of_freedom"))
 
   anova_ret <- model_data %>% model_anova()
-  expect_equal(colnames(anova_ret), c("group", "Term", "Degree of Freedom", "Deviance", "Residual Degree of Freedom",
-                                      "Residual Deviance"))
+  expect_equal(colnames(anova_ret), c("group", "term", "degree_of_freedom", "deviance", "residual_degree_of_freedom",
+                                      "residual_deviance"))
 
   confint_ret <- model_data %>% model_confint(level = 0.99)
   expect_equal(colnames(confint_ret), c("group", "Term", "Prob 0.5", "Prob 99.5"))
