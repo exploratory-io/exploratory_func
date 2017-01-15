@@ -266,7 +266,7 @@ kmeans_info <- function(df){
 #' @param test Test data or training data should be used as data
 #' @param ... Additional argument to be passed to broom::augment
 #' @export
-prediction <- function(df, test = TRUE, ...){
+prediction <- function(df, test = TRUE, pretty.name = FALSE, ...){
   df_cnames <- colnames(df)
 
   # parsing arguments of prediction and getting optional arguemnt for augment in ...
@@ -365,37 +365,61 @@ prediction <- function(df, test = TRUE, ...){
       dplyr::select(-model) %>%
       tidyr::unnest(source.data)
   }
-  # update column name based on both link and response are there for fitted values
-  fitted_label <- if("Fitted.response" %in% colnames(ret)){
-    "Fitted.link"
-  } else {
-    "Fitted"
-  }
 
-  colnames(ret)[colnames(ret) == ".fitted"] <- avoid_conflict(colnames(ret), fitted_label)
-  colnames(ret)[colnames(ret) == ".se.fit"] <- avoid_conflict(colnames(ret), "Standard Error")
-  colnames(ret)[colnames(ret) == ".resid"] <- avoid_conflict(colnames(ret), "Residuals")
-  colnames(ret)[colnames(ret) == ".hat"] <- avoid_conflict(colnames(ret), "Hat")
-  colnames(ret)[colnames(ret) == ".sigma"] <- avoid_conflict(colnames(ret), "Residual Standard Deviation")
-  colnames(ret)[colnames(ret) == ".cooksd"] <- avoid_conflict(colnames(ret), "Cooks Distance")
-  colnames(ret)[colnames(ret) == ".std.resid"] <- avoid_conflict(colnames(ret), "Standardised Residuals")
-  ret
+  if (pretty.name){
+    # update column name based on both link and response are there for fitted values
+    fitted_label <- if("Fitted.response" %in% colnames(ret)){
+      "Fitted.link"
+    } else {
+      "Fitted"
+    }
+
+    colnames(ret)[colnames(ret) == ".fitted"] <- avoid_conflict(colnames(ret), fitted_label)
+    colnames(ret)[colnames(ret) == ".se.fit"] <- avoid_conflict(colnames(ret), "Standard Error")
+    colnames(ret)[colnames(ret) == ".resid"] <- avoid_conflict(colnames(ret), "Residuals")
+    colnames(ret)[colnames(ret) == ".hat"] <- avoid_conflict(colnames(ret), "Hat")
+    colnames(ret)[colnames(ret) == ".sigma"] <- avoid_conflict(colnames(ret), "Residual Standard Deviation")
+    colnames(ret)[colnames(ret) == ".cooksd"] <- avoid_conflict(colnames(ret), "Cooks Distance")
+    colnames(ret)[colnames(ret) == ".std.resid"] <- avoid_conflict(colnames(ret), "Standardised Residuals")
+    ret
+  } else {
+    # update column name based on both link and response are there for fitted values
+    fitted_label <- if("Fitted.response" %in% colnames(ret)){
+      "fitted_link"
+    } else {
+      "fitted"
+    }
+
+    colnames(ret)[colnames(ret) == "Fitted.response"] <- avoid_conflict(colnames(ret), "fitted_response")
+    colnames(ret)[colnames(ret) == ".fitted"] <- avoid_conflict(colnames(ret), fitted_label)
+    colnames(ret)[colnames(ret) == ".se.fit"] <- avoid_conflict(colnames(ret), "standard_error")
+    colnames(ret)[colnames(ret) == ".resid"] <- avoid_conflict(colnames(ret), "residuals")
+    colnames(ret)[colnames(ret) == ".hat"] <- avoid_conflict(colnames(ret), "hat")
+    colnames(ret)[colnames(ret) == ".sigma"] <- avoid_conflict(colnames(ret), "residual_standard_deviation")
+    colnames(ret)[colnames(ret) == ".cooksd"] <- avoid_conflict(colnames(ret), "cooks_distance")
+    colnames(ret)[colnames(ret) == ".std.resid"] <- avoid_conflict(colnames(ret), "standardised_residuals")
+    ret
+  }
 }
 
 #' tidy wrapper for lm and glm
 #' @export
-model_coef <- function(df, pretty.name = FALSE){
-  ret <- broom::tidy(df, model)
+model_coef <- function(df, pretty.name = FALSE, ...){
+  ret <- broom::tidy(df, model, ...)
   if (pretty.name){
     colnames(ret)[colnames(ret) == "term"] <- "Term"
     colnames(ret)[colnames(ret) == "statistic"] <- "t Ratio"
     colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
     colnames(ret)[colnames(ret) == "std.error"] <- "Std Error"
     colnames(ret)[colnames(ret) == "estimate"] <- "Estimate"
+    colnames(ret)[colnames(ret) == "conf.low"] <- "Conf Low"
+    colnames(ret)[colnames(ret) == "conf.high"] <- "Conf High"
   } else {
     colnames(ret)[colnames(ret) == "statistic"] <- "t_ratio"
     colnames(ret)[colnames(ret) == "p.value"] <- "p_value"
     colnames(ret)[colnames(ret) == "std.error"] <- "std_error"
+    colnames(ret)[colnames(ret) == "conf.low"] <- "conf_low"
+    colnames(ret)[colnames(ret) == "conf.high"] <- "conf_high"
   }
   ret
 }
@@ -437,20 +461,32 @@ model_stats <- function(df, pretty.name = FALSE){
 
 #' tidy after converting model to anova
 #' @export
-model_anova <- function(df){
+model_anova <- function(df, pretty.name = FALSE){
   ret <- suppressWarnings({
     # this causes warning for Deviance, Resid..Df, Resid..Dev in glm model
     df %>% dplyr::mutate(model = list(anova(model))) %>% broom::tidy(model)
   })
-  colnames(ret)[colnames(ret) == "term"] <- "Term"
-  colnames(ret)[colnames(ret) == "sumsq"] <- "Sum of Squares"
-  colnames(ret)[colnames(ret) == "meansq"] <- "Mean Square"
-  colnames(ret)[colnames(ret) == "statistic"] <- "F Ratio"
-  colnames(ret)[colnames(ret) == "p.value"] <- "Prob > F"
-  colnames(ret)[colnames(ret) == "df"] <- "Degree of Freedom"
-  # for glm anova
-  colnames(ret)[colnames(ret) == "Resid..Df"] <- "Residual Degree of Freedom"
-  colnames(ret)[colnames(ret) == "Resid..Dev"] <- "Residual Deviance"
+  if(pretty.name){
+    colnames(ret)[colnames(ret) == "term"] <- "Term"
+    colnames(ret)[colnames(ret) == "sumsq"] <- "Sum of Squares"
+    colnames(ret)[colnames(ret) == "meansq"] <- "Mean Square"
+    colnames(ret)[colnames(ret) == "statistic"] <- "F Ratio"
+    colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
+    colnames(ret)[colnames(ret) == "df"] <- "Degree of Freedom"
+    # for glm anova
+    colnames(ret)[colnames(ret) == "Resid..Df"] <- "Residual Degree of Freedom"
+    colnames(ret)[colnames(ret) == "Resid..Dev"] <- "Residual Deviance"
+  } else {
+    colnames(ret)[colnames(ret) == "sumsq"] <- "sum_of_squares"
+    colnames(ret)[colnames(ret) == "meansq"] <- "mean_square"
+    colnames(ret)[colnames(ret) == "statistic"] <- "f_ratio"
+    colnames(ret)[colnames(ret) == "p.value"] <- "p_value"
+    colnames(ret)[colnames(ret) == "df"] <- "degree_of_freedom"
+    # for glm anova
+    colnames(ret)[colnames(ret) == "Deviance"] <- "deviance"
+    colnames(ret)[colnames(ret) == "Resid..Df"] <- "residual_degree_of_freedom"
+    colnames(ret)[colnames(ret) == "Resid..Dev"] <- "residual_deviance"
+  }
   ret
 }
 
