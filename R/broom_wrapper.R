@@ -402,20 +402,35 @@ model_coef <- function(df, pretty.name = FALSE){
 
 #' glance wrapper
 #' @export
-model_stats <- function(df){
+model_stats <- function(df, pretty.name = FALSE){
   ret <- broom::glance(df, model)
-  colnames(ret)[colnames(ret) == "r.squared"] <- "RSquare"
-  colnames(ret)[colnames(ret) == "adj.r.squared"] <- "RSquare Adj"
-  colnames(ret)[colnames(ret) == "sigma"] <- "Root Mean Square Error"
-  colnames(ret)[colnames(ret) == "statistic"] <- "F Ratio"
-  colnames(ret)[colnames(ret) == "p.value"] <- "Prob > F"
-  colnames(ret)[colnames(ret) == "df"] <- "Degree of Freedom"
-  colnames(ret)[colnames(ret) == "logLik"] <- "Log Likelihood"
-  colnames(ret)[colnames(ret) == "deviance"] <- "Deviance"
-  colnames(ret)[colnames(ret) == "df.residual"] <- "Residual Degree of Freedom"
-  # for glm
-  colnames(ret)[colnames(ret) == "null.deviance"] <- "Null Deviance"
-  colnames(ret)[colnames(ret) == "df.null"] <- "Degree of Freedom for Null Model"
+  if(pretty.name){
+    colnames(ret)[colnames(ret) == "r.squared"] <- "R Square"
+    colnames(ret)[colnames(ret) == "adj.r.squared"] <- "R Square Adj"
+    colnames(ret)[colnames(ret) == "sigma"] <- "Root Mean Square Error"
+    colnames(ret)[colnames(ret) == "statistic"] <- "F Ratio"
+    colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
+    colnames(ret)[colnames(ret) == "df"] <- "Degree of Freedom"
+    colnames(ret)[colnames(ret) == "logLik"] <- "Log Likelihood"
+    colnames(ret)[colnames(ret) == "deviance"] <- "Deviance"
+    colnames(ret)[colnames(ret) == "df.residual"] <- "Residual Degree of Freedom"
+    # for glm
+    colnames(ret)[colnames(ret) == "null.deviance"] <- "Null Deviance"
+    colnames(ret)[colnames(ret) == "df.null"] <- "Degree of Freedom for Null Model"
+  }else{
+    colnames(ret)[colnames(ret) == "r.squared"] <- "r_square"
+    colnames(ret)[colnames(ret) == "adj.r.squared"] <- "r_square_adj"
+    colnames(ret)[colnames(ret) == "sigma"] <- "root_mean_square_error"
+    colnames(ret)[colnames(ret) == "statistic"] <- "f_ratio"
+    colnames(ret)[colnames(ret) == "p.value"] <- "p_value"
+    colnames(ret)[colnames(ret) == "df"] <- "degree_of_freedom"
+    colnames(ret)[colnames(ret) == "logLik"] <- "log_likelihood"
+    colnames(ret)[colnames(ret) == "deviance"] <- "deviance"
+    colnames(ret)[colnames(ret) == "df.residual"] <- "residual_degree_of_freedom"
+    # for glm
+    colnames(ret)[colnames(ret) == "null.deviance"] <- "null_deviance"
+    colnames(ret)[colnames(ret) == "df.null"] <- "degree_of_freedom_for_null_model"
+  }
 
   ret
 }
