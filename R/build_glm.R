@@ -1,3 +1,9 @@
+#' glm wrappwer for logistic regression
+#' @export
+build_lr <- function(...) {
+  build_glm(..., family = binomial)
+}
+
 #' glm wrapper with do
 #' @return deta frame which has glm model
 #' @param data Data frame to be used as data
