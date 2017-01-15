@@ -483,6 +483,14 @@ queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, q
     connstr <- stringr::str_c(connstr, ",", additionalParams, ")")
   }
   conn <- eval(parse(text=connstr))
+
+  # For some reason, following line works around Actual Oracle Driver for Mac issue
+  # that it always returns 0 rows.
+  # Since it does not have performance impact because it does not return any row
+  # because of the dummy catalog/schema specification, we are just calling it
+  # unconditionally rather than first checking which ODBC driver is used for the connection.
+  RODBC::sqlTables(conn, catalog = "dummy", schema = "dummy")
+
   df <- RODBC::sqlQuery(conn, GetoptLong::qq(query), max = numOfRows)
   RODBC::odbcClose(conn)
   df
