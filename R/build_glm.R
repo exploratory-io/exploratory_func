@@ -1,7 +1,7 @@
 #' glm wrappwer for logistic regression
 #' @export
-build_lr <- function(...) {
-  build_glm(..., family = binomial)
+build_lr <- function(df, ...) {
+  do.call("build_glm", list(df, ..., family = "binomial"))
 }
 
 #' glm wrapper with do
