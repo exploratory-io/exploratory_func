@@ -417,10 +417,10 @@ test_that("move_col", {
 
 })
 
-test_that("numeric_to_date", {
+test_that("unixtime_to_datetime", {
   data <- c(300, 900, NA)
 
-  unix_ret <- unix_numeric_to_datetime(data)
+  unix_ret <- unixtime_to_datetime(data)
   unix_ans <- as.POSIXct(data, origin="1970-01-01", tz = "GMT")
   expect_equal(unix_ret, unix_ans)
 

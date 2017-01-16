@@ -566,7 +566,7 @@ move_col <- function(df, cname, position){
 #' Unix time numeric values to POSIXct
 #' @param data Numeric vector to convert to date
 #' @export
-unix_numeric_to_datetime <- function(data){
+unixtime_to_datetime <- function(data){
   # referred from http://stackoverflow.com/questions/27408131/convert-unix-timestamp-into-datetime-in-r
   as.POSIXct(data, origin="1970-01-01", tz='GMT')
 }
