@@ -563,39 +563,10 @@ move_col <- function(df, cname, position){
   ret
 }
 
-#' numeric to date from excel format or unix time
+#' Unix time numeric values to POSIXct
 #' @param data Numeric vector to convert to date
-#' @param type "excel" or "unix". type of numeric date
-#' @param output "date" or "datetime" to return
-#' @param ... Additional parameter to be passed to janitor::excel_numeric_to_date if type is excel
 #' @export
-numeric_to_date <- function(data, type = "excel", output = "date", ...){
-  lower_type = tolower(type)
-  lower_output = tolower(output)
-  ret <- if (lower_type == "excel") {
-    ret <- janitor::excel_numeric_to_date(data, ...)
-
-    if (lower_output == "datetime") {
-      ret <- as.POSIXct(ret)
-    } else if (lower_output != "date") {
-      stop("only date or datetime are supported for output")
-    }
-
-    ret
-
-  } else if (lower_type == "unix") {
-    # referred from http://stackoverflow.com/questions/27408131/convert-unix-timestamp-into-datetime-in-r
-    ret <- as.POSIXct(data, origin="1970-01-01", tz='GMT')
-
-    if (lower_output == "date") {
-      ret <- as.Date(ret)
-    } else if (lower_output != "datetime") {
-      stop("only date or datetime are supported for output")
-    }
-
-    ret
-
-  } else {
-    stop("only unix or excel are supported for type")
-  }
+unixtime_to_datetime <- function(data){
+  # referred from http://stackoverflow.com/questions/27408131/convert-unix-timestamp-into-datetime-in-r
+  as.POSIXct(data, origin="1970-01-01", tz='GMT')
 }
