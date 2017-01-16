@@ -1,6 +1,5 @@
 #' Non standard evaluation version of do_roc_
 #' @param df Model data frame that can work prediction
-#' @param
 #' @export
 do_roc <- function(df, actual_value, predicted_prob){
   actual_value_col <- col_name(substitute(actual_value))
