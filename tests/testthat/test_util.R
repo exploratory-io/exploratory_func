@@ -417,23 +417,11 @@ test_that("move_col", {
 
 })
 
-test_that("numeric_to_date", {
+test_that("unixtime_to_datetime", {
   data <- c(300, 900, NA)
 
-  excel_ret <- numeric_to_date(data, type = "EXCEL", date_system = "mac pre-2011")
-  excel_ans <- janitor::excel_numeric_to_date(data, date_system = "mac pre-2011")
-  expect_equal(excel_ret, excel_ans)
-
-  excel_datetime_ret <- numeric_to_date(data, type = "excel", output = "datetime", date_system = "mac pre-2011")
-  excel_datetime_ans <- as.POSIXct(excel_ans)
-  expect_equal(excel_datetime_ret, excel_datetime_ans)
-
-  unix_ret <- numeric_to_date(data, type = "UNIX")
-  unix_ans <- as.Date(as.POSIXct(data, origin="1970-01-01", tz = "GMT"))
+  unix_ret <- unixtime_to_datetime(data)
+  unix_ans <- as.POSIXct(data, origin="1970-01-01", tz = "GMT")
   expect_equal(unix_ret, unix_ans)
-
-  unix_datetime_ret <- numeric_to_date(data, type = "UNIX", output = "datetime")
-  unix_datetime_ans <- as.POSIXct(data, origin="1970-01-01", tz = "GMT")
-  expect_equal(unix_datetime_ret, unix_datetime_ans)
 
 })
