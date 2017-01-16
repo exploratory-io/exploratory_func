@@ -11,7 +11,11 @@ test_that("test do_roc", {
 
   model_data <- build_glm(test_data, family = "binomial", CANCELLED ~ `Carrier Name` + CARRIER + DISTANCE, test_rate = 0.2)
 
-  ret <- do_roc(model_data)
+  predicted <- prediction(model_data)
+
+  ret <- do_roc(predicted, CANCELLED, fitted_response)
+
+  expect_equal(colnames(ret), c("true_positive_rate", "false_positive_rate"))
 
 })
 
@@ -28,5 +32,9 @@ test_that("test do_roc with factor", {
 
   model_data <- build_glm(test_data, family = "binomial", CANCELLED ~ `Carrier Name` + CARRIER + DISTANCE, test_rate = 0.2)
 
-  ret <- do_roc(model_data)
+  predicted <- prediction(model_data)
+
+  ret <- do_roc(predicted, CANCELLED, fitted_response)
+
+  expect_equal(colnames(ret), c("true_positive_rate", "false_positive_rate"))
 })

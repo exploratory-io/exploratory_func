@@ -1,46 +1,46 @@
-#' make plots for ROC curve
+#' Non standard evaluation version of do_roc_
+#' @param df Model data frame that can work prediction
+#' @param
+#' @export
+do_roc <- function(df, actual_value, predicted_prob){
+  actual_value_col <- col_name(substitute(actual_value))
+  predicted_prob_col <- col_name(substitute(predicted_prob))
+  do_roc_(df, actual_value_col, predicted_prob_col)
+}
+
+#' Return cordinations for ROC curve
 #' @param df Model data frame that can work prediction
 #' @export
-do_roc <- function(df){
-  predictor <- all.vars(df$model[[1]]$formula)[1]
-  group_cols <- colnames(df)[!colnames(df) %in% c(".test_index", "source.data", "model")]
+do_roc_ <- function(df, actual_value_col, predicted_prob_col){
+  group_cols <- grouped_by(df)
 
-  pred_ret <- prediction(df, type.predict = "response") %>%
-    dplyr::group_by_(.dots = group_cols) %>%
-    dplyr::select_(.dots = c(predictor, "fitted"))
-
-  roc_col <- avoid_conflict(group_cols, ".roc")
-
-  tpr_col <- avoid_conflict(group_cols, "TPR")
-  fpr_col <- avoid_conflict(group_cols, "FPR")
+  tpr_col <- avoid_conflict(group_cols, "true_positive_rate")
+  fpr_col <- avoid_conflict(group_cols, "false_positive_rate")
 
   do_roc_each <- function(df){
-    arranged <- df %>%
-      dplyr::arrange_(.dots = "desc(fitted)")
+    arranged <- df[order(df[[predicted_prob_col]]), ]
 
-    predictor_val <- arranged[[predictor]][!is.na(arranged[[predictor]])]
-    if(is.factor(predictor_val)){
+    val <- arranged[[actual_value_col]][!is.na(arranged[[actual_value_col]])]
+    if(is.factor(val)){
       # Need to subtract 1 because the first level in factor is regarded as 1
       # though it should be FALSE.
-      predictor_val <- as.logical(as.integer(predictor_val) - 1)
+      val <- as.logical(as.integer(val) - 1)
     } else {
-      predictor_val <- as.logical(predictor_val)
+      val <- as.logical(val)
     }
 
-    predictor_val <- predictor_val[!is.na(predictor_val)]
-
-    if (all(predictor_val)){
-      tpr <- c(0, rep(1, length(predictor_val)), 1)
-      fpr <- c(0, rep(0, length(predictor_val)), 1)
-    } else if (all(!predictor_val)) {
-      tpr <- c(0, rep(0, length(predictor_val)), 1)
-      fpr <- c(0, rep(1, length(predictor_val)), 1)
+    if (all(val)){
+      tpr <- c(0, rep(1, length(val)), 1)
+      fpr <- c(0, rep(0, length(val)), 1)
+    } else if (all(!val)) {
+      tpr <- c(0, rep(0, length(val)), 1)
+      fpr <- c(0, rep(1, length(val)), 1)
     } else {
 
-      pred_sum <- sum(predictor_val)
+      pred_sum <- sum(val)
 
-      tpr <- c(0, cumsum(predictor_val) / pred_sum)
-      fpr <- c(0, cumsum(!predictor_val) / (length(predictor_val) - pred_sum))
+      tpr <- c(0, cumsum(val) / pred_sum)
+      fpr <- c(0, cumsum(!val) / (length(val) - pred_sum))
     }
 
     ret <- data.frame(
@@ -50,9 +50,11 @@ do_roc <- function(df){
     colnames(ret) <- c(tpr_col, fpr_col)
     ret
   }
-  ret <- pred_ret %>%
-    dplyr::do_(.dots=setNames(list(~do_roc_each(.)), roc_col)) %>%
-    tidyr::unnest_(roc_col)
+
+  tmp_col <- avoid_conflict(group_cols, "tmp")
+  ret <- df %>%
+    dplyr::do_(.dots=setNames(list(~do_roc_each(.)), tmp_col)) %>%
+    tidyr::unnest_(tmp_col)
 
   ret
 }
