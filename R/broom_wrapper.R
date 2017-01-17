@@ -262,11 +262,12 @@ kmeans_info <- function(df){
 }
 
 #' augment using source data and test index
-#' @param df Data frame that has model and .test_index
-#' @param test Test data or training data should be used as data
+#' @param df Data frame that has model and .test_index.
+#' @param data "test" or "training". Which source data should be used.
+#' @param data "test" or "training". Which source data should be used.
 #' @param ... Additional argument to be passed to broom::augment
 #' @export
-prediction <- function(df, data = "test", pretty.name = FALSE, ...){
+prediction <- function(df, data = "test", ...){
 
   if (!data %in% c("test", "training")) {
     stop('data argument must be "test" or "training"')
@@ -312,7 +313,7 @@ prediction <- function(df, data = "test", pretty.name = FALSE, ...){
     augmented <- tryCatch({
       data_to_augment %>%
         dplyr::rowwise() %>%
-        # evaluate the formula of augment and "data" column will have it
+        # evaluate the formula of augment and "source.data" column will have it
         dplyr::mutate_(.dots = list(source.data = aug_fml))
     }, error = function(e){
       if (grepl("arguments imply differing number of rows: ", e$message)) {
@@ -377,40 +378,21 @@ prediction <- function(df, data = "test", pretty.name = FALSE, ...){
       tidyr::unnest(source.data)
   }
 
-  if (pretty.name){
-    # update column name based on both link and response are there for fitted values
-    fitted_label <- if("Fitted.response" %in% colnames(ret)){
-      "Fitted.link"
-    } else {
-      "Fitted"
-    }
-
-    colnames(ret)[colnames(ret) == ".fitted"] <- avoid_conflict(colnames(ret), fitted_label)
-    colnames(ret)[colnames(ret) == ".se.fit"] <- avoid_conflict(colnames(ret), "Standard Error")
-    colnames(ret)[colnames(ret) == ".resid"] <- avoid_conflict(colnames(ret), "Residuals")
-    colnames(ret)[colnames(ret) == ".hat"] <- avoid_conflict(colnames(ret), "Hat")
-    colnames(ret)[colnames(ret) == ".sigma"] <- avoid_conflict(colnames(ret), "Residual Standard Deviation")
-    colnames(ret)[colnames(ret) == ".cooksd"] <- avoid_conflict(colnames(ret), "Cooks Distance")
-    colnames(ret)[colnames(ret) == ".std.resid"] <- avoid_conflict(colnames(ret), "Standardised Residuals")
-    ret
+  # update column name based on both link and response are there for fitted values
+  fitted_label <- if("Fitted.response" %in% colnames(ret)){
+    "fitted_link"
   } else {
-    # update column name based on both link and response are there for fitted values
-    fitted_label <- if("Fitted.response" %in% colnames(ret)){
-      "fitted_link"
-    } else {
-      "fitted"
-    }
-
-    colnames(ret)[colnames(ret) == "Fitted.response"] <- avoid_conflict(colnames(ret), "fitted_response")
-    colnames(ret)[colnames(ret) == ".fitted"] <- avoid_conflict(colnames(ret), fitted_label)
-    colnames(ret)[colnames(ret) == ".se.fit"] <- avoid_conflict(colnames(ret), "standard_error")
-    colnames(ret)[colnames(ret) == ".resid"] <- avoid_conflict(colnames(ret), "residuals")
-    colnames(ret)[colnames(ret) == ".hat"] <- avoid_conflict(colnames(ret), "hat")
-    colnames(ret)[colnames(ret) == ".sigma"] <- avoid_conflict(colnames(ret), "residual_standard_deviation")
-    colnames(ret)[colnames(ret) == ".cooksd"] <- avoid_conflict(colnames(ret), "cooks_distance")
-    colnames(ret)[colnames(ret) == ".std.resid"] <- avoid_conflict(colnames(ret), "standardised_residuals")
-    ret
+    "fitted"
   }
+
+  colnames(ret)[colnames(ret) == "Fitted.response"] <- avoid_conflict(colnames(ret), "fitted_response")
+  colnames(ret)[colnames(ret) == ".fitted"] <- avoid_conflict(colnames(ret), fitted_label)
+  colnames(ret)[colnames(ret) == ".se.fit"] <- avoid_conflict(colnames(ret), "standard_error")
+  colnames(ret)[colnames(ret) == ".resid"] <- avoid_conflict(colnames(ret), "residuals")
+  colnames(ret)[colnames(ret) == ".hat"] <- avoid_conflict(colnames(ret), "hat")
+  colnames(ret)[colnames(ret) == ".sigma"] <- avoid_conflict(colnames(ret), "residual_standard_deviation")
+  colnames(ret)[colnames(ret) == ".cooksd"] <- avoid_conflict(colnames(ret), "cooks_distance")
+  colnames(ret)[colnames(ret) == ".std.resid"] <- avoid_conflict(colnames(ret), "standardised_residuals")
 
   dplyr::group_by_(ret, .dots = grouping_cols)
 }

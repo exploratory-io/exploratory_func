@@ -117,26 +117,23 @@ test_that("prediction with categorical columns", {
 
   model_data <- build_glm(test_data, family = "binomial", CANCELLED ~ `Carrier Name` + CARRIER + DISTANCE, test_rate = 0.6)
 
-  ret <- prediction(model_data, type.predict = "response", pretty.name = TRUE)
-  both_ret <- prediction(model_data, pretty.name = TRUE)
-  train_ret <- prediction(model_data, data = "training", pretty.name = TRUE)
+  ret <- prediction(model_data, type.predict = "response")
+  both_ret <- prediction(model_data)
+  train_ret <- prediction(model_data, data = "training")
 
   expect_true(nrow(ret) > 0)
-  expect_true(all(ret["Fitted"] >= 0 & ret["Fitted"] <= 1))
-  expect_equal(colnames(ret), c("CANCELLED", "Carrier.Name", "CARRIER", "DISTANCE", "Fitted", "Standard Error"))
+  expect_true(all(ret["fitted"] >= 0 & ret["fitted"] <= 1))
+  expect_equal(colnames(ret), c("CANCELLED", "Carrier.Name", "CARRIER", "DISTANCE", "fitted", "standard_error"))
 
-  expect_true(all(both_ret["Fitted.response"] >= 0 & both_ret["Fitted.response"] <= 1))
-  expect_equal(colnames(both_ret), c("CANCELLED", "Carrier.Name", "CARRIER", "DISTANCE", "Fitted.response", "Fitted.link", "Standard Error"))
+  expect_true(all(both_ret["fitted_response"] >= 0 & both_ret["fitted_response"] <= 1))
+  expect_equal(colnames(both_ret), c("CANCELLED", "Carrier.Name", "CARRIER", "DISTANCE", "fitted_response", "fitted_link", "standard_error"))
 
-  expect_true(all(train_ret["Fitted.response"] >= 0 & train_ret["Fitted.response"] <= 1))
-  expect_equal(colnames(train_ret), c("CANCELLED", "Carrier.Name", "CARRIER", "DISTANCE", "Fitted.response",
-                                      "Fitted.link", "Standard Error", "Residuals", "Hat", "Residual Standard Deviation",
-                                      "Cooks Distance", "Standardised Residuals"))
+  expect_true(all(train_ret["fitted_response"] >= 0 & train_ret["fitted_response"] <= 1))
+  expect_equal(colnames(train_ret), c("CANCELLED", "Carrier.Name", "CARRIER", "DISTANCE", "fitted_response",
+                                      "fitted_link", "standard_error", "residuals", "hat", "residual_standard_deviation",
+                                      "cooks_distance", "standardised_residuals"))
 
   add_prediction_ret <- test_data %>% add_prediction(model_data, type.predict = "response")
   expect_true(all(add_prediction_ret["fitted"] >= 0 & add_prediction_ret["fitted"] <= 1))
-
-  add_prediction_ret <- test_data %>% add_prediction(model_data)
-  expect_true(all(add_prediction_ret["fitted.response"] >= 0 & add_prediction_ret["fitted.response"] <= 1))
 })
 
