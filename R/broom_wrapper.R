@@ -397,13 +397,16 @@ prediction <- function(df, data = "test", ...){
   dplyr::group_by_(ret, .dots = grouping_cols)
 }
 
+#' prediction wrapper to set predicted labels
+#' @param df Data frame to predict. This should have model column.
+#' @param threshold Threshold value for predicted probability.
 #' @export
 prediction_binary = function(df, threshold = 0.5, ...){
   ret <- prediction(df, ...)
 
   first_model <- df[["model"]][[1]]
 
-  # get actual value column
+  # get actual value column name from model formula
   actual_col <- all.vars(first_model$formula)[[1]]
 
   actual_val <- ret[[actual_col]]
@@ -421,6 +424,8 @@ prediction_binary = function(df, threshold = 0.5, ...){
   } else if (is.numeric(actual_val)) {
     as.numeric(predicted)
   } else if (is.factor(actual_val)){
+    # create a factor vector with the same levels as actual_val
+    # predicted is logical, so should +1 to make it index
     factor(levels(actual_val)[as.numeric(predicted) + 1], levels(actual_val))
   }
 

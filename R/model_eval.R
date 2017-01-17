@@ -1,5 +1,7 @@
 #' Non standard evaluation version of do_roc_
-#' @param df Model data frame that can work prediction
+#' @param df Data frame
+#' @param actual_val Column name for actual values
+#' @param pred_prob Column name for probability
 #' @export
 do_roc <- function(df, actual_val, pred_prob){
   actual_val_col <- col_name(substitute(actual_val))
@@ -8,7 +10,9 @@ do_roc <- function(df, actual_val, pred_prob){
 }
 
 #' Return cordinations for ROC curve
-#' @param df Model data frame that can work prediction
+#' @param df Data frame
+#' @param actual_val_col Column name for actual values
+#' @param pred_prob_col Column name for probability
 #' @export
 do_roc_ <- function(df, actual_val_col, pred_prob_col){
   group_cols <- grouped_by(df)
@@ -50,6 +54,12 @@ do_roc_ <- function(df, actual_val_col, pred_prob_col){
     ret
   }
 
+  # Calculation is executed in each group.
+  # Storing the result in this tmp_col and
+  # unnesting the result.
+  # If the original data frame is grouped by "tmp",
+  # overwriting it should be avoided,
+  # so avoid_conflict is used here.
   tmp_col <- avoid_conflict(group_cols, "tmp")
   ret <- df %>%
     dplyr::do_(.dots=setNames(list(~do_roc_each(.)), tmp_col)) %>%
@@ -58,7 +68,7 @@ do_roc_ <- function(df, actual_val_col, pred_prob_col){
   ret
 }
 
-#' Non standard evaluation version of eval_pred_bin_
+#' Non standard evaluation version of evaluate_binary_
 #' @param df Model data frame that can work prediction
 #' @export
 evaluate_binary <- function(df, actual_val, pred_prob, ...){
@@ -68,7 +78,9 @@ evaluate_binary <- function(df, actual_val, pred_prob, ...){
 }
 
 #' Calculate binary classification evaluation
-#' @param df Model data frame that can work prediction
+#' @param df Data Frame
+#' @param actual_val_col Column name for actual values
+#' @param pred_prob_col Column name for probability
 #' @export
 evaluate_binary_ <- function(df, actual_val_col, pred_prob_col, threshold = "f_score"){
 
@@ -114,7 +126,7 @@ evaluate_binary_ <- function(df, actual_val_col, pred_prob_col, threshold = "f_s
     "specificity"
   )
 
-  eval_pred_bin_each <- function(df){
+  evaluate_binary_each <- function(df){
 
     actual_val <- df[[actual_val_col]]
     pred_prob <- df[[pred_prob_col]]
@@ -166,29 +178,39 @@ evaluate_binary_ <- function(df, actual_val_col, pred_prob_col, threshold = "f_s
 
   group_cols <- grouped_by(df)
 
+  # Calculation is executed in each group.
+  # Storing the result in this tmp_col and
+  # unnesting the result.
+  # If the original data frame is grouped by "tmp",
+  # overwriting it should be avoided,
+  # so avoid_conflict is used here.
   tmp_col <- avoid_conflict(group_cols, "tmp")
   ret <- df %>%
-    dplyr::do_(.dots=setNames(list(~eval_pred_bin_each(.)), tmp_col)) %>%
+    dplyr::do_(.dots=setNames(list(~evaluate_binary_each(.)), tmp_col)) %>%
     tidyr::unnest_(tmp_col)
 
   ret
 }
 
-#' Non standard evaluation version of eval_pred_const_
-#' @param df Model data frame that can work prediction
+#' Non standard evaluation version of evaluate_continuous_
+#' @param df Data frame
+#' @param actual_val Column name for actual values
+#' @param fitted Column name for predicted values
 #' @export
-evaluate_continuos <- function(df, actual_val, fitted){
+evaluate_continuous <- function(df, actual_val, fitted){
   actual_val_col <- col_name(substitute(actual_val))
   fitted_col <- col_name(substitute(fitted))
-  evaluate_continuos_(df, actual_val_col, fitted_col)
+  evaluate_continuous_(df, actual_val_col, fitted_col)
 }
 
-#' Calculate binary classification evaluation
+#' Calculate continuous regression evaluation
 #' @param df Model data frame that can work prediction
+#' @param actual_val_col Column name for actual values
+#' @param fitted_col Column name for predicted values
 #' @export
-evaluate_continuos_ <- function(df, actual_val_col, fitted_col){
+evaluate_continuous_ <- function(df, actual_val_col, fitted_col){
 
-  eval_pred_cont_each <- function(df){
+  evaluate_continuous_each <- function(df){
 
     fitted_val <- df[[fitted_col]]
     actual_val <- df[[actual_val_col]]
@@ -196,27 +218,35 @@ evaluate_continuos_ <- function(df, actual_val_col, fitted_col){
     diff <- actual_val - fitted_val
     abs_diff <- abs(diff)
     diff_sq <- diff^2
+
+    # zero should be removed to avoid Inf
     not_zero_index <- actual_val != 0
-    mape <- if(length(not_zero_index) == 0){
+    mean_absolute_percentage_error <- if(length(not_zero_index) == 0){
       NA
     } else {
       diff_ratio <- abs(diff[not_zero_index] / actual_val[not_zero_index])
       mean(diff_ratio, na.rm = TRUE)
     }
 
-    mse <- mean(diff_sq, na.rm = TRUE)
-    rmse <- sqrt(mse)
-    mae <- mean(abs_diff, na.rm = TRUE)
+    mean_square_error <- mean(diff_sq, na.rm = TRUE)
+    root_mean_square_error <- sqrt(mean_square_error)
+    mean_absolute_error <- mean(abs_diff, na.rm = TRUE)
     data.frame(
-      mse, rmse, mae, mape
+      mean_square_error, root_mean_square_error, mean_absolute_error, mean_absolute_error
     )
   }
 
   group_cols <- grouped_by(df)
 
+  # Calculation is executed in each group.
+  # Storing the result in this tmp_col and
+  # unnesting the result.
+  # If the original data frame is grouped by "tmp",
+  # overwriting it should be avoided,
+  # so avoid_conflict is used here.
   tmp_col <- avoid_conflict(group_cols, "tmp")
   ret <- df %>%
-    dplyr::do_(.dots=setNames(list(~eval_pred_cont_each(.)), tmp_col)) %>%
+    dplyr::do_(.dots=setNames(list(~evaluate_continuous_each(.)), tmp_col)) %>%
     tidyr::unnest_(tmp_col)
 
   ret
