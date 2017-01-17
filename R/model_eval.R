@@ -203,15 +203,15 @@ evaluate_binary_ <- function(df, actual_val_col, pred_prob_col, threshold = "f_s
   ret
 }
 
-#' Non standard evaluation version of evaluate_continuous_
+#' Non standard evaluation version of evaluate_regression_
 #' @param df Data frame
 #' @param actual_val Column name for actual values
 #' @param fitted Column name for predicted values
 #' @export
-evaluate_continuous <- function(df, actual_val, fitted){
+evaluate_regression <- function(df, actual_val, fitted){
   actual_val_col <- col_name(substitute(actual_val))
   fitted_col <- col_name(substitute(fitted))
-  evaluate_continuous_(df, actual_val_col, fitted_col)
+  evaluate_regression_(df, actual_val_col, fitted_col)
 }
 
 #' Calculate continuous regression evaluation
@@ -219,9 +219,9 @@ evaluate_continuous <- function(df, actual_val, fitted){
 #' @param actual_val_col Column name for actual values
 #' @param fitted_col Column name for predicted values
 #' @export
-evaluate_continuous_ <- function(df, actual_val_col, fitted_col){
+evaluate_regression_ <- function(df, actual_val_col, fitted_col){
 
-  evaluate_continuous_each <- function(df){
+  evaluate_regression_each <- function(df){
 
     fitted_val <- df[[fitted_col]]
     actual_val <- df[[actual_val_col]]
@@ -257,7 +257,7 @@ evaluate_continuous_ <- function(df, actual_val_col, fitted_col){
   # so avoid_conflict is used here.
   tmp_col <- avoid_conflict(group_cols, "tmp")
   ret <- df %>%
-    dplyr::do_(.dots=setNames(list(~evaluate_continuous_each(.)), tmp_col)) %>%
+    dplyr::do_(.dots=setNames(list(~evaluate_regression_each(.)), tmp_col)) %>%
     tidyr::unnest_(tmp_col)
 
   ret
