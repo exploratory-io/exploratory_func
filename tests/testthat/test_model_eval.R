@@ -58,7 +58,7 @@ test_that("test eval_pred_bin with factor", {
 
   predicted <- prediction(model_data)
 
-  ret <- eval_pred_bin(predicted, CANCELLED, fitted_response, threshold = "accuracy")
+  ret <- evaluate_binary(predicted, CANCELLED, fitted_response, threshold = "accuracy")
 
   expect_equal(ret$AUC[[1]], 0.939772727272727)
 })
@@ -80,5 +80,5 @@ test_that("test eval_pred_cont", {
 
   predicted <- prediction(model_data)
 
-  ret <- eval_pred_cont(predicted, CANCELLED, fitted)
+  ret <- evaluate_continuos(predicted, CANCELLED, fitted)
 })

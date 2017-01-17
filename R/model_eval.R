@@ -61,16 +61,16 @@ do_roc_ <- function(df, actual_val_col, pred_prob_col){
 #' Non standard evaluation version of eval_pred_bin_
 #' @param df Model data frame that can work prediction
 #' @export
-eval_pred_bin <- function(df, actual_val, pred_prob, ...){
+evaluate_binary <- function(df, actual_val, pred_prob, ...){
   actual_val_col <- col_name(substitute(actual_val))
   pred_prob_col <- col_name(substitute(pred_prob))
-  eval_pred_bin_(df, actual_val_col, pred_prob_col, ...)
+  evaluate_binary_(df, actual_val_col, pred_prob_col, ...)
 }
 
 #' Calculate binary classification evaluation
 #' @param df Model data frame that can work prediction
 #' @export
-eval_pred_bin_ <- function(df, actual_val_col, pred_prob_col, threshold = "f_score"){
+evaluate_binary_ <- function(df, actual_val_col, pred_prob_col, threshold = "f_score"){
 
   get_scores <- function(act_label, pred_label) {
     tp <- pred_label & act_label
@@ -177,16 +177,16 @@ eval_pred_bin_ <- function(df, actual_val_col, pred_prob_col, threshold = "f_sco
 #' Non standard evaluation version of eval_pred_const_
 #' @param df Model data frame that can work prediction
 #' @export
-eval_pred_cont <- function(df, actual_val, fitted){
+evaluate_continuos <- function(df, actual_val, fitted){
   actual_val_col <- col_name(substitute(actual_val))
   fitted_col <- col_name(substitute(fitted))
-  eval_pred_cont_(df, actual_val_col, fitted_col)
+  evaluate_continuos_(df, actual_val_col, fitted_col)
 }
 
 #' Calculate binary classification evaluation
 #' @param df Model data frame that can work prediction
 #' @export
-eval_pred_cont_ <- function(df, actual_val_col, fitted_col){
+evaluate_continuos_ <- function(df, actual_val_col, fitted_col){
 
   eval_pred_cont_each <- function(df){
 
