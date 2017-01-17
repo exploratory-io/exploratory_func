@@ -209,8 +209,10 @@ test_that("test prediction binary", {
     test_data <- dplyr::bind_rows(test_data, test_data)
   }
 
+  test_data[["CANCELLED"]] <- as.factor(test_data[["CANCELLED"]])
+
   model_data <- build_lr(test_data, CANCELLED ~ DISTANCE, test_rate = 0.2)
 
-  ret <- prediction_binary(model_data, threshold = 0.5, type.predict = "response", pretty.name = TRUE)
-  expect_true("predicted_label" %in% colnames(ret))
+  ret <- prediction_binary(model_data, threshold = 0.5, pretty.name = FALSE)
+  expect_true("predicted" %in% colnames(ret))
 })
