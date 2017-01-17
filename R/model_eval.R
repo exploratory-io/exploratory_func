@@ -21,8 +21,10 @@ do_roc_ <- function(df, actual_val_col, pred_prob_col){
   fpr_col <- avoid_conflict(group_cols, "false_positive_rate")
 
   do_roc_each <- function(df){
+    # sort descending order by predicted probability
     arranged <- df[order(-df[[pred_prob_col]]), ]
 
+    # remove na and get actual values
     val <- arranged[[actual_val_col]][!is.na(arranged[[actual_val_col]])]
     if(is.factor(val)){
       # Need to subtract 1 because the first level in factor is regarded as 1
@@ -70,6 +72,8 @@ do_roc_ <- function(df, actual_val_col, pred_prob_col){
 
 #' Non standard evaluation version of evaluate_binary_
 #' @param df Model data frame that can work prediction
+#' @param actual_val Column name for actual values
+#' @param pred_prob Column name for probability
 #' @export
 evaluate_binary <- function(df, actual_val, pred_prob, ...){
   actual_val_col <- col_name(substitute(actual_val))
@@ -144,8 +148,12 @@ evaluate_binary_ <- function(df, actual_val_col, pred_prob_col, threshold = "f_s
       ret <- get_scores(actual_val, pred_label)
       ret[["threshold"]] <- threshold
     } else {
+      # store max result values in this variable
       max_values <- NULL
+      # store max value and will be compared to decide if max_values should be updated or not
       max_value <- -1
+
+      # try 100 threshold to search max
       for (thres in ((seq(101) - 1) / 100)){
 
         pred_label <- pred_prob >= thres
@@ -165,13 +173,16 @@ evaluate_binary_ <- function(df, actual_val_col, pred_prob_col, threshold = "f_s
       max_values
     }
 
+    # calculate AUC
     roc <- df %>% do_roc_(actual_val_col = actual_val_col, pred_prob_col = pred_prob_col)
 
     # use numeric index so that it won't be disturbed by name change
     # 2 should be false positive rate (x axis) and 1 should be true positive rate
     # calculate the area under the plots
     AUC <- sum((roc[[2]] - dplyr::lag(roc[[2]])) * roc[[1]], na.rm = TRUE)
-    ret[["AUC"]] <- AUC
+    auc_ret <- data.frame(AUC)
+
+    ret <- cbind(auc_ret, ret)
 
     ret
   }
