@@ -269,6 +269,10 @@ kmeans_info <- function(df){
 prediction <- function(df, test = TRUE, pretty.name = FALSE, ...){
   df_cnames <- colnames(df)
 
+  # columns other than "source.data", ".test_index" and "model" should be regarded as grouping columns
+  # this should be kept after running prediction
+  grouping_cols <- df_cnames[!df_cnames %in% c("source.data", ".test_index", "model")]
+
   # parsing arguments of prediction and getting optional arguemnt for augment in ...
   cll <- match.call()
   aug_args <- expand_args(cll, exclude = c("df", "test"))
@@ -400,6 +404,8 @@ prediction <- function(df, test = TRUE, pretty.name = FALSE, ...){
     colnames(ret)[colnames(ret) == ".std.resid"] <- avoid_conflict(colnames(ret), "standardised_residuals")
     ret
   }
+
+  dplyr::group_by_(ret, .dots = grouping_cols)
 }
 
 #' tidy wrapper for lm and glm
