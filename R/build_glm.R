@@ -109,9 +109,9 @@ build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, g
   })
   if(augment){
     if(test_rate == 0){
-      ret <- prediction(ret, test = FALSE)
+      ret <- prediction(ret, data = "training")
     } else {
-      ret <- prediction(ret, test = TRUE)
+      ret <- prediction(ret, data = "test")
     }
   } else {
     class(ret[[model_col]]) <- c("list", ".model", ".model.glm")

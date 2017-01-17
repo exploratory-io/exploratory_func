@@ -266,7 +266,14 @@ kmeans_info <- function(df){
 #' @param test Test data or training data should be used as data
 #' @param ... Additional argument to be passed to broom::augment
 #' @export
-prediction <- function(df, test = TRUE, pretty.name = FALSE, ...){
+prediction <- function(df, data = "test", pretty.name = FALSE, ...){
+
+  if (!data %in% c("test", "training")) {
+    stop('data argument must be "test" or "training"')
+  }
+
+  test <- data == "test"
+
   df_cnames <- colnames(df)
 
   # columns other than "source.data", ".test_index" and "model" should be regarded as grouping columns
@@ -275,7 +282,7 @@ prediction <- function(df, test = TRUE, pretty.name = FALSE, ...){
 
   # parsing arguments of prediction and getting optional arguemnt for augment in ...
   cll <- match.call()
-  aug_args <- expand_args(cll, exclude = c("df", "test"))
+  aug_args <- expand_args(cll, exclude = c("df", "test", "data"))
 
   # if type.predict argument is not indicated in this function
   # and models have $family$linkinv (basically, glm models have it),
@@ -406,6 +413,38 @@ prediction <- function(df, test = TRUE, pretty.name = FALSE, ...){
   }
 
   dplyr::group_by_(ret, .dots = grouping_cols)
+}
+
+#' @export
+prediction_binary = function(df, threshold = 0.5, ...){
+  ret <- prediction(df, ...)
+
+  first_model <- df[["model"]][[1]]
+
+  # get actual value column
+  actual_col <- all.vars(first_model$formula)[[1]]
+
+  actual_val <- ret[[actual_col]]
+
+  prob_col_name <- if ("fitted_response" %in% colnames(ret)) {
+    "fitted_response"
+  } else {
+    "fitted"
+  }
+
+  predicted <- ret[[prob_col_name]] >= threshold
+
+  label <- if (is.logical(actual_val)) {
+    predicted
+  } else if (is.numeric(actual_val)) {
+    as.numeric(predicted)
+  } else if (is.factor(actual_val)){
+    factor(levels(actual_val)[as.numeric(predicted) + 1], levels(actual_val))
+  }
+
+  ret[["predicted"]] <- label
+
+  ret
 }
 
 #' tidy wrapper for lm and glm

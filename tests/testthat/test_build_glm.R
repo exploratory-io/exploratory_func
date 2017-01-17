@@ -119,7 +119,7 @@ test_that("prediction with categorical columns", {
 
   ret <- prediction(model_data, type.predict = "response", pretty.name = TRUE)
   both_ret <- prediction(model_data, pretty.name = TRUE)
-  train_ret <- prediction(model_data, test = FALSE, pretty.name = TRUE)
+  train_ret <- prediction(model_data, data = "training", pretty.name = TRUE)
 
   expect_true(nrow(ret) > 0)
   expect_true(all(ret["Fitted"] >= 0 & ret["Fitted"] <= 1))

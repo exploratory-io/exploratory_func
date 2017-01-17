@@ -92,7 +92,7 @@ test_that("build_lm with evaluation", {
   expect_equal(colnames(evaluated), c("group", "num1", "num2", "Fitted", "Standard Error"))
 
   test_eval <- lm_model %>%
-    prediction(test = FALSE, pretty.name = TRUE)
+    prediction(data = "training", pretty.name = TRUE)
 
   expect_equal(colnames(test_eval), c("group", "num1", "num2",
                                       "Fitted", "Standard Error", "Residuals",
