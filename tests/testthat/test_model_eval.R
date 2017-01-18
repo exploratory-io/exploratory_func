@@ -80,5 +80,5 @@ test_that("test eval_pred_cont", {
 
   predicted <- prediction(model_data)
 
-  ret <- evaluate_continuous(predicted, CANCELLED, fitted)
+  ret <- evaluate_regression(predicted, CANCELLED, fitted)
 })
