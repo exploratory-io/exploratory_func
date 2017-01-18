@@ -438,6 +438,10 @@ prediction_binary <- function(df, threshold = 0.5, ...){
 
   ret[["predicted_label"]] <- label
 
+  ret <- move_col(ret, "predicted_label", which(colnames(ret) == prob_col_name) + 1)
+  colnames(ret)[colnames(ret) == prob_col_name] <- "predicted_probability"
+  colnames(ret)[colnames(ret) == "fitted_link"] <- "fitted"
+
   ret
 }
 

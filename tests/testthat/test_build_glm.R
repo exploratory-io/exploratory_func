@@ -126,11 +126,11 @@ test_that("prediction with categorical columns", {
   expect_equal(colnames(ret), c("CANCELLED", "Carrier.Name", "CARRIER", "DISTANCE", "fitted", "standard_error"))
 
   expect_true(all(both_ret["fitted_response"] >= 0 & both_ret["fitted_response"] <= 1))
-  expect_equal(colnames(both_ret), c("CANCELLED", "Carrier.Name", "CARRIER", "DISTANCE", "fitted_response", "fitted_link", "standard_error"))
+  expect_equal(colnames(both_ret), c("CANCELLED", "Carrier.Name", "CARRIER", "DISTANCE", "fitted_link", "fitted_response", "standard_error"))
 
   expect_true(all(train_ret["fitted_response"] >= 0 & train_ret["fitted_response"] <= 1))
-  expect_equal(colnames(train_ret), c("CANCELLED", "Carrier.Name", "CARRIER", "DISTANCE", "fitted_response",
-                                      "fitted_link", "standard_error", "residuals", "hat", "residual_standard_deviation",
+  expect_equal(colnames(train_ret), c("CANCELLED", "Carrier.Name", "CARRIER", "DISTANCE", "fitted_link", "fitted_response",
+                                      "standard_error", "residuals", "hat", "residual_standard_deviation",
                                       "cooks_distance", "standardised_residuals"))
 
   add_prediction_ret <- test_data %>% add_prediction(model_data, type.predict = "response")

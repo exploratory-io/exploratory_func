@@ -498,7 +498,7 @@ add_response <- function(data, model, response_label = "Fitted.response"){
   data[[response_label]] <- model$family$linkinv(data[[".fitted"]])
   # set response_label next to .fitted
   fitted_posi <- which(colnames(data) == ".fitted")
-  data <- move_col(data, response_label, fitted_posi)
+  data <- move_col(data, response_label, fitted_posi + 1)
   data
 }
 
