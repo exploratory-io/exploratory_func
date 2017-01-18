@@ -586,16 +586,18 @@ get_score <- function(act_label, pred_label) {
   test_size <- true_positive + false_positive + true_negative + false_negative
 
   precision <- true_positive / sum(pred_label, na.rm = TRUE)
-  sensitivity <- true_positive / sum(act_label, na.rm = TRUE)
+  recall <- true_positive / sum(act_label, na.rm = TRUE)
   specificity <- true_negative / sum(!act_label, na.rm = TRUE)
   accuracy <- (true_positive + true_negative) / test_size
-  f_score <- 2 * (precision * sensitivity) / (precision + sensitivity)
+  missclassification_error <- 1 - accuracy
+  f_score <- 2 * (precision * recall) / (precision + recall)
 
   data.frame(
     f_score,
     accuracy,
+    missclassification_error,
     precision,
-    sensitivity,
+    recall,
     specificity,
     true_positive,
     false_positive,
@@ -612,7 +614,7 @@ get_optimized_score <- function(actual_val, pred_prob, threshold = "f_score"){
     "f_score",
     "accuracy",
     "precision",
-    "sensitivity",
+    "recall",
     "specificity"
   )
 

@@ -103,7 +103,7 @@ evaluate_binary_ <- function(df, actual_val_col, pred_prob_col, threshold = "f_s
 
     ret <- if (is.numeric(threshold)) {
       pred_label <- pred_prob >= threshold
-      ret <- get_scores(actual_val, pred_label)
+      ret <- get_score(actual_val, pred_label)
       ret[["threshold"]] <- threshold
       ret
     } else {
