@@ -39,6 +39,8 @@ test_that("test build_glm with grouped ", {
   trial <- test_df %>% build_glm(num1 ~ num2, group_cols = c("group1", "group2"))
   expect_equal(length(trial[["group2"]]), 8)
   expect_equal(length(trial[["group1"]]), 8)
+
+  expect_error(build_glm(test_df, num1 ~ num2 + group1, group_cols = c("group1", "group2")), "'group1' is a grouping column. Please remove it from variables.")
 })
 
 test_that("test build_glm with augment TRUE", {
@@ -126,12 +128,12 @@ test_that("prediction with categorical columns", {
   expect_equal(colnames(ret), c("CANCELLED", "Carrier.Name", "CARRIER", "DISTANCE", "fitted", "standard_error"))
 
   expect_true(all(both_ret["fitted_response"] >= 0 & both_ret["fitted_response"] <= 1))
-  expect_equal(colnames(both_ret), c("CANCELLED", "Carrier.Name", "CARRIER", "DISTANCE", "fitted_link", "fitted_response", "standard_error"))
+  expect_equal(colnames(both_ret), c("CANCELLED", "Carrier.Name", "CARRIER", "DISTANCE", "fitted_link", "standard_error", "fitted_response"))
 
   expect_true(all(train_ret["fitted_response"] >= 0 & train_ret["fitted_response"] <= 1))
-  expect_equal(colnames(train_ret), c("CANCELLED", "Carrier.Name", "CARRIER", "DISTANCE", "fitted_link", "fitted_response",
+  expect_equal(colnames(train_ret), c("CANCELLED", "Carrier.Name", "CARRIER", "DISTANCE", "fitted_link",
                                       "standard_error", "residuals", "hat", "residual_standard_deviation",
-                                      "cooks_distance", "standardised_residuals"))
+                                      "cooks_distance", "standardised_residuals", "fitted_response"))
 
   add_prediction_ret <- test_data %>% add_prediction(model_data, type.predict = "response")
   expect_true(all(add_prediction_ret["fitted"] >= 0 & add_prediction_ret["fitted"] <= 1))

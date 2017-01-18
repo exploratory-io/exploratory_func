@@ -56,6 +56,8 @@ build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, g
       dplyr::group_by(.test_index)
   }
 
+  group_col_names <- grouped_by(data)
+
   model_col <- "model"
   source_col <- "source.data"
 
@@ -104,6 +106,16 @@ build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, g
   }, error = function(e){
     if(e$message == "contrasts can be applied only to factors with 2 or more levels"){
       stop("more than 2 unique values are needed for categorical predictor columns")
+    }
+
+    # cases when a grouping column is in variables
+    if (stringr::str_detect(e$message, "object .* not found")) {
+      replaced <- gsub("^object ", "", e$message)
+      name <- gsub(" not found$", "", replaced)
+      # name is with single quotations, so put them to group_cols and compare them
+      if (name %in% paste0("'", group_col_names, "'")) {
+        stop(paste0(name, " is a grouping column. Please remove it from variables."))
+      }
     }
     stop(e$message)
   })

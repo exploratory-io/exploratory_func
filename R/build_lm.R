@@ -53,6 +53,8 @@ build_lm <- function(data, ..., keep.source = TRUE, augment = FALSE, group_cols 
       dplyr::group_by(source.data)
   }
 
+  group_col_names <- grouped_by(data)
+
   model_col <- "model"
   source_col <- "source.data"
 
@@ -101,6 +103,16 @@ build_lm <- function(data, ..., keep.source = TRUE, augment = FALSE, group_cols 
     }
     if(e$message == "0 (non-NA) cases"){
       stop("no data after removing NA")
+    }
+
+    # cases when a grouping column is in variables
+    if (stringr::str_detect(e$message, "object .* not found")) {
+      replaced <- gsub("^object ", "", e$message)
+      name <- gsub(" not found$", "", replaced)
+      # name is with single quotations, so put them to group_cols and compare them
+      if (name %in% paste0("'", group_cols, "'")) {
+        stop(paste0(name, " is a grouping column. Please remove it from variables."))
+      }
     }
     stop(e$message)
   })
