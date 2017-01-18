@@ -264,7 +264,6 @@ kmeans_info <- function(df){
 #' augment using source data and test index
 #' @param df Data frame that has model and .test_index.
 #' @param data "test" or "training". Which source data should be used.
-#' @param data "test" or "training". Which source data should be used.
 #' @param ... Additional argument to be passed to broom::augment
 #' @export
 prediction <- function(df, data = "test", ...){
@@ -399,9 +398,9 @@ prediction <- function(df, data = "test", ...){
 
 #' prediction wrapper to set predicted labels
 #' @param df Data frame to predict. This should have model column.
-#' @param threshold Threshold value for predicted probability.
+#' @param threshold Threshold value for predicted probability or what to optimize. It can be "f_score", "accuracy", "precision", "sensitivity" or "specificity" to optimize.
 #' @export
-prediction_binary = function(df, threshold = 0.5, ...){
+prediction_binary <- function(df, threshold = 0.5, ...){
   ret <- prediction(df, ...)
 
   first_model <- df[["model"]][[1]]

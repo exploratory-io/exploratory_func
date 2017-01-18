@@ -88,48 +88,6 @@ evaluate_binary <- function(df, actual_val, pred_prob, ...){
 #' @export
 evaluate_binary_ <- function(df, actual_val_col, pred_prob_col, threshold = "f_score"){
 
-  get_scores <- function(act_label, pred_label) {
-    tp <- pred_label & act_label
-    fp <- pred_label & !act_label
-    tn <- !pred_label & !act_label
-    fn <- !pred_label & act_label
-
-    true_positive <- sum(tp, na.rm = TRUE)
-    false_positive <- sum(fp, na.rm = TRUE)
-    true_negative <- sum(tn, na.rm = TRUE)
-    false_negative <- sum(fn, na.rm = TRUE)
-
-    test_size <- true_positive + false_positive + true_negative + false_negative
-
-    precision <- true_positive / sum(pred_label, na.rm = TRUE)
-    sensitivity <- true_positive / sum(act_label, na.rm = TRUE)
-    specificity <- true_negative / sum(!act_label, na.rm = TRUE)
-    accuracy <- (true_positive + true_negative) / test_size
-    f_score <- 2 * (precision * sensitivity) / (precision + sensitivity)
-
-    data.frame(
-      f_score,
-      accuracy,
-      precision,
-      sensitivity,
-      specificity,
-      true_positive,
-      false_positive,
-      true_negative,
-      false_negative,
-      test_size
-    )
-  }
-
-  # threshold can be optimized to the result below
-  accept_optimize <- c(
-    "f_score",
-    "accuracy",
-    "precision",
-    "sensitivity",
-    "specificity"
-  )
-
   evaluate_binary_each <- function(df){
 
     actual_val <- df[[actual_val_col]]
@@ -147,30 +105,9 @@ evaluate_binary_ <- function(df, actual_val_col, pred_prob_col, threshold = "f_s
       pred_label <- pred_prob >= threshold
       ret <- get_scores(actual_val, pred_label)
       ret[["threshold"]] <- threshold
+      ret
     } else {
-      # store max result values in this variable
-      max_values <- NULL
-      # store max value and will be compared to decide if max_values should be updated or not
-      max_value <- -1
-
-      # try 100 threshold to search max
-      for (thres in ((seq(101) - 1) / 100)){
-
-        pred_label <- pred_prob >= thres
-
-        score <- get_scores(actual_val, pred_label)
-
-        if (!threshold %in% accept_optimize) {
-          stop(paste0("threshold must be chosen from ", paste(accept_optimize, collapse = ", ")))
-        } else if (is.nan(score[[threshold]])) {
-          # if nan, pass to avoid error
-        } else if (max_value < score[[threshold]]){
-          max_values <- score
-          max_values[["threshold"]] <- thres
-          max_value <- score[[threshold]]
-        }
-      }
-      max_values
+      get_optimized_score(actual_val, pred_prob, threshold)
     }
 
     # calculate AUC
