@@ -572,7 +572,7 @@ unixtime_to_datetime <- function(data){
 }
 
 # get binary prediction scores
-get_scores <- function(act_label, pred_label) {
+get_score <- function(act_label, pred_label) {
   tp <- pred_label & act_label
   fp <- pred_label & !act_label
   tn <- !pred_label & !act_label
@@ -605,6 +605,7 @@ get_scores <- function(act_label, pred_label) {
   )
 }
 
+# get optimized binary prediction scores
 get_optimized_score <- function(actual_val, pred_prob, threshold = "f_score"){
   # threshold can be optimized to the result below
   accept_optimize <- c(
@@ -622,7 +623,7 @@ get_optimized_score <- function(actual_val, pred_prob, threshold = "f_score"){
 
     pred_label <- pred_prob >= thres
 
-    score <- get_scores(actual_val, pred_label)
+    score <- get_score(actual_val, pred_label)
 
     if (!threshold %in% accept_optimize) {
       stop(paste0("threshold must be chosen from ", paste(accept_optimize, collapse = ", ")))
