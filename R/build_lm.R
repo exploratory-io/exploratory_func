@@ -73,6 +73,7 @@ build_lm <- function(data, ..., keep.source = TRUE, augment = FALSE, group_cols 
       dplyr::mutate(model = purrr::map2(source.data, .test_index, function(df, index){
         data <- safe_slice(df, index, remove = TRUE)
 
+        # execute lm with parsed arguments
         eval(parse(text = paste0("stats::lm(data = data, ", arg_char, ")")))
       }))
     if(!keep.source & !augment){

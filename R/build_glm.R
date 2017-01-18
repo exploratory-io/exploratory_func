@@ -76,6 +76,7 @@ build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, g
       dplyr::mutate(model = purrr::map2(source.data, .test_index, function(df, index){
         data <- safe_slice(df, index, remove = TRUE)
 
+        # execute glm with parsed arguments
         eval(parse(text = paste0("stats::glm(data = data, ", arg_char, ")")))
       }))
     if(!keep.source & !augment){
