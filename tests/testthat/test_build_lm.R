@@ -87,7 +87,7 @@ test_that("build_lm with evaluation", {
     build_lm(num1 ~ num2, group_cols = c("group"), test_rate = 0.1)
 
   evaluated <- lm_model %>%
-    prediction()
+    prediction(data = "test")
 
   expect_equal(colnames(evaluated), c("group", "num1", "num2", "fitted", "standard_error"))
 
@@ -117,7 +117,7 @@ test_that("prediction with categorical columns", {
 
   model_data <- build_lm(test_data, CANCELLED ~ `Carrier Name` + CARRIER + DISTANCE, test_rate = 0.6)
 
-  ret <- prediction(model_data, pretty.name = TRUE)
+  ret <- prediction(model_data, data = "test", pretty.name = TRUE)
   expect_true(nrow(ret) > 0)
   expect_equal(colnames(ret), c("CANCELLED", "Carrier.Name", "CARRIER", "DISTANCE", "fitted", "standard_error"))
 })

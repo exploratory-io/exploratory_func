@@ -56,7 +56,7 @@ test_that("test eval_pred_bin with factor", {
 
   model_data <- build_lr(test_data, CANCELLED ~ `Carrier Name` + CARRIER + DISTANCE, test_rate = 0.2)
 
-  predicted <- prediction(model_data)
+  predicted <- prediction(model_data, data = "test")
 
   ret <- evaluate_binary(predicted, CANCELLED, fitted_response, threshold = "accuracy")
 
@@ -78,7 +78,7 @@ test_that("test eval_pred_cont", {
 
   model_data <- build_lm(test_data, DISTANCE ~ CARRIER + CANCELLED, test_rate = 0.2)
 
-  predicted <- prediction(model_data)
+  predicted <- prediction(model_data, data = "test")
 
   ret <- evaluate_regression(predicted, CANCELLED, fitted)
 })

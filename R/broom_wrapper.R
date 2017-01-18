@@ -263,13 +263,17 @@ kmeans_info <- function(df){
 
 #' augment using source data and test index
 #' @param df Data frame that has model and .test_index.
-#' @param data "test" or "training". Which source data should be used.
+#' @param data "training" or "test". Which source data should be used.
 #' @param ... Additional argument to be passed to broom::augment
 #' @export
-prediction <- function(df, data = "test", ...){
+prediction <- function(df, data = "training", ...){
 
   if (!data %in% c("test", "training")) {
     stop('data argument must be "test" or "training"')
+  }
+
+  if (!all(c("source.data", ".test_index", "model") %in% colnames(df))) {
+    stop('input is not model data frame"')
   }
 
   test <- data == "test"
