@@ -114,11 +114,10 @@ evaluate_binary_ <- function(df, actual_val_col, pred_prob_col, threshold = "f_s
       get_optimized_score(actual_val, pred_prob, threshold)
     }
 
-    # calculate AUC
+    # calculate AUC from ROC
     roc <- df %>% do_roc_(actual_val_col = actual_val_col, pred_prob_col = pred_prob_col)
-
     # use numeric index so that it won't be disturbed by name change
-    # 2 should be false positive rate (x axis) and 1 should be true positive rate
+    # 2 should be false positive rate (x axis) and 1 should be true positive rate (yaxis)
     # calculate the area under the plots
     AUC <- sum((roc[[2]] - dplyr::lag(roc[[2]])) * roc[[1]], na.rm = TRUE)
     auc_ret <- data.frame(AUC)
