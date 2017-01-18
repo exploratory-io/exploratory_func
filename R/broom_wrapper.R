@@ -409,6 +409,7 @@ prediction_binary <- function(df, threshold = 0.5, ...){
   actual_col <- all.vars(first_model$formula)[[1]]
 
   actual_val <- ret[[actual_col]]
+  actual_logical <- as.logical(as.numeric(actual_val))
 
   prob_col_name <- if ("fitted_response" %in% colnames(ret)) {
     "fitted_response"
@@ -416,7 +417,14 @@ prediction_binary <- function(df, threshold = 0.5, ...){
     "fitted"
   }
 
-  predicted <- ret[[prob_col_name]] >= threshold
+  thres <- if (!is.numeric(threshold)) {
+    opt <- get_optimized_score(actual_logical, ret[[prob_col_name]], threshold)
+    opt[["threshold"]]
+  } else {
+    threshold
+  }
+
+  predicted <- ret[[prob_col_name]] >= thres
 
   label <- if (is.logical(actual_val)) {
     predicted
@@ -428,7 +436,7 @@ prediction_binary <- function(df, threshold = 0.5, ...){
     factor(levels(actual_val)[as.numeric(predicted) + 1], levels(actual_val))
   }
 
-  ret[["predicted"]] <- label
+  ret[["predicted_label"]] <- label
 
   ret
 }

@@ -214,5 +214,9 @@ test_that("test prediction binary", {
   model_data <- build_lr(test_data, CANCELLED ~ DISTANCE, test_rate = 0.2)
 
   ret <- prediction_binary(model_data, threshold = 0.5, pretty.name = FALSE)
-  expect_true("predicted" %in% colnames(ret))
+  expect_true("predicted_label" %in% colnames(ret))
+
+  opt_ret <- prediction_binary(model_data, threshold = "f_score", pretty.name = FALSE)
+  expect_true(any(ret[["predicted_label"]] != opt_ret[["predicted_label"]]))
+
 })
