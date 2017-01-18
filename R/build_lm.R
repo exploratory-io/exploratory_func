@@ -96,7 +96,7 @@ build_lm <- function(data, ..., keep.source = TRUE, augment = FALSE, group_cols 
       replaced <- gsub("^object ", "", e$message)
       name <- gsub(" not found$", "", replaced)
       # name is with single quotations, so put them to group_cols and compare them
-      if (name %in% paste0("'", group_cols, "'")) {
+      if (name %in% paste0("'", group_col_names, "'")) {
         stop(paste0(name, " is a grouping column. Please remove it from variables."))
       }
     }

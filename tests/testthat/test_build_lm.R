@@ -121,4 +121,9 @@ test_that("prediction with categorical columns", {
   ret <- prediction(model_data, data = "test", pretty.name = TRUE)
   expect_true(nrow(ret) > 0)
   expect_equal(colnames(ret), c("CANCELLED", "Carrier.Name", "CARRIER", "DISTANCE", "fitted", "standard_error"))
+
+  grouped <- test_data %>%
+    dplyr::group_by(CARRIER)
+
+  expect_error(build_lm(grouped, CANCELLED ~ CARRIER), "'CARRIER' is a grouping column. Please remove it from variables.")
 })
