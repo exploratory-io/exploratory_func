@@ -168,8 +168,8 @@ add_prediction <- function(df, model_df, ...){
     }
   })
   # update column name based on both link and response are there for fitted values
-  fitted_label <- if("fitted.response" %in% colnames(ret)){
-    "fitted.link"
+  fitted_label <- if("fitted_response" %in% colnames(ret)){
+    "fitted_link"
   } else {
     "fitted"
   }
@@ -262,39 +262,36 @@ kmeans_info <- function(df){
 }
 
 #' augment using source data and test index
-#' @param df Data frame that has model and .test_index
-#' @param source_data Data frame used to create the model data
-#' @param test Test data or training data should be used as data
+#' @param df Data frame that has model and .test_index.
+#' @param data "training" or "test". Which source data should be used.
 #' @param ... Additional argument to be passed to broom::augment
 #' @export
-prediction <- function(df, source_data, test = TRUE, ...){
-  df_cnames <- colnames(df)
-  # columns that are not model related are regarded as grouping column
-  grouping_col <- df_cnames[!df_cnames %in% c("model", ".test_index", "source.data")]
+prediction <- function(df, data = "training", ...){
 
-  source <- if(any(colnames(source_data) %in% grouping_col)){
-    # nest the source data by each group
-    source_data %>%
-      dplyr::group_by_(.dots = grouping_col) %>%
-      tidyr::nest()
-  } else {
-    # put one value column so that all data can be nested
-    source_data %>%
-      dplyr::mutate(data = 1) %>%
-      dplyr::group_by(data) %>%
-      tidyr::nest()
+  if (!data %in% c("test", "training")) {
+    stop('data argument must be "test" or "training"')
   }
 
-  # drop unnecessary columns
-  df <- dplyr::select(df, .test_index, model)
+  if (!all(c("source.data", ".test_index", "model") %in% colnames(df))) {
+    stop('input is not model data frame"')
+  }
+
+  test <- data == "test"
+
+  df_cnames <- colnames(df)
+
+  # columns other than "source.data", ".test_index" and "model" should be regarded as grouping columns
+  # this should be kept after running prediction
+  grouping_cols <- df_cnames[!df_cnames %in% c("source.data", ".test_index", "model")]
 
   # parsing arguments of prediction and getting optional arguemnt for augment in ...
   cll <- match.call()
-  aug_args <- expand_args(cll, exclude = c("df", "source_data", "test"))
+  aug_args <- expand_args(cll, exclude = c("df", "test", "data"))
 
   # if type.predict argument is not indicated in this function
   # and models have $family$linkinv (basically, glm models have it),
   # both fitted link value column and response value column should appear in the result
+
   with_response <- !("type.predict" %in% names(cll)) & !is.null(df[["model"]][[1]]$family) & !is.null(df[["model"]][[1]]$family$linkinv)
 
   ret <- if(test){
@@ -304,13 +301,13 @@ prediction <- function(df, source_data, test = TRUE, ...){
     # because ... can't be passed to a function inside mutate directly.
     # If test is TRUE, this uses newdata as an argument and if not, uses data as an argument.
     aug_fml <- if(aug_args == ""){
-      as.formula("~list(broom::augment(model, newdata = data))")
+      as.formula("~list(broom::augment(model, newdata = source.data))")
     } else {
-      as.formula(paste0("~list(broom::augment(model, newdata = data, ", aug_args, "))"))
+      as.formula(paste0("~list(broom::augment(model, newdata = source.data, ", aug_args, "))"))
     }
-    data_to_augment <- dplyr::bind_cols(df, source) %>%
+    data_to_augment <- df %>%
       dplyr::ungroup() %>%
-      dplyr::mutate(data = purrr::map2(data, .test_index, function(df, index){
+      dplyr::mutate(source.data = purrr::map2(source.data, .test_index, function(df, index){
         # keep data only in test_index
         safe_slice(df, index)
       })) %>%
@@ -319,23 +316,28 @@ prediction <- function(df, source_data, test = TRUE, ...){
     augmented <- tryCatch({
       data_to_augment %>%
         dplyr::rowwise() %>%
-        # evaluate the formula of augment and "data" column will have it
-        dplyr::mutate_(.dots = list(data = aug_fml))
+        # evaluate the formula of augment and "source.data" column will have it
+        dplyr::mutate_(.dots = list(source.data = aug_fml))
     }, error = function(e){
       if (grepl("arguments imply differing number of rows: ", e$message)) {
         data_to_augment %>%
-          dplyr::mutate(data = purrr::map2(data, model, function(df, model){
+          dplyr::mutate(source.data = purrr::map2(source.data, model, function(df, model){
             # remove rows that have categories that aren't in training data
             # otherwise, broom::augment causes an error
             filtered_data <- df
             for (cname in colnames(model$model)) {
               filtered_data <- filtered_data[filtered_data[[cname]] %in% model$model[[cname]], ]
             }
+
+            if(nrow(filtered_data) == 0){
+              stop("no data found that can be predicted by the model")
+            }
+
             filtered_data
           })) %>%
           dplyr::rowwise() %>%
           # evaluate the formula of augment and "data" column will have it
-          dplyr::mutate_(.dots = list(data = aug_fml))
+          dplyr::mutate_(.dots = list(source.data = aug_fml))
       } else {
         stop(e$message)
       }
@@ -344,12 +346,12 @@ prediction <- function(df, source_data, test = TRUE, ...){
     if (with_response){
       augmented <- augmented %>%
         dplyr::ungroup() %>%
-        dplyr::mutate(data = purrr::map2(data, model, add_response))
+        dplyr::mutate(source.data = purrr::map2(source.data, model, add_response))
     }
 
     ret <- augmented %>%
       dplyr::select(-model) %>%
-      tidyr::unnest(data)
+      tidyr::unnest(source.data)
 
   } else {
     # augment by trainig data
@@ -358,96 +360,181 @@ prediction <- function(df, source_data, test = TRUE, ...){
     # because ... can't be passed to a function inside mutate directly.
     # If test is FALSE, this uses data as an argument and if not, uses newdata as an argument.
     aug_fml <- if(aug_args == ""){
-      as.formula("~list(broom::augment(model, data = data))")
+      as.formula("~list(broom::augment(model, data = source.data))")
     } else {
-      as.formula(paste0("~list(broom::augment(model, data = data, ", aug_args, "))"))
+      as.formula(paste0("~list(broom::augment(model, data = source.data, ", aug_args, "))"))
     }
-    augmented <- dplyr::bind_cols(df, source) %>%
+    augmented <- df %>%
       dplyr::ungroup() %>%
-      dplyr::mutate(data = purrr::map2(data, .test_index, function(df, index){
+      dplyr::mutate(source.data = purrr::map2(source.data, .test_index, function(df, index){
         # remove data in test_index
         safe_slice(df, index, remove = TRUE)
       })) %>%
       dplyr::select(-.test_index) %>%
       dplyr::rowwise() %>%
       # evaluate the formula of augment and "data" column will have it
-      dplyr::mutate_(.dots = list(data = aug_fml))
+      dplyr::mutate_(.dots = list(source.data = aug_fml))
 
     if (with_response){
       augmented <- augmented %>%
         dplyr::ungroup() %>%
-        dplyr::mutate(data = purrr::map2(data, model, add_response))
+        dplyr::mutate(source.data = purrr::map2(source.data, model, add_response))
     }
 
     augmented %>%
       dplyr::select(-model) %>%
-      tidyr::unnest(data)
-  }
-  # update column name based on both link and response are there for fitted values
-  fitted_label <- if("Fitted.response" %in% colnames(ret)){
-    "Fitted.link"
-  } else {
-    "Fitted"
+      tidyr::unnest(source.data)
   }
 
+  # update column name based on both link and response are there for fitted values
+  fitted_label <- if("fitted_response" %in% colnames(ret)){
+    "fitted_link"
+  } else {
+    "fitted"
+  }
+
+  colnames(ret)[colnames(ret) == "Fitted.response"] <- avoid_conflict(colnames(ret), "fitted_response")
   colnames(ret)[colnames(ret) == ".fitted"] <- avoid_conflict(colnames(ret), fitted_label)
-  colnames(ret)[colnames(ret) == ".se.fit"] <- avoid_conflict(colnames(ret), "Standard Error")
-  colnames(ret)[colnames(ret) == ".resid"] <- avoid_conflict(colnames(ret), "Residuals")
-  colnames(ret)[colnames(ret) == ".hat"] <- avoid_conflict(colnames(ret), "Hat")
-  colnames(ret)[colnames(ret) == ".sigma"] <- avoid_conflict(colnames(ret), "Residual Standard Deviation")
-  colnames(ret)[colnames(ret) == ".cooksd"] <- avoid_conflict(colnames(ret), "Cooks Distance")
-  colnames(ret)[colnames(ret) == ".std.resid"] <- avoid_conflict(colnames(ret), "Standardised Residuals")
+  colnames(ret)[colnames(ret) == ".se.fit"] <- avoid_conflict(colnames(ret), "standard_error")
+  colnames(ret)[colnames(ret) == ".resid"] <- avoid_conflict(colnames(ret), "residuals")
+  colnames(ret)[colnames(ret) == ".hat"] <- avoid_conflict(colnames(ret), "hat")
+  colnames(ret)[colnames(ret) == ".sigma"] <- avoid_conflict(colnames(ret), "residual_standard_deviation")
+  colnames(ret)[colnames(ret) == ".cooksd"] <- avoid_conflict(colnames(ret), "cooks_distance")
+  colnames(ret)[colnames(ret) == ".std.resid"] <- avoid_conflict(colnames(ret), "standardised_residuals")
+
+  dplyr::group_by_(ret, .dots = grouping_cols)
+}
+
+#' prediction wrapper to set predicted labels
+#' @param df Data frame to predict. This should have model column.
+#' @param threshold Threshold value for predicted probability or what to optimize. It can be "f_score", "accuracy", "precision", "sensitivity" or "specificity" to optimize.
+#' @export
+prediction_binary <- function(df, threshold = 0.5, ...){
+  ret <- prediction(df, ...)
+
+  first_model <- df[["model"]][[1]]
+
+  # get actual value column name from model formula
+  actual_col <- all.vars(first_model$formula)[[1]]
+
+  actual_val <- ret[[actual_col]]
+  actual_logical <- as.logical(as.numeric(actual_val))
+
+  prob_col_name <- if ("fitted_response" %in% colnames(ret)) {
+    "fitted_response"
+  } else {
+    "fitted"
+  }
+
+  thres <- if (!is.numeric(threshold)) {
+    opt <- get_optimized_score(actual_logical, ret[[prob_col_name]], threshold)
+    opt[["threshold"]]
+  } else {
+    threshold
+  }
+
+  predicted <- ret[[prob_col_name]] >= thres
+
+  label <- if (is.logical(actual_val)) {
+    predicted
+  } else if (is.numeric(actual_val)) {
+    as.numeric(predicted)
+  } else if (is.factor(actual_val)){
+    # create a factor vector with the same levels as actual_val
+    # predicted is logical, so should +1 to make it index
+    factor(levels(actual_val)[as.numeric(predicted) + 1], levels(actual_val))
+  }
+
+  ret[["predicted_label"]] <- label
+  colnames(ret)[colnames(ret) == prob_col_name] <- "predicted_probability"
+  colnames(ret)[colnames(ret) == "fitted_link"] <- "fitted"
+
   ret
 }
 
 #' tidy wrapper for lm and glm
 #' @export
-model_coef <- function(df){
-  ret <- broom::tidy(df, model)
-  colnames(ret)[colnames(ret) == "term"] <- "Term"
-  colnames(ret)[colnames(ret) == "statistic"] <- "t Ratio"
-  colnames(ret)[colnames(ret) == "p.value"] <- "Prob > |t|"
-  colnames(ret)[colnames(ret) == "std.error"] <- "Std Error"
-  colnames(ret)[colnames(ret) == "estimate"] <- "Estimate"
+model_coef <- function(df, pretty.name = FALSE, ...){
+  ret <- broom::tidy(df, model, ...)
+  if (pretty.name){
+    colnames(ret)[colnames(ret) == "term"] <- "Term"
+    colnames(ret)[colnames(ret) == "statistic"] <- "t Ratio"
+    colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
+    colnames(ret)[colnames(ret) == "std.error"] <- "Std Error"
+    colnames(ret)[colnames(ret) == "estimate"] <- "Estimate"
+    colnames(ret)[colnames(ret) == "conf.low"] <- "Conf Low"
+    colnames(ret)[colnames(ret) == "conf.high"] <- "Conf High"
+  } else {
+    colnames(ret)[colnames(ret) == "statistic"] <- "t_ratio"
+    colnames(ret)[colnames(ret) == "p.value"] <- "p_value"
+    colnames(ret)[colnames(ret) == "std.error"] <- "std_error"
+    colnames(ret)[colnames(ret) == "conf.low"] <- "conf_low"
+    colnames(ret)[colnames(ret) == "conf.high"] <- "conf_high"
+  }
   ret
 }
 
 #' glance wrapper
 #' @export
-model_stats <- function(df){
+model_stats <- function(df, pretty.name = FALSE){
   ret <- broom::glance(df, model)
-  colnames(ret)[colnames(ret) == "r.squared"] <- "RSquare"
-  colnames(ret)[colnames(ret) == "adj.r.squared"] <- "RSquare Adj"
-  colnames(ret)[colnames(ret) == "sigma"] <- "Root Mean Square Error"
-  colnames(ret)[colnames(ret) == "statistic"] <- "F Ratio"
-  colnames(ret)[colnames(ret) == "p.value"] <- "Prob > F"
-  colnames(ret)[colnames(ret) == "df"] <- "Degree of Freedom"
-  colnames(ret)[colnames(ret) == "logLik"] <- "Log Likelihood"
-  colnames(ret)[colnames(ret) == "deviance"] <- "Deviance"
-  colnames(ret)[colnames(ret) == "df.residual"] <- "Residual Degree of Freedom"
-  # for glm
-  colnames(ret)[colnames(ret) == "null.deviance"] <- "Null Deviance"
-  colnames(ret)[colnames(ret) == "df.null"] <- "Degree of Freedom for Null Model"
+  if(pretty.name){
+    colnames(ret)[colnames(ret) == "r.squared"] <- "R Square"
+    colnames(ret)[colnames(ret) == "adj.r.squared"] <- "R Square Adj"
+    colnames(ret)[colnames(ret) == "sigma"] <- "Root Mean Square Error"
+    colnames(ret)[colnames(ret) == "statistic"] <- "F Ratio"
+    colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
+    colnames(ret)[colnames(ret) == "df"] <- "DF"
+    colnames(ret)[colnames(ret) == "logLik"] <- "Log Likelihood"
+    colnames(ret)[colnames(ret) == "deviance"] <- "Deviance"
+    colnames(ret)[colnames(ret) == "df.residual"] <- "Residual DF"
+    # for glm
+    colnames(ret)[colnames(ret) == "null.deviance"] <- "Null Deviance"
+    colnames(ret)[colnames(ret) == "df.null"] <- "DF for Null Model"
+  }else{
+    colnames(ret)[colnames(ret) == "r.squared"] <- "r_square"
+    colnames(ret)[colnames(ret) == "adj.r.squared"] <- "r_square_adj"
+    colnames(ret)[colnames(ret) == "sigma"] <- "root_mean_square_error"
+    colnames(ret)[colnames(ret) == "statistic"] <- "f_ratio"
+    colnames(ret)[colnames(ret) == "p.value"] <- "p_value"
+    colnames(ret)[colnames(ret) == "logLik"] <- "log_likelihood"
+    colnames(ret)[colnames(ret) == "deviance"] <- "deviance"
+    colnames(ret)[colnames(ret) == "df.residual"] <- "residual_df"
+    # for glm
+    colnames(ret)[colnames(ret) == "null.deviance"] <- "null_deviance"
+    colnames(ret)[colnames(ret) == "df.null"] <- "df_for_null_model"
+  }
 
   ret
 }
 
 #' tidy after converting model to anova
 #' @export
-model_anova <- function(df){
+model_anova <- function(df, pretty.name = FALSE){
   ret <- suppressWarnings({
     # this causes warning for Deviance, Resid..Df, Resid..Dev in glm model
     df %>% dplyr::mutate(model = list(anova(model))) %>% broom::tidy(model)
   })
-  colnames(ret)[colnames(ret) == "term"] <- "Term"
-  colnames(ret)[colnames(ret) == "sumsq"] <- "Sum of Squares"
-  colnames(ret)[colnames(ret) == "meansq"] <- "Mean Square"
-  colnames(ret)[colnames(ret) == "statistic"] <- "F Ratio"
-  colnames(ret)[colnames(ret) == "p.value"] <- "Prob > F"
-  colnames(ret)[colnames(ret) == "df"] <- "Degree of Freedom"
-  # for glm anova
-  colnames(ret)[colnames(ret) == "Resid..Df"] <- "Residual Degree of Freedom"
-  colnames(ret)[colnames(ret) == "Resid..Dev"] <- "Residual Deviance"
+  if(pretty.name){
+    colnames(ret)[colnames(ret) == "term"] <- "Term"
+    colnames(ret)[colnames(ret) == "sumsq"] <- "Sum of Squares"
+    colnames(ret)[colnames(ret) == "meansq"] <- "Mean Square"
+    colnames(ret)[colnames(ret) == "statistic"] <- "F Ratio"
+    colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
+    colnames(ret)[colnames(ret) == "df"] <- "DF"
+    # for glm anova
+    colnames(ret)[colnames(ret) == "Resid..Df"] <- "Residual DF"
+    colnames(ret)[colnames(ret) == "Resid..Dev"] <- "Residual Deviance"
+  } else {
+    colnames(ret)[colnames(ret) == "sumsq"] <- "sum_of_squares"
+    colnames(ret)[colnames(ret) == "meansq"] <- "mean_square"
+    colnames(ret)[colnames(ret) == "statistic"] <- "f_ratio"
+    colnames(ret)[colnames(ret) == "p.value"] <- "p_value"
+    # for glm anova
+    colnames(ret)[colnames(ret) == "Deviance"] <- "deviance"
+    colnames(ret)[colnames(ret) == "Resid..Df"] <- "residual_df"
+    colnames(ret)[colnames(ret) == "Resid..Dev"] <- "residual_deviance"
+  }
   ret
 }
 

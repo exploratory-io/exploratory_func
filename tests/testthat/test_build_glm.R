@@ -39,6 +39,8 @@ test_that("test build_glm with grouped ", {
   trial <- test_df %>% build_glm(num1 ~ num2, group_cols = c("group1", "group2"))
   expect_equal(length(trial[["group2"]]), 8)
   expect_equal(length(trial[["group1"]]), 8)
+
+  expect_error(build_glm(test_df, num1 ~ num2 + group1, group_cols = c("group1", "group2")), "'group1' is a grouping column. Please remove it from variables.")
 })
 
 test_that("test build_glm with augment TRUE", {
@@ -65,7 +67,7 @@ test_that("test name conflict avoid", {
   glm_model <- test_df %>%
     build_glm(num1 ~ num2, group_cols = c("estimate", "model", "model.group"))
 
-  expect_equal(colnames(glm_model), c("estimate.group", "model.group", "model.group1", ".test_index", "source.data", "model"))
+  expect_equal(colnames(glm_model), c("estimate.group", "model.group", "model.group1", "source.data", ".test_index", "model"))
 
   trial <- suppressWarnings({
     glm_model %>%
@@ -87,15 +89,15 @@ test_that("predict glm with new data", {
   model_data <- fit_df %>% build_glm(num1 ~ num2, family = binomial, group_cols = "group")
 
   coef_ret <- model_data %>% model_coef()
-  expect_equal(colnames(coef_ret), c("group", "Term", "Estimate", "Std Error", "t Ratio", "Prob > |t|"))
+  expect_equal(colnames(coef_ret), c("group", "term", "estimate", "std_error", "t_ratio", "p_value"))
 
   stats_ret <- model_data %>% model_stats()
-  expect_equal(colnames(stats_ret), c("group", "Null Deviance", "Degree of Freedom for Null Model", "Log Likelihood",
-                                      "AIC", "BIC", "Deviance", "Residual Degree of Freedom"))
+  expect_equal(colnames(stats_ret), c("group", "null_deviance", "df_for_null_model", "log_likelihood",
+                                      "AIC", "BIC", "deviance", "residual_df"))
 
   anova_ret <- model_data %>% model_anova()
-  expect_equal(colnames(anova_ret), c("group", "Term", "Degree of Freedom", "Deviance", "Residual Degree of Freedom",
-                                      "Residual Deviance"))
+  expect_equal(colnames(anova_ret), c("group", "term", "df", "deviance", "residual_df",
+                                      "residual_deviance"))
 
   confint_ret <- model_data %>% model_confint(level = 0.99)
   expect_equal(colnames(confint_ret), c("group", "Term", "Prob 0.5", "Prob 99.5"))
@@ -117,26 +119,23 @@ test_that("prediction with categorical columns", {
 
   model_data <- build_glm(test_data, family = "binomial", CANCELLED ~ `Carrier Name` + CARRIER + DISTANCE, test_rate = 0.6)
 
-  ret <- prediction(model_data, test_data, type.predict = "response")
-  both_ret <- prediction(model_data, test_data)
-  train_ret <- prediction(model_data, test_data, test = FALSE)
+  ret <- prediction(model_data, data = "test", type.predict = "response")
+  both_ret <- prediction(model_data, data = "test")
+  train_ret <- prediction(model_data, data = "training")
 
   expect_true(nrow(ret) > 0)
-  expect_true(all(ret["Fitted"] >= 0 & ret["Fitted"] <= 1))
-  expect_equal(colnames(ret), c("CANCELLED", "Carrier.Name", "CARRIER", "DISTANCE", "Fitted", "Standard Error"))
+  expect_true(all(ret["fitted"] >= 0 & ret["fitted"] <= 1))
+  expect_equal(colnames(ret), c("CANCELLED", "Carrier.Name", "CARRIER", "DISTANCE", "fitted", "standard_error"))
 
-  expect_true(all(both_ret["Fitted.response"] >= 0 & both_ret["Fitted.response"] <= 1))
-  expect_equal(colnames(both_ret), c("CANCELLED", "Carrier.Name", "CARRIER", "DISTANCE", "Fitted.response", "Fitted.link", "Standard Error"))
+  expect_true(all(both_ret["fitted_response"] >= 0 & both_ret["fitted_response"] <= 1))
+  expect_equal(colnames(both_ret), c("CANCELLED", "Carrier.Name", "CARRIER", "DISTANCE", "fitted_link", "standard_error", "fitted_response"))
 
-  expect_true(all(train_ret["Fitted.response"] >= 0 & train_ret["Fitted.response"] <= 1))
-  expect_equal(colnames(train_ret), c("CANCELLED", "Carrier.Name", "CARRIER", "DISTANCE", "Fitted.response",
-                                      "Fitted.link", "Standard Error", "Residuals", "Hat", "Residual Standard Deviation",
-                                      "Cooks Distance", "Standardised Residuals"))
+  expect_true(all(train_ret["fitted_response"] >= 0 & train_ret["fitted_response"] <= 1))
+  expect_equal(colnames(train_ret), c("CANCELLED", "Carrier.Name", "CARRIER", "DISTANCE", "fitted_link",
+                                      "standard_error", "residuals", "hat", "residual_standard_deviation",
+                                      "cooks_distance", "standardised_residuals", "fitted_response"))
 
   add_prediction_ret <- test_data %>% add_prediction(model_data, type.predict = "response")
   expect_true(all(add_prediction_ret["fitted"] >= 0 & add_prediction_ret["fitted"] <= 1))
-
-  add_prediction_ret <- test_data %>% add_prediction(model_data)
-  expect_true(all(add_prediction_ret["fitted.response"] >= 0 & add_prediction_ret["fitted.response"] <= 1))
 })
 

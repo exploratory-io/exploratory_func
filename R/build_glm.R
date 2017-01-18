@@ -1,3 +1,9 @@
+#' glm wrappwer for logistic regression
+#' @export
+build_lr <- function(df, ...) {
+  do.call("build_glm", list(df, ..., family = "binomial"))
+}
+
 #' glm wrapper with do
 #' @return deta frame which has glm model
 #' @param data Data frame to be used as data
@@ -22,14 +28,10 @@ build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, g
   reserved_names <- c(
     "model", ".test_index", "data",
     # for tidy
-    "term", "estimate", "std.error", "t.ratio", "p.value",
-    "Term", "Estimate", "Std Error", "t Ratio", "Prob > |t|",
+    "term", "estimate", "std.error", "statistic", "p.value",
     # for glance
-    "null.deviance",
-    "df.null", "logLik", "AIC", "BIC", "deviance", "df.residual",
-    "RSquare", "RSquare Adj", "Root Mean Square Error",
-    "F Ratio", "Prob > F", "Degree of Freedom", "Log Likelihood",
-    "AIC", "BIC", "Deviance", "Residual Degree of Freedom"
+    "null.deviance", "df.null", "logLik", "AIC", "BIC", "deviance",
+    "df.residual"
   )
 
   if(test_rate < 0 | test_rate > 1){
@@ -46,12 +48,15 @@ build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, g
   colnames(data) <- make.unique(colnames(data), sep = "")
 
   if(!is.null(group_cols)){
-    data <- dplyr::group_by_(data, .dots =  colnames(data)[group_col_index])
-  } else {
+    data <- dplyr::group_by_(data, .dots = colnames(data)[group_col_index])
+  } else if (!dplyr::is.grouped_df(data)){
+    # need to be grouped to nest
     data <- data %>%
       dplyr::mutate(.test_index = 1) %>%
       dplyr::group_by(.test_index)
   }
+
+  group_col_names <- grouped_by(data)
 
   model_col <- "model"
   source_col <- "source.data"
@@ -61,56 +66,49 @@ build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, g
   arg_char <- expand_args(caller, exclude = c("data", "keep.source", "augment", "group_cols", "test_rate", "seed"))
 
   ret <- tryCatch({
-    if(keep.source || augment){
-      ret <- data %>%
-        tidyr::nest() %>%
-        # create test index
-        dplyr::mutate(.test_index = purrr::map(data, function(df){
-          sample_df_index(df, rate = test_rate)
-        })) %>%
-        # slice training data
-        # use source.data as column name to keep it
-        dplyr::mutate(source.data = purrr::map2(data, .test_index, function(df, index){
-          safe_slice(df, index, remove = TRUE)
-        })) %>%
-        # execute glm
-        dplyr::mutate(model = purrr::map(source.data, function(data){
-          eval(parse(text = paste0("stats::glm(data = data, ", arg_char, ")")))
-        })) %>%
-        dplyr::select(-data) %>%
-        dplyr::rowwise()
-      class(ret[[source_col]]) <- c("list", ".source.data")
-      ret
+    ret <- data %>%
+      tidyr::nest(.key = "source.data") %>%
+      # create test index
+      dplyr::mutate(.test_index = purrr::map(source.data, function(df){
+        sample_df_index(df, rate = test_rate)
+      })) %>%
+      # slice training data
+      dplyr::mutate(model = purrr::map2(source.data, .test_index, function(df, index){
+        data <- safe_slice(df, index, remove = TRUE)
+
+        # execute glm with parsed arguments
+        eval(parse(text = paste0("stats::glm(data = data, ", arg_char, ")")))
+      }))
+    if(!keep.source & !augment){
+      ret <- dplyr::select(ret, -source.data)
     } else {
-      ret <- data %>%
-        tidyr::nest() %>%
-        # create test index
-        dplyr::mutate(.test_index = purrr::map(data, function(df){
-          sample_df_index(df, rate = test_rate)
-        })) %>%
-        # slice training data
-        # use source.data as column name to keep it
-        dplyr::mutate(data = purrr::map2(data, .test_index, function(df, index){
-          safe_slice(df, index, remove = TRUE)
-        })) %>%
-        # execute glm
-        dplyr::mutate(model = purrr::map(data, function(data){
-          eval(parse(text = paste0("stats::glm(data = data, ", arg_char, ")")))
-        })) %>%
-        dplyr::select(-data) %>%
-        dplyr::rowwise()
-      ret
+      class(ret[[source_col]]) <- c("list", ".source.data")
     }
+    ret <- dplyr::rowwise(ret)
+    ret
   }, error = function(e){
     if(e$message == "contrasts can be applied only to factors with 2 or more levels"){
       stop("more than 2 unique values are needed for categorical predictor columns")
     }
+
+    # cases when a grouping column is in variables
+    if (stringr::str_detect(e$message, "object .* not found")) {
+      # extract only object name
+      replaced <- gsub("^object ", "", e$message)
+      name <- gsub(" not found$", "", replaced)
+      # name is with single quotations, so put them to group_cols and compare them
+      if (name %in% paste0("'", group_col_names, "'")) {
+        stop(paste0(name, " is a grouping column. Please remove it from variables."))
+      }
+    }
     stop(e$message)
   })
   if(augment){
-    # do.call is used because augment tries to regard "model_col" and "source_col"
-    # as column names as non standard evaluation
-    ret <- do.call(broom::augment, list(ret, model_col, source_col))
+    if(test_rate == 0){
+      ret <- prediction(ret, data = "training")
+    } else {
+      ret <- prediction(ret, data = "test")
+    }
   } else {
     class(ret[[model_col]]) <- c("list", ".model", ".model.glm")
   }

@@ -492,13 +492,14 @@ safe_slice <- function(df, index, remove = FALSE){
 #' @param data Data frame to augment (expected to have ".fitted" column augmented by broom::augment)
 #' @param model model that has $family$linkinv attribute (normally glm model)
 #' @param response_label column to be augmented as fitted response values
-add_response <- function(data, model, response_label = "Fitted.response"){
+add_response <- function(data, model, response_label = "fitted_response"){
   # fitted values are converted to response values through inverse link function
   # for example, inverse of logit function is used for logistic regression
-  data[[response_label]] <- model$family$linkinv(data[[".fitted"]])
-  # set response_label next to .fitted
-  fitted_posi <- which(colnames(data) == ".fitted")
-  data <- move_col(data, response_label, fitted_posi)
+  data[[response_label]] <- if (nrow(data) == 0) {
+    numeric(0)
+  } else {
+    model$family$linkinv(data[[".fitted"]])
+  }
   data
 }
 
@@ -569,4 +570,73 @@ move_col <- function(df, cname, position){
 unixtime_to_datetime <- function(data){
   # referred from http://stackoverflow.com/questions/27408131/convert-unix-timestamp-into-datetime-in-r
   as.POSIXct(data, origin="1970-01-01", tz='GMT')
+}
+
+# get binary prediction scores
+get_score <- function(act_label, pred_label) {
+  tp <- pred_label & act_label
+  fp <- pred_label & !act_label
+  tn <- !pred_label & !act_label
+  fn <- !pred_label & act_label
+
+  true_positive <- sum(tp, na.rm = TRUE)
+  false_positive <- sum(fp, na.rm = TRUE)
+  true_negative <- sum(tn, na.rm = TRUE)
+  false_negative <- sum(fn, na.rm = TRUE)
+
+  test_size <- true_positive + false_positive + true_negative + false_negative
+
+  precision <- true_positive / sum(pred_label, na.rm = TRUE)
+  recall <- true_positive / sum(act_label, na.rm = TRUE)
+  specificity <- true_negative / sum(!act_label, na.rm = TRUE)
+  accuracy <- (true_positive + true_negative) / test_size
+  missclassification_error <- 1 - accuracy
+  f_score <- 2 * (precision * recall) / (precision + recall)
+
+  data.frame(
+    f_score,
+    accuracy,
+    missclassification_error,
+    precision,
+    recall,
+    specificity,
+    true_positive,
+    false_positive,
+    true_negative,
+    false_negative,
+    test_size
+  )
+}
+
+# get optimized binary prediction scores
+get_optimized_score <- function(actual_val, pred_prob, threshold = "f_score"){
+  # threshold can be optimized to the result below
+  accept_optimize <- c(
+    "f_score",
+    "accuracy",
+    "precision",
+    "recall",
+    "specificity"
+  )
+
+  # try 100 threshold to search max
+  max_values <- NULL
+  max_value <- -1
+  for (thres in ((seq(101) - 1) / 100)){
+
+    pred_label <- pred_prob >= thres
+
+    score <- get_score(actual_val, pred_label)
+
+    if (!threshold %in% accept_optimize) {
+      stop(paste0("threshold must be chosen from ", paste(accept_optimize, collapse = ", ")))
+    } else if (is.nan(score[[threshold]])) {
+      # if nan, pass to avoid error
+    } else if (max_value < score[[threshold]]){
+      max_values <- score
+      max_values[["threshold"]] <- thres
+      max_value <- score[[threshold]]
+    }
+  }
+  max_values
 }

@@ -102,26 +102,19 @@ test_that("test with too small key", {
 
 test_that("test build_glm and broom tidy", {
   if(requireNamespace("broom")){
-    result <- (
-      test_df
-      %>%
-        build_glm(vec1~vec2)
-      %>%
+    result <- test_df %>%
+        build_glm(vec1~vec2) %>%
         broom::tidy(model)
-    )
     expect_equal(dim(result)[[1]], 2)
   }
 })
 
 test_that("test build_glm and broom", {
   if(requireNamespace("broom")){
-    result <- (
-      test_df
-      %>%
-        build_glm(vec1~vec2, augment=TRUE)
-    )
+    result <- test_df %>%
+      build_glm(vec1~vec2, augment=TRUE)
     expect_equal(nrow(result), 10)
-    expect_equal(ncol(result), ncol(test_df)+7)
+    expect_equal(ncol(result), ncol(test_df)+8)
   }
 })
 
