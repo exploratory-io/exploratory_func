@@ -34,18 +34,22 @@ do_roc_ <- function(df, actual_val_col, pred_prob_col){
       val <- as.logical(val)
     }
 
-    if (all(val)){
-      tpr <- c(0, rep(1, length(val)), 1)
-      fpr <- c(0, rep(0, length(val)), 1)
-    } else if (all(!val)) {
-      tpr <- c(0, rep(0, length(val)), 1)
-      fpr <- c(0, rep(1, length(val)), 1)
+    act_sum <- sum(val)
+
+    fpr <- if (all(val)){
+      # should be all zero but put 1 to draw a curve
+      c(rep(0, length(val)), 1)
     } else {
+      # cumulative rate of false case
+      c(0, cumsum(!val) / (length(val) - act_sum))
+    }
 
-      pred_sum <- sum(val)
-
-      tpr <- c(0, cumsum(val) / pred_sum)
-      fpr <- c(0, cumsum(!val) / (length(val) - pred_sum))
+    tpr <- if (all(!val)) {
+      # should be all zero but put 1 to draw a curve
+      c(rep(0, length(val)), 1)
+    } else {
+      # cumulative rate of true case
+      c(0, cumsum(val) / act_sum)
     }
 
     ret <- data.frame(

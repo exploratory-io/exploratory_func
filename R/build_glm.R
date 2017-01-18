@@ -66,43 +66,25 @@ build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, g
   arg_char <- expand_args(caller, exclude = c("data", "keep.source", "augment", "group_cols", "test_rate", "seed"))
 
   ret <- tryCatch({
-    if(keep.source || augment){
-      ret <- data %>%
-        tidyr::nest(.key = "source.data") %>%
-        # create test index
-        dplyr::mutate(.test_index = purrr::map(source.data, function(df){
-          sample_df_index(df, rate = test_rate)
-        })) %>%
-        # slice training data
-        # use model as column name to keep the sliced result temporarily
-        dplyr::mutate(model = purrr::map2(source.data, .test_index, function(df, index){
-          data <- safe_slice(df, index, remove = TRUE)
-          # execute glm
-          # use eval to use optional arguments for glm from ..., which can't be passed inside mutate
-          eval(parse(text = paste0("stats::glm(data = data, ", arg_char, ")")))
-        })) %>%
-        dplyr::rowwise()
-      class(ret[[source_col]]) <- c("list", ".source.data")
-      ret
+    ret <- data %>%
+      tidyr::nest(.key = "source.data") %>%
+      # create test index
+      dplyr::mutate(.test_index = purrr::map(source.data, function(df){
+        sample_df_index(df, rate = test_rate)
+      })) %>%
+      # slice training data
+      dplyr::mutate(model = purrr::map2(source.data, .test_index, function(df, index){
+        data <- safe_slice(df, index, remove = TRUE)
+
+        eval(parse(text = paste0("stats::glm(data = data, ", arg_char, ")")))
+      }))
+    if(!keep.source & !augment){
+      ret <- dplyr::select(ret, -source.data)
     } else {
-      ret <- data %>%
-        tidyr::nest(.key = "source.data") %>%
-        # create test index
-        dplyr::mutate(.test_index = purrr::map(source.data, function(df){
-          sample_df_index(df, rate = test_rate)
-        })) %>%
-        # slice training data
-        # use model as column name to keep the sliced result temporarily
-        dplyr::mutate(model = purrr::map2(source.data, .test_index, function(df, index){
-          data <- safe_slice(df, index, remove = TRUE)
-          # execute glm
-          # use eval to use optional arguments for glm from ..., which can't be passed inside mutate
-          eval(parse(text = paste0("stats::glm(data = data, ", arg_char, ")")))
-        })) %>%
-        dplyr::select(-source.data) %>%
-        dplyr::rowwise()
-      ret
+      class(ret[[source_col]]) <- c("list", ".source.data")
     }
+    ret <- dplyr::rowwise(ret)
+    ret
   }, error = function(e){
     if(e$message == "contrasts can be applied only to factors with 2 or more levels"){
       stop("more than 2 unique values are needed for categorical predictor columns")
@@ -110,6 +92,7 @@ build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, g
 
     # cases when a grouping column is in variables
     if (stringr::str_detect(e$message, "object .* not found")) {
+      # extract only object name
       replaced <- gsub("^object ", "", e$message)
       name <- gsub(" not found$", "", replaced)
       # name is with single quotations, so put them to group_cols and compare them
