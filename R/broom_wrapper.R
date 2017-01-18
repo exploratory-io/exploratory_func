@@ -168,8 +168,8 @@ add_prediction <- function(df, model_df, ...){
     }
   })
   # update column name based on both link and response are there for fitted values
-  fitted_label <- if("fitted.response" %in% colnames(ret)){
-    "fitted.link"
+  fitted_label <- if("fitted_response" %in% colnames(ret)){
+    "fitted_link"
   } else {
     "fitted"
   }
@@ -328,6 +328,11 @@ prediction <- function(df, data = "training", ...){
             for (cname in colnames(model$model)) {
               filtered_data <- filtered_data[filtered_data[[cname]] %in% model$model[[cname]], ]
             }
+
+            if(nrow(filtered_data) == 0){
+              stop("no data found that can be predicted by the model")
+            }
+
             filtered_data
           })) %>%
           dplyr::rowwise() %>%
@@ -382,7 +387,7 @@ prediction <- function(df, data = "training", ...){
   }
 
   # update column name based on both link and response are there for fitted values
-  fitted_label <- if("Fitted.response" %in% colnames(ret)){
+  fitted_label <- if("fitted_response" %in% colnames(ret)){
     "fitted_link"
   } else {
     "fitted"
