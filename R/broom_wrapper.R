@@ -438,8 +438,39 @@ prediction_binary <- function(df, threshold = 0.5, ...){
 
 #' tidy wrapper for lm and glm
 #' @export
-model_coef <- function(df, pretty.name = FALSE, ...){
-  ret <- broom::tidy(df, model, ...)
+model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
+
+  dots <- list(...)
+
+  ret <- if (!is.null(conf_int)) {
+    if (conf_int == "default") {
+
+      level <- dots$conf.level
+
+      if (is.null(level)) {
+        # default confidence level
+        level <- 0.95
+      }
+
+      df %>%
+        dplyr::ungroup() %>%
+        dplyr::mutate(model = purrr::map(model, function(model){
+          # use confint.default for performance
+          conf <- confint.default(model, level = level) %>% as.data.frame()
+          tidy_ret <- broom::tidy(model)
+          colnames(conf) <- c("conf.low", "conf.high")
+          dplyr::bind_cols(tidy_ret, conf)
+        })) %>%
+        tidyr::unnest(model)
+    } else {
+      # broom::tidy uses confint.lm and it uses profile, so "profile" is used in conf_int to swith how to get confint
+      profile <- conf_int == "profile"
+      broom::tidy(df, model, conf.int = profile, ...)
+    }
+  } else {
+    broom::tidy(df, model, ...)
+  }
+
   if (pretty.name){
     colnames(ret)[colnames(ret) == "term"] <- "Term"
     colnames(ret)[colnames(ret) == "statistic"] <- "t Ratio"
