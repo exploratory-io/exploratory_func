@@ -124,18 +124,18 @@ test_that("prediction with categorical columns", {
   train_ret <- prediction(model_data, data = "training")
 
   expect_true(nrow(ret) > 0)
-  expect_true(all(ret["fitted"] >= 0 & ret["fitted"] <= 1))
-  expect_equal(colnames(ret), c("CANCELLED", "Carrier.Name", "CARRIER", "DISTANCE", "fitted", "standard_error"))
+  expect_true(all(ret["predicted_value"] >= 0 & ret["predicted_value"] <= 1))
+  expect_equal(colnames(ret), c("CANCELLED", "Carrier.Name", "CARRIER", "DISTANCE", "predicted_value", "standard_error"))
 
-  expect_true(all(both_ret["fitted_response"] >= 0 & both_ret["fitted_response"] <= 1))
-  expect_equal(colnames(both_ret), c("CANCELLED", "Carrier.Name", "CARRIER", "DISTANCE", "fitted_link", "standard_error", "fitted_response"))
+  expect_true(all(both_ret["predicted_response"] >= 0 & both_ret["predicted_response"] <= 1))
+  expect_equal(colnames(both_ret), c("CANCELLED", "Carrier.Name", "CARRIER", "DISTANCE", "predicted_value", "standard_error", "predicted_response"))
 
-  expect_true(all(train_ret["fitted_response"] >= 0 & train_ret["fitted_response"] <= 1))
-  expect_equal(colnames(train_ret), c("CANCELLED", "Carrier.Name", "CARRIER", "DISTANCE", "fitted_link",
+  expect_true(all(train_ret["predicted_response"] >= 0 & train_ret["predicted_response"] <= 1))
+  expect_equal(colnames(train_ret), c("CANCELLED", "Carrier.Name", "CARRIER", "DISTANCE", "predicted_value",
                                       "standard_error", "residuals", "hat", "residual_standard_deviation",
-                                      "cooks_distance", "standardised_residuals", "fitted_response"))
+                                      "cooks_distance", "standardised_residuals", "predicted_response"))
 
   add_prediction_ret <- test_data %>% add_prediction(model_data, type.predict = "response")
-  expect_true(all(add_prediction_ret["fitted"] >= 0 & add_prediction_ret["fitted"] <= 1))
+  expect_true(all(add_prediction_ret["predicted_value"] >= 0 & add_prediction_ret["predicted_value"] <= 1))
 })
 

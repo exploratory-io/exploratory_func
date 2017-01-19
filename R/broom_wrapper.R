@@ -116,8 +116,8 @@ add_prediction <- function(df, model_df, ...){
       dplyr::mutate_(.dots = list(.test_index = aug_fml)) %>%
       dplyr::ungroup() %>%
       dplyr::mutate(.test_index = purrr::map2(.test_index, model, function(d, m){
-        # add fitted.response to the result data frame
-        add_response(d, m, "fitted.response")
+        # add predicted_response to the result data frame
+        add_response(d, m, "predicted_response")
       })) %>%
       tidyr::unnest(.test_index)
   }
@@ -168,13 +168,13 @@ add_prediction <- function(df, model_df, ...){
     }
   })
   # update column name based on both link and response are there for fitted values
-  fitted_label <- if("fitted_response" %in% colnames(ret)){
-    "fitted_link"
+  fitted_label <- if("predicted_response" %in% colnames(ret)){
+    "predicted_link"
   } else {
-    "fitted"
+    "predicted_value"
   }
   colnames(ret)[colnames(ret) == ".fitted"] <- avoid_conflict(colnames(ret), fitted_label)
-  colnames(ret)[colnames(ret) == ".se.fit"] <- avoid_conflict(colnames(ret), "se.fit")
+  colnames(ret)[colnames(ret) == ".se.fit"] <- avoid_conflict(colnames(ret), "standard_error")
 
   ret
 }
@@ -385,16 +385,7 @@ prediction <- function(df, data = "training", ...){
       dplyr::select(-model) %>%
       tidyr::unnest(source.data)
   }
-
-  # update column name based on both link and response are there for fitted values
-  fitted_label <- if("fitted_response" %in% colnames(ret)){
-    "fitted_link"
-  } else {
-    "fitted"
-  }
-
-  colnames(ret)[colnames(ret) == "Fitted.response"] <- avoid_conflict(colnames(ret), "fitted_response")
-  colnames(ret)[colnames(ret) == ".fitted"] <- avoid_conflict(colnames(ret), fitted_label)
+  colnames(ret)[colnames(ret) == ".fitted"] <- avoid_conflict(colnames(ret), "predicted_value")
   colnames(ret)[colnames(ret) == ".se.fit"] <- avoid_conflict(colnames(ret), "standard_error")
   colnames(ret)[colnames(ret) == ".resid"] <- avoid_conflict(colnames(ret), "residuals")
   colnames(ret)[colnames(ret) == ".hat"] <- avoid_conflict(colnames(ret), "hat")
@@ -420,10 +411,10 @@ prediction_binary <- function(df, threshold = 0.5, ...){
   actual_val <- ret[[actual_col]]
   actual_logical <- as.logical(as.numeric(actual_val))
 
-  prob_col_name <- if ("fitted_response" %in% colnames(ret)) {
-    "fitted_response"
+  prob_col_name <- if ("predicted_response" %in% colnames(ret)) {
+    "predicted_response"
   } else {
-    "fitted"
+    "predicted_value"
   }
 
   thres <- if (!is.numeric(threshold)) {
@@ -447,7 +438,7 @@ prediction_binary <- function(df, threshold = 0.5, ...){
 
   ret[["predicted_label"]] <- label
   colnames(ret)[colnames(ret) == prob_col_name] <- "predicted_probability"
-  colnames(ret)[colnames(ret) == "fitted_link"] <- "fitted"
+  colnames(ret)[colnames(ret) == "predicted_link"] <- "predicted_value"
 
   ret
 }
