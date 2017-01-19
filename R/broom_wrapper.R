@@ -167,13 +167,7 @@ add_prediction <- function(df, model_df, ...){
       stop(e$message)
     }
   })
-  # update column name based on both link and response are there for fitted values
-  fitted_label <- if("predicted_response" %in% colnames(ret)){
-    "predicted_link"
-  } else {
-    "predicted_value"
-  }
-  colnames(ret)[colnames(ret) == ".fitted"] <- avoid_conflict(colnames(ret), fitted_label)
+  colnames(ret)[colnames(ret) == ".fitted"] <- avoid_conflict(colnames(ret), "predicted_value")
   colnames(ret)[colnames(ret) == ".se.fit"] <- avoid_conflict(colnames(ret), "standard_error")
 
   ret
@@ -438,7 +432,6 @@ prediction_binary <- function(df, threshold = 0.5, ...){
 
   ret[["predicted_label"]] <- label
   colnames(ret)[colnames(ret) == prob_col_name] <- "predicted_probability"
-  colnames(ret)[colnames(ret) == "predicted_link"] <- "predicted_value"
 
   ret
 }
