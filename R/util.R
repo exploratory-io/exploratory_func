@@ -492,7 +492,7 @@ safe_slice <- function(df, index, remove = FALSE){
 #' @param data Data frame to augment (expected to have ".fitted" column augmented by broom::augment)
 #' @param model model that has $family$linkinv attribute (normally glm model)
 #' @param response_label column to be augmented as fitted response values
-add_response <- function(data, model, response_label = "fitted_response"){
+add_response <- function(data, model, response_label = "predicted_response"){
   # fitted values are converted to response values through inverse link function
   # for example, inverse of logit function is used for logistic regression
   data[[response_label]] <- if (nrow(data) == 0) {
