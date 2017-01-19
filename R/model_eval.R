@@ -182,8 +182,17 @@ evaluate_regression_ <- function(df, actual_val_col, fitted_col){
     mean_square_error <- mean(diff_sq, na.rm = TRUE)
     root_mean_square_error <- sqrt(mean_square_error)
     mean_absolute_error <- mean(abs_diff, na.rm = TRUE)
+
+    r_squared <- 1 - (sum(diff_sq)/sum((actual_val-mean(actual_val, na.rm = TRUE))^2))
+    explained_variance <- 1 - var(actual_val - fitted_val, na.rm = TRUE) / var(actual_val, na.rm = TRUE)
+
     data.frame(
-      mean_square_error, root_mean_square_error, mean_absolute_error, mean_absolute_percentage_error
+      r_squared,
+      explained_variance,
+      mean_square_error,
+      root_mean_square_error,
+      mean_absolute_error,
+      mean_absolute_percentage_error
     )
   }
 
