@@ -88,7 +88,7 @@ build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, g
     ret
   }, error = function(e){
     if(e$message == "contrasts can be applied only to factors with 2 or more levels"){
-      stop("more than 1 unique value is expected for categorical columns assigned as predictors")
+      stop("more than 1 unique values are expected for categorical columns assigned as predictors")
     }
 
     # cases when a grouping column is in variables
