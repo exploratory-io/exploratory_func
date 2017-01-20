@@ -213,6 +213,6 @@ test_that("test prediction binary", {
 
   model_data <- build_lr(test_data, CANCELLED ~ DISTANCE, test_rate = 0.2)
 
-  model_coef(model_data, conf.int = "default")
+  model_coef(model_data, conf_int = "default")
 
 })
