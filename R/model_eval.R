@@ -1,20 +1,20 @@
 #' Non standard evaluation version of do_roc_
 #' @param df Data frame
-#' @param actual_val Column name for actual values
 #' @param pred_prob Column name for probability
+#' @param actual_val Column name for actual values
 #' @export
-do_roc <- function(df, actual_val, pred_prob){
-  actual_val_col <- col_name(substitute(actual_val))
+do_roc <- function(df, pred_prob, actual_val){
   pred_prob_col <- col_name(substitute(pred_prob))
-  do_roc_(df, actual_val_col, pred_prob_col)
+  actual_val_col <- col_name(substitute(actual_val))
+  do_roc_(df, pred_prob_col, actual_val_col)
 }
 
 #' Return cordinations for ROC curve
 #' @param df Data frame
-#' @param actual_val_col Column name for actual values
 #' @param pred_prob_col Column name for probability
+#' @param actual_val_col Column name for actual values
 #' @export
-do_roc_ <- function(df, actual_val_col, pred_prob_col){
+do_roc_ <- function(df, pred_prob_col, actual_val_col){
   group_cols <- grouped_by(df)
 
   tpr_col <- avoid_conflict(group_cols, "true_positive_rate")
@@ -76,21 +76,21 @@ do_roc_ <- function(df, actual_val_col, pred_prob_col){
 
 #' Non standard evaluation version of evaluate_binary_
 #' @param df Model data frame that can work prediction
-#' @param actual_val Column name for actual values
 #' @param pred_prob Column name for probability
+#' @param actual_val Column name for actual values
 #' @export
-evaluate_binary <- function(df, actual_val, pred_prob, ...){
-  actual_val_col <- col_name(substitute(actual_val))
+evaluate_binary <- function(df, pred_prob, actual_val, ...){
   pred_prob_col <- col_name(substitute(pred_prob))
-  evaluate_binary_(df, actual_val_col, pred_prob_col, ...)
+  actual_val_col <- col_name(substitute(actual_val))
+  evaluate_binary_(df, pred_prob_col, actual_val_col, ...)
 }
 
 #' Calculate binary classification evaluation
 #' @param df Data Frame
-#' @param actual_val_col Column name for actual values
 #' @param pred_prob_col Column name for probability
+#' @param actual_val_col Column name for actual values
 #' @export
-evaluate_binary_ <- function(df, actual_val_col, pred_prob_col, threshold = "f_score"){
+evaluate_binary_ <- function(df, pred_prob_col, actual_val_col, threshold = "f_score"){
 
   evaluate_binary_each <- function(df){
 
@@ -145,25 +145,25 @@ evaluate_binary_ <- function(df, actual_val_col, pred_prob_col, threshold = "f_s
 
 #' Non standard evaluation version of evaluate_regression_
 #' @param df Data frame
+#' @param pred_val Column name for predicted values
 #' @param actual_val Column name for actual values
-#' @param fitted Column name for predicted values
 #' @export
-evaluate_regression <- function(df, actual_val, fitted){
+evaluate_regression <- function(df, pred_val, actual_val){
+  pred_val_col <- col_name(substitute(pred_val))
   actual_val_col <- col_name(substitute(actual_val))
-  fitted_col <- col_name(substitute(fitted))
-  evaluate_regression_(df, actual_val_col, fitted_col)
+  evaluate_regression_(df, pred_val_col, actual_val_col)
 }
 
 #' Calculate continuous regression evaluation
 #' @param df Model data frame that can work prediction
+#' @param pred_val_col Column name for predicted values
 #' @param actual_val_col Column name for actual values
-#' @param fitted_col Column name for predicted values
 #' @export
-evaluate_regression_ <- function(df, actual_val_col, fitted_col){
+evaluate_regression_ <- function(df, pred_val_col, actual_val_col){
 
   evaluate_regression_each <- function(df){
 
-    fitted_val <- df[[fitted_col]]
+    fitted_val <- df[[pred_val_col]]
     actual_val <- df[[actual_val_col]]
 
     diff <- actual_val - fitted_val

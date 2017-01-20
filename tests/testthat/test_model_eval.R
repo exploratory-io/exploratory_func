@@ -13,7 +13,7 @@ test_that("test do_roc", {
 
   predicted <- prediction(model_data)
 
-  ret <- do_roc(predicted, CANCELLED, predicted_response)
+  ret <- do_roc(predicted, predicted_response, CANCELLED)
 
   expect_equal(colnames(ret), c("true_positive_rate", "false_positive_rate"))
 
@@ -34,7 +34,7 @@ test_that("test do_roc with factor", {
 
   predicted <- prediction(model_data)
 
-  ret <- do_roc(predicted, CANCELLED, predicted_response)
+  ret <- do_roc(predicted, predicted_response, CANCELLED)
 
   expect_equal(colnames(ret), c("true_positive_rate", "false_positive_rate"))
 })
@@ -58,7 +58,7 @@ test_that("test eval_pred_bin with factor", {
 
   predicted <- prediction(model_data, data = "test")
 
-  ret <- evaluate_binary(predicted, CANCELLED, predicted_response, threshold = "accuracy")
+  ret <- evaluate_binary(predicted, predicted_response, CANCELLED, threshold = "accuracy")
 
   expect_equal(ret$AUC[[1]], 0.939772727272727)
 })
@@ -80,5 +80,5 @@ test_that("test eval_pred_cont", {
 
   predicted <- prediction(model_data, data = "test")
 
-  ret <- evaluate_regression(predicted, CANCELLED, predicted_value)
+  ret <- evaluate_regression(predicted, predicted_value, CANCELLED)
 })
