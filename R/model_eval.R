@@ -145,25 +145,25 @@ evaluate_binary_ <- function(df, pred_prob_col, actual_val_col, threshold = "f_s
 
 #' Non standard evaluation version of evaluate_regression_
 #' @param df Data frame
-#' @param fitted Column name for predicted values
+#' @param pred_val Column name for predicted values
 #' @param actual_val Column name for actual values
 #' @export
-evaluate_regression <- function(df, fitted, actual_val){
-  fitted_col <- col_name(substitute(fitted))
+evaluate_regression <- function(df, pred_val, actual_val){
+  pred_val_col <- col_name(substitute(pred_val))
   actual_val_col <- col_name(substitute(actual_val))
-  evaluate_regression_(df, fitted_col, actual_val_col)
+  evaluate_regression_(df, pred_val_col, actual_val_col)
 }
 
 #' Calculate continuous regression evaluation
 #' @param df Model data frame that can work prediction
-#' @param fitted_col Column name for predicted values
+#' @param pred_val_col Column name for predicted values
 #' @param actual_val_col Column name for actual values
 #' @export
-evaluate_regression_ <- function(df, fitted_col, actual_val_col){
+evaluate_regression_ <- function(df, pred_val_col, actual_val_col){
 
   evaluate_regression_each <- function(df){
 
-    fitted_val <- df[[fitted_col]]
+    fitted_val <- df[[pred_val_col]]
     actual_val <- df[[actual_val_col]]
 
     diff <- actual_val - fitted_val
