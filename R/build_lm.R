@@ -85,7 +85,7 @@ build_lm <- function(data, ..., keep.source = TRUE, augment = FALSE, group_cols 
     ret
   }, error = function(e){
     if(e$message == "contrasts can be applied only to factors with 2 or more levels"){
-      stop("more than 2 unique values are needed for categorical predictor columns")
+      stop("more than 1 unique value is expected for categorical columns assigned as predictors")
     }
     if(e$message == "0 (non-NA) cases"){
       stop("no data after removing NA")
