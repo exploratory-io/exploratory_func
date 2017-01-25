@@ -425,3 +425,11 @@ test_that("unixtime_to_datetime", {
   expect_equal(unix_ret, unix_ans)
 
 })
+
+test_that("append_colnames", {
+  test_df <- data.frame(col1 = seq(3), col2 = seq(3))
+
+  ret <- append_colnames(test_df, "a.", ".b")
+
+  expect_equal(colnames(ret), c("a.col1.b", "a.col2.b"))
+})
