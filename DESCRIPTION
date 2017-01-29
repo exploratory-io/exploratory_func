@@ -49,5 +49,6 @@ Suggests:
     slam,
     proxy,
     topicmodels,
-    janitor
+    janitor,
+    nnet
 RoxygenNote: 5.0.1

@@ -642,8 +642,7 @@ get_optimized_score <- function(actual_val, pred_prob, threshold = "f_score"){
 }
 
 #' Put prefix and suffix to column names
-#' @export
 append_colnames <- function(df, prefix = "", suffix = ""){
-  colnames(df) <- paste(prefix, colnames(df), suffix, sep = "")
+  colnames(df) <- stringr::str_c(prefix, colnames(df), suffix, sep = "")
   df
 }

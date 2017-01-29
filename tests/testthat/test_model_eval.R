@@ -63,7 +63,7 @@ test_that("test eval_pred_bin with factor", {
   expect_equal(ret$AUC[[1]], 0.939772727272727)
 })
 
-test_that("test eval_pred_cont", {
+test_that("test evaluate_regression", {
   test_data <- structure(
     list(
       CANCELLED = c(0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0),
@@ -81,4 +81,104 @@ test_that("test eval_pred_cont", {
   predicted <- prediction(model_data, data = "test")
 
   ret <- evaluate_regression(predicted, predicted_value, CANCELLED)
+})
+
+test_that("test evaluate_multi", {
+  test_data <- structure(
+    list(
+      CANCELLED = c(0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0),
+      `Carrier Name` = c("Delta Air Lines", "American Eagle", "American Airlines", "Southwest Airlines", "SkyWest Airlines", "Southwest Airlines", "Southwest Airlines", "Delta Air Lines", "Southwest Airlines", "Atlantic Southeast Airlines", "American Airlines", "Southwest Airlines", "US Airways", "US Airways", "Delta Air Lines", "Atlantic Southeast Airlines", NA, "Atlantic Southeast Airlines", "Delta Air Lines", "Delta Air Lines"),
+      CARRIER = c("DL", "MQ", "AA", "DL", "MQ", "AA", "DL", "DL", "MQ", "AA", "AA", "WN", "US", "US", "DL", "EV", "9E", "EV", "DL", "DL"),
+      DISTANCE = c(1587, 173, 646, 187, 273, 1062, 583, 240, 1123, 851, 852, 862, 361, 507, 1020, 1092, 342, 489, 1184, 545)), row.names = c(NA, -20L),
+    class = c("tbl_df", "tbl", "data.frame"), .Names = c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE"))
+
+
+
+  for (i in seq(5)){
+    test_data <- dplyr::bind_rows(test_data, test_data)
+  }
+
+  model_data <- build_lm(test_data, DISTANCE ~ CARRIER + CANCELLED, test_rate = 0.2)
+
+  predicted <- prediction(model_data, data = "test")
+
+  ret <- evaluate_regression(predicted, predicted_value, CANCELLED)
+})
+
+test_that("eval multi", {
+  test_df <- list(
+    c("b", "b"),
+    c("a", "b"),
+    c("d", "b"),
+    c("b", "b"),
+    c("d", "d"),
+    c("a", "c"),
+    c("b", "b"),
+    c("d", "d"),
+    c("d", "d"),
+    c("b", "b"),
+    c("d", "d"),
+    c("d", "b"),
+    c("d", "d"),
+    c("d", "c"),
+    c("d", "d"),
+    c("b", "c"),
+    c("b", "b"),
+    c("d", "d"),
+    c("b", "d"),
+    c("d", "d")
+  ) %>%
+    as.data.frame() %>%
+    as.matrix() %>%
+    t() %>%
+    as.data.frame(stringsAsFactors = FALSE)
+  rownames(test_df) <- NULL
+  colnames(test_df) <- c("actual", "predicted")
+
+  ret <- evaluate_multi(test_df, predicted, actual)
+
+  expect_equal(ret[["macro_f_score"]], (4/5 + 2/3)/2)
+  expect_equal(ret[["micro_f_score"]], 2 * (13*13/20/20) / (13/20 + 13/20))
+
+  test_df2 <- list(
+    c("c", "b"),
+    c("a", "b"),
+    c("d", "b"),
+    c("b", "b"),
+    c("d", "d"),
+    c("a", "c"),
+    c("b", "b"),
+    c("d", "d"),
+    c("d", "d"),
+    c("b", "b"),
+    c("d", "d"),
+    c("d", "a"),
+    c("d", "d"),
+    c("d", "c"),
+    c("d", "d"),
+    c("b", "c"),
+    c("b", "b"),
+    c("d", "d"),
+    c("b", "d"),
+    c("d", "d")
+  ) %>%
+    as.data.frame() %>%
+    as.matrix() %>%
+    t() %>%
+    as.data.frame(stringsAsFactors = FALSE)
+  rownames(test_df2) <- NULL
+  colnames(test_df2) <- c("actual", "predicted")
+
+  ret <- evaluate_multi(test_df2, predicted, actual)
+
+  # this is confirmed from python scikit learn
+  # sklearn.metrics.f1_score(
+  # ["b","b","b","b","d","c","b","d","d","b","d","a","d","c","d","c","b","d","d","d"],
+  # ["c","a","d","b","d","a","b","d","d","b","d","d","d","d","d","b","b","d","b","d"], average = "macro")
+  # sklearn.metrics.f1_score(
+  # ["b","b","b","b","d","c","b","d","d","b","d","a","d","c","d","c","b","d","d","d"],
+  # ["c","a","d","b","d","a","b","d","d","b","d","d","d","d","d","b","b","d","b","d"], average = "micro")
+  expect_equal(ret[["macro_f_score"]], 0.353846153846154)
+  expect_equal(ret[["micro_f_score"]], 0.6)
+
 })
