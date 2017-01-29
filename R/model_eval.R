@@ -213,3 +213,85 @@ evaluate_regression_ <- function(df, pred_val_col, actual_val_col){
 
   ret
 }
+
+#' Non standard evaluation version of evaluate_multi_
+#' @param df Data frame
+#' @param pred_label Predicted label colmun name
+#' @param actual_val Actual label column name
+#' @export
+evaluate_multi <- function(df, pred_label, actual_val, ...) {
+  pred_label_col <- col_name(substitute(pred_label))
+  actual_val_col <- col_name(substitute(actual_val))
+  evaluate_multi_(df, pred_label_col, actual_val_col, ...)
+}
+
+#' Evaluate multi classification
+#' @param df Data frame
+#' @param pred_label_col Predicted label colmun name
+#' @param actual_val_col Actual label column name
+#' @export
+evaluate_multi_ <- function(df, pred_label_col, actual_val_col, ...) {
+
+  evaluate_multi_each <- function(df){
+    actual_values <- df[[actual_val_col]]
+    pred_values <- df[[pred_label_col]]
+
+    # make values factor so that missing values can be included in conf_mat
+    concat <- c(actual_values, pred_values)
+    unique_label <- sort(unique(concat[!is.na(concat)]))
+    exist_val <- !is.na(actual_values) & !is.na(pred_values)
+    actual_fac <- factor(x = actual_values[exist_val], levels = unique_label)
+    pred_fac <- factor(x = pred_values[exist_val], levels = unique_label)
+
+    conf_mat <- table(actual_fac, pred_fac)
+
+    TP <- diag(conf_mat)
+    # row_sum - TP is FN
+    row_sum <- rowSums(conf_mat)
+    # col_sum - TP is FP
+    col_sum <- colSums(conf_mat)
+
+    recall <- TP / row_sum
+    precision <- TP / col_sum
+
+    # explanations about micro f1 and macro f1
+    # http://rushdishams.blogspot.jp/2011/08/micro-and-macro-average-of-precision.html
+    # http://blog.revolutionanalytics.com/2016/03/com_class_eval_metrics_r.html
+    tp_sum <- sum(TP, na.rm=TRUE)
+    fp_sum <- sum(col_sum, na.rm=TRUE) - tp_sum
+    micro_recall <- tp_sum / sum(row_sum, na.rm=TRUE)
+    micro_precision <- tp_sum / sum(col_sum, na.rm=TRUE)
+    micro_f_score <- 2 * (micro_recall * micro_precision) / (micro_recall + micro_precision)
+
+    denominator <- recall+precision
+    denominator[denominator==0] <- 1 # avoid deviding by 0
+    f_score <- 2 * recall*precision/(denominator)
+
+    macro_f_score <- mean(f_score, na.rm = TRUE)
+
+    missclassification_error <- 1 - tp_sum / length(actual_fac)
+
+    data.frame(
+      micro_f_score,
+      macro_f_score,
+      missclassification_error
+    )
+
+
+  }
+
+  group_cols <- grouped_by(df)
+
+  # Calculation is executed in each group.
+  # Storing the result in this tmp_col and
+  # unnesting the result.
+  # If the original data frame is grouped by "tmp",
+  # overwriting it should be avoided,
+  # so avoid_conflict is used here.
+  tmp_col <- avoid_conflict(group_cols, "tmp")
+  ret <- df %>%
+    dplyr::do_(.dots=setNames(list(~evaluate_multi_each(.)), tmp_col)) %>%
+    tidyr::unnest_(tmp_col)
+
+  ret
+}
