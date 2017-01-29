@@ -28,6 +28,9 @@ build_multinom <- function(data, ...){
 #' @param newdata Data to predict
 #' @export
 augment.multinom <- function(model, data = NULL, newdata = NULL) {
+
+  predicted_label_col <- avoid_conflict(colnames(data), "predicted_label")
+
   if (is.null(newdata)) {
     # use trained data and get probabilities
     ret <- model$fitted.values %>%
@@ -39,7 +42,7 @@ augment.multinom <- function(model, data = NULL, newdata = NULL) {
     data <- tidyr::drop_na_(data, vars)
 
 
-    ret[["predicted_label"]] <- stats::predict(model)
+    ret[[predicted_label_col]] <- stats::predict(model)
     if (!is.null(data)) {
       # append fitted values
       ret <- dplyr::bind_cols(data, ret)
@@ -72,7 +75,7 @@ augment.multinom <- function(model, data = NULL, newdata = NULL) {
     ret <- ret %>%
       as.data.frame() %>%
       append_colnames(prefix = "predicted_probability_")
-    ret[["predicted_label"]] <- prob_label
+    ret[[predicted_label_col]] <- prob_label
     ret <- dplyr::bind_cols(newdata, ret)
   }
 }
