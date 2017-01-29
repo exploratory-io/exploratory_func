@@ -26,6 +26,7 @@ build_model <- function(data, model_func, test_seed = 1, test_rate = 0, group_co
     stop("test_rate has to be between 0 and 1")
   }
 
+  # avoid name conflict of grouping columns
   colnames(data)[group_col_index] <- avoid_conflict(
     reserved_names,
     colnames(data)[group_col_index],

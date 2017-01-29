@@ -24,6 +24,8 @@ build_multinom <- function(data, ...){
 }
 
 #' augment for multinom model
+#' @param data Trained data
+#' @param newdata Data to predict
 #' @export
 augment.multinom <- function(model, data = NULL, newdata = NULL) {
   if (is.null(newdata)) {
