@@ -1052,12 +1052,12 @@ clean_data_frame <- function(x) {
 
 #' This checks name conflict and attach the file if there isn't any conflict
 #' @export
-checkSourceConflict <- function(files){
+checkSourceConflict <- function(files, encoding="UTF-8"){
   ret <- list()
   for (file in files){
     ret[[file]] <- tryCatch({
       env <- new.env()
-      source(file, local=env, encoding = "UTF-8")
+      source(file, local=env, encoding = encoding)
       attached_objects <- ls(env)
       list(names = attached_objects)
     }, error = function(e){
