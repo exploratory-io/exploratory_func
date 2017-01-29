@@ -486,7 +486,7 @@ queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, q
 
   # For some reason, calling RODBC::sqlTables() works around Actual Oracle Driver for Mac issue
   # that it always returns 0 rows.
-  # Since we want this to be done without sacrificing performance, 
+  # Since we want this to be done without sacrificing performance,
   # we are adding dummy catalog/schema condition to make it return nothing.
   # Since it does not have performance impact, we are just calling it
   # unconditionally rather than first checking which ODBC driver is used for the connection.
@@ -1052,12 +1052,12 @@ clean_data_frame <- function(x) {
 
 #' This checks name conflict and attach the file if there isn't any conflict
 #' @export
-checkSourceConflict <- function(files){
+checkSourceConflict <- function(files, encoding="UTF-8"){
   ret <- list()
   for (file in files){
     ret[[file]] <- tryCatch({
       env <- new.env()
-      source(file, local=env)
+      source(file, local=env, encoding = encoding)
       attached_objects <- ls(env)
       list(names = attached_objects)
     }, error = function(e){
