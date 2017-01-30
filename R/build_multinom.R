@@ -5,25 +5,25 @@
 #' @param ... Parameters for nnet::multinom
 #' @export
 build_multinom <- function(data, ...){
-  build_model(data = data,
-              model_func = nnet::multinom,
-              reserved_colnames =  c(
-                # for model_coef
-                "y.level",
-                "term",
-                "estimate",
-                "std_error",
-                "t_ratio",
-                "p_value",
-                # for model_stats
-                "edf",
-                "deviance",
-                "AIC"
-              ),
+  reserved_colnames <- reserved_colnames <- c(
+    # for model_coef
+    "y.level",
+    "term",
+    "estimate",
+    "std_error",
+    "t_ratio",
+    "p_value",
+    # for model_stats
+    "edf",
+    "deviance",
+    "AIC"
+  )
+  build_model(data, model_func = nnet::multinom,
+              reserved_colnames = reserved_colnames,
               ...)
 }
 
-#' augment for multinom model
+#' augment for multinom model, which is not defined by broom
 #' @param data Trained data
 #' @param newdata Data to predict
 #' @export

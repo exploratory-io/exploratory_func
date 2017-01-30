@@ -276,8 +276,6 @@ evaluate_multi_ <- function(df, pred_label_col, actual_val_col, ...) {
       macro_f_score,
       missclassification_error
     )
-
-
   }
 
   group_cols <- grouped_by(df)

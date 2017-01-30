@@ -5,11 +5,17 @@ test_that("test nnet build_model", {
     label = c(rep(letters[1:3], 12), NA, "a", "a"),
     num = seq(39),
     num2 = 39 - seq(39),
+    weight = seq(39)/39,
     term = rep(letters[1:3], each = 13),
     stringsAsFactors = FALSE
   )
 
-  model_df <- build_multinom(test_data, formula = label ~ num + num2, group_cols = "term", test_rate = 0.4)
+  model_df <- build_multinom(
+    test_data,
+    formula = label ~ num + num2,
+    group_cols = "term",
+    # weights = weight,
+    test_rate = 0.4)
   expect_true(any(colnames(model_df) %in% "term.group"))
 
   coef_ret <- model_coef(model_df)
