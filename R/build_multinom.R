@@ -5,15 +5,7 @@
 #' @param ... Parameters for nnet::multinom
 #' @export
 build_multinom <- function(data, ...){
-  # parse ... and use do.call to support
-  # non standard evaluation like weight argument
-  caller <- match.call()
-
-  # -1 removes "build_multinom"
-  args <- as.list(caller)[-1]
-
-  args$model_func <- nnet::multinom
-  args$reserved_colnames <- c(
+  reserved_colnames <- reserved_colnames <- c(
     # for model_coef
     "y.level",
     "term",
@@ -26,9 +18,9 @@ build_multinom <- function(data, ...){
     "deviance",
     "AIC"
   )
-  args$data <- data
-
-  do.call("build_model", args)
+  build_model(data, model_func = nnet::multinom,
+              reserved_colnames = reserved_colnames,
+              ...)
 }
 
 #' augment for multinom model, which is not defined by broom

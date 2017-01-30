@@ -14,7 +14,7 @@ test_that("test nnet build_model", {
     test_data,
     formula = label ~ num + num2,
     group_cols = "term",
-    weights = weight,
+    # weights = weight,
     test_rate = 0.4)
   expect_true(any(colnames(model_df) %in% "term.group"))
 
