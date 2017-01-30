@@ -479,12 +479,14 @@ model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
     colnames(ret)[colnames(ret) == "estimate"] <- "Estimate"
     colnames(ret)[colnames(ret) == "conf.low"] <- "Conf Low"
     colnames(ret)[colnames(ret) == "conf.high"] <- "Conf High"
+    colnames(ret)[colnames(ret) == "y.level"] <- "Predicted Label"
   } else {
     colnames(ret)[colnames(ret) == "statistic"] <- "t_ratio"
     colnames(ret)[colnames(ret) == "p.value"] <- "p_value"
     colnames(ret)[colnames(ret) == "std.error"] <- "std_error"
     colnames(ret)[colnames(ret) == "conf.low"] <- "conf_low"
     colnames(ret)[colnames(ret) == "conf.high"] <- "conf_high"
+    colnames(ret)[colnames(ret) == "y.level"] <- "predicted_label"
   }
   ret
 }
@@ -506,6 +508,8 @@ model_stats <- function(df, pretty.name = FALSE){
     # for glm
     colnames(ret)[colnames(ret) == "null.deviance"] <- "Null Deviance"
     colnames(ret)[colnames(ret) == "df.null"] <- "DF for Null Model"
+    # for multinom
+    colnames(ret)[colnames(ret) == "edf"] <- "Effective Number of DF"
   }else{
     colnames(ret)[colnames(ret) == "r.squared"] <- "r_square"
     colnames(ret)[colnames(ret) == "adj.r.squared"] <- "r_square_adj"
@@ -513,11 +517,12 @@ model_stats <- function(df, pretty.name = FALSE){
     colnames(ret)[colnames(ret) == "statistic"] <- "f_ratio"
     colnames(ret)[colnames(ret) == "p.value"] <- "p_value"
     colnames(ret)[colnames(ret) == "logLik"] <- "log_likelihood"
-    colnames(ret)[colnames(ret) == "deviance"] <- "deviance"
     colnames(ret)[colnames(ret) == "df.residual"] <- "residual_df"
     # for glm
     colnames(ret)[colnames(ret) == "null.deviance"] <- "null_deviance"
     colnames(ret)[colnames(ret) == "df.null"] <- "df_for_null_model"
+    # for multinom
+    colnames(ret)[colnames(ret) == "edf"] <- "effective_number_of_df"
   }
 
   ret
