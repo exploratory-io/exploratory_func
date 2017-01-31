@@ -560,12 +560,26 @@ model_anova <- function(df, pretty.name = FALSE){
 
 model_survfit <- function(df, newdata = NULL){
   # TODO: using ... so that any extra argument can go into survfit might be desirable.
-  df %>% dplyr::mutate(model = list(survival::survfit(model, newdata = newdata))) %>% broom::tidy(model)
+  ret <- df %>% dplyr::mutate(model = list(survival::survfit(model, newdata = newdata))) %>% broom::tidy(model)
+  colnames(ret)[colnames(ret) == "n.risk"] <- "n_risk"
+  colnames(ret)[colnames(ret) == "n.event"] <- "n_event"
+  colnames(ret)[colnames(ret) == "n.censor"] <- "n_censor"
+  colnames(ret)[colnames(ret) == "std.error"] <- "std_error"
+  colnames(ret)[colnames(ret) == "conf.low"] <- "conf_low"
+  colnames(ret)[colnames(ret) == "conf.high"] <- "conf_high"
+  ret
 }
 
 do_survfit <- function(df, formula){
   # TODO: using ... so that any extra argument can go into survfit might be desirable.
-  df %>% build_model(model_func = survival::survfit, formula = formula) %>% broom::tidy(model)
+  ret <- df %>% build_model(model_func = survival::survfit, formula = formula) %>% broom::tidy(model)
+  colnames(ret)[colnames(ret) == "n.risk"] <- "n_risk"
+  colnames(ret)[colnames(ret) == "n.event"] <- "n_event"
+  colnames(ret)[colnames(ret) == "n.censor"] <- "n_censor"
+  colnames(ret)[colnames(ret) == "std.error"] <- "std_error"
+  colnames(ret)[colnames(ret) == "conf.low"] <- "conf_low"
+  colnames(ret)[colnames(ret) == "conf.high"] <- "conf_high"
+  ret
 }
 
 #' tidy after converting model to confint
