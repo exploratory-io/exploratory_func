@@ -558,10 +558,11 @@ model_anova <- function(df, pretty.name = FALSE){
   ret
 }
 
-model_survfit <- function(df, pretty.name = FALSE){
+model_survfit <- function(df, pretty.name = FALSE, newdata = NULL){
+  # TODO: using ... so that any extra argument can go into survfit might be desirable.
   ret <- suppressWarnings({
     # this causes warning for Deviance, Resid..Df, Resid..Dev in glm model
-    df %>% dplyr::mutate(model = list(survival::survfit(model))) %>% broom::tidy(model)
+    df %>% dplyr::mutate(model = list(survival::survfit(model, newdata = newdata))) %>% broom::tidy(model)
   })
 }
 
