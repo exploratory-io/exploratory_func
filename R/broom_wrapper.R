@@ -436,6 +436,10 @@ prediction_binary <- function(df, threshold = 0.5, ...){
   ret
 }
 
+prediction_coxph <- function(df, ...){
+  ret <- prediction(df, ...)
+}
+
 #' tidy wrapper for lm and glm
 #' @export
 model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
