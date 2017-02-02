@@ -570,9 +570,9 @@ model_survfit <- function(df, newdata = NULL){
   ret
 }
 
-do_survfit <- function(df, formula){
+do_survfit <- function(df, formula, ...){
   # TODO: using ... so that any extra argument can go into survfit might be desirable.
-  ret <- df %>% build_model(model_func = survival::survfit, formula = formula) %>% broom::tidy(model)
+  ret <- df %>% build_model(model_func = survival::survfit, formula = formula, ...) %>% broom::tidy(model)
   colnames(ret)[colnames(ret) == "n.risk"] <- "n_risk"
   colnames(ret)[colnames(ret) == "n.event"] <- "n_event"
   colnames(ret)[colnames(ret) == "n.censor"] <- "n_censor"
