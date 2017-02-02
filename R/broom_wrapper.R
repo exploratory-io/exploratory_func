@@ -558,9 +558,17 @@ model_anova <- function(df, pretty.name = FALSE){
   ret
 }
 
-model_survfit <- function(df, newdata = NULL){
-  # TODO: using ... so that any extra argument can go into survfit might be desirable.
-  ret <- df %>% dplyr::mutate(model = list(survival::survfit(model, newdata = newdata))) %>% broom::tidy(model)
+model_survfit <- function(df, ...){
+  caller <- match.call()
+  # this expands dots arguemtns to character
+  arg_char <- expand_args(caller, exclude = c("df"))
+  if (arg_char != "") {
+    fml <- as.formula(paste0("~list(survival::survfit(model, ", arg_char, "))"))
+  } else {
+    fml <- as.formula(paste0("~list(survival::survfit(model))"))
+  }
+  ret <- df %>% dplyr::mutate_(.dots = list(model = fml)) %>% broom::tidy(model)
+  # TODO: adjust following column name adjustments
   colnames(ret)[colnames(ret) == "n.risk"] <- "n_risk"
   colnames(ret)[colnames(ret) == "n.event"] <- "n_event"
   colnames(ret)[colnames(ret) == "n.censor"] <- "n_censor"
@@ -571,7 +579,6 @@ model_survfit <- function(df, newdata = NULL){
 }
 
 do_survfit <- function(df, formula, ...){
-  # TODO: using ... so that any extra argument can go into survfit might be desirable.
   ret <- df %>% build_model(model_func = survival::survfit, formula = formula, ...) %>% broom::tidy(model)
   colnames(ret)[colnames(ret) == "n.risk"] <- "n_risk"
   colnames(ret)[colnames(ret) == "n.event"] <- "n_event"
