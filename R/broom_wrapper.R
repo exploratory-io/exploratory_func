@@ -260,7 +260,7 @@ kmeans_info <- function(df){
 #' @param data "training" or "test". Which source data should be used.
 #' @param ... Additional argument to be passed to broom::augment
 #' @export
-prediction <- function(df, data = "training", ...){
+prediction <- function(df, data = "training", conf_int = 0.95, ...){
 
   if (!data %in% c("test", "training")) {
     stop('data argument must be "test" or "training"')
@@ -379,6 +379,24 @@ prediction <- function(df, data = "training", ...){
       dplyr::select(-model) %>%
       tidyr::unnest(source.data)
   }
+
+  # add confidence interval if conf_int is not null and there are .fitted and .se.fit
+  if (!is.null(conf_int) & ".se.fit" %in% colnames(ret) & ".fitted" %in% colnames(ret)) {
+    if (conf_int < 0 | conf_int > 1){
+      stop("conf_int must be between 0 and 1")
+    }
+    conf_low_colname <- avoid_conflict(colnames(ret), "conf_low")
+    conf_high_colname <- avoid_conflict(colnames(ret), "conf_high")
+    lower <- (1-conf_int)/2
+    higher <- 1-lower
+    ret[[conf_low_colname]] <- get_confint(ret[[".fitted"]], ret[[".se.fit"]], conf_int = lower)
+    ret[[conf_high_colname]] <- get_confint(ret[[".fitted"]], ret[[".se.fit"]], conf_int = higher)
+
+    # move confidece interval columns next to standard error
+    ret <- move_col(ret, conf_low_colname, which(colnames(ret) == ".se.fit") + 1)
+    ret <- move_col(ret, conf_high_colname, which(colnames(ret) == conf_low_colname) + 1)
+  }
+
   colnames(ret)[colnames(ret) == ".fitted"] <- avoid_conflict(colnames(ret), "predicted_value")
   colnames(ret)[colnames(ret) == ".se.fit"] <- avoid_conflict(colnames(ret), "standard_error")
   colnames(ret)[colnames(ret) == ".resid"] <- avoid_conflict(colnames(ret), "residuals")
