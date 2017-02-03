@@ -96,9 +96,9 @@ test_that("build_lm with evaluation", {
     prediction(data = "training")
 
   expect_equal(colnames(test_eval), c("group", "num1", "num2",
-                                      "predicted_value", "standard_error", "residuals",
+                                      "predicted_value", "standard_error", "conf_low", "conf_high", "residuals",
                                       "hat", "residual_standard_deviation", "cooks_distance",
-                                      "standardised_residuals", "conf_low", "conf_high"
+                                      "standardised_residuals"
                                       ))
 
 })

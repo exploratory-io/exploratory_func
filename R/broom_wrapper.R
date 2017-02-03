@@ -380,6 +380,7 @@ prediction <- function(df, data = "training", conf_int = 0.95, ...){
       tidyr::unnest(source.data)
   }
 
+  # add confidence interval if conf_int is not null and there are .fitted and .se.fit
   if (!is.null(conf_int) & ".se.fit" %in% colnames(ret) & ".fitted" %in% colnames(ret)) {
     if (conf_int < 0 | conf_int > 1){
       stop("conf_int must be between 0 and 1")
@@ -390,6 +391,10 @@ prediction <- function(df, data = "training", conf_int = 0.95, ...){
     higher <- 1-lower
     ret[[conf_low_colname]] <- get_confint(ret[[".fitted"]], ret[[".se.fit"]], conf_int = lower)
     ret[[conf_high_colname]] <- get_confint(ret[[".fitted"]], ret[[".se.fit"]], conf_int = higher)
+
+    # move confidece interval columns next to standard error
+    ret <- move_col(ret, conf_low_colname, which(colnames(ret) == ".se.fit") + 1)
+    ret <- move_col(ret, conf_high_colname, which(colnames(ret) == conf_low_colname) + 1)
   }
 
   colnames(ret)[colnames(ret) == ".fitted"] <- avoid_conflict(colnames(ret), "predicted_value")
