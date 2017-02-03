@@ -436,6 +436,9 @@ prediction_binary <- function(df, threshold = 0.5, ...){
   ret
 }
 
+#' TODO: prediction wrapper to set proportional hazard.
+#' @param df Data frame to predict. This should have model column.
+#' @export
 prediction_coxph <- function(df, ...){
   ret <- prediction(df, ...)
 }
