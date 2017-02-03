@@ -584,7 +584,6 @@ model_survfit <- function(df, ...){
     fml <- as.formula(paste0("~list(survival::survfit(model))"))
   }
   ret <- df %>% dplyr::mutate_(.dots = list(model = fml)) %>% broom::tidy(model)
-  # TODO: adjust following column name adjustments
   colnames(ret)[colnames(ret) == "n.risk"] <- "n_risk"
   colnames(ret)[colnames(ret) == "n.event"] <- "n_event"
   colnames(ret)[colnames(ret) == "n.censor"] <- "n_censor"
