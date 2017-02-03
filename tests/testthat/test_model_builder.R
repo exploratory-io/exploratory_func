@@ -114,7 +114,7 @@ test_that("test build_glm and broom", {
     result <- test_df %>%
       build_glm(vec1~vec2, augment=TRUE)
     expect_equal(nrow(result), 10)
-    expect_equal(ncol(result), ncol(test_df)+8)
+    expect_equal(ncol(result), ncol(test_df)+10)
   }
 })
 
