@@ -491,6 +491,13 @@ model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
     colnames(ret)[colnames(ret) == "conf.high"] <- "conf_high"
     colnames(ret)[colnames(ret) == "y.level"] <- "predicted_label"
   }
+  # tidy() on coxph keeps .test_index and source.data that we added. Let's drop it.
+  if(".test_index" %in% colnames(ret)){
+    ret <- ret %>% select(-.test_index)
+  }
+  if("source.data" %in% colnames(ret)){
+    ret <- ret %>% select(-source.data)
+  }
   ret
 }
 
