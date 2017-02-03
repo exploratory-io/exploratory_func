@@ -50,5 +50,6 @@ Suggests:
     proxy,
     topicmodels,
     janitor,
-    nnet
+    nnet,
+    mgcv
 RoxygenNote: 5.0.1
