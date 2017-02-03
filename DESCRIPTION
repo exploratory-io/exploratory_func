@@ -52,5 +52,6 @@ Suggests:
     janitor,
     nnet,
     mgcv,
-    anonymizer
+    anonymizer,
+    survival
 RoxygenNote: 5.0.1
