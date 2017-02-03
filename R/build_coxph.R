@@ -14,17 +14,32 @@ build_coxph <- function(data, formula, ...){
               formula = formula,
               model_func = survival::coxph,
               reserved_colnames =  c(
-                # for model_coef
+                # model_coef can add following columns at the next step
                 "y.level",
                 "term",
                 "estimate",
                 "std_error",
                 "t_ratio",
                 "p_value",
-                # for model_stats
+                # model_stats can add following columns at the next step
                 "edf",
                 "deviance",
-                "AIC"
+                "AIC",
+                # model_survfit can add following columns at the next step
+                "time",
+                "n.risk",
+                "n_risk",
+                "n.event",
+                "n_event",
+                "n.censor",
+                "n_censor",
+                "estimate",
+                "std.error",
+                "std_error",
+                "conf.high",
+                "conf_high",
+                "conf.low",
+                "conf_low"
               ),
               ...)
 }
