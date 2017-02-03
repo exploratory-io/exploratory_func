@@ -577,6 +577,8 @@ model_anova <- function(df, pretty.name = FALSE){
   ret
 }
 
+#' tidy after converting model to survfit
+#' @export
 model_survfit <- function(df, ...){
   caller <- match.call()
   # this expands dots arguemtns to character
@@ -596,6 +598,8 @@ model_survfit <- function(df, ...){
   ret
 }
 
+#' tidy after generating survfit
+#' @export
 do_survfit <- function(df, formula, ...){
   ret <- df %>% build_model(model_func = survival::survfit, formula = formula, ...) %>% broom::tidy(model)
   colnames(ret)[colnames(ret) == "n.risk"] <- "n_risk"
