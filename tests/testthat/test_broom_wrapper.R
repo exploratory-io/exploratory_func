@@ -278,7 +278,7 @@ test_that("test gam", {
 
   test_data[["rand"]] <- runif(nrow(test_data), min=-5, max = 5)
 
-  model_data <- build_model(test_data, model_func = mgcv::gam, formula = rand ~ DISTANCE, test_rate = 0.2)
+  model_data <- build_model(test_data, model_func = mgcv::gam, formula = rand ~ s(DISTANCE), test_rate = 0.2)
 
   prediction_ret <- prediction(model_data)
 
