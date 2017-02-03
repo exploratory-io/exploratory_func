@@ -443,7 +443,6 @@ prediction_coxph <- function(df, ...){
 #' tidy wrapper for lm and glm
 #' @export
 model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
-
   dots <- list(...)
 
   ret <- if (!is.null(conf_int)) {
@@ -461,7 +460,7 @@ model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
         dplyr::mutate(model = purrr::map(model, function(model){
           # use confint.default for performance
           conf <- confint.default(model, level = level) %>% as.data.frame()
-          tidy_ret <- broom::tidy(model)
+          tidy_ret <- broom::tidy(model, ...)
           colnames(conf) <- c("conf.low", "conf.high")
           dplyr::bind_cols(tidy_ret, conf)
         })) %>%
