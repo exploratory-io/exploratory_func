@@ -549,6 +549,9 @@ model_anova <- function(df, pretty.name = FALSE){
     # for glm anova
     colnames(ret)[colnames(ret) == "Resid..Df"] <- "Residual DF"
     colnames(ret)[colnames(ret) == "Resid..Dev"] <- "Residual Deviance"
+    # for coxph anova
+    colnames(ret)[colnames(ret) == "loglik"] <- "Log Likelihood"
+    colnames(ret)[colnames(ret) == "Pr...Chi.."] <- "P Value" # looks like this means P value for chisquare test.
   } else {
     colnames(ret)[colnames(ret) == "sumsq"] <- "sum_of_squares"
     colnames(ret)[colnames(ret) == "meansq"] <- "mean_square"
@@ -558,6 +561,9 @@ model_anova <- function(df, pretty.name = FALSE){
     colnames(ret)[colnames(ret) == "Deviance"] <- "deviance"
     colnames(ret)[colnames(ret) == "Resid..Df"] <- "residual_df"
     colnames(ret)[colnames(ret) == "Resid..Dev"] <- "residual_deviance"
+    # for coxph anova
+    colnames(ret)[colnames(ret) == "loglik"] <- "log_likelihood"
+    colnames(ret)[colnames(ret) == "Pr...Chi.."] <- "p_value"
   }
   ret
 }
