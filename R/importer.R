@@ -18,6 +18,6 @@ urltools::url_encode
 #' @export
 urltools::url_decode
 
-#' @importFrom anonymizer url_decode
+#' @importFrom anonymizer anonymize
 #' @export
 anonymize <- anonymizer::anonymize
