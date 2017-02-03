@@ -1047,7 +1047,12 @@ getObjectFromRdata <- function(rdata_path, object_name){
 #' @return cleaned data frame
 #' @export
 clean_data_frame <- function(x) {
-  tibble::repair_names(jsonlite::flatten(x))
+  df <- tibble::repair_names(jsonlite::flatten(x))
+  original_names <- names(df)
+  # remove tab, new line, carriage return from column names
+  clean_names <- original_names  %>% gsub("[\r\n\t]", "", .)
+  names(df) <- clean_names
+  df
 }
 
 #' This checks name conflict and attach the file if there isn't any conflict
