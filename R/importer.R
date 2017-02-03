@@ -17,3 +17,7 @@ urltools::url_encode
 #' @importFrom urltools url_decode
 #' @export
 urltools::url_decode
+
+#' @importFrom anonymizer url_decode
+#' @export
+anonymize <- anonymizer::anonymize
