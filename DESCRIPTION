@@ -51,5 +51,6 @@ Suggests:
     topicmodels,
     janitor,
     nnet,
-    mgcv
+    mgcv,
+    anonymizer
 RoxygenNote: 5.0.1
