@@ -646,3 +646,12 @@ append_colnames <- function(df, prefix = "", suffix = ""){
   colnames(df) <- avoid_conflict(colnames(df), stringr::str_c(prefix, colnames(df), suffix, sep = ""))
   df
 }
+
+#' get confidence interval value
+#' @param val Predicted value
+#' @param conf_int Confidence interval to get
+#' @export
+get_confint <- function(val, se, conf_int = 0.95) {
+  critval=qnorm(conf_int,0,1)
+  val + critval * se
+}
