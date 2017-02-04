@@ -17,6 +17,20 @@ build_lr <- function(df, ...) {
 #' @export
 build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, group_cols = NULL, test_rate = 0, seed = 0){
 
+  dots <- list(...)
+  if(is.character(dots$family)){
+    if(dots$family == "binomial"){
+      response_val <- all.vars(formula)[[1]]
+      if(is.character(data[[response_val]])) {
+        data[[response_val]] <- as.factor(data[[response_val]])
+      }
+      if(is.factor(data[[response_val]])){
+        if(length(levels(data[[response_val]])) != 2)
+        stop("result column has to have 2 unique values")
+      }
+    }
+  }
+
   if(!is.null(seed)){
     set.seed(seed)
   }
