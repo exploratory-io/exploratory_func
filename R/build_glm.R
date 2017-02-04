@@ -1,7 +1,26 @@
 #' glm wrappwer for logistic regression
 #' @export
 build_lr <- function(df, ...) {
-  do.call("build_glm", list(df, ..., family = "binomial"))
+  dots <- list(...)
+  # formula is from "formula =" argument or first argument
+  formula <- dots$formula
+  if(is.null(formula)){
+    formula <- dots[[1]]
+  }
+  # convert response variable if it's character
+  response_var <- all.vars(formula)[[1]]
+
+  data <- df
+
+  if(is.character(data[[response_var]])) {
+    data[[response_var]] <- as.factor(data[[response_var]])
+  }
+  if(is.factor(data[[response_var]])){
+    if(length(levels(data[[response_var]])) != 2){
+      stop("outcome column has to have 2 unique values")
+    }
+  }
+  do.call("build_glm", list(data, ..., family = "binomial"))
 }
 
 #' glm wrapper with do
