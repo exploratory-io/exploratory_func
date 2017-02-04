@@ -32,12 +32,18 @@ build_multinom <- function(data, formula, ...){
 augment.multinom <- function(model, data = NULL, newdata = NULL) {
 
   predicted_label_col <- avoid_conflict(colnames(data), "predicted_label")
+  predicted_prob_col <- avoid_conflict(colnames(data), "predicted_probability")
 
   if (is.null(newdata)) {
     # use trained data and get probabilities
-    ret <- model$fitted.values %>%
+    f_values <- model$fitted.values
+    ret <- f_values %>%
       as.data.frame() %>%
       append_colnames(prefix = "predicted_probability_")
+
+    # get max values from each row
+    p_values <- f_values[(max.col(f_values) - 1) * nrow(f_values) + seq(nrow(f_values))]
+    ret[[predicted_prob_col]] <- p_values
 
     # in case of training data, NA of terms in both right and left side should be removed
     vars <- all.vars(model$terms)
@@ -74,10 +80,14 @@ augment.multinom <- function(model, data = NULL, newdata = NULL) {
     if (!is.matrix(ret)) {
       ret <- as.list(ret)
     }
+    # get max values from each row
+    p_values <- prob_mat[(max.col(prob_mat) - 1) * nrow(prob_mat) + seq(nrow(prob_mat))]
+
     ret <- ret %>%
       as.data.frame() %>%
       append_colnames(prefix = "predicted_probability_")
     ret[[predicted_label_col]] <- prob_label
+    ret[[predicted_prob_col]] <- p_values
     ret <- dplyr::bind_cols(newdata, ret)
   }
 }
