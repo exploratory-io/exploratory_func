@@ -67,7 +67,7 @@ augment.multinom <- function(model, data = NULL, newdata = NULL) {
     # if newdata is one row, it becomes a vector,
     # so should be converted to matrix
     if (!is.matrix(prob_mat)) {
-      mat <- matrix(prob_mat, ncol = length(prob_mat))
+      mat <- matrix(prob_mat, nrow = nrow(newdata))
       colnames(mat) <- names(prob_mat)
       prob_mat <- mat
     }

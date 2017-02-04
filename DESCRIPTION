@@ -27,7 +27,8 @@ Imports:
     Matrix,
     rvest,
     stats,
-    urltools
+    urltools,
+    anonymizer
 Suggests:
     testthat,
     twitteR,
