@@ -22,6 +22,9 @@ test_that("test nnet build_model", {
   stats_ret <- model_stats(model_df)
 
   expect_equal(nrow(coef_ret), 18)
+  expect_true(any(colnames(coef_ret) %in% "conf_low"))
+  expect_true(any(colnames(coef_ret) %in% "conf_high"))
+
   expect_equal(nrow(stats_ret), 3)
 
 
