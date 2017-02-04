@@ -238,6 +238,9 @@ test_that("test prediction binary", {
 
   coef_ret <- model_coef(model_data, conf_int = "default")
 
+  prediction_train_ret <- prediction_binary(model_data, data = "training")
+  expect_true(any(colnames(prediction_train_ret) %in% "predicted_label"))
+
 })
 
 test_that("test loess", {
