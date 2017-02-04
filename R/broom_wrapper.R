@@ -529,6 +529,15 @@ model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
     broom::tidy(df, model, ...)
   }
 
+  if ("coxph" %in% class(df$model[[1]])) {
+    ret <- ret %>% mutate(hazard_ratio = exp(estimate))
+  }
+  if ("multinom" %in% class(df$model[[1]])) {
+    # TODO: logistic regression should have the same column.
+    # estimate in tidy() result of multinom is already exponentiated. just rename.
+    colnames(ret)[colnames(ret) == "estimate"] <- "odds_ratio"
+  }
+
   if (pretty.name){
     colnames(ret)[colnames(ret) == "term"] <- "Term"
     colnames(ret)[colnames(ret) == "statistic"] <- "t Ratio"
@@ -537,6 +546,8 @@ model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
     colnames(ret)[colnames(ret) == "estimate"] <- "Estimate"
     colnames(ret)[colnames(ret) == "conf.low"] <- "Conf Low"
     colnames(ret)[colnames(ret) == "conf.high"] <- "Conf High"
+    colnames(ret)[colnames(ret) == "hazard_ratio"] <- "Hazard Ratio"
+    colnames(ret)[colnames(ret) == "odds_ratio"] <- "Odds Ratio"
     colnames(ret)[colnames(ret) == "y.level"] <- "Predicted Label"
   } else {
     colnames(ret)[colnames(ret) == "statistic"] <- "t_ratio"
