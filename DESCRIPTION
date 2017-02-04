@@ -27,7 +27,8 @@ Imports:
     Matrix,
     rvest,
     stats,
-    urltools
+    urltools,
+    anonymizer
 Suggests:
     testthat,
     twitteR,
@@ -52,6 +53,5 @@ Suggests:
     janitor,
     nnet,
     mgcv,
-    anonymizer,
     survival
 RoxygenNote: 5.0.1
