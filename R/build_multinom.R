@@ -37,6 +37,12 @@ augment.multinom <- function(model, data = NULL, newdata = NULL) {
   if (is.null(newdata)) {
     # use trained data and get probabilities
     f_values <- model$fitted.values
+
+    # f_values is one column matrix if the number of levels is 2
+    if(ncol(f_values) == 1){
+      f_values <- matrix(c(f_values, 1-f_values[,1]), ncol=2)
+      colnames(f_values) <- model$lev
+    }
     ret <- f_values %>%
       as.data.frame() %>%
       append_colnames(prefix = "predicted_probability_")
@@ -64,26 +70,29 @@ augment.multinom <- function(model, data = NULL, newdata = NULL) {
     newdata <- tidyr::drop_na_(newdata, vars)
 
     prob_mat <-  stats::predict(model, newdata, type = "prob")
-    # if newdata is one row, it becomes a vector,
+    # if newdata is one row or classification labels are two,
+    # it becomes a vector,
     # so should be converted to matrix
     if (!is.matrix(prob_mat)) {
       mat <- matrix(prob_mat, nrow = nrow(newdata))
-      colnames(mat) <- names(prob_mat)
+      if(ncol(mat) == length(prob_mat)){
+        # this is one row newdata case
+        colnames(mat) <- names(prob_mat)
+      } else {
+        # two classification labels case
+        # create both probability for positive and negative
+        mat <- matrix(c(mat, 1-mat[,1]), ncol=2)
+        colnames(mat) <- model$lev
+        mat
+      }
       prob_mat <- mat
     }
 
     prob_label <- colnames(prob_mat)[max.col(prob_mat)]
-    ret <- stats::predict(model, newdata, type = "prob")
-    # if newdata is one row, it becomes a vector and
-    # as.data.frame makes a long dataframe from it,
-    # so it should be converted to a list
-    if (!is.matrix(ret)) {
-      ret <- as.list(ret)
-    }
     # get max values from each row
     p_values <- prob_mat[(max.col(prob_mat) - 1) * nrow(prob_mat) + seq(nrow(prob_mat))]
 
-    ret <- ret %>%
+    ret <- prob_mat %>%
       as.data.frame() %>%
       append_colnames(prefix = "predicted_probability_")
     ret[[predicted_label_col]] <- prob_label

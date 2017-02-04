@@ -291,6 +291,15 @@ prediction <- function(df, data = "training", conf_int = 0.95, ...){
   ret <- if(test){
     # augment by test data
 
+    # check if there is test data
+    test_sizes <- vapply(df[[".test_index"]], function(test){
+      length(test)
+    }, FUN.VALUE = 0)
+
+    if(all(test_sizes==0)){
+      stop("no test data found")
+    }
+
     # Use formula to support expanded aug_args (especially for type.predict for logistic regression)
     # because ... can't be passed to a function inside mutate directly.
     # If test is TRUE, this uses newdata as an argument and if not, uses data as an argument.
@@ -416,6 +425,23 @@ prediction_binary <- function(df, threshold = 0.5, ...){
   ret <- prediction(df, ...)
 
   first_model <- df[["model"]][[1]]
+
+  if(any(class(first_model) %in% "glm")){
+    if (!is.null(first_model$family)) {
+      if (!is.null(first_model$family$linkinv)) {
+        if (any(colnames(ret) %in% "conf_low")) {
+          conf_low_vec <- first_model$family$linkinv(ret[["conf_low"]])
+          ret[["conf_low"]] <- NULL
+          ret[["conf_low"]] <- conf_low_vec
+        }
+        if (any(colnames(ret) %in% "conf_high")) {
+          conf_high_vec <- first_model$family$linkinv(ret[["conf_high"]])
+          ret[["conf_high"]] <- NULL
+          ret[["conf_high"]] <- conf_high_vec
+        }
+      }
+    }
+  }
 
   # get actual value column name from model formula
   actual_col <- all.vars(first_model$formula)[[1]]
