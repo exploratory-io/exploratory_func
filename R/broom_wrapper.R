@@ -480,10 +480,18 @@ model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
         dplyr::ungroup() %>%
         dplyr::mutate(model = purrr::map(model, function(model){
           # use confint.default for performance
-          conf <- confint.default(model, level = level) %>% as.data.frame()
           tidy_ret <- broom::tidy(model, ...)
-          colnames(conf) <- c("conf.low", "conf.high")
-          dplyr::bind_cols(tidy_ret, conf)
+
+          # calculate confidence interval by estimate and std.error
+          if(any(colnames(tidy_ret) %in% "estimate") & any(colnames(tidy_ret) %in% "std.error")){
+            level_low <- (1-level)/2
+            level_high <- 1-level_low
+
+            tidy_ret[["conf.low"]] <- get_confint(tidy_ret[["estimate"]], tidy_ret[["std.error"]], level_low)
+            tidy_ret[["conf.high"]] <- get_confint(tidy_ret[["estimate"]], tidy_ret[["std.error"]], level_high)
+          }
+          tidy_ret
+
         })) %>%
         tidyr::unnest(model)
     } else {
