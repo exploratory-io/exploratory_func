@@ -605,7 +605,7 @@ model_anova <- function(df, pretty.name = FALSE){
 
 #' tidy after converting model to survfit
 #' @export
-model_survfit <- function(df, ...){
+prediction_survfit <- function(df, ...){
   caller <- match.call()
   # this expands dots arguemtns to character
   arg_char <- expand_args(caller, exclude = c("df"))

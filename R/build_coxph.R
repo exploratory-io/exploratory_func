@@ -25,7 +25,7 @@ build_coxph <- function(data, formula, ...){
                 "edf",
                 "deviance",
                 "AIC",
-                # model_survfit can add following columns at the next step
+                # prediction_survfit can add following columns at the next step
                 "time",
                 "n.risk",
                 "n_risk",
