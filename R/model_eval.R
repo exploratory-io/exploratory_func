@@ -263,11 +263,16 @@ evaluate_multi_ <- function(df, pred_label_col, actual_val_col, ...) {
     fp_sum <- sum(col_sum, na.rm=TRUE) - tp_sum
     micro_recall <- tp_sum / sum(row_sum, na.rm=TRUE)
     micro_precision <- tp_sum / sum(col_sum, na.rm=TRUE)
-    micro_f_score <- 2 * (micro_recall * micro_precision) / (micro_recall + micro_precision)
+    micro_f_score <- if (micro_recall + micro_precision == 0){
+      # no prediction was correct
+      0
+    } else {
+      2 * (micro_recall * micro_precision) / (micro_recall + micro_precision)
+    }
 
     denominator <- recall+precision
-    denominator[denominator==0] <- 1 # avoid deviding by 0
     f_score <- 2 * recall*precision/(denominator)
+    f_score[is.na(f_score)] <- 0
 
     macro_f_score <- mean(f_score, na.rm = TRUE)
 

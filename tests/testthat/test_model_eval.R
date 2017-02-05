@@ -137,7 +137,11 @@ test_that("eval multi", {
 
   ret <- evaluate_multi(test_df, predicted, actual)
 
-  expect_equal(ret[["macro_f_score"]], (4/5 + 2/3)/2)
+  #confirmed by this python code
+  #sklearn.metrics.f1_score(
+  #  ["b","b","b","b","d","c","b","d","d","b","d","b","d","c","d","c","b","d","d","d"],
+  #  ["b","a","d","b","d","a","b","d","d","b","d","d","d","d","d","b","b","d","b","d"], average = "macro")
+  expect_equal(ret[["macro_f_score"]], 0.366666666666667)
   expect_equal(ret[["micro_f_score"]], 2 * (13*13/20/20) / (13/20 + 13/20))
 
   test_df2 <- list(
@@ -180,5 +184,27 @@ test_that("eval multi", {
   # ["c","a","d","b","d","a","b","d","d","b","d","d","d","d","d","b","b","d","b","d"], average = "micro")
   expect_equal(ret[["macro_f_score"]], 0.353846153846154)
   expect_equal(ret[["micro_f_score"]], 0.6)
+
+})
+
+test_that("eval multi", {
+  test_df <- list(
+    c("a", "b"),
+    c("a", "b"),
+    c("a", "b"),
+    c("a", "b"),
+    c("b", "a"),
+    c("b", "a"),
+    c("b", "a")
+  ) %>%
+    as.data.frame() %>%
+    as.matrix() %>%
+    t() %>%
+    as.data.frame(stringsAsFactors = FALSE)
+  rownames(test_df) <- NULL
+  colnames(test_df) <- c("actual", "predicted")
+
+  ret <- evaluate_multi(test_df, predicted, actual)
+  expect_equal(ret[["micro_f_score"]], 0)
 
 })
