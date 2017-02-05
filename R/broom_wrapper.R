@@ -291,6 +291,15 @@ prediction <- function(df, data = "training", conf_int = 0.95, ...){
   ret <- if(test){
     # augment by test data
 
+    # check if there is test data
+    test_sizes <- vapply(df[[".test_index"]], function(test){
+      length(test)
+    }, FUN.VALUE = 0)
+
+    if(all(test_sizes==0)){
+      stop("no test data found")
+    }
+
     # Use formula to support expanded aug_args (especially for type.predict for logistic regression)
     # because ... can't be passed to a function inside mutate directly.
     # If test is TRUE, this uses newdata as an argument and if not, uses data as an argument.
@@ -417,6 +426,23 @@ prediction_binary <- function(df, threshold = 0.5, ...){
 
   first_model <- df[["model"]][[1]]
 
+  if(any(class(first_model) %in% "glm")){
+    if (!is.null(first_model$family)) {
+      if (!is.null(first_model$family$linkinv)) {
+        if (any(colnames(ret) %in% "conf_low")) {
+          conf_low_vec <- first_model$family$linkinv(ret[["conf_low"]])
+          ret[["conf_low"]] <- NULL
+          ret[["conf_low"]] <- conf_low_vec
+        }
+        if (any(colnames(ret) %in% "conf_high")) {
+          conf_high_vec <- first_model$family$linkinv(ret[["conf_high"]])
+          ret[["conf_high"]] <- NULL
+          ret[["conf_high"]] <- conf_high_vec
+        }
+      }
+    }
+  }
+
   # get actual value column name from model formula
   actual_col <- all.vars(first_model$formula)[[1]]
 
@@ -454,10 +480,16 @@ prediction_binary <- function(df, threshold = 0.5, ...){
   ret
 }
 
+#' TODO: prediction wrapper to set proportional hazard.
+#' @param df Data frame to predict. This should have model column.
+#' @export
+prediction_coxph <- function(df, ...){
+  ret <- prediction(df, ...)
+}
+
 #' tidy wrapper for lm and glm
 #' @export
 model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
-
   dots <- list(...)
 
   ret <- if (!is.null(conf_int)) {
@@ -474,10 +506,18 @@ model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
         dplyr::ungroup() %>%
         dplyr::mutate(model = purrr::map(model, function(model){
           # use confint.default for performance
-          conf <- confint.default(model, level = level) %>% as.data.frame()
-          tidy_ret <- broom::tidy(model)
-          colnames(conf) <- c("conf.low", "conf.high")
-          dplyr::bind_cols(tidy_ret, conf)
+          tidy_ret <- broom::tidy(model, ...)
+
+          # calculate confidence interval by estimate and std.error
+          if(any(colnames(tidy_ret) %in% "estimate") & any(colnames(tidy_ret) %in% "std.error")){
+            level_low <- (1-level)/2
+            level_high <- 1-level_low
+
+            tidy_ret[["conf.low"]] <- get_confint(tidy_ret[["estimate"]], tidy_ret[["std.error"]], level_low)
+            tidy_ret[["conf.high"]] <- get_confint(tidy_ret[["estimate"]], tidy_ret[["std.error"]], level_high)
+          }
+          tidy_ret
+
         })) %>%
         tidyr::unnest(model)
     } else {
@@ -489,6 +529,15 @@ model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
     broom::tidy(df, model, ...)
   }
 
+  if ("coxph" %in% class(df$model[[1]])) {
+    ret <- ret %>% mutate(hazard_ratio = exp(estimate))
+  }
+  if ("multinom" %in% class(df$model[[1]])) {
+    # TODO: logistic regression should have the same column.
+    # estimate in tidy() result of multinom is already exponentiated. just rename.
+    colnames(ret)[colnames(ret) == "estimate"] <- "odds_ratio"
+  }
+
   if (pretty.name){
     colnames(ret)[colnames(ret) == "term"] <- "Term"
     colnames(ret)[colnames(ret) == "statistic"] <- "t Ratio"
@@ -497,6 +546,8 @@ model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
     colnames(ret)[colnames(ret) == "estimate"] <- "Estimate"
     colnames(ret)[colnames(ret) == "conf.low"] <- "Conf Low"
     colnames(ret)[colnames(ret) == "conf.high"] <- "Conf High"
+    colnames(ret)[colnames(ret) == "hazard_ratio"] <- "Hazard Ratio"
+    colnames(ret)[colnames(ret) == "odds_ratio"] <- "Odds Ratio"
     colnames(ret)[colnames(ret) == "y.level"] <- "Predicted Label"
   } else {
     colnames(ret)[colnames(ret) == "statistic"] <- "t_ratio"
@@ -505,6 +556,13 @@ model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
     colnames(ret)[colnames(ret) == "conf.low"] <- "conf_low"
     colnames(ret)[colnames(ret) == "conf.high"] <- "conf_high"
     colnames(ret)[colnames(ret) == "y.level"] <- "predicted_label"
+  }
+  # tidy() on coxph keeps .test_index and source.data that we added. Let's drop it.
+  if(".test_index" %in% colnames(ret)){
+    ret <- ret %>% select(-.test_index)
+  }
+  if("source.data" %in% colnames(ret)){
+    ret <- ret %>% select(-source.data)
   }
   ret
 }
@@ -563,6 +621,9 @@ model_anova <- function(df, pretty.name = FALSE){
     # for glm anova
     colnames(ret)[colnames(ret) == "Resid..Df"] <- "Residual DF"
     colnames(ret)[colnames(ret) == "Resid..Dev"] <- "Residual Deviance"
+    # for coxph anova
+    colnames(ret)[colnames(ret) == "loglik"] <- "Log Likelihood"
+    colnames(ret)[colnames(ret) == "Pr...Chi.."] <- "P Value" # looks like this means P value for chisquare test.
   } else {
     colnames(ret)[colnames(ret) == "sumsq"] <- "sum_of_squares"
     colnames(ret)[colnames(ret) == "meansq"] <- "mean_square"
@@ -572,7 +633,44 @@ model_anova <- function(df, pretty.name = FALSE){
     colnames(ret)[colnames(ret) == "Deviance"] <- "deviance"
     colnames(ret)[colnames(ret) == "Resid..Df"] <- "residual_df"
     colnames(ret)[colnames(ret) == "Resid..Dev"] <- "residual_deviance"
+    # for coxph anova
+    colnames(ret)[colnames(ret) == "loglik"] <- "log_likelihood"
+    colnames(ret)[colnames(ret) == "Pr...Chi.."] <- "p_value"
   }
+  ret
+}
+
+#' tidy after converting model to survfit
+#' @export
+prediction_survfit <- function(df, ...){
+  caller <- match.call()
+  # this expands dots arguemtns to character
+  arg_char <- expand_args(caller, exclude = c("df"))
+  if (arg_char != "") {
+    fml <- as.formula(paste0("~list(survival::survfit(model, ", arg_char, "))"))
+  } else {
+    fml <- as.formula(paste0("~list(survival::survfit(model))"))
+  }
+  ret <- df %>% dplyr::mutate_(.dots = list(model = fml)) %>% broom::tidy(model)
+  colnames(ret)[colnames(ret) == "n.risk"] <- "n_risk"
+  colnames(ret)[colnames(ret) == "n.event"] <- "n_event"
+  colnames(ret)[colnames(ret) == "n.censor"] <- "n_censor"
+  colnames(ret)[colnames(ret) == "std.error"] <- "std_error"
+  colnames(ret)[colnames(ret) == "conf.low"] <- "conf_low"
+  colnames(ret)[colnames(ret) == "conf.high"] <- "conf_high"
+  ret
+}
+
+#' tidy after generating survfit
+#' @export
+do_survfit <- function(df, formula, ...){
+  ret <- df %>% build_model(model_func = survival::survfit, formula = formula, ...) %>% broom::tidy(model)
+  colnames(ret)[colnames(ret) == "n.risk"] <- "n_risk"
+  colnames(ret)[colnames(ret) == "n.event"] <- "n_event"
+  colnames(ret)[colnames(ret) == "n.censor"] <- "n_censor"
+  colnames(ret)[colnames(ret) == "std.error"] <- "std_error"
+  colnames(ret)[colnames(ret) == "conf.low"] <- "conf_low"
+  colnames(ret)[colnames(ret) == "conf.high"] <- "conf_high"
   ret
 }
 

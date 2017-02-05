@@ -77,7 +77,6 @@ build_model <- function(data, model_func, test_seed = 1, test_rate = 0, group_co
       # slice training data
       dplyr::mutate(model = purrr::map2(source.data, .test_index, function(df, index){
         data <- safe_slice(df, index, remove = TRUE)
-
         # execute model_func with parsed arguments
         eval(parse(text = paste0("model_func(data = data, ", arg_char, ")")))
       }))
