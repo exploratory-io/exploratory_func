@@ -72,8 +72,8 @@ test_that("test statecode",{
 
   abbs <- c("NY", "CA", "IL", "DC")
   num_codes <- c("36", "06", "17", "11")
-  names <- c("New York","California","Illinois","Washington D.C.")
-  namesWithDifferentCases <- c("new york","califorNIA","ILLINOIS", "WashingTOn D.C.")
+  names <- c("New York","California","Illinois","District of Columbia")
+  namesWithDifferentCases <- c("new york","califorNIA","ILLINOIS", "districtOf columbia")
   divisions <- c("Middle Atlantic","Pacific", "East North Central", "South Atlantic")
   regions <- c("Northeast","West","North Central", "South")
 
