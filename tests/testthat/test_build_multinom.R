@@ -63,7 +63,7 @@ test_that("test nnet build_model", {
 
 })
 
-test_that("test nnet build_model", {
+test_that("test group error message", {
   test_data <- data.frame(
     label = c(rep(letters[1:3], 12), NA, "a", "a"),
     num = seq(39),
