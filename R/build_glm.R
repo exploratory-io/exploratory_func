@@ -7,7 +7,7 @@ build_lr <- function(df, ...) {
   if(is.null(formula)){
     formula <- dots[[1]]
   }
-  # convert response variable if it's character
+  # convert response variable if it's character to factor
   response_var <- all.vars(formula)[[1]]
 
   data <- df

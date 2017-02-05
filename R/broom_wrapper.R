@@ -426,8 +426,12 @@ prediction_binary <- function(df, threshold = 0.5, ...){
 
   first_model <- df[["model"]][[1]]
 
+  # converting conf_low and conf_high from regression values
+  # to probability values
   if(any(class(first_model) %in% "glm")){
     if (!is.null(first_model$family)) {
+      # linkinv is a function to convert regression values
+      # to response values (inverse of logit for logistic regression)
       if (!is.null(first_model$family$linkinv)) {
         if (any(colnames(ret) %in% "conf_low")) {
           conf_low_vec <- first_model$family$linkinv(ret[["conf_low"]])
