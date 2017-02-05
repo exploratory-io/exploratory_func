@@ -20,6 +20,6 @@ urltools::url_decode
 
 #' @importFrom anonymizer anonymize
 #' @export
-anonymize <- function(algo = "sha256", seed = 0, chars = letters, n_chars = 5L, ...){
-  anonymizer::anonymize(.algo = algo, .seed = seed, .chars = chars, .n_chars = n_chars, ...)
+anonymize <- function(vec, algo = "sha256", seed = 0, chars = letters, n_chars = 5L, ...){
+  anonymizer::anonymize(vec, .algo = algo, .seed = seed, .chars = chars, .n_chars = n_chars, ...)
 }
