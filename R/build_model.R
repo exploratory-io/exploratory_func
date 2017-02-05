@@ -47,6 +47,20 @@ build_model <- function(data, model_func, test_seed = 1, test_rate = 0, group_co
 
   group_col_names <- grouped_by(data)
 
+  # check if variables in grouped_col_names are not used
+  dots <- list(...)
+  if(!is.null(dots)){
+    fml <- dots$formula
+    if(!is.null(fml)){
+      vars <- all.vars(fml)
+      if(any(vars %in% group_col_names)){
+        grouped <- vars[vars %in% group_col_names]
+        message <- paste("grouped column is used", paste0(grouped, collapse = ", "), sep = " ")
+        stop(message)
+      }
+    }
+  }
+
   model_col <- "model"
   source_col <- "source.data"
 
