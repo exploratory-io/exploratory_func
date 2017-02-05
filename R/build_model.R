@@ -55,7 +55,7 @@ build_model <- function(data, model_func, test_seed = 1, test_rate = 0, group_co
       vars <- all.vars(fml)
       if(any(vars %in% group_col_names)){
         grouped <- vars[vars %in% group_col_names]
-        message <- paste("grouped column is used", paste0(grouped, collapse = ", "), sep = " ")
+        message <- paste("grouped column is used (", paste0(grouped, collapse = ", "), ")", sep = "")
         stop(message)
       }
     }
