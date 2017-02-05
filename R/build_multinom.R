@@ -40,7 +40,7 @@ augment.multinom <- function(model, data = NULL, newdata = NULL) {
 
     # f_values is one column matrix if the number of levels is 2
     if(ncol(f_values) == 1){
-      f_values <- matrix(c(f_values, 1-f_values[,1]), ncol=2)
+      f_values <- matrix(c(1-f_values[,1], f_values), ncol=2)
       colnames(f_values) <- model$lev
     }
     ret <- f_values %>%
@@ -82,7 +82,7 @@ augment.multinom <- function(model, data = NULL, newdata = NULL) {
       } else {
         # two classification labels case
         # create both probability for positive and negative
-        mat <- matrix(c(mat, 1-mat[,1]), ncol=2)
+        mat <- matrix(c(1-mat[,1], mat), ncol=2)
         colnames(mat) <- model$lev
         mat
       }
