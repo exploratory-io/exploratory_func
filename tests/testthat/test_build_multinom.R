@@ -62,3 +62,26 @@ test_that("test nnet build_model", {
   prediction_test_ret <- prediction(model_df, data = "test")
 
 })
+
+test_that("test group error message", {
+  test_data <- data.frame(
+    label = c(rep(letters[1:3], 12), NA, "a", "a"),
+    num = seq(39),
+    num2 = 39 - seq(39),
+    weight = seq(39)/39,
+    term = rep(letters[1:3], each = 13),
+    stringsAsFactors = FALSE
+  )
+
+  test_data <- test_data %>%
+    dplyr::filter(label %in% c("a", "b")) %>%
+    dplyr::group_by(term)
+expect_error({
+  build_multinom(
+    test_data,
+    formula = term ~ num + num2,
+    # weights = weight,
+    test_rate = 0.4)
+}, "grouped column is used \\(term\\)")
+})
+
