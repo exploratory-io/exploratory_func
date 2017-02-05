@@ -48,9 +48,9 @@ augment.multinom <- function(model, data = NULL, newdata = NULL) {
       append_colnames(prefix = "predicted_probability_")
 
     # get max probabilities from each row
-    p_values <- f_values[(max.col(f_values) - 1) * nrow(f_values) + seq(nrow(f_values))]
+    max_prob <- f_values[(max.col(f_values) - 1) * nrow(f_values) + seq(nrow(f_values))]
     # predicted_prob_col is a column for probabilities of chosen values
-    ret[[predicted_prob_col]] <- p_values
+    ret[[predicted_prob_col]] <- max_prob
 
     # in case of training data, NA of terms in both right and left side should be removed
     vars <- all.vars(model$terms)
@@ -91,13 +91,13 @@ augment.multinom <- function(model, data = NULL, newdata = NULL) {
 
     prob_label <- colnames(prob_mat)[max.col(prob_mat)]
     # get max values from each row
-    p_values <- prob_mat[(max.col(prob_mat) - 1) * nrow(prob_mat) + seq(nrow(prob_mat))]
+    max_prob <- prob_mat[(max.col(prob_mat) - 1) * nrow(prob_mat) + seq(nrow(prob_mat))]
 
     ret <- prob_mat %>%
       as.data.frame() %>%
       append_colnames(prefix = "predicted_probability_")
     ret[[predicted_label_col]] <- prob_label
-    ret[[predicted_prob_col]] <- p_values
+    ret[[predicted_prob_col]] <- max_prob
     ret <- dplyr::bind_cols(newdata, ret)
   }
 }
