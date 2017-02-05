@@ -70,12 +70,12 @@ test_that("test source check conflict case", {
 
 test_that("test statecode",{
 
-  abbs <- c("NY", "CA", "IL")
-  num_codes <- c("36", "06", "17")
-  names <- c("New York","California","Illinois")
-  namesWithDifferentCases <- c("new york","califorNIA","ILLINOIS")
-  divisions <- c("Middle Atlantic","Pacific", "East North Central")
-  regions <- c("Northeast","West","North Central")
+  abbs <- c("NY", "CA", "IL", "DC")
+  num_codes <- c("36", "06", "17", "11")
+  names <- c("New York","California","Illinois","Washington D.C.")
+  namesWithDifferentCases <- c("new york","califorNIA","ILLINOIS", "WashingTOn D.C.")
+  divisions <- c("Middle Atlantic","Pacific", "East North Central", "South Atlantic")
+  regions <- c("Northeast","West","North Central", "South")
 
   expect_equal(names, statecode(abbs, "name"))
   expect_equal(divisions, statecode(abbs, "division"))
