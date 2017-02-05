@@ -4,7 +4,7 @@
 #' @param data Data frame
 #' @param ... Parameters for nnet::multinom
 #' @export
-build_multinom <- function(data, ...){
+build_multinom <- function(data, formula, ...){
   reserved_colnames <- reserved_colnames <- c(
     # for model_coef
     "y.level",
@@ -18,7 +18,9 @@ build_multinom <- function(data, ...){
     "deviance",
     "AIC"
   )
-  build_model(data, model_func = nnet::multinom,
+  build_model(data = data,
+              formula = formula,
+              model_func = nnet::multinom,
               reserved_colnames = reserved_colnames,
               ...)
 }
@@ -30,12 +32,24 @@ build_multinom <- function(data, ...){
 augment.multinom <- function(model, data = NULL, newdata = NULL) {
 
   predicted_label_col <- avoid_conflict(colnames(data), "predicted_label")
+  predicted_prob_col <- avoid_conflict(colnames(data), "predicted_probability")
 
   if (is.null(newdata)) {
     # use trained data and get probabilities
-    ret <- model$fitted.values %>%
+    f_values <- model$fitted.values
+
+    # f_values is one column matrix if the number of levels is 2
+    if(ncol(f_values) == 1){
+      f_values <- matrix(c(f_values, 1-f_values[,1]), ncol=2)
+      colnames(f_values) <- model$lev
+    }
+    ret <- f_values %>%
       as.data.frame() %>%
       append_colnames(prefix = "predicted_probability_")
+
+    # get max values from each row
+    p_values <- f_values[(max.col(f_values) - 1) * nrow(f_values) + seq(nrow(f_values))]
+    ret[[predicted_prob_col]] <- p_values
 
     # in case of training data, NA of terms in both right and left side should be removed
     vars <- all.vars(model$terms)
@@ -56,26 +70,33 @@ augment.multinom <- function(model, data = NULL, newdata = NULL) {
     newdata <- tidyr::drop_na_(newdata, vars)
 
     prob_mat <-  stats::predict(model, newdata, type = "prob")
-    # if newdata is one row, it becomes a vector,
+    # if newdata is one row or classification labels are two,
+    # it becomes a vector,
     # so should be converted to matrix
     if (!is.matrix(prob_mat)) {
-      mat <- matrix(prob_mat, ncol = length(prob_mat))
-      colnames(mat) <- names(prob_mat)
+      mat <- matrix(prob_mat, nrow = nrow(newdata))
+      if(ncol(mat) == length(prob_mat)){
+        # this is one row newdata case
+        colnames(mat) <- names(prob_mat)
+      } else {
+        # two classification labels case
+        # create both probability for positive and negative
+        mat <- matrix(c(mat, 1-mat[,1]), ncol=2)
+        colnames(mat) <- model$lev
+        mat
+      }
       prob_mat <- mat
     }
 
     prob_label <- colnames(prob_mat)[max.col(prob_mat)]
-    ret <- stats::predict(model, newdata, type = "prob")
-    # if newdata is one row, it becomes a vector and
-    # as.data.frame makes a long dataframe from it,
-    # so it should be converted to a list
-    if (!is.matrix(ret)) {
-      ret <- as.list(ret)
-    }
-    ret <- ret %>%
+    # get max values from each row
+    p_values <- prob_mat[(max.col(prob_mat) - 1) * nrow(prob_mat) + seq(nrow(prob_mat))]
+
+    ret <- prob_mat %>%
       as.data.frame() %>%
       append_colnames(prefix = "predicted_probability_")
     ret[[predicted_label_col]] <- prob_label
+    ret[[predicted_prob_col]] <- p_values
     ret <- dplyr::bind_cols(newdata, ret)
   }
 }

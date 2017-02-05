@@ -233,7 +233,9 @@ evaluate_multi <- function(df, pred_label, actual_val, ...) {
 evaluate_multi_ <- function(df, pred_label_col, actual_val_col, ...) {
 
   evaluate_multi_each <- function(df){
-    actual_values <- df[[actual_val_col]]
+    actual_values_raw <- df[[actual_val_col]]
+    # as.character() is work around for the case actual_val_col is factor
+    actual_values <- as.character(actual_values_raw)
     pred_values <- df[[pred_label_col]]
 
     # make values factor so that missing values can be included in conf_mat
@@ -269,12 +271,14 @@ evaluate_multi_ <- function(df, pred_label_col, actual_val_col, ...) {
 
     macro_f_score <- mean(f_score, na.rm = TRUE)
 
-    missclassification_error <- 1 - tp_sum / length(actual_fac)
+    accuracy <- tp_sum / length(actual_fac)
+    missclassification_rate <- 1 - accuracy
 
     data.frame(
       micro_f_score,
       macro_f_score,
-      missclassification_error
+      accuracy,
+      missclassification_rate
     )
   }
 

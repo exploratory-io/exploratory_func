@@ -236,7 +236,10 @@ test_that("test prediction binary", {
 
   model_data <- build_lr(test_data, CANCELLED ~ DISTANCE, test_rate = 0.2)
 
-  model_coef(model_data, conf_int = "default")
+  coef_ret <- model_coef(model_data, conf_int = "default")
+
+  prediction_train_ret <- prediction_binary(model_data, data = "training")
+  expect_true(any(colnames(prediction_train_ret) %in% "predicted_label"))
 
 })
 
