@@ -272,7 +272,7 @@ evaluate_multi_ <- function(df, pred_label_col, actual_val_col, ...) {
 
     denominator <- recall+precision
     f_score <- 2 * recall*precision/(denominator)
-    f_score[is.na(f_score)] <- 0
+    f_score[is.na(f_score)] <- 0 # in case any denominator is zero
 
     macro_f_score <- mean(f_score, na.rm = TRUE)
 
