@@ -9,8 +9,17 @@
 #' @param test_rate Ratio of test data
 #' @param seed Random seed to control test data sampling
 #' @export
-build_lm <- function(data, ..., keep.source = TRUE, augment = FALSE, group_cols = NULL, test_rate = 0.0, seed = 0){
-
+build_lm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, group_cols = NULL, test_rate = 0.0, seed = 0){
+  if(is.null(formula)){
+    formula <- dots[[1]]
+  }
+  fml_vars <- all.vars(formula)
+  # make variables factor sorted by the frequency
+  for(var in fml_vars) {
+    if(is.character(data[[var]])){
+      data[[var]] <- forcats::fct_infreq(data[[var]])
+    }
+  }
   if(!is.null(seed)){
     set.seed(seed)
   }
