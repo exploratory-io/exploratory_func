@@ -1,16 +1,14 @@
 #' glm wrappwer for logistic regression
 #' @export
 build_lr <- function(df, ...) {
+  data <- df
   dots <- list(...)
   # formula is from "formula =" argument or first argument
   formula <- dots$formula
   if(is.null(formula)){
     formula <- dots[[1]]
   }
-  # convert response variable if it's character to factor
   response_var <- all.vars(formula)[[1]]
-
-  data <- df
 
   if(is.character(data[[response_var]])) {
     data[[response_var]] <- as.factor(data[[response_var]])
@@ -35,6 +33,13 @@ build_lr <- function(df, ...) {
 #' @param seed Random seed to control test data sampling
 #' @export
 build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, group_cols = NULL, test_rate = 0, seed = 0){
+  # make variables factor sorted by the frequency
+  fml_vars <- all.vars(formula)
+  for(var in fml_vars) {
+    if(is.character(data[[var]])){
+      data[[var]] <- forcats::fct_infreq(data[[var]])
+    }
+  }
 
   if(!is.null(seed)){
     set.seed(seed)

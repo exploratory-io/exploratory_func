@@ -57,6 +57,13 @@ build_model <- function(data, model_func, test_seed = 1, test_rate = 0, group_co
         grouped <- vars[vars %in% group_col_names]
         message <- paste("grouped column is used (", paste0(grouped, collapse = ", "), ")", sep = "")
         stop(message)
+      } else {
+        for (var in vars) {
+          if(is.character(data[[var]])){
+            # make variables factor sorted by the frequency
+            data[[var]] <- forcats::fct_infreq(data[[var]])
+          }
+        }
       }
     }
   }

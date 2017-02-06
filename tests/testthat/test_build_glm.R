@@ -93,7 +93,7 @@ test_that("predict glm with new data", {
 
   stats_ret <- model_data %>% model_stats()
   expect_equal(colnames(stats_ret), c("group", "null_deviance", "df_for_null_model", "log_likelihood",
-                                      "AIC", "BIC", "deviance", "residual_df"))
+                                      "aic", "bic", "deviance", "residual_df"))
 
   anova_ret <- model_data %>% model_anova()
   expect_equal(colnames(anova_ret), c("group", "term", "df", "deviance", "residual_df",
