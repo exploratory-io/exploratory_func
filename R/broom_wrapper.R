@@ -691,8 +691,8 @@ prediction_survfit <- function(df, ...){
 
 #' tidy after generating survfit
 #' @export
-do_survfit <- function(df, formula, ...){
-  ret <- df %>% build_model(model_func = survival::survfit, formula = formula, ...) %>% broom::tidy(model)
+do_survfit <- function(df, time, status, ...){
+  ret <- df %>% build_model(model_func = survival::survfit, formula = survival::Surv(time, status) ~ 1, ...) %>% broom::tidy(model)
   colnames(ret)[colnames(ret) == "n.risk"] <- "n_risk"
   colnames(ret)[colnames(ret) == "n.event"] <- "n_event"
   colnames(ret)[colnames(ret) == "n.censor"] <- "n_censor"
