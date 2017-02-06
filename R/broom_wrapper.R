@@ -590,6 +590,18 @@ model_stats <- function(df, pretty.name = FALSE){
     colnames(ret)[colnames(ret) == "df.null"] <- "DF for Null Model"
     # for multinom
     colnames(ret)[colnames(ret) == "edf"] <- "Effective Number of DF"
+    # for coxph
+    colnames(ret)[colnames(ret) == "n"] <- "Number of Rows"
+    colnames(ret)[colnames(ret) == "nevent"] <- "Number of Events"
+    colnames(ret)[colnames(ret) == "statistic.log"] <- "Likelihood Ratio Test"
+    colnames(ret)[colnames(ret) == "p.value.log"] <- "Likelihood Ratio Test P Value"
+    colnames(ret)[colnames(ret) == "statistic.sc"] <- "Score Test"
+    colnames(ret)[colnames(ret) == "p.value.sc"] <- "Score Test P Value"
+    colnames(ret)[colnames(ret) == "statistic.wald"] <- "Wald Test"
+    colnames(ret)[colnames(ret) == "p.value.wald"] <- "Wald Test P Value"
+    colnames(ret)[colnames(ret) == "r.squared.max"] <- "R Square Max"
+    colnames(ret)[colnames(ret) == "concordance"] <- "Concordance"
+    colnames(ret)[colnames(ret) == "std.error.concordance"] <- "Std Error Concordance"
   }else{
     colnames(ret)[colnames(ret) == "r.squared"] <- "r_square"
     colnames(ret)[colnames(ret) == "adj.r.squared"] <- "r_square_adj"
@@ -603,6 +615,18 @@ model_stats <- function(df, pretty.name = FALSE){
     colnames(ret)[colnames(ret) == "df.null"] <- "df_for_null_model"
     # for multinom
     colnames(ret)[colnames(ret) == "edf"] <- "effective_number_of_df"
+    # for coxph
+    colnames(ret)[colnames(ret) == "nevent"] <- "n_event"
+    colnames(ret)[colnames(ret) == "statistic.log"] <- "likelihood_ratio_test"
+    colnames(ret)[colnames(ret) == "p.value.log"] <- "likelihood_ratio_test_p_value"
+    colnames(ret)[colnames(ret) == "statistic.sc"] <- "score_test"
+    colnames(ret)[colnames(ret) == "p.value.sc"] <- "score_test_p_value"
+    colnames(ret)[colnames(ret) == "statistic.wald"] <- "wald_test"
+    colnames(ret)[colnames(ret) == "p.value.wald"] <- "wald_test_p_value"
+    colnames(ret)[colnames(ret) == "r.squared.max"] <- "r_square_max"
+    colnames(ret)[colnames(ret) == "std.error.concordance"] <- "std_error_concordance"
+    colnames(ret)[colnames(ret) == "AIC"] <- "aic"
+    colnames(ret)[colnames(ret) == "BIC"] <- "bic"
   }
 
   ret
@@ -667,8 +691,8 @@ prediction_survfit <- function(df, ...){
 
 #' tidy after generating survfit
 #' @export
-do_survfit <- function(df, formula, ...){
-  ret <- df %>% build_model(model_func = survival::survfit, formula = formula, ...) %>% broom::tidy(model)
+do_survfit <- function(df, time, status, ...){
+  ret <- df %>% build_model(model_func = survival::survfit, formula = survival::Surv(time, status) ~ 1, ...) %>% broom::tidy(model)
   colnames(ret)[colnames(ret) == "n.risk"] <- "n_risk"
   colnames(ret)[colnames(ret) == "n.event"] <- "n_event"
   colnames(ret)[colnames(ret) == "n.censor"] <- "n_censor"
