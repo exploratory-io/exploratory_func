@@ -575,13 +575,13 @@ model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
 #' @export
 model_stats <- function(df, pretty.name = FALSE){
   ret <- broom::glance(df, model)
-  formula_vars <- all.vars(model_df$model[[1]]$formula)
+  formula_vars <- all.vars(df$model[[1]]$formula)
   model_df_colnames = colnames(df)
   group_by_names <- model_df_colnames[!model_df_colnames %in% c("source.data", ".test_index", "model")]
   nested_ret_df <- ret_df %>% nest()
   df[["ret"]] <- nested_ret_df$data
   df <- df %>% group_by_(group_by_names) #rowwise nature is stripped
-    model_df %>%
+  ret <- df %>%
     mutate(ret = purrr::map2(ret, source.data, function(ret, source_data) {
       for(var in formula_vars) {
         if(is.factor(source_data[[var]])){
