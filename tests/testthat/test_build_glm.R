@@ -89,7 +89,7 @@ test_that("predict glm with new data", {
   model_data <- fit_df %>% build_glm(num1 ~ num2, family = binomial, group_cols = "group")
 
   coef_ret <- model_data %>% model_coef()
-  expect_equal(colnames(coef_ret), c("group", "term", "estimate", "std_error", "t_ratio", "p_value"))
+  expect_equal(colnames(coef_ret), c("group", "term", "estimate", "std_error", "t_ratio", "p_value", "odds_ratio"))
 
   stats_ret <- model_data %>% model_stats()
   expect_equal(colnames(stats_ret), c("group", "null_deviance", "df_for_null_model", "log_likelihood",
@@ -163,7 +163,7 @@ test_that("test prediction binary", {
   expect_true(!is.null(coef_ret[["odds_ratio"]]))
 
   prediction_train_ret <- prediction_binary(model_data, data = "training")
-  expect_true(any(  "predicted_label" == colnames(prediction_train_ret)))
+  expect_true(any("predicted_label" == colnames(prediction_train_ret)))
 
 })
 

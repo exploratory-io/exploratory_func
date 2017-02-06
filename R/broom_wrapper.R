@@ -544,8 +544,8 @@ model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
     ret <- ret %>% mutate(hazard_ratio = exp(estimate))
   }
   if ("multinom" %in% class(df$model[[1]])) {
-    # TODO: logistic regression should have the same column.
-    # estimate in tidy() result of multinom is already exponentiated. just rename.
+    # estimate should be odds_ratio and logarithm of estimate should be new estimate
+    # conf_low and conf_high should be also logarithm of themselves
     odds_ratio <- ret[["estimate"]]
     ret[["estimate"]] <- log(ret[["estimate"]])
     ret[["odds_ratio"]] <- odds_ratio
