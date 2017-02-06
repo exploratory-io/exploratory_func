@@ -695,7 +695,7 @@ do_survfit <- function(df, time, status, ...){
   # need to compose formula with non-standard evaluation.
   # simply using time and status in formula here results in a formula that literally looks at
   # "time" columun and "status" column, which is not what we want.
-  fml <- as.formula(paste0("survival::Surv(", substitute(time), ",", substitute(status), ") ~ 1"))
+  fml <- as.formula(paste0("survival::Surv(`", substitute(time), "`,`", substitute(status), "`) ~ 1"))
   ret <- df %>% build_model(model_func = survival::survfit, formula = fml, ...) %>% broom::tidy(model)
   colnames(ret)[colnames(ret) == "n.risk"] <- "n_risk"
   colnames(ret)[colnames(ret) == "n.event"] <- "n_event"
