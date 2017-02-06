@@ -578,14 +578,19 @@ model_stats <- function(df, pretty.name = FALSE){
   formula_vars <- all.vars(df$model[[1]]$formula)
   model_df_colnames = colnames(df)
   group_by_names <- model_df_colnames[!model_df_colnames %in% c("source.data", ".test_index", "model")]
-  nested_ret_df <- ret_df %>% nest()
+  nested_ret_df <- ret %>% nest()
   df[["ret"]] <- nested_ret_df$data
   df <- df %>% group_by_(group_by_names) #rowwise nature is stripped
   ret <- df %>%
     mutate(ret = purrr::map2(ret, source.data, function(ret, source_data) {
       for(var in formula_vars) {
-        if(is.factor(source_data[[var]])){
-          ret[paste0(var, ".base")] <- levels(source_data[[var]])[[1]]
+        if(is.factor(source_data[[var]])) {
+          if(pretty.name) {
+            ret[paste0("Base Level of ", var)] <- levels(source_data[[var]])[[1]]
+          }
+          else {
+            ret[paste0(var, "_base")] <- levels(source_data[[var]])[[1]]
+          }
         }
       }
       ret
