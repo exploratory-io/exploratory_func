@@ -34,11 +34,7 @@ build_lr <- function(df, ...) {
 #' @export
 build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, group_cols = NULL, test_rate = 0, seed = 0){
   # make variables factor sorted by the frequency
-  if(is.null(formula)){
-    formula <- dots[[1]]
-  }
   fml_vars <- all.vars(formula)
-
   for(var in fml_vars) {
     if(is.character(data[[var]])){
       data[[var]] <- forcats::fct_infreq(data[[var]])
