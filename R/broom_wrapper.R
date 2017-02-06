@@ -533,13 +533,28 @@ model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
     broom::tidy(df, model, ...)
   }
 
+  if ("glm" %in% class(df$model[[1]])) {
+    if (!is.null(df$model[[1]]$family)) {
+      if (df$model[[1]]$family == "binomial"){
+        ret <- ret %>% mutate(odds_ratio = exp(estimate))
+      }
+    }
+  }
   if ("coxph" %in% class(df$model[[1]])) {
     ret <- ret %>% mutate(hazard_ratio = exp(estimate))
   }
   if ("multinom" %in% class(df$model[[1]])) {
     # TODO: logistic regression should have the same column.
     # estimate in tidy() result of multinom is already exponentiated. just rename.
-    colnames(ret)[colnames(ret) == "estimate"] <- "odds_ratio"
+    odds_ratio <- ret[["estimate"]]
+    ret[["estimate"]] <- log(ret[["estimate"]])
+    ret[["odds_ratio"]] <- odds_ratio
+    if("conf.low" %in% colnames(ret)){
+      ret[["conf.low"]] <- log(ret[["conf.low"]])
+    }
+    if("conf.high" %in% colnames(ret)){
+      ret[["conf.high"]] <- log(ret[["conf.high"]])
+    }
   }
 
   if (pretty.name){
