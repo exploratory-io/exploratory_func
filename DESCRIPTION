@@ -28,7 +28,8 @@ Imports:
     rvest,
     stats,
     urltools,
-    anonymizer
+    anonymizer,
+    forcats
 Suggests:
     testthat,
     twitteR,
