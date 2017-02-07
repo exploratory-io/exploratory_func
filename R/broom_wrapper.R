@@ -578,10 +578,10 @@ model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
   }
   # tidy() on coxph keeps .test_index and source.data that we added. Let's drop it.
   if(".test_index" %in% colnames(ret)){
-    ret <- ret %>% select(-.test_index)
+    ret <- ret %>% dplyr::select(-.test_index)
   }
   if("source.data" %in% colnames(ret)){
-    ret <- ret %>% select(-source.data)
+    ret <- ret %>% dplyr::select(-source.data)
   }
   ret
 }
@@ -609,7 +609,7 @@ model_stats <- function(df, pretty.name = FALSE){
   }
 
   # push ret in df so that we can work on ret and source.data at the same time in folliwing mutate() of df.
-  nested_ret_df <- ret %>% nest()
+  nested_ret_df <- ret %>% tidyr::nest()
   df[["ret"]] <- nested_ret_df$data
 
   # group df. rowwise nature of df is stripped here.
@@ -636,12 +636,12 @@ model_stats <- function(df, pretty.name = FALSE){
       }
       ret
     })) %>%
-    select_(c("ret", group_by_names)) %>%
-    unnest()
+    dplyr::select_(c("ret", group_by_names)) %>%
+    tidyr::unnest()
 
   # set it back to non-group-by state that is same as glance() output.
   if (length(group_by_names) == 0) {
-    ret <- ret %>% ungroup() %>% select(-dummy_group_col)
+    ret <- ret %>% ungroup() %>% dplyr::select(-dummy_group_col)
   }
 
 
