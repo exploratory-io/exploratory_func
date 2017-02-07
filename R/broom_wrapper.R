@@ -533,13 +533,28 @@ model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
     broom::tidy(df, model, ...)
   }
 
+  if ("glm" %in% class(df$model[[1]])) {
+    if (!is.null(df$model[[1]]$family)) {
+      if (df$model[[1]]$family == "binomial"){
+        ret <- ret %>% dplyr::mutate(odds_ratio = exp(estimate))
+      }
+    }
+  }
   if ("coxph" %in% class(df$model[[1]])) {
-    ret <- ret %>% mutate(hazard_ratio = exp(estimate))
+    ret <- ret %>% dplyr::mutate(hazard_ratio = exp(estimate))
   }
   if ("multinom" %in% class(df$model[[1]])) {
-    # TODO: logistic regression should have the same column.
-    # estimate in tidy() result of multinom is already exponentiated. just rename.
-    colnames(ret)[colnames(ret) == "estimate"] <- "odds_ratio"
+    # estimate should be odds_ratio and logarithm of estimate should be new estimate
+    # conf_low and conf_high should be also logarithm of themselves
+    odds_ratio <- ret[["estimate"]]
+    ret[["estimate"]] <- log(ret[["estimate"]])
+    ret[["odds_ratio"]] <- odds_ratio
+    if("conf.low" %in% colnames(ret)){
+      ret[["conf.low"]] <- log(ret[["conf.low"]])
+    }
+    if("conf.high" %in% colnames(ret)){
+      ret[["conf.high"]] <- log(ret[["conf.high"]])
+    }
   }
 
   if (pretty.name){
@@ -563,10 +578,10 @@ model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
   }
   # tidy() on coxph keeps .test_index and source.data that we added. Let's drop it.
   if(".test_index" %in% colnames(ret)){
-    ret <- ret %>% select(-.test_index)
+    ret <- ret %>% dplyr::select(-.test_index)
   }
   if("source.data" %in% colnames(ret)){
-    ret <- ret %>% select(-source.data)
+    ret <- ret %>% dplyr::select(-source.data)
   }
   ret
 }
@@ -575,6 +590,62 @@ model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
 #' @export
 model_stats <- function(df, pretty.name = FALSE){
   ret <- broom::glance(df, model)
+
+  # here, we are adding base level info for factor variables found in the formula.
+
+  # extract variables from model formula
+  formula_vars <- all.vars(df$model[[1]]$formula)
+
+  # get group columns.
+  # we assume that columns of model df other than the ones with reserved name are all group columns.
+  model_df_colnames = colnames(df)
+  group_by_names <- model_df_colnames[!model_df_colnames %in% c("source.data", ".test_index", "model")]
+
+  # when pre-grouped, each row of glance result is actually a group.
+  # but when not pre-grouped, the only-one row is not a group.
+  # in that case, we need to group it by something to work with following operations with nest/mutate/map.
+  if (length(group_by_names) == 0) {
+    ret <- ret %>% dplyr::mutate(dummy_group_col = 1) %>% dplyr::group_by(dummy_group_col)
+  }
+
+  # push ret in df so that we can work on ret and source.data at the same time in folliwing mutate() of df.
+  nested_ret_df <- ret %>% tidyr::nest()
+  df[["ret"]] <- nested_ret_df$data
+
+  # group df. rowwise nature of df is stripped here.
+  if (length(group_by_names) == 0) {
+    # need to group by something to work with following operations with mutate/map.
+    df <- df %>% dplyr::mutate(dummy_group_col = 1) %>% dplyr::group_by(dummy_group_col)
+  }
+  else {
+    df <- df %>% dplyr::group_by_(group_by_names)
+  }
+
+  ret <- df %>%
+    dplyr::mutate(ret = purrr::map2(ret, source.data, function(ret, source_data) {
+      # for each factor variable in the formula, add base level info column to ret.
+      for(var in formula_vars) {
+        if(is.factor(source_data[[var]])) {
+          if(pretty.name) {
+            ret[paste0("Base Level of ", var)] <- levels(source_data[[var]])[[1]]
+          }
+          else {
+            ret[paste0(var, "_base")] <- levels(source_data[[var]])[[1]]
+          }
+        }
+      }
+      ret
+    })) %>%
+    dplyr::select_(c("ret", group_by_names)) %>%
+    tidyr::unnest()
+
+  # set it back to non-group-by state that is same as glance() output.
+  if (length(group_by_names) == 0) {
+    ret <- ret %>% dplyr::ungroup() %>% dplyr::select(-dummy_group_col)
+  }
+
+
+  # adjust column name style
   if(pretty.name){
     colnames(ret)[colnames(ret) == "r.squared"] <- "R Square"
     colnames(ret)[colnames(ret) == "adj.r.squared"] <- "R Square Adj"
@@ -692,7 +763,11 @@ prediction_survfit <- function(df, ...){
 #' tidy after generating survfit
 #' @export
 do_survfit <- function(df, time, status, ...){
-  ret <- df %>% build_model(model_func = survival::survfit, formula = survival::Surv(time, status) ~ 1, ...) %>% broom::tidy(model)
+  # need to compose formula with non-standard evaluation.
+  # simply using time and status in formula here results in a formula that literally looks at
+  # "time" columun and "status" column, which is not what we want.
+  fml <- as.formula(paste0("survival::Surv(`", substitute(time), "`,`", substitute(status), "`) ~ 1"))
+  ret <- df %>% build_model(model_func = survival::survfit, formula = fml, ...) %>% broom::tidy(model)
   colnames(ret)[colnames(ret) == "n.risk"] <- "n_risk"
   colnames(ret)[colnames(ret) == "n.event"] <- "n_event"
   colnames(ret)[colnames(ret) == "n.censor"] <- "n_censor"

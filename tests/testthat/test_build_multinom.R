@@ -85,3 +85,21 @@ expect_error({
 }, "grouped column is used \\(term\\)")
 })
 
+
+test_that("test group error message", {
+  test_data <- data.frame(
+    label = c(rep(letters[1:3], 12), NA, "b", "c"),
+    num = seq(39),
+    num2 = 39 - seq(39),
+    weight = seq(39)/39,
+    term = rep(letters[1:3], each = 13),
+    stringsAsFactors = FALSE
+  )
+
+  model_df <- build_multinom(test_data, formula = label ~ num + num2, test_rate = 0.4)
+
+  prediction_ret <- prediction(model_df)
+
+  expect_equal(levels(prediction_ret[["label"]]), c("b", "c", "a"))
+
+})
