@@ -612,7 +612,7 @@ model_stats <- function(df, pretty.name = FALSE){
   nested_ret_df <- ret %>% nest()
   df[["ret"]] <- nested_ret_df$data
 
-  # group df. rowwise nature is stripped here.
+  # group df. rowwise nature of df is stripped here.
   if (length(group_by_names) == 0) {
     # need to group by something to work with following operations with mutate/map.
     df <- df %>% mutate(dummy_group_col = 1) %>% group_by(dummy_group_col)
@@ -637,8 +637,13 @@ model_stats <- function(df, pretty.name = FALSE){
       ret
     })) %>%
     select_(c("ret", group_by_names)) %>%
-    unnest() %>%
-    rowwise() # add back lost rowwise nature.
+    unnest()
+
+  # set it back to non-group-by state that is same as glance() output.
+  if (length(group_by_names) == 0) {
+    ret <- ret %>% ungroup() %>% select(-dummy_group_col)
+  }
+
 
   # adjust column name style
   if(pretty.name){
