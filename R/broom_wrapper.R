@@ -591,15 +591,25 @@ model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
 model_stats <- function(df, pretty.name = FALSE){
   ret <- broom::glance(df, model)
 
-  # add base level info for factor variables in the formula.
+  # here, we are adding base level info for factor variables found in the formula.
+
+  # extract variables from model formula
   formula_vars <- all.vars(df$model[[1]]$formula)
+
+  # get group columns.
+  # we assume that columns of model df other than the ones with reserved name are all group columns.
   model_df_colnames = colnames(df)
   group_by_names <- model_df_colnames[!model_df_colnames %in% c("source.data", ".test_index", "model")]
+
+  # if no group column is there, need to group by something to work with following operations with nest/mutate/map.
   if (length(group_by_names) == 0) {
     ret <- ret %>% mutate(dummy_group_col = 1) %>% group_by(dummy_group_col)
   }
+
+  # push ret in df so that we can work on ret and source.data at the same time in folliwing mutate() of df.
   nested_ret_df <- ret %>% nest()
   df[["ret"]] <- nested_ret_df$data
+
   # group df. rowwise nature is stripped here.
   if (length(group_by_names) == 0) {
     # need to group by something to work with following operations with mutate/map.
@@ -611,6 +621,7 @@ model_stats <- function(df, pretty.name = FALSE){
 
   ret <- df %>%
     mutate(ret = purrr::map2(ret, source.data, function(ret, source_data) {
+      # for each factor variable in the formula, add base level info column to ret.
       for(var in formula_vars) {
         if(is.factor(source_data[[var]])) {
           if(pretty.name) {
@@ -625,8 +636,9 @@ model_stats <- function(df, pretty.name = FALSE){
     })) %>%
     select_(c("ret", group_by_names)) %>%
     unnest() %>%
-    rowwise()
+    rowwise() # add back lost rowwise nature.
 
+  # adjust column name style
   if(pretty.name){
     colnames(ret)[colnames(ret) == "r.squared"] <- "R Square"
     colnames(ret)[colnames(ret) == "adj.r.squared"] <- "R Square Adj"
