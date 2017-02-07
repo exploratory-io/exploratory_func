@@ -601,7 +601,9 @@ model_stats <- function(df, pretty.name = FALSE){
   model_df_colnames = colnames(df)
   group_by_names <- model_df_colnames[!model_df_colnames %in% c("source.data", ".test_index", "model")]
 
-  # if no group column is there, need to group by something to work with following operations with nest/mutate/map.
+  # when pre-grouped, each row of glance result is actually a group.
+  # but when not pre-grouped, the only-one row is not a group.
+  # in that case, we need to group it by something to work with following operations with nest/mutate/map.
   if (length(group_by_names) == 0) {
     ret <- ret %>% mutate(dummy_group_col = 1) %>% group_by(dummy_group_col)
   }
