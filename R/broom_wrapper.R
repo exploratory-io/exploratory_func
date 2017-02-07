@@ -536,12 +536,12 @@ model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
   if ("glm" %in% class(df$model[[1]])) {
     if (!is.null(df$model[[1]]$family)) {
       if (df$model[[1]]$family == "binomial"){
-        ret <- ret %>% mutate(odds_ratio = exp(estimate))
+        ret <- ret %>% dplyr::mutate(odds_ratio = exp(estimate))
       }
     }
   }
   if ("coxph" %in% class(df$model[[1]])) {
-    ret <- ret %>% mutate(hazard_ratio = exp(estimate))
+    ret <- ret %>% dplyr::mutate(hazard_ratio = exp(estimate))
   }
   if ("multinom" %in% class(df$model[[1]])) {
     # estimate should be odds_ratio and logarithm of estimate should be new estimate
@@ -605,7 +605,7 @@ model_stats <- function(df, pretty.name = FALSE){
   # but when not pre-grouped, the only-one row is not a group.
   # in that case, we need to group it by something to work with following operations with nest/mutate/map.
   if (length(group_by_names) == 0) {
-    ret <- ret %>% mutate(dummy_group_col = 1) %>% group_by(dummy_group_col)
+    ret <- ret %>% dplyr::mutate(dummy_group_col = 1) %>% dplyr::group_by(dummy_group_col)
   }
 
   # push ret in df so that we can work on ret and source.data at the same time in folliwing mutate() of df.
@@ -615,14 +615,14 @@ model_stats <- function(df, pretty.name = FALSE){
   # group df. rowwise nature of df is stripped here.
   if (length(group_by_names) == 0) {
     # need to group by something to work with following operations with mutate/map.
-    df <- df %>% mutate(dummy_group_col = 1) %>% group_by(dummy_group_col)
+    df <- df %>% dplyr::mutate(dummy_group_col = 1) %>% dplyr::group_by(dummy_group_col)
   }
   else {
-    df <- df %>% group_by_(group_by_names)
+    df <- df %>% dplyr::group_by_(group_by_names)
   }
 
   ret <- df %>%
-    mutate(ret = purrr::map2(ret, source.data, function(ret, source_data) {
+    dplyr::mutate(ret = purrr::map2(ret, source.data, function(ret, source_data) {
       # for each factor variable in the formula, add base level info column to ret.
       for(var in formula_vars) {
         if(is.factor(source_data[[var]])) {
@@ -641,7 +641,7 @@ model_stats <- function(df, pretty.name = FALSE){
 
   # set it back to non-group-by state that is same as glance() output.
   if (length(group_by_names) == 0) {
-    ret <- ret %>% ungroup() %>% dplyr::select(-dummy_group_col)
+    ret <- ret %>% dplyr::ungroup() %>% dplyr::select(-dummy_group_col)
   }
 
 
