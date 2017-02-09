@@ -131,6 +131,7 @@ sparse_cast <- function(data, row, col, val=NULL, fun.aggregate=sum, count = FAL
 }
 
 #' as.matrix from select argument or cast by three columns
+#' @export
 to_matrix <- function(df, select_dots, by_col=NULL, key_col=NULL, value_col=NULL, fill=0, fun.aggregate=mean){
   should_cast <- !(is.null(by_col) & is.null(key_col) & is.null(value_col))
   if(should_cast){
@@ -145,6 +146,7 @@ to_matrix <- function(df, select_dots, by_col=NULL, key_col=NULL, value_col=NULL
 }
 
 #' Gather only right upper half of matrix - where row_num > col_num
+#' @export
 upper_gather <- function(mat, names=NULL, diag=NULL, cnames = c("Var1", "Var2", "value")){
   loadNamespace("Matrix")
   if(is.vector(mat)){
@@ -216,6 +218,7 @@ group_exclude <- function(df, ...){
 }
 
 #' prevent conflict of 2 character vectors and avoid it by adding .new to elements in the second
+#' @export
 avoid_conflict <- function(origin, new, suffix = ".new"){
   conflict <- new %in% origin
   while(any(conflict)){
@@ -226,11 +229,13 @@ avoid_conflict <- function(origin, new, suffix = ".new"){
 }
 
 #' check grouped column
+#' @export
 grouped_by <- function(df){
   as.character(attr(df, "vars"))
 }
 
 #' matrix to dataframe with gathered form
+#' @export
 mat_to_df <- function(mat, cnames=NULL, na.rm=TRUE, diag=TRUE){
   loadNamespace("reshape2")
   df <- reshape2::melt(t(mat), na.rm=na.rm)
@@ -420,6 +425,7 @@ as_numeric_matrix_ <- function(df, columns){
 #' evaluate select argument
 #' @param dots Lazy dot for select arg. ex:lazyeval::lazy_dots(...)
 #' @param excluded Excluded column names
+#' @export
 evaluate_select <- function(df, .dots, excluded = NULL){
   loadNamespace("dplyr")
   tryCatch({
@@ -440,6 +446,7 @@ evaluate_select <- function(df, .dots, excluded = NULL){
 #' re-build arguments of a function as string
 #' @param call This expects returned value from match.call()
 #' @param exclude Argument names that should be excluded for expansion
+#' @export
 expand_args <- function(call, exclude = c()){
   excluded <- call[!names(call) %in% exclude]
   args <- excluded[-1]
@@ -463,6 +470,7 @@ expand_args <- function(call, exclude = c()){
 }
 
 #' get sampled indice from data frame
+#' @export
 sample_df_index <- function(df, rate, seed = NULL){
   if(!is.null(seed)){
     set.seed(seed)
@@ -471,6 +479,7 @@ sample_df_index <- function(df, rate, seed = NULL){
 }
 
 #' slice that can handle empty vector
+#' @export
 safe_slice <- function(df, index, remove = FALSE){
   if(remove){
     if(is.null(index)){
@@ -510,6 +519,7 @@ add_response <- function(data, model, response_label = "predicted_response"){
 #' @param df Data frame whose column will be moved
 #' @param cname Column name to be moved
 #' @param position Column index to move to
+#' @export
 move_col <- function(df, cname, position){
   # get column index to move
   cname_posi = which(colnames(df) == cname)
