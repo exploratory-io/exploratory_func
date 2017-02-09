@@ -46,7 +46,7 @@ do_t.test <- function(df, value, key=NULL, ...){
               estimate1 = "mean1",
               estimate2 = "mean2",
               statistic = "t.value",
-              parameter = "degrees_of_freedom",
+              parameter = "digrees_of_freedom",
               name
       )
     }, FUN.VALUE = ""))
@@ -102,3 +102,32 @@ do_var.test <- function(df, value, key, ...){
   df %>% dplyr::do_(.dots=setNames(list(~do_var.test_each(df = ., ...)), model_col)) %>% tidyr::unnest_(model_col)
 }
 
+#' Non standard evaluation version of do_chisq.test_
+#' @export
+do_chisq.test <- function(df, col1, col2 = NULL, count = NULL, ...){
+  colname1 <- col_name(substitute(col1))
+  colname2 <- col_name(substitute(col2))
+  count_col <- col_name(substitute(count))
+  do_chisq.test_(df, colname1, colname2, count_col, ...)
+}
+
+#' chisq.test wrapper
+#' @export
+do_chisq.test_ <- function(df, colname1, colname2 = NULL, count_col = NULL, ...){
+  if(is.null(colname2)){
+    df %>%
+      dplyr::do(test = chisq.test(x = .[[colname1]], ...)) %>%
+      broom::glance(test)
+  }else if(is.null(count_col)){
+    df %>%
+      dplyr::do(test = chisq.test(x = .[[colname1]], y = .[[colname2]], ...)) %>%
+      broom::glance(test)
+  } else {
+    chisq.test_casted <- function(df, ...){
+      chisq.test(simple_cast(df, colname1, colname2, count_col), ...)
+    }
+    df %>%
+      dplyr::do(test = chisq.test_casted(., ...)) %>%
+      broom::glance(test)
+  }
+}
