@@ -141,7 +141,10 @@ do_chisq.test_ <- function(df,
   chisq.test_each <- function(df, ...) {
     x <- NULL
     y <- NULL
-    if (is.null(selected_cols)){
+    if (is.null(skv)){
+      # if skv is not indicated, selected area is regarded as matrix
+      x <- df[, selected_cols] %>% as.matrix()
+    } else {
       if(length(skv) == 1){
         x <- df[[skv[[1]]]]
       } else if (length(skv) == 2) {
@@ -153,8 +156,6 @@ do_chisq.test_ <- function(df,
       } else {
         stop("length of skv must be between 1 to 3")
       }
-    } else {
-      x <- df[, selected_cols] %>% as.matrix()
     }
     if (is.null(p)){
       # default of p from chisq.test
