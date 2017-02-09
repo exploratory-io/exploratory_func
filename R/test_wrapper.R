@@ -109,7 +109,8 @@ do_chisq.test <- function(df, ...,
                           fill = 0,
                           fun.aggregate = mean,
                           correct = TRUE,
-                          p = NULL, rescale.p = FALSE,
+                          p = NULL,
+                          rescale.p = FALSE,
                           simulate.p.value = FALSE,
                           B = 2000){
   cols <- if(is.null(skv)){
@@ -120,9 +121,14 @@ do_chisq.test <- function(df, ...,
     # if skv is indicated, cols won't be used
     NULL
   }
-  do_chisq.test_(df, selected_cols = cols, skv = skv, correct = correct,
-                 p = p, rescale.p = rescale.p,
-                 simulate.p.value = simulate.p.value, B = B)
+  do_chisq.test_(df,
+                 selected_cols = cols,
+                 skv = skv,
+                 correct = correct,
+                 p = p,
+                 rescale.p = rescale.p,
+                 simulate.p.value = simulate.p.value,
+                 B = B)
 }
 
 #' chisq.test wrapper
@@ -152,6 +158,9 @@ do_chisq.test_ <- function(df,
         y <- df[[skv[[2]]]]
       } else if (length(skv) == 3){
         # casted matrix
+        if(!is.numeric(df[[skv[[3]]]])){
+          stop("value column must be numeric")
+        }
         x <- simple_cast(df, skv[[1]], skv[[2]], skv[[3]], fill = fill, fun.aggregate = fun.aggregate)
       } else {
         stop("length of skv must be between 1 to 3")
