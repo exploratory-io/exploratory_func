@@ -740,6 +740,7 @@ model_anova <- function(df, pretty.name = FALSE){
 }
 
 #' tidy after converting model to survfit
+#' @param newdata Data frame with rows that represent cohorts to simulate
 #' @export
 prediction_survfit <- function(df, newdata = newdata, ...){
   caller <- match.call()
@@ -752,16 +753,23 @@ prediction_survfit <- function(df, newdata = newdata, ...){
   }
   ret <- df %>% dplyr::mutate_(.dots = list(model = fml)) %>% broom::tidy(model)
 
+  # if newdata exists, make output data frame tidy.
+  # original output is in wide-format with columns like estimate.1, estimate.2, ...
   if (!is.null(newdata)) {
-    united_colnames = c()
+    # first, unite columns for a cohort into one column, so that gather at the next step works.
+    united_colnames = c() 
     for (i in 1:nrow(newdata)){
       united_colname = paste0("est", i)
       ret <- ret %>% unite_(united_colname, c(paste0("estimate.",i), paste0("std.error.",i), paste0("conf.high.",i),paste0("conf.low.",i)), sep="_", remove=TRUE)
       united_colnames = c(united_colnames, united_colname)
     }
+    # gather the united values into key column (cohort) and value column (val)
     gathered <- ret %>% gather_("cohort", "val", united_colnames)
+    # separte the value column to reverse the effect of unite() we did before.
     ret <- gathered %>% separate_("val",c("estimate", "std_error", "conf_high", "conf_low"),sep="_")
+    # convert characterized data back to numeric.
     ret <- ret %>% mutate(estimate = as.numeric(estimate), std_error = as.numeric(std_error), conf_high = as.numeric(conf_high), conf_low = as.numeric(conf_low))
+    # replace the cohort name with a string that is a concatenation of values that represents the cohort.
     cohorts_labels <- newdata %>% unite(label, everything())
     for (i in 1:nrow(newdata)){
       ret <- ret %>% mutate(cohort = if_else(paste0("est", i) == cohort, cohorts_labels$label[[i]], cohort))
