@@ -170,8 +170,13 @@ do_chisq.test_ <- function(df,
       broom::glance()
   }
 
+  # Calculation is executed in each group.
+  # Storing the result in this tmp_col and
+  # unnesting the result.
+  # If the original data frame is grouped by "tmp",
+  # overwriting it should be avoided,
+  # so avoid_conflict is used here.
   tmp_col <- avoid_conflict(colnames(df), "tmp")
-
   df %>%
     dplyr::do_(.dots = setNames(list(~chisq.test_each(.)), tmp_col)) %>%
     tidyr::unnest_(tmp_col)
