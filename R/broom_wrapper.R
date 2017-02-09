@@ -741,7 +741,7 @@ model_anova <- function(df, pretty.name = FALSE){
 
 #' tidy after converting model to survfit
 #' @export
-prediction_survfit <- function(df, ...){
+prediction_survfit <- function(df, newdata = newdata, ...){
   caller <- match.call()
   # this expands dots arguemtns to character
   arg_char <- expand_args(caller, exclude = c("df"))
@@ -751,6 +751,23 @@ prediction_survfit <- function(df, ...){
     fml <- as.formula(paste0("~list(survival::survfit(model))"))
   }
   ret <- df %>% dplyr::mutate_(.dots = list(model = fml)) %>% broom::tidy(model)
+
+  if (!is.null(newdata)) {
+    united_colnames = c()
+    for (i in 1:nrow(newdata)){
+      united_colname = paste0("est", i)
+      ret <- ret %>% unite_(united_colname, c(paste0("estimate.",i), paste0("std.error.",i), paste0("conf.high.",i),paste0("conf.low.",i)), sep="_", remove=TRUE)
+      united_colnames = c(united_colnames, united_colname)
+    }
+    gathered <- ret %>% gather_("cohort", "val", united_colnames)
+    ret <- gathered %>% separate_("val",c("estimate", "std_error", "conf_high", "conf_low"),sep="_")
+    ret <- ret %>% mutate(estimate = as.numeric(estimate), std_error = as.numeric(std_error), conf_high = as.numeric(conf_high), conf_low = as.numeric(conf_low))
+    cohorts_labels <- newdata %>% unite(label, everything())
+    for (i in 1:nrow(newdata)){
+      ret <- ret %>% mutate(cohort = if_else(paste0("est", i) == cohort, cohorts_labels$label[[i]], cohort))
+    }
+  }
+
   colnames(ret)[colnames(ret) == "n.risk"] <- "n_risk"
   colnames(ret)[colnames(ret) == "n.event"] <- "n_event"
   colnames(ret)[colnames(ret) == "n.censor"] <- "n_censor"
