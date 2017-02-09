@@ -104,30 +104,74 @@ do_var.test <- function(df, value, key, ...){
 
 #' Non standard evaluation version of do_chisq.test_
 #' @export
-do_chisq.test <- function(df, col1, col2 = NULL, count = NULL, ...){
-  colname1 <- col_name(substitute(col1))
-  colname2 <- col_name(substitute(col2))
-  count_col <- col_name(substitute(count))
-  do_chisq.test_(df, colname1, colname2, count_col, ...)
+do_chisq.test <- function(df, ...,
+                          skv = NULL,
+                          fill = 0,
+                          fun.aggregate = mean,
+                          correct = TRUE,
+                          p = NULL, rescale.p = FALSE,
+                          simulate.p.value = FALSE,
+                          B = 2000){
+  cols <- if(is.null(skv)){
+    # if skv is not indicated, selected area is regarded as matrix
+    select_dots <- lazyeval::lazy_dots(...)
+    ret <- evaluate_select(df, select_dots, excluded = grouped_by(df))
+  }else{
+    # if skv is indicated, cols won't be used
+    NULL
+  }
+  do_chisq.test_(df, selected_cols = cols, skv = skv, correct = correct,
+                 p = p, rescale.p = rescale.p,
+                 simulate.p.value = simulate.p.value, B = B)
 }
 
 #' chisq.test wrapper
 #' @export
-do_chisq.test_ <- function(df, colname1, colname2 = NULL, count_col = NULL, ...){
-  if(is.null(colname2)){
-    df %>%
-      dplyr::do(test = chisq.test(x = .[[colname1]], ...)) %>%
-      broom::glance(test)
-  }else if(is.null(count_col)){
-    df %>%
-      dplyr::do(test = chisq.test(x = .[[colname1]], y = .[[colname2]], ...)) %>%
-      broom::glance(test)
-  } else {
-    chisq.test_casted <- function(df, ...){
-      chisq.test(simple_cast(df, colname1, colname2, count_col), ...)
+do_chisq.test_ <- function(df,
+                           selected_cols = c(),
+                           skv = NULL,
+                           fill = 0,
+                           fun.aggregate = mean,
+                           correct = TRUE,
+                           p = NULL,
+                           rescale.p = FALSE,
+                           simulate.p.value = FALSE,
+                           B = 2000){
+
+  chisq.test_each <- function(df, ...) {
+    x <- NULL
+    y <- NULL
+    if (is.null(selected_cols)){
+      if(length(skv) == 1){
+        x <- df[[skv[[1]]]]
+      } else if (length(skv) == 2) {
+        x <- df[[skv[[1]]]]
+        y <- df[[skv[[2]]]]
+      } else if (length(skv) == 3){
+        # casted matrix
+        x <- simple_cast(df, skv[[1]], skv[[2]], skv[[3]], fill = fill, fun.aggregate = fun.aggregate)
+      } else {
+        stop("length of skv must be between 1 to 3")
+      }
+    } else {
+      x <- df[, selected_cols] %>% as.matrix()
     }
-    df %>%
-      dplyr::do(test = chisq.test_casted(., ...)) %>%
-      broom::glance(test)
+    if (is.null(p)){
+      # default of p from chisq.test
+      p <- rep(1/length(x), length(x))
+    }
+    chisq.test(x = x, y = y,
+               correct = correct,
+               p = p,
+               rescale.p = rescale.p,
+               simulate.p.value = simulate.p.value,
+               B = B) %>%
+      broom::glance()
   }
+
+  tmp_col <- avoid_conflict(colnames(df), "tmp")
+
+  df %>%
+    dplyr::do_(.dots = setNames(list(~chisq.test_each(.)), tmp_col)) %>%
+    tidyr::unnest_(tmp_col)
 }

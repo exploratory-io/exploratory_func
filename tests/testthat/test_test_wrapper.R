@@ -72,7 +72,7 @@ test_that("test chisq.test with 2 columns", {
   colnames(test_df) <- c("group", "cat 1", "cat2")
 
   ret <- test_df %>%
-    do_chisq.test(`cat 1`, cat2)
+    do_chisq.test(skv = c("cat 1", "cat2"))
 
   expect_equal(nrow(ret), 2)
 
@@ -91,7 +91,7 @@ test_that("test chisq.test with 3 columns", {
   colnames(test_df) <- c("group", "cat 1", "cat2", "count")
 
   ret <- test_df %>%
-    do_chisq.test(`cat 1`, cat2, count)
+    do_chisq.test(skv = c("cat 1", "cat2", "count"))
 
   expect_equal(nrow(ret), 2)
 
@@ -108,7 +108,25 @@ test_that("test chisq.test with one column", {
     dplyr::group_by(group)
 
   ret <- test_df %>%
-    do_chisq.test(count)
+    do_chisq.test(skv = "count")
+
+  expect_equal(nrow(ret), 2)
+
+})
+
+test_that("test chisq.test with select argument", {
+  test_df <- data.frame(
+    group = rep(letters[1:2], each = 500),
+    cat1 = letters[round(runif(1000)*5)+1],
+    cat2 = letters[round(runif(1000)*3)+1]
+  ) %>%
+    group_by(group, cat1, cat2) %>%
+    summarize(count = n()) %>%
+    tidyr::spread(cat2, count) %>%
+    dplyr::group_by(group)
+
+  ret <- test_df %>%
+    do_chisq.test(-cat1)
 
   expect_equal(nrow(ret), 2)
 
