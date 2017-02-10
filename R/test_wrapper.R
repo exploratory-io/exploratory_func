@@ -105,7 +105,6 @@ do_var.test <- function(df, value, key, ...){
 #' Non standard evaluation version of do_chisq.test_
 #' @export
 do_chisq.test <- function(df, ...,
-                          skv = NULL,
                           fill = 0,
                           fun.aggregate = mean,
                           correct = TRUE,
@@ -113,17 +112,10 @@ do_chisq.test <- function(df, ...,
                           rescale.p = FALSE,
                           simulate.p.value = FALSE,
                           B = 2000){
-  cols <- if(is.null(skv)){
-    # if skv is not indicated, selected area is regarded as matrix
-    select_dots <- lazyeval::lazy_dots(...)
-    ret <- evaluate_select(df, select_dots, excluded = grouped_by(df))
-  }else{
-    # if skv is indicated, cols won't be used
-    NULL
-  }
+  select_dots <- lazyeval::lazy_dots(...)
+  cols <- evaluate_select(df, select_dots, excluded = grouped_by(df))
   do_chisq.test_(df,
                  selected_cols = cols,
-                 skv = skv,
                  correct = correct,
                  p = p,
                  rescale.p = rescale.p,
@@ -135,7 +127,6 @@ do_chisq.test <- function(df, ...,
 #' @export
 do_chisq.test_ <- function(df,
                            selected_cols = c(),
-                           skv = NULL,
                            fill = 0,
                            fun.aggregate = mean,
                            correct = TRUE,
@@ -145,32 +136,12 @@ do_chisq.test_ <- function(df,
                            B = 2000){
 
   chisq.test_each <- function(df, ...) {
-    x <- NULL
-    y <- NULL
-    if (is.null(skv)){
-      # if skv is not indicated, selected area is regarded as matrix
-      x <- df[, selected_cols] %>% as.matrix()
-    } else {
-      if(length(skv) == 1){
-        x <- df[[skv[[1]]]]
-      } else if (length(skv) == 2) {
-        x <- df[[skv[[1]]]]
-        y <- df[[skv[[2]]]]
-      } else if (length(skv) == 3){
-        # casted matrix
-        if(!is.numeric(df[[skv[[3]]]])){
-          stop("value column must be numeric")
-        }
-        x <- simple_cast(df, skv[[1]], skv[[2]], skv[[3]], fill = fill, fun.aggregate = fun.aggregate)
-      } else {
-        stop("length of skv must be between 1 to 3")
-      }
-    }
+    x <- df[, selected_cols] %>% as.matrix()
     if (is.null(p)){
       # default of p from chisq.test
       p <- rep(1/length(x), length(x))
     }
-    chisq.test(x = x, y = y,
+    chisq.test(x = x,
                correct = correct,
                p = p,
                rescale.p = rescale.p,
