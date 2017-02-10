@@ -668,3 +668,38 @@ get_confint <- function(val, se, conf_int = 0.95) {
   critval=qnorm(conf_int,0,1)
   val + critval * se
 }
+
+#' NSE version of pivot_
+#' @export
+pivot <- function(data, formula, value = NULL, ...) {
+  value_col <- col_name(substitute(value))
+  pivot_(data, formula = formula, value_col = value_col, ...)
+}
+
+#' pivot columns based on formula
+#' @param data Data frame to pivot
+#' @param formula lhs is composed of columns for rows and rhs is for cols
+#' @param value_col Column name for value. If null, values are count
+#' @param fun.aggregate Function to aggregate duplicated columns
+#' @param fill Value to be filled for missing values
+#' @param na.rm If na should be removed from values
+#' @export
+pivot_ <- function(data, formula, value_col = NULL, fun.aggregate = mean, fill = 0, na.rm = TRUE) {
+  # create a column name for row names
+  # column names in lhs are collapsed by "_"
+  cname <- paste0(all.vars(lazyeval::f_lhs(formula)), collapse = "_")
+
+  casted <- if(is.null(value_col)) {
+    # make a count matrix if value_col is NULL
+    reshape2::acast(data, formula = formula, fun.aggregate = length, fill = fill)
+  } else {
+    if(na.rm){
+      # remove NA
+      data <- data[!is.na(data[[value_col]]),]
+    }
+    reshape2::acast(data, formula = formula, value.var = value_col, fun.aggregate = fun.aggregate, fill = fill)
+  }
+  casted %>%
+    as.data.frame %>%
+    tibble::rownames_to_column(var = cname)
+}
