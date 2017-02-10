@@ -742,7 +742,7 @@ model_anova <- function(df, pretty.name = FALSE){
 #' tidy after converting model to survfit
 #' @param newdata Data frame with rows that represent cohorts to simulate
 #' @export
-prediction_survfit <- function(df, newdata = newdata, ...){
+prediction_survfit <- function(df, newdata = NULL, ...){
   caller <- match.call()
   # this expands dots arguemtns to character
   arg_char <- expand_args(caller, exclude = c("df"))
