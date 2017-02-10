@@ -774,6 +774,8 @@ prediction_survfit <- function(df, newdata = NULL, ...){
     for (i in 1:nrow(newdata)){
       ret <- ret %>% mutate(cohort = if_else(paste0("est", i) == cohort, cohorts_labels$label[[i]], cohort))
     }
+    # replace the "cohort" column name with name like "age_sex".
+    colnames(ret)[colnames(ret) == "cohort"] <- paste0(colnames(newdata), collapse = "_")
   }
 
   colnames(ret)[colnames(ret) == "n.risk"] <- "n_risk"
