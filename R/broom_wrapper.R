@@ -766,8 +766,18 @@ do_survfit <- function(df, time, status, ...){
   # need to compose formula with non-standard evaluation.
   # simply using time and status in formula here results in a formula that literally looks at
   # "time" columun and "status" column, which is not what we want.
+
   fml <- as.formula(paste0("survival::Surv(`", substitute(time), "`,`", substitute(status), "`) ~ 1"))
-  ret <- df %>% build_model(model_func = survival::survfit, formula = fml, ...) %>% broom::tidy(model)
+  # using lazyeval is needed for non standard evaluation arguments like weights
+  lz_dots <- lazyeval::lazy_dots(...)
+  lz_dots[["data"]] <- lazyeval::as.lazy(quote(df))
+  lz_dots[["formula"]] <- lazyeval::lazy(fml)
+  lz_dots[["model_func"]] <- lazyeval::as.lazy(quote(survival::survfit))
+  .call <- lazyeval::make_call(quote(build_model), lz_dots)
+  .call$env <- environment()
+  survfit_df <- lazyeval::lazy_eval(.call)
+
+  ret <- survfit_df %>% broom::tidy(model)
   colnames(ret)[colnames(ret) == "n.risk"] <- "n_risk"
   colnames(ret)[colnames(ret) == "n.event"] <- "n_event"
   colnames(ret)[colnames(ret) == "n.censor"] <- "n_censor"

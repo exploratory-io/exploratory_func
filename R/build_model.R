@@ -47,36 +47,27 @@ build_model <- function(data, model_func, test_seed = 1, test_rate = 0, group_co
 
   group_col_names <- grouped_by(data)
 
+  caller <- match.call()
+
   # check if variables in grouped_col_names are not used
-  dots <- list(...)
-  if(!is.null(dots)){
-    fml <- dots$formula
-    if(!is.null(fml)){
-      vars <- all.vars(fml)
-      if(any(vars %in% group_col_names)){
-        grouped <- vars[vars %in% group_col_names]
-        message <- paste("grouped column is used (", paste0(grouped, collapse = ", "), ")", sep = "")
-        stop(message)
-      } else {
-        for (var in vars) {
-          if(is.character(data[[var]])){
-            # make variables factor sorted by the frequency
-            data[[var]] <- forcats::fct_infreq(data[[var]])
-          }
+  formula <- as.list(caller)$formula
+  if(!is.null(formula)){
+    vars <- all.vars(formula)
+    if(any(vars %in% group_col_names)){
+      grouped <- vars[vars %in% group_col_names]
+      message <- paste("grouped column is used (", paste0(grouped, collapse = ", "), ")", sep = "")
+      stop(message)
+    } else {
+      for (var in vars) {
+        if(is.character(data[[var]])){
+          # make variables factor sorted by the frequency
+          data[[var]] <- forcats::fct_infreq(data[[var]])
         }
       }
     }
   }
-
   model_col <- "model"
   source_col <- "source.data"
-
-  caller <- match.call()
-
-  # somehow, formula in caller becomes "..1" sometimes, so update it by list(...)
-  if ("formula" %in% names(caller)) {
-    caller$formula <- list(...)[["formula"]]
-  }
 
   # this expands dots arguemtns to character
   arg_char <- expand_args(caller, exclude = c(
