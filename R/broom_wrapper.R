@@ -753,9 +753,9 @@ prediction_survfit <- function(df, newdata = NULL, ...){
   }
   ret <- df %>% dplyr::mutate_(.dots = list(model = fml)) %>% broom::tidy(model)
 
-  # if newdata exists, make output data frame tidy.
+  # if newdata exists and has more than one row, make output data frame tidy.
   # original output is in wide-format with columns like estimate.1, estimate.2, ...
-  if (!is.null(newdata)) {
+  if (!is.null(newdata) && nrow(newdata) > 1) {
     # first, unite columns for a cohort into one column, so that gather at the next step works.
     united_colnames = c() 
     for (i in 1:nrow(newdata)){
