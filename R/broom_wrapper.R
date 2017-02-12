@@ -591,10 +591,13 @@ model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
 model_stats <- function(df, pretty.name = FALSE){
   ret <- broom::glance(df, model)
 
-  # here, we are adding base level info for factor variables found in the formula.
-
-  # extract variables from model formula
-  formula_vars <- all.vars(df$model[[1]]$formula)
+  # df$model[[1]]$formula causes error if the model doesn't have formula in attribute names
+  formula_vars <- if("formula" %in% names(df$model[[1]])){
+    # extract variables from model formula
+    all.vars(df$model[[1]]$formula)
+  } else {
+    NULL
+  }
 
   # get group columns.
   # we assume that columns of model df other than the ones with reserved name are all group columns.
@@ -624,13 +627,15 @@ model_stats <- function(df, pretty.name = FALSE){
   ret <- df %>%
     dplyr::mutate(ret = purrr::map2(ret, source.data, function(ret, source_data) {
       # for each factor variable in the formula, add base level info column to ret.
-      for(var in formula_vars) {
-        if(is.factor(source_data[[var]])) {
-          if(pretty.name) {
-            ret[paste0("Base Level of ", var)] <- levels(source_data[[var]])[[1]]
-          }
-          else {
-            ret[paste0(var, "_base")] <- levels(source_data[[var]])[[1]]
+      if(!is.null(formula_vars)){
+        for(var in formula_vars) {
+          if(is.factor(source_data[[var]])) {
+            if(pretty.name) {
+              ret[paste0("Base Level of ", var)] <- levels(source_data[[var]])[[1]]
+            }
+            else {
+              ret[paste0(var, "_base")] <- levels(source_data[[var]])[[1]]
+            }
           }
         }
       }
