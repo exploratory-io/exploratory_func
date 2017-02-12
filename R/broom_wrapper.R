@@ -489,6 +489,45 @@ prediction_binary <- function(df, threshold = 0.5, ...){
 #' @export
 prediction_coxph <- function(df, ...){
   ret <- prediction(df, ...)
+
+  # get group columns.
+  # we assume that columns of model df other than the ones with reserved name are all group columns.
+  model_df_colnames = colnames(df)
+  group_by_names <- model_df_colnames[!model_df_colnames %in% c("source.data", ".test_index", "model")]
+
+  # when pre-grouped, each row of glance result is actually a group.
+  # but when not pre-grouped, the only-one row is not a group.
+  # in that case, we need to group it by something to work with following operations with nest/mutate/map.
+  if (length(group_by_names) == 0) {
+    ret <- ret %>% dplyr::mutate(dummy_group_col = 1) %>% dplyr::group_by(dummy_group_col)
+  }
+
+  # push ret in df so that we can work on ret and source.data at the same time in folliwing mutate() of df.
+  nested_ret_df <- ret %>% tidyr::nest()
+  df[["ret"]] <- nested_ret_df$data
+
+  # group df. rowwise nature of df is stripped here.
+  if (length(group_by_names) == 0) {
+    # need to group by something to work with following operations with mutate/map.
+    df <- df %>% dplyr::mutate(dummy_group_col = 1) %>% dplyr::group_by(dummy_group_col)
+  }
+  else {
+    df <- df %>% dplyr::group_by_(group_by_names)
+  }
+
+  # XXXX
+  ret <- df %>%
+    dplyr::mutate(ret = purrr::map2(ret, model, function(ret, model) {
+      ret
+    })) %>%
+    dplyr::select_(c("ret", group_by_names)) %>%
+    tidyr::unnest()
+
+  # set it back to non-group-by state that is same as glance() output.
+  if (length(group_by_names) == 0) {
+    ret <- ret %>% dplyr::ungroup() %>% dplyr::select(-dummy_group_col)
+  }
+  ret
 }
 
 #' tidy wrapper for lm and glm
