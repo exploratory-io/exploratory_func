@@ -490,6 +490,11 @@ prediction_binary <- function(df, threshold = 0.5, ...){
 prediction_coxph <- function(df, at_time = 10, threshold = 1, ...){
   ret <- prediction(df, ...)
 
+  # extract variables for time and status from model formula
+  surv_vars <- all.vars(lazyeval::f_lhs(df$model[[1]]$formula))
+  time_colname <- surv_vars[[1]]
+  status_colname <- surv_vars[[2]]
+
   # get group columns.
   # we assume that columns of model df other than the ones with reserved name are all group columns.
   model_df_colnames = colnames(df)
@@ -523,7 +528,7 @@ prediction_coxph <- function(df, at_time = 10, threshold = 1, ...){
       cumhaz_base = bh_fun(at_time)
       ret <- ret %>% dplyr::mutate(cumulative_hazard = cumhaz_base * exp(predicted_value))
       ret <- ret %>% dplyr::mutate(predicted_state = cumulative_hazard > threshold)
-      ret <- ret %>% dplyr::mutate(actual_state = if_else((time <= at_time & status == 2), TRUE, if_else(time >= at_time, FALSE, NA))) #TODO column name
+      ret <- ret %>% dplyr::mutate(actual_state = if_else((.[[time_colname]] <= at_time & .[[status_colname]] == 2), TRUE, if_else(.[[time_colname]] >= at_time, FALSE, NA))) #TODO column name
       ret
     })) %>%
     dplyr::select_(c("ret", group_by_names)) %>%
