@@ -527,8 +527,6 @@ prediction_coxph <- function(df, time = NULL, threshold = 1, ...){
       bh_fun <- approxfun(bh$time, bh$hazard)
       cumhaz_base = bh_fun(time)
       ret <- ret %>% dplyr::mutate(cumulative_hazard = cumhaz_base * exp(predicted_value))
-      ret <- ret %>% dplyr::mutate(predicted_state = cumulative_hazard > threshold)
-      ret <- ret %>% dplyr::mutate(actual_state = if_else((.[[time_colname]] <= time & .[[status_colname]] == 2), TRUE, if_else(.[[time_colname]] >= time, FALSE, NA)))
       ret
     })) %>%
     dplyr::select_(c("ret", group_by_names)) %>%
@@ -538,6 +536,8 @@ prediction_coxph <- function(df, time = NULL, threshold = 1, ...){
   if (length(group_by_names) == 0) {
     ret <- ret %>% dplyr::ungroup() %>% dplyr::select(-dummy_group_col)
   }
+  ret <- ret %>% dplyr::mutate(predicted_state = cumulative_hazard > threshold)
+  ret <- ret %>% dplyr::mutate(actual_state = if_else((.[[time_colname]] <= time & .[[status_colname]] == 2), TRUE, if_else(.[[time_colname]] >= time, FALSE, NA)))
   ret
 }
 
