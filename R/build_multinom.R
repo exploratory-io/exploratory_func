@@ -5,23 +5,22 @@
 #' @param ... Parameters for nnet::multinom
 #' @export
 build_multinom <- function(data, formula, ...){
-  reserved_colnames <- reserved_colnames <- c(
-    # for model_coef
-    "y.level",
-    "term",
-    "estimate",
-    "std_error",
-    "t_ratio",
-    "p_value",
-    # for model_stats
-    "edf",
-    "deviance",
-    "AIC"
-  )
-  build_model(data = data,
-              formula = formula,
+  build_model(data,
               model_func = nnet::multinom,
-              reserved_colnames = reserved_colnames,
+              formula = formula,
+              reserved_colnames = c(
+                # for model_coef
+                "y.level",
+                "term",
+                "estimate",
+                "std_error",
+                "t_ratio",
+                "p_value",
+                # for model_stats
+                "edf",
+                "deviance",
+                "AIC"
+              ),
               ...)
 }
 
