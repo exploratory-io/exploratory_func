@@ -7,10 +7,10 @@
 #' @param reserved_colnames Column names that should be avoided for information extraction like tidy, glance later
 #' @param ... Parameters for model_func
 #' @export
-build_model <- function(data, model_func, test_seed = 1, test_rate = 0, group_cols = c(), reserved_colnames = c(), ...) {
+build_model <- function(data, model_func, seed = 0, test_rate = 0, group_cols = c(), reserved_colnames = c(), ...) {
 
-  if(!is.null(test_seed)){
-    set.seed(test_seed)
+  if(!is.null(seed)){
+    set.seed(seed)
   }
 
   # deal with group columns by index because those names might be changed
