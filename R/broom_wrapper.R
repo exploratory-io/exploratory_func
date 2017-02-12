@@ -520,13 +520,13 @@ prediction_coxph <- function(df, time = NULL, threshold = 1, ...){
     df <- df %>% dplyr::group_by_(group_by_names)
   }
 
-  # add cumulative_hazard, actual_status, and predicted_status
+  # add predicted_probability, actual_status, and predicted_status
   ret <- df %>%
     dplyr::mutate(ret = purrr::map2(ret, model, function(ret, model) {
       bh <- survival::basehaz(model)
       bh_fun <- approxfun(bh$time, bh$hazard)
       cumhaz_base = bh_fun(time)
-      ret <- ret %>% dplyr::mutate(cumulative_hazard = cumhaz_base * exp(predicted_value))
+      ret <- ret %>% dplyr::mutate(predicted_probability = 1 - exp(-cumhaz_base * exp(predicted_value)))
       ret
     })) %>%
     dplyr::select_(c("ret", group_by_names)) %>%
@@ -536,8 +536,8 @@ prediction_coxph <- function(df, time = NULL, threshold = 1, ...){
   if (length(group_by_names) == 0) {
     ret <- ret %>% dplyr::ungroup() %>% dplyr::select(-dummy_group_col)
   }
-  ret <- ret %>% dplyr::mutate(predicted_status = cumulative_hazard > threshold)
-  ret <- ret %>% dplyr::mutate(actual_status = if_else((.[[time_colname]] <= time & .[[status_colname]] == 2), TRUE, if_else(.[[time_colname]] >= time, FALSE, NA)))
+  ret <- ret %>% dplyr::mutate(predicted_status = predicted_probability > threshold)
+  ret <- ret %>% dplyr::mutate(actual_status = if_else((.[[time_colname]] <= time & .[[status_colname]] == 2), TRUE, if_else(.[[time_colname]] >= time, FALSE, NA))) #TODO take care of 2
   if (is.numeric(ret[[status_colname]])) {
     ret$predicted_status <- as.numeric(ret$predicted_status)
     ret$actual_status <- as.numeric(ret$actual_status)
