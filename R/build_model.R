@@ -47,46 +47,27 @@ build_model <- function(data, model_func, test_seed = 1, test_rate = 0, group_co
 
   group_col_names <- grouped_by(data)
 
+  dots <- lazyeval::dots_capture(...)
+
   # check if variables in grouped_col_names are not used
-  dots <- list(...)
-  if(!is.null(dots)){
-    fml <- dots$formula
-    if(!is.null(fml)){
-      vars <- all.vars(fml)
-      if(any(vars %in% group_col_names)){
-        grouped <- vars[vars %in% group_col_names]
-        message <- paste("grouped column is used (", paste0(grouped, collapse = ", "), ")", sep = "")
-        stop(message)
-      } else {
-        for (var in vars) {
-          if(is.character(data[[var]])){
-            # make variables factor sorted by the frequency
-            data[[var]] <- forcats::fct_infreq(data[[var]])
-          }
+  formula <- dots$formula
+  if(!is.null(formula)){
+    vars <- all.vars(formula)
+    if(any(vars %in% group_col_names)){
+      grouped <- vars[vars %in% group_col_names]
+      message <- paste("grouped column is used (", paste0(grouped, collapse = ", "), ")", sep = "")
+      stop(message)
+    } else {
+      for (var in vars) {
+        if(is.character(data[[var]])){
+          # make variables factor sorted by the frequency
+          data[[var]] <- forcats::fct_infreq(data[[var]])
         }
       }
     }
   }
-
   model_col <- "model"
   source_col <- "source.data"
-
-  caller <- match.call()
-
-  # somehow, formula in caller becomes "..1" sometimes, so update it by list(...)
-  if ("formula" %in% names(caller)) {
-    caller$formula <- list(...)[["formula"]]
-  }
-
-  # this expands dots arguemtns to character
-  arg_char <- expand_args(caller, exclude = c(
-    "data",
-    "model_func",
-    "test_seed",
-    "test_rate",
-    "group_cols",
-    "reserved_colnames"
-    ))
 
   ret <- tryCatch({
     ret <- data %>%
@@ -99,7 +80,10 @@ build_model <- function(data, model_func, test_seed = 1, test_rate = 0, group_co
       dplyr::mutate(model = purrr::map2(source.data, .test_index, function(df, index){
         data <- safe_slice(df, index, remove = TRUE)
         # execute model_func with parsed arguments
-        eval(parse(text = paste0("model_func(data = data, ", arg_char, ")")))
+        eval_arg <- dots
+        eval_arg[["data"]] <- lazyeval::as.lazy(quote(data))
+        .call <- lazyeval::make_call(quote(model_func), eval_arg)
+        lazyeval::lazy_eval(.call, data = environment())
       }))
     class(ret[[source_col]]) <- c("list", ".source.data")
     ret <- dplyr::rowwise(ret)
