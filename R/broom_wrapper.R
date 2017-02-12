@@ -286,7 +286,7 @@ prediction <- function(df, data = "training", conf_int = 0.95, ...){
   # and models have $family$linkinv (basically, glm models have it),
   # both fitted link value column and response value column should appear in the result
 
-  with_response <- !("type.predict" %in% names(cll)) & !is.null(df[["model"]][[1]]$family) & !is.null(df[["model"]][[1]]$family$linkinv)
+  with_response <- !("type.predict" %in% names(cll)) && "family" %in% names(df[["model"]][[1]]) && !is.null(df[["model"]][[1]]$family$linkinv)
 
   ret <- if(test){
     # augment by test data
