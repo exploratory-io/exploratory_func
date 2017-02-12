@@ -5,27 +5,23 @@
 #' @param ... Parameters for nnet::multinom
 #' @export
 build_multinom <- function(data, formula, ...){
-  # using lazyeval is needed for non standard evaluation arguments like weights
-  lz_dots <- lazyeval::lazy_dots(...)
-  lz_dots[["data"]] <- lazyeval::as.lazy(quote(data))
-  lz_dots[["formula"]] <- lazyeval::lazy(formula)
-  lz_dots[["model_func"]] <- lazyeval::as.lazy(quote(nnet::multinom))
-  lz_dots[["reserved_colnames"]] <- lazyeval::as.lazy(quote(c(
-    # for model_coef
-    "y.level",
-    "term",
-    "estimate",
-    "std_error",
-    "t_ratio",
-    "p_value",
-    # for model_stats
-    "edf",
-    "deviance",
-    "AIC"
-  )))
-  .call <- lazyeval::make_call(quote(build_model), lz_dots)
-  .call$env <- environment()
-  lazyeval::lazy_eval(.call)
+  build_model(data,
+              model_func = nnet::multinom,
+              formula = formula,
+              reserved_colnames = c(
+                # for model_coef
+                "y.level",
+                "term",
+                "estimate",
+                "std_error",
+                "t_ratio",
+                "p_value",
+                # for model_stats
+                "edf",
+                "deviance",
+                "AIC"
+              ),
+              ...)
 }
 
 #' augment for multinom model, which is not defined by broom
