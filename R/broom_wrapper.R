@@ -487,7 +487,7 @@ prediction_binary <- function(df, threshold = 0.5, ...){
 #' TODO: prediction wrapper to set proportional hazard.
 #' @param df Data frame to predict. This should have model column.
 #' @export
-prediction_coxph <- function(df, ...){
+prediction_coxph <- function(df, time = 10, ...){
   ret <- prediction(df, ...)
 
   # get group columns.
@@ -518,6 +518,10 @@ prediction_coxph <- function(df, ...){
   # XXXX
   ret <- df %>%
     dplyr::mutate(ret = purrr::map2(ret, model, function(ret, model) {
+      bh <- survival::basehaz(model)
+      bh_fun <- approxfun(bh$time, bh$hazard)
+      cumhaz_base = bh_fun(time)
+      ret <- ret %>% dplyr::mutate(cumulated_hazard = cumhaz_base * exp(predicted_value))
       ret
     })) %>%
     dplyr::select_(c("ret", group_by_names)) %>%
