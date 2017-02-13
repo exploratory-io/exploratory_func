@@ -54,5 +54,6 @@ Suggests:
     janitor,
     nnet,
     mgcv,
-    survival
+    survival,
+    survAUC
 RoxygenNote: 5.0.1

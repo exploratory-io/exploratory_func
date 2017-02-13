@@ -899,6 +899,14 @@ do_survfit <- function(df, time, status, ...){
   ret
 }
 
+#' Calculates time-dependent AUC of survival model
+#' @param df Model data frame
+#' @param auc_type Type of AUC calculation. Can be one of the following.
+#' "cd" - Chambless and Diao
+#' "hc" - Hung and Chiang
+#' "sh" - Song and Zhou
+#' "uno" - Uno et al.
+#' @param  length_out length of each output curv data.
 #' @export
 do_survauc <- function(df, auc_type = "cd", length_out = 100) {
   # extract variables for time and status from model formula
@@ -920,28 +928,34 @@ do_survauc <- function(df, auc_type = "cd", length_out = 100) {
     df <- df %>% dplyr::group_by_(group_by_names)
   }
 
+  # calculate time-AUC curve with survAUC package.
   ret <- df %>%
     dplyr::mutate(ret = purrr::map3(model, source.data, .test_index, function(model, source_data, test_index) {
       training_data = safe_slice(source_data, test_index, remove = TRUE)
       test_data = safe_slice(source_data, test_index)
+
+      # get linear predictors for training/test data
       lp <- stats::predict(model)
       lpnew <- stats::predict(model, newdata=test_data)
 
+      # get Surv objects for traininig/test data
       Surv.rsp <- survival::Surv(training_data[[time_colname]], training_data[[status_colname]])
       Surv.rsp.new <- survival::Surv(test_data[[time_colname]], test_data[[status_colname]])
+
+      # get grid for x-axis (times) based on time column of the source data.
       timecol = source_data[[time_colname]]
       times <- seq(0, max(timecol), length.out = length_out)
 
-      if (auc_type == "cd") {
+      if (auc_type == "cd") { # Chambless and Diao
         AUC <- survAUC::AUC.cd(Surv.rsp, Surv.rsp.new, lp, lpnew, times)
       }
-      else if (auc_type == "hc") {
+      else if (auc_type == "hc") { # Hung and Chiang
         AUC <- survAUC::AUC.hc(Surv.rsp, Surv.rsp.new, lpnew, times)
       }
-      else if (auc_type == "sh") {
+      else if (auc_type == "sh") { # Song and Zhou
         AUC <- survAUC::AUC.sh(Surv.rsp, Surv.rsp.new, lp, lpnew, times)
       }
-      else if (auc_type == "uno") {
+      else if (auc_type == "uno") { # Uno et al.
         AUC <-survAUC::AUC.uno(Surv.rsp, Surv.rsp.new, lpnew, times)
       }
       aucdf <- data.frame(time = AUC$times, auc = AUC$auc)
@@ -950,7 +964,7 @@ do_survauc <- function(df, auc_type = "cd", length_out = 100) {
   ret <- ret %>% dplyr::select_(c("ret", group_by_names))
   ret <- ret %>% tidyr::unnest()
 
-  # let's return flat ungrouped table from this function.
+  # let's return flat ungrouped table with columns for groups, time, and auc from this function.
   ret <- ret %>% dplyr::ungroup()
   # drop dummy_group_col we added.
   if (length(group_by_names) == 0) {
