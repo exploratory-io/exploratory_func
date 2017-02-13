@@ -61,3 +61,38 @@ test_that("test f-test with 3 groups", {
       do_var.test(val, group)
   }, "Group Column has to have 2 unique values")
 })
+
+test_that("test chisq.test with one column", {
+  test_df <- data.frame(
+    group = rep(letters[1:2], each = 500),
+    cat1 = letters[round(runif(1000)*5)+1],
+    cat2 = letters[round(runif(1000)*3)+1]
+  ) %>%
+    group_by(group, cat1, cat2) %>%
+    summarize(count = n()) %>%
+    dplyr::group_by(group)
+
+  ret <- test_df %>%
+    do_chisq.test(count)
+
+  expect_equal(nrow(ret), 2)
+
+})
+
+test_that("test chisq.test with select argument", {
+  test_df <- data.frame(
+    group = rep(letters[1:2], each = 500),
+    cat1 = letters[round(runif(1000)*5)+1],
+    cat2 = letters[round(runif(1000)*3)+1]
+  ) %>%
+    group_by(group, cat1, cat2) %>%
+    summarize(count = n()) %>%
+    tidyr::spread(cat2, count) %>%
+    dplyr::group_by(group)
+
+  ret <- test_df %>%
+    do_chisq.test(-cat1)
+
+  expect_equal(nrow(ret), 2)
+
+})
