@@ -679,6 +679,8 @@ pivot <- function(data, formula, value = NULL, ...) {
 #' pivot columns based on formula
 #' @param data Data frame to pivot
 #' @param formula lhs is composed of columns for rows and rhs is for cols
+#' For example, data1 + data2 ~ var1 + var2 makes a matrix of combinations of
+#' values in data1, data2 pair and var, var2 pair
 #' @param value_col Column name for value. If null, values are count
 #' @param fun.aggregate Function to aggregate duplicated columns
 #' @param fill Value to be filled for missing values
