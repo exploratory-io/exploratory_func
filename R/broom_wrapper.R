@@ -899,6 +899,38 @@ do_survfit <- function(df, time, status, ...){
   ret
 }
 
+#' @export
+do_survauc <- function(df) {
+  # get group columns.
+  # we assume that columns of model df other than the ones with reserved name are all group columns.
+  model_df_colnames = colnames(df)
+  group_by_names <- model_df_colnames[!model_df_colnames %in% c("source.data", ".test_index", "model")]
+
+  # group df. rowwise nature of df is stripped here.
+  if (length(group_by_names) == 0) {
+    # need to group by something to work with following operations with mutate/map.
+    df <- df %>% dplyr::mutate(dummy_group_col = 1) %>% dplyr::group_by(dummy_group_col)
+  }
+  else {
+    df <- df %>% dplyr::group_by_(group_by_names)
+  }
+
+  ret <- df %>%
+    dplyr::mutate(ret = purrr::map(model, function(model) {
+      data.frame(x=c(1,2), y=c(3,4))
+    }))
+  ret <- ret %>% dplyr::select_(c("ret", group_by_names))
+  ret <- ret %>% tidyr::unnest()
+
+  # let's return flat ungrouped table from this function.
+  ret <- ret %>% dplyr::ungroup()
+  # drop dummy_group_col we added.
+  if (length(group_by_names) == 0) {
+    ret <- ret %>% dplyr::select(-dummy_group_col)
+  }
+  ret
+}
+
 #' tidy after converting model to confint
 #' @export
 model_confint <- function(df, ...){
