@@ -1,3 +1,4 @@
+context("test anomaly detection functions")
 
 test_that("anomary_detection", {
   data("raw_data", package = "AnomalyDetection")

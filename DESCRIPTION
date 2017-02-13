@@ -55,4 +55,4 @@ Suggests:
     nnet,
     mgcv,
     survival
-RoxygenNote: 5.0.1
+RoxygenNote: 6.0.1
