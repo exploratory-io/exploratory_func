@@ -909,6 +909,8 @@ do_survfit <- function(df, time, status, ...){
 #' @param  length_out length of each output curv data.
 #' @export
 do_survauc <- function(df, auc_type = "cd", length_out = 100) {
+  # TODO: filter rows that has NA in any of the vars in formula. it seems to cause R crash.
+
   # extract variables for time and status from model formula
   surv_vars <- all.vars(lazyeval::f_lhs(df$model[[1]]$formula))
   time_colname <- surv_vars[[1]]
