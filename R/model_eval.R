@@ -263,7 +263,7 @@ evaluate_multi_ <- function(df, pred_label_col, actual_val_col, ...) {
     fp_sum <- sum(col_sum, na.rm=TRUE) - tp_sum
     micro_recall <- tp_sum / sum(row_sum, na.rm=TRUE)
     micro_precision <- tp_sum / sum(col_sum, na.rm=TRUE)
-    micro_f_score <- if (micro_recall + micro_precision == 0){
+    micro_f_score <- if (is.na(micro_recall + micro_precision) || micro_recall + micro_precision == 0){
       # no prediction was correct
       0
     } else {
