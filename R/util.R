@@ -1,4 +1,5 @@
 #' Column name parser
+#' @export
 col_name <- function(x, default = stop("Please supply column name", call. = FALSE)){
   if (is.character(x))
     return(x)
@@ -12,6 +13,7 @@ col_name <- function(x, default = stop("Please supply column name", call. = FALS
 }
 
 #' Simple cast wrapper that spreads columns which is choosed as row and col into matrix
+#' @export
 simple_cast <- function(data, row, col, val = NULL, fun.aggregate=mean, fill=0){
   loadNamespace("reshape2")
   loadNamespace("tidyr")
@@ -60,6 +62,7 @@ simple_cast <- function(data, row, col, val = NULL, fun.aggregate=mean, fill=0){
 
 #' Cast data to sparse matrix by choosing row and column from a data frame
 #' @param count If val is NULL and count is TRUE, the value becomes count of the row and col set. Otherwise, it's binary data of row and col set.
+#' @export
 sparse_cast <- function(data, row, col, val=NULL, fun.aggregate=sum, count = FALSE){
   loadNamespace("dplyr")
   loadNamespace("tidyr")
@@ -128,6 +131,7 @@ sparse_cast <- function(data, row, col, val=NULL, fun.aggregate=sum, count = FAL
 }
 
 #' as.matrix from select argument or cast by three columns
+#' @export
 to_matrix <- function(df, select_dots, by_col=NULL, key_col=NULL, value_col=NULL, fill=0, fun.aggregate=mean){
   should_cast <- !(is.null(by_col) & is.null(key_col) & is.null(value_col))
   if(should_cast){
@@ -142,6 +146,7 @@ to_matrix <- function(df, select_dots, by_col=NULL, key_col=NULL, value_col=NULL
 }
 
 #' Gather only right upper half of matrix - where row_num > col_num
+#' @export
 upper_gather <- function(mat, names=NULL, diag=NULL, cnames = c("Var1", "Var2", "value")){
   loadNamespace("Matrix")
   if(is.vector(mat)){
@@ -213,6 +218,7 @@ group_exclude <- function(df, ...){
 }
 
 #' prevent conflict of 2 character vectors and avoid it by adding .new to elements in the second
+#' @export
 avoid_conflict <- function(origin, new, suffix = ".new"){
   conflict <- new %in% origin
   while(any(conflict)){
@@ -223,11 +229,13 @@ avoid_conflict <- function(origin, new, suffix = ".new"){
 }
 
 #' check grouped column
+#' @export
 grouped_by <- function(df){
   as.character(attr(df, "vars"))
 }
 
 #' matrix to dataframe with gathered form
+#' @export
 mat_to_df <- function(mat, cnames=NULL, na.rm=TRUE, diag=TRUE){
   loadNamespace("reshape2")
   df <- reshape2::melt(t(mat), na.rm=na.rm)
@@ -417,6 +425,7 @@ as_numeric_matrix_ <- function(df, columns){
 #' evaluate select argument
 #' @param dots Lazy dot for select arg. ex:lazyeval::lazy_dots(...)
 #' @param excluded Excluded column names
+#' @export
 evaluate_select <- function(df, .dots, excluded = NULL){
   loadNamespace("dplyr")
   tryCatch({
@@ -437,6 +446,7 @@ evaluate_select <- function(df, .dots, excluded = NULL){
 #' re-build arguments of a function as string
 #' @param call This expects returned value from match.call()
 #' @param exclude Argument names that should be excluded for expansion
+#' @export
 expand_args <- function(call, exclude = c()){
   excluded <- call[!names(call) %in% exclude]
   args <- excluded[-1]
@@ -460,6 +470,7 @@ expand_args <- function(call, exclude = c()){
 }
 
 #' get sampled indice from data frame
+#' @export
 sample_df_index <- function(df, rate, seed = NULL){
   if(!is.null(seed)){
     set.seed(seed)
@@ -468,6 +479,7 @@ sample_df_index <- function(df, rate, seed = NULL){
 }
 
 #' slice that can handle empty vector
+#' @export
 safe_slice <- function(df, index, remove = FALSE){
   if(remove){
     if(is.null(index)){
@@ -507,6 +519,7 @@ add_response <- function(data, model, response_label = "predicted_response"){
 #' @param df Data frame whose column will be moved
 #' @param cname Column name to be moved
 #' @param position Column index to move to
+#' @export
 move_col <- function(df, cname, position){
   # get column index to move
   cname_posi = which(colnames(df) == cname)
@@ -654,4 +667,41 @@ append_colnames <- function(df, prefix = "", suffix = ""){
 get_confint <- function(val, se, conf_int = 0.95) {
   critval=qnorm(conf_int,0,1)
   val + critval * se
+}
+
+#' NSE version of pivot_
+#' @export
+pivot <- function(data, formula, value = NULL, ...) {
+  value_col <- col_name(substitute(value))
+  pivot_(data, formula = formula, value_col = value_col, ...)
+}
+
+#' pivot columns based on formula
+#' @param data Data frame to pivot
+#' @param formula lhs is composed of columns for rows and rhs is for cols
+#' For example, data1 + data2 ~ var1 + var2 makes a matrix of combinations of
+#' values in data1, data2 pair and var, var2 pair
+#' @param value_col Column name for value. If null, values are count
+#' @param fun.aggregate Function to aggregate duplicated columns
+#' @param fill Value to be filled for missing values
+#' @param na.rm If na should be removed from values
+#' @export
+pivot_ <- function(data, formula, value_col = NULL, fun.aggregate = mean, fill = 0, na.rm = TRUE) {
+  # create a column name for row names
+  # column names in lhs are collapsed by "_"
+  cname <- paste0(all.vars(lazyeval::f_lhs(formula)), collapse = "_")
+
+  casted <- if(is.null(value_col)) {
+    # make a count matrix if value_col is NULL
+    reshape2::acast(data, formula = formula, fun.aggregate = length, fill = fill)
+  } else {
+    if(na.rm){
+      # remove NA
+      data <- data[!is.na(data[[value_col]]),]
+    }
+    reshape2::acast(data, formula = formula, value.var = value_col, fun.aggregate = fun.aggregate, fill = fill)
+  }
+  casted %>%
+    as.data.frame %>%
+    tibble::rownames_to_column(var = cname)
 }
