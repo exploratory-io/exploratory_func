@@ -715,13 +715,15 @@ binary_label <- function(val) {
   } else {
     logi_val <- as.logical(val)
     # if the values are non-zero values,
-    # larger value should be regarrded as FALSE
+    # larger value should be regarded as TRUE
     if(all(logi_val[!is.na(logi_val)])){
+      # here, all values are numbers that can be regarded as TRUE (non-zero)
       unique_val <- unique(val[!is.na(val)])
       if(length(unique_val) == 2) {
+        # here, val has only 2 unique values
         logi_val <- val == max(unique_val)
       } else if (length(unique_val) > 2) {
-        stop("actual labels can't have more than 2 unique values")
+        stop("binary labels can't have more than 2 unique values")
       }
       # if it is one unique value, as.logical is respected
     }
