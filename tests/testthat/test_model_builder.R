@@ -158,7 +158,7 @@ test_that("test build_kmeans.cols ignore NA rows", {
   if(requireNamespace("broom")){
     result <- test_df %>%
       build_kmeans.cols(vec1, vec2, na, centers=2, keep.source=TRUE, augment = FALSE) %>%
-      predict(model, data=source.data)
+      augment_kmeans(model, data=source.data)
     expect_equal(dim(result)[[1]], 5)
   }
 })
@@ -172,7 +172,7 @@ test_that("test build_kmeans.cols ignore NA rows", {
   )
   result <- test_df %>%
     build_kmeans.cols(na_char, n_char, centers=2, keep.source=TRUE, augment = FALSE) %>%
-    predict(model, data=source.data)
+    augment_kmeans(model, data=source.data)
   expect_equal(dim(result)[[1]], 9)
 })
 
@@ -232,7 +232,7 @@ test_that("test build_kmeans.cols ignore NA rows with grouped and keep.source=FA
 
 test_that("test build_kmeans.cols", {
   df <- data.frame(number = seq(4), number2 = seq(4)-4)
-  ret <- (df %>%  build_kmeans.cols(number, number2, keep.source=TRUE, augment = FALSE) %>%  predict(model, data=source.data))
+  ret <- (df %>%  build_kmeans.cols(number, number2, keep.source=TRUE, augment = FALSE) %>%  augment_kmeans(model, data=source.data))
   expect_true(is.integer(ret$cluster))
 })
 
@@ -240,7 +240,7 @@ test_that("test build_kmeans", {
   test_df[["cluster"]] <- rep(1, nrow(test_df))
   result <- test_df %>%
     build_kmeans(skv = c("vec1", "vec2"), centers=2, augment = FALSE) %>%
-    predict(model, data = source.data)
+    augment_kmeans(model, data = source.data)
   expect_true(is.integer(result[["cluster.new"]]))
   expect_equal(length(colnames(result)[colnames(result) == "cluster"]), 1)
   expect_equal(length(colnames(result)[colnames(result) == "cluster.new"]), 1)
@@ -251,7 +251,7 @@ test_that("test build_kmeans skv with wrong column name", {
   expect_error({
     test_df %>%
       build_kmeans(skv = c("vec1", "vec"), centers=2) %>%
-      predict(model, data = source.data)
+      augment_kmeans(model, data = source.data)
   }, "undefined columns selected")
 })
 
@@ -260,6 +260,6 @@ test_that("test build_kmeans cols with wrong column name", {
   expect_error({
     test_df %>%
       build_kmeans(vec, vec10, centers=2) %>%
-      predict(model, data = source.data)
+      augment_kmeans(model, data = source.data)
   }, "undefined columns selected")
 })
