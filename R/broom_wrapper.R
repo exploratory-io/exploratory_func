@@ -927,8 +927,8 @@ do_survauc <- function(df, length_out = 100) {
       lp <- stats::predict(model)
       lpnew <- stats::predict(model, newdata=test_data)
 
-      Surv.rsp <- survival::Surv(training_data$time, training_data$status)
-      Surv.rsp.new <- survival::Surv(test_data$time, test_data$status)
+      Surv.rsp <- survival::Surv(training_data[[time_colname]], training_data[[status_colname]])
+      Surv.rsp.new <- survival::Surv(test_data[[time_colname]], test_data[[status_colname]])
       timecol = source_data[[time_colname]]
       times <- seq(0, max(timecol), length.out = length_out)
       AUC_CD <- survAUC::AUC.cd(Surv.rsp, Surv.rsp.new, lp, lpnew, times)
