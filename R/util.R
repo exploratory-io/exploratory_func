@@ -716,6 +716,8 @@ binary_label <- function(val) {
     logi_val <- as.logical(val)
     # if the values are non-zero values,
     # larger value should be regarded as TRUE
+    # this is especially for survival analysis,
+    # which can take 1(FALSE) and 2(TRUE) as binary labels
     if(all(logi_val[!is.na(logi_val)])){
       # here, all values are numbers that can be regarded as TRUE (non-zero)
       unique_val <- unique(val[!is.na(val)])
