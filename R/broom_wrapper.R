@@ -900,7 +900,12 @@ do_survfit <- function(df, time, status, ...){
 }
 
 #' @export
-do_survauc <- function(df) {
+do_survauc <- function(df, length_out = 100) {
+  # extract variables for time and status from model formula
+  surv_vars <- all.vars(lazyeval::f_lhs(df$model[[1]]$formula))
+  time_colname <- surv_vars[[1]]
+  status_colname <- surv_vars[[2]]
+
   # get group columns.
   # we assume that columns of model df other than the ones with reserved name are all group columns.
   model_df_colnames = colnames(df)
@@ -924,7 +929,8 @@ do_survauc <- function(df) {
 
       Surv.rsp <- survival::Surv(training_data$time, training_data$status)
       Surv.rsp.new <- survival::Surv(test_data$time, test_data$status)
-      times <- seq(0, 800, 10)
+      timecol = source_data[[time_colname]]
+      times <- seq(0, max(timecol), length.out = length_out)
       AUC_CD <- survAUC::AUC.cd(Surv.rsp, Surv.rsp.new, lp, lpnew, times)
       aucdf <- data.frame(time = AUC_CD$times, auc = AUC_CD$auc)
       aucdf
