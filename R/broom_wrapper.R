@@ -77,21 +77,6 @@ augment_kmeans <- function(df, model, data){
   ret
 }
 
-#' augment wrapper
-#' @export
-predict <- function(df, model, ...){
-  model_col <- col_name(substitute(model))
-  data_col <- col_name(substitute(data))
-  if(!model_col %in% colnames(df)){
-    stop(paste(model_col, "is not in column names"), sep=" ")
-  }
-  if(any(class(df[[model_col]]) %in% ".model.kmeans")){
-    augment_kmeans(df, model, ...)
-  } else {
-    broom::augment(df, model, ...)
-  }
-}
-
 #' apply data frame with model to a data frame
 #' @param df Data frame to predict
 #' @param model_df Data frame that has model
