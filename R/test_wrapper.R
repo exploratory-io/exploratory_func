@@ -46,7 +46,7 @@ do_t.test <- function(df, value, key=NULL, ...){
               estimate1 = "mean1",
               estimate2 = "mean2",
               statistic = "t.value",
-              parameter = "digrees_of_freedom",
+              parameter = "degrees_of_freedom",
               name
       )
     }, FUN.VALUE = ""))
