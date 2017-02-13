@@ -433,3 +433,23 @@ test_that("append_colnames", {
 
   expect_equal(colnames(ret), c("a.col1.b", "a.col2.b"))
 })
+
+test_that("test pivot", {
+  test_df <- data.frame(
+    group = c(rep(letters[1:2], each = 50),"a"),
+    cat1 = c(letters[round(runif(100)*5)+1], NA),
+    cat2 = c(letters[round(runif(100)*3)+1], "a"),
+    cat3 = c(letters[round(runif(100)*3)+1], "a"),
+    num3 = c(NA, seq(100))
+  )
+
+  pivoted <- pivot(test_df, cat1+cat3 ~ cat2)
+  expect_true("cat1_cat3" %in% colnames(pivoted))
+
+  pivoted_with_val <- pivot(test_df, cat1 ~ cat2 + cat3, value = num3, fun.aggregate=mean)
+  expect_true(all(!is.na(pivoted_with_val)))
+
+  pivoted_with_na <- pivot(test_df, cat1 ~ cat2 + cat3, value = num3, fun.aggregate=mean, na.rm = FALSE)
+  expect_true(any(is.na(pivoted_with_na)))
+
+})

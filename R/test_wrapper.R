@@ -102,3 +102,62 @@ do_var.test <- function(df, value, key, ...){
   df %>% dplyr::do_(.dots=setNames(list(~do_var.test_each(df = ., ...)), model_col)) %>% tidyr::unnest_(model_col)
 }
 
+#' Non standard evaluation version of do_chisq.test_
+#' @export
+do_chisq.test <- function(df, ...,
+                          fill = 0,
+                          fun.aggregate = mean,
+                          correct = TRUE,
+                          p = NULL,
+                          rescale.p = FALSE,
+                          simulate.p.value = FALSE,
+                          B = 2000){
+  select_dots <- lazyeval::lazy_dots(...)
+  cols <- evaluate_select(df, select_dots, excluded = grouped_by(df))
+  do_chisq.test_(df,
+                 selected_cols = cols,
+                 correct = correct,
+                 p = p,
+                 rescale.p = rescale.p,
+                 simulate.p.value = simulate.p.value,
+                 B = B)
+}
+
+#' chisq.test wrapper
+#' @export
+do_chisq.test_ <- function(df,
+                           selected_cols = c(),
+                           fill = 0,
+                           fun.aggregate = mean,
+                           correct = TRUE,
+                           p = NULL,
+                           rescale.p = FALSE,
+                           simulate.p.value = FALSE,
+                           B = 2000){
+
+  chisq.test_each <- function(df, ...) {
+    x <- df[, selected_cols] %>% as.matrix()
+    if (is.null(p)){
+      # default of p from chisq.test
+      p <- rep(1/length(x), length(x))
+    }
+    chisq.test(x = x,
+               correct = correct,
+               p = p,
+               rescale.p = rescale.p,
+               simulate.p.value = simulate.p.value,
+               B = B) %>%
+      broom::glance()
+  }
+
+  # Calculation is executed in each group.
+  # Storing the result in this tmp_col and
+  # unnesting the result.
+  # If the original data frame is grouped by "tmp",
+  # overwriting it should be avoided,
+  # so avoid_conflict is used here.
+  tmp_col <- avoid_conflict(colnames(df), "tmp")
+  df %>%
+    dplyr::do_(.dots = setNames(list(~chisq.test_each(.)), tmp_col)) %>%
+    tidyr::unnest_(tmp_col)
+}
