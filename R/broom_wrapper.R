@@ -500,8 +500,8 @@ prediction_coxph <- function(df, time = NULL, threshold = 1, ...){
   model_df_colnames = colnames(df)
   group_by_names <- model_df_colnames[!model_df_colnames %in% c("source.data", ".test_index", "model")]
 
-  # when pre-grouped, each row of glance result is actually a group.
-  # but when not pre-grouped, the only-one row is not a group.
+  # when pre-grouped, prediction() result is grouped.
+  # but when not pre-grouped, it is without grouping.
   # in that case, we need to group it by something to work with following operations with nest/mutate/map.
   if (length(group_by_names) == 0) {
     ret <- ret %>% dplyr::mutate(dummy_group_col = 1) %>% dplyr::group_by(dummy_group_col)
@@ -523,7 +523,6 @@ prediction_coxph <- function(df, time = NULL, threshold = 1, ...){
   # add predicted_probability, actual_status, and predicted_status
   ret <- df %>%
     dplyr::mutate(ret = purrr::map2(ret, model, function(ret, model) {
-      browser()
       bh <- survival::basehaz(model)
       bh_fun <- approxfun(bh$time, bh$hazard)
       cumhaz_base = bh_fun(time)
@@ -533,7 +532,7 @@ prediction_coxph <- function(df, time = NULL, threshold = 1, ...){
   ret <- ret %>% dplyr::select_(c("ret", group_by_names))
   ret <- ret %>% tidyr::unnest()
 
-  # set it back to non-group-by state that is same as glance() output.
+  # set it back to non-group-by state that is same as predict() output.
   if (length(group_by_names) == 0) {
     ret <- ret %>% dplyr::ungroup() %>% dplyr::select(-dummy_group_col)
   }
@@ -549,7 +548,13 @@ prediction_coxph <- function(df, time = NULL, threshold = 1, ...){
   }
 
   ret <- ret %>% dplyr::mutate(predicted_status = predicted_probability > threshold)
+  if (length(group_by_names) > 0) {
+    ret <- ret %>% ungroup() # next line does not work under group_by state, probably because of using dot. so ungroup it once.
+  }
   ret <- ret %>% dplyr::mutate(actual_status = if_else((.[[time_colname]] <= time & .[[status_colname]] == true_value), TRUE, if_else(.[[time_colname]] >= time, FALSE, NA)))
+  if (length(group_by_names) > 0) {
+    ret <- ret %>% dplyr::group_by_(group_by_names) # group it back again.
+  }
 
   if (is.numeric(true_value)) {
     ret$predicted_status <- as.numeric(ret$predicted_status)
