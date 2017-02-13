@@ -8,5 +8,6 @@ If not, please describe the reason.
 
 - [ ] Add test cases for this fix/enhancement
 - [ ] Pass devtools::check()
-- [ ] Pass devtools::test() 
-- [ ] Tested with Exploratory 
+- [ ] Pass devtools::test()
+- [ ] Test installing from github
+- [ ] Tested with Exploratory

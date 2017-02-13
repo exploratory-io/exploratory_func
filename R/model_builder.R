@@ -1,80 +1,20 @@
 #'
 #'
 
-#' Create do wrapper function with source data
-#' @return do wrapper function
-build_data <- function(funcname) {
-  ret <- function(df, ..., keep.source = TRUE, augment=FALSE){
-    loadNamespace("dplyr")
-    grouped_column <- grouped_by(df)
-    model_column <- avoid_conflict(grouped_column, "model")
-    source_column <- avoid_conflict(grouped_column, "source.data")
-    if (keep.source | augment) {
-      output <- df  %>%  dplyr::do_(.dots=setNames(list(~do.call(funcname, list(data = ., ...)), ~(.)), c(model_column, source_column)))
-      # Add a class for Exploratyry to recognize the type of .source.data
-      class(output[[source_column]]) <- c("list", ".source.data")
-    } else {
-      output <- df  %>%  dplyr::do_(.dots=setNames(list(~do.call(funcname, list(data = ., ...))), model_column))
-    }
-
-    if(augment){
-      # use do.call for non standard evaluation
-      augment_func <- get("predict", asNamespace("exploratory"))
-      output <- do.call(augment_func, list(output, model_column, data=source_column))
-    } else {
-      # Add a class for Exploratyry to recognize the type of .model
-      class(output[[model_column]]) <- c("list", ".model", paste0(".model.", funcname))
-      output
-    }
-    output
-  }
-  ret
-}
-
-#' lm wrapper with do
-#' @return deta frame which has lm model
-#' @export
-build_lm <- function(...){
-  tryCatch({
-    build_data("lm")(...)
-  }, error = function(e){
-    if(e$message == "contrasts can be applied only to factors with 2 or more levels"){
-      stop("more than 2 unique values are needed for categorical predictor columns")
-    }
-    if(e$message == "0 (non-NA) cases"){
-      stop("no data after removing NA")
-    }
-    stop(e$message)
-  })
-}
-
-#' glm wrapper with do
-#' @return deta frame which has glm model
-#' @export
-build_glm <- function(...){
-  tryCatch({
-    build_data("glm")(...)
-  }, error = function(e){
-    if(e$message == "contrasts can be applied only to factors with 2 or more levels"){
-      stop("more than 2 unique values are needed for categorical predictor columns")
-    }
-    stop(e$message)
-  })
-}
-
 #' integrated build_kmeans
 #' @export
-build_kmeans <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0){
+build_kmeans <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0, group_cols = c()){
+
   if (!is.null(skv)) {
     #.kv pattern
     if (!(length(skv) %in% c(2, 3))) {
       stop("length of skv has to be 2 or 3")
     }
     value <- if(length(skv) == 2) NULL else skv[[3]]
-    build_kmeans.kv_(df, skv[[1]], skv[[2]], value, fun.aggregate = fun.aggregate, fill = fill, ...)
+    build_kmeans.kv_(df, skv[[1]], skv[[2]], value, fun.aggregate = fun.aggregate, fill = fill, group_cols = group_cols, ...)
   } else {
     #.cols pattern
-    build_kmeans.cols(df, ...)
+    build_kmeans.cols(df, group_cols = group_cols, ...)
   }
 }
 
@@ -106,15 +46,22 @@ build_kmeans.kv_ <- function(df,
                              trace = FALSE,
                              keep.source = TRUE,
                              seed=0,
-                             augment=FALSE,
+                             augment=TRUE,
                              fun.aggregate=mean,
-                             fill=0){
+                             fill=0,
+                             group_cols = c()){
   loadNamespace("dplyr")
   loadNamespace("lazyeval")
   loadNamespace("tidyr")
   loadNamespace("broom")
 
   set.seed(seed)
+
+  if(!is.null(group_cols)){
+    df <- dplyr::group_by_(df, .dots = group_cols)
+  } else {
+    df <- dplyr::ungroup(df)
+  }
 
   row_col <- subject_col
   col_col <- key_col
@@ -131,6 +78,7 @@ build_kmeans.kv_ <- function(df,
 
   build_kmeans_each <- function(df){
     mat <- simple_cast(df, row_col, col_col, value_col, fun.aggregate = fun.aggregate, fill=fill)
+    rownames(mat) <- NULL # this prevents warning about discarding row names of the matrix
     kmeans_ret <- tryCatch({
       kmeans(mat, centers = centers, iter.max = 10, nstart = nstart, algorithm = algorithm, trace = trace)},
       error = function(e){
@@ -191,13 +139,21 @@ build_kmeans.cols <- function(df, ...,
                             trace = FALSE,
                             keep.source = TRUE,
                             seed=0,
-                            augment=FALSE){
+                            augment=TRUE,
+                            group_cols = c()){
   loadNamespace("dplyr")
   loadNamespace("lazyeval")
   loadNamespace("tidyr")
   loadNamespace("broom")
   set.seed(seed)
   select_dots <- lazyeval::lazy_dots(...)
+
+  if(!is.null(group_cols)){
+    df <- dplyr::group_by_(df, .dots = group_cols)
+  } else {
+    df <- dplyr::ungroup(df)
+  }
+
   grouped_column <- grouped_by(df)
   model_column <- avoid_conflict(grouped_column, "model")
   source_column <- avoid_conflict(grouped_column, "source.data")
@@ -213,11 +169,11 @@ build_kmeans.cols <- function(df, ...,
   }
 
   build_kmeans_each <- function(df){
-    mat <- as_numeric_matrix_(df, columns = selected_column)
     kmeans_ret <- tryCatch({
-      if(nrow(mat) == 0 | ncol(mat) == 0){
+      if(nrow(df) == 0 | ncol(df) == 0){
         stop("No data after removing NA")
       }
+      mat <- as_numeric_matrix_(df, columns = selected_column)
       kmeans(mat, centers = centers, iter.max = 10, nstart = nstart, algorithm = algorithm, trace = trace)
     }, error = function(e){
       if(e$message == "invalid first argument"){
@@ -270,3 +226,12 @@ build_kmeans.cols <- function(df, ...,
   }
   output
 }
+
+#' @export
+tidy <- tidytext::tidy
+
+#' @export
+glance <- tidytext::glance
+
+#' @export
+augment <- tidytext::augment

@@ -333,3 +333,123 @@ test_that("list_to_text should return NA", {
 
   expect_equal(ret[["text"]], c(rep(NA, 3), rep("b, b, b, b, b", 7)))
 })
+
+test_that("list_concat", {
+  list1 <- list(
+    NA,
+    NA,
+    character(0),
+    c(3, 5)
+  )
+
+  ret <- list_concat(list1, collapse = TRUE)
+  expect_equal(length(ret), 1)
+  expect_equal(ret[[1]], c(NA, NA, "3", "5"))
+})
+
+test_that("list_concat with multiple list", {
+  list1 <- list(
+    NA,
+    NA,
+    character(0),
+    c(3, 5)
+  )
+
+  list2 <- list(
+    NA,
+    c("a", "c"),
+    character(0),
+    c(6)
+  )
+
+  list3 <- list(
+    NA,
+    c(1, 3),
+    c("a", "c"),
+    c(6)
+  )
+
+  ret1 <- list_concat(list1, list2, list3, collapse = FALSE)
+  expect_equal(ret1[[1]], c(NA, NA, NA))
+  expect_equal(ret1[[2]], c(NA, "a", "c", "1", "3"))
+  expect_equal(ret1[[3]], c("a", "c"))
+  expect_equal(ret1[[4]], c(3, 5, 6, 6))
+
+  ret1_collapse <- list_concat(list1, list2, list3, collapse = TRUE)
+
+  expect_equal(length(ret1_collapse), 1)
+  expect_equal(ret1_collapse[[1]], c(NA, NA, NA, NA, "a", "c", "1", "3", "a", "c", "3", "5", "6", "6"))
+
+})
+
+test_that("test expand_args", {
+  func <- function(..., def = "defalut"){
+    caller <- match.call()
+    expand_args(caller, exclude = "def")
+  }
+
+  ret <- func(aaa = "aa\"a",
+              cc_list = list("c", "c"),
+              fml = ~as.formula("~c()"),
+              chars = c("chars", "chars2"),
+              "no args",
+              def = "not default")
+
+  expect_equal(ret, "aaa = \"aa\"a\", cc_list = list(\"c\", \"c\"), fml = ~as.formula(\"~c()\"), chars = c(\"chars\", \"chars2\"), \"no args\"")
+})
+
+test_that("move_col", {
+  test_data <- data.frame(
+    a = seq(3),
+    b = seq(3),
+    c = seq(3),
+    d = seq(3),
+    e = seq(3),
+    f = seq(3),
+    g = seq(3)
+  )
+
+  left_to_right <- move_col(test_data, "c", 6)
+  expect_equal(colnames(left_to_right), c("a", "b", "d", "e", "f", "c", "g"))
+
+  right_to_left <- move_col(test_data, "f", 2)
+  expect_equal(colnames(right_to_left), c("a", "f", "b", "c", "d", "e", "g"))
+
+})
+
+test_that("unixtime_to_datetime", {
+  data <- c(300, 900, NA)
+
+  unix_ret <- unixtime_to_datetime(data)
+  unix_ans <- as.POSIXct(data, origin="1970-01-01", tz = "GMT")
+  expect_equal(unix_ret, unix_ans)
+
+})
+
+test_that("append_colnames", {
+  test_df <- data.frame(col1 = seq(3), col2 = seq(3))
+
+  ret <- append_colnames(test_df, "a.", ".b")
+
+  expect_equal(colnames(ret), c("a.col1.b", "a.col2.b"))
+})
+
+test_that("test pivot", {
+  test_df <- data.frame(
+    group = c(rep(letters[1:2], each = 50),"a"),
+    cat1 = c(letters[round(runif(100)*5)+1], NA),
+    cat2 = c(letters[round(runif(100)*3)+1], "a"),
+    cat3 = c(letters[round(runif(100)*3)+1], "a"),
+    num3 = c(NA, seq(100))
+  )
+
+  pivoted <- pivot(test_df, cat1+cat3 ~ cat2)
+  expect_true("cat1_cat3" %in% colnames(pivoted))
+
+  pivoted_with_val <- pivot(test_df, cat1 ~ cat2 + cat3, value = num3, fun.aggregate=mean)
+  expect_true(all(!is.na(pivoted_with_val)))
+
+  pivoted_with_na <- pivot(test_df, cat1 ~ cat2 + cat3, value = num3, fun.aggregate=mean, na.rm = FALSE)
+  expect_true(any(is.na(pivoted_with_na)))
+
+})

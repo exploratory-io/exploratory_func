@@ -17,7 +17,7 @@ test_that("test build_lm with NA values", {
     )
   expect_error({
     build_lm(test_df, val ~ .)
-  }, "more than 2 unique values are needed for categorical predictor columns")
+  }, "more than 1 unique values are expected for categorical columns assigned as predictors")
 })
 
 test_that("test build_lm with all NA values", {
@@ -39,7 +39,7 @@ test_that("test build_glm with NA values", {
   )
   expect_error({
     build_glm(test_df, val ~ .)
-  }, "more than 2 unique values are needed for categorical predictor columns")
+  }, "more than 1 unique values are expected for categorical columns assigned as predictors")
 })
 
 # this returns "object 'fit' not found" but yet to understand what this means, so kept commented out
@@ -59,8 +59,12 @@ test_that("test with 2 groups with 3 centers", {
     val = as.vector(rep(c(1,5), 3)),
     group = paste("group",rep(c(1, 2), each = 3), sep = ""),
     col = rep(seq(3), 2))
+
+  # test subject column name with a space
+  colnames(test_df)[2] <- "gro up"
+
   expect_error({
-    build_kmeans(test_df, skv = c("group", "col", "val"), centers = 2)
+    build_kmeans(test_df, skv = c("gro up", "col", "val"), centers = 2)
   }, "Centers should be less than unique subjects\\.")
 })
 
@@ -98,26 +102,19 @@ test_that("test with too small key", {
 
 test_that("test build_glm and broom tidy", {
   if(requireNamespace("broom")){
-    result <- (
-      test_df
-      %>%
-        build_glm(vec1~vec2)
-      %>%
+    result <- test_df %>%
+        build_glm(vec1~vec2) %>%
         broom::tidy(model)
-    )
     expect_equal(dim(result)[[1]], 2)
   }
 })
 
 test_that("test build_glm and broom", {
   if(requireNamespace("broom")){
-    result <- (
-      test_df
-      %>%
-        build_glm(vec1~vec2, augment=TRUE)
-    )
+    result <- test_df %>%
+      build_glm(vec1~vec2, augment=TRUE)
     expect_equal(nrow(result), 10)
-    expect_equal(ncol(result), ncol(test_df)+7)
+    expect_equal(ncol(result), ncol(test_df)+10)
   }
 })
 
@@ -160,8 +157,8 @@ test_that("test build_kmeans all na", {
 test_that("test build_kmeans.cols ignore NA rows", {
   if(requireNamespace("broom")){
     result <- test_df %>%
-      build_kmeans.cols(vec1, vec2, na, centers=2, keep.source=TRUE) %>%
-      predict(model, data=source.data)
+      build_kmeans.cols(vec1, vec2, na, centers=2, keep.source=TRUE, augment = FALSE) %>%
+      augment_kmeans(model, data=source.data)
     expect_equal(dim(result)[[1]], 5)
   }
 })
@@ -174,8 +171,8 @@ test_that("test build_kmeans.cols ignore NA rows", {
     n_char = as.character(10 - seq(10)), stringsAsFactors = FALSE
   )
   result <- test_df %>%
-    build_kmeans.cols(na_char, n_char, centers=2, keep.source=TRUE) %>%
-    predict(model, data=source.data)
+    build_kmeans.cols(na_char, n_char, centers=2, keep.source=TRUE, augment = FALSE) %>%
+    augment_kmeans(model, data=source.data)
   expect_equal(dim(result)[[1]], 9)
 })
 
@@ -217,8 +214,7 @@ test_that("test build_kmeans.kv for grouped data frame as subject error", {
                      val = rep(0, 18))
   expect_error({
     ret <- data %>%
-      dplyr::group_by(group) %>%
-      build_kmeans.kv(group, col, val)
+      build_kmeans.kv(group, col, val, group_cols = "group")
   }, "group is a grouping column\\. ungroup\\(\\) may be necessary before this operation\\.")
 })
 
@@ -236,15 +232,15 @@ test_that("test build_kmeans.cols ignore NA rows with grouped and keep.source=FA
 
 test_that("test build_kmeans.cols", {
   df <- data.frame(number = seq(4), number2 = seq(4)-4)
-  ret <- (df %>%  build_kmeans.cols(number, number2, keep.source=TRUE) %>%  predict(model, data=source.data))
+  ret <- (df %>%  build_kmeans.cols(number, number2, keep.source=TRUE, augment = FALSE) %>%  augment_kmeans(model, data=source.data))
   expect_true(is.integer(ret$cluster))
 })
 
 test_that("test build_kmeans", {
   test_df[["cluster"]] <- rep(1, nrow(test_df))
   result <- test_df %>%
-    build_kmeans(skv = c("vec1", "vec2"), centers=2) %>%
-    predict(model, data = source.data)
+    build_kmeans(skv = c("vec1", "vec2"), centers=2, augment = FALSE) %>%
+    augment_kmeans(model, data = source.data)
   expect_true(is.integer(result[["cluster.new"]]))
   expect_equal(length(colnames(result)[colnames(result) == "cluster"]), 1)
   expect_equal(length(colnames(result)[colnames(result) == "cluster.new"]), 1)
@@ -255,7 +251,7 @@ test_that("test build_kmeans skv with wrong column name", {
   expect_error({
     test_df %>%
       build_kmeans(skv = c("vec1", "vec"), centers=2) %>%
-      predict(model, data = source.data)
+      augment_kmeans(model, data = source.data)
   }, "undefined columns selected")
 })
 
@@ -264,6 +260,6 @@ test_that("test build_kmeans cols with wrong column name", {
   expect_error({
     test_df %>%
       build_kmeans(vec, vec10, centers=2) %>%
-      predict(model, data = source.data)
+      augment_kmeans(model, data = source.data)
   }, "undefined columns selected")
 })

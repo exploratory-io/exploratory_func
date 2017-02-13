@@ -1,6 +1,15 @@
 #'
 #'
 
+#' scale wrapper that returns a vector as a result
+#' @export
+normalize <- function(...) {
+  # scale returns a matrix even if the input is a vector
+  # it should be converted to a numeric vector by as.numeric
+  ret <- scale(...)
+  as.numeric(ret)
+}
+
 #' integrated do_cor
 #' @export
 do_cor <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0){
@@ -88,8 +97,16 @@ do_cor.kv_ <- function(df,
       ret <- mat_to_df(cor_mat, cnames=output_cols, diag=diag)
     }
   }
-
-  (df %>%  dplyr::do_(.dots=setNames(list(~do_cor_each(.)), output_cols[[1]])) %>%  tidyr::unnest_(output_cols[[1]]))
+  # Calculation is executed in each group.
+  # Storing the result in this tmp_col and
+  # unnesting the result.
+  # If the original data frame is grouped by "tmp",
+  # overwriting it should be avoided,
+  # so avoid_conflict is used here.
+  tmp_col <- avoid_conflict(grouped_col, "tmp")
+  df %>%
+    dplyr::do_(.dots=setNames(list(~do_cor_each(.)), tmp_col)) %>%
+    tidyr::unnest_(tmp_col)
 }
 
 #'
@@ -233,23 +250,35 @@ do_svd.kv <- function(df,
   (df %>%  dplyr::do_(.dots=setNames(list(~do_svd_each(.)), value_cname)) %>%  tidyr::unnest_(value_cname))
 }
 
-
-#' Calculate svd from tidy format. This can be used to calculate coordinations by reducing dimensionality.
-#' @param df Data frame which has group and dimension
+#' Non standard evaluation version for do_cmdscale_
 #' @return Tidy format of data frame.
 #' @export
 do_cmdscale <- function(df,
-                        pair_name1,
-                        pair_name2,
-                        value,
-                        k=2,
-                        fun.aggregate=mean,
-                        fill=0){
+                         pair_name1,
+                         pair_name2,
+                         value,
+                         ...){
   loadNamespace("dplyr")
   loadNamespace("tidyr")
   pair1_col <- col_name(substitute(pair_name1))
   pair2_col <- col_name(substitute(pair_name2))
   value_col <- col_name(substitute(value))
+  do_cmdscale_(df, pair1_col, pair2_col, value_col, ...)
+}
+
+#' Map dist result to k dimensions
+#' @param df Data frame which has group and dimension
+#' @return Tidy format of data frame.
+#' @export
+do_cmdscale_ <- function(df,
+                         pair1_col,
+                         pair2_col,
+                         value_col,
+                         k=2,
+                         fun.aggregate=mean,
+                         fill=0){
+  loadNamespace("dplyr")
+  loadNamespace("tidyr")
   grouped_col <- grouped_by(df)
 
   name_col <- avoid_conflict(grouped_col, "name")
@@ -278,5 +307,13 @@ do_cmdscale <- function(df,
     ret
   }
 
-  (df %>%  dplyr::do_(.dots=setNames(list(~do_cmdscale_each(.)), pair1_col)) %>%  tidyr::unnest_(pair1_col))
+  # Calculation is executed in each group.
+  # Storing the result in this name_col and
+  # unnesting the result.
+  # name_col is not conflicting with grouping columns
+  # thanks to avoid_conflict that is used before,
+  # this doesn't overwrite grouping columns.
+  df %>%
+    dplyr::do_(.dots=setNames(list(~do_cmdscale_each(.)), name_col)) %>%
+    tidyr::unnest_(name_col)
 }

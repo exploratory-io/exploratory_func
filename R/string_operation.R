@@ -1,10 +1,33 @@
 #' Check if the token is in stopwords.
 #' @param token Character to be checked if it's stopword.
-#' @param lexicon Type of stopwords. One of "snowball", "onix" and "SMART".
-#' @return Logical vector if the token is in stopwords or not.
+#' @param lang Type of stopwords.
+#' One of
+#' "danish",
+#' "dutch",
+#' "english",
+#' "english_snowball",
+#' "english_smart",
+#' "english_onix",
+#' "finnish",
+#' "french",
+#' "german",
+#' "hungarian",
+#' "italian",
+#' "japanese",
+#' "norwegian",
+#' "portuguese",
+#' "russian",
+#' "spanish",
+#' "swedish",
+#' "smart",
+#' "snowball",
+#' "onix"
+#' @param include Values that should be included as stopwords
+#' @param exclude Values that should be excluded from stopwords
+#' @return Logical vector if the token is in stop words or not.
 #' @export
-is_stopword <- function(token, lexicon="snowball"){
-  token %in% get_stopwords(lexicon)
+is_stopword <- function(token, lang = "english", include = c(), exclude = c()){
+  token %in% get_stopwords(lang, include = include, exclude = exclude)
 }
 
 #' Check if the word is digits.
@@ -19,21 +42,51 @@ is_digit <- function(word){
 #' @param word Character to be checked if it's digits.
 #' @return Logical vector if the word is digits or not.
 #' @export
-is_alphabet <- function(word, lexicon="snowball"){
+is_alphabet <- function(word){
   loadNamespace("stringr")
   stringr::str_detect(word, "^[[:alpha:]]+$")
 }
 
 #' Get vector of stopwords
-#' @param lexicon Type of stopwords. One of "snowball", "onix" and "SMART".
-#' @return vector of stop word.
+#' @param lang Type of stopwords.
+#' One of
+#' "danish",
+#' "dutch",
+#' "english",
+#' "english_snowball",
+#' "english_smart",
+#' "english_onix",
+#' "finnish",
+#' "french",
+#' "german",
+#' "hungarian",
+#' "italian",
+#' "japanese",
+#' "norwegian",
+#' "portuguese",
+#' "russian",
+#' "spanish",
+#' "swedish"
+#' @param include Values that should be included as stop words
+#' @param exclude Values that should be excluded from stop words
+#' @return vector of stop words.
 #' @export
-get_stopwords <- function(lexicon="snowball"){
-  loadNamespace("tidytext")
-  data("stop_words", package = "tidytext", envir = environment())
-  type_check <- stop_words$lexicon %in% lexicon
-  words <- stop_words$word[type_check]
-  unique(words)
+get_stopwords <- function(lang = "english", include = c(), exclude = c()){
+  lang <- tolower(lang)
+  stopwords <- if (lang %in% c(
+    "english_snowball",
+    "english_onix",
+    "english_smart",
+    "japanese")){
+    # these data are created from data-raw/create_internal_data.R
+    get(paste0("stopwords_", lang))
+  } else {
+    loadNamespace("tm")
+    tm::stopwords(kind = lang)
+  }
+
+  ret <- c(stopwords[!stopwords %in% exclude], include)
+  ret
 }
 
 #' Get sentiments of words
@@ -44,37 +97,29 @@ get_stopwords <- function(lexicon="snowball"){
 word_to_sentiment <- function(words, lexicon="bing"){
   loadNamespace("tidytext")
   loadNamespace("dplyr")
-  data("sentiments", package = "tidytext", envir = environment())
-  # chosen lexicon and sentiment in words
-  check <- sentiments$lexicon == lexicon
-  if(lexicon == "nrc"){
-    sentiments <- (
-      sentiments[check,]
-      %>%  dplyr::group_by(word)
-      %>%  dplyr::summarize(sentiment=list(sentiment))
-      )
-  } else {
-    sentiments <- sentiments[check,]
-  }
-  joined_df <- dplyr::left_join(data.frame(word=words, stringsAsFactors = FALSE), sentiments, by="word")
-  if(lexicon=="AFINN"){
-    joined_df$score
-  } else {
-    joined_df$sentiment
-  }
+  # get data saved internally in this package by chosen lexicon
+  sentiment <- get(paste0("sentiment_", lexicon))
+  # sentiment is named vector (for "bing" and "AFINN")
+  # or named list (for "nrc" because it can have many sentiment types for one word)
+  # this is faster than using left join
+  ret <- sentiment[words]
+  # remove the name
+  names(ret) <- NULL
+  ret
 }
 
 #' Tokenize text and unnest
 #' @param df Data frame
 #' @param input Set a column of which you want to split the text or tokenize.
-#' @param output Set a column name for the new column to store the tokenized values.
 #' @param token Select the unit of token from "characters", "words", "sentences", "lines", "paragraphs", and "regex".
+#' @param keep_cols Whether existing columns should be kept or not
 #' @param drop Whether input column should be removed.
-#' @param to_lower Whether output should be lower cased.
 #' @param with_id Whether output should contain original document id and sentence id in each document.
+#' @param output Set a column name for the new column to store the tokenized values.
+#' @param to_lower Whether output should be lower cased.
 #' @return Data frame with tokenized column
 #' @export
-do_tokenize <- function(df, input, output=token, token="words", drop=TRUE, with_id=TRUE, ...){
+do_tokenize <- function(df, input, token = "words", keep_cols = FALSE,  drop = TRUE, with_id = TRUE, output = token, ...){
   loadNamespace("tidytext")
   loadNamespace("stringr")
 
@@ -82,6 +127,11 @@ do_tokenize <- function(df, input, output=token, token="words", drop=TRUE, with_
   output_col <- avoid_conflict(colnames(df), col_name(substitute(output)))
   # This is to prevent encoding error
   df[[input_col]] <- stringr::str_conv(df[[input_col]], "utf-8")
+
+  if(!keep_cols){
+    # keep only a column to tokenize
+    df <- df[input_col]
+  }
   if(token=="words" && with_id){
     loadNamespace("dplyr")
 
@@ -246,13 +296,13 @@ do_ngram <- function(df, token, sentence, document, maxn=2, sep="_"){
   document_col <- col_name(substitute(document))
 
   # this is executed for ngrams not to be connected over sentences
-  grouped <- (df %>%
-            dplyr::group_by_(.dots=list(as.symbol(document_col), as.symbol(sentence_col)))) # convert the column name to symbol for colum names with backticks
+  grouped <- df %>%
+    dplyr::group_by_(.dots=list(as.symbol(document_col), as.symbol(sentence_col))) # convert the column name to symbol for colum names with backticks
   prev_cname <- token_col
-  # create gram2, gram3, gram4, ... columns in this iteration
+  # create ngram columns in this iteration
   for(n in seq(maxn)[-1]){
-    # create a column name that doesn't conflict with the existing column names
-    cname <- avoid_conflict(colnames(df), stringr::str_c("gram", n, sep=""))
+    # column name is gram number
+    cname <- n
 
     # Use following non-standard evaluation formulas to use token_col, prev_cname and cname variables
 
@@ -272,7 +322,16 @@ do_ngram <- function(df, token, sentence, document, maxn=2, sep="_"){
     # preserve the cname to be used in next iteration
     prev_cname <- cname
   }
-  dplyr::ungroup(grouped)
+  ret <- dplyr::ungroup(grouped)
+
+  # this change original token column name to be 1 (mono-gram)
+  colnames(ret)[colnames(ret) == token_col] <- 1
+  kv_cnames <- avoid_conflict(c(document_col, sentence_col), c("gram", "token"))
+  # gather columns that have token (1 and newly created columns)
+  ret <- tidyr::gather_(ret, kv_cnames[[1]], kv_cnames[[2]], c("1", colnames(ret)[(ncol(ret) - maxn + 2):ncol(ret)]), na.rm = TRUE, convert = TRUE)
+  # sort the result
+  ret <- dplyr::arrange_(ret, .dots = c(document_col, sentence_col, kv_cnames[[1]]))
+  ret
 }
 
 #' Calculate sentiment
@@ -281,6 +340,3 @@ get_sentiment <- function(text){
   loadNamespace("sentimentr")
   sentimentr::sentiment_by(text)$ave_sentiment
 }
-
-#' @export
-pair_count <- tidytext::pair_count

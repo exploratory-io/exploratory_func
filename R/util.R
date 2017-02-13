@@ -1,4 +1,5 @@
 #' Column name parser
+#' @export
 col_name <- function(x, default = stop("Please supply column name", call. = FALSE)){
   if (is.character(x))
     return(x)
@@ -12,6 +13,7 @@ col_name <- function(x, default = stop("Please supply column name", call. = FALS
 }
 
 #' Simple cast wrapper that spreads columns which is choosed as row and col into matrix
+#' @export
 simple_cast <- function(data, row, col, val = NULL, fun.aggregate=mean, fill=0){
   loadNamespace("reshape2")
   loadNamespace("tidyr")
@@ -60,6 +62,7 @@ simple_cast <- function(data, row, col, val = NULL, fun.aggregate=mean, fill=0){
 
 #' Cast data to sparse matrix by choosing row and column from a data frame
 #' @param count If val is NULL and count is TRUE, the value becomes count of the row and col set. Otherwise, it's binary data of row and col set.
+#' @export
 sparse_cast <- function(data, row, col, val=NULL, fun.aggregate=sum, count = FALSE){
   loadNamespace("dplyr")
   loadNamespace("tidyr")
@@ -128,6 +131,7 @@ sparse_cast <- function(data, row, col, val=NULL, fun.aggregate=sum, count = FAL
 }
 
 #' as.matrix from select argument or cast by three columns
+#' @export
 to_matrix <- function(df, select_dots, by_col=NULL, key_col=NULL, value_col=NULL, fill=0, fun.aggregate=mean){
   should_cast <- !(is.null(by_col) & is.null(key_col) & is.null(value_col))
   if(should_cast){
@@ -142,6 +146,7 @@ to_matrix <- function(df, select_dots, by_col=NULL, key_col=NULL, value_col=NULL
 }
 
 #' Gather only right upper half of matrix - where row_num > col_num
+#' @export
 upper_gather <- function(mat, names=NULL, diag=NULL, cnames = c("Var1", "Var2", "value")){
   loadNamespace("Matrix")
   if(is.vector(mat)){
@@ -213,21 +218,24 @@ group_exclude <- function(df, ...){
 }
 
 #' prevent conflict of 2 character vectors and avoid it by adding .new to elements in the second
-avoid_conflict <- function(origin, new){
+#' @export
+avoid_conflict <- function(origin, new, suffix = ".new"){
   conflict <- new %in% origin
   while(any(conflict)){
-    new[conflict] <- paste(new[conflict], ".new", sep="")
+    new[conflict] <- paste(new[conflict], suffix, sep="")
     conflict <- new %in% origin
   }
   new
 }
 
 #' check grouped column
+#' @export
 grouped_by <- function(df){
   as.character(attr(df, "vars"))
 }
 
 #' matrix to dataframe with gathered form
+#' @export
 mat_to_df <- function(mat, cnames=NULL, na.rm=TRUE, diag=TRUE){
   loadNamespace("reshape2")
   df <- reshape2::melt(t(mat), na.rm=na.rm)
@@ -346,8 +354,27 @@ list_to_text <- function(column, sep = ", "){
 
 #' concatinate vectors in a list
 #' @export
-list_concat <- function(list){
-  list(unlist(list))
+list_concat <- function(..., collapse = FALSE){
+  lists <- list(...)
+
+  # size of each list
+  lengths <- lapply(lists, function(arg){
+    length(arg)
+  })
+
+  max_index <- which.max(lengths)
+
+  ret <- lapply(seq(lengths[[max_index]]), function(index){
+    val <- unlist(lapply(lists, function(arg){
+      arg[[index]]
+    }))
+  })
+
+  if(collapse){
+    ret <- list(unlist(ret))
+  }
+
+  ret
 }
 
 #' replace sequence of spaces or periods with
@@ -383,15 +410,22 @@ str_count_all <- function(text, patterns, remove.zero = TRUE){
 #' @param colnames Vector of column names or lazy dot for select arg. ex:lazyeval::lazy_dots(...)
 as_numeric_matrix_ <- function(df, columns){
   loadNamespace("dplyr")
-  df[,columns] %>%
-    as.matrix() %>%
+
+  orig_mat <- df[,columns] %>%
+    as.matrix()
+
+  ret <- orig_mat %>%
     as.numeric() %>%
     matrix(nrow = nrow(df))
+  # set colnames because re-constructing matrix by as.numeric eraces column names
+  colnames(ret) <- colnames(orig_mat)
+  ret
 }
 
 #' evaluate select argument
 #' @param dots Lazy dot for select arg. ex:lazyeval::lazy_dots(...)
 #' @param excluded Excluded column names
+#' @export
 evaluate_select <- function(df, .dots, excluded = NULL){
   loadNamespace("dplyr")
   tryCatch({
@@ -407,4 +441,267 @@ evaluate_select <- function(df, .dots, excluded = NULL){
     }
     stop(e$message)
   })
+}
+
+#' re-build arguments of a function as string
+#' @param call This expects returned value from match.call()
+#' @param exclude Argument names that should be excluded for expansion
+#' @export
+expand_args <- function(call, exclude = c()){
+  excluded <- call[!names(call) %in% exclude]
+  args <- excluded[-1]
+  if (is.null(args)) {
+    ""
+  } else {
+    names(args) <- names(excluded[-1])
+    arg_char <- paste(vapply(seq(length(args)) , function(index){
+      arg_name <- names(args)[[index]]
+      arg_value <- if(is.character(args[[index]])) paste0('"', as.character(args[index]), '"') else as.character(args[index])
+      if(is.null(arg_name)) {
+        arg_value
+      } else if(arg_name == ""){
+        # this have to be separated from is.null because is.null(arg_name) | arg_name == "" returns logical(0)
+        arg_value
+      } else {
+        paste0(arg_name, " = ", arg_value , "")
+      }
+    }, FUN.VALUE = ""), collapse = ", ")
+  }
+}
+
+#' get sampled indice from data frame
+#' @export
+sample_df_index <- function(df, rate, seed = NULL){
+  if(!is.null(seed)){
+    set.seed(seed)
+  }
+  sample(seq(nrow(df)), nrow(df) * rate)
+}
+
+#' slice that can handle empty vector
+#' @export
+safe_slice <- function(df, index, remove = FALSE){
+  if(remove){
+    if(is.null(index)){
+      df
+    } else if(length(index) == 0){
+      df
+    } else {
+      df[-index, ]
+    }
+  } else {
+    if(is.null(index)){
+      df[c(), ]
+    } else if(length(index) == 0){
+      df[c(), ]
+    } else {
+      df[index, ]
+    }
+  }
+}
+
+#' Add fitted response value to augment result in prediction functions
+#' @param data Data frame to augment (expected to have ".fitted" column augmented by broom::augment)
+#' @param model model that has $family$linkinv attribute (normally glm model)
+#' @param response_label column to be augmented as fitted response values
+add_response <- function(data, model, response_label = "predicted_response"){
+  # fitted values are converted to response values through inverse link function
+  # for example, inverse of logit function is used for logistic regression
+  data[[response_label]] <- if (nrow(data) == 0) {
+    numeric(0)
+  } else {
+    model$family$linkinv(data[[".fitted"]])
+  }
+  data
+}
+
+#' move a column to a different index
+#' @param df Data frame whose column will be moved
+#' @param cname Column name to be moved
+#' @param position Column index to move to
+#' @export
+move_col <- function(df, cname, position){
+  # get column index to move
+  cname_posi = which(colnames(df) == cname)
+  if(length(cname_posi) == 0){
+    stop("no column matches cname")
+  }else if (length(cname_posi) > 1){
+    stop("duplicated cname is indicated")
+  }
+
+  if(cname_posi == position){
+    # no change in this case
+    ret <- df
+  } else {
+    # create a new index for columns
+    # for example, suppose 8th column goes to 3rd column in 10 columns
+    # 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
+    # should be
+    # 1, 2, 8, 3, 4, 5, 6, 7, 9, 10
+    # in this case,
+    # 1, 2 are regarded as start below
+    # 8, 3, 4, 5, 6, 7 are regarded as inside below
+    # 9, 10 are regarded as end below
+
+    vec = seq(ncol(df))
+    n <- cname_posi
+    m <- position
+
+    start <- if(n == 1 | m == 1){
+      # start should be empty in this case
+      c()
+    } else {
+      seq(min(c(n, m)) - 1)
+    }
+
+    inside <- if (n>m) {
+      # n comes to left in this case
+      c(n, m:(n-1))
+    } else {
+      # n comes to right in this case
+      c((n+1):m, n)
+    }
+
+    end <- if( n == length(vec) | m == length(vec)){
+      # end should be empty in this case
+      c()
+    } else {
+      (max(c(n, m))+1):length(vec)
+    }
+
+    order <- c(start, inside, end)
+
+    ret <- df[, order]
+  }
+
+  ret
+}
+
+#' Unix time numeric values to POSIXct
+#' @param data Numeric vector to convert to date
+#' @export
+unixtime_to_datetime <- function(data){
+  # referred from http://stackoverflow.com/questions/27408131/convert-unix-timestamp-into-datetime-in-r
+  as.POSIXct(data, origin="1970-01-01", tz='GMT')
+}
+
+# get binary prediction scores
+get_score <- function(act_label, pred_label) {
+  tp <- pred_label & act_label
+  fp <- pred_label & !act_label
+  tn <- !pred_label & !act_label
+  fn <- !pred_label & act_label
+
+  true_positive <- sum(tp, na.rm = TRUE)
+  false_positive <- sum(fp, na.rm = TRUE)
+  true_negative <- sum(tn, na.rm = TRUE)
+  false_negative <- sum(fn, na.rm = TRUE)
+
+  test_size <- true_positive + false_positive + true_negative + false_negative
+
+  precision <- true_positive / sum(pred_label, na.rm = TRUE)
+  recall <- true_positive / sum(act_label, na.rm = TRUE)
+  specificity <- true_negative / sum(!act_label, na.rm = TRUE)
+  accuracy <- (true_positive + true_negative) / test_size
+  missclassification_rate <- 1 - accuracy
+  f_score <- 2 * (precision * recall) / (precision + recall)
+
+  data.frame(
+    f_score,
+    accuracy,
+    missclassification_rate,
+    precision,
+    recall,
+    specificity,
+    true_positive,
+    false_positive,
+    true_negative,
+    false_negative,
+    test_size
+  )
+}
+
+# get optimized binary prediction scores
+get_optimized_score <- function(actual_val, pred_prob, threshold = "f_score"){
+  # threshold can be optimized to the result below
+  accept_optimize <- c(
+    "f_score",
+    "accuracy",
+    "precision",
+    "recall",
+    "specificity"
+  )
+
+  # try 100 threshold to search max
+  max_values <- NULL
+  max_value <- -1
+  for (thres in ((seq(101) - 1) / 100)){
+
+    pred_label <- pred_prob >= thres
+
+    score <- get_score(actual_val, pred_label)
+
+    if (!threshold %in% accept_optimize) {
+      stop(paste0("threshold must be chosen from ", paste(accept_optimize, collapse = ", ")))
+    } else if (is.nan(score[[threshold]])) {
+      # if nan, pass to avoid error
+    } else if (max_value < score[[threshold]]){
+      max_values <- score
+      max_values[["threshold"]] <- thres
+      max_value <- score[[threshold]]
+    }
+  }
+  max_values
+}
+
+#' Put prefix and suffix to column names
+append_colnames <- function(df, prefix = "", suffix = ""){
+  colnames(df) <- avoid_conflict(colnames(df), stringr::str_c(prefix, colnames(df), suffix, sep = ""))
+  df
+}
+
+#' get confidence interval value
+#' @param val Predicted value
+#' @param conf_int Confidence interval to get
+#' @export
+get_confint <- function(val, se, conf_int = 0.95) {
+  critval=qnorm(conf_int,0,1)
+  val + critval * se
+}
+
+#' NSE version of pivot_
+#' @export
+pivot <- function(data, formula, value = NULL, ...) {
+  value_col <- col_name(substitute(value))
+  pivot_(data, formula = formula, value_col = value_col, ...)
+}
+
+#' pivot columns based on formula
+#' @param data Data frame to pivot
+#' @param formula lhs is composed of columns for rows and rhs is for cols
+#' For example, data1 + data2 ~ var1 + var2 makes a matrix of combinations of
+#' values in data1, data2 pair and var, var2 pair
+#' @param value_col Column name for value. If null, values are count
+#' @param fun.aggregate Function to aggregate duplicated columns
+#' @param fill Value to be filled for missing values
+#' @param na.rm If na should be removed from values
+#' @export
+pivot_ <- function(data, formula, value_col = NULL, fun.aggregate = mean, fill = 0, na.rm = TRUE) {
+  # create a column name for row names
+  # column names in lhs are collapsed by "_"
+  cname <- paste0(all.vars(lazyeval::f_lhs(formula)), collapse = "_")
+
+  casted <- if(is.null(value_col)) {
+    # make a count matrix if value_col is NULL
+    reshape2::acast(data, formula = formula, fun.aggregate = length, fill = fill)
+  } else {
+    if(na.rm){
+      # remove NA
+      data <- data[!is.na(data[[value_col]]),]
+    }
+    reshape2::acast(data, formula = formula, value.var = value_col, fun.aggregate = fun.aggregate, fill = fill)
+  }
+  casted %>%
+    as.data.frame %>%
+    tibble::rownames_to_column(var = cname)
 }

@@ -4,8 +4,35 @@ test_df <- data.frame(char = c("Hello world!", "This is a data frame for test. T
 
 test_that("is_stopword", {
   test_vec <- c("the", "yourself", "Test", "test")
-  result <- is_stopword(test_vec)
-  expect_equal(result, c(T, T, F, F))
+  result <- is_stopword(test_vec, exclude = "the", include = "Test")
+  expect_equal(result, c(FALSE, TRUE, TRUE, FALSE))
+})
+
+test_that("check languages", {
+  languages <- c(
+    "danish",
+    "dutch",
+    "english",
+    "finnish",
+    "french",
+    "german",
+    "hungarian",
+    "italian",
+    "norwegian",
+    "portuguese",
+    "russian",
+    "spanish",
+    "swedish",
+    "japanese",
+    "english_SMART",
+    "english_snowball",
+    "english_onix"
+  )
+
+  for (lang in languages){
+    # this should succeeds without error
+    get_stopwords(lang = lang)
+  }
 })
 
 test_that("is_digit", {
@@ -35,16 +62,53 @@ test_that("test word_to_sentiment", {
   expect_equal(result, -3)
 })
 
-test_that("do_tokenize with drop=F", {
+test_that("test word_to_sentiment to groupd_df", {
+  # this is added because this function was once very slow for grouped data
+  # see https://github.com/exploratory-io/exploratory_func/pull/106 for details
+  df <- data.frame(
+    text = c("good", "sad", letters[1:(10000 * 3 - 2)]),
+    group = rep(seq(10000), 3),
+    stringsAsFactors = FALSE
+  )
+
+  ret <- df %>%
+    dplyr::group_by(group) %>%
+    dplyr::mutate(sent = word_to_sentiment(text))
+  expect_true(is.character(ret[["sent"]]))
+})
+
+test_that("do_tokenize with drop=FALSE", {
   result <- test_df %>%
     do_tokenize(char, drop=F)
   expect_equal(result$token[[1]], "hello")
   expect_equal(ncol(result), 4)
 })
 
+test_that("do_tokenize with keep_cols = TRUE", {
+  test_df <- data.frame(
+    char = c("Hello world!", "This is a data frame for test. This is second sentence."),
+    extra_col = seq(2),
+    stringsAsFactors = FALSE)
+  result <- test_df %>%
+    do_tokenize(char, keep_cols = TRUE, drop = TRUE)
+  expect_equal(result$token[[1]], "hello")
+  expect_equal(ncol(result), 4)
+})
+
+test_that("do_tokenize with keep_cols = TRUE with sentences", {
+  test_df <- data.frame(
+    char = c("Hello world!", "This is a data frame for test. This is second sentence."),
+    extra_col = seq(2),
+    stringsAsFactors = FALSE)
+  result <- test_df %>%
+    do_tokenize(char, drop=FALSE, token = "sentences", keep_cols = TRUE)
+  expect_equal(result$token[[1]], "hello world!")
+  expect_equal(ncol(result), 3)
+})
+
 test_that("do_tokenize with token=words", {
   result <- test_df %>%
-    do_tokenize(char, token="words")
+    do_tokenize(char, token="words", keep_cols = TRUE)
   expect_equal(result$token[[1]], "hello")
   expect_equal(ncol(result), 3)
 })
@@ -53,7 +117,7 @@ test_that("do_tokenize when names conflict", {
   df <- test_df
   df$document_id <- seq(nrow(df))
   result <- df %>%
-    do_tokenize(char, token="words")
+    do_tokenize(char, token="words", keep_cols = TRUE)
   expect_equal(result$token[[1]], "hello")
   expect_equal(ncol(result), 4)
   expect_equal(colnames(result)[[2]],"document_id.new")
@@ -188,12 +252,14 @@ test_that("do_ngram", {
   loadNamespace("dplyr")
   df <- data.frame(
     doc=paste("doc", rep(c(1,2), each=10)) ,
-    sentence=rep(seq(5), each=4),
     token=paste("token",rep(c(1,2),10), sep=""),
+    sentence=rep(seq(5), each=4),
     stringsAsFactors = F)
 
   ret <- df %>%  do_ngram(token, sentence, doc, maxn = 3)
-  expect_equal(ncol(ret), ncol(df)+2)
+  expect_equal(colnames(ret), c("doc", "sentence", "gram", "token"))
+  expect_true(any(ret[["gram"]] == 1))
+  expect_true(is.integer(ret[["gram"]]))
 })
 
 test_that("sentimentr", {

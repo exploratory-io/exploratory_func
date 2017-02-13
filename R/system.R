@@ -170,6 +170,19 @@ getGoogleAnalytics <- function(tableId, lastNDays, dimensions, metrics, tokenFil
 
   ga.query <- RGoogleAnalytics::QueryBuilder(query.list)
   ga.data <- RGoogleAnalytics::GetReportData(ga.query, token, paginate_query = paginate_query)
+
+  if("date" %in% colnames(ga.data)){
+    # modify date column to Date object from integer like 20140101
+    loadNamespace("lubridate")
+    ga.data <- ga.data %>% mutate( date = lubridate::ymd(date) )
+  }
+
+  if("dateHour" %in% colnames(ga.data)){
+    # modify date column to POSIXct object from integer like 2014010101
+    loadNamespace("lubridate")
+    ga.data <- ga.data %>% mutate( dateHour = lubridate::ymd_h(dateHour) )
+  }
+
   ga.data
 }
 
@@ -229,15 +242,10 @@ getGoogleSheetList <- function(tokenFileId){
   googlesheets::gs_ls()
 }
 
-#' @export
-queryMongoDB <- function(host, port, database, collection, username, password, query = "{}", isFlatten, limit=100000, isSSL=FALSE){
-  if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
-  loadNamespace("stringr")
-  loadNamespace("jsonlite")
-  if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
 
-  # read stored password
-  pass = saveOrReadPassword("mongodb", username, password)
+getMongoURL <- function(host, port, database, username, pass, isSSL=FALSE, authSource=NULL) {
+  loadNamespace("stringr")
+
   if (stringr::str_length(username) > 0) {
     url = stringr::str_c("mongodb://", username, ":", pass, "@", host, ":", as.character(port), "/", database)
   }
@@ -247,8 +255,39 @@ queryMongoDB <- function(host, port, database, collection, username, password, q
   if(isSSL){
     url = stringr::str_c(url, "?ssl=true")
   }
+  if(!is.null(authSource) && authSource != ""){
+    if(isSSL){
+      url = stringr::str_c(url, "&authSource=", authSource)
+    } else {
+      url = stringr::str_c(url, "?authSource=", authSource)
+    }
+  }
+  return (url)
+}
+
+
+#' @export
+queryMongoDB <- function(host, port, database, collection, username, password, query = "{}", isFlatten, limit=0, isSSL=FALSE, authSource=NULL, fields="{}", sort="{}", skip=0, queryType = "find", pipeline="{}"){
+  if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
+  loadNamespace("jsonlite")
+  if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
+
+  # read stored password
+  pass = saveOrReadPassword("mongodb", username, password)
+  url = getMongoURL(host, port, database, username, pass, isSSL, authSource)
   con <- mongolite::mongo(collection, url = url)
-  data <- con$find(query = GetoptLong::qq(query), limit=limit)
+  if(fields == ""){
+    fields = "{}"
+  }
+  if(sort == ""){
+    sort = "{}"
+  }
+  data <- NULL
+  if(queryType == "aggregate"){
+    data <- con$aggregate(pipeline = GetoptLong::qq(pipeline))
+  } else if (queryType == "find") {
+    data <- con$find(query = GetoptLong::qq(query), limit=limit, fields=fields, sort = sort, skip = skip)
+  }
   result <-data
   if (isFlatten) {
     result <- jsonlite::flatten(data)
@@ -260,18 +299,55 @@ queryMongoDB <- function(host, port, database, collection, username, password, q
   }
 }
 
+#' Returns a data frame that has names of the collections in its "name" column.
 #' @export
-getDBConnection <- function(type, host, port, databaseName, username, password){
+getMongoCollectionNames <- function(host, port, database, username, password, isSSL=FALSE, authSource=NULL){
+  collection = "test" # dummy collection name. mongo command seems to work even if the collection does not exist.
+  loadNamespace("jsonlite")
+  if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
+  pass = saveOrReadPassword("mongodb", username, password)
+  url = getMongoURL(host, port, database, username, pass, isSSL, authSource)
+  con <- mongolite::mongo(collection, url = url)
+  # command to list collections.
+  # con$command is our addition in our mongolite fork.
+  result <- con$command(command = '{"listCollections":1}')
+  if (!result$ok) {
+    stop("listCollections command failed");
+  }
+  # TODO: does "firstBatch" mean it is possible there are more?
+  # if so, where does it appear in the result?
+  return(as.data.frame(result$cursor$firstBatch))
+}
+
+#' Returns the total number of rows stored in the target table.
+#' At this moment only mongdb is supported.
+#' @export
+getMongoCollectionNumberOfRows <- function(host, port, database, username, password, collection, isSSL=FALSE, authSource=NULL){
+  loadNamespace("jsonlite")
+  if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
+  pass = saveOrReadPassword("mongodb", username, password)
+  url = getMongoURL(host, port, database, username, pass, isSSL, authSource)
+  con <- mongolite::mongo(collection, url = url)
+  result <- con$count()
+  return(result)
+}
+
+
+#' @export
+getDBConnection <- function(type, host, port, databaseName, username, password, catalog = "", schema = "", dsn="", additionalParams = ""){
   if(!requireNamespace("RMySQL")){stop("package RMySQL must be installed.")}
   if(!requireNamespace("RPostgreSQL")){stop("package RPostgreSQL must be installed.")}
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
+  if(!requireNamespace("RPresto")){stop("package Presto must be installed.")}
+  if(!requireNamespace("RODBC")){stop("package RODBC must be installed.")}
+
   drv = NULL
   conn = NULL
   if(type == "mysql" || type == "aurora"){
     drv <- DBI::dbDriver("MySQL")
     conn = RMySQL::dbConnect(drv, dbname = databaseName, username = username,
                              password = password, host = host, port = port)
-  } else if (type == "postgres" || type == "redshift"){
+  } else if (type == "postgres" || type == "redshift" || type == "vertica"){
     drv <- DBI::dbDriver("PostgreSQL")
     pg_dsn = paste0(
       'dbname=', databaseName, ' ',
@@ -279,17 +355,57 @@ getDBConnection <- function(type, host, port, databaseName, username, password){
     )
     conn = RPostgreSQL::dbConnect(drv, dbname=pg_dsn, user = username,
                                   password = password, host = host, port = port)
+  } else if (type == "presto") {
+    loadNamespace("RPresto")
+    drv <- RPresto::Presto()
+    conn <- RPresto::dbConnect(drv, user = username, password = password, host = host, port = port, schema = schema, catalog = catalog, session.timezone = Sys.timezone(location = TRUE))
+  } else if (type == "odbc") {
+    loadNamespace("RODBC")
+    connstr <- stringr::str_c("RODBC::odbcConnect(dsn = '", dsn, "',uid = '", username, "', pwd = '", password, "'")
+    if(additionalParams == ""){
+      connstr <- stringr::str_c(connstr, ")")
+    } else {
+      connstr <- stringr::str_c(connstr, ",", additionalParams, ")")
+    }
+    conn <- eval(parse(text=connstr))
   }
   conn
 }
 
 #' @export
-getListOfTables <- function(type, host, port, databaseName, username, password){
+getListOfTables <- function(type, host, port, databaseName = NULL, username, password, catalog = "", schema = ""){
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
-  conn <- exploratory::getDBConnection(type, host, port, databaseName, username, password)
+  if (type == "presto") {
+    loadNamespace("RPresto")
+    drv <- RPresto::Presto()
+    conn <- RPresto::dbConnect(drv, schema = schema, catalog = catalog, user = username, host = host, port = port)
+  } else {
+    conn <- exploratory::getDBConnection(type, host, port, databaseName, username, password)
+  }
   tables <- DBI::dbListTables(conn)
   DBI::dbDisconnect(conn)
   tables
+}
+
+#' @export
+getListOfColumns <- function(type, host, port, databaseName, username, password, table){
+  if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
+  conn <- exploratory::getDBConnection(type, host, port, databaseName, username, password)
+  columns <- DBI::dbListFields(conn, table)
+  DBI::dbDisconnect(conn)
+  columns
+}
+
+#' API to execute a query that can be handled with DBI
+#' @export
+executeGenericQuery <- function(type, host, port, databaseName, username, password, query, catalog = "", schema = ""){
+  if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
+  conn <- exploratory::getDBConnection(type, host, port, databaseName, username, password, catalog = catalog, schema = schema)
+  resultSet <- DBI::dbSendQuery(conn, query)
+  df <- DBI::dbFetch(resultSet)
+  DBI::dbClearResult(resultSet)
+  DBI::dbDisconnect(conn)
+  df
 }
 
 #' @export
@@ -302,7 +418,9 @@ queryNeo4j <- function(host, port,  username, password, query, isSSL = FALSE){
 
   graph <- NULL
   if(!is.null(username) && !is.null(password)){
-    graph = RNeo4j::startGraph(url, username = username, password = password)
+    # read stored password
+    pass = saveOrReadPassword("neo4j", username, password)
+    graph = RNeo4j::startGraph(url, username = username, password = pass)
   } else {
     graph = RNeo4j::startGraph(url)
   }
@@ -352,6 +470,33 @@ queryPostgres <- function(host, port, databaseName, username, password, numOfRow
   df
 }
 
+#' @export
+queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, query){
+  if(!requireNamespace("RODBC")){stop("package RODBC must be installed.")}
+  if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
+
+  loadNamespace("RODBC")
+  connstr <- stringr::str_c("RODBC::odbcConnect(dsn = '",dsn, "',uid = '", username, "', pwd = '", password, "'")
+  if(additionalParams == ""){
+    connstr <- stringr::str_c(connstr, ")")
+  } else {
+    connstr <- stringr::str_c(connstr, ",", additionalParams, ")")
+  }
+  conn <- eval(parse(text=connstr))
+
+  # For some reason, calling RODBC::sqlTables() works around Actual Oracle Driver for Mac issue
+  # that it always returns 0 rows.
+  # Since we want this to be done without sacrificing performance,
+  # we are adding dummy catalog/schema condition to make it return nothing.
+  # Since it does not have performance impact, we are just calling it
+  # unconditionally rather than first checking which ODBC driver is used for the connection.
+  RODBC::sqlTables(conn, catalog = "dummy", schema = "dummy")
+
+  df <- RODBC::sqlQuery(conn, GetoptLong::qq(query), max = numOfRows)
+  RODBC::odbcClose(conn)
+  df
+}
+
 #' tokenFileId is a unique value per data farme and is used to create a token cache file
 #' @export
 getTwitterToken <- function(tokenFileId, useCache=TRUE){
@@ -387,8 +532,15 @@ refreshTwitterToken <- function(tokenFileId){
   getTwitterToken(tokenFileId, FALSE)
 }
 
+#' Access twitter serch api
+#' @param n - Maximum number of tweets.
+#' @param lang - Language to filter result.
+#' @param lastNDays - From how many days ago tweets should be searched.
+#' @param searchString - Query to search.
+#' @param tokenFileId - File id for aut
+#' @param withSentiment - Whether there should be sentiment column caluculated by get_sentiment.
 #' @export
-getTwitter <- function(n=200, lang=NULL,  lastNDays=30, searchString, tokenFileId){
+getTwitter <- function(n=200, lang=NULL,  lastNDays=30, searchString, tokenFileId, withSentiment = FALSE){
   if(!requireNamespace("twitteR")){stop("package twitteR must be installed.")}
   loadNamespace("lubridate")
 
@@ -409,7 +561,13 @@ getTwitter <- function(n=200, lang=NULL,  lastNDays=30, searchString, tokenFileI
   tweetList <- twitteR::searchTwitter(searchString, n, lang, since, until, locale, geocode, sinceID, maxID, resultType, retryOnRateLimit)
   # conver list to data frame
   if(length(tweetList)>0){
-    twitteR::twListToDF(tweetList)
+    ret <- twitteR::twListToDF(tweetList)
+    if(withSentiment){
+      # calculate sentiment
+      ret %>% mutate(sentiment = get_sentiment(text))
+    } else {
+      ret
+    }
   } else {
     stop('No Tweets found.')
   }
@@ -440,7 +598,9 @@ getGoogleTokenForBigQuery <- function(tokenFileId, useCache=TRUE){
       cacheOption = FALSE
     }
     token <- httr::oauth2.0_token(httr::oauth_endpoints("google"), myapp,
-                                  scope = c("https://www.googleapis.com/auth/bigquery", "https://www.googleapis.com/auth/cloud-platform"), cache = FALSE)
+                                  scope = c("https://www.googleapis.com/auth/bigquery",
+                                            "https://www.googleapis.com/auth/cloud-platform",
+                                            "https://www.googleapis.com/auth/devstorage.read_write"), cache = FALSE)
     # Save the token object for future sessions
     saveRDS(token, file=tokenPath)
   }
@@ -458,13 +618,18 @@ refreshGoogleTokenForBigQuery <- function(tokenFileId){
 submitGoogleBigQueryJob <- function(project, sqlquery, destination_table, write_disposition = "WRITE_TRUNCATE", tokenFieldId){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
+  if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
+
   #GetoptLong uses stringr and str_c is called without stringr:: so need to use "require" instead of "requireNamespace"
   if(!require("stringr")){stop("package stringr must be installed.")}
 
   token <- getGoogleTokenForBigQuery(tokenFieldId)
   bigrquery::set_access_cred(token)
   # pass desitiona_table to support large data
-  job <- bigrquery::insert_query_job(GetoptLong::qq(sqlquery), project, destination_table = destination_table, write_disposition = write_disposition)
+  # check if the query contains special key word for standardSQL
+  # If we do not pass the useLegaySql argument, bigrquery set TRUE for it, so we need to expliclity set it to make standard SQL work.
+  isStandardSQL <- stringr::str_detect(sqlquery, "#standardSQL")
+  job <- bigrquery::insert_query_job(GetoptLong::qq(sqlquery), project, destination_table = destination_table, write_disposition = write_disposition, useLegacySql = isStandardSQL == FALSE)
   job <- bigrquery::wait_for(job)
   isCacheHit <- job$statistics$query$cacheHit
   # if cache hit case, totalBytesProcessed info is not available. So set it as -1
@@ -486,6 +651,54 @@ getDataFromGoogleBigQueryTable <- function(project, dataset, table, page_size = 
                  table_info = NULL, max_pages = max_page)
 }
 
+#' API to extract data from google BigQuery table to Google Cloud Storage
+#' @export
+extractDataFromGoogleBigQueryToCloudStorage <- function(project, dataset, table, destinationUri, tokenFileId){
+  if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
+  token <- getGoogleTokenForBigQuery(tokenFileId)
+  bigrquery::set_access_cred(token)
+  # call forked bigrquery for submitting extract job
+  job <- bigrquery::insert_extract_job(project, dataset, table, destinationUri,
+                                print_header=TRUE, field_delimiter=",", destination_format="CSV", compression="GZIP")
+  job <- bigrquery::wait_for(job)
+  job
+}
+
+#' API to download data from Google Storage to client and create a data frame from it
+#' @export
+downloadDataFromGoogleCloudStorage <- function(bucket, folder, download_dir, tokenFileId){
+  if(!requireNamespace("googleCloudStorageR")){stop("package googleCloudStorageR must be installed.")}
+  if(!requireNamespace("googleAuthR")){stop("package googleAuthR must be installed.")}
+  token <- getGoogleTokenForBigQuery(tokenFileId)
+  googleAuthR::gar_auth(token = token)
+  googleCloudStorageR::gcs_global_bucket(bucket)
+  objects <- googleCloudStorageR::gcs_list_objects()
+  # set bucket
+  googleCloudStorageR::gcs_global_bucket(bucket)
+  objects <- googleCloudStorageR::gcs_list_objects()
+  # for each file extracted from Google BigQuery to Google Cloud Storage,
+  # download the file to local temporary direcotry.
+  # then delete the extracted files from Google Cloud Storage.
+  lapply(objects$name, function(name){
+    if(stringr::str_detect(name,stringr::str_c(folder, "/"))){
+      googleCloudStorageR::gcs_get_object(name, saveToDisk = str_c(download_dir, "/", stringr::str_replace(name, stringr::str_c(folder, "/"),"")))
+      googleCloudStorageR::gcs_delete_object(name, bucket = bucket)
+    }
+  });
+  files <- list.files(path=download_dir, pattern = ".gz");
+  df <- lapply(files, function(file){readr::read_csv(stringr::str_c(download_dir, "/", file))}) %>% dplyr::bind_rows()
+}
+
+#' API to get a list of buckets from Google Cloud Storage
+#' @export
+listGoogleCloudStorageBuckets <- function(project, tokenFileId){
+  if(!requireNamespace("googleCloudStorageR")){stop("package googleCloudStorageR must be installed.")}
+  if(!requireNamespace("googleAuthR")){stop("package googleAuthR must be installed.")}
+  token <- getGoogleTokenForBigQuery(tokenFileId)
+  googleAuthR::gar_auth(token = token)
+  googleCloudStorageR::gcs_list_buckets(projectId = project, projection = c("full"))
+}
+
 #' API to get a data from google BigQuery table
 #' @export
 saveGoogleBigQueryResultAs <- function(projectId, sourceDatasetId, sourceTableId, targetProjectId, targetDatasetId, targetTableId, tokenFileId){
@@ -498,14 +711,68 @@ saveGoogleBigQueryResultAs <- function(projectId, sourceDatasetId, sourceTableId
   bigrquery::copy_table(src, dest)
 }
 
+#' Get data from google big query
+#' @param bucketProjectId - Google Cloud Storage/BigQuery project id
+#' @param dataSet - Google BigQuery data tht your query result table is associated with
+#' @param table - Google BigQuery table where query result is saved
+#' @param bucket - Google Cloud Storage Bucket
+#' @param folder - Folder under Google Cloud Storage Bucket where temp files are extracted.
+#' @param tokenFileId - file id for auth token
 #' @export
-executeGoogleBigQuery <- function(project, sqlquery, destination_table, page_size = 10000, max_page = 10, write_disposition = "WRITE_TRUNCATE", tokenFileId){
+getDataFromGoogleBigQueryTableViaCloudStorage <- function(bucketProjectId, dataSet, table, bucket, folder, tokenFileId){
+  if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
+  if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
+
+  # submit a job to extract query result to cloud storage
+  uri = stringr::str_c('gs://', bucket, "/", folder, "/", "exploratory_temp*.gz")
+  job <- exploratory::extractDataFromGoogleBigQueryToCloudStorage(project = bucketProjectId, dataset = dataSet, table = table, uri,tokenFileId);
+  # wait for extract to be done
+  job <- bigrquery::wait_for(job)
+  # download tgzip file to client
+  df <- exploratory::downloadDataFromGoogleCloudStorage(bucket = bucket, folder=folder, download_dir = tempdir(), tokenFileId = tokenFileId)
+}
+
+#' Get data from google big query
+#' @param projectId - Google BigQuery project id
+#' @param sqlquery - SQL query to get data
+#' @param destination_table - Google BigQuery table where query result is saved
+#' @param page_size - Number of items per page.
+#' @param max_page - maximum number of pages to retrieve.
+#' @param write_deposition - controls how your BigQuery write operation applies to an existing table.
+#' @param tokenFileId - file id for auth token
+#' @param bucketProjectId - Id of the Project where Google Cloud Storage Bucket belongs
+#' @param bucket - Google Cloud Storage Bucket
+#' @param folder - Folder under Google Cloud Storage Bucket where temp files are extracted.
+#' @export
+executeGoogleBigQuery <- function(project, sqlquery, destination_table, page_size = 100000, max_page = 10, write_disposition = "WRITE_TRUNCATE", tokenFileId, bucketProjectId, bucket=NULL, folder=NULL){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
+  if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
 
   token <- getGoogleTokenForBigQuery(tokenFileId)
-  bigrquery::set_access_cred(token)
-  bigrquery::query_exec(GetoptLong::qq(sqlquery), project = project, destination_table = destination_table, page_size = page_size, max_page = max_page, write_disposition = write_disposition)
+
+  df <- NULL
+  # if bucket is set, use Google Cloud Storage for extract and download
+  if(!is.null(bucket) && !is.na(bucket) && bucket != "" && !is.null(folder) && !is.na(folder) && folder != ""){
+    # destination_table looks like 'exploratory-bigquery-project:exploratory_dataset.exploratory_bq_preview_table'
+    dataSetTable = stringr::str_split(stringr::str_replace(destination_table, stringr::str_c(bucketProjectId,":"),""),"\\.")
+    dataSet = dataSetTable[[1]][1]
+    table = dataSetTable[[1]][2]
+    bqtable <- NULL
+    # submit a query to get a result (for refresh data frame case)
+    result <- exploratory::submitGoogleBigQueryJob(bucketProjectId, sqlquery, destination_table, write_disposition = "WRITE_TRUNCATE", tokenFileId);
+    # extranct result from Google BigQuery to Google Cloud Storage and import
+    df <- getDataFromGoogleBigQueryTableViaCloudStorage(bucketProjectId, dataSet, table, bucket, folder, tokenFileId)
+  } else {
+    # direct import case (for refresh data frame case)
+    bigrquery::set_access_cred(token)
+    # check if the query contains special key word for standardSQL
+    # If we do not pass the useLegaySql argument, bigrquery set TRUE for it, so we need to expliclity set it to make standard SQL work.
+    isStandardSQL <- stringr::str_detect(sqlquery, "#standardSQL")
+    df <- bigrquery::query_exec(GetoptLong::qq(sqlquery), project = project, destination_table = destination_table,
+                                page_size = page_size, max_page = max_page, write_disposition = write_disposition, useLegacySql = isStandardSQL == FALSE)
+  }
+  df
 }
 
 #' API to get projects for current oauth token
@@ -554,7 +821,7 @@ getGoogleBigQueryTable <- function(project, dataset, table, tokenFileId){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   token <- getGoogleTokenForBigQuery(tokenFileId);
   bigrquery::set_access_cred(token)
-  tables <- bigrquery::get_table(project, dataset, table);
+  table <- bigrquery::get_table(project, dataset, table);
 }
 
 #' API to get tables for current project, data set
@@ -725,8 +992,15 @@ createTempEnvironment <- function(){
 #' API to get a list of data frames from a RDATA
 #' @export
 getObjectListFromRdata <- function(rdata_path, temp.space){
-  # load RDATA to temporary env to prevent the polluation on global objects
-  temp.object <- load(rdata_path,temp.space)
+  # load RDATA to temporary env to prevent the pollution on global objects
+  path <- rdata_path
+  if (stringr::str_detect(rdata_path, "^https://") ||
+      stringr::str_detect(rdata_path, "^http://") ||
+      stringr::str_detect(rdata_path, "^ftp://")) {
+
+    path <- download_data_file(rdata_path, "rdata")
+  }
+  temp.object <- load(path,temp.space)
   # get list of ojbect loaded to temporary env
   objectlist <- ls(envir=temp.space)
   result <- lapply(objectlist, function(x){
@@ -746,8 +1020,15 @@ getObjectListFromRdata <- function(rdata_path, temp.space){
 #' @export
 getObjectFromRdata <- function(rdata_path, object_name){
   # load RDATA to temporary env to prevent the polluation on global objects
+  path <- rdata_path
+  if (stringr::str_detect(rdata_path, "^https://") ||
+      stringr::str_detect(rdata_path, "^http://") ||
+      stringr::str_detect(rdata_path, "^ftp://")) {
+
+    path <- download_data_file(rdata_path, "rdata")
+  }
   temp.space = createTempEnvironment()
-  load(rdata_path,temp.space)
+  load(path,temp.space)
   # get list of ojbect loaded to temporary env
   obj <- get(object_name,temp.space)
   # remote temporary env
@@ -766,17 +1047,22 @@ getObjectFromRdata <- function(rdata_path, object_name){
 #' @return cleaned data frame
 #' @export
 clean_data_frame <- function(x) {
-  tibble::repair_names(jsonlite::flatten(x))
+  df <- tibble::repair_names(jsonlite::flatten(x))
+  original_names <- names(df)
+  # remove tab, new line, carriage return from column names
+  clean_names <- original_names  %>% gsub("[\r\n\t]", "", .)
+  names(df) <- clean_names
+  df
 }
 
 #' This checks name conflict and attach the file if there isn't any conflict
 #' @export
-checkSourceConflict <- function(files){
+checkSourceConflict <- function(files, encoding="UTF-8"){
   ret <- list()
   for (file in files){
     ret[[file]] <- tryCatch({
       env <- new.env()
-      source(file, local=env)
+      source(file, local=env, encoding = encoding)
       attached_objects <- ls(env)
       list(names = attached_objects)
     }, error = function(e){
@@ -786,44 +1072,245 @@ checkSourceConflict <- function(files){
   ret
 }
 
-#' Converts between state name and state code of United States.
+#' Returns US state names, abbreviations, numeric codes, divisions, or regions based on US state data.
 #'
 #' Example:
-#' > exploratory::statecode(c("NY","CA", "IL"), "abb", "name")
+#' > exploratory::statecode(c("NY","CA", "IL"), "name")
 #' [1] "New York"   "California" "Illinois"
-#' > exploratory::statecode(c("New York","California","Illinois"), "name", "abb")
+#' > exploratory::statecode(c("New York","California","Illinois"), "code")
 #' [1] "NY" "CA" "IL"
+#' > exploratory::statecode(c("New York","California","Illinois"), "num_code")
+#' [1] "36" "06" "17"
 #'
-#' @param sourcevar source variable
-#' @param origin origin code, either "abb" or "name"
-#' @param destination  destination code, one of "abb", "name", "division", or "region"
-#' @param ignore.case Default is TRUE, you can make it FALSE for performance if you already have formatted data.
+#' @param input vector of US state names, abbreviations, or numeric codes.
+#' @param output_type one of "alpha_code", "num_code", "name", "division", or "region"
 #' @return character vector
 #' @export
-statecode <- function(sourcevar, origin, destination, ignore.case=TRUE) {
-
-  # supported codes
-  codes_origin <- c("abb", "name")
-  codes_destination <- c("abb", "name", "division", "region")
-
-  if (!origin %in% codes_origin){
-    stop("Origin code not supported")
+statecode <- function(input = input, output_type = output_type) {
+  output_types <- c("alpha_code", "num_code", "name", "division", "region")
+  if (!output_type %in% output_types) {
+     stop("Output type not supported")
   }
-  if (!destination %in% codes_destination){
-     stop("Destination code not supported")
-  }
+  # lower case and get rid of space, period, apostrophe, and hiphen to normalize inputs.
+  input_normalized <- gsub("[ \\.\\'\\-]", "", tolower(input))
+  # return matching state info.
+  # state_name_id_map data frame has all those state info plus normalized_name as the search key.
+  return (as.character(state_name_id_map[[output_type]][match(input_normalized, state_name_id_map$normalized_name)]))
+}
 
-  # state is a part of datasets package which comes with R installation
-  # and available anytime. state.abb is a list of state abbreviation
-  # such as 'CA' or 'NY'. state.name is a list of state name
-  # such as 'California'. Look at the following url for details.
-  # https://stat.ethz.ch/R-manual/R-devel/library/datasets/html/state.html
-  origin_vector <- get(paste0("state.", origin))
-  destination_vector <- get(paste0("state.", destination))
+#' Converts pair of state name and county name into county ID,
+#' which is concatenation of FIPS state code and FIPS county code.
+#'
+#' Example:
+#' > countycode(c("California", "CA"),c("San Francisco", "San Francisco"))
+#' [1] "06075" "06075"
+#' > countycode(c("MD", "MD", "MD"),c("Baltimore", "Baltimore City", "City of Baltimore"))
+#' [1] "24005" "24510" "24510"
+#'
+#' @param state state name, or 2 letter state code
+#' @param county county name. For an independent city that has a county with the same name, prefix with "City of " or suffix with " City".
+#' @return character vector
+#' @export
+countycode <- function(state = state, county = county) {
+  loadNamespace("stringr")
+  # lower case and get rid of space, period, apostrophe, and hiphen to normalize inputs.
+  state_normalized <- gsub("[ \\.\\'\\-]", "", tolower(state))
+  county_normalized <- gsub("[ \\.\\'\\-]", "", tolower(county))
+  # if county starts with "City of ", remove it and suffix with " City" to normalize it.
+  county_normalized <- dplyr::if_else(stringr::str_detect(county_normalized, "^cityof"), paste0(stringr::str_sub(county_normalized, 7), "city"), county_normalized)
+  county_normalized <- gsub("county$", "", county_normalized)
+  # concatenate state name and county name.
+  state_county <- stringr::str_c(state_normalized, " ", county_normalized)
+  # return matching county ID.
+  return (county_name_id_map$id[match(state_county, county_name_id_map$name)])
+}
 
-  if (ignore.case) {
-    return (as.character(destination_vector[match(tolower(sourcevar), tolower(origin_vector))]))
+#' It selects the columns that matches with the given strings.
+#' Invalid column names will be just ignored.
+#'
+#' Usage:
+#' > mtcars %>% select_columns('mpg', 'abc', 'mt', 'wt')
+#' mpg    wt
+#' Mazda RX4           21.0 2.620
+#' Mazda RX4 Wag       21.0 2.875
+#' Datsun 710          22.8 2.320
+#' Hornet 4 Drive      21.4 3.215
+#'               :
+#'               :
+#'
+#' @param x data frame
+#' @param ... column name strings
+#' @return data frame
+#' @export
+select_columns <- function(x, ...) {
+  df <- x[, colnames(x) %in% list(...)]
+  # If it selects only 1 column against the normal data.frame
+  # the df becomes a vector, not data.frame. In that case,
+  # we need to cast it. Note that if it is against dplyr tbl dataframe,
+  # it works just fine and returns a data.frame object.
+  if (!is.data.frame(df))
+    df <- data.frame(df)
+  return (df)
+}
+
+#' API to clear excel cache file
+#' @param url
+#' @export
+clear_cache_file <- function(url){
+  options(tam.should.cache.datafile = FALSE)
+  hash <- digest::digest(url, "md5", serialize = FALSE)
+  tryCatch({
+    filepath <- eval(as.name(hash))
+    do.call(rm, c(as.name(hash)),envir = .GlobalEnv)
+    unlink(filepath)
+  }, error = function(e){
+  })
+}
+
+#' API to download remote data file (excel, csv) from URL and cache it if necessary
+#' it uses tempfile https://stat.ethz.ch/R-manual/R-devel/library/base/html/tempfile.html
+#' and a R variable with name of hashed url is assigned to the path given by tempfile.
+#' @param url
+download_data_file <- function(url, type){
+  shouldCacheFile <- getOption("tam.should.cache.datafile")
+  filepath <- NULL
+  hash <- digest::digest(url, "md5", serialize = FALSE)
+  tryCatch({
+    filepath <- eval(as.name(hash))
+  }, error = function(e){
+    # if url hash is not set as global vaiarlbe yet, it raises error that says object not found
+    # which can be ignored
+    filepath <- NULL
+  })
+  # Check if cached excel filepath exists for the URL
+  if(!is.null(shouldCacheFile) && isTRUE(shouldCacheFile) && !is.null(filepath)){
+    filepath
   } else {
-    return (as.character(destination_vector[match(sourcevar, origin_vector)])) #faster
+    ext <- stringr::str_to_lower(tools::file_ext(url))
+    # if no extension, assume the file extension as xlsx
+    if(ext == ""){
+      if(type == "excel"){
+        ext = "xlsx"
+      } else if (type == "csv") {
+        ext = "csv"
+      } else if (type == "rdata") {
+        ext = "rdata"
+      } else if (type == "log") {
+        ext = "log"
+      }
+    }
+    tmp <- tempfile(fileext = stringr::str_c(".", ext))
+    # download file to tempoprary location
+    download.file(url, destfile = tmp, mode = "wb")
+    # cache file
+    if(!is.null(shouldCacheFile) && isTRUE(shouldCacheFile)){
+      assign(hash, tmp, envir = .GlobalEnv)
+    }
+    tmp
   }
 }
+
+#'Wrapper for readxl::read_excel to support remote file
+#'@export
+read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0){
+  loadNamespace("readxl")
+  loadNamespace("stringr")
+  if (stringr::str_detect(path, "^https://") ||
+      stringr::str_detect(path, "^http://") ||
+      stringr::str_detect(path, "^ftp://")) {
+    tmp <- download_data_file(path, "excel")
+    readxl::read_excel(tmp, sheet, col_names, col_types, na, skip)
+  } else {
+    # if it's local file simply call readxl::read_excel
+    readxl::read_excel(path, sheet, col_names, col_types, na, skip)
+  }
+}
+
+#'Wrapper for readxl::excel_sheets to support remote file
+#'@export
+get_excel_sheets <- function(path){
+  loadNamespace("readxl")
+  loadNamespace("stringr")
+  if (stringr::str_detect(path, "^https://") ||
+      stringr::str_detect(path, "^http://") ||
+      stringr::str_detect(path, "^ftp://")) {
+    tmp <- download_data_file(path, "excel")
+    readxl::excel_sheets(tmp)
+  } else {
+    # if it's local file simply call readxl::read_excel
+    readxl::excel_sheets(path)
+  }
+}
+
+#'Wrapper for readr::read_delim to support remote file
+#'@export
+read_delim_file <- function(file, delim, quote = '"',
+                            escape_backslash = FALSE, escape_double = TRUE,
+                            col_names = TRUE, col_types = NULL,
+                            locale = readr::default_locale(),
+                            na = c("", "NA"), quoted_na = TRUE,
+                            comment = "", trim_ws = FALSE,
+                            skip = 0, n_max = Inf, guess_max = min(1000, n_max), progress = interactive()){
+  loadNamespace("readr")
+  loadNamespace("stringr")
+  if (stringr::str_detect(file, "^https://") ||
+      stringr::str_detect(file, "^http://") ||
+      stringr::str_detect(file, "^ftp://")) {
+    tmp <- download_data_file(file, "csv")
+    readr::read_delim(tmp, delim, quote, escape_backslash, escape_double,col_names, col_types,
+                      locale,na, quoted_na, comment, trim_ws,skip, n_max, guess_max, progress)
+  } else {
+    # if it's local file simply call readr::read_delim
+    readr::read_delim(file, delim, quote, escape_backslash, escape_double,col_names, col_types,
+                      locale,na, quoted_na, comment, trim_ws,skip, n_max, guess_max, progress)
+  }
+}
+
+#'Wrapper for readr::guess_encoding to support remote file
+#'@export
+guess_csv_file_encoding <- function(file,  n_max = 1e4, threshold = 0.20){
+  loadNamespace("readr")
+  loadNamespace("stringr")
+  if (stringr::str_detect(file, "^https://") ||
+      stringr::str_detect(file, "^http://") ||
+      stringr::str_detect(file, "^ftp://")) {
+    tmp <- download_data_file(file, "csv")
+    readr::guess_encoding(tmp, n_max, threshold)
+  } else {
+    # if it's local file simply call readr::read_delim
+    readr::guess_encoding(file, n_max, threshold)
+  }
+}
+
+#'Wrapper for readr::read_log to support remote file
+#'@export
+read_log_file <- function(file, col_names = FALSE, col_types = NULL,
+                          skip = 0, n_max = -1, progress = interactive()){
+  loadNamespace("readr")
+  loadNamespace("stringr")
+  if (stringr::str_detect(file, "^https://") ||
+      stringr::str_detect(file, "^http://") ||
+      stringr::str_detect(file, "^ftp://")) {
+    tmp <- download_data_file(file, "log")
+    readr::read_log(tmp, col_names, col_types, skip, n_max, progress)
+  } else {
+    # if it's local file simply call readr::read_log
+    readr::read_log(file, col_names, col_types, skip, n_max, progress)
+  }
+}
+
+#'Wrapper for readRDS to support remote file
+#'@export
+read_rds_file <- function(file, refhook = NULL){
+  loadNamespace("stringr")
+  if (stringr::str_detect(file, "^https://") ||
+      stringr::str_detect(file, "^http://") ||
+      stringr::str_detect(file, "^ftp://")) {
+    # for remote RDS, need to call url and gzcon before pass it to readRDS
+    readRDS(gzcon(url(file)), refhook)
+  } else {
+    # if it's local file simply call read_rds
+    readRDS(file, refhook)
+  }
+}
+

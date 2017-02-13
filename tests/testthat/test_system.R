@@ -1,7 +1,7 @@
 context("test system functions")
 
 test_that("test clean_data_frame",{
-  # create df with dupicated columns names and data frame type column 
+  # create df with dupicated columns names and data frame type column
   df <- data.frame(a = 1:5, a = 2:6)
   colnames(df)<-c("a", "a")
   df$b <- data.frame(c = 3:7, d = 4:8)
@@ -51,36 +51,52 @@ test_that("test scrape_html_table with japanese shift_jis table",{
 })
 
 test_that("test source check conflict case", {
-  filenames <- c("../../R/model_builder.R", "../../R/don't_exist.R")
+  # this fails in devtools::check() because it can't find the pass because ../../R/model_builder.R can't be found
+  # but this works in devtools::test(), so this needs condition to check the existance of the file.
+  if(file.exists("../../R/model_builder.R")){
+    filenames <- c("../../R/model_builder.R", "../../R/don't_exist.R")
 
-  # suppress file doesn't exist warning
-  suppressWarnings({ret <- checkSourceConflict(filenames)})
-  expect_true(!is.null(ret[[filenames[[1]]]]$names))
-  expect_true(is.null(ret[[filenames[[2]]]]$names))
+    # suppress file doesn't exist warning
+    suppressWarnings({ret <- checkSourceConflict(filenames)})
+    expect_true(!is.null(ret[[filenames[[1]]]]$names))
+    expect_true(is.null(ret[[filenames[[2]]]]$names))
 
-  expect_true(is.null(ret[[filenames[[1]]]]$error))
-  expect_true(!is.null(ret[[filenames[[2]]]]$error))
+    expect_true(is.null(ret[[filenames[[1]]]]$error))
+    expect_true(!is.null(ret[[filenames[[2]]]]$error))
+  } else {
+    testthat::skip("../../R/model_builder.R doesn't exist")
+  }
 })
 
 test_that("test statecode",{
-  
-  abbs <- c("NY", "CA", "IL")
-  names <- c("New York","California","Illinois")
-  namesWithDifferentCases <- c("new york","califorNIA","ILLINOIS")
-  divisions <- c("Middle Atlantic","Pacific", "East North Central")
-  regions <- c("Northeast","West","North Central")
 
-  expect_equal(names, statecode(abbs, "abb", "name"))
-  expect_equal(divisions, statecode(abbs, "abb", "division"))
-  expect_equal(regions, statecode(abbs, "abb", "region"))
-  expect_equal(abbs, statecode(names, "name", "abb"))
-  # ignore.case=FASLE test
-  expect_equal(abbs, statecode(names, "name", "abb", ignore.case=FALSE))
+  abbs <- c("NY", "CA", "IL", "DC", "DC")
+  num_codes <- c("36", "06", "17", "11", "11")
+  names <- c("New York","California","Illinois","District of Columbia","District of Columbia")
+  namesWithDifferentCases <- c("new york","califorNIA","ILLINOIS", "districtOf columbia","washington D.C.")
+  divisions <- c("Middle Atlantic","Pacific", "East North Central", "South Atlantic", "South Atlantic")
+  regions <- c("Northeast","West","North Central", "South", "South")
+
+  expect_equal(names, statecode(abbs, "name"))
+  expect_equal(divisions, statecode(abbs, "division"))
+  expect_equal(regions, statecode(abbs, "region"))
+  expect_equal(abbs, statecode(names, "alpha_code"))
+  expect_equal(num_codes, statecode(names, "num_code"))
   # with different cases
-  expect_equal(abbs, statecode(namesWithDifferentCases, "name", "abb"))
+  expect_equal(abbs, statecode(namesWithDifferentCases, "alpha_code"))
   # format test
-  expect_equal(names, statecode(namesWithDifferentCases, "name", "name"))
-
-
-  
+  expect_equal(names, statecode(namesWithDifferentCases, "name"))
 })
+
+test_that("test select_columns",{
+  df <- data.frame(year=c(2014, 2015, 2016), sales=c(400, 500, 600), profit=c(200, 200, 300))
+  # it selects only year and profit
+  df1 <- df %>% exploratory::select_columns('year2', 'year1', 'year', 'profit', 'sales1')
+  expect_equal(ncol(df1), 2)
+  expect_equal(colnames(df1), c('year', 'profit'))
+
+  df2 <- df %>% exploratory::select_columns('year')
+  expect_true(is.data.frame(df2))
+})
+
+

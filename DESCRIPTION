@@ -1,14 +1,16 @@
 Package: exploratory
 Type: Package
 Title: R package for Exploratory
-Version: 0.3.9.3
-Date: 2016-05-13
+Version: 0.5.5.3
+Date: 2017-02-03
 Authors@R: c(person("Yosuke", "Yasuda", email = "double.y.919.quick@gmail.com", role = c("aut", "cre")))
 URL: https://github.com/exploratory-io/exploratory_func
 Description: Functions for Exploratory
 License: What license is it under?
 LazyData: TRUE
-Import: dplyr,
+Encoding: UTF-8
+Imports:
+    dplyr,
     broom,
     tibble,
     jsonlite,
@@ -23,7 +25,11 @@ Import: dplyr,
     text2vec,
     quanteda,
     Matrix,
-    rvest
+    rvest,
+    stats,
+    urltools,
+    anonymizer,
+    forcats
 Suggests:
     testthat,
     twitteR,
@@ -32,11 +38,21 @@ Suggests:
     RGoogleAnalytics,
     lubridate,
     googlesheets,
-    mongolite,
     DBI,
     RPostgreSQL,
+    RPresto,
     mongolite,
     bigrquery,
+    googleCloudStorageR,
+    googleAuthR,
     GetoptLong,
-    arules
+    gtrendsR,
+    arules,
+    slam,
+    proxy,
+    topicmodels,
+    janitor,
+    nnet,
+    mgcv,
+    survival
 RoxygenNote: 5.0.1
