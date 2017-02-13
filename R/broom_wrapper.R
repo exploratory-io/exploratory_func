@@ -484,11 +484,21 @@ prediction_binary <- function(df, threshold = 0.5, ...){
   ret
 }
 
-#' TODO: prediction wrapper to set proportional hazard.
+#' prediction wrapper to add predicted_probability (probability of "death"), predicted_status,
+#' and actual_status, when time is specified.
 #' @param df Data frame to predict. This should have model column.
+#' @param time The point of time at which we predict survival of subjects.
+#' @param threshold The threshold probability to determine predicted_status.
 #' @export
-prediction_coxph <- function(df, time = NULL, threshold = 1, ...){
+prediction_coxph <- function(df, time = NULL, threshold = 0.5, ...){
+  # TODO: need to make sure prediction.type is set to "lp"
+  # when time is specified.
   ret <- prediction(df, ...)
+  
+  # if time is not specified return prediction() result as is.
+  if (is.null(time)) {
+    return(ret)
+  }
 
   # extract variables for time and status from model formula
   surv_vars <- all.vars(lazyeval::f_lhs(df$model[[1]]$formula))
