@@ -533,9 +533,13 @@ prediction_coxph <- function(df, time = NULL, threshold = 0.5, ...){
   # add predicted_probability, actual_status, and predicted_status
   ret <- df %>%
     dplyr::mutate(ret = purrr::map2(ret, model, function(ret, model) {
+      # basehaz returns base cumulative hazard.
       bh <- survival::basehaz(model)
+      # create a function to interpolate function that returns cumulative hazard.
       bh_fun <- approxfun(bh$time, bh$hazard)
       cumhaz_base = bh_fun(time)
+      # transform linear predictor (predicted_value) into predicted_probability.
+      # predicted_probability is 1 - (y of survival curve).
       ret <- ret %>% dplyr::mutate(predicted_probability = 1 - exp(-cumhaz_base * exp(predicted_value)))
       ret
     }))
