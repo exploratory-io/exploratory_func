@@ -916,8 +916,18 @@ do_survauc <- function(df) {
   }
 
   ret <- df %>%
-    dplyr::mutate(ret = purrr::map(model, function(model) {
-      data.frame(x=c(1,2), y=c(3,4))
+    dplyr::mutate(ret = purrr::map3(model, source.data, .test_index, function(model, source_data, test_index) {
+      training_data = safe_slice(source_data, test_index, remove = TRUE)
+      test_data = safe_slice(source_data, test_index)
+      lp <- stats::predict(model)
+      lpnew <- stats::predict(model, newdata=test_data)
+
+      Surv.rsp <- survival::Surv(training_data$time, training_data$status)
+      Surv.rsp.new <- survival::Surv(test_data$time, test_data$status)
+      times <- seq(0, 800, 10)
+      AUC_CD <- survAUC::AUC.cd(Surv.rsp, Surv.rsp.new, lp, lpnew, times)
+      aucdf <- data.frame(time = AUC_CD$times, auc = AUC_CD$auc)
+      aucdf
     }))
   ret <- ret %>% dplyr::select_(c("ret", group_by_names))
   ret <- ret %>% tidyr::unnest()
