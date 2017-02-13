@@ -163,7 +163,9 @@ test_that("test prediction binary", {
   expect_true(!is.null(coef_ret[["odds_ratio"]]))
 
   prediction_train_ret <- prediction_binary(model_data, data = "training")
-  expect_true(any("predicted_label" == colnames(prediction_train_ret)))
+  expect_true("predicted_label" %in% colnames(prediction_train_ret))
+  expect_true("predicted_value" %in% colnames(prediction_train_ret))
+  expect_true("predicted_probability" %in% colnames(prediction_train_ret))
 
 })
 
