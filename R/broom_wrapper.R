@@ -523,25 +523,38 @@ prediction_coxph <- function(df, time = NULL, threshold = 1, ...){
   # add predicted_probability, actual_status, and predicted_status
   ret <- df %>%
     dplyr::mutate(ret = purrr::map2(ret, model, function(ret, model) {
+      browser()
       bh <- survival::basehaz(model)
       bh_fun <- approxfun(bh$time, bh$hazard)
       cumhaz_base = bh_fun(time)
       ret <- ret %>% dplyr::mutate(predicted_probability = 1 - exp(-cumhaz_base * exp(predicted_value)))
       ret
-    })) %>%
-    dplyr::select_(c("ret", group_by_names)) %>%
-    tidyr::unnest()
+    }))
+  ret <- ret %>% dplyr::select_(c("ret", group_by_names))
+  ret <- ret %>% tidyr::unnest()
 
   # set it back to non-group-by state that is same as glance() output.
   if (length(group_by_names) == 0) {
     ret <- ret %>% dplyr::ungroup() %>% dplyr::select(-dummy_group_col)
   }
-  ret <- ret %>% dplyr::mutate(predicted_status = predicted_probability > threshold)
-  ret <- ret %>% dplyr::mutate(actual_status = if_else((.[[time_colname]] <= time & .[[status_colname]] == 2), TRUE, if_else(.[[time_colname]] >= time, FALSE, NA))) #TODO take care of 2
+
+  true_value = TRUE
   if (is.numeric(ret[[status_colname]])) {
+    if (any(ret[[status_colname]] == 2)) {
+      true_value = 2
+    }
+    else {
+      true_value = 1
+    }
+  }
+
+  ret <- ret %>% dplyr::mutate(predicted_status = predicted_probability > threshold)
+  ret <- ret %>% dplyr::mutate(actual_status = if_else((.[[time_colname]] <= time & .[[status_colname]] == true_value), TRUE, if_else(.[[time_colname]] >= time, FALSE, NA)))
+
+  if (is.numeric(true_value)) {
     ret$predicted_status <- as.numeric(ret$predicted_status)
     ret$actual_status <- as.numeric(ret$actual_status)
-    if (any(ret[[status_colname]] == 2)) {
+    if (true_value == 2) {
       ret$predicted_status <- ret$predicted_status + 1
       ret$actual_status <- ret$actual_status + 1
     }
