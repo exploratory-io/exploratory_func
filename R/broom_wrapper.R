@@ -900,7 +900,7 @@ do_survfit <- function(df, time, status, ...){
 }
 
 #' @export
-do_survauc <- function(df, length_out = 100) {
+do_survauc <- function(df, auc_type = "cd", length_out = 100) {
   # extract variables for time and status from model formula
   surv_vars <- all.vars(lazyeval::f_lhs(df$model[[1]]$formula))
   time_colname <- surv_vars[[1]]
@@ -931,8 +931,20 @@ do_survauc <- function(df, length_out = 100) {
       Surv.rsp.new <- survival::Surv(test_data[[time_colname]], test_data[[status_colname]])
       timecol = source_data[[time_colname]]
       times <- seq(0, max(timecol), length.out = length_out)
-      AUC_CD <- survAUC::AUC.cd(Surv.rsp, Surv.rsp.new, lp, lpnew, times)
-      aucdf <- data.frame(time = AUC_CD$times, auc = AUC_CD$auc)
+
+      if (auc_type == "cd") {
+        AUC <- survAUC::AUC.cd(Surv.rsp, Surv.rsp.new, lp, lpnew, times)
+      }
+      else if (auc_type == "hc") {
+        AUC <- survAUC::AUC.hc(Surv.rsp, Surv.rsp.new, lpnew, times)
+      }
+      else if (auc_type == "sh") {
+        AUC <- survAUC::AUC.sh(Surv.rsp, Surv.rsp.new, lp, lpnew, times)
+      }
+      else if (auc_type == "uno") {
+        AUC <-survAUC::AUC.uno(Surv.rsp, Surv.rsp.new, lpnew, times)
+      }
+      aucdf <- data.frame(time = AUC$times, auc = AUC$auc)
       aucdf
     }))
   ret <- ret %>% dplyr::select_(c("ret", group_by_names))
