@@ -26,13 +26,7 @@ do_roc_ <- function(df, pred_prob_col, actual_val_col){
 
     # remove na and get actual values
     val <- arranged[[actual_val_col]][!is.na(arranged[[actual_val_col]])]
-    if(is.factor(val)){
-      # Need to subtract 1 because the first level in factor is regarded as 1
-      # though it should be FALSE.
-      val <- as.logical(as.integer(val) - 1)
-    } else {
-      val <- as.logical(val)
-    }
+    val <- binary_label(val)
 
     act_sum <- sum(val)
 
@@ -97,13 +91,7 @@ evaluate_binary_ <- function(df, pred_prob_col, actual_val_col, threshold = "f_s
     actual_val <- df[[actual_val_col]]
     pred_prob <- df[[pred_prob_col]]
 
-    if(is.factor(actual_val)){
-      # Need to subtract 1 because the first level in factor is regarded as 1
-      # though it should be FALSE.
-      actual_val <- as.logical(as.integer(actual_val) - 1)
-    } else {
-      actual_val <- as.logical(actual_val)
-    }
+    actual_val <- binary_label(actual_val)
 
     ret <- if (is.numeric(threshold)) {
       pred_label <- pred_prob >= threshold
@@ -263,7 +251,7 @@ evaluate_multi_ <- function(df, pred_label_col, actual_val_col, ...) {
     fp_sum <- sum(col_sum, na.rm=TRUE) - tp_sum
     micro_recall <- tp_sum / sum(row_sum, na.rm=TRUE)
     micro_precision <- tp_sum / sum(col_sum, na.rm=TRUE)
-    micro_f_score <- if (micro_recall + micro_precision == 0){
+    micro_f_score <- if (is.na(micro_recall + micro_precision) || micro_recall + micro_precision == 0){
       # no prediction was correct
       0
     } else {

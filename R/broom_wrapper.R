@@ -77,21 +77,6 @@ augment_kmeans <- function(df, model, data){
   ret
 }
 
-#' augment wrapper
-#' @export
-predict <- function(df, model, ...){
-  model_col <- col_name(substitute(model))
-  data_col <- col_name(substitute(data))
-  if(!model_col %in% colnames(df)){
-    stop(paste(model_col, "is not in column names"), sep=" ")
-  }
-  if(any(class(df[[model_col]]) %in% ".model.kmeans")){
-    augment_kmeans(df, model, ...)
-  } else {
-    broom::augment(df, model, ...)
-  }
-}
-
 #' apply data frame with model to a data frame
 #' @param df Data frame to predict
 #' @param model_df Data frame that has model
@@ -286,7 +271,7 @@ prediction <- function(df, data = "training", conf_int = 0.95, ...){
   # and models have $family$linkinv (basically, glm models have it),
   # both fitted link value column and response value column should appear in the result
 
-  with_response <- !("type.predict" %in% names(cll)) & !is.null(df[["model"]][[1]]$family) & !is.null(df[["model"]][[1]]$family$linkinv)
+  with_response <- !("type.predict" %in% names(cll)) && "family" %in% names(df[["model"]][[1]]) && !is.null(df[["model"]][[1]]$family$linkinv)
 
   ret <- if(test){
     # augment by test data

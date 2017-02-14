@@ -38,7 +38,7 @@ test_that("do_kmeans.kv augment", {
   result <- test_df %>%
     dplyr::group_by(group) %>%
     build_kmeans.kv(subject, key, value, keep.source=TRUE, centers=1, augment = FALSE) %>%
-    predict(model, source.data)
+    augment_kmeans(model, source.data)
   expect_true(is.integer(result[["cluster"]]))
   expect_true(all(result[["cluster"]] == 1))
 })

@@ -10,7 +10,11 @@ test_that("test nnet build_model", {
     class = c("tbl_df", "tbl", "data.frame"), .Names = c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE"))
   model_ret <- nnet::multinom(CARRIER ~ DISTANCE, data = test_data)
 
-  model_df <- build_model(test_data, model_func = nnet::multinom, formula = CARRIER ~ DISTANCE, test_rate = 0.1)
+  model_df <- build_model(test_data,
+                          model_func = nnet::multinom,
+                          formula = CARRIER ~ DISTANCE,
+                          test_rate = 0.1,
+                          seed=0)
 
   coef_ret <- model_coef(model_df)
   stats_ret <- model_stats(model_df)

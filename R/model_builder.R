@@ -1,36 +1,6 @@
 #'
 #'
 
-#' Create do wrapper function with source data
-#' @return do wrapper function
-build_data <- function(funcname) {
-  ret <- function(df, ..., keep.source = TRUE, augment=FALSE){
-    loadNamespace("dplyr")
-    grouped_column <- grouped_by(df)
-    model_column <- avoid_conflict(grouped_column, "model")
-    source_column <- avoid_conflict(grouped_column, "source.data")
-    if (keep.source | augment) {
-      output <- df  %>%  dplyr::do_(.dots=setNames(list(~do.call(funcname, list(data = ., ...)), ~(.)), c(model_column, source_column)))
-      # Add a class for Exploratyry to recognize the type of .source.data
-      class(output[[source_column]]) <- c("list", ".source.data")
-    } else {
-      output <- df  %>%  dplyr::do_(.dots=setNames(list(~do.call(funcname, list(data = ., ...))), model_column))
-    }
-
-    if(augment){
-      # use do.call for non standard evaluation
-      augment_func <- get("predict", asNamespace("exploratory"))
-      output <- do.call(augment_func, list(output, model_column, data=source_column))
-    } else {
-      # Add a class for Exploratyry to recognize the type of .model
-      class(output[[model_column]]) <- c("list", ".model", paste0(".model.", funcname))
-      output
-    }
-    output
-  }
-  ret
-}
-
 #' integrated build_kmeans
 #' @export
 build_kmeans <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0, group_cols = c()){
