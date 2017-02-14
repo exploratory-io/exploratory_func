@@ -705,3 +705,33 @@ pivot_ <- function(data, formula, value_col = NULL, fun.aggregate = mean, fill =
     as.data.frame %>%
     tibble::rownames_to_column(var = cname)
 }
+
+#' convert values to binary label
+#' this is basically as.logical but this handles factor
+#' and numeric vector with 2 unique values
+binary_label <- function(val) {
+  if(is.factor(val)){
+    # Need to subtract 1 because the first level in factor is regarded as 1
+    # though it should be FALSE.
+    val <- as.logical(as.integer(val) - 1)
+  } else {
+    logi_val <- as.logical(val)
+    # if the values are non-zero values,
+    # larger value should be regarded as TRUE
+    # this is especially for survival analysis,
+    # which can take 1(FALSE) and 2(TRUE) as binary labels
+    if(all(logi_val[!is.na(logi_val)])){
+      # here, all values are numbers that can be regarded as TRUE (non-zero)
+      unique_val <- unique(val[!is.na(val)])
+      if(length(unique_val) == 2) {
+        # here, val has only 2 unique values
+        # larger values are regarded as TRUE
+        logi_val <- val == max(unique_val)
+      } else if (length(unique_val) > 2) {
+        stop("binary labels can't have more than 2 unique values")
+      }
+      # if it is one unique value, as.logical is respected
+    }
+    val <- logi_val
+  }
+}
