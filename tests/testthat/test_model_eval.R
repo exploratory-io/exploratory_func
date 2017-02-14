@@ -63,7 +63,7 @@ test_that("test do_roc with 2 numeric values", {
   predicted[["CANCELLED"]] <- c(2, 4, 4, 2, 2, 4, 4, 2, 2, 2, 3, 4, 2, NA, 2)
   expect_error({
     do_roc(predicted, predicted_response, CANCELLED)
-  }, "actual labels can't have more than 2 unique values")
+  }, "binary labels can't have more than 2 unique values")
   expect_equal(colnames(ret), c("true_positive_rate", "false_positive_rate"))
 })
 
@@ -91,7 +91,7 @@ test_that("test evaluate_binary with 2 numeric values", {
   predicted[["CANCELLED"]] <- c(2, 4, 4, 2, 2, 4, 4, 2, 2, 2, 3, 4, 2, NA, 2)
   expect_error({
     evaluate_binary(predicted, predicted_response, CANCELLED)
-  }, "actual labels can't have more than 2 unique values")
+  }, "binary labels can't have more than 2 unique values")
 })
 
 test_that("test eval_pred_bin with factor", {
