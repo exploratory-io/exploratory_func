@@ -35,3 +35,16 @@ detect_anomaly <- function(value, time = NULL, ...){
   }
   ret
 }
+
+#' @export
+detect_anomaly <- function(value, time = NULL, ...){
+  if(is.null(time)){
+    anom <- AnomalyDetection::AnomalyDetectionVec(value, ...)$anom
+    ret <- seq(length(value)) %in% anom$index
+  } else {
+    data <- data.frame(time, value)
+    anom <- AnomalyDetection::AnomalyDetectionTs(data, ...)$anom
+    ret <- ifelse(time %in% as.POSIXct(anom$timestamp), value, NA)
+  }
+  ret
+}
