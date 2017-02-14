@@ -884,6 +884,93 @@ do_survfit <- function(df, time, status, ...){
   ret
 }
 
+#' Calculates time-dependent AUC of survival model
+#' @param df Model data frame
+#' @param auc_type Type of AUC calculation. Can be one of the following.
+#' "cd" - Chambless and Diao
+#' "hc" - Hung and Chiang
+#' "sh" - Song and Zhou
+#' "uno" - Uno et al.
+#' @param  length_out length of each output curv data.
+#' @export
+do_survauc <- function(df, auc_type = "cd", length_out = NULL) {
+  # TODO: filter rows that has NA in any of the vars in formula. it seems to cause R crash.
+
+  # extract variables for time and status from model formula
+  surv_vars <- all.vars(lazyeval::f_lhs(df$model[[1]]$formula))
+  time_colname <- surv_vars[[1]]
+  status_colname <- surv_vars[[2]]
+
+  # get group columns.
+  # we assume that columns of model df other than the ones with reserved name are all group columns.
+  model_df_colnames = colnames(df)
+  group_by_names <- model_df_colnames[!model_df_colnames %in% c("source.data", ".test_index", "model")]
+
+  # group df. rowwise nature of df is stripped here.
+  if (length(group_by_names) == 0) {
+    # need to group by something to work with following operations with mutate/map.
+    df <- df %>% dplyr::mutate(dummy_group_col = 1) %>% dplyr::group_by(dummy_group_col)
+  }
+  else {
+    df <- df %>% dplyr::group_by_(group_by_names)
+  }
+
+  # calculate time-AUC curve with survAUC package.
+  ret <- df %>%
+    dplyr::mutate(ret = purrr::map3(model, source.data, .test_index, function(model, source_data, test_index) {
+      training_data = safe_slice(source_data, test_index, remove = TRUE)
+      test_data = safe_slice(source_data, test_index)
+
+      # get linear predictors for training/test data
+      lp <- stats::predict(model)
+      lpnew <- stats::predict(model, newdata=test_data)
+
+      # get Surv objects for traininig/test data
+      Surv.rsp <- survival::Surv(training_data[[time_colname]], training_data[[status_colname]])
+      Surv.rsp.new <- survival::Surv(test_data[[time_colname]], test_data[[status_colname]])
+
+      # get grid for x-axis (times) based on time column of the source data.
+      timecol = source_data[[time_colname]]
+      if (!is.null(length_out)) {
+        times <- seq(0, max(timecol), length.out = length_out)
+      }
+      else {
+        # by default, keep data length around 100 and make step an integer
+        # so that table view data is easier to understand.
+        step <- floor(max(timecol) / 100)
+        if (step == 0) {
+          step = 1
+        }
+        times <- seq(0, max(timecol), by = step)
+      }
+
+      if (auc_type == "cd") { # Chambless and Diao
+        AUC <- survAUC::AUC.cd(Surv.rsp, Surv.rsp.new, lp, lpnew, times)
+      }
+      else if (auc_type == "hc") { # Hung and Chiang
+        AUC <- survAUC::AUC.hc(Surv.rsp, Surv.rsp.new, lpnew, times)
+      }
+      else if (auc_type == "sh") { # Song and Zhou
+        AUC <- survAUC::AUC.sh(Surv.rsp, Surv.rsp.new, lp, lpnew, times)
+      }
+      else if (auc_type == "uno") { # Uno et al.
+        AUC <-survAUC::AUC.uno(Surv.rsp, Surv.rsp.new, lpnew, times)
+      }
+      aucdf <- data.frame(time = AUC$times, auc = AUC$auc)
+      aucdf
+    }))
+  ret <- ret %>% dplyr::select_(c("ret", group_by_names))
+  ret <- ret %>% tidyr::unnest()
+
+  # let's return flat ungrouped table with columns for groups, time, and auc from this function.
+  ret <- ret %>% dplyr::ungroup()
+  # drop dummy_group_col we added.
+  if (length(group_by_names) == 0) {
+    ret <- ret %>% dplyr::select(-dummy_group_col)
+  }
+  ret
+}
+
 #' tidy after converting model to confint
 #' @export
 model_confint <- function(df, ...){
