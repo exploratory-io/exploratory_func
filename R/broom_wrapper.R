@@ -908,7 +908,7 @@ do_survfit <- function(df, time, status, ...){
 #' "uno" - Uno et al.
 #' @param  length_out length of each output curv data.
 #' @export
-do_survauc <- function(df, auc_type = "cd", length_out = 100) {
+do_survauc <- function(df, auc_type = "cd", length_out = NULL) {
   # TODO: filter rows that has NA in any of the vars in formula. it seems to cause R crash.
 
   # extract variables for time and status from model formula
@@ -946,7 +946,18 @@ do_survauc <- function(df, auc_type = "cd", length_out = 100) {
 
       # get grid for x-axis (times) based on time column of the source data.
       timecol = source_data[[time_colname]]
-      times <- seq(0, max(timecol), length.out = length_out)
+      if (!is.null(length_out)) {
+        times <- seq(0, max(timecol), length.out = length_out)
+      }
+      else {
+        # by default, keep data length around 100 and make step an integer
+        # so that table view data is easier to understand.
+        step <- floor(max(timecol) / 100)
+        if (step == 0) {
+          step = 1
+        }
+        times <- seq(0, max(timecol), by = step)
+      }
 
       if (auc_type == "cd") { # Chambless and Diao
         AUC <- survAUC::AUC.cd(Surv.rsp, Surv.rsp.new, lp, lpnew, times)
