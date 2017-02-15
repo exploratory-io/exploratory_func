@@ -1,14 +1,27 @@
+
+#' NSE version of do_anomaly_detection_
 #' @export
-do_anomaly_detection <- function(df, time, value, direction="both", e_value=TRUE, ...){
+do_anomaly_detection <- function(df, time, value, ...){
+  time_col <- col_name(substitute(time))
+  value_col <- col_name(substitute(value))
+  do_anomaly_detection_(df, time_col, value_col, ...)
+}
+
+#' Detect anomaly data
+#' @param df Data frame
+#' @param time_col Column that has time data
+#' @param value_col Column that has value data
+#' @param direction Direction of anomaly. Positive ("posi"), Negative ("neg") or "both".
+#' @param e_value Whther expected values should be returned.
+#' @param ... extra values to be passed to AnomalyDetection::AnomalyDetectionTs.
+#' @export
+do_anomaly_detection_ <- function(df, time_col, value_col, direction="both", e_value=TRUE, ...){
   loadNamespace("dplyr")
   loadNamespace("AnomalyDetection")
 
   if(!direction %in% c("both", "pos", "neg")){
     stop("derection must be 'both', 'pos' or 'neg'")
   }
-
-  time_col <- col_name(substitute(time))
-  value_col <- col_name(substitute(value))
 
   pos_anom_col <- avoid_conflict(colnames(df), "pos_anomaly")
   pos_val_col <- avoid_conflict(colnames(df), "pos_value")
@@ -17,17 +30,28 @@ do_anomaly_detection <- function(df, time, value, direction="both", e_value=TRUE
   exp_val_col <- avoid_conflict(colnames(df), "expected_value")
 
   do_anomaly_detection_each <- function(df){
+    # AnomalyDetection::AnomalyDetectionTs expects
+    # a data frame whose first column is time column
+    # and second column is value column, so it's created
     data <- df[, c(time_col, value_col)]
+
+    # this will be overwritten by expected values
     expected_values <- df[[value_col]]
+
     if(direction == "both" || direction == "pos"){
+      # this returns anomaly timestamp in timestamp column
       pos_anom <- AnomalyDetection::AnomalyDetectionTs(data, direction = "pos", e_value = e_value, ...)$anoms
       if(nrow(pos_anom) > 0) {
         pos_ret <- data[[time_col]] %in% as.POSIXct(pos_anom$timestamp)
+        # values of timestamps are regarded as anomaly values
+        # NA_real_(NA compatible with numeric valeus) is used for non-anomaly data
         pos_val <- ifelse(pos_ret, data[[value_col]], NA_real_)
         if(e_value){
+          # positive anomaly values overwrite expected_values
           expected_values <- ifelse(pos_ret, pos_anom[["expected_value"]], expected_values)
         }
       } else {
+        # no anomaly case
         pos_ret <- rep(FALSE, nrow(df))
         pos_val <- rep(NA, nrow(df))
       }
@@ -36,14 +60,19 @@ do_anomaly_detection <- function(df, time, value, direction="both", e_value=TRUE
     }
 
     if(direction == "both" || direction == "neg"){
+      # this returns anomaly timestamp in timestamp column
       neg_anom <- AnomalyDetection::AnomalyDetectionTs(data, direction = "neg", e_value = e_value,...)$anoms
       if(nrow(neg_anom) > 0) {
         neg_ret <- data[[time_col]] %in% as.POSIXct(neg_anom$timestamp)
+        # values of timestamps are regarded as anomaly values
+        # NA_real_(NA compatible with numeric valeus) is used for non-anomaly data
         neg_val <- ifelse(neg_ret, data[[value_col]], NA)
         if(e_value){
+          # negative anomaly values overwrite expected_values
           expected_values <- ifelse(neg_ret, neg_anom[["expected_value"]], expected_values)
         }
       } else {
+        # no anomaly case
         neg_ret <- rep(FALSE, nrow(df))
         neg_val <- rep(NA, nrow(df))
       }
