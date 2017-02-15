@@ -1,5 +1,5 @@
 #' @export
-do_anomaly_detection <- function(df, value, time, direction="both", e_value=TRUE, ...){
+do_anomaly_detection <- function(df, time, value, direction="both", e_value=TRUE, ...){
   loadNamespace("dplyr")
   loadNamespace("AnomalyDetection")
 
@@ -18,44 +18,44 @@ do_anomaly_detection <- function(df, value, time, direction="both", e_value=TRUE
 
   do_anomaly_detection_each <- function(df){
     data <- df[, c(time_col, value_col)]
-    expected_values <- NULL
+    expected_values <- df[[value_col]]
     if(direction == "both" || direction == "pos"){
       pos_anom <- AnomalyDetection::AnomalyDetectionTs(data, direction = "pos", e_value = e_value, ...)$anoms
-      pos_ret <- data[[time_col]] %in% as.POSIXct(pos_anom$timestamp)
-      pos_val <- ifelse(pos_ret, data[[value_col]], NA)
+      if(nrow(pos_anom) > 0) {
+        pos_ret <- data[[time_col]] %in% as.POSIXct(pos_anom$timestamp)
+        pos_val <- ifelse(pos_ret, data[[value_col]], NA_real_)
+        if(e_value){
+          expected_values <- ifelse(pos_ret, pos_anom[["expected_value"]], expected_values)
+        }
+      } else {
+        pos_ret <- rep(FALSE, nrow(df))
+        pos_val <- rep(NA, nrow(df))
+      }
       df[[pos_anom_col]] <- pos_ret
       df[[pos_val_col]] <- pos_val
-      if(e_value){
-        df[[exp_val_col]] <- ifelse(pos_ret, pos_anom[["expected_value"]], NA)
-      }
     }
 
     if(direction == "both" || direction == "neg"){
       neg_anom <- AnomalyDetection::AnomalyDetectionTs(data, direction = "neg", e_value = e_value,...)$anoms
-      neg_ret <- data[[time_col]] %in% as.POSIXct(neg_anom$timestamp)
-      neg_val <- ifelse(neg_ret, data[[value_col]], NA)
+      if(nrow(neg_anom) > 0) {
+        neg_ret <- data[[time_col]] %in% as.POSIXct(neg_anom$timestamp)
+        neg_val <- ifelse(neg_ret, data[[value_col]], NA)
+        if(e_value){
+          expected_values <- ifelse(neg_ret, neg_anom[["expected_value"]], expected_values)
+        }
+      } else {
+        neg_ret <- rep(FALSE, nrow(df))
+        neg_val <- rep(NA, nrow(df))
+      }
       df[[neg_anom_col]] <- neg_ret
       df[[neg_val_col]] <- neg_val
-      if(e_value){
-        df[[exp_val_col]] <- ifelse(neg_ret, neg_anom[["expected_value"]], df[[exp_val_col]])
-      }
+    }
+    if (e_value) {
+      df[[exp_val_col]] <- expected_values
     }
     df
   }
   tmp_col <- avoid_conflict(colnames(df), "tmp_col")
   test <- (df %>%  dplyr::do_(.dots=setNames(list(~do_anomaly_detection_each(.)), tmp_col)))
   test %>%  tidyr::unnest_(tmp_col)
-}
-
-#' @export
-detect_anomaly <- function(value, time = NULL, ...){
-  if(is.null(time)){
-    anom <- AnomalyDetection::AnomalyDetectionVec(value, ...)$anom
-    ret <- seq(length(value)) %in% anom$index
-  } else {
-    data <- data.frame(time, value)
-    anom <- AnomalyDetection::AnomalyDetectionTs(data, ...)$anom
-    ret <- ifelse(time %in% as.POSIXct(anom$timestamp), value, NA)
-  }
-  ret
 }
