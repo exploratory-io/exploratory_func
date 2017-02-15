@@ -1,4 +1,5 @@
 #' Column name parser
+#' This function is from https://github.com/tidyverse/broom/blob/master/R/utilities.R
 #' @export
 col_name <- function(x, default = stop("Please supply column name", call. = FALSE)){
   if (is.character(x))
