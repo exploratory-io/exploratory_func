@@ -54,5 +54,6 @@ Suggests:
     janitor,
     nnet,
     mgcv,
-    survival
+    survival,
+    AnomalyDetection
 RoxygenNote: 6.0.1
