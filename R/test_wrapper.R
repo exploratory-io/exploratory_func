@@ -105,15 +105,18 @@ do_var.test <- function(df, value, key, ...){
 #' Non standard evaluation version of do_chisq.test_
 #' @export
 do_chisq.test <- function(df, ...,
-                          fill = 0,
-                          fun.aggregate = mean,
                           correct = TRUE,
                           p = NULL,
-                          rescale.p = FALSE,
+                          rescale.p = TRUE,
                           simulate.p.value = FALSE,
                           B = 2000){
   select_dots <- lazyeval::lazy_dots(...)
   cols <- evaluate_select(df, select_dots, excluded = grouped_by(df))
+  p_col <- col_name(substitute(p))
+  if(!is.null(p_col) && p_col %in% colnames(df)){
+    # in this case, p is column name, so converted to character
+    p <- p_col
+  }
   do_chisq.test_(df,
                  selected_cols = cols,
                  correct = correct,
@@ -124,14 +127,20 @@ do_chisq.test <- function(df, ...,
 }
 
 #' chisq.test wrapper
+#' @param df Data frame to be tested.
+#' @param selected_cols Names of columns of categories.
+#' @param correct Whether continuity correction will be applied for 2 by 2 tables.
+#' @param p This works when one column is selected. A column to be considered as probability to be tested.
+#' If NULL, it's considered as uniform distribution.
+#' @param rescale.p If TRUE, p is rescaled to sum to 1. If FALSE and p doesn't sum to 1, it causes an error.
+#' @param simulate.p.value Whether p value should be calculated by Monte Carlo simulation.
+#' @param B This works only when simulate.p.value is TRUE. The number of replicates for Monte Carlo test.
 #' @export
 do_chisq.test_ <- function(df,
                            selected_cols = c(),
-                           fill = 0,
-                           fun.aggregate = mean,
                            correct = TRUE,
                            p = NULL,
-                           rescale.p = FALSE,
+                           rescale.p = TRUE,
                            simulate.p.value = FALSE,
                            B = 2000){
 
@@ -140,6 +149,9 @@ do_chisq.test_ <- function(df,
     if (is.null(p)){
       # default of p from chisq.test
       p <- rep(1/length(x), length(x))
+    } else if (is.character(p)){
+      # p is column name in this case, so the values are used as p
+      p <- df[[p]]
     }
     chisq.test(x = x,
                correct = correct,
