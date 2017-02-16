@@ -12,7 +12,7 @@ do_anomaly_detection <- function(df, time, value, ...){
 #' @param time_col Column that has time data
 #' @param value_col Column that has value data
 #' @param direction Direction of anomaly. Positive ("posi"), Negative ("neg") or "both".
-#' @param e_value Whther expected values should be returned.
+#' @param e_value Whether expected values should be returned.
 #' @param ... extra values to be passed to AnomalyDetection::AnomalyDetectionTs.
 #' @export
 do_anomaly_detection_ <- function(df, time_col, value_col, direction="both", e_value=TRUE, ...){
@@ -20,7 +20,7 @@ do_anomaly_detection_ <- function(df, time_col, value_col, direction="both", e_v
   loadNamespace("AnomalyDetection")
 
   if(!direction %in% c("both", "pos", "neg")){
-    stop("derection must be 'both', 'pos' or 'neg'")
+    stop("direction must be 'both', 'pos' or 'neg'")
   }
 
   pos_anom_col <- avoid_conflict(colnames(df), "pos_anomaly")
