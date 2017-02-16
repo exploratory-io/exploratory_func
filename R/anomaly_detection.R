@@ -31,6 +31,8 @@ do_anomaly_detection_ <- function(df, time_col, value_col, direction="both", e_v
 
   grouped_col <- grouped_by(df)
 
+  # this logic is duplicated between positive and negative direction, so
+  # integrated into a function and used in do_anomaly_detection_each
   get_anomalies <- function(data, exp_value_tmp, direction, e_value, ...){
     # exp_value_tmp is temporary expected values to be overwritten
     anom <- AnomalyDetection::AnomalyDetectionTs(data, direction = direction, e_value = e_value, ...)$anoms
