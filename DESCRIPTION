@@ -54,5 +54,6 @@ Suggests:
     janitor,
     nnet,
     mgcv,
-    survival
 RoxygenNote: 5.0.1
+    survival,
+    xgboost
