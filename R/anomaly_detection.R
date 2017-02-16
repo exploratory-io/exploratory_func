@@ -45,8 +45,8 @@ do_anomaly_detection_ <- function(df, time_col, value_col, direction="both", e_v
       }
     } else {
       # no anomaly case
-      ret <- rep(FALSE, nrow(df))
-      val <- rep(NA_real_, nrow(df))
+      ret <- rep(FALSE, nrow(data))
+      val <- rep(NA_real_, nrow(data))
       expected_val <- exp_value_tmp
     }
     list(
