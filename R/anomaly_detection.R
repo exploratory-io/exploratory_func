@@ -43,7 +43,7 @@ do_anomaly_detection_ <- function(df, time_col, value_col, direction="both", e_v
       val <- ifelse(ret, data[[value_col]], NA_real_)
       if(e_value){
         # positive anomaly values overwrite expected_values
-        expected_val <- ifelse(ret, val, exp_value_tmp)
+        expected_val <- ifelse(ret, anom[["expected_value"]], exp_value_tmp)
       }
     } else {
       # no anomaly case
