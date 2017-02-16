@@ -29,11 +29,20 @@ do_anomaly_detection_ <- function(df, time_col, value_col, direction="both", e_v
   neg_val_col <- avoid_conflict(colnames(df), "neg_value")
   exp_val_col <- avoid_conflict(colnames(df), "expected_value")
 
+  grouped_col <- grouped_by(df)
+
   do_anomaly_detection_each <- function(df){
+    if(!is.null(grouped_col)){
+      # drop grouping columns
+      df <- df[, !colnames(df) %in% grouped_col]
+    }
+
     # AnomalyDetection::AnomalyDetectionTs expects
     # a data frame whose first column is time column
     # and second column is value column, so it's created
     data <- df[, c(time_col, value_col)]
+    # time column should be posixct, otherwise AnomalyDetection::AnomalyDetectionTs throws an error
+    data[[time_col]] <- as.POSIXct(data[[time_col]])
 
     # this will be overwritten by expected values
     expected_values <- df[[value_col]]
@@ -53,7 +62,7 @@ do_anomaly_detection_ <- function(df, time_col, value_col, direction="both", e_v
       } else {
         # no anomaly case
         pos_ret <- rep(FALSE, nrow(df))
-        pos_val <- rep(NA, nrow(df))
+        pos_val <- rep(NA_real_, nrow(df))
       }
       df[[pos_anom_col]] <- pos_ret
       df[[pos_val_col]] <- pos_val
@@ -66,7 +75,7 @@ do_anomaly_detection_ <- function(df, time_col, value_col, direction="both", e_v
         neg_ret <- data[[time_col]] %in% as.POSIXct(neg_anom$timestamp)
         # values of timestamps are regarded as anomaly values
         # NA_real_(NA compatible with numeric valeus) is used for non-anomaly data
-        neg_val <- ifelse(neg_ret, data[[value_col]], NA)
+        neg_val <- ifelse(neg_ret, data[[value_col]], NA_real_)
         if(e_value){
           # negative anomaly values overwrite expected_values
           expected_values <- ifelse(neg_ret, neg_anom[["expected_value"]], expected_values)
@@ -74,7 +83,7 @@ do_anomaly_detection_ <- function(df, time_col, value_col, direction="both", e_v
       } else {
         # no anomaly case
         neg_ret <- rep(FALSE, nrow(df))
-        neg_val <- rep(NA, nrow(df))
+        neg_val <- rep(NA_real_, nrow(df))
       }
       df[[neg_anom_col]] <- neg_ret
       df[[neg_val_col]] <- neg_val
@@ -84,6 +93,13 @@ do_anomaly_detection_ <- function(df, time_col, value_col, direction="both", e_v
     }
     df
   }
+
+  # Calculation is executed in each group.
+  # Storing the result in this name_col and
+  # unnesting the result.
+  # name_col is not conflicting with grouping columns
+  # thanks to avoid_conflict that is used before,
+  # this doesn't overwrite grouping columns.
   tmp_col <- avoid_conflict(colnames(df), "tmp_col")
   test <- (df %>%  dplyr::do_(.dots=setNames(list(~do_anomaly_detection_each(.)), tmp_col)))
   test %>%  tidyr::unnest_(tmp_col)
