@@ -31,6 +31,31 @@ do_anomaly_detection_ <- function(df, time_col, value_col, direction="both", e_v
 
   grouped_col <- grouped_by(df)
 
+  get_anomalies <- function(data, exp_value_tmp, direction, e_value, ...){
+    # exp_value_tmp is temporary expected values to be overwritten
+    anom <- AnomalyDetection::AnomalyDetectionTs(data, direction = direction, e_value = e_value, ...)$anoms
+    if(nrow(anom) > 0) {
+      ret <- data[[time_col]] %in% as.POSIXct(anom$timestamp)
+      # values of timestamps are regarded as anomaly values
+      # NA_real_(NA compatible with numeric valeus) is used for non-anomaly data
+      val <- ifelse(ret, data[[value_col]], NA_real_)
+      if(e_value){
+        # positive anomaly values overwrite expected_values
+        expected_val <- ifelse(ret, val, exp_value_tmp)
+      }
+    } else {
+      # no anomaly case
+      ret <- rep(FALSE, nrow(df))
+      val <- rep(NA_real_, nrow(df))
+      expected_val <- exp_value_tmp
+    }
+    list(
+      ret = ret,
+      val = val,
+      expected_val = expected_val
+    )
+  }
+
   do_anomaly_detection_each <- function(df){
     if(!is.null(grouped_col)){
       # drop grouping columns
@@ -48,45 +73,17 @@ do_anomaly_detection_ <- function(df, time_col, value_col, direction="both", e_v
     expected_values <- df[[value_col]]
 
     if(direction == "both" || direction == "pos"){
-      # this returns anomaly timestamp in timestamp column
-      pos_anom <- AnomalyDetection::AnomalyDetectionTs(data, direction = "pos", e_value = e_value, ...)$anoms
-      if(nrow(pos_anom) > 0) {
-        pos_ret <- data[[time_col]] %in% as.POSIXct(pos_anom$timestamp)
-        # values of timestamps are regarded as anomaly values
-        # NA_real_(NA compatible with numeric valeus) is used for non-anomaly data
-        pos_val <- ifelse(pos_ret, data[[value_col]], NA_real_)
-        if(e_value){
-          # positive anomaly values overwrite expected_values
-          expected_values <- ifelse(pos_ret, pos_anom[["expected_value"]], expected_values)
-        }
-      } else {
-        # no anomaly case
-        pos_ret <- rep(FALSE, nrow(df))
-        pos_val <- rep(NA_real_, nrow(df))
-      }
-      df[[pos_anom_col]] <- pos_ret
-      df[[pos_val_col]] <- pos_val
+      pos <- get_anomalies(data, expected_values, "pos", e_value, ...)
+      df[[pos_anom_col]] <- pos$ret
+      df[[pos_val_col]] <- pos$val
+      expected_values <- pos$expected_val
     }
 
     if(direction == "both" || direction == "neg"){
-      # this returns anomaly timestamp in timestamp column
-      neg_anom <- AnomalyDetection::AnomalyDetectionTs(data, direction = "neg", e_value = e_value,...)$anoms
-      if(nrow(neg_anom) > 0) {
-        neg_ret <- data[[time_col]] %in% as.POSIXct(neg_anom$timestamp)
-        # values of timestamps are regarded as anomaly values
-        # NA_real_(NA compatible with numeric valeus) is used for non-anomaly data
-        neg_val <- ifelse(neg_ret, data[[value_col]], NA_real_)
-        if(e_value){
-          # negative anomaly values overwrite expected_values
-          expected_values <- ifelse(neg_ret, neg_anom[["expected_value"]], expected_values)
-        }
-      } else {
-        # no anomaly case
-        neg_ret <- rep(FALSE, nrow(df))
-        neg_val <- rep(NA_real_, nrow(df))
-      }
-      df[[neg_anom_col]] <- neg_ret
-      df[[neg_val_col]] <- neg_val
+      neg <- get_anomalies(data, expected_values, "neg", e_value, ...)
+      df[[neg_anom_col]] <- neg$ret
+      df[[neg_val_col]] <- neg$val
+      expected_values <- neg$expected_val
     }
     if (e_value) {
       df[[exp_val_col]] <- expected_values
