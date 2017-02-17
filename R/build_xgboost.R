@@ -1,6 +1,6 @@
 #' formula version of xgboost
 #' ref: https://www.r-bloggers.com/with-our-powers-combined-xgboost-and-pipelearner/
-fml_xgboost <- function(data, formula, ...) {
+fml_xgboost <- function(data, formula, weight = NULL, ...) {
   vars <- all.vars(formula)
 
   X_names <- vars[-1]
@@ -12,8 +12,14 @@ fml_xgboost <- function(data, formula, ...) {
 
   X <- data.matrix(data[, X_names])
   y <- data[[y_name]]
+  weight <- if (!is.null(substitute(weight))) {
+    lz <- lazyeval::as.lazy(substitute(weight))
+    lazyeval::lazy_eval(lz, data = data)
+  } else {
+    NULL
+  }
 
-  ret <- xgboost::xgboost(data = X, label = y, ...)
+  ret <- xgboost::xgboost(data = X, label = y, weight = weight, ...)
   ret$formula <- formula
   ret$X_names <- X_names
   ret
