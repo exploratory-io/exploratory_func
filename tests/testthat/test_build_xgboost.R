@@ -29,3 +29,18 @@ test_that("test build_xgboost with weight", {
   coef_ret <- model_coef(model_ret)
   expect_equal(ncol(model_ret), 3)
 })
+
+test_that("test build_xgboost with weight", {
+  test_data <- readRDS("~/Downloads/xgboost_test_sample.rds")
+
+  browser()
+  x <- test_data %>%
+    build_xgboost(DISTANCE ~ AIR_TIME, nrounds = 10, test_rate = 0.3)
+
+
+  test_data[["weight"]] <- seq(nrow(test_data))
+  model_ret <- build_xgboost(test_data, CANCELLED ~ DISTANCE, nrounds = 5, objectives = "binary:logistic", params = list(eval_metric = "auc"), weight = log(weight))
+  coef_ret <- model_coef(model_ret)
+  expect_equal(ncol(model_ret), 3)
+})
+
