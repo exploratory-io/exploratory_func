@@ -34,23 +34,12 @@ build_xgboost <- function(data, formula, ...) {
   build_model(data, model_func = fml_xgboost, formula = formula, ...)
 }
 
-#' Glance xgb.Booster model
-#' @param x xgb.Booster model
-#' @param ... Not used for now.
-#' @export
-glance.xgb.Booster <- function(x, ...) {
-  # data frame with
-  # number of iteration
-  # last value of evaluation_log
-  # chosen objectives parameter
-  data.frame(nitr = x$niter, x$evaluation_log[nrow(x$evaluation_log),2], objectives = x$params$objectives)
-}
-
 #' Augment predicted values
 #' @param x xgb.Booster model
 #' @param data Data frame used to train xgb.Booster
 #' @param newdata New data frame to predict
 #' @param ... Not used for now.
+#' @importFrom tidytext augment
 #' @export
 augment.xgb.Booster <- function(x, data = NULL, newdata = NULL, ...) {
   if(!is.null(newdata)){
@@ -72,11 +61,32 @@ augment.xgb.Booster <- function(x, data = NULL, newdata = NULL, ...) {
 #' @param type Can be "weight" or "log".
 #' "weight" returns importances of features and "log" returns evaluation log.
 #' @param ... Not used for now.
+#' @importFrom tidytext tidy
 #' @export
 tidy.xgb.Booster <- function(x, type="weight", ...){
   if(type == "weight"){
     xgboost::xgb.importance(x$X_names,model=x) %>% as.data.frame()
   } else if (type == "log") {
-    data.frame(x$evaluation_log)
+    data.frame(x[["evaluation_log"]])
   }
 }
+
+#' Glance xgb.Booster model
+#' @param x xgb.Booster model
+#' @param ... Not used for now.
+#' @export
+#' @importFrom tidytext glance
+#' @export
+glance.xgb.Booster <- function(x, ...) {
+  # data frame with
+  # number of iteration
+  # last value of evaluation_log
+  # chosen objectives parameter
+  eval_log <- x[["evaluation_log"]]
+  browser()
+  eval_log_names <- colnames(eval_log)
+  ret <- data.frame(nitr = x$niter, eval_log[nrow(eval_log),2])
+  colnames(ret) <- c("nitr", eval_log_names[[2]])
+  ret
+}
+

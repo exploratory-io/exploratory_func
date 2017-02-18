@@ -226,12 +226,3 @@ build_kmeans.cols <- function(df, ...,
   }
   output
 }
-
-#' @export
-tidy <- tidytext::tidy
-
-#' @export
-glance <- tidytext::glance
-
-#' @export
-augment <- tidytext::augment

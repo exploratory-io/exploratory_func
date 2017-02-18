@@ -23,3 +23,15 @@ urltools::url_decode
 anonymize <- function(vec, algo = "sha256", seed = 0, chars = letters, n_chars = 5L, ...){
   anonymizer::anonymize(vec, .algo = algo, .seed = seed, .chars = chars, .n_chars = n_chars, ...)
 }
+
+#' @importFrom tidytext tidy
+#' @export
+tidy
+
+#' @importFrom tidytext glance
+#' @export
+glance
+
+#' @importFrom tidytext augment
+#' @export
+augment
