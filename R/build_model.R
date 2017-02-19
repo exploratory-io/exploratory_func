@@ -8,6 +8,27 @@
 #' @param ... Parameters for model_func
 #' @export
 build_model <- function(data, model_func, seed = 0, test_rate = 0, group_cols = c(), reserved_colnames = c(), ...) {
+  .dots <- lazyeval::dots_capture(...)
+  build_model_(
+    data = data,
+    model_func = model_func,
+    seed = seed,
+    test_rate = test_rate,
+    group_cols = group_cols,
+    reserved_colnames = reserved_colnames,
+    .dots = .dots)
+}
+
+#' Generic function for model functions
+#' @param data Data frame for model function
+#' @param model_func Function to create a model object
+#' @param test_seed Random seed for train test split
+#' @param test_rate Rate for test data
+#' @param group_cols Column names for grouping
+#' @param reserved_colnames Column names that should be avoided for information extraction like tidy, glance later
+#' @param ... Parameters for model_func
+#' @export
+build_model_ <- function(data, model_func, seed = 0, test_rate = 0, group_cols = c(), reserved_colnames = c(), .dots, ...) {
 
   if(!is.null(seed)){
     set.seed(seed)
@@ -47,12 +68,12 @@ build_model <- function(data, model_func, seed = 0, test_rate = 0, group_cols = 
 
   group_col_names <- grouped_by(data)
 
-  dots <- lazyeval::dots_capture(...)
+  dots <- lazyeval::all_dots(.dots, ...)
 
   # check if variables in grouped_col_names are not used
   formula <- dots$formula
   if(!is.null(formula)){
-    vars <- all.vars(formula)
+    vars <- all.vars(formula$expr)
     if(any(vars %in% group_col_names)){
       grouped <- vars[vars %in% group_col_names]
       message <- paste("grouped column is used (", paste0(grouped, collapse = ", "), ")", sep = "")
@@ -93,3 +114,4 @@ build_model <- function(data, model_func, seed = 0, test_rate = 0, group_cols = 
   })
   ret
 }
+

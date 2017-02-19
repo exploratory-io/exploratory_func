@@ -10,7 +10,7 @@ test_that("test build_xgboost", {
     class = c("tbl_df", "tbl", "data.frame"), .Names = c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE"))
 
   test_data[["weight"]] <- seq(nrow(test_data))
-  model_ret <- build_xgboost(test_data, CANCELLED ~ DISTANCE, nrounds = 5, objectives = "binary:logistic", params = list(eval_metric = "auc"))
+  model_ret <- build_xgboost(test_data, CANCELLED ~ DISTANCE, nrounds = 5, objectives = "binary:logistic", params = list(eval_metric = "auc"), verbose = 0)
   coef_ret <- model_coef(model_ret)
   expect_equal(ncol(model_ret), 3)
 })
@@ -25,21 +25,37 @@ test_that("test build_xgboost with weight", {
     class = c("tbl_df", "tbl", "data.frame"), .Names = c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE"))
 
   test_data[["weight"]] <- seq(nrow(test_data))
-  model_ret <- build_xgboost(test_data, CANCELLED ~ DISTANCE, nrounds = 5, objectives = "binary:logistic", params = list(eval_metric = "auc"), weight = log(weight))
+  model_ret <- build_xgboost(test_data, CANCELLED ~ DISTANCE, nrounds = 5, objectives = "binary:logistic", params = list(eval_metric = "auc"), weight = log(weight), verbose = 0)
   coef_ret <- model_coef(model_ret)
   expect_equal(ncol(model_ret), 3)
 })
 
 test_that("test build_xgboost with weight", {
-  test_data <- readRDS("~/Downloads/xgboost_test_sample.rds")
-
-  browser()
-  x <- test_data %>%
-    build_xgboost(DISTANCE ~ AIR_TIME, nrounds = 10, test_rate = 0.3)
-
-
+  test_data <- structure(
+    list(
+      CANCELLED = c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0),
+      `Carrier Name` = c("Delta Air Lines", "American Eagle", "American Airlines", "Southwest Airlines", "SkyWest Airlines", "Southwest Airlines", "Southwest Airlines", "Delta Air Lines", "Southwest Airlines", "Atlantic Southeast Airlines", "American Airlines", "Southwest Airlines", "US Airways", "US Airways", "Delta Air Lines", "Atlantic Southeast Airlines", NA, "Atlantic Southeast Airlines", "Delta Air Lines", "Delta Air Lines"),
+      CARRIER = c("DL", "MQ", "AA", "DL", "MQ", "AA", "DL", "DL", "MQ", "AA", "AA", "WN", "US", "US", "DL", "EV", "9E", "EV", "DL", "DL"),
+      DISTANCE = c(1587, 173, 646, 187, 273, 1062, 583, 240, 1123, 851, 852, 862, 361, 507, 1020, 1092, 342, 489, 1184, 545)), row.names = c(NA, -20L),
+    class = c("tbl_df", "tbl", "data.frame"), .Names = c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE"))
   test_data[["weight"]] <- seq(nrow(test_data))
-  model_ret <- build_xgboost(test_data, CANCELLED ~ DISTANCE, nrounds = 5, objectives = "binary:logistic", params = list(eval_metric = "auc"), weight = log(weight))
+  test_data[["IS_AA"]] <- test_data$CARRIER == "AA"
+  model_ret <- build_xgboost(test_data, IS_AA ~ DISTANCE, nrounds = 5, params = list(objectives = "binary:logistic", eval_metric = "auc"), weight = log(weight), verbose = 0)
+  coef_ret <- model_coef(model_ret)
+  expect_equal(ncol(model_ret), 3)
+})
+
+test_that("test build_xgboost_reg", {
+  test_data <- structure(
+    list(
+      CANCELLED = c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0),
+      `Carrier Name` = c("Delta Air Lines", "American Eagle", "American Airlines", "Southwest Airlines", "SkyWest Airlines", "Southwest Airlines", "Southwest Airlines", "Delta Air Lines", "Southwest Airlines", "Atlantic Southeast Airlines", "American Airlines", "Southwest Airlines", "US Airways", "US Airways", "Delta Air Lines", "Atlantic Southeast Airlines", NA, "Atlantic Southeast Airlines", "Delta Air Lines", "Delta Air Lines"),
+      CARRIER = c("DL", "MQ", "AA", "DL", "MQ", "AA", "DL", "DL", "MQ", "AA", "AA", "WN", "US", "US", "DL", "EV", "9E", "EV", "DL", "DL"),
+      DISTANCE = c(1587, 173, 646, 187, 273, 1062, 583, 240, 1123, 851, 852, 862, 361, 507, 1020, 1092, 342, 489, 1184, 545)), row.names = c(NA, -20L),
+    class = c("tbl_df", "tbl", "data.frame"), .Names = c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE"))
+  test_data[["weight"]] <- seq(nrow(test_data))
+  test_data[["IS_AA"]] <- test_data$CARRIER == "AA"
+  model_ret <- build_xgboost_reg(test_data, formula = IS_AA ~ DISTANCE, nrounds = 5, weight = log(weight), verbose = 0)
   coef_ret <- model_coef(model_ret)
   expect_equal(ncol(model_ret), 3)
 })

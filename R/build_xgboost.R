@@ -30,8 +30,31 @@ fml_xgboost <- function(data, formula, weight = NULL, ...) {
 #' @param formula Formula for xgb.Booster training.
 #' @param ... Arguments to be passed to xgboost::xgboost
 #' @export
-build_xgboost <- function(data, formula, ...) {
-  build_model(data, model_func = fml_xgboost, formula = formula, ...)
+build_xgboost_reg <- function(data, formula, output_type = "linear", nrounds = 10, params = list(), ...) {
+  .dots <- lazyeval::dots_capture(...)
+  objective <- paste0("reg:", "linear", sep = "")
+  params[["objective"]] <- objective
+  .dots[["params"]] <- lazyeval::lazy(params)
+  .dots[["formula"]] <- lazyeval::lazy(formula)
+  build_model_(
+    data,
+    model_func = fml_xgboost,
+    nrounds = nrounds,
+    .dots = .dots)
+}
+
+#' Glance xgb.Booster model
+#' @param data Data frame
+#' @param formula Formula for xgb.Booster training.
+#' @param ... Arguments to be passed to xgboost::xgboost
+#' @export
+build_xgboost <- function(data, formula, nrounds = 10, params = list(), ...) {
+  build_model(
+    data,
+    model_func = fml_xgboost,
+    formula = formula,
+    nrounds = nrounds,
+    params = params, ...)
 }
 
 #' Augment predicted values
