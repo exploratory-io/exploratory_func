@@ -16,6 +16,6 @@ test_that("do_anomary_detection with dupe", {
   expect_error({
     raw_data %>%
       do_anomaly_detection(timestamp, count, e_value=TRUE)
-  }, "Please remove duplicated time values")
+  }, "Please remove duplicated time.")
 })
 

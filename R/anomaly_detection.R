@@ -36,7 +36,7 @@ do_anomaly_detection_ <- function(df, time_col, value_col, direction="both", e_v
 
   # validate data duplication
   if(any(duplicated(df[[time_col]]))){
-    stop("Please remove duplicated time values")
+    stop("Please remove duplicated time.")
   }
 
   # this logic is duplicated between positive and negative direction, so
