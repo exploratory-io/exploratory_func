@@ -106,7 +106,6 @@ glance.xgb.Booster <- function(x, ...) {
   # last value of evaluation_log
   # chosen objectives parameter
   eval_log <- x[["evaluation_log"]]
-  browser()
   eval_log_names <- colnames(eval_log)
   ret <- data.frame(nitr = x$niter, eval_log[nrow(eval_log),2])
   colnames(ret) <- c("nitr", eval_log_names[[2]])
