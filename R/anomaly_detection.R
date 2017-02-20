@@ -31,6 +31,14 @@ do_anomaly_detection_ <- function(df, time_col, value_col, direction="both", e_v
 
   grouped_col <- grouped_by(df)
 
+  # remove NA data
+  df <- df[!(is.na(df[[time_col]]) | is.na(df[[value_col]])), ]
+
+  # validate data duplication
+  if(any(duplicated(df[[time_col]]))){
+    stop("Please remove duplicated time values")
+  }
+
   # this logic is duplicated between positive and negative direction, so
   # integrated into a function and used in do_anomaly_detection_each
   get_anomalies <- function(data, exp_value_tmp, direction, e_value, ...){
