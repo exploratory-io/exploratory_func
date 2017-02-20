@@ -9,12 +9,14 @@ Description: Functions for Exploratory
 License: What license is it under?
 LazyData: TRUE
 Encoding: UTF-8
+Depends:
+    broom,
+    urltools
 Imports:
     dplyr,
     broom,
     tibble,
     jsonlite,
-    tidytext,
     rgeolocate,
     countrycode,
     reshape2,
@@ -29,7 +31,8 @@ Imports:
     stats,
     urltools,
     anonymizer,
-    forcats
+    forcats,
+    tidytext
 Suggests:
     testthat,
     twitteR,
