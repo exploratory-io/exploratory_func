@@ -361,7 +361,13 @@ getDBConnection <- function(type, host, port, databaseName, username, password, 
     conn <- RPresto::dbConnect(drv, user = username, password = password, host = host, port = port, schema = schema, catalog = catalog, session.timezone = Sys.timezone(location = TRUE))
   } else if (type == "odbc") {
     loadNamespace("RODBC")
-    connstr <- stringr::str_c("RODBC::odbcConnect(dsn = '", dsn, "',uid = '", username, "', pwd = '", password, "'")
+    connstr <- stringr::str_c("RODBC::odbcConnect(dsn = '", dsn, "'")
+    if(username != ""){
+      connstr <- stringr::str_c(connstr, ", uid = '", username, "'")
+    }
+    if(password != ""){
+      connstr <- stringr::str_c(connstr, ", pwd = '", password, "'")
+    }
     if(additionalParams == ""){
       connstr <- stringr::str_c(connstr, ")")
     } else {
