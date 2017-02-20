@@ -59,6 +59,5 @@ Suggests:
     mgcv,
     survival,
     xgboost,
-    survival,
     AnomalyDetection
 RoxygenNote: 6.0.1
