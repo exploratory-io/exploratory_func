@@ -20,7 +20,7 @@ do_anomaly_detection_ <- function(df, time_col, value_col, direction="both", e_v
   loadNamespace("AnomalyDetection")
 
   # remove NA data
-  data <- data[!(is.na(data[[time_col]]) | is.na(data[[value_col]])), ]
+  df <- df[!(is.na(df[[time_col]]) | is.na(df[[value_col]])), ]
 
   if(!direction %in% c("both", "pos", "neg")){
     stop("direction must be 'both', 'pos' or 'neg'")
@@ -37,11 +37,6 @@ do_anomaly_detection_ <- function(df, time_col, value_col, direction="both", e_v
   # this logic is duplicated between positive and negative direction, so
   # integrated into a function and used in do_anomaly_detection_each
   get_anomalies <- function(data, exp_value_tmp, direction, e_value, ...){
-
-    # validate data duplication
-    if(any(duplicated(data[[time_col]]))){
-      stop("There are duplicated values in Date/Time column.")
-    }
 
     # exp_value_tmp is temporary expected values to be overwritten
     anom <- AnomalyDetection::AnomalyDetectionTs(data, direction = direction, e_value = e_value, ...)$anoms
@@ -79,6 +74,11 @@ do_anomaly_detection_ <- function(df, time_col, value_col, direction="both", e_v
     data <- df[, c(time_col, value_col)]
     # time column should be posixct, otherwise AnomalyDetection::AnomalyDetectionTs throws an error
     data[[time_col]] <- as.POSIXct(data[[time_col]])
+
+    # validate data duplication
+    if(any(duplicated(data[[time_col]]))){
+      stop("There are duplicated values in Date/Time column.")
+    }
 
     # this will be overwritten by expected values
     expected_values <- df[[value_col]]
