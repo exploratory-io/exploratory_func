@@ -98,17 +98,23 @@ tidy.xgb.Booster <- function(x, type="weight", ...){
 #' @param x xgb.Booster model
 #' @param ... Not used for now.
 #' @export
-#' @importFrom tidytext glance
-#' @export
 glance.xgb.Booster <- function(x, ...) {
   # data frame with
   # number of iteration
   # last value of evaluation_log
   # chosen objectives parameter
+  values <- list()
+  if(!is.null(x$niter)){
+    values[["number_of_iterations"]] <- x$niter
+  }
   eval_log <- x[["evaluation_log"]]
-  eval_log_names <- colnames(eval_log)
-  ret <- data.frame(nitr = x$niter, eval_log[nrow(eval_log),2])
-  colnames(ret) <- c("nitr", eval_log_names[[2]])
-  ret
+  if(!is.null(eval_log)){
+
+    val_cname <- switch(colnames(eval_log)[[2]],
+                        train_rmse = "root_mean_square_error"
+    )
+    values[[val_cname]] <- eval_log[nrow(eval_log),2]
+  }
+  as.data.frame(values)
 }
 
