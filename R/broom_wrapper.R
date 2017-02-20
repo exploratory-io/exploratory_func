@@ -433,7 +433,11 @@ prediction_binary <- function(df, threshold = 0.5, ...){
   }
 
   # get actual value column name from model formula
-  actual_col <- all.vars(first_model$formula)[[1]]
+  actual_col <- if(!is.null(first_model$formula)) {
+    all.vars(first_model$formula)[[1]]
+  } else {
+    all.vars(first_model$fml)[[1]]
+  }
 
   actual_val <- ret[[actual_col]]
   actual_logical <- as.logical(as.numeric(actual_val))
@@ -479,7 +483,7 @@ prediction_coxph <- function(df, time = NULL, threshold = 0.5, ...){
   # TODO: need to make sure prediction.type is set to "lp"
   # when time is specified.
   ret <- prediction(df, ...)
-  
+
   # if time is not specified return prediction() result as is.
   if (is.null(time)) {
     return(ret)
@@ -753,6 +757,18 @@ model_stats <- function(df, pretty.name = FALSE){
     colnames(ret)[colnames(ret) == "r.squared.max"] <- "R Square Max"
     colnames(ret)[colnames(ret) == "concordance"] <- "Concordance"
     colnames(ret)[colnames(ret) == "std.error.concordance"] <- "Std Error Concordance"
+
+
+    colnames(ret)[colnames(ret) =="number_of_iteration"] <- "Number of Iteration"
+    colnames(ret)[colnames(ret) =="root_mean_square_error"] <- "Root Mean Square Error"
+    colnames(ret)[colnames(ret) =="mean_absolute_error"] <- "Mean Absolute Error"
+    colnames(ret)[colnames(ret) =="negative_log_likelihood"] <- "Negative Log Likelihood"
+    colnames(ret)[colnames(ret) =="binary_missclassification_rate"] <- "Binary Missclassification Rate"
+    colnames(ret)[colnames(ret) =="missclassification_rate"] <- "Missclassification Rate"
+    colnames(ret)[colnames(ret) =="multiclass_logloss"] <- "Multiclass Logloss"
+    colnames(ret)[colnames(ret) =="auc"] <- "AUC"
+    colnames(ret)[colnames(ret) =="normalized_discounted_cumulative_gain"] <- "Normalized Discounted Cumulative Gain"
+    colnames(ret)[colnames(ret) =="mean_average_precision"] <- "Mean Average Precision"
   }else{
     colnames(ret)[colnames(ret) == "r.squared"] <- "r_square"
     colnames(ret)[colnames(ret) == "adj.r.squared"] <- "r_square_adj"
@@ -837,7 +853,7 @@ prediction_survfit <- function(df, newdata = NULL, ...){
   # original output is in wide-format with columns like estimate.1, estimate.2, ...
   if (!is.null(newdata) && nrow(newdata) > 1) {
     # first, unite columns for a cohort into one column, so that gather at the next step works.
-    united_colnames = c() 
+    united_colnames = c()
     for (i in 1:nrow(newdata)){
       united_colname = paste0("est", i)
       ret <- ret %>% unite_(united_colname, c(paste0("estimate.",i), paste0("std.error.",i), paste0("conf.high.",i),paste0("conf.low.",i)), sep="_", remove=TRUE)

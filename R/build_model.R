@@ -1,11 +1,4 @@
-#' Generic function for model functions
-#' @param data Data frame for model function
-#' @param model_func Function to create a model object
-#' @param test_seed Random seed for train test split
-#' @param test_rate Rate for test data
-#' @param group_cols Column names for grouping
-#' @param reserved_colnames Column names that should be avoided for information extraction like tidy, glance later
-#' @param ... Parameters for model_func
+#' @rdname build_model_
 #' @export
 build_model <- function(data, model_func, seed = 0, test_rate = 0, group_cols = c(), reserved_colnames = c(), ...) {
   .dots <- lazyeval::dots_capture(...)
@@ -26,6 +19,7 @@ build_model <- function(data, model_func, seed = 0, test_rate = 0, group_cols = 
 #' @param test_rate Rate for test data
 #' @param group_cols Column names for grouping
 #' @param reserved_colnames Column names that should be avoided for information extraction like tidy, glance later
+#' @param .dots Additional parameters to work around error of non standard evaluation.
 #' @param ... Parameters for model_func
 #' @export
 build_model_ <- function(data, model_func, seed = 0, test_rate = 0, group_cols = c(), reserved_colnames = c(), .dots, ...) {
@@ -68,6 +62,7 @@ build_model_ <- function(data, model_func, seed = 0, test_rate = 0, group_cols =
 
   group_col_names <- grouped_by(data)
 
+  # integrate all additional parameters
   dots <- lazyeval::all_dots(.dots, ...)
 
   # check if variables in grouped_col_names are not used

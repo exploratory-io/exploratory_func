@@ -1,27 +1,108 @@
 #' formula version of xgboost
 #' ref: https://www.r-bloggers.com/with-our-powers-combined-xgboost-and-pipelearner/
-fml_xgboost <- function(data, formula, weight = NULL, ...) {
+#' @export
+fml_xgboost <- function(data, formula, weight = NULL, params = list(), ...) {
   vars <- all.vars(formula)
+  is_multi <- params$objective == "multi:softmax" ||
+    params$objective == "multi:softprob"
+  if (is.na(is_multi)) {
+    is_multi <- FALSE
+  }
+
+  is_binary <- params$objective == "binary:logistic" ||
+    params$objective == "binary:logitraw" ||
+    params$objective == "reg:logistic"
+  if (is.na(is_binary)) {
+    is_binary <- FALSE
+  }
 
   X_names <- vars[-1]
   y_name  <- vars[1]
+  y_fct_level <- NULL
+  factorized <- FALSE
+  if(is.character(data[[y_name]])){
+    if(!(is_multi || is_binary)){
+      stop("target must be numeric for regression")
+    }
+    output_type <- "character"
+    y_fct <- as.factor(data[[y_name]])
+    # labels should start with 0, so there is -1
+    data[[y_name]] <- as.integer(y_fct) - 1
+    factorized <- TRUE
+  } else if (is.factor(data[[y_name]])){
+    if(!(is_multi || is_binary)){
+      stop("target must be numeric for regression")
+    }
+    output_type <- "factor"
+    y_fct <- data[[y_name]]
+    # labels should start with 0, so there is -1
+    data[[y_name]] <- as.integer(y_fct) - 1
+    factorized <- TRUE
+  } else if (is.logical(data[[y_name]])) {
+    output_type <- "logical"
+    y_fct <- as.factor(data[[y_name]])
+    # labels should start with 0, so there is -1
+    data[[y_name]] <- as.integer(y_fct) - 1
+    factorized <- TRUE
+  } else if(is.numeric(data[[y_name]])){
+    output_type <- "numeric"
+    if(is_multi) {
+      y_fct <- as.factor(data[[y_name]])
+      # labels should start with 0, so there is -1
+      data[[y_name]] <- as.integer(y_fct) - 1
+      factorized <- TRUE
+    }
+  } else {
+    stop("Type of target variable is not supported.")
+  }
+
+  if (factorized) {
+    if(is_multi){
+      y_fct_level <- levels(y_fct)
+    } else if (is_binary) {
+      if (length(levels(y_fct)) != 2) {
+        stop("number of labels must be 2 for binary classification")
+      } else {
+        y_fct_level <- levels(y_fct)
+      }
+    }
+    if(is_multi){
+      params[["num_class"]] <- length(y_fct_level)
+    }
+  }
+  # data must be only numeric
+  data <- data %>% dplyr::select_if(function(col){is.numeric(col) || is.logical(col)})
 
   if (any(X_names == '.')) {
     X_names <- colnames(data)[names(data) != y_name]
   }
+  for (X_name in X_names) {
+    data <- data[!is.na(data[[X_name]]), ]
+  }
 
-  X <- data.matrix(data[, X_names])
-  y <- data[[y_name]]
   weight <- if (!is.null(substitute(weight))) {
     lz <- lazyeval::as.lazy(substitute(weight))
-    lazyeval::lazy_eval(lz, data = data)
+    ret <- lazyeval::lazy_eval(lz, data = data)
+    data <- data[!is.na(ret), ]
+    ret[!is.na(ret)]
   } else {
     NULL
   }
 
-  ret <- xgboost::xgboost(data = X, label = y, weight = weight, ...)
-  ret$formula <- formula
+  X <- data.matrix(data[, X_names])
+
+  if(is.integer(X) || is.logical(X)){
+    # X must be a double matrix
+    X <- matrix(as.double(X), ncol = ncol(X))
+  }
+
+  y <- data[[y_name]]
+
+  ret <- xgboost::xgboost(data = X, label = y, weight = weight, params = params, ...)
+  ret$fml <- formula
   ret$X_names <- X_names
+  ret$y_fct_level <- y_fct_level
+  ret$output_type <- output_type
   ret
 }
 
@@ -62,20 +143,72 @@ build_xgboost <- function(data, formula, nrounds = 10, params = list(), ...) {
 #' @param data Data frame used to train xgb.Booster
 #' @param newdata New data frame to predict
 #' @param ... Not used for now.
-#' @importFrom tidytext augment
 #' @export
 augment.xgb.Booster <- function(x, data = NULL, newdata = NULL, ...) {
+
   if(!is.null(newdata)){
     data <- newdata
   }
-  fml <- x$formula
-  vars <- all.vars(fml)
-  columns <- vars[-1]
-  if (columns == '.') {
-    columns <- names(data)[names(data) != all.vars(fml)[[1]]]
+  if(is.null(x$X_names)) {
+    stop("model must be created from fml_xgboost to augment")
   }
-  predicted <- stats::predict(x, as.matrix(data[columns]))
-  data[["predicted_value"]] <- predicted
+
+  mat <- as.matrix(data[x$X_names])
+
+  if(is.integer(mat)){
+    mat <- matrix(as.numeric(mat), ncol = ncol(mat))
+  }
+
+  predicted <- stats::predict(x, mat)
+
+  vars <- all.vars(x$fml)
+  y_name <- vars[[1]]
+
+  find_label <- function(ids, levels, original_data) {
+    if(is.character(original_data)){
+      x$y_fct_level[ids]
+    } else if (is.factor(original_data)){
+      factor(levels[ids], levels)
+    } else if (is.logical(original_data)) {
+      as.logical(levels[ids])
+    } else if(is.numeric(original_data)){
+      as.numeric(levels[ids])
+    }
+  }
+
+  obj <- x$params$objective
+  if(!is.null(obj)){
+    if (obj == "multi:softmax") {
+      predicted_label_col <- avoid_conflict(colnames(data), "predicted_label")
+      predicted <- find_label(predicted+1, x$y_fct_level, data[[y_name]])
+      data[[predicted_label_col]] <- predicted
+    } else if (obj == "multi:softprob") {
+      predicted_label_col <- avoid_conflict(colnames(data), "predicted_label")
+      predicted_prob_col <- avoid_conflict(colnames(data), "predicted_probability")
+
+      y_fct_level <- x$y_fct_level
+      probs <- matrix(predicted, nrow = length(y_fct_level)) %>% t()
+      colnames(probs) <- y_fct_level
+      predicted <- probs %>%
+        as.data.frame() %>%
+        append_colnames(prefix = "predicted_probability_")
+
+      data <- cbind(data, predicted)
+
+      colmax <- max.col(probs)
+
+      # get max probabilities from each row
+      max_prob <- probs[(colmax - 1) * nrow(probs) + seq(nrow(probs))]
+      predicted_label <- find_label(colmax, y_fct_level, data[[y_name]])
+      # predicted_prob_col is a column for probabilities of chosen values
+      data[[predicted_prob_col]] <- max_prob
+      data[[predicted_label_col]] <- predicted_label
+    } else {
+      data[["predicted_value"]] <- predicted
+    }
+  } else {
+    data[["predicted_value"]] <- predicted
+  }
   data
 }
 
@@ -84,14 +217,11 @@ augment.xgb.Booster <- function(x, data = NULL, newdata = NULL, ...) {
 #' @param type Can be "weight" or "log".
 #' "weight" returns importances of features and "log" returns evaluation log.
 #' @param ... Not used for now.
-#' @importFrom tidytext tidy
 #' @export
 tidy.xgb.Booster <- function(x, type="weight", ...){
-  if(type == "weight"){
-    xgboost::xgb.importance(x$X_names,model=x) %>% as.data.frame()
-  } else if (type == "log") {
-    data.frame(x[["evaluation_log"]])
-  }
+  ret <- xgboost::xgb.importance(x$X_names,model=x) %>% as.data.frame()
+  colnames(ret)[colnames(ret)=="Gain"] <- "Importance"
+  ret
 }
 
 #' Glance xgb.Booster model
@@ -101,20 +231,18 @@ tidy.xgb.Booster <- function(x, type="weight", ...){
 glance.xgb.Booster <- function(x, ...) {
   # data frame with
   # number of iteration
-  # last value of evaluation_log
-  # chosen objectives parameter
-  values <- list()
-  if(!is.null(x$niter)){
-    values[["number_of_iterations"]] <- x$niter
-  }
-  eval_log <- x[["evaluation_log"]]
-  if(!is.null(eval_log)){
-
-    val_cname <- switch(colnames(eval_log)[[2]],
-                        train_rmse = "root_mean_square_error"
-    )
-    values[[val_cname]] <- eval_log[nrow(eval_log),2]
-  }
-  as.data.frame(values)
+  # with chosen evaluation metrics
+  ret <- x$evaluation_log %>% as.data.frame()
+  colnames(ret)[colnames(ret) == "iter"] <- "number_of_iteration"
+  colnames(ret)[colnames(ret) == "train_rmse"] <- "root_mean_square_error"
+  colnames(ret)[colnames(ret) == "train_mae"] <- "mean_absolute_error"
+  colnames(ret)[colnames(ret) == "train_logloss"] <- "negative_log_likelihood"
+  colnames(ret)[colnames(ret) == "train_error"] <- "binary_missclassification_rate"
+  colnames(ret)[colnames(ret) == "train_merror"] <- "missclassification_rate"
+  colnames(ret)[colnames(ret) == "train_mlogloss"] <- "multiclass_logloss"
+  colnames(ret)[colnames(ret) == "train_auc"] <- "auc"
+  colnames(ret)[colnames(ret) == "train_ndcg"] <- "normalized_discounted_cumulative_gain"
+  colnames(ret)[colnames(ret) == "train_map"] <- "mean_average_precision"
+  ret
 }
 
