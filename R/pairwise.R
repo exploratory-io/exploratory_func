@@ -266,7 +266,7 @@ do_dist.cols <- function(df,
 
   select_dots <- lazyeval::lazy_dots(...)
 
-  cnames <- avoid_conflict(grouped_column, c("pair.name.1", "pair.name.2", "value"))
+  cnames <- avoid_conflict(grouped_column, c("pair.name.x", "pair.name.y", "value"))
 
   # this is executed on each group
   calc_dist_each <- function(df){
