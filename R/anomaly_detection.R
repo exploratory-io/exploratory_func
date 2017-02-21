@@ -18,10 +18,10 @@ do_anomaly_detection <- function(df, time, value, ...){
 do_anomaly_detection_ <- function(df, time_col, value_col, direction="both", e_value=TRUE, ...){
   loadNamespace("dplyr")
   loadNamespace("AnomalyDetection")
+  # column name validation
   if(!time_col %in% colnames(df)){
     stop(paste0(time_col, " is not in column names"))
   }
-
   if(!value_col %in% colnames(df)){
     stop(paste0(value_col, " is not in column names"))
   }
@@ -44,7 +44,6 @@ do_anomaly_detection_ <- function(df, time_col, value_col, direction="both", e_v
   # this logic is duplicated between positive and negative direction, so
   # integrated into a function and used in do_anomaly_detection_each
   get_anomalies <- function(data, exp_value_tmp, direction, e_value, ...){
-
     # exp_value_tmp is temporary expected values to be overwritten
     anom <- AnomalyDetection::AnomalyDetectionTs(data, direction = direction, e_value = e_value, ...)$anoms
     if(nrow(anom) > 0) {

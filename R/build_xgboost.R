@@ -5,19 +5,24 @@ fml_xgboost <- function(data, formula, weight = NULL, params = list(), ...) {
   vars <- all.vars(formula)
   is_multi <- params$objective == "multi:softmax" ||
     params$objective == "multi:softprob"
-  if (is.na(is_multi)) {
-    is_multi <- FALSE
-  }
 
   is_binary <- params$objective == "binary:logistic" ||
     params$objective == "binary:logitraw" ||
     params$objective == "reg:logistic"
+
+  # case of params$objective is empty
+  if (is.na(is_multi)) {
+    is_multi <- FALSE
+  }
   if (is.na(is_binary)) {
     is_binary <- FALSE
   }
 
   X_names <- vars[-1]
   y_name  <- vars[1]
+
+  # these parameter will be stored in models,
+  # so that values can be back to original state in prediction
   y_fct_level <- NULL
   factorized <- FALSE
   if(is.character(data[[y_name]])){
@@ -59,15 +64,15 @@ fml_xgboost <- function(data, formula, weight = NULL, params = list(), ...) {
   if (factorized) {
     if(is_multi){
       y_fct_level <- levels(y_fct)
+      if(is.null(params[["num_class"]])){
+        params[["num_class"]] <- length(y_fct_level)
+      }
     } else if (is_binary) {
       if (length(levels(y_fct)) != 2) {
         stop("number of labels must be 2 for binary classification")
       } else {
         y_fct_level <- levels(y_fct)
       }
-    }
-    if(is_multi){
-      params[["num_class"]] <- length(y_fct_level)
     }
   }
   # data must be only numeric
@@ -80,6 +85,7 @@ fml_xgboost <- function(data, formula, weight = NULL, params = list(), ...) {
     data <- data[!is.na(data[[X_name]]), ]
   }
 
+  # weight arguemtn should be evaluated using data name space
   weight <- if (!is.null(substitute(weight))) {
     lz <- lazyeval::as.lazy(substitute(weight))
     ret <- lazyeval::lazy_eval(lz, data = data)
@@ -113,8 +119,9 @@ fml_xgboost <- function(data, formula, weight = NULL, params = list(), ...) {
 #' @export
 build_xgboost_reg <- function(data, formula, output_type = "linear", nrounds = 10, params = list(), ...) {
   .dots <- lazyeval::dots_capture(...)
-  objective <- paste0("reg:", "linear", sep = "")
+  objective <- paste0("reg:", output_type, sep = "")
   params[["objective"]] <- objective
+  # lazyevaluation must be used for params argument to work correctly
   .dots[["params"]] <- lazyeval::lazy(params)
   .dots[["formula"]] <- lazyeval::lazy(formula)
   build_model_(
@@ -155,7 +162,8 @@ augment.xgb.Booster <- function(x, data = NULL, newdata = NULL, ...) {
 
   mat <- as.matrix(data[x$X_names])
 
-  if(is.integer(mat)){
+  # predict of xgboost expects double matrix as input
+  if(is.integer(mat) || is.logical(mat)){
     mat <- matrix(as.numeric(mat), ncol = ncol(mat))
   }
 
@@ -164,15 +172,19 @@ augment.xgb.Booster <- function(x, data = NULL, newdata = NULL, ...) {
   vars <- all.vars(x$fml)
   y_name <- vars[[1]]
 
+  # create predicted labels for classification
+  # based on factor levels and it's indice
   find_label <- function(ids, levels, original_data) {
     if(is.character(original_data)){
-      x$y_fct_level[ids]
+      levels[ids]
     } else if (is.factor(original_data)){
       factor(levels[ids], levels)
     } else if (is.logical(original_data)) {
       as.logical(levels[ids])
     } else if(is.numeric(original_data)){
       as.numeric(levels[ids])
+    } else {
+      ids
     }
   }
 
@@ -182,11 +194,13 @@ augment.xgb.Booster <- function(x, data = NULL, newdata = NULL, ...) {
       predicted_label_col <- avoid_conflict(colnames(data), "predicted_label")
       predicted <- find_label(predicted+1, x$y_fct_level, data[[y_name]])
       data[[predicted_label_col]] <- predicted
+
     } else if (obj == "multi:softprob") {
       predicted_label_col <- avoid_conflict(colnames(data), "predicted_label")
       predicted_prob_col <- avoid_conflict(colnames(data), "predicted_probability")
 
       y_fct_level <- x$y_fct_level
+      # predicted is a vector containing probabilities for each class
       probs <- matrix(predicted, nrow = length(y_fct_level)) %>% t()
       colnames(probs) <- y_fct_level
       predicted <- probs %>%
