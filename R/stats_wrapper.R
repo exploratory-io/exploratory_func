@@ -124,7 +124,7 @@ do_cor.cols <- function(df, ..., use="pairwise.complete.obs", method="pearson", 
   # select columns using dplyr::select logic
   select_dots <- lazyeval::lazy_dots(...)
   grouped_col <- grouped_by(df)
-  output_cols <- avoid_conflict(grouped_col, c("pair.name.1", "pair.name.2", "value"))
+  output_cols <- avoid_conflict(grouped_col, c("pair.name.x", "pair.name.y", "value"))
   # check if the df's grouped
   do_cor_each <- function(df){
     mat <- dplyr::select_(df, .dots = select_dots) %>%  as.matrix()
