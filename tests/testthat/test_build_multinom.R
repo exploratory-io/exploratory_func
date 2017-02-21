@@ -14,7 +14,7 @@ test_that("test nnet build_model", {
     test_data,
     formula = label ~ num + num2,
     group_cols = "term",
-    # weights = weight,
+    weights = weight,
     test_rate = 0.4)
   expect_true(any(colnames(model_df) %in% "term.group"))
 
@@ -76,13 +76,13 @@ test_that("test group error message", {
   test_data <- test_data %>%
     dplyr::filter(label %in% c("a", "b")) %>%
     dplyr::group_by(term)
-expect_error({
-  build_multinom(
-    test_data,
-    formula = term ~ num + num2,
-    # weights = weight,
-    test_rate = 0.4)
-}, "grouped column is used \\(term\\)")
+  expect_error({
+    build_multinom(
+      test_data,
+      formula = term ~ num + num2,
+      # weights = weight,
+      test_rate = 0.4)
+  }, "grouped column is used \\(term\\)")
 })
 
 

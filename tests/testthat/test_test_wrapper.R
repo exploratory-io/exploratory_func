@@ -61,3 +61,62 @@ test_that("test f-test with 3 groups", {
       do_var.test(val, group)
   }, "Group Column has to have 2 unique values")
 })
+
+test_that("test chisq.test with one column", {
+  test_df <- data.frame(
+    group = rep(letters[1:2], each = 500),
+    cat1 = letters[round(runif(1000)*5)+1],
+    cat2 = letters[round(runif(1000)*3)+1]
+  ) %>%
+    dplyr::group_by(group, cat1, cat2) %>%
+    dplyr::summarize(count = n()) %>%
+    dplyr::group_by(group)
+
+  ret <- test_df %>%
+    do_chisq.test(count)
+
+  expect_equal(nrow(ret), 2)
+
+})
+
+test_that("test chisq.test with select argument", {
+  test_df <- data.frame(
+    group = rep(letters[1:2], each = 500),
+    cat1 = letters[round(runif(1000)*5)+1],
+    cat2 = letters[round(runif(1000)*3)+1]
+  ) %>%
+    dplyr::group_by(group, cat1, cat2) %>%
+    dplyr::summarize(count = n()) %>%
+    tidyr::spread(cat2, count) %>%
+    dplyr::group_by(group)
+
+  ret <- test_df %>%
+    do_chisq.test(-cat1)
+
+  expect_equal(nrow(ret), 2)
+
+})
+
+test_that("test chisq.test with p column", {
+  test_df <- structure(
+    list(
+      clarity = c("IF", "VS1", "VS2", "VVS1", "VVS2"),
+      GIA = c(6, 61, 36, 15, 33),
+      HRD = c(4, 13, 15, 23, 24),
+      IGI = c(34, 7, 2, 14, 21)),
+    .Names = c("clarity", "GIA", "HRD", "IGI"),
+    class = "data.frame",
+    row.names = c(NA,-5L)) %>%
+    dplyr::mutate(p = seq(5))
+
+  ret <- test_df %>%
+    do_chisq.test(GIA, p = p)
+  expect_equal(nrow(ret), 1)
+
+  p_from_outside <- seq(5)
+
+  ret2 <- test_df %>%
+    do_chisq.test(IGI, p = p_from_outside)
+  expect_equal(nrow(ret), 1)
+
+})

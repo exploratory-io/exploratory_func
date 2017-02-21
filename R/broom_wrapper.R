@@ -77,21 +77,6 @@ augment_kmeans <- function(df, model, data){
   ret
 }
 
-#' augment wrapper
-#' @export
-predict <- function(df, model, ...){
-  model_col <- col_name(substitute(model))
-  data_col <- col_name(substitute(data))
-  if(!model_col %in% colnames(df)){
-    stop(paste(model_col, "is not in column names"), sep=" ")
-  }
-  if(any(class(df[[model_col]]) %in% ".model.kmeans")){
-    augment_kmeans(df, model, ...)
-  } else {
-    broom::augment(df, model, ...)
-  }
-}
-
 #' apply data frame with model to a data frame
 #' @param df Data frame to predict
 #' @param model_df Data frame that has model
@@ -286,7 +271,7 @@ prediction <- function(df, data = "training", conf_int = 0.95, ...){
   # and models have $family$linkinv (basically, glm models have it),
   # both fitted link value column and response value column should appear in the result
 
-  with_response <- !("type.predict" %in% names(cll)) & !is.null(df[["model"]][[1]]$family) & !is.null(df[["model"]][[1]]$family$linkinv)
+  with_response <- !("type.predict" %in% names(cll)) && "family" %in% names(df[["model"]][[1]]) && !is.null(df[["model"]][[1]]$family$linkinv)
 
   ret <- if(test){
     # augment by test data
@@ -484,11 +469,101 @@ prediction_binary <- function(df, threshold = 0.5, ...){
   ret
 }
 
-#' TODO: prediction wrapper to set proportional hazard.
+#' prediction wrapper to add predicted_probability (probability of "death"), predicted_status,
+#' and actual_status, when time is specified.
 #' @param df Data frame to predict. This should have model column.
+#' @param time The point of time at which we predict survival of subjects.
+#' @param threshold The threshold probability to determine predicted_status.
 #' @export
-prediction_coxph <- function(df, ...){
+prediction_coxph <- function(df, time = NULL, threshold = 0.5, ...){
+  # TODO: need to make sure prediction.type is set to "lp"
+  # when time is specified.
   ret <- prediction(df, ...)
+  
+  # if time is not specified return prediction() result as is.
+  if (is.null(time)) {
+    return(ret)
+  }
+
+  # extract variables for time and status from model formula
+  surv_vars <- all.vars(lazyeval::f_lhs(df$model[[1]]$formula))
+  time_colname <- surv_vars[[1]]
+  status_colname <- surv_vars[[2]]
+
+  # get group columns.
+  # we assume that columns of model df other than the ones with reserved name are all group columns.
+  model_df_colnames = colnames(df)
+  group_by_names <- model_df_colnames[!model_df_colnames %in% c("source.data", ".test_index", "model")]
+
+  # when pre-grouped, prediction() result is grouped.
+  # but when not pre-grouped, it is without grouping.
+  # in that case, we need to group it by something to work with following operations with nest/mutate/map.
+  if (length(group_by_names) == 0) {
+    ret <- ret %>% dplyr::mutate(dummy_group_col = 1) %>% dplyr::group_by(dummy_group_col)
+  }
+
+  # push ret in df so that we can work on ret and source.data at the same time in folliwing mutate() of df.
+  nested_ret_df <- ret %>% tidyr::nest()
+  df[["ret"]] <- nested_ret_df$data
+
+  # group df. rowwise nature of df is stripped here.
+  if (length(group_by_names) == 0) {
+    # need to group by something to work with following operations with mutate/map.
+    df <- df %>% dplyr::mutate(dummy_group_col = 1) %>% dplyr::group_by(dummy_group_col)
+  }
+  else {
+    df <- df %>% dplyr::group_by_(group_by_names)
+  }
+
+  # add predicted_probability, actual_status, and predicted_status
+  ret <- df %>%
+    dplyr::mutate(ret = purrr::map2(ret, model, function(ret, model) {
+      # basehaz returns base cumulative hazard.
+      bh <- survival::basehaz(model)
+      # create a function to interpolate function that returns cumulative hazard.
+      bh_fun <- approxfun(bh$time, bh$hazard)
+      cumhaz_base = bh_fun(time)
+      # transform linear predictor (predicted_value) into predicted_probability.
+      # predicted_probability is 1 - (y of survival curve).
+      ret <- ret %>% dplyr::mutate(predicted_probability = 1 - exp(-cumhaz_base * exp(predicted_value)))
+      ret
+    }))
+  ret <- ret %>% dplyr::select_(c("ret", group_by_names))
+  ret <- ret %>% tidyr::unnest()
+
+  # set it back to non-group-by state that is same as predict() output.
+  if (length(group_by_names) == 0) {
+    ret <- ret %>% dplyr::ungroup() %>% dplyr::select(-dummy_group_col)
+  }
+
+  true_value = TRUE
+  if (is.numeric(ret[[status_colname]])) {
+    if (any(ret[[status_colname]] == 2)) {
+      true_value = 2
+    }
+    else {
+      true_value = 1
+    }
+  }
+
+  ret <- ret %>% dplyr::mutate(predicted_status = predicted_probability > threshold)
+  if (length(group_by_names) > 0) {
+    ret <- ret %>% ungroup() # next line does not work under group_by state, probably because of using dot. so ungroup it once.
+  }
+  ret <- ret %>% dplyr::mutate(actual_status = if_else((.[[time_colname]] <= time & .[[status_colname]] == true_value), TRUE, if_else(.[[time_colname]] >= time, FALSE, NA)))
+  if (length(group_by_names) > 0) {
+    ret <- ret %>% dplyr::group_by_(group_by_names) # group it back again.
+  }
+
+  if (is.numeric(true_value)) {
+    ret$predicted_status <- as.numeric(ret$predicted_status)
+    ret$actual_status <- as.numeric(ret$actual_status)
+    if (true_value == 2) {
+      ret$predicted_status <- ret$predicted_status + 1
+      ret$actual_status <- ret$actual_status + 1
+    }
+  }
+  ret
 }
 
 #' tidy wrapper for lm and glm
@@ -591,10 +666,13 @@ model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
 model_stats <- function(df, pretty.name = FALSE){
   ret <- broom::glance(df, model)
 
-  # here, we are adding base level info for factor variables found in the formula.
-
-  # extract variables from model formula
-  formula_vars <- all.vars(df$model[[1]]$formula)
+  # df$model[[1]]$formula causes error if the model doesn't have formula in attribute names
+  formula_vars <- if("formula" %in% names(df$model[[1]])){
+    # extract variables from model formula
+    all.vars(df$model[[1]]$formula)
+  } else {
+    NULL
+  }
 
   # get group columns.
   # we assume that columns of model df other than the ones with reserved name are all group columns.
@@ -624,13 +702,15 @@ model_stats <- function(df, pretty.name = FALSE){
   ret <- df %>%
     dplyr::mutate(ret = purrr::map2(ret, source.data, function(ret, source_data) {
       # for each factor variable in the formula, add base level info column to ret.
-      for(var in formula_vars) {
-        if(is.factor(source_data[[var]])) {
-          if(pretty.name) {
-            ret[paste0("Base Level of ", var)] <- levels(source_data[[var]])[[1]]
-          }
-          else {
-            ret[paste0(var, "_base")] <- levels(source_data[[var]])[[1]]
+      if(!is.null(formula_vars)){
+        for(var in formula_vars) {
+          if(is.factor(source_data[[var]])) {
+            if(pretty.name) {
+              ret[paste0("Base Level of ", var)] <- levels(source_data[[var]])[[1]]
+            }
+            else {
+              ret[paste0(var, "_base")] <- levels(source_data[[var]])[[1]]
+            }
           }
         }
       }
@@ -740,8 +820,9 @@ model_anova <- function(df, pretty.name = FALSE){
 }
 
 #' tidy after converting model to survfit
+#' @param newdata Data frame with rows that represent cohorts to simulate
 #' @export
-prediction_survfit <- function(df, ...){
+prediction_survfit <- function(df, newdata = NULL, ...){
   caller <- match.call()
   # this expands dots arguemtns to character
   arg_char <- expand_args(caller, exclude = c("df"))
@@ -751,6 +832,32 @@ prediction_survfit <- function(df, ...){
     fml <- as.formula(paste0("~list(survival::survfit(model))"))
   }
   ret <- df %>% dplyr::mutate_(.dots = list(model = fml)) %>% broom::tidy(model)
+
+  # if newdata exists and has more than one row, make output data frame tidy.
+  # original output is in wide-format with columns like estimate.1, estimate.2, ...
+  if (!is.null(newdata) && nrow(newdata) > 1) {
+    # first, unite columns for a cohort into one column, so that gather at the next step works.
+    united_colnames = c() 
+    for (i in 1:nrow(newdata)){
+      united_colname = paste0("est", i)
+      ret <- ret %>% unite_(united_colname, c(paste0("estimate.",i), paste0("std.error.",i), paste0("conf.high.",i),paste0("conf.low.",i)), sep="_", remove=TRUE)
+      united_colnames = c(united_colnames, united_colname)
+    }
+    # gather the united values into key column (cohort) and value column (val)
+    gathered <- ret %>% gather_("cohort", "val", united_colnames)
+    # separte the value column to reverse the effect of unite() we did before.
+    ret <- gathered %>% separate_("val",c("estimate", "std_error", "conf_high", "conf_low"),sep="_")
+    # convert characterized data back to numeric.
+    ret <- ret %>% mutate(estimate = as.numeric(estimate), std_error = as.numeric(std_error), conf_high = as.numeric(conf_high), conf_low = as.numeric(conf_low))
+    # replace the cohort name with a string that is a concatenation of values that represents the cohort.
+    cohorts_labels <- newdata %>% unite(label, everything())
+    for (i in 1:nrow(newdata)){
+      ret <- ret %>% mutate(cohort = if_else(paste0("est", i) == cohort, cohorts_labels$label[[i]], cohort))
+    }
+    # replace the "cohort" column name with name like "age_sex".
+    colnames(ret)[colnames(ret) == "cohort"] <- paste0(colnames(newdata), collapse = "_")
+  }
+
   colnames(ret)[colnames(ret) == "n.risk"] <- "n_risk"
   colnames(ret)[colnames(ret) == "n.event"] <- "n_event"
   colnames(ret)[colnames(ret) == "n.censor"] <- "n_censor"
