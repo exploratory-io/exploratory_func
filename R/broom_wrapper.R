@@ -844,7 +844,7 @@ prediction_survfit <- function(df, newdata = NULL, ...){
       united_colnames = c(united_colnames, united_colname)
     }
     # gather the united values into key column (cohort) and value column (val)
-    gathered <- ret %>% gather_("cohort", "val", united_colnames)
+    gathered <- ret %>% gather_(".cohort.temp", "val", united_colnames)
     # separte the value column to reverse the effect of unite() we did before.
     ret <- gathered %>% separate_("val",c("estimate", "std_error", "conf_high", "conf_low"),sep="_")
     # convert characterized data back to numeric.
@@ -852,10 +852,10 @@ prediction_survfit <- function(df, newdata = NULL, ...){
     # replace the cohort name with a string that is a concatenation of values that represents the cohort.
     cohorts_labels <- newdata %>% unite(label, everything())
     for (i in 1:nrow(newdata)){
-      ret <- ret %>% mutate(cohort = if_else(paste0("est", i) == cohort, cohorts_labels$label[[i]], cohort))
+      ret <- ret %>% mutate(.cohort.temp = if_else(paste0("est", i) == .cohort.temp, cohorts_labels$label[[i]], .cohort.temp))
     }
-    # replace the "cohort" column name with name like "age_sex".
-    colnames(ret)[colnames(ret) == "cohort"] <- paste0(colnames(newdata), collapse = "_")
+    # replace the .cohort.temp column name with name like "age_sex".
+    colnames(ret)[colnames(ret) == ".cohort.temp"] <- paste0(colnames(newdata), collapse = "_")
   }
 
   colnames(ret)[colnames(ret) == "n.risk"] <- "n_risk"
