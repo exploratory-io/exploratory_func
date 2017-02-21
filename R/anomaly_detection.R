@@ -18,6 +18,13 @@ do_anomaly_detection <- function(df, time, value, ...){
 do_anomaly_detection_ <- function(df, time_col, value_col, direction="both", e_value=TRUE, ...){
   loadNamespace("dplyr")
   loadNamespace("AnomalyDetection")
+  if(!time_col %in% colnames(df)){
+    stop(paste0(time_col, " is not in column names"))
+  }
+
+  if(!value_col %in% colnames(df)){
+    stop(paste0(value_col, " is not in column names"))
+  }
 
   # remove NA data
   df <- df[!(is.na(df[[time_col]]) | is.na(df[[value_col]])), ]
