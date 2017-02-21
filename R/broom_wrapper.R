@@ -666,10 +666,14 @@ model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
 model_stats <- function(df, pretty.name = FALSE){
   ret <- broom::glance(df, model)
 
-  # df$model[[1]]$formula causes error if the model doesn't have formula in attribute names
-  formula_vars <- if("formula" %in% names(df$model[[1]])){
-    # extract variables from model formula
-    all.vars(df$model[[1]]$formula)
+  formula_vars <- if (any(c("multinom", "lm", "glm") %in% class(df$model[[1]]))) {
+    # lm, glm (including logistic), multinom has a formula class attribute $terms.
+    # dot (.) is espanded into actual names there, which is convenient for our purpose of finding factor variables.
+    all.vars(df$model[[1]]$terms)
+  } else if("coxph" %in% class(df$model[[1]])) {
+    # coxph has $formula, but it can have dot (.) in it, which is not good for extracting variable names. 
+    # use $assign instead.
+    names(df$model[[1]]$assign)
   } else {
     NULL
   }
