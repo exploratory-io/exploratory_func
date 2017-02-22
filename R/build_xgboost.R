@@ -18,7 +18,7 @@ fml_xgboost <- function(data, formula, weight = NULL, params = list(), ...) {
     is_binary <- FALSE
   }
 
-  X_names <- vars[-1]
+  x_names <- vars[-1]
   y_name  <- vars[1]
 
   # these parameter will be stored in models,
@@ -78,14 +78,14 @@ fml_xgboost <- function(data, formula, weight = NULL, params = list(), ...) {
   # data must be only numeric
   data <- data %>% dplyr::select_if(function(col){is.numeric(col) || is.logical(col)})
 
-  if (any(X_names == '.')) {
-    X_names <- colnames(data)[names(data) != y_name]
+  if (any(x_names == '.')) {
+    x_names <- colnames(data)[names(data) != y_name]
   }
-  for (X_name in X_names) {
-    data <- data[!is.na(data[[X_name]]), ]
+  for (x_name in x_names) {
+    data <- data[!is.na(data[[x_name]]), ]
   }
 
-  # weight arguemtn should be evaluated using data name space
+  # weight argument should be evaluated using data name space
   weight <- if (!is.null(substitute(weight))) {
     lz <- lazyeval::as.lazy(substitute(weight))
     ret <- lazyeval::lazy_eval(lz, data = data)
@@ -95,24 +95,24 @@ fml_xgboost <- function(data, formula, weight = NULL, params = list(), ...) {
     NULL
   }
 
-  X <- data.matrix(data[, X_names])
+  x <- data.matrix(data[, x_names])
 
-  if(is.integer(X) || is.logical(X)){
-    # X must be a double matrix
-    X <- matrix(as.double(X), ncol = ncol(X))
+  if(is.integer(x) || is.logical(x)){
+    # x must be a double matrix
+    x <- matrix(as.double(x), ncol = ncol(x))
   }
 
   y <- data[[y_name]]
 
-  ret <- xgboost::xgboost(data = X, label = y, weight = weight, params = params, ...)
+  ret <- xgboost::xgboost(data = x, label = y, weight = weight, params = params, ...)
   ret$fml <- formula
-  ret$X_names <- X_names
+  ret$x_names <- x_names
   ret$y_fct_level <- y_fct_level
   ret$output_type <- output_type
   ret
 }
 
-#' Glance xgb.Booster model
+#' Create regression model by xgboost
 #' @param data Data frame
 #' @param formula Formula for xgb.Booster training.
 #' @param ... Arguments to be passed to xgboost::xgboost
@@ -131,7 +131,7 @@ build_xgboost_reg <- function(data, formula, output_type = "linear", nrounds = 1
     .dots = .dots)
 }
 
-#' Glance xgb.Booster model
+#' Create regression model by xgboost
 #' @param data Data frame
 #' @param formula Formula for xgb.Booster training.
 #' @param ... Arguments to be passed to xgboost::xgboost
@@ -156,11 +156,11 @@ augment.xgb.Booster <- function(x, data = NULL, newdata = NULL, ...) {
   if(!is.null(newdata)){
     data <- newdata
   }
-  if(is.null(x$X_names)) {
+  if(is.null(x$x_names)) {
     stop("model must be created from fml_xgboost to augment")
   }
 
-  mat <- as.matrix(data[x$X_names])
+  mat <- as.matrix(data[x$x_names])
 
   # predict of xgboost expects double matrix as input
   if(is.integer(mat) || is.logical(mat)){
@@ -233,12 +233,12 @@ augment.xgb.Booster <- function(x, data = NULL, newdata = NULL, ...) {
 #' @param ... Not used for now.
 #' @export
 tidy.xgb.Booster <- function(x, type="weight", ...){
-  ret <- xgboost::xgb.importance(x$X_names,model=x) %>% as.data.frame()
+  ret <- xgboost::xgb.importance(x$x_names,model=x) %>% as.data.frame()
   colnames(ret)[colnames(ret)=="Gain"] <- "Importance"
   ret
 }
 
-#' Glance xgb.Booster model
+#' Glance for xgb.Booster model
 #' @param x xgb.Booster model
 #' @param ... Not used for now.
 #' @export

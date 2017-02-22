@@ -24,14 +24,17 @@ anonymize <- function(vec, algo = "sha256", seed = 0, chars = letters, n_chars =
   anonymizer::anonymize(vec, .algo = algo, .seed = seed, .chars = chars, .n_chars = n_chars, ...)
 }
 
+# Importing tidy is needed to define tidy methods to other classes
 #' @importFrom tidytext tidy
 #' @export
 tidy
 
+# Importing glance is needed to define glance methods to other classes
 #' @importFrom tidytext glance
 #' @export
 glance
 
+# Importing augment is needed to define augment methods to other classes
 #' @importFrom tidytext augment
 #' @export
 augment

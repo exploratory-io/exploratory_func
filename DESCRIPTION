@@ -9,8 +9,12 @@ Description: Functions for Exploratory
 License: What license is it under?
 LazyData: TRUE
 Encoding: UTF-8
+Notes: 
+    Depends section is to load namespaces to environment when loading exploratory.
+    broom is to expose augment, tidy and glance functions.
+    urltools is loaded to avoid an error "Error : .onLoad failed in loadNamespace() for 'urltools'".
 Depends:
-    broom,
+    broom, 
     urltools
 Imports:
     dplyr,

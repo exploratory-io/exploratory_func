@@ -437,7 +437,11 @@ prediction_binary <- function(df, threshold = 0.5, ...){
     all.vars(first_model$formula)[[1]]
   } else {
     # this is for xgboost model
-    all.vars(first_model$fml)[[1]]
+    if ("xgb.Booster" %in% class(first_model)) {
+      all.vars(first_model$fml)[[1]]
+    } else {
+      stop(paste0(class(first_model)[[1]], " is not supported by prediction_binary"))
+    }
   }
 
   actual_val <- ret[[actual_col]]
