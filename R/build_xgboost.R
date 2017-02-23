@@ -33,6 +33,8 @@ data_xgboost <- function(data, x_names, y_name, weight = NULL, nrounds= 10, ...)
 }
 
 #' formula version of xgboost (multinomial)
+#' @param output_type Type of output. Can be "logistic" or "logitraw"
+#' The explanation is in https://www.r-bloggers.com/with-our-powers-combined-xgboost-and-pipelearner/
 #' @export
 xgboost_binary <- function(data, formula, output_type = "logistic", eval_metric = "auc", ...) {
   vars <- all.vars(formula)
@@ -48,13 +50,14 @@ xgboost_binary <- function(data, formula, output_type = "logistic", eval_metric 
 
   y_vals <- data[[y_name]]
 
+  # this is used to get back original values from predicted output
   label_levels <- c(0, 1)
   if(is.logical(y_vals)) {
     label_levels <- c(FALSE, TRUE)
     y_vals <- as.numeric(y_vals)
   } else if (!all(y_vals %in% c(0, 1))){
     factored <- as.factor(data[[y_name]])
-    label_levels <- levels(factored)
+    label_levels <- same_type(levels(factored), data[[y_name]])
     if(length(label_levels) != 2){
       stop("target variable must have 2 unique values")
     }
@@ -70,6 +73,7 @@ xgboost_binary <- function(data, formula, output_type = "logistic", eval_metric 
                       objective = objective,
                       eval_metric = eval_metric,
                       ...)
+  # add class to control S3 methods
   class(ret) <- c("xgboost_binary", class(ret))
   ret$fml <- formula
   ret$x_names <- x_names
@@ -78,6 +82,8 @@ xgboost_binary <- function(data, formula, output_type = "logistic", eval_metric 
 }
 
 #' formula version of xgboost (multinomial)
+#' @param output_type Type of output. Can be "softprob" or "softmax"
+#' The explanation is in https://www.r-bloggers.com/with-our-powers-combined-xgboost-and-pipelearner/
 #' @export
 xgboost_multi <- function(data, formula, output_type = "softprob", ...) {
   vars <- all.vars(formula)
@@ -93,11 +99,14 @@ xgboost_multi <- function(data, formula, output_type = "softprob", ...) {
 
   y_vals <- data[[y_name]]
 
+  # this is used to get back original values from predicted output
   label_levels <- if(is.logical(y_vals)) {
     y_vals <- as.numeric(y_vals)
     c(FALSE, TRUE)
   } else if (is.factor(y_vals)) {
     y_vals <- as.numeric(y_vals) - 1
+    # this is sorted unique factor
+    # will be used to re-construct factor from index vector with the same level
     sort(unique(data[[y_name]]))
   } else {
     factored <- as.factor(data[[y_name]])
@@ -114,6 +123,7 @@ xgboost_multi <- function(data, formula, output_type = "softprob", ...) {
                              objective = objective,
                              num_class = length(label_levels),
                              ...)
+  # add class to control S3 methods
   class(ret) <- c("xgboost_multi", class(ret))
   ret$fml <- formula
   ret$x_names <- x_names
@@ -122,6 +132,8 @@ xgboost_multi <- function(data, formula, output_type = "softprob", ...) {
 }
 
 #' formula version of xgboost (regression)
+#' @param output_type Type of output. Can be "linear", "logistic", "gamma" or "tweedie"
+#' The explanation is in https://www.r-bloggers.com/with-our-powers-combined-xgboost-and-pipelearner/
 #' @export
 xgboost_reg <- function(data, formula, output_type = "linear", ...) {
   vars <- all.vars(formula)
@@ -140,6 +152,7 @@ xgboost_reg <- function(data, formula, output_type = "linear", ...) {
   objective <- paste0("reg:", output_type, sep = "")
 
   ret <- data_xgboost(data = data, x_names = x_names, y_name = y_name,  objective = objective, ...)
+  # add class to control S3 methods
   class(ret) <- c("xgboost_reg", class(ret))
   ret$fml <- formula
   ret$x_names <- x_names
@@ -208,7 +221,7 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, ...) {
   data
 }
 
-#' Augment predicted values
+#' Augment predicted values for binary task
 #' @param x xgb.Booster model
 #' @param data Data frame used to train xgb.Booster
 #' @param newdata New data frame to predict
@@ -242,13 +255,20 @@ augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, threshold = 0
   predicted_prob_col <- avoid_conflict(colnames(data), "predicted_probability")
   if (obj == "binary:logistic") {
     predicted_prob_col <- avoid_conflict(colnames(data), "predicted_probability")
+
+    # TODO: should support optimized threshold
+    # +1 is needed to get index from binary values
     predicted_label <- x$y_levels[(predicted>threshold) + 1]
     data[[predicted_prob_col]] <- predicted
     data[[predicted_label_col]] <- predicted_label
   } else if (obj == "binary:logitraw") {
     predicted_val_col <- avoid_conflict(colnames(data), "predicted_value")
 
+    # binary:logitraw returns logit values
     prob <- boot::inv.logit(predicted)
+
+    # TODO: should support optimized threshold
+    # +1 is needed to get index from binary values
     predicted_label <- x$y_levels[(predicted>threshold) + 1]
 
     data[[predicted_val_col]] <- predicted
@@ -271,11 +291,14 @@ augment.xgb.Booster <- function(x, data = NULL, newdata = NULL, ...) {
   if(!is.null(newdata)){
     data <- newdata
   }
-  if(is.null(x$x_names)) {
-    stop("model must be created from fml_xgboost to augment")
+  mat_data <- if(!is.null(x$x_names)) {
+    data[x$x_names]
+  } else {
+    # use all data if there is no x_names
+    data
   }
 
-  mat <- as.matrix(data[x$x_names])
+  mat <- as.matrix(mat_data)
 
   # predict of xgboost expects double matrix as input
   if(is.integer(mat) || is.logical(mat)){

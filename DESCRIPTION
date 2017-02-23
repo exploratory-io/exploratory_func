@@ -36,7 +36,8 @@ Imports:
     urltools,
     anonymizer,
     forcats,
-    tidytext
+    tidytext,
+    boot
 Suggests:
     testthat,
     twitteR,
