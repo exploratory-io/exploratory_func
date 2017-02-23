@@ -117,12 +117,12 @@ xgboost_multi <- function(data, formula, output_type = "softprob", ...) {
   data[[y_name]] <- y_vals
 
   objective <- paste0("multi:", output_type, sep = "")
-  ret <- ret <- data_xgboost(data = data,
-                             x_names = x_names,
-                             y_name = y_name,
-                             objective = objective,
-                             num_class = length(label_levels),
-                             ...)
+  ret <- data_xgboost(data = data,
+                      x_names = x_names,
+                      y_name = y_name,
+                      objective = objective,
+                      num_class = length(label_levels),
+                      ...)
   # add class to control S3 methods
   class(ret) <- c("xgboost_multi", class(ret))
   ret$fml <- formula
