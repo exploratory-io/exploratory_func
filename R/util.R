@@ -268,7 +268,7 @@ same_type <- function(vector, original){
     if(all(vector[!is.na(vector)] %in% levels(original))){
       # if original is factor and vector has all values,
       # should return factor with same levels
-      factor(vector, levels = vector)
+      factor(vector, levels = levels(original))
     } else {
       as.factor(vector)
     }
