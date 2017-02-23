@@ -611,10 +611,10 @@ model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
     } else {
       # broom::tidy uses confint.lm and it uses profile, so "profile" is used in conf_int to swith how to get confint
       profile <- conf_int == "profile"
-      broom::tidy(df, model, conf.int = profile, ...)
+      broom::tidy(df, model, conf.int = profile, pretty.name = pretty.name, ...)
     }
   } else {
-    broom::tidy(df, model, ...)
+    broom::tidy(df, model, pretty.name = pretty.name, ...)
   }
 
   if ("glm" %in% class(df$model[[1]])) {
@@ -672,15 +672,15 @@ model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
 
 #' glance wrapper
 #' @export
-model_stats <- function(df, pretty.name = FALSE){
-  ret <- broom::glance(df, model)
+model_stats <- function(df, pretty.name = FALSE, ...){
+  ret <- broom::glance(df, model, pretty.name = pretty.name, ...)
 
   formula_vars <- if (any(c("multinom", "lm", "glm") %in% class(df$model[[1]]))) {
     # lm, glm (including logistic), multinom has a formula class attribute $terms.
     # dot (.) is espanded into actual names there, which is convenient for our purpose of finding factor variables.
     all.vars(df$model[[1]]$terms)
   } else if("coxph" %in% class(df$model[[1]])) {
-    # coxph has $formula, but it can have dot (.) in it, which is not good for extracting variable names. 
+    # coxph has $formula, but it can have dot (.) in it, which is not good for extracting variable names.
     # use $assign instead.
     names(df$model[[1]]$assign)
   } else {

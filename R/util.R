@@ -265,7 +265,11 @@ mat_to_df <- function(mat, cnames=NULL, na.rm=TRUE, diag=TRUE){
 #' match the type of two vector
 same_type <- function(vector, original){
   if(is.factor(original)){
-    as.factor(vector)
+    if(all(vector[!is.na(vector)] %in% levels(original))){
+      factor(vector, levels = vector)
+    } else {
+      as.factor(vector)
+    }
   } else if(is.integer(original)){
     as.integer(vector)
   } else if(is.numeric.Date(original)) {
@@ -735,4 +739,9 @@ binary_label <- function(val) {
     }
     val <- logi_val
   }
+}
+
+#' function to create model matrix
+quantifiable_cols <- function(data){
+  data %>% dplyr::select_if(function(col){is.numeric(col) || is.logical(col)}) %>% colnames()
 }
