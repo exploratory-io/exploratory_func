@@ -58,7 +58,6 @@ test_that("test build_xgboost with weight", {
   coef_ret <- model_coef(model_ret)
   stats_ret <- model_stats(model_ret)
   prediction_ret <- prediction(model_ret)
-
   expect_true(is.logical(prediction_ret$predicted_label))
   expect_equal(ncol(model_ret), 3)
 })
