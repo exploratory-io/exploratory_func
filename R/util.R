@@ -266,6 +266,8 @@ mat_to_df <- function(mat, cnames=NULL, na.rm=TRUE, diag=TRUE){
 same_type <- function(vector, original){
   if(is.factor(original)){
     if(all(vector[!is.na(vector)] %in% levels(original))){
+      # if original is factor and vector has all values,
+      # should return factor with same levels
       factor(vector, levels = vector)
     } else {
       as.factor(vector)
@@ -741,7 +743,7 @@ binary_label <- function(val) {
   }
 }
 
-#' function to create model matrix
+#' function to find column names that can be numeric values
 quantifiable_cols <- function(data){
   data %>% dplyr::select_if(function(col){is.numeric(col) || is.logical(col)}) %>% colnames()
 }
