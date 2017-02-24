@@ -177,3 +177,19 @@ test_that("test build_xgboost with linear booster", {
   stats_ret <- model_stats(model_ret)
   expect_equal(nrow(stats_ret), 5)
 })
+
+test_that("test build_xgboost prediction with optimized threshold", {
+  test_data <- structure(
+    list(
+      CANCELLED = c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0),
+      `Carrier Name` = c("Delta Air Lines", "American Eagle", "American Airlines", "Southwest Airlines", "SkyWest Airlines", "Southwest Airlines", "Southwest Airlines", "Delta Air Lines", "Southwest Airlines", "Atlantic Southeast Airlines", "American Airlines", "Southwest Airlines", "US Airways", "US Airways", "Delta Air Lines", "Atlantic Southeast Airlines", NA, "Atlantic Southeast Airlines", "Delta Air Lines", "Delta Air Lines"),
+      CARRIER = c("DL", "MQ", "AA", "DL", "MQ", "AA", "DL", "DL", "MQ", "AA", "AA", "WN", "US", "US", "DL", "EV", "9E", "EV", "DL", "DL"),
+      DISTANCE = c(1587, 173, 646, 187, 273, 1062, 583, 240, 1123, 851, 852, 862, 361, 507, 1020, 1092, 342, 489, 1184, 545)), row.names = c(NA, -20L),
+    class = c("tbl_df", "tbl", "data.frame"), .Names = c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE"))
+  test_data[["weight"]] <- c(seq(nrow(test_data)-1), NA)
+  test_data[["IS_AA"]] <- test_data$CARRIER == "AA"
+  model_ret <- build_model(test_data, model_func = xgboost_binary, formula = IS_AA ~ ., nrounds = 5, eval_metric = "auc")
+  prediction_ret <- prediction(model_ret, threshold = "f_score")
+  expect_true(any(prediction_ret$predicted_label))
+  expect_true(any(!prediction_ret$predicted_label))
+})

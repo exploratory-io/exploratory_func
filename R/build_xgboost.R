@@ -260,28 +260,41 @@ augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, threshold = 0
   obj <- x$params$objective
   predicted_label_col <- avoid_conflict(colnames(data), "predicted_label")
   predicted_prob_col <- avoid_conflict(colnames(data), "predicted_probability")
-  if (obj == "binary:logistic") {
+  prob <- if (obj == "binary:logistic") {
     predicted_prob_col <- avoid_conflict(colnames(data), "predicted_probability")
-
-    # TODO: should support optimized threshold
-    # +1 is needed to get index from binary values
-    predicted_label <- x$y_levels[(predicted>threshold) + 1]
     data[[predicted_prob_col]] <- predicted
-    data[[predicted_label_col]] <- predicted_label
+    predicted
   } else if (obj == "binary:logitraw") {
     predicted_val_col <- avoid_conflict(colnames(data), "predicted_value")
 
     # binary:logitraw returns logit values
     prob <- boot::inv.logit(predicted)
 
-    # TODO: should support optimized threshold
-    # +1 is needed to get index from binary values
-    predicted_label <- x$y_levels[(predicted>threshold) + 1]
-
     data[[predicted_val_col]] <- predicted
     data[[predicted_prob_col]] <- prob
-    data[[predicted_label_col]] <- predicted_label
+    prob
+  } else {
+    stop(paste0("object type ", obj, " is not supported"))
   }
+
+  thres_val <- if(is.numeric(threshold)) {
+    threshold
+  } else if (!is.null(data[[y_name]])){
+    # find optimized threshold
+    y_vals <- data[[y_name]]
+
+    # convert the y_values to logical
+    if(!all(y_vals %in% c(0, 1))){
+      y_vals <- factor(y_vals, levels = x$y_levels) %>% as.integer() %>% as.logical()
+    } else {
+      y_vals <- as.logical(y_vals)
+    }
+    get_optimized_score(y_vals, prob, threshold)$threshold
+  }
+  predicted_label <- x$y_levels[(predicted>thres_val) + 1]
+
+  data[[predicted_label_col]] <- predicted_label
+
   data
 }
 
