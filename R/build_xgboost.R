@@ -234,7 +234,7 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, ...) {
 #' @param newdata New data frame to predict
 #' @param ... Not used for now.
 #' @export
-augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, threshold = 0.5, ...) {
+augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, ...) {
   class(x) <- class(x)[class(x) != "xgboost_binary"]
   if(!is.null(newdata)){
     data <- newdata
@@ -276,24 +276,6 @@ augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, threshold = 0
   } else {
     stop(paste0("object type ", obj, " is not supported"))
   }
-
-  thres_val <- if(is.numeric(threshold)) {
-    threshold
-  } else if (!is.null(data[[y_name]])){
-    # find optimized threshold
-    y_vals <- data[[y_name]]
-
-    # convert the y_values to logical
-    if(!all(y_vals %in% c(0, 1))){
-      y_vals <- factor(y_vals, levels = x$y_levels) %>% as.integer() %>% as.logical()
-    } else {
-      y_vals <- as.logical(y_vals)
-    }
-    get_optimized_score(y_vals, prob, threshold)$threshold
-  }
-  predicted_label <- x$y_levels[(predicted>thres_val) + 1]
-
-  data[[predicted_label_col]] <- predicted_label
 
   data
 }
