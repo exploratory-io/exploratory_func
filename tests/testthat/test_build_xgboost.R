@@ -1,5 +1,15 @@
 context("test build_xgboost")
 
+test_that("test xgboost_multi with numeric target", {
+  test_data <- data.frame(
+    label = rep(seq(3) * 5, 100),
+    num1 =  rep(seq(3), 100) + runif(100),
+    num2 = rep(seq(3), 100) + runif(100)
+  )
+  model_ret <- build_model(test_data, model_func = xgboost_multi, formula = label ~ ., nrounds = 5)
+  prediction_ret <- prediction(model_ret)
+  expect_true(all(prediction_ret$predicted_label %in% c(5, 10, 15)))
+})
 
 test_that("test build_xgboost", {
   test_data <- structure(
@@ -57,7 +67,7 @@ test_that("test build_xgboost with weight", {
   model_ret <- build_model(test_data, model_func = xgboost_binary, formula = IS_AA ~ DISTANCE, nrounds = 5, booster = "dart", eval_metric = "auc", output_type = "logitraw", weight = log(weight))
   coef_ret <- model_coef(model_ret)
   stats_ret <- model_stats(model_ret)
-  prediction_ret <- prediction(model_ret)
+  prediction_ret <- prediction_binary(model_ret)
   expect_true(is.logical(prediction_ret$predicted_label))
   expect_equal(ncol(model_ret), 3)
 })
@@ -91,7 +101,7 @@ test_that("test build_xgboost with dot", {
   test_data[["weight"]] <- c(seq(nrow(test_data)-1), NA)
   test_data[["IS_AA"]] <- test_data$CARRIER == "AA"
   model_ret <- build_model(test_data, model_func = xgboost_binary, formula = IS_AA ~ ., nrounds = 5, eval_metric = "auc")
-  prediction_ret <- prediction(model_ret)
+  prediction_ret <- prediction_binary(model_ret)
   expect_equal(ncol(prediction_ret), ncol(test_data) + 2)
 })
 

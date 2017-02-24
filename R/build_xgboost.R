@@ -44,6 +44,7 @@ xgboost_binary <- function(data, formula, output_type = "logistic", eval_metric 
 
   if (any(x_names == '.')) {
     x_names <- quantifiable_cols(data)
+    x_names <- x_names[x_names != y_name]
   }
 
   data <- tidyr::drop_na_(data, c(x_names, y_name))
@@ -100,6 +101,7 @@ xgboost_multi <- function(data, formula, output_type = "softprob", ...) {
 
   if (any(x_names == '.')) {
     x_names <- quantifiable_cols(data)
+    x_names <- x_names[x_names != y_name]
   }
 
   data <- tidyr::drop_na_(data, c(x_names, y_name))
@@ -150,6 +152,7 @@ xgboost_reg <- function(data, formula, output_type = "linear", ...) {
 
   if (any(x_names == '.')) {
     x_names <- quantifiable_cols(data)
+    x_names <- x_names[x_names != y_name]
   }
 
   data[[y_name]] <- as.numeric(data[[y_name]])
