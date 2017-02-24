@@ -449,6 +449,8 @@ prediction_binary <- function(df, threshold = 0.5, ...){
 
   prob_col_name <- if ("predicted_response" %in% colnames(ret)) {
     "predicted_response"
+  } else if ("predicted_probability" %in% colnames(ret)){
+    "predicted_probability"
   } else {
     "predicted_value"
   }

@@ -189,7 +189,7 @@ test_that("test build_xgboost prediction with optimized threshold", {
   test_data[["weight"]] <- c(seq(nrow(test_data)-1), NA)
   test_data[["IS_AA"]] <- test_data$CARRIER == "AA"
   model_ret <- build_model(test_data, model_func = xgboost_binary, formula = IS_AA ~ ., nrounds = 5, eval_metric = "auc")
-  prediction_ret <- prediction(model_ret, threshold = "f_score")
+  prediction_ret <- prediction_binary(model_ret, threshold = "f_score")
   expect_true(any(prediction_ret$predicted_label))
   expect_true(any(!prediction_ret$predicted_label))
 })
