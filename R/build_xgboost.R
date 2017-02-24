@@ -67,12 +67,19 @@ xgboost_binary <- function(data, formula, output_type = "logistic", eval_metric 
   data[[y_name]] <- y_vals
   objective <- paste0("binary:", output_type, sep = "")
 
-  ret <- data_xgboost(data = data,
-                      x_names = x_names,
-                      y_name = y_name,
-                      objective = objective,
-                      eval_metric = eval_metric,
-                      ...)
+  ret <- tryCatch({
+    data_xgboost(data = data,
+                 x_names = x_names,
+                 y_name = y_name,
+                 objective = objective,
+                 eval_metric = eval_metric,
+                 ...)
+  }, error = function(e){
+    if(stringr::str_detect(e$message, "Check failed: !auc_error AUC: the dataset only contains pos or neg samples")){
+      stop("The target only contains positive or negative values")
+    }
+    stop(e)
+  })
   # add class to control S3 methods
   class(ret) <- c("xgboost_binary", class(ret))
   ret$fml <- formula

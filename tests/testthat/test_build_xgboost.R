@@ -160,3 +160,20 @@ test_that("test build_xgboost with linear booster", {
   stats_ret <- model_stats(model_ret)
   expect_equal(nrow(stats_ret), 5)
 })
+
+test_that("test build_xgboost with linear booster", {
+  test_data <- structure(
+    list(
+      CANCELLED = c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+      `Carrier Name` = c("Delta Air Lines", "American Eagle", "American Airlines", "Southwest Airlines", "SkyWest Airlines", "Southwest Airlines", "Southwest Airlines", "Delta Air Lines", "Southwest Airlines", "Atlantic Southeast Airlines", "American Airlines", "Southwest Airlines", "US Airways", "US Airways", "Delta Air Lines", "Atlantic Southeast Airlines", NA, "Atlantic Southeast Airlines", "Delta Air Lines", "Delta Air Lines"),
+      CARRIER = c("DL", "MQ", "AA", "DL", "MQ", "AA", "DL", "DL", "MQ", "AA", "AA", "WN", "US", "US", "DL", "EV", "9E", "EV", "DL", "DL"),
+      DISTANCE = c(1587, 173, 646, 187, 273, 1062, 583, 240, 1123, 851, 852, 862, 361, 507, 1020, 1092, 342, 489, 1184, 545)), row.names = c(NA, -20L),
+    class = c("tbl_df", "tbl", "data.frame"), .Names = c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE"))
+  expect_error({
+    model_ret <- build_model(test_data, model_func = xgboost_binary, formula = CANCELLED ~ DISTANCE, nrounds = 5, booster = "gblinear")
+  }, "The target only contains positive or negative values")
+  model_ret <- build_model(test_data, model_func = xgboost_binary, eval_metric = "error", formula = CANCELLED ~ DISTANCE, nrounds = 5, booster = "gbtree")
+  coef_ret <- model_coef(model_ret)
+  stats_ret <- model_stats(model_ret)
+  expect_equal(nrow(stats_ret), 5)
+})
