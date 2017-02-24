@@ -95,7 +95,7 @@ augment.multinom <- function(model, data = NULL, newdata = NULL) {
     ret <- prob_mat %>%
       as.data.frame() %>%
       append_colnames(prefix = "predicted_probability_")
-    ret[[predicted_label_col]] <- prob_label
+    ret[[predicted_label_col]] <- factor(prob_label, levels = model$lev)
     ret[[predicted_prob_col]] <- max_prob
     ret <- dplyr::bind_cols(newdata, ret)
   }
