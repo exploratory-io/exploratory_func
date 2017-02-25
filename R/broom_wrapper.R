@@ -435,7 +435,9 @@ prediction_binary <- function(df, threshold = 0.5, ...){
   # get actual value column name from model formula
   actual_col <- if(!is.null(first_model$formula)) {
     all.vars(first_model$formula)[[1]]
-  } else {
+  } else if (!is.null(first_model$terms)) {
+    all.vars(first_model$terms)[[1]]
+  }else {
     # this is for xgboost model
     if ("xgb.Booster" %in% class(first_model)) {
       all.vars(first_model$fml)[[1]]
