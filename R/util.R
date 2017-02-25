@@ -282,6 +282,8 @@ same_type <- function(vector, original){
     as.numeric(vector)
   } else if(is.character(original)) {
     as.character(vector)
+  } else if (is.logical(original)) {
+    as.logical(vector)
   }
 }
 
@@ -746,4 +748,20 @@ binary_label <- function(val) {
 #' function to find column names that can be numeric values
 quantifiable_cols <- function(data){
   data %>% dplyr::select_if(function(col){is.numeric(col) || is.logical(col)}) %>% colnames()
+}
+
+#' get multinomial predicted value results
+get_multi_predicted_values <- function(prob_mat, actual_vals = NULL){
+  prob_label <- colnames(prob_mat)[max.col(prob_mat)]
+  if(!is.null(actual_vals)){
+    prob_label <- same_type(prob_label, actual_vals)
+  }
+
+  # get max values from each row
+  max_prob <- prob_mat[(max.col(prob_mat) - 1) * nrow(prob_mat) + seq(nrow(prob_mat))]
+  ret <- as.data.frame(prob_mat) %>%
+    append_colnames(prefix = "predicted_probability_")
+  ret$predicted_probability <- max_prob
+  ret$predicted_label <- prob_label
+  ret
 }
