@@ -2,7 +2,7 @@ context("test build_multinom")
 
 test_that("test nnet build_model", {
   test_data <- data.frame(
-    label = c(rep(letters[1:3], 12), NA, "a", "a"),
+    label = c(rep(letters[1:3], 12), NA, "c", "c"),
     num = seq(39),
     num2 = 39 - seq(39),
     weight = seq(39)/39,
@@ -30,6 +30,8 @@ test_that("test nnet build_model", {
 
   prediction_training_ret <- prediction(model_df, data = "training")
   prediction_ret <- prediction(model_df, data = "test")
+  expect_equal(levels(prediction_ret$predicted_label), c("c", "a", "b"))
+  expect_equal(levels(prediction_ret$predicted_label), levels(prediction_ret$label))
 
   evaluation_ret <- evaluate_multi(prediction_ret, predicted_label, label)
 
