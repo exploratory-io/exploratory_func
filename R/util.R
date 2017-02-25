@@ -265,7 +265,13 @@ mat_to_df <- function(mat, cnames=NULL, na.rm=TRUE, diag=TRUE){
 #' match the type of two vector
 same_type <- function(vector, original){
   if(is.factor(original)){
-    as.factor(vector)
+    if(all(vector[!is.na(vector)] %in% levels(original))){
+      # if original is factor and vector has all values,
+      # should return factor with same levels
+      factor(vector, levels = levels(original))
+    } else {
+      as.factor(vector)
+    }
   } else if(is.integer(original)){
     as.integer(vector)
   } else if(is.numeric.Date(original)) {
@@ -735,4 +741,9 @@ binary_label <- function(val) {
     }
     val <- logi_val
   }
+}
+
+#' function to find column names that can be numeric values
+quantifiable_cols <- function(data){
+  data %>% dplyr::select_if(function(col){is.numeric(col) || is.logical(col)}) %>% colnames()
 }

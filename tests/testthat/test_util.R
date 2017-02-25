@@ -453,3 +453,15 @@ test_that("test pivot", {
   expect_true(any(is.na(pivoted_with_na)))
 
 })
+
+test_that("test same_type for factor", {
+  original <- factor(c("bb", "bb", "aa"), levels = c("bb", "aa"))
+
+  to_replace <- c("aa", "aa", "bb")
+  ret <- same_type(to_replace, original)
+  expect_equal(ret, factor(c("aa", "aa", "bb"), levels = c("bb", "aa")))
+
+  to_replace <- factor(c("aa", "aa", "bb"), levels = c("aa", "bb"))
+  ret <- same_type(to_replace, original)
+  expect_equal(ret, factor(c("aa", "aa", "bb"), levels = c("bb", "aa")))
+})
