@@ -1,14 +1,152 @@
+#' Random Forest wrapper for regression
+#' @export
+randomForestReg <- function(data, formula, na.action = na.omit, ...) {
+  target_col <- all.vars(formula)[[1]]
+
+  if(!is.numeric(data[[target_col]])){
+    stop("Target must be numeric column")
+  }
+
+  original_colnames <- colnames(data)
+
+  target_col_index <- which(colnames(data) == target_col)
+
+  # randomForest must take clean names
+  data <- janitor::clean_names(data)
+  updated_colnames <- colnames(data)
+  names(updated_colnames) <- original_colnames
+
+  # get target col as clean name
+  target_col <- colnames(data)[target_col_index]
+
+  if("." %in% all.vars(lazyeval::f_rhs(formula))){
+    # somehow, mixing numeric and categorical predictors causes an error in randomForest
+    # so use only numeric or logical columns
+    cols <- quantifiable_cols(data)
+    vars <- cols[!cols %in% target_col]
+    formula <- as.formula(paste0(target_col, " ~ ", paste0(vars, collapse = " + ")))
+  } else {
+    vars <- all.vars(formula)
+    newvars <- updated_colnames[vars]
+    formula <- as.formula(paste0(newvars[[1]], " ~ ", paste0(newvars[-1], collapse = " + ")))
+  }
+
+  ret <- tryCatch({
+    randomForest::randomForest(formula = formula, data = data, na.action = na.action, ...)
+  }, error = function(e){
+    if (e$message == "NA/NaN/Inf in foreign function call (arg 1)"){
+      # TODO: Should find the root cause of this error because indicating
+      # numerical and categorical predictors doesn't always cause this error
+      stop("Categorical and numerical predictors can't be used at the same time.")
+    }
+    stop(e)
+  })
+
+  # this attribute will be used to get back original column names
+  terms_mapping <- original_colnames
+  names(terms_mapping) <- updated_colnames
+  ret$terms_mapping <- terms_mapping
+
+  ret
+}
+
 #' Random Forest wrapper for classification
 #' This is needed because boolean target starts regression task,
 #' not classification task
 #' @export
-randomForestClassify <- function(data, formula, ...) {
+randomForestBinary <- function(data, formula, ...) {
   target_col <- all.vars(formula)[[1]]
-
   original_val <- data[[target_col]]
+  original_colnames <- colnames(data)
+
+  target_col_index <- which(colnames(data) == target_col)
+
+  # randomForest must take clean names
+  data <- janitor::clean_names(data)
+  updated_colnames <- colnames(data)
+  # this will be used to get original colmn names later
+  names(updated_colnames) <- original_colnames
+  # get target col as clean name
+  target_col <- colnames(data)[target_col_index]
+
   data[[target_col]] <- as.factor(data[[target_col]])
 
-  ret <- randomForest::randomForest(formula = formula, data = data, ...)
+  if(!is.logical(original_val) &&
+     length(levels(data[[target_col]] )) != 2){
+    stop("There should be 2 unique values for binary classification.")
+  }
+
+  if("." %in% all.vars(lazyeval::f_rhs(formula))){
+    # somehow, mixing numeric and categorical predictors causes an error in randomForest
+    # so use only numeric or logical columns
+    cols <- quantifiable_cols(data)
+    vars <- cols[!cols %in% target_col]
+    formula <- as.formula(paste0(target_col, " ~ ", paste0(vars, collapse = " + ")))
+  } else {
+    vars <- all.vars(formula)
+    newvars <- updated_colnames[vars]
+    formula <- as.formula(paste0(newvars[[1]], " ~ ", paste0(newvars[-1], collapse = " + ")))
+  }
+
+  ret <- tryCatch({
+    randomForest::randomForest(formula = formula, data = data, ...)
+  }, error = function(e){
+    if (e$message == "NA/NaN/Inf in foreign function call (arg 1)"){
+      stop("Categorical and numerical predictors can't be used at the same time.")
+    }
+    stop(e)
+  })
+
+  # this attribute will be used to get back original column names
+  terms_mapping <- original_colnames
+  names(terms_mapping) <- updated_colnames
+  ret$terms_mapping <- terms_mapping
+  ret$classification_type = "binary"
+
+  ret
+}
+
+#' Random Forest wrapper for classification
+#' This is needed because boolean target starts regression task,
+#' not classification task
+#' @export
+randomForestMulti <- function(data, formula, ...) {
+  target_col <- all.vars(formula)[[1]]
+  original_val <- data[[target_col]]
+  original_colnames <- colnames(data)
+
+  target_col_index <- which(colnames(data) == target_col)
+
+  # randomForest must take clean names
+  data <- janitor::clean_names(data)
+  updated_colnames <- colnames(data)
+  names(updated_colnames) <- original_colnames
+
+  # get target col as clean name
+  target_col <- colnames(data)[target_col_index]
+
+  data[[target_col]] <- as.factor(data[[target_col]])
+
+  if("." %in% all.vars(lazyeval::f_rhs(formula))){
+    # somehow, mixing numeric and categorical predictors causes an error in randomForest
+    # so use only numeric or logical columns
+    cols <- quantifiable_cols(data)
+    vars <- cols[!cols %in% target_col]
+    formula <- as.formula(paste0(target_col, " ~ ", paste0(vars, collapse = " + ")))
+  } else {
+    vars <- all.vars(formula)
+    newvars <- updated_colnames[vars]
+    formula <- as.formula(paste0(newvars[[1]], " ~ ", paste0(newvars[-1], collapse = " + ")))
+  }
+
+  ret <- tryCatch({
+    randomForest::randomForest(formula = formula, data = data, ...)
+  }, error = function(e){
+    if (e$message == "NA/NaN/Inf in foreign function call (arg 1)"){
+      stop("Categorical and numerical predictors can't be used at the same time.")
+    }
+    stop(e)
+  })
 
   if(is.logical(original_val) ||
      length(levels(data[[target_col]] )) == 2){
@@ -16,6 +154,11 @@ randomForestClassify <- function(data, formula, ...) {
   } else {
     ret$classification_type = "multi"
   }
+
+  # this attribute will be used to get back original column names
+  terms_mapping <- original_colnames
+  names(terms_mapping) <- updated_colnames
+  ret$terms_mapping <- terms_mapping
 
   ret
 }
@@ -43,6 +186,12 @@ tidy.randomForest.classification <- function(x, pretty.name = FALSE, type = "imp
   if (type == "importance") {
     imp_m <- as.data.frame(x[["importance"]]) %>%
       tibble::rownames_to_column()
+
+    if(!is.null(x$terms_mapping)) {
+      # these terms names might be cleaned by janitor::clean_names
+      # so reverse them
+      imp_m[[1]] <- x$terms_mapping[imp_m[[1]]]
+    }
 
     if (ncol(imp_m) > 3){
       names(imp_m) <- if(pretty.name){
@@ -101,9 +250,10 @@ tidy.randomForest.classification <- function(x, pretty.name = FALSE, type = "imp
 
       precision <- tp / (tp + fp)
       recall <- tp / (tp + fn)
-      data_size <- tp + fp + tn + fn
-      accuracy <- (tp + tn) / data_size
+      accuracy <- (tp + tn) / (tp + fp + tn + fn)
       f_score <- 2 * ((precision * recall) / (precision + recall))
+      data_size <- sum(actual == class)
+
       ret <- data.frame(
         class,
         f_score,
@@ -138,6 +288,12 @@ tidy.randomForest.classification <- function(x, pretty.name = FALSE, type = "imp
 tidy.randomForest.regression <- function(x, pretty.name = FALSE, ...) {
   imp_m <- as.data.frame(x[["importance"]]) %>%
     tibble::rownames_to_column()
+
+  if(!is.null(x$terms_mapping)) {
+    # these terms names might be cleaned by janitor::clean_names
+    # so reverse them
+    imp_m[[1]] <- x$terms_mapping[imp_m[[1]]]
+  }
 
   colnames(imp_m) <- if(pretty.name) {
     if (ncol(imp_m) == 3){
@@ -295,25 +451,32 @@ augment.randomForest.classification <- function(x, data = NULL, newdata = NULL, 
   y_name <- all.vars(x$terms)[[1]]
 
   if(!is.null(newdata)){
+    # janitor::clean_names is called in randomForestClassify,
+    # so it should be called here too
+    cleaned_data <- janitor::clean_names(newdata)
+
     predicted_value_col <- avoid_conflict(colnames(newdata), "predicted_value")
 
     if(is.null(x$classification_type)){
       # just append predicted labels
-      predicted_val <- predict(x, newdata)
+      predicted_val <- predict(x, cleaned_data)
       newdata[[predicted_value_col]] <- predicted_val
       newdata
     } else if (x$classification_type == "binary") {
       # append predicted probability of positive
-      predicted_val <- predict(x, newdata, type = "prob")[, 2]
+      predicted_val <- predict(x, cleaned_data, type = "prob")[, 2]
       newdata[[predicted_value_col]] <- predicted_val
       newdata
     } else if (x$classification_type == "multi") {
       # append predicted probability for each class, max and labels at max values
-      probs <- predict(x, newdata, type = "prob")
+      probs <- predict(x, cleaned_data, type = "prob")
       ret <- get_multi_predicted_values(probs, newdata[[y_name]])
       newdata <- dplyr::bind_cols(newdata, ret)
     }
   } else if (!is.null(data)) {
+    # create clean name data frame because the model learned by those names
+    cleaned_data <- janitor::clean_names(data)
+
     # When na.omit is used, case-wise model attributes will only be calculated
     # for complete cases in the original data. All columns returned with
     # augment() must be expanded to the length of the full data, inserting NA
@@ -334,7 +497,7 @@ augment.randomForest.classification <- function(x, data = NULL, newdata = NULL, 
 
     predicted <- rep(NA, times = n_data)
     predicted[!na_at] <- x[["predicted"]]
-    predicted <- same_type(levels(x[["y"]])[predicted], data[[y_name]])
+    predicted <- same_type(levels(x[["y"]])[predicted], cleaned_data[[y_name]])
 
     votes <- x[["votes"]]
     full_votes <- matrix(data = NA, nrow = n_data, ncol = ncol(votes))
@@ -373,8 +536,7 @@ augment.randomForest.classification <- function(x, data = NULL, newdata = NULL, 
       data[[predicted_value_col]] <- predicted_prob
     } else if (x$classification_type == "multi"){
       # append predicted probability for each class, max and labels at max values
-      probs <- predict(x, data, type = "prob")
-      ret <- get_multi_predicted_values(probs, newdata[[y_name]])
+      ret <- get_multi_predicted_values(predicted_prob, cleaned_data[[y_name]])
       data <- dplyr::bind_cols(data, ret)
     }
 
@@ -387,10 +549,15 @@ augment.randomForest.classification <- function(x, data = NULL, newdata = NULL, 
 #' augment for randomForest model
 #' @export
 augment.randomForest.regression <- function(x, data = NULL, newdata = NULL, ...) {
+  predicted_value_col <- avoid_conflict(colnames(newdata), "predicted_value")
+
   if(!is.null(newdata)) {
-    predicted_value_col <- avoid_conflict(colnames(newdata), "predicted_value")
-    predicted_val <- predict(x, newdata)
+    # create clean name data frame because the model learned by those names
+    cleaned_data <- janitor::clean_names(newdata)
+
+    predicted_val <- predict(x, cleaned_data)
     newdata[[predicted_value_col]] <- predicted_val
+
     newdata
   } else if (!is.null(data)) {
     predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
