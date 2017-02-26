@@ -101,9 +101,10 @@ tidy.randomForest.classification <- function(x, pretty.name = FALSE, type = "imp
 
       precision <- tp / (tp + fp)
       recall <- tp / (tp + fn)
-      data_size <- tp + fp + tn + fn
-      accuracy <- (tp + tn) / data_size
+      accuracy <- (tp + tn) / (tp + fp + tn + fn)
       f_score <- 2 * ((precision * recall) / (precision + recall))
+      data_size <- sum(actual == class)
+
       ret <- data.frame(
         class,
         f_score,
