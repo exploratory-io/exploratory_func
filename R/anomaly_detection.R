@@ -11,7 +11,7 @@ do_anomaly_detection <- function(df, time, value = NULL, ...){
 #' @param df Data frame
 #' @param time_col Column that has time data
 #' @param value_col Column that has value data
-#' @param time_unit Time unit to for aggregation.
+#' @param time_unit Time unit for aggregation.
 #' @param fun.aggregate Function to aggregate values.
 #' @param direction Direction of anomaly. Positive ("posi"), Negative ("neg") or "both".
 #' @param e_value Whether expected values should be returned.
@@ -64,7 +64,7 @@ do_anomaly_detection_ <- function(df, time_col, value_col = NULL, time_unit = "d
       AnomalyDetection::AnomalyDetectionTs(data, direction = direction, e_value = e_value, ...)$anoms
     }, error = function(e){
       if(e$message == "Anom detection needs at least 2 periods worth of data") {
-        stop("Not enogh data to detect anomaly. Try smaller time unit.")
+        stop("Not enough data to detect anomaly. Try smaller time unit.")
       }
     })
     if(nrow(anom) > 0) {
