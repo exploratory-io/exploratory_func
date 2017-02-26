@@ -1,7 +1,7 @@
 
 #' NSE version of do_anomaly_detection_
 #' @export
-do_anomaly_detection <- function(df, time, value, ...){
+do_anomaly_detection <- function(df, time, value = NULL, ...){
   time_col <- col_name(substitute(time))
   value_col <- col_name(substitute(value))
   do_anomaly_detection_(df, time_col, value_col, ...)
@@ -11,23 +11,40 @@ do_anomaly_detection <- function(df, time, value, ...){
 #' @param df Data frame
 #' @param time_col Column that has time data
 #' @param value_col Column that has value data
+#' @param time_unit Time unit to for aggregation.
+#' @param fun.aggregate Function to aggregate values.
 #' @param direction Direction of anomaly. Positive ("posi"), Negative ("neg") or "both".
 #' @param e_value Whether expected values should be returned.
 #' @param ... extra values to be passed to AnomalyDetection::AnomalyDetectionTs.
 #' @export
-do_anomaly_detection_ <- function(df, time_col, value_col, direction="both", e_value=TRUE, ...){
+do_anomaly_detection_ <- function(df, time_col, value_col = NULL, time_unit = "day", fun.aggregate = sum, direction="both", e_value=TRUE, ...){
+
   loadNamespace("dplyr")
   loadNamespace("AnomalyDetection")
+
+  grouped_col <- grouped_by(df)
+
   # column name validation
   if(!time_col %in% colnames(df)){
     stop(paste0(time_col, " is not in column names"))
   }
-  if(!value_col %in% colnames(df)){
-    stop(paste0(value_col, " is not in column names"))
+
+  if(time_col %in% grouped_col){
+    stop(paste0(time_col, " is grouped. Please ungroup it."))
+  }
+
+  if(!is.null(value_col)){
+    if (!value_col %in% colnames(df)){
+      stop(paste0(value_col, " is not in column names"))
+    }
+    if(value_col %in% grouped_col){
+      stop(paste0(value_col, " is grouped. Please ungroup it."))
+    }
+    df <- df[!is.na(df[[value_col]]), ]
   }
 
   # remove NA data
-  df <- df[!(is.na(df[[time_col]]) | is.na(df[[value_col]])), ]
+  df <- df[!is.na(df[[time_col]]), ]
 
   if(!direction %in% c("both", "pos", "neg")){
     stop("direction must be 'both', 'pos' or 'neg'")
@@ -39,21 +56,17 @@ do_anomaly_detection_ <- function(df, time_col, value_col, direction="both", e_v
   neg_val_col <- avoid_conflict(colnames(df), "neg_value")
   exp_val_col <- avoid_conflict(colnames(df), "expected_value")
 
-  grouped_col <- grouped_by(df)
-
-  if(time_col %in% grouped_col){
-   stop(paste0(time_col, " is grouped. Please ungroup it."))
-  }
-
-  if(value_col %in% grouped_col){
-    stop(paste0(value_col, " is grouped. Please ungroup it."))
-  }
-
   # this logic is duplicated between positive and negative direction, so
   # integrated into a function and used in do_anomaly_detection_each
-  get_anomalies <- function(data, exp_value_tmp, direction, e_value, ...){
+  get_anomalies <- function(data, exp_value_tmp, direction, e_value, value_col, ...){
     # exp_value_tmp is temporary expected values to be overwritten
-    anom <- AnomalyDetection::AnomalyDetectionTs(data, direction = direction, e_value = e_value, ...)$anoms
+    anom <- tryCatch({
+      AnomalyDetection::AnomalyDetectionTs(data, direction = direction, e_value = e_value, ...)$anoms
+    }, error = function(e){
+      if(e$message == "Anom detection needs at least 2 periods worth of data") {
+        stop("Not enogh data to detect anomaly. Try smaller time unit.")
+      }
+    })
     if(nrow(anom) > 0) {
       ret <- data[[time_col]] %in% as.POSIXct(anom$timestamp)
       # values of timestamps are regarded as anomaly values
@@ -82,38 +95,48 @@ do_anomaly_detection_ <- function(df, time_col, value_col, direction="both", e_v
       df <- df[, !colnames(df) %in% grouped_col]
     }
 
-    # AnomalyDetection::AnomalyDetectionTs expects
-    # a data frame whose first column is time column
-    # and second column is value column, so it's created
-    data <- df[, c(time_col, value_col)]
-    # time column should be posixct, otherwise AnomalyDetection::AnomalyDetectionTs throws an error
-    data[[time_col]] <- as.POSIXct(data[[time_col]])
-
-    # validate data duplication
-    if(any(duplicated(data[[time_col]]))){
-      stop("There are duplicated values in Date/Time column.")
+    aggregated_data <- if (!is.null(value_col)){
+      data.frame(
+        time = lubridate::round_date(df[[time_col]], unit = time_unit),
+        value = df[[value_col]]
+      ) %>%
+        dplyr::group_by(time) %>%
+        dplyr::summarise(val = fun.aggregate(value))
+    } else {
+      value_col <- avoid_conflict(time_col, "count")
+      data.frame(
+        time = lubridate::round_date(df[[time_col]], unit = time_unit)
+      ) %>%
+        dplyr::group_by(time) %>%
+        dplyr::summarise(count = n())
     }
 
+    colnames(aggregated_data) <- c(time_col, value_col)
+
+    # time column should be posixct, otherwise AnomalyDetection::AnomalyDetectionTs throws an error
+    aggregated_data[[time_col]] <- as.POSIXct(aggregated_data[[time_col]])
+    data_for_anom <- aggregated_data
+
     # this will be overwritten by expected values
-    expected_values <- df[[value_col]]
+    expected_values <- aggregated_data[[value_col]]
 
     if(direction == "both" || direction == "pos"){
-      pos <- get_anomalies(data, expected_values, "pos", e_value, ...)
-      df[[pos_anom_col]] <- pos$ret
-      df[[pos_val_col]] <- pos$val
+      pos <- get_anomalies(data_for_anom, expected_values, "pos", e_value, value_col, ...)
+      aggregated_data[[pos_anom_col]] <- pos$ret
+      aggregated_data[[pos_val_col]] <- pos$val
       expected_values <- pos$expected_val
     }
 
     if(direction == "both" || direction == "neg"){
-      neg <- get_anomalies(data, expected_values, "neg", e_value, ...)
-      df[[neg_anom_col]] <- neg$ret
-      df[[neg_val_col]] <- neg$val
+      neg <- get_anomalies(data_for_anom, expected_values, "neg", e_value, value_col, ...)
+      aggregated_data[[neg_anom_col]] <- neg$ret
+      aggregated_data[[neg_val_col]] <- neg$val
       expected_values <- neg$expected_val
     }
     if (e_value) {
-      df[[exp_val_col]] <- expected_values
+      aggregated_data[[exp_val_col]] <- expected_values
     }
-    df
+    aggregated_data
   }
 
   # Calculation is executed in each group.
