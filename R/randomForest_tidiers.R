@@ -2,7 +2,8 @@
 #' Differences from randomForest::randomForest
 #' * When . is used in right hand side of formula,
 #'   only numeric/logical columns are used as predictors.
-#' * terms_mapping attribute is added to model for keeping mapping of original column names and cleaned-up column names.
+#' * terms_mapping attribute is added to model
+#'   for keeping mapping of original column names and cleaned-up column names.
 #' @export
 randomForestReg <- function(data, formula, na.action = na.omit, ...) {
   target_col <- all.vars(formula)[[1]]
@@ -60,7 +61,8 @@ randomForestReg <- function(data, formula, na.action = na.omit, ...) {
 #' Differences from randomForest::randomForest
 #' * When . is used in right hand side of formula,
 #'   only numeric/logical columns are used as predictors.
-#' * terms_mapping attribute is added to model for keeping mapping of original column names and cleaned-up column names.
+#' * terms_mapping attribute is added to model
+#'   for keeping mapping of original column names and cleaned-up column names.
 #' @export
 randomForestBinary <- function(data, formula, ...) {
   target_col <- all.vars(formula)[[1]]
@@ -120,7 +122,8 @@ randomForestBinary <- function(data, formula, ...) {
 #' Differences from randomForest::randomForest
 #' * When . is used in right hand side of formula,
 #'   only numeric/logical columns are used as predictors.
-#' * terms_mapping attribute is added to model for keeping mapping of original column names and cleaned-up column names.
+#' * terms_mapping attribute is added to model
+#'   for keeping mapping of original column names and cleaned-up column names.
 #' @export
 randomForestMulti <- function(data, formula, ...) {
   target_col <- all.vars(formula)[[1]]
