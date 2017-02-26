@@ -12,7 +12,7 @@ do_anomaly_detection <- function(df, time, value = NULL, ...){
 #' @param time_col Column that has time data
 #' @param value_col Column that has value data
 #' @param time_unit Time unit to for aggregation.
-#' @param fun.aggregate .
+#' @param fun.aggregate Function to aggregate values.
 #' @param direction Direction of anomaly. Positive ("posi"), Negative ("neg") or "both".
 #' @param e_value Whether expected values should be returned.
 #' @param ... extra values to be passed to AnomalyDetection::AnomalyDetectionTs.
