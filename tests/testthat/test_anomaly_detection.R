@@ -19,3 +19,18 @@ test_that("do_anomary_detection with dupe", {
   }, "There are duplicated values in Date/Time column.")
 })
 
+test_that("do_anomary_detection grouped case", {
+  data("raw_data", package = "AnomalyDetection")
+  raw_data$timestamp <- as.POSIXct(raw_data$timestamp)
+  expect_error({
+    ret <- raw_data %>%
+      dplyr::group_by(timestamp) %>%
+      do_anomaly_detection(timestamp, count, e_value=TRUE)
+  }, "timestamp is grouped. Please ungroup it.")
+
+  expect_error({
+    ret <- raw_data %>%
+      dplyr::group_by(count) %>%
+      do_anomaly_detection(timestamp, count, e_value=TRUE)
+  }, "count is grouped. Please ungroup it.")
+})

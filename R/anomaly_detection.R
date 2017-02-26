@@ -41,6 +41,14 @@ do_anomaly_detection_ <- function(df, time_col, value_col, direction="both", e_v
 
   grouped_col <- grouped_by(df)
 
+  if(time_col %in% grouped_col){
+   stop(paste0(time_col, " is grouped. Please ungroup it."))
+  }
+
+  if(value_col %in% grouped_col){
+    stop(paste0(value_col, " is grouped. Please ungroup it."))
+  }
+
   # this logic is duplicated between positive and negative direction, so
   # integrated into a function and used in do_anomaly_detection_each
   get_anomalies <- function(data, exp_value_tmp, direction, e_value, ...){
