@@ -25,7 +25,7 @@ test_that("do_anomary_detection with aggregation", {
   expect_error({
     raw_data %>%
       do_anomaly_detection(timestamp, count, e_value=TRUE)
-  }, "Not enogh data to detect anomaly. Try smaller time unit.")
+  }, "Try smaller time unit or make sure there is enough data for each group.")
 })
 
 test_that("do_anomary_detection grouped case", {

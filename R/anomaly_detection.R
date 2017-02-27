@@ -64,7 +64,7 @@ do_anomaly_detection_ <- function(df, time_col, value_col = NULL, time_unit = "d
       AnomalyDetection::AnomalyDetectionTs(data, direction = direction, e_value = e_value, ...)$anoms
     }, error = function(e){
       if(e$message == "Anom detection needs at least 2 periods worth of data") {
-        stop("Not enough data to detect anomaly. Try smaller time unit.")
+        stop("Try smaller time unit or make sure there is enough data for each group.")
       }
     })
     if(nrow(anom) > 0) {
