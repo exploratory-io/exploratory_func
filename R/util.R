@@ -708,19 +708,46 @@ pivot_ <- function(data, formula, value_col = NULL, fun.aggregate = mean, fill =
   # column names in lhs are collapsed by "_"
   cname <- paste0(all.vars(lazyeval::f_lhs(formula)), collapse = "_")
 
-  casted <- if(is.null(value_col)) {
-    # make a count matrix if value_col is NULL
-    reshape2::acast(data, formula = formula, fun.aggregate = length, fill = fill)
-  } else {
-    if(na.rm){
-      # remove NA
-      data <- data[!is.na(data[[value_col]]),]
-    }
-    reshape2::acast(data, formula = formula, value.var = value_col, fun.aggregate = fun.aggregate, fill = fill)
+  vars <- all.vars(formula)
+
+  # remove NA data
+  for(var in vars) {
+    data <- data[!is.na(data[[var]]), ]
   }
-  casted %>%
-    as.data.frame %>%
-    tibble::rownames_to_column(var = cname)
+
+  pivot_each <- function(df) {
+    casted <- if(is.null(value_col)) {
+      # make a count matrix if value_col is NULL
+      reshape2::acast(data, formula = formula, fun.aggregate = length, fill = fill)
+    } else {
+      if(na.rm){
+        # remove NA
+        data <- data[!is.na(data[[value_col]]),]
+      }
+      reshape2::acast(data, formula = formula, value.var = value_col, fun.aggregate = fun.aggregate, fill = fill)
+    }
+    casted %>%
+      as.data.frame %>%
+      tibble::rownames_to_column(var = cname)
+  }
+
+  grouped_col <- grouped_by(data)
+
+  # Calculation is executed in each group.
+  # Storing the result in this tmp_col and
+  # unnesting the result.
+  # If the original data frame is grouped by "tmp",
+  # overwriting it should be avoided,
+  # so avoid_conflict is used here.
+  tmp_col <- avoid_conflict(grouped_col, "tmp")
+  ret <- data %>%
+    dplyr::do_(.dots=setNames(list(~pivot_each(.)), tmp_col)) %>%
+    tidyr::unnest_(tmp_col)
+  # grouping should be kept
+  if(length(grouped_col) != 0){
+    ret <- dplyr::group_by_(ret, grouped_col)
+  }
+  ret
 }
 
 #' convert values to binary label
