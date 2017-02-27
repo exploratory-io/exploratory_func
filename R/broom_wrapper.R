@@ -848,6 +848,20 @@ model_anova <- function(df, pretty.name = FALSE){
   ret
 }
 
+# function to use in prediction_survfit to remove single value columns.
+# alternative to select_if which gives error when column name has '-' in it.
+non_single_value_colnames <- function(data) {
+  ret <- c()
+  for (colname in colnames(data)) {
+    if (length(unique(data[[colname]])) > 1) {
+      ret <- c(ret, colname)
+    } else if (is.logical(data[[colname]])) {
+      ret <- c(ret,colname)
+    }
+  }
+  ret
+}
+
 #' tidy after converting model to survfit
 #' @param newdata Data frame with rows that represent cohorts to simulate
 #' @export
@@ -880,7 +894,8 @@ prediction_survfit <- function(df, newdata = NULL, ...){
     ret <- ret %>% mutate(estimate = as.numeric(estimate), std_error = as.numeric(std_error), conf_high = as.numeric(conf_high), conf_low = as.numeric(conf_low))
     # replace the cohort name with a string that is a concatenation of values that represents the cohort.
     # but, omit newdata column that has only 1 unique value from the cohort names we create here.
-    selected_newdata <- newdata %>% dplyr::select_if(function(x) length(unique(x)) > 1)
+    selected_newdata_colnames <- non_single_value_colnames(newdata)
+    selected_newdata <- newdata[, selected_newdata_colnames]
     cohorts_labels <- selected_newdata %>% unite(label, everything())
     for (i in 1:nrow(selected_newdata)){
       ret <- ret %>% mutate(.cohort.temp = if_else(paste0("est", i) == .cohort.temp, cohorts_labels$label[[i]], .cohort.temp))
