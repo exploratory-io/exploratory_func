@@ -718,15 +718,26 @@ pivot_ <- function(data, formula, value_col = NULL, fun.aggregate = mean, fill =
   pivot_each <- function(df) {
     casted <- if(is.null(value_col)) {
       if(is.null(fill)){
-        # default is 0 for empty value column
+        # in this case, values are count of rows and columns,
+        # so default is 0 for empty value column
         fill <- 0
       }
       # make a count matrix if value_col is NULL
       reshape2::acast(data, formula = formula, fun.aggregate = length, fill = fill)
     } else {
-      if(is.null(fill)){
-        # default is NA (NA_real_ is for NA in numeric values) for non-empty value column
-        fill <- NA_real_
+      if(is.null(fill) || is.na(fill)){
+        # in this case, values in data frame is aggregated values
+        # , so default is NA and fill must be NA of the same type
+        # with returned values from aggregate function
+
+        # NA should be same type as returned type of fun.aggregate
+        if (identical(fun.aggregate, all) || identical(fun.aggregate, any) ) {
+          # NA is regarded as logical
+          fill <- NA
+        } else {
+          # NA_real_ is regarded as numeric
+          fill <- NA_real_
+        }
       }
       if(na.rm){
         # remove NA
