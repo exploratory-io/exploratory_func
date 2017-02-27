@@ -1,5 +1,17 @@
 context("test build_xgboost")
 
+test_that("test xgboost_reg with not clean names", {
+  test_data <- data.frame(
+    label = rep(seq(3) * 5, 100),
+    num1 =  rep(seq(3), 100) + runif(100),
+    num2 = rep(seq(3), 100) + runif(100)
+  )
+  colnames(test_data) <- c("label 1", "num-1", "Num 2")
+  model_ret <- build_model(test_data, model_func = xgboost_reg, formula = `label 1` ~ ., nrounds = 5)
+  prediction_ret <- prediction(model_ret)
+  expect_true(all(prediction_ret$predicted_label %in% c(5, 10, 15)))
+})
+
 test_that("test xgboost_multi with numeric target", {
   test_data <- data.frame(
     label = rep(seq(3) * 5, 100),
