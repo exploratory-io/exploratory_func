@@ -879,12 +879,14 @@ prediction_survfit <- function(df, newdata = NULL, ...){
     # convert characterized data back to numeric.
     ret <- ret %>% mutate(estimate = as.numeric(estimate), std_error = as.numeric(std_error), conf_high = as.numeric(conf_high), conf_low = as.numeric(conf_low))
     # replace the cohort name with a string that is a concatenation of values that represents the cohort.
-    cohorts_labels <- newdata %>% unite(label, everything())
-    for (i in 1:nrow(newdata)){
+    # but, omit newdata column that has only 1 unique value from the cohort names we create here.
+    selected_newdata <- newdata %>% dplyr::select_if(function(x) length(unique(x)) > 1)
+    cohorts_labels <- selected_newdata %>% unite(label, everything())
+    for (i in 1:nrow(selected_newdata)){
       ret <- ret %>% mutate(.cohort.temp = if_else(paste0("est", i) == .cohort.temp, cohorts_labels$label[[i]], .cohort.temp))
     }
     # replace the .cohort.temp column name with name like "age_sex".
-    colnames(ret)[colnames(ret) == ".cohort.temp"] <- paste0(colnames(newdata), collapse = "_")
+    colnames(ret)[colnames(ret) == ".cohort.temp"] <- paste0(colnames(selected_newdata), collapse = "_")
   }
 
   colnames(ret)[colnames(ret) == "n.risk"] <- "n_risk"
