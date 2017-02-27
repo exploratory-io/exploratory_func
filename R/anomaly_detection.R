@@ -66,8 +66,10 @@ do_anomaly_detection_ <- function(df, time_col, value_col = NULL, time_unit = "d
       if(e$message == "Anom detection needs at least 2 periods worth of data") {
         stop("Try smaller time unit or make sure there is enough data for each group.")
       }
+      # found a weired error by twitter data, so should be investigated later
+      # filed an issue in https://github.com/exploratory-io/tam/issues/4935
     })
-    if(nrow(anom) > 0) {
+    if(!is.null(anom) && nrow(anom) > 0) {
       ret <- data[[time_col]] %in% as.POSIXct(anom$timestamp)
       # values of timestamps are regarded as anomaly values
       # NA_real_(NA compatible with numeric valeus) is used for non-anomaly data
