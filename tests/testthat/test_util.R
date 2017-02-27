@@ -446,7 +446,7 @@ test_that("test pivot", {
   pivoted <- pivot(test_df, cat1+cat3 ~ cat2)
   expect_true("cat1_cat3" %in% colnames(pivoted))
 
-  pivoted_with_val <- pivot(test_df, cat1 ~ cat2 + cat3, value = num3, fun.aggregate=mean)
+  pivoted_with_val <- pivot(test_df, cat1 ~ cat2 + cat3, value = num3, fun.aggregate=mean, fill = 0)
   expect_true(all(!is.na(pivoted_with_val)))
 
   pivoted_with_na <- pivot(test_df, cat1 ~ cat2 + cat3, value = num3, fun.aggregate=mean, na.rm = FALSE)
