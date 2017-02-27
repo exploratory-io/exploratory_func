@@ -703,7 +703,7 @@ pivot <- function(data, formula, value = NULL, ...) {
 #' @param fill Value to be filled for missing values
 #' @param na.rm If na should be removed from values
 #' @export
-pivot_ <- function(data, formula, value_col = NULL, fun.aggregate = mean, fill = 0, na.rm = TRUE) {
+pivot_ <- function(data, formula, value_col = NULL, fun.aggregate = mean, fill = NULL, na.rm = TRUE) {
   # create a column name for row names
   # column names in lhs are collapsed by "_"
   cname <- paste0(all.vars(lazyeval::f_lhs(formula)), collapse = "_")
@@ -717,9 +717,17 @@ pivot_ <- function(data, formula, value_col = NULL, fun.aggregate = mean, fill =
 
   pivot_each <- function(df) {
     casted <- if(is.null(value_col)) {
+      if(is.null(fill)){
+        # default is 0 for empty value column
+        fill <- 0
+      }
       # make a count matrix if value_col is NULL
       reshape2::acast(data, formula = formula, fun.aggregate = length, fill = fill)
     } else {
+      if(is.null(fill)){
+        # default is NA (NA_real_ is for NA in numeric values) for non-empty value column
+        fill <- NA_real_
+      }
       if(na.rm){
         # remove NA
         data <- data[!is.na(data[[value_col]]),]
