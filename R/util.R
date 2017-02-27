@@ -747,7 +747,15 @@ binary_label <- function(val) {
 
 #' function to find column names that can be numeric values
 quantifiable_cols <- function(data){
-  data %>% dplyr::select_if(function(col){is.numeric(col) || is.logical(col)}) %>% colnames()
+  ret <- c()
+  for (colname in colnames(data)) {
+    if(is.numeric(data[[colname]])){
+      ret <- c(colname, ret)
+    } else if (is.logical(data[[colname]])) {
+      ret <- c(colname, ret)
+    }
+  }
+  ret
 }
 
 #' get multinomial predicted value results
