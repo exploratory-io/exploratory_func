@@ -280,9 +280,9 @@ tidy.randomForest.classification <- function(x, pretty.name = FALSE, type = "imp
       )
 
       names(ret) <- if(pretty.name){
-        c("Class", "F Score", "Accuracy", "Missclassification Rate", "Precision", "Recall", "Data Size")
+        c("Class", "F Score", "Accuracy Rate", "Missclassification Rate", "Precision", "Recall", "Data Size")
       } else {
-        c("class", "f_score", "accuracy", "missclassification_rate", "precision", "recall", "data_size")
+        c("class", "f_score", "accuracy_rate", "missclassification_rate", "precision", "recall", "data_size")
       }
       ret
     }

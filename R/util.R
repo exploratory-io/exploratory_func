@@ -615,9 +615,12 @@ get_score <- function(act_label, pred_label) {
   missclassification_rate <- 1 - accuracy
   f_score <- 2 * (precision * recall) / (precision + recall)
 
+  # modify the name for column name
+  accuracy_rate <- accuracy
+
   data.frame(
     f_score,
-    accuracy,
+    accuracy_rate,
     missclassification_rate,
     precision,
     recall,
@@ -632,10 +635,15 @@ get_score <- function(act_label, pred_label) {
 
 # get optimized binary prediction scores
 get_optimized_score <- function(actual_val, pred_prob, threshold = "f_score"){
+  # accracy was changed to accuracy_rate, so should work with both
+  if (threshold == "accuracy") {
+    threshold <- "accuracy_rate"
+  }
+
   # threshold can be optimized to the result below
   accept_optimize <- c(
     "f_score",
-    "accuracy",
+    "accuracy_rate",
     "precision",
     "recall",
     "specificity"
