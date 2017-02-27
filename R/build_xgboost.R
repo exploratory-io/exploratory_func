@@ -2,7 +2,8 @@
 #' ref: https://www.r-bloggers.com/with-our-powers-combined-xgboost-and-pipelearner/
 data_xgboost <- function(data, x_names, y_name, weight = NULL, nrounds= 10, ...) {
   # data must be only numeric or logical
-  data <- data %>% dplyr::select_if(function(col){is.numeric(col) || is.logical(col)})
+  cols <- quantifiable_cols(data)
+  data <- data[, cols]
 
   if(any(!x_names %in% colnames(data))){
     error_cols <- x_names[!x_names %in% colnames(data)]
