@@ -68,6 +68,18 @@ test_that("test with 2 groups with 3 centers", {
   }, "Centers should be less than unique subjects\\.")
 })
 
+test_that("test with 2 groups with 3 centers", {
+  test_df <- data.frame(
+    val = rep(c(1,5), 30),
+    group = paste("group",rep(c(1, 2), each = 30), sep = ""),
+    col = rep(seq(5), 12))
+
+  # test subject column name with a space
+  colnames(test_df)[2] <- "gro up"
+
+  test_df %>% dplyr::group_by(`gro up`) %>% build_kmeans(val, col, augment = FALSE)
+})
+
 test_that("test with na values", {
   test_df <- data.frame(
     na=rep(c(NA, 5, 1, 4), 5),
@@ -214,7 +226,8 @@ test_that("test build_kmeans.kv for grouped data frame as subject error", {
                      val = rep(0, 18))
   expect_error({
     ret <- data %>%
-      build_kmeans.kv(group, col, val, group_cols = "group")
+      dplyr::group_by(group) %>%
+      build_kmeans.kv(group, col, val)
   }, "group is a grouping column\\. ungroup\\(\\) may be necessary before this operation\\.")
 })
 

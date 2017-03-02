@@ -3,7 +3,7 @@
 
 #' integrated build_kmeans
 #' @export
-build_kmeans <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0, group_cols = c()){
+build_kmeans <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0){
 
   if (!is.null(skv)) {
     #.kv pattern
@@ -11,10 +11,10 @@ build_kmeans <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0, group_
       stop("length of skv has to be 2 or 3")
     }
     value <- if(length(skv) == 2) NULL else skv[[3]]
-    build_kmeans.kv_(df, skv[[1]], skv[[2]], value, fun.aggregate = fun.aggregate, fill = fill, group_cols = group_cols, ...)
+    build_kmeans.kv_(df, skv[[1]], skv[[2]], value, fun.aggregate = fun.aggregate, fill = fill, ...)
   } else {
     #.cols pattern
-    build_kmeans.cols(df, group_cols = group_cols, ...)
+    build_kmeans.cols(df, ...)
   }
 }
 
@@ -48,20 +48,13 @@ build_kmeans.kv_ <- function(df,
                              seed=0,
                              augment=TRUE,
                              fun.aggregate=mean,
-                             fill=0,
-                             group_cols = c()){
+                             fill=0){
   loadNamespace("dplyr")
   loadNamespace("lazyeval")
   loadNamespace("tidyr")
   loadNamespace("broom")
 
   set.seed(seed)
-
-  if(!is.null(group_cols)){
-    df <- dplyr::group_by_(df, .dots = group_cols)
-  } else {
-    df <- dplyr::ungroup(df)
-  }
 
   row_col <- subject_col
   col_col <- key_col
@@ -148,12 +141,6 @@ build_kmeans.cols <- function(df, ...,
   set.seed(seed)
   select_dots <- lazyeval::lazy_dots(...)
 
-  if(!is.null(group_cols)){
-    df <- dplyr::group_by_(df, .dots = group_cols)
-  } else {
-    df <- dplyr::ungroup(df)
-  }
-
   grouped_column <- grouped_by(df)
   model_column <- avoid_conflict(grouped_column, "model")
   source_column <- avoid_conflict(grouped_column, "source.data")
@@ -175,7 +162,7 @@ build_kmeans.cols <- function(df, ...,
       }
       mat <- as_numeric_matrix_(df, columns = selected_column)
       kmeans(mat, centers = centers, iter.max = 10, nstart = nstart, algorithm = algorithm, trace = trace)
-    }, error = function(e){
+    }, error = function(e) {
       if(e$message == "invalid first argument"){
         stop("Created matrix is invalid")
       }
