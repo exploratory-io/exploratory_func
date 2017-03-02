@@ -70,6 +70,8 @@ build_kmeans.kv_ <- function(df,
   }
 
   build_kmeans_each <- function(df){
+    # remove grouping column
+    df <- df[, !colnames(df) %in% grouped_column]
     mat <- simple_cast(df, row_col, col_col, value_col, fun.aggregate = fun.aggregate, fill=fill)
     rownames(mat) <- NULL # this prevents warning about discarding row names of the matrix
     kmeans_ret <- tryCatch({
@@ -94,8 +96,8 @@ build_kmeans.kv_ <- function(df,
     )
     if(augment){
       cluster_column <- avoid_conflict(grouped_column, "cluster")
-      row_fact <- as.factor(df[[row_col]])
-      df[[cluster_column]] <- kmeans_ret$cluster[row_fact]
+      row_fact <- factor(df[[row_col]], levels=seq(centers))
+      df[[cluster_column]] <- as.factor(kmeans_ret$cluster[row_fact])
       df
     } else {
       # add an attribute to be referred from augment_kmeans
@@ -156,6 +158,8 @@ build_kmeans.cols <- function(df, ...,
   }
 
   build_kmeans_each <- function(df){
+    # remove grouping column
+    df <- df[, !colnames(df) %in% grouped_column]
     kmeans_ret <- tryCatch({
       if(nrow(df) == 0 | ncol(df) == 0){
         stop("No data after removing NA")
@@ -189,7 +193,7 @@ build_kmeans.cols <- function(df, ...,
       ret <- broom::augment(kmeans_ret, df)
       colnames(ret)[[ncol(ret)]] <- avoid_conflict(grouped_column, "cluster")
       # cluster column is factor labeled "1", "2"..., so convert it to integer to avoid confusion
-      ret[[ncol(ret)]] <- as.integer(ret[[ncol(ret)]])
+      ret[[ncol(ret)]] <- factor(ret[[ncol(ret)]], levels=seq(centers))
       ret
     } else {
       kmeans_ret
