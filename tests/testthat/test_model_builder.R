@@ -151,7 +151,7 @@ test_that("test build_kmeans.cols augment=T", {
         build_kmeans.cols(vec1, vec2, rand, centers=2, augment=T)
     )
     expect_equal(nrow(result), 10)
-    expect_true(is.integer(result[["cluster"]]))
+    expect_true(is.factor(result[["cluster"]]))
   }
 })
 
@@ -246,7 +246,7 @@ test_that("test build_kmeans.cols ignore NA rows with grouped and keep.source=FA
 test_that("test build_kmeans.cols", {
   df <- data.frame(number = seq(4), number2 = seq(4)-4)
   ret <- (df %>%  build_kmeans.cols(number, number2, keep.source=TRUE, augment = FALSE) %>%  augment_kmeans(model, data=source.data))
-  expect_true(is.integer(ret$cluster))
+  expect_true(is.factor(ret$cluster))
 })
 
 test_that("test build_kmeans", {
@@ -254,7 +254,7 @@ test_that("test build_kmeans", {
   result <- test_df %>%
     build_kmeans(skv = c("vec1", "vec2"), centers=2, augment = FALSE) %>%
     augment_kmeans(model, data = source.data)
-  expect_true(is.integer(result[["cluster.new"]]))
+  expect_true(is.factor(result[["cluster.new"]]))
   expect_equal(length(colnames(result)[colnames(result) == "cluster"]), 1)
   expect_equal(length(colnames(result)[colnames(result) == "cluster.new"]), 1)
 })
