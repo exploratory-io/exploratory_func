@@ -71,6 +71,8 @@ build_kmeans.kv_ <- function(df,
 
   build_kmeans_each <- function(df){
     # remove grouping column
+    # to avoid it appears as duplicated column
+    # after unnesting the result
     df <- df[, !colnames(df) %in% grouped_column]
     mat <- simple_cast(df, row_col, col_col, value_col, fun.aggregate = fun.aggregate, fill=fill)
     rownames(mat) <- NULL # this prevents warning about discarding row names of the matrix
@@ -97,6 +99,7 @@ build_kmeans.kv_ <- function(df,
     if(augment){
       cluster_column <- avoid_conflict(grouped_column, "cluster")
       row_fact <- as.factor(df[[row_col]])
+      # modify the result into factor from integer
       df[[cluster_column]] <- factor(kmeans_ret$cluster[row_fact], levels = seq(centers))
       df
     } else {
@@ -159,6 +162,8 @@ build_kmeans.cols <- function(df, ...,
 
   build_kmeans_each <- function(df){
     # remove grouping column
+    # to avoid it appears as duplicated column
+    # after unnesting the result
     df <- df[, !colnames(df) %in% grouped_column]
     kmeans_ret <- tryCatch({
       if(nrow(df) == 0 | ncol(df) == 0){
@@ -192,8 +197,6 @@ build_kmeans.cols <- function(df, ...,
     if(augment){
       ret <- broom::augment(kmeans_ret, df)
       colnames(ret)[[ncol(ret)]] <- avoid_conflict(grouped_column, "cluster")
-      # make the clustering labels factor with levels with sequence of numbers
-      ret[[ncol(ret)]] <- factor(ret[[ncol(ret)]], levels=seq(centers))
       ret
     } else {
       kmeans_ret
