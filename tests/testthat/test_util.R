@@ -471,6 +471,24 @@ test_that("test pivot with group_by and dirty colum names", {
   expect_equal("group", grouped_by(grouped_pivoted))
 })
 
+test_that("test pivot by one hot encoding", {
+  test_df <- data.frame(
+    group = c(rep(letters[1:2], each = 50),"a"),
+    cat1 = c(letters[round(runif(100)*5)+1], NA),
+    cat2 = c(letters[round(runif(100)*3)+1], "a"),
+    cat3 = c(letters[round(runif(100)*3)+1], "a"),
+    num3 = c(NA, seq(100))
+  )
+  colnames(test_df) <- c("group", "cat 1", "cat-2", "cat 3", "Num 3")
+
+  grouped_pivoted <- test_df %>%
+    dplyr::group_by(group) %>%
+    one_hot("cat 3")
+
+  expect_true("group" %in% colnames(grouped_pivoted))
+  expect_equal("group", grouped_by(grouped_pivoted))
+})
+
 test_that("test same_type for factor", {
   original <- factor(c("bb", "bb", "aa"), levels = c("bb", "aa"))
 

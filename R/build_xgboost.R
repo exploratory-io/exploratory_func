@@ -1,35 +1,21 @@
 #' formula version of xgboost
-#' ref: https://www.r-bloggers.com/with-our-powers-combined-xgboost-and-pipelearner/
-data_xgboost <- function(data, x_names, y_name, weight = NULL, nrounds= 10, ...) {
-  # data must be only numeric or logical
-  cols <- quantifiable_cols(data)
-  data <- data[, cols]
+#' @export
+fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, ...) {
+  term <- terms(formula, data = data)
+  # do.call is used to substitute weight
+  md_frame <- do.call(model.frame, list(term, data = data, weights = substitute(weights)))
+  md_mat <- model.matrix(term, data = md_frame)
+  weight <- model.weights(md_frame)
 
-  if(any(!x_names %in% colnames(data))){
-    error_cols <- x_names[!x_names %in% colnames(data)]
-    stop(paste0("non numeric column found " + paste0(error_cols, collapse = ", ")))
+  y_name <- all.vars(lazyeval::f_lhs(formula))
+
+  if(!y_name %in% colnames(data)) {
+    stop(paste0(y_name, " is not in data."))
   }
 
-  # weight argument should be evaluated using data name space
-  weight <- if (!is.null(substitute(weight))) {
-    lz <- lazyeval::as.lazy(substitute(weight))
-    ret <- lazyeval::lazy_eval(lz, data = data)
-    data <- data[!is.na(ret), ]
-    ret[!is.na(ret)]
-  } else {
-    NULL
-  }
-
-  x <- data.matrix(data[, x_names])
-  if(is.integer(x) || is.logical(x)){
-    # x must be a double matrix
-    x <- matrix(as.double(x), ncol = ncol(x))
-  }
-
-  y <- as.numeric(data[[y_name]])
-
-  ret <- xgboost::xgboost(data = x, label = y, weight = weight, nrounds = nrounds, ...)
-  ret$x_names <- x_names
+  ret <- xgboost::xgboost(data = md_mat, label = md_frame[[y_name]], weight = weight, nrounds = nrounds, ...)
+  ret$terms <- term
+  ret$x_names <- colnames(md_mat)
   ret
 }
 
@@ -40,15 +26,7 @@ data_xgboost <- function(data, x_names, y_name, weight = NULL, nrounds= 10, ...)
 xgboost_binary <- function(data, formula, output_type = "logistic", eval_metric = "auc", ...) {
   vars <- all.vars(formula)
 
-  x_names <- vars[-1]
-  y_name  <- vars[1]
-
-  if (any(x_names == '.')) {
-    x_names <- quantifiable_cols(data)
-    x_names <- x_names[x_names != y_name]
-  }
-
-  data <- tidyr::drop_na_(data, c(x_names, y_name))
+  y_name  <- vars[[1]]
 
   y_vals <- data[[y_name]]
 
@@ -57,7 +35,7 @@ xgboost_binary <- function(data, formula, output_type = "logistic", eval_metric 
   if(is.logical(y_vals)) {
     label_levels <- c(FALSE, TRUE)
     y_vals <- as.numeric(y_vals)
-  } else if (!all(y_vals %in% c(0, 1))){
+  } else if (!all(y_vals[[!is.na(y_vals)]] %in% c(0, 1))){
     factored <- as.factor(data[[y_name]])
     label_levels <- same_type(levels(factored), data[[y_name]])
     if(length(label_levels) != 2){
@@ -70,12 +48,11 @@ xgboost_binary <- function(data, formula, output_type = "logistic", eval_metric 
   objective <- paste0("binary:", output_type, sep = "")
 
   ret <- tryCatch({
-    data_xgboost(data = data,
-                 x_names = x_names,
-                 y_name = y_name,
-                 objective = objective,
-                 eval_metric = eval_metric,
-                 ...)
+    fml_xgboost(data = data,
+                formula = formula,
+                objective = objective,
+                eval_metric = eval_metric,
+                ...)
   }, error = function(e){
     if(stringr::str_detect(e$message, "Check failed: !auc_error AUC: the dataset only contains pos or neg samples")){
       stop("The target only contains positive or negative values")
@@ -85,7 +62,6 @@ xgboost_binary <- function(data, formula, output_type = "logistic", eval_metric 
   # add class to control S3 methods
   class(ret) <- c("xgboost_binary", class(ret))
   ret$fml <- formula
-  ret$x_names <- x_names
   ret$y_levels <- label_levels
   ret
 }
@@ -97,16 +73,7 @@ xgboost_binary <- function(data, formula, output_type = "logistic", eval_metric 
 xgboost_multi <- function(data, formula, output_type = "softprob", ...) {
   vars <- all.vars(formula)
 
-  x_names <- vars[-1]
-  y_name  <- vars[1]
-
-  if (any(x_names == '.')) {
-    x_names <- quantifiable_cols(data)
-    x_names <- x_names[x_names != y_name]
-  }
-
-  data <- tidyr::drop_na_(data, c(x_names, y_name))
-
+  y_name  <- vars[[1]]
   y_vals <- data[[y_name]]
 
   # this is used to get back original values from predicted output
@@ -127,16 +94,14 @@ xgboost_multi <- function(data, formula, output_type = "softprob", ...) {
   data[[y_name]] <- y_vals
 
   objective <- paste0("multi:", output_type, sep = "")
-  ret <- data_xgboost(data = data,
-                      x_names = x_names,
-                      y_name = y_name,
-                      objective = objective,
-                      num_class = length(label_levels),
-                      ...)
+  ret <- fml_xgboost(data = data,
+                     formula = formula,
+                     objective = objective,
+                     num_class = length(label_levels),
+                     ...)
   # add class to control S3 methods
   class(ret) <- c("xgboost_multi", class(ret))
   ret$fml <- formula
-  ret$x_names <- x_names
   ret$y_levels <- label_levels
   ret
 }
@@ -148,26 +113,16 @@ xgboost_multi <- function(data, formula, output_type = "softprob", ...) {
 xgboost_reg <- function(data, formula, output_type = "linear", ...) {
   vars <- all.vars(formula)
 
-  x_names <- vars[-1]
   y_name  <- vars[1]
-
-  if (any(x_names == '.')) {
-    x_names <- quantifiable_cols(data)
-    x_names <- x_names[x_names != y_name]
-  }
 
   data[[y_name]] <- as.numeric(data[[y_name]])
 
-  data <- tidyr::drop_na_(data, c(x_names, y_name))
-
   objective <- paste0("reg:", output_type, sep = "")
 
-  ret <- data_xgboost(data = data, x_names = x_names, y_name = y_name,  objective = objective, ...)
+  ret <- fml_xgboost(data = data, formula = formula,  objective = objective, ...)
   # add class to control S3 methods
   class(ret) <- c("xgboost_reg", class(ret))
   ret$fml <- formula
-  ret$x_names <- x_names
-  ret$output_type <- output_type
   ret
 }
 
@@ -178,58 +133,59 @@ xgboost_reg <- function(data, formula, output_type = "linear", ...) {
 #' @param ... Not used for now.
 #' @export
 augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, ...) {
-  class(x) <- class(x)[class(x) != "xgboost_multi"]
-  if(!is.null(newdata)){
-    data <- newdata
+  class(x) <- class(x)[class(x) != c("xgboost_multi")]
+
+  if(!is.null(ret$terms)){
+
+    ret_data <- if(!is.null(newdata)){
+      newdata
+    } else {
+      data
+    }
+
+    # todo: check missing value behaviour
+    mat <- model.matrix(x$terms, ret_data)
+    predicted <- stats::predict(x, mat)
+
+    vars <- all.vars(x$terms)
+    y_name <- vars[[1]]
+
+    # create predicted labels for classification
+    # based on factor levels and it's indice
+    find_label <- function(ids, levels, original_data) {
+      levels[ids]
+    }
+    obj <- x$params$objective
+    if (obj == "multi:softmax") {
+      predicted_label_col <- avoid_conflict(colnames(ret_data), "predicted_label")
+      predicted <- x$y_levels[predicted+1]
+      ret_data[[predicted_label_col]] <- predicted
+    } else if (obj == "multi:softprob") {
+      predicted_label_col <- avoid_conflict(colnames(ret_data), "predicted_label")
+      predicted_prob_col <- avoid_conflict(colnames(ret_data), "predicted_probability")
+
+      # predicted is a vector containing probabilities for each class
+      probs <- matrix(predicted, nrow = length(x$y_levels)) %>% t()
+      colnames(probs) <- x$y_levels
+      predicted <- probs %>%
+        as.data.frame() %>%
+        append_colnames(prefix = "predicted_probability_")
+
+      ret_data <- cbind(ret_data, predicted)
+
+      colmax <- max.col(probs)
+
+      # get max probabilities from each row
+      max_prob <- probs[(colmax - 1) * nrow(probs) + seq(nrow(probs))]
+      predicted_label <- x$y_levels[colmax]
+      # predicted_prob_col is a column for probabilities of chosen values
+      ret_data[[predicted_prob_col]] <- max_prob
+      ret_data[[predicted_label_col]] <- predicted_label
+    }
+    data
+  } else {
+    augment(x, data = data, newdata = newdata, ...)
   }
-
-  mat <- as.matrix(data[x$x_names])
-
-  # predict of xgboost expects double matrix as input
-  if(is.integer(mat) || is.logical(mat)){
-    mat <- matrix(as.numeric(mat), ncol = ncol(mat))
-  }
-
-  predicted <- stats::predict(x, mat)
-
-  vars <- all.vars(x$fml)
-  y_name <- vars[[1]]
-
-  # create predicted labels for classification
-  # based on factor levels and it's indice
-  find_label <- function(ids, levels, original_data) {
-    levels[ids]
-  }
-
-  obj <- x$params$objective
-  if (obj == "multi:softmax") {
-    predicted_label_col <- avoid_conflict(colnames(data), "predicted_label")
-    predicted <- x$y_levels[predicted+1]
-    data[[predicted_label_col]] <- predicted
-
-  } else if (obj == "multi:softprob") {
-    predicted_label_col <- avoid_conflict(colnames(data), "predicted_label")
-    predicted_prob_col <- avoid_conflict(colnames(data), "predicted_probability")
-
-    # predicted is a vector containing probabilities for each class
-    probs <- matrix(predicted, nrow = length(x$y_levels)) %>% t()
-    colnames(probs) <- x$y_levels
-    predicted <- probs %>%
-      as.data.frame() %>%
-      append_colnames(prefix = "predicted_probability_")
-
-    data <- cbind(data, predicted)
-
-    colmax <- max.col(probs)
-
-    # get max probabilities from each row
-    max_prob <- probs[(colmax - 1) * nrow(probs) + seq(nrow(probs))]
-    predicted_label <- x$y_levels[colmax]
-    # predicted_prob_col is a column for probabilities of chosen values
-    data[[predicted_prob_col]] <- max_prob
-    data[[predicted_label_col]] <- predicted_label
-  }
-  data
 }
 
 #' Augment predicted values for binary task
@@ -239,49 +195,80 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, ...) {
 #' @param ... Not used for now.
 #' @export
 augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, ...) {
-  class(x) <- class(x)[class(x) != "xgboost_binary"]
-  if(!is.null(newdata)){
-    data <- newdata
-  }
+  class(x) <- class(x)[!class(x) %in% c("xgboost_binary", "xgb.Booster.formula")]
+  if(!is.null(x$terms)){
+    ret_data <- if(!is.null(newdata)){
+      newdata
+    } else {
+      data
+    }
 
-  mat <- as.matrix(data[x$x_names])
+    mat <- model.matrix(x$terms, data = ret_data)
+    # this is to find omitted indice for NA
+    row_index <- as.numeric(rownames(mat))
+    predicted <- fill_with_NA(row_index, stats::predict(x, mat), max_index = nrow(ret_data))
 
-  # predict of xgboost expects double matrix as input
-  if(is.integer(mat) || is.logical(mat)){
-    mat <- matrix(as.numeric(mat), ncol = ncol(mat))
-  }
-  predicted <- stats::predict(x, mat)
+    vars <- all.vars(x$terms)
+    y_name <- vars[[1]]
 
-  vars <- all.vars(x$fml)
-  y_name <- vars[[1]]
+    # create predicted labels for classification
+    # based on factor levels and it's indice
+    find_label <- function(ids, levels, original_data) {
+      levels[ids]
+    }
 
-  # create predicted labels for classification
-  # based on factor levels and it's indice
-  find_label <- function(ids, levels, original_data) {
-    levels[ids]
-  }
+    obj <- x$params$objective
+    predicted_label_col <- avoid_conflict(colnames(ret_data), "predicted_label")
+    predicted_prob_col <- avoid_conflict(colnames(ret_data), "predicted_probability")
+    prob <- if (obj == "binary:logistic") {
+      predicted_prob_col <- avoid_conflict(colnames(ret_data), "predicted_probability")
+      ret_data[[predicted_prob_col]] <- predicted
+      predicted
+    } else if (obj == "binary:logitraw") {
+      predicted_val_col <- avoid_conflict(colnames(ret_data), "predicted_value")
 
-  obj <- x$params$objective
-  predicted_label_col <- avoid_conflict(colnames(data), "predicted_label")
-  predicted_prob_col <- avoid_conflict(colnames(data), "predicted_probability")
-  prob <- if (obj == "binary:logistic") {
-    predicted_prob_col <- avoid_conflict(colnames(data), "predicted_probability")
-    data[[predicted_prob_col]] <- predicted
-    predicted
-  } else if (obj == "binary:logitraw") {
-    predicted_val_col <- avoid_conflict(colnames(data), "predicted_value")
+      # binary:logitraw returns logit values
+      prob <- boot::inv.logit(predicted)
 
-    # binary:logitraw returns logit values
-    prob <- boot::inv.logit(predicted)
+      ret_data[[predicted_val_col]] <- predicted
+      ret_data[[predicted_prob_col]] <- prob
+      prob
+    } else {
+      stop(paste0("object type ", obj, " is not supported"))
+    }
 
-    data[[predicted_val_col]] <- predicted
-    data[[predicted_prob_col]] <- prob
-    prob
+    ret_data
   } else {
-    stop(paste0("object type ", obj, " is not supported"))
+    augment(x, data = data, newdata = newdata)
   }
+}
 
-  data
+#' Augment predicted values
+#' @param x xgb.Booster model
+#' @param data Data frame used to train xgb.Booster
+#' @param newdata New data frame to predict
+#' @param ... Not used for now.
+#' @export
+augment.xgboost_reg <- function(x, data = NULL, newdata = NULL, ...) {
+  class(x) <- class(x)[class(x) != "xgboost_reg" &
+                       class(x) != "xgb.Booster.formula"]
+
+  if(!is.null(x$terms)){
+    ret_data <- if(!is.null(newdata)){
+      data <- newdata
+    } else {
+      data
+    }
+
+    mat_data <- model.matrix(x$terms, data = ret_data)
+
+    predicted <- stats::predict(x, mat_data)
+    predicted_value_col <- avoid_conflict(colnames(ret_data), "predicted_value")
+    ret_data[[predicted_value_col]] <- predicted
+    ret_data
+  } else {
+    augment(x, data = data, newdata = newdata)
+  }
 }
 
 #' Augment predicted values
@@ -293,7 +280,8 @@ augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, ...) {
 augment.xgb.Booster <- function(x, data = NULL, newdata = NULL, ...) {
   class(x) <- class(x)[class(x) != "xgboost_binary" &
                          class(x) != "xgboost_multi" &
-                         class(x) != "xgboost_reg"]
+                         class(x) != "xgboost_reg" &
+                         class(x) != "fml_xgboost"]
   if(!is.null(newdata)){
     data <- newdata
   }
@@ -327,7 +315,8 @@ tidy.xgb.Booster <- function(x, type="weight", pretty.name = FALSE, ...){
   # xgboost_? class must be removed for xgboost::xgb.importance to work
   class(x) <- class(x)[class(x)!="xgboost_binary" &
                          class(x)!="xgboost_multi" &
-                         class(x)!="xgboost_reg"]
+                         class(x)!="xgboost_reg" &
+                         class(x) != "fml_xgboost"]
   ret <- tryCatch({
     ret <- xgboost::xgb.importance(x$x_names,model=x) %>% as.data.frame()
     if (pretty.name) {

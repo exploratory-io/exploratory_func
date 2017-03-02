@@ -827,3 +827,9 @@ get_multi_predicted_values <- function(prob_mat, actual_vals = NULL){
   ret$predicted_label <- prob_label
   ret
 }
+
+fill_with_NA <- function(indice, values, max_index = max(indice, na.rm = TRUE)){
+  ret <- same_type(rep(NA, max_index), values)
+  ret[indice] <- values
+  ret
+}
