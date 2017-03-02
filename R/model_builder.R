@@ -192,7 +192,7 @@ build_kmeans.cols <- function(df, ...,
     if(augment){
       ret <- broom::augment(kmeans_ret, df)
       colnames(ret)[[ncol(ret)]] <- avoid_conflict(grouped_column, "cluster")
-      # cluster column is factor labeled "1", "2"..., so convert it to integer to avoid confusion
+      # make the clustering labels factor with levels with sequence of numbers
       ret[[ncol(ret)]] <- factor(ret[[ncol(ret)]], levels=seq(centers))
       ret
     } else {
