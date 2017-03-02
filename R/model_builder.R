@@ -96,8 +96,8 @@ build_kmeans.kv_ <- function(df,
     )
     if(augment){
       cluster_column <- avoid_conflict(grouped_column, "cluster")
-      row_fact <- factor(df[[row_col]], levels=seq(centers))
-      df[[cluster_column]] <- as.factor(kmeans_ret$cluster[row_fact])
+      row_fact <- as.factor(df[[row_col]])
+      df[[cluster_column]] <- factor(kmeans_ret$cluster[row_fact], levels = seq(centers))
       df
     } else {
       # add an attribute to be referred from augment_kmeans
