@@ -232,7 +232,8 @@ avoid_conflict <- function(origin, new, suffix = ".new"){
 #' check grouped column
 #' @export
 grouped_by <- function(df){
-  as.character(attr(df, "vars"))
+  # remove backtick for escaped column names
+  stringr::str_replace_all(as.character(attr(df, "vars")), "`", "")
 }
 
 #' matrix to dataframe with gathered form
