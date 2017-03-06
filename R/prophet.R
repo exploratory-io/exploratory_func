@@ -70,7 +70,10 @@ do_prophet_ <- function(df, time_col, value_col = NULL, days, fun.aggregate = su
     # time column should be Date. TODO: really??
     aggregated_data[["ds"]] <- as.Date(aggregated_data[["ds"]])
     # TODO: do prophet
-    aggregated_data
+    m <- prophet(aggregated_data)
+    future <- make_future_dataframe(m, periods = days) #includes past dates
+    forecast <- predict(m, future)
+    forecast
   }
 
   # Calculation is executed in each group.
