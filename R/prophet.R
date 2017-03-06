@@ -43,10 +43,6 @@ do_prophet_ <- function(df, time_col, value_col = NULL, days, fun.aggregate = su
   # remove NA data
   df <- df[!is.na(df[[time_col]]), ]
 
-  if(!direction %in% c("both", "pos", "neg")){
-    stop("direction must be 'both', 'pos' or 'neg'")
-  }
-
   do_prophet_each <- function(df){
     if(!is.null(grouped_col)){
       # drop grouping columns
@@ -55,7 +51,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, days, fun.aggregate = su
 
     aggregated_data <- if (!is.null(value_col)){
       data.frame(
-        time = lubridate::round_date(df[[time_col]], unit = time_unit),
+        time = lubridate::round_date(df[[time_col]], unit = "day"),
         value = df[[value_col]]
       ) %>%
         dplyr::group_by(time) %>%
@@ -63,7 +59,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, days, fun.aggregate = su
     } else {
       value_col <- avoid_conflict(time_col, "count")
       data.frame(
-        time = lubridate::round_date(df[[time_col]], unit = time_unit)
+        time = lubridate::round_date(df[[time_col]], unit = "day")
       ) %>%
         dplyr::group_by(time) %>%
         dplyr::summarise(count = n())
