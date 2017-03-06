@@ -55,20 +55,20 @@ do_prophet_ <- function(df, time_col, value_col = NULL, days, fun.aggregate = su
         value = df[[value_col]]
       ) %>%
         dplyr::group_by(time) %>%
-        dplyr::summarise(val = fun.aggregate(value))
+        dplyr::summarise(y = fun.aggregate(value))
     } else {
       value_col <- avoid_conflict(time_col, "count")
       data.frame(
         time = lubridate::round_date(df[[time_col]], unit = "day")
       ) %>%
         dplyr::group_by(time) %>%
-        dplyr::summarise(count = n())
+        dplyr::summarise(y = n())
     }
 
-    colnames(aggregated_data) <- c(time_col, value_col)
+    colnames(aggregated_data) <- c("ds", "y")
 
     # time column should be Date. TODO: really??
-    aggregated_data[[time_col]] <- as.Date(aggregated_data[[time_col]])
+    aggregated_data[["ds"]] <- as.Date(aggregated_data[["ds"]])
     # TODO: do prophet
     aggregated_data
   }
