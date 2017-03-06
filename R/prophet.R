@@ -17,7 +17,9 @@ do_prophet <- function(df, time, value = NULL, ...){
 do_prophet_ <- function(df, time_col, value_col = NULL, days, fun.aggregate = sum, ...){
 
   loadNamespace("dplyr")
-  loadNamespace("prophet")
+  # For some reason this needs to be library() instead of loadNamespace() to avoid error.
+  # Bug in prophet?
+  library("prophet")
 
   grouped_col <- grouped_by(df)
 
@@ -70,9 +72,9 @@ do_prophet_ <- function(df, time_col, value_col = NULL, days, fun.aggregate = su
     # time column should be Date. TODO: really??
     aggregated_data[["ds"]] <- as.Date(aggregated_data[["ds"]])
     # TODO: do prophet
-    m <- prophet(aggregated_data)
-    future <- make_future_dataframe(m, periods = days) #includes past dates
-    forecast <- predict(m, future)
+    m <- prophet::prophet(aggregated_data)
+    future <- prophet::make_future_dataframe(m, periods = days) #includes past dates
+    forecast <- stats::predict(m, future)
     forecast
   }
 
