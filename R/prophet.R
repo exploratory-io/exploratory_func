@@ -59,7 +59,6 @@ do_prophet_ <- function(df, time_col, value_col = NULL, days, fun.aggregate = su
         dplyr::group_by(time) %>%
         dplyr::summarise(y = fun.aggregate(value))
     } else {
-      value_col <- avoid_conflict(time_col, "count")
       data.frame(
         time = lubridate::round_date(df[[time_col]], unit = "day")
       ) %>%
@@ -75,7 +74,13 @@ do_prophet_ <- function(df, time_col, value_col = NULL, days, fun.aggregate = su
     m <- prophet::prophet(aggregated_data)
     future <- prophet::make_future_dataframe(m, periods = days) #includes past dates
     forecast <- stats::predict(m, future)
-    forecast
+    ret <- forecast %>% dplyr::left_join(aggregated_data, by = c("ds" = "ds"))
+    colnames(ret)[colnames(ret) == "ds"] <- avoid_conflict(colnames(ret), time_col)
+    if (is.null(value_col)) {
+      value_col <- "count"
+    }
+    colnames(ret)[colnames(ret) == "y"] <- avoid_conflict(colnames(ret), value_col)
+    ret
   }
 
   # Calculation is executed in each group.
