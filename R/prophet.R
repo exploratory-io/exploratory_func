@@ -16,13 +16,18 @@ do_prophet <- function(df, time, value = NULL, ...){
 #' @param include_history - Whether to include history data in forecast or not.
 #' @param fun.aggregate - Function to aggregate values.
 #' @param ... - extra values to be passed to prophet::prophet. listed below.
+#' @param growth
+#' @param seasonality.prior.scale
+#' @param yearly.seasonality
+#' @param weekly.seasonality
 #' @param n.changepoints
 #' @param changepoint.prior.scale
 #' @param changepoints
 #' @param holidays.prior.scale
-#' @param seasonality.prior.scale
-#' @param interval.width
+#' @param holidays
 #' @param mcmc.samples
+#' @param interval.width
+#' @param uncertainty.samples
 #' @export
 do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "day", include_history = TRUE, fun.aggregate = sum, ...){
 
@@ -85,6 +90,8 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
     future <- prophet::make_future_dataframe(m, periods = periods, freq = time_unit, include_history = include_history) #includes past dates
     forecast <- stats::predict(m, future)
     ret <- forecast %>% dplyr::full_join(aggregated_data, by = c("ds" = "ds"))
+    # drop t column, which is just scaled time, which does not seem informative.
+    ret <- ret %>% select(-t)
     # adjust order of output columns
     ret <- ret %>% select(ds, y, yhat, yhat_upper, yhat_lower, trend, trend_upper, trend_lower,
                           seasonal, seasonal_lower, seasonal_upper, yearly, yearly_lower, yearly_upper,
