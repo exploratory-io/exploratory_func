@@ -8,11 +8,19 @@ do_prophet <- function(df, time, value = NULL, ...){
 }
 
 #' Detect anomaly data
-#' @param df Data frame
-#' @param time_col Column that has time data
-#' @param value_col Column that has value data
-#' @param fun.aggregate Function to aggregate values.
-#' @param ... extra values to be passed to AnomalyDetection::AnomalyDetectionTs.
+#' @param df - Data frame
+#' @param time_col - Column that has time data
+#' @param value_col - Column that has value data
+#' @param fun.aggregate - Function to aggregate values.
+#' @param ... - extra values to be passed to prophet::prophet. listed below.
+#' @param n.changepoints
+#' @param changepoint.prior.scale
+#' @param changepoints
+#' @param holidays.prior.scale
+#' @param seasonality.prior.scale
+#' @param interval.width
+#' @param mcmc.samples
+#' @param freq
 #' @export
 do_prophet_ <- function(df, time_col, value_col = NULL, days, fun.aggregate = sum, ...){
 
@@ -71,7 +79,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, days, fun.aggregate = su
     # time column should be Date. TODO: really??
     aggregated_data[["ds"]] <- as.Date(aggregated_data[["ds"]])
     # TODO: do prophet
-    m <- prophet::prophet(aggregated_data)
+    m <- prophet::prophet(aggregated_data, ...)
     future <- prophet::make_future_dataframe(m, periods = days) #includes past dates
     forecast <- stats::predict(m, future)
     ret <- forecast %>% dplyr::left_join(aggregated_data, by = c("ds" = "ds"))
