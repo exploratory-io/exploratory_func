@@ -88,6 +88,18 @@ do_prophet_ <- function(df, time_col, value_col = NULL, days, time_unit = "day",
       value_col <- "count"
     }
     colnames(ret)[colnames(ret) == "y"] <- avoid_conflict(colnames(ret), value_col)
+
+    # adjust column name style
+    colnames(ret)[colnames(ret) == "yhat_upper"] <- avoid_conflict(colnames(ret), "yhat_high")
+    colnames(ret)[colnames(ret) == "trend_upper"] <- avoid_conflict(colnames(ret), "trend_high")
+    colnames(ret)[colnames(ret) == "seasonal_upper"] <- avoid_conflict(colnames(ret), "seasonal_high")
+    colnames(ret)[colnames(ret) == "yearly_upper"] <- avoid_conflict(colnames(ret), "yearly_high")
+    colnames(ret)[colnames(ret) == "weekly_upper"] <- avoid_conflict(colnames(ret), "weekly_high")
+    colnames(ret)[colnames(ret) == "yhat_lower"] <- avoid_conflict(colnames(ret), "yhat_lower")
+    colnames(ret)[colnames(ret) == "trend_lower"] <- avoid_conflict(colnames(ret), "trend_lower")
+    colnames(ret)[colnames(ret) == "seasonal_lower"] <- avoid_conflict(colnames(ret), "seasonal_lower")
+    colnames(ret)[colnames(ret) == "yearly_lower"] <- avoid_conflict(colnames(ret), "yearly_lower")
+    colnames(ret)[colnames(ret) == "weekly_lower"] <- avoid_conflict(colnames(ret), "weekly_lower")
     ret
   }
 
