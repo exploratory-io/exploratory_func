@@ -78,11 +78,16 @@ do_prophet_ <- function(df, time_col, value_col = NULL, days, time_unit = "day",
 
     # time column should be Date. TODO: really??
     aggregated_data[["ds"]] <- as.Date(aggregated_data[["ds"]])
-    # TODO: do prophet
     m <- prophet::prophet(aggregated_data, ...)
     future <- prophet::make_future_dataframe(m, periods = days, freq = time_unit) #includes past dates
     forecast <- stats::predict(m, future)
     ret <- forecast %>% dplyr::left_join(aggregated_data, by = c("ds" = "ds"))
+    # adjust order of output columns
+    ret <- ret %>% select(ds, y, yhat, yhat_upper, yhat_lower, trend, trend_upper, trend_lower,
+                          seasonal, seasonal_lower, seasonal_upper, yearly, yearly_lower, yearly_upper,
+                          weekly, weekly_lower, weekly_upper, everything())
+
+    # revive original column names (time_col, value_col)
     colnames(ret)[colnames(ret) == "ds"] <- avoid_conflict(colnames(ret), time_col)
     if (is.null(value_col)) {
       value_col <- "count"
