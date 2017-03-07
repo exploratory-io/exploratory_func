@@ -132,11 +132,11 @@ test_that("cluster_data", {
     with_na_group2 = rep(c(NA, 5, 1, 4), 5),
     g = 2
   )
-  test_df <- dplyr::bind_rows(test_df_group1, test_df_group2)
-  kmeans_ret <- build_kmeans(test_df, with_na_group1, with_na_group2, fill = 1, augment = FALSE, keep.source = FALSE, group_cols = "g")
+  test_df <- dplyr::bind_rows(test_df_group1, test_df_group2) %>% dplyr::group_by(g)
+  kmeans_ret <- build_kmeans(test_df, with_na_group1, with_na_group2, fill = 1, augment = FALSE, keep.source = FALSE)
   cluster_ret <- cluster_info(kmeans_ret)
-  expect_equal(colnames(cluster_ret), c("g", "Center with_na_group1", "Center with_na_group2", "Size",
-                                "Withinss"))
+  expect_equal(colnames(cluster_ret),
+               c("g", "Center with_na_group1", "Center with_na_group2", "Size", "Withinss"))
 
   ret <- kmeans_info(kmeans_ret)
   expect_equal(colnames(ret), c("g", "Total Sum of Squares", "Total Sum of Squares within Clusters",

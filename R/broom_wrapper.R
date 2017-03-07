@@ -42,7 +42,7 @@ augment_kmeans <- function(df, model, data){
     augment_func <- get("augment", asNamespace("broom"))
     ret <- do.call(augment_func, list(df, model_col, data=data_col))
     # cluster column is factor labeled "1", "2"..., so convert it to integer to avoid confusion
-    ret[[ncol(ret)]] <- as.integer(ret[[ncol(ret)]])
+    ret[[ncol(ret)]] <- ret[[ncol(ret)]]
     ret
   },
   error = function(e){
