@@ -11,8 +11,9 @@ do_prophet <- function(df, time, value = NULL, ...){
 #' @param df - Data frame
 #' @param time_col - Column that has time data
 #' @param value_col - Column that has value data
-#' @param periods - number of time periods (e.g. days. unit is determined by time_unit) to forecast.
+#' @param periods - Number of time periods (e.g. days. unit is determined by time_unit) to forecast.
 #' @param time_unit - "day", "week", "month", "quarter", or "year"
+#' @param include_history - Whether to include history data in forecast or not.
 #' @param fun.aggregate - Function to aggregate values.
 #' @param ... - extra values to be passed to prophet::prophet. listed below.
 #' @param n.changepoints
@@ -23,7 +24,7 @@ do_prophet <- function(df, time, value = NULL, ...){
 #' @param interval.width
 #' @param mcmc.samples
 #' @export
-do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "day", fun.aggregate = sum, ...){
+do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "day", include_history = TRUE, fun.aggregate = sum, ...){
 
   loadNamespace("dplyr")
   # For some reason this needs to be library() instead of loadNamespace() to avoid error.
@@ -62,14 +63,14 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
 
     aggregated_data <- if (!is.null(value_col)){
       data.frame(
-        time = lubridate::round_date(df[[time_col]], unit = time_unit),
+        time = lubridate::floor_date(df[[time_col]], unit = time_unit),
         value = df[[value_col]]
       ) %>%
         dplyr::group_by(time) %>%
         dplyr::summarise(y = fun.aggregate(value))
     } else {
       data.frame(
-        time = lubridate::round_date(df[[time_col]], unit = time_unit)
+        time = lubridate::floor_date(df[[time_col]], unit = time_unit)
       ) %>%
         dplyr::group_by(time) %>%
         dplyr::summarise(y = n())
@@ -81,9 +82,9 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
     # time column should be Date. TODO: really??
     aggregated_data[["ds"]] <- as.Date(aggregated_data[["ds"]])
     m <- prophet::prophet(aggregated_data, ...)
-    future <- prophet::make_future_dataframe(m, periods = periods, freq = time_unit) #includes past dates
+    future <- prophet::make_future_dataframe(m, periods = periods, freq = time_unit, include_history = include_history) #includes past dates
     forecast <- stats::predict(m, future)
-    ret <- forecast %>% dplyr::left_join(aggregated_data, by = c("ds" = "ds"))
+    ret <- forecast %>% dplyr::full_join(aggregated_data, by = c("ds" = "ds"))
     # adjust order of output columns
     ret <- ret %>% select(ds, y, yhat, yhat_upper, yhat_lower, trend, trend_upper, trend_lower,
                           seasonal, seasonal_lower, seasonal_upper, yearly, yearly_lower, yearly_upper,
