@@ -11,6 +11,8 @@ do_prophet <- function(df, time, value = NULL, ...){
 #' @param df - Data frame
 #' @param time_col - Column that has time data
 #' @param value_col - Column that has value data
+#' @param periods - number of time periods (e.g. days. unit is determined by time_unit) to forecast.
+#' @param time_unit - "day", "week", "month", "quarter", or "year"
 #' @param fun.aggregate - Function to aggregate values.
 #' @param ... - extra values to be passed to prophet::prophet. listed below.
 #' @param n.changepoints
@@ -20,9 +22,8 @@ do_prophet <- function(df, time, value = NULL, ...){
 #' @param seasonality.prior.scale
 #' @param interval.width
 #' @param mcmc.samples
-#' @param time_unit
 #' @export
-do_prophet_ <- function(df, time_col, value_col = NULL, days, time_unit = "day", fun.aggregate = sum, ...){
+do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "day", fun.aggregate = sum, ...){
 
   loadNamespace("dplyr")
   # For some reason this needs to be library() instead of loadNamespace() to avoid error.
@@ -80,7 +81,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, days, time_unit = "day",
     # time column should be Date. TODO: really??
     aggregated_data[["ds"]] <- as.Date(aggregated_data[["ds"]])
     m <- prophet::prophet(aggregated_data, ...)
-    future <- prophet::make_future_dataframe(m, periods = days, freq = time_unit) #includes past dates
+    future <- prophet::make_future_dataframe(m, periods = periods, freq = time_unit) #includes past dates
     forecast <- stats::predict(m, future)
     ret <- forecast %>% dplyr::left_join(aggregated_data, by = c("ds" = "ds"))
     # adjust order of output columns
