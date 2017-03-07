@@ -500,3 +500,10 @@ test_that("test same_type for factor", {
   ret <- same_type(to_replace, original)
   expect_equal(ret, factor(c("aa", "aa", "bb"), levels = c("bb", "aa")))
 })
+
+test_that("test fill_mat_NA", {
+  test_mat <- matrix(seq(10), nrow = 2)
+  indice <- c(2, 5)
+  ret <- fill_mat_NA(indice, test_mat)
+  expect_true(any(is.na(ret)))
+})

@@ -829,8 +829,19 @@ get_multi_predicted_values <- function(prob_mat, actual_vals = NULL){
   ret
 }
 
-fill_with_NA <- function(indice, values, max_index = max(indice, na.rm = TRUE)){
+fill_vec_NA <- function(indice, values, max_index = max(indice, na.rm = TRUE)){
   ret <- same_type(rep(NA, max_index), values)
   ret[indice] <- values
+  ret
+}
+
+fill_mat_NA <- function(indice, mat, max_index = max(indice, na.rm = TRUE)){
+  if(nrow(mat) != length(indice)) {
+    stop("matrix must have the same length of indice")
+  }
+  na_val <- same_type(NA, as.vector(mat))
+  ret <- matrix(na_val, nrow = max_index, ncol = ncol(mat))
+  colnames(ret) <- colnames(mat)
+  ret[indice, ] <- mat
   ret
 }

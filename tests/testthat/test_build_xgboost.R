@@ -180,7 +180,8 @@ test_that("test build_xgboost with multi softprob", {
   test_data[["CARRIER"]] <- as.factor(test_data[["CARRIER"]])
   model_ret <- build_model(test_data, model_func = xgboost_multi, formula = CARRIER ~ ., nrounds = 5, verbose = 0)
   prediction_ret <- prediction(model_ret)
-  expect_true(all(prediction_ret$predicted_probability > 0))
+  prob <- prediction_ret$predicted_probability
+  expect_true(all(prob[!is.na(prob)] > 0))
   expect_true(length(unique(prediction_ret$predicted_label)) > 1)
 })
 

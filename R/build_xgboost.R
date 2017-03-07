@@ -7,13 +7,9 @@ fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, ...) {
   md_mat <- model.matrix(term, data = md_frame)
   weight <- model.weights(md_frame)
 
-  y_name <- all.vars(lazyeval::f_lhs(formula))
+  y <- model.response(md_frame)
 
-  if(!y_name %in% colnames(data)) {
-    stop(paste0(y_name, " is not in data."))
-  }
-
-  ret <- xgboost::xgboost(data = md_mat, label = md_frame[[y_name]], weight = weight, nrounds = nrounds, ...)
+  ret <- xgboost::xgboost(data = md_mat, label = y, weight = weight, nrounds = nrounds, ...)
   ret$terms <- term
   ret$x_names <- colnames(md_mat)
   ret
@@ -35,7 +31,8 @@ xgboost_binary <- function(data, formula, output_type = "logistic", eval_metric 
   if(is.logical(y_vals)) {
     label_levels <- c(FALSE, TRUE)
     y_vals <- as.numeric(y_vals)
-  } else if (!all(y_vals[[!is.na(y_vals)]] %in% c(0, 1))){
+  } else if (!all(y_vals[!is.na(y_vals)] %in% c(0, 1))){
+    # there are values that are not 0 or 1, so should be mapped as factor
     factored <- as.factor(data[[y_name]])
     label_levels <- same_type(levels(factored), data[[y_name]])
     if(length(label_levels) != 2){
@@ -61,7 +58,6 @@ xgboost_binary <- function(data, formula, output_type = "logistic", eval_metric 
   })
   # add class to control S3 methods
   class(ret) <- c("xgboost_binary", class(ret))
-  ret$fml <- formula
   ret$y_levels <- label_levels
   ret
 }
@@ -135,7 +131,7 @@ xgboost_reg <- function(data, formula, output_type = "linear", ...) {
 augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, ...) {
   class(x) <- class(x)[class(x) != c("xgboost_multi")]
 
-  if(!is.null(ret$terms)){
+  if(!is.null(x$terms)){
 
     ret_data <- if(!is.null(newdata)){
       newdata
@@ -159,13 +155,15 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, ...) {
     if (obj == "multi:softmax") {
       predicted_label_col <- avoid_conflict(colnames(ret_data), "predicted_label")
       predicted <- x$y_levels[predicted+1]
-      ret_data[[predicted_label_col]] <- predicted
+      # fill rows with NA
+      ret_data[[predicted_label_col]] <- fill_vec_NA(as.integer(rownames(mat)), predicted, max_index = nrow(ret_data))
     } else if (obj == "multi:softprob") {
       predicted_label_col <- avoid_conflict(colnames(ret_data), "predicted_label")
       predicted_prob_col <- avoid_conflict(colnames(ret_data), "predicted_probability")
 
       # predicted is a vector containing probabilities for each class
       probs <- matrix(predicted, nrow = length(x$y_levels)) %>% t()
+      probs <- fill_mat_NA(as.numeric(rownames(mat)), probs, nrow(ret_data))
       colnames(probs) <- x$y_levels
       predicted <- probs %>%
         as.data.frame() %>%
@@ -182,7 +180,7 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, ...) {
       ret_data[[predicted_prob_col]] <- max_prob
       ret_data[[predicted_label_col]] <- predicted_label
     }
-    data
+    ret_data
   } else {
     augment(x, data = data, newdata = newdata, ...)
   }
@@ -206,7 +204,7 @@ augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, ...) {
     mat <- model.matrix(x$terms, data = ret_data)
     # this is to find omitted indice for NA
     row_index <- as.numeric(rownames(mat))
-    predicted <- fill_with_NA(row_index, stats::predict(x, mat), max_index = nrow(ret_data))
+    predicted <- fill_vec_NA(row_index, stats::predict(x, mat), max_index = nrow(ret_data))
 
     vars <- all.vars(x$terms)
     y_name <- vars[[1]]
