@@ -74,6 +74,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, days, time_unit = "day",
         dplyr::summarise(y = n())
     }
 
+    # rename column names since prophet only takes columns with those predetermined names as input
     colnames(aggregated_data) <- c("ds", "y")
 
     # time column should be Date. TODO: really??
