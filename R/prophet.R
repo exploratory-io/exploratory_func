@@ -20,9 +20,9 @@ do_prophet <- function(df, time, value = NULL, ...){
 #' @param seasonality.prior.scale
 #' @param interval.width
 #' @param mcmc.samples
-#' @param freq
+#' @param time_unit
 #' @export
-do_prophet_ <- function(df, time_col, value_col = NULL, days, fun.aggregate = sum, ...){
+do_prophet_ <- function(df, time_col, value_col = NULL, days, time_unit = "day", fun.aggregate = sum, ...){
 
   loadNamespace("dplyr")
   # For some reason this needs to be library() instead of loadNamespace() to avoid error.
@@ -61,14 +61,14 @@ do_prophet_ <- function(df, time_col, value_col = NULL, days, fun.aggregate = su
 
     aggregated_data <- if (!is.null(value_col)){
       data.frame(
-        time = lubridate::round_date(df[[time_col]], unit = "day"),
+        time = lubridate::round_date(df[[time_col]], unit = time_unit),
         value = df[[value_col]]
       ) %>%
         dplyr::group_by(time) %>%
         dplyr::summarise(y = fun.aggregate(value))
     } else {
       data.frame(
-        time = lubridate::round_date(df[[time_col]], unit = "day")
+        time = lubridate::round_date(df[[time_col]], unit = time_unit)
       ) %>%
         dplyr::group_by(time) %>%
         dplyr::summarise(y = n())
@@ -80,7 +80,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, days, fun.aggregate = su
     aggregated_data[["ds"]] <- as.Date(aggregated_data[["ds"]])
     # TODO: do prophet
     m <- prophet::prophet(aggregated_data, ...)
-    future <- prophet::make_future_dataframe(m, periods = days) #includes past dates
+    future <- prophet::make_future_dataframe(m, periods = days, freq = time_unit) #includes past dates
     forecast <- stats::predict(m, future)
     ret <- forecast %>% dplyr::left_join(aggregated_data, by = c("ds" = "ds"))
     colnames(ret)[colnames(ret) == "ds"] <- avoid_conflict(colnames(ret), time_col)
