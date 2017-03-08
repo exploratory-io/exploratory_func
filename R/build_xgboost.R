@@ -19,7 +19,15 @@ fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, ...) {
 #' @param output_type Type of output. Can be "logistic" or "logitraw"
 #' The explanation is in https://www.r-bloggers.com/with-our-powers-combined-xgboost-and-pipelearner/
 #' @export
-xgboost_binary <- function(data, formula, output_type = "logistic", eval_metric = "auc", ...) {
+xgboost_binary <- function(data, formula, output_type = "logistic", eval_metric = NULL, params = list(), ...) {
+  if (is.null(params$eval_metric)){
+    if(is.null(eval_metric)){
+      params <- append(params, list(eval_metric = "auc", eval_metric = "error", eval_metric = "logloss"))
+    } else {
+      params$eval_metric <- eval_metric
+    }
+  }
+
   vars <- all.vars(formula)
 
   y_name  <- vars[[1]]
@@ -48,7 +56,7 @@ xgboost_binary <- function(data, formula, output_type = "logistic", eval_metric 
     fml_xgboost(data = data,
                 formula = formula,
                 objective = objective,
-                eval_metric = eval_metric,
+                params = params,
                 ...)
   }, error = function(e){
     if(stringr::str_detect(e$message, "Check failed: !auc_error AUC: the dataset only contains pos or neg samples")){
@@ -66,7 +74,14 @@ xgboost_binary <- function(data, formula, output_type = "logistic", eval_metric 
 #' @param output_type Type of output. Can be "softprob" or "softmax"
 #' The explanation is in https://www.r-bloggers.com/with-our-powers-combined-xgboost-and-pipelearner/
 #' @export
-xgboost_multi <- function(data, formula, output_type = "softprob", ...) {
+xgboost_multi <- function(data, formula, output_type = "softprob", eval_metric = NULL, params = list(), ...) {
+  if (is.null(params$eval_metric)){
+    if(is.null(eval_metric)){
+      params <- append(params, list(eval_metric = "merror", eval_metric = "mlogloss"))
+    } else {
+      params$eval_metric <- eval_metric
+    }
+  }
   vars <- all.vars(formula)
 
   y_name  <- vars[[1]]
@@ -94,6 +109,7 @@ xgboost_multi <- function(data, formula, output_type = "softprob", ...) {
                      formula = formula,
                      objective = objective,
                      num_class = length(label_levels),
+                     params = params,
                      ...)
   # add class to control S3 methods
   class(ret) <- c("xgboost_multi", class(ret))
@@ -106,7 +122,15 @@ xgboost_multi <- function(data, formula, output_type = "softprob", ...) {
 #' @param output_type Type of output. Can be "linear", "logistic", "gamma" or "tweedie"
 #' The explanation is in https://www.r-bloggers.com/with-our-powers-combined-xgboost-and-pipelearner/
 #' @export
-xgboost_reg <- function(data, formula, output_type = "linear", ...) {
+xgboost_reg <- function(data, formula, output_type = "linear", eval_metric = NULL, params = list(), ...) {
+  if (is.null(params$eval_metric)){
+    if(is.null(eval_metric) && (output_type == "linear" || output_type == "logistic")){
+      params <- append(params, list(eval_metric = "rmse", eval_metric = "mae"))
+    } else {
+      params$eval_metric <- eval_metric
+    }
+  }
+
   vars <- all.vars(formula)
 
   y_name  <- vars[1]
@@ -115,7 +139,10 @@ xgboost_reg <- function(data, formula, output_type = "linear", ...) {
 
   objective <- paste0("reg:", output_type, sep = "")
 
-  ret <- fml_xgboost(data = data, formula = formula,  objective = objective, ...)
+  ret <- fml_xgboost(data = data,
+                     formula = formula,
+                     objective = objective,
+                     params = params, ...)
   # add class to control S3 methods
   class(ret) <- c("xgboost_reg", class(ret))
   ret$fml <- formula
