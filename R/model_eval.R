@@ -265,7 +265,7 @@ evaluate_multi_ <- function(df, pred_label_col, actual_val_col, ...) {
     macro_f_score <- mean(f_score, na.rm = TRUE)
 
     accuracy <- tp_sum / length(actual_fac)
-    missclassification_rate <- 1 - accuracy
+    misclassification_rate <- 1 - accuracy
 
     # this is to change column name
     accuracy_rate <- accuracy
@@ -274,7 +274,7 @@ evaluate_multi_ <- function(df, pred_label_col, actual_val_col, ...) {
       micro_f_score,
       macro_f_score,
       accuracy_rate,
-      missclassification_rate
+      misclassification_rate
     )
   }
 

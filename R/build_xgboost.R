@@ -360,8 +360,8 @@ glance.xgb.Booster <- function(x, pretty.name = FALSE, ...) {
     colnames(ret)[colnames(ret) == "train_rmse"] <- "Root Mean Square Error"
     colnames(ret)[colnames(ret) == "train_mae"] <- "Mean Absolute Error"
     colnames(ret)[colnames(ret) == "train_logloss"] <- "Negative Log Likelihood"
-    colnames(ret)[colnames(ret) == "train_error"] <- "Missclassification Rate" # this is for binary
-    colnames(ret)[colnames(ret) == "train_merror"] <- "Missclassification Rate" # this is for multiclass
+    colnames(ret)[colnames(ret) == "train_error"] <- "Misclassification Rate" # this is for binary
+    colnames(ret)[colnames(ret) == "train_merror"] <- "Misclassification Rate" # this is for multiclass
     colnames(ret)[colnames(ret) == "train_mlogloss"] <- "Multiclass Logloss"
     colnames(ret)[colnames(ret) == "train_auc"] <- "AUC"
     colnames(ret)[colnames(ret) == "train_ndcg"] <- "Normalized Discounted Cumulative Gain"
@@ -374,8 +374,8 @@ glance.xgb.Booster <- function(x, pretty.name = FALSE, ...) {
     colnames(ret)[colnames(ret) == "train_rmse"] <- "root_mean_square_error"
     colnames(ret)[colnames(ret) == "train_mae"] <- "mean_absolute_error"
     colnames(ret)[colnames(ret) == "train_logloss"] <- "negative_log_likelihood"
-    colnames(ret)[colnames(ret) == "train_error"] <- "missclassification_rate" # this is for binary
-    colnames(ret)[colnames(ret) == "train_merror"] <- "missclassification_rate" # this is for multiclass
+    colnames(ret)[colnames(ret) == "train_error"] <- "misclassification_rate" # this is for binary
+    colnames(ret)[colnames(ret) == "train_merror"] <- "misclassification_rate" # this is for multiclass
     colnames(ret)[colnames(ret) == "train_mlogloss"] <- "multiclass_logloss"
     colnames(ret)[colnames(ret) == "train_auc"] <- "auc"
     colnames(ret)[colnames(ret) == "train_ndcg"] <- "normalized_discounted_cumulative_gain"

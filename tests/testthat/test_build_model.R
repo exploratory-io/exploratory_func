@@ -25,7 +25,7 @@ test_that("test nnet build_model", {
 
   evaluate_ret <- evaluate_multi(prediction_ret, CARRIER, predicted_label)
 
-  expect_equal(evaluate_ret[["missclassification_rate"]], 1)
+  expect_equal(evaluate_ret[["misclassification_rate"]], 1)
 
 })
 
