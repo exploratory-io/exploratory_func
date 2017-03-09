@@ -7,7 +7,7 @@ do_prophet <- function(df, time, value = NULL, ...){
   do_prophet_(df, time_col, value_col, ...)
 }
 
-#' Detect anomaly data
+#' Forecast time series data
 #' @param df - Data frame
 #' @param time_col - Column that has time data
 #' @param value_col - Column that has value data
@@ -16,18 +16,18 @@ do_prophet <- function(df, time, value = NULL, ...){
 #' @param include_history - Whether to include history data in forecast or not.
 #' @param fun.aggregate - Function to aggregate values.
 #' @param ... - extra values to be passed to prophet::prophet. listed below.
-#' @param growth
-#' @param seasonality.prior.scale
-#' @param yearly.seasonality
-#' @param weekly.seasonality
-#' @param n.changepoints
-#' @param changepoint.prior.scale
-#' @param changepoints
-#' @param holidays.prior.scale
-#' @param holidays
-#' @param mcmc.samples
-#' @param interval.width
-#' @param uncertainty.samples
+#' @param growth - Type of Trend. "linear" or "logistic".
+#' @param seasonality.prior.scale - Strength of seasonality. Default is 10.
+#' @param yearly.seasonality - Whether to return yearly seasonality data.
+#' @param weekly.seasonality - Whther to return weekly seasonality data.
+#' @param n.changepoints - Number of potential changepoints. Default is 25.
+#' @param changepoint.prior.scale - Flexibility of automatic changepoint selection. Default is 0.05.
+#' @param changepoints - list of potential changepoints.
+#' @param holidays.prior.scale - Strength of holiday effect. Default is 10.
+#' @param holidays - Holiday definition data frame.
+#' @param mcmc.samples - MCMC samples for full bayesian inference. Default is 0.
+#' @param interval.width - Width of uncertainty intervals.
+#' @param uncertainty.samples - Number of simulations made for calculating uncertainty intervals. Default is 1000.
 #' @export
 do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "day", include_history = TRUE, fun.aggregate = sum, ...){
 
