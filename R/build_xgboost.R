@@ -1,6 +1,6 @@
 #' formula version of xgboost
 #' @export
-fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, ...) {
+fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_rate = 0, ...) {
   term <- terms(formula, data = data)
   # do.call is used to substitute weight
   md_frame <- do.call(model.frame, list(term, data = data, weights = substitute(weights)))
@@ -13,7 +13,14 @@ fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, ...) {
 
   y <- model.response(md_frame)
 
-  ret <- xgboost::xgboost(data = md_mat, label = y, weight = weight, nrounds = nrounds, ...)
+  ret <- if(watchlist_rate != 0.0) {
+    index <- sample(seq(nrow(md_mat)), nrow(md_mat) * watchlist_rate)
+    watch_mat <- xgboost::xgb.DMatrix(data = safe_slice(md_mat ,index), label = y[index])
+    train_mat <- xgboost::xgb.DMatrix(data = safe_slice(md_mat ,index, remove = TRUE), label = y[-index])
+    xgboost::xgb.train(data = train_mat, watchlist = list(validation = watch_mat, train = train_mat), label = y, weight = weight, nrounds = nrounds, ...)
+  } else {
+    xgboost::xgboost(data = md_mat, label = y, weight = weight, nrounds = nrounds, ...)
+  }
   ret$terms <- term
   ret$x_names <- colnames(md_mat)
   ret

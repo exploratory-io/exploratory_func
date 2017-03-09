@@ -488,25 +488,33 @@ sample_df_index <- function(df, rate, seed = NULL){
   sample(seq(nrow(df)), nrow(df) * rate)
 }
 
-#' slice that can handle empty vector
+#' slice of 2 dimensional data that can handle empty vector
 #' @export
-safe_slice <- function(df, index, remove = FALSE){
-  if(remove){
+safe_slice <- function(data, index, remove = FALSE){
+  ret <- if(remove){
     if(is.null(index)){
-      df
+      data
     } else if(length(index) == 0){
-      df
+      data
     } else {
-      df[-index, ]
+      data[-index, ]
     }
   } else {
     if(is.null(index)){
-      df[c(), ]
+      data[c(), ]
     } else if(length(index) == 0){
-      df[c(), ]
+      data[c(), ]
     } else {
-      df[index, ]
+      data[index, ]
     }
+  }
+
+  if(is.vector(ret)){
+    mat <- matrix(ret, nrow = 1)
+    colnames(mat) <- names(ret)
+    mat
+  } else {
+    ret
   }
 }
 
