@@ -17,7 +17,7 @@ fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_ra
     index <- sample(seq(nrow(md_mat)), nrow(md_mat) * watchlist_rate)
     watch_mat <- xgboost::xgb.DMatrix(data = safe_slice(md_mat ,index), label = y[index])
     train_mat <- xgboost::xgb.DMatrix(data = safe_slice(md_mat ,index, remove = TRUE), label = y[-index])
-    xgboost::xgb.train(data = train_mat, watchlist = list(validation = watch_mat, train = train_mat), label = y, weight = weight, nrounds = nrounds, ...)
+    xgboost::xgb.train(data = train_mat, watchlist = list(train = train_mat, validation = watch_mat), label = y, weight = weight, nrounds = nrounds, ...)
   } else {
     xgboost::xgboost(data = md_mat, label = y, weight = weight, nrounds = nrounds, ...)
   }
@@ -30,14 +30,23 @@ fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_ra
 #' @param output_type Type of output. Can be "logistic" or "logitraw"
 #' The explanation is in https://www.r-bloggers.com/with-our-powers-combined-xgboost-and-pipelearner/
 #' @export
-xgboost_binary <- function(data, formula, output_type = "logistic", eval_metric = NULL, params = list(), ...) {
-  if (is.null(params$eval_metric)){
-    if(is.null(eval_metric)){
-      params <- append(params, list(eval_metric = "auc", eval_metric = "error", eval_metric = "logloss"))
+xgboost_binary <- function(data, formula, output_type = "logistic", eval_metric = "auc", params = list(), ...) {
+
+  # there can be more than 2 eval_metric
+  metric_list <- list()
+  default_metrics <- c("auc", "error", "logloss")
+  for (metric in default_metrics) {
+    if (eval_metric == metric) {
+      # indicated metric is first
+      metric_list <- append(list(eval_metric = metric), metric_list)
     } else {
-      params$eval_metric <- eval_metric
+      metric_list <- append(metric_list, list(eval_metric = metric))
     }
   }
+  if (!eval_metric %in% default_metrics) {
+    metric_list <- append(list(eval_metric = eval_metric), metric_list)
+  }
+  params <- append(metric_list, params)
 
   vars <- all.vars(formula)
 
@@ -85,14 +94,23 @@ xgboost_binary <- function(data, formula, output_type = "logistic", eval_metric 
 #' @param output_type Type of output. Can be "softprob" or "softmax"
 #' The explanation is in https://www.r-bloggers.com/with-our-powers-combined-xgboost-and-pipelearner/
 #' @export
-xgboost_multi <- function(data, formula, output_type = "softprob", eval_metric = NULL, params = list(), ...) {
-  if (is.null(params$eval_metric)){
-    if(is.null(eval_metric)){
-      params <- append(params, list(eval_metric = "merror", eval_metric = "mlogloss"))
+xgboost_multi <- function(data, formula, output_type = "softprob", eval_metric = "merror", params = list(), ...) {
+  # there can be more than 2 eval_metric
+  metric_list <- list()
+  default_metrics <- c("merror", "mlogloss")
+  for (metric in default_metrics) {
+    if (eval_metric == metric) {
+      # indicated metric is first
+      metric_list <- append(list(eval_metric = metric), metric_list)
     } else {
-      params$eval_metric <- eval_metric
+      metric_list <- append(metric_list, list(eval_metric = metric))
     }
   }
+  if (!eval_metric %in% default_metrics) {
+    metric_list <- append(list(eval_metric = eval_metric), metric_list)
+  }
+  params <- append(metric_list, params)
+
   vars <- all.vars(formula)
 
   y_name  <- vars[[1]]
@@ -133,14 +151,22 @@ xgboost_multi <- function(data, formula, output_type = "softprob", eval_metric =
 #' @param output_type Type of output. Can be "linear", "logistic", "gamma" or "tweedie"
 #' The explanation is in https://www.r-bloggers.com/with-our-powers-combined-xgboost-and-pipelearner/
 #' @export
-xgboost_reg <- function(data, formula, output_type = "linear", eval_metric = NULL, params = list(), ...) {
-  if (is.null(params$eval_metric)){
-    if(is.null(eval_metric) && (output_type == "linear" || output_type == "logistic")){
-      params <- append(params, list(eval_metric = "rmse", eval_metric = "mae"))
+xgboost_reg <- function(data, formula, output_type = "linear", eval_metric = "rmse", params = list(), ...) {
+  # there can be more than 2 eval_metric
+  metric_list <- list()
+  default_metrics <- c("rmse", "mae")
+  for (metric in default_metrics) {
+    if (eval_metric == metric) {
+      # indicated metric is first
+      metric_list <- append(list(eval_metric = metric), metric_list)
     } else {
-      params$eval_metric <- eval_metric
+      metric_list <- append(metric_list, list(eval_metric = metric))
     }
   }
+  if (!eval_metric %in% default_metrics) {
+    metric_list <- append(list(eval_metric = eval_metric), metric_list)
+  }
+  params <- append(metric_list, params)
 
   vars <- all.vars(formula)
 
@@ -394,6 +420,19 @@ glance.xgb.Booster <- function(x, pretty.name = FALSE, ...) {
     colnames(ret)[colnames(ret) == "train_map"] <- "Mean Average Precision"
     colnames(ret)[colnames(ret) == "train_gamma_nloglik"] <- "Gamma Negative Log Likelihood"
     colnames(ret)[colnames(ret) == "train_gamma_deviance"] <- "Gamma Deviance"
+
+    colnames(ret)[colnames(ret) == "validation_rmse"] <- "Validation Root Mean Square Error"
+    colnames(ret)[colnames(ret) == "validation_mae"] <- "Validation Mean Absolute Error"
+    colnames(ret)[colnames(ret) == "validation_logloss"] <- "Validation Negative Log Likelihood"
+    colnames(ret)[colnames(ret) == "validation_error"] <- "Validation Misclassification Rate" # this is for binary
+    colnames(ret)[colnames(ret) == "validation_merror"] <- "Validation Misclassification Rate" # this is for multiclass
+    colnames(ret)[colnames(ret) == "validation_mlogloss"] <- "Validation Multiclass Logloss"
+    colnames(ret)[colnames(ret) == "validation_auc"] <- "Validation AUC"
+    colnames(ret)[colnames(ret) == "validation_ndcg"] <- "Validation Normalized Discounted Cumulative Gain"
+    colnames(ret)[colnames(ret) == "validation_map"] <- "Validation Mean Average Precision"
+    colnames(ret)[colnames(ret) == "validation_map"] <- "Validation Mean Average Precision"
+    colnames(ret)[colnames(ret) == "validation_gamma_nloglik"] <- "Validation Gamma Negative Log Likelihood"
+    colnames(ret)[colnames(ret) == "validation_gamma_deviance"] <- "Validation Gamma Deviance"
   } else {
     colnames(ret)[colnames(ret) == "iter"] <- "number_of_iteration"
     colnames(ret)[colnames(ret) == "train_rmse"] <- "root_mean_square_error"
@@ -408,6 +447,19 @@ glance.xgb.Booster <- function(x, pretty.name = FALSE, ...) {
     colnames(ret)[colnames(ret) == "train_map"] <- "mean_average_precision"
     colnames(ret)[colnames(ret) == "train_gamma_nloglik"] <- "gamma_negative_log_likelihood"
     colnames(ret)[colnames(ret) == "train_gamma_deviance"] <- "gamma_deviance"
+
+    colnames(ret)[colnames(ret) == "validation_rmse"] <- "validation_root_mean_square_error"
+    colnames(ret)[colnames(ret) == "validation_mae"] <- "validation_mean_absolute_error"
+    colnames(ret)[colnames(ret) == "validation_logloss"] <- "validation_negative_log_likelihood"
+    colnames(ret)[colnames(ret) == "validation_error"] <- "validation_misclassification_rate" # this is for binary
+    colnames(ret)[colnames(ret) == "validation_merror"] <- "validation_misclassification_rate" # this is for multiclass
+    colnames(ret)[colnames(ret) == "validation_mlogloss"] <- "validation_multiclass_logloss"
+    colnames(ret)[colnames(ret) == "validation_auc"] <- "validation_auc"
+    colnames(ret)[colnames(ret) == "validation_ndcg"] <- "validation_normalized_discounted_cumulative_gain"
+    colnames(ret)[colnames(ret) == "validation_map"] <- "validation_mean_average_precision"
+    colnames(ret)[colnames(ret) == "validation_map"] <- "validation_mean_average_precision"
+    colnames(ret)[colnames(ret) == "validation_gamma_nloglik"] <- "validation_gamma_negative_log_likelihood"
+    colnames(ret)[colnames(ret) == "validation_gamma_deviance"] <- "validation_gamma_deviance"
   }
   ret
 }
