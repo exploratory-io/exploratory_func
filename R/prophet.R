@@ -1,3 +1,4 @@
+# Wrapper functions around prophet.
 
 #' NSE version of do_prophet_
 #' @export
