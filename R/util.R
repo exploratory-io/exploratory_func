@@ -613,7 +613,7 @@ get_score <- function(act_label, pred_label) {
   recall <- true_positive / sum(act_label, na.rm = TRUE)
   specificity <- true_negative / sum(!act_label, na.rm = TRUE)
   accuracy <- (true_positive + true_negative) / test_size
-  missclassification_rate <- 1 - accuracy
+  misclassification_rate <- 1 - accuracy
   f_score <- 2 * (precision * recall) / (precision + recall)
 
   # modify the name for column name
@@ -622,7 +622,7 @@ get_score <- function(act_label, pred_label) {
   data.frame(
     f_score,
     accuracy_rate,
-    missclassification_rate,
+    misclassification_rate,
     precision,
     recall,
     specificity,
