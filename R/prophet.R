@@ -92,11 +92,11 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
     forecast <- stats::predict(m, future)
     ret <- forecast %>% dplyr::full_join(aggregated_data, by = c("ds" = "ds"))
     # drop t column, which is just scaled time, which does not seem informative.
-    ret <- ret %>% select(-t)
+    ret <- ret %>% dplyr::select(-t)
     # adjust order of output columns
-    ret <- ret %>% select(ds, y, yhat, yhat_upper, yhat_lower, trend, trend_upper, trend_lower,
+    ret <- ret %>% dplyr::select(ds, y, yhat, yhat_upper, yhat_lower, trend, trend_upper, trend_lower,
                           seasonal, seasonal_lower, seasonal_upper, yearly, yearly_lower, yearly_upper,
-                          weekly, weekly_lower, weekly_upper, everything())
+                          weekly, weekly_lower, weekly_upper, dplyr::everything())
 
     # revive original column names (time_col, value_col)
     colnames(ret)[colnames(ret) == "ds"] <- avoid_conflict(colnames(ret), time_col)
