@@ -26,6 +26,10 @@ data_xgboost <- function(data, x_names, y_name, weight = NULL, nrounds= 10, ...)
     x <- matrix(as.double(x), ncol = ncol(x))
   }
 
+  if (nrow(x) == 0) {
+    stop("No valid data to create xgboost model.")
+  }
+
   y <- as.numeric(data[[y_name]])
 
   ret <- xgboost::xgboost(data = x, label = y, weight = weight, nrounds = nrounds, ...)
