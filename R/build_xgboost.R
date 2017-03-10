@@ -30,8 +30,6 @@ fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_ra
     }
     ret$terms <- term
     ret$x_names <- colnames(md_mat)
-    ret$model.matrix <- md_mat
-    ret$label <- y
     ret
   }
 }
@@ -391,9 +389,7 @@ tidy.xgb.Booster <- function(x, type="weight", pretty.name = FALSE, ...){
                          class(x) != "fml_xgboost"]
   ret <- tryCatch({
     ret <- xgboost::xgb.importance(feature_names = x$x_names,
-                                   model=x,
-                                   data = x$model.matrix,
-                                   label = x$label) %>% as.data.frame()
+                                   model=x) %>% as.data.frame()
     if (pretty.name) {
       colnames(ret)[colnames(ret)=="Gain"] <- "Importance"
       colnames(ret)[colnames(ret)=="Cover"] <- "Coverage"
