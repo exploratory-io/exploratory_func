@@ -99,7 +99,7 @@ do_anomaly_detection_ <- function(df, time_col, value_col = NULL, time_unit = "d
 
     aggregated_data <- if (!is.null(value_col)){
       data.frame(
-        time = lubridate::round_date(df[[time_col]], unit = time_unit),
+        time = lubridate::floor_date(df[[time_col]], unit = time_unit),
         value = df[[value_col]]
       ) %>%
         dplyr::group_by(time) %>%
@@ -107,7 +107,7 @@ do_anomaly_detection_ <- function(df, time_col, value_col = NULL, time_unit = "d
     } else {
       value_col <- avoid_conflict(time_col, "count")
       data.frame(
-        time = lubridate::round_date(df[[time_col]], unit = time_unit)
+        time = lubridate::floor_date(df[[time_col]], unit = time_unit)
       ) %>%
         dplyr::group_by(time) %>%
         dplyr::summarise(count = n())
