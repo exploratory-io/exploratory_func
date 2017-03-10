@@ -1,7 +1,7 @@
 #' Find outlier values
 #' ref: https://www.r-bloggers.com/outlier-detection-and-treatment-with-r/
 #' @export
-find_outlier <- function (vec) {
+detect_outlier <- function (vec) {
   q <- quantile(vec, na.rm = TRUE)
   # q is with 0%, 25%, 50%, 75%, 100% quartiles
   # IQR is difference between 75% and 25%
