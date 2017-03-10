@@ -4,26 +4,36 @@ fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_ra
   term <- terms(formula, data = data)
   # do.call is used to substitute weight
   md_frame <- do.call(model.frame, list(term, data = data, weights = substitute(weights)))
-  md_mat <- model.matrix(term, data = md_frame)
-  weight <- model.weights(md_frame)
-
-  if (nrow(md_mat) == 0) {
+  if(nrow(md_frame) == 0){
     stop("No valid data to create xgboost model.")
-  }
-
-  y <- model.response(md_frame)
-
-  ret <- if(watchlist_rate != 0.0) {
-    index <- sample(seq(nrow(md_mat)), nrow(md_mat) * watchlist_rate)
-    watch_mat <- xgboost::xgb.DMatrix(data = safe_slice(md_mat ,index), label = y[index])
-    train_mat <- xgboost::xgb.DMatrix(data = safe_slice(md_mat ,index, remove = TRUE), label = y[-index])
-    xgboost::xgb.train(data = train_mat, watchlist = list(train = train_mat, validation = watch_mat), label = y, weight = weight, nrounds = nrounds, ...)
   } else {
-    xgboost::xgboost(data = md_mat, label = y, weight = weight, nrounds = nrounds, ...)
+    md_mat <- tryCatch({
+      model.matrix(term, data = md_frame, contrasts = FALSE)
+    }, error = function(e){
+      if(e$message == "contrasts can be applied only to factors with 2 or more levels") {
+        stop("more than 1 unique values are expected for categorical columns assigned as predictors")
+      }
+      stop(e)
+    })
+    weight <- model.weights(md_frame)
+
+    y <- model.response(md_frame)
+
+
+    ret <- if(watchlist_rate != 0.0) {
+      index <- sample(seq(nrow(md_mat)), ceiling(nrow(md_mat) * watchlist_rate))
+      watch_mat <- xgboost::xgb.DMatrix(data = safe_slice(md_mat ,index), label = y[index])
+      train_mat <- xgboost::xgb.DMatrix(data = safe_slice(md_mat ,index, remove = TRUE), label = y[-index])
+      xgboost::xgb.train(data = train_mat, watchlist = list(train = train_mat, validation = watch_mat), label = y, weight = weight, nrounds = nrounds, ...)
+    } else {
+      xgboost::xgboost(data = md_mat, label = y, weight = weight, nrounds = nrounds, ...)
+    }
+    ret$terms <- term
+    ret$x_names <- colnames(md_mat)
+    ret$model.matrix <- md_mat
+    ret$label <- y
+    ret
   }
-  ret$terms <- term
-  ret$x_names <- colnames(md_mat)
-  ret
 }
 
 #' formula version of xgboost (multinomial)
@@ -380,15 +390,24 @@ tidy.xgb.Booster <- function(x, type="weight", pretty.name = FALSE, ...){
                          class(x)!="xgboost_reg" &
                          class(x) != "fml_xgboost"]
   ret <- tryCatch({
-    ret <- xgboost::xgb.importance(x$x_names,model=x) %>% as.data.frame()
+    ret <- xgboost::xgb.importance(feature_names = x$x_names,
+                                   model=x,
+                                   data = x$model.matrix,
+                                   label = x$label) %>% as.data.frame()
     if (pretty.name) {
       colnames(ret)[colnames(ret)=="Gain"] <- "Importance"
       colnames(ret)[colnames(ret)=="Cover"] <- "Coverage"
+      colnames(ret)[colnames(ret)=="RealCover"] <- "Real Coverage"
+      colnames(ret)[colnames(ret)=="RealCover %"] <- "Real Coverage %"
     } else {
       colnames(ret)[colnames(ret)=="Feature"] <- "feature"
       colnames(ret)[colnames(ret)=="Gain"] <- "importance"
       colnames(ret)[colnames(ret)=="Cover"] <- "coverage"
       colnames(ret)[colnames(ret)=="Frequency"] <- "frequency"
+      colnames(ret)[colnames(ret)=="Split"] <- "split"
+      colnames(ret)[colnames(ret)=="RealCover"] <- "real_coverage"
+      colnames(ret)[colnames(ret)=="RealCover %"] <- "real_coverage_%"
+      colnames(ret)[colnames(ret)=="Weight"] <- "weight"
     }
     ret
   }, error = function(e){
@@ -411,25 +430,37 @@ glance.xgb.Booster <- function(x, pretty.name = FALSE, ...) {
     colnames(ret)[colnames(ret) == "train_rmse"] <- "Root Mean Square Error"
     colnames(ret)[colnames(ret) == "train_mae"] <- "Mean Absolute Error"
     colnames(ret)[colnames(ret) == "train_logloss"] <- "Negative Log Likelihood"
-    colnames(ret)[colnames(ret) == "train_error"] <- "Misclassification Rate" # this is for binary
+    # this can be train_error@{threshold}
+    with_train_error <- stringr::str_detect(colnames(ret), "^train_error")
+    colnames(ret)[with_train_error] <- stringr::str_replace(colnames(ret)[with_train_error], "^train_error", "Misclassification Rate")
     colnames(ret)[colnames(ret) == "train_merror"] <- "Misclassification Rate" # this is for multiclass
     colnames(ret)[colnames(ret) == "train_mlogloss"] <- "Multiclass Logloss"
     colnames(ret)[colnames(ret) == "train_auc"] <- "AUC"
-    colnames(ret)[colnames(ret) == "train_ndcg"] <- "Normalized Discounted Cumulative Gain"
-    colnames(ret)[colnames(ret) == "train_map"] <- "Mean Average Precision"
-    colnames(ret)[colnames(ret) == "train_map"] <- "Mean Average Precision"
+    # this can be train_ndcg@{threshold}
+    with_train_ndcg <- stringr::str_detect(colnames(ret), "^train_ndcg")
+    colnames(ret)[with_train_ndcg] <- stringr::str_replace(colnames(ret)[with_train_ndcg], "^train_ndcg", "Normalized Discounted Cumulative Gain")
+    # this can be train_map@{threshold}
+    with_train_map <- stringr::str_detect(colnames(ret), "^train_map")
+    colnames(ret)[with_train_map] <- stringr::str_replace(colnames(ret)[with_train_map], "^train_map", "Mean Average Precision")
     colnames(ret)[colnames(ret) == "train_gamma_nloglik"] <- "Gamma Negative Log Likelihood"
     colnames(ret)[colnames(ret) == "train_gamma_deviance"] <- "Gamma Deviance"
 
     colnames(ret)[colnames(ret) == "validation_rmse"] <- "Validation Root Mean Square Error"
     colnames(ret)[colnames(ret) == "validation_mae"] <- "Validation Mean Absolute Error"
     colnames(ret)[colnames(ret) == "validation_logloss"] <- "Validation Negative Log Likelihood"
-    colnames(ret)[colnames(ret) == "validation_error"] <- "Validation Misclassification Rate" # this is for binary
+    # this can be validation_error@{threshold}
+    with_validation_error <- stringr::str_detect(colnames(ret), "^validation_error")
+    colnames(ret)[with_validation_error] <- stringr::str_replace(colnames(ret)[with_validation_error], "^validation_error", "Validation Misclassification Rate")
     colnames(ret)[colnames(ret) == "validation_merror"] <- "Validation Misclassification Rate" # this is for multiclass
     colnames(ret)[colnames(ret) == "validation_mlogloss"] <- "Validation Multiclass Logloss"
     colnames(ret)[colnames(ret) == "validation_auc"] <- "Validation AUC"
+    # this can be validation_ndcg@{threshold}
+    with_validation_ndcg <- stringr::str_detect(colnames(ret), "^validation_ndcg")
+    colnames(ret)[with_validation_ndcg] <- stringr::str_replace(colnames(ret)[with_validation_ndcg], "^validation_ndcg", "Validation Normalized Discounted Cumulative Gain")
+    # this can be validation_map@{threshold}
+    with_validation_map <- stringr::str_detect(colnames(ret), "^validation_map")
+    colnames(ret)[with_train_map] <- stringr::str_replace(colnames(ret)[with_train_map], "^train_map", "Validation Mean Average Precision")
     colnames(ret)[colnames(ret) == "validation_ndcg"] <- "Validation Normalized Discounted Cumulative Gain"
-    colnames(ret)[colnames(ret) == "validation_map"] <- "Validation Mean Average Precision"
     colnames(ret)[colnames(ret) == "validation_map"] <- "Validation Mean Average Precision"
     colnames(ret)[colnames(ret) == "validation_gamma_nloglik"] <- "Validation Gamma Negative Log Likelihood"
     colnames(ret)[colnames(ret) == "validation_gamma_deviance"] <- "Validation Gamma Deviance"
@@ -438,26 +469,36 @@ glance.xgb.Booster <- function(x, pretty.name = FALSE, ...) {
     colnames(ret)[colnames(ret) == "train_rmse"] <- "root_mean_square_error"
     colnames(ret)[colnames(ret) == "train_mae"] <- "mean_absolute_error"
     colnames(ret)[colnames(ret) == "train_logloss"] <- "negative_log_likelihood"
-    colnames(ret)[colnames(ret) == "train_error"] <- "misclassification_rate" # this is for binary
+    # this can be train_error@{threshold}
+    with_train_error <- stringr::str_detect(colnames(ret), "^train_error")
+    colnames(ret)[with_train_error] <- stringr::str_replace(colnames(ret)[with_train_error], "^train_error", "misclassification_rate")
     colnames(ret)[colnames(ret) == "train_merror"] <- "misclassification_rate" # this is for multiclass
     colnames(ret)[colnames(ret) == "train_mlogloss"] <- "multiclass_logloss"
     colnames(ret)[colnames(ret) == "train_auc"] <- "auc"
-    colnames(ret)[colnames(ret) == "train_ndcg"] <- "normalized_discounted_cumulative_gain"
-    colnames(ret)[colnames(ret) == "train_map"] <- "mean_average_precision"
-    colnames(ret)[colnames(ret) == "train_map"] <- "mean_average_precision"
+    # this can be train_ndcg@{threshold}
+    with_train_ndcg <- stringr::str_detect(colnames(ret), "^train_ndcg")
+    colnames(ret)[with_train_ndcg] <- stringr::str_replace(colnames(ret)[with_train_ndcg], "^train_ndcg", "normalized_discounted_cumulative_gain")
+    # this can be train_map@{threshold}
+    with_train_map <- stringr::str_detect(colnames(ret), "^train_map")
+    colnames(ret)[with_train_map] <- stringr::str_replace(colnames(ret)[with_train_map], "^train_map", "mean_average_precision")
     colnames(ret)[colnames(ret) == "train_gamma_nloglik"] <- "gamma_negative_log_likelihood"
     colnames(ret)[colnames(ret) == "train_gamma_deviance"] <- "gamma_deviance"
 
     colnames(ret)[colnames(ret) == "validation_rmse"] <- "validation_root_mean_square_error"
     colnames(ret)[colnames(ret) == "validation_mae"] <- "validation_mean_absolute_error"
     colnames(ret)[colnames(ret) == "validation_logloss"] <- "validation_negative_log_likelihood"
-    colnames(ret)[colnames(ret) == "validation_error"] <- "validation_misclassification_rate" # this is for binary
+    # this can be validation_error@{threshold}
+    with_validation_error <- stringr::str_detect(colnames(ret), "^validation_error")
+    colnames(ret)[with_validation_error] <- stringr::str_replace(colnames(ret)[with_validation_error], "^validation_error", "validation_misclassification_rate")
     colnames(ret)[colnames(ret) == "validation_merror"] <- "validation_misclassification_rate" # this is for multiclass
     colnames(ret)[colnames(ret) == "validation_mlogloss"] <- "validation_multiclass_logloss"
     colnames(ret)[colnames(ret) == "validation_auc"] <- "validation_auc"
-    colnames(ret)[colnames(ret) == "validation_ndcg"] <- "validation_normalized_discounted_cumulative_gain"
-    colnames(ret)[colnames(ret) == "validation_map"] <- "validation_mean_average_precision"
-    colnames(ret)[colnames(ret) == "validation_map"] <- "validation_mean_average_precision"
+    # this can be validation_ndcg@{threshold}
+    with_validation_ndcg <- stringr::str_detect(colnames(ret), "^validation_ndcg")
+    colnames(ret)[with_validation_ndcg] <- stringr::str_replace(colnames(ret)[with_validation_ndcg], "^validation_ndcg", "validation_normalized_discounted_cumulative_gain")
+    # this can be validation_map@{threshold}
+    with_validation_map <- stringr::str_detect(colnames(ret), "^validation_map")
+    colnames(ret)[with_train_map] <- stringr::str_replace(colnames(ret)[with_train_map], "^train_map", "validation_mean_average_precision")
     colnames(ret)[colnames(ret) == "validation_gamma_nloglik"] <- "validation_gamma_negative_log_likelihood"
     colnames(ret)[colnames(ret) == "validation_gamma_deviance"] <- "validation_gamma_deviance"
   }
