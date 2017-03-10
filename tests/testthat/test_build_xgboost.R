@@ -212,10 +212,6 @@ test_that("test build_xgboost with linear booster", {
   expect_error({
     model_ret <- build_model(test_data, model_func = xgboost_binary, formula = CANCELLED ~ DISTANCE, nrounds = 5, booster = "gblinear")
   }, "The target only contains positive or negative values")
-  model_ret <- build_model(test_data, model_func = xgboost_binary, eval_metric = "error", formula = CANCELLED ~ DISTANCE, nrounds = 5, booster = "gbtree")
-  coef_ret <- model_coef(model_ret)
-  stats_ret <- model_stats(model_ret)
-  expect_equal(nrow(stats_ret), 5)
 })
 
 test_that("test build_xgboost prediction with optimized threshold", {
