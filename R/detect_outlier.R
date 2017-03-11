@@ -6,12 +6,6 @@ detect_outlier <- function (vec, type = "iqr", threshold = 0.95) {
                 levels = c("lower", "normal", "upper"),
                 ordered=TRUE)
 
-  if (threshold <= 0 || threshold >= 1) {
-    stop("threshold must be between 0 and 1")
-  } else if (threshold < 0.5) {
-    threshold <- 1-threshold
-  }
-
   switch(type, iqr = {
     q <- quantile(vec, na.rm = TRUE)
     # q is with 0%, 25%, 50%, 75%, 100% quartiles
@@ -23,16 +17,22 @@ detect_outlier <- function (vec, type = "iqr", threshold = 0.95) {
     ret[(vec < lower_whisker)] <- "lower"
     ret[(vec > upper_whisker)] <- "upper"
   }, percentile = {
+    if (threshold <= 0 || threshold >= 1) {
+      stop("threshold must be between 0 and 1")
+    } else if (threshold < 0.5) {
+      threshold <- 1-threshold
+    }
     q <- quantile(vec, probs = c(1-threshold, threshold), na.rm = TRUE)
     ret[(vec < q[1])] <- "lower"
     ret[(vec > q[2])] <- "upper"
   }, standard_deviation = {
-    # get critical value from threshold
-    critval <- qnorm(threshold, 0, 1)
+    if (threshold <= 0) {
+      stop("threshold must be larger than 0")
+    }
     m <- mean(vec, na.rm = TRUE)
     s <- sd(vec, na.rm = TRUE)
-    ret[(vec < m - critval * s) ] <- "lower"
-    ret[(vec > m + critval * s)] <- "upper"
+    ret[(vec < m - threshold * s) ] <- "lower"
+    ret[(vec > m + threshold * s)] <- "upper"
   })
   ret
 }

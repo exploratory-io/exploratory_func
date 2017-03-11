@@ -60,7 +60,7 @@ test_that("detect_outlier with standard_deviation", {
 
   ret <- data %>%
     dplyr::group_by(group) %>%
-    dplyr::mutate(is_outlier = detect_outlier(value, type = "standard_deviation", threshold = 0.05))
+    dplyr::mutate(is_outlier = detect_outlier(value, type = "standard_deviation", threshold = 1.63))
   expect_equal(ret$is_outlier, factor(c(c("upper", rep("normal", 10), "lower"),c("upper", rep("normal", 10), "lower")),
                                       levels = c("lower", "normal", "upper"),
                                       ordered=TRUE))
