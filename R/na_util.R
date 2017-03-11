@@ -6,7 +6,9 @@ impute_na <- function(target, ..., type = "lm_predict") {
     df <- as.data.frame(list(...))
     df$target <- target
     lm_model <- lm(data = df, target ~ ., na.action = na.omit)
-    # predict return double, so values should be double
+    # even if the original column is integer,
+    # predicted values can be double and they are appropriate
+    # so it's converted to double
     ret <- as.double(target)
     try({
       ret[is.na(ret)] <- suppressWarnings({
