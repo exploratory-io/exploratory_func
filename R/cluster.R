@@ -10,8 +10,6 @@ cluster <- function(..., type = "kmeans", n_cluster = 3) {
   cluster <- if (ncol(data) == 1) {
     # sort by centers
     sorted <- sort(model$centers[,1], index.return = TRUE)
-    map <- seq(n_cluster)
-    names(map) <- sorted$ix
     # create mapping
     map <- rep(NA_real_, n_cluster)
     map[sorted$ix] <- seq(n_cluster)
@@ -20,9 +18,9 @@ cluster <- function(..., type = "kmeans", n_cluster = 3) {
     # sort by size
     sorted <- sort(model$size, index.return = TRUE, decreasing = TRUE)
     # create mapping
-    ret <- rep(NA_real_, n_cluster)
-    ret[sorted$ix] <- seq(n_cluster)
-    ret[model$cluster]
+    map <- rep(NA_real_, n_cluster)
+    map[sorted$ix] <- seq(n_cluster)
+    map[model$cluster]
   }
   # fill NA
   ret <- rep(NA_real_, nrow(data))
