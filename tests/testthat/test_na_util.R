@@ -33,7 +33,7 @@ test_that("test impute_na with mean", {
   )
   colnames(test_data) <- c("col 1", "col-2", "col_3", "chars")
   ret <- test_data %>%
-    dplyr::mutate(filled_na = impute_na(`col 1`, type = "mean", chars))
+    dplyr::mutate(filled_na = impute_na(`col 1`, type = "mean"))
 
   val <- mean(test_data[["col 1"]], na.rm = TRUE)
   expect_equal(ret[["filled_na"]], rep(c(val, val, seq(7), val), 10))
@@ -48,7 +48,7 @@ test_that("test impute_na with mean", {
   )
   colnames(test_data) <- c("col 1", "col-2", "col_3", "chars")
   ret <- test_data %>%
-    dplyr::mutate(filled_na = impute_na(`col 1`, type = "median", chars))
+    dplyr::mutate(filled_na = impute_na(`col 1`, type = "median"))
 
   val <- median(test_data[["col 1"]], na.rm = TRUE)
   expect_equal(ret[["filled_na"]], rep(c(val, val, seq(7), val), 10))
