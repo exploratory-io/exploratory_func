@@ -21,6 +21,9 @@ fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_ra
 
 
     ret <- if(watchlist_rate != 0.0) {
+      if (watchlist_rate < 0 ||  1 <= watchlist_rate) {
+        stop("watchlist_rate must be between 0 and 1")
+      }
       # create validation data set
       index <- sample(seq(nrow(md_mat)), ceiling(nrow(md_mat) * watchlist_rate))
       watch_mat <- xgboost::xgb.DMatrix(data = safe_slice(md_mat ,index), label = y[index])
