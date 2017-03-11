@@ -21,9 +21,11 @@ fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_ra
 
 
     ret <- if(watchlist_rate != 0.0) {
+      # create validation data set
       index <- sample(seq(nrow(md_mat)), ceiling(nrow(md_mat) * watchlist_rate))
       watch_mat <- xgboost::xgb.DMatrix(data = safe_slice(md_mat ,index), label = y[index])
       train_mat <- xgboost::xgb.DMatrix(data = safe_slice(md_mat ,index, remove = TRUE), label = y[-index])
+
       xgboost::xgb.train(data = train_mat, watchlist = list(train = train_mat, validation = watch_mat), label = y, weight = weight, nrounds = nrounds, ...)
     } else {
       xgboost::xgboost(data = md_mat, label = y, weight = weight, nrounds = nrounds, ...)
@@ -41,6 +43,7 @@ fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_ra
 xgboost_binary <- function(data, formula, output_type = "logistic", eval_metric = "auc", params = list(), ...) {
 
   # there can be more than 2 eval_metric
+  # by creating eval_metric parameters in params list
   metric_list <- list()
   default_metrics <- c("auc", "error", "logloss")
   for (metric in default_metrics) {
@@ -104,6 +107,7 @@ xgboost_binary <- function(data, formula, output_type = "logistic", eval_metric 
 #' @export
 xgboost_multi <- function(data, formula, output_type = "softprob", eval_metric = "merror", params = list(), ...) {
   # there can be more than 2 eval_metric
+  # by creating eval_metric parameters in params list
   metric_list <- list()
   default_metrics <- c("merror", "mlogloss")
   for (metric in default_metrics) {
@@ -161,6 +165,7 @@ xgboost_multi <- function(data, formula, output_type = "softprob", eval_metric =
 #' @export
 xgboost_reg <- function(data, formula, output_type = "linear", eval_metric = "rmse", params = list(), ...) {
   # there can be more than 2 eval_metric
+  # by creating eval_metric parameters in params list
   metric_list <- list()
   default_metrics <- c("rmse", "mae")
   for (metric in default_metrics) {
