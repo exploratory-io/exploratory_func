@@ -163,11 +163,23 @@ xgboost_multi <- function(data, formula, output_type = "softprob", eval_metric =
 #' @param output_type Type of output. Can be "linear", "logistic", "gamma" or "tweedie"
 #' The explanation is in https://www.r-bloggers.com/with-our-powers-combined-xgboost-and-pipelearner/
 #' @export
-xgboost_reg <- function(data, formula, output_type = "linear", eval_metric = "rmse", params = list(), ...) {
+xgboost_reg <- function(data, formula, output_type = "linear", eval_metric = "rmse", params = list(), tweedie_variance_power = 1.5, ...) {
   # there can be more than 2 eval_metric
   # by creating eval_metric parameters in params list
   metric_list <- list()
   default_metrics <- c("rmse", "mae")
+  if(output_type == "gamma"){
+    default_metrics <- c(default_metrics, "gamma-nloglik", "gamma-deviance")
+  }
+  if(output_type == "tweedie"){
+    tvp <- if(!is.null(params$tweedie_variance_power)){
+      params$tweedie_variance_power
+    } else {
+      params$tweedie_variance_power <- tweedie_variance_power
+      tweedie_variance_power
+    }
+    default_metrics <- c(default_metrics, paste0("tweedie-nloglik@", tvp))
+  }
   for (metric in default_metrics) {
     if (eval_metric == metric) {
       # indicated metric is first
@@ -192,7 +204,8 @@ xgboost_reg <- function(data, formula, output_type = "linear", eval_metric = "rm
   ret <- fml_xgboost(data = data,
                      formula = formula,
                      objective = objective,
-                     params = params, ...)
+                     params = params,
+                     ...)
   # add class to control S3 methods
   class(ret) <- c("xgboost_reg", class(ret))
   ret$fml <- formula
@@ -443,6 +456,9 @@ glance.xgb.Booster <- function(x, pretty.name = FALSE, ...) {
     # this can be train_map@{threshold}
     with_train_map <- stringr::str_detect(colnames(ret), "^train_map")
     colnames(ret)[with_train_map] <- stringr::str_replace(colnames(ret)[with_train_map], "^train_map", "Mean Average Precision")
+    # this can be train_tweedie_nloglik@{rho}
+    with_train_tweedie_nloglik <- stringr::str_detect(colnames(ret), "^train_tweedie_nloglik")
+    colnames(ret)[with_train_tweedie_nloglik] <- stringr::str_replace(colnames(ret)[with_train_tweedie_nloglik], "^train_tweedie_nloglik", "Tweedie Negative Log Likelihood")
     colnames(ret)[colnames(ret) == "train_gamma_nloglik"] <- "Gamma Negative Log Likelihood"
     colnames(ret)[colnames(ret) == "train_gamma_deviance"] <- "Gamma Deviance"
 
@@ -461,6 +477,9 @@ glance.xgb.Booster <- function(x, pretty.name = FALSE, ...) {
     # this can be validation_map@{threshold}
     with_validation_map <- stringr::str_detect(colnames(ret), "^validation_map")
     colnames(ret)[with_train_map] <- stringr::str_replace(colnames(ret)[with_train_map], "^train_map", "Validation Mean Average Precision")
+    # this can be validation_tweedie_nloglik@{rho}
+    with_validation_tweedie_nloglik <- stringr::str_detect(colnames(ret), "^validation_tweedie_nloglik")
+    colnames(ret)[with_validation_tweedie_nloglik] <- stringr::str_replace(colnames(ret)[with_validation_tweedie_nloglik], "^validation_tweedie_nloglik", "Validation Tweedie Negative Log Likelihood")
     colnames(ret)[colnames(ret) == "validation_ndcg"] <- "Validation Normalized Discounted Cumulative Gain"
     colnames(ret)[colnames(ret) == "validation_map"] <- "Validation Mean Average Precision"
     colnames(ret)[colnames(ret) == "validation_gamma_nloglik"] <- "Validation Gamma Negative Log Likelihood"
@@ -482,6 +501,9 @@ glance.xgb.Booster <- function(x, pretty.name = FALSE, ...) {
     # this can be train_map@{threshold}
     with_train_map <- stringr::str_detect(colnames(ret), "^train_map")
     colnames(ret)[with_train_map] <- stringr::str_replace(colnames(ret)[with_train_map], "^train_map", "mean_average_precision")
+    # this can be train_tweedie_nloglik@{rho}
+    with_train_tweedie_nloglik <- stringr::str_detect(colnames(ret), "^train_tweedie_nloglik")
+    colnames(ret)[with_train_tweedie_nloglik] <- stringr::str_replace(colnames(ret)[with_train_tweedie_nloglik], "^train_tweedie_nloglik", "tweedie_negative_log_likelihood")
     colnames(ret)[colnames(ret) == "train_gamma_nloglik"] <- "gamma_negative_log_likelihood"
     colnames(ret)[colnames(ret) == "train_gamma_deviance"] <- "gamma_deviance"
 
@@ -500,6 +522,9 @@ glance.xgb.Booster <- function(x, pretty.name = FALSE, ...) {
     # this can be validation_map@{threshold}
     with_validation_map <- stringr::str_detect(colnames(ret), "^validation_map")
     colnames(ret)[with_train_map] <- stringr::str_replace(colnames(ret)[with_train_map], "^train_map", "validation_mean_average_precision")
+    # this can be validation_tweedie_nloglik@{rho}
+    with_validation_tweedie_nloglik <- stringr::str_detect(colnames(ret), "^validation_tweedie_nloglik")
+    colnames(ret)[with_validation_tweedie_nloglik] <- stringr::str_replace(colnames(ret)[with_validation_tweedie_nloglik], "^validation_tweedie_nloglik", "validation_tweedie_negative_log_likelihood")
     colnames(ret)[colnames(ret) == "validation_gamma_nloglik"] <- "validation_gamma_negative_log_likelihood"
     colnames(ret)[colnames(ret) == "validation_gamma_deviance"] <- "validation_gamma_deviance"
   }
