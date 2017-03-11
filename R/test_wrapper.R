@@ -102,35 +102,6 @@ do_var.test <- function(df, value, key, ...){
   df %>% dplyr::do_(.dots=setNames(list(~do_var.test_each(df = ., ...)), model_col)) %>% tidyr::unnest_(model_col)
 }
 
-#' Non standard evaluation version of do_chisq.test_
-#' @export
-do_chisq.test.skv <- function(df,
-                              subject_col,
-                              key_col,
-                              value_col = NULL,
-                              correct = TRUE,
-                              p = NULL,
-                              rescale.p = TRUE,
-                              simulate.p.value = FALSE,
-                              B = 2000,
-                              fun.aggregate = mean,
-                              fill = fill
-                              ){
-  do_chisq.test_each <- function(df) {
-    mat <- simple_cast(df, subject_col, key_col, value_col, fun.aggregate = fun.aggregate, fill = fill)
-  }
-  # Calculation is executed in each group.
-  # Storing the result in this tmp_col and
-  # unnesting the result.
-  # If the original data frame is grouped by "tmp",
-  # overwriting it should be avoided,
-  # so avoid_conflict is used here.
-  tmp_col <- avoid_conflict(colnames(df), "tmp")
-  df %>%
-    dplyr::do_(.dots = setNames(list(~chisq.test_each(.)), tmp_col)) %>%
-    tidyr::unnest_(tmp_col)
-}
-
 #' chisq.test wrapper
 #' @param df Data frame to be tested.
 #' @param selected_cols Names of columns of categories.
