@@ -2,7 +2,7 @@
 #' @export
 fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_rate = 0, ...) {
   term <- terms(formula, data = data)
-  # do.call is used to substitute weight
+  # do.call is used to substitute weights
   md_frame <- do.call(model.frame, list(term, data = data, weights = substitute(weights)))
   if(nrow(md_frame) == 0){
     stop("No valid data to create xgboost model.")
