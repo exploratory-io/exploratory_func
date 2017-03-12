@@ -837,12 +837,20 @@ get_multi_predicted_values <- function(prob_mat, actual_vals = NULL){
   ret
 }
 
+#' Fill missing values with NA
+#' @param indice Indice where the values should be placed in the output vector.
+#' @param values Vector to be filled with NA.
+#' @param max_index The size of output vector
 fill_vec_NA <- function(indice, values, max_index = max(indice, na.rm = TRUE)){
   ret <- same_type(rep(NA, max_index), values)
   ret[indice] <- values
   ret
 }
 
+#' Fill missing rows by NA
+#' @param indice Row indice where the values should be placed in the output vector.
+#' @param mat Matrix to be filled with NA.
+#' @param max_index The row size of output matrix
 fill_mat_NA <- function(indice, mat, max_index = max(indice, na.rm = TRUE)){
   if(nrow(mat) != length(indice)) {
     stop("matrix must have the same length of indice")
