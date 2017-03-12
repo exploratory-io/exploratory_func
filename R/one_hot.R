@@ -2,9 +2,11 @@
 #' @param ... Column selection
 #' @param sep Separating character for new columns
 #' @export
-one_hot <- function(data, ..., sep = "_"){
+one_hot <- function(data, ..., sep = "_", aggregate = TRUE){
   selected <- data %>%
     dplyr::select(...)
+
+  ret <- data
 
   for (col in colnames(selected)) {
     fct <- as.factor(selected[[col]])
@@ -16,9 +18,19 @@ one_hot <- function(data, ..., sep = "_"){
 
     col_names <- paste(col, levels(fct), sep = sep)
     colnames(mat) <- col_names
-    data <- cbind(data, as.data.frame(mat))
+    ret <- cbind(ret, as.data.frame(mat))
     # remove original column
-    data <- data[,colnames(data) != col]
+    ret <- ret[,colnames(ret) != col]
   }
-  data
+
+  if(aggregate){
+    other_cols <- colnames(data)[!colnames(data) %in% colnames(selected)]
+    if(length(other_cols) != 0){
+      ret <- ret %>%
+        dplyr::group_by_(.dots = other_cols) %>%
+        dplyr::summarize_all(any)
+    }
+  }
+
+  ret
 }
