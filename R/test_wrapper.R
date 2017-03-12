@@ -102,54 +102,6 @@ do_var.test <- function(df, value, key, ...){
   df %>% dplyr::do_(.dots=setNames(list(~do_var.test_each(df = ., ...)), model_col)) %>% tidyr::unnest_(model_col)
 }
 
-#' chisq.test wrapper
-#' @param df Data frame to be tested.
-#' @param selected_cols Names of columns of categories.
-#' @param correct Whether continuity correction will be applied for 2 by 2 tables.
-#' @param p This works when one column is selected. A column to be considered as probability to be tested.
-#' If NULL, it's considered as uniform distribution.
-#' @param rescale.p If TRUE, p is rescaled to sum to 1. If FALSE and p doesn't sum to 1, it causes an error.
-#' @param simulate.p.value Whether p value should be calculated by Monte Carlo simulation.
-#' @param B This works only when simulate.p.value is TRUE. The number of replicates for Monte Carlo test.
-#' @export
-do_chisq.test_ <- function(df,
-                           selected_cols = c(),
-                           correct = TRUE,
-                           p = NULL,
-                           rescale.p = TRUE,
-                           simulate.p.value = FALSE,
-                           B = 2000){
-
-  chisq.test_each <- function(df, ...) {
-    x <- df[, selected_cols] %>% as.matrix()
-    if (is.null(p)){
-      # default of p from chisq.test
-      p <- rep(1/length(x), length(x))
-    } else if (is.character(p)){
-      # p is column name in this case, so the values are used as p
-      p <- df[[p]]
-    }
-    chisq.test(x = x,
-               correct = correct,
-               p = p,
-               rescale.p = rescale.p,
-               simulate.p.value = simulate.p.value,
-               B = B) %>%
-      broom::glance()
-  }
-
-  # Calculation is executed in each group.
-  # Storing the result in this tmp_col and
-  # unnesting the result.
-  # If the original data frame is grouped by "tmp",
-  # overwriting it should be avoided,
-  # so avoid_conflict is used here.
-  tmp_col <- avoid_conflict(colnames(df), "tmp")
-  df %>%
-    dplyr::do_(.dots = setNames(list(~chisq.test_each(.)), tmp_col)) %>%
-    tidyr::unnest_(tmp_col)
-}
-
 #' Non standard evaluation version of do_chisq.test_
 #' @export
 do_chisq.test <- function(df, ...,
