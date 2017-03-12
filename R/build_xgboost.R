@@ -423,7 +423,7 @@ tidy.xgb.Booster <- function(x, type="weight", pretty.name = FALSE, ...){
       colnames(ret)[colnames(ret)=="Frequency"] <- "frequency"
       colnames(ret)[colnames(ret)=="Split"] <- "split"
       colnames(ret)[colnames(ret)=="RealCover"] <- "real_coverage"
-      colnames(ret)[colnames(ret)=="RealCover %"] <- "real_coverage_%"
+      colnames(ret)[colnames(ret)=="RealCover %"] <- "real_coverage_pct"
       colnames(ret)[colnames(ret)=="Weight"] <- "weight"
     }
     ret
