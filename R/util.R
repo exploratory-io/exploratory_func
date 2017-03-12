@@ -488,25 +488,33 @@ sample_df_index <- function(df, rate, seed = NULL){
   sample(seq(nrow(df)), nrow(df) * rate)
 }
 
-#' slice that can handle empty vector
+#' slice of 2 dimensional data that can handle empty vector
 #' @export
-safe_slice <- function(df, index, remove = FALSE){
-  if(remove){
+safe_slice <- function(data, index, remove = FALSE){
+  ret <- if(remove){
     if(is.null(index)){
-      df
+      data
     } else if(length(index) == 0){
-      df
+      data
     } else {
-      df[-index, ]
+      data[-index, ]
     }
   } else {
     if(is.null(index)){
-      df[c(), ]
+      data[c(), ]
     } else if(length(index) == 0){
-      df[c(), ]
+      data[c(), ]
     } else {
-      df[index, ]
+      data[index, ]
     }
+  }
+
+  if(is.vector(ret)){
+    mat <- matrix(ret, nrow = 1)
+    colnames(mat) <- names(ret)
+    mat
+  } else {
+    ret
   }
 }
 
@@ -826,5 +834,30 @@ get_multi_predicted_values <- function(prob_mat, actual_vals = NULL){
     append_colnames(prefix = "predicted_probability_")
   ret$predicted_probability <- max_prob
   ret$predicted_label <- prob_label
+  ret
+}
+
+#' Fill missing values with NA
+#' @param indice Indice where the values should be placed in the output vector.
+#' @param values Vector to be filled with NA.
+#' @param max_index The size of output vector
+fill_vec_NA <- function(indice, values, max_index = max(indice, na.rm = TRUE)){
+  ret <- same_type(rep(NA, max_index), values)
+  ret[indice] <- values
+  ret
+}
+
+#' Fill missing rows by NA
+#' @param indice Row indice where the values should be placed in the output vector.
+#' @param mat Matrix to be filled with NA.
+#' @param max_index The row size of output matrix
+fill_mat_NA <- function(indice, mat, max_index = max(indice, na.rm = TRUE)){
+  if(nrow(mat) != length(indice)) {
+    stop("matrix must have the same length of indice")
+  }
+  na_val <- same_type(NA, as.vector(mat))
+  ret <- matrix(na_val, nrow = max_index, ncol = ncol(mat))
+  colnames(ret) <- colnames(mat)
+  ret[indice, ] <- mat
   ret
 }
