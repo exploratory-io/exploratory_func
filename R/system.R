@@ -883,7 +883,7 @@ scrape_html_table <- function(url, index, heading, encoding = NULL) {
 #' @export
 handleLabelledColumns = function(df){
   is_labelled <- which(lapply(df, class) == "labelled")
-  df[is_labelled] <- lapply(df[is_labelled], as_factor)
+  df[is_labelled] <- lapply(df[is_labelled], haven::as_factor)
   df
 }
 
