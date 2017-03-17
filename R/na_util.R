@@ -1,9 +1,13 @@
 #' Guess missing values by lm
 #' @export
-impute_na <- function(target, ..., type = "lm_predict") {
+impute_na <- function(target, ..., type = "mean") {
   ret <- switch(type, lm_predict = {
     # list(...) is a list of vectors
     df <- as.data.frame(list(...))
+    if(nrow(df) == 0){
+      # this is when no predictor columns are chosen
+      stop("Please choose predictor columns")
+    }
     df$target <- target
     lm_model <- lm(data = df, target ~ ., na.action = na.omit)
     # even if the original column is integer,
