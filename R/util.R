@@ -861,3 +861,22 @@ fill_mat_NA <- function(indice, mat, max_index = max(indice, na.rm = TRUE)){
   ret[indice, ] <- mat
   ret
 }
+
+# get data type to distinguish more than typeof function
+get_data_type <- function(data){
+  if (is.factor(data)){
+    # factor is regarded as integer by typeof
+    "factor"
+  } else if (inherits(data, "Date")){
+    # Date is regarded as double by typeof
+    "Date"
+  } else if (inherits(data, "POSIXct")) {
+    # POSIXct is regarded as double by typeof
+    "POSIXct"
+  } else if (inherits(data, "POSIXlt")) {
+    # POSIXct is regarded as list by typeof
+    "POSIXlt"
+  } else {
+    typeof(data)
+  }
+}
