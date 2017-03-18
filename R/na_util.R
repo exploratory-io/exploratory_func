@@ -2,7 +2,7 @@
 #' @param target Target vector whose NA is filled
 #' @param ... Vectors to be used to pridict NA when type is lm_predict
 #' @param type This can be "mean", "median", "lm_predict", "value" or aggregate function
-#' @paramm val This is effective when type is mean
+#' @paramm val This is effective when type is "value". NA is replaced by this value.
 #' @export
 impute_na <- function(target, ..., type = mean, val = 0) {
   if(typeof(type) == "closure"){
