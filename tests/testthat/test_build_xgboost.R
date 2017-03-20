@@ -39,7 +39,7 @@ test_that("test xgboost_reg with add_prediction", {
   test_data <- data.frame(
     label = rep(seq(3) * 5, 100),
     num1 =  rep(seq(3), 100) + runif(100),
-    num2 = as.character(rep(seq(3), 100) + runif(100))
+    num2 = rep(seq(3), 100) + runif(100)
   )
   colnames(train_data) <- c("label 1", "num-1", "Num 2")
   colnames(test_data) <- colnames(train_data)
