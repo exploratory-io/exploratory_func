@@ -242,6 +242,10 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, ...) {
       data
     }
 
+    # validate column types
+    # newdata might have different type of columns with same name
+    validate_data(x$types, ret_data)
+
     # todo: check missing value behaviour
     mat <- model.matrix(x$terms, ret_data)
     predicted <- stats::predict(x, mat)
@@ -304,6 +308,10 @@ augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, ...) {
       data
     }
 
+    # validate column types
+    # newdata might have different type of columns with same name
+    validate_data(x$types, ret_data)
+
     mat <- model.matrix(x$terms, data = ret_data)
     # this is to find omitted indice for NA
     row_index <- as.numeric(rownames(mat))
@@ -363,27 +371,7 @@ augment.xgboost_reg <- function(x, data = NULL, newdata = NULL, ...) {
 
     # validate column types
     # newdata might have different type of columns with same name
-    if(!is.null(x$types)){
-      message <- vapply(names(x$types), function(name){
-        original_type <- x$types[[name]]
-        if(is.null(data[[name]])){
-          # can't find a column
-          paste0(" ", name, " is NULL")
-        } else {
-          data_type <- get_data_type(data[[name]])
-          if((data_type != original_type) && !(data_type == "character" && original_type == "factor")){
-            # data type is different
-            paste0(name, ": ", original_type, " and ", data_type)
-          } else {
-            NA_character_
-          }
-        }
-      }, FUN.VALUE = "")
-
-      if(any(!is.na(message))){
-        stop(paste0("Found data type mismatch: ", paste0(message[!is.na(message)], collapse = ", ")))
-      }
-    }
+    validate_data(x$types, ret_data)
 
     y_name <- all.vars(x$terms)[[1]]
     if(is.null(ret_data[[y_name]])){
@@ -421,6 +409,11 @@ augment.xgb.Booster <- function(x, data = NULL, newdata = NULL, ...) {
   if(!is.null(newdata)){
     data <- newdata
   }
+
+  # validate column types
+  # newdata might have different type of columns with same name
+  validate_data(x$types, data)
+
   mat_data <- if(!is.null(x$x_names)) {
     data[x$x_names]
   } else {
@@ -439,6 +432,38 @@ augment.xgb.Booster <- function(x, data = NULL, newdata = NULL, ...) {
   predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
   data[[predicted_value_col]] <- predicted
   data
+}
+
+#' validate data type of newdata for xgboost prediction
+#' @param x xgboost model
+#' @param data new data to predict
+validate_data <- function(types, data){
+  if(!is.null(types)){
+    message <- vapply(names(types), function(name){
+      original_type <- types[[name]]
+      if(is.null(data[[name]])){
+        # can't find a column
+        paste0(" ", name, " is NULL in new data")
+      } else {
+        data_type <- get_data_type(data[[name]])
+        if((data_type != original_type) &&
+           # difference of factor and character is acceptable
+           !(all(c(data_type, original_type) %in% c("character", "factor"))) &&
+           # difference of integer and double is acceptable
+           !(all(c(data_type, original_type) %in% c("double", "integer")))){
+          # data type is different
+          paste0(name, ": ", original_type, " in training data and ", data_type, " in new data")
+        } else {
+          NA_character_
+        }
+      }
+    }, FUN.VALUE = "")
+
+    if(any(!is.na(message))){
+      stop(paste0("Found data type mismatch: ", paste0(message[!is.na(message)], collapse = ", ")))
+    }
+  }
+  TRUE
 }
 
 #' Tidy method for xgboost output
