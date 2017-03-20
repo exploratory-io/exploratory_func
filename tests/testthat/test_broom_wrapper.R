@@ -3,15 +3,6 @@ context("test broom wrappers")
 set.seed(0)
 test_df <- data.frame(vec1 = seq(10), vec2 = seq(10), random = runif(10, min=0, max=10))
 
-test_that("test test", {
-  trained_data <- readRDS("~/Downloads/test_build_lr_sample.rds")
-
-  test_data <- readRDS("~/Downloads/test_data.rds")
-
-  ret <- trained_data %>%
-    prediction_binary(data = "df", data_frame = test_data)
-})
-
 test_that("test augment_lm newdata argument", {
   result <- (
     test_df
