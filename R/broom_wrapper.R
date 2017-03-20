@@ -353,7 +353,7 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
         tidyr::unnest(source.data)
 
     } else {
-      # augment by trainig data
+      # augment by training data
 
       # Use formula to support expanded aug_args (especially for type.predict for logistic regression)
       # because ... can't be passed to a function inside mutate directly.
