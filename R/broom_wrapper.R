@@ -102,11 +102,11 @@ add_prediction <- function(df, model_df, conf_int = 0.95, ...){
       dplyr::ungroup()
 
     ret <- if(with_respose) {
-     ret %>%
-       dplyr::mutate(.test_index = purrr::map2(.test_index, model, function(d, m){
-         # add predicted_response to the result data frame
-         add_response(d, m, "predicted_response")
-       }))
+      ret %>%
+        dplyr::mutate(.test_index = purrr::map2(.test_index, model, function(d, m){
+          # add predicted_response to the result data frame
+          add_response(d, m, "predicted_response")
+        }))
     } else {
       ret
     }
