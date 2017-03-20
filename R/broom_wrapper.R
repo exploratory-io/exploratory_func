@@ -485,6 +485,7 @@ prediction_binary <- function(df, threshold = 0.5, ...){
     # predicted is logical, so should +1 to make it index
     factor(levels(actual_val)[as.numeric(predicted) + 1], levels(actual_val))
   } else if (is.character(actual_val)) {
+    # modify actual_val to factor with levels used in training data
     if(!is.null(first_model$model) && !is.null(first_model$model[[actual_col]])){
       lev <- first_model$model[[actual_col]] %>% levels()
       factor(lev[as.numeric(predicted) + 1], lev)

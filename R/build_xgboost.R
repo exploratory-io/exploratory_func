@@ -384,6 +384,7 @@ augment.xgboost_reg <- function(x, data = NULL, newdata = NULL, ...) {
     y_name <- all.vars(x$terms)[[1]]
     if(is.null(ret_data[[y_name]])){
       # if there are no column in the formula, model.matrix causes an error
+      # so create the column with 0
       ret_data[[y_name]] <- rep(0, nrow(ret_data))
     }
 
