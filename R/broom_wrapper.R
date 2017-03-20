@@ -110,10 +110,12 @@ add_prediction <- function(df, model_df, conf_int = 0.95, ...){
       ret
     }
 
+    # add .group to overwrapped column names
     duped <- colnames(ret) %in% colnames(df)
     if(any(duped)){
       colnames(ret)[duped] <- avoid_conflict(colnames(df), colnames(ret)[duped], ".group")
     }
+
     ret <- ret %>%
       tidyr::unnest(.test_index)
   }
