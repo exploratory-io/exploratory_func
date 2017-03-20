@@ -29,6 +29,25 @@ test_that("test xgboost_reg with not clean names", {
   expect_true(all(prediction_ret$predicted_label %in% c(5, 10, 15)))
 })
 
+test_that("test xgboost_reg with add_prediction", {
+  train_data <- data.frame(
+    label = rep(seq(3) * 5, 100),
+    num1 =  rep(seq(3), 100) + runif(100),
+    num2 = rep(seq(3), 100) + runif(100)
+  )
+
+  test_data <- data.frame(
+    label = rep(seq(3) * 5, 100),
+    num1 =  rep(seq(3), 100) + runif(100),
+    num2 = rep(seq(3), 100) + runif(100)
+  )
+  colnames(train_data) <- c("label 1", "num-1", "Num 2")
+  colnames(test_data) <- colnames(train_data)
+  model_ret <- build_model(train_data, model_func = xgboost_reg, formula = `label 1` ~ ., nrounds = 5)
+  prediction_ret <- add_prediction(test_data, model_df = model_ret)
+  expect_true(all(prediction_ret$predicted_label %in% c(5, 10, 15)))
+})
+
 test_that("test xgboost_multi with numeric target", {
   test_data <- data.frame(
     label = rep(seq(3) * 5, 100),

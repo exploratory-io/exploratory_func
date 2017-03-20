@@ -35,6 +35,16 @@ fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_ra
     }
     ret$terms <- term
     ret$x_names <- colnames(md_mat)
+    pred_cnames <- all.vars(term)[-1]
+    types <- vapply(pred_cnames, function(cname) {
+      get_data_type(md_frame[[cname]])
+    }, FUN.VALUE = "")
+    names(types) <- pred_cnames
+    ret$types <- types
+    # this is how categorical columns are casted to columns in matrix
+    # this is needed in augment, so that matrix with the same levels
+    # can be created
+    ret$xlevels <- .getXlevels(term, md_frame)
     ret
   }
 }
@@ -232,6 +242,10 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, ...) {
       data
     }
 
+    # validate column types
+    # newdata might have different type of columns with same name
+    validate_data(x$types, ret_data)
+
     # todo: check missing value behaviour
     mat <- model.matrix(x$terms, ret_data)
     predicted <- stats::predict(x, mat)
@@ -294,6 +308,10 @@ augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, ...) {
       data
     }
 
+    # validate column types
+    # newdata might have different type of columns with same name
+    validate_data(x$types, ret_data)
+
     mat <- model.matrix(x$terms, data = ret_data)
     # this is to find omitted indice for NA
     row_index <- as.numeric(rownames(mat))
@@ -351,11 +369,26 @@ augment.xgboost_reg <- function(x, data = NULL, newdata = NULL, ...) {
       data
     }
 
-    mat_data <- model.matrix(x$terms, data = ret_data)
+    # validate column types
+    # newdata might have different type of columns with same name
+    validate_data(x$types, ret_data)
+
+    y_name <- all.vars(x$terms)[[1]]
+    if(is.null(ret_data[[y_name]])){
+      # if there is no column in the formula (even if it's response variable),
+      # model.matrix function causes an error
+      # so create the column with 0
+      ret_data[[y_name]] <- rep(0, nrow(ret_data))
+    }
+
+    mat_data <- model.matrix(x$terms, data = ret_data, xlev = x$xlevels)
 
     predicted <- stats::predict(x, mat_data)
     predicted_value_col <- avoid_conflict(colnames(ret_data), "predicted_value")
-    ret_data[[predicted_value_col]] <- predicted
+    # model.matrix removes rows with NA and stats::predict returns a matrix
+    # whose number of rows is the same with its size,
+    # so the result should be filled by NA
+    ret_data[[predicted_value_col]] <- fill_vec_NA(as.integer(rownames(mat_data)), predicted, nrow(ret_data))
     ret_data
   } else {
     augment(x, data = data, newdata = newdata)
@@ -376,6 +409,11 @@ augment.xgb.Booster <- function(x, data = NULL, newdata = NULL, ...) {
   if(!is.null(newdata)){
     data <- newdata
   }
+
+  # validate column types
+  # newdata might have different type of columns with same name
+  validate_data(x$types, data)
+
   mat_data <- if(!is.null(x$x_names)) {
     data[x$x_names]
   } else {
@@ -394,6 +432,38 @@ augment.xgb.Booster <- function(x, data = NULL, newdata = NULL, ...) {
   predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
   data[[predicted_value_col]] <- predicted
   data
+}
+
+#' validate data type of newdata for xgboost prediction
+#' @param x xgboost model
+#' @param data new data to predict
+validate_data <- function(types, data){
+  if(!is.null(types)){
+    message <- vapply(names(types), function(name){
+      original_type <- types[[name]]
+      if(is.null(data[[name]])){
+        # can't find a column
+        paste0(" ", name, " is NULL in new data")
+      } else {
+        data_type <- get_data_type(data[[name]])
+        if((data_type != original_type) &&
+           # difference of factor and character is acceptable
+           !(all(c(data_type, original_type) %in% c("character", "factor"))) &&
+           # difference of integer and double is acceptable
+           !(all(c(data_type, original_type) %in% c("double", "integer")))){
+          # data type is different
+          paste0(name, ": ", original_type, " in training data and ", data_type, " in new data")
+        } else {
+          NA_character_
+        }
+      }
+    }, FUN.VALUE = "")
+
+    if(any(!is.na(message))){
+      stop(paste0("Found data type mismatch: ", paste0(message[!is.na(message)], collapse = ", ")))
+    }
+  }
+  TRUE
 }
 
 #' Tidy method for xgboost output

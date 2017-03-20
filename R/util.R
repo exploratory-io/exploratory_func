@@ -861,3 +861,43 @@ fill_mat_NA <- function(indice, mat, max_index = max(indice, na.rm = TRUE)){
   ret[indice, ] <- mat
   ret
 }
+
+# get data type to distinguish more than typeof function
+get_data_type <- function(data){
+  if (is.factor(data)){
+    # factor is regarded as integer by typeof
+    "factor"
+  } else if (inherits(data, "Date")){
+    # Date is regarded as double by typeof
+    "Date"
+  } else if (inherits(data, "POSIXct")) {
+    # POSIXct is regarded as double by typeof
+    "POSIXct"
+  } else if (inherits(data, "POSIXlt")) {
+    # POSIXct is regarded as list by typeof
+    "POSIXlt"
+  } else {
+    typeof(data)
+  }
+}
+
+# add confidence interval
+add_confint <- function(data, conf_int){
+  # add confidence interval if conf_int is not null and there are .fitted and .se.fit
+  if (!is.null(conf_int) & ".se.fit" %in% colnames(data) & ".fitted" %in% colnames(data)) {
+    if (conf_int < 0 | conf_int > 1){
+      stop("conf_int must be between 0 and 1")
+    }
+    conf_low_colname <- avoid_conflict(colnames(data), "conf_low")
+    conf_high_colname <- avoid_conflict(colnames(data), "conf_high")
+    lower <- (1-conf_int)/2
+    higher <- 1-lower
+    data[[conf_low_colname]] <- get_confint(data[[".fitted"]], data[[".se.fit"]], conf_int = lower)
+    data[[conf_high_colname]] <- get_confint(data[[".fitted"]], data[[".se.fit"]], conf_int = higher)
+
+    # move confidece interval columns next to standard error
+    data <- move_col(data, conf_low_colname, which(colnames(data) == ".se.fit") + 1)
+    data <- move_col(data, conf_high_colname, which(colnames(data) == conf_low_colname) + 1)
+  }
+  data
+}
