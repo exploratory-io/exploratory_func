@@ -379,7 +379,7 @@ test_that("test data frame prediction by xgboost", {
                                     ),
                          row.names = c(NA, -10L), class = c("tbl_df", "tbl", "data.frame"))
   model_ret <- build_model(train_data, model_func = xgboost_reg, formula = `hours-per-week` ~ . - `native-country`, nrounds = 5)
-  prediction_ret <- prediction(model_ret, data = "df", data_frame = test_data)
+  prediction_ret <- prediction(model_ret, data = "newdata", data_frame = test_data)
   expect_true(any(is.na(prediction_ret$predicted_value)))
 })
 
@@ -479,7 +479,7 @@ test_that("test data frame prediction by xgboost with group", {
     build_model(model_func = xgboost_reg, formula = age ~ ., nrounds = 5)
 
   test_data[["education-num"]] <- as.numeric(test_data[["education-num"]])
-  prediction_ret <- prediction(model_ret, data = "df", data_frame = test_data)
+  prediction_ret <- prediction(model_ret, data = "newdata", data_frame = test_data)
   expect_true(any(is.na(prediction_ret$predicted_value)))
 
   model_ret2 <- train_data %>%
@@ -489,10 +489,10 @@ test_that("test data frame prediction by xgboost with group", {
     dplyr::select(age, `hours-per-week`, `capital-loss`, `capital-gain`, relationship, `education-num`) %>%
     build_model(model_func = xgboost_reg, formula = age ~ ., nrounds = 5)
 
-  prediction_ret2 <- prediction(model_ret2, data = "df", data_frame = test_data)
+  prediction_ret2 <- prediction(model_ret2, data = "newdata", data_frame = test_data)
   prediction_ret3 <- model_ret %>%
     dplyr::filter(sex == "Male") %>%
-    prediction(data = "df", data_frame = test_data)
+    prediction(data = "newdata", data_frame = test_data)
   expect_equal(prediction_ret3$predicted_value[!is.na(prediction_ret3$predicted_value)], prediction_ret2$predicted_value[!is.na(prediction_ret2$predicted_value)])
 })
 

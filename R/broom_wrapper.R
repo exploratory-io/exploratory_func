@@ -100,6 +100,7 @@ add_prediction <- function(df, model_df, conf_int = 0.95, ...){
       # .test_index is used because model_df has it and won't be used here
       dplyr::mutate_(.dots = list(.test_index = aug_fml)) %>%
       dplyr::ungroup()
+
     ret <- if(with_respose) {
      ret %>%
        dplyr::mutate(.test_index = purrr::map2(.test_index, model, function(d, m){
@@ -246,7 +247,7 @@ kmeans_info <- function(df){
 
 #' augment using source data and test index
 #' @param df Data frame that has model and .test_index.
-#' @param data "training" or "test" or "df". Which source data should be used.
+#' @param data "training" or "test" or "newdata". Which source data should be used.
 #' @param ... Additional argument to be passed to broom::augment
 #' @export
 prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95, ...){
@@ -258,15 +259,15 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
   grouping_cols <- df_cnames[!df_cnames %in% c("source.data", ".test_index", "model")]
 
 
-  if (!data %in% c("test", "training", "df")) {
-    stop('data argument must be "test", "training" or "df"')
+  if (!data %in% c("test", "training", "newdata")) {
+    stop('data argument must be "test", "training" or "newdata"')
   }
 
   if (!all(c("source.data", ".test_index", "model") %in% colnames(df))) {
-    stop('input is not model data frame"')
+    stop('input is not model data frame')
   }
 
-  ret <- if(data == "df") {
+  ret <- if(data == "newdata") {
     if(is.null(data_frame)) {
       stop("Please indicate data_frame")
     }
@@ -275,7 +276,7 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
     test <- data == "test"
     # parsing arguments of prediction and getting optional arguemnt for augment in ...
     cll <- match.call()
-    aug_args <- expand_args(cll, exclude = c("df", "test", "data"))
+    aug_args <- expand_args(cll, exclude = c("df", "data", "data_frame", "conf_int"))
 
     # if type.predict argument is not indicated in this function
     # and models have $family$linkinv (basically, glm models have it),
