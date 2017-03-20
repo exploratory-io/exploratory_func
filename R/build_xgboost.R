@@ -37,10 +37,11 @@ fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_ra
     ret$x_names <- colnames(md_mat)
     pred_cnames <- all.vars(term)[-1]
     types <- vapply(pred_cnames, function(cname) {
-      typeof(md_frame[[cname]])
+      get_data_type(md_frame[[cname]])
     }, FUN.VALUE = "")
     names(types) <- pred_cnames
     ret$types <- types
+    ret$xlevels <- .getXlevels(term, md_frame)
     ret
   }
 }
@@ -359,21 +360,16 @@ augment.xgboost_reg <- function(x, data = NULL, newdata = NULL, ...) {
 
     # validate column types
     if(!is.null(x$types)){
-      browser()
       message <- vapply(names(x$types), function(name){
         original_type <- x$types[[name]]
         if(is.null(data[[name]])){
           # can't find a column
           paste0(" ", name, " is NULL")
         } else {
-          data_type <- if(is.factor(data[[name]])){
-            "factor"
-          } else {
-            typeof(data[[name]])
-          }
-          if(data_type != original_type){
+          data_type <- get_data_type(data[[name]])
+          if((data_type != original_type) && !(data_type == "character" && original_type == "factor")){
             # data type is different
-            paste0("source: ", original_type, " data: ", data_type)
+            paste0(name, ": ", original_type, " and ", data_type)
           } else {
             NA_character_
           }
@@ -381,7 +377,7 @@ augment.xgboost_reg <- function(x, data = NULL, newdata = NULL, ...) {
       }, FUN.VALUE = "")
 
       if(any(!is.na(message))){
-        stop(message[!is.na(message)], collapse = " ")
+        stop(paste0("Found data type mismatch: ", paste0(message[!is.na(message)], collapse = ", ")))
       }
     }
 
@@ -391,7 +387,7 @@ augment.xgboost_reg <- function(x, data = NULL, newdata = NULL, ...) {
       ret_data[[y_name]] <- rep(0, nrow(ret_data))
     }
 
-    mat_data <- model.matrix(x$terms, data = ret_data)
+    mat_data <- model.matrix(x$terms, data = ret_data, xlev = x$xlevels)
 
     predicted <- stats::predict(x, mat_data)
     predicted_value_col <- avoid_conflict(colnames(ret_data), "predicted_value")
