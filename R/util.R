@@ -697,13 +697,13 @@ get_confint <- function(val, se, conf_int = 0.95) {
 
 #' NSE version of pivot_
 #' @export
-pivot <- function(data, formula, value = NULL, ...) {
+pivot <- function(df, formula, value = NULL, ...) {
   value_col <- col_name(substitute(value))
-  pivot_(data, formula = formula, value_col = value_col, ...)
+  pivot_(df, formula = formula, value_col = value_col, ...)
 }
 
 #' pivot columns based on formula
-#' @param data Data frame to pivot
+#' @param df Data frame to pivot
 #' @param formula lhs is composed of columns for rows and rhs is for cols
 #' For example, data1 + data2 ~ var1 + var2 makes a matrix of combinations of
 #' values in data1, data2 pair and var, var2 pair
@@ -712,7 +712,7 @@ pivot <- function(data, formula, value = NULL, ...) {
 #' @param fill Value to be filled for missing values
 #' @param na.rm If na should be removed from values
 #' @export
-pivot_ <- function(data, formula, value_col = NULL, fun.aggregate = mean, fill = NULL, na.rm = TRUE) {
+pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = NULL, na.rm = TRUE) {
   # create a column name for row names
   # column names in lhs are collapsed by "_"
   cname <- paste0(all.vars(lazyeval::f_lhs(formula)), collapse = "_")
@@ -721,45 +721,48 @@ pivot_ <- function(data, formula, value_col = NULL, fun.aggregate = mean, fill =
 
   # remove NA data
   for(var in vars) {
-    data <- data[!is.na(data[[var]]), ]
+    df <- df[!is.na(df[[var]]), ]
+  }
+
+  if(!is.null(value_col) && (is.null(fill) || is.na(fill))){
+    # in this case, values in data frame is aggregated values
+    # , so default is NA and fill must be NA of the same type
+    # with returned values from aggregate function
+
+    # NA should be same type as returned type of fun.aggregate
+    if (identical(fun.aggregate, all) || identical(fun.aggregate, any) ) {
+      # NA is regarded as logical
+      fill <- NA
+    } else {
+      # NA_real_ is regarded as numeric
+      fill <- NA_real_
+    }
+  } else if (is.null(fill)){
+    # this case is counting row col pairs and default is 0
+    fill <- 0
+  } else if (is.na(fill)) {
+    # this case is counting row col pairs and
+    # fill must be a numeric type of NA for data type consistency
+    fill <- NA_real_
   }
 
   pivot_each <- function(df) {
     casted <- if(is.null(value_col)) {
-      if(is.null(fill)){
-        # in this case, values are count of rows and columns,
-        # so default is 0 for empty value column
-        fill <- 0
-      }
       # make a count matrix if value_col is NULL
-      reshape2::acast(data, formula = formula, fun.aggregate = length, fill = fill)
+      reshape2::acast(df, formula = formula, fun.aggregate = length, fill = fill)
     } else {
-      if(is.null(fill) || is.na(fill)){
-        # in this case, values in data frame is aggregated values
-        # , so default is NA and fill must be NA of the same type
-        # with returned values from aggregate function
-
-        # NA should be same type as returned type of fun.aggregate
-        if (identical(fun.aggregate, all) || identical(fun.aggregate, any) ) {
-          # NA is regarded as logical
-          fill <- NA
-        } else {
-          # NA_real_ is regarded as numeric
-          fill <- NA_real_
-        }
-      }
       if(na.rm){
         # remove NA
-        data <- data[!is.na(data[[value_col]]),]
+        df <- df[!is.na(df[[value_col]]),]
       }
-      reshape2::acast(data, formula = formula, value.var = value_col, fun.aggregate = fun.aggregate, fill = fill)
+      reshape2::acast(df, formula = formula, value.var = value_col, fun.aggregate = fun.aggregate, fill = fill)
     }
     casted %>%
       as.data.frame %>%
       tibble::rownames_to_column(var = cname)
   }
 
-  grouped_col <- grouped_by(data)
+  grouped_col <- grouped_by(df)
 
   # Calculation is executed in each group.
   # Storing the result in this tmp_col and
@@ -768,9 +771,19 @@ pivot_ <- function(data, formula, value_col = NULL, fun.aggregate = mean, fill =
   # overwriting it should be avoided,
   # so avoid_conflict is used here.
   tmp_col <- avoid_conflict(grouped_col, "tmp")
-  ret <- data %>%
+  ret <- df %>%
     dplyr::do_(.dots=setNames(list(~pivot_each(.)), tmp_col)) %>%
     tidyr::unnest_(tmp_col)
+
+  # replace NA values in missing columns in some groups with fill
+  if(!is.na(fill)) {
+    newcols <- colnames(ret)[!colnames(ret) %in% grouped_col]
+    replace <- as.list(rep(fill, length(newcols)))
+    names(replace) <- newcols
+    ret <- ret %>%
+      tidyr::replace_na(replace = replace)
+  }
+
   # grouping should be kept
   if(length(grouped_col) != 0){
     ret <- dplyr::group_by_(ret, grouped_col)
