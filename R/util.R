@@ -738,7 +738,12 @@ pivot_ <- function(data, formula, value_col = NULL, fun.aggregate = mean, fill =
       fill <- NA_real_
     }
   } else if (is.null(fill)){
+    # this case is counting row col pairs and default is 0
     fill <- 0
+  } else if (is.na(fill)) {
+    # this case is counting row col pairs and
+    # fill must be a numeric type of NA for data type consistency
+    fill <- NA_real_
   }
 
   pivot_each <- function(df) {
