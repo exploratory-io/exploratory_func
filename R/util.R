@@ -724,35 +724,33 @@ pivot_ <- function(data, formula, value_col = NULL, fun.aggregate = mean, fill =
     data <- data[!is.na(data[[var]]), ]
   }
 
+  if(!is.null(value_col) && (is.null(fill) || is.na(fill))){
+    # in this case, values in data frame is aggregated values
+    # , so default is NA and fill must be NA of the same type
+    # with returned values from aggregate function
+
+    # NA should be same type as returned type of fun.aggregate
+    if (identical(fun.aggregate, all) || identical(fun.aggregate, any) ) {
+      # NA is regarded as logical
+      fill <- NA
+    } else {
+      # NA_real_ is regarded as numeric
+      fill <- NA_real_
+    }
+  } else if (is.null(fill)){
+    fill <- 0
+  }
+
   pivot_each <- function(df) {
     casted <- if(is.null(value_col)) {
-      if(is.null(fill)){
-        # in this case, values are count of rows and columns,
-        # so default is 0 for empty value column
-        fill <- 0
-      }
       # make a count matrix if value_col is NULL
-      reshape2::acast(data, formula = formula, fun.aggregate = length, fill = fill)
+      reshape2::acast(df, formula = formula, fun.aggregate = length, fill = fill)
     } else {
-      if(is.null(fill) || is.na(fill)){
-        # in this case, values in data frame is aggregated values
-        # , so default is NA and fill must be NA of the same type
-        # with returned values from aggregate function
-
-        # NA should be same type as returned type of fun.aggregate
-        if (identical(fun.aggregate, all) || identical(fun.aggregate, any) ) {
-          # NA is regarded as logical
-          fill <- NA
-        } else {
-          # NA_real_ is regarded as numeric
-          fill <- NA_real_
-        }
-      }
       if(na.rm){
         # remove NA
-        data <- data[!is.na(data[[value_col]]),]
+        df <- df[!is.na(df[[value_col]]),]
       }
-      reshape2::acast(data, formula = formula, value.var = value_col, fun.aggregate = fun.aggregate, fill = fill)
+      reshape2::acast(df, formula = formula, value.var = value_col, fun.aggregate = fun.aggregate, fill = fill)
     }
     casted %>%
       as.data.frame %>%
@@ -771,6 +769,16 @@ pivot_ <- function(data, formula, value_col = NULL, fun.aggregate = mean, fill =
   ret <- data %>%
     dplyr::do_(.dots=setNames(list(~pivot_each(.)), tmp_col)) %>%
     tidyr::unnest_(tmp_col)
+
+  # replace NA values in missing columns in some groups with fill
+  if(!is.na(fill)) {
+    newcols <- colnames(ret)[!colnames(ret) %in% grouped_col]
+    replace <- as.list(rep(fill, length(newcols)))
+    names(replace) <- newcols
+    ret <- ret %>%
+      tidyr::replace_na(replace = replace)
+  }
+
   # grouping should be kept
   if(length(grouped_col) != 0){
     ret <- dplyr::group_by_(ret, grouped_col)
