@@ -112,6 +112,8 @@ do_chisq.test <- function(df, ...,
                           B = 2000){
   select_dots <- lazyeval::lazy_dots(...)
   cols <- evaluate_select(df, select_dots, excluded = grouped_by(df))
+  # p should be able to be NSE column name or numeric vector
+  # , so evaluated lazily
   lazy_p <- lazyeval::lazy(p)
   p <- lazyeval::lazy_eval(lazy_p, data = df)
 
