@@ -119,4 +119,8 @@ test_that("test chisq.test with p column", {
     do_chisq.test(IGI, p = p_from_outside)
   expect_equal(nrow(ret), 1)
 
+  ret3 <- test_df %>%
+    do_chisq.test(IGI, p = c(1, 2, 3, 4, 5))
+  expect_equal(nrow(ret), 1)
+
 })
