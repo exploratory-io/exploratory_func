@@ -697,13 +697,13 @@ get_confint <- function(val, se, conf_int = 0.95) {
 
 #' NSE version of pivot_
 #' @export
-pivot <- function(data, formula, value = NULL, ...) {
+pivot <- function(df, formula, value = NULL, ...) {
   value_col <- col_name(substitute(value))
-  pivot_(data, formula = formula, value_col = value_col, ...)
+  pivot_(df, formula = formula, value_col = value_col, ...)
 }
 
 #' pivot columns based on formula
-#' @param data Data frame to pivot
+#' @param df Data frame to pivot
 #' @param formula lhs is composed of columns for rows and rhs is for cols
 #' For example, data1 + data2 ~ var1 + var2 makes a matrix of combinations of
 #' values in data1, data2 pair and var, var2 pair
@@ -712,7 +712,7 @@ pivot <- function(data, formula, value = NULL, ...) {
 #' @param fill Value to be filled for missing values
 #' @param na.rm If na should be removed from values
 #' @export
-pivot_ <- function(data, formula, value_col = NULL, fun.aggregate = mean, fill = NULL, na.rm = TRUE) {
+pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = NULL, na.rm = TRUE) {
   # create a column name for row names
   # column names in lhs are collapsed by "_"
   cname <- paste0(all.vars(lazyeval::f_lhs(formula)), collapse = "_")
@@ -721,7 +721,7 @@ pivot_ <- function(data, formula, value_col = NULL, fun.aggregate = mean, fill =
 
   # remove NA data
   for(var in vars) {
-    data <- data[!is.na(data[[var]]), ]
+    df <- df[!is.na(df[[var]]), ]
   }
 
   if(!is.null(value_col) && (is.null(fill) || is.na(fill))){
@@ -762,7 +762,7 @@ pivot_ <- function(data, formula, value_col = NULL, fun.aggregate = mean, fill =
       tibble::rownames_to_column(var = cname)
   }
 
-  grouped_col <- grouped_by(data)
+  grouped_col <- grouped_by(df)
 
   # Calculation is executed in each group.
   # Storing the result in this tmp_col and
@@ -771,7 +771,7 @@ pivot_ <- function(data, formula, value_col = NULL, fun.aggregate = mean, fill =
   # overwriting it should be avoided,
   # so avoid_conflict is used here.
   tmp_col <- avoid_conflict(grouped_col, "tmp")
-  ret <- data %>%
+  ret <- df %>%
     dplyr::do_(.dots=setNames(list(~pivot_each(.)), tmp_col)) %>%
     tidyr::unnest_(tmp_col)
 
