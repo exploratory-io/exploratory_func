@@ -36,11 +36,6 @@ fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_ra
     ret$terms <- term
     ret$x_names <- colnames(md_mat)
     pred_cnames <- all.vars(term)[-1]
-    types <- vapply(pred_cnames, function(cname) {
-      get_data_type(md_frame[[cname]])
-    }, FUN.VALUE = "")
-    names(types) <- pred_cnames
-    ret$types <- types
     # this is how categorical columns are casted to columns in matrix
     # this is needed in augment, so that matrix with the same levels
     # can be created
@@ -242,10 +237,6 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, ...) {
       data
     }
 
-    # validate column types
-    # newdata might have different type of columns with same name
-    validate_data(x$types, ret_data)
-
     # todo: check missing value behaviour
     mat <- model.matrix(x$terms, ret_data)
     predicted <- stats::predict(x, mat)
@@ -308,10 +299,6 @@ augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, ...) {
       data
     }
 
-    # validate column types
-    # newdata might have different type of columns with same name
-    validate_data(x$types, ret_data)
-
     mat <- model.matrix(x$terms, data = ret_data)
     # this is to find omitted indice for NA
     row_index <- as.numeric(rownames(mat))
@@ -369,10 +356,6 @@ augment.xgboost_reg <- function(x, data = NULL, newdata = NULL, ...) {
       data
     }
 
-    # validate column types
-    # newdata might have different type of columns with same name
-    validate_data(x$types, ret_data)
-
     y_name <- all.vars(x$terms)[[1]]
     if(is.null(ret_data[[y_name]])){
       # if there is no column in the formula (even if it's response variable),
@@ -409,10 +392,6 @@ augment.xgb.Booster <- function(x, data = NULL, newdata = NULL, ...) {
   if(!is.null(newdata)){
     data <- newdata
   }
-
-  # validate column types
-  # newdata might have different type of columns with same name
-  validate_data(x$types, data)
 
   mat_data <- if(!is.null(x$x_names)) {
     data[x$x_names]

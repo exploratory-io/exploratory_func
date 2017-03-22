@@ -152,7 +152,7 @@ test_that("test randomForest with classification", {
   test_data[["IS_AA"]] <- test_data$CARRIER == "AA"
   model_ret <- build_model(test_data,
                            model_func = randomForestMulti,
-                           formula = CARRIER ~ DISTANCE,
+                           formula = CARRIER ~ poly(DISTANCE, 3),
                            localImp = TRUE,
                            test_rate = 0.3)
   coef_ret <- model_coef(model_ret)

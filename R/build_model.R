@@ -105,11 +105,11 @@ build_model_ <- function(data, model_func, seed = 0, test_rate = 0, group_cols =
         ret <- list()
         if(!is.null(formula)){
           tryCatch({
-            ret$md_frame <- model.frame(formula$expr, data = df)
-            ret$terms <- terms(ret$md_frame, formula$expr)
+            md_frame <- model.frame(formula$expr, data = df)
+            ret$terms <- terms(md_frame, formula$expr)
             pred_cnames <- all.vars(ret$terms)[-1]
             types <- vapply(pred_cnames, function(cname) {
-              get_data_type(ret$md_frame[[cname]])
+              get_data_type(df[[cname]])
             }, FUN.VALUE = "")
             names(types) <- pred_cnames
             ret$types <- types
