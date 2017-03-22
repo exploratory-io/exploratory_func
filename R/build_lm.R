@@ -87,7 +87,7 @@ build_lm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, gr
         if(!is.null(formula)){
           create_model_meta(df, formula)
         } else {
-          NULL
+          list()
         }
       }))
     if(!keep.source & !augment){
