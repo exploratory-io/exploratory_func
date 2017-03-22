@@ -33,7 +33,7 @@ build_model_ <- function(data, model_func, seed = 0, test_rate = 0, group_cols =
 
   # change column names to avoid name conflict when tidy or glance are executed
   reserved_names <- c(
-    "model", ".test_index", "data",
+    "model", ".test_index", "data", ".model_meta_information",
     reserved_colnames
   )
 
@@ -100,6 +100,24 @@ build_model_ <- function(data, model_func, seed = 0, test_rate = 0, group_cols =
         eval_arg[["data"]] <- lazyeval::as.lazy(quote(data))
         .call <- lazyeval::make_call(quote(model_func), eval_arg)
         lazyeval::lazy_eval(.call, data = environment())
+      })) %>%
+      dplyr::mutate(.model_meta_information = purrr::map2(source.data, model, function(df, model){
+        ret <- list()
+        if(!is.null(formula)){
+          tryCatch({
+            ret$md_frame <- model.frame(formula$expr, data = df)
+            ret$terms <- terms(ret$md_frame, formula$expr)
+            pred_cnames <- all.vars(ret$terms)[-1]
+            types <- vapply(pred_cnames, function(cname) {
+              get_data_type(ret$md_frame[[cname]])
+            }, FUN.VALUE = "")
+            names(types) <- pred_cnames
+            ret$types <- types
+          }, error = function(e){
+            NULL
+          })
+        }
+        ret
       }))
     class(ret[[source_col]]) <- c("list", ".source.data")
     ret <- dplyr::rowwise(ret)

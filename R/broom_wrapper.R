@@ -87,6 +87,15 @@ add_prediction <- function(df, model_df, conf_int = 0.95, ...){
   cll <- match.call()
   aug_args <- expand_args(cll, exclude = c("df", "model_df"))
 
+  # validate data frame based on meta info
+  model_meta <- model_df[[".model_meta_information"]]
+  if(!is.null(model_meta)){
+    types <- model_meta[[1]]$types
+    if(!is.null(types)){
+      validate_data(types, df)
+    }
+  }
+
   get_result <- function(model_df, df, aug_args, with_respose){
     # Use formula to support expanded aug_args (especially for type.predict for logistic regression)
     # because ... can't be passed to a function inside mutate directly.
@@ -256,7 +265,7 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
 
   # columns other than "source.data", ".test_index" and "model" should be regarded as grouping columns
   # this should be kept after running prediction
-  grouping_cols <- df_cnames[!df_cnames %in% c("source.data", ".test_index", "model")]
+  grouping_cols <- df_cnames[!df_cnames %in% c("source.data", ".test_index", "model", ".model_meta_information")]
 
 
   if (!data %in% c("test", "training", "newdata")) {
@@ -715,7 +724,7 @@ model_stats <- function(df, pretty.name = FALSE, ...){
   # get group columns.
   # we assume that columns of model df other than the ones with reserved name are all group columns.
   model_df_colnames = colnames(df)
-  group_by_names <- model_df_colnames[!model_df_colnames %in% c("source.data", ".test_index", "model")]
+  group_by_names <- model_df_colnames[!model_df_colnames %in% c("source.data", ".test_index", "model", ".model_meta_information")]
 
   # when pre-grouped, each row of glance result is actually a group.
   # but when not pre-grouped, the only-one row is not a group.
