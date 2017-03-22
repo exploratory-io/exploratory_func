@@ -413,38 +413,6 @@ augment.xgb.Booster <- function(x, data = NULL, newdata = NULL, ...) {
   data
 }
 
-#' validate data type of newdata for xgboost prediction
-#' @param x xgboost model
-#' @param data new data to predict
-validate_data <- function(types, data){
-  if(!is.null(types)){
-    message <- vapply(names(types), function(name){
-      original_type <- types[[name]]
-      if(is.null(data[[name]])){
-        # can't find a column
-        paste0(" ", name, " is NULL in new data")
-      } else {
-        data_type <- get_data_type(data[[name]])
-        if((data_type != original_type) &&
-           # difference of factor and character is acceptable
-           !(all(c(data_type, original_type) %in% c("character", "factor"))) &&
-           # difference of integer and double is acceptable
-           !(all(c(data_type, original_type) %in% c("double", "integer")))){
-          # data type is different
-          paste0(name, ": ", original_type, " in training data and ", data_type, " in new data")
-        } else {
-          NA_character_
-        }
-      }
-    }, FUN.VALUE = "")
-
-    if(any(!is.na(message))){
-      stop(paste0("Found data type mismatch: ", paste0(message[!is.na(message)], collapse = ", ")))
-    }
-  }
-  TRUE
-}
-
 #' Tidy method for xgboost output
 #' @param x Fitted xgb.Booster model
 #' @param type Can be "weight" or "log".
