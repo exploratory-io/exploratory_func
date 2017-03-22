@@ -50,7 +50,7 @@ build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, g
 
   # change column names to avoid name conflict when tidy or glance are executed
   reserved_names <- c(
-    "model", ".test_index", "data",
+    "model", ".test_index", "data", ".model_meta_information",
     # for tidy
     "term", "estimate", "std.error", "statistic", "p.value",
     # for glance
@@ -102,6 +102,13 @@ build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, g
 
         # execute glm with parsed arguments
         eval(parse(text = paste0("stats::glm(data = data, ", arg_char, ")")))
+      })) %>%
+      dplyr::mutate(.model_meta_information = purrr::map(source.data, function(df){
+        if(!is.null(formula)){
+          create_model_meta(df, formula)
+        } else {
+          list()
+        }
       }))
     if(!keep.source & !augment){
       ret <- dplyr::select(ret, -source.data)

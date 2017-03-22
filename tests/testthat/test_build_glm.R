@@ -10,7 +10,7 @@ test_that("test build_glm summary output ", {
   )
   trial <- test_df %>% build_glm(num1 ~ num2 + category + with_NA, weights = weights)
 
-  expect_equal(colnames(trial), c(".test_index", "source.data", "model"))
+  expect_equal(colnames(trial), c(".test_index", "source.data", "model", ".model_meta_information"))
 
   res <- capture.output(summary(trial$model[[1]]))
   expect_lt(length(res), 50) # the output of summary should be less than 50 lines
@@ -26,7 +26,7 @@ test_that("test build_glm with keep.source FALSE ", {
   )
   trial <- test_df %>% build_glm(num1 ~ num2 + category + with_NA, weights = weights, keep.source = FALSE)
 
-  expect_equal(colnames(trial), c(".test_index", "model"))
+  expect_equal(colnames(trial), c(".test_index", "model", ".model_meta_information"))
 })
 
 test_that("test build_glm with grouped ", {
@@ -67,7 +67,7 @@ test_that("test name conflict avoid", {
   glm_model <- test_df %>%
     build_glm(num1 ~ num2, group_cols = c("estimate", "model", "model.group"))
 
-  expect_equal(colnames(glm_model), c("estimate.group", "model.group", "model.group1", "source.data", ".test_index", "model"))
+  expect_equal(colnames(glm_model), c("estimate.group", "model.group", "model.group1", "source.data", ".test_index", "model", ".model_meta_information"))
 
   trial <- suppressWarnings({
     glm_model %>%

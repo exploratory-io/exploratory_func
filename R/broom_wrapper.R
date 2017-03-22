@@ -321,6 +321,10 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
         })) %>%
         dplyr::select(-.test_index)
 
+      if(".model_meta_information" %in% colnames(data_to_augment)){
+        data_to_augment <- data_to_augment %>% dplyr::select(-`.model_meta_information`)
+      }
+
       augmented <- tryCatch({
         data_to_augment %>%
           dplyr::rowwise() %>%

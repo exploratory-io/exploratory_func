@@ -10,7 +10,7 @@ test_that("test build_lm summary output ", {
   )
   trial <- test_df %>% build_lm(num1 ~ num2 + category + with_NA, weights = weight)
 
-  expect_equal(colnames(trial), c("source.data", ".test_index", "model"))
+  expect_equal(colnames(trial), c("source.data", ".test_index", "model", ".model_meta_information"))
 
   res <- capture.output(summary(trial$model[[1]]))
   expect_lt(length(res), 50) # the output of summary should be less than 50 lines
@@ -26,7 +26,7 @@ test_that("test build_lm with keep.source FALSE ", {
   )
   trial <- test_df %>% build_lm(num1 ~ num2 + category + with_NA, weights = weight, keep.source = FALSE)
 
-  expect_equal(colnames(trial), c(".test_index", "model"))
+  expect_equal(colnames(trial), c(".test_index", "model", ".model_meta_information"))
 })
 
 test_that("test build_lm with grouped ", {
@@ -66,7 +66,7 @@ test_that("test name conflict avoid", {
   lm_model <- test_df %>%
     build_lm(num1 ~ num2, group_cols = c("estimate", "model", "model.group"))
 
-  expect_equal(colnames(lm_model), c("estimate.group", "model.group", "model.group1", "source.data", ".test_index", "model"))
+  expect_equal(colnames(lm_model), c("estimate.group", "model.group", "model.group1", "source.data", ".test_index", "model", ".model_meta_information"))
 
   trial <- suppressWarnings({
     lm_model %>%
