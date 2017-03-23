@@ -914,3 +914,62 @@ add_confint <- function(data, conf_int){
   }
   data
 }
+
+#' validate data type of newdata for prediction
+#' @param types Named vector. Values are data types and names are column names
+#' @param data new data to predict
+validate_data <- function(types, data){
+  if(!is.null(types)){
+    message <- vapply(names(types), function(name){
+      original_type <- types[[name]]
+      if(is.null(data[[name]])){
+        # can't find a column
+        paste0(" ", name, " is NULL in new data")
+      } else {
+        data_type <- get_data_type(data[[name]])
+        if((data_type != original_type) &&
+           # difference of factor and character is acceptable
+           !(all(c(data_type, original_type) %in% c("character", "factor"))) &&
+           # difference of integer and double is acceptable
+           !(all(c(data_type, original_type) %in% c("double", "integer")))){
+          # data type is different
+          paste0(name, ": ", original_type, " in training data and ", data_type, " in new data")
+        } else {
+          NA_character_
+        }
+      }
+    }, FUN.VALUE = "")
+
+    if(any(!is.na(message))){
+      stop(paste0("Data type mismatch. ", paste0(message[!is.na(message)], collapse = ", ")))
+    }
+  }
+  TRUE
+}
+
+# This is used in model building functions
+# to create meta data.
+# It contains terms to create model and
+# column types of the variables.
+# Its's used for column type validation.
+# return value looks like following example.
+# list(
+#   types = c(col1 = "numeric", col2 = "character"),
+#   terms = res ~ col1 + col2
+# )
+create_model_meta <- function(df, formula){
+  ret <- list()
+  tryCatch({
+    md_frame <- model.frame(formula, data = df)
+    ret$terms <- terms(md_frame, formula)
+    pred_cnames <- all.vars(ret$terms)[-1]
+    types <- vapply(pred_cnames, function(cname) {
+      get_data_type(df[[cname]])
+    }, FUN.VALUE = "")
+    names(types) <- pred_cnames
+    ret$types <- types
+  }, error = function(e){
+    NULL
+  })
+  ret
+}

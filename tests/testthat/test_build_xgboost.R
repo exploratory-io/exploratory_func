@@ -78,7 +78,7 @@ test_that("test build_xgboost", {
     verbose = 0
     )
   coef_ret <- model_coef(model_ret)
-  expect_equal(ncol(model_ret), 3)
+  expect_equal(ncol(model_ret), 4)
 })
 
 test_that("test build_xgboost with weight", {
@@ -99,7 +99,7 @@ test_that("test build_xgboost with weight", {
     output_type = "logistic",
     eval_metric = "auc")
   coef_ret <- model_coef(model_ret)
-  expect_equal(ncol(model_ret), 3)
+  expect_equal(ncol(model_ret), 4)
 })
 
 test_that("test build_xgboost with weight", {
@@ -117,7 +117,7 @@ test_that("test build_xgboost with weight", {
   stats_ret <- model_stats(model_ret)
   prediction_ret <- prediction_binary(model_ret)
   expect_true(is.logical(prediction_ret$predicted_label))
-  expect_equal(ncol(model_ret), 3)
+  expect_equal(ncol(model_ret), 4)
 })
 
 test_that("test build_xgboost reg", {
@@ -132,10 +132,7 @@ test_that("test build_xgboost reg", {
   test_data[["IS_AA"]] <- test_data$CARRIER == "AA"
   model_ret <- build_model(test_data, model_func = xgboost_reg, formula = IS_AA ~ DISTANCE, nrounds = 5, weight = log(weight), verbose = 1, booster = "dart")
   stats_ret <- model_stats(model_ret)
-  expect_equal(ncol(model_ret), 3)
-
-  coef_ret <- model_coef(model_ret)
-  expect_equal(ncol(model_ret), 3)
+  expect_equal(ncol(model_ret), 4)
 })
 
 test_that("test build_xgboost with dot", {
