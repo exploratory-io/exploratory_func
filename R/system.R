@@ -1215,6 +1215,15 @@ download_data_file <- function(url, type){
       }
     }
     tmp <- tempfile(fileext = stringr::str_c(".", ext))
+    # In case of using Rserve on linux, somehow it doesn't create a 
+    # temporary directory which is used as a part of tempfile path above. 
+    # It works fine from the R command line on linux, and it works 
+    # fine all the time on Mac and Windows regardless Rserv or not. 
+    #
+    # This command is harmless even you already have the directory. 
+    # http://stackoverflow.com/questions/4216753/check-existence-of-directory-and-create-if-doesnt-exist
+    dir.create(tempdir(), showWarnings = FALSE)
+    
     # download file to tempoprary location
     download.file(url, destfile = tmp, mode = "wb")
     # cache file
