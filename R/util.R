@@ -933,7 +933,7 @@ validate_data <- function(types, data){
            # difference of integer and double is acceptable
            !(all(c(data_type, original_type) %in% c("double", "integer")))){
           # data type is different
-          paste0(name, ": ", original_type, " in training data and ", data_type, " in new data")
+          paste0(name, ": ", original_type, " - ", data_type)
         } else {
           NA_character_
         }
@@ -941,7 +941,7 @@ validate_data <- function(types, data){
     }, FUN.VALUE = "")
 
     if(any(!is.na(message))){
-      stop(paste0("Data type mismatch. ", paste0(message[!is.na(message)], collapse = ", ")))
+      stop(paste0("Data type mismatch detected for ", paste0(message[!is.na(message)], collapse = ", ")))
     }
   }
   TRUE
