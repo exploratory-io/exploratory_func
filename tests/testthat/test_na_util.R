@@ -12,13 +12,13 @@ test_that("test impute_na", {
   colnames(test_data) <- c("col 1", "col-2", "col_3", "chars", "group1", "group2")
   ret1 <- test_data %>%
     dplyr::group_by(group1) %>%
-    dplyr::mutate(filled_na = impute_na(`col 1`, `col-2`, col_3, chars, type = "lm_predict"))
+    dplyr::mutate(filled_na = impute_na(`col 1`, `col-2`, col_3, chars, type = "predict"))
 
   expect_true(any(is.na(test_data[["col 1"]]) & !is.na(ret1[["filled_na"]])))
 
   ret2 <- test_data %>%
     dplyr::group_by(group2) %>%
-    dplyr::mutate(filled_na = impute_na(`col 1`, `col-2`, col_3, chars, type = "lm_predict"))
+    dplyr::mutate(filled_na = impute_na(`col 1`, `col-2`, col_3, chars, type = "predict"))
 
   # result should be changed by group_by
   expect_true(any(ret1[["filled_na"]][!is.na(ret1[["filled_na"]])] != ret2[["filled_na"]][!is.na(ret2[["filled_na"]])]))
@@ -37,7 +37,7 @@ test_that("test impute_na", {
   expect_error({
     test_data %>%
       dplyr::group_by(group1) %>%
-      dplyr::mutate(filled_na = impute_na(`col 1`, type = "lm_predict"))
+      dplyr::mutate(filled_na = impute_na(`col 1`, type = "predict"))
   }, "Please choose predictor columns")
 })
 

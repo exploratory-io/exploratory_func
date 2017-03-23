@@ -1,7 +1,7 @@
 #' Guess missing values by lm
 #' @param target Target vector whose NA is filled
 #' @param ... Vectors to be used to pridict NA when type is lm_predict
-#' @param type This can be "mean", "median", "lm_predict", "value" or aggregate function
+#' @param type This can be "mean", "median", "predict", "value" or aggregate function
 #' @paramm val This is effective when type is "value". NA is replaced by this value.
 #' @export
 impute_na <- function(target, ..., type = mean, val = 0) {
@@ -14,7 +14,7 @@ impute_na <- function(target, ..., type = mean, val = 0) {
     target[is.na(target)] <- val
     target
   } else {
-    switch(type, lm_predict = {
+    switch(type, predict = {
       # list(...) is a list of vectors
       df <- as.data.frame(list(...))
       if(nrow(df) == 0){
