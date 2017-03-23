@@ -952,6 +952,11 @@ validate_data <- function(types, data){
 # It contains terms to create model and
 # column types of the variables.
 # Its's used for column type validation.
+# return value looks like following example.
+# list(
+#   types = c(col1 = "numeric", col2 = "character"),
+#   terms = res ~ col1 + col2
+# )
 create_model_meta <- function(df, formula){
   ret <- list()
   tryCatch({
