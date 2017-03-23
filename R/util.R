@@ -947,8 +947,11 @@ validate_data <- function(types, data){
   TRUE
 }
 
-# used in model building functions to create meta data
-# the meta data is used for column type validation
+# This is used in model building functions
+# to create meta data.
+# It contains terms to create model and
+# column types of the variables.
+# Its's used for column type validation.
 create_model_meta <- function(df, formula){
   ret <- list()
   tryCatch({
