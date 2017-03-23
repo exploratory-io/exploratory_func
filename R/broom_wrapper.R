@@ -88,7 +88,7 @@ add_prediction <- function(df, model_df, conf_int = 0.95, ...){
   aug_args <- expand_args(cll, exclude = c("df", "model_df"))
 
   # validate data frame based on meta info
-  model_meta <- model_df[[".model_meta_data"]]
+  model_meta <- model_df[[".model_metadata"]]
   if(!is.null(model_meta)){
     types <- model_meta[[1]]$types
     if(!is.null(types)){
@@ -265,7 +265,7 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
 
   # columns other than "source.data", ".test_index" and "model" should be regarded as grouping columns
   # this should be kept after running prediction
-  grouping_cols <- df_cnames[!df_cnames %in% c("source.data", ".test_index", "model", ".model_meta_data")]
+  grouping_cols <- df_cnames[!df_cnames %in% c("source.data", ".test_index", "model", ".model_metadata")]
 
 
   if (!data %in% c("test", "training", "newdata")) {
@@ -321,8 +321,8 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
         })) %>%
         dplyr::select(-.test_index)
 
-      if(".model_meta_data" %in% colnames(data_to_augment)){
-        data_to_augment <- data_to_augment %>% dplyr::select(-`.model_meta_data`)
+      if(".model_metadata" %in% colnames(data_to_augment)){
+        data_to_augment <- data_to_augment %>% dplyr::select(-`.model_metadata`)
       }
 
       augmented <- tryCatch({
@@ -728,7 +728,7 @@ model_stats <- function(df, pretty.name = FALSE, ...){
   # get group columns.
   # we assume that columns of model df other than the ones with reserved name are all group columns.
   model_df_colnames = colnames(df)
-  group_by_names <- model_df_colnames[!model_df_colnames %in% c("source.data", ".test_index", "model", ".model_meta_data")]
+  group_by_names <- model_df_colnames[!model_df_colnames %in% c("source.data", ".test_index", "model", ".model_metadata")]
 
   # when pre-grouped, each row of glance result is actually a group.
   # but when not pre-grouped, the only-one row is not a group.
