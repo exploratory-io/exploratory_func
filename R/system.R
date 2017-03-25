@@ -372,20 +372,40 @@ getDBConnection <- function(type, host, port, databaseName, username, password, 
     drv <- RPresto::Presto()
     conn <- RPresto::dbConnect(drv, user = username, password = password, host = host, port = port, schema = schema, catalog = catalog, session.timezone = Sys.timezone(location = TRUE))
   } else if (type == "odbc") {
+    if(!requireNamespace("RODBC")){stop("package RODBC must be installed.")}
+    if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
+
     loadNamespace("RODBC")
-    connstr <- stringr::str_c("RODBC::odbcConnect(dsn = '", dsn, "'")
-    if(username != ""){
-      connstr <- stringr::str_c(connstr, ", uid = '", username, "'")
+    connect <- function() {
+      connstr <- stringr::str_c("RODBC::odbcConnect(dsn = '",dsn, "',uid = '", username, "', pwd = '", password, "'")
+      if(additionalParams == ""){
+        connstr <- stringr::str_c(connstr, ")")
+      } else {
+        connstr <- stringr::str_c(connstr, ",", additionalParams, ")")
+      }
+      conn <- eval(parse(text=connstr))
+      if (conn == -1) {
+        # capture warning and throw error with the message.
+        # odbcConnect() returns -1 and does not stop execution even if connection fails.
+        # TODO capture.output() might cause error on windows with multibyte chars.
+        stop(paste("ODBC connection failed.", capture.output(warnings())))
+      }
+
+      # For some reason, calling RODBC::sqlTables() works around Actual Oracle Driver for Mac issue
+      # that it always returns 0 rows.
+      # Since we want this to be done without sacrificing performance,
+      # we are adding dummy catalog/schema condition to make it return nothing.
+      # Since it does not have performance impact, we are just calling it
+      # unconditionally rather than first checking which ODBC driver is used for the connection.
+      RODBC::sqlTables(conn, catalog = "dummy", schema = "dummy")
+      conn
     }
-    if(password != ""){
-      connstr <- stringr::str_c(connstr, ", pwd = '", password, "'")
+    key <- paste("odbc", dsn, username, additionalParams, sep = ":")
+    conn <- connection_pool[[key]]
+    if (is.null(conn)) {
+      conn <- connect()
+      connection_pool[[key]] <- conn
     }
-    if(additionalParams == ""){
-      connstr <- stringr::str_c(connstr, ")")
-    } else {
-      connstr <- stringr::str_c(connstr, ",", additionalParams, ")")
-    }
-    conn <- eval(parse(text=connstr))
   }
   conn
 }
