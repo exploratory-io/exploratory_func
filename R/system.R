@@ -533,7 +533,6 @@ queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, q
 
   conn <- getConnection()
   df <- RODBC::sqlQuery(conn, GetoptLong::qq(query), max = numOfRows)
-  RODBC::odbcClose(conn)
   df
 }
 
