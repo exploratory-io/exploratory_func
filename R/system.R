@@ -526,6 +526,11 @@ queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, q
     conn
   }
 
+  clearConnection <- function() {
+    key <- paste("odbc", dsn, username, additionalParams, sep = ":")
+    rm(list = key, envir = connection_pool)
+  }
+
   conn <- getConnection()
   df <- RODBC::sqlQuery(conn, GetoptLong::qq(query), max = numOfRows)
   RODBC::odbcClose(conn)
