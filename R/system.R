@@ -411,6 +411,14 @@ getDBConnection <- function(type, host, port, databaseName, username, password, 
 }
 
 #' @export
+clearDBConnection <- function(type, host, port, databaseName, username, catalog = "", schema = "", dsn="", additionalParams = ""){
+  if (type == "odbc") { #TODO: implement for other types too
+    key <- paste(type, dsn, username, additionalParams, sep = ":")
+    rm(list = key, envir = connection_pool)
+  }
+}
+
+#' @export
 getListOfTables <- function(type, host, port, databaseName = NULL, username, password, catalog = "", schema = ""){
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
   if (type == "presto") {
