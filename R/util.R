@@ -697,13 +697,13 @@ get_confint <- function(val, se, conf_int = 0.95) {
 
 #' NSE version of pivot_
 #' @export
-pivot <- function(data, formula, value = NULL, ...) {
+pivot <- function(df, formula, value = NULL, ...) {
   value_col <- col_name(substitute(value))
-  pivot_(data, formula = formula, value_col = value_col, ...)
+  pivot_(df, formula = formula, value_col = value_col, ...)
 }
 
 #' pivot columns based on formula
-#' @param data Data frame to pivot
+#' @param df Data frame to pivot
 #' @param formula lhs is composed of columns for rows and rhs is for cols
 #' For example, data1 + data2 ~ var1 + var2 makes a matrix of combinations of
 #' values in data1, data2 pair and var, var2 pair
@@ -712,7 +712,7 @@ pivot <- function(data, formula, value = NULL, ...) {
 #' @param fill Value to be filled for missing values
 #' @param na.rm If na should be removed from values
 #' @export
-pivot_ <- function(data, formula, value_col = NULL, fun.aggregate = mean, fill = NULL, na.rm = TRUE) {
+pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = NULL, na.rm = TRUE) {
   # create a column name for row names
   # column names in lhs are collapsed by "_"
   cname <- paste0(all.vars(lazyeval::f_lhs(formula)), collapse = "_")
@@ -721,45 +721,48 @@ pivot_ <- function(data, formula, value_col = NULL, fun.aggregate = mean, fill =
 
   # remove NA data
   for(var in vars) {
-    data <- data[!is.na(data[[var]]), ]
+    df <- df[!is.na(df[[var]]), ]
+  }
+
+  if(!is.null(value_col) && (is.null(fill) || is.na(fill))){
+    # in this case, values in data frame is aggregated values
+    # , so default is NA and fill must be NA of the same type
+    # with returned values from aggregate function
+
+    # NA should be same type as returned type of fun.aggregate
+    if (identical(fun.aggregate, all) || identical(fun.aggregate, any) ) {
+      # NA is regarded as logical
+      fill <- NA
+    } else {
+      # NA_real_ is regarded as numeric
+      fill <- NA_real_
+    }
+  } else if (is.null(fill)){
+    # this case is counting row col pairs and default is 0
+    fill <- 0
+  } else if (is.na(fill)) {
+    # this case is counting row col pairs and
+    # fill must be a numeric type of NA for data type consistency
+    fill <- NA_real_
   }
 
   pivot_each <- function(df) {
     casted <- if(is.null(value_col)) {
-      if(is.null(fill)){
-        # in this case, values are count of rows and columns,
-        # so default is 0 for empty value column
-        fill <- 0
-      }
       # make a count matrix if value_col is NULL
-      reshape2::acast(data, formula = formula, fun.aggregate = length, fill = fill)
+      reshape2::acast(df, formula = formula, fun.aggregate = length, fill = fill)
     } else {
-      if(is.null(fill) || is.na(fill)){
-        # in this case, values in data frame is aggregated values
-        # , so default is NA and fill must be NA of the same type
-        # with returned values from aggregate function
-
-        # NA should be same type as returned type of fun.aggregate
-        if (identical(fun.aggregate, all) || identical(fun.aggregate, any) ) {
-          # NA is regarded as logical
-          fill <- NA
-        } else {
-          # NA_real_ is regarded as numeric
-          fill <- NA_real_
-        }
-      }
       if(na.rm){
         # remove NA
-        data <- data[!is.na(data[[value_col]]),]
+        df <- df[!is.na(df[[value_col]]),]
       }
-      reshape2::acast(data, formula = formula, value.var = value_col, fun.aggregate = fun.aggregate, fill = fill)
+      reshape2::acast(df, formula = formula, value.var = value_col, fun.aggregate = fun.aggregate, fill = fill)
     }
     casted %>%
       as.data.frame %>%
       tibble::rownames_to_column(var = cname)
   }
 
-  grouped_col <- grouped_by(data)
+  grouped_col <- grouped_by(df)
 
   # Calculation is executed in each group.
   # Storing the result in this tmp_col and
@@ -768,9 +771,19 @@ pivot_ <- function(data, formula, value_col = NULL, fun.aggregate = mean, fill =
   # overwriting it should be avoided,
   # so avoid_conflict is used here.
   tmp_col <- avoid_conflict(grouped_col, "tmp")
-  ret <- data %>%
+  ret <- df %>%
     dplyr::do_(.dots=setNames(list(~pivot_each(.)), tmp_col)) %>%
     tidyr::unnest_(tmp_col)
+
+  # replace NA values in missing columns in some groups with fill
+  if(!is.na(fill)) {
+    newcols <- colnames(ret)[!colnames(ret) %in% grouped_col]
+    replace <- as.list(rep(fill, length(newcols)))
+    names(replace) <- newcols
+    ret <- ret %>%
+      tidyr::replace_na(replace = replace)
+  }
+
   # grouping should be kept
   if(length(grouped_col) != 0){
     ret <- dplyr::group_by_(ret, grouped_col)
@@ -859,5 +872,104 @@ fill_mat_NA <- function(indice, mat, max_index = max(indice, na.rm = TRUE)){
   ret <- matrix(na_val, nrow = max_index, ncol = ncol(mat))
   colnames(ret) <- colnames(mat)
   ret[indice, ] <- mat
+  ret
+}
+
+# get data type to distinguish more than typeof function
+get_data_type <- function(data){
+  if (is.factor(data)){
+    # factor is regarded as integer by typeof
+    "factor"
+  } else if (inherits(data, "Date")){
+    # Date is regarded as double by typeof
+    "Date"
+  } else if (inherits(data, "POSIXct")) {
+    # POSIXct is regarded as double by typeof
+    "POSIXct"
+  } else if (inherits(data, "POSIXlt")) {
+    # POSIXct is regarded as list by typeof
+    "POSIXlt"
+  } else {
+    typeof(data)
+  }
+}
+
+# add confidence interval
+add_confint <- function(data, conf_int){
+  # add confidence interval if conf_int is not null and there are .fitted and .se.fit
+  if (!is.null(conf_int) & ".se.fit" %in% colnames(data) & ".fitted" %in% colnames(data)) {
+    if (conf_int < 0 | conf_int > 1){
+      stop("conf_int must be between 0 and 1")
+    }
+    conf_low_colname <- avoid_conflict(colnames(data), "conf_low")
+    conf_high_colname <- avoid_conflict(colnames(data), "conf_high")
+    lower <- (1-conf_int)/2
+    higher <- 1-lower
+    data[[conf_low_colname]] <- get_confint(data[[".fitted"]], data[[".se.fit"]], conf_int = lower)
+    data[[conf_high_colname]] <- get_confint(data[[".fitted"]], data[[".se.fit"]], conf_int = higher)
+
+    # move confidece interval columns next to standard error
+    data <- move_col(data, conf_low_colname, which(colnames(data) == ".se.fit") + 1)
+    data <- move_col(data, conf_high_colname, which(colnames(data) == conf_low_colname) + 1)
+  }
+  data
+}
+
+#' validate data type of newdata for prediction
+#' @param types Named vector. Values are data types and names are column names
+#' @param data new data to predict
+validate_data <- function(types, data){
+  if(!is.null(types)){
+    message <- vapply(names(types), function(name){
+      original_type <- types[[name]]
+      if(is.null(data[[name]])){
+        # can't find a column
+        paste0(" ", name, " is NULL in new data")
+      } else {
+        data_type <- get_data_type(data[[name]])
+        if((data_type != original_type) &&
+           # difference of factor and character is acceptable
+           !(all(c(data_type, original_type) %in% c("character", "factor"))) &&
+           # difference of integer and double is acceptable
+           !(all(c(data_type, original_type) %in% c("double", "integer")))){
+          # data type is different
+          paste0(name, ": ", original_type, " - ", data_type)
+        } else {
+          NA_character_
+        }
+      }
+    }, FUN.VALUE = "")
+
+    if(any(!is.na(message))){
+      stop(paste0("Data type mismatch detected for ", paste0(message[!is.na(message)], collapse = ", ")))
+    }
+  }
+  TRUE
+}
+
+# This is used in model building functions
+# to create meta data.
+# It contains terms to create model and
+# column types of the variables.
+# Its's used for column type validation.
+# return value looks like following example.
+# list(
+#   types = c(col1 = "numeric", col2 = "character"),
+#   terms = res ~ col1 + col2
+# )
+create_model_meta <- function(df, formula){
+  ret <- list()
+  tryCatch({
+    md_frame <- model.frame(formula, data = df)
+    ret$terms <- terms(md_frame, formula)
+    pred_cnames <- all.vars(ret$terms)[-1]
+    types <- vapply(pred_cnames, function(cname) {
+      get_data_type(df[[cname]])
+    }, FUN.VALUE = "")
+    names(types) <- pred_cnames
+    ret$types <- types
+  }, error = function(e){
+    NULL
+  })
   ret
 }

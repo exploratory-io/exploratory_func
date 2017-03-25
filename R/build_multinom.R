@@ -28,7 +28,7 @@ build_multinom <- function(data, formula, ...){
 #' @param data Trained data
 #' @param newdata Data to predict
 #' @export
-augment.multinom <- function(model, data = NULL, newdata = NULL) {
+augment.multinom <- function(model, data = NULL, newdata = NULL, ...) {
 
   predicted_label_col <- avoid_conflict(colnames(data), "predicted_label")
   predicted_prob_col <- avoid_conflict(colnames(data), "predicted_probability")
@@ -66,7 +66,7 @@ augment.multinom <- function(model, data = NULL, newdata = NULL) {
     # use new data and get probabilities
 
     # in case of test data, NA of terms only in right hand side should be removed
-    vars <- labels(model$terms)
+    vars <- all.vars(model$terms)[-1]
     newdata <- tidyr::drop_na_(newdata, vars)
 
     prob_mat <-  stats::predict(model, newdata, type = "prob")

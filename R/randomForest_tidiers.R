@@ -64,7 +64,7 @@ randomForestReg <- function(data, formula, na.action = na.omit, ...) {
 #' * terms_mapping attribute is added to model
 #'   for keeping mapping of original column names and cleaned-up column names.
 #' @export
-randomForestBinary <- function(data, formula, ...) {
+randomForestBinary <- function(data, formula, na.action = na.omit, ...) {
   target_col <- all.vars(formula)[[1]]
   original_val <- data[[target_col]]
   original_colnames <- colnames(data)
@@ -99,7 +99,7 @@ randomForestBinary <- function(data, formula, ...) {
   }
 
   ret <- tryCatch({
-    randomForest::randomForest(formula = formula, data = data, ...)
+    randomForest::randomForest(formula = formula, data = data, na.action = na.omit, ...)
   }, error = function(e){
     if (e$message == "NA/NaN/Inf in foreign function call (arg 1)"){
       stop("Categorical and numerical predictors can't be used at the same time.")
@@ -125,7 +125,7 @@ randomForestBinary <- function(data, formula, ...) {
 #' * terms_mapping attribute is added to model
 #'   for keeping mapping of original column names and cleaned-up column names.
 #' @export
-randomForestMulti <- function(data, formula, ...) {
+randomForestMulti <- function(data, formula, na.action = na.omit, ...) {
   target_col <- all.vars(formula)[[1]]
   original_val <- data[[target_col]]
   original_colnames <- colnames(data)
@@ -155,7 +155,7 @@ randomForestMulti <- function(data, formula, ...) {
   }
 
   ret <- tryCatch({
-    randomForest::randomForest(formula = formula, data = data, ...)
+    randomForest::randomForest(formula = formula, data = data, na.action = na.omit, ...)
   }, error = function(e){
     if (e$message == "NA/NaN/Inf in foreign function call (arg 1)"){
       stop("Categorical and numerical predictors can't be used at the same time.")

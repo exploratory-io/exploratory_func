@@ -35,6 +35,11 @@ fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_ra
     }
     ret$terms <- term
     ret$x_names <- colnames(md_mat)
+    pred_cnames <- all.vars(term)[-1]
+    # this is how categorical columns are casted to columns in matrix
+    # this is needed in augment, so that matrix with the same levels
+    # can be created
+    ret$xlevels <- .getXlevels(term, md_frame)
     ret
   }
 }
@@ -351,11 +356,22 @@ augment.xgboost_reg <- function(x, data = NULL, newdata = NULL, ...) {
       data
     }
 
-    mat_data <- model.matrix(x$terms, data = ret_data)
+    y_name <- all.vars(x$terms)[[1]]
+    if(is.null(ret_data[[y_name]])){
+      # if there is no column in the formula (even if it's response variable),
+      # model.matrix function causes an error
+      # so create the column with 0
+      ret_data[[y_name]] <- rep(0, nrow(ret_data))
+    }
+
+    mat_data <- model.matrix(x$terms, data = ret_data, xlev = x$xlevels)
 
     predicted <- stats::predict(x, mat_data)
     predicted_value_col <- avoid_conflict(colnames(ret_data), "predicted_value")
-    ret_data[[predicted_value_col]] <- predicted
+    # model.matrix removes rows with NA and stats::predict returns a matrix
+    # whose number of rows is the same with its size,
+    # so the result should be filled by NA
+    ret_data[[predicted_value_col]] <- fill_vec_NA(as.integer(rownames(mat_data)), predicted, nrow(ret_data))
     ret_data
   } else {
     augment(x, data = data, newdata = newdata)
@@ -376,6 +392,7 @@ augment.xgb.Booster <- function(x, data = NULL, newdata = NULL, ...) {
   if(!is.null(newdata)){
     data <- newdata
   }
+
   mat_data <- if(!is.null(x$x_names)) {
     data[x$x_names]
   } else {

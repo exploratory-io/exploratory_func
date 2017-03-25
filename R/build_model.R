@@ -33,7 +33,7 @@ build_model_ <- function(data, model_func, seed = 0, test_rate = 0, group_cols =
 
   # change column names to avoid name conflict when tidy or glance are executed
   reserved_names <- c(
-    "model", ".test_index", "data",
+    "model", ".test_index", "data", ".model_metadata",
     reserved_colnames
   )
 
@@ -100,6 +100,17 @@ build_model_ <- function(data, model_func, seed = 0, test_rate = 0, group_cols =
         eval_arg[["data"]] <- lazyeval::as.lazy(quote(data))
         .call <- lazyeval::make_call(quote(model_func), eval_arg)
         lazyeval::lazy_eval(.call, data = environment())
+      })) %>%
+      # .model_metadata is a list column to store data
+      # to preserve information about the model which is
+      # used later.
+      # For example, column type validation of new data before prediction.
+      dplyr::mutate(.model_metadata = purrr::map2(source.data, model, function(df, model){
+        if(!is.null(formula)){
+          create_model_meta(df, formula$expr)
+        } else {
+          list()
+        }
       }))
     class(ret[[source_col]]) <- c("list", ".source.data")
     ret <- dplyr::rowwise(ret)

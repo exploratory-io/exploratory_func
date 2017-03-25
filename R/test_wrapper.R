@@ -112,11 +112,11 @@ do_chisq.test <- function(df, ...,
                           B = 2000){
   select_dots <- lazyeval::lazy_dots(...)
   cols <- evaluate_select(df, select_dots, excluded = grouped_by(df))
-  p_col <- col_name(substitute(p))
-  if(!is.null(p_col) && p_col %in% colnames(df)){
-    # in this case, p is column name, so converted to character
-    p <- p_col
-  }
+  # p should be able to be NSE column name or numeric vector
+  # , so evaluated lazily
+  lazy_p <- lazyeval::lazy(p)
+  p <- lazyeval::lazy_eval(lazy_p, data = df)
+
   do_chisq.test_(df,
                  selected_cols = cols,
                  correct = correct,
@@ -149,9 +149,6 @@ do_chisq.test_ <- function(df,
     if (is.null(p)){
       # default of p from chisq.test
       p <- rep(1/length(x), length(x))
-    } else if (is.character(p)){
-      # p is column name in this case, so the values are used as p
-      p <- df[[p]]
     }
     chisq.test(x = x,
                correct = correct,

@@ -82,12 +82,21 @@ augment_kmeans <- function(df, model, data){
 #' @param model_df Data frame that has model
 #' @param ... Additional argument to be passed to broom::augment
 #' @export
-add_prediction <- function(df, model_df, ...){
+add_prediction <- function(df, model_df, conf_int = 0.95, ...){
   # parsing arguments of add_prediction and getting optional arguemnt for augment in ...
   cll <- match.call()
   aug_args <- expand_args(cll, exclude = c("df", "model_df"))
 
-  get_result_with_response <- function(model_df, df, aug_args){
+  # validate data frame based on meta info
+  model_meta <- model_df[[".model_metadata"]]
+  if(!is.null(model_meta)){
+    types <- model_meta[[1]]$types
+    if(!is.null(types)){
+      validate_data(types, df)
+    }
+  }
+
+  get_result <- function(model_df, df, aug_args, with_respose){
     # Use formula to support expanded aug_args (especially for type.predict for logistic regression)
     # because ... can't be passed to a function inside mutate directly.
     aug_fml <- if(aug_args == ""){
@@ -95,15 +104,29 @@ add_prediction <- function(df, model_df, ...){
     } else {
       as.formula(paste0("~list(broom::augment(model, newdata = df, ", aug_args, "))"))
     }
-    model_df %>%
+    ret <- model_df %>%
       # result of aug_fml will be stored in .text_index column
       # .test_index is used because model_df has it and won't be used here
       dplyr::mutate_(.dots = list(.test_index = aug_fml)) %>%
-      dplyr::ungroup() %>%
-      dplyr::mutate(.test_index = purrr::map2(.test_index, model, function(d, m){
-        # add predicted_response to the result data frame
-        add_response(d, m, "predicted_response")
-      })) %>%
+      dplyr::ungroup()
+
+    ret <- if(with_respose) {
+      ret %>%
+        dplyr::mutate(.test_index = purrr::map2(.test_index, model, function(d, m){
+          # add predicted_response to the result data frame
+          add_response(d, m, "predicted_response")
+        }))
+    } else {
+      ret
+    }
+
+    # add .group to overwrapped column names
+    duped <- colnames(ret) %in% colnames(df)
+    if(any(duped)){
+      colnames(ret)[duped] <- avoid_conflict(colnames(df), colnames(ret)[duped], ".group")
+    }
+
+    ret <- ret %>%
       tidyr::unnest(.test_index)
   }
 
@@ -113,12 +136,7 @@ add_prediction <- function(df, model_df, ...){
   with_response <- !("type.predict" %in% names(cll)) & !is.null(model_df[["model"]][[1]]$family) & !is.null(model_df[["model"]][[1]]$family$linkinv)
 
   ret <- tryCatch({
-    if(with_response){
-      # this function is defined beforehand to avoid code duplication
-      get_result_with_response(model_df, df, aug_args)
-    } else {
-      broom::augment(model_df, model, newdata = df, ...)
-    }
+    get_result(model_df, df, aug_args, with_response)
   }, error = function(e){
     if (grepl("arguments imply differing number of rows: ", e$message)) {
       # In this case, df has categories that aren't in model.
@@ -142,16 +160,12 @@ add_prediction <- function(df, model_df, ...){
         stop("not enough information to predict in data frame")
       }
 
-      if(with_response){
-        # this function is defined beforehand to avoid code duplication
-        get_result_with_response(model_df, filtered_data, aug_args)
-      } else {
-        broom::augment(model_df, model, newdata = filtered_data, ...)
-      }
+      get_result(model_df, filtered_data, aug_args, with_response)
     } else {
       stop(e$message)
     }
   })
+  ret <- add_confint(ret, conf_int)
   colnames(ret)[colnames(ret) == ".fitted"] <- avoid_conflict(colnames(ret), "predicted_value")
   colnames(ret)[colnames(ret) == ".se.fit"] <- avoid_conflict(colnames(ret), "standard_error")
 
@@ -242,136 +256,147 @@ kmeans_info <- function(df){
 
 #' augment using source data and test index
 #' @param df Data frame that has model and .test_index.
-#' @param data "training" or "test". Which source data should be used.
+#' @param data "training" or "test" or "newdata". Which source data should be used.
 #' @param ... Additional argument to be passed to broom::augment
 #' @export
-prediction <- function(df, data = "training", conf_int = 0.95, ...){
-
-  if (!data %in% c("test", "training")) {
-    stop('data argument must be "test" or "training"')
-  }
-
-  if (!all(c("source.data", ".test_index", "model") %in% colnames(df))) {
-    stop('input is not model data frame"')
-  }
-
-  test <- data == "test"
+prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95, ...){
 
   df_cnames <- colnames(df)
 
   # columns other than "source.data", ".test_index" and "model" should be regarded as grouping columns
   # this should be kept after running prediction
-  grouping_cols <- df_cnames[!df_cnames %in% c("source.data", ".test_index", "model")]
+  grouping_cols <- df_cnames[!df_cnames %in% c("source.data", ".test_index", "model", ".model_metadata")]
 
-  # parsing arguments of prediction and getting optional arguemnt for augment in ...
-  cll <- match.call()
-  aug_args <- expand_args(cll, exclude = c("df", "test", "data"))
 
-  # if type.predict argument is not indicated in this function
-  # and models have $family$linkinv (basically, glm models have it),
-  # both fitted link value column and response value column should appear in the result
+  if (!data %in% c("test", "training", "newdata")) {
+    stop('data argument must be "test", "training" or "newdata"')
+  }
 
-  with_response <- !("type.predict" %in% names(cll)) && "family" %in% names(df[["model"]][[1]]) && !is.null(df[["model"]][[1]]$family$linkinv)
+  if (!all(c("source.data", ".test_index", "model") %in% colnames(df))) {
+    stop('input is not model data frame')
+  }
 
-  ret <- if(test){
-    # augment by test data
-
-    # check if there is test data
-    test_sizes <- vapply(df[[".test_index"]], function(test){
-      length(test)
-    }, FUN.VALUE = 0)
-
-    if(all(test_sizes==0)){
-      stop("no test data found")
+  ret <- if(data == "newdata") {
+    if(is.null(data_frame)) {
+      stop("Please indicate data_frame")
     }
-
-    # Use formula to support expanded aug_args (especially for type.predict for logistic regression)
-    # because ... can't be passed to a function inside mutate directly.
-    # If test is TRUE, this uses newdata as an argument and if not, uses data as an argument.
-    aug_fml <- if(aug_args == ""){
-      as.formula("~list(broom::augment(model, newdata = source.data))")
-    } else {
-      as.formula(paste0("~list(broom::augment(model, newdata = source.data, ", aug_args, "))"))
-    }
-    data_to_augment <- df %>%
-      dplyr::ungroup() %>%
-      dplyr::mutate(source.data = purrr::map2(source.data, .test_index, function(df, index){
-        # keep data only in test_index
-        safe_slice(df, index)
-      })) %>%
-      dplyr::select(-.test_index)
-
-    augmented <- tryCatch({
-      data_to_augment %>%
-        dplyr::rowwise() %>%
-        # evaluate the formula of augment and "source.data" column will have it
-        dplyr::mutate_(.dots = list(source.data = aug_fml))
-    }, error = function(e){
-      if (grepl("arguments imply differing number of rows: ", e$message)) {
-        data_to_augment %>%
-          dplyr::mutate(source.data = purrr::map2(source.data, model, function(df, model){
-            # remove rows that have categories that aren't in training data
-            # otherwise, broom::augment causes an error
-            filtered_data <- df
-            for (cname in colnames(model$model)) {
-              filtered_data <- filtered_data[filtered_data[[cname]] %in% model$model[[cname]], ]
-            }
-
-            if(nrow(filtered_data) == 0){
-              stop("no data found that can be predicted by the model")
-            }
-
-            filtered_data
-          })) %>%
-          dplyr::rowwise() %>%
-          # evaluate the formula of augment and "data" column will have it
-          dplyr::mutate_(.dots = list(source.data = aug_fml))
-      } else {
-        stop(e$message)
-      }
-    })
-
-    if (with_response){
-      augmented <- augmented %>%
-        dplyr::ungroup() %>%
-        dplyr::mutate(source.data = purrr::map2(source.data, model, add_response))
-    }
-
-    ret <- augmented %>%
-      dplyr::select(-model) %>%
-      tidyr::unnest(source.data)
-
+    add_prediction(data_frame, df, conf_int = conf_int, ...)
   } else {
-    # augment by trainig data
+    test <- data == "test"
+    # parsing arguments of prediction and getting optional arguemnt for augment in ...
+    cll <- match.call()
+    aug_args <- expand_args(cll, exclude = c("df", "data", "data_frame", "conf_int"))
 
-    # Use formula to support expanded aug_args (especially for type.predict for logistic regression)
-    # because ... can't be passed to a function inside mutate directly.
-    # If test is FALSE, this uses data as an argument and if not, uses newdata as an argument.
-    aug_fml <- if(aug_args == ""){
-      as.formula("~list(broom::augment(model, data = source.data))")
-    } else {
-      as.formula(paste0("~list(broom::augment(model, data = source.data, ", aug_args, "))"))
-    }
-    augmented <- df %>%
-      dplyr::ungroup() %>%
-      dplyr::mutate(source.data = purrr::map2(source.data, .test_index, function(df, index){
-        # remove data in test_index
-        safe_slice(df, index, remove = TRUE)
-      })) %>%
-      dplyr::select(-.test_index) %>%
-      dplyr::rowwise() %>%
-      # evaluate the formula of augment and "data" column will have it
-      dplyr::mutate_(.dots = list(source.data = aug_fml))
+    # if type.predict argument is not indicated in this function
+    # and models have $family$linkinv (basically, glm models have it),
+    # both fitted link value column and response value column should appear in the result
 
-    if (with_response){
-      augmented <- augmented %>%
+    with_response <- !("type.predict" %in% names(cll)) && "family" %in% names(df[["model"]][[1]]) && !is.null(df[["model"]][[1]]$family$linkinv)
+
+    ret <- if(test){
+      # augment by test data
+
+      # check if there is test data
+      test_sizes <- vapply(df[[".test_index"]], function(test){
+        length(test)
+      }, FUN.VALUE = 0)
+
+      if(all(test_sizes==0)){
+        stop("no test data found")
+      }
+
+      # Use formula to support expanded aug_args (especially for type.predict for logistic regression)
+      # because ... can't be passed to a function inside mutate directly.
+      # If test is TRUE, this uses newdata as an argument and if not, uses data as an argument.
+      aug_fml <- if(aug_args == ""){
+        as.formula("~list(broom::augment(model, newdata = source.data))")
+      } else {
+        as.formula(paste0("~list(broom::augment(model, newdata = source.data, ", aug_args, "))"))
+      }
+      data_to_augment <- df %>%
         dplyr::ungroup() %>%
-        dplyr::mutate(source.data = purrr::map2(source.data, model, add_response))
-    }
+        dplyr::mutate(source.data = purrr::map2(source.data, .test_index, function(df, index){
+          # keep data only in test_index
+          safe_slice(df, index)
+        })) %>%
+        dplyr::select(-.test_index)
 
-    augmented %>%
-      dplyr::select(-model) %>%
-      tidyr::unnest(source.data)
+      if(".model_metadata" %in% colnames(data_to_augment)){
+        data_to_augment <- data_to_augment %>% dplyr::select(-`.model_metadata`)
+      }
+
+      augmented <- tryCatch({
+        data_to_augment %>%
+          dplyr::rowwise() %>%
+          # evaluate the formula of augment and "source.data" column will have it
+          dplyr::mutate_(.dots = list(source.data = aug_fml))
+      }, error = function(e){
+        if (grepl("arguments imply differing number of rows: ", e$message)) {
+          data_to_augment %>%
+            dplyr::mutate(source.data = purrr::map2(source.data, model, function(df, model){
+              # remove rows that have categories that aren't in training data
+              # otherwise, broom::augment causes an error
+              filtered_data <- df
+              for (cname in colnames(model$model)) {
+                filtered_data <- filtered_data[filtered_data[[cname]] %in% model$model[[cname]], ]
+              }
+
+              if(nrow(filtered_data) == 0){
+                stop("no data found that can be predicted by the model")
+              }
+
+              filtered_data
+            })) %>%
+            dplyr::rowwise() %>%
+            # evaluate the formula of augment and "data" column will have it
+            dplyr::mutate_(.dots = list(source.data = aug_fml))
+        } else {
+          stop(e$message)
+        }
+      })
+
+      if (with_response){
+        augmented <- augmented %>%
+          dplyr::ungroup() %>%
+          dplyr::mutate(source.data = purrr::map2(source.data, model, add_response))
+      }
+
+      ret <- augmented %>%
+        dplyr::select(-model) %>%
+        tidyr::unnest(source.data)
+
+    } else {
+      # augment by training data
+
+      # Use formula to support expanded aug_args (especially for type.predict for logistic regression)
+      # because ... can't be passed to a function inside mutate directly.
+      # If test is FALSE, this uses data as an argument and if not, uses newdata as an argument.
+      aug_fml <- if(aug_args == ""){
+        as.formula("~list(broom::augment(model, data = source.data))")
+      } else {
+        as.formula(paste0("~list(broom::augment(model, data = source.data, ", aug_args, "))"))
+      }
+      augmented <- df %>%
+        dplyr::ungroup() %>%
+        dplyr::mutate(source.data = purrr::map2(source.data, .test_index, function(df, index){
+          # remove data in test_index
+          safe_slice(df, index, remove = TRUE)
+        })) %>%
+        dplyr::select(-.test_index) %>%
+        dplyr::rowwise() %>%
+        # evaluate the formula of augment and "data" column will have it
+        dplyr::mutate_(.dots = list(source.data = aug_fml))
+
+      if (with_response){
+        augmented <- augmented %>%
+          dplyr::ungroup() %>%
+          dplyr::mutate(source.data = purrr::map2(source.data, model, add_response))
+      }
+
+      augmented %>%
+        dplyr::select(-model) %>%
+        tidyr::unnest(source.data)
+    }
   }
 
   # add confidence interval if conf_int is not null and there are .fitted and .se.fit
@@ -408,7 +433,6 @@ prediction <- function(df, data = "training", conf_int = 0.95, ...){
 #' @export
 prediction_binary <- function(df, threshold = 0.5, ...){
   ret <- prediction(df, ...)
-
   first_model <- df[["model"]][[1]]
 
   # converting conf_low and conf_high from regression values
@@ -474,6 +498,16 @@ prediction_binary <- function(df, threshold = 0.5, ...){
     # create a factor vector with the same levels as actual_val
     # predicted is logical, so should +1 to make it index
     factor(levels(actual_val)[as.numeric(predicted) + 1], levels(actual_val))
+  } else if (is.character(actual_val)) {
+    # modify actual_val to factor with levels used in training data
+    if(!is.null(first_model$model) && !is.null(first_model$model[[actual_col]])){
+      lev <- first_model$model[[actual_col]] %>% levels()
+      factor(lev[as.numeric(predicted) + 1], lev)
+    } else {
+      NULL
+    }
+  } else {
+    NULL
   }
 
   ret[["predicted_label"]] <- label
@@ -694,7 +728,7 @@ model_stats <- function(df, pretty.name = FALSE, ...){
   # get group columns.
   # we assume that columns of model df other than the ones with reserved name are all group columns.
   model_df_colnames = colnames(df)
-  group_by_names <- model_df_colnames[!model_df_colnames %in% c("source.data", ".test_index", "model")]
+  group_by_names <- model_df_colnames[!model_df_colnames %in% c("source.data", ".test_index", "model", ".model_metadata")]
 
   # when pre-grouped, each row of glance result is actually a group.
   # but when not pre-grouped, the only-one row is not a group.
