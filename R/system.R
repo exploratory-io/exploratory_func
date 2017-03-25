@@ -494,22 +494,27 @@ queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, q
   if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
 
   loadNamespace("RODBC")
-  connstr <- stringr::str_c("RODBC::odbcConnect(dsn = '",dsn, "',uid = '", username, "', pwd = '", password, "'")
-  if(additionalParams == ""){
-    connstr <- stringr::str_c(connstr, ")")
-  } else {
-    connstr <- stringr::str_c(connstr, ",", additionalParams, ")")
+
+  connect <- function() {
+    connstr <- stringr::str_c("RODBC::odbcConnect(dsn = '",dsn, "',uid = '", username, "', pwd = '", password, "'")
+    if(additionalParams == ""){
+      connstr <- stringr::str_c(connstr, ")")
+    } else {
+      connstr <- stringr::str_c(connstr, ",", additionalParams, ")")
+    }
+    conn <- eval(parse(text=connstr))
+
+    # For some reason, calling RODBC::sqlTables() works around Actual Oracle Driver for Mac issue
+    # that it always returns 0 rows.
+    # Since we want this to be done without sacrificing performance,
+    # we are adding dummy catalog/schema condition to make it return nothing.
+    # Since it does not have performance impact, we are just calling it
+    # unconditionally rather than first checking which ODBC driver is used for the connection.
+    RODBC::sqlTables(conn, catalog = "dummy", schema = "dummy")
+    conn
   }
-  conn <- eval(parse(text=connstr))
 
-  # For some reason, calling RODBC::sqlTables() works around Actual Oracle Driver for Mac issue
-  # that it always returns 0 rows.
-  # Since we want this to be done without sacrificing performance,
-  # we are adding dummy catalog/schema condition to make it return nothing.
-  # Since it does not have performance impact, we are just calling it
-  # unconditionally rather than first checking which ODBC driver is used for the connection.
-  RODBC::sqlTables(conn, catalog = "dummy", schema = "dummy")
-
+  conn <- connect()
   df <- RODBC::sqlQuery(conn, GetoptLong::qq(query), max = numOfRows)
   RODBC::odbcClose(conn)
   df
