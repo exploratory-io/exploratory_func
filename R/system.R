@@ -503,6 +503,12 @@ queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, q
       connstr <- stringr::str_c(connstr, ",", additionalParams, ")")
     }
     conn <- eval(parse(text=connstr))
+    if (conn == -1) {
+      # capture warning and throw error with the message.
+      # odbcConnect() returns -1 and does not stop execution even if connection fails.
+      # TODO capture.output() might cause error on windows with multibyte chars.
+      stop(paste("ODBC connection failed.", capture.output(warnings())))
+    }
 
     # For some reason, calling RODBC::sqlTables() works around Actual Oracle Driver for Mac issue
     # that it always returns 0 rows.
