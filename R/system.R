@@ -1,3 +1,6 @@
+# hashmap in which we keep active connections to databases etc.
+connection_pool <- new.env()
+
 #' Set cache path for oauth token cachefile
 setOAuthTokenCacheOptions <- function(path){
   options(tam.oauth_token_cache = path)
