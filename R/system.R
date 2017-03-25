@@ -514,10 +514,12 @@ queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, q
     conn
   }
 
-  getConnection <- function() {
+  # get connection, from pool if possible by default.
+  # if renew is TRUE, connect again and set the connection in the pool.
+  getConnection <- function(renew =FALSE) {
     key <- paste("odbc", dsn, username, additionalParams, sep = ":")
     conn <- connection_pool[[key]]
-    if (is.null(conn)) {
+    if (is.null(conn) || renew) {
       conn <- connect()
       connection_pool[[key]] <- conn
     }
