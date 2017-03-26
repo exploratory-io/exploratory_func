@@ -523,13 +523,16 @@ queryMySQL <- function(host, port, databaseName, username, password, numOfRows =
   # read stored password
   pass = saveOrReadPassword("mysql", username, password)
 
-  drv <- DBI::dbDriver("MySQL")
-  conn = RMySQL::dbConnect(drv, dbname = databaseName, username = username,
-                   password = pass, host = host, port = port)
-  resultSet <- RMySQL::dbSendQuery(conn, GetoptLong::qq(query))
-  df <- RMySQL::dbFetch(resultSet, n = numOfRows)
+  conn <- exploratory::getDBConnection("mysql", host, port, databaseName, username, pass)
+  tryCatch({
+    resultSet <- RMySQL::dbSendQuery(conn, GetoptLong::qq(query))
+    df <- RMySQL::dbFetch(resultSet, n = numOfRows)
+  }, error = function(err) {
+    # clear connection in pool so that new connection will be used for the next try
+    clearDBConnection("mysql", host, port, databaseName, username)
+    stop(err)
+  })
   RMySQL::dbClearResult(resultSet)
-  RMySQL::dbDisconnect(conn)
   df
 }
 
