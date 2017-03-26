@@ -457,8 +457,14 @@ getListOfTables <- function(type, host, port, databaseName = NULL, username, pas
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
     clearDBConnection(type, host, port, databaseName, username, catalog = catalog, schema = schema)
+    if (!type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora")) { # only if conn pool is not used yet
+      DBI::dbDisconnect(conn)
+    }
     stop(err)
   })
+  if (!type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora")) { # only if conn pool is not used yet
+    DBI::dbDisconnect(conn)
+  }
   tables
 }
 
@@ -471,8 +477,14 @@ getListOfColumns <- function(type, host, port, databaseName, username, password,
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
     clearDBConnection(type, host, port, databaseName, username)
+    if (!type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora")) { # only if conn pool is not used yet
+      DBI::dbDisconnect(conn)
+    }
     stop(err)
   })
+  if (!type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora")) { # only if conn pool is not used yet
+    DBI::dbDisconnect(conn)
+  }
   columns
 }
 
@@ -487,9 +499,15 @@ executeGenericQuery <- function(type, host, port, databaseName, username, passwo
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
     clearDBConnection(type, host, port, databaseName, username, catalog = catalog, schema = schema)
+    if (!type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora")) { # only if conn pool is not used yet
+      DBI::dbDisconnect(conn)
+    }
     stop(err)
   })
   DBI::dbClearResult(resultSet)
+  if (!type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora")) { # only if conn pool is not used yet
+    DBI::dbDisconnect(conn)
+  }
   df
 }
 
