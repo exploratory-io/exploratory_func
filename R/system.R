@@ -355,11 +355,18 @@ getDBConnection <- function(type, host, port, databaseName, username, password, 
 
   drv = NULL
   conn = NULL
-  if(type == "mysql" || type == "aurora"){
-    drv <- DBI::dbDriver("MySQL")
-    conn = RMySQL::dbConnect(drv, dbname = databaseName, username = username,
-                             password = password, host = host, port = port)
-  } else if (type == "postgres" || type == "redshift" || type == "vertica"){
+  if(type == "mysql" || type == "aurora") {
+    # use same key "mysql" for aurora too, since it uses
+    # queryMySQL() too, which uses the key "mysql"
+    key <- paste("mysql", host, port, databaseName, username, sep = ":")
+    conn <- connection_pool[[key]]
+    if (is.null(conn)) {
+      drv <- DBI::dbDriver("MySQL")
+      conn = RMySQL::dbConnect(drv, dbname = databaseName, username = username,
+                               password = password, host = host, port = port)
+      connection_pool[[key]] <- conn
+    }
+  } else if (type == "postgres" || type == "redshift" || type == "vertica") {
     # use same key "postgres" for redshift and vertica too, since they use
     # queryPostgres() too, which uses the key "postgres"
     key <- paste("postgres", host, port, databaseName, username, sep = ":")
