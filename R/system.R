@@ -521,13 +521,6 @@ queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, q
   if(!requireNamespace("RODBC")){stop("package RODBC must be installed.")}
   if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
 
-  loadNamespace("RODBC")
-
-  clearConnection <- function() {
-    key <- paste("odbc", dsn, username, additionalParams, sep = ":")
-    rm(list = key, envir = connection_pool)
-  }
-
   conn <- getDBConnection("odbc", NULL, NULL, NULL, username, password, dsn = dsn, additionalParams = additionalParams)
   tryCatch({
     df <- RODBC::sqlQuery(conn, GetoptLong::qq(query), max = numOfRows)
@@ -536,8 +529,10 @@ queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, q
       # in such cases, df is a character vecter rather than a data.frame.
       stop(paste(df, collapse = "\n"))
     }
-  }, error = function(err){
-    clearConnection() # clear connection in pool so that new connection will be used for the next try
+  }, error = function(err) {
+    # for some cases like conn not being an open connection, sqlQuery still throws error. handle it here.
+    # clear connection in pool so that new connection will be used for the next try
+    clearDBConnection("odbc", NULL, NULL, NULL, username, dsn = dsn, additionalParams = additionalParams)
     stop(err)
   })
   df
