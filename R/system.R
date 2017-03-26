@@ -419,7 +419,11 @@ getDBConnection <- function(type, host, port, databaseName, username, password, 
 
 #' @export
 clearDBConnection <- function(type, host, port, databaseName, username, catalog = "", schema = "", dsn="", additionalParams = ""){
-  if (type == "odbc") { #TODO: implement for other types too
+  if (type %in% c("odbc", "postgres", "redshift", "vertica") { #TODO: implement for other types too
+    if (type %in% c("postgres", "redshift", "vertica")) {
+      # they use common key "postgres"
+      type <- "postgres"
+    }
     key <- paste(type, dsn, username, additionalParams, sep = ":")
     rm(list = key, envir = connection_pool)
   }
