@@ -360,13 +360,18 @@ getDBConnection <- function(type, host, port, databaseName, username, password, 
     conn = RMySQL::dbConnect(drv, dbname = databaseName, username = username,
                              password = password, host = host, port = port)
   } else if (type == "postgres" || type == "redshift" || type == "vertica"){
-    drv <- DBI::dbDriver("PostgreSQL")
-    pg_dsn = paste0(
-      'dbname=', databaseName, ' ',
-      'sslmode=prefer'
-    )
-    conn = RPostgreSQL::dbConnect(drv, dbname=pg_dsn, user = username,
-                                  password = password, host = host, port = port)
+    key <- paste(type, host, port, databaseName, username, sep = ":")
+    conn <- connection_pool[[key]]
+    if (is.null(conn)) {
+      drv <- DBI::dbDriver("PostgreSQL")
+      pg_dsn = paste0(
+        'dbname=', databaseName, ' ',
+        'sslmode=prefer'
+      )
+      conn <- RPostgreSQL::dbConnect(drv, dbname=pg_dsn, user = username,
+                                     password = password, host = host, port = port)
+      connection_pool[[key]] <- conn
+    }
   } else if (type == "presto") {
     loadNamespace("RPresto")
     drv <- RPresto::Presto()
@@ -429,7 +434,6 @@ getListOfTables <- function(type, host, port, databaseName = NULL, username, pas
     conn <- exploratory::getDBConnection(type, host, port, databaseName, username, password)
   }
   tables <- DBI::dbListTables(conn)
-  DBI::dbDisconnect(conn)
   tables
 }
 
@@ -438,7 +442,6 @@ getListOfColumns <- function(type, host, port, databaseName, username, password,
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
   conn <- exploratory::getDBConnection(type, host, port, databaseName, username, password)
   columns <- DBI::dbListFields(conn, table)
-  DBI::dbDisconnect(conn)
   columns
 }
 
@@ -450,7 +453,6 @@ executeGenericQuery <- function(type, host, port, databaseName, username, passwo
   resultSet <- DBI::dbSendQuery(conn, query)
   df <- DBI::dbFetch(resultSet)
   DBI::dbClearResult(resultSet)
-  DBI::dbDisconnect(conn)
   df
 }
 
@@ -512,7 +514,6 @@ queryPostgres <- function(host, port, databaseName, username, password, numOfRow
   resultSet <- RPostgreSQL::dbSendQuery(conn, GetoptLong::qq(query))
   df <- DBI::dbFetch(resultSet, n = numOfRows)
   RPostgreSQL::dbClearResult(resultSet)
-  RPostgreSQL::dbDisconnect(conn)
   df
 }
 
