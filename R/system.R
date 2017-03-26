@@ -568,6 +568,11 @@ queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, q
   conn <- getConnection()
   tryCatch({
     df <- RODBC::sqlQuery(conn, GetoptLong::qq(query), max = numOfRows)
+    if (!is.data.frame(df)) {
+      # when it is error, RODBC::sqlQuery() does not stop() (throw) with error most of the cases.
+      # in such cases, df is a character vecter rather than a data.frame.
+      stop(paste(df, collapse = "\n"))
+    }
   }, error = function(err){
     clearConnection() # clear connection in pool so that new connection will be used for the next try
     stop(err)
