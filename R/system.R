@@ -439,7 +439,13 @@ getListOfTables <- function(type, host, port, databaseName = NULL, username, pas
   } else {
     conn <- exploratory::getDBConnection(type, host, port, databaseName, username, password)
   }
-  tables <- DBI::dbListTables(conn)
+  tryCatch({
+    tables <- DBI::dbListTables(conn)
+  }, error = function(err) {
+    # clear connection in pool so that new connection will be used for the next try
+    clearDBConnection(type, host, port, databaseName, username, catalog = catalog, schema = schema)
+    stop(err)
+  })
   tables
 }
 
@@ -447,7 +453,13 @@ getListOfTables <- function(type, host, port, databaseName = NULL, username, pas
 getListOfColumns <- function(type, host, port, databaseName, username, password, table){
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
   conn <- exploratory::getDBConnection(type, host, port, databaseName, username, password)
-  columns <- DBI::dbListFields(conn, table)
+  tryCatch({
+    columns <- DBI::dbListFields(conn, table)
+  }, error = function(err) {
+    # clear connection in pool so that new connection will be used for the next try
+    clearDBConnection(type, host, port, databaseName, username)
+    stop(err)
+  })
   columns
 }
 
@@ -456,8 +468,14 @@ getListOfColumns <- function(type, host, port, databaseName, username, password,
 executeGenericQuery <- function(type, host, port, databaseName, username, password, query, catalog = "", schema = ""){
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
   conn <- exploratory::getDBConnection(type, host, port, databaseName, username, password, catalog = catalog, schema = schema)
-  resultSet <- DBI::dbSendQuery(conn, query)
-  df <- DBI::dbFetch(resultSet)
+  tryCatch({
+    resultSet <- DBI::dbSendQuery(conn, query)
+    df <- DBI::dbFetch(resultSet)
+  }, error = function(err) {
+    # clear connection in pool so that new connection will be used for the next try
+    clearDBConnection(type, host, port, databaseName, username, catalog = catalog, schema = schema)
+    stop(err)
+  })
   DBI::dbClearResult(resultSet)
   df
 }
