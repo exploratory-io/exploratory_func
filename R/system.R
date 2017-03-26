@@ -450,7 +450,7 @@ getListOfTables <- function(type, host, port, databaseName = NULL, username, pas
     drv <- RPresto::Presto()
     conn <- RPresto::dbConnect(drv, schema = schema, catalog = catalog, user = username, host = host, port = port)
   } else {
-    conn <- exploratory::getDBConnection(type, host, port, databaseName, username, password)
+    conn <- getDBConnection(type, host, port, databaseName, username, password)
   }
   tryCatch({
     tables <- DBI::dbListTables(conn)
@@ -471,7 +471,7 @@ getListOfTables <- function(type, host, port, databaseName = NULL, username, pas
 #' @export
 getListOfColumns <- function(type, host, port, databaseName, username, password, table){
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
-  conn <- exploratory::getDBConnection(type, host, port, databaseName, username, password)
+  conn <- getDBConnection(type, host, port, databaseName, username, password)
   tryCatch({
     columns <- DBI::dbListFields(conn, table)
   }, error = function(err) {
@@ -492,7 +492,7 @@ getListOfColumns <- function(type, host, port, databaseName, username, password,
 #' @export
 executeGenericQuery <- function(type, host, port, databaseName, username, password, query, catalog = "", schema = ""){
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
-  conn <- exploratory::getDBConnection(type, host, port, databaseName, username, password, catalog = catalog, schema = schema)
+  conn <- getDBConnection(type, host, port, databaseName, username, password, catalog = catalog, schema = schema)
   tryCatch({
     resultSet <- DBI::dbSendQuery(conn, query)
     df <- DBI::dbFetch(resultSet)
@@ -541,7 +541,7 @@ queryMySQL <- function(host, port, databaseName, username, password, numOfRows =
   # read stored password
   pass = saveOrReadPassword("mysql", username, password)
 
-  conn <- exploratory::getDBConnection("mysql", host, port, databaseName, username, pass)
+  conn <- getDBConnection("mysql", host, port, databaseName, username, pass)
   tryCatch({
     resultSet <- RMySQL::dbSendQuery(conn, GetoptLong::qq(query))
     df <- RMySQL::dbFetch(resultSet, n = numOfRows)
@@ -562,7 +562,7 @@ queryPostgres <- function(host, port, databaseName, username, password, numOfRow
 
   # read stored password
   pass = saveOrReadPassword("postgres", username, password)
-  conn <- exploratory::getDBConnection("postgres", host, port, databaseName, username, pass)
+  conn <- getDBConnection("postgres", host, port, databaseName, username, pass)
 
   tryCatch({
     resultSet <- RPostgreSQL::dbSendQuery(conn, GetoptLong::qq(query))
