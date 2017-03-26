@@ -508,8 +508,14 @@ queryPostgres <- function(host, port, databaseName, username, password, numOfRow
   pass = saveOrReadPassword("postgres", username, password)
   conn <- exploratory::getDBConnection("postgres", host, port, databaseName, username, pass)
 
-  resultSet <- RPostgreSQL::dbSendQuery(conn, GetoptLong::qq(query))
-  df <- DBI::dbFetch(resultSet, n = numOfRows)
+  tryCatch({
+    resultSet <- RPostgreSQL::dbSendQuery(conn, GetoptLong::qq(query))
+    df <- DBI::dbFetch(resultSet, n = numOfRows)
+  }, error = function(err) {
+    # clear connection in pool so that new connection will be used for the next try
+    clearDBConnection("postgres", host, port, databaseName, username)
+    stop(err)
+  })
   RPostgreSQL::dbClearResult(resultSet)
   df
 }
@@ -525,6 +531,7 @@ queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, q
     if (!is.data.frame(df)) {
       # when it is error, RODBC::sqlQuery() does not stop() (throw) with error most of the cases.
       # in such cases, df is a character vecter rather than a data.frame.
+      clearDBConnection("odbc", NULL, NULL, NULL, username, dsn = dsn, additionalParams = additionalParams)
       stop(paste(df, collapse = "\n"))
     }
   }, error = function(err) {
