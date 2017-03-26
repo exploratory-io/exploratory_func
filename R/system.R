@@ -360,7 +360,9 @@ getDBConnection <- function(type, host, port, databaseName, username, password, 
     conn = RMySQL::dbConnect(drv, dbname = databaseName, username = username,
                              password = password, host = host, port = port)
   } else if (type == "postgres" || type == "redshift" || type == "vertica"){
-    key <- paste(type, host, port, databaseName, username, sep = ":")
+    # use same key "postgres" for redshift and vertica too, since they use
+    # queryPostgres() too, which uses the key "postgres"
+    key <- paste("postgres", host, port, databaseName, username, sep = ":")
     conn <- connection_pool[[key]]
     if (is.null(conn)) {
       drv <- DBI::dbDriver("PostgreSQL")
