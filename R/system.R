@@ -523,49 +523,12 @@ queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, q
 
   loadNamespace("RODBC")
 
-  connect <- function() {
-    connstr <- stringr::str_c("RODBC::odbcConnect(dsn = '",dsn, "',uid = '", username, "', pwd = '", password, "'")
-    if(additionalParams == ""){
-      connstr <- stringr::str_c(connstr, ")")
-    } else {
-      connstr <- stringr::str_c(connstr, ",", additionalParams, ")")
-    }
-    conn <- eval(parse(text=connstr))
-    if (conn == -1) {
-      # capture warning and throw error with the message.
-      # odbcConnect() returns -1 and does not stop execution even if connection fails.
-      # TODO capture.output() might cause error on windows with multibyte chars.
-      stop(paste("ODBC connection failed.", capture.output(warnings())))
-    }
-
-    # For some reason, calling RODBC::sqlTables() works around Actual Oracle Driver for Mac issue
-    # that it always returns 0 rows.
-    # Since we want this to be done without sacrificing performance,
-    # we are adding dummy catalog/schema condition to make it return nothing.
-    # Since it does not have performance impact, we are just calling it
-    # unconditionally rather than first checking which ODBC driver is used for the connection.
-    RODBC::sqlTables(conn, catalog = "dummy", schema = "dummy")
-    conn
-  }
-
-  # get connection, from pool if possible by default.
-  # if renew is TRUE, connect again and set the connection in the pool.
-  getConnection <- function(renew =FALSE) {
-    key <- paste("odbc", dsn, username, additionalParams, sep = ":")
-    conn <- connection_pool[[key]]
-    if (is.null(conn) || renew) {
-      conn <- connect()
-      connection_pool[[key]] <- conn
-    }
-    conn
-  }
-
   clearConnection <- function() {
     key <- paste("odbc", dsn, username, additionalParams, sep = ":")
     rm(list = key, envir = connection_pool)
   }
 
-  conn <- getConnection()
+  conn <- getDBConnection("odbc", NULL, NULL, NULL, username, password, dsn = dsn, additionalParams = additionalParams)
   tryCatch({
     df <- RODBC::sqlQuery(conn, GetoptLong::qq(query), max = numOfRows)
     if (!is.data.frame(df)) {
