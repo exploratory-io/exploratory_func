@@ -8,7 +8,7 @@
 #' @param tokenFileName name of the RDS file tht stores the OAuth token
 #' @param tokenFileId for backward compatiblity only.
 #' @export
-getOAuthToken <- function(clientId, secret, appName, endpointType, scopeList, tokenFileName, tokenFileId = "", useCache = TRUE){
+getOAuthToken <- function(clientId, secret, appName, endpointType, scopeList, tokenFileName, tokenFileId = "", useCache = TRUE, version="2.0"){
   loadNamespace("httr")
   loadNamespace("stringr")
 
@@ -39,8 +39,12 @@ getOAuthToken <- function(clientId, secret, appName, endpointType, scopeList, to
       # set cacheOption as FALSE so that it forces to creaet a new token
       cacheOption = FALSE
     }
-    token <- httr::oauth2.0_token(httr::oauth_endpoints(endpointType), myapp,
-                                  scope = scopeList, cache = FALSE)
+    if(version == "2.0"){
+      token <- httr::oauth2.0_token(httr::oauth_endpoints(endpointType), myapp,
+                                    scope = scopeList, cache = FALSE)
+    } else if (version == "1.0") {
+      token <- httr::oauth1.0_token(httr::oauth_endpoints(endpointType), myapp, cache = FALSE)
+    }
     # Save the token object for future sessions
     saveRDS(token, file=globalTokenPath)
   }
@@ -99,5 +103,25 @@ getGoogleTokenForSheet <- function(tokenFileId="", useCache=TRUE){
 #' @export
 refreshGoogleTokenForSheet <- function(tokenFileId){
   getGoogleTokenForSheet(tokenFileId, FALSE)
+}
+
+#' tokenFileId is a unique value per data farme and is used to create a token cache file
+#' @export
+getTwitterToken <- function(tokenFileId="", useCache=TRUE){
+  if(!requireNamespace("twitteR")){stop("package twitteR must be installed.")}
+  consumer_key = "0lWpnop0HLfWRbpkDEJ0XA"
+  consumer_secret = "xYNUMALkRnvuT3vls48LW7k2XK1l9xjZTLnRv2JaFaM"
+  appName = "twitter"
+  endpointType = "twitter"
+  tokenFileName ="twitter_token.rds"
+  # Get OAuth credentials (For twitter use OAuth1.0)
+  twitter_token <- getOAuthToken(consumer_key, consumer_secret, appName, endpointType, "", tokenFileName, tokenFileId, useCache, version = "1.0")
+  twitter_token
+}
+
+#' API to refresh token
+#' @export
+refreshTwitterToken <- function(tokenFileId){
+  getTwitterToken(tokenFileId, FALSE)
 }
 

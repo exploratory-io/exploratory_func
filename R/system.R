@@ -522,40 +522,6 @@ queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, q
   df
 }
 
-#' tokenFileId is a unique value per data farme and is used to create a token cache file
-#' @export
-getTwitterToken <- function(tokenFileId, useCache=TRUE){
-  if(!requireNamespace("twitteR")){stop("package twitteR must be installed.")}
-  loadNamespace("httr")
-  loadNamespace("stringr")
-
-  consumer_key = "0lWpnop0HLfWRbpkDEJ0XA"
-  consumer_secret = "xYNUMALkRnvuT3vls48LW7k2XK1l9xjZTLnRv2JaFaM"
-
-  cacheOption = getOption("tam.oauth_token_cache")
-  # tam.oauth_token_cache is RDS file path (~/.exploratory/projects/<projectid>/rdata/placeholder.rds)
-  # for each data frame, create token cache as
-  # ~/.exploratory/projects/<projectid>/rdata/<tokenFileId_per_dataframe>_ga_token.rds
-  tokenPath = stringr::str_replace(cacheOption, "placeholder.rds", stringr::str_c(tokenFileId, "_twitter_token.rds"))
-
-  twitter_token <- NULL
-  if(useCache == TRUE && file.exists(tokenPath)){
-    twitter_token <- readRDS(tokenPath)
-  } else {
-    myapp <- httr::oauth_app("twitter", key = consumer_key, secret = consumer_secret)
-    # Get OAuth credentials (For twitter use OAuth1.0)
-    twitter_token <- httr::oauth1.0_token(httr::oauth_endpoints("twitter"), myapp, cache = FALSE)
-    # Save the token object for future sessions
-    saveRDS(twitter_token, file=tokenPath)
-  }
-  twitter_token
-}
-
-#' API to refresh token
-#' @export
-refreshTwitterToken <- function(tokenFileId){
-  getTwitterToken(tokenFileId, FALSE)
-}
 
 #' Access twitter serch api
 #' @param n - Maximum number of tweets.
