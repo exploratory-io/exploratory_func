@@ -149,44 +149,8 @@ getGoogleAnalytics <- function(tableId, lastNDays, dimensions, metrics, tokenFil
 }
 
 
-#' tokenFileId is a unique value per data farme and is used to create a token cache file
 #' @export
-getGoogleTokenForSheet <- function(tokenFileId, useCache=TRUE){
-  loadNamespace("httr")
-  loadNamespace("stringr")
-  # As per Kan, this can be hard coded since Google limits acces per ViewID (tableID) and
-  # not by clientID
-  clientId <- "1066595427418-aeppbdhi7bj7g0osn8jpj4p6r9vus7ci.apps.googleusercontent.com"
-  secret <-  "wGVbD4fttv_shYreB3PXcjDY"
-  cacheOption = getOption("tam.oauth_token_cache")
-  # tam.oauth_token_cache is path ~/.exploratory/projects/<projectid>/rdata/placeholder.rds is the rds file templatettr cache
-  # for each data set, create token cache as
-  # ~/.exploratory/projects/<projectid>/rdata/<tokenFileId_per_dataframe>_gs_token.rds
-  tokenPath = stringr::str_replace(cacheOption, "placeholder.rds", stringr::str_c(tokenFileId, "_gs_token.rds"))
-  # use oauth_app and oauth2.0_token
-  token <- NULL
-  if(useCache == TRUE && file.exists(tokenPath)){
-    token <- readRDS(tokenPath)
-  } else {
-    myapp <- httr::oauth_app("google", clientId, secret)
-    # scope is same as gs_auth does
-    scope_list <- c("https://spreadsheets.google.com/feeds","https://www.googleapis.com/auth/drive")
-    token <- httr::oauth2.0_token(httr::oauth_endpoints("google"), myapp,
-                            scope = scope_list, cache = FALSE)
-    # Save the token object for future sessions
-    saveRDS(token, file=tokenPath)
-  }
-  token
-}
-
-#' API to refresh token
-#' @export
-refreshGoogleTokenForSheet <- function(tokenFileId){
-  getGoogleTokenForSheet(tokenFileId, FALSE)
-}
-
-#' @export
-getGoogleSheet <- function(title, sheetNumber, skipNRows, treatTheseAsNA, firstRowAsHeader, commentChar, tokenFileId){
+getGoogleSheet <- function(title, sheetNumber, skipNRows, treatTheseAsNA, firstRowAsHeader, commentChar, tokenFileId=""){
   if(!requireNamespace("googlesheets")){stop("package googlesheets must be installed.")}
   token <- getGoogleTokenForSheet(tokenFileId)
   googlesheets::gs_auth(token)
@@ -197,7 +161,7 @@ getGoogleSheet <- function(title, sheetNumber, skipNRows, treatTheseAsNA, firstR
 
 #' API to get a list of available google sheets
 #' @export
-getGoogleSheetList <- function(tokenFileId){
+getGoogleSheetList <- function(tokenFileId=""){
   if(!requireNamespace("googlesheets")){stop("package googlesheets must be installed.")}
   token = getGoogleTokenForSheet(tokenFileId)
   googlesheets::gs_auth(token)
@@ -206,7 +170,7 @@ getGoogleSheetList <- function(tokenFileId){
 
 #' API to get a list of available google sheets
 #' @export
-getGoogleSheetWorkSheetList <- function(tokenFileId, title){
+getGoogleSheetWorkSheetList <- function(tokenFileId="", title){
   if(!requireNamespace("googlesheets")){stop("package googlesheets must be installed.")}
   token = getGoogleTokenForSheet(tokenFileId)
   googlesheets::gs_auth(token)

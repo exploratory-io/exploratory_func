@@ -9,6 +9,8 @@
 #' @param tokenFileId for backward compatiblity only.
 #' @export
 getOAuthToken <- function(clientId, secret, appName, endpointType, scopeList, tokenFileName, tokenFileId = "", useCache = TRUE){
+  loadNamespace("httr")
+  loadNamespace("stringr")
 
   # get a token RDS location for Global
   globalCacheOption = getOption("tam.global_oauth_token_cache")
@@ -26,9 +28,10 @@ getOAuthToken <- function(clientId, secret, appName, endpointType, scopeList, to
   # switch to use oauth_app and oauth2.0_token
   token <- NULL
   # first check global token
+  browser()
   if(useCache == TRUE && file.exists(globalTokenPath)){
     token <- readRDS(globalTokenPath)
-  } else if(useCache == TRUE && file.exists(tokenPath)){ # then fallback to local for backward compatibility
+  } else if(useCache == TRUE && length(tokenPath) > 0 && file.exists(tokenPath)){ # then fallback to local for backward compatibility
     token <- readRDS(tokenPath)
   } else { # get a new token.
     myapp <- httr::oauth_app(appName, clientId, secret)
@@ -78,9 +81,7 @@ refreshGoogleTokenForAnalysis <- function(tokenFileId){
 
 #' tokenFileId is a unique value per data farme and is used to create a token cache file
 #' @export
-getGoogleTokenForSheet <- function(tokenFileId, useCache=TRUE){
-  loadNamespace("httr")
-  loadNamespace("stringr")
+getGoogleTokenForSheet <- function(tokenFileId="", useCache=TRUE){
   # As per Kan, this can be hard coded since Google limits acces per ViewID (tableID) and
   # not by clientID
   clientId <- "1066595427418-aeppbdhi7bj7g0osn8jpj4p6r9vus7ci.apps.googleusercontent.com"
@@ -88,7 +89,15 @@ getGoogleTokenForSheet <- function(tokenFileId, useCache=TRUE){
   appName = "google"
   endpointType = "google"
   tokenFileName ="gs_token.rds"
+  scopeList <- c("https://spreadsheets.google.com/feeds","https://www.googleapis.com/auth/drive")
   token = getOAuthToken(clientId, secret, appName, endpointType, scopeList, tokenFileName, tokenFileId, useCache)
-  # use oauth_app and oauth2.0_token
   token
 }
+
+
+#' API to refresh token
+#' @export
+refreshGoogleTokenForSheet <- function(tokenFileId){
+  getGoogleTokenForSheet(tokenFileId, FALSE)
+}
+
