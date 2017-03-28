@@ -28,7 +28,6 @@ getOAuthToken <- function(clientId, secret, appName, endpointType, scopeList, to
   # switch to use oauth_app and oauth2.0_token
   token <- NULL
   # first check global token
-  browser()
   if(useCache == TRUE && file.exists(globalTokenPath)){
     token <- readRDS(globalTokenPath)
   } else if(useCache == TRUE && length(tokenPath) > 0 && file.exists(tokenPath)){ # then fallback to local for backward compatibility
@@ -124,4 +123,28 @@ getTwitterToken <- function(tokenFileId="", useCache=TRUE){
 refreshTwitterToken <- function(tokenFileId){
   getTwitterToken(tokenFileId, FALSE)
 }
+
+#' tokenFileId is a unique value per data farme and is used to create a token cache file
+#' @export
+getGoogleTokenForBigQuery <- function(tokenFileId="", useCache=TRUE){
+  if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
+  clientId <- "1066595427418-aeppbdhi7bj7g0osn8jpj4p6r9vus7ci.apps.googleusercontent.com"
+  secret <-  "wGVbD4fttv_shYreB3PXcjDY"
+  scopeList = c("https://www.googleapis.com/auth/bigquery",
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/devstorage.read_write")
+  appName = "google"
+  endpointType = "google"
+  tokenFileName ="bigquery_token.rds"
+  token <-getOAuthToken(clientId, secret, appName, endpointType, scopeList, tokenFileName, tokenFileId, useCache)
+  token
+}
+
+#' API to refresh token
+#' @export
+refreshGoogleTokenForBigQuery <- function(tokenFileId){
+  getGoogleTokenForBigQuery(tokenFileId, FALSE)
+}
+
+
 

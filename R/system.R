@@ -564,45 +564,7 @@ getTwitter <- function(n=200, lang=NULL,  lastNDays=30, searchString, tokenFileI
   }
 }
 
-#' tokenFileId is a unique value per data farme and is used to create a token cache file
-#' @export
-getGoogleTokenForBigQuery <- function(tokenFileId, useCache=TRUE){
-  if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
-  loadNamespace("stringr")
-  loadNamespace("httr")
-  clientId <- "1066595427418-aeppbdhi7bj7g0osn8jpj4p6r9vus7ci.apps.googleusercontent.com"
-  secret <-  "wGVbD4fttv_shYreB3PXcjDY"
-  cacheOption = getOption("tam.oauth_token_cache")
-  # tam.oauth_token_cache is RDS file path (~/.exploratory/projects/<projectid>/rdata/placeholder.rds)
-  # for each data frame, create token cache as
-  # ~/.exploratory/projects/<projectid>/rdata/<tokenFileId_per_dataframe>_bigquery_token.rds
-  tokenPath = stringr::str_replace(cacheOption, "placeholder.rds", str_c(tokenFileId, "_bigquery_token.rds"))
-  # since Auth from RGoogleAnalytics does not work well
-  # switch to use oauth_app and oauth2.0_token
-  token <- NULL
-  if(useCache == TRUE && file.exists(tokenPath)){
-    token <- readRDS(tokenPath)
-  } else {
-    myapp <- httr::oauth_app("google", clientId, secret)
-    if(useCache == FALSE){
-      # set cacheOption as FALSE so that it forces to creaet a new token
-      cacheOption = FALSE
-    }
-    token <- httr::oauth2.0_token(httr::oauth_endpoints("google"), myapp,
-                                  scope = c("https://www.googleapis.com/auth/bigquery",
-                                            "https://www.googleapis.com/auth/cloud-platform",
-                                            "https://www.googleapis.com/auth/devstorage.read_write"), cache = FALSE)
-    # Save the token object for future sessions
-    saveRDS(token, file=tokenPath)
-  }
-  token
-}
 
-#' API to refresh token
-#' @export
-refreshGoogleTokenForBigQuery <- function(tokenFileId){
-  getGoogleTokenForBigQuery(tokenFileId, FALSE)
-}
 
 #' API to submit a Google Big Query Job
 #' @export
@@ -768,7 +730,7 @@ executeGoogleBigQuery <- function(project, sqlquery, destination_table, page_siz
 
 #' API to get projects for current oauth token
 #' @export
-getGoogleBigQueryProjects <- function(tokenFileId){
+getGoogleBigQueryProjects <- function(tokenFileId=""){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   tryCatch({
     token <- getGoogleTokenForBigQuery(tokenFileId);
@@ -781,7 +743,7 @@ getGoogleBigQueryProjects <- function(tokenFileId){
 
 #' API to get datasets for a project
 #' @export
-getGoogleBigQueryDataSets <- function(project, tokenFileId){
+getGoogleBigQueryDataSets <- function(project, tokenFileId=""){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   tryCatch({
     token <- getGoogleTokenForBigQuery(tokenFileId);
@@ -794,7 +756,7 @@ getGoogleBigQueryDataSets <- function(project, tokenFileId){
 
 #' API to get tables for current project, data set
 #' @export
-getGoogleBigQueryTables <- function(project, dataset, tokenFileId){
+getGoogleBigQueryTables <- function(project, dataset, tokenFileId=""){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   tryCatch({
     token <- getGoogleTokenForBigQuery(tokenFileId);
@@ -808,7 +770,7 @@ getGoogleBigQueryTables <- function(project, dataset, tokenFileId){
 
 #' API to get table info
 #' @export
-getGoogleBigQueryTable <- function(project, dataset, table, tokenFileId){
+getGoogleBigQueryTable <- function(project, dataset, table, tokenFileId=""){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   token <- getGoogleTokenForBigQuery(tokenFileId);
   bigrquery::set_access_cred(token)
@@ -817,7 +779,7 @@ getGoogleBigQueryTable <- function(project, dataset, table, tokenFileId){
 
 #' API to get tables for current project, data set
 #' @export
-deleteGoogleBigQueryTable <- function(project, dataset, table, tokenFileId){
+deleteGoogleBigQueryTable <- function(project, dataset, table, tokenFileId=""){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   token <- getGoogleTokenForBigQuery(tokenFileId);
   bigrquery::set_access_cred(token)
