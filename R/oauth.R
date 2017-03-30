@@ -1,4 +1,4 @@
-#' coxph wrapper with do
+#' API to get OAuth token
 #' @return OAuth token
 #' @param clientId OAuth client ID to get a OAuth token
 #' @param secret OAuth secret to get a OAuth token
