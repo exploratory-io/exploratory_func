@@ -1,5 +1,5 @@
 #' @export
-CopiedToken2.0 <- R6::R6Class("CopiedToken2.0", inherit = httr::Token2.0, list(
+HttrOAuthToken2.0 <- R6::R6Class("HttrOAuthToken2.0", inherit = httr::Token2.0, list(
   initialize = function(
     ...,
     appname,
