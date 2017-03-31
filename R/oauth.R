@@ -133,10 +133,28 @@ getTwitterToken <- function(tokenFileId="", useCache=TRUE){
   consumer_secret = "xYNUMALkRnvuT3vls48LW7k2XK1l9xjZTLnRv2JaFaM"
   appName = "twitter"
   endpointType = "twitter"
-  tokenFileName ="twitter_token.rds"
-  # Get OAuth credentials (For twitter use OAuth1.0)
-  twitter_token <- getOAuthToken(consumer_key, consumer_secret, appName, endpointType, "", tokenFileName, tokenFileId, useCache, version = "1.0")
-  twitter_token
+  # retrieve token info from environment
+  # main purpose is to enable server refresh
+  token_info <- getTokenInfo("twitter")
+  if(!is.null(token_info)){
+    HttrOAuthToken1.0$new(
+      request = "https://api.twitter.com/oauth/request_token",
+      authorize = "https://api.twitter.com/oauth/authenticate",
+      access = "https://api.twitter.com/oauth/access_token",
+      appname = "twitter",
+      key = consumer_key,
+      secret = consumer_secret,
+      oauth_token = token_info$oauth_token,
+      oauth_token_secret = token_info$oauth_token_secret,
+      user_id = token_info$user_id,
+      screen_name = token_info$screen_name,
+      x_auth_expires = token_info$x_auth_expires
+    )
+  } else {
+    tokenFileName ="twitter_token.rds"
+    # Get OAuth credentials (For twitter use OAuth1.0)
+    getOAuthToken(consumer_key, consumer_secret, appName, endpointType, "", tokenFileName, tokenFileId, useCache, version = "1.0")
+  }
 }
 
 #' API to refresh token
