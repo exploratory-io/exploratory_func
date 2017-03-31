@@ -144,11 +144,13 @@ getTwitterToken <- function(tokenFileId="", useCache=TRUE){
       appname = "twitter",
       key = consumer_key,
       secret = consumer_secret,
-      oauth_token = token_info$oauth_token,
-      oauth_token_secret = token_info$oauth_token_secret,
-      user_id = token_info$user_id,
-      screen_name = token_info$screen_name,
-      x_auth_expires = token_info$x_auth_expires
+      credentials = list(
+        oauth_token = token_info$oauth_token,
+        oauth_token_secret = token_info$oauth_token_secret,
+        user_id = token_info$user_id,
+        screen_name = token_info$screen_name,
+        x_auth_expires = token_info$x_auth_expires
+      )
     )
   } else {
     tokenFileName ="twitter_token.rds"
