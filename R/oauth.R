@@ -80,9 +80,9 @@ getGoogleTokenForAnalytics <- function(tokenFileId = "", useCache=TRUE){
       secret = secret,
       credentials = list(
         access_token = token_info$access_token,
-        refresh_token = token_info$token_type,
+        refresh_token = token_info$refresh_token,
         token_type = token_info$token_type,
-        expiry_date = token_info$expiry_data
+        expiry_date = token_info$expiry_date
       )
     )
   }
