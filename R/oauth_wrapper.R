@@ -3,13 +3,21 @@ HttrOAuthToken2.0 <- R6::R6Class("HttrOAuthToken2.0", inherit = httr::Token2.0, 
   initialize = function(
     ...,
     appname,
-    key,
-    secret,
+    key = NULL,
+    secret = NULL,
     credentials = list()
   ){
     self$endpoint <- httr::oauth_endpoint(
       ...
     )
+    # token is created directly from access token,
+    # so these parameters are created by dummy parameters
+    if(is.null(key)){
+      key <- "dummy"
+    }
+    if(is.null(secret)){
+      secret <- "dummy"
+    }
     self$app <- httr::oauth_app(
       appname = appname,
       key = key,
@@ -26,13 +34,21 @@ HttrOAuthToken1.0 <- R6::R6Class("HttrOAuthToken1.0", inherit = httr::Token1.0, 
   initialize = function(
     ...,
     appname,
-    key,
-    secret,
+    key = NULL,
+    secret = NULL,
     credentials = list()
   ){
     self$endpoint <- httr::oauth_endpoint(
       ...
     )
+    # token is created directly from access token,
+    # so these parameters are created by dummy parameters
+    if(is.null(key)){
+      key <- "dummy"
+    }
+    if(is.null(secret)){
+      secret <- "dummy"
+    }
     self$app <- httr::oauth_app(
       appname = appname,
       key = key,

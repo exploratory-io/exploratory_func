@@ -76,8 +76,6 @@ getGoogleTokenForAnalytics <- function(tokenFileId = "", useCache=TRUE){
       validate = "https://www.googleapis.com/oauth2/v1/tokeninfo",
       revoke = "https://accounts.google.com/o/oauth2/revoke",
       appname = appName,
-      key = clientId,
-      secret = secret,
       credentials = list(
         access_token = token_info$access_token,
         refresh_token = token_info$refresh_token,
@@ -122,8 +120,6 @@ getGoogleTokenForSheet <- function(tokenFileId="", useCache=TRUE){
       validate = "https://www.googleapis.com/oauth2/v1/tokeninfo",
       revoke = "https://accounts.google.com/o/oauth2/revoke",
       appname = appName,
-      key = clientId,
-      secret = secret,
       credentials = list(
         access_token = token_info$access_token,
         refresh_token = token_info$refresh_token,
