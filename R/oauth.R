@@ -60,11 +60,32 @@ getGoogleTokenForAnalytics <- function(tokenFileId = "", useCache=TRUE){
   secret <-  "wGVbD4fttv_shYreB3PXcjDY"
   appName = "google"
   endpointType = "google"
-  tokenFileName ="ga_token.rds"
-  scopeList = c("https://www.googleapis.com/auth/analytics.readonly")
-  token = getOAuthToken(clientId, secret, appName, endpointType, scopeList, tokenFileName, tokenFileId, useCache)
-  RGoogleAnalytics::ValidateToken(token)
-  token
+  # retrieve token info from environment
+  # main purpose is to enable server refresh
+  token_info <- getTokenInfo("googleanalytics")
+  if(is.null(token_info)){
+    tokenFileName ="ga_token.rds"
+    scopeList = c("https://www.googleapis.com/auth/analytics.readonly")
+    token = getOAuthToken(clientId, secret, appName, endpointType, scopeList, tokenFileName, tokenFileId, useCache)
+    RGoogleAnalytics::ValidateToken(token)
+    token
+  } else {
+    HttrOAuthToken2.0$new(
+      authorize = "https://accounts.google.com/o/oauth2/auth",
+      access = "https://accounts.google.com/o/oauth2/token",
+      validate = "https://www.googleapis.com/oauth2/v1/tokeninfo",
+      revoke = "https://accounts.google.com/o/oauth2/revoke",
+      appname = appName,
+      key = clientId,
+      secret = secret,
+      credentials = list(
+        access_token = token_info$access_token,
+        refresh_token = token_info$token_type,
+        token_type = token_info$token_type,
+        expiry_date = token_info$expiry_data
+      )
+    )
+  }
 }
 
 

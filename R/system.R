@@ -1,3 +1,20 @@
+# environment to keep variables for users
+user_env <- new.env()
+# environment to keep values to create connection
+user_env$token_info <- new.env()
+
+#' get oauth token info from key
+#' @export
+getTokenInfo <- function(token_key){
+  user_env$token_info[[token_key]]
+}
+
+#' set oauth token info
+#' @export
+setTokenInfo <- function(token_key, value) {
+  user_env$token_info[[token_key]] <- value
+}
+
 # hashmap in which we keep active connections to databases etc.
 connection_pool <- new.env()
 
