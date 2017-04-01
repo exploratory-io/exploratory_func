@@ -2,7 +2,7 @@
 #' @param app_id App ID
 #' @param key API Key
 #' @export
-get_intercom_data <- function(app_id, key, endpoint, pagenate = NULL){
+get_intercom_data <- function(app_id, key, endpoint, paginate = NULL){
   url <- paste0("https://api.intercom.io/", endpoint)
   data_list <- list()
   page <- 1
@@ -17,9 +17,9 @@ get_intercom_data <- function(app_id, key, endpoint, pagenate = NULL){
 
     if(!is.null(from_json[["pages"]]) &&
        !is.null(from_json[["pages"]][["next"]])){
-      # if pagenate is NULL,
-      # pagenate until no result is returned
-      if(is.null(pagenate) || page < pagenate){
+      # if paginate is NULL,
+      # paginate until no result is returned
+      if(is.null(paginate) || page < paginate){
         page <- page + 1
         url <- from_json[["pages"]][["next"]]
         Sys.sleep(0.2)
