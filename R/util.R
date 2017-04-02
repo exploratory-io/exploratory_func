@@ -183,7 +183,6 @@ upper_gather <- function(mat, names=NULL, diag=NULL, cnames = c("Var1", "Var2", 
     }
     # use transpose and lower tri to make output order clean
     tmat <- Matrix::t(mat)
-    lower_tri <- lower.tri(tmat, diag=diag)
     c_names <- colnames(tmat)
     r_names <- rownames(tmat)
     if(is.null(c_names)){
@@ -192,13 +191,22 @@ upper_gather <- function(mat, names=NULL, diag=NULL, cnames = c("Var1", "Var2", 
     if(is.null(r_names)){
       r_names <- seq(nrow(tmat))
     }
+    # get indice of non-zero values
+    ind <- Matrix::which(tmat != 0, arr.ind = TRUE)
+
+    # remove duplicated pairs
+    # by comparing indice
+    filtered <- if(diag) {
+      ind[ind[,2] <= ind[,1], ]
+    } else {
+      ind[ind[,2] < ind[,1], ]
+    }
 
     # this creates pairs of row and column indices
-    ind <- which( lower_tri , arr.ind = TRUE )
     # make a vector of upper half of matrix
-    row <- r_names[ind[,1]]
-    col <- c_names[ind[,2]]
-    val <- tmat[lower_tri]
+    row <- r_names[filtered[,1]]
+    col <- c_names[filtered[,2]]
+    val <- tmat[filtered]
     df <- data.frame(
       Var1=col,
       Var2=row,
