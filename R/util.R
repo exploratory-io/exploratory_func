@@ -191,6 +191,7 @@ upper_gather <- function(mat, names=NULL, diag=NULL, cnames = c("Var1", "Var2", 
     if(is.null(r_names)){
       r_names <- seq(nrow(tmat))
     }
+    # get indice of non-zero values
     ind <- Matrix::which(tmat != 0, arr.ind = TRUE)
 
     filtered <- if(diag) {
