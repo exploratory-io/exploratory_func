@@ -7,14 +7,14 @@ get_stripe_data <- function(
   limit = 100
   paginate = NULL
 
-  token_info <- exploratory::getTokenInfo("stripe")
+  token_info <- getTokenInfo("stripe")
   access_token <- if(!is.null(token_info) && !is.null(token_info$access_token)){
     token_info$access_token
   } else {
     stop("No access token is set.")
   }
 
-  token <- exploratory::HttrOAuthToken2.0$new(
+  token <- HttrOAuthToken2.0$new(
     authorize = "https://connect.stripe.com/oauth/authorize",
     access = "https://connect.stripe.com/oauth/token",
     revoke = "https://connect.stripe.com/oauth/deauthorize",
@@ -91,7 +91,7 @@ get_stripe_data <- function(
       &&
       is.integer(ret[[column]])
     ){
-      ret[[column]] <- exploratory::unixtime_to_datetime(ret[[column]])
+      ret[[column]] <- unixtime_to_datetime(ret[[column]])
     }
   }
 

@@ -39,7 +39,7 @@ get_intercom_data <- function(app_id, key, endpoint, paginate = NULL){
       &&
       is.integer(ret[[column]])
     ){
-      ret[[column]] <- exploratory::unixtime_to_datetime(ret[[column]])
+      ret[[column]] <- unixtime_to_datetime(ret[[column]])
     }
   }
 
