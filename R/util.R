@@ -194,6 +194,8 @@ upper_gather <- function(mat, names=NULL, diag=NULL, cnames = c("Var1", "Var2", 
     # get indice of non-zero values
     ind <- Matrix::which(tmat != 0, arr.ind = TRUE)
 
+    # remove duplicated pairs
+    # by comparing indice
     filtered <- if(diag) {
       ind[ind[,2] <= ind[,1], ]
     } else {
