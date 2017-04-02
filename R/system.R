@@ -1,3 +1,23 @@
+# environment to keep variables for users
+user_env <- new.env()
+# environment to keep values to create connection
+user_env$token_info <- new.env()
+
+#' get oauth token info from key
+#' @export
+getTokenInfo <- function(token_key){
+  user_env$token_info[[token_key]]
+}
+
+#' set oauth token info
+#' @export
+setTokenInfo <- function(token_key, value) {
+  user_env$token_info[[token_key]] <- value
+}
+
+# hashmap in which we keep active connections to databases etc.
+connection_pool <- new.env()
+
 #' Set cache path for oauth token cachefile
 setOAuthTokenCacheOptions <- function(path){
   options(tam.oauth_token_cache = path)
@@ -101,50 +121,9 @@ getGithubIssues <- function(username, password, owner, repository){
   issues <- dplyr::bind_rows(pages)
 }
 
-#' tokenFileId is a unique value per data farme and is used to create a token cache file
-#' @export
-getGoogleTokenForAnalytics <- function(tokenFileId, useCache=TRUE){
-  if(!requireNamespace("RGoogleAnalytics")){stop("package RGoogleAnalytics must be installed")}
-  loadNamespace("httr")
-  loadNamespace("stringr")
-  # As per Kan, this can be hard coded since Google limits acces per ViewID (tableID) and
-  # not by clientID
-  clientId <- "1066595427418-aeppbdhi7bj7g0osn8jpj4p6r9vus7ci.apps.googleusercontent.com"
-  secret <-  "wGVbD4fttv_shYreB3PXcjDY"
-  cacheOption = getOption("tam.oauth_token_cache")
-  # tam.oauth_token_cache is RDS file path (~/.exploratory/projects/<projectid>/rdata/placeholder.rds)
-  # for each data frame, create token cache as
-  # ~/.exploratory/projects/<projectid>/rdata/<tokenFileId_per_dataframe>_ga_token.rds
-  tokenPath = stringr::str_replace(cacheOption, "placeholder.rds", stringr::str_c(tokenFileId, "_ga_token.rds"))
-  # since Auth from RGoogleAnalytics does not work well
-  # switch to use oauth_app and oauth2.0_token
-  token <- NULL
-  if(useCache == TRUE && file.exists(tokenPath)){
-    token <- readRDS(tokenPath)
-  } else {
-    myapp <- httr::oauth_app("google", clientId, secret)
-    if(useCache == FALSE){
-      # set cacheOption as FALSE so that it forces to creaet a new token
-      cacheOption = FALSE
-    }
-    token <- httr::oauth2.0_token(httr::oauth_endpoints("google"), myapp,
-                            scope = "https://www.googleapis.com/auth/analytics.readonly", cache = FALSE)
-    # Save the token object for future sessions
-    saveRDS(token, file=tokenPath)
-  }
-  RGoogleAnalytics::ValidateToken(token)
-  token
-}
-
-#' API to refresh token
-#' @export
-refreshGoogleTokenForAnalysis <- function(tokenFileId){
-  getGoogleTokenForAnalytics(tokenFileId, FALSE)
-}
-
 #' API to get profile for current oauth token
 #' @export
-getGoogleProfile <- function(tokenFileId){
+getGoogleProfile <- function(tokenFileId = ""){
   if(!requireNamespace("RGoogleAnalytics")){stop("package RGoogleAnalytics must be installed.")}
   try({
     token <- getGoogleTokenForAnalytics(tokenFileId);
@@ -187,44 +166,8 @@ getGoogleAnalytics <- function(tableId, lastNDays, dimensions, metrics, tokenFil
 }
 
 
-#' tokenFileId is a unique value per data farme and is used to create a token cache file
 #' @export
-getGoogleTokenForSheet <- function(tokenFileId, useCache=TRUE){
-  loadNamespace("httr")
-  loadNamespace("stringr")
-  # As per Kan, this can be hard coded since Google limits acces per ViewID (tableID) and
-  # not by clientID
-  clientId <- "1066595427418-aeppbdhi7bj7g0osn8jpj4p6r9vus7ci.apps.googleusercontent.com"
-  secret <-  "wGVbD4fttv_shYreB3PXcjDY"
-  cacheOption = getOption("tam.oauth_token_cache")
-  # tam.oauth_token_cache is path ~/.exploratory/projects/<projectid>/rdata/placeholder.rds is the rds file templatettr cache
-  # for each data set, create token cache as
-  # ~/.exploratory/projects/<projectid>/rdata/<tokenFileId_per_dataframe>_gs_token.rds
-  tokenPath = stringr::str_replace(cacheOption, "placeholder.rds", stringr::str_c(tokenFileId, "_gs_token.rds"))
-  # use oauth_app and oauth2.0_token
-  token <- NULL
-  if(useCache == TRUE && file.exists(tokenPath)){
-    token <- readRDS(tokenPath)
-  } else {
-    myapp <- httr::oauth_app("google", clientId, secret)
-    # scope is same as gs_auth does
-    scope_list <- c("https://spreadsheets.google.com/feeds","https://www.googleapis.com/auth/drive")
-    token <- httr::oauth2.0_token(httr::oauth_endpoints("google"), myapp,
-                            scope = scope_list, cache = FALSE)
-    # Save the token object for future sessions
-    saveRDS(token, file=tokenPath)
-  }
-  token
-}
-
-#' API to refresh token
-#' @export
-refreshGoogleTokenForSheet <- function(tokenFileId){
-  getGoogleTokenForSheet(tokenFileId, FALSE)
-}
-
-#' @export
-getGoogleSheet <- function(title, sheetNumber, skipNRows, treatTheseAsNA, firstRowAsHeader, commentChar, tokenFileId){
+getGoogleSheet <- function(title, sheetNumber, skipNRows, treatTheseAsNA, firstRowAsHeader, commentChar, tokenFileId=""){
   if(!requireNamespace("googlesheets")){stop("package googlesheets must be installed.")}
   token <- getGoogleTokenForSheet(tokenFileId)
   googlesheets::gs_auth(token)
@@ -235,7 +178,7 @@ getGoogleSheet <- function(title, sheetNumber, skipNRows, treatTheseAsNA, firstR
 
 #' API to get a list of available google sheets
 #' @export
-getGoogleSheetList <- function(tokenFileId){
+getGoogleSheetList <- function(tokenFileId=""){
   if(!requireNamespace("googlesheets")){stop("package googlesheets must be installed.")}
   token = getGoogleTokenForSheet(tokenFileId)
   googlesheets::gs_auth(token)
@@ -244,7 +187,7 @@ getGoogleSheetList <- function(tokenFileId){
 
 #' API to get a list of available google sheets
 #' @export
-getGoogleSheetWorkSheetList <- function(tokenFileId, title){
+getGoogleSheetWorkSheetList <- function(tokenFileId="", title){
   if(!requireNamespace("googlesheets")){stop("package googlesheets must be installed.")}
   token = getGoogleTokenForSheet(tokenFileId)
   googlesheets::gs_auth(token)
@@ -352,39 +295,91 @@ getDBConnection <- function(type, host, port, databaseName, username, password, 
 
   drv = NULL
   conn = NULL
-  if(type == "mysql" || type == "aurora"){
-    drv <- DBI::dbDriver("MySQL")
-    conn = RMySQL::dbConnect(drv, dbname = databaseName, username = username,
-                             password = password, host = host, port = port)
-  } else if (type == "postgres" || type == "redshift" || type == "vertica"){
-    drv <- DBI::dbDriver("PostgreSQL")
-    pg_dsn = paste0(
-      'dbname=', databaseName, ' ',
-      'sslmode=prefer'
-    )
-    conn = RPostgreSQL::dbConnect(drv, dbname=pg_dsn, user = username,
-                                  password = password, host = host, port = port)
+  if(type == "mysql" || type == "aurora") {
+    # use same key "mysql" for aurora too, since it uses
+    # queryMySQL() too, which uses the key "mysql"
+    key <- paste("mysql", host, port, databaseName, username, sep = ":")
+    conn <- connection_pool[[key]]
+    if (is.null(conn)) {
+      drv <- DBI::dbDriver("MySQL")
+      conn = RMySQL::dbConnect(drv, dbname = databaseName, username = username,
+                               password = password, host = host, port = port)
+      connection_pool[[key]] <- conn
+    }
+  } else if (type == "postgres" || type == "redshift" || type == "vertica") {
+    # use same key "postgres" for redshift and vertica too, since they use
+    # queryPostgres() too, which uses the key "postgres"
+    key <- paste("postgres", host, port, databaseName, username, sep = ":")
+    conn <- connection_pool[[key]]
+    if (is.null(conn)) {
+      drv <- DBI::dbDriver("PostgreSQL")
+      pg_dsn = paste0(
+        'dbname=', databaseName, ' ',
+        'sslmode=prefer'
+      )
+      conn <- RPostgreSQL::dbConnect(drv, dbname=pg_dsn, user = username,
+                                     password = password, host = host, port = port)
+      connection_pool[[key]] <- conn
+    }
   } else if (type == "presto") {
     loadNamespace("RPresto")
     drv <- RPresto::Presto()
     conn <- RPresto::dbConnect(drv, user = username, password = password, host = host, port = port, schema = schema, catalog = catalog, session.timezone = Sys.timezone(location = TRUE))
   } else if (type == "odbc") {
+    if(!requireNamespace("RODBC")){stop("package RODBC must be installed.")}
+    if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
+
     loadNamespace("RODBC")
-    connstr <- stringr::str_c("RODBC::odbcConnect(dsn = '", dsn, "'")
-    if(username != ""){
-      connstr <- stringr::str_c(connstr, ", uid = '", username, "'")
+    connect <- function() {
+      connstr <- stringr::str_c("RODBC::odbcConnect(dsn = '",dsn, "',uid = '", username, "', pwd = '", password, "'")
+      if(additionalParams == ""){
+        connstr <- stringr::str_c(connstr, ")")
+      } else {
+        connstr <- stringr::str_c(connstr, ",", additionalParams, ")")
+      }
+      conn <- eval(parse(text=connstr))
+      if (conn == -1) {
+        # capture warning and throw error with the message.
+        # odbcConnect() returns -1 and does not stop execution even if connection fails.
+        # TODO capture.output() might cause error on windows with multibyte chars.
+        stop(paste("ODBC connection failed.", capture.output(warnings())))
+      }
+
+      # For some reason, calling RODBC::sqlTables() works around Actual Oracle Driver for Mac issue
+      # that it always returns 0 rows.
+      # Since we want this to be done without sacrificing performance,
+      # we are adding dummy catalog/schema condition to make it return nothing.
+      # Since it does not have performance impact, we are just calling it
+      # unconditionally rather than first checking which ODBC driver is used for the connection.
+      RODBC::sqlTables(conn, catalog = "dummy", schema = "dummy")
+      conn
     }
-    if(password != ""){
-      connstr <- stringr::str_c(connstr, ", pwd = '", password, "'")
+    key <- paste("odbc", dsn, username, additionalParams, sep = ":")
+    conn <- connection_pool[[key]]
+    if (is.null(conn)) {
+      conn <- connect()
+      connection_pool[[key]] <- conn
     }
-    if(additionalParams == ""){
-      connstr <- stringr::str_c(connstr, ")")
-    } else {
-      connstr <- stringr::str_c(connstr, ",", additionalParams, ")")
-    }
-    conn <- eval(parse(text=connstr))
   }
   conn
+}
+
+#' @export
+clearDBConnection <- function(type, host, port, databaseName, username, catalog = "", schema = "", dsn="", additionalParams = ""){
+  if (type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora")) { #TODO: implement for other types too
+    if (type %in% c("postgres", "redshift", "vertica")) {
+      # they use common key "postgres"
+      key <- paste("postgres", host, port, databaseName, username, sep = ":")
+    }
+    if (type %in% c("mysql", "aurora")) {
+      # they use common key "mysql"
+      key <- paste("mysql", host, port, databaseName, username, sep = ":")
+    }
+    else { # odbc
+      key <- paste("odbc", dsn, username, additionalParams, sep = ":")
+    }
+    rm(list = key, envir = connection_pool)
+  }
 }
 
 #' @export
@@ -395,19 +390,41 @@ getListOfTables <- function(type, host, port, databaseName = NULL, username, pas
     drv <- RPresto::Presto()
     conn <- RPresto::dbConnect(drv, schema = schema, catalog = catalog, user = username, host = host, port = port)
   } else {
-    conn <- exploratory::getDBConnection(type, host, port, databaseName, username, password)
+    conn <- getDBConnection(type, host, port, databaseName, username, password)
   }
-  tables <- DBI::dbListTables(conn)
-  DBI::dbDisconnect(conn)
+  tryCatch({
+    tables <- DBI::dbListTables(conn)
+  }, error = function(err) {
+    # clear connection in pool so that new connection will be used for the next try
+    clearDBConnection(type, host, port, databaseName, username, catalog = catalog, schema = schema)
+    if (!type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora")) { # only if conn pool is not used yet
+      DBI::dbDisconnect(conn)
+    }
+    stop(err)
+  })
+  if (!type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora")) { # only if conn pool is not used yet
+    DBI::dbDisconnect(conn)
+  }
   tables
 }
 
 #' @export
 getListOfColumns <- function(type, host, port, databaseName, username, password, table){
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
-  conn <- exploratory::getDBConnection(type, host, port, databaseName, username, password)
-  columns <- DBI::dbListFields(conn, table)
-  DBI::dbDisconnect(conn)
+  conn <- getDBConnection(type, host, port, databaseName, username, password)
+  tryCatch({
+    columns <- DBI::dbListFields(conn, table)
+  }, error = function(err) {
+    # clear connection in pool so that new connection will be used for the next try
+    clearDBConnection(type, host, port, databaseName, username)
+    if (!type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora")) { # only if conn pool is not used yet
+      DBI::dbDisconnect(conn)
+    }
+    stop(err)
+  })
+  if (!type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora")) { # only if conn pool is not used yet
+    DBI::dbDisconnect(conn)
+  }
   columns
 }
 
@@ -415,11 +432,22 @@ getListOfColumns <- function(type, host, port, databaseName, username, password,
 #' @export
 executeGenericQuery <- function(type, host, port, databaseName, username, password, query, catalog = "", schema = ""){
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
-  conn <- exploratory::getDBConnection(type, host, port, databaseName, username, password, catalog = catalog, schema = schema)
-  resultSet <- DBI::dbSendQuery(conn, query)
-  df <- DBI::dbFetch(resultSet)
+  conn <- getDBConnection(type, host, port, databaseName, username, password, catalog = catalog, schema = schema)
+  tryCatch({
+    resultSet <- DBI::dbSendQuery(conn, query)
+    df <- DBI::dbFetch(resultSet)
+  }, error = function(err) {
+    # clear connection in pool so that new connection will be used for the next try
+    clearDBConnection(type, host, port, databaseName, username, catalog = catalog, schema = schema)
+    if (!type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora")) { # only if conn pool is not used yet
+      DBI::dbDisconnect(conn)
+    }
+    stop(err)
+  })
   DBI::dbClearResult(resultSet)
-  DBI::dbDisconnect(conn)
+  if (!type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora")) { # only if conn pool is not used yet
+    DBI::dbDisconnect(conn)
+  }
   df
 }
 
@@ -453,13 +481,16 @@ queryMySQL <- function(host, port, databaseName, username, password, numOfRows =
   # read stored password
   pass = saveOrReadPassword("mysql", username, password)
 
-  drv <- DBI::dbDriver("MySQL")
-  conn = RMySQL::dbConnect(drv, dbname = databaseName, username = username,
-                   password = pass, host = host, port = port)
-  resultSet <- RMySQL::dbSendQuery(conn, GetoptLong::qq(query))
-  df <- RMySQL::dbFetch(resultSet, n = numOfRows)
+  conn <- getDBConnection("mysql", host, port, databaseName, username, pass)
+  tryCatch({
+    resultSet <- RMySQL::dbSendQuery(conn, GetoptLong::qq(query))
+    df <- RMySQL::dbFetch(resultSet, n = numOfRows)
+  }, error = function(err) {
+    # clear connection in pool so that new connection will be used for the next try
+    clearDBConnection("mysql", host, port, databaseName, username)
+    stop(err)
+  })
   RMySQL::dbClearResult(resultSet)
-  RMySQL::dbDisconnect(conn)
   df
 }
 
@@ -471,17 +502,17 @@ queryPostgres <- function(host, port, databaseName, username, password, numOfRow
 
   # read stored password
   pass = saveOrReadPassword("postgres", username, password)
-  drv <- DBI::dbDriver("PostgreSQL")
-  pg_dsn = paste0(
-    'dbname=', databaseName, ' ',
-    'sslmode=prefer'
-  )
-  conn = RPostgreSQL::dbConnect(drv, dbname=pg_dsn, user = username,
-                   password = pass, host = host, port = port)
-  resultSet <- RPostgreSQL::dbSendQuery(conn, GetoptLong::qq(query))
-  df <- DBI::dbFetch(resultSet, n = numOfRows)
+  conn <- getDBConnection("postgres", host, port, databaseName, username, pass)
+
+  tryCatch({
+    resultSet <- RPostgreSQL::dbSendQuery(conn, GetoptLong::qq(query))
+    df <- DBI::dbFetch(resultSet, n = numOfRows)
+  }, error = function(err) {
+    # clear connection in pool so that new connection will be used for the next try
+    clearDBConnection("postgres", host, port, databaseName, username)
+    stop(err)
+  })
   RPostgreSQL::dbClearResult(resultSet)
-  RPostgreSQL::dbDisconnect(conn)
   df
 }
 
@@ -490,62 +521,24 @@ queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, q
   if(!requireNamespace("RODBC")){stop("package RODBC must be installed.")}
   if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
 
-  loadNamespace("RODBC")
-  connstr <- stringr::str_c("RODBC::odbcConnect(dsn = '",dsn, "',uid = '", username, "', pwd = '", password, "'")
-  if(additionalParams == ""){
-    connstr <- stringr::str_c(connstr, ")")
-  } else {
-    connstr <- stringr::str_c(connstr, ",", additionalParams, ")")
-  }
-  conn <- eval(parse(text=connstr))
-
-  # For some reason, calling RODBC::sqlTables() works around Actual Oracle Driver for Mac issue
-  # that it always returns 0 rows.
-  # Since we want this to be done without sacrificing performance,
-  # we are adding dummy catalog/schema condition to make it return nothing.
-  # Since it does not have performance impact, we are just calling it
-  # unconditionally rather than first checking which ODBC driver is used for the connection.
-  RODBC::sqlTables(conn, catalog = "dummy", schema = "dummy")
-
-  df <- RODBC::sqlQuery(conn, GetoptLong::qq(query), max = numOfRows)
-  RODBC::odbcClose(conn)
+  conn <- getDBConnection("odbc", NULL, NULL, NULL, username, password, dsn = dsn, additionalParams = additionalParams)
+  tryCatch({
+    df <- RODBC::sqlQuery(conn, GetoptLong::qq(query), max = numOfRows)
+    if (!is.data.frame(df)) {
+      # when it is error, RODBC::sqlQuery() does not stop() (throw) with error most of the cases.
+      # in such cases, df is a character vecter rather than a data.frame.
+      clearDBConnection("odbc", NULL, NULL, NULL, username, dsn = dsn, additionalParams = additionalParams)
+      stop(paste(df, collapse = "\n"))
+    }
+  }, error = function(err) {
+    # for some cases like conn not being an open connection, sqlQuery still throws error. handle it here.
+    # clear connection in pool so that new connection will be used for the next try
+    clearDBConnection("odbc", NULL, NULL, NULL, username, dsn = dsn, additionalParams = additionalParams)
+    stop(err)
+  })
   df
 }
 
-#' tokenFileId is a unique value per data farme and is used to create a token cache file
-#' @export
-getTwitterToken <- function(tokenFileId, useCache=TRUE){
-  if(!requireNamespace("twitteR")){stop("package twitteR must be installed.")}
-  loadNamespace("httr")
-  loadNamespace("stringr")
-
-  consumer_key = "0lWpnop0HLfWRbpkDEJ0XA"
-  consumer_secret = "xYNUMALkRnvuT3vls48LW7k2XK1l9xjZTLnRv2JaFaM"
-
-  cacheOption = getOption("tam.oauth_token_cache")
-  # tam.oauth_token_cache is RDS file path (~/.exploratory/projects/<projectid>/rdata/placeholder.rds)
-  # for each data frame, create token cache as
-  # ~/.exploratory/projects/<projectid>/rdata/<tokenFileId_per_dataframe>_ga_token.rds
-  tokenPath = stringr::str_replace(cacheOption, "placeholder.rds", stringr::str_c(tokenFileId, "_twitter_token.rds"))
-
-  twitter_token <- NULL
-  if(useCache == TRUE && file.exists(tokenPath)){
-    twitter_token <- readRDS(tokenPath)
-  } else {
-    myapp <- httr::oauth_app("twitter", key = consumer_key, secret = consumer_secret)
-    # Get OAuth credentials (For twitter use OAuth1.0)
-    twitter_token <- httr::oauth1.0_token(httr::oauth_endpoints("twitter"), myapp, cache = FALSE)
-    # Save the token object for future sessions
-    saveRDS(twitter_token, file=tokenPath)
-  }
-  twitter_token
-}
-
-#' API to refresh token
-#' @export
-refreshTwitterToken <- function(tokenFileId){
-  getTwitterToken(tokenFileId, FALSE)
-}
 
 #' Access twitter serch api
 #' @param n - Maximum number of tweets.
@@ -588,45 +581,7 @@ getTwitter <- function(n=200, lang=NULL,  lastNDays=30, searchString, tokenFileI
   }
 }
 
-#' tokenFileId is a unique value per data farme and is used to create a token cache file
-#' @export
-getGoogleTokenForBigQuery <- function(tokenFileId, useCache=TRUE){
-  if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
-  loadNamespace("stringr")
-  loadNamespace("httr")
-  clientId <- "1066595427418-aeppbdhi7bj7g0osn8jpj4p6r9vus7ci.apps.googleusercontent.com"
-  secret <-  "wGVbD4fttv_shYreB3PXcjDY"
-  cacheOption = getOption("tam.oauth_token_cache")
-  # tam.oauth_token_cache is RDS file path (~/.exploratory/projects/<projectid>/rdata/placeholder.rds)
-  # for each data frame, create token cache as
-  # ~/.exploratory/projects/<projectid>/rdata/<tokenFileId_per_dataframe>_bigquery_token.rds
-  tokenPath = stringr::str_replace(cacheOption, "placeholder.rds", str_c(tokenFileId, "_bigquery_token.rds"))
-  # since Auth from RGoogleAnalytics does not work well
-  # switch to use oauth_app and oauth2.0_token
-  token <- NULL
-  if(useCache == TRUE && file.exists(tokenPath)){
-    token <- readRDS(tokenPath)
-  } else {
-    myapp <- httr::oauth_app("google", clientId, secret)
-    if(useCache == FALSE){
-      # set cacheOption as FALSE so that it forces to creaet a new token
-      cacheOption = FALSE
-    }
-    token <- httr::oauth2.0_token(httr::oauth_endpoints("google"), myapp,
-                                  scope = c("https://www.googleapis.com/auth/bigquery",
-                                            "https://www.googleapis.com/auth/cloud-platform",
-                                            "https://www.googleapis.com/auth/devstorage.read_write"), cache = FALSE)
-    # Save the token object for future sessions
-    saveRDS(token, file=tokenPath)
-  }
-  token
-}
 
-#' API to refresh token
-#' @export
-refreshGoogleTokenForBigQuery <- function(tokenFileId){
-  getGoogleTokenForBigQuery(tokenFileId, FALSE)
-}
 
 #' API to submit a Google Big Query Job
 #' @export
@@ -792,7 +747,7 @@ executeGoogleBigQuery <- function(project, sqlquery, destination_table, page_siz
 
 #' API to get projects for current oauth token
 #' @export
-getGoogleBigQueryProjects <- function(tokenFileId){
+getGoogleBigQueryProjects <- function(tokenFileId=""){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   tryCatch({
     token <- getGoogleTokenForBigQuery(tokenFileId);
@@ -805,7 +760,7 @@ getGoogleBigQueryProjects <- function(tokenFileId){
 
 #' API to get datasets for a project
 #' @export
-getGoogleBigQueryDataSets <- function(project, tokenFileId){
+getGoogleBigQueryDataSets <- function(project, tokenFileId=""){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   tryCatch({
     token <- getGoogleTokenForBigQuery(tokenFileId);
@@ -818,7 +773,7 @@ getGoogleBigQueryDataSets <- function(project, tokenFileId){
 
 #' API to get tables for current project, data set
 #' @export
-getGoogleBigQueryTables <- function(project, dataset, tokenFileId){
+getGoogleBigQueryTables <- function(project, dataset, tokenFileId=""){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   tryCatch({
     token <- getGoogleTokenForBigQuery(tokenFileId);
@@ -832,7 +787,7 @@ getGoogleBigQueryTables <- function(project, dataset, tokenFileId){
 
 #' API to get table info
 #' @export
-getGoogleBigQueryTable <- function(project, dataset, table, tokenFileId){
+getGoogleBigQueryTable <- function(project, dataset, table, tokenFileId=""){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   token <- getGoogleTokenForBigQuery(tokenFileId);
   bigrquery::set_access_cred(token)
@@ -841,7 +796,7 @@ getGoogleBigQueryTable <- function(project, dataset, table, tokenFileId){
 
 #' API to get tables for current project, data set
 #' @export
-deleteGoogleBigQueryTable <- function(project, dataset, table, tokenFileId){
+deleteGoogleBigQueryTable <- function(project, dataset, table, tokenFileId=""){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   token <- getGoogleTokenForBigQuery(tokenFileId);
   bigrquery::set_access_cred(token)
@@ -1216,19 +1171,19 @@ download_data_file <- function(url, type){
     }
     tmp <- tempfile(fileext = stringr::str_c(".", ext))
 
-    # In case of using Rserve on linux, somehow it doesn't create a temporary 
-    # directory specified by tempdir() which is used as a part of temp file 
-    # path generated by tempfile(). So if you try to use that temp file path, 
-    # dump some data into it for example, it will fail because no such path 
+    # In case of using Rserve on linux, somehow it doesn't create a temporary
+    # directory specified by tempdir() which is used as a part of temp file
+    # path generated by tempfile(). So if you try to use that temp file path,
+    # dump some data into it for example, it will fail because no such path
     # found. This function fails with the same reason at download.file below.
     #
-    # It works fine from the R command line on linux, and it works 
-    # fine all the time on Mac and Windows regardless Rserv or not. 
+    # It works fine from the R command line on linux, and it works
+    # fine all the time on Mac and Windows regardless Rserv or not.
     #
-    # The following command is harmless even if you have the directory already. 
+    # The following command is harmless even if you have the directory already.
     # http://stackoverflow.com/questions/4216753/check-existence-of-directory-and-create-if-doesnt-exist
     dir.create(tempdir(), showWarnings = FALSE)
-    
+
     # download file to tempoprary location
     download.file(url, destfile = tmp, mode = "wb")
     # cache file
