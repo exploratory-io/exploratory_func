@@ -112,7 +112,7 @@ getGoogleTokenForSheet <- function(tokenFileId="", useCache=TRUE){
   endpointType = "google"
   # retrieve token info from environment
   # main purpose is to enable server refresh
-  token_info <- getTokenInfo("googlesheets")
+  token_info <- getTokenInfo("googlesheet") # this should be googlesheets but our plunin is already named googlesheet
   if(!is.null(token_info)){
     HttrOAuthToken2.0$new(
       authorize = "https://accounts.google.com/o/oauth2/auth",
