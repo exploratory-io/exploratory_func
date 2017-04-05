@@ -287,15 +287,12 @@ getMongoCollectionNumberOfRows <- function(host, port, database, username, passw
 
 #' @export
 getDBConnection <- function(type, host, port, databaseName, username, password, catalog = "", schema = "", dsn="", additionalParams = ""){
-  if(!requireNamespace("RMySQL")){stop("package RMySQL must be installed.")}
-  if(!requireNamespace("RPostgreSQL")){stop("package RPostgreSQL must be installed.")}
-  if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
-  if(!requireNamespace("RPresto")){stop("package Presto must be installed.")}
-  if(!requireNamespace("RODBC")){stop("package RODBC must be installed.")}
 
   drv = NULL
   conn = NULL
   if(type == "mysql" || type == "aurora") {
+    if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
+    if(!requireNamespace("RMySQL")){stop("package RMySQL must be installed.")}
     # use same key "mysql" for aurora too, since it uses
     # queryMySQL() too, which uses the key "mysql"
     key <- paste("mysql", host, port, databaseName, username, sep = ":")
@@ -307,6 +304,8 @@ getDBConnection <- function(type, host, port, databaseName, username, password, 
       connection_pool[[key]] <- conn
     }
   } else if (type == "postgres" || type == "redshift" || type == "vertica") {
+    if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
+    if(!requireNamespace("RPostgreSQL")){stop("package RPostgreSQL must be installed.")}
     # use same key "postgres" for redshift and vertica too, since they use
     # queryPostgres() too, which uses the key "postgres"
     key <- paste("postgres", host, port, databaseName, username, sep = ":")
@@ -322,10 +321,14 @@ getDBConnection <- function(type, host, port, databaseName, username, password, 
       connection_pool[[key]] <- conn
     }
   } else if (type == "presto") {
+    if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
+    if(!requireNamespace("RPresto")){stop("package Presto must be installed.")}
     loadNamespace("RPresto")
     drv <- RPresto::Presto()
     conn <- RPresto::dbConnect(drv, user = username, password = password, host = host, port = port, schema = schema, catalog = catalog, session.timezone = Sys.timezone(location = TRUE))
   } else if (type == "odbc") {
+    # do those package loading only when we need to use odbc in this if statement,
+    # so that we will not have error at our server environemnt where RODBC is not there.
     if(!requireNamespace("RODBC")){stop("package RODBC must be installed.")}
     if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
 
