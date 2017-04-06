@@ -1272,7 +1272,7 @@ guess_csv_file_encoding <- function(file,  n_max = 1e4, threshold = 0.20){
 #'Wrapper for readr::read_log to support remote file
 #'@export
 read_log_file <- function(file, col_names = FALSE, col_types = NULL,
-                          skip = 0, n_max = -1, progress = interactive()){
+                          skip = 0, n_max = Inf, progress = interactive()){
   loadNamespace("readr")
   loadNamespace("stringr")
   if (stringr::str_detect(file, "^https://") ||
