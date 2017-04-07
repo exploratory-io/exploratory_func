@@ -153,13 +153,25 @@ getGoogleAnalytics <- function(tableId, lastNDays, dimensions, metrics, tokenFil
   if("date" %in% colnames(ga.data)){
     # modify date column to Date object from integer like 20140101
     loadNamespace("lubridate")
-    ga.data <- ga.data %>% mutate( date = lubridate::ymd(date) )
+    ga.data <- ga.data %>% dplyr::mutate( date = lubridate::ymd(date) )
   }
 
   if("dateHour" %in% colnames(ga.data)){
     # modify date column to POSIXct object from integer like 2014010101
     loadNamespace("lubridate")
-    ga.data <- ga.data %>% mutate( dateHour = lubridate::ymd_h(dateHour) )
+    ga.data <- ga.data %>% dplyr::mutate( dateHour = lubridate::ymd_h(dateHour) )
+  }
+
+  if("sessionCount" %in% colnames(ga.data)){
+    # sessionCount is sometimes returned as character and numeric other times.
+    # let's always cast it to numeric
+    ga.data <- ga.data %>% dplyr::mutate( sessionCount = as.numeric(sessionCount) )
+  }
+
+  if("daysSinceLastSession" %in% colnames(ga.data)){
+    # sessionCount is sometimes returned as character and numeric other times.
+    # let's always cast it to numeric
+    ga.data <- ga.data %>% dplyr::mutate( daysSinceLastSession = as.numeric(daysSinceLastSession) )
   }
 
   ga.data
@@ -575,7 +587,7 @@ getTwitter <- function(n=200, lang=NULL,  lastNDays=30, searchString, tokenFileI
     ret <- twitteR::twListToDF(tweetList)
     if(withSentiment){
       # calculate sentiment
-      ret %>% mutate(sentiment = get_sentiment(text))
+      ret %>% dplyr::mutate(sentiment = get_sentiment(text))
     } else {
       ret
     }
