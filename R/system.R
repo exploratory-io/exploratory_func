@@ -162,6 +162,18 @@ getGoogleAnalytics <- function(tableId, lastNDays, dimensions, metrics, tokenFil
     ga.data <- ga.data %>% mutate( dateHour = lubridate::ymd_h(dateHour) )
   }
 
+  if("sessionCount" %in% colnames(ga.data)){
+    # sessionCount is sometimes returned as character and numeric other times.
+    # let's always cast it to numeric
+    ga.data <- ga.data %>% mutate( sessionCount = as.numeric(sessionCount) )
+  }
+
+  if("daysSinceLastSession" %in% colnames(ga.data)){
+    # sessionCount is sometimes returned as character and numeric other times.
+    # let's always cast it to numeric
+    ga.data <- ga.data %>% mutate( daysSinceLastSession = as.numeric(daysSinceLastSession) )
+  }
+
   ga.data
 }
 
