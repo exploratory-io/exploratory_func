@@ -1,10 +1,9 @@
 #' Guess missing values by lm
 #' @param target Target vector whose NA is filled
-#' @param ... Vectors to be used to pridict NA when type is lm_predict
-#' @param type This can be "mean", "median", "predict", "value" or aggregate function
-#' @paramm val This is effective when type is "value". NA is replaced by this value.
+#' @param type This can be "mean", "median", "predict", numeric value or aggregate function
+#' @param ... Vectors to be used to pridict NA when type is predict
 #' @export
-impute_na <- function(target, ..., type = mean, val = 0) {
+impute_na <- function(target, type = mean, ...) {
   if(typeof(type) == "closure"){
     # type is function in this case
     val <- type(target[!is.na(target)])
@@ -12,6 +11,10 @@ impute_na <- function(target, ..., type = mean, val = 0) {
       stop("type function must return one value")
     }
     target[is.na(target)] <- val
+    target
+  } else if(is.numeric(type) && length(type) == 1){
+    # type is a number to fill NA in this case
+    target[is.na(target)] <- type
     target
   } else {
     switch(type, predict = {
@@ -40,9 +43,6 @@ impute_na <- function(target, ..., type = mean, val = 0) {
       target
     }, median = {
       val <- median(target, na.rm = TRUE)
-      target[is.na(target)] <- val
-      target
-    }, value = {
       target[is.na(target)] <- val
       target
     }, {

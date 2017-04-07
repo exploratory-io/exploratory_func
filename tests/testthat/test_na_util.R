@@ -95,7 +95,7 @@ test_that("test impute_na with val", {
   )
   colnames(test_data) <- c("col 1", "col-2", "col_3", "chars")
   ret <- test_data %>%
-    dplyr::mutate(filled_na = impute_na(`col 1`, type = "value"))
+    dplyr::mutate(filled_na = impute_na(`col 1`, type = 0))
 
   val <- 0
   expect_equal(ret[["filled_na"]], rep(c(val, val, seq(7), val), 10))
