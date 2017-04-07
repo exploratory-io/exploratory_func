@@ -132,7 +132,7 @@ getGoogleProfile <- function(tokenFileId = ""){
 }
 
 #' @export
-getGoogleAnalytics <- function(tableId, lastNDays, dimensions, metrics, tokenFileId, paginate_query=FALSE){
+getGoogleAnalytics <- function(tableId, lastNDays, dimensions, metrics, tokenFileId = NULL, paginate_query=FALSE){
   if(!requireNamespace("RGoogleAnalytics")){stop("package RGoogleAnalytics must be installed.")}
   loadNamespace("lubridate")
 
@@ -179,7 +179,7 @@ getGoogleAnalytics <- function(tableId, lastNDays, dimensions, metrics, tokenFil
 
 
 #' @export
-getGoogleSheet <- function(title, sheetNumber, skipNRows, treatTheseAsNA, firstRowAsHeader, commentChar, tokenFileId=""){
+getGoogleSheet <- function(title, sheetNumber, skipNRows, treatTheseAsNA, firstRowAsHeader, commentChar, tokenFileId=NULL){
   if(!requireNamespace("googlesheets")){stop("package googlesheets must be installed.")}
   token <- getGoogleTokenForSheet(tokenFileId)
   googlesheets::gs_auth(token)
@@ -563,7 +563,7 @@ queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, q
 #' @param tokenFileId - File id for aut
 #' @param withSentiment - Whether there should be sentiment column caluculated by get_sentiment.
 #' @export
-getTwitter <- function(n=200, lang=NULL,  lastNDays=30, searchString, tokenFileId, withSentiment = FALSE){
+getTwitter <- function(n=200, lang=NULL,  lastNDays=30, searchString, tokenFileId=NULL, withSentiment = FALSE){
   if(!requireNamespace("twitteR")){stop("package twitteR must be installed.")}
   loadNamespace("lubridate")
 
