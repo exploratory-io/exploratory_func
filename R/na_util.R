@@ -13,6 +13,7 @@ impute_na <- function(target, type = mean, ...) {
     target[is.na(target)] <- val
     target
   } else if(is.numeric(type) && length(type) == 1){
+    # type is a number to fill NA in this case
     target[is.na(target)] <- type
     target
   } else {
