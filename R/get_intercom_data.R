@@ -1,10 +1,12 @@
 #' Get data from intercom API
-#' @param app_id App ID
-#' @param key API Key
+#' @param endpoint Object to access under https://api.intercom.io/
+#' @param date_since Filter data by date
 #' @export
 get_intercom_data <- function(endpoint,
-                              date_since = NULL,
-                              paginate = NULL){
+                              date_since = NULL){
+  # this was once parameter which could be max number of pagination
+  paginate <- NULL
+
   url <- paste0("https://api.intercom.io/", endpoint)
   data_list <- list()
   page <- 1
