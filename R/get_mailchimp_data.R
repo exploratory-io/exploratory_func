@@ -1,48 +1,113 @@
 #' Get mailchimp data
+#' @param api_key API key
+#' @param endpoint Name of target data to access under api.mailchimp.com
+#' e.g. "reports", "lists/members"
+#' @param date_since Filter data by date
 #' @export
-get_mailchimp_data <- function(api_key, obj, count = 10){
-  area <- stringr::str_split(api_key, "-")[[1]][[2]]
+get_mailchimp_data <- function(api_key, endpoint, date_since){
+  # there is a server area information in api_key
+  area <- tryCatch({
+    stringr::str_split(api_key, "-")[[1]][[2]]
+  }, error = function(e){
+    stop("API key is invalid")
+  })
+  # key is endpoint and value is query parameter to filter data
+  date_filter_params <- list(
+    "automations" = "since_create_time",
+    "campaigns" = "since_create_time",
+    "file-manager/files" = "since_created_at",
+    "file-manager/folders" = "since_created_at",
+    "lists" = "since_date_created",
+    "lists/members" = "since_timestamp_opt",
+    "reports" = "since_send_time", # there was no date parameter
+    "templates" = "since_created_at"
+  )
 
-  get_data <- function(obj){
-    url <- paste0("https://", area,".api.mailchimp.com/3.0/", obj)
-    res <- httr::GET(url, httr::authenticate("any", api_key), query = list(
-      count = count
-    ))
+  access_api <- function(query, path){
+    query$offset <- 0
+    ret <- list()
+    while(TRUE){
+      url <- paste0("https://", area,".api.mailchimp.com/3.0/", path)
 
-    from_json <- res %>% httr::content(as = "text") %>% jsonlite::fromJSON()
+      res <- httr::GET(url, httr::authenticate("any", api_key), query = query)
 
-    split <- stringr::str_split(obj, "/")
+      from_json <- res %>% httr::content(as = "text") %>% jsonlite::fromJSON()
 
-    if(length(split[[1]]) > 1) {
-      obj <- tail(split[[1]], 1)
+      # get last path to get the name of fetched objects
+      split <- stringr::str_split(path, "/")
+      if(length(split[[1]]) > 1) {
+        key <- tail(split[[1]], 1)
+      } else {
+        key <- path
+      }
+
+      data <- tryCatch({
+        from_json[[key]] %>% jsonlite::flatten()
+      }, error = function(e){
+        NULL
+      })
+
+      if(is.null(data) || length(data) == 0) {
+        break()
+      }
+
+      # somehow, offset query in /templates doesn't work,
+      # so check if access won't exceeds total number of the items
+      if(from_json$total_items >= query$offset + nrow(data)){
+        ret <- append(ret, list(data))
+        query$offset <- query$offset + query$count
+      } else {
+        break()
+      }
     }
 
-    ret <- from_json[[obj]]
+    if(length(ret) == 0){
+      NULL
+    } else {
+      do.call(dplyr::bind_rows, ret)
+    }
   }
 
-  ret <- if(obj == "lists/members"){
-    lists <- get_data("lists")
-    data <- purrr::map2(lists$id, lists$name, function(id, name){
-      ret <- get_data(paste0(c("lists", id, "members"), collapse = "/"))
-      if(length(ret) > 0){
-        ret[["list_name"]] <- rep(name, nrow(ret))
-        ret
-      }else{
-        NULL
-      }
-    })
-    data <- data[vapply(data, function(elem){
-      length(elem) > 0
-    }, FUN.VALUE = TRUE)]
-    do.call(rbind, data)
+  base_query <- list(count = 100)
+  # set filtering query depending on endpoint
+  with_filter_query <- if(!is.null(date_since) &&
+                    !is.null(date_filter_params[[endpoint]])){
+    query <- base_query
+    query[[date_filter_params[[endpoint]]]] <- date_since
+    query
   } else {
-    get_data(obj)
+    base_query
   }
 
-  if(is.null(ret) || length(ret) == 0) {
+  ret <- if(stringr::str_detect(endpoint, "^lists/")){
+    # In this case, access path can be lists/{list_id}/members,
+    # so first, get all lists and get members from their ids
+
+    # set filtering query to list access query
+    list_query <- base_query
+    if(!is.null(date_since)){
+      list_query[[date_filter_params[["lists"]]]] <- date_since
+    }
+    ret <- access_api(list_query, "lists")
+    split <- stringr::str_split(endpoint, "/")
+    if (length(split[[1]]) == 1){
+      ret
+    } else {
+      # in this case, access data under lists/
+      list_ids <- ret$id
+      paths <- paste("lists/", list_ids, "/", split[[1]][[2]], sep = "")
+      data <- lapply(paths, function(path){
+        access_api(with_filter_query, path)
+      })
+      do.call(dplyr::bind_rows, data)
+    }
+  } else {
+    ret <- access_api(with_filter_query, endpoint)
+  }
+
+  if(is.null(ret)){
     stop("No data found.")
+  } else {
+    ret
   }
-
-  ret
-
 }

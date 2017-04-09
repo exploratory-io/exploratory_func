@@ -1,8 +1,10 @@
 #' Get data from stripe API
+#' @param endpoint Name of target data to access under https://api.stripe.com/v1/
+#' e.g. "users", "charges"
+#' @param date_since Filter data by date
 #' @export
-get_stripe_data <- function(
-  endpoint
-){
+get_stripe_data <- function(endpoint,
+                            date_since = NULL){
   # these were once arguments
   limit = 100
   paginate = NULL
@@ -25,9 +27,10 @@ get_stripe_data <- function(
   )
   url <- paste0("https://api.stripe.com/v1/", endpoint)
 
-  get_data <- function(query){
+  get_data <- function(query, body){
     res <- httr::GET(url,
                      query = query,
+                     body = body,
                      token
     )
     if(httr::status_code(res) != 200){
@@ -41,6 +44,10 @@ get_stripe_data <- function(
   }
 
   query <- list(limit = limit)
+  if(!is.null(date_since)){
+    min_unixtime <- as.numeric(as.POSIXct(date_since))
+    query[["created[gte]"]] <- min_unixtime
+  }
 
   ret <- list()
   last_id <- NULL
@@ -51,7 +58,7 @@ get_stripe_data <- function(
       query$starting_after <- last_id
     }
     data <- tryCatch({
-      get_data(query)
+      get_data(query, body)
     }, error = function(e){
       if(stringr::str_detect(e$message, "^Error Response:")){
         stop(e)
