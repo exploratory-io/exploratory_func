@@ -6,9 +6,9 @@
 #' @param endpointType end point type that is passed to httr
 #' @param scopeList list of permissions that the OAuth token requires
 #' @param tokenFileName name of the RDS file tht stores the OAuth token
-#' @param tokenFileId for backward compatiblity only.
+#' @param tokenFileId for backward compatiblity only. If this is empty, oauth process starts.
 #' @export
-getOAuthToken <- function(clientId, secret, appName, endpointType, scopeList, tokenFileName, tokenFileId = "", useCache = TRUE, version="2.0"){
+getOAuthToken <- function(clientId, secret, appName, endpointType, scopeList, tokenFileName = "", tokenFileId = "", useCache = TRUE, version="2.0"){
   loadNamespace("httr")
   loadNamespace("stringr")
 
@@ -28,9 +28,9 @@ getOAuthToken <- function(clientId, secret, appName, endpointType, scopeList, to
   # switch to use oauth_app and oauth2.0_token
   token <- NULL
   # first check global token
-  if(useCache == TRUE && file.exists(globalTokenPath)){
+  if(useCache == TRUE && length(globalTokenPath) == 1 && file.exists(globalTokenPath)){
     token <- readRDS(globalTokenPath)
-  } else if(useCache == TRUE && length(tokenPath) > 0 && file.exists(tokenPath)){ # then fallback to local for backward compatibility
+  } else if(useCache == TRUE && length(tokenPath) == 1 && file.exists(tokenPath)){ # then fallback to local for backward compatibility
     token <- readRDS(tokenPath)
   } else { # get a new token.
     myapp <- httr::oauth_app(appName, clientId, secret)
@@ -44,8 +44,10 @@ getOAuthToken <- function(clientId, secret, appName, endpointType, scopeList, to
     } else if (version == "1.0") {
       token <- httr::oauth1.0_token(httr::oauth_endpoints(endpointType), myapp, cache = FALSE)
     }
-    # Save the token object for future sessions
-    saveRDS(token, file=globalTokenPath)
+    # Save the token object for future sessions if globalTokenPath is set
+    if(length(globalTokenPath) == 1 && globalTokenPath != ""){
+      saveRDS(token, file=globalTokenPath)
+    }
   }
   token
 }

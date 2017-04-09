@@ -8,7 +8,7 @@
 #' @param withSentiment - Whether there should be sentiment column caluculated by get_sentiment.
 #' @export
 getTwitterTimeline <- function(user, n=3200,
-                               includeReplies = TRUE, maxID = NULL, sinceID = NULL, tokenFileId, withSentiment = FALSE){
+                               includeReplies = TRUE, maxID = NULL, sinceID = NULL, tokenFileId = NULL, withSentiment = FALSE){
   if(!requireNamespace("twitteR")){stop("package twitteR must be installed.")}
 
   twitter_token = getTwitterToken(tokenFileId)
