@@ -32,8 +32,8 @@ get_mailchimp_data <- function(api_key, endpoint, date_since){
 
       from_json <- res %>% httr::content(as = "text") %>% jsonlite::fromJSON()
 
+      # get last path to get the name of fetched objects
       split <- stringr::str_split(path, "/")
-
       if(length(split[[1]]) > 1) {
         key <- tail(split[[1]], 1)
       } else {
@@ -92,6 +92,7 @@ get_mailchimp_data <- function(api_key, endpoint, date_since){
     if (length(split[[1]]) == 1){
       ret
     } else {
+      # in this case, access data under lists/
       list_ids <- ret$id
       paths <- paste("lists/", list_ids, "/", split[[1]][[2]], sep = "")
       data <- lapply(paths, function(path){
