@@ -1,6 +1,6 @@
 #' Get mailchimp data
 #' @param api_key API key
-#' @param endpoint Object to access under https://api.intercom.io/
+#' @param endpoint Object to access under api.mailchimp.com
 #' @param date_since Filter data by date
 #' @export
 get_mailchimp_data <- function(api_key, endpoint, date_since){
