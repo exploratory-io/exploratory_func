@@ -6,7 +6,7 @@
 #' @param endpointType end point type that is passed to httr
 #' @param scopeList list of permissions that the OAuth token requires
 #' @param tokenFileName name of the RDS file tht stores the OAuth token
-#' @param tokenFileId for backward compatiblity only.
+#' @param tokenFileId for backward compatiblity only. If this is empty, oauth process starts.
 #' @export
 getOAuthToken <- function(clientId, secret, appName, endpointType, scopeList, tokenFileName = "", tokenFileId = "", useCache = TRUE, version="2.0"){
   loadNamespace("httr")
