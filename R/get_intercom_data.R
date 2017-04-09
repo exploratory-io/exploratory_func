@@ -1,13 +1,47 @@
 #' Get data from intercom API
-#' @param app_id App ID
-#' @param key API Key
+#' @param endpoint Name of target data to access under https://api.intercom.io/
+#' e.g. "users", "companies"
+#' @param date_since Filter data by date
 #' @export
-get_intercom_data <- function(app_id, key, endpoint, paginate = NULL){
+get_intercom_data <- function(endpoint,
+                              date_since = NULL){
+  # this was once parameter which could be max number of pagination
+  paginate <- NULL
+
   url <- paste0("https://api.intercom.io/", endpoint)
   data_list <- list()
   page <- 1
+
+  query <- list()
+
+  if(!is.null(date_since)){
+    # put from how many days ago the data sould be fetched
+    query$date_since <- as.integer(
+      difftime(
+        lubridate::today(),
+        as.POSIXct(date_since),
+        units = "days"
+        )
+      )
+  }
+
+  token_info <- getTokenInfo("intercom")
+  access_token <- if(!is.null(token_info) && !is.null(token_info$access_token)){
+    token_info$access_token
+  } else {
+    stop("No access token is set.")
+  }
+  token <- HttrOAuthToken2.0$new(
+    authorize = "https://app.intercom.io/oauth",
+    access = "https://api.intercom.io/auth/eagle/token",
+    appname = "intercom",
+    credentials = list(
+      access_token = access_token
+    )
+  )
+
   while(TRUE){
-    res <- httr::GET(url, httr::authenticate(app_id, key))
+    res <- httr::GET(url, token)
     from_json <- res %>% httr::content(as = "text") %>% jsonlite::fromJSON(flatten = TRUE)
     ret <- from_json[[endpoint]]
     if(length(ret) == 0){
