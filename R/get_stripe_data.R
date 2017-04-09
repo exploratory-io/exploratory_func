@@ -41,8 +41,8 @@ get_stripe_data <- function(endpoint,
   }
 
   query <- list(limit = limit)
-  if(!is.null(min_date)){
-    min_unixtime <- as.numeric(as.POSIXct(min_date))
+  if(!is.null(date_since)){
+    min_unixtime <- as.numeric(as.POSIXct(date_since))
     query[["created[gte]"]] <- min_unixtime
   }
 
