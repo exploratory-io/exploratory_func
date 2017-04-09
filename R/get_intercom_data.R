@@ -1,5 +1,6 @@
 #' Get data from intercom API
-#' @param endpoint Object to access under https://api.intercom.io/
+#' @param endpoint Name of target data to access under https://api.intercom.io/
+#' e.g. "users", "companies"
 #' @param date_since Filter data by date
 #' @export
 get_intercom_data <- function(endpoint,

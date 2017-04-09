@@ -1,5 +1,6 @@
 #' Get data from stripe API
-#' @param endpoint Object to access under https://api.stripe.com/v1/
+#' @param endpoint Name of target data to access under https://api.stripe.com/v1/
+#' e.g. "users", "charges"
 #' @param date_since Filter data by date
 #' @export
 get_stripe_data <- function(endpoint,

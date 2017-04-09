@@ -1,6 +1,7 @@
 #' Get mailchimp data
 #' @param api_key API key
-#' @param endpoint Object to access under api.mailchimp.com
+#' @param endpoint Name of target data to access under api.mailchimp.com
+#' e.g. "reports", "lists/members"
 #' @param date_since Filter data by date
 #' @export
 get_mailchimp_data <- function(api_key, endpoint, date_since){
