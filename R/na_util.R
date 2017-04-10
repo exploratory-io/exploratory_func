@@ -21,7 +21,7 @@ impute_na <- function(target, type = mean, val = 0, ...) {
         # this is when no predictor columns are chosen
         stop("Please choose predictor columns")
       }
-      # list(...) is a list of vectors
+      # list(val, ...) is a list of vectors to predict NA values
       df <- as.data.frame(list(val, ...))
       df$target <- target
       lm_model <- lm(data = df, target ~ ., na.action = na.omit)
