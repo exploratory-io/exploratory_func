@@ -56,7 +56,7 @@ test_that("test impute_na with mean", {
   expect_equal(ret[["filled_na"]], rep(c(val, val, seq(7), val), 10))
 })
 
-test_that("test impute_na with mean", {
+test_that("test impute_na with median", {
   test_data <- data.frame(
     rep(c(NA, NA, seq(7), NA), 10),
     rep(c(10, seq(8), NA), 10),
@@ -95,10 +95,33 @@ test_that("test impute_na with val", {
   )
   colnames(test_data) <- c("col 1", "col-2", "col_3", "chars")
   ret <- test_data %>%
-    dplyr::mutate(filled_na = impute_na(`col 1`, type = 0))
+    dplyr::mutate(filled_na = impute_na(`col 1`, type = "value", val = 0))
 
   val <- 0
   expect_equal(ret[["filled_na"]], rep(c(val, val, seq(7), val), 10))
+})
+
+test_that("test impute_na with POSIXct", {
+  test_data <- data.frame(
+    rep(as.POSIXct(as.Date(c("2013-01-01", "2014-01-01", "2015-01-01", NA, "2016-01-01"))), 20)
+  )
+  colnames(test_data) <- "col 1"
+  ret <- test_data %>%
+    dplyr::mutate(filled_na = impute_na(`col 1`, type = "value", val = as.POSIXct(as.Date("2013-01-01"))))
+
+  expect_equal(ret[["filled_na"]], rep(as.POSIXct(as.Date(c("2013-01-01", "2014-01-01", "2015-01-01", "2013-01-01", "2016-01-01"))), 20))
+})
+
+test_that("test impute_na with a column", {
+  test_data <- data.frame(
+    rep(c("2013-01-01", "2014-01-01", "2015-01-01", NA, "2016-01-01")),
+    rep(c("2013-01-01", "2014-01-01", NA, "2015-01-01", "2016-01-01"))
+  )
+  colnames(test_data) <- c("col 1", "col-2")
+  ret <- test_data %>%
+    dplyr::mutate(filled_na = impute_na(`col 1`, type = "value", val = `col-2`))
+
+  expect_equal(ret[["filled_na"]], as.factor(c("2013-01-01", "2014-01-01", "2015-01-01", "2015-01-01", "2016-01-01")))
 })
 
 test_that("test impute_na with undefined type", {
