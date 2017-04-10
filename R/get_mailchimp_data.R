@@ -1,5 +1,4 @@
 #' Get mailchimp data
-#' @param api_key API key
 #' @param endpoint Name of target data to access under api.mailchimp.com
 #' e.g. "reports", "lists/members"
 #' @param date_since Filter data by date
@@ -8,8 +7,8 @@ get_mailchimp_data <- function(endpoint, date_since = NULL){
   token_info <- getTokenInfo("mailchimp")
   area <- ""
   api_key <- if(!is.null(token_info) &&
-                     !is.null(token_info$access_token) &&
-                     !is.null(token_info$dc)){
+                !is.null(token_info$access_token) &&
+                !is.null(token_info$dc)){
     area <- token_info$dc
     token_info$access_token
   } else {
