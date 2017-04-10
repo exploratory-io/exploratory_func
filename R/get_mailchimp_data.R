@@ -1,16 +1,20 @@
 #' Get mailchimp data
-#' @param api_key API key
 #' @param endpoint Name of target data to access under api.mailchimp.com
 #' e.g. "reports", "lists/members"
 #' @param date_since Filter data by date
 #' @export
-get_mailchimp_data <- function(api_key, endpoint, date_since){
-  # there is a server area information in api_key
-  area <- tryCatch({
-    stringr::str_split(api_key, "-")[[1]][[2]]
-  }, error = function(e){
-    stop("API key is invalid")
-  })
+get_mailchimp_data <- function(endpoint, date_since = NULL){
+  token_info <- getTokenInfo("mailchimp")
+  area <- ""
+  api_key <- if(!is.null(token_info) &&
+                !is.null(token_info$access_token) &&
+                !is.null(token_info$dc)){
+    area <- token_info$dc
+    token_info$access_token
+  } else {
+    stop("No access token is set.")
+  }
+
   # key is endpoint and value is query parameter to filter data
   date_filter_params <- list(
     "automations" = "since_create_time",
