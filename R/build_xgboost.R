@@ -1,6 +1,6 @@
 #' formula version of xgboost
 #' @export
-fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_rate = 0, na.action = na.pass, ...) {
+fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_rate = 0, na.action = na.pass, sparse = NULL, ...) {
   term <- terms(formula, data = data)
   # do.call is used to substitute weights
   md_frame <- tryCatch({
@@ -23,7 +23,20 @@ fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_ra
     y <- y[!is.na(y)]
 
     md_mat <- tryCatch({
-      model.matrix(term, data = md_frame, contrasts = FALSE)
+      if(is.null(sparse)){
+        sparse <- FALSE
+        # If any variable is factor, it uses sparse matrix
+        for(var in all.vars(term)){
+          if(is.factor(data[[var]])) {
+            sparse = TRUE
+          }
+        }
+      }
+      if(sparse){
+        Matrix::sparse.model.matrix(term, data = md_frame)
+      } else {
+        model.matrix(term, data = md_frame, contrasts = FALSE)
+      }
     }, error = function(e){
       if(e$message == "contrasts can be applied only to factors with 2 or more levels") {
         stop("more than 1 unique values are expected for categorical columns assigned as predictors")
@@ -47,6 +60,7 @@ fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_ra
     }
     ret$terms <- term
     ret$x_names <- colnames(md_mat)
+    ret$is_sparse <- sparse
     pred_cnames <- all.vars(term)[-1]
     # this is how categorical columns are casted to columns in matrix
     # this is needed in augment, so that matrix with the same levels
@@ -250,7 +264,12 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, ...) {
     }
 
     # todo: check missing value behaviour
-    mat <- model.matrix(x$terms, ret_data)
+    mat <- if(x$is_sparse){
+      Matrix::sparse.model.matrix(x$terms, ret_data, xlev = x$xlevels)
+    } else {
+      model.matrix(x$terms, model.frame(ret_data, na.action = na.pass, xlev = x$xlevels))
+    }
+
     predicted <- stats::predict(x, mat)
 
     vars <- all.vars(x$terms)
@@ -311,7 +330,11 @@ augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, ...) {
       data
     }
 
-    mat <- model.matrix(x$terms, data = ret_data)
+    mat <- if(x$is_sparse){
+      Matrix::sparse.model.matrix(x$terms, ret_data, xlev = x$xlevels)
+    } else {
+      model.matrix(x$terms, model.frame(ret_data, na.action = na.pass, xlev = x$xlevels))
+    }
     # this is to find omitted indice for NA
     row_index <- as.numeric(rownames(mat))
     predicted <- fill_vec_NA(row_index, stats::predict(x, mat), max_index = nrow(ret_data))
@@ -376,7 +399,11 @@ augment.xgboost_reg <- function(x, data = NULL, newdata = NULL, ...) {
       ret_data[[y_name]] <- rep(0, nrow(ret_data))
     }
 
-    mat_data <- model.matrix(x$terms, model.frame(ret_data, na.action = na.pass, xlev = x$xlevels))
+    mat_data <- if(x$is_sparse){
+      Matrix::sparse.model.matrix(x$terms, ret_data, xlev = x$xlevels)
+    } else {
+      model.matrix(x$terms, model.frame(ret_data, na.action = na.pass, xlev = x$xlevels))
+    }
 
     predicted <- stats::predict(x, mat_data)
     predicted_value_col <- avoid_conflict(colnames(ret_data), "predicted_value")
