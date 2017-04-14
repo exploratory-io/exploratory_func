@@ -42,7 +42,10 @@ build_model_ <- function(data, model_func, seed = 0, test_rate = 0, group_cols =
   }
 
   # use this for preprocess
+  # and keep original data unchanged for later use
+  # like getting column names from formula
   processed <- data
+
   # avoid name conflict of grouping columns
   colnames(processed)[group_col_index] <- avoid_conflict(
     reserved_names,
