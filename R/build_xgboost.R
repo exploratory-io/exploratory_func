@@ -250,7 +250,7 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, ...) {
     }
 
     # todo: check missing value behaviour
-    mat <- model.matrix(x$terms, ret_data)
+    mat <- model.matrix(x$terms, model.frame(ret_data, na.action = na.pass, xlev = x$xlevels))
     predicted <- stats::predict(x, mat)
 
     vars <- all.vars(x$terms)
@@ -311,7 +311,7 @@ augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, ...) {
       data
     }
 
-    mat <- model.matrix(x$terms, data = ret_data)
+    mat <- model.matrix(x$terms, model.frame(ret_data, na.action = na.pass, xlev = x$xlevels))
     # this is to find omitted indice for NA
     row_index <- as.numeric(rownames(mat))
     predicted <- fill_vec_NA(row_index, stats::predict(x, mat), max_index = nrow(ret_data))
