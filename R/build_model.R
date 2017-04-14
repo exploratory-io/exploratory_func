@@ -41,27 +41,28 @@ build_model_ <- function(data, model_func, seed = 0, test_rate = 0, group_cols =
     stop("test_rate has to be between 0 and 1")
   }
 
-  newdata <- data
+  # use this for preprocess
+  processed <- data
   # avoid name conflict of grouping columns
-  colnames(newdata)[group_col_index] <- avoid_conflict(
+  colnames(processed)[group_col_index] <- avoid_conflict(
     reserved_names,
-    colnames(newdata)[group_col_index],
+    colnames(processed)[group_col_index],
     ".group"
   )
 
   # make column names unique
-  colnames(newdata) <- make.unique(colnames(newdata), sep = "")
+  colnames(processed) <- make.unique(colnames(processed), sep = "")
 
   if(!is.null(group_cols)){
-    newdata <- dplyr::group_by_(newdata, .dots = colnames(newdata)[group_col_index])
-  } else if (!dplyr::is.grouped_df(newdata)){
+    processed <- dplyr::group_by_(processed, .dots = colnames(processed)[group_col_index])
+  } else if (!dplyr::is.grouped_df(processed)){
     # need to be grouped to nest
-    newdata <- newdata %>%
+    processed <- processed %>%
       dplyr::mutate(.test_index = 1) %>%
       dplyr::group_by(.test_index)
   }
 
-  group_col_names <- grouped_by(newdata)
+  group_col_names <- grouped_by(processed)
 
   # integrate all additional parameters
   dots <- lazyeval::all_dots(.dots, ...)
@@ -78,9 +79,9 @@ build_model_ <- function(data, model_func, seed = 0, test_rate = 0, group_cols =
       stop(message)
     } else {
       for (var in vars) {
-        if(is.character(newdata[[var]])){
+        if(is.character(processed[[var]])){
           # make variables factor sorted by the frequency
-          newdata[[var]] <- forcats::fct_infreq(newdata[[var]])
+          processed[[var]] <- forcats::fct_infreq(processed[[var]])
         }
       }
     }
@@ -89,7 +90,7 @@ build_model_ <- function(data, model_func, seed = 0, test_rate = 0, group_cols =
   source_col <- "source.data"
 
   ret <- tryCatch({
-    ret <- newdata %>%
+    ret <- processed %>%
       tidyr::nest(.key = "source.data") %>%
       # create test index
       dplyr::mutate(.test_index = purrr::map(source.data, function(df){
