@@ -41,26 +41,31 @@ build_model_ <- function(data, model_func, seed = 0, test_rate = 0, group_cols =
     stop("test_rate has to be between 0 and 1")
   }
 
+  # use this for preprocess
+  # and keep original data unchanged for later use
+  # like getting column names from formula
+  processed <- data
+
   # avoid name conflict of grouping columns
-  colnames(data)[group_col_index] <- avoid_conflict(
+  colnames(processed)[group_col_index] <- avoid_conflict(
     reserved_names,
-    colnames(data)[group_col_index],
+    colnames(processed)[group_col_index],
     ".group"
   )
 
   # make column names unique
-  colnames(data) <- make.unique(colnames(data), sep = "")
+  colnames(processed) <- make.unique(colnames(processed), sep = "")
 
   if(!is.null(group_cols)){
-    data <- dplyr::group_by_(data, .dots = colnames(data)[group_col_index])
-  } else if (!dplyr::is.grouped_df(data)){
+    processed <- dplyr::group_by_(processed, .dots = colnames(processed)[group_col_index])
+  } else if (!dplyr::is.grouped_df(processed)){
     # need to be grouped to nest
-    data <- data %>%
+    processed <- processed %>%
       dplyr::mutate(.test_index = 1) %>%
       dplyr::group_by(.test_index)
   }
 
-  group_col_names <- grouped_by(data)
+  group_col_names <- grouped_by(processed)
 
   # integrate all additional parameters
   dots <- lazyeval::all_dots(.dots, ...)
@@ -68,16 +73,18 @@ build_model_ <- function(data, model_func, seed = 0, test_rate = 0, group_cols =
   # check if variables in grouped_col_names are not used
   formula <- dots$formula
   if(!is.null(formula)){
-    vars <- all.vars(formula$expr)
+    # expand formula with column names of data
+    without_group <- data[, !colnames(data) %in% group_col_names]
+    vars <- all.vars(terms(lazyeval::lazy_eval(dots$formula), data = without_group))
     if(any(vars %in% group_col_names)){
       grouped <- vars[vars %in% group_col_names]
       message <- paste("grouped column is used (", paste0(grouped, collapse = ", "), ")", sep = "")
       stop(message)
     } else {
       for (var in vars) {
-        if(is.character(data[[var]])){
+        if(is.character(processed[[var]])){
           # make variables factor sorted by the frequency
-          data[[var]] <- forcats::fct_infreq(data[[var]])
+          processed[[var]] <- forcats::fct_infreq(processed[[var]])
         }
       }
     }
@@ -86,7 +93,7 @@ build_model_ <- function(data, model_func, seed = 0, test_rate = 0, group_cols =
   source_col <- "source.data"
 
   ret <- tryCatch({
-    ret <- data %>%
+    ret <- processed %>%
       tidyr::nest(.key = "source.data") %>%
       # create test index
       dplyr::mutate(.test_index = purrr::map(source.data, function(df){
@@ -94,10 +101,10 @@ build_model_ <- function(data, model_func, seed = 0, test_rate = 0, group_cols =
       })) %>%
       # slice training data
       dplyr::mutate(model = purrr::map2(source.data, .test_index, function(df, index){
-        data <- safe_slice(df, index, remove = TRUE)
+        tmp_df <- safe_slice(df, index, remove = TRUE)
         # execute model_func with parsed arguments
         eval_arg <- dots
-        eval_arg[["data"]] <- lazyeval::as.lazy(quote(data))
+        eval_arg[["data"]] <- lazyeval::as.lazy(quote(tmp_df))
         .call <- lazyeval::make_call(quote(model_func), eval_arg)
         lazyeval::lazy_eval(.call, data = environment())
       })) %>%

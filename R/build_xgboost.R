@@ -1,12 +1,27 @@
 #' formula version of xgboost
 #' @export
-fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_rate = 0, ...) {
+fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_rate = 0, na.action = na.pass, ...) {
   term <- terms(formula, data = data)
   # do.call is used to substitute weights
-  md_frame <- do.call(model.frame, list(term, data = data, weights = substitute(weights)))
+  md_frame <- tryCatch({
+    do.call(model.frame, list(term, data = data, weights = substitute(weights), na.action = na.action))
+  }, error = function(e){
+    if(e$message == "missing values in object"){
+      # this happens when na.action argument is na.fail
+      stop("There is NA in data. Please deal with NA or change na.action argument.")
+    }
+    stop(e)
+  })
   if(nrow(md_frame) == 0){
-    stop("No valid data to create xgboost model.")
+    # this might happen when na.action is na.omit
+    stop("No valid data to create xgboost model after removing NA.")
   } else {
+    y <- model.response(md_frame)
+
+    # NA in y causes an error
+    md_frame <- md_frame[!is.na(y), ]
+    y <- y[!is.na(y)]
+
     md_mat <- tryCatch({
       model.matrix(term, data = md_frame, contrasts = FALSE)
     }, error = function(e){
@@ -16,9 +31,6 @@ fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_ra
       stop(e)
     })
     weight <- model.weights(md_frame)
-
-    y <- model.response(md_frame)
-
 
     ret <- if(watchlist_rate != 0.0) {
       if (watchlist_rate < 0 ||  1 <= watchlist_rate) {
@@ -238,7 +250,7 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, ...) {
     }
 
     # todo: check missing value behaviour
-    mat <- model.matrix(x$terms, ret_data)
+    mat <- model.matrix(x$terms, model.frame(ret_data, na.action = na.pass, xlev = x$xlevels))
     predicted <- stats::predict(x, mat)
 
     vars <- all.vars(x$terms)
@@ -299,7 +311,7 @@ augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, ...) {
       data
     }
 
-    mat <- model.matrix(x$terms, data = ret_data)
+    mat <- model.matrix(x$terms, model.frame(ret_data, na.action = na.pass, xlev = x$xlevels))
     # this is to find omitted indice for NA
     row_index <- as.numeric(rownames(mat))
     predicted <- fill_vec_NA(row_index, stats::predict(x, mat), max_index = nrow(ret_data))
@@ -364,7 +376,7 @@ augment.xgboost_reg <- function(x, data = NULL, newdata = NULL, ...) {
       ret_data[[y_name]] <- rep(0, nrow(ret_data))
     }
 
-    mat_data <- model.matrix(x$terms, data = ret_data, xlev = x$xlevels)
+    mat_data <- model.matrix(x$terms, model.frame(ret_data, na.action = na.pass, xlev = x$xlevels))
 
     predicted <- stats::predict(x, mat_data)
     predicted_value_col <- avoid_conflict(colnames(ret_data), "predicted_value")
