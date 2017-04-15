@@ -263,7 +263,6 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, ...) {
       data
     }
 
-    # todo: check missing value behaviour
     mat <- if(x$is_sparse){
       Matrix::sparse.model.matrix(x$terms, ret_data, xlev = x$xlevels)
     } else {
@@ -335,6 +334,7 @@ augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, ...) {
     } else {
       model.matrix(x$terms, model.frame(ret_data, na.action = na.pass, xlev = x$xlevels))
     }
+
     # this is to find omitted indice for NA
     row_index <- as.numeric(rownames(mat))
     predicted <- fill_vec_NA(row_index, stats::predict(x, mat), max_index = nrow(ret_data))
