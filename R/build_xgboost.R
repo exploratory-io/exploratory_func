@@ -1,6 +1,6 @@
 #' formula version of xgboost
 #' @export
-fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_rate = 0, na.action = na.pass, sparse = FALSE, ...) {
+fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_rate = 0, na.action = na.pass, sparse = NULL, ...) {
   term <- terms(formula, data = data)
   # do.call is used to substitute weights
   md_frame <- tryCatch({
@@ -23,12 +23,22 @@ fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_ra
     y <- y[!is.na(y)]
 
     md_mat <- tryCatch({
+      if(is.null(sparse)){
+        sparse <- FALSE
+        # If any variable is factor, it uses sparse matrix
+        for(var in all.vars(lazyeval::f_rhs(term))){
+          if(is.factor(data[[var]])) {
+            sparse <- TRUE
+          }
+        }
+      }
+
       if(sparse){
         tryCatch({
           Matrix::sparse.model.matrix(term, data = md_frame)
         }, error = function(e){
           if (e$message == "fnames == names(mf) are not all TRUE"){
-            stop("Column names with spaces or special characters are not supported for sparse modeling.")
+            stop("Invalid column names are found. Please run clean_names function beforehand.")
           }
           stop(e)
         })
