@@ -24,7 +24,14 @@ fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_ra
 
     md_mat <- tryCatch({
       if(sparse){
-        Matrix::sparse.model.matrix(term, data = md_frame)
+        tryCatch({
+          Matrix::sparse.model.matrix(term, data = md_frame)
+        }, error = function(e){
+          if (e$message == "fnames == names(mf) are not all TRUE"){
+            stop("Column names with spaces or special characters are not supported for sparse modeling.")
+          }
+          stop(e)
+        })
       } else {
         model.matrix(term, data = md_frame, contrasts = FALSE)
       }
