@@ -330,7 +330,7 @@ augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, ...) {
     }
 
     mat <- if(x$is_sparse){
-      Matrix::sparse.model.matrix(x$terms, ret_data, xlev = x$xlevels)
+      Matrix::sparse.model.matrix(x$terms, model.frame(ret_data, na.action = na.pass, xlev = x$xlevels))
     } else {
       model.matrix(x$terms, model.frame(ret_data, na.action = na.pass, xlev = x$xlevels))
     }
@@ -400,7 +400,7 @@ augment.xgboost_reg <- function(x, data = NULL, newdata = NULL, ...) {
     }
 
     mat_data <- if(x$is_sparse){
-      Matrix::sparse.model.matrix(x$terms, ret_data, xlev = x$xlevels)
+      Matrix::sparse.model.matrix(x$terms, data = model.frame(ret_data, na.action = na.pass, xlev = x$xlevels))
     } else {
       model.matrix(x$terms, model.frame(ret_data, na.action = na.pass, xlev = x$xlevels))
     }
