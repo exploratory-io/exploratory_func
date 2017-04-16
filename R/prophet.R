@@ -94,9 +94,34 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
     # drop t column, which is just scaled time, which does not seem informative.
     ret <- ret %>% dplyr::select(-t)
     # adjust order of output columns
-    ret <- ret %>% dplyr::select(ds, y, yhat, yhat_upper, yhat_lower, trend, trend_upper, trend_lower,
-                          seasonal, seasonal_lower, seasonal_upper, yearly, yearly_lower, yearly_upper,
-                          weekly, weekly_lower, weekly_upper, dplyr::everything())
+    if ("yearly_upper" %in% colnames(ret)) { # yearly_upper/lower exists only when yearly.seasonality is TRUE
+      if ("weekly_upper" %in% colnames(ret)) { # weekly_upper/lower exists only when weekly.seasonality is TRUE
+        ret <- ret %>% dplyr::select(ds, y, yhat, yhat_upper, yhat_lower, trend, trend_upper, trend_lower,
+                                     seasonal, seasonal_lower, seasonal_upper,
+                                     yearly, yearly_lower, yearly_upper,
+                                     weekly, weekly_lower, weekly_upper,
+                                     dplyr::everything())
+      }
+      else {
+        ret <- ret %>% dplyr::select(ds, y, yhat, yhat_upper, yhat_lower, trend, trend_upper, trend_lower,
+                                     seasonal, seasonal_lower, seasonal_upper,
+                                     yearly, yearly_lower, yearly_upper,
+                                     dplyr::everything())
+      }
+    }
+    else {
+      if ("weekly_upper" %in% colnames(ret)) { # weekly_upper/lower exists only when weekly.seasonality is TRUE
+        ret <- ret %>% dplyr::select(ds, y, yhat, yhat_upper, yhat_lower, trend, trend_upper, trend_lower,
+                                     seasonal, seasonal_lower, seasonal_upper,
+                                     weekly, weekly_lower, weekly_upper,
+                                     dplyr::everything())
+      }
+      else {
+        ret <- ret %>% dplyr::select(ds, y, yhat, yhat_upper, yhat_lower, trend, trend_upper, trend_lower,
+                                     seasonal, seasonal_lower, seasonal_upper,
+                                     dplyr::everything())
+      }
+    }
 
     # revive original column names (time_col, value_col)
     colnames(ret)[colnames(ret) == "ds"] <- avoid_conflict(colnames(ret), time_col)
