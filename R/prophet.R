@@ -120,33 +120,73 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
     ret <- forecast %>% dplyr::full_join(aggregated_data, by = c("ds" = "ds"))
     # drop t column, which is just scaled time, which does not seem informative.
     ret <- ret %>% dplyr::select(-t)
+    # drop cap_scaled column, which is just scaled capacity, which does not seem informative.
+    if ("cap_scaled" %in% colnames(ret)) {
+      ret <- ret %>% dplyr::select(-cap_scaled)
+    }
     # adjust order of output columns
-    if ("yearly_upper" %in% colnames(ret)) { # yearly_upper/lower exists only when yearly.seasonality is TRUE
-      if ("weekly_upper" %in% colnames(ret)) { # weekly_upper/lower exists only when weekly.seasonality is TRUE
-        ret <- ret %>% dplyr::select(ds, y, yhat, yhat_upper, yhat_lower, trend, trend_upper, trend_lower,
-                                     seasonal, seasonal_lower, seasonal_upper,
-                                     yearly, yearly_lower, yearly_upper,
-                                     weekly, weekly_lower, weekly_upper,
-                                     dplyr::everything())
+    if ("cap.y" %in% colnames(ret)) { # cap.y exists only when cap is used.
+      if ("yearly_upper" %in% colnames(ret)) { # yearly_upper/lower exists only when yearly.seasonality is TRUE
+        if ("weekly_upper" %in% colnames(ret)) { # weekly_upper/lower exists only when weekly.seasonality is TRUE
+          ret <- ret %>% dplyr::select(ds, y, yhat, yhat_upper, yhat_lower, trend, trend_upper, trend_lower,
+                                       seasonal, seasonal_lower, seasonal_upper,
+                                       yearly, yearly_lower, yearly_upper,
+                                       weekly, weekly_lower, weekly_upper,
+                                       cap.y, cap.x,
+                                       dplyr::everything())
+        }
+        else {
+          ret <- ret %>% dplyr::select(ds, y, yhat, yhat_upper, yhat_lower, trend, trend_upper, trend_lower,
+                                       seasonal, seasonal_lower, seasonal_upper,
+                                       yearly, yearly_lower, yearly_upper,
+                                       cap.y, cap.x,
+                                       dplyr::everything())
+        }
       }
       else {
-        ret <- ret %>% dplyr::select(ds, y, yhat, yhat_upper, yhat_lower, trend, trend_upper, trend_lower,
-                                     seasonal, seasonal_lower, seasonal_upper,
-                                     yearly, yearly_lower, yearly_upper,
-                                     dplyr::everything())
+        if ("weekly_upper" %in% colnames(ret)) { # weekly_upper/lower exists only when weekly.seasonality is TRUE
+          ret <- ret %>% dplyr::select(ds, y, yhat, yhat_upper, yhat_lower, trend, trend_upper, trend_lower,
+                                       seasonal, seasonal_lower, seasonal_upper,
+                                       weekly, weekly_lower, weekly_upper,
+                                       cap.y, cap.x,
+                                       dplyr::everything())
+        }
+        else {
+          ret <- ret %>% dplyr::select(ds, y, yhat, yhat_upper, yhat_lower, trend, trend_upper, trend_lower,
+                                       seasonal, seasonal_lower, seasonal_upper,
+                                       cap.y, cap.x,
+                                       dplyr::everything())
+        }
       }
     }
     else {
-      if ("weekly_upper" %in% colnames(ret)) { # weekly_upper/lower exists only when weekly.seasonality is TRUE
-        ret <- ret %>% dplyr::select(ds, y, yhat, yhat_upper, yhat_lower, trend, trend_upper, trend_lower,
-                                     seasonal, seasonal_lower, seasonal_upper,
-                                     weekly, weekly_lower, weekly_upper,
-                                     dplyr::everything())
+      if ("yearly_upper" %in% colnames(ret)) { # yearly_upper/lower exists only when yearly.seasonality is TRUE
+        if ("weekly_upper" %in% colnames(ret)) { # weekly_upper/lower exists only when weekly.seasonality is TRUE
+          ret <- ret %>% dplyr::select(ds, y, yhat, yhat_upper, yhat_lower, trend, trend_upper, trend_lower,
+                                       seasonal, seasonal_lower, seasonal_upper,
+                                       yearly, yearly_lower, yearly_upper,
+                                       weekly, weekly_lower, weekly_upper,
+                                       dplyr::everything())
+        }
+        else {
+          ret <- ret %>% dplyr::select(ds, y, yhat, yhat_upper, yhat_lower, trend, trend_upper, trend_lower,
+                                       seasonal, seasonal_lower, seasonal_upper,
+                                       yearly, yearly_lower, yearly_upper,
+                                       dplyr::everything())
+        }
       }
       else {
-        ret <- ret %>% dplyr::select(ds, y, yhat, yhat_upper, yhat_lower, trend, trend_upper, trend_lower,
-                                     seasonal, seasonal_lower, seasonal_upper,
-                                     dplyr::everything())
+        if ("weekly_upper" %in% colnames(ret)) { # weekly_upper/lower exists only when weekly.seasonality is TRUE
+          ret <- ret %>% dplyr::select(ds, y, yhat, yhat_upper, yhat_lower, trend, trend_upper, trend_lower,
+                                       seasonal, seasonal_lower, seasonal_upper,
+                                       weekly, weekly_lower, weekly_upper,
+                                       dplyr::everything())
+        }
+        else {
+          ret <- ret %>% dplyr::select(ds, y, yhat, yhat_upper, yhat_lower, trend, trend_upper, trend_lower,
+                                       seasonal, seasonal_lower, seasonal_upper,
+                                       dplyr::everything())
+        }
       }
     }
 
@@ -169,6 +209,8 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
     colnames(ret)[colnames(ret) == "yearly_lower"] <- avoid_conflict(colnames(ret), "yearly_low")
     colnames(ret)[colnames(ret) == "weekly_upper"] <- avoid_conflict(colnames(ret), "weekly_high")
     colnames(ret)[colnames(ret) == "weekly_lower"] <- avoid_conflict(colnames(ret), "weekly_low")
+    colnames(ret)[colnames(ret) == "cap.x"] <- avoid_conflict(colnames(ret), "cap_forecast")
+    colnames(ret)[colnames(ret) == "cap.y"] <- avoid_conflict(colnames(ret), "cap_model")
     ret
   }
 
