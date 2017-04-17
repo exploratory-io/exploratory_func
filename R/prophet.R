@@ -87,8 +87,19 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
 
     # time column should be Date. TODO: really??
     aggregated_data[["ds"]] <- as.Date(aggregated_data[["ds"]])
-    m <- prophet::prophet(aggregated_data, ...)
+    if (!is.na(cap)) { # set cap if it is there
+      aggregated_data[["cap"]] <- cap
+    }
+    if (!is.na(cap)) { # if cap is set, use logistic. otherwise use linear.
+      m <- prophet::prophet(aggregated_data, growth = "logistic", ...)
+    }
+    else {
+      m <- prophet::prophet(aggregated_data, growth = "linear", ...)
+    }
     future <- prophet::make_future_dataframe(m, periods = periods, freq = time_unit, include_history = include_history) #includes past dates
+    if (!is.na(cap)) { # set cap to future table too, if it is there
+      future[["cap"]] <- cap
+    }
     forecast <- stats::predict(m, future)
     ret <- forecast %>% dplyr::full_join(aggregated_data, by = c("ds" = "ds"))
     # drop t column, which is just scaled time, which does not seem informative.
