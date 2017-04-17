@@ -67,44 +67,52 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
       df <- df[, !colnames(df) %in% grouped_col]
     }
 
-    aggregated_data <- if (!is.null(value_col)){
+    # note that prophet only takes columns with predetermined names like ds, y, cap, as input
+    aggregated_data <- if (!is.null(value_col) && ("cap" %in% colnames(df))) {
+      # preserve cap column if it is there, so that cap argument as future data frame works.
+      # apply same aggregation as value to cap.
       data.frame(
-        time = lubridate::floor_date(df[[time_col]], unit = time_unit),
+        ds = lubridate::floor_date(df[[time_col]], unit = time_unit),
+        value = df[[value_col]],
+        cap_col = df$cap
+      ) %>%
+        dplyr::group_by(ds) %>%
+        dplyr::summarise(y = fun.aggregate(value), cap = fun.aggregate(cap_col))
+    } else if (!is.null(value_col)){
+      data.frame(
+        ds = lubridate::floor_date(df[[time_col]], unit = time_unit),
         value = df[[value_col]]
       ) %>%
-        dplyr::group_by(time) %>%
+        dplyr::group_by(ds) %>%
         dplyr::summarise(y = fun.aggregate(value))
     } else {
       data.frame(
-        time = lubridate::floor_date(df[[time_col]], unit = time_unit)
+        ds = lubridate::floor_date(df[[time_col]], unit = time_unit)
       ) %>%
-        dplyr::group_by(time) %>%
+        dplyr::group_by(ds) %>%
         dplyr::summarise(y = n())
     }
 
-    # rename column names since prophet only takes columns with those predetermined names as input
-    colnames(aggregated_data) <- c("ds", "y")
-
-    # time column should be Date. TODO: really??
+    # ds column should be Date. TODO: really??
     aggregated_data[["ds"]] <- as.Date(aggregated_data[["ds"]])
-    if (!is.na(cap) && is.data.frame(cap)) {
+    if (!is.null(cap) && is.data.frame(cap)) {
       # in this case, cap is the future data frame with cap, specified by user.
       # this is a back door to allow user to specify cap column.
       m <- prophet::prophet(aggregated_data, growth = "logistic", ...)
       forecast <- stats::predict(m, cap)
     }
     else {
-      if (!is.na(cap)) { # set cap if it is there
+      if (!is.null(cap)) { # set cap if it is there
         aggregated_data[["cap"]] <- cap
       }
-      if (!is.na(cap)) { # if cap is set, use logistic. otherwise use linear.
+      if (!is.null(cap)) { # if cap is set, use logistic. otherwise use linear.
         m <- prophet::prophet(aggregated_data, growth = "logistic", ...)
       }
       else {
         m <- prophet::prophet(aggregated_data, growth = "linear", ...)
       }
       future <- prophet::make_future_dataframe(m, periods = periods, freq = time_unit, include_history = include_history) #includes past dates
-      if (!is.na(cap)) { # set cap to future table too, if it is there
+      if (!is.null(cap)) { # set cap to future table too, if it is there
         future[["cap"]] <- cap
       }
       forecast <- stats::predict(m, future)
