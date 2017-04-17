@@ -18,6 +18,13 @@ do_prophet <- function(df, time, value = NULL, ...){
 #' @param fun.aggregate - Function to aggregate values.
 #' @param ... - extra values to be passed to prophet::prophet. listed below.
 #' @param growth - Type of Trend. "linear" or "logistic".
+#' @param cap - Achievable Maximum Capacity of the value to forecast.
+#'        https://facebookincubator.github.io/prophet/docs/forecasting_growth.html
+#'        It can be numeric or data frame. When numeric, the value is used as cap for both modeling and forecasting.
+#'        When it is a data frame, it should be a future data frame with cap column for forecasting.
+#'        When this is specified, the original data frame (df) should also have cap column for modeling.
+#'        When either a numeric or a data frame is specified, growth argument for prophet becomes "logistic",
+#'        as opposed to default "linear".
 #' @param seasonality.prior.scale - Strength of seasonality. Default is 10.
 #' @param yearly.seasonality - Whether to return yearly seasonality data.
 #' @param weekly.seasonality - Whther to return weekly seasonality data.
