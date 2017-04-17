@@ -30,7 +30,7 @@ do_prophet <- function(df, time, value = NULL, ...){
 #' @param interval.width - Width of uncertainty intervals.
 #' @param uncertainty.samples - Number of simulations made for calculating uncertainty intervals. Default is 1000.
 #' @export
-do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "day", include_history = TRUE, fun.aggregate = sum, ...){
+do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "day", include_history = TRUE, fun.aggregate = sum, cap = NULL, ...){
 
   loadNamespace("dplyr")
   # For some reason this needs to be library() instead of loadNamespace() to avoid error.
