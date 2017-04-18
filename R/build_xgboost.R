@@ -1,4 +1,13 @@
 #' formula version of xgboost
+#' @param data Dataframe to create model
+#' @param formula Formula for model
+#' @param nrounds Maximum number of iteration of training
+#' @param weights Weight of data for modeling
+#' @param watchlist_rate Ratio of validation data to watch learning process
+#' @param na.action How to handle data with na
+#' Can be na.omit, na.pass, na.fail
+#' @param sparse If matrix should be sparse.
+#' As default, it becomes sparse if there is any categorical value.
 #' @export
 fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_rate = 0, na.action = na.pass, sparse = NULL, ...) {
   term <- terms(formula, data = data)
@@ -38,6 +47,8 @@ fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_ra
           Matrix::sparse.model.matrix(term, data = md_frame)
         }, error = function(e){
           if (e$message == "fnames == names(mf) are not all TRUE"){
+            # if there are not clean column names like including spaces or special characters,
+            # Matrix::sparse.model.matrix causes this error
             stop("Invalid column names are found. Please run clean_names function beforehand.")
           }
           stop(e)
