@@ -3,7 +3,7 @@
 #' e.g. "reports", "lists/members"
 #' @param date_since Filter data by date
 #' @export
-get_mailchimp_data <- function(endpoint, date_since = NULL){
+get_mailchimp_data <- function(endpoint, date_since = NULL, simple = TRUE){
   token_info <- getTokenInfo("mailchimp")
   area <- ""
   api_key <- if(!is.null(token_info) &&
@@ -29,6 +29,20 @@ get_mailchimp_data <- function(endpoint, date_since = NULL){
 
   access_api <- function(query, path){
     query$offset <- 0
+    if(simple){
+      if(endpoint == "reports"){
+        query$exclude_fields <- paste0(c(
+          "reports.ecommerce",
+          "reports.delivery_status",
+          "reports.share_report",
+          "reports.delivery_status",
+          "reports.industry_stats",
+          "reports.facebook_likes",
+          "reports.timeseries",
+          "reports._links"
+        ), collapse = ",")
+      }
+    }
     ret <- list()
     while(TRUE){
       url <- paste0("https://", area,".api.mailchimp.com/3.0/", path)
@@ -72,7 +86,7 @@ get_mailchimp_data <- function(endpoint, date_since = NULL){
     }
   }
 
-  base_query <- list(count = 100)
+  base_query <- list(count = 1000)
   # set filtering query depending on endpoint
   with_filter_query <- if(!is.null(date_since) &&
                     !is.null(date_filter_params[[endpoint]])){
@@ -83,31 +97,52 @@ get_mailchimp_data <- function(endpoint, date_since = NULL){
     base_query
   }
 
-  ret <- if(stringr::str_detect(endpoint, "^lists/")){
-    # In this case, access path can be lists/{list_id}/members,
-    # so first, get all lists and get members from their ids
-
-    # set filtering query to list access query
-    list_query <- base_query
-    if(!is.null(date_since)){
-      list_query[[date_filter_params[["lists"]]]] <- date_since
-    }
-    ret <- access_api(list_query, "lists")
+  ret <- if(stringr::str_detect(endpoint, "/")){
     split <- stringr::str_split(endpoint, "/")
-    if (length(split[[1]]) == 1){
-      ret
-    } else {
-      # in this case, access data under lists/
-      list_ids <- ret$id
-      paths <- paste("lists/", list_ids, "/", split[[1]][[2]], sep = "")
-      data <- lapply(paths, function(path){
-        access_api(with_filter_query, path)
+    ret <- access_api(with_filter_query, split[[1]][[1]])
+    ids <- ret$id
+    if(endpoint == "reports/email-activity"){
+      # this is to get activities in a campaign
+      export_activity <- function(id, dc, apikey){
+        url <- paste0("https://", dc, ".api.mailchimp.com/export/1.0/campaignSubscriberActivity/", sep = "")
+        res <- httr::POST(
+          url,
+          body = list(
+            apikey = apikey,
+            id = id,
+            include_empty = TRUE
+          )
+        )
+        text <- httr::content(res, as = "text")
+        split <- stringr::str_split(text, "\n")[[1]]
+        # remove last value because it is just an empty string
+        row_data <- lapply(split[seq(length(split)-1)], function(line){
+          parsed <- jsonlite::fromJSON(line)
+          # key of the object is the email address
+          email <- names(parsed)
+          activity <- list(parsed[[email]])
+          ret <- data.frame(campain_id = id, email = email)
+          ret$activity <- activity
+          ret
+        })
+        do.call(dplyr::bind_rows, row_data)
+      }
+      ret$data <- lapply(ids, function(id){
+        export_activity(id, dc = area, apikey = api_key)
       })
-      do.call(dplyr::bind_rows, data)
+    } else {
+      endpoints <- paste(split[[1]][[1]], "/", ids, "/", split[[1]][[2]], sep = "")
+      ret$data <- lapply(endpoints, function(endpoint){
+        access_api(with_filter_query, endpoint)
+      })
     }
+    ret %>%
+      dplyr::filter(exploratory::list_n(data) > 0) %>%
+      tidyr::unnest(data)
   } else {
-    ret <- access_api(with_filter_query, endpoint)
+    access_api(with_filter_query, endpoint)
   }
+
 
   if(is.null(ret)){
     stop("No data found.")
