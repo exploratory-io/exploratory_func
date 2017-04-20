@@ -4,7 +4,9 @@
 #' @param date_since Filter data by date
 #' @export
 get_stripe_data <- function(endpoint,
-                            date_since = NULL){
+                            date_type = "exact",
+                            date_since = NULL
+                            ){
   # these were once arguments
   limit = 100
   paginate = NULL
@@ -26,6 +28,18 @@ get_stripe_data <- function(endpoint,
     )
   )
   url <- paste0("https://api.stripe.com/v1/", endpoint)
+
+  if(!is.null(date_since)){
+    if(date_type != "exact"){
+      if(!date_type %in% c("days", "weeks", "months", "years")){
+        stop("date_type must be \"days\", \"weeks\", \"months\", \"years\" or \"exact\"")
+      }
+      date_since <- lubridate::today() - lubridate::period(as.numeric(date_since), units = date_type)
+    } else {
+      # format validation if it can be regarded as Date format
+      date_since <- as.Date(date_since)
+    }
+  }
 
   get_data <- function(query, body){
     res <- httr::GET(url,
