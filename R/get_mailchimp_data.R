@@ -2,17 +2,28 @@
 #' @param endpoint Name of target data to access under api.mailchimp.com
 #' e.g. "reports", "lists/members"
 #' @param date_since Filter data by date
+#' @param before From how many days/weeks/months before the data should be returned
+#' @param units Time unit for before argument. Can be "days", "weeks", "months" and "years".
+#' @param simple If TRUE, returns only limited fields from api.
+#' @param include_empty This works only when endpoint is reports/email-activity.
+#' If set to “true” a record for every email address sent to will be returned even if there is no activity data.
 #' @export
-get_mailchimp_data <- function(endpoint, date_since = NULL, simple = TRUE){
+get_mailchimp_data <- function(endpoint, date_since = NULL, before = NULL, units = "days", simple = TRUE, include_empty = FALSE){
   token_info <- getTokenInfo("mailchimp")
   area <- ""
-  api_key <- if(!is.null(token_info) &&
-                !is.null(token_info$access_token) &&
-                !is.null(token_info$dc)){
+  api_key <- if(
+    !is.null(token_info) &&
+    !is.null(token_info$access_token) &&
+    !is.null(token_info$dc)
+  ){
     area <- token_info$dc
     token_info$access_token
   } else {
     stop("No access token is set.")
+  }
+
+  if(is.null(date_since) && !is.null(before)){
+    date_since = lubridate::today() - lubridate::period(before, units = units)
   }
 
   # key is endpoint and value is query parameter to filter data
@@ -30,8 +41,8 @@ get_mailchimp_data <- function(endpoint, date_since = NULL, simple = TRUE){
   access_api <- function(query, path){
     query$offset <- 0
     if(simple){
-      if(endpoint == "reports"){
-        query$exclude_fields <- paste0(c(
+      if(path == "reports"){
+        excluded_fields <- c(
           "reports.ecommerce",
           "reports.delivery_status",
           "reports.share_report",
@@ -40,7 +51,50 @@ get_mailchimp_data <- function(endpoint, date_since = NULL, simple = TRUE){
           "reports.facebook_likes",
           "reports.timeseries",
           "reports._links"
-        ), collapse = ",")
+        )
+        if (endpoint == "reports/email-activity"){
+          excluded_fields <- c(
+            excluded_fields,
+            "reports.type",
+            "reports.list_id",
+            "reports.list_name",
+            "reports.bounces",
+            "reports.subject_line",
+            "reports.emails_sent",
+            "reports.abuse_reports",
+            "reports.unsubscribed",
+            "reports.bounces",
+            "reports.forwards",
+            "reports.opens",
+            "reports.clicks",
+            "reports.list_stats"
+          )
+        }
+        query$exclude_fields <- paste0(excluded_fields, collapse = ",")
+      } else if (path == "lists") {
+        excluded_fields <- c(
+          "lists.web_id",
+          "lists.use_archive_bar",
+          "lists.notify_on_subscribe",
+          "lists.notify_on_unsubscribe",
+          "lists.subscribe_url_short",
+          "lists.subscribe_url_long",
+          "lists.beamer_address"
+        )
+        if (endpoint == "lists/members"){
+          excluded_fields <- c(
+            excluded_fields,
+            "lists.permission_reminder",
+            "lists.date_created",
+            "lists.list_rating",
+            "lists.email_type_option",
+            "lists.visibility",
+            "lists.contact",
+            "lists.campaign_defaults",
+            "lists.stats"
+          )
+        }
+        query$exclude_fields <- paste0(excluded_fields, collapse = ",")
       }
     }
     ret <- list()
@@ -110,34 +164,82 @@ get_mailchimp_data <- function(endpoint, date_since = NULL, simple = TRUE){
           body = list(
             apikey = apikey,
             id = id,
-            include_empty = TRUE
+            include_empty = include_empty,
+            since = date_since
           )
         )
         text <- httr::content(res, as = "text")
         split <- stringr::str_split(text, "\n")[[1]]
         # remove last value because it is just an empty string
-        row_data <- lapply(split[seq(length(split)-1)], function(line){
-          parsed <- jsonlite::fromJSON(line)
-          # key of the object is the email address
-          email <- names(parsed)
-          activity <- list(parsed[[email]])
-          ret <- data.frame(campain_id = id, email = email)
-          ret$activity <- activity
-          ret
+        row_data <- lapply(split[!is_empty(split)], function(line){
+          parsed <- tryCatch({
+            jsonlite::fromJSON(line)
+          }, error = function(e){
+            stop(line)
+            NULL
+          })
+
+          if(is.null(parsed)){
+            list()
+          } else {
+            # key of the object is the email address
+            email <- names(parsed)
+            activity <- list(parsed[[email]])
+            ret <- data.frame(campain_id = id, email = email)
+            ret$activity <- activity
+            ret
+          }
         })
         do.call(dplyr::bind_rows, row_data)
       }
       ret$data <- lapply(ids, function(id){
         export_activity(id, dc = area, apikey = api_key)
       })
+    } else if(endpoint == "lists/members" && simple){
+      export_members <- function(id, dc, apikey){
+        url <- paste0("https://", dc, ".api.mailchimp.com/export/1.0/list/", sep = "")
+        res <- httr::POST(
+          url,
+          body = list(
+            apikey = apikey,
+            id = id
+          )
+        )
+        text <- httr::content(res, as = "text")
+        split <- stringr::str_split(text, "\n")[[1]]
+        header <- jsonlite::fromJSON(split[1])
+        main <- split[-1]
+        # remove last value because it is just an empty string
+        row_data <- lapply(main[!is_empty(main)], function(line){
+          parsed <- jsonlite::fromJSON(line)
+          setNames(as.data.frame(as.list(parsed), stringsAsFactors = FALSE), header)
+        })
+        if(length(row_data) > 0){
+          janitor::clean_names(do.call(dplyr::bind_rows, row_data))
+        } else {
+          list()
+        }
+      }
+
+      ret$data <- lapply(ids, function(id){
+        export_members(id, dc = area, apikey = api_key)
+      })
+      ret <- ret %>%
+        dplyr::mutate(list_id = id) %>% # keep id column to prevent fail of select later
+        dplyr::rename(list_name = name)
     } else {
       endpoints <- paste(split[[1]][[1]], "/", ids, "/", split[[1]][[2]], sep = "")
       ret$data <- lapply(endpoints, function(endpoint){
         access_api(with_filter_query, endpoint)
       })
     }
-    ret %>%
-      dplyr::filter(exploratory::list_n(data) > 0) %>%
+    filtered <- ret %>%
+      dplyr::select(-id) %>% # remove id because it's duplicated in nested parameters
+      dplyr::filter(exploratory::list_n(data) > 0)
+    if(nrow(filtered) == 0){
+      stop("No data found")
+    }
+    filtered %>%
       tidyr::unnest(data)
   } else {
     access_api(with_filter_query, endpoint)
