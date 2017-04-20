@@ -73,7 +73,9 @@ build_model_ <- function(data, model_func, seed = 0, test_rate = 0, group_cols =
   # check if variables in grouped_col_names are not used
   formula <- dots$formula
   if(!is.null(formula)){
-    # expand formula with column names of data
+    # use terms function with data frame
+    # to expand dot in formula with column names of the data
+    # so that factorization can work on those columns too
     without_group <- data[, !colnames(data) %in% group_col_names]
     vars <- all.vars(terms(lazyeval::lazy_eval(dots$formula), data = without_group))
     if(any(vars %in% group_col_names)){
