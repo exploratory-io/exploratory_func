@@ -5,8 +5,8 @@
 #' "exact" uses exact date like "2016-01-01".
 #' "days", "weeks", "months" or "years" uses a number and get data from that time ago.
 #' @param date_since From when data should be returned.
-#' @param include_empty This works only when endpoint is reports/email-activity.
-#' If set to “true” a record for every email address sent to will be returned even if there is no activity data.
+#' @param include_empty This works only when endpoint is export/1.0/campaignSubscriberActivity.
+#' If set to TRUE, a record for every email address sent to will be returned even if there is no activity data.
 #' @export
 get_mailchimp_data <- function(endpoint, date_type = "exact", date_since = NULL, include_empty = TRUE){
   token_info <- getTokenInfo("mailchimp")
@@ -29,12 +29,12 @@ get_mailchimp_data <- function(endpoint, date_type = "exact", date_since = NULL,
       }
       date_since <- lubridate::today() - lubridate::period(as.numeric(date_since), units = date_type)
     } else {
-      # format validation if it can be regarded as Date format
+      # format validation to check if it can be regarded as Date format
       date_since <- as.Date(date_since)
     }
   }
 
-  # key is endpoint and value is query parameter to filter data
+  # keys are endpoints and values are query parameters to filter data
   date_filter_params <- list(
     "automations" = "since_create_time",
     "campaigns" = "since_create_time",
@@ -47,7 +47,7 @@ get_mailchimp_data <- function(endpoint, date_type = "exact", date_since = NULL,
   )
 
   base_query <- list(count = 1000)
-  # set filtering query depending on endpoint
+  # set date filtering query depending on the endpoint
   with_filter_query <- if(!is.null(date_since) &&
                     !is.null(date_filter_params[[endpoint]])){
     query <- base_query
@@ -58,26 +58,44 @@ get_mailchimp_data <- function(endpoint, date_type = "exact", date_since = NULL,
   }
 
   ret <- if (endpoint == "export/1.0/list") {
-    with_filter_query$fields <- paste0(c("total_items", "lists.id", "lists.name", "lists.date_created", "lists.stats"), collapse = ",")
+    # get members list from export api
+
+    # first, get these fields about lists from REST api
+    with_filter_query$fields <- paste0(
+      c(
+        "total_items",
+        "lists.id",
+        "lists.name",
+        "lists.date_created",
+        "lists.stats"
+      ), collapse = ",")
     ret <- access_api(with_filter_query, dc, api_key, "lists")
 
     if(length(ret) == 0){
       stop("No data found.")
     }
 
+    # clean up data frame column names removing "stats." prefix
     colnames(ret) <- stringr::str_replace(colnames(ret), "^stats\\.", "")
 
     ret <- ret %>%
       dplyr::select(-member_count, -merge_field_count, -last_sub_date, -last_unsub_date)
 
     ids <- ret$id
+    # put "list_" suffix to colum names
+    # to make it clear that the columns are from list data
     colnames(ret) <- paste0("list_", colnames(ret))
+
+    # get member data for each list from export API
     ret$data <- lapply(ids, function(id){
       export_members(id, dc, api_key, date_since)
     })
     ret %>%
       unnest_without_empty(data)
   } else if (endpoint == "export/1.0/campaignSubscriberActivity") {
+    # get email activities from export api
+
+    # first, get these fields about reports from REST api
     with_filter_query$fields <- paste0(
       c(
         "total_items",
@@ -95,11 +113,14 @@ get_mailchimp_data <- function(endpoint, date_type = "exact", date_since = NULL,
     if(nrow(ret) == 0){
       stop("No data found.")
     }
-
+    # clean up data frame column names removing "opens." prefix
     colnames(ret) <- stringr::str_replace(colnames(ret), "^opens\\.", "")
 
     ids <- ret$id
+    # put "eport_" suffix to colum names
+    # to make it clear that the columns are from report data
     colnames(ret) <- paste0("report_", colnames(ret))
+    # get activity data for each list from export API
     ret$data <- lapply(ids, function(id){
       export_activity(id, dc, api_key, date_since, include_empty)
     })
@@ -116,6 +137,11 @@ get_mailchimp_data <- function(endpoint, date_type = "exact", date_since = NULL,
   }
 }
 
+#' Access data from REST api
+#' @param query Query parameters for API access
+#' @param dc Data center id
+#' @param apikey Access key for API access
+#' @param path API path to access
 access_api <- function(query, dc, apikey, path){
   query$offset <- 0
   ret <- list()
@@ -125,14 +151,15 @@ access_api <- function(query, dc, apikey, path){
     if(stringr::str_detect(path, "/email-activity$")){
       "emails"
     } else {
-      # this is used when path is /ecommerce/stores
+      # this is used when path is something like ecommerce/stores
+      # because in that case, "stores" is used as the key
       tail(split[[1]], 1)
     }
   } else {
     path
   }
   # _links is urls for the actions of the data like deleting
-  # , so it's not important for data analysis
+  # , so it's not important for data analysis and excluded from fields
   query$exclude_fields <- paste0(key, "._links")
 
   while(TRUE){
@@ -169,6 +196,11 @@ access_api <- function(query, dc, apikey, path){
   }
 }
 
+#' Access members export API
+#' @param id List ID
+#' @param dc Data center id
+#' @param apikey Access key for API access
+#' @param date_since From when members data should be returned
 export_members <- function(id, dc, apikey, date_since){
   url <- paste0("https://", dc, ".api.mailchimp.com/export/1.0/list/", sep = "")
   res <- httr::POST(
@@ -180,10 +212,14 @@ export_members <- function(id, dc, apikey, date_since){
     )
   )
   text <- httr::content(res, as = "text")
+
+  # objects are separated by "\n" (ndjson format)
+  # , so parse them line by line
   split <- stringr::str_split(text, "\n")[[1]]
+  # first object is header
   header <- jsonlite::fromJSON(split[1])
   main <- split[-1]
-  # remove last value because it is just an empty string
+  # there are sometimes empty strings, so they are removed
   row_data <- lapply(main[!is_empty(main)], function(line){
     parsed <- jsonlite::fromJSON(line)
     setNames(as.data.frame(as.list(parsed), stringsAsFactors = FALSE), header)
@@ -207,7 +243,12 @@ export_members <- function(id, dc, apikey, date_since){
   }
 }
 
-# this is to get activities in a campaign
+#' Access activities export API
+#' @param id Report ID
+#' @param dc Data center id
+#' @param apikey Access key for API access
+#' @param date_since From when members data should be returned
+#' @param include_empty  If set to TRUE, a record for every email address sent to will be returned even if there is no activity data
 export_activity <- function(id, dc, apikey, date_since, include_empty){
   url <- paste0("https://", dc, ".api.mailchimp.com/export/1.0/campaignSubscriberActivity/", sep = "")
   res <- httr::POST(
@@ -220,8 +261,10 @@ export_activity <- function(id, dc, apikey, date_since, include_empty){
     )
   )
   text <- httr::content(res, as = "text")
+  # objects are separated by "\n" (ndjson format)
+  # , so parse them line by line
   split <- stringr::str_split(text, "\n")[[1]]
-  # remove last value because it is just an empty string
+  # there are sometimes empty strings, so they are removed
   row_data <- lapply(split[!is_empty(split)], function(line){
     parsed <- tryCatch({
       jsonlite::fromJSON(line)
