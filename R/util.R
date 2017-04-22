@@ -995,6 +995,8 @@ unnest_without_empty_ <- function(data, nested_col){
   empty <- list_n(data[[nested_col]]) == 0
   without_empty <- data[!empty, ]
   if(nrow(without_empty) == 0){
+    # returns 0 row data frame,
+    # if all values in nested_col are empty
     without_empty
   } else {
     tidyr::unnest_(without_empty, nested_col)
