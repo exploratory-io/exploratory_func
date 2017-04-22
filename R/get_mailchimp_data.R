@@ -3,19 +3,21 @@
 #' e.g. "reports", "lists/members"
 #' @param date_type Type of date_since argument. Can be "exact", "days", "weeks", "months" or "years".
 #' "exact" uses exact date like "2016-01-01".
-#' "days", "weeks", "months" or "years" uses a number and get data from that time ago.
+#' "days", "weeks", "months" or "years" uses a number and get data since that much time ago.
 #' @param date_since From when data should be returned.
 #' @param include_empty This works only when endpoint is export/1.0/campaignSubscriberActivity.
 #' If set to TRUE, a record for every email address sent to will be returned even if there is no activity data.
 #' @export
 get_mailchimp_data <- function(endpoint, date_type = "exact", date_since = NULL, include_empty = TRUE){
   token_info <- getTokenInfo("mailchimp")
+  # this is data center id like "us-13"
   dc <- ""
   api_key <- if(
     !is.null(token_info) &&
     !is.null(token_info$access_token) &&
     !is.null(token_info$dc)
   ){
+    # this is the case when valid access token is set.
     dc <- token_info$dc
     token_info$access_token
   } else {
@@ -23,6 +25,9 @@ get_mailchimp_data <- function(endpoint, date_type = "exact", date_since = NULL,
   }
 
   if(!is.null(date_since)){
+    # if date_type is "exact", date_since is regarded as date string
+    # and if it's type unit like "days" or "weeks", the value date_since is
+    # subtracted from today and it's regarded as date_since
     if(date_type != "exact"){
       if(!date_type %in% c("days", "weeks", "months", "years")){
         stop("date_type must be \"days\", \"weeks\", \"months\", \"years\" or \"exact\"")
@@ -53,6 +58,7 @@ get_mailchimp_data <- function(endpoint, date_type = "exact", date_since = NULL,
     "templates" = "since_created_at"
   )
 
+  # this base query is common query among endpoints
   base_query <- list(count = 1000)
   # set date filtering query depending on the endpoint
   with_filter_query <- if(!is.null(date_since) &&
@@ -78,6 +84,8 @@ get_mailchimp_data <- function(endpoint, date_type = "exact", date_since = NULL,
       ), collapse = ",")
     ret <- access_api(with_filter_query, dc, api_key, "lists")
 
+    # throw an error if there is no report data
+    # to prevent assigning colnames to NULL
     if(length(ret) == 0){
       stop("No data found.")
     }
@@ -117,9 +125,12 @@ get_mailchimp_data <- function(endpoint, date_type = "exact", date_since = NULL,
     collapse = ",")
     ret <- access_api(with_filter_query, dc, api_key,"reports")
 
-    if(nrow(ret) == 0){
+    # throw an error if there is no report data
+    # to prevent assigning colnames to NULL
+    if(length(ret) == 0){
       stop("No data found.")
     }
+
     # clean up data frame column names removing "opens." prefix
     colnames(ret) <- stringr::str_replace(colnames(ret), "^opens\\.", "")
 
