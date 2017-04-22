@@ -40,7 +40,11 @@ get_stripe_data <- function(endpoint,
       date_since <- lubridate::today() - lubridate::period(as.numeric(date_since), units = date_type)
     } else {
       # format validation if it can be regarded as Date format
-      date_since <- as.Date(date_since)
+      date_since <- tryCatch({
+        as.Date(date_since)
+      }, error = function(e){
+        stop("date_since can't be recognized as date. It should be \"2016-08-26\", for example")
+      })
     }
   }
 

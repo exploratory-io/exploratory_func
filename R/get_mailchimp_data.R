@@ -28,9 +28,16 @@ get_mailchimp_data <- function(endpoint, date_type = "exact", date_since = NULL,
         stop("date_type must be \"days\", \"weeks\", \"months\", \"years\" or \"exact\"")
       }
       date_since <- lubridate::today() - lubridate::period(as.numeric(date_since), units = date_type)
+      if(is.na(date_since)){
+        stop("Value for Date Range is invalid. Please put a number.")
+      }
     } else {
       # format validation to check if it can be regarded as Date format
-      date_since <- as.Date(date_since)
+      date_since <- tryCatch({
+        as.Date(date_since)
+      }, error = function(e){
+        stop("Value for Date Range can't be recognized as date. It should be \"2016-08-26\", for example")
+      })
     }
   }
 
