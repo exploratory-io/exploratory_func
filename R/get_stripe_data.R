@@ -1,7 +1,10 @@
 #' Get data from stripe API
 #' @param endpoint Name of target data to access under https://api.stripe.com/v1/
 #' e.g. "users", "charges"
-#' @param date_since Filter data by date
+#' @param date_type Type of date_since argument. Can be "exact", "days", "weeks", "months" or "years".
+#' "exact" uses exact date like "2016-01-01".
+#' "days", "weeks", "months" or "years" uses a number and get data from that time ago.
+#' @param date_since From when data should be returned.
 #' @export
 get_stripe_data <- function(endpoint,
                             date_type = "exact",
