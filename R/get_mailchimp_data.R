@@ -246,7 +246,8 @@ export_members <- function(id, dc, apikey, date_since){
         signup_time = optin_time,
         country_code = cc
       ) %>%
-      select(-leid, -notes)
+      select(-leid, -notes) %>%
+      typeConvert()
   }
 }
 
