@@ -165,9 +165,12 @@ access_api <- function(query, dc, apikey, path){
   } else {
     path
   }
-  # _links is urls for the actions of the data like deleting
-  # , so it's not important for data analysis and excluded from fields
-  query$exclude_fields <- paste0(key, "._links")
+
+  if(is.null(query$fields)){
+    # _links is urls for the actions of the data like deleting
+    # , so it's not important for data analysis and excluded from fields
+    query$exclude_fields <- paste0(key, "._links")
+  }
 
   while(TRUE){
     url <- paste0("https://", dc,".api.mailchimp.com/3.0/", path)
@@ -247,7 +250,11 @@ export_members <- function(id, dc, apikey, date_since){
         country_code = cc
       ) %>%
       select(-leid, -notes) %>%
-      typeConvert()
+      dplyr::mutate_at(dplyr::vars(
+        signup_time,
+        confirm_time,
+        last_changed
+      ), lubridate::ymd_hms)
   }
 }
 
