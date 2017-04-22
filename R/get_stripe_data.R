@@ -1,10 +1,15 @@
 #' Get data from stripe API
 #' @param endpoint Name of target data to access under https://api.stripe.com/v1/
 #' e.g. "users", "charges"
-#' @param date_since Filter data by date
+#' @param date_type Type of date_since argument. Can be "exact", "days", "weeks", "months" or "years".
+#' "exact" uses exact date like "2016-01-01".
+#' "days", "weeks", "months" or "years" uses a number and get data from that time ago.
+#' @param date_since From when data should be returned.
 #' @export
 get_stripe_data <- function(endpoint,
-                            date_since = NULL){
+                            date_type = "exact",
+                            date_since = NULL
+                            ){
   # these were once arguments
   limit = 100
   paginate = NULL
@@ -26,6 +31,22 @@ get_stripe_data <- function(endpoint,
     )
   )
   url <- paste0("https://api.stripe.com/v1/", endpoint)
+
+  if(!is.null(date_since)){
+    if(date_type != "exact"){
+      if(!date_type %in% c("days", "weeks", "months", "years")){
+        stop("date_type must be \"days\", \"weeks\", \"months\", \"years\" or \"exact\"")
+      }
+      date_since <- lubridate::today() - lubridate::period(as.numeric(date_since), units = date_type)
+    } else {
+      # format validation if it can be regarded as Date format
+      date_since <- tryCatch({
+        as.Date(date_since)
+      }, error = function(e){
+        stop("date_since can't be recognized as date. It should be \"2016-08-26\", for example")
+      })
+    }
+  }
 
   get_data <- function(query, body){
     res <- httr::GET(url,
