@@ -105,6 +105,8 @@ get_mailchimp_data <- function(endpoint, date_type = "exact", date_since = NULL,
     ret$data <- lapply(ids, function(id){
       export_members(id, dc, api_key, date_since)
     })
+    # there might be empty data and tidyr::unnest causes an error
+    # , so unnest_without_empty is used
     ret %>%
       unnest_without_empty(data)
   } else if (endpoint == "export/1.0/campaignSubscriberActivity") {
@@ -142,6 +144,8 @@ get_mailchimp_data <- function(endpoint, date_type = "exact", date_since = NULL,
     ret$data <- lapply(ids, function(id){
       export_activity(id, dc, api_key, date_since, include_empty)
     })
+    # there might be empty data and tidyr::unnest causes an error
+    # , so unnest_without_empty is used
     ret %>%
       unnest_without_empty(data)
   } else {
@@ -211,6 +215,7 @@ access_api <- function(query, dc, apikey, path){
   }
 
   if(length(ret) == 0){
+    # prevent applying bind_rows to NULL or empty list
     NULL
   } else {
     do.call(dplyr::bind_rows, ret)
