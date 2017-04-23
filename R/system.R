@@ -553,10 +553,15 @@ getTwitter <- function(n=200, lang=NULL,  lastNDays=30, searchString, tokenFileI
   resultType = "recent"
   retryOnRateLimit = 120
 
+  # on windows, since searchString is in windows code page, (windows R does not support UTF-8 as part of locale.)
+  # we need to convert it to UTF-8 before sending it on the wire.
   if (Sys.info()[["sysname"]] == "Windows") {
-    lc_ctype_locale = Sys.getlocale("LC_CTYPE")
-    encoding = strsplit(lc_ctype_locale, "\\.")[[1]][[2]]
-    searchString = iconv(searchString, from = encoding, to = "UTF-8")
+    lc_ctype_locale = Sys.getlocale("LC_CTYPE") # returns string like "Japanese_Japan.932"
+    lc_ctype_locale_tokens = base::strsplit(lc_ctype_locale, "\\.")[[1]] # c("Japanese_Japan", "932"). [[1]] is necessary since strsplit return is nested.
+    if (length(lc_ctype_locale_tokens) == 2) { # check length to avoid out of bound error.
+      encoding = lc_ctype_locale_tokens[[2]] # extracts "932"
+      searchString = base::iconv(searchString, from = encoding, to = "UTF-8")
+    }
   }
   tweetList <- twitteR::searchTwitter(searchString, n, lang, since, until, locale, geocode, sinceID, maxID, resultType, retryOnRateLimit)
   # conver list to data frame
