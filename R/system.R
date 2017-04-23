@@ -581,6 +581,15 @@ getTwitter <- function(n=200, lang=NULL,  lastNDays=30, searchString, tokenFileI
   resultType = "recent"
   retryOnRateLimit = 120
 
+  fileConn <- file("C:/Users/hihay/testhello.txt")
+  writeLines(iconv(searchString, from="932", to="UTF-8"), fileConn, useBytes = TRUE)
+  close(fileConn)
+
+  if (Sys.info()[["sysname"]] == "Windows") {
+    lc_ctype_locale = Sys.getlocale("LC_CTYPE")
+    encoding = strsplit(lc_ctype_locale, "\\.")[[1]][[2]]
+    searchString = iconv(searchString, from = encoding, to = "UTF-8")
+  }
   tweetList <- twitteR::searchTwitter(searchString, n, lang, since, until, locale, geocode, sinceID, maxID, resultType, retryOnRateLimit)
   # conver list to data frame
   if(length(tweetList)>0){
