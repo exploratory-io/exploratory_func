@@ -150,6 +150,7 @@ get_mailchimp_data <- function(endpoint, date_type = "exact", date_since = NULL,
       unnest_without_empty(data)
   } else if(endpoint == "lists/members"){
     # get member info from REST api for each list
+    # this is for Exploratory Desktop 3.3 backward compatibility
     ret <- access_api(with_filter_query, dc = dc, apikey = api_key, endpoint = "lists")
     ids <- ret$id
     endpoints <- paste("lists", "/", ids, "/", "members", sep = "")
