@@ -148,6 +148,20 @@ get_mailchimp_data <- function(endpoint, date_type = "exact", date_since = NULL,
     # , so unnest_without_empty is used
     ret %>%
       unnest_without_empty(data)
+  } else if(endpoint == "lists/members"){
+    # get member info from REST api for each list
+    ret <- access_api(with_filter_query, dc = dc, apikey = api_key, path = "lists")
+    ids <- ret$id
+    endpoints <- paste("lists", "/", ids, "/", "members", sep = "")
+    ret$data <- lapply(endpoints, function(endpoint){
+      access_api(with_filter_query, dc = dc, apikey = api_key, path = endpoint)
+    })
+
+    # there might be empty data and tidyr::unnest causes an error
+    # , so unnest_without_empty is used
+    ret %>%
+      unnest_without_empty(data)
+
   } else {
     access_api(with_filter_query, dc, api_key, endpoint)
   }
