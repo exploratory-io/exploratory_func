@@ -23,6 +23,21 @@ setOAuthTokenCacheOptions <- function(path){
   options(tam.oauth_token_cache = path)
 }
 
+#' On windows, since user input string like SQL or search string for twitter are in windows code page,
+#' (windows R does not support UTF-8 as part of locale.)
+#' we need to convert it to UTF-8 before sending it on the wire.
+convertUserInputToUtf8 <- function(inputString) {
+  if (Sys.info()[["sysname"]] == "Windows") {
+    lc_ctype_locale = Sys.getlocale("LC_CTYPE") # returns string like "Japanese_Japan.932"
+    lc_ctype_locale_tokens = base::strsplit(lc_ctype_locale, "\\.")[[1]] # c("Japanese_Japan", "932"). [[1]] is necessary since strsplit return is nested.
+    if (length(lc_ctype_locale_tokens) == 2) { # check length to avoid out of bound error.
+      encoding = lc_ctype_locale_tokens[[2]] # extracts "932"
+      inputString = base::iconv(inputString, from = encoding, to = "UTF-8")
+    }
+  }
+  inputString
+}
+
 #' API to take care of read/save password for each plugin type and user name combination
 #' if password argument is null, it means we need to retrieve password from RDS file
 #' so the return value is password from RDS file.
