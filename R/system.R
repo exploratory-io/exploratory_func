@@ -440,6 +440,7 @@ executeGenericQuery <- function(type, host, port, databaseName, username, passwo
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
   conn <- getDBConnection(type, host, port, databaseName, username, password, catalog = catalog, schema = schema)
   tryCatch({
+    query <- convertUserInputToUtf8(query)
     resultSet <- DBI::dbSendQuery(conn, query)
     df <- DBI::dbFetch(resultSet)
   }, error = function(err) {
@@ -473,6 +474,7 @@ queryNeo4j <- function(host, port,  username, password, query, isSSL = FALSE){
   } else {
     graph = RNeo4j::startGraph(url)
   }
+  query <- convertUserInputToUtf8(query)
   df <- RNeo4j::cypher(graph, query)
   df
 }
@@ -489,6 +491,7 @@ queryMySQL <- function(host, port, databaseName, username, password, numOfRows =
 
   conn <- getDBConnection("mysql", host, port, databaseName, username, pass)
   tryCatch({
+    query <- convertUserInputToUtf8(query)
     resultSet <- RMySQL::dbSendQuery(conn, GetoptLong::qq(query))
     df <- RMySQL::dbFetch(resultSet, n = numOfRows)
   }, error = function(err) {
@@ -511,6 +514,7 @@ queryPostgres <- function(host, port, databaseName, username, password, numOfRow
   conn <- getDBConnection("postgres", host, port, databaseName, username, pass)
 
   tryCatch({
+    query <- convertUserInputToUtf8(query)
     resultSet <- RPostgreSQL::dbSendQuery(conn, GetoptLong::qq(query))
     df <- DBI::dbFetch(resultSet, n = numOfRows)
   }, error = function(err) {
@@ -529,6 +533,7 @@ queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, q
 
   conn <- getDBConnection("odbc", NULL, NULL, NULL, username, password, dsn = dsn, additionalParams = additionalParams)
   tryCatch({
+    query <- convertUserInputToUtf8(query)
     df <- RODBC::sqlQuery(conn, GetoptLong::qq(query), max = numOfRows)
     if (!is.data.frame(df)) {
       # when it is error, RODBC::sqlQuery() does not stop() (throw) with error most of the cases.
@@ -603,6 +608,7 @@ submitGoogleBigQueryJob <- function(project, sqlquery, destination_table, write_
 
   token <- getGoogleTokenForBigQuery(tokenFieldId)
   bigrquery::set_access_cred(token)
+  sqlquery <- convertUserInputToUtf8(sqlquery)
   # pass desitiona_table to support large data
   # check if the query contains special key word for standardSQL
   # If we do not pass the useLegaySql argument, bigrquery set TRUE for it, so we need to expliclity set it to make standard SQL work.
@@ -737,6 +743,7 @@ executeGoogleBigQuery <- function(project, sqlquery, destination_table, page_siz
     dataSet = dataSetTable[[1]][1]
     table = dataSetTable[[1]][2]
     bqtable <- NULL
+    sqlquery <- convertUserInputToUtf8(sqlquery)
     # submit a query to get a result (for refresh data frame case)
     result <- exploratory::submitGoogleBigQueryJob(bucketProjectId, sqlquery, destination_table, write_disposition = "WRITE_TRUNCATE", tokenFileId);
     # extranct result from Google BigQuery to Google Cloud Storage and import
