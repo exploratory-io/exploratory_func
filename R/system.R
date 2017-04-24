@@ -235,8 +235,12 @@ queryMongoDB <- function(host, port, database, collection, username, password, q
   }
   data <- NULL
   if(queryType == "aggregate"){
+    pipeline <- convertUserInputToUtf8(pipeline)
     data <- con$aggregate(pipeline = GetoptLong::qq(pipeline))
   } else if (queryType == "find") {
+    query <- convertUserInputToUtf8(query)
+    fields <- convertUserInputToUtf8(fields)
+    sort <- convertUserInputToUtf8(sort)
     data <- con$find(query = GetoptLong::qq(query), limit=limit, fields=fields, sort = sort, skip = skip)
   }
   result <-data
