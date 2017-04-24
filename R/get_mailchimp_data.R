@@ -148,6 +148,21 @@ get_mailchimp_data <- function(endpoint, date_type = "exact", date_since = NULL,
     # , so unnest_without_empty is used
     ret %>%
       unnest_without_empty(data)
+  } else if(endpoint == "lists/members"){
+    # get member info from REST api for each list
+    # this is for Exploratory Desktop 3.3 backward compatibility
+    ret <- access_api(with_filter_query, dc = dc, apikey = api_key, endpoint = "lists")
+    ids <- ret$id
+    endpoints <- paste("lists", "/", ids, "/", "members", sep = "")
+    ret$data <- lapply(endpoints, function(endpoint){
+      access_api(with_filter_query, dc = dc, apikey = api_key, endpoint = endpoint)
+    })
+
+    # there might be empty data and tidyr::unnest causes an error
+    # , so unnest_without_empty is used
+    ret %>%
+      unnest_without_empty(data)
+
   } else {
     access_api(with_filter_query, dc, api_key, endpoint)
   }
@@ -164,21 +179,21 @@ get_mailchimp_data <- function(endpoint, date_type = "exact", date_since = NULL,
 #' @param dc Data center id
 #' @param apikey Access key for API access
 #' @param path API path to access
-access_api <- function(query, dc, apikey, path){
+access_api <- function(query, dc, apikey, endpoint){
   query$offset <- 0
   ret <- list()
-  # get last path to get the name of fetched objects
-  split <- stringr::str_split(path, "/")
+  # get last endpoint to get the name of fetched objects
+  split <- stringr::str_split(endpoint, "/")
   key <- if(length(split[[1]]) > 1) {
-    if(stringr::str_detect(path, "/email-activity$")){
+    if(stringr::str_detect(endpoint, "/email-activity$")){
       "emails"
     } else {
-      # this is used when path is something like ecommerce/stores
+      # this is used when endpoint is something like ecommerce/stores
       # because in that case, "stores" is used as the key
       tail(split[[1]], 1)
     }
   } else {
-    path
+    endpoint
   }
 
   if(is.null(query$fields)){
@@ -188,7 +203,7 @@ access_api <- function(query, dc, apikey, path){
   }
 
   while(TRUE){
-    url <- paste0("https://", dc,".api.mailchimp.com/3.0/", path)
+    url <- paste0("https://", dc,".api.mailchimp.com/3.0/", endpoint)
 
     res <- httr::GET(url, httr::authenticate("any", apikey), query = query)
 
