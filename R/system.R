@@ -23,6 +23,21 @@ setOAuthTokenCacheOptions <- function(path){
   options(tam.oauth_token_cache = path)
 }
 
+#' On windows, since user input string like SQL or search string for twitter are in windows code page,
+#' (windows R does not support UTF-8 as part of locale.)
+#' we need to convert it to UTF-8 before sending it on the wire.
+convertUserInputToUtf8 <- function(inputString) {
+  if (Sys.info()[["sysname"]] == "Windows") {
+    lc_ctype_locale = Sys.getlocale("LC_CTYPE") # returns string like "Japanese_Japan.932"
+    lc_ctype_locale_tokens = base::strsplit(lc_ctype_locale, "\\.")[[1]] # c("Japanese_Japan", "932"). [[1]] is necessary since strsplit return is nested.
+    if (length(lc_ctype_locale_tokens) == 2) { # check length to avoid out of bound error.
+      encoding = lc_ctype_locale_tokens[[2]] # extracts "932"
+      inputString = base::iconv(inputString, from = encoding, to = "UTF-8")
+    }
+  }
+  inputString
+}
+
 #' API to take care of read/save password for each plugin type and user name combination
 #' if password argument is null, it means we need to retrieve password from RDS file
 #' so the return value is password from RDS file.
@@ -220,8 +235,12 @@ queryMongoDB <- function(host, port, database, collection, username, password, q
   }
   data <- NULL
   if(queryType == "aggregate"){
+    pipeline <- convertUserInputToUtf8(pipeline)
     data <- con$aggregate(pipeline = GetoptLong::qq(pipeline))
   } else if (queryType == "find") {
+    query <- convertUserInputToUtf8(query)
+    fields <- convertUserInputToUtf8(fields)
+    sort <- convertUserInputToUtf8(sort)
     data <- con$find(query = GetoptLong::qq(query), limit=limit, fields=fields, sort = sort, skip = skip)
   }
   result <-data
@@ -421,6 +440,7 @@ executeGenericQuery <- function(type, host, port, databaseName, username, passwo
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
   conn <- getDBConnection(type, host, port, databaseName, username, password, catalog = catalog, schema = schema)
   tryCatch({
+    query <- convertUserInputToUtf8(query)
     resultSet <- DBI::dbSendQuery(conn, query)
     df <- DBI::dbFetch(resultSet)
   }, error = function(err) {
@@ -454,6 +474,7 @@ queryNeo4j <- function(host, port,  username, password, query, isSSL = FALSE){
   } else {
     graph = RNeo4j::startGraph(url)
   }
+  query <- convertUserInputToUtf8(query)
   df <- RNeo4j::cypher(graph, query)
   df
 }
@@ -470,6 +491,8 @@ queryMySQL <- function(host, port, databaseName, username, password, numOfRows =
 
   conn <- getDBConnection("mysql", host, port, databaseName, username, pass)
   tryCatch({
+    DBI::dbGetQuery(conn,"set names utf8")
+    query <- convertUserInputToUtf8(query)
     resultSet <- RMySQL::dbSendQuery(conn, GetoptLong::qq(query))
     df <- RMySQL::dbFetch(resultSet, n = numOfRows)
   }, error = function(err) {
@@ -492,6 +515,7 @@ queryPostgres <- function(host, port, databaseName, username, password, numOfRow
   conn <- getDBConnection("postgres", host, port, databaseName, username, pass)
 
   tryCatch({
+    query <- convertUserInputToUtf8(query)
     resultSet <- RPostgreSQL::dbSendQuery(conn, GetoptLong::qq(query))
     df <- DBI::dbFetch(resultSet, n = numOfRows)
   }, error = function(err) {
@@ -510,6 +534,7 @@ queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, q
 
   conn <- getDBConnection("odbc", NULL, NULL, NULL, username, password, dsn = dsn, additionalParams = additionalParams)
   tryCatch({
+    query <- convertUserInputToUtf8(query)
     df <- RODBC::sqlQuery(conn, GetoptLong::qq(query), max = numOfRows)
     if (!is.data.frame(df)) {
       # when it is error, RODBC::sqlQuery() does not stop() (throw) with error most of the cases.
@@ -553,6 +578,8 @@ getTwitter <- function(n=200, lang=NULL,  lastNDays=30, searchString, tokenFileI
   resultType = "recent"
   retryOnRateLimit = 120
 
+  # convert search string to UTF-8 before sending it on the wire on windows.
+  searchString <- convertUserInputToUtf8(searchString)
   tweetList <- twitteR::searchTwitter(searchString, n, lang, since, until, locale, geocode, sinceID, maxID, resultType, retryOnRateLimit)
   # conver list to data frame
   if(length(tweetList)>0){
@@ -582,6 +609,7 @@ submitGoogleBigQueryJob <- function(project, sqlquery, destination_table, write_
 
   token <- getGoogleTokenForBigQuery(tokenFieldId)
   bigrquery::set_access_cred(token)
+  sqlquery <- convertUserInputToUtf8(sqlquery)
   # pass desitiona_table to support large data
   # check if the query contains special key word for standardSQL
   # If we do not pass the useLegaySql argument, bigrquery set TRUE for it, so we need to expliclity set it to make standard SQL work.
@@ -716,6 +744,7 @@ executeGoogleBigQuery <- function(project, sqlquery, destination_table, page_siz
     dataSet = dataSetTable[[1]][1]
     table = dataSetTable[[1]][2]
     bqtable <- NULL
+    sqlquery <- convertUserInputToUtf8(sqlquery)
     # submit a query to get a result (for refresh data frame case)
     result <- exploratory::submitGoogleBigQueryJob(bucketProjectId, sqlquery, destination_table, write_disposition = "WRITE_TRUNCATE", tokenFileId);
     # extranct result from Google BigQuery to Google Cloud Storage and import
