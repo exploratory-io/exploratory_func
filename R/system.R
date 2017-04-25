@@ -381,13 +381,17 @@ getDBConnection <- function(type, host, port, databaseName, username, password, 
 }
 
 #' @export
-clearDBConnection <- function(type, host, port, databaseName, username, catalog = "", schema = "", dsn="", additionalParams = ""){
+clearDBConnection <- function(type, host, port, databaseName, username, catalog = "", schema = "", dsn="", additionalParams = "",
+                              collection = "", isSSL = FALSE, authSource = NULL) {
   if (type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora")) { #TODO: implement for other types too
-    if (type %in% c("postgres", "redshift", "vertica")) {
+    if (type %in% c("mongodb")) {
+      key <- paste("mongodb", host, port, databaseName, collection, username, toString(isSSL), authSource, sep = ":")
+    }
+    else if (type %in% c("postgres", "redshift", "vertica")) {
       # they use common key "postgres"
       key <- paste("postgres", host, port, databaseName, username, sep = ":")
     }
-    if (type %in% c("mysql", "aurora")) {
+    else if (type %in% c("mysql", "aurora")) {
       # they use common key "mysql"
       key <- paste("mysql", host, port, databaseName, username, sep = ":")
     }
