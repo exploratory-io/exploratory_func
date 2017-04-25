@@ -261,8 +261,7 @@ getMongoCollectionNames <- function(host, port, database, username, password, is
   loadNamespace("jsonlite")
   if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
   pass = saveOrReadPassword("mongodb", username, password)
-  url = getMongoURL(host, port, database, username, pass, isSSL, authSource)
-  con <- mongolite::mongo(collection, url = url)
+  con <- getDBConnection("mongodb", host, port, database, username, pass, collection = collection, isSSL = isSSL, authSource = authSource)
   # command to list collections.
   # con$command is our addition in our mongolite fork.
   result <- con$command(command = '{"listCollections":1}')
@@ -281,8 +280,7 @@ getMongoCollectionNumberOfRows <- function(host, port, database, username, passw
   loadNamespace("jsonlite")
   if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
   pass = saveOrReadPassword("mongodb", username, password)
-  url = getMongoURL(host, port, database, username, pass, isSSL, authSource)
-  con <- mongolite::mongo(collection, url = url)
+  con <- getDBConnection("mongodb", host, port, database, username, pass, collection = collection, isSSL = isSSL, authSource = authSource)
   result <- con$count()
   return(result)
 }
