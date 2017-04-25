@@ -289,11 +289,13 @@ getMongoCollectionNumberOfRows <- function(host, port, database, username, passw
 
 
 #' @export
-getDBConnection <- function(type, host, port, databaseName, username, password, catalog = "", schema = "", dsn="", additionalParams = ""){
+getDBConnection <- function(type, host, port, databaseName, username, password, catalog = "", schema = "", dsn="", additionalParams = "",
+                            collection = "", isSSL = FALSE, authSource = NULL) {
 
   drv = NULL
   conn = NULL
-  if(type == "mysql" || type == "aurora") {
+  if(type == "mongodb") {
+  } else if(type == "mysql" || type == "aurora") {
     if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
     if(!requireNamespace("RMySQL")){stop("package RMySQL must be installed.")}
     # use same key "mysql" for aurora too, since it uses
