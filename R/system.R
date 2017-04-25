@@ -491,6 +491,7 @@ queryMySQL <- function(host, port, databaseName, username, password, numOfRows =
 
   conn <- getDBConnection("mysql", host, port, databaseName, username, pass)
   tryCatch({
+    DBI::dbGetQuery(conn,"set names utf8")
     query <- convertUserInputToUtf8(query)
     resultSet <- RMySQL::dbSendQuery(conn, GetoptLong::qq(query))
     df <- RMySQL::dbFetch(resultSet, n = numOfRows)
