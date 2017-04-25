@@ -295,6 +295,13 @@ getDBConnection <- function(type, host, port, databaseName, username, password, 
   drv = NULL
   conn = NULL
   if(type == "mongodb") {
+    if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
+    loadNamespace("jsonlite")
+    if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
+  
+    # read stored password
+    url = getMongoURL(host, port, databaseName, username, password, isSSL, authSource)
+    conn <- mongolite::mongo(collection, url = url)
   } else if(type == "mysql" || type == "aurora") {
     if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
     if(!requireNamespace("RMySQL")){stop("package RMySQL must be installed.")}
