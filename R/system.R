@@ -299,6 +299,8 @@ getMongoCollectionNumberOfRows <- function(host, port, database, username, passw
 }
 
 
+#' Returns specified connection from pool if it exists in the pool.
+#' If not, new connection is created and returned.
 #' @export
 getDBConnection <- function(type, host, port, databaseName, username, password, catalog = "", schema = "", dsn="", additionalParams = "",
                             collection = "", isSSL = FALSE, authSource = NULL) {
@@ -393,6 +395,9 @@ getDBConnection <- function(type, host, port, databaseName, username, password, 
   conn
 }
 
+#' Clears specified connection from the pool.
+#' When there is an error from a connection, we should call this so that next call to getDBConnection
+#' would return a newly created connection.
 #' @export
 clearDBConnection <- function(type, host, port, databaseName, username, catalog = "", schema = "", dsn="", additionalParams = "",
                               collection = "", isSSL = FALSE, authSource = NULL) {
