@@ -296,7 +296,7 @@ getDBConnection <- function(type, host, port, databaseName, username, password, 
     if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
     loadNamespace("jsonlite")
     if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
-    key <- paste("mongodb", host, port, databaseName, username, toString(isSSL), authSource, sep = ":")
+    key <- paste("mongodb", host, port, databaseName, collection, username, toString(isSSL), authSource, sep = ":")
     conn <- connection_pool[[key]]
     if (is.null(conn)) {
       url = getMongoURL(host, port, databaseName, username, password, isSSL, authSource)
