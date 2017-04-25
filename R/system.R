@@ -225,8 +225,8 @@ queryMongoDB <- function(host, port, database, collection, username, password, q
 
   # read stored password
   pass = saveOrReadPassword("mongodb", username, password)
-  url = getMongoURL(host, port, database, username, pass, isSSL, authSource)
-  con <- mongolite::mongo(collection, url = url)
+  # get connection from connection pool
+  con <- getDBConnection("mongodb", host, port, database, username, pass, collection = collection, isSSL = isSSL, authSource = authSource)
   if(fields == ""){
     fields = "{}"
   }
