@@ -234,20 +234,27 @@ queryMongoDB <- function(host, port, database, collection, username, password, q
     sort = "{}"
   }
   data <- NULL
-  if(queryType == "aggregate"){
-    pipeline <- convertUserInputToUtf8(pipeline)
-    data <- con$aggregate(pipeline = GetoptLong::qq(pipeline))
-  } else if (queryType == "find") {
-    query <- convertUserInputToUtf8(query)
-    fields <- convertUserInputToUtf8(fields)
-    sort <- convertUserInputToUtf8(sort)
-    data <- con$find(query = GetoptLong::qq(query), limit=limit, fields=fields, sort = sort, skip = skip)
-  }
+  tryCatch({
+    if(queryType == "aggregate"){
+      pipeline <- convertUserInputToUtf8(pipeline)
+      data <- con$aggregate(pipeline = GetoptLong::qq(pipeline))
+    } else if (queryType == "find") {
+      query <- convertUserInputToUtf8(query)
+      fields <- convertUserInputToUtf8(fields)
+      sort <- convertUserInputToUtf8(sort)
+      data <- con$find(query = GetoptLong::qq(query), limit=limit, fields=fields, sort = sort, skip = skip)
+    }
+  }, error = function(err) {
+    clearDBConnection("mongodb", host, port, database, username, collection = collection, isSSL = isSSL, authSource = authSource)
+    stop(err)
+  })
   result <-data
   if (isFlatten) {
     result <- jsonlite::flatten(data)
   }
   if (nrow(result)==0) {
+    # possibly this is an error. clear connection once.
+    clearDBConnection("mongodb", host, port, database, username, collection = collection, isSSL = isSSL, authSource = authSource)
     stop("No Data Found");
   } else {
     result
@@ -266,6 +273,7 @@ getMongoCollectionNames <- function(host, port, database, username, password, is
   # con$command is our addition in our mongolite fork.
   result <- con$command(command = '{"listCollections":1}')
   if (!result$ok) {
+    clearDBConnection("mongodb", host, port, database, username, collection = collection, isSSL = isSSL, authSource = authSource)
     stop("listCollections command failed");
   }
   # TODO: does "firstBatch" mean it is possible there are more?
@@ -281,7 +289,12 @@ getMongoCollectionNumberOfRows <- function(host, port, database, username, passw
   if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
   pass = saveOrReadPassword("mongodb", username, password)
   con <- getDBConnection("mongodb", host, port, database, username, pass, collection = collection, isSSL = isSSL, authSource = authSource)
-  result <- con$count()
+  tryCatch({
+    result <- con$count()
+  }, error = function(err) {
+    clearDBConnection("mongodb", host, port, database, username, collection = collection, isSSL = isSSL, authSource = authSource)
+    stop(err)
+  })
   return(result)
 }
 
