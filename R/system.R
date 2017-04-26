@@ -413,11 +413,15 @@ getDBConnection <- function(type, host, port, databaseName, username, password, 
       RODBC::sqlTables(conn, catalog = "dummy", schema = "dummy")
       conn
     }
-    key <- paste("odbc", dsn, username, additionalParams, sep = ":")
-    conn <- connection_pool[[key]]
+    if (pool_connection) { # check pool only when connection pooling is on.
+      key <- paste("odbc", dsn, username, additionalParams, sep = ":")
+      conn <- connection_pool[[key]]
+    }
     if (is.null(conn)) {
       conn <- connect()
-      connection_pool[[key]] <- conn
+      if (pool_connection) { # pool connection if connection pooling is on.
+        connection_pool[[key]] <- conn
+      }
     }
   }
   conn
