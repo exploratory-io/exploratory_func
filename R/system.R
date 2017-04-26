@@ -413,7 +413,11 @@ getDBConnection <- function(type, host, port, databaseName, username, password, 
       RODBC::sqlTables(conn, catalog = "dummy", schema = "dummy")
       conn
     }
-    if (pool_connection) { # check pool only when connection pooling is on.
+    # Check pool only when connection pooling is on. To avoid getting error from timed-out connection,
+    # we use connection pooling for ODBC only while data source dialog is open.
+    # TODO: We may be able to check connection instead by RODBC::sqlTable() or something instead of this,
+    # but we are not very sure of a sure way to check connection for all possible types of ODBC databases.
+    if (pool_connection) {
       key <- paste("odbc", dsn, username, additionalParams, sep = ":")
       conn <- connection_pool[[key]]
     }
