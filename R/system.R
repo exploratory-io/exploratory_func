@@ -225,8 +225,8 @@ queryMongoDB <- function(host, port, database, collection, username, password, q
 
   # read stored password
   pass = saveOrReadPassword("mongodb", username, password)
-  url = getMongoURL(host, port, database, username, pass, isSSL, authSource)
-  con <- mongolite::mongo(collection, url = url)
+  # get connection from connection pool
+  con <- getDBConnection("mongodb", host, port, database, username, pass, collection = collection, isSSL = isSSL, authSource = authSource)
   if(fields == ""){
     fields = "{}"
   }
@@ -234,20 +234,27 @@ queryMongoDB <- function(host, port, database, collection, username, password, q
     sort = "{}"
   }
   data <- NULL
-  if(queryType == "aggregate"){
-    pipeline <- convertUserInputToUtf8(pipeline)
-    data <- con$aggregate(pipeline = GetoptLong::qq(pipeline))
-  } else if (queryType == "find") {
-    query <- convertUserInputToUtf8(query)
-    fields <- convertUserInputToUtf8(fields)
-    sort <- convertUserInputToUtf8(sort)
-    data <- con$find(query = GetoptLong::qq(query), limit=limit, fields=fields, sort = sort, skip = skip)
-  }
+  tryCatch({
+    if(queryType == "aggregate"){
+      pipeline <- convertUserInputToUtf8(pipeline)
+      data <- con$aggregate(pipeline = GetoptLong::qq(pipeline))
+    } else if (queryType == "find") {
+      query <- convertUserInputToUtf8(query)
+      fields <- convertUserInputToUtf8(fields)
+      sort <- convertUserInputToUtf8(sort)
+      data <- con$find(query = GetoptLong::qq(query), limit=limit, fields=fields, sort = sort, skip = skip)
+    }
+  }, error = function(err) {
+    clearDBConnection("mongodb", host, port, database, username, collection = collection, isSSL = isSSL, authSource = authSource)
+    stop(err)
+  })
   result <-data
   if (isFlatten) {
     result <- jsonlite::flatten(data)
   }
   if (nrow(result)==0) {
+    # possibly this is an error. clear connection once.
+    clearDBConnection("mongodb", host, port, database, username, collection = collection, isSSL = isSSL, authSource = authSource)
     stop("No Data Found");
   } else {
     result
@@ -261,12 +268,12 @@ getMongoCollectionNames <- function(host, port, database, username, password, is
   loadNamespace("jsonlite")
   if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
   pass = saveOrReadPassword("mongodb", username, password)
-  url = getMongoURL(host, port, database, username, pass, isSSL, authSource)
-  con <- mongolite::mongo(collection, url = url)
+  con <- getDBConnection("mongodb", host, port, database, username, pass, collection = collection, isSSL = isSSL, authSource = authSource)
   # command to list collections.
   # con$command is our addition in our mongolite fork.
   result <- con$command(command = '{"listCollections":1}')
   if (!result$ok) {
+    clearDBConnection("mongodb", host, port, database, username, collection = collection, isSSL = isSSL, authSource = authSource)
     stop("listCollections command failed");
   }
   # TODO: does "firstBatch" mean it is possible there are more?
@@ -281,19 +288,37 @@ getMongoCollectionNumberOfRows <- function(host, port, database, username, passw
   loadNamespace("jsonlite")
   if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
   pass = saveOrReadPassword("mongodb", username, password)
-  url = getMongoURL(host, port, database, username, pass, isSSL, authSource)
-  con <- mongolite::mongo(collection, url = url)
-  result <- con$count()
+  con <- getDBConnection("mongodb", host, port, database, username, pass, collection = collection, isSSL = isSSL, authSource = authSource)
+  tryCatch({
+    result <- con$count()
+  }, error = function(err) {
+    clearDBConnection("mongodb", host, port, database, username, collection = collection, isSSL = isSSL, authSource = authSource)
+    stop(err)
+  })
   return(result)
 }
 
 
+#' Returns specified connection from pool if it exists in the pool.
+#' If not, new connection is created and returned.
 #' @export
-getDBConnection <- function(type, host, port, databaseName, username, password, catalog = "", schema = "", dsn="", additionalParams = ""){
+getDBConnection <- function(type, host, port, databaseName, username, password, catalog = "", schema = "", dsn="", additionalParams = "",
+                            collection = "", isSSL = FALSE, authSource = NULL) {
 
   drv = NULL
   conn = NULL
-  if(type == "mysql" || type == "aurora") {
+  if(type == "mongodb") {
+    if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
+    loadNamespace("jsonlite")
+    if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
+    key <- paste("mongodb", host, port, databaseName, collection, username, toString(isSSL), authSource, sep = ":")
+    conn <- connection_pool[[key]]
+    if (is.null(conn)) {
+      url = getMongoURL(host, port, databaseName, username, password, isSSL, authSource)
+      conn <- mongolite::mongo(collection, url = url)
+      connection_pool[[key]] <- conn
+    }
+  } else if(type == "mysql" || type == "aurora") {
     if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
     if(!requireNamespace("RMySQL")){stop("package RMySQL must be installed.")}
     # use same key "mysql" for aurora too, since it uses
@@ -370,14 +395,21 @@ getDBConnection <- function(type, host, port, databaseName, username, password, 
   conn
 }
 
+#' Clears specified connection from the pool.
+#' When there is an error from a connection, we should call this so that next call to getDBConnection
+#' would return a newly created connection.
 #' @export
-clearDBConnection <- function(type, host, port, databaseName, username, catalog = "", schema = "", dsn="", additionalParams = ""){
+clearDBConnection <- function(type, host, port, databaseName, username, catalog = "", schema = "", dsn="", additionalParams = "",
+                              collection = "", isSSL = FALSE, authSource = NULL) {
   if (type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora")) { #TODO: implement for other types too
-    if (type %in% c("postgres", "redshift", "vertica")) {
+    if (type %in% c("mongodb")) {
+      key <- paste("mongodb", host, port, databaseName, collection, username, toString(isSSL), authSource, sep = ":")
+    }
+    else if (type %in% c("postgres", "redshift", "vertica")) {
       # they use common key "postgres"
       key <- paste("postgres", host, port, databaseName, username, sep = ":")
     }
-    if (type %in% c("mysql", "aurora")) {
+    else if (type %in% c("mysql", "aurora")) {
       # they use common key "mysql"
       key <- paste("mysql", host, port, databaseName, username, sep = ":")
     }
