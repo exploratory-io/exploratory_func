@@ -325,6 +325,16 @@ getDBConnection <- function(type, host, port, databaseName, username, password, 
     # queryMySQL() too, which uses the key "mysql"
     key <- paste("mysql", host, port, databaseName, username, sep = ":")
     conn <- connection_pool[[key]]
+    if (!is.null(conn)){
+      tryCatch({
+        # test connection
+        DBI::dbGetQuery(conn,"select 1")
+      }, error = function(err) {
+        conn <- NULL
+        # fall through to getting new connection.
+        # TODO: maybe close connection?
+      })
+    }
     if (is.null(conn)) {
       drv <- DBI::dbDriver("MySQL")
       conn = RMySQL::dbConnect(drv, dbname = databaseName, username = username,
