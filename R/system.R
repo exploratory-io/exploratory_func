@@ -338,6 +338,16 @@ getDBConnection <- function(type, host, port, databaseName, username, password, 
     # queryPostgres() too, which uses the key "postgres"
     key <- paste("postgres", host, port, databaseName, username, sep = ":")
     conn <- connection_pool[[key]]
+    if (!is.null(conn)){
+      tryCatch({
+        # test connection
+        DBI::dbGetQuery(conn,"select 1")
+      }, error = function(err) {
+        conn <- NULL
+        # fall through to getting new connection.
+        # TODO: maybe close connection?
+      })
+    }
     if (is.null(conn)) {
       drv <- DBI::dbDriver("PostgreSQL")
       pg_dsn = paste0(
