@@ -1161,13 +1161,16 @@ countycode <- function(state = state, county = county) {
 #' @return data frame
 #' @export
 select_columns <- function(x, ...) {
-  df <- x[, colnames(x) %in% list(...)]
+  col <- colnames(x)[colnames(x) %in% list(...)]
+  df <- x[, col]
   # If it selects only 1 column against the normal data.frame
   # the df becomes a vector, not data.frame. In that case,
   # we need to cast it. Note that if it is against dplyr tbl dataframe,
   # it works just fine and returns a data.frame object.
-  if (!is.data.frame(df))
+  if (!is.data.frame(df)){
     df <- data.frame(df)
+    colnames(df) <- col
+  }
   return (df)
 }
 
