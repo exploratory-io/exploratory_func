@@ -18,6 +18,14 @@ setTokenInfo <- function(token_key, value) {
 # hashmap in which we keep active connections to databases etc.
 connection_pool <- new.env()
 
+pool_connection = FALSE;
+
+#' set connection pool mode. TRUE means on and FALSE means off.
+#' @export
+setConnectionPoolMode <- function(val) {
+  pool_connection <<- val
+}
+
 #' Set cache path for oauth token cachefile
 setOAuthTokenCacheOptions <- function(path){
   options(tam.oauth_token_cache = path)
