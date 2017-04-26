@@ -99,4 +99,15 @@ test_that("test select_columns",{
   expect_true(is.data.frame(df2))
 })
 
+test_that("test select_columns with one column", {
+  df <- structure(
+    list(
+      id = c("cus_AFEeV9EMHRXGeS", "cus_AA00SSatqya7uv", "cus_ARStNcs5xADH7a"),
+      object = c("customer", "customer", "customer")
+    ),
+    .Names = c("id", "object"), class = "data.frame", row.names = c(443L, 609L, 131L)
+  )
 
+  col <- exploratory::select_columns(exploratory::clean_data_frame(df), "id") %>% colnames()
+  expect_equal(col, "id")
+})
