@@ -108,5 +108,6 @@ test_that("test select_columns with one column", {
     .Names = c("id", "object"), class = "data.frame", row.names = c(443L, 609L, 131L)
   )
 
-  exploratory::select_columns(exploratory::clean_data_frame(df), "id") %>% colnames()
+  col <- exploratory::select_columns(exploratory::clean_data_frame(df), "id") %>% colnames()
+  expect_equal(col, "id")
 })
