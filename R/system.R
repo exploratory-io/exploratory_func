@@ -602,6 +602,10 @@ queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, q
       clearDBConnection("odbc", NULL, NULL, NULL, username, dsn = dsn, additionalParams = additionalParams)
       stop(paste(df, collapse = "\n"))
     }
+    if (!pool_connection) {
+      # close connection if not pooling.
+      RODBC::odbcClose(conn)
+    }
   }, error = function(err) {
     # for some cases like conn not being an open connection, sqlQuery still throws error. handle it here.
     # clear connection in pool so that new connection will be used for the next try
