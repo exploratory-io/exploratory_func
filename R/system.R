@@ -24,6 +24,11 @@ user_env$pool_connection <- FALSE;
 #' @export
 setConnectionPoolMode <- function(val) {
   user_env$pool_connection <- val
+  if (!val) {
+    # clear pool when turning off connection pooling mode
+    keys <- ls(connection_pool)
+    rm(list = keys, envir = connection_pool)
+  }
 }
 
 #' get connection pool mode. for test purpose.
