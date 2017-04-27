@@ -321,6 +321,16 @@ getDBConnection <- function(type, host, port, databaseName, username, password, 
     if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
     key <- paste("mongodb", host, port, databaseName, collection, username, toString(isSSL), authSource, sep = ":")
     conn <- connection_pool[[key]]
+    if (!is.null(conn)){
+      # command to ping to check connection validity. 
+      # con$command is our addition in our mongolite fork.
+      result <- conn$command(command = '{"ping":1}')
+      if (!result$ok) {
+        conn <- NULL
+        # fall through to getting new connection.
+        # TODO: do we need to close connection?
+      }
+    }
     if (is.null(conn)) {
       url = getMongoURL(host, port, databaseName, username, password, isSSL, authSource)
       conn <- mongolite::mongo(collection, url = url)
