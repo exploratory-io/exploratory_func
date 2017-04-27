@@ -17,7 +17,7 @@ fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_ra
   }, error = function(e){
     if(e$message == "missing values in object"){
       # this happens when na.action argument is na.fail
-      stop("There is NA in data. Please deal with NA or change na.action argument.")
+      stop("There are NAs in the training data. You might want to set 'na.action' parameter to 'na.pass' or impute NAs manually.")
     }
     stop(e)
   })
