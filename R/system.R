@@ -280,7 +280,8 @@ getMongoCollectionNames <- function(host, port, database, username, password, is
   # command to list collections.
   # con$command is our addition in our mongolite fork.
   result <- con$command(command = '{"listCollections":1}')
-  if (!result$ok) {
+  # need to check existence of ok column of result dataframe first to avoid error in error check.
+  if (!("ok" %in% colnames(result)) || !result$ok) {
     clearDBConnection("mongodb", host, port, database, username, collection = collection, isSSL = isSSL, authSource = authSource)
     stop("listCollections command failed");
   }
@@ -325,7 +326,8 @@ getDBConnection <- function(type, host, port, databaseName, username, password, 
       # command to ping to check connection validity. 
       # con$command is our addition in our mongolite fork.
       result <- conn$command(command = '{"ping":1}')
-      if (!result$ok) {
+      # need to check existence of ok column of result dataframe first to avoid error in error check.
+      if (!("ok" %in% colnames(result)) || !result$ok) {
         conn <- NULL
         # fall through to getting new connection.
         # TODO: do we need to close connection?
