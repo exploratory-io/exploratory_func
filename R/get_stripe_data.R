@@ -119,7 +119,8 @@ get_stripe_data <- function(endpoint,
         grepl("created$", column) ||
         grepl("start$", column) ||
         grepl("end$", column) ||
-        grepl("payment_attempt$", column)
+        grepl("payment_attempt$", column) ||
+        grepl("_on$", column) # there is available_on column for balance/history
       )
       &&
       is.integer(ret[[column]])
