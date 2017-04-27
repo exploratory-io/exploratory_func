@@ -18,6 +18,20 @@ setTokenInfo <- function(token_key, value) {
 # hashmap in which we keep active connections to databases etc.
 connection_pool <- new.env()
 
+user_env$pool_connection <- FALSE;
+
+#' set connection pool mode. TRUE means on and FALSE means off.
+#' @export
+setConnectionPoolMode <- function(val) {
+  user_env$pool_connection <- val
+}
+
+#' get connection pool mode. for test purpose.
+#' @export
+getConnectionPoolMode <- function() {
+  user_env$pool_connection
+}
+
 #' Set cache path for oauth token cachefile
 setOAuthTokenCacheOptions <- function(path){
   options(tam.oauth_token_cache = path)
@@ -272,7 +286,8 @@ getMongoCollectionNames <- function(host, port, database, username, password, is
   # command to list collections.
   # con$command is our addition in our mongolite fork.
   result <- con$command(command = '{"listCollections":1}')
-  if (!result$ok) {
+  # need to check existence of ok column of result dataframe first to avoid error in error check.
+  if (!("ok" %in% colnames(result)) || !result$ok) {
     clearDBConnection("mongodb", host, port, database, username, collection = collection, isSSL = isSSL, authSource = authSource)
     stop("listCollections command failed");
   }
@@ -313,6 +328,17 @@ getDBConnection <- function(type, host, port, databaseName, username, password, 
     if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
     key <- paste("mongodb", host, port, databaseName, collection, username, toString(isSSL), authSource, sep = ":")
     conn <- connection_pool[[key]]
+    if (!is.null(conn)){
+      # command to ping to check connection validity. 
+      # con$command is our addition in our mongolite fork.
+      result <- conn$command(command = '{"ping":1}')
+      # need to check existence of ok column of result dataframe first to avoid error in error check.
+      if (!("ok" %in% colnames(result)) || !result$ok) {
+        conn <- NULL
+        # fall through to getting new connection.
+        # TODO: do we need to close connection?
+      }
+    }
     if (is.null(conn)) {
       url = getMongoURL(host, port, databaseName, username, password, isSSL, authSource)
       conn <- mongolite::mongo(collection, url = url)
@@ -325,6 +351,21 @@ getDBConnection <- function(type, host, port, databaseName, username, password, 
     # queryMySQL() too, which uses the key "mysql"
     key <- paste("mysql", host, port, databaseName, username, sep = ":")
     conn <- connection_pool[[key]]
+    if (!is.null(conn)){
+      tryCatch({
+        # test connection
+        result <- DBI::dbGetQuery(conn,"select 1")
+        if (!is.data.frame(result)) { # it can fail by returning NULL rather than throwing error.
+          conn <- NULL
+          # fall through to getting new connection.
+          # TODO: maybe close connection?
+        }
+      }, error = function(err) {
+        conn <- NULL
+        # fall through to getting new connection.
+        # TODO: maybe close connection?
+      })
+    }
     if (is.null(conn)) {
       drv <- DBI::dbDriver("MySQL")
       conn = RMySQL::dbConnect(drv, dbname = databaseName, username = username,
@@ -338,6 +379,21 @@ getDBConnection <- function(type, host, port, databaseName, username, password, 
     # queryPostgres() too, which uses the key "postgres"
     key <- paste("postgres", host, port, databaseName, username, sep = ":")
     conn <- connection_pool[[key]]
+    if (!is.null(conn)){
+      tryCatch({
+        # test connection
+        result <- DBI::dbGetQuery(conn,"select 1")
+        if (!is.data.frame(result)) { # it can fail by returning NULL rather than throwing error.
+          conn <- NULL
+          # fall through to getting new connection.
+          # TODO: maybe close connection?
+        }
+      }, error = function(err) {
+        conn <- NULL
+        # fall through to getting new connection.
+        # TODO: maybe close connection?
+      })
+    }
     if (is.null(conn)) {
       drv <- DBI::dbDriver("PostgreSQL")
       pg_dsn = paste0(
@@ -385,11 +441,19 @@ getDBConnection <- function(type, host, port, databaseName, username, password, 
       RODBC::sqlTables(conn, catalog = "dummy", schema = "dummy")
       conn
     }
-    key <- paste("odbc", dsn, username, additionalParams, sep = ":")
-    conn <- connection_pool[[key]]
+    # Check pool only when connection pooling is on. To avoid getting error from timed-out connection,
+    # we use connection pooling for ODBC only while data source dialog is open.
+    # TODO: We may be able to check connection instead by RODBC::sqlTable() or something instead of this,
+    # but we are not very sure of a sure way to check connection for all possible types of ODBC databases.
+    if (user_env$pool_connection) {
+      key <- paste("odbc", dsn, username, additionalParams, sep = ":")
+      conn <- connection_pool[[key]]
+    }
     if (is.null(conn)) {
       conn <- connect()
-      connection_pool[[key]] <- conn
+      if (user_env$pool_connection) { # pool connection if connection pooling is on.
+        connection_pool[[key]] <- conn
+      }
     }
   }
   conn
@@ -573,6 +637,10 @@ queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, q
       # in such cases, df is a character vecter rather than a data.frame.
       clearDBConnection("odbc", NULL, NULL, NULL, username, dsn = dsn, additionalParams = additionalParams)
       stop(paste(df, collapse = "\n"))
+    }
+    if (!user_env$pool_connection) {
+      # close connection if not pooling.
+      RODBC::odbcClose(conn)
     }
   }, error = function(err) {
     # for some cases like conn not being an open connection, sqlQuery still throws error. handle it here.
