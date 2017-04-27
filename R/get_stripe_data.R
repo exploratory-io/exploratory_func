@@ -30,7 +30,12 @@ get_stripe_data <- function(endpoint,
       access_token = access_token
     )
   )
-  url <- paste0("https://api.stripe.com/v1/", endpoint)
+  url <- if(endpoint == "files"){
+    # only files need a different url https://stripe.com/docs/api/curl#list_file_uploads
+    paste0("https://uploads.stripe.com/v1/", endpoint)
+  } else {
+    paste0("https://api.stripe.com/v1/", endpoint)
+  }
 
   if(!is.null(date_since)){
     if(date_type != "exact"){
