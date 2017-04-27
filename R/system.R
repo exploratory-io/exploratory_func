@@ -18,12 +18,16 @@ setTokenInfo <- function(token_key, value) {
 # hashmap in which we keep active connections to databases etc.
 connection_pool <- new.env()
 
-pool_connection = FALSE;
+user_env$pool_connection <- FALSE;
 
 #' set connection pool mode. TRUE means on and FALSE means off.
 #' @export
 setConnectionPoolMode <- function(val) {
-  pool_connection <<- val
+  user_env$pool_connection <- val
+}
+
+getConnectionPoolMode <- function() {
+  user_env$pool_connection
 }
 
 #' Set cache path for oauth token cachefile
@@ -439,13 +443,13 @@ getDBConnection <- function(type, host, port, databaseName, username, password, 
     # we use connection pooling for ODBC only while data source dialog is open.
     # TODO: We may be able to check connection instead by RODBC::sqlTable() or something instead of this,
     # but we are not very sure of a sure way to check connection for all possible types of ODBC databases.
-    if (pool_connection) {
+    if (user_env$pool_connection) {
       key <- paste("odbc", dsn, username, additionalParams, sep = ":")
       conn <- connection_pool[[key]]
     }
     if (is.null(conn)) {
       conn <- connect()
-      if (pool_connection) { # pool connection if connection pooling is on.
+      if (user_env$pool_connection) { # pool connection if connection pooling is on.
         connection_pool[[key]] <- conn
       }
     }
@@ -632,7 +636,7 @@ queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, q
       clearDBConnection("odbc", NULL, NULL, NULL, username, dsn = dsn, additionalParams = additionalParams)
       stop(paste(df, collapse = "\n"))
     }
-    if (!pool_connection) {
+    if (!user_env$pool_connection) {
       # close connection if not pooling.
       RODBC::odbcClose(conn)
     }
