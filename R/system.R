@@ -1320,17 +1320,17 @@ download_data_file <- function(url, type){
 
 #'Wrapper for readxl::read_excel to support remote file
 #'@export
-read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0){
+read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf){
   loadNamespace("readxl")
   loadNamespace("stringr")
   if (stringr::str_detect(path, "^https://") ||
       stringr::str_detect(path, "^http://") ||
       stringr::str_detect(path, "^ftp://")) {
     tmp <- download_data_file(path, "excel")
-    readxl::read_excel(tmp, sheet, col_names, col_types, na, skip)
+    readxl::read_excel(tmp, sheet = sheet, col_names = col_names, col_types = col_types, na = na, trim_ws = trim_ws, skip = skip, n_max = n_max)
   } else {
     # if it's local file simply call readxl::read_excel
-    readxl::read_excel(path, sheet, col_names, col_types, na, skip)
+    readxl::read_excel(path, sheet = sheet, col_names = col_names, col_types = col_types, na = na, trim_ws = trim_ws, skip = skip, n_max = n_max)
   }
 }
 
@@ -1365,12 +1365,12 @@ read_delim_file <- function(file, delim, quote = '"',
       stringr::str_detect(file, "^http://") ||
       stringr::str_detect(file, "^ftp://")) {
     tmp <- download_data_file(file, "csv")
-    readr::read_delim(tmp, delim, quote, escape_backslash, escape_double,col_names, col_types,
-                      locale,na, quoted_na, comment, trim_ws,skip, n_max, guess_max, progress)
+    readr::read_delim(tmp, delim, quote = quote, escape_backslash = escape_backslash, escape_double = escape_double, col_names = col_names, col_types = col_types,
+                      locale = locale, na = na, quoted_na = quoted_na, comment = comment, trim_ws = trim_ws, skip = skip, n_max = n_max, guess_max = guess_max, progress = progress)
   } else {
     # if it's local file simply call readr::read_delim
-    readr::read_delim(file, delim, quote, escape_backslash, escape_double,col_names, col_types,
-                      locale,na, quoted_na, comment, trim_ws,skip, n_max, guess_max, progress)
+    readr::read_delim(file, delim, quote = quote, escape_backslash = escape_backslash, escape_double = escape_double, col_names = col_names, col_types = col_types,
+                      locale = locale, na = na, quoted_na = quoted_na, comment = comment, trim_ws = trim_ws, skip = skip, n_max = n_max, guess_max = guess_max, progress = progress)
   }
 }
 
