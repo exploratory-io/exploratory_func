@@ -26,6 +26,8 @@ setConnectionPoolMode <- function(val) {
   user_env$pool_connection <- val
 }
 
+#' get connection pool mode. for test purpose.
+#' @export
 getConnectionPoolMode <- function() {
   user_env$pool_connection
 }
