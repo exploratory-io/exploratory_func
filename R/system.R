@@ -1365,12 +1365,12 @@ read_delim_file <- function(file, delim, quote = '"',
       stringr::str_detect(file, "^http://") ||
       stringr::str_detect(file, "^ftp://")) {
     tmp <- download_data_file(file, "csv")
-    readr::read_delim(tmp, delim, quote, escape_backslash, escape_double,col_names, col_types,
-                      locale,na, quoted_na, comment, trim_ws,skip, n_max, guess_max, progress)
+    readr::read_delim(tmp, delim, quote = quote, escape_backslash = escape_backslash, escape_double = escape_double, col_names = col_names, col_types = col_types,
+                      locale = locale, na = na, quoted_na = quoted_na, comment = comment, trim_ws = trim_ws, skip = skip, n_max = n_max, guess_max = guess_max, progress = progress)
   } else {
     # if it's local file simply call readr::read_delim
-    readr::read_delim(file, delim, quote, escape_backslash, escape_double,col_names, col_types,
-                      locale,na, quoted_na, comment, trim_ws,skip, n_max, guess_max, progress)
+    readr::read_delim(file, delim, quote = quote, escape_backslash = escape_backslash, escape_double = escape_double, col_names = col_names, col_types = col_types,
+                      locale = locale, na = na, quoted_na = quoted_na, comment = comment, trim_ws = trim_ws, skip = skip, n_max = n_max, guess_max = guess_max, progress = progress)
   }
 }
 
