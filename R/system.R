@@ -334,7 +334,7 @@ getDBConnection <- function(type, host, port, databaseName, username, password, 
     key <- paste("mongodb", host, port, databaseName, collection, username, toString(isSSL), authSource, sep = ":")
     conn <- connection_pool[[key]]
     if (!is.null(conn)){
-      # command to ping to check connection validity. 
+      # command to ping to check connection validity.
       # con$command is our addition in our mongolite fork.
       result <- conn$command(command = '{"ping":1}')
       # need to check existence of ok column of result dataframe first to avoid error in error check.
@@ -1320,17 +1320,17 @@ download_data_file <- function(url, type){
 
 #'Wrapper for readxl::read_excel to support remote file
 #'@export
-read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0){
+read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws=TRUE, n_max = Inf){
   loadNamespace("readxl")
   loadNamespace("stringr")
   if (stringr::str_detect(path, "^https://") ||
       stringr::str_detect(path, "^http://") ||
       stringr::str_detect(path, "^ftp://")) {
     tmp <- download_data_file(path, "excel")
-    readxl::read_excel(tmp, sheet, col_names, col_types, na, skip)
+    readxl::read_excel(tmp, sheet = sheet, col_names = col_names, col_types = col_types, na = na, skip = skip, trim_ws = trim_ws, n_max = n_max)
   } else {
     # if it's local file simply call readxl::read_excel
-    readxl::read_excel(path, sheet, col_names, col_types, na, skip)
+    readxl::read_excel(path, sheet = sheet, col_names = col_names, col_types = col_types, na = na, skip = skip, trim_ws = trim_ws, n_max = n_max)
   }
 }
 
