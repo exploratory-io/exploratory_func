@@ -1327,10 +1327,10 @@ read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL,
       stringr::str_detect(path, "^http://") ||
       stringr::str_detect(path, "^ftp://")) {
     tmp <- download_data_file(path, "excel")
-    readxl::read_excel(tmp, sheet, col_names, col_types, na, skip)
+    readxl::read_excel(tmp, sheet = sheet, col_names = col_names, col_types = col_types, na = na, skip = skip)
   } else {
     # if it's local file simply call readxl::read_excel
-    readxl::read_excel(path, sheet, col_names, col_types, na, skip)
+    readxl::read_excel(path, sheet = sheet, col_names = col_names, col_types = col_types, na = na, skip = skip)
   }
 }
 
