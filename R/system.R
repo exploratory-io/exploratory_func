@@ -371,7 +371,12 @@ getDBConnection <- function(type, host, port, databaseName, username, password, 
     if (!is.null(conn)){
       tryCatch({
         # test connection
-        DBI::dbGetQuery(conn,"select 1")
+        result <- DBI::dbGetQuery(conn,"select 1")
+        if (!is.data.frame(result)) { # it can fail by returning NULL rather than throwing error.
+          conn <- NULL
+          # fall through to getting new connection.
+          # TODO: maybe close connection?
+        }
       }, error = function(err) {
         conn <- NULL
         # fall through to getting new connection.
