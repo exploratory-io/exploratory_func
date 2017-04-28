@@ -349,9 +349,9 @@ getDBConnection <- function(type, host, port, databaseName, username, password, 
       result <- conn$command(command = '{"ping":1}')
       # need to check existence of ok column of result dataframe first to avoid error in error check.
       if (!("ok" %in% colnames(result)) || !result$ok) {
+        rm(conn) # this disconnects connection
         conn <- NULL
         # fall through to getting new connection.
-        # TODO: do we need to close connection?
       }
     }
     if (is.null(conn)) {
@@ -371,14 +371,14 @@ getDBConnection <- function(type, host, port, databaseName, username, password, 
         # test connection
         result <- DBI::dbGetQuery(conn,"select 1")
         if (!is.data.frame(result)) { # it can fail by returning NULL rather than throwing error.
+          DBI::dbDisconnect(conn)
           conn <- NULL
           # fall through to getting new connection.
-          # TODO: maybe close connection?
         }
       }, error = function(err) {
+        DBI::dbDisconnect(conn)
         conn <- NULL
         # fall through to getting new connection.
-        # TODO: maybe close connection?
       })
     }
     if (is.null(conn)) {
@@ -399,14 +399,14 @@ getDBConnection <- function(type, host, port, databaseName, username, password, 
         # test connection
         result <- DBI::dbGetQuery(conn,"select 1")
         if (!is.data.frame(result)) { # it can fail by returning NULL rather than throwing error.
+          DBI::dbDisconnect(conn)
           conn <- NULL
           # fall through to getting new connection.
-          # TODO: maybe close connection?
         }
       }, error = function(err) {
+        DBI::dbDisconnect(conn)
         conn <- NULL
         # fall through to getting new connection.
-        # TODO: maybe close connection?
       })
     }
     if (is.null(conn)) {
