@@ -371,12 +371,20 @@ getDBConnection <- function(type, host, port, databaseName, username, password, 
         # test connection
         result <- DBI::dbGetQuery(conn,"select 1")
         if (!is.data.frame(result)) { # it can fail by returning NULL rather than throwing error.
-          DBI::dbDisconnect(conn)
+          tryCatch({ # try to close connection and ignore error
+            DBI::dbDisconnect(conn)
+          }, warning = function(w) {
+          }, error = function(e) {
+          })
           conn <- NULL
           # fall through to getting new connection.
         }
       }, error = function(err) {
-        DBI::dbDisconnect(conn)
+        tryCatch({ # try to close connection and ignore error
+          DBI::dbDisconnect(conn)
+        }, warning = function(w) {
+        }, error = function(e) {
+        })
         conn <- NULL
         # fall through to getting new connection.
       })
@@ -399,12 +407,20 @@ getDBConnection <- function(type, host, port, databaseName, username, password, 
         # test connection
         result <- DBI::dbGetQuery(conn,"select 1")
         if (!is.data.frame(result)) { # it can fail by returning NULL rather than throwing error.
-          DBI::dbDisconnect(conn)
+          tryCatch({ # try to close connection and ignore error
+            DBI::dbDisconnect(conn)
+          }, warning = function(w) {
+          }, error = function(e) {
+          })
           conn <- NULL
           # fall through to getting new connection.
         }
       }, error = function(err) {
-        DBI::dbDisconnect(conn)
+        tryCatch({ # try to close connection and ignore error
+          DBI::dbDisconnect(conn)
+        }, warning = function(w) {
+        }, error = function(e) {
+        })
         conn <- NULL
         # fall through to getting new connection.
       })
@@ -493,7 +509,11 @@ clearDBConnection <- function(type, host, port, databaseName, username, catalog 
       key <- paste("postgres", host, port, databaseName, username, sep = ":")
       conn <- connection_pool[[key]]
       if (conn) {
-        DBI:dbDisconnect(conn)
+        tryCatch({ # try to close connection and ignore error
+          DBI::dbDisconnect(conn)
+        }, warning = function(w) {
+        }, error = function(e) {
+        })
       }
     }
     else if (type %in% c("mysql", "aurora")) {
@@ -501,7 +521,11 @@ clearDBConnection <- function(type, host, port, databaseName, username, catalog 
       key <- paste("mysql", host, port, databaseName, username, sep = ":")
       conn <- connection_pool[[key]]
       if (conn) {
-        DBI:dbDisconnect(conn)
+        tryCatch({ # try to close connection and ignore error
+          DBI::dbDisconnect(conn)
+        }, warning = function(w) {
+        }, error = function(e) {
+        })
       }
     }
     else { # odbc
@@ -535,12 +559,20 @@ getListOfTables <- function(type, host, port, databaseName = NULL, username, pas
     # clear connection in pool so that new connection will be used for the next try
     clearDBConnection(type, host, port, databaseName, username, catalog = catalog, schema = schema)
     if (!type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora")) { # only if conn pool is not used yet
-      DBI::dbDisconnect(conn)
+      tryCatch({ # try to close connection and ignore error
+        DBI::dbDisconnect(conn)
+      }, warning = function(w) {
+      }, error = function(e) {
+      })
     }
     stop(err)
   })
   if (!type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora")) { # only if conn pool is not used yet
-    DBI::dbDisconnect(conn)
+    tryCatch({ # try to close connection and ignore error
+      DBI::dbDisconnect(conn)
+    }, warning = function(w) {
+    }, error = function(e) {
+    })
   }
   tables
 }
@@ -555,12 +587,20 @@ getListOfColumns <- function(type, host, port, databaseName, username, password,
     # clear connection in pool so that new connection will be used for the next try
     clearDBConnection(type, host, port, databaseName, username)
     if (!type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora")) { # only if conn pool is not used yet
-      DBI::dbDisconnect(conn)
+      tryCatch({ # try to close connection and ignore error
+        DBI::dbDisconnect(conn)
+      }, warning = function(w) {
+      }, error = function(e) {
+      })
     }
     stop(err)
   })
   if (!type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora")) { # only if conn pool is not used yet
-    DBI::dbDisconnect(conn)
+    tryCatch({ # try to close connection and ignore error
+      DBI::dbDisconnect(conn)
+    }, warning = function(w) {
+    }, error = function(e) {
+    })
   }
   columns
 }
@@ -578,13 +618,21 @@ executeGenericQuery <- function(type, host, port, databaseName, username, passwo
     # clear connection in pool so that new connection will be used for the next try
     clearDBConnection(type, host, port, databaseName, username, catalog = catalog, schema = schema)
     if (!type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora")) { # only if conn pool is not used yet
-      DBI::dbDisconnect(conn)
+      tryCatch({ # try to close connection and ignore error
+        DBI::dbDisconnect(conn)
+      }, warning = function(w) {
+      }, error = function(e) {
+      })
     }
     stop(err)
   })
   DBI::dbClearResult(resultSet)
   if (!type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora")) { # only if conn pool is not used yet
-    DBI::dbDisconnect(conn)
+    tryCatch({ # try to close connection and ignore error
+      DBI::dbDisconnect(conn)
+    }, warning = function(w) {
+    }, error = function(e) {
+    })
   }
   df
 }
