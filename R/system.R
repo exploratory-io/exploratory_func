@@ -483,17 +483,33 @@ clearDBConnection <- function(type, host, port, databaseName, username, catalog 
   if (type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora")) { #TODO: implement for other types too
     if (type %in% c("mongodb")) {
       key <- paste("mongodb", host, port, databaseName, collection, username, toString(isSSL), authSource, sep = ":")
+      conn <- connection_pool[[key]]
+      if (conn) {
+        rm(conn)
+      }
     }
     else if (type %in% c("postgres", "redshift", "vertica")) {
       # they use common key "postgres"
       key <- paste("postgres", host, port, databaseName, username, sep = ":")
+      conn <- connection_pool[[key]]
+      if (conn) {
+        DBI:dbDisconnect(conn)
+      }
     }
     else if (type %in% c("mysql", "aurora")) {
       # they use common key "mysql"
       key <- paste("mysql", host, port, databaseName, username, sep = ":")
+      conn <- connection_pool[[key]]
+      if (conn) {
+        DBI:dbDisconnect(conn)
+      }
     }
     else { # odbc
       key <- paste("odbc", dsn, username, additionalParams, sep = ":")
+      conn <- connection_pool[[key]]
+      if (conn) {
+        RODBC::odbcClose(conn)
+      }
     }
     rm(list = key, envir = connection_pool)
   }
