@@ -37,7 +37,7 @@ do_prophet <- function(df, time, value = NULL, ...){
 #' @param interval.width - Width of uncertainty intervals.
 #' @param uncertainty.samples - Number of simulations made for calculating uncertainty intervals. Default is 1000.
 #' @export
-do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "day", include_history = TRUE, fun.aggregate = sum, cap = NULL, ...){
+do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "day", include_history = TRUE, fun.aggregate = sum, cap = NULL, weekly.seasonality = TRUE, ...){
 
   loadNamespace("dplyr")
   # For some reason this needs to be library() instead of loadNamespace() to avoid error.
@@ -105,7 +105,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
     if (!is.null(cap) && is.data.frame(cap)) {
       # in this case, cap is the future data frame with cap, specified by user.
       # this is a back door to allow user to specify cap column.
-      m <- prophet::prophet(aggregated_data, growth = "logistic", ...)
+      m <- prophet::prophet(aggregated_data, growth = "logistic", weekly.seasonality = weekly.seasonality, ...)
       forecast <- stats::predict(m, cap)
     }
     else {
@@ -113,10 +113,10 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
         aggregated_data[["cap"]] <- cap
       }
       if (!is.null(cap)) { # if cap is set, use logistic. otherwise use linear.
-        m <- prophet::prophet(aggregated_data, growth = "logistic", ...)
+        m <- prophet::prophet(aggregated_data, growth = "logistic", weekly.seasonality = weekly.seasonality, ...)
       }
       else {
-        m <- prophet::prophet(aggregated_data, growth = "linear", ...)
+        m <- prophet::prophet(aggregated_data, growth = "linear", weekly.seasonality = weekly.seasonality, ...)
       }
       future <- prophet::make_future_dataframe(m, periods = periods, freq = time_unit, include_history = include_history) #includes past dates
       if (!is.null(cap)) { # set cap to future table too, if it is there
