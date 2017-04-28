@@ -508,7 +508,11 @@ clearDBConnection <- function(type, host, port, databaseName, username, catalog 
       key <- paste("odbc", dsn, username, additionalParams, sep = ":")
       conn <- connection_pool[[key]]
       if (conn) {
-        RODBC::odbcClose(conn)
+        tryCatch({ # try to close connection and ignore error
+          RODBC::odbcClose(conn)
+        }, warning = function(w) {
+        }, error = function(e) {
+        })
       }
     }
     rm(list = key, envir = connection_pool)
@@ -671,7 +675,11 @@ queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, q
     }
     if (!user_env$pool_connection) {
       # close connection if not pooling.
-      RODBC::odbcClose(conn)
+      tryCatch({ # try to close connection and ignore error
+        RODBC::odbcClose(conn)
+      }, warning = function(w) {
+      }, error = function(e) {
+      })
     }
   }, error = function(err) {
     # for some cases like conn not being an open connection, sqlQuery still throws error. handle it here.
