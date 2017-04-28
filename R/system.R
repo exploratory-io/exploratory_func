@@ -25,9 +25,19 @@ user_env$pool_connection <- FALSE;
 setConnectionPoolMode <- function(val) {
   user_env$pool_connection <- val
   if (!val) {
-    # clear pool when turning off connection pooling mode
+    # clear odbc pooled connections when turning off connection pooling mode
     keys <- ls(connection_pool)
-    rm(list = keys, envir = connection_pool)
+    lapply(keys, function(key) {
+      if (startsWith(key, "odbc")) {
+        tryCatch({ # try to close connection and ignore error
+          conn <- connection_pool[[key]]
+          RODBC::odbcClose(conn)
+        }, warning = function(w) {
+        }, error = function(e) {
+        })
+        rm(list = key, envir = connection_pool)
+      }
+    })
   }
 }
 
