@@ -27,7 +27,7 @@ do_prophet <- function(df, time, value = NULL, ...){
 #'        as opposed to default "linear".
 #' @param seasonality.prior.scale - Strength of seasonality. Default is 10.
 #' @param yearly.seasonality - Whether to return yearly seasonality data.
-#' @param weekly.seasonality - Whther to return weekly seasonality data.
+#' @param weekly.seasonality - Whether to return weekly seasonality data.
 #' @param n.changepoints - Number of potential changepoints. Default is 25.
 #' @param changepoint.prior.scale - Flexibility of automatic changepoint selection. Default is 0.05.
 #' @param changepoints - list of potential changepoints.
