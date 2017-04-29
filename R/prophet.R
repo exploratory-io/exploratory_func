@@ -102,6 +102,9 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
 
     # ds column should be Date. TODO: really??
     aggregated_data[["ds"]] <- as.Date(aggregated_data[["ds"]])
+    if (time_unit != "day") { # if time_unit is larger than day, having weekly.seasonality does not make sense.
+      weekly.seasonality = FALSE
+    }
     if (!is.null(cap) && is.data.frame(cap)) {
       # in this case, cap is the future data frame with cap, specified by user.
       # this is a back door to allow user to specify cap column.
