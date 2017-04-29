@@ -266,12 +266,14 @@ queryMongoDB <- function(host, port, database, collection, username, password, q
   tryCatch({
     if(queryType == "aggregate"){
       pipeline <- convertUserInputToUtf8(pipeline)
-      data <- con$aggregate(pipeline = GetoptLong::qq(pipeline))
+      # set envir = parent.frame() to get variables from users environment, not papckage environment
+      data <- con$aggregate(pipeline = GetoptLong::qq(pipeline, envir = parent.frame()))
     } else if (queryType == "find") {
       query <- convertUserInputToUtf8(query)
       fields <- convertUserInputToUtf8(fields)
       sort <- convertUserInputToUtf8(sort)
-      data <- con$find(query = GetoptLong::qq(query), limit=limit, fields=fields, sort = sort, skip = skip)
+      # set envir = parent.frame() to get variables from users environment, not papckage environment
+      data <- con$find(query = GetoptLong::qq(query, envir = parent.frame()), limit=limit, fields=fields, sort = sort, skip = skip)
     }
   }, error = function(err) {
     clearDBConnection("mongodb", host, port, database, username, collection = collection, isSSL = isSSL, authSource = authSource)
@@ -344,7 +346,7 @@ getDBConnection <- function(type, host, port, databaseName, username, password, 
     key <- paste("mongodb", host, port, databaseName, collection, username, toString(isSSL), authSource, sep = ":")
     conn <- connection_pool[[key]]
     if (!is.null(conn)){
-      # command to ping to check connection validity. 
+      # command to ping to check connection validity.
       # con$command is our addition in our mongolite fork.
       result <- conn$command(command = '{"ping":1}')
       # need to check existence of ok column of result dataframe first to avoid error in error check.
@@ -500,7 +502,7 @@ clearDBConnection <- function(type, host, port, databaseName, username, catalog 
     if (type %in% c("mongodb")) {
       key <- paste("mongodb", host, port, databaseName, collection, username, toString(isSSL), authSource, sep = ":")
       conn <- connection_pool[[key]]
-      if (conn) {
+      if (!is.null(conn)) {
         rm(conn)
       }
     }
@@ -508,7 +510,7 @@ clearDBConnection <- function(type, host, port, databaseName, username, catalog 
       # they use common key "postgres"
       key <- paste("postgres", host, port, databaseName, username, sep = ":")
       conn <- connection_pool[[key]]
-      if (conn) {
+      if (!is.null(conn)) {
         tryCatch({ # try to close connection and ignore error
           DBI::dbDisconnect(conn)
         }, warning = function(w) {
@@ -520,7 +522,7 @@ clearDBConnection <- function(type, host, port, databaseName, username, catalog 
       # they use common key "mysql"
       key <- paste("mysql", host, port, databaseName, username, sep = ":")
       conn <- connection_pool[[key]]
-      if (conn) {
+      if (!is.null(conn)) {
         tryCatch({ # try to close connection and ignore error
           DBI::dbDisconnect(conn)
         }, warning = function(w) {
@@ -531,7 +533,7 @@ clearDBConnection <- function(type, host, port, databaseName, username, catalog 
     else { # odbc
       key <- paste("odbc", dsn, username, additionalParams, sep = ":")
       conn <- connection_pool[[key]]
-      if (conn) {
+      if (!is.null(conn)) {
         tryCatch({ # try to close connection and ignore error
           RODBC::odbcClose(conn)
         }, warning = function(w) {
@@ -612,7 +614,8 @@ executeGenericQuery <- function(type, host, port, databaseName, username, passwo
   conn <- getDBConnection(type, host, port, databaseName, username, password, catalog = catalog, schema = schema)
   tryCatch({
     query <- convertUserInputToUtf8(query)
-    resultSet <- DBI::dbSendQuery(conn, query)
+    # set envir = parent.frame() to get variables from users environment, not papckage environment
+    resultSet <- DBI::dbSendQuery(conn, GetoptLong::qq(query, envir = parent.frame()))
     df <- DBI::dbFetch(resultSet)
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
@@ -672,7 +675,8 @@ queryMySQL <- function(host, port, databaseName, username, password, numOfRows =
   tryCatch({
     DBI::dbGetQuery(conn,"set names utf8")
     query <- convertUserInputToUtf8(query)
-    resultSet <- RMySQL::dbSendQuery(conn, GetoptLong::qq(query))
+    # set envir = parent.frame() to get variables from users environment, not papckage environment
+    resultSet <- RMySQL::dbSendQuery(conn, GetoptLong::qq(query, envir = parent.frame()))
     df <- RMySQL::dbFetch(resultSet, n = numOfRows)
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
@@ -695,7 +699,8 @@ queryPostgres <- function(host, port, databaseName, username, password, numOfRow
 
   tryCatch({
     query <- convertUserInputToUtf8(query)
-    resultSet <- RPostgreSQL::dbSendQuery(conn, GetoptLong::qq(query))
+    # set envir = parent.frame() to get variables from users environment, not papckage environment
+    resultSet <- RPostgreSQL::dbSendQuery(conn, GetoptLong::qq(query, envir = parent.frame()))
     df <- DBI::dbFetch(resultSet, n = numOfRows)
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
@@ -714,7 +719,8 @@ queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, q
   conn <- getDBConnection("odbc", NULL, NULL, NULL, username, password, dsn = dsn, additionalParams = additionalParams)
   tryCatch({
     query <- convertUserInputToUtf8(query)
-    df <- RODBC::sqlQuery(conn, GetoptLong::qq(query), max = numOfRows)
+    # set envir = parent.frame() to get variables from users environment, not papckage environment
+    df <- RODBC::sqlQuery(conn, GetoptLong::qq(query, envir = parent.frame()), max = numOfRows)
     if (!is.data.frame(df)) {
       # when it is error, RODBC::sqlQuery() does not stop() (throw) with error most of the cases.
       # in such cases, df is a character vecter rather than a data.frame.
@@ -801,7 +807,8 @@ submitGoogleBigQueryJob <- function(project, sqlquery, destination_table, write_
   # check if the query contains special key word for standardSQL
   # If we do not pass the useLegaySql argument, bigrquery set TRUE for it, so we need to expliclity set it to make standard SQL work.
   isStandardSQL <- stringr::str_detect(sqlquery, "#standardSQL")
-  job <- bigrquery::insert_query_job(GetoptLong::qq(sqlquery), project, destination_table = destination_table, write_disposition = write_disposition, useLegacySql = isStandardSQL == FALSE)
+  # set envir = parent.frame() to get variables from users environment, not papckage environment
+  job <- bigrquery::insert_query_job(GetoptLong::qq(sqlquery, envir = parent.frame()), project, destination_table = destination_table, write_disposition = write_disposition, useLegacySql = isStandardSQL == FALSE)
   job <- bigrquery::wait_for(job)
   isCacheHit <- job$statistics$query$cacheHit
   # if cache hit case, totalBytesProcessed info is not available. So set it as -1
@@ -942,7 +949,8 @@ executeGoogleBigQuery <- function(project, sqlquery, destination_table, page_siz
     # check if the query contains special key word for standardSQL
     # If we do not pass the useLegaySql argument, bigrquery set TRUE for it, so we need to expliclity set it to make standard SQL work.
     isStandardSQL <- stringr::str_detect(sqlquery, "#standardSQL")
-    df <- bigrquery::query_exec(GetoptLong::qq(sqlquery), project = project, destination_table = destination_table,
+    # set envir = parent.frame() to get variables from users environment, not papckage environment
+    df <- bigrquery::query_exec(GetoptLong::qq(sqlquery, envir = parent.frame()), project = project, destination_table = destination_table,
                                 page_size = page_size, max_page = max_page, write_disposition = write_disposition, useLegacySql = isStandardSQL == FALSE)
   }
   df
