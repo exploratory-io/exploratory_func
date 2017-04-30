@@ -27,7 +27,7 @@ do_prophet <- function(df, time, value = NULL, ...){
 #'        as opposed to default "linear".
 #' @param seasonality.prior.scale - Strength of seasonality. Default is 10.
 #' @param yearly.seasonality - Whether to return yearly seasonality data.
-#' @param weekly.seasonality - Whther to return weekly seasonality data.
+#' @param weekly.seasonality - Whether to return weekly seasonality data.
 #' @param n.changepoints - Number of potential changepoints. Default is 25.
 #' @param changepoint.prior.scale - Flexibility of automatic changepoint selection. Default is 0.05.
 #' @param changepoints - list of potential changepoints.
@@ -37,7 +37,8 @@ do_prophet <- function(df, time, value = NULL, ...){
 #' @param interval.width - Width of uncertainty intervals.
 #' @param uncertainty.samples - Number of simulations made for calculating uncertainty intervals. Default is 1000.
 #' @export
-do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "day", include_history = TRUE, fun.aggregate = sum, cap = NULL, ...){
+do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "day", include_history = TRUE,
+                        fun.aggregate = sum, cap = NULL, weekly.seasonality = "auto", yearly.seasonality = "auto", ...){
 
   loadNamespace("dplyr")
   # For some reason this needs to be library() instead of loadNamespace() to avoid error.
@@ -102,10 +103,16 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
 
     # ds column should be Date. TODO: really??
     aggregated_data[["ds"]] <- as.Date(aggregated_data[["ds"]])
+    if (time_unit != "day") { # if time_unit is larger than day (the next level is week), having weekly.seasonality does not make sense.
+      weekly.seasonality = FALSE
+    }
+    if (time_unit == "year") { # if time_unit is year (the largest unit), having yearly.seasonality does not make sense.
+      yearly.seasonality = FALSE
+    }
     if (!is.null(cap) && is.data.frame(cap)) {
       # in this case, cap is the future data frame with cap, specified by user.
       # this is a back door to allow user to specify cap column.
-      m <- prophet::prophet(aggregated_data, growth = "logistic", ...)
+      m <- prophet::prophet(aggregated_data, growth = "logistic", weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, ...)
       forecast <- stats::predict(m, cap)
     }
     else {
@@ -113,10 +120,10 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
         aggregated_data[["cap"]] <- cap
       }
       if (!is.null(cap)) { # if cap is set, use logistic. otherwise use linear.
-        m <- prophet::prophet(aggregated_data, growth = "logistic", ...)
+        m <- prophet::prophet(aggregated_data, growth = "logistic", weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, ...)
       }
       else {
-        m <- prophet::prophet(aggregated_data, growth = "linear", ...)
+        m <- prophet::prophet(aggregated_data, growth = "linear", weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, ...)
       }
       future <- prophet::make_future_dataframe(m, periods = periods, freq = time_unit, include_history = include_history) #includes past dates
       if (!is.null(cap)) { # set cap to future table too, if it is there
