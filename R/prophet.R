@@ -38,7 +38,7 @@ do_prophet <- function(df, time, value = NULL, ...){
 #' @param uncertainty.samples - Number of simulations made for calculating uncertainty intervals. Default is 1000.
 #' @export
 do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "day", include_history = TRUE,
-                        fun.aggregate = sum, cap = NULL, weekly.seasonality = "auto", yearly.seasonality = "auto", ...){
+                        fun.aggregate = sum, cap = NULL, weekly.seasonality = TRUE, yearly.seasonality = TRUE, ...){ # make default for weekly/yearly.seasonality TRUE since 'auto' does not behave well.
 
   loadNamespace("dplyr")
   # For some reason this needs to be library() instead of loadNamespace() to avoid error.
@@ -106,9 +106,10 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
     if (time_unit != "day") { # if time_unit is larger than day (the next level is week), having weekly.seasonality does not make sense.
       weekly.seasonality = FALSE
     }
-    if (time_unit == "year") { # if time_unit is year (the largest unit), having yearly.seasonality does not make sense.
-      yearly.seasonality = FALSE
-    }
+    # disabling this logic for now, since setting yearly.seasonality FALSE disables weekly.seasonality too.
+    # if (time_unit == "year") { # if time_unit is year (the largest unit), having yearly.seasonality does not make sense.
+    #   yearly.seasonality = FALSE
+    # }
     if (!is.null(cap) && is.data.frame(cap)) {
       # in this case, cap is the future data frame with cap, specified by user.
       # this is a back door to allow user to specify cap column.
