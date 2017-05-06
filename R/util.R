@@ -759,8 +759,10 @@ pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = N
       # make a count matrix if value_col is NULL
       reshape2::acast(df, formula = formula, fun.aggregate = length, fill = fill)
     } else {
-      if(na.rm){
+      if(na.rm && !identical(na_pct, fun.aggregate) && !identical(na_count, fun.aggregate) ){
         # remove NA
+        # if fun.aggregate function is na_pct or na_count,
+        # NA should not be removed because the user wants that information
         df <- df[!is.na(df[[value_col]]),]
       }
       reshape2::acast(df, formula = formula, value.var = value_col, fun.aggregate = fun.aggregate, fill = fill)
@@ -1001,4 +1003,18 @@ unnest_without_empty_ <- function(data, nested_col){
   } else {
     tidyr::unnest_(without_empty, nested_col)
   }
+}
+
+#' Count NA in a vector
+#' @param x vector
+#' @export
+na_count <- function(x){
+  sum(is.na(x))
+}
+
+#' Percentage of NA in a vector
+#' @param x vector
+#' @export
+na_pct <- function(x){
+  sum(is.na(x)) / length(x) * 100
 }
