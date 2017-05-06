@@ -1002,3 +1002,13 @@ unnest_without_empty_ <- function(data, nested_col){
     tidyr::unnest_(without_empty, nested_col)
   }
 }
+
+#' @export
+na_count <- function(x){
+  sum(is.na(x))
+}
+
+#' @export
+na_pct <- function(x){
+  sum(is.na(x)) / length(x) * 100
+}
