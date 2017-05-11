@@ -283,9 +283,11 @@ same_type <- function(vector, original){
     }
   } else if(is.integer(original)){
     as.integer(vector)
-  } else if(is.numeric.Date(original)) {
+  } else if(inherits(original, "Date")) {
+    # when original data is Date
     as.Date(vector)
-  } else if(is.numeric.POSIXt(original)){
+  } else if(inherits(original, "POSIXct")){
+    # when original data is POSIXct
     as.POSIXct(vector)
   } else if (is.numeric(original)){
     as.numeric(vector)
@@ -723,7 +725,8 @@ pivot <- function(df, formula, value = NULL, ...) {
 pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = NULL, na.rm = TRUE) {
   # create a column name for row names
   # column names in lhs are collapsed by "_"
-  cname <- paste0(all.vars(lazyeval::f_lhs(formula)), collapse = "_")
+  rows <- all.vars(lazyeval::f_lhs(formula))
+  cname <- paste0(rows, collapse = "_")
 
   vars <- all.vars(formula)
 
@@ -784,6 +787,11 @@ pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = N
   ret <- df %>%
     dplyr::do_(.dots=setNames(list(~pivot_each(.)), tmp_col)) %>%
     tidyr::unnest_(tmp_col)
+
+  if(length(rows) == 1){
+    # set same data type with original data
+    ret[[rows]] <- same_type(ret[[rows]], original = df[[rows]])
+  }
 
   # replace NA values in missing columns in some groups with fill
   if(!is.na(fill)) {

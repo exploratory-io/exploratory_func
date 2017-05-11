@@ -454,6 +454,28 @@ test_that("test pivot", {
 
 })
 
+test_that("test pivot with Date", {
+  test_df <- data.frame(
+    dt = rep(lubridate::today() + seq(3), each = 5),
+    col = rep(seq(5), 3),
+    val = seq(15)
+  )
+
+  pivoted <- pivot(test_df, dt ~ col, value = val)
+  expect_true(pivoted$dt %>% inherits("Date"))
+})
+
+test_that("test pivot with POSIXct", {
+  test_df <- data.frame(
+    dt = rep(lubridate::now() + seq(3), each = 5),
+    col = rep(seq(5), 3),
+    val = seq(15)
+  )
+
+  pivoted <- pivot(test_df, dt ~ col, value = val)
+  expect_true(pivoted$dt %>% inherits("POSIXct"))
+})
+
 test_that("test pivot with group_by and dirty colum names", {
   test_df <- data.frame(
     group = c(rep(letters[1:2], each = 50),"a"),
