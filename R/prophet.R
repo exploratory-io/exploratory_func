@@ -17,7 +17,9 @@ do_prophet <- function(df, time, value = NULL, ...){
 #' @param include_history - Whether to include history data in forecast or not.
 #' @param fun.aggregate - Function to aggregate values.
 #' @param ... - extra values to be passed to prophet::prophet. listed below.
-#' @param growth - Type of Trend. "linear" or "logistic".
+#' @param growth - This parameter used to specify type of Trend, which can be "linear" or "logistic",
+#'        but now we determine this automatically by cap. It is here just to avoid throwing error from prophet,
+#'        (about doubly specifying grouth param by our code and by "...") when old caller calls with this parameter.
 #' @param cap - Achievable Maximum Capacity of the value to forecast.
 #'        https://facebookincubator.github.io/prophet/docs/forecasting_growth.html
 #'        It can be numeric or data frame. When numeric, the value is used as cap for both modeling and forecasting.
@@ -38,7 +40,7 @@ do_prophet <- function(df, time, value = NULL, ...){
 #' @param uncertainty.samples - Number of simulations made for calculating uncertainty intervals. Default is 1000.
 #' @export
 do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "day", include_history = TRUE,
-                        fun.aggregate = sum, cap = NULL, weekly.seasonality = TRUE, yearly.seasonality = TRUE, ...){
+                        fun.aggregate = sum, cap = NULL, growth = NULL, weekly.seasonality = TRUE, yearly.seasonality = TRUE, ...){
   # we are making default for weekly/yearly.seasonality TRUE since 'auto' does not behave well.
   # it seems that there are cases that weekly.seasonality is turned off as a side-effect of yearly.seasonality turned off.
   # if that happens, since no seasonality is on, prophet forecast result becomes just a linear trend line,
