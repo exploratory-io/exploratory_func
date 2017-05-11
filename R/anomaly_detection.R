@@ -102,6 +102,7 @@ do_anomaly_detection_ <- function(df, time_col, value_col = NULL, time_unit = "d
         time = lubridate::floor_date(df[[time_col]], unit = time_unit),
         value = df[[value_col]]
       ) %>%
+        dplyr::filter(!is.na(value)) %>% # filter out NA so that aggregate function does not need to handle NA
         dplyr::group_by(time) %>%
         dplyr::summarise(val = fun.aggregate(value))
     } else {
