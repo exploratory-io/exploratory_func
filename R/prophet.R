@@ -90,6 +90,9 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
         value = df[[value_col]],
         cap_col = df$cap
       ) %>%
+        # remove NA so that we do not pass data with NA, NaN, or 0 to prophet, which we are not very sure what would happen.
+        # we saw a case where rstan crashes with the last row with 0 y value.
+        dplyr::filter(!is.na(value)) %>%
         dplyr::group_by(ds) %>%
         dplyr::summarise(y = fun.aggregate(value), cap = fun.aggregate(cap_col))
     } else if (!is.null(value_col)){
@@ -97,6 +100,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
         ds = lubridate::floor_date(df[[time_col]], unit = time_unit),
         value = df[[value_col]]
       ) %>%
+        dplyr::filter(!is.na(value)) %>% # remove NA so that we do not pass data with NA, NaN, or 0 to prophet
         dplyr::group_by(ds) %>%
         dplyr::summarise(y = fun.aggregate(value))
     } else {
