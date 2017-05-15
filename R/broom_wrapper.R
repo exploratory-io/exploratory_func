@@ -67,7 +67,7 @@ augment_kmeans <- function(df, model, data){
         source_data
       }
 
-      (df %>%  dplyr::do_(.dots=setNames(list(~augment_each(.)), model_col)) %>%  tidyr::unnest_(model_col))
+      (df %>%  dplyr::do_(.dots=setNames(list(~augment_each(.)), model_col)) %>%  tidyr::unnest_(model_col, .drop = TRUE))
     } else {
       stop(e)
     }
@@ -127,7 +127,7 @@ add_prediction <- function(df, model_df, conf_int = 0.95, ...){
     }
 
     ret <- ret %>%
-      tidyr::unnest(.test_index)
+      tidyr::unnest(.test_index, .drop = TRUE)
   }
 
   # if type.predict argument is not indicated in this function
@@ -240,7 +240,7 @@ cluster_info <- function(df){
         dplyr::bind_cols(info)
       ret
     })) %>%
-    tidyr::unnest(model)
+    tidyr::unnest(model, .drop = TRUE)
 }
 
 #' glance wrapper for kmeans
@@ -363,7 +363,7 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
 
       ret <- augmented %>%
         dplyr::select(-model) %>%
-        tidyr::unnest(source.data)
+        tidyr::unnest(source.data, .drop = TRUE)
 
     } else {
       # augment by training data
@@ -395,7 +395,7 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
 
       augmented %>%
         dplyr::select(-model) %>%
-        tidyr::unnest(source.data)
+        tidyr::unnest(source.data, .drop = TRUE)
     }
   }
 
@@ -576,7 +576,7 @@ prediction_coxph <- function(df, time = NULL, threshold = 0.5, ...){
       ret
     }))
   ret <- ret %>% dplyr::select_(c("ret", group_by_names))
-  ret <- ret %>% tidyr::unnest()
+  ret <- ret %>% tidyr::unnest(.drop = TRUE)
 
   # set it back to non-group-by state that is same as predict() output.
   if (length(group_by_names) == 0) {
@@ -645,7 +645,7 @@ model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
           tidy_ret
 
         })) %>%
-        tidyr::unnest(model)
+        tidyr::unnest(model, .drop = TRUE)
     } else {
       # broom::tidy uses confint.lm and it uses profile, so "profile" is used in conf_int to swith how to get confint
       profile <- conf_int == "profile"
@@ -768,7 +768,7 @@ model_stats <- function(df, pretty.name = FALSE, ...){
       ret
     })) %>%
     dplyr::select_(c("ret", group_by_names)) %>%
-    tidyr::unnest()
+    tidyr::unnest(.drop = TRUE)
 
   # set it back to non-group-by state that is same as glance() output.
   if (length(group_by_names) == 0) {

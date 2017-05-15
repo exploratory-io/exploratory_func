@@ -783,7 +783,7 @@ pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = N
   tmp_col <- avoid_conflict(grouped_col, "tmp")
   ret <- df %>%
     dplyr::do_(.dots=setNames(list(~pivot_each(.)), tmp_col)) %>%
-    tidyr::unnest_(tmp_col)
+    tidyr::unnest_(tmp_col, .drop = TRUE)
 
   # replace NA values in missing columns in some groups with fill
   if(!is.na(fill)) {
@@ -1001,7 +1001,7 @@ unnest_without_empty_ <- function(data, nested_col){
     # if all values in nested_col are empty
     without_empty
   } else {
-    tidyr::unnest_(without_empty, nested_col)
+    tidyr::unnest_(without_empty, nested_col, .drop = TRUE)
   }
 }
 

@@ -150,5 +150,5 @@ do_anomaly_detection_ <- function(df, time_col, value_col = NULL, time_unit = "d
   # this doesn't overwrite grouping columns.
   tmp_col <- avoid_conflict(colnames(df), "tmp_col")
   test <- (df %>%  dplyr::do_(.dots=setNames(list(~do_anomaly_detection_each(.)), tmp_col)))
-  test %>%  tidyr::unnest_(tmp_col)
+  test %>%  tidyr::unnest_(tmp_col, .drop = TRUE)
 }
