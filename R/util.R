@@ -1024,6 +1024,10 @@ na_pct <- function(x){
 #' so that it always drops other list
 #' columns, which is an expected behaviour
 #' for usage in this package in most cases.
+#' By default, unnest will drop other list columns
+#' if unnesting the specified columns requires the
+#' rows to be duplicated becouse of more than
+#' 2 rows data frames for example.
 unnest_with_drop_ <- function(..., .drop = TRUE){
   tidyr::unnest_(..., .drop = .drop)
 }
@@ -1033,6 +1037,10 @@ unnest_with_drop_ <- function(..., .drop = TRUE){
 #' so that it always drops other list
 #' columns, which is an expected behaviour
 #' for usage in this package in most cases.
+#' By default, unnest will drop other list columns
+#' if unnesting the specified columns requires the
+#' rows to be duplicated becouse of more than
+#' 2 rows data frames for example.
 unnest_with_drop <- function(..., .drop = TRUE){
   tidyr::unnest(..., .drop = .drop)
 }
