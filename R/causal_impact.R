@@ -43,9 +43,12 @@ do_causal_impact_ <- function(df, time_colname, formula, ...) {
     df_zoo <- zoo::zoo(df, time_points_vec)
     
     impact <- CausalImpact::CausalImpact(df_zoo, ...)
-    data <- as.data.frame(impact$series)
-    data <- tibble::rownames_to_column(data)
-    mutate(data, rowname = as.numeric(rowname))
+    ret <- as.data.frame(impact$series)
+    ret <- tibble::rownames_to_column(ret)
+    ret <- mutate(ret, rowname = as.Date(rowname))
+    colnames(ret)[colnames(ret) == "rowname"] <- avoid_conflict(colnames(ret), time_colname) # set back original time column name
+    colnames(ret)[colnames(ret) == "y"] <- avoid_conflict(colnames(ret), y_colname) # set back original y column name
+    ret
   }
 
   # Calculation is executed in each group.
