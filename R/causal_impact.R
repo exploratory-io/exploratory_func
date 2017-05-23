@@ -3,23 +3,23 @@
 #' NSE version of do_causal_impact_
 #' @export
 do_causal_impact <- function(df, time, formula, ...) {
-  time_col <- col_name(substitute(time))
-  do_causal_impact_(df, time_col, formula = formula, ...)
+  time_colname <- col_name(substitute(time))
+  do_causal_impact_(df, time_colname, formula = formula, ...)
 }
 
-do_causal_impact_ <- function(df, time_col, formula, ...) {
-  y_column_name <- as.character(lazyeval::f_lhs(formula))
+do_causal_impact_ <- function(df, time_colname, formula, ...) {
+  y_colname <- as.character(lazyeval::f_lhs(formula))
   predictor_column_names <- all.vars(lazyeval::f_rhs(formula))
   all_column_names <- all.vars(formula)
   grouped_col <- grouped_by(df)
 
   # column name validation
-  if(!time_col %in% colnames(df)){
-    stop(paste0(time_col, " is not in column names"))
+  if(!time_colname %in% colnames(df)){
+    stop(paste0(time_colname, " is not in column names"))
   }
 
-  if(time_col %in% grouped_col){
-    stop(paste0(time_col, " is grouped. Please ungroup it."))
+  if(time_colname %in% grouped_col){
+    stop(paste0(time_colname, " is grouped. Please ungroup it."))
   }
 
   # remove rows with NA in predictors. CausalImpact does not allow NA in predictors (covariates).
@@ -27,12 +27,12 @@ do_causal_impact_ <- function(df, time_col, formula, ...) {
     df <- df[!is.na(df[[var]]), ]
   }
   # remove NA data
-  df <- df[!is.na(df[[time_col]]), ]
+  df <- df[!is.na(df[[time_colname]]), ]
 
   # select only columns that appear in the formula.
-  input_df <- dplyr::select_(df, .dots = all_column_names)
+  input_df <- dplyr::select_(df, .dots = c(time_colname, all_column_names))
   # rename the y column to fixed name y so that it is easier to handle in the next step.
-  input_df <- dplyr::rename_(input_df, y = y_column_name)
+  input_df <- dplyr::rename_(input_df, y = y_colname)
   # bring y column at the beginning of the input_df, so that CausalImpact understand this is the column to predict.
   input_df <- dplyr::select(input_df, y, dplyr::everything())
 
