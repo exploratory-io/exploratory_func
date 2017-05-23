@@ -7,7 +7,7 @@ do_causal_impact <- function(df, time, formula, ...) {
   do_causal_impact_(df, time_colname, formula = formula, ...)
 }
 
-do_causal_impact_ <- function(df, time_colname, formula, ...) {
+do_causal_impact_ <- function(df, time_colname, formula, impact_time = NULL, ...) {
   y_colname <- as.character(lazyeval::f_lhs(formula))
   predictor_column_names <- all.vars(lazyeval::f_rhs(formula))
   all_column_names <- all.vars(formula)
@@ -24,6 +24,10 @@ do_causal_impact_ <- function(df, time_colname, formula, ...) {
 
   if (!class(df[[time_colname]]) %in% c("Date", "POSIXct")) {
     stop(paste0(time_colname, " must be Date or POSIXct."))
+  }
+
+  if (class(df[[time_colname]]) != class(impact_time)) {
+    stop(paste0("impact_time must be the same class as ", time_colname, "."))
   }
 
   # remove rows with NA in predictors. CausalImpact does not allow NA in predictors (covariates).
@@ -45,8 +49,14 @@ do_causal_impact_ <- function(df, time_colname, formula, ...) {
     time_points_vec <- df$time_points
     df <- dplyr::select_(df, quote(-time_points)) # drop time_points from main df
     df_zoo <- zoo::zoo(df, time_points_vec)
+
+    pre_period <- c(min(time_points_vec), impact_time - 1) # -1 works as -1 day on Date and -1 sec on POSIXct.
+    post_period <- c(impact_time, max(time_points_vec))
     
-    impact <- CausalImpact::CausalImpact(df_zoo, ...)
+    # call CausalImpact::CausalImpact, which is the heart of this analysis.
+    impact <- CausalImpact::CausalImpact(df_zoo, pre.period = pre_period, post.period = post_period, ...)
+
+    # $series has the result of prediction. for now ignore the rest such as $model.
     ret <- as.data.frame(impact$series)
     ret <- tibble::rownames_to_column(ret)
     if (class(time_points_vec) == "Date") {
