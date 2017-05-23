@@ -26,6 +26,8 @@ do_causal_impact_ <- function(df, time_col, formula, ...) {
   for(var in predictor_column_names) {
     df <- df[!is.na(df[[var]]), ]
   }
+  # remove NA data
+  df <- df[!is.na(df[[time_col]]), ]
 
   # select only columns that appear in the formula.
   input_df <- dplyr::select_(df, .dots = all_column_names)
