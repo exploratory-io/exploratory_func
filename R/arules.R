@@ -95,7 +95,7 @@ do_apriori <- function(df, subject, key, minlen=1, maxlen=10, min_support=0.1, m
     stop("No matching rule was found.")
   }
 
-  ret <- (ret %>%  tidyr::unnest_(cnames[[5]]))
+  ret <- (ret %>%  unnest_with_drop_(cnames[[5]]))
   if(all(is.na(ret[[1]])) & nrow(ret)==1){
     stop("No rule was found. Adjusting arguments might work.")
   }
