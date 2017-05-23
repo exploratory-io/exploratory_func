@@ -39,6 +39,9 @@ do_t.test <- function(df, value, key=NULL, ...){
     ret[["method"]] <- as.character(ret[["method"]])
     ret[["alternative"]] <- as.character(ret[["alternative"]])
 
+    # "two.sided" should be "two sided" because "two.sided" is confused as a url by Exploratory Desktop
+    ret[["alternative"]] <- ifelse(ret[["alternative"]] == "two.sided", "two sided", ret[["alternative"]])
+
     # change column names
     col_names <- avoid_conflict(grouped_col, vapply(colnames(ret), function(name){
       switch (name,
@@ -83,6 +86,9 @@ do_var.test <- function(df, value, key, ...){
 
     ret[["method"]] <- as.character(ret[["method"]])
     ret[["alternative"]] <- as.character(ret[["alternative"]])
+
+    # "two.sided" should be "two sided" because "two.sided" is confused as a url by Exploratory Desktop
+    ret[["alternative"]] <- ifelse(ret[["alternative"]] == "two.sided", "two sided", ret[["alternative"]])
 
     # change column names
     col_names <- avoid_conflict(grouped_col, vapply(colnames(ret), function(name){
