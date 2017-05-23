@@ -26,7 +26,7 @@ do_causal_impact_ <- function(df, time_colname, formula, impact_time = NULL, ...
     stop(paste0(time_colname, " must be Date or POSIXct."))
   }
 
-  if (class(df[[time_colname]]) != class(impact_time)) {
+  if (!is.null(impact_time) && class(df[[time_colname]]) != class(impact_time)) {
     stop(paste0("impact_time must be the same class as ", time_colname, "."))
   }
 
@@ -50,11 +50,17 @@ do_causal_impact_ <- function(df, time_colname, formula, impact_time = NULL, ...
     df <- dplyr::select_(df, quote(-time_points)) # drop time_points from main df
     df_zoo <- zoo::zoo(df, time_points_vec)
 
-    pre_period <- c(min(time_points_vec), impact_time - 1) # -1 works as -1 day on Date and -1 sec on POSIXct.
-    post_period <- c(impact_time, max(time_points_vec))
+    if (!is.null(impact_time)) { # if impact_time is specified, create pre.period/post.period automatically.
+      pre_period <- c(min(time_points_vec), impact_time - 1) # -1 works as -1 day on Date and -1 sec on POSIXct.
+      post_period <- c(impact_time, max(time_points_vec))
     
-    # call CausalImpact::CausalImpact, which is the heart of this analysis.
-    impact <- CausalImpact::CausalImpact(df_zoo, pre.period = pre_period, post.period = post_period, ...)
+      # call CausalImpact::CausalImpact, which is the heart of this analysis.
+      impact <- CausalImpact::CausalImpact(df_zoo, pre.period = pre_period, post.period = post_period, ...)
+    }
+    else {
+      # pre.period, post.period must be in the ... in this case.
+      impact <- CausalImpact::CausalImpact(df_zoo, ...)
+    }
 
     # $series has the result of prediction. for now ignore the rest such as $model.
     ret <- as.data.frame(impact$series)
