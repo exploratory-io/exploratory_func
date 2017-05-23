@@ -106,7 +106,7 @@ do_cor.kv_ <- function(df,
   tmp_col <- avoid_conflict(grouped_col, "tmp")
   df %>%
     dplyr::do_(.dots=setNames(list(~do_cor_each(.)), tmp_col)) %>%
-    tidyr::unnest_(tmp_col, .drop = TRUE)
+    unnest_with_drop_(tmp_col)
 }
 
 #'
@@ -140,7 +140,7 @@ do_cor.cols <- function(df, ..., use="pairwise.complete.obs", method="pearson", 
     }
   }
 
-  (df %>%  dplyr::do_(.dots=setNames(list(~do_cor_each(.)), output_cols[[1]])) %>%  tidyr::unnest_(output_cols[[1]], .drop = TRUE))
+  (df %>%  dplyr::do_(.dots=setNames(list(~do_cor_each(.)), output_cols[[1]])) %>%  unnest_with_drop_(output_cols[[1]]))
 }
 
 #' Calculate svd from tidy format. This can be used to calculate coordinations by reducing dimensionality.
@@ -247,7 +247,7 @@ do_svd.kv <- function(df,
     ret
   }
 
-  (df %>%  dplyr::do_(.dots=setNames(list(~do_svd_each(.)), value_cname)) %>%  tidyr::unnest_(value_cname, .drop = TRUE))
+  (df %>%  dplyr::do_(.dots=setNames(list(~do_svd_each(.)), value_cname)) %>%  unnest_with_drop_(value_cname))
 }
 
 #' Non standard evaluation version for do_cmdscale_
@@ -315,5 +315,5 @@ do_cmdscale_ <- function(df,
   # this doesn't overwrite grouping columns.
   df %>%
     dplyr::do_(.dots=setNames(list(~do_cmdscale_each(.)), name_col)) %>%
-    tidyr::unnest_(name_col, .drop = TRUE)
+    unnest_with_drop_(name_col)
 }
