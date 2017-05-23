@@ -33,11 +33,16 @@ do_causal_impact_ <- function(df, time_colname, formula, ...) {
   input_df <- dplyr::select_(df, .dots = c(time_colname, all_column_names))
   # rename the y column to fixed name y so that it is easier to handle in the next step.
   input_df <- dplyr::rename_(input_df, y = y_colname)
+  input_df <- dplyr::rename_(input_df, time_points = time_colname)
   # bring y column at the beginning of the input_df, so that CausalImpact understand this is the column to predict.
   input_df <- dplyr::select(input_df, y, dplyr::everything())
 
   do_causal_impact_each <- function(df) {
-    impact <- CausalImpact::CausalImpact(df, ...)
+    time_points_vec <- df$time_points
+    df <- dplyr::select_(df, quote(-time_points)) # drop time_points from main df
+    df_zoo <- zoo::zoo(df, time_points_vec)
+    
+    impact <- CausalImpact::CausalImpact(df_zoo, ...)
     data <- as.data.frame(impact$series)
     data <- tibble::rownames_to_column(data)
     mutate(data, rowname = as.numeric(rowname))
@@ -50,7 +55,7 @@ do_causal_impact_ <- function(df, time_colname, formula, ...) {
   # overwriting it should be avoided,
   # so avoid_conflict is used here.
   tmp_col <- avoid_conflict(grouped_col, "tmp")
-  ret <- df %>%
+  ret <- input_df %>%
     dplyr::do_(.dots=setNames(list(~do_causal_impact_each(.)), tmp_col)) %>%
     tidyr::unnest_(tmp_col)
 
