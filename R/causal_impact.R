@@ -22,6 +22,10 @@ do_causal_impact_ <- function(df, time_colname, formula, ...) {
     stop(paste0(time_colname, " is grouped. Please ungroup it."))
   }
 
+  if (!class(df[[time_colname]]) %in% c("Date", "POSIXct")) {
+    stop(paste0(time_colname, " must be Date or POSIXct."))
+  }
+
   # remove rows with NA in predictors. CausalImpact does not allow NA in predictors (covariates).
   for(var in predictor_column_names) {
     df <- df[!is.na(df[[var]]), ]
@@ -45,7 +49,12 @@ do_causal_impact_ <- function(df, time_colname, formula, ...) {
     impact <- CausalImpact::CausalImpact(df_zoo, ...)
     ret <- as.data.frame(impact$series)
     ret <- tibble::rownames_to_column(ret)
-    ret <- mutate(ret, rowname = as.Date(rowname))
+    if (class(time_points_vec) == "Date") {
+      ret <- mutate(ret, rowname = as.Date(rowname))
+    }
+    else {
+      ret <- mutate(ret, rowname = as.POSIXct(rowname))
+    }
     colnames(ret)[colnames(ret) == "rowname"] <- avoid_conflict(colnames(ret), time_colname) # set back original time column name
     colnames(ret)[colnames(ret) == "y"] <- avoid_conflict(colnames(ret), y_colname) # set back original y column name
     ret
