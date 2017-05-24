@@ -40,6 +40,7 @@ do_t.test <- function(df, value, key=NULL, ...){
     ret[["alternative"]] <- as.character(ret[["alternative"]])
 
     # "two.sided" should be "two sided" because "two.sided" is confused as a url by Exploratory Desktop
+    # this can be "greater" or "lower" but they are okay.
     ret[["alternative"]] <- ifelse(ret[["alternative"]] == "two.sided", "two sided", ret[["alternative"]])
 
     # change column names
@@ -88,6 +89,7 @@ do_var.test <- function(df, value, key, ...){
     ret[["alternative"]] <- as.character(ret[["alternative"]])
 
     # "two.sided" should be "two sided" because "two.sided" is confused as a url by Exploratory Desktop
+    # this can be "greater" or "lower" but they are okay.
     ret[["alternative"]] <- ifelse(ret[["alternative"]] == "two.sided", "two sided", ret[["alternative"]])
 
     # change column names
