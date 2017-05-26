@@ -7,7 +7,7 @@ do_causal_impact <- function(df, time, formula, ...) {
   do_causal_impact_(df, time_colname, formula = formula, ...)
 }
 
-do_causal_impact_ <- function(df, time_colname, formula, impact_time = NULL, ...) {
+do_causal_impact_ <- function(df, time_colname, formula, impact_time = NULL, output_type = "series", ...) {
   y_colname <- as.character(lazyeval::f_lhs(formula))
   predictor_column_names <- all.vars(lazyeval::f_rhs(formula))
   all_column_names <- all.vars(formula)
@@ -63,17 +63,27 @@ do_causal_impact_ <- function(df, time_colname, formula, impact_time = NULL, ...
     }
 
     # $series has the result of prediction. for now ignore the rest such as $model.
-    ret <- as.data.frame(impact$series)
-    ret <- tibble::rownames_to_column(ret)
-    if (class(time_points_vec) == "Date") {
-      ret <- mutate(ret, rowname = as.Date(rowname))
+    if (output_type == "series") {
+      ret <- as.data.frame(impact$series)
+      ret <- tibble::rownames_to_column(ret)
+      if (class(time_points_vec) == "Date") {
+        ret <- mutate(ret, rowname = as.Date(rowname))
+      }
+      else {
+        ret <- mutate(ret, rowname = as.POSIXct(rowname))
+      }
+      colnames(ret)[colnames(ret) == "rowname"] <- avoid_conflict(colnames(ret), time_colname) # set back original time column name
+      colnames(ret)[colnames(ret) == "y"] <- avoid_conflict(colnames(ret), y_colname) # set back original y column name
+      ret
     }
-    else {
-      ret <- mutate(ret, rowname = as.POSIXct(rowname))
+    else { # output_type should be "model"
+      # following would cause error : cannot coerce class ""bsts"" to a data.frame 
+      # ret <- data.frame(model = list(impact$model$bsts.model))
+      # working it around like following.
+      ret <- data.frame(model = 1)
+      ret$model = list(impact$model$bsts.model)
+      ret
     }
-    colnames(ret)[colnames(ret) == "rowname"] <- avoid_conflict(colnames(ret), time_colname) # set back original time column name
-    colnames(ret)[colnames(ret) == "y"] <- avoid_conflict(colnames(ret), y_colname) # set back original y column name
-    ret
   }
 
   # Calculation is executed in each group.
