@@ -37,18 +37,18 @@ do_causal_impact_ <- function(df, time_colname, formula, impact_time = NULL, out
   # remove NA data
   df <- df[!is.na(df[[time_colname]]), ]
 
-  # select only columns that appear in the formula.
-  input_df <- dplyr::select_(df, .dots = c(time_colname, all_column_names))
-  # rename the y column to fixed name y so that it is easier to handle in the next step.
-  input_df <- dplyr::rename_(input_df, y = y_colname)
-  input_df <- dplyr::rename_(input_df, time_points = time_colname)
-  # bring y column at the beginning of the input_df, so that CausalImpact understand this is the column to predict.
-  input_df <- dplyr::select(input_df, y, dplyr::everything())
-
   do_causal_impact_each <- function(df) {
-    time_points_vec <- df$time_points
-    df <- dplyr::select_(df, quote(-time_points)) # drop time_points from main df
-    df_zoo <- zoo::zoo(df, time_points_vec)
+    # select only columns that appear in the formula.
+    input_df <- dplyr::select_(df, .dots = c(time_colname, all_column_names))
+    # rename the y column to fixed name y so that it is easier to handle in the next step.
+    input_df <- dplyr::rename_(input_df, y = y_colname)
+    input_df <- dplyr::rename_(input_df, time_points = time_colname)
+    # bring y column at the beginning of the input_df, so that CausalImpact understand this is the column to predict.
+    input_df <- dplyr::select(input_df, y, dplyr::everything())
+
+    time_points_vec <- input_df$time_points
+    input_df <- dplyr::select_(input_df, quote(-time_points)) # drop time_points from main df
+    df_zoo <- zoo::zoo(input_df, time_points_vec)
 
     if (!is.null(impact_time)) { # if impact_time is specified, create pre.period/post.period automatically.
       pre_period <- c(min(time_points_vec), impact_time - 1) # -1 works as -1 day on Date and -1 sec on POSIXct.
@@ -93,7 +93,7 @@ do_causal_impact_ <- function(df, time_colname, formula, impact_time = NULL, out
   # overwriting it should be avoided,
   # so avoid_conflict is used here.
   tmp_col <- avoid_conflict(grouped_col, "tmp")
-  ret <- input_df %>%
+  ret <- df %>%
     dplyr::do_(.dots=setNames(list(~do_causal_impact_each(.)), tmp_col)) %>%
     tidyr::unnest_(tmp_col)
 
