@@ -27,7 +27,7 @@ do_causal_impact <- function(df, time, formula, ...) {
   do_causal_impact_(df, time_colname, formula = formula, ...)
 }
 
-do_causal_impact_ <- function(df, time_colname, formula, impact_time = NULL, output_type = "series", ...) {
+do_causal_impact_ <- function(df, time_colname, formula, intervention_time = NULL, output_type = "series", ...) {
   y_colname <- as.character(lazyeval::f_lhs(formula))
   predictor_column_names <- all.vars(lazyeval::f_rhs(formula))
   all_column_names <- all.vars(formula)
@@ -46,8 +46,8 @@ do_causal_impact_ <- function(df, time_colname, formula, impact_time = NULL, out
     stop(paste0(time_colname, " must be Date or POSIXct."))
   }
 
-  if (!is.null(impact_time) && class(df[[time_colname]]) != class(impact_time)) {
-    stop(paste0("impact_time must be the same class as ", time_colname, "."))
+  if (!is.null(intervention_time) && class(df[[time_colname]]) != class(intervention_time)) {
+    stop(paste0("intervention_time must be the same class as ", time_colname, "."))
   }
 
   # remove rows with NA in predictors. CausalImpact does not allow NA in predictors (covariates).
@@ -70,9 +70,9 @@ do_causal_impact_ <- function(df, time_colname, formula, impact_time = NULL, out
     input_df <- dplyr::select_(input_df, quote(-time_points)) # drop time_points from main df
     df_zoo <- zoo::zoo(input_df, time_points_vec)
 
-    if (!is.null(impact_time)) { # if impact_time is specified, create pre.period/post.period automatically.
-      pre_period <- c(min(time_points_vec), impact_time - 1) # -1 works as -1 day on Date and -1 sec on POSIXct.
-      post_period <- c(impact_time, max(time_points_vec))
+    if (!is.null(intervention_time)) { # if intervention_time is specified, create pre.period/post.period automatically.
+      pre_period <- c(min(time_points_vec), intervention_time - 1) # -1 works as -1 day on Date and -1 sec on POSIXct.
+      post_period <- c(intervention_time, max(time_points_vec))
     
       # call CausalImpact::CausalImpact, which is the heart of this analysis.
       impact <- CausalImpact::CausalImpact(df_zoo, pre.period = pre_period, post.period = post_period, ...)
