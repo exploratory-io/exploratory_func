@@ -64,17 +64,16 @@ do_causal_impact_ <- function(df, time_colname, formula, impact_time = NULL, out
 
     # $series has the result of prediction. for now ignore the rest such as $model.
     if (output_type == "series") {
-      ret <- as.data.frame(impact$series)
-      ret <- tibble::rownames_to_column(ret)
-      if (class(time_points_vec) == "Date") {
-        ret <- mutate(ret, rowname = as.Date(rowname))
-      }
-      else {
-        ret <- mutate(ret, rowname = as.POSIXct(rowname))
-      }
-      colnames(ret)[colnames(ret) == "rowname"] <- avoid_conflict(colnames(ret), time_colname) # set back original time column name
-      colnames(ret)[colnames(ret) == "y"] <- avoid_conflict(colnames(ret), y_colname) # set back original y column name
-      ret
+      df <- df %>% dplyr::mutate(point.pred = impact$series$point.pred,
+                                 point.pred.lower = impact$series$point.pred.lower,
+                                 point.pred.upper = impact$series$point.pred.upper,
+                                 point.effect = impact$series$point.effect,
+                                 point.effect.lower = impact$series$point.effect.lower,
+                                 point.effect.upper = impact$series$point.effect.upper,
+                                 cum.effect = impact$series$cum.effect,
+                                 cum.effect.lower = impact$series$cum.effect.lower,
+                                 cum.effect.upper = impact$series$cum.effect.upper)
+      df
     }
     else { # output_type should be "model"
       # following would cause error : cannot coerce class ""bsts"" to a data.frame 
