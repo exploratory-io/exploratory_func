@@ -1,5 +1,25 @@
 # Wrapper functions around CausalImpact
 
+#' @export
+glance.bsts <- function(x) {
+  ret <- summary(x)
+  data.frame(residual.sd = ret$residual.sd,
+             prediction.sd = ret$prediction.sd,
+             rsquare = ret$rsquare,
+             relative.gof = ret$relative.gof,
+             coef_min = ret$size[[1]],
+             coef_1st_quartile = ret$size[[2]],
+             coef_median = ret$size[[3]],
+             coef_mean = ret$size[[4]],
+             coef_3rd_quartile = ret$size[[5]],
+             coef_max = ret$size[[6]])
+}
+
+#' @export
+tidy.bsts <- function(x) {
+  as.data.frame(summary(x)$coefficients)
+}
+
 #' NSE version of do_causal_impact_
 #' @export
 do_causal_impact <- function(df, time, formula, ...) {
