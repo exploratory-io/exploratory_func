@@ -60,7 +60,12 @@ do_causal_impact_ <- function(df, time_colname, formula, intervention_time = NUL
 
   do_causal_impact_each <- function(df) {
     # select only columns that appear in the formula.
-    input_df <- dplyr::select_(df, .dots = c(time_colname, all_column_names))
+    # following fails with column names with spaces most likely because of dplyr bug.
+    # input_df <- dplyr::select_(df, .dots = c(time_colname, all_column_names))
+    # using base R style to avoid it.
+    # since this base R style "select" seems to mess up grouping info if done outside of do_causal_impact_each,
+    # it has to be done inside do_causal_impact_each.
+    input_df <- df[, c(time_colname, all_column_names)]
     # rename the y column to fixed name y so that it is easier to handle in the next step.
     input_df <- dplyr::rename_(input_df, y = y_colname)
     input_df <- dplyr::rename_(input_df, time_points = time_colname)
