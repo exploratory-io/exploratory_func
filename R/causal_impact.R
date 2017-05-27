@@ -47,8 +47,8 @@ do_causal_impact_ <- function(df, time_colname, formula, intervention_time = NUL
     stop(paste0(time_colname, " must be Date or POSIXct."))
   }
 
-  if (!is.null(intervention_time) && class(df[[time_colname]]) != class(intervention_time)) {
-    stop(paste0("intervention_time must be the same class as ", time_colname, "."))
+  if (!is.null(intervention_time) && class(intervention_time) != "character" && class(df[[time_colname]]) != class(intervention_time)) {
+    stop(paste0("intervention_time must be character or the same class as ", time_colname, "."))
   }
 
   # remove rows with NA in predictors. CausalImpact does not allow NA in predictors (covariates).
@@ -93,6 +93,14 @@ do_causal_impact_ <- function(df, time_colname, formula, intervention_time = NUL
     }
 
     if (!is.null(intervention_time)) { # if intervention_time is specified, create pre.period/post.period automatically.
+      if (class(intervention_time) == "character") { # translate character intervention_time into Date or POSIXct.
+        if (class(df[[time_colname]]) == "Date") {
+          intervention_time <- as.Date(intervention_time)
+        }
+        else {
+          intervention_time <- as.POSIXct(intervention_time)
+        }
+      }
       pre_period <- c(min(time_points_vec), intervention_time - 1) # -1 works as -1 day on Date and -1 sec on POSIXct.
       post_period <- c(intervention_time, max(time_points_vec))
     
