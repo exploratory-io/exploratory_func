@@ -27,7 +27,8 @@ do_causal_impact <- function(df, time, formula, ...) {
   do_causal_impact_(df, time_colname, formula = formula, ...)
 }
 
-do_causal_impact_ <- function(df, time_colname, formula, intervention_time = NULL, output_type = "series", ...) {
+do_causal_impact_ <- function(df, time_colname, formula, intervention_time = NULL, output_type = "series",
+                              niter = NULL, standardize.data = NULL, prior.level.sd = NULL, nseasons = NULL, season.duration = NULL, dynamic.regression = NULL, ...) {
   y_colname <- as.character(lazyeval::f_lhs(formula))
   predictor_column_names <- all.vars(lazyeval::f_rhs(formula))
   all_column_names <- all.vars(formula)
@@ -70,16 +71,37 @@ do_causal_impact_ <- function(df, time_colname, formula, intervention_time = NUL
     input_df <- dplyr::select_(input_df, quote(-time_points)) # drop time_points from main df
     df_zoo <- zoo::zoo(input_df, time_points_vec)
 
+    # compose list for model.args argument of CausalImpact.
+    model_args <- list()
+    if (!is.null(niter)) {
+      model_args$niter = niter
+    }
+    if (!is.null(standardize.data)) {
+      model_args$standardize.data = standardize.data
+    }
+    if (!is.null(prior.level.sd)) {
+      model_args$prior.level.sd = prior.level.sd
+    }
+    if (!is.null(nseasons)) {
+      model_args$nseasons = nseasons
+    }
+    if (!is.null(season.duration)) {
+      model_args$season.duration = season.duration
+    }
+    if (!is.null(dynamic.regression)) {
+      model_args$dynamic.regression = dynamic.regression
+    }
+
     if (!is.null(intervention_time)) { # if intervention_time is specified, create pre.period/post.period automatically.
       pre_period <- c(min(time_points_vec), intervention_time - 1) # -1 works as -1 day on Date and -1 sec on POSIXct.
       post_period <- c(intervention_time, max(time_points_vec))
     
       # call CausalImpact::CausalImpact, which is the heart of this analysis.
-      impact <- CausalImpact::CausalImpact(df_zoo, pre.period = pre_period, post.period = post_period, ...)
+      impact <- CausalImpact::CausalImpact(df_zoo, pre.period = pre_period, post.period = post_period, model.args = model_args, ...)
     }
     else {
       # pre.period, post.period must be in the ... in this case.
-      impact <- CausalImpact::CausalImpact(df_zoo, ...)
+      impact <- CausalImpact::CausalImpact(df_zoo, model.args = model_args, ...)
     }
 
     # $series has the result of prediction. for now ignore the rest such as $model.
