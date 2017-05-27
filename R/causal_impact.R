@@ -95,6 +95,12 @@ do_causal_impact_ <- function(df, time_colname, formula, intervention_time = NUL
                                  cum.effect.upper = impact$series$cum.effect.upper)
       df
     }
+    else if (output_type == "model_stats") {
+      broom::glance(impact$model$bsts.model)
+    }
+    else if (output_type == "model_coef") {
+      broom::tidy(impact$model$bsts.model)
+    }
     else { # output_type should be "model"
       # following would cause error : cannot coerce class ""bsts"" to a data.frame 
       # ret <- data.frame(model = list(impact$model$bsts.model))
