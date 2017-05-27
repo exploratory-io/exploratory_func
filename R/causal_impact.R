@@ -27,6 +27,23 @@ do_causal_impact <- function(df, time, formula, ...) {
   do_causal_impact_(df, time_colname, formula = formula, ...)
 }
 
+#' @param df - Data frame
+#' @param time_colname - Column that has time data
+#' @param formula - Formula with target value column on the left-hand side, and predictor columns on the right-hand side. e.g. y ~ predictor1 + predictor2
+#' @param intervention_time - The point of time where intervention happened.
+#' @param output_type - Type of output data frame:
+#'                      "series" - time series (default)
+#'                      "model_stats" - model fit summary from broom::glance() on the bsts model.
+#'                      "model_coef" - model coefficients from broom::tidy() on the bsts model.
+#'                      "model" - model data frame with the bsts model. (Not use in Exploratory UI for now.)
+#' @param alpha - Tail-area probability of posterior interval (a concept that is similar to confidence interval.)
+#' @param niter - Number of MCMC Samples.
+#' @param standardize.data - Whether to standardize data.
+#' @param prior.level.sd - Prior Standard Deviation of Random Walk
+#' @param nseasons - Period of Seasonal Trend. e.g. 7, for weekly trend.
+#' @param season.duration - Used with nseasons. How many unit time one season consists of. e.g. 24, when unit time is hour.
+#' @param dynamic.regression - Whether to include time-varying regression coefficients.
+#' @param ... - extra values to be passed to CausalImpact::CausalImpact.
 do_causal_impact_ <- function(df, time_colname, formula, intervention_time = NULL, output_type = "series",
                               niter = NULL, standardize.data = NULL, prior.level.sd = NULL, nseasons = NULL, season.duration = NULL, dynamic.regression = NULL, ...) {
   y_colname <- as.character(lazyeval::f_lhs(formula))
