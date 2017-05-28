@@ -1,5 +1,7 @@
 # Wrapper functions around CausalImpact
 
+#' broom::glance() implementation for bsts (Bayesian Structural Time Series) model,
+#' which is the model used internally in CausalImpact to predict synthetic control (counterfactual).
 #' @export
 glance.bsts <- function(x) {
   ret <- summary(x)
@@ -15,6 +17,7 @@ glance.bsts <- function(x) {
              coef_max = ret$size[[6]])
 }
 
+#' broom::tidy() implementation for bsts model
 #' @export
 tidy.bsts <- function(x) {
   as.data.frame(summary(x)$coefficients)
