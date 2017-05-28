@@ -137,15 +137,15 @@ do_causal_impact_ <- function(df, time_colname, formula, intervention_time = NUL
     # $series has the result of prediction. for now ignore the rest such as $model.
     if (output_type == "series") {
       df <- df[ , !(colnames(df) %in% grouped_col)] # drop group columns since they will be added back outside of do_causal_impact_each.
-      df <- df %>% dplyr::mutate(point.pred = impact$series$point.pred,
-                                 point.pred.lower = impact$series$point.pred.lower,
-                                 point.pred.upper = impact$series$point.pred.upper,
-                                 point.effect = impact$series$point.effect,
-                                 point.effect.lower = impact$series$point.effect.lower,
-                                 point.effect.upper = impact$series$point.effect.upper,
-                                 cum.effect = impact$series$cum.effect,
-                                 cum.effect.lower = impact$series$cum.effect.lower,
-                                 cum.effect.upper = impact$series$cum.effect.upper)
+      df <- df %>% dplyr::mutate(predicted_value = impact$series$point.pred,
+                                 predicted_value_high = impact$series$point.pred.upper,
+                                 predicted_value_low = impact$series$point.pred.lower,
+                                 effect = impact$series$point.effect,
+                                 effect_high = impact$series$point.effect.upper,
+                                 effect_low = impact$series$point.effect.lower,
+                                 cumulative_effect = impact$series$cum.effect,
+                                 cumulative_effect_high = impact$series$cum.effect.upper,
+                                 cumulative_effect_low = impact$series$cum.effect.lower)
       df
     }
     else if (output_type == "model_stats") {
