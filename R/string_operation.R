@@ -132,13 +132,15 @@ do_tokenize <- function(df, input, token = "words", keep_cols = FALSE,  drop = T
     # keep only a column to tokenize
     df <- df[input_col]
   }
+
+  doc_id <- avoid_conflict(colnames(df), "document_id")
+  df <- dplyr::mutate_(df, .dots=setNames(list(~row_number()),doc_id))
+
   if(token=="words" && with_id){
     loadNamespace("dplyr")
 
     # split into sentences
     func <- get("unnest_tokens_", asNamespace("tidytext"))
-    doc_id <- avoid_conflict(colnames(df), "document_id")
-    df <- dplyr::mutate_(df, .dots=setNames(list(~row_number()),doc_id))
     tokenize_df <- df[,c(doc_id, input_col)]
     sentences <- tidytext::unnest_tokens_(tokenize_df, output_col, input_col, token="sentences", drop=TRUE, ...)
     grouped <- dplyr::group_by_(sentences, .dots=list( as.symbol(doc_id))) # convert the column name to symbol for colum names with backticks
