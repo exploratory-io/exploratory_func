@@ -49,7 +49,7 @@ do_causal_impact <- function(df, time, formula, ...) {
 #' @param ... - extra values to be passed to CausalImpact::CausalImpact.
 do_causal_impact_ <- function(df, time_colname, formula, intervention_time = NULL, output_type = "series",
                               niter = NULL, standardize.data = NULL, prior.level.sd = NULL, nseasons = NULL, season.duration = NULL, dynamic.regression = NULL, ...) {
-  y_colname <- as.character(lazyeval::f_lhs(formula))
+  y_colname <- all.vars(lazyeval::f_lhs(formula))
   predictor_column_names <- all.vars(lazyeval::f_rhs(formula))
   all_column_names <- all.vars(formula)
   grouped_col <- grouped_by(df)
@@ -67,7 +67,7 @@ do_causal_impact_ <- function(df, time_colname, formula, intervention_time = NUL
     stop(paste0(time_colname, " must be Date or POSIXct."))
   }
 
-  if (!is.null(intervention_time) && class(intervention_time) != "character" && class(df[[time_colname]]) != class(intervention_time)) {
+  if (!(is.null(intervention_time) || class(intervention_time) == "character" || class(df[[time_colname]]) == class(intervention_time))) {
     stop(paste0("intervention_time must be character or the same class as ", time_colname, "."))
   }
 
@@ -86,11 +86,11 @@ do_causal_impact_ <- function(df, time_colname, formula, intervention_time = NUL
     # since this base R style "select" seems to mess up grouping info if done outside of do_causal_impact_each,
     # it has to be done inside do_causal_impact_each.
     input_df <- df[, c(time_colname, all_column_names)]
-    # rename the y column to fixed name y so that it is easier to handle in the next step.
-    input_df <- dplyr::rename_(input_df, y = y_colname)
+    # rename the y column to fixed name .y_value so that it is easier to handle in the next step.
+    input_df <- dplyr::rename_(input_df, .y_value = y_colname)
     input_df <- dplyr::rename_(input_df, time_points = time_colname)
     # bring y column at the beginning of the input_df, so that CausalImpact understand this is the column to predict.
-    input_df <- dplyr::select(input_df, y, dplyr::everything())
+    input_df <- dplyr::select(input_df, .y_value, dplyr::everything())
 
     time_points_vec <- input_df$time_points
     input_df <- dplyr::select_(input_df, quote(-time_points)) # drop time_points from main df
