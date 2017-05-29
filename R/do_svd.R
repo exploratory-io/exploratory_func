@@ -1,4 +1,4 @@
-#' integrated do_dist
+#' integrated do_svd
 #' @export
 do_svd <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0){
   if (!is.null(skv)) {
@@ -70,10 +70,11 @@ do_svd.kv_ <- function(df,
 
   # this is executed on each group
   do_svd_each <- function(df){
-    matrix <-simple_cast(df, subject_col, dimension_col, value_col, fun.aggregate = fun.aggregate, fill=fill)
-    if(any(is.na(matrix))){
-      stop("NA is not supported as value.")
-    }
+
+    df <- df[!is.na(df[[value_col]]), ]
+
+    matrix <- simple_cast(df, subject_col, dimension_col, value_col, fun.aggregate = fun.aggregate, fill=fill)
+
     if(centering){
       # move the origin to center of data
       matrix <- sweep(matrix, 2, colMeans(matrix), "-")
@@ -135,7 +136,6 @@ do_svd.kv_ <- function(df,
   (df %>%  dplyr::do_(.dots=setNames(list(~do_svd_each(.)), value_cname)) %>%  unnest_with_drop_(value_cname))
 }
 
-
 #' Calculate distance of each pair of groups.
 #' @param df data frame in tidy format
 #' @param group A column you want to calculate the correlations for.
@@ -148,60 +148,106 @@ do_svd.kv_ <- function(df,
 #' @export
 do_svd.cols <- function(df,
                          ...,
-                         label=NULL,
-                         fill=0,
-                         fun.aggregate=mean,
-                         distinct=FALSE,
-                         diag=FALSE,
-                         method="euclidean",
-                         p=2,
-                         cmdscale_k = NULL){
+                        type="group",
+                        fill=0,
+                        fun.aggregate=mean,
+                        n_component=3,
+                        centering=TRUE,
+                        output ="long"){
   loadNamespace("dplyr")
   loadNamespace("tidyr")
   loadNamespace("reshape2")
   loadNamespace("stats")
   loadNamespace("lazyeval")
 
-  grouped_column <- grouped_by(df)
+  grouped_col <- grouped_by(df)
   label_col <- col_name(substitute(label))
 
   select_dots <- lazyeval::lazy_dots(...)
 
-  cnames <- avoid_conflict(grouped_column, c("pair.name.x", "pair.name.y", "value"))
+  value_colname <- avoid_conflict(grouped_col, "value")
 
   # this is executed on each group
-  calc_svd_each <- function(df){
-    mat <- df %>%  dplyr::select_(.dots=select_dots) %>%  as.matrix()
+  do_svd_each <- function(df){
+    # create matrix by selected columns
+    matrix <- df %>%
+      dplyr::select_(.dots=select_dots) %>%
+      as.matrix() %>%
+      na.omit()
 
-    # sort the column name so that the output of pair.name.1 and pair.name.2 will be sorted
-    # it's better to be sorted so that heatmap in exploratory can be triangle if distinct is TRUE
-    sortedNames <- sort(colnames(mat))
-    mat <- t(mat)
-    mat <- mat[sortedNames, ]
+    if(centering){
+      # move the origin to center of data
+      matrix <- sweep(matrix, 2, colMeans(matrix), "-")
+    }
+    if(type=="group"){
+      result <- svd(matrix, nu=n_component, nv=0)
+      mat <- result$u
 
-    # Dist is actually an atomic vector of upper half so upper and diag arguments don't matter
-    dist <- stats::dist(mat, method=method, diag=FALSE, p=p)
-    if(distinct){
-      if(diag){
-        diag <- 0
-      }else{
-        diag <- NULL
+      if (output=="wide") {
+        # get row indice that had NA
+        na_indice <- na.action(matrix)
+
+        # fill rows with NA where there was any NA value
+        mat <- fill_mat_NA(setdiff(seq(nrow(df)),na_indice), mat = mat, max_index = nrow(df))
+
+        ret <- as.data.frame(mat)
+        colnames(ret) <- avoid_conflict(c(colnames(df), grouped_col), paste0("axis", seq(ncol(ret))))
+        ret <- cbind(df, ret)
+      } else if (output=="long") {
+        cnames <- avoid_conflict(grouped_col, c("row", "new.dimension", value_colname))
+        #rownames(mat) <- seq(nrow(mat))
+        ret <- mat_to_df(mat, cnames)
+      } else {
+        stop(paste(output, "is not supported as output"))
       }
-      ret <- upper_gather(as.vector(dist), rownames(mat), diag=diag, cnames=cnames)
-    }else{
-      ret <- dist %>%  as.matrix() %>%  mat_to_df(cnames)
-      if(!diag){
-        ret <- ret[ret[,1] != ret[,2],]
+    } else if (type=="dimension") {
+
+      result <- svd(matrix, nv=n_component, nu=0)
+      mat <- result$v
+      rownames(mat) <- colnames(matrix)
+
+      if (output=="wide") {
+        ret <- as.data.frame(mat)
+        colnames(ret) <- avoid_conflict(c(grouped_col), paste("axis", seq(ncol(mat)), sep=""))
+        rnames <- colnames(matrix)
+        df <- setNames(data.frame(rnames, stringsAsFactors = FALSE), "colname")
+        ret <- cbind(df, ret)
+      } else if (output=="long") {
+        cnames <- avoid_conflict(grouped_col, c("colname", "new.dimension", value_colname))
+        ret <- mat_to_df(mat, cnames)
+      } else {
+        stop(paste(output, "is not supported as output"))
       }
+    } else if (type=="variance"){
+      variance <- svd(matrix, nu=0, nv=0)$d
+      component <- seq(min(length(variance), n_component))
+      if (output=="wide") {
+        mat <- matrix(variance[component], ncol=length(component))
+        ret <- as.data.frame(mat)
+        colnames(ret) <- avoid_conflict(grouped_col, paste("axis", seq(ncol(mat)), sep=""))
+      } else if (output=="long") {
+        ret <- data.frame(component = component, svd.value = variance[component])
+        colnames(ret) <- avoid_conflict(grouped_col, c("new.dimension", value_colname))
+      } else {
+        stop(paste(output, "is not supported as output"))
+      }
+    } else {
+      stop(paste(type, "is not supported as type argument."))
     }
-    rownames(ret) <- NULL
-    if (!is.null(cmdscale_k)) {
-      ret <- do_cmdscale_(ret, cnames[[1]], cnames[[2]], cnames[[3]], k = cmdscale_k)
-    }
+
     ret
   }
-  (df %>% dplyr::do_(.dots=setNames(list(~calc_dist_each(.)), cnames[[1]])) %>%  unnest_with_drop_(cnames[[1]]))
+
+  # Calculation is executed in each group.
+  # Storing the result in this tmp_col and
+  # unnesting the result.
+  # If the original data frame is grouped by "tmp",
+  # overwriting it should be avoided,
+  # so avoid_conflict is used here.
+  tmp_col <- avoid_conflict(grouped_col, "tmp")
+  ret <- df %>%
+    dplyr::do_(.dots=setNames(list(~do_svd_each(.)), tmp_col)) %>%
+    unnest_with_drop_(tmp_col)
+
+  ret
 }
-
-
-do_svd.cols
