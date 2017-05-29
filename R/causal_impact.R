@@ -26,12 +26,12 @@ tidy.bsts <- function(x) {
 #' NSE version of do_causal_impact_
 #' @export
 do_causal_impact <- function(df, time, formula, ...) {
-  time_colname <- col_name(substitute(time))
-  do_causal_impact_(df, time_colname, formula = formula, ...)
+  time_col <- col_name(substitute(time))
+  do_causal_impact_(df, time_col, formula = formula, ...)
 }
 
 #' @param df - Data frame
-#' @param time_colname - Column that has time data
+#' @param time_col - Column that has time data
 #' @param formula - Formula with target value column on the left-hand side, and predictor columns on the right-hand side. e.g. y ~ predictor1 + predictor2
 #' @param intervention_time - The point of time where intervention happened.
 #' @param output_type - Type of output data frame:
@@ -47,7 +47,7 @@ do_causal_impact <- function(df, time, formula, ...) {
 #' @param season.duration - Used with nseasons. How many unit time one season consists of. e.g. 24, when unit time is hour.
 #' @param dynamic.regression - Whether to include time-varying regression coefficients.
 #' @param ... - extra values to be passed to CausalImpact::CausalImpact.
-do_causal_impact_ <- function(df, time_colname, formula, intervention_time = NULL, output_type = "series",
+do_causal_impact_ <- function(df, time_col, formula, intervention_time = NULL, output_type = "series",
                               niter = NULL, standardize.data = NULL, prior.level.sd = NULL, nseasons = NULL, season.duration = NULL, dynamic.regression = NULL, ...) {
   y_colname <- all.vars(lazyeval::f_lhs(formula))
   predictor_column_names <- all.vars(lazyeval::f_rhs(formula))
@@ -55,20 +55,20 @@ do_causal_impact_ <- function(df, time_colname, formula, intervention_time = NUL
   grouped_col <- grouped_by(df)
 
   # column name validation
-  if(!time_colname %in% colnames(df)){
-    stop(paste0(time_colname, " is not in column names"))
+  if(!time_col %in% colnames(df)){
+    stop(paste0(time_col, " is not in column names"))
   }
 
-  if(time_colname %in% grouped_col){
-    stop(paste0(time_colname, " is grouped. Please ungroup it."))
+  if(time_col %in% grouped_col){
+    stop(paste0(time_col, " is grouped. Please ungroup it."))
   }
 
-  if (!class(df[[time_colname]]) %in% c("Date", "POSIXct")) {
-    stop(paste0(time_colname, " must be Date or POSIXct."))
+  if (!class(df[[time_col]]) %in% c("Date", "POSIXct")) {
+    stop(paste0(time_col, " must be Date or POSIXct."))
   }
 
-  if (!(is.null(intervention_time) || class(intervention_time) == "character" || class(df[[time_colname]]) == class(intervention_time))) {
-    stop(paste0("intervention_time must be character or the same class as ", time_colname, "."))
+  if (!(is.null(intervention_time) || class(intervention_time) == "character" || class(df[[time_col]]) == class(intervention_time))) {
+    stop(paste0("intervention_time must be character or the same class as ", time_col, "."))
   }
 
   # remove rows with NA in predictors. CausalImpact does not allow NA in predictors (covariates).
@@ -76,19 +76,19 @@ do_causal_impact_ <- function(df, time_colname, formula, intervention_time = NUL
     df <- df[!is.na(df[[var]]), ]
   }
   # remove NA data
-  df <- df[!is.na(df[[time_colname]]), ]
+  df <- df[!is.na(df[[time_col]]), ]
 
   do_causal_impact_each <- function(df) {
     # select only columns that appear in the formula.
     # following fails with column names with spaces most likely because of dplyr bug.
-    # input_df <- dplyr::select_(df, .dots = c(time_colname, all_column_names))
+    # input_df <- dplyr::select_(df, .dots = c(time_col, all_column_names))
     # using base R style to avoid it.
     # since this base R style "select" seems to mess up grouping info if done outside of do_causal_impact_each,
     # it has to be done inside do_causal_impact_each.
-    input_df <- df[, c(time_colname, all_column_names)]
+    input_df <- df[, c(time_col, all_column_names)]
     # rename the y column to fixed name .y_value so that it is easier to handle in the next step.
     input_df <- dplyr::rename_(input_df, .y_value = y_colname)
-    input_df <- dplyr::rename_(input_df, time_points = time_colname)
+    input_df <- dplyr::rename_(input_df, time_points = time_col)
     # bring y column at the beginning of the input_df, so that CausalImpact understand this is the column to predict.
     input_df <- dplyr::select(input_df, .y_value, dplyr::everything())
 
@@ -119,7 +119,7 @@ do_causal_impact_ <- function(df, time_colname, formula, intervention_time = NUL
 
     if (!is.null(intervention_time)) { # if intervention_time is specified, create pre.period/post.period automatically.
       if (class(intervention_time) == "character") { # translate character intervention_time into Date or POSIXct.
-        if (class(df[[time_colname]]) == "Date") {
+        if (class(df[[time_col]]) == "Date") {
           intervention_time <- as.Date(intervention_time)
         }
         else {
