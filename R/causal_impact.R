@@ -86,11 +86,9 @@ do_causal_impact_ <- function(df, time_col, formula, intervention_time = NULL, o
     # since this base R style "select" seems to mess up grouping info if done outside of do_causal_impact_each,
     # it has to be done inside do_causal_impact_each.
     input_df <- df[, c(time_col, all_column_names)]
-    # rename the y column to fixed name .y_value so that it is easier to handle in the next step.
-    input_df <- dplyr::rename_(input_df, .y_value = y_colname)
     input_df <- dplyr::rename_(input_df, time_points = time_col)
     # bring y column at the beginning of the input_df, so that CausalImpact understand this is the column to predict.
-    input_df <- dplyr::select(input_df, .y_value, dplyr::everything())
+    move_col(input_df, y_colname, 1)
 
     time_points_vec <- input_df$time_points
     input_df <- dplyr::select_(input_df, quote(-time_points)) # drop time_points from main df
