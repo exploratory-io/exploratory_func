@@ -79,19 +79,19 @@ do_causal_impact_ <- function(df, time_col, formula, intervention_time = NULL, o
   df <- df[!is.na(df[[time_col]]), ]
 
   do_causal_impact_each <- function(df) {
+    # keep time_col column, since we will drop it in the next step,
+    # but will need it to compose zoo object.
+    time_points_vec <- df[[time_col]]
     # select only columns that appear in the formula.
     # following fails with column names with spaces most likely because of dplyr bug.
-    # input_df <- dplyr::select_(df, .dots = c(time_col, all_column_names))
+    # input_df <- dplyr::select_(df, .dots = all_column_names)
     # using base R style to avoid it.
     # since this base R style "select" seems to mess up grouping info if done outside of do_causal_impact_each,
     # it has to be done inside do_causal_impact_each.
-    input_df <- df[, c(time_col, all_column_names)]
-    input_df <- dplyr::rename_(input_df, time_points = time_col)
+    input_df <- df[, all_column_names]
     # bring y column at the beginning of the input_df, so that CausalImpact understand this is the column to predict.
     move_col(input_df, y_colname, 1)
 
-    time_points_vec <- input_df$time_points
-    input_df <- dplyr::select_(input_df, quote(-time_points)) # drop time_points from main df
     df_zoo <- zoo::zoo(input_df, time_points_vec)
 
     # compose list for model.args argument of CausalImpact.
