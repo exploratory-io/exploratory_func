@@ -2,6 +2,22 @@ context("tests for wrappers of stats package")
 
 spread_test_df <- data.frame(var1 = c(1, 3, 2, NA), var2 = c(1, 3, 2, 10))
 
+test_that("test do_svd.kv with fill", {
+  test_df <- data.frame(
+    rand=runif(20, min = 0, max=10),
+    axis2=paste("group",c(rep(1,5), rep(2, 5), rep(3, 5), rep(4, 5)), sep=""),
+    col=rep(seq(5),4))
+  loadNamespace("dplyr")
+  result <- (
+    test_df  %>%
+      do_svd.kv(axis2, col, n_component=3, fill = 1)
+  )
+  expect_equal(colnames(result), c("axis2","new.dimension", "value"))
+  expect_true(any(result[[1]]=="group1"))
+  expect_true(any(result[[2]]==1))
+
+})
+
 test_that("test normalize", {
   test_vec <- c(seq(10), NA, 10 - seq(10))
   ans <- scale(test_vec) %>% as.numeric()
@@ -112,7 +128,7 @@ test_that("do_svd.kv with NA value", {
   do_svd.kv(data, `ro w`, col, val, fill=0)
   expect_error({
     do_svd.kv(data, `ro w`, col, val, fill=NA)
-  }, "NA is not supported as value.")
+  }, "NA is not supported as value")
 })
 
 test_that("test do_svd.kv output wide", {
@@ -167,22 +183,6 @@ test_that("test do_svd.kv", {
     test_df  %>%
       do_svd.kv(axis2, col, n_component=3)
     )
-  expect_equal(colnames(result), c("axis2","new.dimension", "value"))
-  expect_true(any(result[[1]]=="group1"))
-  expect_true(any(result[[2]]==1))
-
-})
-
-test_that("test do_svd.kv with fill", {
-  test_df <- data.frame(
-    rand=runif(20, min = 0, max=10),
-    axis2=paste("group",c(rep(1,5), rep(2, 5), rep(3, 5), rep(4, 5)), sep=""),
-    col=rep(seq(5),4))
-  loadNamespace("dplyr")
-  result <- (
-    test_df  %>%
-      do_svd.kv(axis2, col, n_component=3, fill = 1)
-  )
   expect_equal(colnames(result), c("axis2","new.dimension", "value"))
   expect_true(any(result[[1]]=="group1"))
   expect_true(any(result[[2]]==1))
