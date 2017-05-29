@@ -14,8 +14,7 @@ do_svd <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0){
   }
 }
 
-#' Non Standard Evaluation version of do_svd
-#' Calculate svd of each pair of groups
+#' Non Standard Evaluation version of do_svd.kv_
 #' @export
 do_svd.kv <- function(df, subject, key, value = NULL, ...){
   subject_col <- col_name(substitute(subject))
@@ -32,16 +31,16 @@ do_svd.kv <- function(df, subject, key, value = NULL, ...){
 
 #' Calculate svd from tidy format. This can be used to calculate coordinations by reducing dimensionality.
 #' @param df Data frame which has group and dimension
-#' @param subject_col Column to be regarded as groups
-#' @param key_col Column to be regarded as original dimensions
-#' @param value_col Column to be regarded as values
-#' @param type "group" to see the coordinations in reduced dimension.
-#' "dimension" to see the direction of new axes from original ones.
+#' @param subject_col A column name to be regarded as groups
+#' @param key_col A column name to be regarded as original dimensions
+#' @param value_col A column name to be regarded as values
+#' @param type "group" to see the coordinations of groups in reduced dimension.
+#' "dimension" to see the direction of new axes in original dimension.
 #' "variance" to see how much the data is distributed in the direction of new axes.
 #' @param fill Value to fill where value doesn't exist.
-#' @param fun.aggregate Value to fill where value doesn't exist.
+#' @param fun.aggregate Function to aggregate values in duplicated pairs of subject and key.
 #' @param n_component Number of dimensions to return.
-#' @return Tidy format of data frame.
+#' @return Tidy format of svd result in a data frame.
 #' @export
 do_svd.kv_ <- function(df,
                       subject_col,
@@ -71,25 +70,45 @@ do_svd.kv_ <- function(df,
   # this is executed on each group
   do_svd_each <- function(df){
 
-    df <- df[!is.na(df[[value_col]]), ]
+    # value_col might be NULL
+    # when values in matrix
+    # should be count of key and value pairs,
+    # so it should be checked
+    if (!is.null(value_col)) {
+      # remove NA from the value column
+      df <- df[!is.na(df[[value_col]]), ]
+    }
 
     matrix <- simple_cast(df, subject_col, dimension_col, value_col, fun.aggregate = fun.aggregate, fill=fill)
+
+    # this might happen if fill argument is NA or fun.aggregate returns NA
+    if(any(is.na(matrix))){
+      stop("NA is not supported as value")
+    }
 
     if(centering){
       # move the origin to center of data
       matrix <- sweep(matrix, 2, colMeans(matrix), "-")
     }
     if(type=="group"){
+      # u matrix in svd can be regarded as coordinations of groups in reduced dimension
       result <- svd(matrix, nu=n_component, nv=0)
       mat <- result$u
 
       if (output=="wide") {
         ret <- as.data.frame(mat)
         colnames(ret) <- avoid_conflict(c(grouped_col, subject_col), paste("axis", seq(ncol(mat)), sep=""))
+        # subject column might be non-character type,
+        # but rownames are always character,
+        # so its type should be reverted to the same type
+        # with subject column
         rnames <- same_type(rownames(matrix), df[[subject_col]])
+        # create a column for subject values
         df <- setNames(data.frame(rnames, stringsAsFactors = FALSE), subject_col)
         ret <- cbind(df, ret)
       } else if (output=="long") {
+        # this returns molten format data frame of matrix
+        # with subjects, new dimentions and values
         cnames <- avoid_conflict(grouped_col, c(subject_col, "new.dimension", value_cname))
         rownames(mat) <- rownames(matrix)
         ret <- mat_to_df(mat, cnames)
@@ -97,33 +116,44 @@ do_svd.kv_ <- function(df,
         stop(paste(output, "is not supported as output"))
       }
     } else if (type=="dimension") {
-
+      # v matrix in svd can be regarded as the direction of new axes in original dimension.
       result <- svd(matrix, nv=n_component, nu=0)
       mat <- result$v
+
       rownames(mat) <- colnames(matrix)
 
       if (output=="wide") {
+        # a column is a base vector of
+        # a new axis of reduced dimension
+        # in the original dimension
         ret <- as.data.frame(mat)
         colnames(ret) <- avoid_conflict(c(grouped_col, dimension_col), paste("axis", seq(ncol(mat)), sep=""))
-        rnames <- same_type(rownames(mat), df[[subject_col]])
+        rnames <- same_type(rownames(mat), df[[dimension_col]])
         df <- setNames(data.frame(rnames, stringsAsFactors = FALSE), dimension_col)
         ret <- cbind(df, ret)
       } else if (output=="long") {
+        # this returns molten format data frame of matrix
+        # with key, new dimentions and values
         cnames <- avoid_conflict(grouped_col, c(dimension_col, "new.dimension", value_cname))
         ret <- mat_to_df(mat, cnames)
       } else {
         stop(paste(output, "is not supported as output"))
       }
     } else if (type=="variance"){
+      # d vector can be regarded
+      # as how much the data is distributed
+      # in the direction of new axes.
       variance <- svd(matrix, nu=0, nv=0)$d
       component <- seq(min(length(variance), n_component))
       if (output=="wide") {
+        # this return one row data frame with d of svd
         mat <- matrix(variance[component], ncol=length(component))
         ret <- as.data.frame(mat)
-        colnames(ret) <- avoid_conflict(c(subject_col), paste("axis", seq(ncol(mat)), sep=""))
+        colnames(ret) <- avoid_conflict(c(grouped_col), paste("axis", seq(ncol(mat)), sep=""))
       } else if (output=="long") {
+        # this return a data frame with a column with d of svd
         ret <- data.frame(component = component, svd.value = variance[component])
-        colnames(ret) <- avoid_conflict(subject_col, c("new.dimension", value_cname))
+        colnames(ret) <- avoid_conflict(grouped_col, c("new.dimension", value_cname))
       } else {
         stop(paste(output, "is not supported as output"))
       }
@@ -133,7 +163,18 @@ do_svd.kv_ <- function(df,
     ret
   }
 
-  (df %>%  dplyr::do_(.dots=setNames(list(~do_svd_each(.)), value_cname)) %>%  unnest_with_drop_(value_cname))
+  # Calculation is executed in each group.
+  # Storing the result in this tmp_col and
+  # unnesting the result.
+  # If the original data frame is grouped by "tmp",
+  # overwriting it should be avoided,
+  # so avoid_conflict is used here.
+  tmp_col <- avoid_conflict(grouped_col, "tmp")
+  ret <- df %>%
+    dplyr::do_(.dots=setNames(list(~do_svd_each(.)), tmp_col)) %>%
+    unnest_with_drop_(tmp_col)
+
+  ret
 }
 
 #' Calculate distance of each pair of groups.
@@ -180,6 +221,7 @@ do_svd.cols <- function(df,
       matrix <- sweep(matrix, 2, colMeans(matrix), "-")
     }
     if(type=="group"){
+      # u matrix in svd can be regarded as coordinations of groups in reduced dimension
       result <- svd(matrix, nu=n_component, nv=0)
       mat <- result$u
 
@@ -192,40 +234,53 @@ do_svd.cols <- function(df,
 
         ret <- as.data.frame(mat)
         colnames(ret) <- avoid_conflict(c(colnames(df), grouped_col), paste0("axis", seq(ncol(ret))))
+
+        # append u matrix to the original data frame
         ret <- cbind(df, ret)
       } else if (output=="long") {
+        # this returns molten format data frame of matrix
+        # with subjects, new dimentions and values
         cnames <- avoid_conflict(grouped_col, c("row", "new.dimension", value_colname))
-        #rownames(mat) <- seq(nrow(mat))
         ret <- mat_to_df(mat, cnames)
       } else {
         stop(paste(output, "is not supported as output"))
       }
     } else if (type=="dimension") {
-
+      # v matrix in svd can be regarded as the direction of new axes in original dimension.
       result <- svd(matrix, nv=n_component, nu=0)
       mat <- result$v
       rownames(mat) <- colnames(matrix)
 
       if (output=="wide") {
+        # a column is a base vector of
+        # a new axis of reduced dimension
+        # in the original dimension
         ret <- as.data.frame(mat)
         colnames(ret) <- avoid_conflict(c(grouped_col), paste("axis", seq(ncol(mat)), sep=""))
         rnames <- colnames(matrix)
         df <- setNames(data.frame(rnames, stringsAsFactors = FALSE), "colname")
         ret <- cbind(df, ret)
       } else if (output=="long") {
+        # this returns molten format data frame of matrix
+        # with key, new dimentions and values
         cnames <- avoid_conflict(grouped_col, c("colname", "new.dimension", value_colname))
         ret <- mat_to_df(mat, cnames)
       } else {
         stop(paste(output, "is not supported as output"))
       }
     } else if (type=="variance"){
+      # d vector can be regarded
+      # as how much the data is distributed
+      # in the direction of new axes.
       variance <- svd(matrix, nu=0, nv=0)$d
       component <- seq(min(length(variance), n_component))
       if (output=="wide") {
+        # this return one row data frame with d of svd
         mat <- matrix(variance[component], ncol=length(component))
         ret <- as.data.frame(mat)
         colnames(ret) <- avoid_conflict(grouped_col, paste("axis", seq(ncol(mat)), sep=""))
       } else if (output=="long") {
+        # this return a data frame with a column with d of svd
         ret <- data.frame(component = component, svd.value = variance[component])
         colnames(ret) <- avoid_conflict(grouped_col, c("new.dimension", value_colname))
       } else {
