@@ -90,7 +90,7 @@ do_causal_impact_ <- function(df, time_col, formula, intervention_time = NULL, o
     # it has to be done inside do_causal_impact_each.
     input_df <- df[, all_column_names]
     # bring y column at the beginning of the input_df, so that CausalImpact understand this is the column to predict.
-    move_col(input_df, y_colname, 1)
+    input_df <- move_col(input_df, y_colname, 1)
 
     df_zoo <- zoo::zoo(input_df, time_points_vec)
 
