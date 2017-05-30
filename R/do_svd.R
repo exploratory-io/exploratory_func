@@ -41,6 +41,11 @@ do_svd.kv <- function(df, subject, key, value = NULL, ...){
 #' @param fill Value to fill where value doesn't exist.
 #' @param fun.aggregate Function to aggregate values in duplicated pairs of subject and key.
 #' @param n_component Number of dimensions to return.
+#' @param centering Move the origin to center of data (Mean of each column)
+#' Taken from http://genomicsclass.github.io/book/pages/pca_svd.html
+#' @param output "long" or "wide".
+#' "long" is a format with 3 columns which represents rows, columns and values
+#' "wide" is a format which spreads the long information into matrix
 #' @return Tidy format of svd result in a data frame.
 #' @export
 do_svd.kv_ <- function(df,
@@ -109,6 +114,10 @@ do_svd.kv_ <- function(df,
       mat <- result$u
 
       if (output=="wide") {
+        # This returns a data frame
+        # whose columns are coordinations
+        # in new dimension.
+
         ret <- as.data.frame(mat)
         colnames(ret) <- avoid_conflict(c(grouped_col, subject_col), paste("axis", seq(ncol(mat)), sep=""))
         # subject column might be non-character type,
@@ -205,10 +214,7 @@ do_svd.kv_ <- function(df,
 #' @param fun.aggregate Function to aggregate values in duplicated pairs of subject and key.
 #' @param n_component Number of dimensions to return.
 #' @param centering Move the origin to center of data (Mean of each column)
-#' Explanation from http://genomicsclass.github.io/book/pages/pca_svd.html
-#' "The second argument specifies we want to operate on the columns
-#' (1 would be used for rows), and the third and fourth arguments
-#' specify that we want to subtract the column means."
+#' Taken from http://genomicsclass.github.io/book/pages/pca_svd.html
 #' @param output "long" or "wide".
 #' "long" is a format with 3 columns which represents rows, columns and values
 #' "wide" is a format which spreads the long information into matrix
@@ -265,7 +271,11 @@ do_svd.cols <- function(df,
       mat <- result$u
 
       if (output=="wide") {
-
+        # This returns a data frame
+        # whose columns are coordinations
+        # in new dimension
+        # while keeping columns
+        # from the original data frame.
 
         # get row indice that had NA
         na_indice <- na.action(matrix)
