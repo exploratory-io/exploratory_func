@@ -153,8 +153,8 @@ do_tokenize <- function(df, input, token = "words", keep_cols = FALSE,  drop = T
     grouped <- dplyr::group_by_(sentences, .dots=list( as.symbol(doc_id)))
 
     # put sentence_id
-    tokenize_df <- dplyr::mutate_(grouped, .dots=setNames(list(~row_number()), sentence_id))
     sentence_id <- avoid_conflict(colnames(df), "sentence_id")
+    tokenize_df <- dplyr::mutate_(grouped, .dots=setNames(list(~row_number()), sentence_id))
 
     # split into tokens
     tokenize_df <- dplyr::ungroup(tokenize_df)
