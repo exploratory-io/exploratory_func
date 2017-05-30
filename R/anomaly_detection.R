@@ -18,6 +18,7 @@ do_anomaly_detection <- function(df, time, value = NULL, ...){
 #' @param ... extra values to be passed to AnomalyDetection::AnomalyDetectionTs.
 #' @export
 do_anomaly_detection_ <- function(df, time_col, value_col = NULL, time_unit = "day", fun.aggregate = sum, direction="both", e_value=TRUE, ...){
+  validate_empty_data(df)
 
   loadNamespace("dplyr")
   loadNamespace("AnomalyDetection")

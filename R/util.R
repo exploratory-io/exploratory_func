@@ -721,9 +721,7 @@ pivot <- function(df, formula, value = NULL, ...) {
 #' @param na.rm If na should be removed from values
 #' @export
 pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = NULL, na.rm = TRUE) {
-  if(nrow(df) == 0) {
-    stop("Input data frame is empty.")
-  }
+  validate_empty_data(df)
 
   # create a column name for row names
   # column names in lhs are collapsed by "_"
@@ -998,6 +996,7 @@ unnest_without_empty <- function(data, nested){
 #' unnest with removing NULL or empty list
 #' @export
 unnest_without_empty_ <- function(data, nested_col){
+  validate_empty_data(data)
   empty <- list_n(data[[nested_col]]) == 0
   without_empty <- data[!empty, ]
   if(nrow(without_empty) == 0){
@@ -1047,4 +1046,10 @@ unnest_with_drop_ <- function(..., .drop = TRUE){
 #' 2 rows data frames for example.
 unnest_with_drop <- function(..., .drop = TRUE){
   tidyr::unnest(..., .drop = .drop)
+}
+
+#' validate empty data frame
+validate_empty_data <- function(df) {
+  if(nrow(df) == 0) {stop("Input data frame is empty.")}
+  df
 }

@@ -15,6 +15,8 @@ do_roc <- function(df, pred_prob, actual_val){
 #' @param actual_val_col Column name for actual values
 #' @export
 do_roc_ <- function(df, pred_prob_col, actual_val_col){
+  validate_empty_data(df)
+
   group_cols <- grouped_by(df)
 
   tpr_col <- avoid_conflict(group_cols, "true_positive_rate")
@@ -85,6 +87,7 @@ evaluate_binary <- function(df, pred_prob, actual_val, ...){
 #' @param actual_val_col Column name for actual values
 #' @export
 evaluate_binary_ <- function(df, pred_prob_col, actual_val_col, threshold = "f_score"){
+  validate_empty_data(df)
 
   evaluate_binary_each <- function(df){
 
@@ -148,6 +151,7 @@ evaluate_regression <- function(df, pred_val, actual_val){
 #' @param actual_val_col Column name for actual values
 #' @export
 evaluate_regression_ <- function(df, pred_val_col, actual_val_col){
+  validate_empty_data(df)
 
   evaluate_regression_each <- function(df){
 
@@ -219,6 +223,7 @@ evaluate_multi <- function(df, pred_label, actual_val, ...) {
 #' @param actual_val_col Actual label column name
 #' @export
 evaluate_multi_ <- function(df, pred_label_col, actual_val_col, ...) {
+  validate_empty_data(df)
 
   evaluate_multi_each <- function(df){
     actual_values_raw <- df[[actual_val_col]]

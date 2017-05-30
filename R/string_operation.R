@@ -120,6 +120,8 @@ word_to_sentiment <- function(words, lexicon="bing"){
 #' @return Data frame with tokenized column
 #' @export
 do_tokenize <- function(df, input, token = "words", keep_cols = FALSE,  drop = TRUE, with_id = TRUE, output = token, ...){
+  validate_empty_data(df)
+
   loadNamespace("tidytext")
   loadNamespace("stringr")
 
@@ -247,6 +249,8 @@ calc_tf_ <- function(df, group_col, term_col, weight="ratio"){
 #' log10 strongly suppress the increase of idf values and log2 does it more weakly.
 #' @export
 do_tfidf <- function(df, group, term, idf_log_scale = log, tf_weight="raw", norm="l2"){
+  validate_empty_data(df)
+
   loadNamespace("tidytext")
   loadNamespace("dplyr")
 
@@ -300,6 +304,8 @@ stem_word <- function(...){
 #' @param n How many tokens should be together as new tokens. This should be numeric vector.
 #' @export
 do_ngram <- function(df, token, sentence, document, maxn=2, sep="_"){
+  validate_empty_data(df)
+
   loadNamespace("dplyr")
   loadNamespace("tidyr")
   loadNamespace("stringr")

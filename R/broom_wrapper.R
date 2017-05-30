@@ -29,6 +29,8 @@ augment_glm <- broom::augment
 #' augment for kmeans
 #' @export
 augment_kmeans <- function(df, model, data){
+  validate_empty_data(df)
+
   model_col <- col_name(substitute(model))
   data_col <- col_name(substitute(data))
   if(!model_col %in% colnames(df)){
@@ -83,6 +85,8 @@ augment_kmeans <- function(df, model, data){
 #' @param ... Additional argument to be passed to broom::augment
 #' @export
 add_prediction <- function(df, model_df, conf_int = 0.95, ...){
+  validate_empty_data(df)
+
   # parsing arguments of add_prediction and getting optional arguemnt for augment in ...
   cll <- match.call()
   aug_args <- expand_args(cll, exclude = c("df", "model_df"))
@@ -175,6 +179,8 @@ add_prediction <- function(df, model_df, conf_int = 0.95, ...){
 #' assign cluster number to each rows
 #' @export
 assign_cluster <- function(df, source_data){
+  validate_empty_data(df)
+
   df_cnames <- colnames(df)
   # columns that are not model related are regarded as grouping column
   grouping_cols <- df_cnames[!df_cnames %in% c("model", "source.data")]
@@ -225,6 +231,8 @@ assign_cluster <- function(df, source_data){
 #' tidy wrapper for kmeans
 #' @export
 cluster_info <- function(df){
+  validate_empty_data(df)
+
   # , col.names = names(model[["cluster"]])
   ret <- df %>%
     dplyr::ungroup() %>%
@@ -246,6 +254,8 @@ cluster_info <- function(df){
 #' glance wrapper for kmeans
 #' @export
 kmeans_info <- function(df){
+  validate_empty_data(df)
+
   ret <- broom::glance(df, model)
   colnames(ret)[colnames(ret) == "totss"] <- "Total Sum of Squares"
   colnames(ret)[colnames(ret) == "tot.withinss"] <- "Total Sum of Squares within Clusters"
@@ -260,6 +270,7 @@ kmeans_info <- function(df){
 #' @param ... Additional argument to be passed to broom::augment
 #' @export
 prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95, ...){
+  validate_empty_data(df)
 
   df_cnames <- colnames(df)
 
@@ -432,6 +443,8 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
 #' @param threshold Threshold value for predicted probability or what to optimize. It can be "f_score", "accuracy", "precision", "sensitivity" or "specificity" to optimize.
 #' @export
 prediction_binary <- function(df, threshold = 0.5, ...){
+  validate_empty_data(df)
+
   ret <- prediction(df, ...)
   first_model <- df[["model"]][[1]]
 
@@ -523,6 +536,8 @@ prediction_binary <- function(df, threshold = 0.5, ...){
 #' @param threshold The threshold probability to determine predicted_status.
 #' @export
 prediction_coxph <- function(df, time = NULL, threshold = 0.5, ...){
+  validate_empty_data(df)
+
   # TODO: need to make sure prediction.type is set to "lp"
   # when time is specified.
   ret <- prediction(df, ...)
@@ -616,6 +631,8 @@ prediction_coxph <- function(df, time = NULL, threshold = 0.5, ...){
 #' tidy wrapper for lm and glm
 #' @export
 model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
+  validate_empty_data(df)
+
   dots <- list(...)
 
   ret <- if (!is.null(conf_int)) {
@@ -711,6 +728,8 @@ model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
 #' glance wrapper
 #' @export
 model_stats <- function(df, pretty.name = FALSE, ...){
+  validate_empty_data(df)
+
   ret <- broom::glance(df, model, pretty.name = pretty.name, ...)
 
   formula_vars <- if (any(c("multinom", "lm", "glm") %in% class(df$model[[1]]))) {
@@ -849,6 +868,8 @@ model_stats <- function(df, pretty.name = FALSE, ...){
 #' tidy after converting model to anova
 #' @export
 model_anova <- function(df, pretty.name = FALSE){
+  validate_empty_data(df)
+
   ret <- suppressWarnings({
     # this causes warning for Deviance, Resid..Df, Resid..Dev in glm model
     df %>% dplyr::mutate(model = list(anova(model))) %>% broom::tidy(model)
@@ -900,6 +921,8 @@ non_single_value_colnames <- function(data) {
 #' @param newdata Data frame with rows that represent cohorts to simulate
 #' @export
 prediction_survfit <- function(df, newdata = NULL, ...){
+  validate_empty_data(df)
+
   caller <- match.call()
   # this expands dots arguemtns to character
   arg_char <- expand_args(caller, exclude = c("df"))
@@ -950,6 +973,8 @@ prediction_survfit <- function(df, newdata = NULL, ...){
 #' tidy after generating survfit
 #' @export
 do_survfit <- function(df, time, status, ...){
+  validate_empty_data(df)
+
   # need to compose formula with non-standard evaluation.
   # simply using time and status in formula here results in a formula that literally looks at
   # "time" columun and "status" column, which is not what we want.
@@ -967,6 +992,8 @@ do_survfit <- function(df, time, status, ...){
 #' tidy after converting model to confint
 #' @export
 model_confint <- function(df, ...){
+  validate_empty_data(df)
+
   caller <- match.call()
   # this expands dots arguemtns to character
   arg_char <- expand_args(caller, exclude = c("df"))
