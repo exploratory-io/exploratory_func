@@ -103,7 +103,7 @@ test_that("do_tokenize with keep_cols = TRUE with sentences", {
   result <- test_df %>%
     do_tokenize(char, drop=FALSE, token = "sentences", keep_cols = TRUE)
   expect_equal(result$token[[1]], "hello world!")
-  expect_equal(ncol(result), 3)
+  expect_equal(ncol(result), 4)
 })
 
 test_that("do_tokenize with token=words", {
@@ -127,7 +127,7 @@ test_that("do_tokenize with token=sentence", {
   result <- test_df %>%
     do_tokenize(char, token="sentences")
   expect_equal(result$token[[1]], "hello world!")
-  expect_equal(ncol(result), 1)
+  expect_equal(ncol(result), 2)
 })
 
 test_that("do_tokenize should work with output", {
