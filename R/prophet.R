@@ -41,6 +41,8 @@ do_prophet <- function(df, time, value = NULL, ...){
 #' @export
 do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "day", include_history = TRUE,
                         fun.aggregate = sum, cap = NULL, growth = NULL, weekly.seasonality = TRUE, yearly.seasonality = TRUE, ...){
+  validate_empty_data(df)
+
   # we are making default for weekly/yearly.seasonality TRUE since 'auto' does not behave well.
   # it seems that there are cases that weekly.seasonality is turned off as a side-effect of yearly.seasonality turned off.
   # if that happens, since no seasonality is on, prophet forecast result becomes just a linear trend line,

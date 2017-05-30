@@ -24,6 +24,8 @@ pair_count_ <- function (df,
                          distinct = FALSE,
                          diag = FALSE,
                          sort = FALSE){
+  validate_empty_data(df)
+
   loadNamespace("Matrix")
   # sparse matrix by group rows and value columns
   sparse_tab <- xtabs(data = df[, c(group_col, value_col)], sparse = TRUE, exclude = NULL, na.action=na.pass)

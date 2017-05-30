@@ -5,6 +5,8 @@
 #' @param clean_name If janitor::clean_names should be used
 #' @export
 row_as_header <- function(df, row_index = 1, prefix = "", clean_names = TRUE){
+  validate_empty_data(df)
+
   loadNamespace("stringr")
   loadNamespace("janitor")
   names <- as.character(df[row_index, ])

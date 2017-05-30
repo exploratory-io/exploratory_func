@@ -1,5 +1,12 @@
 context("check util functions")
 
+test_that("test pivot with empty data frame", {
+  df <- data.frame()
+  expect_error({
+    pivot(df, row ~ col)
+  }, "Input data frame is empty.")
+})
+
 test_that("test upper_gather", {
   mat <- matrix(seq(20),nrow=5, ncol=4)
   # use col03 to break sorted state
@@ -452,6 +459,28 @@ test_that("test pivot", {
   pivoted_with_na <- pivot(test_df, cat1 ~ cat2 + cat3, value = num3, fun.aggregate=mean, na.rm = FALSE)
   expect_true(any(is.na(pivoted_with_na)))
 
+})
+
+test_that("test pivot with Date", {
+  test_df <- data.frame(
+    dt = rep(lubridate::today() + seq(3), each = 5),
+    col = rep(seq(5), 3),
+    val = seq(15)
+  )
+
+  pivoted <- pivot(test_df, dt ~ col, value = val)
+  expect_true(pivoted$dt %>% inherits("Date"))
+})
+
+test_that("test pivot with POSIXct", {
+  test_df <- data.frame(
+    dt = rep(lubridate::now() + seq(3), each = 5),
+    col = rep(seq(5), 3),
+    val = seq(15)
+  )
+
+  pivoted <- pivot(test_df, dt ~ col, value = val)
+  expect_true(pivoted$dt %>% inherits("POSIXct"))
 })
 
 test_that("test pivot with group_by and dirty colum names", {

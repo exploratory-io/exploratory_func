@@ -49,6 +49,8 @@ do_causal_impact <- function(df, time, formula, ...) {
 #' @param ... - extra values to be passed to CausalImpact::CausalImpact.
 do_causal_impact_ <- function(df, time_col, formula, intervention_time = NULL, output_type = "series",
                               niter = NULL, standardize.data = NULL, prior.level.sd = NULL, nseasons = NULL, season.duration = NULL, dynamic.regression = NULL, ...) {
+  validate_empty_data(df)
+
   y_colname <- all.vars(lazyeval::f_lhs(formula))
   predictor_column_names <- all.vars(lazyeval::f_rhs(formula))
   all_column_names <- all.vars(formula)

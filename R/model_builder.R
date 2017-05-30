@@ -4,6 +4,7 @@
 #' integrated build_kmeans
 #' @export
 build_kmeans <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0){
+  validate_empty_data(df)
 
   if (!is.null(skv)) {
     #.kv pattern
@@ -49,6 +50,8 @@ build_kmeans.kv_ <- function(df,
                              augment=TRUE,
                              fun.aggregate=mean,
                              fill=0){
+  validate_empty_data(df)
+
   loadNamespace("dplyr")
   loadNamespace("lazyeval")
   loadNamespace("tidyr")
@@ -139,6 +142,8 @@ build_kmeans.cols <- function(df, ...,
                             seed=0,
                             augment=TRUE,
                             group_cols = c()){
+  validate_empty_data(df)
+
   loadNamespace("dplyr")
   loadNamespace("lazyeval")
   loadNamespace("tidyr")

@@ -10,6 +10,8 @@
 #' @param seed Random seed to control test data sampling
 #' @export
 build_lm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, group_cols = NULL, test_rate = 0.0, seed = 0){
+  validate_empty_data(data)
+
   # make variables factor sorted by the frequency
   fml_vars <- all.vars(formula)
   for(var in fml_vars) {
