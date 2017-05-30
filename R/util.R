@@ -791,8 +791,11 @@ pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = N
     unnest_with_drop_(tmp_col)
 
   if(length(rows) == 1){
-    # set same data type with original data
-    # because it's always converted to character
+    # Set same data type with original data
+    # because it's always converted to character.
+    # When there are more than 2 rows,
+    # they are concatenated,
+    # so the data type can't be converted
     ret[[rows]] <- same_type(ret[[rows]], original = df[[rows]])
   }
 
