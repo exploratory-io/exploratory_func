@@ -133,7 +133,7 @@ do_tokenize <- function(df, input, token = "words", keep_cols = FALSE,  drop = T
     df <- df[input_col]
   }
 
-  # always put document_id
+  # always put document_id to know what document the tokens are from
   doc_id <- avoid_conflict(colnames(df), "document_id")
   df <- dplyr::mutate_(df, .dots=setNames(list(~row_number()),doc_id))
 
