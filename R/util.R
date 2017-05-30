@@ -792,6 +792,7 @@ pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = N
 
   if(length(rows) == 1){
     # set same data type with original data
+    # because it's always converted to character
     ret[[rows]] <- same_type(ret[[rows]], original = df[[rows]])
   }
 
