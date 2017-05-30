@@ -73,13 +73,6 @@ do_causal_impact_ <- function(df, time_col, formula, intervention_time = NULL, o
     stop(paste0("intervention_time must be character or the same class as ", time_col, "."))
   }
 
-  # remove rows with NA in predictors. CausalImpact does not allow NA in predictors (covariates).
-  for(var in predictor_column_names) {
-    df <- df[!is.na(df[[var]]), ]
-  }
-  # remove NA data
-  df <- df[!is.na(df[[time_col]]), ]
-
   do_causal_impact_each <- function(df) {
     # keep time_col column, since we will drop it in the next step,
     # but will need it to compose zoo object.
@@ -95,6 +88,7 @@ do_causal_impact_ <- function(df, time_col, formula, intervention_time = NULL, o
     input_df <- move_col(input_df, y_colname, 1)
 
     df_zoo <- zoo::zoo(input_df, time_points_vec)
+    df_zoo <- zoo::na.spline(df_zoo)
 
     # compose list for model.args argument of CausalImpact.
     model_args <- list()
