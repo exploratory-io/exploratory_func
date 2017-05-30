@@ -1,5 +1,12 @@
 context("check util functions")
 
+test_that("test pivot with empty data frame", {
+  df <- data.frame()
+  expect_error({
+    pivot(df, row ~ col)
+  }, "Input data frame is empty.")
+})
+
 test_that("test upper_gather", {
   mat <- matrix(seq(20),nrow=5, ncol=4)
   # use col03 to break sorted state

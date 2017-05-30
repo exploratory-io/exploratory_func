@@ -18,6 +18,8 @@ build_lda <- function(df, document, token, count = NULL,
                       seed = 0,
                       keep.source = TRUE,
                       group_cols = NULL){
+  validate_empty_data(df)
+
   loadNamespace("dplyr")
   loadNamespace("topicmodels")
   loadNamespace("slam")

@@ -723,6 +723,8 @@ pivot <- function(df, formula, value = NULL, ...) {
 #' @param na.rm If na should be removed from values
 #' @export
 pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = NULL, na.rm = TRUE) {
+  validate_empty_data(df)
+
   # create a column name for row names
   # column names in lhs are collapsed by "_"
   rows <- all.vars(lazyeval::f_lhs(formula))
@@ -786,7 +788,7 @@ pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = N
   tmp_col <- avoid_conflict(grouped_col, "tmp")
   ret <- df %>%
     dplyr::do_(.dots=setNames(list(~pivot_each(.)), tmp_col)) %>%
-    tidyr::unnest_(tmp_col)
+    unnest_with_drop_(tmp_col)
 
   if(length(rows) == 1){
     # set same data type with original data
@@ -1002,6 +1004,7 @@ unnest_without_empty <- function(data, nested){
 #' unnest with removing NULL or empty list
 #' @export
 unnest_without_empty_ <- function(data, nested_col){
+  validate_empty_data(data)
   empty <- list_n(data[[nested_col]]) == 0
   without_empty <- data[!empty, ]
   if(nrow(without_empty) == 0){
@@ -1009,7 +1012,7 @@ unnest_without_empty_ <- function(data, nested_col){
     # if all values in nested_col are empty
     without_empty
   } else {
-    tidyr::unnest_(without_empty, nested_col)
+    unnest_with_drop_(without_empty, nested_col)
   }
 }
 
@@ -1025,4 +1028,36 @@ na_count <- function(x){
 #' @export
 na_pct <- function(x){
   sum(is.na(x)) / length(x) * 100
+}
+
+#' This is a wrapper of tidyr::unnest
+#' to change the default of .drop,
+#' so that it always drops other list
+#' columns, which is an expected behaviour
+#' for usage in this package in most cases.
+#' By default, unnest will drop other list columns
+#' if unnesting the specified columns requires the
+#' rows to be duplicated because of more than
+#' 2 rows data frames for example.
+unnest_with_drop_ <- function(..., .drop = TRUE){
+  tidyr::unnest_(..., .drop = .drop)
+}
+
+#' This is a wrapper of tidyr::unnest
+#' to change the default of .drop,
+#' so that it always drops other list
+#' columns, which is an expected behaviour
+#' for usage in this package in most cases.
+#' By default, unnest will drop other list columns
+#' if unnesting the specified columns requires the
+#' rows to be duplicated because of more than
+#' 2 rows data frames for example.
+unnest_with_drop <- function(..., .drop = TRUE){
+  tidyr::unnest(..., .drop = .drop)
+}
+
+#' validate empty data frame
+validate_empty_data <- function(df) {
+  if(nrow(df) == 0) {stop("Input data frame is empty.")}
+  df
 }

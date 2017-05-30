@@ -1,7 +1,7 @@
 Package: exploratory
 Type: Package
 Title: R package for Exploratory
-Version: 0.5.9.7
+Version: 0.5.9.9
 Date: 2017-04-26
 Authors@R: c(person("Yosuke", "Yasuda", email = "double.y.919.quick@gmail.com", role = c("aut", "cre")))
 URL: https://github.com/exploratory-io/exploratory_func
@@ -21,7 +21,6 @@ Imports:
     broom,
     tibble,
     jsonlite,
-    rgeolocate,
     countrycode,
     reshape2,
     lazyeval,
@@ -67,5 +66,6 @@ Suggests:
     AnomalyDetection,
     prophet,
     randomForest,
-    lexicon
+    lexicon,
+    rgeolocate
 RoxygenNote: 6.0.1

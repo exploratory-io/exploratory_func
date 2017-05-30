@@ -4,6 +4,7 @@
 #' integrated build_kmeans
 #' @export
 build_kmeans <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0){
+  validate_empty_data(df)
 
   if (!is.null(skv)) {
     #.kv pattern
@@ -49,6 +50,8 @@ build_kmeans.kv_ <- function(df,
                              augment=TRUE,
                              fun.aggregate=mean,
                              fill=0){
+  validate_empty_data(df)
+
   loadNamespace("dplyr")
   loadNamespace("lazyeval")
   loadNamespace("tidyr")
@@ -120,7 +123,7 @@ build_kmeans.kv_ <- function(df,
   }
   # Add a class for Exploratyry to recognize the type of .model
   if(augment){
-    output <- tidyr::unnest_(output, model_column)
+    output <- unnest_with_drop_(output, model_column)
   } else {
     class(output[[model_column]]) <- c("list", ".model", ".model.kmeans")
   }
@@ -139,6 +142,8 @@ build_kmeans.cols <- function(df, ...,
                             seed=0,
                             augment=TRUE,
                             group_cols = c()){
+  validate_empty_data(df)
+
   loadNamespace("dplyr")
   loadNamespace("lazyeval")
   loadNamespace("tidyr")
@@ -213,7 +218,7 @@ build_kmeans.cols <- function(df, ...,
       dplyr::do_(.dots=setNames(list(~build_kmeans_each(.)), model_column))
   }
   if(augment){
-    output <- tidyr::unnest_(output, model_column)
+    output <- unnest_with_drop_(output, model_column)
   } else {
     # Add a class for Exploratyry to recognize the type of .model
     class(output[[model_column]]) <- c("list", ".model", ".model.kmeans")

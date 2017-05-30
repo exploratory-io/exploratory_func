@@ -18,6 +18,7 @@ do_anomaly_detection <- function(df, time, value = NULL, ...){
 #' @param ... extra values to be passed to AnomalyDetection::AnomalyDetectionTs.
 #' @export
 do_anomaly_detection_ <- function(df, time_col, value_col = NULL, time_unit = "day", fun.aggregate = sum, direction="both", e_value=TRUE, ...){
+  validate_empty_data(df)
 
   loadNamespace("dplyr")
   loadNamespace("AnomalyDetection")
@@ -102,6 +103,7 @@ do_anomaly_detection_ <- function(df, time_col, value_col = NULL, time_unit = "d
         time = lubridate::floor_date(df[[time_col]], unit = time_unit),
         value = df[[value_col]]
       ) %>%
+        dplyr::filter(!is.na(value)) %>% # filter out NA so that aggregate function does not need to handle NA
         dplyr::group_by(time) %>%
         dplyr::summarise(val = fun.aggregate(value))
     } else {
@@ -149,5 +151,5 @@ do_anomaly_detection_ <- function(df, time_col, value_col = NULL, time_unit = "d
   # this doesn't overwrite grouping columns.
   tmp_col <- avoid_conflict(colnames(df), "tmp_col")
   test <- (df %>%  dplyr::do_(.dots=setNames(list(~do_anomaly_detection_each(.)), tmp_col)))
-  test %>%  tidyr::unnest_(tmp_col)
+  test %>%  unnest_with_drop_(tmp_col)
 }

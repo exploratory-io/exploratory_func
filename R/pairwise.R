@@ -10,6 +10,8 @@
 #' @param fun.aggregate Set an aggregate function when there are multiple entries for the key column per each category.
 #' @export
 do_cosine_sim.kv <- function(df, subject, key, value = NULL, distinct=FALSE, diag=FALSE, fun.aggregate=mean){
+  validate_empty_data(df)
+
   loadNamespace("qlcMatrix")
   loadNamespace("tidytext")
   loadNamespace("Matrix")
@@ -59,13 +61,15 @@ do_cosine_sim.kv <- function(df, subject, key, value = NULL, distinct=FALSE, dia
   tmp_col <- avoid_conflict(grouped_column, "tmp")
   df %>%
     dplyr::do_(.dots=setNames(list(~calc_doc_sim_each(.)), tmp_col)) %>%
-    tidyr::unnest_(tmp_col)
+    unnest_with_drop_(tmp_col)
 
 }
 
 #' integrated do_dist
 #' @export
 do_dist <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0){
+  validate_empty_data(df)
+
   if (!is.null(skv)) {
     #.kv pattern
     if (!length(skv) %in% c(2, 3)) {
@@ -117,6 +121,8 @@ do_dist.kv_ <- function(df,
                         method="euclidean",
                         p=2,
                         cmdscale_k = NULL){
+  validate_empty_data(df)
+
   loadNamespace("dplyr")
   loadNamespace("tidyr")
   loadNamespace("reshape2")
@@ -167,7 +173,7 @@ do_dist.kv_ <- function(df,
   tmp_col <- avoid_conflict(grouped_column, "tmp")
   df %>%
     dplyr::do_(.dots=setNames(list(~calc_dist_each(.)), tmp_col)) %>%
-    tidyr::unnest_(tmp_col)
+    unnest_with_drop_(tmp_col)
 }
 
 #' A symmetric version of KL-divergence
@@ -185,6 +191,7 @@ do_kl_dist.kv_ <- function(df,
                            method="euclidean",
                            p=2,
                            cmdscale_k = NULL){
+  validate_empty_data(df)
 
   loadNamespace("dplyr")
   loadNamespace("tidyr")
@@ -232,7 +239,7 @@ do_kl_dist.kv_ <- function(df,
     }
     ret
   }
-  (df %>% dplyr::do_(.dots=setNames(list(~calc_dist_each(.)), cnames[[1]])) %>%  tidyr::unnest_(cnames[[1]]))
+  (df %>% dplyr::do_(.dots=setNames(list(~calc_dist_each(.)), cnames[[1]])) %>%  unnest_with_drop_(cnames[[1]]))
 }
 
 #' Calculate distance of each pair of groups.
@@ -255,6 +262,8 @@ do_dist.cols <- function(df,
                          method="euclidean",
                          p=2,
                          cmdscale_k = NULL){
+  validate_empty_data(df)
+
   loadNamespace("dplyr")
   loadNamespace("tidyr")
   loadNamespace("reshape2")
@@ -299,5 +308,5 @@ do_dist.cols <- function(df,
     }
     ret
   }
-  (df %>% dplyr::do_(.dots=setNames(list(~calc_dist_each(.)), cnames[[1]])) %>%  tidyr::unnest_(cnames[[1]]))
+  (df %>% dplyr::do_(.dots=setNames(list(~calc_dist_each(.)), cnames[[1]])) %>%  unnest_with_drop_(cnames[[1]]))
 }
