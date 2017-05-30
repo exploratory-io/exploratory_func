@@ -87,7 +87,13 @@ do_svd.kv_ <- function(df,
     }
 
     if(centering){
-      # move the origin to center of data
+      # Move the origin to center of data
+      # (Mean of each column)
+      #
+      # Explanation from http://genomicsclass.github.io/book/pages/pca_svd.html
+      # "The second argument specifies we want to operate on the columns
+      # (1 would be used for rows), and the third and fourth arguments
+      # specify that we want to subtract the column means."
       matrix <- sweep(matrix, 2, colMeans(matrix), "-")
     }
     if(type=="group"){
@@ -217,7 +223,13 @@ do_svd.cols <- function(df,
       na.omit()
 
     if(centering){
-      # move the origin to center of data
+      # Move the origin to center of data
+      # (Mean of each column)
+      #
+      # Explanation from http://genomicsclass.github.io/book/pages/pca_svd.html
+      # "The second argument specifies we want to operate on the columns
+      # (1 would be used for rows), and the third and fourth arguments
+      # specify that we want to subtract the column means."
       matrix <- sweep(matrix, 2, colMeans(matrix), "-")
     }
     if(type=="group"){
@@ -229,8 +241,10 @@ do_svd.cols <- function(df,
         # get row indice that had NA
         na_indice <- na.action(matrix)
 
-        # fill rows with NA where there was any NA value
-        mat <- fill_mat_NA(setdiff(seq(nrow(df)),na_indice), mat = mat, max_index = nrow(df))
+        # Rows which have any NA value are removed from matrix to calculate svd
+        # but the result will be binded to original data frame
+        # so rows with all NA should be inserted to the removed rows
+        mat <- fill_mat_NA(setdiff(seq(nrow(df)), na_indice), mat = mat, max_index = nrow(df))
 
         ret <- as.data.frame(mat)
         colnames(ret) <- avoid_conflict(c(colnames(df), grouped_col), paste0("axis", seq(ncol(ret))))
