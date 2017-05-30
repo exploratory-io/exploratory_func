@@ -34,6 +34,13 @@ do_causal_impact <- function(df, time, formula, ...) {
 #' @param time_col - Column that has time data
 #' @param formula - Formula with target value column on the left-hand side, and predictor columns on the right-hand side. e.g. y ~ predictor1 + predictor2
 #' @param intervention_time - The point of time where intervention happened.
+#' @param na_fill_type - Type of NA fill:
+#'                       "spline" - Spline interpolation.
+#'                       "interpolate" - Linear interpolation.
+#'                       "StructTS" - Predict with Structural Time Series Model.
+#'                       "locf" - Fill with last previous non-NA value.
+#'                       "value" - Fill with the value of na_fill_value.
+#' @param na_fill_value - Value to fill NA when na_fill_type is "value"
 #' @param output_type - Type of output data frame:
 #'                      "series" - time series (default)
 #'                      "model_stats" - model fit summary from broom::glance() on the bsts model.
