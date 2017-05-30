@@ -2,6 +2,8 @@
 #' It calculates support, confidence and lift values from combinations of items.
 #' @export
 do_apriori <- function(df, subject, key, minlen=1, maxlen=10, min_support=0.1, max_support=1, min_confidence=0.5, lhs=NULL, rhs=NULL){
+  validate_empty_data(df)
+
   loadNamespace("dplyr")
   loadNamespace("tidyr")
   loadNamespace("arules")

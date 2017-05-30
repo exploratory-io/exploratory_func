@@ -23,6 +23,7 @@ build_model <- function(data, model_func, seed = 0, test_rate = 0, group_cols = 
 #' @param ... Parameters for model_func
 #' @export
 build_model_ <- function(data, model_func, seed = 0, test_rate = 0, group_cols = c(), reserved_colnames = c(), .dots, ...) {
+  validate_empty_data(data)
 
   if(!is.null(seed)){
     set.seed(seed)

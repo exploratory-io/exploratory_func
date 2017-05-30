@@ -13,6 +13,8 @@ normalize <- function(...) {
 #' integrated do_cor
 #' @export
 do_cor <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0){
+  validate_empty_data(df)
+
   if (!is.null(skv)) {
     #.kv pattern
     if (!(length(skv) %in% c(2, 3))) {
@@ -68,6 +70,7 @@ do_cor.kv_ <- function(df,
                       fill = 0,
                       fun.aggregate=mean)
 {
+  validate_empty_data(df)
   loadNamespace("reshape2")
   loadNamespace("dplyr")
   loadNamespace("tidyr")
@@ -118,6 +121,8 @@ do_cor.kv_ <- function(df,
 #' @return correlations between pairs of columns
 #' @export
 do_cor.cols <- function(df, ..., use="pairwise.complete.obs", method="pearson", distinct=FALSE, diag=FALSE){
+  validate_empty_data(df)
+
   loadNamespace("dplyr")
   loadNamespace("lazyeval")
   loadNamespace("tibble")
@@ -142,7 +147,6 @@ do_cor.cols <- function(df, ..., use="pairwise.complete.obs", method="pearson", 
 
   (df %>%  dplyr::do_(.dots=setNames(list(~do_cor_each(.)), output_cols[[1]])) %>%  unnest_with_drop_(output_cols[[1]]))
 }
-
 
 #' Non standard evaluation version for do_cmdscale_
 #' @return Tidy format of data frame.
@@ -171,6 +175,8 @@ do_cmdscale_ <- function(df,
                          k=2,
                          fun.aggregate=mean,
                          fill=0){
+  validate_empty_data(df)
+
   loadNamespace("dplyr")
   loadNamespace("tidyr")
   grouped_col <- grouped_by(df)

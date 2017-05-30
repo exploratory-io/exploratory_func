@@ -283,10 +283,12 @@ same_type <- function(vector, original){
     }
   } else if(is.integer(original)){
     as.integer(vector)
-  } else if(is.numeric.Date(original)) {
-    as.Date(vector)
-  } else if(is.numeric.POSIXt(original)){
-    as.POSIXct(vector)
+  } else if(inherits(original, "Date")) {
+    # when original data is Date
+    as.Date(vector, tz = lubridate::tz(original))
+  } else if(inherits(original, "POSIXct")){
+    # when original data is POSIXct
+    as.POSIXct(vector, tz = lubridate::tz(original))
   } else if (is.numeric(original)){
     as.numeric(vector)
   } else if(is.character(original)) {
@@ -721,9 +723,12 @@ pivot <- function(df, formula, value = NULL, ...) {
 #' @param na.rm If na should be removed from values
 #' @export
 pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = NULL, na.rm = TRUE) {
+  validate_empty_data(df)
+
   # create a column name for row names
   # column names in lhs are collapsed by "_"
-  cname <- paste0(all.vars(lazyeval::f_lhs(formula)), collapse = "_")
+  rows <- all.vars(lazyeval::f_lhs(formula))
+  cname <- paste0(rows, collapse = "_")
 
   vars <- all.vars(formula)
 
@@ -785,9 +790,22 @@ pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = N
     dplyr::do_(.dots=setNames(list(~pivot_each(.)), tmp_col)) %>%
     unnest_with_drop_(tmp_col)
 
-  # replace NA values in missing columns in some groups with fill
+  if(length(rows) == 1){
+    # Set same data type with original data
+    # because it's always converted to character.
+    # When there are more than 2 rows,
+    # they are concatenated,
+    # so the data type can't be converted
+    ret[[rows]] <- same_type(ret[[rows]], original = df[[rows]])
+  }
+
+  # replace NA values in new columns with fill value
   if(!is.na(fill)) {
-    newcols <- colnames(ret)[!colnames(ret) %in% grouped_col]
+    # exclude grouping columns and row label column
+    newcols <- setdiff(colnames(ret), c(grouped_col, cname))
+    # create key value with list
+    # whose keys are value columns
+    # and values are fill
     replace <- as.list(rep(fill, length(newcols)))
     names(replace) <- newcols
     ret <- ret %>%
@@ -994,6 +1012,7 @@ unnest_without_empty <- function(data, nested){
 #' unnest with removing NULL or empty list
 #' @export
 unnest_without_empty_ <- function(data, nested_col){
+  validate_empty_data(data)
   empty <- list_n(data[[nested_col]]) == 0
   without_empty <- data[!empty, ]
   if(nrow(without_empty) == 0){
@@ -1043,4 +1062,10 @@ unnest_with_drop_ <- function(..., .drop = TRUE){
 #' 2 rows data frames for example.
 unnest_with_drop <- function(..., .drop = TRUE){
   tidyr::unnest(..., .drop = .drop)
+}
+
+#' validate empty data frame
+validate_empty_data <- function(df) {
+  if(nrow(df) == 0) {stop("Input data frame is empty.")}
+  df
 }
