@@ -47,7 +47,8 @@ do_causal_impact <- function(df, time, formula, ...) {
 #' @param season.duration - Used with nseasons. How many unit time one season consists of. e.g. 24, when unit time is hour.
 #' @param dynamic.regression - Whether to include time-varying regression coefficients.
 #' @param ... - extra values to be passed to CausalImpact::CausalImpact.
-do_causal_impact_ <- function(df, time_col, formula, intervention_time = NULL, output_type = "series", na_fill = "spline",
+do_causal_impact_ <- function(df, time_col, formula, intervention_time = NULL, output_type = "series",
+                              na_fill_type = "spline", na_fill_value = NULL,
                               niter = NULL, standardize.data = NULL, prior.level.sd = NULL, nseasons = NULL, season.duration = NULL, dynamic.regression = NULL, ...) {
   validate_empty_data(df)
 
@@ -89,20 +90,20 @@ do_causal_impact_ <- function(df, time_col, formula, intervention_time = NULL, o
 
     df_zoo <- zoo::zoo(input_df, time_points_vec)
     # fill NAs in the input.
-    if (na_fill == "spline") {
+    if (na_fill_type == "spline") {
       df_zoo <- zoo::na.spline(df_zoo)
     }
-    else if (na_fill == "interpolate") {
+    else if (na_fill_type == "interpolate") {
       df_zoo <- zoo::na.approx(df_zoo)
     }
-    else if (na_fill == "locf") {
+    else if (na_fill_type == "locf") {
       df_zoo <- zoo::na.locf(df_zoo)
     }
-    else if (na_fill == "StructTS") {
+    else if (na_fill_type == "StructTS") {
       df_zoo <- zoo::na.StructTS(df_zoo)
     }
-    else if (class(na_fill) %in% c("integer", "numeric")) {
-      df_zoo <- zoo::na.fill(na_fill)
+    else if (na_fill_type == "value") {
+      df_zoo <- zoo::na.fill(na_fill_value)
     }
 
     # compose list for model.args argument of CausalImpact.
