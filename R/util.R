@@ -721,6 +721,10 @@ pivot <- function(df, formula, value = NULL, ...) {
 #' @param na.rm If na should be removed from values
 #' @export
 pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = NULL, na.rm = TRUE) {
+  if(nrow(df) == 0) {
+    stop("Input data frame is empty.")
+  }
+
   # create a column name for row names
   # column names in lhs are collapsed by "_"
   cname <- paste0(all.vars(lazyeval::f_lhs(formula)), collapse = "_")
