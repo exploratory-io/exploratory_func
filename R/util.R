@@ -285,10 +285,10 @@ same_type <- function(vector, original){
     as.integer(vector)
   } else if(inherits(original, "Date")) {
     # when original data is Date
-    as.Date(vector)
+    as.Date(vector, tz = lubridate::tz(original))
   } else if(inherits(original, "POSIXct")){
     # when original data is POSIXct
-    as.POSIXct(vector)
+    as.POSIXct(vector, tz = lubridate::tz(original))
   } else if (is.numeric(original)){
     as.numeric(vector)
   } else if(is.character(original)) {
@@ -795,9 +795,13 @@ pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = N
     ret[[rows]] <- same_type(ret[[rows]], original = df[[rows]])
   }
 
-  # replace NA values in missing columns in some groups with fill
+  # replace NA values in new columns with fill value
   if(!is.na(fill)) {
-    newcols <- colnames(ret)[!colnames(ret) %in% grouped_col]
+    # exclude grouping columns and row label column
+    newcols <- setdiff(colnames(ret), c(grouped_col, cname))
+    # create key value with list
+    # whose keys are value columns
+    # and values are fill
     replace <- as.list(rep(fill, length(newcols)))
     names(replace) <- newcols
     ret <- ret %>%
