@@ -40,6 +40,7 @@ do_causal_impact <- function(df, time, formula, ...) {
 #'                       "StructTS" - Predict with Structural Time Series Model.
 #'                       "locf" - Fill with last previous non-NA value.
 #'                       "value" - Fill with the value of na_fill_value.
+#'                       NULL - Skip NA fill. Use this only when you know there is no NA.
 #' @param na_fill_value - Value to fill NA when na_fill_type is "value"
 #' @param output_type - Type of output data frame:
 #'                      "series" - time series (default)
@@ -97,6 +98,8 @@ do_causal_impact_ <- function(df, time_col, formula, intervention_time = NULL, o
 
     df_zoo <- zoo::zoo(input_df, time_points_vec)
     # fill NAs in the input.
+    # since CausalImpact does not allow irregular time series,
+    # filtering rows would not work.
     if (na_fill_type == "spline") {
       df_zoo <- zoo::na.spline(df_zoo)
     }
@@ -111,6 +114,13 @@ do_causal_impact_ <- function(df, time_col, formula, intervention_time = NULL, o
     }
     else if (na_fill_type == "value") {
       df_zoo <- zoo::na.fill(na_fill_value)
+    }
+    else if (is.null(na_fill_type)) {
+      # skip when it is NULL. this is for the case caller is confident that
+      # there is no NA and want to skip overhead of checking for NA.
+    }
+    else {
+      stop(paste0(na_fill_type, " is not a valid na_fill_type option."))
     }
 
     # compose list for model.args argument of CausalImpact.
