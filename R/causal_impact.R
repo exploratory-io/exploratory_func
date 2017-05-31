@@ -25,9 +25,11 @@ tidy.bsts <- function(x) {
 
 #' NSE version of do_causal_impact_
 #' @export
-do_causal_impact <- function(df, time, formula, ...) {
+do_causal_impact <- function(df, time, value, segment, ...) {
   time_col <- col_name(substitute(time))
-  do_causal_impact_(df, time_col, formula = formula, ...)
+  value_col <- col_name(substitute(value))
+  segment_col <- col_name(substitute(segment))
+  do_causal_impact_(df, time_col, value_col, segment_col, ...)
 }
 
 #' @param df - Data frame
@@ -54,7 +56,7 @@ do_causal_impact <- function(df, time, formula, ...) {
 #' @param season.duration - Used with nseasons. How many unit time one season consists of. e.g. 24, when unit time is hour.
 #' @param dynamic.regression - Whether to include time-varying regression coefficients.
 #' @param ... - extra values to be passed to CausalImpact::CausalImpact.
-do_causal_impact_ <- function(df, time_col, formula, intervention_time = NULL, output_type = "series",
+do_causal_impact_ <- function(df, time_col, value_col, segment_col, formula = formula, intervention_time = NULL, output_type = "series",
                               na_fill_type = "spline", na_fill_value = 0,
                               niter = NULL, standardize.data = NULL, prior.level.sd = NULL, nseasons = NULL, season.duration = NULL, dynamic.regression = NULL, ...) {
   validate_empty_data(df)
