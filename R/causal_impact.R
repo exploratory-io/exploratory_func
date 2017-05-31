@@ -37,8 +37,7 @@ do_causal_impact <- function(df, time, formula, ...) {
 #' @param na_fill_type - Type of NA fill:
 #'                       "spline" - Spline interpolation.
 #'                       "interpolate" - Linear interpolation.
-#'                       "StructTS" - Predict with Structural Time Series Model.
-#'                       "locf" - Fill with last previous non-NA value.
+#'                       "previous" - Fill with last previous non-NA value.
 #'                       "value" - Fill with the value of na_fill_value.
 #'                       NULL - Skip NA fill. Use this only when you know there is no NA.
 #' @param na_fill_value - Value to fill NA when na_fill_type is "value"
@@ -56,7 +55,7 @@ do_causal_impact <- function(df, time, formula, ...) {
 #' @param dynamic.regression - Whether to include time-varying regression coefficients.
 #' @param ... - extra values to be passed to CausalImpact::CausalImpact.
 do_causal_impact_ <- function(df, time_col, formula, intervention_time = NULL, output_type = "series",
-                              na_fill_type = "spline", na_fill_value = NULL,
+                              na_fill_type = "spline", na_fill_value = 0,
                               niter = NULL, standardize.data = NULL, prior.level.sd = NULL, nseasons = NULL, season.duration = NULL, dynamic.regression = NULL, ...) {
   validate_empty_data(df)
 
@@ -106,14 +105,17 @@ do_causal_impact_ <- function(df, time_col, formula, intervention_time = NULL, o
     else if (na_fill_type == "interpolate") {
       df_zoo <- zoo::na.approx(df_zoo)
     }
-    else if (na_fill_type == "locf") {
+    else if (na_fill_type == "previous") {
       df_zoo <- zoo::na.locf(df_zoo)
     }
-    else if (na_fill_type == "StructTS") {
-      df_zoo <- zoo::na.StructTS(df_zoo)
-    }
+    # TODO: Getting this error with some input with na.StructTS().
+    #       Error in rowSums(tsSmooth(StructTS(y))[, -2]) : 'x' must be an array of at least two dimensions
+    #
+    # else if (na_fill_type == "StructTS") {
+    #   df_zoo <- zoo::na.StructTS(df_zoo)
+    # }
     else if (na_fill_type == "value") {
-      df_zoo <- zoo::na.fill(na_fill_value)
+      df_zoo <- zoo::na.fill(df_zoo, na_fill_value)
     }
     else if (is.null(na_fill_type)) {
       # skip when it is NULL. this is for the case caller is confident that
