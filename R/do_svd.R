@@ -89,6 +89,12 @@ do_svd.kv_ <- function(df,
 
     matrix <- simple_cast(df, subject_col, dimension_col, value_col, fun.aggregate = fun.aggregate, fill=fill)
 
+    # n_component must be smaller than
+    # or equal to ncol(matrix).
+    # Otherwise, svd takes to much memory and R session
+    # crushes
+    n_component <- min(c(ncol(matrix), n_component))
+
     # this might happen if fill argument is NA or fun.aggregate returns NA
     if(any(is.na(matrix))){
       stop("NA is not supported as value")
@@ -250,6 +256,12 @@ do_svd.cols <- function(df,
       dplyr::select_(.dots=select_dots) %>%
       as.matrix() %>%
       na.omit() # this removes rows which have any NA
+
+    # n_component must be smaller than
+    # or equal to ncol(matrix).
+    # Otherwise, svd takes to much memory and R session
+    # crushes
+    n_component <- min(c(ncol(matrix), n_component))
 
     if(centering){
       # Move the origin to center of data
