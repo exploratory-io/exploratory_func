@@ -109,6 +109,8 @@ do_causal_impact_ <- function(df, time_col, value_col, segment_col, subject_segm
         dplyr::summarise(y = n()) %>%
         dplyr::ungroup() # ungroup for time
     }
+    # no need to complete(). spread should have the same effect as complate().
+    # aggregated_data <- aggregated_data %>% complete(time, segment)
     df <- aggregated_data %>% tidyr::spread(segment, y)
 
     # keep time_col column, since we will drop it in the next step,
