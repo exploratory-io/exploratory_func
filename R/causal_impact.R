@@ -36,7 +36,7 @@ do_causal_impact <- function(df, time, value, segment, ...) {
 #' @param df - Data frame
 #' @param time_col - Column that has time data
 #' @param formula - Formula with target value column on the left-hand side, and predictor columns on the right-hand side. e.g. y ~ predictor1 + predictor2
-#' @param intervention_time - The point of time where intervention happened.
+#' @param event_time - The point of time where intervention happened.
 #' @param na_fill_type - Type of NA fill:
 #'                       "spline" - Spline interpolation.
 #'                       "interpolate" - Linear interpolation.
@@ -59,7 +59,7 @@ do_causal_impact <- function(df, time, value, segment, ...) {
 #' @param ... - extra values to be passed to CausalImpact::CausalImpact.
 do_causal_impact_ <- function(df, time_col, value_col, segment_col, subject_segment = NULL, max_predictors = 5,
                               time_unit = "day", fun.aggregate = sum,
-                              formula = NULL, intervention_time = NULL, output_type = "series",
+                              formula = NULL, event_time = NULL, output_type = "series",
                               na_fill_type = "spline", na_fill_value = 0,
                               niter = NULL, standardize.data = NULL, prior.level.sd = NULL, nseasons = NULL, season.duration = NULL, dynamic.regression = NULL, ...) {
   validate_empty_data(df)
@@ -86,8 +86,8 @@ do_causal_impact_ <- function(df, time_col, value_col, segment_col, subject_segm
     stop(paste0(time_col, " must be Date or POSIXct."))
   }
 
-  if (!(is.null(intervention_time) || class(intervention_time) == "character" || class(df[[time_col]]) == class(intervention_time))) {
-    stop(paste0("intervention_time must be character or the same class as ", time_col, "."))
+  if (!(is.null(event_time) || class(event_time) == "character" || class(df[[time_col]]) == class(event_time))) {
+    stop(paste0("event_time must be character or the same class as ", time_col, "."))
   }
 
   do_causal_impact_each <- function(df) {
@@ -170,7 +170,7 @@ do_causal_impact_ <- function(df, time_col, value_col, segment_col, subject_segm
       warping_limit = 1, # warping limit=1
       dtw_emphasis = 1, # rely only on dtw for pre-screening
       matches = max_predictors, # number of best matches to return
-      end_match_period = intervention_time,
+      end_match_period = event_time,
       parallel = FALSE
     )
 
@@ -197,17 +197,17 @@ do_causal_impact_ <- function(df, time_col, value_col, segment_col, subject_segm
       model_args$dynamic.regression = dynamic.regression
     }
 
-    if (!is.null(intervention_time)) { # if intervention_time is specified, create pre.period/post.period automatically.
-      if (class(intervention_time) == "character") { # translate character intervention_time into Date or POSIXct.
+    if (!is.null(event_time)) { # if event_time is specified, create pre.period/post.period automatically.
+      if (class(event_time) == "character") { # translate character event_time into Date or POSIXct.
         if (class(df[["time"]]) == "Date") {
-          intervention_time <- as.Date(intervention_time)
+          event_time <- as.Date(event_time)
         }
         else {
-          intervention_time <- as.POSIXct(intervention_time)
+          event_time <- as.POSIXct(event_time)
         }
       }
-      pre_period <- c(min(time_points_vec), intervention_time - 1) # -1 works as -1 day on Date and -1 sec on POSIXct.
-      post_period <- c(intervention_time, max(time_points_vec))
+      pre_period <- c(min(time_points_vec), event_time - 1) # -1 works as -1 day on Date and -1 sec on POSIXct.
+      post_period <- c(event_time, max(time_points_vec))
     
       # call CausalImpact::CausalImpact, which is the heart of this analysis.
       impact <- CausalImpact::CausalImpact(df_zoo, pre.period = pre_period, post.period = post_period, model.args = model_args, ...)
@@ -231,7 +231,7 @@ do_causal_impact_ <- function(df, time_col, value_col, segment_col, subject_segm
                            cumulative_impact_high = impact$series$cum.effect.upper,
                            cumulative_impact_low = impact$series$cum.effect.lower,
                            # to make this work with NA, this has to be ifelse, not if_else.
-                           actual_at_event_time = ifelse(df$time == intervention_time, df[[subject_segment]], NA))
+                           actual_at_event_time = ifelse(df$time == event_time, df[[subject_segment]], NA))
       ret_df
     }
     else if (output_type == "model_stats") {
