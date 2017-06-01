@@ -88,6 +88,9 @@ do_causal_impact_ <- function(df, time_col, value_col, segment_col, formula = fo
   }
 
   do_causal_impact_each <- function(df) {
+    df <- df[, c(time_col, value_col, segment_col)] # keep only time, value, and segment.
+    df <- df %>% tidyr::spread_(segment_col, value_col)
+
     # keep time_col column, since we will drop it in the next step,
     # but will need it to compose zoo object.
     time_points_vec <- df[[time_col]]
@@ -97,7 +100,12 @@ do_causal_impact_ <- function(df, time_col, value_col, segment_col, formula = fo
     # using base R style to avoid it.
     # since this base R style "select" seems to mess up grouping info if done outside of do_causal_impact_each,
     # it has to be done inside do_causal_impact_each.
-    input_df <- df[, all_column_names]
+    # input_df <- df[, all_column_names] # formula case
+
+
+    # drop time_col.
+    input_df <- df[, colnames(df) != time_col]
+
     # bring y column at the beginning of the input_df, so that CausalImpact understand this is the column to predict.
     input_df <- move_col(input_df, y_colname, 1)
 
