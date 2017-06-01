@@ -159,6 +159,18 @@ do_causal_impact_ <- function(df, time_col, value_col, segment_col, subject_segm
       stop(paste0(na_fill_type, " is not a valid na_fill_type option."))
     }
 
+    zoo_mm <- MarketMatching::best_matches_from_zoo(
+      zoo_data = df_zoo,
+      target_value = subject_segment,
+      warping_limit=1, # warping limit=1
+      dtw_emphasis=1, # rely only on dtw for pre-screening
+      matches=10, # request 5 matches
+      end_match_period=intervention_time,
+      parallel = FALSE
+    )
+
+    df_zoo = df_zoo[, colnames(df_zoo) %in%  c("y", zoo_mm$BestMatches$BestControl)]
+
     # compose list for model.args argument of CausalImpact.
     model_args <- list()
     if (!is.null(niter)) {
