@@ -56,7 +56,7 @@ do_causal_impact <- function(df, time, value, segment, ...) {
 #' @param season.duration - Used with nseasons. How many unit time one season consists of. e.g. 24, when unit time is hour.
 #' @param dynamic.regression - Whether to include time-varying regression coefficients.
 #' @param ... - extra values to be passed to CausalImpact::CausalImpact.
-do_causal_impact_ <- function(df, time_col, value_col, segment_col, formula = formula, intervention_time = NULL, output_type = "series",
+do_causal_impact_ <- function(df, time_col, value_col, segment_col, subject_segment = NULL, formula = NULL, intervention_time = NULL, output_type = "series",
                               na_fill_type = "spline", na_fill_value = 0,
                               niter = NULL, standardize.data = NULL, prior.level.sd = NULL, nseasons = NULL, season.duration = NULL, dynamic.regression = NULL, ...) {
   validate_empty_data(df)
@@ -66,7 +66,7 @@ do_causal_impact_ <- function(df, time_col, value_col, segment_col, formula = fo
     all_column_names <- all.vars(formula)
   }
   else {
-    y_colname <- value_col
+    y_colname <- subject_segment
   }
   grouped_col <- grouped_by(df)
 
