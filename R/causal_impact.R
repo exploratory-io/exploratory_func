@@ -20,7 +20,8 @@ glance.bsts <- function(x) {
 #' broom::tidy() implementation for bsts model
 #' @export
 tidy.bsts <- function(x) {
-  as.data.frame(summary(x)$coefficients)
+  df <- as.data.frame(summary(x)$coefficients)
+  tibble::rownames_to_column(df, var="market") # not really generic, but in our usage, it is market.
 }
 
 #' NSE version of do_causal_impact_
