@@ -57,7 +57,9 @@ do_causal_impact <- function(df, time, value, segment, ...) {
 #' @param season.duration - Used with nseasons. How many unit time one season consists of. e.g. 24, when unit time is hour.
 #' @param dynamic.regression - Whether to include time-varying regression coefficients.
 #' @param ... - extra values to be passed to CausalImpact::CausalImpact.
-do_causal_impact_ <- function(df, time_col, value_col, segment_col, subject_segment = NULL, time_unit = "day", fun.aggregate = sum, formula = NULL, intervention_time = NULL, output_type = "series",
+do_causal_impact_ <- function(df, time_col, value_col, segment_col, subject_segment = NULL, max_predictors = 5,
+                              time_unit = "day", fun.aggregate = sum,
+                              formula = NULL, intervention_time = NULL, output_type = "series",
                               na_fill_type = "spline", na_fill_value = 0,
                               niter = NULL, standardize.data = NULL, prior.level.sd = NULL, nseasons = NULL, season.duration = NULL, dynamic.regression = NULL, ...) {
   validate_empty_data(df)
@@ -165,10 +167,10 @@ do_causal_impact_ <- function(df, time_col, value_col, segment_col, subject_segm
     zoo_mm <- best_matches_from_zoo(
       zoo_data = df_zoo,
       target_value = subject_segment,
-      warping_limit=1, # warping limit=1
-      dtw_emphasis=1, # rely only on dtw for pre-screening
-      matches=10, # request 5 matches
-      end_match_period=intervention_time,
+      warping_limit = 1, # warping limit=1
+      dtw_emphasis = 1, # rely only on dtw for pre-screening
+      matches = max_predictors, # number of best matches to return
+      end_match_period = intervention_time,
       parallel = FALSE
     )
 
