@@ -130,7 +130,7 @@ do_causal_impact_ <- function(df, time_col, value_col, segment_col, subject_segm
     input_df <- df[, colnames(df) != "time"]
 
     # bring y column at the beginning of the input_df, so that CausalImpact understand this is the column to predict.
-    input_df <- move_col(input_df, y_colname, 1)
+    input_df <- move_col(input_df, subject_segment, 1)
 
     df_zoo <- zoo::zoo(input_df, time_points_vec)
     # fill NAs in the input.
@@ -217,17 +217,18 @@ do_causal_impact_ <- function(df, time_col, value_col, segment_col, subject_segm
 
     # $series has the result of prediction. for now ignore the rest such as $model.
     if (output_type == "series") {
-      df <- df[ , !(colnames(df) %in% grouped_col)] # drop group columns since they will be added back outside of do_causal_impact_each.
-      df <- df %>% dplyr::mutate(predicted_value = impact$series$point.pred,
-                                 predicted_value_high = impact$series$point.pred.upper,
-                                 predicted_value_low = impact$series$point.pred.lower,
-                                 effect = impact$series$point.effect,
-                                 effect_high = impact$series$point.effect.upper,
-                                 effect_low = impact$series$point.effect.lower,
-                                 cumulative_effect = impact$series$cum.effect,
-                                 cumulative_effect_high = impact$series$cum.effect.upper,
-                                 cumulative_effect_low = impact$series$cum.effect.lower)
-      df
+      ret_df <- data.frame(time = df$time,
+                           actual = df[[subject_segment]],
+                           expected = impact$series$point.pred,
+                           expected_high = impact$series$point.pred.upper,
+                           expected_low = impact$series$point.pred.lower,
+                           impact = impact$series$point.effect,
+                           impact_high = impact$series$point.effect.upper,
+                           impact_low = impact$series$point.effect.lower,
+                           cumulative_impact = impact$series$cum.effect,
+                           cumulative_impact_high = impact$series$cum.effect.upper,
+                           cumulative_impact_low = impact$series$cum.effect.lower)
+      ret_df
     }
     else if (output_type == "model_stats") {
       broom::glance(impact$model$bsts.model)
