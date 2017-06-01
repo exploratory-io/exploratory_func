@@ -21,7 +21,11 @@ glance.bsts <- function(x) {
 #' @export
 tidy.bsts <- function(x) {
   df <- as.data.frame(summary(x)$coefficients)
-  tibble::rownames_to_column(df, var="market") # not really generic, but in our usage, it is market.
+  df <- tibble::rownames_to_column(df, var="market") # not really generic, but in our usage, it is market.
+  colnames(df)[colnames(df) == "mean.inc"] <- "mean_inc"
+  colnames(df)[colnames(df) == "sd.inc"] <- "sd_inc"
+  colnames(df)[colnames(df) == "inc.prob"] <- "inc_prob"
+  df
 }
 
 #' NSE version of do_market_impact
