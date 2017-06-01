@@ -61,9 +61,13 @@ do_causal_impact_ <- function(df, time_col, value_col, segment_col, formula = fo
                               niter = NULL, standardize.data = NULL, prior.level.sd = NULL, nseasons = NULL, season.duration = NULL, dynamic.regression = NULL, ...) {
   validate_empty_data(df)
 
-  y_colname <- all.vars(lazyeval::f_lhs(formula))
-  predictor_column_names <- all.vars(lazyeval::f_rhs(formula))
-  all_column_names <- all.vars(formula)
+  if (!is.null(formula)) { # dead code for now.
+    y_colname <- all.vars(lazyeval::f_lhs(formula))
+    all_column_names <- all.vars(formula)
+  }
+  else {
+    y_colname <- value_col
+  }
   grouped_col <- grouped_by(df)
 
   # column name validation
