@@ -24,13 +24,13 @@ tidy.bsts <- function(x) {
   tibble::rownames_to_column(df, var="market") # not really generic, but in our usage, it is market.
 }
 
-#' NSE version of do_causal_impact_
+#' NSE version of do_market_impact
 #' @export
-do_causal_impact <- function(df, time, value, segment, ...) {
+do_market_impact <- function(df, time, value, market, ...) {
   time_col <- col_name(substitute(time))
   value_col <- col_name(substitute(value))
-  segment_col <- col_name(substitute(segment))
-  do_causal_impact_(df, time_col, value_col, segment_col, ...)
+  market_col <- col_name(substitute(market))
+  do_market_impact_(df, time_col, value_col, market_col, ...)
 }
 
 #' @param df - Data frame
@@ -57,7 +57,7 @@ do_causal_impact <- function(df, time, value, segment, ...) {
 #' @param season.duration - Used with nseasons. How many unit time one season consists of. e.g. 24, when unit time is hour.
 #' @param dynamic.regression - Whether to include time-varying regression coefficients.
 #' @param ... - extra values to be passed to CausalImpact::CausalImpact.
-do_causal_impact_ <- function(df, time_col, value_col, segment_col, subject_segment = NULL, max_predictors = 5,
+do_market_impact_ <- function(df, time_col, value_col, market_col, target_market = NULL, max_predictors = 5,
                               time_unit = "day", fun.aggregate = sum,
                               formula = NULL, event_time = NULL, output_type = "series",
                               na_fill_type = "spline", na_fill_value = 0,
@@ -69,7 +69,7 @@ do_causal_impact_ <- function(df, time_col, value_col, segment_col, subject_segm
     all_column_names <- all.vars(formula)
   }
   else {
-    y_colname <- subject_segment
+    y_colname <- target_market
   }
   grouped_col <- grouped_by(df)
 
@@ -97,24 +97,24 @@ do_causal_impact_ <- function(df, time_col, value_col, segment_col, subject_segm
       data.frame(
         time = lubridate::floor_date(df[[time_col]], unit = time_unit),
         value = df[[value_col]],
-        segment = df[[segment_col]]
+        market = df[[market_col]]
       ) %>%
         dplyr::filter(!is.na(value)) %>% # remove NA so that we do not pass NA to aggregate function.
-        dplyr::group_by(time, segment) %>%
+        dplyr::group_by(time, market) %>%
         dplyr::summarise(y = fun.aggregate(value)) %>%
         dplyr::ungroup() # ungroup for time
     } else {
       data.frame(
         time = lubridate::floor_date(df[[time_col]], unit = time_unit),
-        segment = df[[segment_col]]
+        market = df[[market_col]]
       ) %>%
-        dplyr::group_by(time, segment) %>%
+        dplyr::group_by(time, market) %>%
         dplyr::summarise(y = n()) %>%
         dplyr::ungroup() # ungroup for time
     }
     # no need to complete(). spread should have the same effect as complate().
-    # aggregated_data <- aggregated_data %>% complete(time, segment)
-    df <- aggregated_data %>% tidyr::spread(segment, y)
+    # aggregated_data <- aggregated_data %>% complete(time, market)
+    df <- aggregated_data %>% tidyr::spread(market, y)
 
     # keep time_col column, since we will drop it in the next step,
     # but will need it to compose zoo object.
@@ -132,7 +132,7 @@ do_causal_impact_ <- function(df, time_col, value_col, segment_col, subject_segm
     input_df <- df[, colnames(df) != "time"]
 
     # bring y column at the beginning of the input_df, so that CausalImpact understand this is the column to predict.
-    input_df <- move_col(input_df, subject_segment, 1)
+    input_df <- move_col(input_df, target_market, 1)
 
     df_zoo <- zoo::zoo(input_df, time_points_vec)
     # fill NAs in the input.
@@ -166,7 +166,7 @@ do_causal_impact_ <- function(df, time_col, value_col, segment_col, subject_segm
 
     zoo_mm <- best_matches_from_zoo(
       zoo_data = df_zoo,
-      target_value = subject_segment,
+      target_value = target_market,
       warping_limit = 1, # warping limit=1
       dtw_emphasis = 1, # rely only on dtw for pre-screening
       matches = max_predictors, # number of best matches to return
@@ -174,7 +174,7 @@ do_causal_impact_ <- function(df, time_col, value_col, segment_col, subject_segm
       parallel = FALSE
     )
 
-    df_zoo = df_zoo[, colnames(df_zoo) %in%  c(subject_segment, zoo_mm$BestMatches$BestControl)]
+    df_zoo = df_zoo[, colnames(df_zoo) %in%  c(target_market, zoo_mm$BestMatches$BestControl)]
 
     # compose list for model.args argument of CausalImpact.
     model_args <- list()
@@ -220,7 +220,7 @@ do_causal_impact_ <- function(df, time_col, value_col, segment_col, subject_segm
     # $series has the result of prediction. for now ignore the rest such as $model.
     if (output_type == "series") {
       ret_df <- data.frame(time = df$time,
-                           actual = df[[subject_segment]],
+                           actual = df[[target_market]],
                            expected = impact$series$point.pred,
                            expected_high = impact$series$point.pred.upper,
                            expected_low = impact$series$point.pred.lower,
@@ -231,7 +231,7 @@ do_causal_impact_ <- function(df, time_col, value_col, segment_col, subject_segm
                            cumulative_impact_high = impact$series$cum.effect.upper,
                            cumulative_impact_low = impact$series$cum.effect.lower,
                            # to make this work with NA, this has to be ifelse, not if_else.
-                           actual_at_event_time = ifelse(df$time == event_time, df[[subject_segment]], NA))
+                           actual_at_event_time = ifelse(df$time == event_time, df[[target_market]], NA))
       ret_df
     }
     else if (output_type == "model_stats") {
