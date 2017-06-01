@@ -5,10 +5,10 @@
 #' @export
 glance.bsts <- function(x) {
   ret <- summary(x)
-  data.frame(residual.sd = ret$residual.sd,
-             prediction.sd = ret$prediction.sd,
-             rsquare = ret$rsquare,
-             relative.gof = ret$relative.gof,
+  data.frame(residual_sd = ret$residual.sd,
+             prediction_sd = ret$prediction.sd,
+             r_square = ret$rsquare,
+             relative_gof = ret$relative.gof,
              coef_min = ret$size[[1]],
              coef_1st_quartile = ret$size[[2]],
              coef_median = ret$size[[3]],
