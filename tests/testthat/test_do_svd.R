@@ -28,7 +28,7 @@ test_that("test do_svd cols with NA long", {
 
   ret <- do_svd(test_df, dplyr::starts_with("col"), output = "long")
 
-  expect_equal(nrow(ret), 9)
+  expect_equal(nrow(ret), 6)
   expect_true(all(ret$row %in% seq(3)))
 })
 
@@ -46,7 +46,7 @@ test_that("test do_svd cols with NA", {
   ret <- do_svd(test_df, dplyr::starts_with("col"), output = "wide")
 
   expect_equal(nrow(ret), 4)
-  expect_equal(colnames(ret), c(colnames(test_df), "axis1.new", "axis2", "axis3"))
+  expect_equal(colnames(ret), c("axis1", "axis1.new", "axis2"))
 })
 
 test_that("test do_svd cols dimension with NA long", {
@@ -62,7 +62,7 @@ test_that("test do_svd cols dimension with NA long", {
 
   ret <- do_svd(test_df, dplyr::starts_with("col"), output = "long", type = "dimension")
 
-  expect_equal(nrow(ret), 9)
+  expect_equal(nrow(ret), 6)
   expect_true(all(ret$colname %in% colnames(test_df)))
 })
 
@@ -96,7 +96,7 @@ test_that("test do_svd cols variance with NA long", {
 
   ret <- do_svd(test_df, dplyr::starts_with("col"), output = "long", type = "variance")
 
-  expect_equal(nrow(ret), 3)
+  expect_equal(nrow(ret), 2)
   expect_equal(colnames(ret), c("new.dimension", "value"))
 })
 
@@ -114,5 +114,5 @@ test_that("test do_svd cols variance with NA wide", {
   ret <- do_svd(test_df, dplyr::starts_with("col"), output = "wide", type = "variance")
 
   expect_equal(nrow(ret), 1)
-  expect_equal(colnames(ret), c("axis1", "axis2", "axis3"))
+  expect_equal(colnames(ret), c("axis1", "axis2"))
 })
