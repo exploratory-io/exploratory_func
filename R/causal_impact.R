@@ -169,7 +169,7 @@ do_causal_impact_ <- function(df, time_col, value_col, segment_col, subject_segm
       parallel = FALSE
     )
 
-    df_zoo = df_zoo[, colnames(df_zoo) %in%  c("y", zoo_mm$BestMatches$BestControl)]
+    df_zoo = df_zoo[, colnames(df_zoo) %in%  c(subject_segment, zoo_mm$BestMatches$BestControl)]
 
     # compose list for model.args argument of CausalImpact.
     model_args <- list()
