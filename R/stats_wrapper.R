@@ -201,6 +201,7 @@ do_cmdscale_ <- function(df,
     }
     points <- cmdscale(as.dist(t(mat)), eig=FALSE, k=k)
     result_df <- as.data.frame(points)
+    colnames(result_df) <- paste("axis", seq(ncol(result_df)), sep = "")
 
     df <- setNames(data.frame(rownames(points), stringsAsFactors=FALSE), name_col)
     ret <- cbind(df, result_df)
