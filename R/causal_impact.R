@@ -229,7 +229,9 @@ do_causal_impact_ <- function(df, time_col, value_col, segment_col, subject_segm
                            impact_low = impact$series$point.effect.lower,
                            cumulative_impact = impact$series$cum.effect,
                            cumulative_impact_high = impact$series$cum.effect.upper,
-                           cumulative_impact_low = impact$series$cum.effect.lower)
+                           cumulative_impact_low = impact$series$cum.effect.lower,
+                           # to make this work with NA, this has to be ifelse, not if_else.
+                           actual_at_event_time = ifelse(df$time == intervention_time, df[[subject_segment]], NA))
       ret_df
     }
     else if (output_type == "model_stats") {
