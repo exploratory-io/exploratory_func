@@ -56,7 +56,7 @@ do_causal_impact <- function(df, time, value, segment, ...) {
 #' @param season.duration - Used with nseasons. How many unit time one season consists of. e.g. 24, when unit time is hour.
 #' @param dynamic.regression - Whether to include time-varying regression coefficients.
 #' @param ... - extra values to be passed to CausalImpact::CausalImpact.
-do_causal_impact_ <- function(df, time_col, value_col, segment_col, subject_segment = NULL, formula = NULL, intervention_time = NULL, output_type = "series",
+do_causal_impact_ <- function(df, time_col, value_col, segment_col, subject_segment = NULL, time_unit = "day", fun.aggregate = sum, formula = NULL, intervention_time = NULL, output_type = "series",
                               na_fill_type = "spline", na_fill_value = 0,
                               niter = NULL, standardize.data = NULL, prior.level.sd = NULL, nseasons = NULL, season.duration = NULL, dynamic.regression = NULL, ...) {
   validate_empty_data(df)
@@ -88,12 +88,32 @@ do_causal_impact_ <- function(df, time_col, value_col, segment_col, subject_segm
   }
 
   do_causal_impact_each <- function(df) {
-    df <- df[, c(time_col, value_col, segment_col)] # keep only time, value, and segment.
-    df <- df %>% tidyr::spread_(segment_col, value_col)
+    # aggregate data with day
+    aggregated_data <- 
+    if (!is.null(value_col)){
+      data.frame(
+        time = lubridate::floor_date(df[[time_col]], unit = time_unit),
+        value = df[[value_col]],
+        segment = df[[segment_col]]
+      ) %>%
+        dplyr::filter(!is.na(value)) %>% # remove NA so that we do not pass NA to aggregate function.
+        dplyr::group_by(time, segment) %>%
+        dplyr::summarise(y = fun.aggregate(value)) %>%
+        dplyr::ungroup() # ungroup for time
+    } else {
+      data.frame(
+        time = lubridate::floor_date(df[[time_col]], unit = time_unit),
+        segment = df[[segment_col]]
+      ) %>%
+        dplyr::group_by(time, segment) %>%
+        dplyr::summarise(y = n()) %>%
+        dplyr::ungroup() # ungroup for time
+    }
+    df <- aggregated_data %>% tidyr::spread(segment, y)
 
     # keep time_col column, since we will drop it in the next step,
     # but will need it to compose zoo object.
-    time_points_vec <- df[[time_col]]
+    time_points_vec <- df[["time"]]
     # select only columns that appear in the formula.
     # following fails with column names with spaces most likely because of dplyr bug.
     # input_df <- dplyr::select_(df, .dots = all_column_names)
@@ -104,7 +124,7 @@ do_causal_impact_ <- function(df, time_col, value_col, segment_col, subject_segm
 
 
     # drop time_col.
-    input_df <- df[, colnames(df) != time_col]
+    input_df <- df[, colnames(df) != "time"]
 
     # bring y column at the beginning of the input_df, so that CausalImpact understand this is the column to predict.
     input_df <- move_col(input_df, y_colname, 1)
@@ -162,7 +182,7 @@ do_causal_impact_ <- function(df, time_col, value_col, segment_col, subject_segm
 
     if (!is.null(intervention_time)) { # if intervention_time is specified, create pre.period/post.period automatically.
       if (class(intervention_time) == "character") { # translate character intervention_time into Date or POSIXct.
-        if (class(df[[time_col]]) == "Date") {
+        if (class(df[["time"]]) == "Date") {
           intervention_time <- as.Date(intervention_time)
         }
         else {
