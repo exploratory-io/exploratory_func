@@ -201,6 +201,8 @@ do_cmdscale_ <- function(df,
     }
     points <- cmdscale(as.dist(t(mat)), eig=FALSE, k=k)
     result_df <- as.data.frame(points)
+
+    # these column names should be consistent with the result of do_svd
     colnames(result_df) <- paste("axis", seq(ncol(result_df)), sep = "")
 
     df <- setNames(data.frame(rownames(points), stringsAsFactors=FALSE), name_col)
