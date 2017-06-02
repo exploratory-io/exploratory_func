@@ -89,6 +89,12 @@ do_svd.kv_ <- function(df,
 
     matrix <- simple_cast(df, subject_col, dimension_col, value_col, fun.aggregate = fun.aggregate, fill=fill)
 
+    # n_component must be smaller than
+    # or equal to ncol(matrix).
+    # Otherwise, svd takes to much memory and R session
+    # crushes
+    n_component <- min(c(ncol(matrix), n_component))
+
     # this might happen if fill argument is NA or fun.aggregate returns NA
     if(any(is.na(matrix))){
       stop("NA is not supported as value")
@@ -218,16 +224,16 @@ do_svd.kv_ <- function(df,
 #' @param output "long" or "wide".
 #' "long" is a format with 3 columns which represents rows, columns and values
 #' "wide" is a format which spreads the long information into matrix
+#' @param keep_cols If TRUE, selected columns are kept in the result.
 #' @return Tidy format of svd result in a data frame.
 #' @export
 do_svd.cols <- function(df,
-                         ...,
+                        ...,
                         type="group",
-                        fill=0,
-                        fun.aggregate=mean,
-                        n_component=3,
+                        n_component=2,
                         centering=TRUE,
-                        output ="long"){
+                        output ="wide",
+                        keep_cols = FALSE){
   validate_empty_data(df)
 
   loadNamespace("dplyr")
@@ -246,10 +252,17 @@ do_svd.cols <- function(df,
   # this is executed on each group
   do_svd_each <- function(df){
     # create matrix by selected columns
-    matrix <- df %>%
-      dplyr::select_(.dots=select_dots) %>%
+    selected_df <- df %>%
+      dplyr::select_(.dots=select_dots)
+    matrix <- selected_df %>%
       as.matrix() %>%
       na.omit() # this removes rows which have any NA
+
+    # n_component must be smaller than
+    # or equal to ncol(matrix).
+    # Otherwise, svd takes too much memory and R session
+    # crushes
+    n_component <- min(c(ncol(matrix), n_component))
 
     if(centering){
       # Move the origin to center of data
@@ -288,8 +301,17 @@ do_svd.cols <- function(df,
         ret <- as.data.frame(mat)
         colnames(ret) <- avoid_conflict(c(colnames(df), grouped_col), paste0("axis", seq(ncol(ret))))
 
+        # remove selected columns
+        not_selected_df <- df[,!colnames(df) %in% colnames(selected_df)]
+
         # append u matrix to the original data frame
-        ret <- cbind(df, ret)
+        ret <- if(keep_cols){
+          # keep selected columns in the end
+          # if keep_cols is TRUE
+          cbind(not_selected_df, ret, selected_df)
+        } else {
+          cbind(not_selected_df, ret)
+        }
       } else if (output=="long") {
         # this returns molten format data frame of matrix
         # with subjects, new dimentions and values
