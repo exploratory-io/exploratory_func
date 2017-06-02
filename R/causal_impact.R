@@ -64,7 +64,7 @@ do_market_impact <- function(df, time, value, market, ...) {
 do_market_impact_ <- function(df, time_col, value_col, market_col, target_market = NULL, max_predictors = 5,
                               time_unit = "day", fun.aggregate = sum,
                               formula = NULL, event_time = NULL, output_type = "series",
-                              na_fill_type = "spline", na_fill_value = 0,
+                              na_fill_type = "value", na_fill_value = 0,
                               niter = NULL, standardize.data = NULL, prior.level.sd = NULL, nseasons = NULL, season.duration = NULL, dynamic.regression = NULL, ...) {
   validate_empty_data(df)
 
