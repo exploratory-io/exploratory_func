@@ -46,12 +46,10 @@ calculate_distances_from_zoo <- function(zoo_data, target_market, id = "id", war
       distances[row, "Correlation"] <- cor(test, ref)
       distances[row, "RelativeDistance"] <- dist
       distances[row, "Skip"] <- FALSE
-      distances[row, "Length"] <- length(ref)
     } else{
       distances[row, "Skip"] <- TRUE
       distances[row, "RelativeDistance"] <- NA
       distances[row, "Correlation"] <- NA
-      distances[row, "Length"] <- NA
     }
     row <- row + 1
   }
@@ -67,8 +65,6 @@ calculate_distances_from_zoo <- function(zoo_data, target_market, id = "id", war
     dplyr::filter(rank<=matches) %>%
     dplyr::select(-matches, -w)
   
-  distances$MatchingStartDate <- min(dates)
-  distances$MatchingEndDate <- max(dates)
   return(distances)
 }
 
