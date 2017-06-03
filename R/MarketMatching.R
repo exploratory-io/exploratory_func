@@ -365,7 +365,7 @@ best_matches_from_zoo <- function(zoo_data=NULL, target_value = NULL, warping_li
   ## loop through markets and compute distances
   if (parallel==FALSE){
     if(!is.null(target_value)){
-      all_distances[[1]] <- calculate_distances_with_trycatch(data, target_market=target_value,  warping_limit = warping_limit, matches = matches, dtw_emphasis = dtw_emphasis)
+      all_distances[[1]] <- calculate_distances_with_trycatch(data, target_market=target_value,  warping_limit = warping_limit, matches = length(all_markets), dtw_emphasis = dtw_emphasis)
     } else {
       for (i in 1:length(all_markets)){
         cat(i)
