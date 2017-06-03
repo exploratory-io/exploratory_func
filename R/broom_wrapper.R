@@ -940,7 +940,7 @@ prediction_survfit <- function(df, newdata = NULL, ...){
     united_colnames = c()
     for (i in 1:nrow(newdata)){
       united_colname = paste0("est", i)
-      ret <- ret %>% unite_(united_colname, c(paste0("estimate.",i), paste0("std.error.",i), paste0("conf.high.",i),paste0("conf.low.",i)), sep="_", remove=TRUE)
+      ret <- ret %>% tidyr::unite_(united_colname, c(paste0("estimate.",i), paste0("std.error.",i), paste0("conf.high.",i),paste0("conf.low.",i)), sep="_", remove=TRUE)
       united_colnames = c(united_colnames, united_colname)
     }
     # gather the united values into key column (.cohort.temp) and value column (.val.temp)
@@ -953,7 +953,7 @@ prediction_survfit <- function(df, newdata = NULL, ...){
     # but, omit newdata column that has only 1 unique value from the cohort names we create here.
     selected_newdata_colnames <- non_single_value_colnames(newdata)
     selected_newdata <- newdata[, selected_newdata_colnames]
-    cohorts_labels <- selected_newdata %>% unite(label, everything())
+    cohorts_labels <- selected_newdata %>% tidyr::unite(label, everything())
     for (i in 1:nrow(selected_newdata)){
       ret <- ret %>% mutate(.cohort.temp = if_else(paste0("est", i) == .cohort.temp, cohorts_labels$label[[i]], .cohort.temp))
     }
