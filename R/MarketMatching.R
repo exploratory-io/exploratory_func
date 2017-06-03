@@ -16,11 +16,11 @@ calculate_distances_from_zoo <- function(zoo_data, target_market, id = "id", war
   row <- 1
   all_markets <- names(zoo_data)
   distances <- data.frame(matrix(nrow=length(all_markets), ncol=5))
-  names(distances) <- c(id, "BestControl", "RelativeDistance", "Correlation", "Length")
+  names(distances) <- c(id, "market", "RelativeDistance", "Correlation", "Length")
   for (ThatMarket in all_markets){
     messages <- 0 # clear messages inside loop.
     distances[row, id] <- target_market
-    distances[row, "BestControl"] <- ThatMarket
+    distances[row, "market"] <- ThatMarket
     # values from ThatMarket
     test <- zoo_data[, ThatMarket]
     # values from target_market
