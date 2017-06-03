@@ -66,7 +66,7 @@ do_market_impact_ <- function(df, time_col, value_col, market_col, target_market
                               time_unit = "day", fun.aggregate = sum,
                               formula = NULL, event_time = NULL, output_type = "series",
                               na_fill_type = "value", na_fill_value = 0,
-                              dtw_weight = 1,
+                              distance_weight = 1,
                               niter = NULL, standardize.data = NULL, prior.level.sd = NULL, nseasons = NULL, season.duration = NULL, dynamic.regression = NULL, ...) {
   validate_empty_data(df)
 
@@ -174,7 +174,7 @@ do_market_impact_ <- function(df, time_col, value_col, market_col, target_market
       zoo_data = df_zoo,
       target_value = target_market,
       warping_limit = 1, # warping limit=1
-      dtw_emphasis = dtw_weight, # rely only on dtw for pre-screening
+      dtw_emphasis = distance_weight, # how much to rely on dtw for pre-screening
       matches = max_predictors, # number of best matches to return
       end_match_period = event_time,
       parallel = FALSE
