@@ -51,7 +51,8 @@ do_market_impact <- function(df, time, value, market, ...) {
 #' @param output_type - Type of output data frame:
 #'                      "series" - time series (default)
 #'                      "model_stats" - model fit summary from broom::glance() on the bsts model.
-#'                      "model_coef" - model coefficients from broom::tidy() on the bsts model.
+#'                      "predictor_markets" - model coefficients from broom::tidy() on the bsts model.
+#'                      "predictor_market_candidates" - candidates of predictor market and their ranking based on distance and correlation.
 #'                      "model" - model data frame with the bsts model. (Not use in Exploratory UI for now.)
 #' @param alpha - Tail-area probability of posterior interval (a concept that is similar to confidence interval.)
 #' @param niter - Number of MCMC Samples.
@@ -177,7 +178,7 @@ do_market_impact_ <- function(df, time_col, value_col, market_col, target_market
       end_match_period = event_time,
       parallel = FALSE
     )
-    if (output_type == "correlations") {
+    if (output_type == "predictor_market_candidates") {
       return(zoo_mm$BestMatches)
     }
 
@@ -244,7 +245,7 @@ do_market_impact_ <- function(df, time_col, value_col, market_col, target_market
     else if (output_type == "model_stats") {
       broom::glance(impact$model$bsts.model)
     }
-    else if (output_type == "model_coef") {
+    else if (output_type == "predictor_markets") {
       broom::tidy(impact$model$bsts.model)
     }
     else { # output_type should be "model"
