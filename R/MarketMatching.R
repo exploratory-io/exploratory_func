@@ -200,7 +200,6 @@ dw <- function(y, yhat){
 #' @import iterators
 #' @import utils
 #' @import dtw
-#' @importFrom doParallel registerDoParallel stopImplicitCluster
 #'
 #' @export best_matches
 #' @examples
