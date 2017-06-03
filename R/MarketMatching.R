@@ -16,7 +16,7 @@ calculate_distances_from_zoo <- function(zoo_data, target_market, id = "id", war
   row <- 1
   all_markets <- names(zoo_data)
   distances <- data.frame(matrix(nrow=length(all_markets), ncol=5))
-  names(distances) <- c(id, "market", "relative_distance", "Correlation", "Length")
+  names(distances) <- c(id, "market", "relative_distance", "correlation", "Length")
   for (ThatMarket in all_markets){
     messages <- 0 # clear messages inside loop.
     distances[row, id] <- target_market
@@ -43,13 +43,13 @@ calculate_distances_from_zoo <- function(zoo_data, target_market, id = "id", war
       } else{
         dist <- 0
       }
-      distances[row, "Correlation"] <- cor(test, ref)
+      distances[row, "correlation"] <- cor(test, ref)
       distances[row, "relative_distance"] <- dist
       distances[row, "Skip"] <- FALSE
     } else{
       distances[row, "Skip"] <- TRUE
       distances[row, "relative_distance"] <- NA
-      distances[row, "Correlation"] <- NA
+      distances[row, "correlation"] <- NA
     }
     row <- row + 1
   }
@@ -57,7 +57,7 @@ calculate_distances_from_zoo <- function(zoo_data, target_market, id = "id", war
   distances$w <- dtw_emphasis
   distances <- dplyr::filter(distances, Skip==FALSE) %>%
     dplyr::mutate(dist_rank=rank(relative_distance)) %>%
-    dplyr::mutate(corr_rank=rank(-Correlation)) %>%
+    dplyr::mutate(corr_rank=rank(-correlation)) %>%
     dplyr::mutate(combined_rank=w*dist_rank+(1-w)*corr_rank) %>%
     dplyr::arrange(combined_rank) %>%
     dplyr::select(-Skip, -combined_rank, -id, -Length) %>%
