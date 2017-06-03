@@ -177,6 +177,9 @@ do_market_impact_ <- function(df, time_col, value_col, market_col, target_market
       end_match_period = event_time,
       parallel = FALSE
     )
+    if (output_type == "correlations") {
+      return(zoo_mm$BestMatches)
+    }
 
     df_zoo = df_zoo[, colnames(df_zoo) %in%  c(target_market, head(zoo_mm$BestMatches$BestControl, max_predictors))]
 
