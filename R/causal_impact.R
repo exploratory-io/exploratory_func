@@ -39,7 +39,7 @@ do_market_impact <- function(df, time, value, market, ...) {
 
 #' @param df - Data frame
 #' @param time_col - Column that has time data
-#' @param event_time - The point of time where intervention happened.
+#' @param event_time - The point of time when the event of interest happened.
 #' @param na_fill_type - Type of NA fill:
 #'                       "spline" - Spline interpolation.
 #'                       "interpolate" - Linear interpolation.
