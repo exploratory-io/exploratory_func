@@ -199,7 +199,14 @@ do_cmdscale_ <- function(df,
         mat <- rbind(mat, matrix(0, nrow=1, ncol=ncol(mat), dimnames = list(diffrow, NULL)))
       }
     }
+
+    if (ncol(mat) <= k) {
+      # this causes an error in cmdscale, so should be validated
+      stop("Number of unique values of the pair should be more than k")
+    }
+
     points <- cmdscale(as.dist(t(mat)), eig=FALSE, k=k)
+
     result_df <- as.data.frame(points)
 
     # these column names should be consistent with the result of do_svd
