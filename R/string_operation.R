@@ -142,7 +142,9 @@ do_tokenize <- function(df, input, token = "words", keep_cols = FALSE,  drop = T
     df <- dplyr::mutate_(df, .dots=setNames(list(~row_number()),doc_id))
   }
 
-  if(token=="words" && with_id){
+  if(token %in% c("words", "characters") && with_id){
+    # get sentence_id too in this case for each token
+
     loadNamespace("dplyr")
 
     # split into sentences
@@ -163,7 +165,7 @@ do_tokenize <- function(df, input, token = "words", keep_cols = FALSE,  drop = T
 
     # split into tokens
     tokenize_df <- dplyr::ungroup(tokenize_df)
-    tokenized <- tidytext::unnest_tokens_(tokenize_df, output_col, output_col, token="words", drop=TRUE, ...)
+    tokenized <- tidytext::unnest_tokens_(tokenize_df, output_col, output_col, token=token, drop=TRUE, ...)
 
     if(drop){
       df[[input_col]] <- NULL
