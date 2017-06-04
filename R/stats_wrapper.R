@@ -202,7 +202,7 @@ do_cmdscale_ <- function(df,
 
     if (ncol(mat) <= k) {
       # this causes an error in cmdscale, so should be validated
-      stop("Number of unique values of the pair should be more than k")
+      stop("Number of unique values in pairs should be more than the number of dimensions")
     }
 
     points <- cmdscale(as.dist(t(mat)), eig=FALSE, k=k)
