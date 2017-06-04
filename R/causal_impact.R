@@ -183,7 +183,7 @@ do_market_impact_ <- function(df, time_col, value_col, market_col, target_market
       return(zoo_mm$BestMatches)
     }
 
-    df_zoo = df_zoo[, colnames(df_zoo) %in%  c(target_market, head(zoo_mm$BestMatches$BestControl, max_predictors))]
+    df_zoo = df_zoo[, colnames(df_zoo) %in%  c(target_market, head(zoo_mm$BestMatches$market, max_predictors))]
 
     # compose list for model.args argument of CausalImpact.
     model_args <- list()
