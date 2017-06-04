@@ -56,9 +56,9 @@ calculate_distances_from_zoo <- function(zoo_data, target_market, id = "id", war
   distances$matches <- matches
   distances$w <- dtw_emphasis
   distances <- dplyr::filter(distances, Skip==FALSE) %>%
-    dplyr::mutate(dist_rank=rank(distance)) %>%
-    dplyr::mutate(corr_rank=rank(-correlation)) %>%
-    dplyr::mutate(combined_rank=w*dist_rank+(1-w)*corr_rank) %>%
+    dplyr::mutate(distance_rank=rank(distance)) %>%
+    dplyr::mutate(correlation_rank=rank(-correlation)) %>%
+    dplyr::mutate(combined_rank=w*distance_rank+(1-w)*correlation_rank) %>%
     dplyr::arrange(combined_rank) %>%
     dplyr::select(-Skip, -combined_rank, -id, -Length) %>%
     dplyr::mutate(rank=row_number()) %>%
