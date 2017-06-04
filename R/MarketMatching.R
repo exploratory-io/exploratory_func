@@ -201,7 +201,6 @@ dw <- function(y, yhat){
 #' @import utils
 #' @import dtw
 #'
-#' @export best_matches
 #' @examples
 #' ##-----------------------------------------------------------------------
 #' ## Find best matches for each airport time series
@@ -321,7 +320,6 @@ best_matches <- function(data=NULL, id_variable=NULL, target_value = NULL, date_
 }
 
 #' best_matches from zoo object version
-#' @export
 best_matches_from_zoo <- function(zoo_data=NULL, target_value = NULL, warping_limit=1, parallel=TRUE, end_match_period=NULL, matches=5, dtw_emphasis=1){
   
   all_markets <- names(zoo_data)
@@ -403,7 +401,6 @@ best_matches_from_zoo <- function(zoo_data=NULL, target_value = NULL, warping_li
 #' @import ggplot2
 #' @import zoo
 
-#' @export inference
 #' @examples
 #' library(MarketMatching)
 #' ##-----------------------------------------------------------------------
