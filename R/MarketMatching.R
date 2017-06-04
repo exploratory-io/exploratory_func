@@ -34,7 +34,7 @@ calculate_distances_from_zoo <- function(zoo_data, target_market, id = "id", war
     dates <- zoo::index(zoo_data)[index_without_na]
     
     if ((var(test)==0 | length(test)<=2*warping_limit+1) & messages==0){
-      print(paste0("NOTE: test market ", target_market, " has insufficient data or no variance and hence will be excluded"))
+      print(paste0("NOTE: test market ", ThatMarket, " has insufficient data or no variance and hence will be excluded"))
       messages <- messages + 1
     }
     if (target_market != ThatMarket & messages==0 & var(ref)>0 & length(test)>2*warping_limit){
