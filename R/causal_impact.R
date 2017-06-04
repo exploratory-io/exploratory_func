@@ -39,7 +39,6 @@ do_market_impact <- function(df, time, value, market, ...) {
 
 #' @param df - Data frame
 #' @param time_col - Column that has time data
-#' @param formula - Formula with target value column on the left-hand side, and predictor columns on the right-hand side. e.g. y ~ predictor1 + predictor2
 #' @param event_time - The point of time where intervention happened.
 #' @param na_fill_type - Type of NA fill:
 #'                       "spline" - Spline interpolation.
@@ -64,19 +63,13 @@ do_market_impact <- function(df, time, value, market, ...) {
 #' @param ... - extra values to be passed to CausalImpact::CausalImpact.
 do_market_impact_ <- function(df, time_col, value_col, market_col, target_market = NULL, max_predictors = 5,
                               time_unit = "day", fun.aggregate = sum,
-                              formula = NULL, event_time = NULL, output_type = "series",
+                              event_time = NULL, output_type = "series",
                               na_fill_type = "value", na_fill_value = 0,
                               distance_weight = 1,
                               niter = NULL, standardize.data = NULL, prior.level.sd = NULL, nseasons = NULL, season.duration = NULL, dynamic.regression = NULL, ...) {
   validate_empty_data(df)
 
-  if (!is.null(formula)) { # dead code for now.
-    y_colname <- all.vars(lazyeval::f_lhs(formula))
-    all_column_names <- all.vars(formula)
-  }
-  else {
-    y_colname <- target_market
-  }
+  y_colname <- target_market
   grouped_col <- grouped_by(df)
 
   # column name validation
@@ -125,14 +118,6 @@ do_market_impact_ <- function(df, time_col, value_col, market_col, target_market
     # keep time_col column, since we will drop it in the next step,
     # but will need it to compose zoo object.
     time_points_vec <- df[["time"]]
-    # select only columns that appear in the formula.
-    # following fails with column names with spaces most likely because of dplyr bug.
-    # input_df <- dplyr::select_(df, .dots = all_column_names)
-    # using base R style to avoid it.
-    # since this base R style "select" seems to mess up grouping info if done outside of do_causal_impact_each,
-    # it has to be done inside do_causal_impact_each.
-    # input_df <- df[, all_column_names] # formula case
-
 
     # drop time_col.
     input_df <- df[, colnames(df) != "time"]
