@@ -39,7 +39,18 @@ do_market_impact <- function(df, time, value, market, ...) {
 
 #' @param df - Data frame
 #' @param time_col - Column that has time data
+#' @param value_col - Column that has value data
+#' @param market_col - Column that has id/name of market
+#' @param target_market - The market of interest
+#' @param time_unit - "day", "week", "month", "quarter", or "year"
+#' @param fun.aggregate - Function to aggregate values.
 #' @param event_time - The point of time when the event of interest happened.
+#' @param output_type - Type of output data frame:
+#'                      "series" - time series (default)
+#'                      "model_stats" - model fit summary from broom::glance() on the bsts model.
+#'                      "model_coef" - model coefficients from broom::tidy() on the bsts model.
+#'                      "predictor_market_candidates" - candidates of predictor market and their ranking based on distance and correlation.
+#'                      "model" - model data frame with the bsts model. (Not use in Exploratory UI for now.)
 #' @param na_fill_type - Type of NA fill:
 #'                       "spline" - Spline interpolation.
 #'                       "interpolate" - Linear interpolation.
@@ -47,12 +58,7 @@ do_market_impact <- function(df, time, value, market, ...) {
 #'                       "value" - Fill with the value of na_fill_value.
 #'                       NULL - Skip NA fill. Use this only when you know there is no NA.
 #' @param na_fill_value - Value to fill NA when na_fill_type is "value"
-#' @param output_type - Type of output data frame:
-#'                      "series" - time series (default)
-#'                      "model_stats" - model fit summary from broom::glance() on the bsts model.
-#'                      "model_coef" - model coefficients from broom::tidy() on the bsts model.
-#'                      "predictor_market_candidates" - candidates of predictor market and their ranking based on distance and correlation.
-#'                      "model" - model data frame with the bsts model. (Not use in Exploratory UI for now.)
+#' @param distance_weight - Weight of distance (vs. correlation) for calculating ranking of candidate control markets.
 #' @param alpha - Tail-area probability of posterior interval (a concept that is similar to confidence interval.)
 #' @param niter - Number of MCMC Samples.
 #' @param standardize.data - Whether to standardize data.
