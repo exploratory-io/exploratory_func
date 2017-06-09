@@ -39,7 +39,18 @@ do_market_impact <- function(df, time, value, market, ...) {
 
 #' @param df - Data frame
 #' @param time_col - Column that has time data
+#' @param value_col - Column that has value data
+#' @param market_col - Column that has id/name of market
+#' @param target_market - The market of interest
+#' @param time_unit - "day", "week", "month", "quarter", or "year"
+#' @param fun.aggregate - Function to aggregate values.
 #' @param event_time - The point of time when the event of interest happened.
+#' @param output_type - Type of output data frame:
+#'                      "series" - time series (default)
+#'                      "model_stats" - model fit summary from broom::glance() on the bsts model.
+#'                      "model_coef" - model coefficients from broom::tidy() on the bsts model.
+#'                      "predictor_market_candidates" - candidates of predictor market and their ranking based on distance and correlation.
+#'                      "model" - model data frame with the bsts model. (Not use in Exploratory UI for now.)
 #' @param na_fill_type - Type of NA fill:
 #'                       "spline" - Spline interpolation.
 #'                       "interpolate" - Linear interpolation.
@@ -47,12 +58,7 @@ do_market_impact <- function(df, time, value, market, ...) {
 #'                       "value" - Fill with the value of na_fill_value.
 #'                       NULL - Skip NA fill. Use this only when you know there is no NA.
 #' @param na_fill_value - Value to fill NA when na_fill_type is "value"
-#' @param output_type - Type of output data frame:
-#'                      "series" - time series (default)
-#'                      "model_stats" - model fit summary from broom::glance() on the bsts model.
-#'                      "model_coef" - model coefficients from broom::tidy() on the bsts model.
-#'                      "predictor_market_candidates" - candidates of predictor market and their ranking based on distance and correlation.
-#'                      "model" - model data frame with the bsts model. (Not use in Exploratory UI for now.)
+#' @param distance_weight - Weight of distance (vs. correlation) for calculating ranking of candidate control markets.
 #' @param alpha - Tail-area probability of posterior interval (a concept that is similar to confidence interval.)
 #' @param niter - Number of MCMC Samples.
 #' @param standardize.data - Whether to standardize data.
@@ -169,6 +175,13 @@ do_market_impact_ <- function(df, time_col, value_col, market_col, target_market
     }
 
     df_zoo = df_zoo[, colnames(df_zoo) %in%  c(target_market, head(zoo_mm$BestMatches$market, max_predictors))]
+    orig_colnames = colnames(df_zoo)
+    # rename column names too "y", "x1", "x2", ... since CausalImpact throws error when column names starts with number,
+    # or in some other cases too.
+    temp_colnames = c("y", paste0("x", as.character(1:(length(orig_colnames) - 1))))
+    # create mapping so that we can convert coefficient names back in model_coef output type.
+    colnames_map <- stats::setNames(orig_colnames, temp_colnames)
+    colnames(df_zoo) <- temp_colnames
 
     # compose list for model.args argument of CausalImpact.
     model_args <- list()
@@ -232,7 +245,11 @@ do_market_impact_ <- function(df, time_col, value_col, market_col, target_market
       broom::glance(impact$model$bsts.model)
     }
     else if (output_type == "model_coef") {
-      broom::tidy(impact$model$bsts.model)
+      ret_df <- broom::tidy(impact$model$bsts.model)
+      # map values of market back to original names.
+      # if there is no match, use the name as is. this if for "(intercept)" row from broom::tidy().
+      ret_df <- ret_df %>% mutate(market = ifelse(!is.na(colnames_map[market]), colnames_map[market], market))
+      ret_df
     }
     else { # output_type should be "model"
       # following would cause error : cannot coerce class ""bsts"" to a data.frame 
