@@ -179,6 +179,8 @@ do_market_impact_ <- function(df, time_col, value_col, market_col, target_market
     # rename column names too "y", "x1", "x2", ... since CausalImpact throws error when column names starts with number,
     # or in some other cases too.
     temp_colnames = c("y", paste0("x", as.character(1:(length(orig_colnames) - 1))))
+    # create mapping so that we can convert coefficient names back in model_coef output type.
+    colnames_map <- stats::setNames(orig_colnames, temp_colnames)
     colnames(df_zoo) <- temp_colnames
 
     # compose list for model.args argument of CausalImpact.
@@ -243,7 +245,11 @@ do_market_impact_ <- function(df, time_col, value_col, market_col, target_market
       broom::glance(impact$model$bsts.model)
     }
     else if (output_type == "model_coef") {
-      broom::tidy(impact$model$bsts.model)
+      ret_df <- broom::tidy(impact$model$bsts.model)
+      # map values of market back to original names.
+      # if there is no match, use the name as is. this if for "(intercept)" row from broom::tidy().
+      ret_df <- ret_df %>% mutate(market = ifelse(!is.na(colnames_map[market]), colnames_map[market], market))
+      ret_df
     }
     else { # output_type should be "model"
       # following would cause error : cannot coerce class ""bsts"" to a data.frame 
