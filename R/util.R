@@ -202,6 +202,9 @@ upper_gather <- function(mat, names=NULL, diag=NULL, cnames = c("Var1", "Var2", 
       ind[ind[,2] < ind[,1], ]
     }
 
+    if(is.vector(filtered)){
+      filtered <- as.data.frame(as.list(filtered))
+    }
     # this creates pairs of row and column indices
     # make a vector of upper half of matrix
     row <- r_names[filtered[,1]]
