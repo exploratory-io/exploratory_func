@@ -175,6 +175,11 @@ do_market_impact_ <- function(df, time_col, value_col, market_col, target_market
     }
 
     df_zoo = df_zoo[, colnames(df_zoo) %in%  c(target_market, head(zoo_mm$BestMatches$market, max_predictors))]
+    orig_colnames = colnames(df_zoo)
+    # rename column names too "y", "x1", "x2", ... since CausalImpact throws error when column names starts with number,
+    # or in some other cases too.
+    temp_colnames = c("y", paste0("x", as.character(1:(length(orig_colnames) - 1))))
+    colnames(df_zoo) <- temp_colnames
 
     # compose list for model.args argument of CausalImpact.
     model_args <- list()
