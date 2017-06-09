@@ -19,6 +19,17 @@ test_that("test upper_gather", {
   expect_equal(nrow(result), 6)
 })
 
+test_that("upper_gather with 2 by 2 matrix", {
+  upper_gather(
+    structure(
+      c(1, 0.952601667396786, 0.952601667396786, 1),
+      .Dim = c(2L,2L),
+      .Dimnames = list(
+        c("ARR_DELAY", "DEP_DELAY"),
+        c("ARR_DELAY", "DEP_DELAY"))))
+  browser()
+})
+
 test_that("test upper_gather with vector", {
   mat <- seq(6)
   names <- paste("entity", seq(4))
