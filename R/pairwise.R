@@ -161,7 +161,11 @@ do_dist.kv_ <- function(df,
     rownames(ret) <- NULL
     if (!is.null(cmdscale_k)) {
       ret <- do_cmdscale_(ret, cnames[[1]], cnames[[2]], cnames[[3]], k = cmdscale_k)
+      # the label for each points should be the subject
+      # so the column name should be the same
+      colnames(ret)[[1]] <- subject_col
     }
+
     ret
   }
   # Calculation is executed in each group.
