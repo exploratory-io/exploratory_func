@@ -202,8 +202,8 @@ upper_gather <- function(mat, names=NULL, diag=NULL, cnames = c("Var1", "Var2", 
       ind[ind[,2] < ind[,1], ]
     }
 
-    # when there is only one index peirs,
-    # filtered becomes vector, not matrix
+    # when there is only one index pairs,
+    # filtered becomes a vector, not matrix
     # but matrix is expected later
     # so should be converted to matrix with
     # one row
