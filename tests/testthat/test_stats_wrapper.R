@@ -67,8 +67,6 @@ test_that("do_cor with 2 columns and distinct TRUE", {
 
   cor_ret <- cor(melt_mat[["Var1"]], melt_mat[["Var 2"]], use = "pairwise.complete.obs")
 
-  browser()
-
 })
 
 tidy_test_df <- data.frame(

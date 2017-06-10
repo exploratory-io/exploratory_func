@@ -20,14 +20,21 @@ test_that("test upper_gather", {
 })
 
 test_that("upper_gather with 2 by 2 matrix", {
-  upper_gather(
+  ret <- upper_gather(
     structure(
       c(1, 0.952601667396786, 0.952601667396786, 1),
       .Dim = c(2L,2L),
       .Dimnames = list(
         c("ARR_DELAY", "DEP_DELAY"),
         c("ARR_DELAY", "DEP_DELAY"))))
-  browser()
+  expect_equal(ret,
+               structure(
+                 list(
+                   Var1 = "ARR_DELAY", Var2 = "DEP_DELAY", value = 0.952601667396786),
+                 .Names = c("Var1", "Var2", "value"),
+                 row.names = c(NA, -1L),
+                 class = "data.frame")
+               )
 })
 
 test_that("test upper_gather with vector", {
