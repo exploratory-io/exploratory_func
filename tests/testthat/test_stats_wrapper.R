@@ -51,24 +51,6 @@ test_that("do_cor with NA values", {
   }
 })
 
-test_that("do_cor with 2 columns and distinct TRUE", {
-  loadNamespace("reshape2")
-  nrow <- 10
-  ncol <- 2
-  vec <- rnorm(nrow * ncol)
-  vec[[3]] <- NA
-  vec[[30]] <- NA
-  vec[[55]] <- NA
-  mat <- matrix(vec, nrow = nrow)
-  melt_mat <- reshape2::melt(mat)
-  colnames(melt_mat)[[2]] <- "Var 2"
-
-  ret <- do_cor(melt_mat, Var1, `Var 2`, distinct = TRUE)
-
-  cor_ret <- cor(melt_mat[["Var1"]], melt_mat[["Var 2"]], use = "pairwise.complete.obs")
-
-})
-
 tidy_test_df <- data.frame(
   cat=rep(c("cat1", "cat2"), 20),
   dim = sort(rep(paste0("dim", seq(4)), 5)),
