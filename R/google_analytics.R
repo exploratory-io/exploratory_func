@@ -12,7 +12,10 @@ getGoogleProfile <- function(tokenFileId = ""){
 getGoogleAnalytics <- function(tableId, lastNDays, dimensions, metrics, tokenFileId = NULL, paginate_query=FALSE, segments = NULL){
   if(!requireNamespace("RGoogleAnalytics")){stop("package RGoogleAnalytics must be installed.")}
   loadNamespace("lubridate")
-
+  # if segment is empty, pass it as NULL
+  if(segments == ''){
+    segments = NULL
+  }
   token <- getGoogleTokenForAnalytics(tokenFileId)
   start_date <- as.character(lubridate::today() - lubridate::days(lastNDays))
   #end_date <- as.character(lubridate::today() - lubridate::days(1))
