@@ -14,6 +14,8 @@ getGoogleAnalytics <- function(tableId, lastNDays, dimensions, metrics, tokenFil
   loadNamespace("lubridate")
   # if segment is not null and empty string, pass it as NULL
   # NOTE: null can be passed for data frame created with old version so need to explicitly check it.
+  # Also if we do not set !is.null(segments) before hand, if(segment == '') part fails
+  # with Error in if (segments == “”) { : argument is of length zero
   if(!is.null(segments) && segments == ''){
     segments = NULL
   }
