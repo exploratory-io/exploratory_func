@@ -12,8 +12,8 @@ getGoogleProfile <- function(tokenFileId = ""){
 getGoogleAnalytics <- function(tableId, lastNDays, dimensions, metrics, tokenFileId = NULL, paginate_query=FALSE, segments = NULL){
   if(!requireNamespace("RGoogleAnalytics")){stop("package RGoogleAnalytics must be installed.")}
   loadNamespace("lubridate")
-  # if segment is empty, pass it as NULL
-  if(segments == ''){
+  # if segment is empty string, pass it as NULL
+  if(!is.null(segments) && segments == ''){
     segments = NULL
   }
   token <- getGoogleTokenForAnalytics(tokenFileId)
