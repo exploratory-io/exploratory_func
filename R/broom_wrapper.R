@@ -797,8 +797,8 @@ model_stats <- function(df, pretty.name = FALSE, ...){
 
   # adjust column name style
   if(pretty.name){
-    colnames(ret)[colnames(ret) == "r.squared"] <- "R Square"
-    colnames(ret)[colnames(ret) == "adj.r.squared"] <- "R Square Adj"
+    colnames(ret)[colnames(ret) == "r.squared"] <- "R Squared"
+    colnames(ret)[colnames(ret) == "adj.r.squared"] <- "Adj R Squared"
     colnames(ret)[colnames(ret) == "sigma"] <- "Root Mean Square Error"
     colnames(ret)[colnames(ret) == "statistic"] <- "F Ratio"
     colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
@@ -820,7 +820,7 @@ model_stats <- function(df, pretty.name = FALSE, ...){
     colnames(ret)[colnames(ret) == "p.value.sc"] <- "Score Test P Value"
     colnames(ret)[colnames(ret) == "statistic.wald"] <- "Wald Test"
     colnames(ret)[colnames(ret) == "p.value.wald"] <- "Wald Test P Value"
-    colnames(ret)[colnames(ret) == "r.squared.max"] <- "R Square Max"
+    colnames(ret)[colnames(ret) == "r.squared.max"] <- "R Squared Max"
     colnames(ret)[colnames(ret) == "concordance"] <- "Concordance"
     colnames(ret)[colnames(ret) == "std.error.concordance"] <- "Std Error Concordance"
 
@@ -836,8 +836,8 @@ model_stats <- function(df, pretty.name = FALSE, ...){
     colnames(ret)[colnames(ret) =="normalized_discounted_cumulative_gain"] <- "Normalized Discounted Cumulative Gain"
     colnames(ret)[colnames(ret) =="mean_average_precision"] <- "Mean Average Precision"
   }else{
-    colnames(ret)[colnames(ret) == "r.squared"] <- "r_square"
-    colnames(ret)[colnames(ret) == "adj.r.squared"] <- "r_square_adj"
+    colnames(ret)[colnames(ret) == "r.squared"] <- "r_squared"
+    colnames(ret)[colnames(ret) == "adj.r.squared"] <- "adj_r_squared"
     colnames(ret)[colnames(ret) == "sigma"] <- "root_mean_square_error"
     colnames(ret)[colnames(ret) == "statistic"] <- "f_ratio"
     colnames(ret)[colnames(ret) == "p.value"] <- "p_value"
@@ -856,7 +856,7 @@ model_stats <- function(df, pretty.name = FALSE, ...){
     colnames(ret)[colnames(ret) == "p.value.sc"] <- "score_test_p_value"
     colnames(ret)[colnames(ret) == "statistic.wald"] <- "wald_test"
     colnames(ret)[colnames(ret) == "p.value.wald"] <- "wald_test_p_value"
-    colnames(ret)[colnames(ret) == "r.squared.max"] <- "r_square_max"
+    colnames(ret)[colnames(ret) == "r.squared.max"] <- "r_squared_max"
     colnames(ret)[colnames(ret) == "std.error.concordance"] <- "std_error_concordance"
     colnames(ret)[colnames(ret) == "AIC"] <- "aic"
     colnames(ret)[colnames(ret) == "BIC"] <- "bic"
