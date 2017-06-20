@@ -205,7 +205,7 @@ test_that("predict lm with new data", {
   expect_equal(colnames(coef_ret), c("group", "term", "estimate", "std_error", "t_ratio", "p_value", "conf_low", "conf_high"))
 
   stats_ret <- model_data %>% model_stats()
-  expect_equal(colnames(stats_ret), c("group", "r_square", "r_square_adj", "root_mean_square_error",
+  expect_equal(colnames(stats_ret), c("group", "r_squared", "adj_r_squared", "root_mean_square_error",
                                       "f_ratio", "p_value", "df", "log_likelihood",
                                       "aic", "bic", "deviance", "residual_df"))
 
