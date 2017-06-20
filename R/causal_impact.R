@@ -8,13 +8,15 @@ glance.bsts <- function(x) {
   data.frame(residual_sd = ret$residual.sd,
              prediction_sd = ret$prediction.sd,
              r_square = ret$rsquare,
-             relative_gof = ret$relative.gof,
-             coef_min = ret$size[[1]],
-             coef_1st_quartile = ret$size[[2]],
-             coef_median = ret$size[[3]],
-             coef_mean = ret$size[[4]],
-             coef_3rd_quartile = ret$size[[5]],
-             coef_max = ret$size[[6]])
+             # relative.gof always gives NA.
+             # bsts does not seem to handle NAs in the data in post-event period from CausalImpact. seems to be a bsts bug.
+             # relative_gof = ret$relative.gof,
+             n_coef_min = ret$size[[1]],
+             n_coef_1st_quartile = ret$size[[2]],
+             n_coef_median = ret$size[[3]],
+             n_coef_mean = ret$size[[4]],
+             n_coef_3rd_quartile = ret$size[[5]],
+             n_coef_max = ret$size[[6]])
 }
 
 #' broom::tidy() implementation for bsts model
@@ -22,9 +24,9 @@ glance.bsts <- function(x) {
 tidy.bsts <- function(x) {
   df <- as.data.frame(summary(x)$coefficients)
   df <- tibble::rownames_to_column(df, var="market") # not really generic, but in our usage, it is market.
-  colnames(df)[colnames(df) == "mean.inc"] <- "mean_inc"
-  colnames(df)[colnames(df) == "sd.inc"] <- "sd_inc"
-  colnames(df)[colnames(df) == "inc.prob"] <- "inc_prob"
+  colnames(df)[colnames(df) == "mean.inc"] <- "mean_when_included"
+  colnames(df)[colnames(df) == "sd.inc"] <- "sd_when_included"
+  colnames(df)[colnames(df) == "inc.prob"] <- "include_prob"
   df
 }
 
