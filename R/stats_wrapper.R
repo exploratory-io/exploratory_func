@@ -182,10 +182,14 @@ do_cmdscale_ <- function(df,
   grouped_col <- grouped_by(df)
 
   # if pair1_col and pair2_col are with the same name
-  # like aaa.x and aaa.y (output of do_dist),
-  # it sould be used as name column
+  # like aaa.x and aaa.y (output of skv of do_dist),
+  # it (in this case, "aaa") sould be used as name column
+  # because the results are coordinates of them
+  # but pair.name.x and pair.name.y is from do_dist.cols and it isn't
+  # a valid name for name column because the output is no longer pair
+  # , so in that case, it will be just "name"
   name <- stringr::str_replace(pair1_col, "\\.[x|y]$", "")
-  name_col <- if(name == stringr::str_replace(pair2_col, "\\.[x|y]$", "")){
+  name_col <- if(name != "pair.name" && name == stringr::str_replace(pair2_col, "\\.[x|y]$", "")){
     name
   } else {
     avoid_conflict(grouped_col, "name")
