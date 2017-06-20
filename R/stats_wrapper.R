@@ -181,7 +181,14 @@ do_cmdscale_ <- function(df,
   loadNamespace("tidyr")
   grouped_col <- grouped_by(df)
 
-  name_col <- avoid_conflict(grouped_col, "name")
+  # if pair1_col and pair2_col are with the same name, it sould be used
+  # as name column
+  name <- stringr::str_replace(pair1_col, "\\.[x|y]$", "")
+  name_col <- if(name == stringr::str_replace(pair2_col, "\\.[x|y]$", "")){
+    name
+  } else {
+    avoid_conflict(grouped_col, "name")
+  }
 
   # this is executed on each group
   do_cmdscale_each <- function(df){
@@ -211,19 +218,19 @@ do_cmdscale_ <- function(df,
 
     # these column names should be consistent with the result of do_svd
     colnames(result_df) <- paste("axis", seq(ncol(result_df)), sep = "")
-
     df <- setNames(data.frame(rownames(points), stringsAsFactors=FALSE), name_col)
     ret <- cbind(df, result_df)
     ret
   }
 
   # Calculation is executed in each group.
-  # Storing the result in this name_col and
+  # Storing the result in this tmp_col and
   # unnesting the result.
-  # name_col is not conflicting with grouping columns
-  # thanks to avoid_conflict that is used before,
-  # this doesn't overwrite grouping columns.
+  # If the original data frame is grouped by "tmp",
+  # overwriting it should be avoided,
+  # so avoid_conflict is used here.
+  tmp_col <- avoid_conflict(grouped_col, "tmp")
   df %>%
-    dplyr::do_(.dots=setNames(list(~do_cmdscale_each(.)), name_col)) %>%
-    unnest_with_drop_(name_col)
+    dplyr::do_(.dots=setNames(list(~do_cmdscale_each(.)), tmp_col)) %>%
+    unnest_with_drop_(tmp_col)
 }
