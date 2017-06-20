@@ -181,8 +181,9 @@ do_cmdscale_ <- function(df,
   loadNamespace("tidyr")
   grouped_col <- grouped_by(df)
 
-  # if pair1_col and pair2_col are with the same name, it sould be used
-  # as name column
+  # if pair1_col and pair2_col are with the same name
+  # like aaa.x and aaa.y (output of do_dist),
+  # it sould be used as name column
   name <- stringr::str_replace(pair1_col, "\\.[x|y]$", "")
   name_col <- if(name == stringr::str_replace(pair2_col, "\\.[x|y]$", "")){
     name
