@@ -952,7 +952,8 @@ prediction_survfit <- function(df, newdata = NULL, ...){
     # replace the cohort name with a string that is a concatenation of values that represents the cohort.
     # but, omit newdata column that has only 1 unique value from the cohort names we create here.
     selected_newdata_colnames <- non_single_value_colnames(newdata)
-    selected_newdata <- newdata[, selected_newdata_colnames]
+    # drop = FALSE keeps the output a data.frame as opposed to a vector even when only one column is selected.
+    selected_newdata <- newdata[, selected_newdata_colnames, drop = FALSE]
     cohorts_labels <- selected_newdata %>% tidyr::unite(label, everything())
     for (i in 1:nrow(selected_newdata)){
       ret <- ret %>% mutate(.cohort.temp = if_else(paste0("est", i) == .cohort.temp, cohorts_labels$label[[i]], .cohort.temp))

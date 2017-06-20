@@ -1,6 +1,6 @@
 #' Guess missing values by lm
 #' @param target Target vector whose NA is filled
-#' @param type This can be "mean", "median", "predict", "value" or aggregate function
+#' @param type This can be "mean", "median", "previous", "predict", "value" or aggregate function
 #' @param val This is effective when type is "value" or "predict".
 #' When type is "value", NA is replaced by this value.
 #' When type is "predict", this is used to predict NA.
@@ -53,6 +53,12 @@ impute_na <- function(target, type = mean, val = 0, ...) {
         # NA in target is replaced with the value in the same position
         target <- dplyr::coalesce(target, val)
       }
+      target
+    }, previous = {
+      z <- zoo::zoo(target) # create zoo object
+      z <- zoo::na.locf(z) # fill NA with previous non-NA value
+      z <- as.data.frame(z)
+      target <- z[[1]] # extract the resulting column
       target
     }, {
       stop(paste0(type, " is not supported as type"))
