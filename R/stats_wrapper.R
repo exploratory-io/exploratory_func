@@ -183,7 +183,7 @@ do_cmdscale_ <- function(df,
 
   # if pair1_col and pair2_col are with the same name
   # like aaa.x and aaa.y (output of skv of do_dist),
-  # it (in this case, "aaa") sould be used as name column
+  # it (in this case, "aaa") should be used as name column
   # because the results are coordinates of them
   # but pair.name.x and pair.name.y is from do_dist.cols and it isn't
   # a valid name for name column because the output is no longer pair
