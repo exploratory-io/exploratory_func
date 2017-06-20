@@ -12,7 +12,13 @@ getGoogleProfile <- function(tokenFileId = ""){
 getGoogleAnalytics <- function(tableId, lastNDays, dimensions, metrics, tokenFileId = NULL, paginate_query=FALSE, segments = NULL){
   if(!requireNamespace("RGoogleAnalytics")){stop("package RGoogleAnalytics must be installed.")}
   loadNamespace("lubridate")
-
+  # if segment is not null and empty string, pass it as NULL
+  # NOTE: null can be passed for data frame created with old version so need to explicitly check it.
+  # Also if we do not set !is.null(segments) before hand, if(segment == '') part fails
+  # with Error in if (segments == “”) { : argument is of length zero
+  if(!is.null(segments) && segments == ''){
+    segments = NULL
+  }
   token <- getGoogleTokenForAnalytics(tokenFileId)
   start_date <- as.character(lubridate::today() - lubridate::days(lastNDays))
   #end_date <- as.character(lubridate::today() - lubridate::days(1))
