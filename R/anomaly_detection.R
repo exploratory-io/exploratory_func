@@ -71,7 +71,7 @@ do_anomaly_detection_ <- function(df, time_col, value_col = NULL, time_unit = "d
       # filed an issue in https://github.com/exploratory-io/tam/issues/4935
     })
     if(!is.null(anom) && nrow(anom) > 0) {
-      ret <- data[[time_col]] %in% as.POSIXct(anom$timestamp)
+      ret <- data[[time_col]] %in% lubridate::force_tz(as.POSIXct(anom$timestamp), lubridate::tz(data[[time_col]]))
       # values of timestamps are regarded as anomaly values
       # NA_real_(NA compatible with numeric valeus) is used for non-anomaly data
       val <- ifelse(ret, data[[value_col]], NA_real_)
