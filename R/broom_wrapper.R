@@ -495,6 +495,11 @@ prediction_binary <- function(df, threshold = 0.5, ...){
   }
 
   thres <- if (!is.numeric(threshold)) {
+    # need answer to optimize threshold,
+    # so the column name should be validated
+    if(!actual_col %in% colnames(ret)) {
+      stop("There is no actual result in data and can't optimize threshold.")
+    }
     opt <- get_optimized_score(actual_logical, ret[[prob_col_name]], threshold)
     opt[["threshold"]]
   } else {
