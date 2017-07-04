@@ -455,6 +455,12 @@ test_that("new data prediction without response column", {
       sparse = FALSE
     )
 
+  prediction_ret <- model_ret %>%
+    prediction_binary(data = "newdata", data_frame = test_data, threshold = 0.4)
+
+  expect_true(all(dplyr::between(prediction_ret$predicted_probability,0,1)))
+  expect_true(any(prediction_ret$predicted_label) && any(!prediction_ret$predicted_label))
+
   # there should be an error because no actual column
   # but this tries to optimize threshold,
   # which needs actual column
@@ -462,4 +468,22 @@ test_that("new data prediction without response column", {
     prediction_ret <- model_ret %>%
       prediction_binary(data = "newdata", data_frame = test_data, threshold = "f_score")
   )
+
+  # test factor response column
+  train_data2 <- train_data %>%
+    mutate(is_greater_than_50k = as.factor(c("no", "yes")[as.integer(is_greater_than_50k)+1]))
+
+  model_ret2 <- train_data2 %>%
+    dplyr::mutate(`education-num` = as.numeric(`education-num`)) %>%
+    dplyr::select(age, is_greater_than_50k, `hours-per-week`, `capital-loss`, `capital-gain`, relationship, `education-num`) %>%
+    build_model(
+      model_func = xgboost_binary,
+      formula = is_greater_than_50k ~ .,
+      nrounds = 5,
+      sparse = FALSE
+    )
+
+  prediction_ret2 <- model_ret2 %>%
+    prediction_binary(data = "newdata", data_frame = test_data, threshold = 0.4)
+  expect_equal(as.integer(prediction_ret$predicted_label)+1, as.integer(prediction_ret2$predicted_label))
 })
