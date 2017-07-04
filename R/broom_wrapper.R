@@ -525,7 +525,13 @@ prediction_binary <- function(df, threshold = 0.5, ...){
       NULL
     }
   } else {
-    NULL
+    if(!is.null(df[["model"]][[1]]) && !is.null(df[["model"]][[1]]$y_levels)){
+      # this is new data prediction for xgboost_binary
+      # to check levels of response column
+      df[["model"]][[1]]$y_levels[as.numeric(predicted) + 1]
+    } else {
+      NULL
+    }
   }
 
   ret[["predicted_label"]] <- label
