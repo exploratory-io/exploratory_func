@@ -9,7 +9,9 @@ row_as_header <- function(df, row_index = 1, prefix = "", clean_names = TRUE){
 
   loadNamespace("stringr")
   loadNamespace("janitor")
-  names <- as.character(df[row_index, ])
+  header_row <- df[row_index, ]
+  # make values to character
+  names <- vapply(header_row, function(val){as.character(val)}, FUN.VALUE="")
   if (prefix != ""){
     names <- stringr::str_c(prefix, names)
   }
