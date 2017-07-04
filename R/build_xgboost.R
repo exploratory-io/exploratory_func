@@ -348,10 +348,18 @@ augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, ...) {
       data
     }
 
+    # copy ret_data to add response_col if it doesn't exist.
+    # it's needed for model.matrix function
+    md_frame <- ret_data
+    response_col <- as.character(lazyeval::f_lhs(x$terms))
+    if (!response_col %in% colnames(md_frame)) {
+      md_frame[[response_col]] <- rep(NA, nrow(ret_data))
+    }
+
     mat <- if(!is.null(x$is_sparse) && x$is_sparse){
-      Matrix::sparse.model.matrix(x$terms, model.frame(ret_data, na.action = na.pass, xlev = x$xlevels))
+      Matrix::sparse.model.matrix(x$terms, model.frame(md_frame, na.action = na.pass, xlev = x$xlevels))
     } else {
-      model.matrix(x$terms, model.frame(ret_data, na.action = na.pass, xlev = x$xlevels))
+      model.matrix(x$terms, model.frame(md_frame, na.action = na.pass, xlev = x$xlevels))
     }
 
     # this is to find omitted indice for NA
