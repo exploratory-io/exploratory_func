@@ -23,3 +23,18 @@ test_that("test row_as_header", {
     row.names = c(1L, 3L),
     class = "data.frame"))
 })
+
+test_that("test row_as_header with factor", {
+  test_df <- data.frame(
+    num1 = seq(3),
+    num2 = -seq(3),
+    char = letters[seq(3)]
+  )
+
+  ret <- row_as_header(test_df, row_index = 2)
+  ret2 <- row_as_header(test_df, row_index = 2, clean_names = FALSE)
+
+  expect_equal(c("x2", "x_2", "b"), colnames(ret))
+  expect_equal(c("2", "-2", "b"), colnames(ret2))
+})
+
