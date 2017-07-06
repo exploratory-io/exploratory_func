@@ -366,9 +366,10 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
         }
       })
 
+      augmented <- augmented %>% dplyr::ungroup()
+
       if (with_response){
         augmented <- augmented %>%
-          dplyr::ungroup() %>%
           dplyr::mutate(source.data = purrr::map2(source.data, model, add_response))
       }
 
@@ -398,9 +399,10 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
         # evaluate the formula of augment and "data" column will have it
         dplyr::mutate_(.dots = list(source.data = aug_fml))
 
+      augmented <- augmented %>% dplyr::ungroup()
+
       if (with_response){
         augmented <- augmented %>%
-          dplyr::ungroup() %>%
           dplyr::mutate(source.data = purrr::map2(source.data, model, add_response))
       }
 
@@ -645,9 +647,11 @@ model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
         level <- 0.95
       }
 
-      df %>%
-        dplyr::ungroup() %>%
+      df <- df %>%
+        dplyr::ungroup()
+      df <- df %>%
         dplyr::mutate(model = purrr::map(model, function(model){
+          browser()
           # use confint.default for performance
           tidy_ret <- broom::tidy(model, ...)
 
@@ -661,7 +665,8 @@ model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
           }
           tidy_ret
 
-        })) %>%
+        }))
+      df <- df %>%
         unnest_with_drop(model)
     } else {
       # broom::tidy uses confint.lm and it uses profile, so "profile" is used in conf_int to swith how to get confint
