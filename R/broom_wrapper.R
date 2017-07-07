@@ -69,7 +69,10 @@ augment_kmeans <- function(df, model, data){
         source_data
       }
 
-      (df %>%  dplyr::do_(.dots=setNames(list(~augment_each(.)), model_col)) %>%  unnest_with_drop_(model_col))
+      df %>%
+        dplyr::do_(.dots=setNames(list(~augment_each(.)), model_col)) %>%
+        dplyr::ungroup() %>%
+        unnest_with_drop_(model_col)
     } else {
       stop(e)
     }
@@ -647,11 +650,9 @@ model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
         level <- 0.95
       }
 
-      df <- df %>%
-        dplyr::ungroup()
-      df <- df %>%
+      df %>%
+        dplyr::ungroup() %>%
         dplyr::mutate(model = purrr::map(model, function(model){
-          browser()
           # use confint.default for performance
           tidy_ret <- broom::tidy(model, ...)
 
@@ -665,8 +666,7 @@ model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
           }
           tidy_ret
 
-        }))
-      df <- df %>%
+        })) %>%
         unnest_with_drop(model)
     } else {
       # broom::tidy uses confint.lm and it uses profile, so "profile" is used in conf_int to swith how to get confint
