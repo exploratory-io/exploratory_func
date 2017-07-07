@@ -527,7 +527,9 @@ prediction_binary <- function(df, threshold = 0.5, ...){
   } else {
     if(!is.null(df[["model"]][[1]]) && !is.null(df[["model"]][[1]]$y_levels)){
       # this is new data prediction for xgboost_binary
-      # to check levels of response column
+      # to check levels of response column because
+      # it might be factor with two levels, 2 numbers or logical
+      # so the predicted result must be the same type too
       df[["model"]][[1]]$y_levels[as.numeric(predicted) + 1]
     } else {
       NULL
