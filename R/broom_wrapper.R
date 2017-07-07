@@ -495,6 +495,11 @@ prediction_binary <- function(df, threshold = 0.5, ...){
   }
 
   thres <- if (!is.numeric(threshold)) {
+    # need actual column to optimize threshold,
+    # so the column name should be validated
+    if(!actual_col %in% colnames(ret)) {
+      stop("There is no actual result in data and can't optimize threshold.")
+    }
     opt <- get_optimized_score(actual_logical, ret[[prob_col_name]], threshold)
     opt[["threshold"]]
   } else {
@@ -520,7 +525,15 @@ prediction_binary <- function(df, threshold = 0.5, ...){
       NULL
     }
   } else {
-    NULL
+    if(!is.null(df[["model"]][[1]]) && !is.null(df[["model"]][[1]]$y_levels)){
+      # this is new data prediction for xgboost_binary
+      # to check levels of response column because
+      # it might be factor with two levels, 2 numbers or logical
+      # so the predicted result must be the same type too
+      df[["model"]][[1]]$y_levels[as.numeric(predicted) + 1]
+    } else {
+      NULL
+    }
   }
 
   ret[["predicted_label"]] <- label
