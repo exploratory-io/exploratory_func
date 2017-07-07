@@ -132,13 +132,9 @@ test_that("test build_glm and broom", {
 
 test_that("test build_kmeans.cols and broom::tidy", {
   if(requireNamespace("broom")){
-    result <- (
-      test_df
-      %>%
-        build_kmeans.cols(vec1, vec2, rand, centers=2)
-      %>%
-        broom::tidy(model)
-    )
+    result <- test_df %>%
+      build_kmeans.cols(vec1, vec2, rand, centers=2) %>%
+      broom::tidy(model)
     expect_equal(dim(result)[[1]], 2)
   }
 })
@@ -191,11 +187,10 @@ test_that("test build_kmeans.cols ignore NA rows", {
 test_that("test build_kmeans.cols ignore NA rows with grouped", {
   if(requireNamespace("broom")){
     loadNamespace("dplyr")
-    result <- (
-      test_df
-      %>%  dplyr::group_by(group)
-      %>%  build_kmeans.cols(vec1, vec2, na, centers=1, keep.source=TRUE)
-      %>%  broom::tidy(model))
+    result <- test_df %>%
+      dplyr::group_by(group) %>%
+      build_kmeans.cols(vec1, vec2, na, centers=1, keep.source=TRUE) %>%
+      broom::tidy(model)
     expect_equal(dim(result)[[1]], 2)
   }
 })
@@ -210,11 +205,10 @@ test_that("build_kmeans.kv augment=TRUE", {
 
   test_df[["subject with space"]] <- rep(paste("sub", rep(seq(3), each=3)), each=2)
 
-  result <- (
-    test_df
-    %>%  dplyr::group_by(group)
-    %>%  build_kmeans.kv(`subject with space`, key, value, center=1, augment=TRUE)
-  )
+  result <- test_df %>%
+    dplyr::group_by(group) %>%
+    build_kmeans.kv(`subject with space`, key, value, center=1, augment=TRUE)
+
   expect_true(!is.null(result[["cluster"]]))
   expect_true(all(result[["cluster"]] == 1))
 })
