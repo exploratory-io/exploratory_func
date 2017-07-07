@@ -16,7 +16,7 @@ test_that("test nnet build_model", {
                           test_rate = 0.1,
                           seed=0)
 
-  coef_ret <- model_coef(model_df)
+  # coef_ret <- model_coef(model_df)
   stats_ret <- model_stats(model_df)
 
 
