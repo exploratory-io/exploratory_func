@@ -38,6 +38,7 @@ build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, g
 
   # make variables factor sorted by the frequency
   fml_vars <- all.vars(formula)
+
   for(var in fml_vars) {
     if(is.character(data[[var]])){
       data[[var]] <- forcats::fct_infreq(data[[var]])
@@ -92,6 +93,14 @@ build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, g
   # this expands dots arguemtns to character
   arg_char <- expand_args(caller, exclude = c("data", "keep.source", "augment", "group_cols", "test_rate", "seed"))
 
+  # check if grouping columns are in the formula
+  grouped_var <- group_col_names[group_col_names %in% fml_vars]
+  if (length(grouped_var) == 1) {
+    stop(paste0(grouped_var, " is a grouping column. Please remove it from variables."))
+  } else if (length(grouped_var) > 0) {
+    stop(paste0(paste(grouped_var, collapse = ", "), " are grouping columns. Please remove them from variables."))
+  }
+
   ret <- tryCatch({
     ret <- data %>%
       tidyr::nest(.key = "source.data") %>%
@@ -102,7 +111,6 @@ build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, g
       # slice training data
       dplyr::mutate(model = purrr::map2(source.data, .test_index, function(df, index){
         data <- safe_slice(df, index, remove = TRUE)
-
         # execute glm with parsed arguments
         eval(parse(text = paste0("stats::glm(data = data, ", arg_char, ")")))
       })) %>%
@@ -121,20 +129,12 @@ build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, g
     ret <- dplyr::rowwise(ret)
     ret
   }, error = function(e){
-    if(e$message == "contrasts can be applied only to factors with 2 or more levels"){
+    # error message was changed when upgrading dplyr to 0.7.1
+    # so use stringr::str_detect to make this robust
+    if(stringr::str_detect(e$message, "contrasts can be applied only to factors with 2 or more levels")){
       stop("more than 1 unique values are expected for categorical columns assigned as predictors")
     }
 
-    # cases when a grouping column is in variables
-    if (stringr::str_detect(e$message, "object .* not found")) {
-      # extract only object name
-      replaced <- gsub("^object ", "", e$message)
-      name <- gsub(" not found$", "", replaced)
-      # name is with single quotations, so put them to group_cols and compare them
-      if (name %in% paste0("'", group_col_names, "'")) {
-        stop(paste0(name, " is a grouping column. Please remove it from variables."))
-      }
-    }
     stop(e$message)
   })
   if(augment){

@@ -64,6 +64,14 @@ build_lm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, gr
 
   group_col_names <- grouped_by(data)
 
+  # check if grouping columns are in the formula
+  grouped_var <- group_col_names[group_col_names %in% fml_vars]
+  if (length(grouped_var) == 1) {
+    stop(paste0(grouped_var, " is a grouping column. Please remove it from variables."))
+  } else if (length(grouped_var) > 0) {
+    stop(paste0(paste(grouped_var, collapse = ", "), " are grouping columns. Please remove them from variables."))
+  }
+
   model_col <- "model"
   source_col <- "source.data"
 
@@ -100,23 +108,15 @@ build_lm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, gr
     ret <- dplyr::rowwise(ret)
     ret
   }, error = function(e){
-    if(e$message == "contrasts can be applied only to factors with 2 or more levels"){
+    # error message was changed when upgrading dplyr to 0.7.1
+    # so use stringr::str_detect to make these robust
+    if(stringr::str_detect(e$message, "contrasts can be applied only to factors with 2 or more levels")){
       stop("more than 1 unique values are expected for categorical columns assigned as predictors")
     }
-    if(e$message == "0 (non-NA) cases"){
+    if(stringr::str_detect(e$message, "0 \\(non\\-NA\\) cases")){
       stop("no data after removing NA")
     }
 
-    # cases when a grouping column is in variables
-    if (stringr::str_detect(e$message, "object .* not found")) {
-      # extract only object name
-      replaced <- gsub("^object ", "", e$message)
-      name <- gsub(" not found$", "", replaced)
-      # name is with single quotations, so put them to group_cols and compare them
-      if (name %in% paste0("'", group_col_names, "'")) {
-        stop(paste0(name, " is a grouping column. Please remove it from variables."))
-      }
-    }
     stop(e$message)
   })
   if(augment){
