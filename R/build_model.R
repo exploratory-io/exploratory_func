@@ -131,3 +131,24 @@ build_model_ <- function(data, model_func, seed = 0, test_rate = 0, group_cols =
   ret
 }
 
+build_model_with_select <- function(df, response = NULL, ..., model_func, seed = 0, test_rate = 0, reserved_colnames = c(), params = list()) {
+  grouped_cols <- grouped_by(df)
+  response_col <- colnames(substitute(response))
+  # get columns with select expression from ...
+  # excluding response column and grouping column
+  cols <- setdiff(evaluate_select(df, .dots = rlang::exprs(...)), c(grouped_cols, response_col))
+  fml <- as.formula(paste0("`", as.character(substitute(response)), "` ~ ", paste("`", cols, "`", collapse = " + ", sep = "")))
+  # params is arguments for model_func
+  # and rlang::lang_args extracts them safely
+  # without evaluation. Sometimes, params contains
+  # NSE like weights for lm function,
+  # and normally evaluating it causes an error.
+  # rlang::lang_arg evaluate them as an symbol,
+  # so it prevents the error
+  .call <- substitute(params)
+  args <- rlang::lang_args(.call)
+
+  args[["formula"]] <- lazyeval::as.lazy(paste0("`", as.character(substitute(response)), "` ~ ", paste("`", cols, "`", collapse = " + ", sep = "")))
+
+  build_model_(df, model_func, seed = seed, test_rate = test_rate, reserved_colnames = reserved_colnames, .dots = lazyeval::as.lazy_dots(args))
+}
