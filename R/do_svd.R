@@ -205,6 +205,7 @@ do_svd.kv_ <- function(df,
   tmp_col <- avoid_conflict(grouped_col, "tmp")
   ret <- df %>%
     dplyr::do_(.dots=setNames(list(~do_svd_each(.)), tmp_col)) %>%
+    dplyr::ungroup() %>%
     unnest_with_drop_(tmp_col)
 
   ret
@@ -384,6 +385,7 @@ do_svd.cols <- function(df,
   tmp_col <- avoid_conflict(grouped_col, "tmp")
   ret <- df %>%
     dplyr::do_(.dots=setNames(list(~do_svd_each(.)), tmp_col)) %>%
+    dplyr::ungroup() %>%
     unnest_with_drop_(tmp_col)
 
   ret
