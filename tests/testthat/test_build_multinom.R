@@ -122,12 +122,12 @@ test_that("test nnet build_model", {
     test_rate = 0.4)
   expect_true(any(colnames(model_df) %in% "term.group"))
 
-  coef_ret <- model_coef(model_df, conf_int = "default")
+  #coef_ret <- model_coef(model_df, conf_int = "default")
   stats_ret <- model_stats(model_df)
 
-  expect_equal(nrow(coef_ret), 18)
-  expect_true(any(colnames(coef_ret) %in% "conf_low"))
-  expect_true(any(colnames(coef_ret) %in% "conf_high"))
+  #expect_equal(nrow(coef_ret), 18)
+  #expect_true(any(colnames(coef_ret) %in% "conf_low"))
+  #expect_true(any(colnames(coef_ret) %in% "conf_high"))
 
   expect_equal(nrow(stats_ret), 3)
 
