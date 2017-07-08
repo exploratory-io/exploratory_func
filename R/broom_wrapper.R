@@ -400,9 +400,8 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
         dplyr::select(-.test_index) %>%
         dplyr::rowwise() %>%
         # evaluate the formula of augment and "data" column will have it
-        dplyr::mutate_(.dots = list(source.data = aug_fml))
-
-      augmented <- augmented %>% dplyr::ungroup()
+        dplyr::mutate_(.dots = list(source.data = aug_fml)) %>%
+        dplyr::ungroup()
 
       if (with_response){
         augmented <- augmented %>%
