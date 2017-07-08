@@ -62,7 +62,7 @@ do_t.test <- function(df, value, key=NULL, ...){
   df %>%
     dplyr::do_(.dots=setNames(list(~do_t.test_each(df = ., ...)), model_col)) %>%
     dplyr::ungroup() %>%
-    tidyr::unnest_(model_col)
+    unnest_with_drop_(model_col)
 }
 
 #' wrapper for var.test, which compares variances
@@ -113,7 +113,7 @@ do_var.test <- function(df, value, key, ...){
   df %>%
     dplyr::do_(.dots=setNames(list(~do_var.test_each(df = ., ...)), model_col)) %>%
     dplyr::ungroup() %>%
-    tidyr::unnest_(model_col)
+    unnest_with_drop_(model_col)
 }
 
 #' Non standard evaluation version of do_chisq.test_
@@ -183,5 +183,5 @@ do_chisq.test_ <- function(df,
   df %>%
     dplyr::do_(.dots = setNames(list(~chisq.test_each(.)), tmp_col)) %>%
     dplyr::ungroup() %>%
-    tidyr::unnest_(tmp_col)
+    unnest_with_drop_(tmp_col)
 }
