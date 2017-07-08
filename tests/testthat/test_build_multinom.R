@@ -122,6 +122,9 @@ test_that("test nnet build_model", {
     test_rate = 0.4)
   expect_true(any(colnames(model_df) %in% "term.group"))
 
+  # TODO: This test is commented out because
+  # model_coef to multinom model fails with unknown reason
+  # because of dplyr upgrade to 0.7.1
   #coef_ret <- model_coef(model_df, conf_int = "default")
   stats_ret <- model_stats(model_df)
 
