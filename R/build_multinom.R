@@ -5,7 +5,6 @@
 #' @param ... Parameters for nnet::multinom
 #' @export
 build_multinom <- function(data, formula, ...){
-  stop("build_multinom is temporarily unsupported.")
   build_model(data,
               model_func = nnet::multinom,
               formula = formula,
