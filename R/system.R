@@ -170,6 +170,10 @@ getMongoURL <- function(host, port, database, username, pass, isSSL=FALSE, authS
   loadNamespace("stringr")
 
   if (stringr::str_length(username) > 0) {
+    if(!is.null(pass) && pass != ''){
+      # mongodb connection URL uses @ as a separator so need to escape it if used inside password.
+      pass = stringr::str_replace_all(pass, "@", "%40")
+    }
     url = stringr::str_c("mongodb://", username, ":", pass, "@", host, ":", as.character(port), "/", database)
   }
   else {
