@@ -150,6 +150,8 @@ do_anomaly_detection_ <- function(df, time_col, value_col = NULL, time_unit = "d
   # thanks to avoid_conflict that is used before,
   # this doesn't overwrite grouping columns.
   tmp_col <- avoid_conflict(colnames(df), "tmp_col")
-  test <- (df %>%  dplyr::do_(.dots=setNames(list(~do_anomaly_detection_each(.)), tmp_col)))
-  test %>%  unnest_with_drop_(tmp_col)
+  test <- df %>%
+    dplyr::do_(.dots=setNames(list(~do_anomaly_detection_each(.)), tmp_col)) %>%
+    dplyr::ungroup() %>%
+    unnest_with_drop_(tmp_col)
 }

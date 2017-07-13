@@ -109,6 +109,7 @@ do_cor.kv_ <- function(df,
   tmp_col <- avoid_conflict(grouped_col, "tmp")
   df %>%
     dplyr::do_(.dots=setNames(list(~do_cor_each(.)), tmp_col)) %>%
+    dplyr::ungroup() %>%
     unnest_with_drop_(tmp_col)
 }
 
@@ -145,7 +146,10 @@ do_cor.cols <- function(df, ..., use="pairwise.complete.obs", method="pearson", 
     }
   }
 
-  (df %>%  dplyr::do_(.dots=setNames(list(~do_cor_each(.)), output_cols[[1]])) %>%  unnest_with_drop_(output_cols[[1]]))
+  df %>%
+    dplyr::do_(.dots=setNames(list(~do_cor_each(.)), output_cols[[1]])) %>%
+    dplyr::ungroup() %>%
+    unnest_with_drop_(output_cols[[1]])
 }
 
 #' Non standard evaluation version for do_cmdscale_
@@ -237,5 +241,6 @@ do_cmdscale_ <- function(df,
   tmp_col <- avoid_conflict(grouped_col, "tmp")
   df %>%
     dplyr::do_(.dots=setNames(list(~do_cmdscale_each(.)), tmp_col)) %>%
+    dplyr::ungroup() %>%
     unnest_with_drop_(tmp_col)
 }

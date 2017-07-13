@@ -39,7 +39,7 @@ test_that("test build_lm with grouped ", {
   trial <- test_df %>% build_lm(num1 ~ num2, group_cols = c("group1", "group2"))
   expect_equal(length(trial[["group2"]]), 8)
   expect_equal(length(trial[["group1"]]), 8)
-  expect_error(build_lm(test_df, num1 ~ num2 + group1, group_cols = c("group1", "group2")), "'group1' is a grouping column. Please remove it from variables.")
+  expect_error(build_lm(test_df, num1 ~ num2 + group1, group_cols = c("group1", "group2")), "group1 is a grouping column. Please remove it from variables.")
 })
 
 test_that("test build_lm with augment TRUE", {
@@ -125,5 +125,5 @@ test_that("prediction with categorical columns", {
   grouped <- test_data %>%
     dplyr::group_by(CARRIER)
 
-  expect_error(build_lm(grouped, CANCELLED ~ CARRIER), "'CARRIER' is a grouping column. Please remove it from variables.")
+  expect_error(build_lm(grouped, CANCELLED ~ CARRIER), "CARRIER is a grouping column. Please remove it from variables.")
 })

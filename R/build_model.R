@@ -107,7 +107,7 @@ build_model_ <- function(data, model_func, seed = 0, test_rate = 0, group_cols =
         tmp_df <- safe_slice(df, index, remove = TRUE)
         # execute model_func with parsed arguments
         eval_arg <- dots
-        eval_arg[["data"]] <- lazyeval::as.lazy(quote(tmp_df))
+        eval_arg[["data"]] <- lazyeval::lazy(tmp_df)
         .call <- lazyeval::make_call(quote(model_func), eval_arg)
         lazyeval::lazy_eval(.call, data = environment())
       })) %>%

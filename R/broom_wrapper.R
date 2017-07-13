@@ -69,7 +69,10 @@ augment_kmeans <- function(df, model, data){
         source_data
       }
 
-      (df %>%  dplyr::do_(.dots=setNames(list(~augment_each(.)), model_col)) %>%  unnest_with_drop_(model_col))
+      df %>%
+        dplyr::do_(.dots=setNames(list(~augment_each(.)), model_col)) %>%
+        dplyr::ungroup() %>%
+        unnest_with_drop_(model_col)
     } else {
       stop(e)
     }
@@ -366,9 +369,10 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
         }
       })
 
+      augmented <- augmented %>% dplyr::ungroup()
+
       if (with_response){
         augmented <- augmented %>%
-          dplyr::ungroup() %>%
           dplyr::mutate(source.data = purrr::map2(source.data, model, add_response))
       }
 
@@ -396,11 +400,11 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
         dplyr::select(-.test_index) %>%
         dplyr::rowwise() %>%
         # evaluate the formula of augment and "data" column will have it
-        dplyr::mutate_(.dots = list(source.data = aug_fml))
+        dplyr::mutate_(.dots = list(source.data = aug_fml)) %>%
+        dplyr::ungroup()
 
       if (with_response){
         augmented <- augmented %>%
-          dplyr::ungroup() %>%
           dplyr::mutate(source.data = purrr::map2(source.data, model, add_response))
       }
 
