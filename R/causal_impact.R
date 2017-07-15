@@ -99,7 +99,7 @@ do_market_impact_ <- function(df, time_col, value_col, market_col, target_market
 
   do_causal_impact_each <- function(df) {
     # aggregate data with day
-    aggregated_data <- 
+    aggregated_data <-
     if (!is.null(value_col)){
       data.frame(
         time = lubridate::floor_date(df[[time_col]], unit = time_unit),
@@ -217,7 +217,7 @@ do_market_impact_ <- function(df, time_col, value_col, market_col, target_market
       }
       pre_period <- c(min(time_points_vec), event_time - 1) # -1 works as -1 day on Date and -1 sec on POSIXct.
       post_period <- c(event_time, max(time_points_vec))
-    
+
       # call CausalImpact::CausalImpact, which is the heart of this analysis.
       impact <- CausalImpact::CausalImpact(df_zoo, pre.period = pre_period, post.period = post_period, model.args = model_args, ...)
     }
@@ -254,7 +254,7 @@ do_market_impact_ <- function(df, time_col, value_col, market_col, target_market
       ret_df
     }
     else { # output_type should be "model"
-      # following would cause error : cannot coerce class ""bsts"" to a data.frame 
+      # following would cause error : cannot coerce class ""bsts"" to a data.frame
       # ret <- data.frame(model = list(impact$model$bsts.model))
       # working it around like following.
       ret <- data.frame(model = 1)
@@ -272,6 +272,7 @@ do_market_impact_ <- function(df, time_col, value_col, market_col, target_market
   tmp_col <- avoid_conflict(grouped_col, "tmp")
   ret <- df %>%
     dplyr::do_(.dots=setNames(list(~do_causal_impact_each(.)), tmp_col)) %>%
+    dplyr::ungroup() %>%
     tidyr::unnest_(tmp_col)
 
   # grouping should be kept

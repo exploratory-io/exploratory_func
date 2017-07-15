@@ -250,6 +250,8 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
   # thanks to avoid_conflict that is used before,
   # this doesn't overwrite grouping columns.
   tmp_col <- avoid_conflict(colnames(df), "tmp_col")
-  test <- (df %>%  dplyr::do_(.dots=setNames(list(~do_prophet_each(.)), tmp_col)))
+  test <- df %>%
+    dplyr::do_(.dots=setNames(list(~do_prophet_each(.)), tmp_col)) %>%
+    dplyr::ungroup()
   test %>%  unnest_with_drop_(tmp_col)
 }

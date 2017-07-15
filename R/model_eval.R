@@ -65,6 +65,7 @@ do_roc_ <- function(df, pred_prob_col, actual_val_col){
   tmp_col <- avoid_conflict(group_cols, "tmp")
   ret <- df %>%
     dplyr::do_(.dots=setNames(list(~do_roc_each(.)), tmp_col)) %>%
+    dplyr::ungroup() %>%
     unnest_with_drop_(tmp_col)
 
   ret
@@ -129,6 +130,7 @@ evaluate_binary_ <- function(df, pred_prob_col, actual_val_col, threshold = "f_s
   tmp_col <- avoid_conflict(group_cols, "tmp")
   ret <- df %>%
     dplyr::do_(.dots=setNames(list(~evaluate_binary_each(.)), tmp_col)) %>%
+    dplyr::ungroup() %>%
     unnest_with_drop_(tmp_col)
 
   ret
@@ -201,6 +203,7 @@ evaluate_regression_ <- function(df, pred_val_col, actual_val_col){
   tmp_col <- avoid_conflict(group_cols, "tmp")
   ret <- df %>%
     dplyr::do_(.dots=setNames(list(~evaluate_regression_each(.)), tmp_col)) %>%
+    dplyr::ungroup() %>%
     unnest_with_drop_(tmp_col)
 
   ret
@@ -294,6 +297,7 @@ evaluate_multi_ <- function(df, pred_label_col, actual_val_col, ...) {
   tmp_col <- avoid_conflict(group_cols, "tmp")
   ret <- df %>%
     dplyr::do_(.dots=setNames(list(~evaluate_multi_each(.)), tmp_col)) %>%
+    dplyr::ungroup() %>%
     unnest_with_drop_(tmp_col)
 
   ret

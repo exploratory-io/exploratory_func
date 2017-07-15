@@ -61,6 +61,7 @@ do_cosine_sim.kv <- function(df, subject, key, value = NULL, distinct=FALSE, dia
   tmp_col <- avoid_conflict(grouped_column, "tmp")
   df %>%
     dplyr::do_(.dots=setNames(list(~calc_doc_sim_each(.)), tmp_col)) %>%
+    dplyr::ungroup() %>%
     unnest_with_drop_(tmp_col)
 
 }
@@ -177,6 +178,7 @@ do_dist.kv_ <- function(df,
   tmp_col <- avoid_conflict(grouped_column, "tmp")
   df %>%
     dplyr::do_(.dots=setNames(list(~calc_dist_each(.)), tmp_col)) %>%
+    dplyr::ungroup() %>%
     unnest_with_drop_(tmp_col)
 }
 
@@ -243,7 +245,10 @@ do_kl_dist.kv_ <- function(df,
     }
     ret
   }
-  (df %>% dplyr::do_(.dots=setNames(list(~calc_dist_each(.)), cnames[[1]])) %>%  unnest_with_drop_(cnames[[1]]))
+  df %>%
+    dplyr::do_(.dots=setNames(list(~calc_dist_each(.)), cnames[[1]])) %>%
+    dplyr::ungroup() %>%
+    unnest_with_drop_(cnames[[1]])
 }
 
 #' Calculate distance of each pair of groups.
@@ -312,5 +317,8 @@ do_dist.cols <- function(df,
     }
     ret
   }
-  (df %>% dplyr::do_(.dots=setNames(list(~calc_dist_each(.)), cnames[[1]])) %>%  unnest_with_drop_(cnames[[1]]))
+  df %>%
+    dplyr::do_(.dots=setNames(list(~calc_dist_each(.)), cnames[[1]])) %>%
+    dplyr::ungroup() %>%
+    unnest_with_drop_(cnames[[1]])
 }

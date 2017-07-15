@@ -797,6 +797,7 @@ pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = N
   tmp_col <- avoid_conflict(grouped_col, "tmp")
   ret <- df %>%
     dplyr::do_(.dots=setNames(list(~pivot_each(.)), tmp_col)) %>%
+    dplyr::ungroup() %>%
     unnest_with_drop_(tmp_col)
 
   if(length(rows) == 1){
