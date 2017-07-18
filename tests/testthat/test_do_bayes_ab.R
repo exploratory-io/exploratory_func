@@ -33,7 +33,6 @@ test_that("test do_bayes_ab test with count data", {
     mutate(group = rbinom(n(), 1, 0.3)) %>%
     group_by(group)
   ret <- do_bayes_ab(full_data, data_b, access_count, click, type = "prior")
-  browser()
   expect_equal(nrow(ret), 4)
 })
 
