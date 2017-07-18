@@ -201,20 +201,6 @@ dw <- function(y, yhat){
 #' @import utils
 #' @import dtw
 #'
-#' @examples
-#' ##-----------------------------------------------------------------------
-#' ## Find best matches for each airport time series
-#' ##-----------------------------------------------------------------------
-#' library(MarketMatching)
-#' data(weather, package="MarketMatching")
-#' mm <- best_matches(data=weather, id="Area",
-#'                    date_variable="Date",
-#'                    matching_variable="Mean_TemperatureF",
-#'                    parallel=FALSE,
-#'                    start_match_period="2014-01-01",
-#'                    end_match_period="2014-10-01")
-#' head(mm$BestMatches)
-#'
 #' @usage
 #' best_matches(data=NULL,
 #'              id_variable=NULL,

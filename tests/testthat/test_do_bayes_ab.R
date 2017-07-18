@@ -1,6 +1,6 @@
 context("test do_bayes_ab")
 
-test_that("test do_bayes_ab test with count data", {
+test_that("test do_bayes_ab test with summary output", {
   set.seed(0)
   data_a <- data.frame(
     access_count = round(runif(50) * 100 + 100)
@@ -18,7 +18,7 @@ test_that("test do_bayes_ab test with count data", {
   expect_equal(nrow(ret), 4)
 })
 
-test_that("test do_bayes_ab test with count data", {
+test_that("test do_bayes_ab test with model output", {
   set.seed(0)
   data_a <- data.frame(
     access_count = round(runif(50) * 100 + 100)
@@ -33,11 +33,11 @@ test_that("test do_bayes_ab test with count data", {
     mutate(group = rbinom(n(), 1, 0.3)) %>%
     group_by(group)
   ret <- do_bayes_ab(full_data, data_b, access_count, click, type = "prior")
-  expect_equal(nrow(ret), 4)
+  expect_equal(colnames(ret), c("estimate", "density"))
 })
 
 
-test_that("test do_bayes_ab test with count data", {
+test_that("test do_bayes_ab test with ", {
   set.seed(0)
   data_a <- data.frame(
     access_count = round(runif(50) * 100 + 100)
@@ -55,7 +55,7 @@ test_that("test do_bayes_ab test with count data", {
   expect_true(is.list(ret$model))
 })
 
-test_that("test do_bayes_ab test with count data", {
+test_that("test calc_beta_prior", {
   set.seed(0)
   data_a <- data.frame(
     access_count = round(runif(50) * 100 + 100)
@@ -69,6 +69,6 @@ test_that("test do_bayes_ab test with count data", {
   full_data <- dplyr::bind_rows(data_a, data_b) %>%
     dplyr::mutate(click_rate = click / access_count, group = rbinom(n(), 1, 0.3)) %>%
     group_by(group)
-  ret <- calc_beta_prior(full_data, click_rate, param1, "param2")
+  ret <- calc_beta_prior(full_data, click_rate)
   expect_equal(nrow(ret), 2)
 })
