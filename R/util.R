@@ -1079,3 +1079,25 @@ validate_empty_data <- function(df) {
   if(nrow(df) == 0) {stop("Input data frame is empty.")}
   df
 }
+
+#' Execute func to each group with params
+#' @param df Data frame
+#' @param func Function to execute
+#' @param params Parameters for func
+#' @export
+do_on_each_group <- function(df, func, params = list(), name = "tmp", with_unnest = TRUE){
+  name <- avoid_conflict(colnames(df), name)
+  # This is a list of arguments in do clause
+  args <- append(list(quote(.)), rlang::lang_args(params))
+  call <- rlang::new_language(func, rlang::as_pairlist(args))
+  ret <- df %>%
+    # UQ and UQE evaluates those variables
+    dplyr::do(rlang::UQ(name) := rlang::UQE(call))
+  if(with_unnest){
+    ret %>%
+      dplyr::ungroup() %>%
+      unnest_with_drop_(name)
+  }else{
+    ret
+  }
+}

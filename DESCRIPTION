@@ -36,7 +36,14 @@ Imports:
     anonymizer,
     forcats,
     tidytext,
-    boot
+    boot,
+    data.table,
+    foreach,
+    ggplot2,
+    iterators,
+    scales,
+    zoo,
+    dtw
 Suggests:
     testthat,
     twitteR,
@@ -67,5 +74,6 @@ Suggests:
     prophet,
     randomForest,
     lexicon,
-    rgeolocate
+    rgeolocate,
+    bayesAB
 RoxygenNote: 6.0.1

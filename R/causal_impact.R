@@ -39,6 +39,7 @@ do_market_impact <- function(df, time, value, market, ...) {
   do_market_impact_(df, time_col, value_col, market_col, ...)
 }
 
+#' Calculate impact of an event in timeseries data.
 #' @param df - Data frame
 #' @param time_col - Column that has time data
 #' @param value_col - Column that has value data
