@@ -216,8 +216,8 @@ tidy.bayesTest <- function(x, percentLift = 0, credInt = 0.9, type = "lift", ...
     alpha <- x$inputs$priors[["alpha"]]
     beta <- x$inputs$priors[["beta"]]
     data.frame(
-      estimate = seq(0, 1, 0.01),
-      density = dbeta(seq(0, 1, 0.01), shape1 = alpha, shape2 = beta)
+      estimate = seq(0, 1, 0.001),
+      density = dbeta(seq(0, 1, 0.001), shape1 = alpha, shape2 = beta)
     )
   } else {
     stop(paste0(type, " is not defined as type"))
