@@ -1,47 +1,84 @@
 #' Run bayesTest from bayesAB package
 #' @param df Data frame to run bayes ab test
-#' @param group A logical column to distinguish groups.
-#' TRUE is for the A group which is the target to be tested.
+#' @param a_b_identifier A column with 2 unique values to distinguish groups
 #' @param total_count Column of the total count
-#' @param success_count Column of the count of success
-#' @param alpha Alpha parameter for prior beta distribution
-#' @param beta Beta parameter for prior beta distribution
+#' @param success_rate Column of the rate of success
+#' @param prior_mean Mean of prior beta distribution
+#' @param prior_sd Standard deviation of prior beta distribution
+#' The default value with 0.5 prior_mean is uniform distribution
 #' @param type Type of output
 #' * model - Returns a data frame with bayesTest model.
 #' * summary - Output summary of the result of the test.
 #' * prior - Output coordinates of prior density chart.
 #' * posteriors - Output coordinates of posterior density chart of the success rate.
-#' * lift - Output probability density chart of lift, which is the ratio of performance improvement of A over B. The formula is (A - B) / B.
+#' * lift - Output coordinate of histogram of lift, which is the ratio of performance improvement of A over B. The formula is (A - B) / B.
 #' @param seed Random seed for bayes test to estimate probability density.
 #' @export
-do_bayes_ab <- function(df, group, total_count, success_count, alpha = 1, beta = 1, type = "model", seed = 0, ...){
+do_bayes_ab <- function(df, a_b_identifier, total_count, success_rate, prior_mean = 0.5, prior_sd = 0.288675, type = "model", seed = 0, ...){
   set.seed(seed)
 
-  if (type == "prior") {
-    # this returns coordinates of density chart of prior
-    return(data.frame(
-      estimate = seq(0, 1, 0.01),
-      density = dbeta(seq(0, 1, 0.01), shape1 = alpha, shape2 = beta)
-    ))
+  if(prior_mean <= 0 || 1 <= prior_mean) {
+    stop("mean for prior must be between 0 and 1")
   }
 
-  group_col <- col_name(substitute(group))
-  total_count_col <- col_name(substitute(total_count))
-  success_count_col <- col_name(substitute(success_count))
+  # calculate alpha and beta
+  # https://stats.stackexchange.com/questions/12232/calculating-the-parameters-of-a-beta-distribution-using-the-mean-and-variance
+  prior_var <- prior_sd^2
+  alpha <- ((1 - prior_mean) / prior_var - 1 / prior_mean) * prior_mean ^ 2
+  beta <- alpha * (1 / prior_mean - 1)
+
+  # validate alpha and beta
+  # when they are invalid, sd is too large
+  if (!(!is.na(alpha) && !is.na(beta) && alpha > 0 && beta > 0)){
+    stop("sd for prior is too large")
+  }
+
+  # when type is prior, no need to evaluate other parameters
+  if (type != "prior") {
+    a_b_identifier_col <- dplyr::select_var(names(df), !! rlang::enquo(a_b_identifier))
+    total_count_col <- dplyr::select_var(names(df), !! rlang::enquo(total_count))
+    success_rate_col <- dplyr::select_var(names(df), !! rlang::enquo(success_rate))
+
+    # make a_b identifier column to factor if they are numeric or character
+    if (is.character(df[[a_b_identifier_col]]) || is.numeric(df[[a_b_identifier_col]])) {
+      df[[a_b_identifier_col]] <- forcats::fct_inorder(as.character(df[[a_b_identifier_col]]))
+    }
+
+    if (is.factor(df[[a_b_identifier_col]])) {
+      if (length(levels(df[[a_b_identifier_col]])) != 2) {
+        stop("A/B must be 2 unique identifiers")
+      }
+      df[[a_b_identifier_col]] <- as.logical(as.integer(df[[a_b_identifier_col]]) - 1)
+    }
+
+    if(any(df[[success_rate_col]] < 0 | df[[success_rate_col]] > 1)) {
+      stop("Success rate must be between 0 and 1")
+    }
+  }
 
   grouped_col <- grouped_by(df)
 
   # this will be executed to each group
   each_func <- function(df, ...){
-    data_a <- df[df[[group_col]], ]
-    data_b <- df[!df[[group_col]], ]
+    if (type == "prior") {
+      # this returns coordinates of density chart of prior
+      return(data.frame(
+        estimate = seq(0, 1, 0.001),
+        density = dbeta(seq(0, 1, 0.001), shape1 = alpha, shape2 = beta)
+      ))
+    }
+    # get a, b subset data
+    data_a <- df[df[[a_b_identifier_col]], ]
+    data_b <- df[!df[[a_b_identifier_col]], ]
 
+    # calculate sum of total count
     data_a_total <- sum(data_a[[total_count_col]], na.rm = TRUE)
     data_b_total <- sum(data_b[[total_count_col]], na.rm = TRUE)
+    # calculate sum of success count
+    data_a_conv_total <- sum(round(data_a[[total_count_col]] * data_a[[success_rate_col]]), na.rm = TRUE)
+    data_b_conv_total <- sum(round(data_b[[total_count_col]] * data_b[[success_rate_col]]), na.rm = TRUE)
 
-    data_a_conv_total <- sum(data_a[[success_count_col]], na.rm = TRUE)
-    data_b_conv_total <- sum(data_b[[success_count_col]], na.rm = TRUE)
-
+    # expand the data to TRUE and FALSE raw data
     bin_a <- c(rep(TRUE, data_a_conv_total), rep(FALSE, data_a_total - data_a_conv_total))
     bin_b <- c(rep(TRUE, data_b_conv_total), rep(FALSE, data_b_total - data_b_conv_total))
 
@@ -59,6 +96,11 @@ do_bayes_ab <- function(df, group, total_count, success_count, alpha = 1, beta =
 
   if(type == "model"){
     ret
+  } else if (type == "prior") {
+    # expand nested data frame of prior distribution
+    ret %>%
+      dplyr::ungroup() %>%
+      unnest_with_drop(model)
   } else {
     tidy(ret, model, type = type, ...)
   }
@@ -111,9 +153,10 @@ tidy.bayesTest <- function(x, percentLift = 0, credInt = 0.9, type = "lift", ...
     d <- density(lift)
     # get the peak of density chart
     expected_lift <- d$x[which.max(d$y)]
-    s <- summary(x,
-                 percentLift = rep(percentLift, length(x$posteriors)),
-                 credInt = rep(credInt, length(x$posteriors))
+    s <- summary(
+      x,
+      percentLift = rep(percentLift, length(x$posteriors)),
+      credInt = rep(credInt, length(x$posteriors))
     )
     data.frame(
       variation = c("A variation", "B default"),
@@ -131,12 +174,12 @@ tidy.bayesTest <- function(x, percentLift = 0, credInt = 0.9, type = "lift", ...
     probability_a = x$posteriors$Probability$A_probs
     probability_b = x$posteriors$Probability$B_probs
 
-    beta_a <- density(probability_a)
+    beta_a <- density(probability_a, n = 2048)
     # rate must be in 0 ~ 1,
     # so the data outside will be removed
     indice_a <- beta_a$x > 0 & beta_a$x < 1
 
-    beta_b <- density(probability_b)
+    beta_b <- density(probability_b, n = 2048)
     indice_b <- beta_b$x > 0 & beta_b$x < 1
 
     a_data <- data.frame(
@@ -156,12 +199,16 @@ tidy.bayesTest <- function(x, percentLift = 0, credInt = 0.9, type = "lift", ...
   } else if (type == "lift") {
     # estimation of (A - B) / B
     lift <- (x$posteriors$Probability$A_probs -x$posteriors$Probability$B_probs)/ x$posteriors$Probability$B_probs
-    # get density chart of lift
-    d <- density(lift)
+
+    lift_hist <- hist(lift, breaks = 50, plot = FALSE)
+
+    x$inputs$n_samples
+
+    # get ratio chart of lift
     data.frame(
-      estimate = d$x,
-      density = d$y,
-      is_positive = d$x > 0,
+      estimate = lift_hist$mids,
+      ratio = lift_hist$counts/x$inputs$n_samples, # devide by x$inputs$n_samples to make total of bars 1
+      chance_of_being_better = factor(ifelse(lift_hist$mids >= 0, "positive", "negative"), levels = c("positive", "negative")),
       stringsAsFactors = FALSE
     )
   } else if (type == "prior") {
