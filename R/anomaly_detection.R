@@ -14,10 +14,12 @@ do_anomaly_detection <- function(df, time, value = NULL, ...){
 #' @param time_unit Time unit for aggregation.
 #' @param fun.aggregate Function to aggregate values.
 #' @param direction Direction of anomaly. Positive ("posi"), Negative ("neg") or "both".
+#' @param longterm Increase anom detection efficacy for time series that are greater than a month.
+#' This automatically becomes TRUE if the data is longer than 30 days.
 #' @param e_value Whether expected values should be returned.
 #' @param ... extra values to be passed to AnomalyDetection::AnomalyDetectionTs.
 #' @export
-do_anomaly_detection_ <- function(df, time_col, value_col = NULL, time_unit = "day", fun.aggregate = sum, direction="both", e_value=TRUE, ...){
+do_anomaly_detection_ <- function(df, time_col, value_col = NULL, time_unit = "day", fun.aggregate = sum, direction="both", e_value=TRUE, longterm = NULL, ...){
   validate_empty_data(df)
 
   loadNamespace("dplyr")
@@ -71,7 +73,10 @@ do_anomaly_detection_ <- function(df, time_col, value_col = NULL, time_unit = "d
       # filed an issue in https://github.com/exploratory-io/tam/issues/4935
     })
     if(!is.null(anom) && nrow(anom) > 0) {
-      ret <- data[[time_col]] %in% as.POSIXct(anom$timestamp)
+      # set timezone to timestamp.
+      # otherwise fails to find anomaly time in data
+      # because of timezone difference
+      ret <- data[[time_col]] %in% lubridate::force_tz(as.POSIXct(anom$timestamp), lubridate::tz(data[[time_col]]))
       # values of timestamps are regarded as anomaly values
       # NA_real_(NA compatible with numeric valeus) is used for non-anomaly data
       val <- ifelse(ret, data[[value_col]], NA_real_)
@@ -115,6 +120,13 @@ do_anomaly_detection_ <- function(df, time_col, value_col = NULL, time_unit = "d
         dplyr::summarise(count = n())
     }
 
+    if (is.null(longterm)){
+      # set longterm to TRUE if the data range is
+      # longer than 30 days (one month)
+      timerange <- max(aggregated_data$time, na.rm = TRUE) - min(aggregated_data$time, na.rm = TRUE)
+      longterm <- as.numeric(timerange, unit = "days") > 30
+    }
+
     colnames(aggregated_data) <- c(time_col, value_col)
 
     # time column should be posixct, otherwise AnomalyDetection::AnomalyDetectionTs throws an error
@@ -125,14 +137,14 @@ do_anomaly_detection_ <- function(df, time_col, value_col = NULL, time_unit = "d
     expected_values <- aggregated_data[[value_col]]
 
     if(direction == "both" || direction == "pos"){
-      pos <- get_anomalies(data_for_anom, expected_values, "pos", e_value, value_col, ...)
+      pos <- get_anomalies(data_for_anom, expected_values, "pos", e_value, value_col, longterm = longterm, ...)
       aggregated_data[[pos_anom_col]] <- pos$ret
       aggregated_data[[pos_val_col]] <- pos$val
       expected_values <- pos$expected_val
     }
 
     if(direction == "both" || direction == "neg"){
-      neg <- get_anomalies(data_for_anom, expected_values, "neg", e_value, value_col, ...)
+      neg <- get_anomalies(data_for_anom, expected_values, "neg", e_value, value_col, longterm = longterm, ...)
       aggregated_data[[neg_anom_col]] <- neg$ret
       aggregated_data[[neg_val_col]] <- neg$val
       expected_values <- neg$expected_val

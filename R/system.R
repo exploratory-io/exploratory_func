@@ -168,8 +168,13 @@ getGithubIssues <- function(username, password, owner, repository){
 
 getMongoURL <- function(host, port, database, username, pass, isSSL=FALSE, authSource=NULL) {
   loadNamespace("stringr")
+  loadNamespace("urltools")
 
   if (stringr::str_length(username) > 0) {
+    if(!is.null(pass) && pass != ''){
+      # mongodb connection URL uses @ as a separator so need to encode password for those special characters.
+      pass = urltools::url_encode(pass)
+    }
     url = stringr::str_c("mongodb://", username, ":", pass, "@", host, ":", as.character(port), "/", database)
   }
   else {

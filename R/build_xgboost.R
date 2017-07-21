@@ -12,7 +12,7 @@
 fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_rate = 0, na.action = na.pass, sparse = NULL, ...) {
   term <- terms(formula, data = data)
   # do.call is used to substitute weights
-  md_frame <- tryCatch({
+  df_for_model_matrix <- tryCatch({
     do.call(model.frame, list(term, data = data, weights = substitute(weights), na.action = na.action))
   }, error = function(e){
     if(e$message == "missing values in object"){
@@ -21,14 +21,14 @@ fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_ra
     }
     stop(e)
   })
-  if(nrow(md_frame) == 0){
+  if(nrow(df_for_model_matrix) == 0){
     # this might happen when na.action is na.omit
     stop("No valid data to create xgboost model after removing NA.")
   } else {
-    y <- model.response(md_frame)
+    y <- model.response(df_for_model_matrix)
 
     # NA in y causes an error
-    md_frame <- md_frame[!is.na(y), ]
+    df_for_model_matrix <- df_for_model_matrix[!is.na(y), ]
     y <- y[!is.na(y)]
 
     md_mat <- tryCatch({
@@ -44,7 +44,7 @@ fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_ra
 
       if(sparse){
         tryCatch({
-          Matrix::sparse.model.matrix(term, data = md_frame)
+          Matrix::sparse.model.matrix(term, data = df_for_model_matrix)
         }, error = function(e){
           if (e$message == "fnames == names(mf) are not all TRUE"){
             # if there are not clean column names like including spaces or special characters,
@@ -54,7 +54,7 @@ fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_ra
           stop(e)
         })
       } else {
-        model.matrix(term, data = md_frame, contrasts = FALSE)
+        model.matrix(term, data = df_for_model_matrix, contrasts = FALSE)
       }
     }, error = function(e){
       if(e$message == "contrasts can be applied only to factors with 2 or more levels") {
@@ -62,7 +62,7 @@ fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_ra
       }
       stop(e)
     })
-    weight <- model.weights(md_frame)
+    weight <- model.weights(df_for_model_matrix)
 
     ret <- if(watchlist_rate != 0.0) {
       if (watchlist_rate < 0 ||  1 <= watchlist_rate) {
@@ -84,7 +84,7 @@ fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_ra
     # this is how categorical columns are casted to columns in matrix
     # this is needed in augment, so that matrix with the same levels
     # can be created
-    ret$xlevels <- .getXlevels(term, md_frame)
+    ret$xlevels <- .getXlevels(term, df_for_model_matrix)
     ret
   }
 }
@@ -348,10 +348,18 @@ augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, ...) {
       data
     }
 
+    # copy ret_data to add response_col if it doesn't exist.
+    # it's needed for model.matrix function
+    df_for_model_matrix <- ret_data
+    response_col <- as.character(lazyeval::f_lhs(x$terms))
+    if (!response_col %in% colnames(df_for_model_matrix)) {
+      df_for_model_matrix[[response_col]] <- rep(NA, nrow(ret_data))
+    }
+
     mat <- if(!is.null(x$is_sparse) && x$is_sparse){
-      Matrix::sparse.model.matrix(x$terms, model.frame(ret_data, na.action = na.pass, xlev = x$xlevels))
+      Matrix::sparse.model.matrix(x$terms, model.frame(df_for_model_matrix, na.action = na.pass, xlev = x$xlevels))
     } else {
-      model.matrix(x$terms, model.frame(ret_data, na.action = na.pass, xlev = x$xlevels))
+      model.matrix(x$terms, model.frame(df_for_model_matrix, na.action = na.pass, xlev = x$xlevels))
     }
 
     # this is to find omitted indice for NA
