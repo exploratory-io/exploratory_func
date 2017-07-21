@@ -44,6 +44,7 @@ do_bayes_ab <- function(df, a_b_identifier, total_count, success_rate, prior_mea
       df[[a_b_identifier_col]] <- forcats::fct_inorder(as.character(df[[a_b_identifier_col]]))
     }
 
+    # convert a_b_identifier_col from factor to logical
     if (is.factor(df[[a_b_identifier_col]])) {
       if (length(levels(df[[a_b_identifier_col]])) != 2) {
         stop("A/B must be 2 unique identifiers")
