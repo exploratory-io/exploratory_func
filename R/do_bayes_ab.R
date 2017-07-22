@@ -11,7 +11,7 @@
 #' * summary - Output summary of the result of the test.
 #' * prior - Output coordinates of prior density chart.
 #' * posteriors - Output coordinates of posterior density chart of the success rate.
-#' * lift - Output coordinate of histogram of lift, which is the ratio of performance improvement of A over B. The formula is (A - B) / B.
+#' * improvement - Output coordinate of histogram of lift, which is the ratio of performance improvement of A over B. The formula is (A - B) / B.
 #' @param seed Random seed for bayes test to estimate probability density.
 #' @export
 do_bayes_ab <- function(df, a_b_identifier, total_count, success_rate, prior_mean = 0.5, prior_sd = 0.288675, type = "model", seed = 0, ...){
@@ -64,8 +64,8 @@ do_bayes_ab <- function(df, a_b_identifier, total_count, success_rate, prior_mea
     if (type == "prior") {
       # this returns coordinates of density chart of prior
       return(data.frame(
-        estimate = seq(0, 1, 0.001),
-        density = dbeta(seq(0, 1, 0.001), shape1 = alpha, shape2 = beta)
+        conversion_rate_pct = seq(0, 1, 0.001) * 100,
+        probability_density = dbeta(seq(0, 1, 0.001), shape1 = alpha, shape2 = beta)
       ))
     }
     # get a, b subset data
@@ -141,7 +141,7 @@ calc_beta_prior <- function(df, rate, ...){
 #' @param percentLift Lift threshold to calculate the probability of success
 #' @param credInt Ratio for credible interval
 #' @param type Type of output
-#' This can be "summary", "prior", "posteriors" and "lift"
+#' This can be "summary", "prior", "posteriors" and "improvement"
 #' @export
 tidy.bayesTest <- function(x, percentLift = 0, credInt = 0.9, type = "lift", ...) {
   if (type == "summary"){
@@ -165,10 +165,10 @@ tidy.bayesTest <- function(x, percentLift = 0, credInt = 0.9, type = "lift", ...
       success = each_success,
       rate = each_mean,
       chance_of_being_better = c(s$probability[[1]], 1-s$probability[[1]]) ,
-      expected_lift = c(expected_lift, NA_real_),
+      expected_improvement_rate = c(expected_lift, NA_real_),
       credible_interval_low = c(s$interval$Probability[[1]], NA_real_),
       credible_interval_high = c(s$interval$Probability[[2]], NA_real_),
-      expected_loss = c(s$posteriorExpectedLoss$Probability, NA_real_),
+      expected_loss_rate = c(s$posteriorExpectedLoss$Probability, NA_real_),
       stringsAsFactors = FALSE
     )
   } else if (type == "posteriors") {
@@ -185,19 +185,19 @@ tidy.bayesTest <- function(x, percentLift = 0, credInt = 0.9, type = "lift", ...
 
     a_data <- data.frame(
       a_or_b = rep("A", sum(indice_a)),
-      estimate = beta_a$x[indice_a],
-      density = beta_a$y[indice_a],
+      conversion_rate_pct = beta_a$x[indice_a] * 100,
+      probability_density = beta_a$y[indice_a],
       stringsAsFactors = FALSE
     )
 
     b_data <- data.frame(
       a_or_b = rep("B",sum(indice_b)),
-      estimate = beta_b$x[indice_b],
-      density = beta_b$y[indice_b],
+      conversion_rate_pct = beta_b$x[indice_b] * 100,
+      probability_density = beta_b$y[indice_b],
       stringsAsFactors = FALSE
     )
     dplyr::bind_rows(a_data, b_data)
-  } else if (type == "lift") {
+  } else if (type == "improvement") {
     # estimation of (A - B) / B
     lift <- (x$posteriors$Probability$A_probs -x$posteriors$Probability$B_probs)/ x$posteriors$Probability$B_probs
 
@@ -207,8 +207,8 @@ tidy.bayesTest <- function(x, percentLift = 0, credInt = 0.9, type = "lift", ...
 
     # get ratio chart of lift
     data.frame(
-      estimate = lift_hist$mids,
-      ratio = lift_hist$counts/x$inputs$n_samples, # devide by x$inputs$n_samples to make total of bars 1
+      improvement_rate_pct = lift_hist$mids * 100,
+      probability_pct = lift_hist$counts/x$inputs$n_samples * 100, # devide by x$inputs$n_samples to make total of bars 1
       chance_of_being_better = factor(ifelse(lift_hist$mids >= 0, "positive", "negative"), levels = c("positive", "negative")),
       stringsAsFactors = FALSE
     )
@@ -217,8 +217,8 @@ tidy.bayesTest <- function(x, percentLift = 0, credInt = 0.9, type = "lift", ...
     alpha <- x$inputs$priors[["alpha"]]
     beta <- x$inputs$priors[["beta"]]
     data.frame(
-      estimate = seq(0, 1, 0.001),
-      density = dbeta(seq(0, 1, 0.001), shape1 = alpha, shape2 = beta)
+      conversion_rate_pct = seq(0, 1, 0.001) * 100,
+      probability_density = dbeta(seq(0, 1, 0.001), shape1 = alpha, shape2 = beta)
     )
   } else {
     stop(paste0(type, " is not defined as type"))

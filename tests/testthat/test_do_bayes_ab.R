@@ -32,9 +32,9 @@ test_that("test do_bayes_ab test with lift output", {
   full_data <- dplyr::bind_rows(data_a, data_b) %>%
     mutate(group = rbinom(n(), 1, 0.3)) %>%
     group_by(group)
-  ret <- do_bayes_ab(full_data, data_b, access_count, click, type = "lift")
+  ret <- do_bayes_ab(full_data, data_b, access_count, click, type = "improvement")
   # this is 2 groups, so this should be 1 * 2
-  expect_equal(sum(ret$ratio), 2)
+  expect_equal(sum(ret$probability_pct), 200)
 })
 
 test_that("test do_bayes_ab test with ", {
@@ -71,7 +71,7 @@ test_that("test do_bayes_ab test with ", {
     mutate(group = rbinom(n(), 1, 0.3)) %>%
     group_by(group)
   ret <- do_bayes_ab(full_data, data_b, access_count, click, prior_mean = 0.5, prior_sd = 0.2, type = "prior")
-  expect_true(!all(ret$density == 1))
+  expect_true(!all(ret$probability_density == 1))
 })
 
 test_that("test calc_beta_prior", {
