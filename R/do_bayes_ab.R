@@ -6,6 +6,7 @@
 #' @param prior_mean Mean of prior beta distribution
 #' @param prior_sd Standard deviation of prior beta distribution
 #' The default value with 0.5 prior_mean is uniform distribution
+#' 0.288675 is the sd of [0,1] uniform distribution sqrt(1/3 -1/2 + 1/4)
 #' @param type Type of output
 #' * model - Returns a data frame with bayesTest model.
 #' * summary - Output summary of the result of the test.
@@ -35,6 +36,8 @@ do_bayes_ab <- function(df, a_b_identifier, total_count, success_rate, prior_mea
 
   # when type is prior, no need to evaluate other parameters
   if (type != "prior") {
+    # this seems to be the new way of NSE column selection evaluation
+    # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
     a_b_identifier_col <- dplyr::select_var(names(df), !! rlang::enquo(a_b_identifier))
     total_count_col <- dplyr::select_var(names(df), !! rlang::enquo(total_count))
     success_rate_col <- dplyr::select_var(names(df), !! rlang::enquo(success_rate))
