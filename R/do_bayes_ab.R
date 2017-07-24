@@ -146,7 +146,7 @@ calc_beta_prior <- function(df, rate, ...){
 #' @param type Type of output
 #' This can be "summary", "prior", "posteriors" and "improvement"
 #' @export
-tidy.bayesTest <- function(x, percentLift = 0, credInt = 0.9, type = "lift", ...) {
+tidy.bayesTest <- function(x, percentLift = 0, credInt = 0.9, type = "summary", ...) {
   if (type == "summary"){
     each_len <- c(length(x$inputs$A_data), length(x$inputs$B_data))
     each_success <- c(sum(x$inputs$A_data), sum(x$inputs$B_data))
