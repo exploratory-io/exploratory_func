@@ -14,8 +14,15 @@ col_name <- function(x, default = stop("Please supply column name", call. = FALS
 }
 
 #' Simple cast wrapper that spreads columns which is choosed as row and col into matrix
+#' @param data Data frame to cast
+#' @param row Column name to be used as row
+#' @param col Column name to be used as column
+#' @param val Column name to be used as value. Default is number of rows
+#' @param fun.aggregate Aggregate function for duplicated row and col
+#' @param fill Values to fill NA.
+#' @param time_unit Unit of time to aggregate key_col if key_col is Date or POSIXct#' @param time_unit Unit of time to aggregate key_col if key_col is Date or POSIXct. NULL doesn't aggregate.
 #' @export
-simple_cast <- function(data, row, col, val = NULL, fun.aggregate=mean, fill=0){
+simple_cast <- function(data, row, col, val=NULL, fun.aggregate=mean, fill=0, time_unit=NULL){
   loadNamespace("reshape2")
   loadNamespace("tidyr")
 
@@ -35,6 +42,12 @@ simple_cast <- function(data, row, col, val = NULL, fun.aggregate=mean, fill=0){
 
   # remove NA from row and column
   data <- tidyr::drop_na_(data, c(row, col))
+
+  if ((inherits(data[[row]], "Date") ||
+      inherits(data[[row]], "POSIXct")) &&
+      !is.null(time_unit)) {
+    data[[row]] <- lubridate::floor_date(data[[row]], unit = time_unit)
+  }
 
   # validation
   uniq_row <- unique(data[[row]], na.rm=TRUE)

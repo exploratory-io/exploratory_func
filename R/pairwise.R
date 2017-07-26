@@ -110,6 +110,7 @@ do_dist.kv <- function(df, subject, key, value = NULL, ...){
 #' @param method Type of calculation. https://cran.r-project.org/web/packages/proxy/vignettes/overview.pdf
 #' @param p P parameter for "minkowski" method.
 #' @param cmdscale_k Number of dimention to map the result.
+#' @param time_unit Unit of time to aggregate key_col if key_col is Date or POSIXct#' @param time_unit Unit of time to aggregate key_col if key_col is Date or POSIXct. NULL doesn't aggregate.
 #' @export
 do_dist.kv_ <- function(df,
                         subject_col,
@@ -121,7 +122,8 @@ do_dist.kv_ <- function(df,
                         diag=FALSE,
                         method="euclidean",
                         p=2,
-                        cmdscale_k = NULL){
+                        cmdscale_k = NULL,
+                        time_unit = NULL){
   validate_empty_data(df)
 
   loadNamespace("dplyr")
@@ -143,7 +145,13 @@ do_dist.kv_ <- function(df,
 
   # this is executed on each group
   calc_dist_each <- function(df){
-    mat <- df %>%  simple_cast(subject_col, key_col, value_col, fill=fill, fun.aggregate=fun.aggregate)
+    # t is used because dist calculates distances of rows
+    # but simple_cast is designed for subject to columns,
+    # so the matrix is transposed
+    mat <- df %>%
+      simple_cast(key_col, subject_col, value_col, fill=fill, fun.aggregate=fun.aggregate, time_unit = time_unit) %>%
+      t()
+
     # Dist is actually an atomic vector of upper half so upper and diag arguments don't matter
     dist <- stats::dist(mat, method=method, diag=FALSE, p=p)
     if(distinct){
