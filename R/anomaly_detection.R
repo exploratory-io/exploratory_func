@@ -53,10 +53,10 @@ do_anomaly_detection_ <- function(df, time_col, value_col = NULL, time_unit = "d
     stop("direction must be 'both', 'pos' or 'neg'")
   }
 
-  pos_anom_col <- avoid_conflict(colnames(df), "pos_anomaly")
-  pos_val_col <- avoid_conflict(colnames(df), "pos_value")
-  neg_anom_col <- avoid_conflict(colnames(df), "neg_anomaly")
-  neg_val_col <- avoid_conflict(colnames(df), "neg_value")
+  pos_anom_col <- avoid_conflict(colnames(df), "is_positive_anomaly")
+  pos_val_col <- avoid_conflict(colnames(df), "positive_anomalies")
+  neg_anom_col <- avoid_conflict(colnames(df), "is_negative_anomaly")
+  neg_val_col <- avoid_conflict(colnames(df), "negative_anomalies")
   exp_val_col <- avoid_conflict(colnames(df), "expected_value")
 
   # this logic is duplicated between positive and negative direction, so
