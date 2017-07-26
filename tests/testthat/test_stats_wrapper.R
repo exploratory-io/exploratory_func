@@ -2,6 +2,40 @@ context("tests for wrappers of stats package")
 
 spread_test_df <- data.frame(var1 = c(1, 3, 2, NA), var2 = c(1, 3, 2, 10))
 
+test_that("do_cor with date aggregation", {
+  set.seed(0)
+  rownum <- 60
+  test_df <- data.frame(
+    rows = rep(c("a", "b", "c"), each = rownum / 3),
+    dt = rep(as.Date("2014-01-01"), rownum) + lubridate::days(rep(seq(rownum / 3), 3)),
+    val = runif(rownum)
+  )
+
+  mat <- test_df %>%
+    mutate(week_round = lubridate::floor_date(dt, unit = "weeks")) %>%
+    select(-dt) %>%
+    group_by(rows, week_round) %>%
+    summarize(mean_val = mean(val)) %>%
+    spread(rows, mean_val) %>%
+    select(-week_round) %>%
+    as.matrix()
+
+  cor_ret <- cor(mat, use = "pairwise.complete.obs")
+
+  melt_ret <- reshape2::melt(cor_ret)
+
+  ret <- test_df %>%
+    do_cor(skv = c("rows", "dt", "val"), time_unit = "weeks", diag = TRUE)
+
+  for(i in seq(nrow(cor_ret))){
+    for(j in seq(ncol(cor_ret))){
+      mat_answer <- cor_ret[i, j]
+      df_answer <- ret[ret[[1]] == letters[[i]] & ret[[2]] == letters[[j]], 3][[1]]
+      expect_equal(mat_answer, df_answer)
+    }
+  }
+})
+
 test_that("test do_svd.kv with fill", {
   test_df <- data.frame(
     rand=runif(20, min = 0, max=10),
