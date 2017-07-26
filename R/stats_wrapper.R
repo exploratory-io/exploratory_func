@@ -37,6 +37,7 @@ do_cor <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0){
 #' @param use Operation type for dealing with missing values. This can be one of "everything", "all.obs", "complete.obs", "na.or.complete", or "pairwise.complete.obs"
 #' @param method Method of calculation. This can be one of "pearson", "kendall", or "spearman".
 #' @param fun.aggregate  Set an aggregate function when there are multiple entries for the key column per each category.
+#' @param time_unit Unit of time to aggregate key_col if key_col is Date or POSIXct. NULL doesn't aggregate.
 #' @return correlations between pairs of groups
 #' @export
 do_cor.kv <- function(df,
@@ -63,12 +64,14 @@ do_cor.kv_ <- function(df,
                       subject_col,
                       key_col,
                       value_col = NULL,
+                      time_unit = NULL,
                       use="pairwise.complete.obs",
                       method="pearson",
                       distinct = FALSE,
                       diag = FALSE,
                       fill = 0,
-                      fun.aggregate=mean)
+                      fun.aggregate=mean
+                      )
 {
   validate_empty_data(df)
   loadNamespace("reshape2")
@@ -92,7 +95,7 @@ do_cor.kv_ <- function(df,
 
 
   do_cor_each <- function(df){
-    mat <- simple_cast(df, row, col, val, fun.aggregate=fun.aggregate, fill=fill)
+    mat <- simple_cast(df, row, col, val, fun.aggregate=fun.aggregate, fill=fill, time_unit = time_unit)
     cor_mat <- cor(mat, use = use, method = method)
     if(distinct){
       ret <- upper_gather(cor_mat, diag=diag, cnames=output_cols)

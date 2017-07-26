@@ -162,16 +162,6 @@ test_that("test do_dist.kv diag TRUE", {
   expect_equal(result[[3]][1], 0)
 })
 
-test_that("test do_dist.kv distinct TRUE", {
-  loadNamespace("dplyr")
-  result <- (
-    test_df %>%
-      do_dist.kv(row, col, val, distinct=TRUE)
-  )
-
-  expect_equal(nrow(result), 6)
-})
-
 test_that("test do_dist.kv without val", {
   loadNamespace("dplyr")
 
