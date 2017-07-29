@@ -938,7 +938,7 @@ getGoogleBigQueryTables <- function(project, dataset, tokenFileId=""){
     token <- getGoogleTokenForBigQuery(tokenFileId);
     bigrquery::set_access_cred(token)
     # if we do not pass max_results, it only returnss 50 items. so explicitly set it.
-    tables <- bigrquery::list_tables(project, dataset, max_results=1000000);
+    tables <- bigrquery::list_tables(project, dataset, page_size=1000000);
   }, error = function(err){
     c("")
   })
