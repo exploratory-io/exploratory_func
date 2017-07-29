@@ -2,7 +2,7 @@
 #' @param df Data frame to run bayes ab test
 #' @param a_b_identifier A column with 2 unique values to distinguish groups
 #' @param total_count Column of the total count
-#' @param success_rate Column of the rate of success
+#' @param conversion_rate Column of the rate of success
 #' @param prior_mean Mean of prior beta distribution
 #' @param prior_sd Standard deviation of prior beta distribution
 #' The default value with 0.5 prior_mean is uniform distribution
@@ -15,7 +15,7 @@
 #' * improvement - Output coordinate of histogram of lift, which is the ratio of performance improvement of A over B. The formula is (A - B) / B.
 #' @param seed Random seed for bayes test to estimate probability density.
 #' @export
-do_bayes_ab <- function(df, a_b_identifier, total_count, success_rate, prior_mean = 0.5, prior_sd = 0.288675, type = "model", seed = 0, ...){
+do_bayes_ab <- function(df, a_b_identifier, total_count, conversion_rate, prior_mean = 0.5, prior_sd = 0.288675, type = "model", seed = 0, ...){
   set.seed(seed)
 
   if(prior_mean <= 0 || 1 <= prior_mean) {
@@ -40,7 +40,7 @@ do_bayes_ab <- function(df, a_b_identifier, total_count, success_rate, prior_mea
     # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
     a_b_identifier_col <- dplyr::select_var(names(df), !! rlang::enquo(a_b_identifier))
     total_count_col <- dplyr::select_var(names(df), !! rlang::enquo(total_count))
-    success_rate_col <- dplyr::select_var(names(df), !! rlang::enquo(success_rate))
+    conversion_rate_col <- dplyr::select_var(names(df), !! rlang::enquo(conversion_rate))
 
     # make a_b identifier column to factor if they are numeric or character
     if (is.character(df[[a_b_identifier_col]]) || is.numeric(df[[a_b_identifier_col]])) {
@@ -55,8 +55,8 @@ do_bayes_ab <- function(df, a_b_identifier, total_count, success_rate, prior_mea
       df[[a_b_identifier_col]] <- as.logical(as.integer(df[[a_b_identifier_col]]) - 1)
     }
 
-    if(any(df[[success_rate_col]] < 0 | df[[success_rate_col]] > 1)) {
-      stop("Success rate must be between 0 and 1")
+    if(any(df[[conversion_rate_col]] < 0 | df[[conversion_rate_col]] > 1)) {
+      stop("Conversion rate must be between 0 and 1")
     }
   }
 
@@ -79,8 +79,8 @@ do_bayes_ab <- function(df, a_b_identifier, total_count, success_rate, prior_mea
     data_a_total <- sum(data_a[[total_count_col]], na.rm = TRUE)
     data_b_total <- sum(data_b[[total_count_col]], na.rm = TRUE)
     # calculate sum of success count
-    data_a_conv_total <- sum(round(data_a[[total_count_col]] * data_a[[success_rate_col]]), na.rm = TRUE)
-    data_b_conv_total <- sum(round(data_b[[total_count_col]] * data_b[[success_rate_col]]), na.rm = TRUE)
+    data_a_conv_total <- sum(round(data_a[[total_count_col]] * data_a[[conversion_rate_col]]), na.rm = TRUE)
+    data_b_conv_total <- sum(round(data_b[[total_count_col]] * data_b[[conversion_rate_col]]), na.rm = TRUE)
 
     # expand the data to TRUE and FALSE raw data
     bin_a <- c(rep(TRUE, data_a_conv_total), rep(FALSE, data_a_total - data_a_conv_total))
@@ -166,7 +166,7 @@ tidy.bayesTest <- function(x, percentLift = 0, credInt = 0.9, type = "summary", 
       variation = c("A variation", "B default"),
       size = each_len,
       success = each_success,
-      rate = each_mean,
+      conversion_rate = each_mean,
       chance_of_being_better = c(s$probability[[1]], 1-s$probability[[1]]) ,
       expected_improvement_rate = c(expected_lift, NA_real_),
       credible_interval_low = c(s$interval$Probability[[1]], NA_real_),
