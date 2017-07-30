@@ -1,11 +1,14 @@
 #' Run retention cohort analysis
 #' @param df Data frame to run bayes ab test
 #' @export
-do_retention_cohort <- function(df, timestamp, user_id, time_unit = "month"){
+do_retention_cohort <- function(df, timestamp, user_id, time_unit = "month", measure = NULL){
   # this seems to be the new way of NSE column selection evaluation
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
   timestamp_col <- dplyr::select_var(names(df), !! rlang::enquo(timestamp))
   user_id_col <- dplyr::select_var(names(df), !! rlang::enquo(user_id))
+  if (!is.null(measure)) {
+    measure_col <- dplyr::select_var(names(df), !! rlang::enquo(measure))
+  }
 
   grouped_col <- grouped_by(df)
 
@@ -20,10 +23,10 @@ do_retention_cohort <- function(df, timestamp, user_id, time_unit = "month"){
     ret <- ret %>% mutate(period = round(as.numeric(as.Date(.timestamp) - as.Date(.start_time))/switch(time_unit, day = 1, week = 7, month = (365.25/12), quarter = (365.25/4), year = 365.25)))
     ret <- ret %>% group_by(.start_time, period) %>%
       summarize(retained = n(), timestamp = first(.timestamp)) %>%
-      group_by(.start_time) %>%
-      mutate(retained_pct = retained / first(retained) * 100) %>%
-      ungroup() %>%
-      dplyr::rename(start_time = .start_time)
+      group_by(.start_time)
+    ret <- ret %>% mutate(value = retained / first(retained) * 100) %>%
+      ungroup()
+    ret <- ret %>% dplyr::rename(start_time = .start_time)
     ret
   }
 
