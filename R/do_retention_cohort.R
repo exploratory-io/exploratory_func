@@ -24,9 +24,9 @@ do_retention_cohort <- function(df, timestamp, user_id, time_unit = "month", mea
       ungroup()
     ret <- ret %>% mutate(period = round(as.numeric(as.Date(.timestamp) - as.Date(.start_time))/switch(time_unit, day = 1, week = 7, month = (365.25/12), quarter = (365.25/4), year = 365.25)))
     ret <- ret %>% group_by(.start_time, period) %>%
-      summarize(retained = n(), timestamp = first(.timestamp)) %>%
-      group_by(.start_time)
-    ret <- ret %>% mutate(value = retained / first(retained) * 100) %>%
+      summarize(retained = n(), timestamp = first(.timestamp))
+    ret <- ret %>% group_by(.start_time) %>%
+      mutate(value = retained / first(retained) * 100) %>%
       ungroup()
     ret <- ret %>% dplyr::rename(start_time = .start_time)
     ret
