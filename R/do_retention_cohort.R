@@ -14,7 +14,7 @@ do_retention_cohort <- function(df, timestamp, user_id, measure = NULL, time_uni
   # this will be executed to each group
   each_func <- function(df, ...){
     ret <- df %>% rename_(.dots = list(.timestamp = timestamp_col))
-    if (!is.null(measure_col)) {
+    if (!is.null(measure_col)) { # note that accessing measure here throws error. has to be measure_col.
       ret <- ret %>% rename_(.dots = list(.measure = measure_col))
     }
     ret <- ret %>% dplyr::mutate(.timestamp =lubridate::floor_date(.timestamp, unit = time_unit))
