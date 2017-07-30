@@ -36,6 +36,7 @@ do_retention_cohort <- function(df, timestamp, user_id, measure = NULL, time_uni
     else {
       ret <- ret %>% group_by(.start_time, period) %>%
         summarize(value = sum(.measure), timestamp = first(.timestamp))
+      colnames(ret)[colnames(ret) == "value"] <- avoid_conflict(colnames(ret), measure_col)
     }
     ret <- ret %>% dplyr::rename(start_time = .start_time)
     ret
