@@ -16,7 +16,9 @@ do_retention_cohort <- function(df, timestamp, user_id, time_unit = "month", mea
   each_func <- function(df, ...){
     ret <- df %>% rename_(.dots = list(.timestamp = timestamp_col))
     ret <- ret %>% dplyr::mutate(.timestamp =lubridate::floor_date(.timestamp, unit = time_unit))
-    ret <- ret %>% dplyr::distinct_(".timestamp", user_id_col)
+    if (is.null(measure)) {
+      ret <- ret %>% dplyr::distinct_(".timestamp", user_id_col)
+    }
     ret <- ret %>% dplyr::group_by_(user_id_col) %>%
       mutate(.start_time = min(.timestamp)) %>%
       ungroup()
