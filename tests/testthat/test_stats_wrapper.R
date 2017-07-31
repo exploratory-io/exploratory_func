@@ -2,6 +2,33 @@ context("tests for wrappers of stats package")
 
 spread_test_df <- data.frame(var1 = c(1, 3, 2, NA), var2 = c(1, 3, 2, 10))
 
+test_that("do_dist with NA results", {
+  data <- data.frame(
+    x = rep(letters[1:3], 3),
+    y = rep(letters[1:3], each=3)
+  )
+  ret <- do_dist(data, skv = c("x", "y"), distinct = TRUE)
+  expect_true(nrow(ret) > 0)
+})
+
+test_that("do_cor with NA results", {
+  data <- data.frame(
+    x = rep(letters[1:3], 3),
+    y = rep(letters[1:3], each=3)
+  )
+  ret <- do_cor(data, skv = c("x", "y"))
+  expect_true(nrow(ret) > 0)
+})
+
+test_that("do_cor with NA results", {
+  data <- data.frame(
+    x = rep(letters[1:3], 3),
+    y = rep(letters[1:3], each=3)
+  )
+  ret <- do_cor(data, skv = c("x", "y"), distinct = TRUE)
+  expect_true(nrow(ret) > 0)
+})
+
 test_that("do_cor with date aggregation", {
   set.seed(0)
   rownum <- 60
@@ -12,12 +39,12 @@ test_that("do_cor with date aggregation", {
   )
 
   mat <- test_df %>%
-    mutate(week_round = lubridate::floor_date(dt, unit = "weeks")) %>%
-    select(-dt) %>%
-    group_by(rows, week_round) %>%
-    summarize(mean_val = mean(val)) %>%
-    spread(rows, mean_val) %>%
-    select(-week_round) %>%
+    dplyr::mutate(week_round = lubridate::floor_date(dt, unit = "weeks")) %>%
+    dplyr::select(-dt) %>%
+    dplyr::group_by(rows, week_round) %>%
+    dplyr::summarize(mean_val = mean(val)) %>%
+    tidyr::spread(rows, mean_val) %>%
+    dplyr::select(-week_round) %>%
     as.matrix()
 
   cor_ret <- cor(mat, use = "pairwise.complete.obs")

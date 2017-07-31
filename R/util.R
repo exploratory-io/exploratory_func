@@ -161,7 +161,7 @@ to_matrix <- function(df, select_dots, by_col=NULL, key_col=NULL, value_col=NULL
 
 #' Gather only right upper half of matrix - where row_num > col_num
 #' @export
-upper_gather <- function(mat, names=NULL, diag=NULL, cnames = c("Var1", "Var2", "value")){
+upper_gather <- function(mat, names=NULL, diag=NULL, cnames = c("Var1", "Var2", "value"), na.rm = TRUE, rm.zero = TRUE){
   loadNamespace("Matrix")
   if(is.vector(mat)){
     # This is basically for dist function
@@ -204,8 +204,17 @@ upper_gather <- function(mat, names=NULL, diag=NULL, cnames = c("Var1", "Var2", 
     if(is.null(r_names)){
       r_names <- seq(nrow(tmat))
     }
-    # get indice of non-zero values
-    ind <- Matrix::which(tmat != 0, arr.ind = TRUE)
+    # get indice of matrix.
+    # remove NA if na.rm is TRUE
+    ind_mat <- if(rm.zero){
+      tmat != 0
+    } else {
+      tmat
+    }
+    if(!na.rm){
+      ind_mat <- is.na(ind_mat) | ind_mat
+    }
+    ind <- Matrix::which(ind_mat, arr.ind = TRUE)
 
     # remove duplicated pairs
     # by comparing indice
