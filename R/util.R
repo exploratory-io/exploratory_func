@@ -160,8 +160,14 @@ to_matrix <- function(df, select_dots, by_col=NULL, key_col=NULL, value_col=NULL
 }
 
 #' Gather only right upper half of matrix - where row_num > col_num
+#' @param mat Matrix to be converted to data frame
+#' @param names Dimension names of input matrix
+#' @param diag If diagonal values should be returned
+#' @param cnames Column names of output
+#' @param na.rm If NA should be removed from the result
+#' @param zero.rm If 0 should be removed from the result
 #' @export
-upper_gather <- function(mat, names=NULL, diag=NULL, cnames = c("Var1", "Var2", "value")){
+upper_gather <- function(mat, names=NULL, diag=NULL, cnames = c("Var1", "Var2", "value"), na.rm = TRUE, zero.rm = TRUE){
   loadNamespace("Matrix")
   if(is.vector(mat)){
     # This is basically for dist function
@@ -188,7 +194,7 @@ upper_gather <- function(mat, names=NULL, diag=NULL, cnames = c("Var1", "Var2", 
       # fill diagonal elements
       trimat[row(trimat)==col(trimat)] = rep(diag, length(names))
     }
-    mat_to_df(t(trimat), na.rm=TRUE, cnames=cnames)
+    mat_to_df(t(trimat), na.rm=na.rm, cnames=cnames, zero.rm = zero.rm)
   }else{
     # diag can be NULL or FALSE
     if(is.null(diag)){
@@ -204,8 +210,19 @@ upper_gather <- function(mat, names=NULL, diag=NULL, cnames = c("Var1", "Var2", 
     if(is.null(r_names)){
       r_names <- seq(nrow(tmat))
     }
-    # get indice of non-zero values
-    ind <- Matrix::which(tmat != 0, arr.ind = TRUE)
+
+    # remove 0 if zero.rm is TRUE
+    ind_mat <- if(zero.rm){
+      tmat != 0
+    } else {
+      tmat
+    }
+    # preserve NA if na.rm is FALSE
+    if(!na.rm){
+      ind_mat <- is.na(ind_mat) | ind_mat
+    }
+    # get indice of matrix
+    ind <- Matrix::which(ind_mat, arr.ind = TRUE)
 
     # remove duplicated pairs
     # by comparing indice
@@ -267,10 +284,19 @@ grouped_by <- function(df){
 }
 
 #' matrix to dataframe with gathered form
+#' @param mat Matrix to be converted to data frame
+#' @param cnames Column names of output
+#' @param na.rm If NA should be removed from the result
+#' @param zero.rm If 0 should be removed from the result
+#' @param diag If diagonal values should be returned
 #' @export
-mat_to_df <- function(mat, cnames=NULL, na.rm=TRUE, diag=TRUE){
+mat_to_df <- function(mat, cnames=NULL, na.rm=TRUE, zero.rm = TRUE, diag=TRUE){
   loadNamespace("reshape2")
   df <- reshape2::melt(t(mat), na.rm=na.rm)
+
+  if(zero.rm){
+    df <- df[is.na(df[[3]]) | df[[3]] != 0, ]
+  }
 
   if(!diag){
     df <- df[df[[1]]!=df[[2]],]

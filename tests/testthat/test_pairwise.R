@@ -18,6 +18,15 @@ test_df$rand <- vapply(seq(nrow(test_df)), function(x){
   }
 }, FUN.VALUE=1)
 
+test_that("test do_cosine_sim.kv with NA value", {
+  loadNamespace("dplyr")
+  result <- test_df %>%
+      do_cosine_sim.kv(row, col, with_na)
+  expect_equal(nrow(result), 12)
+  expect_equal( typeof(result[[1]]), "character")
+  expect_equal( typeof(result[[2]]), "character")
+})
+
 test_that("test do_cosine_sim.kv", {
   loadNamespace("dplyr")
   df <- test_df

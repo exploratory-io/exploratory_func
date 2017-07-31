@@ -40,11 +40,11 @@ do_cosine_sim.kv <- function(df, subject, key, value = NULL, distinct=FALSE, dia
       if(!diag){
         diag <- NULL
       }
-      df <- upper_gather(sim, rownames(mat), diag=diag, cnames=cnames)
+      df <- upper_gather(sim, rownames(mat), diag=diag, cnames=cnames, na.rm = FALSE, zero.rm = FALSE)
     }else{
       loadNamespace("reshape2")
       loadNamespace("dplyr")
-      df <- sim %>%  as.matrix() %>%  mat_to_df(cnames, na.rm=FALSE)
+      df <- sim %>%  as.matrix() %>%  mat_to_df(cnames, na.rm = FALSE, zero.rm = FALSE)
       if(!diag){
         df <- df[df[,1] != df[,2],]
       }
@@ -160,9 +160,16 @@ do_dist.kv_ <- function(df,
       }else{
         diag <- NULL
       }
-      ret <- upper_gather(as.vector(dist), rownames(mat), diag=diag, cnames=cnames)
+      ret <- upper_gather(
+        as.vector(dist),
+        rownames(mat),
+        diag=diag,
+        cnames=cnames,
+        na.rm = FALSE,
+        zero.rm = FALSE
+      )
     }else{
-      ret <- dist %>%  as.matrix() %>%  mat_to_df(cnames)
+      ret <- dist %>%  as.matrix() %>%  mat_to_df(cnames, na.rm = FALSE, zero.rm = FALSE)
       if(!diag){
         ret<- ret[ret[,1] != ret[,2],]
       }
@@ -240,7 +247,14 @@ do_kl_dist.kv_ <- function(df,
       }else{
         diag <- NULL
       }
-      ret <- upper_gather(as.vector(dist), rownames(mat), diag=diag, cnames=cnames)
+      ret <- upper_gather(
+        as.vector(dist),
+        rownames(mat),
+        diag=diag,
+        cnames=cnames,
+        na.rm = FALSE,
+        zero.rm = FALSE
+      )
     }else{
       ret <- dist %>%  as.matrix() %>%  mat_to_df(cnames)
       if(!diag){
@@ -312,9 +326,20 @@ do_dist.cols <- function(df,
       }else{
         diag <- NULL
       }
-      ret <- upper_gather(as.vector(dist), rownames(mat), diag=diag, cnames=cnames)
+      ret <- upper_gather(
+        as.vector(dist),
+        rownames(mat),
+        diag=diag,
+        cnames=cnames,
+        na.rm = FALSE,
+        zero.rm = FALSE
+      )
     }else{
-      ret <- dist %>%  as.matrix() %>%  mat_to_df(cnames)
+      ret <- dist %>%  as.matrix() %>%  mat_to_df(
+        cnames,
+        na.rm = FALSE,
+        zero.rm = FALSE
+      )
       if(!diag){
         ret <- ret[ret[,1] != ret[,2],]
       }
