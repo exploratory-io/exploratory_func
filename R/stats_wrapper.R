@@ -98,7 +98,13 @@ do_cor.kv_ <- function(df,
     mat <- simple_cast(df, row, col, val, fun.aggregate=fun.aggregate, fill=fill, time_unit = time_unit)
     cor_mat <- cor(mat, use = use, method = method)
     if(distinct){
-      ret <- upper_gather(cor_mat, diag=diag, cnames=output_cols, na.rm = FALSE)
+      ret <- upper_gather(
+        cor_mat,
+        diag=diag,
+        cnames=output_cols,
+        na.rm = FALSE,
+        zero.rm = FALSE
+      )
     } else {
       ret <- mat_to_df(cor_mat, cnames=output_cols, diag=diag, na.rm = FALSE)
     }
