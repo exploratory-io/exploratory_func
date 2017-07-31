@@ -12,7 +12,6 @@ do_retention_cohort <- function(df, time, value, cohort, time_unit = "month", fu
 
   # this will be executed to each group
   each_func <- function(df, ...){
-    browser()
     ret <- df %>% rename_(.dots = list(.time = time_col, .value = value_col, .cohort = cohort_col))
     if (class(df[[cohort_col]]) %in% c("Date", "POSIXct")) { # floor cohort if it is time.
       ret <- ret %>% dplyr::mutate(.cohort =lubridate::floor_date(.cohort, unit = cohort_time_unit))
