@@ -1,7 +1,13 @@
-#' Run retention cohort analysis
-#' @param df Data frame to run bayes ab test
+#' Run timeseries cohort analysis
+#' @param df - Data frame to run bayes ab test
+#' @param time - time column
+#' @param value - value to aggregate
+#' @param cohort - value used to define cohort. if it is time, will be aggregated by cohort_time_unit.
+#' @param time_unit - time unit to aggregate
+#' @param fun.aggregate - aggregate function applied to values that falls under same cohort and period.
+#' @param cohort_time_unit time unit to aggregate cohort time value.
 #' @export
-do_retention_cohort <- function(df, time, value, cohort, time_unit = "month", fun.aggregate = n_distinct, cohort_time_unit = "month"){
+do_cohort <- function(df, time, value, cohort, time_unit = "month", fun.aggregate = n_distinct, cohort_time_unit = "month"){
   # this seems to be the new way of NSE column selection evaluation
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
   time_col <- dplyr::select_var(names(df), !! rlang::enquo(time))
