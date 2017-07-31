@@ -84,9 +84,6 @@ do_anomaly_detection_ <- function(
     anom <- tryCatch({
       AnomalyDetection::AnomalyDetectionTs(data, direction = direction, e_value = e_value, ...)$anoms
     }, error = function(e){
-      if(e$message == "Anom detection needs at least 2 periods worth of data") {
-        stop("Try smaller time unit or make sure there is enough data for each group.")
-      }
       # found a weired error by twitter data, so should be investigated later
       # filed an issue in https://github.com/exploratory-io/tam/issues/4935
     })
