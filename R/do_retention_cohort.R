@@ -1,47 +1,50 @@
-#' Run retention cohort analysis
-#' @param df Data frame to run bayes ab test
+#' Run timeseries cohort analysis
+#' @param df - Data frame to run bayes ab test
+#' @param time - time column
+#' @param value - value to aggregate
+#' @param cohort - value used to define cohort. if it is time, will be aggregated by cohort_time_unit.
+#' @param time_unit - time unit to aggregate
+#' @param fun.aggregate - aggregate function applied to values that falls under same cohort and period.
+#' @param cohort_time_unit time unit to aggregate cohort time value.
 #' @export
-do_retention_cohort <- function(df, timestamp, user_id, measure = NULL, time_unit = "month"){
+do_cohort <- function(df, time, value, cohort, time_unit = "month", fun.aggregate = n_distinct, cohort_time_unit = "month"){
   # this seems to be the new way of NSE column selection evaluation
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
-  timestamp_col <- dplyr::select_var(names(df), !! rlang::enquo(timestamp))
-  user_id_col <- dplyr::select_var(names(df), !! rlang::enquo(user_id))
-  # the way with rlang::enquo above cannot handle NULL well. using old way.
-  measure_col <- col_name(substitute(measure))
+  time_col <- dplyr::select_var(names(df), !! rlang::enquo(time))
+  value_col <- dplyr::select_var(names(df), !! rlang::enquo(value))
+  cohort_col <- dplyr::select_var(names(df), !! rlang::enquo(cohort))
 
   grouped_col <- grouped_by(df)
 
-  # this will be executed to each group
+  # this will be executed for each group
   each_func <- function(df, ...){
-    ret <- df %>% rename_(.dots = list(.timestamp = timestamp_col))
-    if (!is.null(measure_col)) { # note that accessing measure here throws error. has to be measure_col.
-      ret <- ret %>% rename_(.dots = list(.measure = measure_col))
+    # rename columns to temporary ones first and use familiar NSE dplyr functions.
+    ret <- df %>% rename_(.dots = list(.time = time_col, .value = value_col, .cohort = cohort_col))
+    if (class(df[[cohort_col]]) %in% c("Date", "POSIXct")) { # floor cohort if it is time.
+      ret <- ret %>% dplyr::mutate(.cohort =lubridate::floor_date(.cohort, unit = cohort_time_unit))
     }
-    ret <- ret %>% dplyr::mutate(.timestamp =lubridate::floor_date(.timestamp, unit = time_unit))
-    if (is.null(measure_col)) { # if measure is NULL, we are calculating retention. distinct user access for the time period now.
-      ret <- ret %>% dplyr::distinct_(".timestamp", user_id_col)
-    }
-    ret <- ret %>% dplyr::group_by_(user_id_col) %>%
-      mutate(.start_time = min(.timestamp)) %>%
+    ret <- ret %>% dplyr::mutate(.time =lubridate::floor_date(.time, unit = time_unit))
+    # obtain start time for each cohort
+    ret <- ret %>% dplyr::group_by(.cohort) %>%
+      mutate(.start_time = min(.time)) %>%
       ungroup()
-    ret <- ret %>% mutate(period = round(as.numeric(as.Date(.timestamp) - as.Date(.start_time))/switch(time_unit, day = 1, week = 7, month = (365.25/12), quarter = (365.25/4), year = 365.25)))
-    if (is.null(measure_col)) {
-      ret <- ret %>% group_by(.start_time, period) %>%
-        summarize(retained = n(), timestamp = first(.timestamp))
-      ret <- ret %>% group_by(.start_time) %>%
-        mutate(retained_pct = retained / first(retained) * 100) %>%
-        ungroup()
-    }
-    else {
-      ret <- ret %>% group_by(.start_time, period) %>%
-        summarize(value = sum(.measure), timestamp = first(.timestamp))
-      colnames(ret)[colnames(ret) == "value"] <- avoid_conflict(colnames(ret), measure_col)
-    }
-    ret <- ret %>% dplyr::rename(start_time = .start_time)
+    # calculate period. (0th period represents the first floored time a row from the cohort belongs to.)
+    # division and round is for "month" case where a month can vary from 28 to 31 days.
+    ret <- ret %>% mutate(period = round(as.numeric(as.Date(.time) - as.Date(.start_time))/switch(time_unit, day = 1, week = 7, month = (365.25/12), quarter = (365.25/4), year = 365.25)))
+    # aggregate value.
+    ret <- ret %>% group_by(.cohort, period) %>%
+      dplyr::summarise(.value = fun.aggregate(.value))
+    # sort for the first() function used next
+    ret <- ret %>% arrange(.cohort, period)
+    # calculate .value_pct. intended use is for retention ratio.
+    ret <- ret %>% group_by(.cohort) %>%
+      mutate(.value_pct = .value / first(.value) * 100) %>%
+      ungroup()
+
+    # rename temporary column names to final column names.
+    ret <- ret %>% dplyr::rename(cohort = .cohort, value = .value, value_pct = .value_pct)
     ret
   }
-
   ret <- do_on_each_group(df, each_func, params = substitute(list()))
   ret
 }
-
