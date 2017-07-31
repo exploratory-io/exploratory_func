@@ -193,7 +193,7 @@ tidy.bayesTest <- function(x, percentLift = 0, credInt = 0.9, type = "summary", 
     }
 
     ret <- data.frame(
-      variation = c("A", "B"),
+      group = c("A", "B"),
       ab_identifier = ab_identifier,
       total_population = each_len,
       converted = each_success,
@@ -208,7 +208,7 @@ tidy.bayesTest <- function(x, percentLift = 0, credInt = 0.9, type = "summary", 
 
     if (pretty.name) {
       map <- c(
-        variation = "Variation",
+        group = "Group",
         ab_identifier = "AB Identifier",
         total_population = "Total Population",
         converted = "Converted",
