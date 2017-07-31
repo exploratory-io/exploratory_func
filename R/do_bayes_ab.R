@@ -48,7 +48,9 @@ do_bayes_ab <- function(df, a_b_identifier, total_count, conversion_rate, prior_
     }
 
     # convert a_b_identifier_col from factor to logical
+    fct_lev <- NULL
     if (is.factor(df[[a_b_identifier_col]])) {
+      fct_lev <- levels(df[[a_b_identifier_col]])
       if (length(levels(df[[a_b_identifier_col]])) != 2) {
         stop("A/B must be 2 unique identifiers")
       }
@@ -93,6 +95,12 @@ do_bayes_ab <- function(df, a_b_identifier, total_count, conversion_rate, prior_
       n_samples = 1e5,
       distribution = 'bernoulli'
     )
+
+    # save factor levels if the AB identifier is 2 levels factor
+    if(!is.null(fct_lev)){
+      bayes_model$ab_identifier <- fct_lev
+    }
+
     bayes_model
   }
 
@@ -146,7 +154,7 @@ calc_beta_prior <- function(df, rate, ...){
 #' @param type Type of output
 #' This can be "summary", "prior", "posteriors" and "improvement"
 #' @export
-tidy.bayesTest <- function(x, percentLift = 0, credInt = 0.9, type = "summary", ...) {
+tidy.bayesTest <- function(x, percentLift = 0, credInt = 0.9, type = "summary", pretty.name = FALSE, ...) {
   if (type == "summary"){
     each_len <- c(length(x$inputs$A_data), length(x$inputs$B_data))
     each_success <- c(sum(x$inputs$A_data), sum(x$inputs$B_data))
@@ -162,10 +170,17 @@ tidy.bayesTest <- function(x, percentLift = 0, credInt = 0.9, type = "summary", 
       percentLift = rep(percentLift, length(x$posteriors)),
       credInt = rep(credInt, length(x$posteriors))
     )
-    data.frame(
-      variation = c("A variation", "B default"),
-      size = each_len,
-      success = each_success,
+
+    ab_identifier <- if(!is.null(x$ab_identifier) && length(x$ab_identifier) == 2){
+      x$ab_identifier
+    } else {
+      c("A variation", "B default")
+    }
+
+    ret <- data.frame(
+      ab_identifier = ab_identifier,
+      total_population = each_len,
+      converted = each_success,
       conversion_rate = each_mean,
       chance_of_being_better = c(s$probability[[1]], 1-s$probability[[1]]) ,
       expected_improvement_rate = c(expected_lift, NA_real_),
@@ -174,6 +189,24 @@ tidy.bayesTest <- function(x, percentLift = 0, credInt = 0.9, type = "summary", 
       expected_loss_rate = c(s$posteriorExpectedLoss$Probability, NA_real_),
       stringsAsFactors = FALSE
     )
+
+    if (pretty.name) {
+      map <- c(
+        ab_identifier = "AB Identifier",
+        total_population = "Total Population",
+        converted = "Converted",
+        conversion_rate = "Conversion Rate",
+        chance_of_being_better = "Chance of Being Better",
+        expected_improvement_rate = "Expected Improvement Rate",
+        credible_interval_low = "Credible Interval Low",
+        credible_interval_high = "Credible Interval High",
+        expected_loss_rate = "Expected Loss Rate"
+      )
+      colnames(ret) <- map[colnames(ret)]
+    }
+
+    ret
+
   } else if (type == "posteriors") {
     probability_a = x$posteriors$Probability$A_probs
     probability_b = x$posteriors$Probability$B_probs
