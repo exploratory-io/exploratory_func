@@ -15,24 +15,8 @@
 #' * improvement - Output coordinate of histogram of lift, which is the ratio of performance improvement of A over B. The formula is (A - B) / B.
 #' @param seed Random seed for bayes test to estimate probability density.
 #' @export
-do_bayes_ab <- function(df, a_b_identifier, total_count, conversion_rate, prior_mean = 0.5, prior_sd = 0.288675, type = "model", seed = 0, ...){
+do_bayes_ab <- function(df, a_b_identifier, total_count, conversion_rate, prior_mean = NULL, prior_sd = NULL, type = "model", seed = 0, ...){
   set.seed(seed)
-
-  if(prior_mean <= 0 || 1 <= prior_mean) {
-    stop("mean for prior must be between 0 and 1")
-  }
-
-  # calculate alpha and beta
-  # https://stats.stackexchange.com/questions/12232/calculating-the-parameters-of-a-beta-distribution-using-the-mean-and-variance
-  prior_var <- prior_sd^2
-  alpha <- ((1 - prior_mean) / prior_var - 1 / prior_mean) * prior_mean ^ 2
-  beta <- alpha * (1 / prior_mean - 1)
-
-  # validate alpha and beta
-  # when they are invalid, sd is too large
-  if (!(!is.na(alpha) && !is.na(beta) && alpha > 0 && beta > 0)){
-    stop("sd for prior is too large")
-  }
 
   # when type is prior, no need to evaluate other parameters
   if (type != "prior") {
@@ -54,7 +38,8 @@ do_bayes_ab <- function(df, a_b_identifier, total_count, conversion_rate, prior_
       if (length(levels(df[[a_b_identifier_col]])) != 2) {
         stop("A/B must be 2 unique identifiers")
       }
-      df[[a_b_identifier_col]] <- as.logical(as.integer(df[[a_b_identifier_col]]) - 1)
+      # first factor is group A, so TRUE and FALSE should be swapped
+      df[[a_b_identifier_col]] <- !as.logical(as.integer(df[[a_b_identifier_col]]) - 1)
     }
 
     if(any(df[[conversion_rate_col]] < 0 | df[[conversion_rate_col]] > 1)) {
@@ -66,6 +51,34 @@ do_bayes_ab <- function(df, a_b_identifier, total_count, conversion_rate, prior_
 
   # this will be executed to each group
   each_func <- function(df, ...){
+    group_prior_mean <- if(is.null(prior_mean)){
+      mean(df[[conversion_rate_col]], na.rm = TRUE)
+    } else {
+      prior_mean
+    }
+
+    group_prior_sd <- if(is.null(prior_sd)){
+      sd(df[[conversion_rate_col]], na.rm = TRUE)
+    } else {
+      prior_sd
+    }
+
+    if(group_prior_mean <= 0 || 1 <= group_prior_mean) {
+      stop("Average of CR must be between 0 and 1")
+    }
+
+    # calculate alpha and beta
+    # https://stats.stackexchange.com/questions/12232/calculating-the-parameters-of-a-beta-distribution-using-the-mean-and-variance
+    group_prior_var <- group_prior_sd^2
+    alpha <- ((1 - group_prior_mean) / group_prior_var - 1 / group_prior_mean) * group_prior_mean ^ 2
+    beta <- alpha * (1 / group_prior_mean - 1)
+
+    # validate alpha and beta
+    # when they are invalid, sd is too large
+    if (!(!is.na(alpha) && !is.na(beta) && alpha > 0 && beta > 0)){
+      stop("SD of CR is too large")
+    }
+
     if (type == "prior") {
       # this returns coordinates of density chart of prior
       return(data.frame(
@@ -99,6 +112,8 @@ do_bayes_ab <- function(df, a_b_identifier, total_count, conversion_rate, prior_
     # save factor levels if the AB identifier is 2 levels factor
     if(!is.null(fct_lev)){
       bayes_model$ab_identifier <- fct_lev
+    } else {
+      c(TRUE, FALSE)
     }
 
     bayes_model
@@ -174,10 +189,11 @@ tidy.bayesTest <- function(x, percentLift = 0, credInt = 0.9, type = "summary", 
     ab_identifier <- if(!is.null(x$ab_identifier) && length(x$ab_identifier) == 2){
       x$ab_identifier
     } else {
-      c("A variation", "B default")
+      c(TRUE, FALSE)
     }
 
     ret <- data.frame(
+      variation = c("A", "B"),
       ab_identifier = ab_identifier,
       total_population = each_len,
       converted = each_success,
@@ -192,6 +208,7 @@ tidy.bayesTest <- function(x, percentLift = 0, credInt = 0.9, type = "summary", 
 
     if (pretty.name) {
       map <- c(
+        variation = "Variation",
         ab_identifier = "AB Identifier",
         total_population = "Total Population",
         converted = "Converted",
@@ -219,15 +236,21 @@ tidy.bayesTest <- function(x, percentLift = 0, credInt = 0.9, type = "summary", 
     beta_b <- density(probability_b, n = 2048)
     indice_b <- beta_b$x > 0 & beta_b$x < 1
 
+    ab_identifier <- if(!is.null(x$ab_identifier) && length(x$ab_identifier) == 2){
+      x$ab_identifier
+    } else {
+      c("A", "B")
+    }
+
     a_data <- data.frame(
-      a_or_b = rep("A", sum(indice_a)),
+      ab_identifier = ab_identifier[[1]],
       conversion_rate_pct = beta_a$x[indice_a] * 100,
       probability_density = beta_a$y[indice_a],
       stringsAsFactors = FALSE
     )
 
     b_data <- data.frame(
-      a_or_b = rep("B",sum(indice_b)),
+      ab_identifier = ab_identifier[[2]],
       conversion_rate_pct = beta_b$x[indice_b] * 100,
       probability_density = beta_b$y[indice_b],
       stringsAsFactors = FALSE
