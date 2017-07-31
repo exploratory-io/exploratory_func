@@ -161,7 +161,7 @@ to_matrix <- function(df, select_dots, by_col=NULL, key_col=NULL, value_col=NULL
 
 #' Gather only right upper half of matrix - where row_num > col_num
 #' @export
-upper_gather <- function(mat, names=NULL, diag=NULL, cnames = c("Var1", "Var2", "value"), na.rm = TRUE, rm.zero = TRUE){
+upper_gather <- function(mat, names=NULL, diag=NULL, cnames = c("Var1", "Var2", "value"), na.rm = TRUE, zero.rm = TRUE){
   loadNamespace("Matrix")
   if(is.vector(mat)){
     # This is basically for dist function
@@ -188,7 +188,7 @@ upper_gather <- function(mat, names=NULL, diag=NULL, cnames = c("Var1", "Var2", 
       # fill diagonal elements
       trimat[row(trimat)==col(trimat)] = rep(diag, length(names))
     }
-    mat_to_df(t(trimat), na.rm=TRUE, cnames=cnames)
+    mat_to_df(t(trimat), na.rm=TRUE, cnames=cnames, zero.rm = zero.rm)
   }else{
     # diag can be NULL or FALSE
     if(is.null(diag)){
@@ -206,7 +206,7 @@ upper_gather <- function(mat, names=NULL, diag=NULL, cnames = c("Var1", "Var2", 
     }
     # get indice of matrix.
     # remove NA if na.rm is TRUE
-    ind_mat <- if(rm.zero){
+    ind_mat <- if(zero.rm){
       tmat != 0
     } else {
       tmat
@@ -277,9 +277,13 @@ grouped_by <- function(df){
 
 #' matrix to dataframe with gathered form
 #' @export
-mat_to_df <- function(mat, cnames=NULL, na.rm=TRUE, diag=TRUE){
+mat_to_df <- function(mat, cnames=NULL, na.rm=TRUE, zero.rm = TRUE, diag=TRUE){
   loadNamespace("reshape2")
   df <- reshape2::melt(t(mat), na.rm=na.rm)
+
+  if(zero.rm){
+    df <- df[is.na(df[[3]]) | df[[3]] != 0, ]
+  }
 
   if(!diag){
     df <- df[df[[1]]!=df[[2]],]
