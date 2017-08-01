@@ -32,7 +32,7 @@ do_cohort <- function(df, time, value, cohort, time_unit = "month", fun.aggregat
     ret <- ret %>% mutate(period = round(as.numeric(as.Date(.time) - as.Date(.start_time))/switch(time_unit, day = 1, week = 7, month = (365.25/12), quarter = (365.25/4), year = 365.25)))
     # aggregate value.
     ret <- ret %>% group_by(.cohort, period) %>%
-      dplyr::summarise(.value = fun.aggregate(.value))
+      dplyr::summarise(.value = fun.aggregate(.value), .time = first(.time))
     # sort for the first() function used next
     ret <- ret %>% arrange(.cohort, period)
     # calculate .value_pct. intended use is for retention ratio.
@@ -41,7 +41,7 @@ do_cohort <- function(df, time, value, cohort, time_unit = "month", fun.aggregat
       ungroup()
 
     # rename temporary column names to final column names.
-    ret <- ret %>% dplyr::rename(cohort = .cohort, value = .value, value_pct = .value_pct)
+    ret <- ret %>% dplyr::rename(time = .time, cohort = .cohort, value = .value, value_pct = .value_pct)
     ret
   }
   ret <- do_on_each_group(df, each_func, params = substitute(list()))
