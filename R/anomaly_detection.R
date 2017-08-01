@@ -17,9 +17,27 @@ do_anomaly_detection <- function(df, time, value = NULL, ...){
 #' @param longterm Increase anom detection efficacy for time series that are greater than a month.
 #' This automatically becomes TRUE if the data is longer than 30 days.
 #' @param e_value Whether expected values should be returned.
+#' @param na_fill_type - Type of NA fill:
+#'                       "spline" - Spline interpolation.
+#'                       "interpolate" - Linear interpolation.
+#'                       "previous" - Fill with last previous non-NA value.
+#'                       "value" - Fill with the value of na_fill_value.
+#'                       NULL - Skip NA fill. Use this only when you know there is no NA.
+#' @param na_fill_value - Value to fill NA when na_fill_type is "value"
 #' @param ... extra values to be passed to AnomalyDetection::AnomalyDetectionTs.
 #' @export
-do_anomaly_detection_ <- function(df, time_col, value_col = NULL, time_unit = "day", fun.aggregate = sum, direction="both", e_value=TRUE, longterm = NULL, ...){
+do_anomaly_detection_ <- function(
+  df,
+  time_col,
+  value_col = NULL,
+  time_unit = "day",
+  fun.aggregate = sum,
+  direction="both",
+  e_value=TRUE,
+  longterm = NULL,
+  na_fill_type = "value",
+  na_fill_value = 0,
+  ...){
   validate_empty_data(df)
 
   loadNamespace("dplyr")
@@ -66,9 +84,6 @@ do_anomaly_detection_ <- function(df, time_col, value_col = NULL, time_unit = "d
     anom <- tryCatch({
       AnomalyDetection::AnomalyDetectionTs(data, direction = direction, e_value = e_value, ...)$anoms
     }, error = function(e){
-      if(e$message == "Anom detection needs at least 2 periods worth of data") {
-        stop("Try smaller time unit or make sure there is enough data for each group.")
-      }
       # found a weired error by twitter data, so should be investigated later
       # filed an issue in https://github.com/exploratory-io/tam/issues/4935
     })
@@ -119,6 +134,62 @@ do_anomaly_detection_ <- function(df, time_col, value_col = NULL, time_unit = "d
         dplyr::group_by(time) %>%
         dplyr::summarise(count = n())
     }
+
+    # complete the date time with NA
+    aggregated_data <- if(inherits(aggregated_data$time, "Date")){
+      aggregated_data %>%
+        tidyr::complete(time = seq.Date(min(time), max(time), by = time_unit))
+    } else if(inherits(aggregated_data$time, "POSIXct")) {
+      aggregated_data %>%
+        tidyr::complete(time = seq.POSIXt(min(time), max(time), by = time_unit))
+    } else {
+      stop("time must be Date or POSIXct.")
+    }
+
+    # fill na with zoo
+
+    # keep time_col column, since we will drop it in the next step,
+    # but will need it to compose zoo object.
+    time_points_vec <- aggregated_data[["time"]]
+
+    # drop time_col.
+    input_df <- aggregated_data[, colnames(aggregated_data) != "time"]
+
+    df_zoo <- zoo::zoo(input_df, time_points_vec)
+    # fill NAs in the input
+    # when some date or time are missing,
+    # AnomalyDetection::AnomalyDetectionTs throws this error
+    # "Anom detection needs at least 2 periods worth of data"
+    if (na_fill_type == "spline") {
+      df_zoo <- zoo::na.spline(df_zoo)
+    }
+    else if (na_fill_type == "interpolate") {
+      df_zoo <- zoo::na.approx(df_zoo)
+    }
+    else if (na_fill_type == "previous") {
+      df_zoo <- zoo::na.locf(df_zoo)
+    }
+    # TODO: Getting this error with some input with na.StructTS().
+    #       Error in rowSums(tsSmooth(StructTS(y))[, -2]) : 'x' must be an array of at least two dimensions
+    #
+    # else if (na_fill_type == "StructTS") {
+    #   df_zoo <- zoo::na.StructTS(df_zoo)
+    # }
+    else if (na_fill_type == "value") {
+      df_zoo <- zoo::na.fill(df_zoo, na_fill_value)
+    }
+    else if (is.null(na_fill_type)) {
+      # skip when it is NULL. this is for the case caller is confident that
+      # there is no NA and want to skip overhead of checking for NA.
+    }
+    else {
+      stop(paste0(na_fill_type, " is not a valid na_fill_type option."))
+    }
+    aggregated_data <- df_zoo %>%
+      as.data.frame() %>%
+      dplyr::mutate(time = index(df_zoo)) %>%
+      # bring time column first
+      dplyr::select(time, everything())
 
     if (is.null(longterm)){
       # set longterm to TRUE if the data range is
