@@ -1124,7 +1124,7 @@ validate_empty_data <- function(df) {
 #' @param func Function to execute
 #' @param params Parameters for func
 #' @export
-do_on_each_group <- function(df, func, params = list(), name = "tmp", with_unnest = TRUE){
+do_on_each_group <- function(df, func, params = quote(list()), name = "tmp", with_unnest = TRUE){
   name <- avoid_conflict(colnames(df), name)
   # This is a list of arguments in do clause
   args <- append(list(quote(.)), rlang::lang_args(params))

@@ -1,6 +1,27 @@
 context("test tidiers for randomForest")
 
 test_that("test randomForest with binary classification", {
+  set.seed(0)
+  nrow <- 100
+  test_data <- data.frame(
+    target = c(NA_character_, sample(letters[1:4], nrow-2, replace = TRUE), NA_character_),
+    cat_10 = sample(c(letters[1:10], NA_character_), nrow, replace = TRUE),
+    cat_25 = sample(letters[1:25], nrow, replace = TRUE),
+    num_1 = runif(nrow),
+    num_2 = runif(nrow)
+  ) %>%
+    rename(`Tar get` = "target") # check if colname with space works
+  ret <- calc_feature_imp(test_data,
+                          `Tar get`,
+                          dplyr::starts_with("cat_"),
+                          num_1,
+                          num_2)
+
+  conf_mat <- tidy(ret, model, type = "conf_mat", pretty.name = TRUE)
+
+})
+
+test_that("test randomForest with binary classification", {
   test_data <- structure(
     list(
       CANCELLED = c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0),

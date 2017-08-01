@@ -195,7 +195,7 @@ tidy.randomForest <- function(x, ...) {
 tidy.randomForest.formula <- tidy.randomForest
 
 #' tidy for randomForest model
-#' @param type "importance" or "evaluation". Feature importance or evaluated scores of training data.
+#' @param type "importance", "evaluation" or "conf_mat". Feature importance, evaluated scores or confusion matrix of training data.
 #' @export
 tidy.randomForest.classification <- function(x, pretty.name = FALSE, type = "importance", ...) {
   if (type == "importance") {
@@ -253,20 +253,35 @@ tidy.randomForest.classification <- function(x, pretty.name = FALSE, type = "imp
     }
   } else if (type == "evaluation") {
     # get evaluation scores from training data
-
     actual <- x[["y"]]
     predicted <- x[["predicted"]]
 
     per_level <- function(class) {
-      tp <- sum(actual == class & predicted == class)
-      tn <- sum(actual != class & predicted != class)
-      fp <- sum(actual != class & predicted == class)
-      fn <- sum(actual == class & predicted != class)
+      tp <- sum(actual == class & predicted == class, na.rm = TRUE)
+      tn <- sum(actual != class & predicted != class, na.rm = TRUE)
+      fp <- sum(actual != class & predicted == class, na.rm = TRUE)
+      fn <- sum(actual == class & predicted != class, na.rm = TRUE)
 
       precision <- tp / (tp + fp)
+      # this avoids NA
+      if(tp+fp == 0) {
+        precision <- 0
+      }
+
       recall <- tp / (tp + fn)
+      # this avoids NA
+      if(tn+fn == 0) {
+        recall <- 0
+      }
+
       accuracy <- (tp + tn) / (tp + fp + tn + fn)
+
       f_score <- 2 * ((precision * recall) / (precision + recall))
+      # this avoids NA
+      if(precision + recall == 0) {
+        f_score <- 0
+      }
+
       data_size <- sum(actual == class)
 
       ret <- data.frame(
@@ -295,6 +310,16 @@ tidy.randomForest.classification <- function(x, pretty.name = FALSE, type = "imp
     } else {
       dplyr::bind_rows(lapply(levels(actual), per_level))
     }
+  } else if (type == "conf_mat") {
+    ret <- data.frame(
+      actual_value = x$y,
+      predicted_value = x$predicted
+    ) %>%
+      dplyr::filter(!is.na(predicted_value)) %>%
+      dplyr::group_by(actual_value, predicted_value) %>%
+      dplyr::summarize(count = n())
+
+    ret
   }
 }
 
@@ -664,4 +689,84 @@ rf_importance <- function(data, ...) {
 #' @export
 rf_evaluation <- function(data, ...) {
   tidy(data, model, type = "evaluation", ...)
+}
+
+#' get feature importance for multi class classification using randomForest
+#' @export
+calc_feature_imp <- function(df,
+                             target,
+                             ...,
+                             max_nrow = 100000,
+                             samplesize = 100,
+                             ntree = 20,
+                             nodesize = 12,
+                             target_n = 10,
+                             predictor_n = 6){
+  # this seems to be the new way of NSE column selection evaluation
+  # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
+  target_col <- dplyr::select_var(names(df), !! rlang::enquo(target))
+  # this evaluates select arguments like starts_with
+  cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
+
+  # randomForest fails if columns are not clean
+  clean_df <- janitor::clean_names(df)
+  # this mapping will be used to restore column names
+  name_map <- colnames(clean_df)
+  names(name_map) <- colnames(df)
+
+  clean_target_col <- name_map[target_col]
+  clean_cols <- name_map[cols]
+
+  # remove NA because it's not permitted for randomForest
+  clean_df <- clean_df %>%
+    dplyr::filter(!is.na(!!clean_target_col))
+
+  # limit the number of levels in factor by fct_lump
+  clean_df[[clean_target_col]] <- forcats::fct_lump(
+    as.factor(clean_df[[clean_target_col]]), n = target_n
+  )
+
+  # build formula for randomForest
+  rhs <- paste0("`", clean_cols, "`", collapse = " + ")
+  fml <- as.formula(paste(clean_target_col, " ~ ", rhs))
+
+  for (clean_col in clean_cols) {
+    # remove NA from predictor columns
+    clean_df <- clean_df %>%
+      dplyr::filter(!is.na(!!clean_col))
+
+    if(!is.numeric(clean_df[[clean_col]]) && !is.logical(clean_df[[clean_col]])) {
+      # convert data to factor if predictors are not numeric or logical
+      # and limit the number of levels in factor by fct_lump
+      clean_df[[clean_col]] <- forcats::fct_lump(as.factor(clean_df[[clean_col]]), n=predictor_n)
+    }
+  }
+
+  each_func <- function(df) {
+
+    # sample the data because randomForest takes long time
+    # if data size is too large
+    if (nrow(df) > max_nrow) {
+      df <- df %>%
+        dplyr::sample_n(max_nrow)
+    }
+
+
+    rf <- randomForest::randomForest(
+      fml,
+      data = df,
+      importance = FALSE,
+      samplesize = samplesize,
+      nodesize=nodesize,
+      ntree = ntree,
+      na.action = na.omit
+    )
+    # these attributes are used in tidy of randomForest
+    rf$classification_type <- "multi"
+    rf$terms_mapping <- names(name_map)
+    names(rf$terms_mapping) <- name_map
+    rf
+  }
+
+  do_on_each_group(clean_df, each_func, name = "model", with_unnest = FALSE)
 }
