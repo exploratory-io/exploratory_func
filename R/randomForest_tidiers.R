@@ -311,22 +311,13 @@ tidy.randomForest.classification <- function(x, pretty.name = FALSE, type = "imp
       dplyr::bind_rows(lapply(levels(actual), per_level))
     }
   } else if (type == "conf_mat") {
-    ret <- as.data.frame.matrix(
-      table(
-        x$y,
-        x$predicted
-      )
+    ret <- data.frame(
+      actual_value = x$y,
+      predicted_value = x$predicted
     ) %>%
-      tibble::rownames_to_column("actual_value")
-
-    if(pretty.name){
-      map <- c(
-        `Actual Value` = "actual_value"
-      )
-
-      ret <- ret %>%
-        dplyr::rename(!!!map)
-    }
+      dplyr::filter(!is.na(predicted_value)) %>%
+      dplyr::group_by(actual_value, predicted_value) %>%
+      dplyr::summarize(count = n())
 
     ret
   }
@@ -702,7 +693,15 @@ rf_evaluation <- function(data, ...) {
 
 #' get feature importance for multi class classification using randomForest
 #' @export
-calc_feature_imp <- function(df, target, ..., max_nrow = 100000, samplesize = 100, ntree = 20, nodesize = 12, target_n = 10, predictor_n = 6){
+calc_feature_imp <- function(df,
+                             target,
+                             ...,
+                             max_nrow = 100000,
+                             samplesize = 100,
+                             ntree = 20,
+                             nodesize = 12,
+                             target_n = 10,
+                             predictor_n = 6){
   # this seems to be the new way of NSE column selection evaluation
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
   target_col <- dplyr::select_var(names(df), !! rlang::enquo(target))
