@@ -253,20 +253,35 @@ tidy.randomForest.classification <- function(x, pretty.name = FALSE, type = "imp
     }
   } else if (type == "evaluation") {
     # get evaluation scores from training data
-
     actual <- x[["y"]]
     predicted <- x[["predicted"]]
 
     per_level <- function(class) {
-      tp <- sum(actual == class & predicted == class)
-      tn <- sum(actual != class & predicted != class)
-      fp <- sum(actual != class & predicted == class)
-      fn <- sum(actual == class & predicted != class)
+      tp <- sum(actual == class & predicted == class, na.rm = TRUE)
+      tn <- sum(actual != class & predicted != class, na.rm = TRUE)
+      fp <- sum(actual != class & predicted == class, na.rm = TRUE)
+      fn <- sum(actual == class & predicted != class, na.rm = TRUE)
 
       precision <- tp / (tp + fp)
+      # this avoids NA
+      if(tp+fp == 0) {
+        precision <- 0
+      }
+
       recall <- tp / (tp + fn)
+      # this avoids NA
+      if(tn+fn == 0) {
+        recall <- 0
+      }
+
       accuracy <- (tp + tn) / (tp + fp + tn + fn)
+
       f_score <- 2 * ((precision * recall) / (precision + recall))
+      # this avoids NA
+      if(precision + recall == 0) {
+        f_score <- 0
+      }
+
       data_size <- sum(actual == class)
 
       ret <- data.frame(
