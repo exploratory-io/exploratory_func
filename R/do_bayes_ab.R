@@ -225,6 +225,12 @@ tidy.bayesTest <- function(x, percentLift = 0, credInt = 0.9, type = "summary", 
     ret
 
   } else if (type == "posteriors") {
+    s <- summary(x)
+    level <- if(s$probability[[1]] > 0.5) {
+      c("A", "B")
+    } else {
+      c("B", "A")
+    }
     probability_a = x$posteriors$Probability$A_probs
     probability_b = x$posteriors$Probability$B_probs
 
@@ -243,19 +249,20 @@ tidy.bayesTest <- function(x, percentLift = 0, credInt = 0.9, type = "summary", 
     }
 
     a_data <- data.frame(
-      ab_identifier = ab_identifier[[1]],
+      ab_identifier = rep("A", length(indice_a)),
       conversion_rate_pct = beta_a$x[indice_a] * 100,
       probability_density = beta_a$y[indice_a],
       stringsAsFactors = FALSE
     )
 
     b_data <- data.frame(
-      ab_identifier = ab_identifier[[2]],
+      ab_identifier = rep("B", length(indice_a)),
       conversion_rate_pct = beta_b$x[indice_b] * 100,
       probability_density = beta_b$y[indice_b],
       stringsAsFactors = FALSE
     )
-    dplyr::bind_rows(a_data, b_data)
+    dplyr::bind_rows(a_data, b_data) %>%
+      mutate(ab_identifier = factor(ab_identifier, levels = level))
   } else if (type == "improvement") {
     # estimation of (A - B) / B
     lift <- (x$posteriors$Probability$A_probs -x$posteriors$Probability$B_probs)/ x$posteriors$Probability$B_probs
@@ -268,7 +275,7 @@ tidy.bayesTest <- function(x, percentLift = 0, credInt = 0.9, type = "summary", 
     data.frame(
       improvement_rate_pct = lift_hist$mids * 100,
       probability_pct = lift_hist$counts/x$inputs$n_samples * 100, # devide by x$inputs$n_samples to make total of bars 1
-      chance_of_being_better = factor(ifelse(lift_hist$mids >= 0, "positive", "negative"), levels = c("positive", "negative")),
+      chance_of_being_better = factor(ifelse(lift_hist$mids >= 0, "A is better", "A is not better"), levels = c("A is better", "A is not better")),
       stringsAsFactors = FALSE
     )
   } else if (type == "prior") {
