@@ -225,12 +225,6 @@ tidy.bayesTest <- function(x, percentLift = 0, credInt = 0.9, type = "summary", 
     ret
 
   } else if (type == "posteriors") {
-    s <- summary(x)
-    level <- if(s$probability[[1]] > 0.5) {
-      c("A", "B")
-    } else {
-      c("B", "A")
-    }
     probability_a = x$posteriors$Probability$A_probs
     probability_b = x$posteriors$Probability$B_probs
 
@@ -241,12 +235,6 @@ tidy.bayesTest <- function(x, percentLift = 0, credInt = 0.9, type = "summary", 
 
     beta_b <- density(probability_b, n = 2048)
     indice_b <- beta_b$x > 0 & beta_b$x < 1
-
-    ab_identifier <- if(!is.null(x$ab_identifier) && length(x$ab_identifier) == 2){
-      x$ab_identifier
-    } else {
-      c("A", "B")
-    }
 
     a_data <- data.frame(
       ab_identifier = rep("A", length(indice_a)),
@@ -261,6 +249,14 @@ tidy.bayesTest <- function(x, percentLift = 0, credInt = 0.9, type = "summary", 
       probability_density = beta_b$y[indice_b],
       stringsAsFactors = FALSE
     )
+    # set factor levels so that better group
+    # will come to the first level of output
+    s <- summary(x)
+    level <- if(s$probability[[1]] > 0.5) {
+      c("A", "B")
+    } else {
+      c("B", "A")
+    }
     dplyr::bind_rows(a_data, b_data) %>%
       mutate(ab_identifier = factor(ab_identifier, levels = level))
   } else if (type == "improvement") {
