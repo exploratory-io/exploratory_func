@@ -744,7 +744,9 @@ calc_feature_imp <- function(df,
   # to avoid error that grouping column
   # is not found
   if(length(grouped_cols) > 0) {
-    group_cols <- as.list(name_map[grouped_cols])
+    # need as.symbol so that double quotations won't be
+    # recognized as a part of column names
+    group_cols <- lapply(name_map[grouped_cols], as.symbol)
     names(group_cols) <- NULL
     clean_df <- clean_df %>%
       dplyr::group_by(!!!group_cols)
