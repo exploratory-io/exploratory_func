@@ -237,14 +237,14 @@ tidy.bayesTest <- function(x, percentLift = 0, credInt = 0.9, type = "summary", 
     indice_b <- beta_b$x > 0 & beta_b$x < 1
 
     a_data <- data.frame(
-      ab_identifier = rep("A", length(indice_a)),
+      ab_identifier = "A",
       conversion_rate_pct = beta_a$x[indice_a] * 100,
       probability_density = beta_a$y[indice_a],
       stringsAsFactors = FALSE
     )
 
     b_data <- data.frame(
-      ab_identifier = rep("B", length(indice_a)),
+      ab_identifier = "B",
       conversion_rate_pct = beta_b$x[indice_b] * 100,
       probability_density = beta_b$y[indice_b],
       stringsAsFactors = FALSE
