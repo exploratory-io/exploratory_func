@@ -699,8 +699,9 @@ model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
   if ("coxph" %in% class(df$model[[1]])) {
     ret <- ret %>% dplyr::mutate(
       hazard_ratio = exp(estimate),
-      # remove column names
-      # in categorical variables from term
+      # remove original column names
+      # in categorical predictor variables
+      # from term like countryJapan -> Japan
       term = stringr::str_replace(
         term,
         paste0(
