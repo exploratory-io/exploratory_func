@@ -697,7 +697,18 @@ model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
     }
   }
   if ("coxph" %in% class(df$model[[1]])) {
-    ret <- ret %>% dplyr::mutate(hazard_ratio = exp(estimate))
+    ret <- ret %>% dplyr::mutate(
+      hazard_ratio = exp(estimate),
+      # remove column names
+      # in categorical variables from term
+      term = stringr::str_replace(
+        term,
+        paste0(
+          "^",
+          all.vars(df$model[[1]]$term),
+          collapse = "|"
+        ), "")
+    )
   }
   if ("multinom" %in% class(df$model[[1]])) {
     # estimate should be odds_ratio and logarithm of estimate should be new estimate
