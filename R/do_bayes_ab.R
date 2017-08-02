@@ -236,26 +236,30 @@ tidy.bayesTest <- function(x, percentLift = 0, credInt = 0.9, type = "summary", 
     beta_b <- density(probability_b, n = 2048)
     indice_b <- beta_b$x > 0 & beta_b$x < 1
 
-    ab_identifier <- if(!is.null(x$ab_identifier) && length(x$ab_identifier) == 2){
-      x$ab_identifier
-    } else {
-      c("A", "B")
-    }
-
     a_data <- data.frame(
-      ab_identifier = ab_identifier[[1]],
+      ab_identifier = "A",
       conversion_rate_pct = beta_a$x[indice_a] * 100,
       probability_density = beta_a$y[indice_a],
       stringsAsFactors = FALSE
     )
 
     b_data <- data.frame(
-      ab_identifier = ab_identifier[[2]],
+      ab_identifier = "B",
       conversion_rate_pct = beta_b$x[indice_b] * 100,
       probability_density = beta_b$y[indice_b],
       stringsAsFactors = FALSE
     )
-    dplyr::bind_rows(a_data, b_data)
+    # set factor levels so that better group
+    # will come to the first level of output.
+    # This is needed for showing better chart
+    s <- summary(x)
+    level <- if(s$probability[[1]] > 0.5) {
+      c("A", "B")
+    } else {
+      c("B", "A")
+    }
+    dplyr::bind_rows(a_data, b_data) %>%
+      mutate(ab_identifier = factor(ab_identifier, levels = level))
   } else if (type == "improvement") {
     # estimation of (A - B) / B
     lift <- (x$posteriors$Probability$A_probs -x$posteriors$Probability$B_probs)/ x$posteriors$Probability$B_probs
@@ -268,7 +272,7 @@ tidy.bayesTest <- function(x, percentLift = 0, credInt = 0.9, type = "summary", 
     data.frame(
       improvement_rate_pct = lift_hist$mids * 100,
       probability_pct = lift_hist$counts/x$inputs$n_samples * 100, # devide by x$inputs$n_samples to make total of bars 1
-      chance_of_being_better = factor(ifelse(lift_hist$mids >= 0, "positive", "negative"), levels = c("positive", "negative")),
+      chance_of_being_better = factor(ifelse(lift_hist$mids >= 0, "A is better", "A is not better"), levels = c("A is better", "A is not better")),
       stringsAsFactors = FALSE
     )
   } else if (type == "prior") {
