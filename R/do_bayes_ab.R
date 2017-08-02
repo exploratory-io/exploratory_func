@@ -249,17 +249,8 @@ tidy.bayesTest <- function(x, percentLift = 0, credInt = 0.9, type = "summary", 
       probability_density = beta_b$y[indice_b],
       stringsAsFactors = FALSE
     )
-    # set factor levels so that better group
-    # will come to the first level of output.
-    # This is needed for showing better chart
-    s <- summary(x)
-    level <- if(s$probability[[1]] > 0.5) {
-      c("A", "B")
-    } else {
-      c("B", "A")
-    }
-    dplyr::bind_rows(a_data, b_data) %>%
-      mutate(ab_identifier = factor(ab_identifier, levels = level))
+
+    dplyr::bind_rows(a_data, b_data)
   } else if (type == "improvement") {
     # estimation of (A - B) / B
     lift <- (x$posteriors$Probability$A_probs -x$posteriors$Probability$B_probs)/ x$posteriors$Probability$B_probs
