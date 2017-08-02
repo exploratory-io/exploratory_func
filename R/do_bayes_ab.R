@@ -250,7 +250,8 @@ tidy.bayesTest <- function(x, percentLift = 0, credInt = 0.9, type = "summary", 
       stringsAsFactors = FALSE
     )
     # set factor levels so that better group
-    # will come to the first level of output
+    # will come to the first level of output.
+    # This is needed for showing better chart
     s <- summary(x)
     level <- if(s$probability[[1]] > 0.5) {
       c("A", "B")
