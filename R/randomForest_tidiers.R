@@ -740,9 +740,11 @@ calc_feature_imp <- function(df,
     as.factor(clean_df[[clean_target_col]]), n = target_n
   )
 
-  # regroup data with clean names
-  # to avoid error that grouping column
-  # is not found
+  # clean_names changes column names
+  # without chaning grouping column name
+  # information in the data frame,
+  # so it causes an error.
+  # To prevent it, regroup data with clean names
   if(length(grouped_cols) > 0) {
     # need as.symbol so that double quotations won't be
     # recognized as a part of column names
