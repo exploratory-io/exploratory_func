@@ -710,6 +710,10 @@ calc_feature_imp <- function(df,
 
   grouped_cols <- grouped_by(df)
 
+  if (any(c(target_col, cols) %in% grouped_cols)) {
+    stop("grouping column is used as variable columns")
+  }
+
   # remove NA because it's not permitted for randomForest
   df <- df %>%
     dplyr::filter(!is.na(!!target_col))
@@ -732,6 +736,12 @@ calc_feature_imp <- function(df,
   name_map <- colnames(clean_df)
   names(name_map) <- colnames(df)
 
+  # grouping column should be original column
+  # so the value of grouping columns
+  # should be still the names of grouping columns
+  name_map[grouped_cols] <- grouped_cols
+  colnames(clean_df) <- name_map
+
   clean_target_col <- name_map[target_col]
   clean_cols <- name_map[cols]
 
@@ -739,20 +749,6 @@ calc_feature_imp <- function(df,
   clean_df[[clean_target_col]] <- forcats::fct_lump(
     as.factor(clean_df[[clean_target_col]]), n = target_n
   )
-
-  # clean_names changes column names
-  # without chaning grouping column name
-  # information in the data frame,
-  # so it causes an error.
-  # To prevent it, regroup data with clean names
-  if(length(grouped_cols) > 0) {
-    # need as.symbol so that double quotations won't be
-    # recognized as a part of column names
-    group_cols <- lapply(name_map[grouped_cols], as.symbol)
-    names(group_cols) <- NULL
-    clean_df <- clean_df %>%
-      dplyr::group_by(!!!group_cols)
-  }
 
   # build formula for randomForest
   rhs <- paste0("`", clean_cols, "`", collapse = " + ")
