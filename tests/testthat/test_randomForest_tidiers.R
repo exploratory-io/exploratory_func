@@ -1,6 +1,13 @@
 context("test tidiers for randomForest")
 
 test_that("test randomForest with binary classification", {
+
+  test_d <- exploratory::read_delim_file("/Users/yasudayousuke/Documents/job/oracle_visualiezer/exploratory/src/test/123flight.csv" , ",", quote = "\"", skip = 0 , col_names = TRUE , na = c("","NA") , locale=readr::locale(encoding = "UTF-8", decimal_mark = "."), trim_ws = FALSE , progress = FALSE) %>% exploratory::clean_data_frame()
+
+  ret <- test_d %>%
+    dplyr::group_by(`ORIGIN_STATE_ABR`) %>%
+    calc_feature_imp(`CARRIER`, `FL_NUM`, `ORIGIN`, `DEST`)
+
   set.seed(0)
   nrow <- 100
   test_data <- data.frame(
@@ -8,14 +15,17 @@ test_that("test randomForest with binary classification", {
     cat_10 = sample(c(letters[1:10], NA_character_), nrow, replace = TRUE),
     cat_25 = sample(letters[1:25], nrow, replace = TRUE),
     num_1 = runif(nrow),
-    num_2 = runif(nrow)
+    num_2 = runif(nrow),
+    Group = rbinom(nrow, 2, 0.5)
   ) %>%
     rename(`Tar get` = "target") # check if colname with space works
-  ret <- calc_feature_imp(test_data,
-                          `Tar get`,
-                          dplyr::starts_with("cat_"),
-                          num_1,
-                          num_2)
+
+  ret <- test_data %>%
+    dplyr::group_by(Group) %>%
+    calc_feature_imp(`Tar get`,
+                      dplyr::starts_with("cat_"),
+                      num_1,
+                      num_2)
 
   conf_mat <- tidy(ret, model, type = "conf_mat", pretty.name = TRUE)
 
