@@ -13,6 +13,16 @@ do_cohort <- function(df, time, value, cohort, time_unit = "month", fun.aggregat
   value_col <- dplyr::select_var(names(df), !! rlang::enquo(value))
   cohort_col <- dplyr::select_var(names(df), !! rlang::enquo(cohort))
 
+  if (cohort_col == time_col) {
+    stop("cohort column must be different from time column.")
+  }
+  if (cohort_col == value_col) {
+    stop("cohort column must be different from measure column.")
+  }
+  if (value_col == time_col) {
+    stop("measure column must be different from time column.")
+  }
+
   grouped_col <- grouped_by(df)
 
   # this will be executed for each group
