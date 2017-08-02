@@ -736,7 +736,10 @@ calc_feature_imp <- function(df,
   name_map <- colnames(clean_df)
   names(name_map) <- colnames(df)
 
-  # grouping column should be original column
+  # clean_names changes column names
+  # without chaning grouping column name
+  # information in the data frame
+  # and it causes an error,
   # so the value of grouping columns
   # should be still the names of grouping columns
   name_map[grouped_cols] <- grouped_cols
