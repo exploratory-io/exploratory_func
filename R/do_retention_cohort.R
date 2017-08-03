@@ -28,7 +28,11 @@ do_cohort <- function(df, time, value, cohort, time_unit = "month", fun.aggregat
   # this will be executed for each group
   each_func <- function(df, ...){
     # rename columns to temporary ones first and use familiar NSE dplyr functions.
-    ret <- df %>% rename_(.dots = list(.time = time_col, .value = value_col, .cohort = cohort_col))
+    # since rename_ throws error with column name with space, we use regular R approach with colnames().
+    ret <- df
+    colnames(ret)[colnames(ret) == time_col] <- ".time"
+    colnames(ret)[colnames(ret) == value_col] <- ".value"
+    colnames(ret)[colnames(ret) == cohort_col] <- ".cohort"
     if (class(df[[cohort_col]]) %in% c("Date", "POSIXct")) { # floor cohort if it is time.
       ret <- ret %>% dplyr::mutate(.cohort =lubridate::floor_date(.cohort, unit = time_unit))
     }
