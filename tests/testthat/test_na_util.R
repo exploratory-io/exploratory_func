@@ -1,5 +1,16 @@
 context("test na_util")
 
+test_that("test impute_na with factor", {
+  input <- factor(c(letters[1:5], NA_character_, letters[1:5], NA_character_))
+
+  ret1 <- impute_na(input, type = "value", val = "new")
+  expect_equal(ret1, as.factor(c(letters[1:5], "new", letters[1:5], "new")))
+
+  ret2 <- impute_na(input, type = "value", val = letters[seq(length(input))])
+  expect_equal(ret2, as.factor(c(letters[1:5], letters[6], letters[1:5], letters[12])))
+
+})
+
 test_that("test impute_na", {
   test_data <- data.frame(
     rep(c(NA, NA, seq(7), NA), 10),

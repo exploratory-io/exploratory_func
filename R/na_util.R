@@ -47,10 +47,26 @@ impute_na <- function(target, type = mean, val = 0, ...) {
     }, value = {
       if(length(val) == 1){
         # if val is length 1, na is filled with the value
+        if(is.factor(target)) {
+          # if target is factor, val should be added as target level
+          # otherwise, it doesn't replace NA
+          levels(target) <- c(levels(target), val)
+        }
         target[is.na(target)] <- val
       } else {
         # if val is not length 1,
         # NA in target is replaced with the value in the same position
+        if(is.factor(target)){
+          # if target is factor, val should be added as target level
+          # otherwise, it doesn't replace NA
+
+          # get val only where target is NA not to get unnecessary level
+          needed_val <- dplyr::if_else(is.na(target), as.character(val), NA_character_)
+          # update target level so that it can accept the value to be replaced
+          levels(target) <- c(levels(target), needed_val)
+          # update val level so that it will be the same level with target's
+          val <- factor(needed_val, levels = levels(target))
+        }
         target <- dplyr::coalesce(target, val)
       }
       target
