@@ -698,21 +698,7 @@ model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
   }
   if ("coxph" %in% class(df$model[[1]])) {
     ret <- ret %>% dplyr::mutate(
-      hazard_ratio = exp(estimate),
-      # remove original column names
-      # in categorical predictor variables
-      # from term like countryJapan -> Japan
-      term = stringr::str_replace(
-        term,
-        paste0(
-          "^",
-          all.vars(df$model[[1]]$term),
-          # this prevents replacing entire character
-          # http://www.regular-expressions.info/lookaround.html
-          # logic column name should be kept
-          "(?!($|TRUE$|FALSE$))",
-          collapse = "|"
-        ), "")
+      hazard_ratio = exp(estimate)
     )
   }
   if ("multinom" %in% class(df$model[[1]])) {
