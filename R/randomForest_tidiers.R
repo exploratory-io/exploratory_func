@@ -758,29 +758,52 @@ calc_feature_imp <- function(df,
   fml <- as.formula(paste(clean_target_col, " ~ ", rhs))
 
   each_func <- function(df) {
+    tryCatch({
+      # sample the data because randomForest takes long time
+      # if data size is too large
+      if (nrow(df) > max_nrow) {
+        df <- df %>%
+          dplyr::sample_n(max_nrow)
+      }
 
-    # sample the data because randomForest takes long time
-    # if data size is too large
-    if (nrow(df) > max_nrow) {
-      df <- df %>%
-        dplyr::sample_n(max_nrow)
-    }
+      # Return NULL if there is only one row
+      # for a class of target variable because
+      # rondomForest enters infinite loop
+      # in such case.
+      # The group with NULL is removed when
+      # unnesting the result
+      for (level in levels(df[[target_col]])) {
+        if(sum(df[[target_col]] == level, na.rm = TRUE) == 1) {
+          return(NULL)
+        }
+      }
 
-
-    rf <- randomForest::randomForest(
-      fml,
-      data = df,
-      importance = FALSE,
-      samplesize = samplesize,
-      nodesize=nodesize,
-      ntree = ntree,
-      na.action = na.omit
-    )
-    # these attributes are used in tidy of randomForest
-    rf$classification_type <- "multi"
-    rf$terms_mapping <- names(name_map)
-    names(rf$terms_mapping) <- name_map
-    rf
+      rf <- randomForest::randomForest(
+        fml,
+        data = df,
+        importance = FALSE,
+        samplesize = samplesize,
+        nodesize=nodesize,
+        ntree = ntree,
+        na.action = na.omit
+      )
+      # these attributes are used in tidy of randomForest
+      rf$classification_type <- "multi"
+      rf$terms_mapping <- names(name_map)
+      names(rf$terms_mapping) <- name_map
+      rf
+    }, error = function(e){
+      if(length(grouped_cols) > 0) {
+        # ignore the error if
+        # it is caused by subset of
+        # grouped data frame
+        # to show result of
+        # data frames that succeed
+        NULL
+      } else {
+        stop(e)
+      }
+    })
   }
 
   do_on_each_group(clean_df, each_func, name = "model", with_unnest = FALSE)
