@@ -18,24 +18,6 @@ test_that("test do_bayes_ab test with summary output", {
   expect_equal(nrow(ret), 4)
 })
 
-test_that("test do_bayes_ab test with prior output", {
-  set.seed(0)
-  data_a <- data.frame(
-    access_count = round(runif(50) * 100 + 100)
-  ) %>%
-    dplyr::mutate(click = 0.2 + 0.8 * runif(nrow(.)), group = "a")
-  data_b <- data.frame(
-    access_count = round(runif(20) * 20 + 20)
-  ) %>%
-    dplyr::mutate(click = 0.3 + 0.7 * runif(nrow(.)), group = "b")
-
-  full_data <- dplyr::bind_rows(data_a, data_b) %>%
-    mutate(grouping = rbinom(n(), 1, 0.3)) %>%
-    group_by(grouping)
-  ret <- do_bayes_ab(full_data, group, access_count, click, type = "prior")
-  expect_equal(ncol(ret), 3)
-})
-
 test_that("test do_bayes_ab test with lift output", {
   set.seed(0)
   data_a <- data.frame(
