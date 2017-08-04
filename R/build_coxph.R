@@ -9,7 +9,18 @@
 #' @param test_rate Ratio of test data
 #' @param seed Random seed to control test data sampling
 #' @export
-build_coxph <- function(data, formula, ...){
+build_coxph <- function(data, formula, max_categories = 10, ...){
+  preprocess_group_cols <- grouped_by(data)
+  if(!is.null(max_categories)) {
+    for (col in colnames(data)) {
+      if(col %nin% preprocess_group_cols && !is.numeric(data[[col]]) && !is.logical(data[[col]])) {
+        # convert data to factor if predictors are not numeric or logical
+        # and limit the number of levels in factor by fct_lump
+        # TODO: should this be done for each group_by group?
+        data[[col]] <- forcats::fct_lump(as.factor(data[[col]]), n = max_categories)
+      }
+    }
+  }
   build_model(data = data,
               formula = formula,
               model_func = survival::coxph,
