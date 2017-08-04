@@ -109,7 +109,20 @@ build_model_ <- function(data, model_func, seed = 0, test_rate = 0, group_cols =
         eval_arg <- dots
         eval_arg[["data"]] <- lazyeval::lazy(tmp_df)
         .call <- lazyeval::make_call(quote(model_func), eval_arg)
-        lazyeval::lazy_eval(.call, data = environment())
+        tryCatch({
+          lazyeval::lazy_eval(.call, data = environment())
+        }, error = function(e){
+          # return NULL if this is thrown in
+          # a group if input data frame was grouped.
+          # If it was not grouped, throws the error
+          if(length(group_col_names) == 1 && group_col_names == ".test_index"){
+            # this means input data frame was not
+            # grouped by before build_model function
+            stop(e)
+          } else {
+            NULL
+          }
+        })
       })) %>%
       # .model_metadata is a list column to store data
       # to preserve information about the model which is
