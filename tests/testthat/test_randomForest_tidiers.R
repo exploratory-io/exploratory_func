@@ -1,13 +1,19 @@
 context("test tidiers for randomForest")
 
+test_that("test when the number of rows of classes is one", {
+  sample_data <- data.frame(
+    y = c("a", "b", "b", "b", "b", "c"),
+    num = runif(6)
+  )
+
+  ret <- sample_data %>%
+    calc_feature_imp(y, num) %>%
+    rf_importance()
+
+  expect_equal(nrow(ret), 0)
+})
+
 test_that("test randomForest with binary classification", {
-
-  test_d <- exploratory::read_delim_file("/Users/yasudayousuke/Documents/job/oracle_visualiezer/exploratory/src/test/123flight.csv" , ",", quote = "\"", skip = 0 , col_names = TRUE , na = c("","NA") , locale=readr::locale(encoding = "UTF-8", decimal_mark = "."), trim_ws = FALSE , progress = FALSE) %>% exploratory::clean_data_frame()
-
-  ret <- test_d %>%
-    dplyr::group_by(`ORIGIN_STATE_ABR`) %>%
-    calc_feature_imp(`CARRIER`, `FL_NUM`, `ORIGIN`, `DEST`)
-
   set.seed(0)
   nrow <- 100
   test_data <- data.frame(
