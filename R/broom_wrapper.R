@@ -709,7 +709,7 @@ model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
           all.vars(df$model[[1]]$term),
           # this prevents replacing entire character
           # http://www.regular-expressions.info/lookaround.html
-          "(?![$|TRUE|FALSE])",
+          "(?!($|TRUE$|FALSE$))",
           collapse = "|"
         ), "")
     )
