@@ -49,7 +49,9 @@ impute_na <- function(target, type = mean, val = 0, ...) {
         # if val is length 1, na is filled with the value
         if(is.factor(target)) {
           # if target is factor, val should be added as target level
-          # otherwise, it doesn't replace NA
+          # otherwise, it doesn't replace NA.
+          # val might be already in the level but
+          # it doesn't cause error, so it's safe
           levels(target) <- c(levels(target), val)
         }
         target[is.na(target)] <- val
@@ -58,7 +60,9 @@ impute_na <- function(target, type = mean, val = 0, ...) {
         # NA in target is replaced with the value in the same position
         if(is.factor(target)){
           # if target is factor, val should be added as target level
-          # otherwise, it doesn't replace NA
+          # otherwise, it doesn't replace NA.
+          # val might be already in the level but
+          # it doesn't cause error, so it's safe
 
           # get val only where target is NA not to get unnecessary level
           needed_val <- dplyr::if_else(is.na(target), as.character(val), NA_character_)
