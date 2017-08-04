@@ -9,11 +9,79 @@ test_df$list_c <- as.list(seq(20))
 
 test_df[["with space"]] <- seq(20)
 
-test_that("test two sample t-test", {
+test_that("test two sample t-test with column name", {
+  test_df <- data.frame(
+    cat=rep(c("cat1", "cat2"), 20),
+    val = rep(seq(10), 2)
+  )
+
   result <- test_df %>%
-    dplyr::group_by(dim) %>%
-    do_t.test(`with space`, cat)
-  expect_equal(ncol(result), 11)
+    do_t.test(val, cat)
+
+  expect_equal(result$mean_cat1, 5)
+  expect_equal(result$mean_cat2, 6)
+
+  # swap cat1 and cat2
+  test_df <- data.frame(
+    cat=rep(c("cat2", "cat1"), 20),
+    val = rep(seq(10), 2)
+  )
+
+  result <- test_df %>%
+    do_t.test(val, cat)
+
+  expect_equal(result$mean_cat1, 6)
+  expect_equal(result$mean_cat2, 5)
+})
+
+test_that("test two sample t-test with factor", {
+  test_df <- data.frame(
+    cat=factor(rep(c("cat1", "cat2"), 20), levels = c("cat1", "cat2")),
+    val = rep(seq(10), 2)
+  )
+
+  result <- test_df %>%
+    do_t.test(val, cat)
+
+  expect_equal(result$mean_cat1, 5)
+  expect_equal(result$mean_cat2, 6)
+
+  # swap cat1 and cat2
+  test_df <- data.frame(
+    cat=factor(rep(c("cat2", "cat1"), 20), levels = c("cat2", "cat1")),
+    val = rep(seq(10), 2)
+  )
+
+  result <- test_df %>%
+    do_t.test(val, cat)
+
+  expect_equal(result$mean_cat1, 6)
+  expect_equal(result$mean_cat2, 5)
+})
+
+test_that("test two sample t-test with logical", {
+  test_df <- data.frame(
+    cat=rep(c(TRUE, FALSE), 20),
+    val = rep(seq(10), 2)
+  )
+
+  result <- test_df %>%
+    do_t.test(val, cat)
+
+  expect_equal(result$mean_TRUE, 5)
+  expect_equal(result$mean_FALSE, 6)
+
+  # swap TRUE and FALSE
+  test_df <- data.frame(
+    cat=rep(c(FALSE, TRUE), 20),
+    val = rep(seq(10), 2)
+  )
+
+  result <- test_df %>%
+    do_t.test(val, cat)
+
+  expect_equal(result$mean_FALSE, 5)
+  expect_equal(result$mean_TRUE, 6)
 })
 
 test_that("test two sample t-test more than 2 levels", {

@@ -20,6 +20,13 @@ do_t.test <- function(df, value, key=NULL, ...){
   # this is executed on each group
   do_t.test_each <- function(df, ...){
     if(with_key){
+      # make key column factor
+      # so that which key
+      # the result columns (estimate1 and estimate2)
+      # are from can be clear
+      df[[key_col]] <- as.factor(df[[key_col]])
+      mean_col_names <- paste("mean_", levels(df[[key_col]]), sep = "")
+
       # use formula (`value_col`~`key_col`) for two sample t-test
       model <- tryCatch({
         t.test(data=df, fml, ...)
@@ -47,8 +54,8 @@ do_t.test <- function(df, value, key=NULL, ...){
     col_names <- avoid_conflict(grouped_col, vapply(colnames(ret), function(name){
       switch (name,
               estimate = "effect_size",
-              estimate1 = "mean1",
-              estimate2 = "mean2",
+              estimate1 = mean_col_names[[1]],
+              estimate2 = mean_col_names[[2]],
               statistic = "t.value",
               parameter = "degrees_of_freedom",
               name
