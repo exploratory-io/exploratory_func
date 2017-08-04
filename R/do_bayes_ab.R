@@ -19,7 +19,7 @@ do_bayes_ab <- function(df, a_b_identifier, total_count, conversion_rate, prior_
   set.seed(seed)
 
   # when type is prior, no need to evaluate other parameters
-  if (type != "prior") {
+  if (type != "prior" || (is.null(prior_mean) || is.null(prior_sd))) {
     # this seems to be the new way of NSE column selection evaluation
     # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
     a_b_identifier_col <- dplyr::select_var(names(df), !! rlang::enquo(a_b_identifier))
