@@ -9,7 +9,10 @@
 #' @param test_rate Ratio of test data
 #' @param seed Random seed to control test data sampling
 #' @export
-build_coxph <- function(data, formula, max_categories = 10, ...){
+build_coxph <- function(data, formula, max_categories = NULL, min_group_size = NULL, ...){
+  if(!is.null(min_group_size)) {
+    data <- data %>% dplyr::filter(n() >= min_group_size)
+  }
   preprocess_group_cols <- grouped_by(data)
   if(!is.null(max_categories)) {
     for (col in colnames(data)) {
