@@ -11,6 +11,9 @@
 #' @export
 build_coxph <- function(data, formula, max_categories = NULL, min_group_size = NULL, ...){
   if(!is.null(min_group_size)) {
+    # a group too small (like 2) causes "non-conformable arguments" error in building model.
+    # this allows us to filter them out.
+    # used for Analytics page.
     data <- data %>% dplyr::filter(n() >= min_group_size)
   }
   preprocess_group_cols <- grouped_by(data)
@@ -19,6 +22,7 @@ build_coxph <- function(data, formula, max_categories = NULL, min_group_size = N
       if(col %nin% preprocess_group_cols && !is.numeric(data[[col]]) && !is.logical(data[[col]])) {
         # convert data to factor if predictors are not numeric or logical
         # and limit the number of levels in factor by fct_lump
+        # used for Analytics page.
         # TODO: should this be done for each group_by group?
         data[[col]] <- forcats::fct_lump(as.factor(data[[col]]), n = max_categories)
       }
