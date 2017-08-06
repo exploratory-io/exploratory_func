@@ -194,7 +194,10 @@ do_cmdscale_ <- function(df,
   loadNamespace("tidyr")
   grouped_col <- grouped_by(df)
 
-  # remove NA because cmdscale doesn't accept NA
+  # remove NA because cmdscale doesn't accept NA.
+  # NA happens if a data has NA in a value and
+  # all distances with others become NA too, so
+  # it should be totally removed from the data
   df <- df %>%
     dplyr::filter(!is.na(!!as.symbol(value_col)))
 
