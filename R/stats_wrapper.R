@@ -194,6 +194,10 @@ do_cmdscale_ <- function(df,
   loadNamespace("tidyr")
   grouped_col <- grouped_by(df)
 
+  # remove NA because cmdscale doesn't accept NA
+  df <- df %>%
+    dplyr::filter(!is.na(!!as.symbol(value_col)))
+
   # if pair1_col and pair2_col are with the same name
   # like aaa.x and aaa.y (output of skv of do_dist),
   # it (in this case, "aaa") should be used as name column
