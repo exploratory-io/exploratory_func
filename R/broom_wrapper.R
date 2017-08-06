@@ -992,13 +992,29 @@ prediction_survfit <- function(df, newdata = NULL, ...){
 
 #' tidy after generating survfit
 #' @export
-do_survfit <- function(df, time, status, ...){
+do_survfit <- function(df, time, status, start_time = NULL, end_time = NULL, time_unit = "day", ...){
   validate_empty_data(df)
 
-  # need to compose formula with non-standard evaluation.
-  # simply using time and status in formula here results in a formula that literally looks at
-  # "time" columun and "status" column, which is not what we want.
-  fml <- as.formula(paste0("survival::Surv(`", substitute(time), "`,`", substitute(status), "`) ~ 1"))
+  if (is.null(time)) {
+    # as.numeric() does not support all units.
+    # also support of units are different between Date and POSIXct.
+    # let's do it ourselves.
+    time_unit_days_str = switch(time_unit,
+                                day = "1",
+                                week = "7",
+                                month = "(365.25/12)",
+                                quarter = "(365.25/4)",
+                                year = "365.25",
+                                "1")
+    fml <- as.formula(paste0("survival::Surv(as.numeric(`", substitute(end_time), "`-`", substitute(start_time), "`, units = \"days\")/", time_unit_days_str, ", `", substitute(status), "`) ~ 1"))
+  }
+  else {
+    # need to compose formula with non-standard evaluation.
+    # simply using time and status in formula here results in a formula that literally looks at
+    # "time" columun and "status" column, which is not what we want.
+    fml <- as.formula(paste0("survival::Surv(`", substitute(time), "`,`", substitute(status), "`) ~ 1"))
+  }
+
   ret <- df %>% build_model(model_func = survival::survfit, formula = fml, ...) %>% broom::tidy(model)
   colnames(ret)[colnames(ret) == "n.risk"] <- "n_risk"
   colnames(ret)[colnames(ret) == "n.event"] <- "n_event"
