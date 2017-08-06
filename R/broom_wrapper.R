@@ -996,6 +996,9 @@ do_survfit <- function(df, time, status, start_time = NULL, end_time = NULL, tim
   validate_empty_data(df)
 
   if (is.null(time)) {
+    # as.numeric() does not support all units.
+    # also support of units are different between Date and POSIXct.
+    # let's do it ourselves.
     time_unit_days_str = switch(time_unit,
                                 day = "1",
                                 week = "7",
