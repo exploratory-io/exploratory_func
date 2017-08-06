@@ -1001,7 +1001,9 @@ do_survfit <- function(df, time, status, start_time = NULL, end_time = NULL, tim
       fml <- as.formula(paste0("survival::Surv(as.numeric(`", substitute(end_time), "`-`", substitute(start_time), "`, units = \"", time_units, "\"),`", substitute(status), "`) ~ 1"))
     }
     else {
-      time_unit_days_str = "(365.25/12)"
+      time_unit_days_str = switch(time_unit,
+                                  month = "(365.25/12)",
+                                  "1")
       fml <- as.formula(paste0("survival::Surv(as.numeric(`", substitute(end_time), "`-`", substitute(start_time), "`, units = \"days\")/", time_unit_days_str, ", `", substitute(status), "`) ~ 1"))
     }
   }
