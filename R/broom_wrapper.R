@@ -996,7 +996,8 @@ do_survfit <- function(df, time, status, start_time = NULL, end_time = NULL, tim
   validate_empty_data(df)
 
   if(is.null(time)) {
-    fml <- as.formula(paste0("survival::Surv(as.numeric(`", substitute(end_time), "`-`", substitute(start_time), "`, units = \"weeks\"),`", substitute(status), "`) ~ 1"))
+    time_units = paste0(time_unit, "s")
+    fml <- as.formula(paste0("survival::Surv(as.numeric(`", substitute(end_time), "`-`", substitute(start_time), "`, units = \"", time_units, "\"),`", substitute(status), "`) ~ 1"))
   }
   else {
     # need to compose formula with non-standard evaluation.
