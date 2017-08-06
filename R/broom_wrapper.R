@@ -992,13 +992,19 @@ prediction_survfit <- function(df, newdata = NULL, ...){
 
 #' tidy after generating survfit
 #' @export
-do_survfit <- function(df, time, status, ...){
+do_survfit <- function(df, time, status, start_time = NULL, end_time = NULL, time_unit = "day", ...){
   validate_empty_data(df)
 
-  # need to compose formula with non-standard evaluation.
-  # simply using time and status in formula here results in a formula that literally looks at
-  # "time" columun and "status" column, which is not what we want.
-  fml <- as.formula(paste0("survival::Surv(`", substitute(time), "`,`", substitute(status), "`) ~ 1"))
+  if(is.null(time)) {
+    fml <- as.formula(paste0("survival::Surv(as.numeric(`", substitute(end_time), "`-`", substitute(start_time), "`, units = \"weeks\"),`", substitute(status), "`) ~ 1"))
+  }
+  else {
+    # need to compose formula with non-standard evaluation.
+    # simply using time and status in formula here results in a formula that literally looks at
+    # "time" columun and "status" column, which is not what we want.
+    fml <- as.formula(paste0("survival::Surv(`", substitute(time), "`,`", substitute(status), "`) ~ 1"))
+  }
+
   ret <- df %>% build_model(model_func = survival::survfit, formula = fml, ...) %>% broom::tidy(model)
   colnames(ret)[colnames(ret) == "n.risk"] <- "n_risk"
   colnames(ret)[colnames(ret) == "n.event"] <- "n_event"
