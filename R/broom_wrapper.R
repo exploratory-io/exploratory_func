@@ -995,9 +995,14 @@ prediction_survfit <- function(df, newdata = NULL, ...){
 do_survfit <- function(df, time, status, start_time = NULL, end_time = NULL, time_unit = "day", ...){
   validate_empty_data(df)
 
-  if(is.null(time)) {
-    time_units = paste0(time_unit, "s")
-    fml <- as.formula(paste0("survival::Surv(as.numeric(`", substitute(end_time), "`-`", substitute(start_time), "`, units = \"", time_units, "\"),`", substitute(status), "`) ~ 1"))
+  if (is.null(time)) {
+    if (time_unit != "month") {
+      time_units = paste0(time_unit, "s")
+      fml <- as.formula(paste0("survival::Surv(as.numeric(`", substitute(end_time), "`-`", substitute(start_time), "`, units = \"", time_units, "\"),`", substitute(status), "`) ~ 1"))
+    }
+    else {
+      fml <- as.formula(paste0("survival::Surv(as.numeric(`", substitute(end_time), "`-`", substitute(start_time), "`, units = \"days\")/(365.25/12),`", substitute(status), "`) ~ 1"))
+    }
   }
   else {
     # need to compose formula with non-standard evaluation.
