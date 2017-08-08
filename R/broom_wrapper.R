@@ -995,7 +995,7 @@ prediction_survfit <- function(df, newdata = NULL, ...){
 do_survfit <- function(df, time, status, start_time = NULL, end_time = NULL, time_unit = "day", ...){
   validate_empty_data(df)
 
-  if (is.null(time)) {
+  if (is.null(substitute(time))) {
     # as.numeric() does not support all units.
     # also support of units are different between Date and POSIXct.
     # let's do it ourselves.
