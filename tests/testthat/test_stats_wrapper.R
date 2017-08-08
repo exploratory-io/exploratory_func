@@ -91,9 +91,6 @@ test_that("do_cor with NA values", {
   nrow <- 10
   ncol <- 20
   vec <- rnorm(nrow * ncol)
-  vec[[3]] <- NA
-  vec[[30]] <- NA
-  vec[[55]] <- NA
   mat <- matrix(vec, nrow = nrow)
   melt_mat <- reshape2::melt(mat)
   colnames(melt_mat)[[2]] <- "Var 2"
@@ -409,5 +406,5 @@ test_that("do_cmdscale undefined column name error", {
   data <- data.frame(var1 = c(1, 3, 2, NA), var2 = c(1, 3, 2, 10))
   expect_error({
     do_cmdscale(data, var1, var2, var3)
-  }, "var3 is not in column names")
+  }, "Evaluation error: object 'var3' not found.")
 })

@@ -21,8 +21,9 @@ col_name <- function(x, default = stop("Please supply column name", call. = FALS
 #' @param fun.aggregate Aggregate function for duplicated row and col
 #' @param fill Values to fill NA.
 #' @param time_unit Unit of time to aggregate key_col if key_col is Date or POSIXct#' @param time_unit Unit of time to aggregate key_col if key_col is Date or POSIXct. NULL doesn't aggregate.
+#' @param na.rm If NA in val should be removed
 #' @export
-simple_cast <- function(data, row, col, val=NULL, fun.aggregate=mean, fill=0, time_unit=NULL){
+simple_cast <- function(data, row, col, val=NULL, fun.aggregate=mean, fill=0, time_unit=NULL, na.rm = FALSE){
   loadNamespace("reshape2")
   loadNamespace("tidyr")
 
@@ -38,6 +39,11 @@ simple_cast <- function(data, row, col, val=NULL, fun.aggregate=mean, fill=0, ti
   # noraml na causes error in reshape2::acast so it has to be NA_real_
   if(is.na(fill)){
     fill <- NA_real_
+  }
+
+  if(!is.null(val) && na.rm){
+    data <- data %>%
+      dplyr::filter(!is.na(!!as.symbol(val)))
   }
 
   # remove NA from row and column
@@ -152,7 +158,15 @@ to_matrix <- function(df, select_dots, by_col=NULL, key_col=NULL, value_col=NULL
     if(is.null(by_col) | is.null(key_col) | is.null(value_col)){
       stop("all by, key and value should be defined")
     }
-    simple_cast(df, by_col, key_col, value_col, fun.aggregate = fun.aggregate, fill=fill)
+    simple_cast(
+      df,
+      by_col,
+      key_col,
+      value_col,
+      fun.aggregate = fun.aggregate,
+      fill=fill,
+      na.rm = TRUE
+    )
   } else {
     loadNamespace("dplyr")
     dplyr::select_(df, .dots=select_dots) %>%  as.matrix()

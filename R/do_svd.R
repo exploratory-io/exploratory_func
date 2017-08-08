@@ -87,7 +87,15 @@ do_svd.kv_ <- function(df,
       df <- df[!is.na(df[[value_col]]), ]
     }
 
-    matrix <- simple_cast(df, subject_col, dimension_col, value_col, fun.aggregate = fun.aggregate, fill=fill)
+    matrix <- simple_cast(
+      df,
+      subject_col,
+      dimension_col,
+      value_col,
+      fun.aggregate = fun.aggregate,
+      fill=fill,
+      na.rm = TRUE
+    )
 
     # n_component must be smaller than
     # or equal to ncol(matrix).

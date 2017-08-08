@@ -95,7 +95,16 @@ do_cor.kv_ <- function(df,
 
 
   do_cor_each <- function(df){
-    mat <- simple_cast(df, row, col, val, fun.aggregate=fun.aggregate, fill=fill, time_unit = time_unit)
+    mat <- simple_cast(
+      df,
+      row,
+      col,
+      val,
+      fun.aggregate=fun.aggregate,
+      fill=fill,
+      time_unit = time_unit,
+      na.rm = TRUE
+    )
     cor_mat <- cor(mat, use = use, method = method)
     if(distinct){
       ret <- upper_gather(
@@ -217,7 +226,15 @@ do_cmdscale_ <- function(df,
 
   # this is executed on each group
   do_cmdscale_each <- function(df){
-    mat <- simple_cast(df, pair1_col, pair2_col, value_col, fun.aggregate = fun.aggregate, fill=fill)
+    mat <- simple_cast(
+      df,
+      pair1_col,
+      pair2_col,
+      value_col,
+      fun.aggregate = fun.aggregate,
+      fill=fill,
+      na.rm = TRUE
+    )
     cnames <- colnames(mat)
     rnames <- rownames(mat)
     if(any(cnames != rnames)){
