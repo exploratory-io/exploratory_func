@@ -1010,6 +1010,7 @@ do_survfit <- function(df, time, status, start_time = NULL, end_time = NULL, tim
                                 year = "365.25",
                                 "1")
     # we are flooring survival time to make it integer in the specified time unit.
+    # this is to make resulting survival curve to have integer data point in the specified time unit.
     fml <- as.formula(paste0("survival::Surv(as.numeric(`", substitute(end_time), "`-`", substitute(start_time), "`, units = \"days\")%/%", time_unit_days_str, ", `", substitute(status), "`) ~ 1"))
   }
   else {
