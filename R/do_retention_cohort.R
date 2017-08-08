@@ -48,7 +48,7 @@ do_cohort <- function(df, time, value, cohort, time_unit = "month", fun.aggregat
     ret <- ret %>% arrange(.cohort, period)
     # calculate .value_pct. intended use is for retention ratio.
     ret <- ret %>% group_by(.cohort) %>%
-      mutate(.value_pct = if(first(.value)==0){NA_real_}else{.value/first(.value)/100}) %>%
+      mutate(.value_pct = if (first(.value)==0) {NA_real_} else {.value/first(.value)*100}) %>% # avoid division by 0
       ungroup()
 
     # rename temporary column names to final column names.
