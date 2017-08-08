@@ -149,7 +149,15 @@ do_dist.kv_ <- function(df,
     # but simple_cast is designed for subject to columns,
     # so the matrix is transposed
     mat <- df %>%
-      simple_cast(key_col, subject_col, value_col, fill=fill, fun.aggregate=fun.aggregate, time_unit = time_unit) %>%
+      simple_cast(
+        key_col,
+        subject_col,
+        value_col,
+        fill=fill,
+        fun.aggregate=fun.aggregate,
+        time_unit = time_unit,
+        na.rm = TRUE
+      ) %>%
       t()
 
     # Dist is actually an atomic vector of upper half so upper and diag arguments don't matter

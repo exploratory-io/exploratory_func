@@ -95,7 +95,16 @@ do_cor.kv_ <- function(df,
 
 
   do_cor_each <- function(df){
-    mat <- simple_cast(df, row, col, val, fun.aggregate=fun.aggregate, fill=fill, time_unit = time_unit)
+    mat <- simple_cast(
+      df,
+      row,
+      col,
+      val,
+      fun.aggregate=fun.aggregate,
+      fill=fill,
+      time_unit = time_unit,
+      na.rm = TRUE
+    )
     cor_mat <- cor(mat, use = use, method = method)
     if(distinct){
       ret <- upper_gather(
