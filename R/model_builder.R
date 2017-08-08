@@ -77,7 +77,15 @@ build_kmeans.kv_ <- function(df,
     # to avoid it appears as duplicated column
     # after unnesting the result
     df <- df[, !colnames(df) %in% grouped_column]
-    mat <- simple_cast(df, row_col, col_col, value_col, fun.aggregate = fun.aggregate, fill=fill)
+    mat <- simple_cast(
+      df,
+      row_col,
+      col_col,
+      value_col,
+      fun.aggregate = fun.aggregate,
+      fill=fill,
+      na.rm = TRUE
+    )
     rownames(mat) <- NULL # this prevents warning about discarding row names of the matrix
     kmeans_ret <- tryCatch({
       kmeans(mat, centers = centers, iter.max = 10, nstart = nstart, algorithm = algorithm, trace = trace)},

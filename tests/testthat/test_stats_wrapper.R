@@ -91,9 +91,6 @@ test_that("do_cor with NA values", {
   nrow <- 10
   ncol <- 20
   vec <- rnorm(nrow * ncol)
-  vec[[3]] <- NA
-  vec[[30]] <- NA
-  vec[[55]] <- NA
   mat <- matrix(vec, nrow = nrow)
   melt_mat <- reshape2::melt(mat)
   colnames(melt_mat)[[2]] <- "Var 2"

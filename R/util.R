@@ -158,7 +158,15 @@ to_matrix <- function(df, select_dots, by_col=NULL, key_col=NULL, value_col=NULL
     if(is.null(by_col) | is.null(key_col) | is.null(value_col)){
       stop("all by, key and value should be defined")
     }
-    simple_cast(df, by_col, key_col, value_col, fun.aggregate = fun.aggregate, fill=fill)
+    simple_cast(
+      df,
+      by_col,
+      key_col,
+      value_col,
+      fun.aggregate = fun.aggregate,
+      fill=fill,
+      na.rm = TRUE
+    )
   } else {
     loadNamespace("dplyr")
     dplyr::select_(df, .dots=select_dots) %>%  as.matrix()

@@ -242,7 +242,14 @@ do_kl_dist.kv_ <- function(df,
 
   # this is executed on each group
   calc_dist_each <- function(df){
-    mat <- df %>%  simple_cast(subject_col, key_col, value_col, fill=fill, fun.aggregate=fun.aggregate)
+    mat <- df %>%  simple_cast(
+      subject_col,
+      key_col,
+      value_col,
+      fill=fill,
+      fun.aggregate=fun.aggregate,
+      na.rm = TRUE
+    )
     # Dist is actually an atomic vector of upper half so upper and diag arguments don't matter
     jensenShannon <- function(x, y) {
       m <- 0.5*(x + y)

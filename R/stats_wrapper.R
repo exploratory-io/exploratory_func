@@ -226,7 +226,15 @@ do_cmdscale_ <- function(df,
 
   # this is executed on each group
   do_cmdscale_each <- function(df){
-    mat <- simple_cast(df, pair1_col, pair2_col, value_col, fun.aggregate = fun.aggregate, fill=fill)
+    mat <- simple_cast(
+      df,
+      pair1_col,
+      pair2_col,
+      value_col,
+      fun.aggregate = fun.aggregate,
+      fill=fill,
+      na.rm = TRUE
+    )
     cnames <- colnames(mat)
     rnames <- rownames(mat)
     if(any(cnames != rnames)){
