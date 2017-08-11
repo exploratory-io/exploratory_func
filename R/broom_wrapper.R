@@ -999,6 +999,9 @@ do_survfit <- function(df, time, status, start_time = NULL, end_time = NULL, tim
   # NSE column name and it throws an evaluation error
   # without it
   if (is.null(substitute(time))) {
+    end_time_col <- col_name(substitute(end_time))
+    df[[end_time_col]] <- impute_na(df[[end_time_col]] ,type = "value", val=lubridate::today())
+
     # as.numeric() does not support all units.
     # also support of units are different between Date and POSIXct.
     # let's do it ourselves.
