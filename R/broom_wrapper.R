@@ -1000,13 +1000,13 @@ do_survfit <- function(df, time, status, start_time = NULL, end_time = NULL, tim
   # without it
   if (is.null(substitute(time))) {
     start_time_col <- col_name(substitute(start_time))
-    df[[start_time_col]] <- as.Date(df[[start_time_col]])
-    if (!is.null(substitute(end_time))) {
+    df[[start_time_col]] <- as.Date(df[[start_time_col]]) # convert to Date in case it is POSIXct.
+    if (!is.null(substitute(end_time))) { # if end_time exists, fill NA with today()
       end_time_col <- col_name(substitute(end_time))
-      df[[end_time_col]] <- as.Date(df[[end_time_col]])
+      df[[end_time_col]] <- as.Date(df[[end_time_col]]) # convert to Date in case it is POSIXct.
       df[[end_time_col]] <- impute_na(df[[end_time_col]] ,type = "value", val=lubridate::today())
     }
-    else {
+    else { # if end_time does not exist, create .end_time column with value of today()
       end_time_col <- ".end_time"
       df[[".end_time"]] <- lubridate::today()
     }
