@@ -1007,8 +1007,8 @@ do_survfit <- function(df, time, status, start_time = NULL, end_time = NULL, tim
       df[[end_time_col]] <- impute_na(df[[end_time_col]] ,type = "value", val=lubridate::today())
     }
     else { # if end_time does not exist, create .end_time column with value of today()
-      end_time_col <- ".end_time"
-      df[[".end_time"]] <- lubridate::today()
+      end_time_col <- avoid_conflict(colnames(df), ".end_time")
+      df[[end_time_col]] <- lubridate::today()
     }
 
     # as.numeric() does not support all units.
