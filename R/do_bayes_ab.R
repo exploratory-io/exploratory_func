@@ -78,7 +78,7 @@ do_bayes_ab <- function(df, a_b_identifier, total_count, conversion_rate, prior_
     # validate alpha and beta
     # when they are invalid, sd is too large
     if (!(!is.na(alpha) && !is.na(beta) && alpha > 0 && beta > 0)){
-      stop("SD of CR is too large")
+      stop("SD of CR is too large to create prior beta distribution. Please try smaller value.")
     }
 
     if (type == "prior") {
