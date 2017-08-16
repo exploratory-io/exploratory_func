@@ -995,10 +995,14 @@ prediction_survfit <- function(df, newdata = NULL, ...){
 do_survfit <- function(df, time, status, start_time = NULL, end_time = NULL, time_unit = "day", ...){
   validate_empty_data(df)
 
+  # for each group_by group, create row for time 0 with 100 survival rate
+  time_zero_rows <- df %>% summarize(time = 0, n_risk = n(), n_event = 0, n_censor = 0, estimate = 1, std_error = 0, conf_high = 1, conf_low = 1)
+
   # substitute is needed because time can be
   # NSE column name and it throws an evaluation error
   # without it
   if (is.null(substitute(time))) {
+
     start_time_col <- col_name(substitute(start_time))
     df[[start_time_col]] <- as.Date(df[[start_time_col]]) # convert to Date in case it is POSIXct.
     if (!is.null(substitute(end_time))) { # if end_time exists, fill NA with today()
@@ -1023,7 +1027,7 @@ do_survfit <- function(df, time, status, start_time = NULL, end_time = NULL, tim
                                 "1")
     # we are flooring survival time to make it integer in the specified time unit.
     # this is to make resulting survival curve to have integer data point in the specified time unit.
-    fml <- as.formula(paste0("survival::Surv(as.numeric(`", end_time_col, "`-`", start_time_col, "`, units = \"days\")%/%", time_unit_days_str, ", `", substitute(status), "`) ~ 1"))
+    fml <- as.formula(paste0("survival::Surv(as.numeric(`", end_time_col, "`-`", start_time_col, "`, units = \"days\")%/%", time_unit_days_str, "+1, `", substitute(status), "`) ~ 1"))
   }
   else {
     # need to compose formula with non-standard evaluation.
@@ -1039,6 +1043,9 @@ do_survfit <- function(df, time, status, start_time = NULL, end_time = NULL, tim
   colnames(ret)[colnames(ret) == "std.error"] <- "std_error"
   colnames(ret)[colnames(ret) == "conf.low"] <- "conf_low"
   colnames(ret)[colnames(ret) == "conf.high"] <- "conf_high"
+
+  # bind with time 0 rows. sort it by time.
+  ret <- ret %>% bind_rows(time_zero_rows) %>% arrange(time)
   ret
 }
 
