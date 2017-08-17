@@ -706,11 +706,11 @@ calc_feature_imp <- function(df,
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
   target_col <- dplyr::select_var(names(df), !! rlang::enquo(target))
   # this evaluates select arguments like starts_with
-  cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
+  selected_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
 
   grouped_cols <- grouped_by(df)
 
-  if (any(c(target_col, cols) %in% grouped_cols)) {
+  if (any(c(target_col, selected_cols) %in% grouped_cols)) {
     stop("grouping column is used as variable columns")
   }
 
@@ -718,15 +718,18 @@ calc_feature_imp <- function(df,
   df <- df %>%
     dplyr::filter(!is.na(!!target_col))
 
-  for (col in cols) {
-    # remove NA from predictor columns
-    df <- df %>%
-      dplyr::filter(!is.na(!!col))
-
-    if(!is.numeric(df[[col]]) && !is.logical(df[[col]])) {
-      # convert data to factor if predictors are not numeric or logical
-      # and limit the number of levels in factor by fct_lump
-      df[[col]] <- forcats::fct_lump(as.factor(df[[col]]), n=predictor_n)
+  # cols will be filtered to remove invalid columns
+  cols <- selected_cols
+  for (col in selected_cols) {
+    if(all(is.na(df[[col]]))){
+      # remove columns if they are all NA
+      cols <- setdiff(cols, col)
+    } else {
+      if(!is.numeric(df[[col]]) && !is.logical(df[[col]])) {
+        # convert data to factor if predictors are not numeric or logical
+        # and limit the number of levels in factor by fct_lump
+        df[[col]] <- forcats::fct_lump(as.factor(df[[col]]), n=predictor_n)
+      }
     }
   }
 
@@ -785,7 +788,7 @@ calc_feature_imp <- function(df,
         samplesize = samplesize,
         nodesize=nodesize,
         ntree = ntree,
-        na.action = na.omit
+        na.action = randomForest::na.roughfix # replace NA with median (numeric) or mode (categorical)
       )
       # these attributes are used in tidy of randomForest
       rf$classification_type <- "multi"
