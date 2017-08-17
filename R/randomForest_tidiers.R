@@ -719,14 +719,15 @@ calc_feature_imp <- function(df,
     dplyr::filter(!is.na(!!target_col))
 
   for (col in cols) {
-    # remove NA from predictor columns
-    df <- df %>%
-      dplyr::filter(!is.na(!!col))
-
-    if(!is.numeric(df[[col]]) && !is.logical(df[[col]])) {
-      # convert data to factor if predictors are not numeric or logical
-      # and limit the number of levels in factor by fct_lump
-      df[[col]] <- forcats::fct_lump(as.factor(df[[col]]), n=predictor_n)
+    if(all(is.na(df[[col]]))){
+      # remove all NA column
+      cols <- setdiff(cols, col)
+    } else {
+      if(!is.numeric(df[[col]]) && !is.logical(df[[col]])) {
+        # convert data to factor if predictors are not numeric or logical
+        # and limit the number of levels in factor by fct_lump
+        df[[col]] <- forcats::fct_lump(as.factor(df[[col]]), n=predictor_n)
+      }
     }
   }
 
@@ -785,7 +786,7 @@ calc_feature_imp <- function(df,
         samplesize = samplesize,
         nodesize=nodesize,
         ntree = ntree,
-        na.action = na.omit
+        na.action = randomForest::na.roughfix # replace NA with median (numeric) or mode (categorical)
       )
       # these attributes are used in tidy of randomForest
       rf$classification_type <- "multi"
