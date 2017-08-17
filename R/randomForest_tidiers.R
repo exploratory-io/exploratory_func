@@ -706,7 +706,7 @@ calc_feature_imp <- function(df,
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
   target_col <- dplyr::select_var(names(df), !! rlang::enquo(target))
   # this evaluates select arguments like starts_with
-  cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
+  selected_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
 
   grouped_cols <- grouped_by(df)
 
@@ -718,9 +718,11 @@ calc_feature_imp <- function(df,
   df <- df %>%
     dplyr::filter(!is.na(!!target_col))
 
-  for (col in cols) {
+  # cols will be filtered to remove invalid columns
+  cols <- selected_cols
+  for (col in selected_cols) {
     if(all(is.na(df[[col]]))){
-      # remove all NA column
+      # remove columns if they are all NA
       cols <- setdiff(cols, col)
     } else {
       if(!is.numeric(df[[col]]) && !is.logical(df[[col]])) {
