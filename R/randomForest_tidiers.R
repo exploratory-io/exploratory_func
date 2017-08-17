@@ -710,7 +710,7 @@ calc_feature_imp <- function(df,
 
   grouped_cols <- grouped_by(df)
 
-  if (any(c(target_col, cols) %in% grouped_cols)) {
+  if (any(c(target_col, selected_cols) %in% grouped_cols)) {
     stop("grouping column is used as variable columns")
   }
 
