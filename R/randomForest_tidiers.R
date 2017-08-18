@@ -725,7 +725,13 @@ calc_feature_imp <- function(df,
       # remove columns if they are all NA
       cols <- setdiff(cols, col)
     } else {
-      if(!is.numeric(df[[col]]) && !is.logical(df[[col]])) {
+      if(lubridate::is.Date(df[[col]])) {
+        cols <- setdiff(cols, col)
+        wday_col <- avoid_conflict(colnames(df), paste0(col, "_wday"))
+        cols <- c(cols, wday_col)
+        df[[wday_col]] <- lubridate::wday(df[[col]], label=TRUE)
+      }
+      else if(!is.numeric(df[[col]]) && !is.logical(df[[col]])) {
         # convert data to factor if predictors are not numeric or logical
         # and limit the number of levels in factor by fct_lump
         df[[col]] <- forcats::fct_lump(as.factor(df[[col]]), n=predictor_n)
