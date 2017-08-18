@@ -75,5 +75,6 @@ Suggests:
     randomForest,
     lexicon,
     rgeolocate,
-    bayesAB
+    bayesAB,
+    ranger
 RoxygenNote: 6.0.1
