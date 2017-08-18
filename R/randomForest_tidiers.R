@@ -728,8 +728,12 @@ calc_feature_imp <- function(df,
       if(lubridate::is.Date(df[[col]])) {
         cols <- setdiff(cols, col)
         wday_col <- avoid_conflict(colnames(df), paste0(col, "_wday"))
-        cols <- c(cols, wday_col)
+        month_col <- avoid_conflict(colnames(df), paste0(col, "_month"))
+        year_col <- avoid_conflict(colnames(df), paste0(col, "_year"))
+        cols <- c(cols, wday_col, month_col, year_col)
         df[[wday_col]] <- lubridate::wday(df[[col]], label=TRUE)
+        df[[month_col]] <- lubridate::month(df[[col]], label=TRUE)
+        df[[year_col]] <- lubridate::year(df[[col]])
       }
       else if(!is.numeric(df[[col]]) && !is.logical(df[[col]])) {
         # convert data to factor if predictors are not numeric or logical
