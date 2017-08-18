@@ -725,7 +725,7 @@ calc_feature_imp <- function(df,
       # remove columns if they are all NA
       cols <- setdiff(cols, col)
     } else {
-      if(lubridate::is.Date(df[[col]])) {
+      if(lubridate::is.Date(df[[col]]) || lubridate::is.POSIXct(df[[col]])) {
         cols <- setdiff(cols, col)
         wday_col <- avoid_conflict(colnames(df), paste0(col, "_wday"))
         month_col <- avoid_conflict(colnames(df), paste0(col, "_month"))
