@@ -698,11 +698,10 @@ calc_feature_imp <- function(df,
                              target,
                              ...,
                              max_nrow = 100000,
-                             samplesize = 100,
                              ntree = 20,
                              nodesize = 12,
-                             target_n = 10,
-                             predictor_n = 6
+                             target_n = 20,
+                             predictor_n = 10
                              ){
   # this seems to be the new way of NSE column selection evaluation
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
@@ -753,8 +752,10 @@ calc_feature_imp <- function(df,
   clean_target_col <- name_map[target_col]
   clean_cols <- name_map[cols]
 
-  # limit the number of levels in factor by fct_lump
+  # if target is numeric, it is regression but
+  # if not, it is classification
   if(!is.numeric(clean_df[[clean_target_col]])) {
+    # limit the number of levels in factor by fct_lump
     clean_df[[clean_target_col]] <- forcats::fct_lump(
       as.factor(clean_df[[clean_target_col]]), n = target_n
     )
@@ -790,7 +791,9 @@ calc_feature_imp <- function(df,
       rf <- ranger::ranger(
         fml,
         data = model_df,
-        importance = "impurity"
+        importance = "impurity",
+        num.trees = ntree,
+        min.node.size = nodesize
       )
       # these attributes are used in tidy of randomForest
       rf$classification_type <- "multi"
@@ -816,11 +819,13 @@ calc_feature_imp <- function(df,
 }
 
 #' @export
+#' @param type "importance", "evaluation" or "conf_mat". Feature importance, evaluated scores or confusion matrix of training data.
 tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
-  browser()
   switch(
     type,
     importance = {
+      # return variable importance
+
       imp <- ranger::importance(x)
 
       ret <- data.frame(
@@ -892,6 +897,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
       }
     },
     conf_mat = {
+      # return confusion matrix
       ret <- data.frame(
         actual_value = x$y,
         predicted_value = x$predictions
@@ -899,7 +905,9 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
         dplyr::filter(!is.na(predicted_value))
 
       if(!is.numeric(ret$actual_value)){
-        ret <- dplyr::group_by(actual_value, predicted_value) %>%
+        # get count if it's classification
+        ret <- ret %>%
+          dplyr::group_by(actual_value, predicted_value) %>%
           dplyr::summarize(count = n()) %>%
           dplyr::ungroup()
       }
