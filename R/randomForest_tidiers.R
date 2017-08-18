@@ -317,7 +317,8 @@ tidy.randomForest.classification <- function(x, pretty.name = FALSE, type = "imp
     ) %>%
       dplyr::filter(!is.na(predicted_value)) %>%
       dplyr::group_by(actual_value, predicted_value) %>%
-      dplyr::summarize(count = n())
+      dplyr::summarize(count = n()) %>%
+      dplyr::ungroup()
 
     ret
   }
@@ -895,9 +896,13 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
         actual_value = x$y,
         predicted_value = x$predictions
       ) %>%
-        dplyr::filter(!is.na(predicted_value)) %>%
-        dplyr::group_by(actual_value, predicted_value) %>%
-        dplyr::summarize(count = n())
+        dplyr::filter(!is.na(predicted_value))
+
+      if(!is.numeric(ret$actual_value)){
+        ret <- dplyr::group_by(actual_value, predicted_value) %>%
+          dplyr::summarize(count = n()) %>%
+          dplyr::ungroup()
+      }
 
       ret
     },
