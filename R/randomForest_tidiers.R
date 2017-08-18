@@ -734,6 +734,11 @@ calc_feature_imp <- function(df,
         df[[wday_col]] <- lubridate::wday(df[[col]], label=TRUE)
         df[[month_col]] <- lubridate::month(df[[col]], label=TRUE)
         df[[year_col]] <- lubridate::year(df[[col]])
+        if(lubridate::is.POSIXct(df[[col]])) {
+          hour_col <- avoid_conflict(colnames(df), paste0(col, "_hour"))
+          cols <- c(cols, hour_col)
+          df[[hour_col]] <- factor(lubridate::hour(df[[col]])) # treat hour as category
+        }
       }
       else if(!is.numeric(df[[col]]) && !is.logical(df[[col]])) {
         # convert data to factor if predictors are not numeric or logical
