@@ -701,7 +701,8 @@ calc_feature_imp <- function(df,
                              ntree = 20,
                              nodesize = 12,
                              target_n = 10,
-                             predictor_n = 6){
+                             predictor_n = 6
+                             ){
   # this seems to be the new way of NSE column selection evaluation
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
   target_col <- dplyr::select_var(names(df), !! rlang::enquo(target))
@@ -752,9 +753,11 @@ calc_feature_imp <- function(df,
   clean_cols <- name_map[cols]
 
   # limit the number of levels in factor by fct_lump
-  clean_df[[clean_target_col]] <- forcats::fct_lump(
-    as.factor(clean_df[[clean_target_col]]), n = target_n
-  )
+  if(!is.numeric(clean_df[[clean_target_col]])) {
+    clean_df[[clean_target_col]] <- forcats::fct_lump(
+      as.factor(clean_df[[clean_target_col]]), n = target_n
+    )
+  }
 
   # build formula for randomForest
   rhs <- paste0("`", clean_cols, "`", collapse = " + ")
@@ -781,18 +784,17 @@ calc_feature_imp <- function(df,
         }
       }
 
-      rf <- randomForest::randomForest(
+      model_df <- model.frame(fml, data = df, na.action = randomForest::na.roughfix)
+
+      rf <- ranger::ranger(
         fml,
-        data = df,
-        importance = FALSE,
-        samplesize = samplesize,
-        nodesize=nodesize,
-        ntree = ntree,
-        na.action = randomForest::na.roughfix # replace NA with median (numeric) or mode (categorical)
+        data = model_df,
+        importance = "impurity"
       )
       # these attributes are used in tidy of randomForest
       rf$classification_type <- "multi"
       rf$terms_mapping <- names(name_map)
+      rf$y <- model.response(model_df)
       names(rf$terms_mapping) <- name_map
       rf
     }, error = function(e){
@@ -810,4 +812,96 @@ calc_feature_imp <- function(df,
   }
 
   do_on_each_group(clean_df, each_func, name = "model", with_unnest = FALSE)
+}
+
+#' @export
+tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
+  browser()
+  switch(
+    type,
+    importance = {
+      imp <- ranger::importance(x)
+
+      ret <- data.frame(
+        variable = x$terms_mapping[names(imp)],
+        importance = imp,
+        stringsAsFactors = FALSE
+      )
+
+      ret
+    },
+    evaluation = {
+      # get evaluation scores from training data
+      actual <- x$y
+      predicted <- x$predictions
+
+      per_level <- function(class) {
+        tp <- sum(actual == class & predicted == class, na.rm = TRUE)
+        tn <- sum(actual != class & predicted != class, na.rm = TRUE)
+        fp <- sum(actual != class & predicted == class, na.rm = TRUE)
+        fn <- sum(actual == class & predicted != class, na.rm = TRUE)
+
+        precision <- tp / (tp + fp)
+        # this avoids NA
+        if(tp+fp == 0) {
+          precision <- 0
+        }
+
+        recall <- tp / (tp + fn)
+        # this avoids NA
+        if(tn+fn == 0) {
+          recall <- 0
+        }
+
+        accuracy <- (tp + tn) / (tp + fp + tn + fn)
+
+        f_score <- 2 * ((precision * recall) / (precision + recall))
+        # this avoids NA
+        if(precision + recall == 0) {
+          f_score <- 0
+        }
+
+        data_size <- sum(actual == class)
+
+        ret <- data.frame(
+          class,
+          f_score,
+          accuracy,
+          1- accuracy,
+          precision,
+          recall,
+          data_size
+        )
+
+        names(ret) <- if(pretty.name){
+          c("Class", "F Score", "Accuracy Rate", "Missclassification Rate", "Precision", "Recall", "Data Size")
+        } else {
+          c("class", "f_score", "accuracy_rate", "missclassification_rate", "precision", "recall", "data_size")
+        }
+        ret
+      }
+
+      if(x$classification_type == "binary") {
+        ret <- per_level(levels(actual)[2])
+        # remove class column
+        ret <- ret[, 2:6]
+        ret
+      } else {
+        dplyr::bind_rows(lapply(levels(actual), per_level))
+      }
+    },
+    conf_mat = {
+      ret <- data.frame(
+        actual_value = x$y,
+        predicted_value = x$predictions
+      ) %>%
+        dplyr::filter(!is.na(predicted_value)) %>%
+        dplyr::group_by(actual_value, predicted_value) %>%
+        dplyr::summarize(count = n())
+
+      ret
+    },
+    {
+      stop(paste0("type ", type, " is not defined"))
+    })
 }
