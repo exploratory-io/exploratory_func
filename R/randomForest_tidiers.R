@@ -726,7 +726,24 @@ calc_feature_imp <- function(df,
       # remove columns if they are all NA
       cols <- setdiff(cols, col)
     } else {
-      if(!is.numeric(df[[col]]) && !is.logical(df[[col]])) {
+      if(lubridate::is.Date(df[[col]]) || lubridate::is.POSIXct(df[[col]])) {
+        cols <- setdiff(cols, col)
+        wday_col <- avoid_conflict(colnames(df), paste0(col, "_wday"))
+        day_col <- avoid_conflict(colnames(df), paste0(col, "_day"))
+        month_col <- avoid_conflict(colnames(df), paste0(col, "_month"))
+        year_col <- avoid_conflict(colnames(df), paste0(col, "_year"))
+        cols <- c(cols, wday_col, day_col, month_col, year_col)
+        df[[wday_col]] <- lubridate::wday(df[[col]], label=TRUE)
+        df[[day_col]] <- lubridate::day(df[[col]])
+        df[[month_col]] <- lubridate::month(df[[col]], label=TRUE)
+        df[[year_col]] <- lubridate::year(df[[col]])
+        if(lubridate::is.POSIXct(df[[col]])) {
+          hour_col <- avoid_conflict(colnames(df), paste0(col, "_hour"))
+          cols <- c(cols, hour_col)
+          df[[hour_col]] <- factor(lubridate::hour(df[[col]])) # treat hour as category
+        }
+      }
+      else if(!is.numeric(df[[col]]) && !is.logical(df[[col]])) {
         # convert data to factor if predictors are not numeric or logical
         # and limit the number of levels in factor by fct_lump
         df[[col]] <- forcats::fct_lump(as.factor(df[[col]]), n=predictor_n)
