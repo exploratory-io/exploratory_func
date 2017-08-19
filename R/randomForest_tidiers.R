@@ -856,61 +856,66 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
     evaluation = {
       # get evaluation scores from training data
       actual <- x$y
-      predicted <- x$predictions
 
-      per_level <- function(class) {
-        tp <- sum(actual == class & predicted == class, na.rm = TRUE)
-        tn <- sum(actual != class & predicted != class, na.rm = TRUE)
-        fp <- sum(actual != class & predicted == class, na.rm = TRUE)
-        fn <- sum(actual == class & predicted != class, na.rm = TRUE)
-
-        precision <- tp / (tp + fp)
-        # this avoids NA
-        if(tp+fp == 0) {
-          precision <- 0
-        }
-
-        recall <- tp / (tp + fn)
-        # this avoids NA
-        if(tn+fn == 0) {
-          recall <- 0
-        }
-
-        accuracy <- (tp + tn) / (tp + fp + tn + fn)
-
-        f_score <- 2 * ((precision * recall) / (precision + recall))
-        # this avoids NA
-        if(precision + recall == 0) {
-          f_score <- 0
-        }
-
-        data_size <- sum(actual == class)
-
-        ret <- data.frame(
-          class,
-          f_score,
-          accuracy,
-          1- accuracy,
-          precision,
-          recall,
-          data_size
-        )
-
-        names(ret) <- if(pretty.name){
-          c("Class", "F Score", "Accuracy Rate", "Missclassification Rate", "Precision", "Recall", "Data Size")
-        } else {
-          c("class", "f_score", "accuracy_rate", "missclassification_rate", "precision", "recall", "data_size")
-        }
-        ret
-      }
-
-      if(x$classification_type == "binary") {
-        ret <- per_level(levels(actual)[2])
-        # remove class column
-        ret <- ret[, 2:6]
-        ret
+      if(is.numeric(actual)){
+        glance(x, pretty.name = pretty.name, ...)
       } else {
-        dplyr::bind_rows(lapply(levels(actual), per_level))
+        predicted <- x$predictions
+
+        per_level <- function(class) {
+          tp <- sum(actual == class & predicted == class, na.rm = TRUE)
+          tn <- sum(actual != class & predicted != class, na.rm = TRUE)
+          fp <- sum(actual != class & predicted == class, na.rm = TRUE)
+          fn <- sum(actual == class & predicted != class, na.rm = TRUE)
+
+          precision <- tp / (tp + fp)
+          # this avoids NA
+          if(tp+fp == 0) {
+            precision <- 0
+          }
+
+          recall <- tp / (tp + fn)
+          # this avoids NA
+          if(tn+fn == 0) {
+            recall <- 0
+          }
+
+          accuracy <- (tp + tn) / (tp + fp + tn + fn)
+
+          f_score <- 2 * ((precision * recall) / (precision + recall))
+          # this avoids NA
+          if(precision + recall == 0) {
+            f_score <- 0
+          }
+
+          data_size <- sum(actual == class)
+
+          ret <- data.frame(
+            class,
+            f_score,
+            accuracy,
+            1- accuracy,
+            precision,
+            recall,
+            data_size
+          )
+
+          names(ret) <- if(pretty.name){
+            c("Class", "F Score", "Accuracy Rate", "Missclassification Rate", "Precision", "Recall", "Data Size")
+          } else {
+            c("class", "f_score", "accuracy_rate", "missclassification_rate", "precision", "recall", "data_size")
+          }
+          ret
+        }
+
+        if(x$classification_type == "binary") {
+          ret <- per_level(levels(actual)[2])
+          # remove class column
+          ret <- ret[, 2:6]
+          ret
+        } else {
+          dplyr::bind_rows(lapply(levels(actual), per_level))
+        }
       }
     },
     conf_mat = {
@@ -938,7 +943,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
     scatter = {
       # return actual and predicted value pairs
       ret <- data.frame(
-        actual_value = x$y,
+        expected_value = x$y,
         predicted_value = x$predictions
       ) %>%
         dplyr::filter(!is.na(predicted_value))
@@ -948,4 +953,23 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
     {
       stop(paste0("type ", type, " is not defined"))
     })
+}
+
+#' @export
+glance.ranger <- function(x, pretty.name = FALSE, ...) {
+  ret <- data.frame(
+    root_mean_square_error = sqrt(x$prediction.error),
+    r_squared = x$r.squared
+  )
+
+  if(pretty.name){
+    map = list(
+      `Root Mean Square Error` = as.symbol("root_mean_square_error"),
+      `R Squared` = as.symbol("r_squared")
+    )
+    ret <- ret %>%
+      dplyr::rename(!!!map)
+  }
+
+  ret
 }
