@@ -919,7 +919,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
       ret
     },
     scatter = {
-      # return confusion matrix
+      # return actual and predicted value pairs
       ret <- data.frame(
         actual_value = x$y,
         predicted_value = x$predictions
