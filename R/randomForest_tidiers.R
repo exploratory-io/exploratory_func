@@ -800,6 +800,19 @@ calc_feature_imp <- function(df,
           yday_col <- avoid_conflict(colnames(df), paste0(col, "_day_of_year"))
           month_col <- avoid_conflict(colnames(df), paste0(col, "_month"))
           year_col <- avoid_conflict(colnames(df), paste0(col, "_year"))
+          new_name <- c(wday_col, day_col, yday_col, month_col, year_col)
+          names(new_name) <- paste(
+            names(name_map)[name_map == col],
+            c(
+              "_day_of_week",
+              "_day",
+              "_day_of_year",
+              "_month",
+              "_year"
+            ), sep="")
+
+          name_map <- c(name_map, new_name)
+
           c_cols <- c(c_cols, absolute_time_col, wday_col, day_col, yday_col, month_col, year_col)
           df[[absolute_time_col]] <- as.numeric(df[[col]])
           df[[wday_col]] <- lubridate::wday(df[[col]], label=TRUE)
