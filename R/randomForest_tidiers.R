@@ -794,6 +794,7 @@ calc_feature_imp <- function(df,
       for(col in clean_cols){
         if(lubridate::is.Date(df[[col]]) || lubridate::is.POSIXct(df[[col]])) {
           c_cols <- setdiff(c_cols, col)
+
           absolute_time_col <- avoid_conflict(colnames(df), paste0(col, "_absolute_time"))
           wday_col <- avoid_conflict(colnames(df), paste0(col, "_day_of_week"))
           day_col <- avoid_conflict(colnames(df), paste0(col, "_day_of_month"))
@@ -836,6 +837,16 @@ calc_feature_imp <- function(df,
           }
         }
       }
+
+      # remove columns with only one unique value
+      cols_copy <- c_cols
+      for (col in cols_copy) {
+        unique_val <- unique(df[[col]])
+        if (length(unique_val[!is.na(unique_val)]) == 1) {
+          c_cols <- setdiff(c_cols, col)
+        }
+      }
+
       # build formula for randomForest
       rhs <- paste0("`", c_cols, "`", collapse = " + ")
       fml <- as.formula(paste(clean_target_col, " ~ ", rhs))
