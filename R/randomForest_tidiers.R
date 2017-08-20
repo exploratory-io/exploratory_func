@@ -728,13 +728,15 @@ calc_feature_imp <- function(df,
     } else {
       if(lubridate::is.Date(df[[col]]) || lubridate::is.POSIXct(df[[col]])) {
         cols <- setdiff(cols, col)
-        wday_col <- avoid_conflict(colnames(df), paste0(col, "_wday"))
-        day_col <- avoid_conflict(colnames(df), paste0(col, "_day"))
+        wday_col <- avoid_conflict(colnames(df), paste0(col, "_day_of_week"))
+        day_col <- avoid_conflict(colnames(df), paste0(col, "_day_of_month"))
+        yday_col <- avoid_conflict(colnames(df), paste0(col, "_day_of_year"))
         month_col <- avoid_conflict(colnames(df), paste0(col, "_month"))
         year_col <- avoid_conflict(colnames(df), paste0(col, "_year"))
-        cols <- c(cols, wday_col, day_col, month_col, year_col)
+        cols <- c(cols, wday_col, day_col, yday_col, month_col, year_col)
         df[[wday_col]] <- lubridate::wday(df[[col]], label=TRUE)
         df[[day_col]] <- lubridate::day(df[[col]])
+        df[[yday_col]] <- lubridate::yday(df[[col]])
         df[[month_col]] <- lubridate::month(df[[col]], label=TRUE)
         df[[year_col]] <- lubridate::year(df[[col]])
         if(lubridate::is.POSIXct(df[[col]])) {
