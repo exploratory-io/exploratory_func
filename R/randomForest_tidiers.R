@@ -800,7 +800,7 @@ calc_feature_imp <- function(df,
           yday_col <- avoid_conflict(colnames(df), paste0(col, "_day_of_year"))
           month_col <- avoid_conflict(colnames(df), paste0(col, "_month"))
           year_col <- avoid_conflict(colnames(df), paste0(col, "_year"))
-          cols <- c(cols, absolute_time_col, wday_col, day_col, yday_col, month_col, year_col)
+          c_cols <- c(c_cols, absolute_time_col, wday_col, day_col, yday_col, month_col, year_col)
           df[[absolute_time_col]] <- as.numeric(df[[col]])
           df[[wday_col]] <- lubridate::wday(df[[col]], label=TRUE)
           df[[day_col]] <- lubridate::day(df[[col]])
@@ -809,7 +809,7 @@ calc_feature_imp <- function(df,
           df[[year_col]] <- lubridate::year(df[[col]])
           if(lubridate::is.POSIXct(df[[col]])) {
             hour_col <- avoid_conflict(colnames(df), paste0(col, "_hour"))
-            cols <- c(cols, hour_col)
+            c_cols <- c(c_cols, hour_col)
             df[[hour_col]] <- factor(lubridate::hour(df[[col]])) # treat hour as category
           }
         }
