@@ -698,6 +698,7 @@ calc_feature_imp <- function(df,
                              target,
                              ...,
                              max_nrow = 100000,
+                             max_sample_size = 50000,
                              ntree = 20,
                              nodesize = 12,
                              target_n = 20,
@@ -711,6 +712,13 @@ calc_feature_imp <- function(df,
 
   grouped_cols <- grouped_by(df)
 
+  # remove grouped col or target col
+  selected_cols <- setdiff(selected_cols, c(grouped_cols, target_col))
+
+  if(target_col %in% grouped_cols) {
+    stop(paste0(target_col, " is used as target column but it's grouped."))
+  }
+
   if (any(c(target_col, selected_cols) %in% grouped_cols)) {
     stop("grouping column is used as variable columns")
   }
@@ -721,33 +729,15 @@ calc_feature_imp <- function(df,
 
   # cols will be filtered to remove invalid columns
   cols <- selected_cols
+
   for (col in selected_cols) {
     if(all(is.na(df[[col]]))){
       # remove columns if they are all NA
       cols <- setdiff(cols, col)
-    } else {
-      if(lubridate::is.Date(df[[col]]) || lubridate::is.POSIXct(df[[col]])) {
-        cols <- setdiff(cols, col)
-        wday_col <- avoid_conflict(colnames(df), paste0(col, "_wday"))
-        day_col <- avoid_conflict(colnames(df), paste0(col, "_day"))
-        month_col <- avoid_conflict(colnames(df), paste0(col, "_month"))
-        year_col <- avoid_conflict(colnames(df), paste0(col, "_year"))
-        cols <- c(cols, wday_col, day_col, month_col, year_col)
-        df[[wday_col]] <- lubridate::wday(df[[col]], label=TRUE)
-        df[[day_col]] <- lubridate::day(df[[col]])
-        df[[month_col]] <- lubridate::month(df[[col]], label=TRUE)
-        df[[year_col]] <- lubridate::year(df[[col]])
-        if(lubridate::is.POSIXct(df[[col]])) {
-          hour_col <- avoid_conflict(colnames(df), paste0(col, "_hour"))
-          cols <- c(cols, hour_col)
-          df[[hour_col]] <- factor(lubridate::hour(df[[col]])) # treat hour as category
-        }
-      }
-      else if(!is.numeric(df[[col]]) && !is.logical(df[[col]])) {
-        # convert data to factor if predictors are not numeric or logical
-        # and limit the number of levels in factor by fct_lump
-        df[[col]] <- forcats::fct_lump(as.factor(df[[col]]), n=predictor_n)
-      }
+    } else if(!is.numeric(df[[col]])) {
+      # convert data to factor if predictors are not numeric or logical
+      # and limit the number of levels in factor by fct_lump
+      df[[col]] <- forcats::fct_lump(as.factor(df[[col]]), n=predictor_n)
     }
   }
 
@@ -771,7 +761,7 @@ calc_feature_imp <- function(df,
 
   # if target is numeric, it is regression but
   # if not, it is classification
-  if(!is.numeric(clean_df[[clean_target_col]])) {
+  if (!is.numeric(clean_df[[clean_target_col]])) {
     # limit the number of levels in factor by fct_lump
     clean_df[[clean_target_col]] <- forcats::fct_lump(
       as.factor(clean_df[[clean_target_col]]), n = target_n
@@ -802,15 +792,39 @@ calc_feature_imp <- function(df,
           return(NULL)
         }
       }
+      for(col in clean_cols){
+        if(lubridate::is.Date(df[[col]]) || lubridate::is.POSIXct(df[[col]])) {
+          cols <- setdiff(cols, col)
+          wday_col <- avoid_conflict(colnames(df), paste0(col, "_wday"))
+          day_col <- avoid_conflict(colnames(df), paste0(col, "_day"))
+          month_col <- avoid_conflict(colnames(df), paste0(col, "_month"))
+          year_col <- avoid_conflict(colnames(df), paste0(col, "_year"))
+          cols <- c(cols, wday_col, day_col, month_col, year_col)
+          df[[wday_col]] <- lubridate::wday(df[[col]], label=TRUE)
+          df[[day_col]] <- lubridate::day(df[[col]])
+          df[[month_col]] <- lubridate::month(df[[col]], label=TRUE)
+          df[[year_col]] <- lubridate::year(df[[col]])
+          if(lubridate::is.POSIXct(df[[col]])) {
+            hour_col <- avoid_conflict(colnames(df), paste0(col, "_hour"))
+            cols <- c(cols, hour_col)
+            df[[hour_col]] <- factor(lubridate::hour(df[[col]])) # treat hour as category
+          }
+        }
+      }
 
       model_df <- model.frame(fml, data = df, na.action = randomForest::na.roughfix)
+
+      # all or max_sample_size data will be used for randomForest
+      # to grow a tree
+      sample.fraction <- min(c(max_sample_size / max_nrow, 1))
 
       rf <- ranger::ranger(
         fml,
         data = model_df,
         importance = "impurity",
         num.trees = ntree,
-        min.node.size = nodesize
+        min.node.size = nodesize,
+        sample.fraction = sample.fraction
       )
       # these attributes are used in tidy of randomForest
       rf$classification_type <- "multi"
