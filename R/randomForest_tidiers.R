@@ -715,10 +715,6 @@ calc_feature_imp <- function(df,
   # remove grouped col or target col
   selected_cols <- setdiff(selected_cols, c(grouped_cols, target_col))
 
-  if(target_col %in% grouped_cols) {
-    stop(paste0(target_col, " is used as target column but it's grouped."))
-  }
-
   if (any(c(target_col, selected_cols) %in% grouped_cols)) {
     stop("grouping column is used as variable columns")
   }
@@ -734,7 +730,12 @@ calc_feature_imp <- function(df,
     if(all(is.na(df[[col]]))){
       # remove columns if they are all NA
       cols <- setdiff(cols, col)
-    } else if(!is.numeric(df[[col]])) {
+    } else if(!is.numeric(df[[col]]) &&
+              !lubridate::is.Date(df[[col]]) &&
+              !lubridate::is.POSIXct(df[[col]])
+              # if it's date or POSIXct, it will be removed
+              # so no need to convert to factor
+              ) {
       # convert data to factor if predictors are not numeric or logical
       # and limit the number of levels in factor by fct_lump
       df[[col]] <- forcats::fct_lump(as.factor(df[[col]]), n=predictor_n)
@@ -768,10 +769,6 @@ calc_feature_imp <- function(df,
     )
   }
 
-  # build formula for randomForest
-  rhs <- paste0("`", clean_cols, "`", collapse = " + ")
-  fml <- as.formula(paste(clean_target_col, " ~ ", rhs))
-
   each_func <- function(df) {
     tryCatch({
       # sample the data because randomForest takes long time
@@ -792,9 +789,11 @@ calc_feature_imp <- function(df,
           return(NULL)
         }
       }
+
+      c_cols <- clean_cols
       for(col in clean_cols){
         if(lubridate::is.Date(df[[col]]) || lubridate::is.POSIXct(df[[col]])) {
-          cols <- setdiff(cols, col)
+          c_cols <- setdiff(c_cols, col)
           wday_col <- avoid_conflict(colnames(df), paste0(col, "_wday"))
           day_col <- avoid_conflict(colnames(df), paste0(col, "_day"))
           month_col <- avoid_conflict(colnames(df), paste0(col, "_month"))
@@ -811,7 +810,9 @@ calc_feature_imp <- function(df,
           }
         }
       }
-
+      # build formula for randomForest
+      rhs <- paste0("`", c_cols, "`", collapse = " + ")
+      fml <- as.formula(paste(clean_target_col, " ~ ", rhs))
       model_df <- model.frame(fml, data = df, na.action = randomForest::na.roughfix)
 
       # all or max_sample_size data will be used for randomForest
