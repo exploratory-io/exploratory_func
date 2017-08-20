@@ -800,10 +800,11 @@ calc_feature_imp <- function(df,
           yday_col <- avoid_conflict(colnames(df), paste0(col, "_day_of_year"))
           month_col <- avoid_conflict(colnames(df), paste0(col, "_month"))
           year_col <- avoid_conflict(colnames(df), paste0(col, "_year"))
-          new_name <- c(wday_col, day_col, yday_col, month_col, year_col)
+          new_name <- c(absolute_time_col, wday_col, day_col, yday_col, month_col, year_col)
           names(new_name) <- paste(
             names(name_map)[name_map == col],
             c(
+              "_absolute_time",
               "_day_of_week",
               "_day",
               "_day_of_year",
