@@ -823,6 +823,14 @@ calc_feature_imp <- function(df,
           df[[year_col]] <- lubridate::year(df[[col]])
           if(lubridate::is.POSIXct(df[[col]])) {
             hour_col <- avoid_conflict(colnames(df), paste0(col, "_hour"))
+            new_name <- c(hour_col)
+            names(new_name) <- paste(
+              names(name_map)[name_map == col],
+              c(
+                "_hour"
+              ), sep="")
+            name_map <- c(name_map, new_name)
+
             c_cols <- c(c_cols, hour_col)
             df[[hour_col]] <- factor(lubridate::hour(df[[col]])) # treat hour as category
           }
