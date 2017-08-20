@@ -317,7 +317,8 @@ tidy.randomForest.classification <- function(x, pretty.name = FALSE, type = "imp
     ) %>%
       dplyr::filter(!is.na(predicted_value)) %>%
       dplyr::group_by(actual_value, predicted_value) %>%
-      dplyr::summarize(count = n())
+      dplyr::summarize(count = n()) %>%
+      dplyr::ungroup()
 
     ret
   }
@@ -697,11 +698,12 @@ calc_feature_imp <- function(df,
                              target,
                              ...,
                              max_nrow = 100000,
-                             samplesize = 100,
+                             max_sample_size = 50000,
                              ntree = 20,
                              nodesize = 12,
-                             target_n = 10,
-                             predictor_n = 6){
+                             target_n = 20,
+                             predictor_n = 10
+                             ){
   # this seems to be the new way of NSE column selection evaluation
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
   target_col <- dplyr::select_var(names(df), !! rlang::enquo(target))
@@ -709,6 +711,9 @@ calc_feature_imp <- function(df,
   selected_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
 
   grouped_cols <- grouped_by(df)
+
+  # remove grouped col or target col
+  selected_cols <- setdiff(selected_cols, c(grouped_cols, target_col))
 
   if (any(c(target_col, selected_cols) %in% grouped_cols)) {
     stop("grouping column is used as variable columns")
@@ -720,16 +725,20 @@ calc_feature_imp <- function(df,
 
   # cols will be filtered to remove invalid columns
   cols <- selected_cols
+
   for (col in selected_cols) {
     if(all(is.na(df[[col]]))){
       # remove columns if they are all NA
       cols <- setdiff(cols, col)
-    } else {
-      if(!is.numeric(df[[col]]) && !is.logical(df[[col]])) {
-        # convert data to factor if predictors are not numeric or logical
-        # and limit the number of levels in factor by fct_lump
-        df[[col]] <- forcats::fct_lump(as.factor(df[[col]]), n=predictor_n)
-      }
+    } else if(!is.numeric(df[[col]]) &&
+              !lubridate::is.Date(df[[col]]) &&
+              !lubridate::is.POSIXct(df[[col]])
+              # if it's date or POSIXct, it will be removed
+              # so no need to convert to factor
+              ) {
+      # convert data to factor if predictors are not numeric or logical
+      # and limit the number of levels in factor by fct_lump
+      df[[col]] <- forcats::fct_lump(as.factor(df[[col]]), n=predictor_n)
     }
   }
 
@@ -751,14 +760,14 @@ calc_feature_imp <- function(df,
   clean_target_col <- name_map[target_col]
   clean_cols <- name_map[cols]
 
-  # limit the number of levels in factor by fct_lump
-  clean_df[[clean_target_col]] <- forcats::fct_lump(
-    as.factor(clean_df[[clean_target_col]]), n = target_n
-  )
-
-  # build formula for randomForest
-  rhs <- paste0("`", clean_cols, "`", collapse = " + ")
-  fml <- as.formula(paste(clean_target_col, " ~ ", rhs))
+  # if target is numeric, it is regression but
+  # if not, it is classification
+  if (!is.numeric(clean_df[[clean_target_col]])) {
+    # limit the number of levels in factor by fct_lump
+    clean_df[[clean_target_col]] <- forcats::fct_lump(
+      as.factor(clean_df[[clean_target_col]]), n = target_n
+    )
+  }
 
   each_func <- function(df) {
     tryCatch({
@@ -781,18 +790,65 @@ calc_feature_imp <- function(df,
         }
       }
 
-      rf <- randomForest::randomForest(
+      c_cols <- clean_cols
+      for(col in clean_cols){
+        if(lubridate::is.Date(df[[col]]) || lubridate::is.POSIXct(df[[col]])) {
+          c_cols <- setdiff(c_cols, col)
+          absolute_time_col <- avoid_conflict(colnames(df), paste0(col, "_absolute_time"))
+          wday_col <- avoid_conflict(colnames(df), paste0(col, "_day_of_week"))
+          day_col <- avoid_conflict(colnames(df), paste0(col, "_day"))
+          yday_col <- avoid_conflict(colnames(df), paste0(col, "_day_of_year"))
+          month_col <- avoid_conflict(colnames(df), paste0(col, "_month"))
+          year_col <- avoid_conflict(colnames(df), paste0(col, "_year"))
+          new_name <- c(absolute_time_col, wday_col, day_col, yday_col, month_col, year_col)
+          names(new_name) <- paste(
+            names(name_map)[name_map == col],
+            c(
+              "_absolute_time",
+              "_day_of_week",
+              "_day",
+              "_day_of_year",
+              "_month",
+              "_year"
+            ), sep="")
+
+          name_map <- c(name_map, new_name)
+
+          c_cols <- c(c_cols, absolute_time_col, wday_col, day_col, yday_col, month_col, year_col)
+          df[[absolute_time_col]] <- as.numeric(df[[col]])
+          df[[wday_col]] <- lubridate::wday(df[[col]], label=TRUE)
+          df[[day_col]] <- lubridate::day(df[[col]])
+          df[[yday_col]] <- lubridate::yday(df[[col]])
+          df[[month_col]] <- lubridate::month(df[[col]], label=TRUE)
+          df[[year_col]] <- lubridate::year(df[[col]])
+          if(lubridate::is.POSIXct(df[[col]])) {
+            hour_col <- avoid_conflict(colnames(df), paste0(col, "_hour"))
+            c_cols <- c(c_cols, hour_col)
+            df[[hour_col]] <- factor(lubridate::hour(df[[col]])) # treat hour as category
+          }
+        }
+      }
+      # build formula for randomForest
+      rhs <- paste0("`", c_cols, "`", collapse = " + ")
+      fml <- as.formula(paste(clean_target_col, " ~ ", rhs))
+      model_df <- model.frame(fml, data = df, na.action = randomForest::na.roughfix)
+
+      # all or max_sample_size data will be used for randomForest
+      # to grow a tree
+      sample.fraction <- min(c(max_sample_size / max_nrow, 1))
+
+      rf <- ranger::ranger(
         fml,
-        data = df,
-        importance = FALSE,
-        samplesize = samplesize,
-        nodesize=nodesize,
-        ntree = ntree,
-        na.action = randomForest::na.roughfix # replace NA with median (numeric) or mode (categorical)
+        data = model_df,
+        importance = "impurity",
+        num.trees = ntree,
+        min.node.size = nodesize,
+        sample.fraction = sample.fraction
       )
       # these attributes are used in tidy of randomForest
       rf$classification_type <- "multi"
       rf$terms_mapping <- names(name_map)
+      rf$y <- model.response(model_df)
       names(rf$terms_mapping) <- name_map
       rf
     }, error = function(e){
@@ -810,4 +866,137 @@ calc_feature_imp <- function(df,
   }
 
   do_on_each_group(clean_df, each_func, name = "model", with_unnest = FALSE)
+}
+
+#' @export
+#' @param type "importance", "evaluation" or "conf_mat". Feature importance, evaluated scores or confusion matrix of training data.
+tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
+  switch(
+    type,
+    importance = {
+      # return variable importance
+
+      imp <- ranger::importance(x)
+
+      ret <- data.frame(
+        variable = x$terms_mapping[names(imp)],
+        importance = imp,
+        stringsAsFactors = FALSE
+      )
+
+      ret
+    },
+    evaluation = {
+      # get evaluation scores from training data
+      actual <- x$y
+
+      if(is.numeric(actual)){
+        glance(x, pretty.name = pretty.name, ...)
+      } else {
+        predicted <- x$predictions
+
+        per_level <- function(class) {
+          tp <- sum(actual == class & predicted == class, na.rm = TRUE)
+          tn <- sum(actual != class & predicted != class, na.rm = TRUE)
+          fp <- sum(actual != class & predicted == class, na.rm = TRUE)
+          fn <- sum(actual == class & predicted != class, na.rm = TRUE)
+
+          precision <- tp / (tp + fp)
+          # this avoids NA
+          if(tp+fp == 0) {
+            precision <- 0
+          }
+
+          recall <- tp / (tp + fn)
+          # this avoids NA
+          if(tn+fn == 0) {
+            recall <- 0
+          }
+
+          accuracy <- (tp + tn) / (tp + fp + tn + fn)
+
+          f_score <- 2 * ((precision * recall) / (precision + recall))
+          # this avoids NA
+          if(precision + recall == 0) {
+            f_score <- 0
+          }
+
+          data_size <- sum(actual == class)
+
+          ret <- data.frame(
+            class,
+            f_score,
+            accuracy,
+            1- accuracy,
+            precision,
+            recall,
+            data_size
+          )
+
+          names(ret) <- if(pretty.name){
+            c("Class", "F Score", "Accuracy Rate", "Missclassification Rate", "Precision", "Recall", "Data Size")
+          } else {
+            c("class", "f_score", "accuracy_rate", "missclassification_rate", "precision", "recall", "data_size")
+          }
+          ret
+        }
+
+        if(x$classification_type == "binary") {
+          ret <- per_level(levels(actual)[2])
+          # remove class column
+          ret <- ret[, 2:6]
+          ret
+        } else {
+          dplyr::bind_rows(lapply(levels(actual), per_level))
+        }
+      }
+    },
+    conf_mat = {
+      # return confusion matrix
+      ret <- data.frame(
+        actual_value = x$y,
+        predicted_value = x$predictions
+      ) %>%
+        dplyr::filter(!is.na(predicted_value))
+
+      # get count if it's classification
+      ret <- ret %>%
+        dplyr::group_by(actual_value, predicted_value) %>%
+        dplyr::summarize(count = n()) %>%
+        dplyr::ungroup()
+
+      ret
+    },
+    scatter = {
+      # return actual and predicted value pairs
+      ret <- data.frame(
+        expected_value = x$y,
+        predicted_value = x$predictions
+      ) %>%
+        dplyr::filter(!is.na(predicted_value))
+
+      ret
+    },
+    {
+      stop(paste0("type ", type, " is not defined"))
+    })
+}
+
+#' @export
+glance.ranger <- function(x, pretty.name = FALSE, ...) {
+  ret <- data.frame(
+    root_mean_square_error = sqrt(x$prediction.error),
+    r_squared = x$r.squared
+  )
+
+  if(pretty.name){
+    map = list(
+      `Root Mean Square Error` = as.symbol("root_mean_square_error"),
+      `R Squared` = as.symbol("r_squared")
+    )
+    ret <- ret %>%
+      dplyr::rename(!!!map)
+  }
+
+  ret
 }
