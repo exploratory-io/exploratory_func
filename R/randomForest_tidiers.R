@@ -959,17 +959,11 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
       ) %>%
         dplyr::filter(!is.na(predicted_value))
 
-      if (is.numeric(ret$actual_value)){
-        tile <- cut(c(ret$actual_value, ret$predicted_value), 10)
-        ret$actual_bucket <- tile[seq(length(tile)/2)]
-        ret$predicted_bucket <- tile[length(tile)/2 + seq(length(tile)/2)]
-      } else {
-        # get count if it's classification
-        ret <- ret %>%
-          dplyr::group_by(actual_value, predicted_value) %>%
-          dplyr::summarize(count = n()) %>%
-          dplyr::ungroup()
-      }
+      # get count if it's classification
+      ret <- ret %>%
+        dplyr::group_by(actual_value, predicted_value) %>%
+        dplyr::summarize(count = n()) %>%
+        dplyr::ungroup()
 
       ret
     },
