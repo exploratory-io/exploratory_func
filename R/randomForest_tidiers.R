@@ -697,8 +697,8 @@ rf_evaluation <- function(data, ...) {
 calc_feature_imp <- function(df,
                              target,
                              ...,
-                             max_nrow = 100000,
-                             max_sample_size = 50000,
+                             max_nrow = 200000,
+                             max_sample_size = 100000,
                              ntree = 20,
                              nodesize = 12,
                              target_n = 20,
@@ -730,15 +730,6 @@ calc_feature_imp <- function(df,
     if(all(is.na(df[[col]]))){
       # remove columns if they are all NA
       cols <- setdiff(cols, col)
-    } else if(!is.numeric(df[[col]]) &&
-              !lubridate::is.Date(df[[col]]) &&
-              !lubridate::is.POSIXct(df[[col]])
-              # if it's date or POSIXct, it will be removed
-              # so no need to convert to factor
-              ) {
-      # convert data to factor if predictors are not numeric or logical
-      # and limit the number of levels in factor by fct_lump
-      df[[col]] <- forcats::fct_lump(as.factor(df[[col]]), n=predictor_n)
     }
   }
 
@@ -835,6 +826,10 @@ calc_feature_imp <- function(df,
             c_cols <- c(c_cols, hour_col)
             df[[hour_col]] <- factor(lubridate::hour(df[[col]])) # treat hour as category
           }
+        } else if(!is.numeric(df[[col]])) {
+          # convert data to factor if predictors are not numeric or logical
+          # and limit the number of levels in factor by fct_lump
+          df[[col]] <- forcats::fct_lump(as.factor(df[[col]]), n=predictor_n)
         }
       }
 
