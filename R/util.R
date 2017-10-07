@@ -1094,11 +1094,25 @@ na_count <- function(x){
   sum(is.na(x))
 }
 
+#' Count Non NA in a vector
+#' @param x vector
+#' @export
+non_na_count <- function(x){
+  sum(!is.na(x))
+}
+
 #' Percentage of NA in a vector
 #' @param x vector
 #' @export
 na_pct <- function(x){
   sum(is.na(x)) / length(x) * 100
+}
+
+#' Percentage of Non NA in a vector
+#' @param x vector
+#' @export
+non_na_pct <- function(x){
+  sum(!is.na(x)) / length(x) * 100
 }
 
 #' This is a wrapper of tidyr::unnest

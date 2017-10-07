@@ -536,3 +536,29 @@ test_that("test fill_mat_NA", {
   ret <- fill_mat_NA(indice, test_mat)
   expect_true(any(is.na(ret)))
 })
+
+
+test_that("test na_count", {
+  data <- c("a", "b", NA, "c", NA, "d", "e", "f", NA, NA)
+  ret <- na_count(data)
+  expect_true(ret == 4)
+})
+
+test_that("test na_pct", {
+  data <- c("a", "b", NA, "c", NA, "d", "e", "f", NA, NA)
+  ret <- na_pct(data)
+  expect_true(ret == 40)
+})
+
+test_that("test non_na_count", {
+  data <- c("a", "b", NA, "c", NA, "d", "e", "f", NA, NA)
+  ret <- non_na_count(data)
+  expect_true(ret == 6)
+})
+
+test_that("test non_na_pct", {
+  data <- c("a", "b", NA, "c", NA, "d", "e", "f", NA, NA)
+  ret <- non_na_pct(data)
+  expect_true(ret == 60)
+})
+
