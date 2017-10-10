@@ -282,7 +282,7 @@ getMongoCollectionNumberOfRows <- function(host, port, database, username, passw
 #' Returns specified connection from pool if it exists in the pool.
 #' If not, new connection is created and returned.
 #' @export
-getDBConnection <- function(type, host, port, databaseName, username, password, catalog = "", schema = "", dsn="", additionalParams = "",
+getDBConnection <- function(type, host, port, databaseName, username = "", password = "", catalog = "", schema = "", dsn="", additionalParams = "",
                             collection = "", isSSL = FALSE, authSource = NULL) {
 
   drv = NULL
@@ -400,7 +400,13 @@ getDBConnection <- function(type, host, port, databaseName, username, password, 
     loadNamespace("RODBC")
     connect <- function() {
       if(dsn != ""){
-        connstr <- stringr::str_c("RODBC::odbcConnect(dsn = '",dsn, "',uid = '", username, "', pwd = '", password, "'")
+        connstr <- stringr::str_c("RODBC::odbcConnect(dsn = '", dsn , "'")
+        if(username != ""){
+          connstr <- stringr::str_c(connstr, ", uid = '", username, "'")
+        }
+        if(password != ""){
+          connstr <- stringr::str_c(connstr, ", pwd = '", password, "'")
+        }
         if(additionalParams == ""){
           connstr <- stringr::str_c(connstr, ")")
         } else {
