@@ -399,13 +399,17 @@ getDBConnection <- function(type, host, port, databaseName, username, password, 
 
     loadNamespace("RODBC")
     connect <- function() {
-      connstr <- stringr::str_c("RODBC::odbcConnect(dsn = '",dsn, "',uid = '", username, "', pwd = '", password, "'")
-      if(additionalParams == ""){
-        connstr <- stringr::str_c(connstr, ")")
-      } else {
-        connstr <- stringr::str_c(connstr, ",", additionalParams, ")")
+      if(dsn != ""){
+        connstr <- stringr::str_c("RODBC::odbcConnect(dsn = '",dsn, "',uid = '", username, "', pwd = '", password, "'")
+        if(additionalParams == ""){
+          connstr <- stringr::str_c(connstr, ")")
+        } else {
+          connstr <- stringr::str_c(connstr, ",", additionalParams, ")")
+        }
+        conn <- eval(parse(text=connstr))
+      } else if (host != "") { # for dremio direct access
+        conn <- RODBC::odbcDriverConnect(stringr::str_c("DRIVER=Dremio ODBC Driver;HOST=", host, ";ConnectionType=Direct;AuthenticationType=Plain;Catalog=DREMIO;PORT=", port, ";UID=", username, ";PWD=", password))
       }
-      conn <- eval(parse(text=connstr))
       if (conn == -1) {
         # capture warning and throw error with the message.
         # odbcConnect() returns -1 and does not stop execution even if connection fails.
@@ -427,7 +431,7 @@ getDBConnection <- function(type, host, port, databaseName, username, password, 
     # TODO: We may be able to check connection instead by RODBC::sqlTable() or something instead of this,
     # but we are not very sure of a sure way to check connection for all possible types of ODBC databases.
     if (user_env$pool_connection) {
-      key <- paste("odbc", dsn, username, additionalParams, sep = ":")
+      key <- paste("odbc", dsn, host, username, additionalParams, sep = ":")
       conn <- connection_pool[[key]]
     }
     if (is.null(conn)) {
@@ -660,11 +664,11 @@ queryPostgres <- function(host, port, databaseName, username, password, numOfRow
 }
 
 #' @export
-queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, query, stringsAsFactors = FALSE){
+queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, query, stringsAsFactors = FALSE, host="", port=""){
   if(!requireNamespace("RODBC")){stop("package RODBC must be installed.")}
   if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
 
-  conn <- getDBConnection("odbc", NULL, NULL, NULL, username, password, dsn = dsn, additionalParams = additionalParams)
+  conn <- getDBConnection("odbc", host, port, NULL, username, password, dsn = dsn, additionalParams = additionalParams)
   tryCatch({
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
