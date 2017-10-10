@@ -8,7 +8,8 @@
 #' @export
 get_stripe_data <- function(endpoint,
                             date_type = "exact",
-                            date_since = NULL
+                            date_since = NULL,
+                            query_string = ""
                             ){
   # these were once arguments
   limit = 100
@@ -35,6 +36,9 @@ get_stripe_data <- function(endpoint,
     paste0("https://uploads.stripe.com/v1/", endpoint)
   } else {
     paste0("https://api.stripe.com/v1/", endpoint)
+  }
+  if (str_length(query_string) > 0) { # append custom query string
+    url <- paste0(url, "?", query_string)
   }
 
   if(!is.null(date_since)){
