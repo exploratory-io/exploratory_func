@@ -574,7 +574,7 @@ augment.randomForest.classification <- function(x, data = NULL, newdata = NULL, 
       # append predicted probability
       predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
       predicted_prob <- predicted_prob[, 2]
-      data[[predicted_value_col]] <- predicted_prob
+      data[[predicted_value_col]][!na_at] <- predicted_prob
     } else if (x$classification_type == "multi"){
       # append predicted probability for each class, max and labels at max values
       ret <- get_multi_predicted_values(predicted_prob, cleaned_data[[y_name]])
