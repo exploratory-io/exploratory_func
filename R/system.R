@@ -415,7 +415,7 @@ getDBConnection <- function(type, host, port, databaseName, username = "", passw
         conn <- eval(parse(text=connstr))
       } else if (host != "") { # for dremio direct access
         if(.Platform$OS.type == "windows"){ # Dremio Connector is only available for Win for now..
-          connstr <-"DRIVER=Dremio Connector"
+          connstr <- "DRIVER=Dremio Connector"
         } else {
           connstr <- "DRIVER=Dremio ODBC Driver"
         }
