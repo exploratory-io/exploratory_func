@@ -101,6 +101,12 @@ add_prediction <- function(df, model_df, conf_int = 0.95, ...){
     if(!is.null(types)){
       validate_data(types, df)
     }
+    # turn character predictor columns into factors
+    # with the same levels as training data.
+    flevels <- model_meta[[1]]$flevels
+    if(!is.null(types)){
+      df <- factorize_data(flevels, df)
+    }
   }
 
   get_result <- function(model_df, df, aug_args, with_respose){

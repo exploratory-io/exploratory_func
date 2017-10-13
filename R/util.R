@@ -1038,6 +1038,10 @@ validate_data <- function(types, data){
   TRUE
 }
 
+factorize_data <- function(flevels, data) {
+  data
+}
+
 # This is used in model building functions
 # to create meta data.
 # It contains terms to create model and
