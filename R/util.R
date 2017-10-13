@@ -1044,9 +1044,11 @@ validate_data <- function(types, data){
 #' @param data new data to predict on.
 factorize_data <- function(flevels, data) {
   fcol_names <- names(flevels)
-  for (i in 1:length(flevels)) {
-    if (class(data[[fcol_names[[i]]]]) == "character") {
-      data[[fcol_names[[i]]]] <- factor(data[[fcol_names[[i]]]], levels = flevels[[i]])
+  if (length(flevels) > 0) {
+    for (i in 1:length(flevels)) {
+      if (class(data[[fcol_names[[i]]]]) == "character") {
+        data[[fcol_names[[i]]]] <- factor(data[[fcol_names[[i]]]], levels = flevels[[i]])
+      }
     }
   }
   data
