@@ -525,7 +525,9 @@ augment.randomForest.classification <- function(x, data = NULL, newdata = NULL, 
     oob_col <- avoid_conflict(colnames(data), "out_of_bag_times")
 
     # These are from https://github.com/mdlincoln/broom/blob/e3cdf5f3363ab9514e5b61a56c6277cb0d9899fd/R/rf_tidiers.R
-    # TODO: This seems to be taking care of NA cases. Should review this part later
+    # create index of eliminated rows (na_at) by na.action from model.
+    # since prediction output may have fewer rows than original data because of na.action, 
+    # we cannot augment the data just by binding columns.
     n_data <- nrow(data)
     if (is.null(x[["na.action"]])) {
       na_at <- rep(FALSE, times = n_data)
@@ -574,11 +576,14 @@ augment.randomForest.classification <- function(x, data = NULL, newdata = NULL, 
       # append predicted probability
       predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
       predicted_prob <- predicted_prob[, 2]
-      data[[predicted_value_col]] <- predicted_prob
+      data[[predicted_value_col]][!na_at] <- predicted_prob
     } else if (x$classification_type == "multi"){
       # append predicted probability for each class, max and labels at max values
       ret <- get_multi_predicted_values(predicted_prob, cleaned_data[[y_name]])
-      data <- dplyr::bind_cols(data, ret)
+      for (i in 1:length(ret)) { # for each column
+        # this is basically bind_cols with na_at taken into account.
+        data[[colnames(ret)[[i]]]][!na_at] <- ret[[i]]
+      }
     }
 
     data
