@@ -196,19 +196,6 @@ build_lm.fast <- function(df,
           dplyr::sample_n(max_nrow)
       }
 
-      # TODO: is this good for lm too??
-      # Return NULL if there is only one row
-      # for a class of target variable because
-      # rondomForest enters infinite loop
-      # in such case.
-      # The group with NULL is removed when
-      # unnesting the result
-      for (level in levels(df[[target_col]])) {
-        if(sum(df[[target_col]] == level, na.rm = TRUE) == 1) {
-          return(NULL)
-        }
-      }
-
       c_cols <- clean_cols
       for(col in clean_cols){
         if(lubridate::is.Date(df[[col]]) || lubridate::is.POSIXct(df[[col]])) {
