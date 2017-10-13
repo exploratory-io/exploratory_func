@@ -169,7 +169,8 @@ build_lm.fast <- function(df,
   }
 
   # randomForest fails if columns are not clean. TODO is this needed?
-  clean_df <- janitor::clean_names(df)
+  #clean_df <- janitor::clean_names(df)
+  clean_df <- df # turn off clean_names for lm
   # this mapping will be used to restore column names
   name_map <- colnames(clean_df)
   names(name_map) <- colnames(df)
