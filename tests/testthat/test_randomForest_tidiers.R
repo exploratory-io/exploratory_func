@@ -123,7 +123,7 @@ test_that("test randomForest with regression", {
   pred_test_ret <- prediction(model_ret, data = "newdata", data_frame = test_data)
 })
 
-test_that("test randomForest with unsupervied", {
+test_that("test randomForest with unsupervised", {
   test_data <- structure(
     list(
       CANCELLED = c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0),
@@ -160,7 +160,7 @@ test_that("test randomForest with unsupervied by 3 classes", {
   prediction_ret <- prediction(model_ret)
 })
 
-test_that("test randomForest with classification", {
+test_that("test randomForest with multinomial classification", {
   test_data <- structure(
     list(
       CANCELLED = c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0),
@@ -182,7 +182,7 @@ test_that("test randomForest with classification", {
   pred_test_ret <- prediction(model_ret, data = "newdata", data_frame = test_data)
 })
 
-test_that("test randomForest with classification", {
+test_that("test randomForest with multinomial classification", {
   test_data <- structure(
     list(
       CANCELLED = c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0),
