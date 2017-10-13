@@ -1038,6 +1038,10 @@ validate_data <- function(types, data){
   TRUE
 }
 
+#' turn character predictor columns into factors,
+#' with the same levels as training data.
+#' @param flevels list. Names are column names, and values are factor levels for the columns.
+#' @param data new data to predict on.
 factorize_data <- function(flevels, data) {
   fcol_names <- names(flevels)
   for (i in 1:length(flevels)) {
