@@ -580,7 +580,10 @@ augment.randomForest.classification <- function(x, data = NULL, newdata = NULL, 
     } else if (x$classification_type == "multi"){
       # append predicted probability for each class, max and labels at max values
       ret <- get_multi_predicted_values(predicted_prob, cleaned_data[[y_name]])
-      data <- dplyr::bind_cols(data, ret)
+      for (i in 1:length(ret)) { # for each column
+        # this is basically bind_cols with na_at taken into account.
+        data[[colnames(ret)[[i]]]][!na_at] <- ret[[i]]
+      }
     }
 
     data
