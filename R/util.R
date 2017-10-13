@@ -1054,11 +1054,23 @@ create_model_meta <- function(df, formula){
     md_frame <- model.frame(formula, data = df)
     ret$terms <- terms(md_frame, formula)
     pred_cnames <- all.vars(ret$terms)[-1]
+
+    # capture column data types info
     types <- vapply(pred_cnames, function(cname) {
       get_data_type(df[[cname]])
     }, FUN.VALUE = "")
     names(types) <- pred_cnames
     ret$types <- types
+
+    # capture factor levels info so that we can use same levels
+    # when we preprocess newdata.
+    flevels <- list()
+    for (cname in pred_cnames) {
+      if (is.factor(df[[cname]])) {
+        flevels[[cname]] <- levels(df[[cname]])
+      }
+    }
+    ret$flevels <- flevels
   }, error = function(e){
     NULL
   })
