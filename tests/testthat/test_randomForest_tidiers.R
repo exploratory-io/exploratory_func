@@ -55,6 +55,7 @@ test_that("test randomForest with multinomial classification", {
   model_stats <- model_stats(model_ret, pretty.name = TRUE)
   pred_train_ret <- prediction(model_ret, data = "training")
   pred_test_ret <- prediction(model_ret, data = "test")
+  pred_test_ret <- prediction(model_ret, data = "newdata", data_frame = test_data)
 })
 
 test_that("test randomForest with binary classification", {
@@ -75,6 +76,7 @@ test_that("test randomForest with binary classification", {
   model_stats <- model_stats(model_ret, pretty.name = TRUE)
   pred_train_ret <- prediction_binary(model_ret, data = "training")
   pred_test_ret <- prediction_binary(model_ret, data = "test")
+  pred_test_ret <- prediction_binary(model_ret, data = "newdata", data_frame = test_data)
 })
 
 test_that("test randomForest with regression without localImp", {
@@ -96,6 +98,7 @@ test_that("test randomForest with regression without localImp", {
   stats_ret <- model_stats(model_ret)
   pred_train_ret <- prediction(model_ret, data = "training")
   pred_test_ret <- prediction(model_ret, data = "test")
+  pred_test_ret <- prediction(model_ret, data = "newdata", data_frame = test_data)
 })
 
 test_that("test randomForest with regression", {
@@ -117,6 +120,7 @@ test_that("test randomForest with regression", {
   stats_ret <- model_stats(model_ret)
   pred_train_ret <- prediction(model_ret, data = "training")
   pred_test_ret <- prediction(model_ret, data = "test")
+  pred_test_ret <- prediction(model_ret, data = "newdata", data_frame = test_data)
 })
 
 test_that("test randomForest with unsupervied", {
@@ -175,6 +179,7 @@ test_that("test randomForest with classification", {
   model_stats <- model_stats(model_ret, pretty.name = TRUE)
   pred_train_ret <- prediction(model_ret, data = "training")
   pred_test_ret <- prediction(model_ret, data = "test")
+  pred_test_ret <- prediction(model_ret, data = "newdata", data_frame = test_data)
 })
 
 test_that("test randomForest with classification", {
@@ -196,4 +201,5 @@ test_that("test randomForest with classification", {
   model_stats <- model_stats(model_ret, pretty.name = TRUE)
   pred_train_ret <- prediction(model_ret, data = "training")
   pred_test_ret <- prediction(model_ret, data = "test")
+  pred_test_ret <- prediction(model_ret, data = "newdata", data_frame = test_data)
 })
