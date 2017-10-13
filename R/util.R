@@ -1039,6 +1039,12 @@ validate_data <- function(types, data){
 }
 
 factorize_data <- function(flevels, data) {
+  fcol_names <- names(flevels)
+  for (i in 1:length(flevels)) {
+    if (class(data[[fcol_names[[i]]]]) == "character") {
+      data[[fcol_names[[i]]]] <- factor(data[[fcol_names[[i]]]], levels = flevels[[i]])
+    }
+  }
   data
 }
 
