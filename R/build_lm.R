@@ -131,9 +131,9 @@ build_lm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, gr
   ret
 }
 
-#' builds lm model for getting coefficients for analytics view.
+#' builds lm model quickly for analytics view.
 #' @export
-calc_lm <- function(df,
+build_lm.fast <- function(df,
                     target,
                     ...,
                     max_nrow = 200000,
