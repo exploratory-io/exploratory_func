@@ -137,7 +137,8 @@ build_lm.fast <- function(df,
                     target,
                     ...,
                     max_nrow = 200000,
-                    predictor_n = 10
+                    predictor_n = 10,
+                    seed = 0
                     ){
   # TODO: cleanup code only aplicable to randomForest. this func was started from copy of calc_feature_imp, and still adjusting for lm. 
 
@@ -154,6 +155,10 @@ build_lm.fast <- function(df,
 
   if (any(c(target_col, selected_cols) %in% grouped_cols)) {
     stop("grouping column is used as variable columns")
+  }
+
+  if(!is.null(seed)){
+    set.seed(seed)
   }
 
   # remove NA because it's not permitted for randomForest. TODO is this good for lm too?
