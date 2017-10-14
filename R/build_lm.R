@@ -130,3 +130,162 @@ build_lm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, gr
   }
   ret
 }
+
+#' builds lm model quickly for analytics view.
+#' @export
+build_lm.fast <- function(df,
+                    target,
+                    ...,
+                    max_nrow = 200000,
+                    predictor_n = 10,
+                    seed = 0
+                    ){
+  # TODO: cleanup code only aplicable to randomForest. this func was started from copy of calc_feature_imp, and still adjusting for lm. 
+
+  # this seems to be the new way of NSE column selection evaluation
+  # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
+  target_col <- dplyr::select_var(names(df), !! rlang::enquo(target))
+  # this evaluates select arguments like starts_with
+  selected_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
+
+  grouped_cols <- grouped_by(df)
+
+  # remove grouped col or target col
+  selected_cols <- setdiff(selected_cols, c(grouped_cols, target_col))
+
+  if (any(c(target_col, selected_cols) %in% grouped_cols)) {
+    stop("grouping column is used as variable columns")
+  }
+
+  if(!is.null(seed)){
+    set.seed(seed)
+  }
+
+  # remove NA because it's not permitted for randomForest. TODO is this good for lm too?
+  df <- df %>%
+    dplyr::filter(!is.na(!!target_col))
+
+  # cols will be filtered to remove invalid columns
+  cols <- selected_cols
+
+  for (col in selected_cols) {
+    if(all(is.na(df[[col]]))){
+      # remove columns if they are all NA
+      cols <- setdiff(cols, col)
+    }
+  }
+
+  # randomForest fails if columns are not clean. TODO is this needed?
+  #clean_df <- janitor::clean_names(df)
+  clean_df <- df # turn off clean_names for lm
+  # this mapping will be used to restore column names
+  name_map <- colnames(clean_df)
+  names(name_map) <- colnames(df)
+
+  # clean_names changes column names
+  # without chaning grouping column name
+  # information in the data frame
+  # and it causes an error,
+  # so the value of grouping columns
+  # should be still the names of grouping columns
+  name_map[grouped_cols] <- grouped_cols
+  colnames(clean_df) <- name_map
+
+  clean_target_col <- name_map[target_col]
+  clean_cols <- name_map[cols]
+
+  each_func <- function(df) {
+    tryCatch({
+      # sample the data because randomForest takes long time
+      # if data size is too large
+      if (nrow(df) > max_nrow) {
+        df <- df %>%
+          dplyr::sample_n(max_nrow)
+      }
+
+      c_cols <- clean_cols
+      for(col in clean_cols){
+        if(lubridate::is.Date(df[[col]]) || lubridate::is.POSIXct(df[[col]])) {
+          c_cols <- setdiff(c_cols, col)
+
+          absolute_time_col <- avoid_conflict(colnames(df), paste0(col, "_absolute_time"))
+          wday_col <- avoid_conflict(colnames(df), paste0(col, "_day_of_week"))
+          day_col <- avoid_conflict(colnames(df), paste0(col, "_day_of_month"))
+          yday_col <- avoid_conflict(colnames(df), paste0(col, "_day_of_year"))
+          month_col <- avoid_conflict(colnames(df), paste0(col, "_month"))
+          year_col <- avoid_conflict(colnames(df), paste0(col, "_year"))
+          new_name <- c(absolute_time_col, wday_col, day_col, yday_col, month_col, year_col)
+          names(new_name) <- paste(
+            names(name_map)[name_map == col],
+            c(
+              "_absolute_time",
+              "_day_of_week",
+              "_day_of_month",
+              "_day_of_year",
+              "_month",
+              "_year"
+            ), sep="")
+
+          name_map <- c(name_map, new_name)
+
+          c_cols <- c(c_cols, absolute_time_col, wday_col, day_col, yday_col, month_col, year_col)
+          df[[absolute_time_col]] <- as.numeric(df[[col]])
+          df[[wday_col]] <- lubridate::wday(df[[col]], label=TRUE)
+          df[[day_col]] <- lubridate::day(df[[col]])
+          df[[yday_col]] <- lubridate::yday(df[[col]])
+          df[[month_col]] <- lubridate::month(df[[col]], label=TRUE)
+          df[[year_col]] <- lubridate::year(df[[col]])
+          if(lubridate::is.POSIXct(df[[col]])) {
+            hour_col <- avoid_conflict(colnames(df), paste0(col, "_hour"))
+            new_name <- c(hour_col)
+            names(new_name) <- paste(
+              names(name_map)[name_map == col],
+              c(
+                "_hour"
+              ), sep="")
+            name_map <- c(name_map, new_name)
+
+            c_cols <- c(c_cols, hour_col)
+            df[[hour_col]] <- factor(lubridate::hour(df[[col]])) # treat hour as category
+          }
+        } else if(!is.numeric(df[[col]])) {
+          # convert data to factor if predictors are not numeric or logical
+          # and limit the number of levels in factor by fct_lump.
+          # also, turn NA into (Missing) factor level so that lm will not drop all the rows.
+          df[[col]] <- forcats::fct_explicit_na(forcats::fct_lump(as.factor(df[[col]]), n=predictor_n))
+        }
+      }
+
+      # remove columns with only one unique value
+      cols_copy <- c_cols
+      for (col in cols_copy) {
+        unique_val <- unique(df[[col]])
+        if (length(unique_val[!is.na(unique_val)]) == 1) {
+          c_cols <- setdiff(c_cols, col)
+        }
+      }
+
+      # build formula for lm
+      rhs <- paste0("`", c_cols, "`", collapse = " + ")
+      fml <- as.formula(paste(clean_target_col, " ~ ", rhs))
+      rf <- stats::lm(fml, data = df) 
+      # these attributes are used in tidy of randomForest TODO: is this good for lm too?
+      rf$terms_mapping <- names(name_map)
+      names(rf$terms_mapping) <- name_map
+      rf
+    }, error = function(e){
+      if(length(grouped_cols) > 0) {
+        # ignore the error if
+        # it is caused by subset of
+        # grouped data frame
+        # to show result of
+        # data frames that succeed
+        NULL
+      } else {
+        stop(e)
+      }
+    })
+  }
+
+  do_on_each_group(clean_df, each_func, name = "model", with_unnest = FALSE)
+}
