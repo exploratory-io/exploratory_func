@@ -260,7 +260,8 @@ build_lm.fast <- function(df,
         }
       }
 
-      # remove columns if they are all NA. this has to be done after sampling
+      # remove columns if they are all NA. this has to be done after filtering/sampling.
+      # otherwise, columns might turn into all NA or single value as the result of filtering/sampling.
       cols_copy <- c_cols
       for (col in cols_copy) {
         if(all(is.na(df[[col]]))){
