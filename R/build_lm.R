@@ -164,13 +164,6 @@ build_lm.fast <- function(df,
   # cols will be filtered to remove invalid columns
   cols <- selected_cols
 
-  for (col in selected_cols) {
-    if(all(is.na(df[[col]]))){
-      # remove columns if they are all NA. TODO: we do this after sampling/filtering too. do we still need it here?
-      cols <- setdiff(cols, col)
-    }
-  }
-
   # randomForest fails if columns are not clean. TODO is this needed?
   #clean_df <- janitor::clean_names(df)
   clean_df <- df # turn off clean_names for lm
@@ -260,14 +253,6 @@ build_lm.fast <- function(df,
         }
       }
 
-      # remove columns if they are all NA. this has to be done after filtering/sampling.
-      # otherwise, columns might turn into all NA or single value as the result of filtering/sampling.
-      cols_copy <- c_cols
-      for (col in cols_copy) {
-        if(all(is.na(df[[col]]))){
-          c_cols <- setdiff(c_cols, col)
-        }
-      }
       # remove columns with only one unique value
       cols_copy <- c_cols
       for (col in cols_copy) {
