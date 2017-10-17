@@ -255,7 +255,7 @@ build_lm.fast <- function(df,
           df[[col]] <- forcats::fct_explicit_na(forcats::fct_lump(as.factor(df[[col]]), n=predictor_n))
         } else {
           # for numeric cols, filter NA rows, because lm will anyway do this internally, and errors out
-          # if the remaining rows are all NAs in any predictor column.
+          # if the remaining rows are with single value in any predictor column.
           df <- df %>% dplyr::filter(!is.na(df[[col]]))
         }
       }
