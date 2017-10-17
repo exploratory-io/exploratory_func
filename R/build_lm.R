@@ -161,11 +161,6 @@ build_lm.fast <- function(df,
     set.seed(seed)
   }
 
-  # remove NA because it's not permitted for randomForest. TODO is this good for lm too?
-  df <- df %>%
-    # dplyr::filter(!is.na(!!target_col))  TODO: this was not filtering, and replaced it with the next line. check other similar places.
-    dplyr::filter(!is.na(df[[target_col]]))
-
   # cols will be filtered to remove invalid columns
   cols <- selected_cols
 
@@ -197,6 +192,10 @@ build_lm.fast <- function(df,
 
   each_func <- function(df) {
     tryCatch({
+      df <- df %>%
+        # dplyr::filter(!is.na(!!target_col))  TODO: this was not filtering, and replaced it with the next line. check other similar places.
+        dplyr::filter(!is.na(df[[target_col]])) # this form does not handle group_by. so moved into each_func from outside.
+
       # sample the data because randomForest takes long time
       # if data size is too large
       if (nrow(df) > max_nrow) {
