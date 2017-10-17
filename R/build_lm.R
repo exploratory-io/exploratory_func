@@ -161,19 +161,8 @@ build_lm.fast <- function(df,
     set.seed(seed)
   }
 
-  # remove NA because it's not permitted for randomForest. TODO is this good for lm too?
-  df <- df %>%
-    dplyr::filter(!is.na(!!target_col))
-
   # cols will be filtered to remove invalid columns
   cols <- selected_cols
-
-  for (col in selected_cols) {
-    if(all(is.na(df[[col]]))){
-      # remove columns if they are all NA
-      cols <- setdiff(cols, col)
-    }
-  }
 
   # randomForest fails if columns are not clean. TODO is this needed?
   #clean_df <- janitor::clean_names(df)
@@ -196,6 +185,10 @@ build_lm.fast <- function(df,
 
   each_func <- function(df) {
     tryCatch({
+      df <- df %>%
+        # dplyr::filter(!is.na(!!target_col))  TODO: this was not filtering, and replaced it with the next line. check other similar places.
+        dplyr::filter(!is.na(df[[target_col]])) # this form does not handle group_by. so moved into each_func from outside.
+
       # sample the data because randomForest takes long time
       # if data size is too large
       if (nrow(df) > max_nrow) {
@@ -253,6 +246,10 @@ build_lm.fast <- function(df,
           # and limit the number of levels in factor by fct_lump.
           # also, turn NA into (Missing) factor level so that lm will not drop all the rows.
           df[[col]] <- forcats::fct_explicit_na(forcats::fct_lump(as.factor(df[[col]]), n=predictor_n))
+        } else {
+          # for numeric cols, filter NA rows, because lm will anyway do this internally, and errors out
+          # if the remaining rows are with single value in any predictor column.
+          df <- df %>% dplyr::filter(!is.na(df[[col]]))
         }
       }
 
