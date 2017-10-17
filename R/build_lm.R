@@ -163,14 +163,15 @@ build_lm.fast <- function(df,
 
   # remove NA because it's not permitted for randomForest. TODO is this good for lm too?
   df <- df %>%
-    dplyr::filter(!is.na(!!target_col))
+    # dplyr::filter(!is.na(!!target_col))  TODO: this was not filtering, and replaced it with the next line. check other similar places.
+    dplyr::filter(!is.na(df[[target_col]]))
 
   # cols will be filtered to remove invalid columns
   cols <- selected_cols
 
   for (col in selected_cols) {
     if(all(is.na(df[[col]]))){
-      # remove columns if they are all NA
+      # remove columns if they are all NA. TODO: we do this after sampling/filtering too. do we still need it here?
       cols <- setdiff(cols, col)
     }
   }
@@ -253,9 +254,20 @@ build_lm.fast <- function(df,
           # and limit the number of levels in factor by fct_lump.
           # also, turn NA into (Missing) factor level so that lm will not drop all the rows.
           df[[col]] <- forcats::fct_explicit_na(forcats::fct_lump(as.factor(df[[col]]), n=predictor_n))
+        } else {
+          # for numeric cols, filter NA rows, because lm will anyway do this internally, and errors out
+          # if the remaining rows are all NAs in any predictor column.
+          df <- df %>% dplyr::filter(!is.na(df[[col]]))
         }
       }
 
+      # remove columns if they are all NA. this has to be done after sampling
+      cols_copy <- c_cols
+      for (col in cols_copy) {
+        if(all(is.na(df[[col]]))){
+          c_cols <- setdiff(c_cols, col)
+        }
+      }
       # remove columns with only one unique value
       cols_copy <- c_cols
       for (col in cols_copy) {
