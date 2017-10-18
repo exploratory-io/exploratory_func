@@ -137,7 +137,7 @@ build_lm.fast <- function(df,
                     target,
                     ...,
                     max_nrow = 200000,
-                    predictor_n = 10,
+                    predictor_n = 12, # so that at least months can fit in it.
                     seed = 0
                     ){
   # TODO: cleanup code only aplicable to randomForest. this func was started from copy of calc_feature_imp, and still adjusting for lm. 
