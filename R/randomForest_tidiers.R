@@ -707,7 +707,7 @@ calc_feature_imp <- function(df,
                              ntree = 20,
                              nodesize = 12,
                              target_n = 20,
-                             predictor_n = 10
+                             predictor_n = 12 # so that at least months can fit in it.
                              ){
   # this seems to be the new way of NSE column selection evaluation
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
