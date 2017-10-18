@@ -202,20 +202,20 @@ build_lm.fast <- function(df,
           c_cols <- setdiff(c_cols, col)
 
           absolute_time_col <- avoid_conflict(colnames(df), paste0(col, "_absolute_time"))
-          wday_col <- avoid_conflict(colnames(df), paste0(col, "_day_of_week"))
+          wday_col <- avoid_conflict(colnames(df), paste0(col, "_w_"))
           day_col <- avoid_conflict(colnames(df), paste0(col, "_day_of_month"))
           yday_col <- avoid_conflict(colnames(df), paste0(col, "_day_of_year"))
-          month_col <- avoid_conflict(colnames(df), paste0(col, "_month"))
+          month_col <- avoid_conflict(colnames(df), paste0(col, "_m_"))
           year_col <- avoid_conflict(colnames(df), paste0(col, "_year"))
           new_name <- c(absolute_time_col, wday_col, day_col, yday_col, month_col, year_col)
           names(new_name) <- paste(
             names(name_map)[name_map == col],
             c(
               "_absolute_time",
-              "_day_of_week",
+              "_w_",
               "_day_of_month",
               "_day_of_year",
-              "_month",
+              "_m_",
               "_year"
             ), sep="")
 
@@ -223,10 +223,12 @@ build_lm.fast <- function(df,
 
           c_cols <- c(c_cols, absolute_time_col, wday_col, day_col, yday_col, month_col, year_col)
           df[[absolute_time_col]] <- as.numeric(df[[col]])
-          df[[wday_col]] <- lubridate::wday(df[[col]], label=TRUE)
+          # turn it into character since if it is factor, the name of term is broken
+          df[[wday_col]] <- as.character(lubridate::wday(df[[col]], label=TRUE))
           df[[day_col]] <- lubridate::day(df[[col]])
           df[[yday_col]] <- lubridate::yday(df[[col]])
-          df[[month_col]] <- lubridate::month(df[[col]], label=TRUE)
+          # turn it into character since if it is factor, the name of term is broken
+          df[[month_col]] <- as.character(lubridate::month(df[[col]], label=TRUE))
           df[[year_col]] <- lubridate::year(df[[col]])
           if(lubridate::is.POSIXct(df[[col]])) {
             hour_col <- avoid_conflict(colnames(df), paste0(col, "_hour"))
