@@ -137,7 +137,7 @@ build_lm.fast <- function(df,
                     target,
                     ...,
                     max_nrow = 200000,
-                    predictor_n = 10,
+                    predictor_n = 12, # so that at least months can fit in it.
                     seed = 0
                     ){
   # TODO: cleanup code only aplicable to randomForest. this func was started from copy of calc_feature_imp, and still adjusting for lm. 
@@ -202,20 +202,20 @@ build_lm.fast <- function(df,
           c_cols <- setdiff(c_cols, col)
 
           absolute_time_col <- avoid_conflict(colnames(df), paste0(col, "_absolute_time"))
-          wday_col <- avoid_conflict(colnames(df), paste0(col, "_day_of_week"))
+          wday_col <- avoid_conflict(colnames(df), paste0(col, "_w_"))
           day_col <- avoid_conflict(colnames(df), paste0(col, "_day_of_month"))
           yday_col <- avoid_conflict(colnames(df), paste0(col, "_day_of_year"))
-          month_col <- avoid_conflict(colnames(df), paste0(col, "_month"))
+          month_col <- avoid_conflict(colnames(df), paste0(col, "_m_"))
           year_col <- avoid_conflict(colnames(df), paste0(col, "_year"))
           new_name <- c(absolute_time_col, wday_col, day_col, yday_col, month_col, year_col)
           names(new_name) <- paste(
             names(name_map)[name_map == col],
             c(
               "_absolute_time",
-              "_day_of_week",
+              "_w_",
               "_day_of_month",
               "_day_of_year",
-              "_month",
+              "_m_",
               "_year"
             ), sep="")
 
@@ -223,10 +223,12 @@ build_lm.fast <- function(df,
 
           c_cols <- c(c_cols, absolute_time_col, wday_col, day_col, yday_col, month_col, year_col)
           df[[absolute_time_col]] <- as.numeric(df[[col]])
-          df[[wday_col]] <- lubridate::wday(df[[col]], label=TRUE)
+          # turn it into character since if it is factor, the name of term is broken
+          df[[wday_col]] <- as.character(lubridate::wday(df[[col]], label=TRUE))
           df[[day_col]] <- lubridate::day(df[[col]])
           df[[yday_col]] <- lubridate::yday(df[[col]])
-          df[[month_col]] <- lubridate::month(df[[col]], label=TRUE)
+          # turn it into character since if it is factor, the name of term is broken
+          df[[month_col]] <- as.character(lubridate::month(df[[col]], label=TRUE))
           df[[year_col]] <- lubridate::year(df[[col]])
           if(lubridate::is.POSIXct(df[[col]])) {
             hour_col <- avoid_conflict(colnames(df), paste0(col, "_hour"))
@@ -244,8 +246,10 @@ build_lm.fast <- function(df,
         } else if(!is.numeric(df[[col]])) {
           # convert data to factor if predictors are not numeric or logical
           # and limit the number of levels in factor by fct_lump.
+          # we use ties.method to handle the case where there are many unique values. (without it, they all survive fct_lump.)
+          # TODO: see if ties.method would make sense for calc_feature_imp.
           # also, turn NA into (Missing) factor level so that lm will not drop all the rows.
-          df[[col]] <- forcats::fct_explicit_na(forcats::fct_lump(as.factor(df[[col]]), n=predictor_n))
+          df[[col]] <- forcats::fct_explicit_na(forcats::fct_lump(as.factor(df[[col]]), n=predictor_n, ties.method="first"))
         } else {
           # for numeric cols, filter NA rows, because lm will anyway do this internally, and errors out
           # if the remaining rows are with single value in any predictor column.
