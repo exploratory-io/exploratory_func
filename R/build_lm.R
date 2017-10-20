@@ -140,6 +140,7 @@ build_lm.fast <- function(df,
                     predictor_n = 12, # so that at least months can fit in it.
                     seed = 0
                     ){
+  # TODO: add test
   # TODO: cleanup code only aplicable to randomForest. this func was started from copy of calc_feature_imp, and still adjusting for lm. 
 
   # this seems to be the new way of NSE column selection evaluation
@@ -293,8 +294,9 @@ build_lm.fast <- function(df,
   do_on_each_group(clean_df, each_func, name = "model", with_unnest = FALSE)
 }
 
+#' special version of glance.lm function to use with build_lm.fast.
 #' @export
-glance.lm_exploratory <- function(x, pretty.name = FALSE, ...) {
+glance.lm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
   ret <- broom:::glance.lm(x)
   formula_vars <- all.vars(x$terms)
   for(var in formula_vars) {
