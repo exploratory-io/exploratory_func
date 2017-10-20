@@ -140,6 +140,7 @@ build_lm.fast <- function(df,
                     predictor_n = 12, # so that at least months can fit in it.
                     seed = 0
                     ){
+  # TODO: add test
   # TODO: cleanup code only aplicable to randomForest. this func was started from copy of calc_feature_imp, and still adjusting for lm. 
 
   # this seems to be the new way of NSE column selection evaluation
@@ -273,6 +274,8 @@ build_lm.fast <- function(df,
       # these attributes are used in tidy of randomForest TODO: is this good for lm too?
       rf$terms_mapping <- names(name_map)
       names(rf$terms_mapping) <- name_map
+      # add special lm_exploratory class for adding extra info at glance().
+      class(rf) <- c("lm_exploratory", class(rf))
       rf
     }, error = function(e){
       if(length(grouped_cols) > 0) {
@@ -289,4 +292,25 @@ build_lm.fast <- function(df,
   }
 
   do_on_each_group(clean_df, each_func, name = "model", with_unnest = FALSE)
+}
+
+#' special version of glance.lm function to use with build_lm.fast.
+#' @export
+glance.lm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
+  ret <- broom:::glance.lm(x)
+  formula_vars <- all.vars(x$terms)
+  for(var in formula_vars) {
+    if(is.factor(x$model[[var]])) {
+      if(pretty.name) {
+        ret[paste0("Base Level of ", var)] <- levels(x$model[[var]])[[1]]
+      }
+      else {
+        ret[paste0(var, "_base")] <- levels(x$model[[var]])[[1]]
+      }
+    }
+  }
+  if(pretty.name) {
+    ret <- ret %>% dplyr::rename(`R Squared`=r.squared, `Adj R Squared`=adj.r.squared, `Root Mean Square Error`=sigma, `F Ratio`=statistic, `P Value`=p.value, DF=df, `Log Likelihood`=logLik, Deviance=deviance, `Residual DF`=df.residual)
+  }
+  ret
 }
