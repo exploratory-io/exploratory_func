@@ -273,6 +273,8 @@ build_lm.fast <- function(df,
       # these attributes are used in tidy of randomForest TODO: is this good for lm too?
       rf$terms_mapping <- names(name_map)
       names(rf$terms_mapping) <- name_map
+      # add special lm_exploratory class for adding extra info at glance().
+      class(rf) <- c("lm_exploratory", class(rf))
       rf
     }, error = function(e){
       if(length(grouped_cols) > 0) {
@@ -289,4 +291,21 @@ build_lm.fast <- function(df,
   }
 
   do_on_each_group(clean_df, each_func, name = "model", with_unnest = FALSE)
+}
+
+#' @export
+glance.lm_exploratory <- function(x, pretty.name = FALSE, ...) {
+  ret <- broom:::glance.lm(x)
+  formula_vars <- all.vars(x$terms)
+  for(var in formula_vars) {
+    if(is.factor(x$model[[var]])) {
+      if(pretty.name) {
+        ret[paste0("Base Level of ", var)] <- levels(x$model[[var]])[[1]]
+      }
+      else {
+        ret[paste0(var, "_base")] <- levels(x$model[[var]])[[1]]
+      }
+    }
+  }
+  ret
 }
