@@ -298,15 +298,13 @@ build_lm.fast <- function(df,
 #' @export
 glance.lm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
   ret <- broom:::glance.lm(x)
-  formula_vars <- all.vars(x$terms)
-  for(var in formula_vars) {
-    if(is.factor(x$model[[var]])) {
-      if(pretty.name) {
-        ret[paste0("Base Level of ", var)] <- levels(x$model[[var]])[[1]]
-      }
-      else {
-        ret[paste0(var, "_base")] <- levels(x$model[[var]])[[1]]
-      }
+
+  for(var in names(x$xlevels)) { # extract base levels info on factor/character columns from lm model
+    if(pretty.name) {
+      ret[paste0("Base Level of ", var)] <- x$xlevels[[var]][[1]]
+    }
+    else {
+      ret[paste0(var, "_base")] <- x$xlevels[[var]][[1]]
     }
   }
   if(pretty.name) {
