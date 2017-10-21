@@ -202,7 +202,7 @@ build_lm.fast <- function(df,
         if(lubridate::is.Date(df[[col]]) || lubridate::is.POSIXct(df[[col]])) {
           c_cols <- setdiff(c_cols, col)
 
-          absolute_time_col <- avoid_conflict(colnames(df), paste0(col, "_absolute_time"))
+          absolute_time_col <- avoid_conflict(colnames(df), paste0(col, "_abs_time"))
           wday_col <- avoid_conflict(colnames(df), paste0(col, "_w_"))
           day_col <- avoid_conflict(colnames(df), paste0(col, "_day_of_month"))
           yday_col <- avoid_conflict(colnames(df), paste0(col, "_day_of_year"))
@@ -212,7 +212,7 @@ build_lm.fast <- function(df,
           names(new_name) <- paste(
             names(name_map)[name_map == col],
             c(
-              "_absolute_time",
+              "_abs_time",
               "_w_",
               "_day_of_month",
               "_day_of_year",
