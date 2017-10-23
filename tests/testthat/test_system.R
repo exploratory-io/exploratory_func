@@ -111,3 +111,14 @@ test_that("test select_columns with one column", {
   col <- exploratory::select_columns(exploratory::clean_data_frame(df), "id") %>% colnames()
   expect_equal(col, "id")
 })
+
+test_that("test select_columns with exclude option",{
+  df <- data.frame(year=c(2014, 2015, 2016), sales=c(400, 500, 600), profit=c(200, 200, 300))
+  # It selects only sales. year and profit will be EXCLUDED
+  df1 <- df %>% exploratory::select_columns('year2', 'year1', 'year', 'profit', 'sales1', exclude=TRUE)
+  expect_equal(ncol(df1), 1)
+  expect_equal(colnames(df1), c('sales'))
+  expect_true(is.data.frame(df1))
+
+})
+

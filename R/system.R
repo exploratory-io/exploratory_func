@@ -1285,11 +1285,17 @@ countycode <- function(state = state, county = county) {
 #'
 #' @param x data frame
 #' @param ... column name strings
+#' @param exclude If you set it to TRUE, list of columns will be excluded.
 #' @return data frame
 #' @export
-select_columns <- function(x, ...) {
-  col <- colnames(x)[colnames(x) %in% list(...)]
+select_columns <- function(x, ..., exclude=FALSE) {
+  if (exclude==TRUE) {
+    col <- colnames(x)[colnames(x) %nin% list(...)]
+  } else {
+    col <- colnames(x)[colnames(x) %in% list(...)]
+  }
   df <- x[, col]
+
   # If it selects only 1 column against the normal data.frame
   # the df becomes a vector, not data.frame. In that case,
   # we need to cast it. Note that if it is against dplyr tbl dataframe,
