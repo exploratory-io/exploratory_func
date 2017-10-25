@@ -269,7 +269,8 @@ build_lm.fast <- function(df,
 
       # build formula for lm
       rhs <- paste0("`", c_cols, "`", collapse = " + ")
-      fml <- as.formula(paste(clean_target_col, " ~ ", rhs))
+      # TODO: This clean_target_col is actually not a cleaned column name since we want lm to show real name. Clean up our variable name.
+      fml <- as.formula(paste0("`", clean_target_col, "` ~ ", rhs))
       rf <- stats::lm(fml, data = df) 
       # these attributes are used in tidy of randomForest TODO: is this good for lm too?
       rf$terms_mapping <- names(name_map)
