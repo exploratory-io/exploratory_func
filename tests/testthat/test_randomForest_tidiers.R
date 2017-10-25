@@ -37,6 +37,33 @@ test_that("test calc_feature_imp", {
 
 })
 
+test_that("test calc_feature_imp predicting logical", {
+  set.seed(0)
+  nrow <- 100
+  test_data <- data.frame(
+    target = c(NA, sample(c(TRUE,FALSE), nrow-2, replace = TRUE), NA),
+    cat_10 = sample(c(letters[1:10], NA_character_), nrow, replace = TRUE),
+    cat_25 = sample(letters[1:25], nrow, replace = TRUE),
+    num_1 = runif(nrow),
+    num_2 = runif(nrow),
+    Group = rbinom(nrow, 2, 0.5)
+  ) %>%
+    rename(`Tar get` = "target") # check if colname with space works
+
+  ret <- test_data %>%
+    dplyr::group_by(Group) %>%
+    calc_feature_imp(`Tar get`,
+                      dplyr::starts_with("cat_"),
+                      num_1,
+                      num_2)
+
+  conf_mat <- tidy(ret, model, type = "conf_mat", pretty.name = TRUE)
+  # factor order should be TRUE then FALSE.
+  expect_equal(levels(conf_mat$actual_value)[1], "TRUE")
+  expect_equal(levels(conf_mat$predicted_value)[1], "TRUE")
+
+})
+
 test_that("test randomForest with multinomial classification", {
   test_data <- structure(
     list(

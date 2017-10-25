@@ -759,10 +759,17 @@ calc_feature_imp <- function(df,
   # if target is numeric, it is regression but
   # if not, it is classification
   if (!is.numeric(clean_df[[clean_target_col]])) {
-    # limit the number of levels in factor by fct_lump
-    clean_df[[clean_target_col]] <- forcats::fct_lump(
-      as.factor(clean_df[[clean_target_col]]), n = target_n
-    )
+    if (!is.logical(clean_df[[clean_target_col]])) {
+      # limit the number of levels in factor by fct_lump
+      clean_df[[clean_target_col]] <- forcats::fct_lump(
+        as.factor(clean_df[[clean_target_col]]), n = target_n
+      )
+    }
+    else {
+      # we need to convert logical to factor since na.roughfix only works for numeric or factor.
+      # for logical set TRUE, FALSE level order for better visualization.
+      clean_df[[clean_target_col]] <- factor(clean_df[[clean_target_col]], levels = c("TRUE", "FALSE"))
+    }
   }
 
   each_func <- function(df) {
@@ -832,8 +839,9 @@ calc_feature_imp <- function(df,
             df[[hour_col]] <- factor(lubridate::hour(df[[col]])) # treat hour as category
           }
         } else if(!is.numeric(df[[col]])) {
-          # convert data to factor if predictors are not numeric or logical
-          # and limit the number of levels in factor by fct_lump
+          # convert data to factor if predictors are not numeric.
+          # and limit the number of levels in factor by fct_lump.
+          # we need to convert logical to factor too since na.roughfix only works for numeric or factor.
           df[[col]] <- forcats::fct_lump(as.factor(df[[col]]), n=predictor_n)
         }
       }
