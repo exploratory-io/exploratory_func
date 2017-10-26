@@ -191,7 +191,7 @@ build_lm.fast <- function(df,
         # for numeric cols, filter NA rows, because lm will anyway do this internally, and errors out
         # if the remaining rows are with single value in any predictor column.
         # filter Inf/-Inf too to avoid error at lm.
-        dplyr::filter(!is.na(df[[target_col]]) & df[[target_col]] %nin% c(Inf, -Inf)) # this form does not handle group_by. so moved into each_func from outside.
+        dplyr::filter(!is.na(df[[target_col]]) & !is.infinite(df[[target_col]])) # this form does not handle group_by. so moved into each_func from outside.
 
       # sample the data because randomForest takes long time
       # if data size is too large
@@ -258,7 +258,7 @@ build_lm.fast <- function(df,
           # for numeric cols, filter NA rows, because lm will anyway do this internally, and errors out
           # if the remaining rows are with single value in any predictor column.
           # filter Inf/-Inf too to avoid error at lm.
-          df <- df %>% dplyr::filter(!is.na(df[[col]]) & df[[col]] %nin% c(Inf, -Inf))
+          df <- df %>% dplyr::filter(!is.na(df[[col]]) & !is.infinite(df[[col]]))
         }
       }
 
