@@ -83,7 +83,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
     if (!is.null(holidays)) {
       holidays_df <- holidays
       for (a_grouped_col in grouped_col) {
-        if (!is.null(holidays_df[[a_grouped_col]]) {
+        if (!is.null(holidays_df[[a_grouped_col]])) {
           holidays_df <- holidays_df[holidays_df[[a_grouped_col]] == df[[a_grouped_col]][[1]],]
         }
       }
