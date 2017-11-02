@@ -80,11 +80,21 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
   df <- df[!is.na(df[[time_col]]), ]
 
   do_prophet_each <- function(df){
+    holidays_df <- NULL
     if (!is.null(holidays)) {
       holidays_df <- holidays
       for (a_grouped_col in grouped_col) {
         if (!is.null(holidays_df[[a_grouped_col]])) {
           holidays_df <- holidays_df[holidays_df[[a_grouped_col]] == df[[a_grouped_col]][[1]],]
+        }
+      }
+    }
+    cap_df <- NULL
+    if (!is.null(cap) && is.data.frame(cap)) {
+      cap_df <- cap
+      for (a_grouped_col in grouped_col) {
+        if (!is.null(cap_df[[a_grouped_col]])) {
+          cap_df <- cap_df[cap_df[[a_grouped_col]] == df[[a_grouped_col]][[1]],]
         }
       }
     }
@@ -137,7 +147,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
       # in this case, cap is the future data frame with cap, specified by user.
       # this is a back door to allow user to specify cap column.
       m <- prophet::prophet(aggregated_data, growth = "logistic", weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
-      forecast <- stats::predict(m, cap)
+      forecast <- stats::predict(m, cap_df)
     }
     else {
       if (!is.null(cap)) { # set cap if it is there
