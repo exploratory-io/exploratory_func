@@ -146,7 +146,12 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
     if (!is.null(cap) && is.data.frame(cap)) {
       # in this case, cap is the future data frame with cap, specified by user.
       # this is a back door to allow user to specify cap column.
-      m <- prophet::prophet(aggregated_data, growth = "logistic", weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
+      if (!is.null(cap$cap)) {
+        m <- prophet::prophet(aggregated_data, growth = "logistic", weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
+      }
+      else {
+        m <- prophet::prophet(aggregated_data, growth = "linear", weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
+      }
       forecast <- stats::predict(m, cap_df)
     }
     else {
