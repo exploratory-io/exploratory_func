@@ -15,7 +15,8 @@ do_princomp <- function(df,
     stop("grouping column is used as variable columns")
   }
 
-  df <- df %>% dplyr::select_(.dots=selected_cols)
+  df <- df %>% dplyr::select_(.dots=selected_cols) %>%
+    drop_na(everything())
 
   each_func <- function(df) {
     fit <- princomp(df, cor=TRUE)
