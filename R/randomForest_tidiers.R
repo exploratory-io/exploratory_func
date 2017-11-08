@@ -877,6 +877,7 @@ calc_feature_imp <- function(df,
       rf$terms_mapping <- names(name_map)
       rf$y <- model.response(model_df)
       names(rf$terms_mapping) <- name_map
+      rf$df <- model_df
       rf
     }, error = function(e){
       if(length(grouped_cols) > 0) {
@@ -1002,6 +1003,14 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
       ) %>%
         dplyr::filter(!is.na(predicted_value))
 
+      ret
+    },
+    partial_dependence = {
+      # return partial dependence
+      ret <- edarf::partial_dependence(x, vars=colnames(x$df)[-1], data=x$df)
+      ret <- ret %>% select_if(is.numeric)
+      var_cols <- colnames(ret)[colnames(ret) %in% colnames(x$df)]
+      ret <- ret %>% gather_("key", "value", var_cols, na.rm = TRUE, convert = TRUE)
       ret
     },
     {
