@@ -16,9 +16,10 @@ do_princomp <- function(df,
   }
 
   each_func <- function(df) { # TODO: right now, group_by case throws error.
-    df <- df %>% dplyr::select_(.dots=selected_cols) %>%
+    cleaned_df <- df %>% dplyr::select_(.dots=selected_cols) %>%
       drop_na(everything())
-    fit <- princomp(df, cor=TRUE) # TODO: make cor an option
+    fit <- princomp(cleaned_df, cor=TRUE) # TODO: make cor an option
+    fit$df <- df # add original df to model so that we can bind_col it for output.
     class(fit) <- c("princomp_exploratory", class(fit))
     fit
   }
