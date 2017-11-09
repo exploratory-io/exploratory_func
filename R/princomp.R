@@ -31,10 +31,12 @@ do_princomp <- function(df,
 #' @export
 tidy.princomp_exploratory <- function(x, type="sdevs", ...) { #TODO: add test
   if (type == "sdevs") {
-    res <- rownames_to_column(as.data.frame(x$sdev))
+    res <- rownames_to_column(as.data.frame(x$sdev)) %>%
+      mutate(rowname = fct_inorder(rowname)) # fct_inorder is to make order on chart right, e.g. Comp.2 before Comp.10
   }
   else if (type == "loadings") {
-    res <- rownames_to_column(as.data.frame(x$loadings[,]))
+    res <- rownames_to_column(as.data.frame(x$loadings[,])) %>% gather(key, value, starts_with("Comp."), na.rm = TRUE, convert = TRUE) %>%
+      mutate(key = fct_inorder(key)) # fct_inorder is to make order on chart right, e.g. Comp.2 before Comp.10
   }
   else { # should be "scores"
     res <- as.data.frame(x$scores)
