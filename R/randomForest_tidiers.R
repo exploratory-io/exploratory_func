@@ -1018,7 +1018,8 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
       ret <- edarf::partial_dependence(x, vars=imp_vars, data=x$df)
       ret <- ret %>% select_if(is.numeric) # keep numeric only since this will be a line chart.
       var_cols <- colnames(ret)[colnames(ret) %in% colnames(x$df)]
-      ret <- ret %>% gather_("key", "value", var_cols, na.rm = TRUE, convert = TRUE)
+      ret <- ret %>% gather_("x_name", "x_value", var_cols, na.rm = TRUE, convert = TRUE)
+      ret <- ret %>% gather("y_name", "y_value", -x_name, -x_value, na.rm = TRUE, convert = TRUE)
       ret
     },
     {
