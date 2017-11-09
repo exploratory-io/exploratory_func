@@ -17,7 +17,7 @@ do_princomp <- function(df,
 
   each_func <- function(df) { # TODO: right now, group_by case throws error.
     cleaned_df <- df %>% dplyr::select_(.dots=selected_cols) %>%
-      drop_na(everything())
+      drop_na(everything()) # TODO: take care of the case where values of a column are mostly NA
     fit <- princomp(cleaned_df, cor=TRUE) # TODO: make cor an option
     fit$df <- df # add original df to model so that we can bind_col it for output.
     class(fit) <- c("princomp_exploratory", class(fit))
