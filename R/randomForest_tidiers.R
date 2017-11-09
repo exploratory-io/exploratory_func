@@ -1007,8 +1007,16 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
     },
     partial_dependence = {
       # return partial dependence
-      ret <- edarf::partial_dependence(x, vars=colnames(x$df)[-1], data=x$df)
-      ret <- ret %>% select_if(is.numeric)
+      browser()
+      imp <- ranger::importance(x)
+      imp_df <- data.frame(
+        variable = names(imp),
+        importance = imp
+      ) %>% dplyr::arrange(-importance)
+      imp_vars <- imp_df$variable[1:min(length(imp_df),6)] # take maximum of 6 most important variables
+      imp_vars <- as.character(imp_vars) # for some reason imp_vars is converted to factor at this point. turn it back to character.
+      ret <- edarf::partial_dependence(x, vars=imp_vars, data=x$df)
+      ret <- ret %>% select_if(is.numeric) # keep numeric only since this will be a line chart.
       var_cols <- colnames(ret)[colnames(ret) %in% colnames(x$df)]
       ret <- ret %>% gather_("key", "value", var_cols, na.rm = TRUE, convert = TRUE)
       ret
