@@ -1033,7 +1033,8 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
       var_cols <- colnames(ret)[colnames(ret) %in% colnames(x$df)]
       ret <- ret %>% gather_("x_name", "x_value", var_cols, na.rm = TRUE, convert = TRUE)
       ret <- ret %>% gather("y_name", "y_value", -x_name, -x_value, na.rm = TRUE, convert = TRUE)
-      ret <- ret %>% mutate(x_value = forcats::fct_inorder(x_value)) # TODO: if same number appears for different variables, order will be broken.
+      # the first factor() is for the case x_value is not already a factor, to avoid error from fct_inorder()
+      ret <- ret %>% mutate(x_value = forcats::fct_inorder(factor(x_value))) # TODO: if same number appears for different variables, order will be broken.
       ret
     },
     {
