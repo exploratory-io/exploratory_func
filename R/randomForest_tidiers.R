@@ -714,8 +714,8 @@ rf_partial_dependence <- function(df, ...) {
 calc_feature_imp <- function(df,
                              target,
                              ...,
-                             max_nrow = 200000,
-                             max_sample_size = 100000,
+                             max_nrow = 160000, # down from 200000 when we added pertial dependence
+                             max_sample_size = 80000, # down from 100000 when we added pertial dependence
                              ntree = 20,
                              nodesize = 12,
                              target_n = 20,
@@ -1028,7 +1028,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
       imp_vars <- imp_df$variable
       imp_vars <- imp_vars[1:min(length(imp_vars),6)] # take maximum of 6 most important variables
       imp_vars <- as.character(imp_vars) # for some reason imp_vars is converted to factor at this point. turn it back to character.
-      ret <- edarf::partial_dependence(x, vars=imp_vars, data=x$df)
+      ret <- edarf::partial_dependence(x, vars=imp_vars, data=x$df, n=c(10,10))
       # ret <- ret %>% select_if(is.numeric) # keep numeric only since this will be a line chart.
       var_cols <- colnames(ret)[colnames(ret) %in% colnames(x$df)]
       for (var_col in var_cols) {
