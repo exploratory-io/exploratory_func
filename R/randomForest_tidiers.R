@@ -1050,7 +1050,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, var.type = 
       # gather turns x_value into factor if not all variables are in a same data type like numeric.
       # to keep the numeric order in the resulting chart, we do fct_inorder here while x_value is in order.
       # the first factor() is for the case x_value is not already a factor, to avoid error from fct_inorder()
-      ret <- ret %>% mutate(x_value = forcats::fct_inorder(factor(x_value))) # TODO: if same number appears for different variables, order will be broken.
+      #ret <- ret %>% mutate(x_value = forcats::fct_inorder(factor(x_value))) # TODO: if same number appears for different variables, order will be broken.
       ret
     },
     {
