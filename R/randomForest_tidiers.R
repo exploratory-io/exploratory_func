@@ -1019,7 +1019,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
     },
     partial_dependence = {
       # return partial dependence
-      browser()
+      browser() # TODO: remove!
       imp <- ranger::importance(x)
       imp_df <- data.frame(
         variable = names(imp),
