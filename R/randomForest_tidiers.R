@@ -1060,6 +1060,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, var.type = 
       # to keep the numeric order in the resulting chart, we do fct_inorder here while x_value is in order.
       # the first factor() is for the case x_value is not already a factor, to avoid error from fct_inorder()
       #ret <- ret %>% mutate(x_value = forcats::fct_inorder(factor(x_value))) # TODO: if same number appears for different variables, order will be broken.
+      ret <- ret %>% mutate(x_name = forcats::fct_relevel(x_name, imp_vars)) # set factor level order so that charts appear in order of importance.
       ret
     },
     {
