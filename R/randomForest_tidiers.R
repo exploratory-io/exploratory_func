@@ -698,7 +698,7 @@ rf_evaluation <- function(data, ...) {
 }
 
 rf_partial_dependence <- function(df, ...) {
-  res <- df %>% tidy(model, type="partial_dependence")
+  res <- df %>% tidy(model, type="partial_dependence", ...)
   grouped_col <- grouped_by(df) # when called from analytics view, this should be a single column or empty.
   if (length(grouped_col) > 0) {
     res <- res %>% dplyr::ungroup() # ungroup to mutate group_by column.
