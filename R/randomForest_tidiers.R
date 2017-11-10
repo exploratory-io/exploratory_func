@@ -697,6 +697,14 @@ rf_evaluation <- function(data, ...) {
   tidy(data, model, type = "evaluation", ...)
 }
 
+rf_partial_dependence <- function(df, ...) {
+  grouped_col <- grouped_by(df) # when called from analytics view, this should be a single column.
+  res <- tidy(df, model, type="partial_dependence") %>% ungroup()
+  res[[grouped_col]] <- paste(as.character(res[[grouped_col]]), res[[grouped_col]])
+  res <- dplyr::group_by_(.dots=grouped_col)
+  res
+}
+
 #' get feature importance for multi class classification using randomForest
 #' @export
 calc_feature_imp <- function(df,
