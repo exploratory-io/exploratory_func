@@ -699,9 +699,10 @@ rf_evaluation <- function(data, ...) {
 
 rf_partial_dependence <- function(df, ...) {
   grouped_col <- grouped_by(df) # when called from analytics view, this should be a single column.
-  res <- tidy(df, model, type="partial_dependence") %>% ungroup()
-  res[[grouped_col]] <- paste(as.character(res[[grouped_col]]), res[[grouped_col]])
-  res <- dplyr::group_by_(.dots=grouped_col)
+  res <- df %>% tidy(model, type="partial_dependence") %>% ungroup()
+  # add variable name to the group_by column, so that chart is repeated by the combination of group_by column and variable name.
+  res[[grouped_col]] <- paste(as.character(res[[grouped_col]]), res$x_name)
+  res <- res %>% dplyr::group_by_(.dots=grouped_col)
   res
 }
 
