@@ -1028,8 +1028,17 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, var.type = 
       imp_vars_tmp <- imp_df$variable
       imp_vars <- character(0)
       if (var.type == "numeric") {
+        # keep only numeric variables from important ones
         for (imp_var in imp_vars_tmp) {
           if (is.numeric(x$df[[imp_var]])) {
+            imp_vars <- c(imp_vars, imp_var)
+          }
+        }
+      }
+      else {
+        # keep only non-numeric variables from important ones
+        for (imp_var in imp_vars_tmp) {
+          if (!is.numeric(x$df[[imp_var]])) {
             imp_vars <- c(imp_vars, imp_var)
           }
         }
