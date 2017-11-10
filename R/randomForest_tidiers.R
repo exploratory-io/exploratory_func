@@ -714,8 +714,8 @@ rf_partial_dependence <- function(df, ...) {
 calc_feature_imp <- function(df,
                              target,
                              ...,
-                             max_nrow = 160000, # down from 200000 when we added pertial dependence
-                             max_sample_size = 80000, # down from 100000 when we added pertial dependence
+                             max_nrow = 50000, # down from 200000 when we added pertial dependence
+                             max_sample_size = 25000, # down from 100000 when we added pertial dependence
                              ntree = 20,
                              nodesize = 12,
                              target_n = 20,
@@ -1045,7 +1045,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, var.type = 
       }
       imp_vars <- imp_vars[1:min(length(imp_vars),6)] # take maximum of 6 most important variables
       imp_vars <- as.character(imp_vars) # for some reason imp_vars is converted to factor at this point. turn it back to character.
-      ret <- edarf::partial_dependence(x, vars=imp_vars, data=x$df, n=c(10,10))
+      ret <- edarf::partial_dependence(x, vars=imp_vars, data=x$df, n=c(20,20))
       var_cols <- colnames(ret)
       var_cols <- var_cols[1:(length(var_cols)-1)] # remove the last column which is the target column in case of regression.
       var_cols <- var_cols[var_cols %in% colnames(x$df)] # to get list of predictor columns, compare with training df.
