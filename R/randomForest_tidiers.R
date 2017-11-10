@@ -1030,7 +1030,9 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
       imp_vars <- as.character(imp_vars) # for some reason imp_vars is converted to factor at this point. turn it back to character.
       ret <- edarf::partial_dependence(x, vars=imp_vars, data=x$df, n=c(10,10))
       # ret <- ret %>% select_if(is.numeric) # keep numeric only since this will be a line chart.
-      var_cols <- colnames(ret)[colnames(ret) %in% colnames(x$df)]
+      var_cols <- colnames(ret)
+      var_cols <- var_cols[1:(length(var_cols)-1)] # remove the last column which is the target column in case of regression.
+      var_cols <- var_cols[var_cols %in% colnames(x$df)] # to get list of predictor columns, compare with training df.
       for (var_col in var_cols) {
         if (is.numeric(ret[[var_col]])) {
           ret[[var_col]] <- signif(ret[[var_col]], digits=4) # limit digits before we turn it into a factor.
