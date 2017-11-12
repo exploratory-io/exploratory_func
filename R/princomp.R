@@ -30,6 +30,7 @@ do_princomp <- function(df,
 
     fit <- princomp(cleaned_df, cor=TRUE) # TODO: make cor an option
     fit$df <- df # add original df to model so that we can bind_col it for output.
+    fit$grouped_cols <- grouped_cols
     class(fit) <- c("princomp_exploratory", class(fit))
     fit
   }
@@ -45,7 +46,8 @@ tidy.princomp_exploratory <- function(x, type="variances", ...) { #TODO: add tes
     res <- as.data.frame(x$sdev*x$sdev) # square it to make it variance
     colnames(res)[1] <- "variance"
     res <- rownames_to_column(res, var="component") %>% # square it to make it variance
-      mutate(component = fct_inorder(component)) # fct_inorder is to make order on chart right, e.g. Comp.2 before Comp.10
+      mutate(component = forcats::fct_inorder(component)) # fct_inorder is to make order on chart right, e.g. Comp.2 before Comp.10
+    res <- res %>% dplyr::mutate(cum_pct_variance = cumsum(variance), cum_pct_variance = cum_pct_variance/max(cum_pct_variance)*100)
   }
   else if (type == "loadings") {
     res <- rownames_to_column(as.data.frame(x$loadings[,]), var="measure") %>% gather(component, value, starts_with("Comp."), na.rm = TRUE, convert = TRUE) %>%
@@ -66,6 +68,8 @@ tidy.princomp_exploratory <- function(x, type="variances", ...) { #TODO: add tes
     loadings_df0 <- loadings_df %>% mutate(Comp.1=0, Measures=0) # create df for origin of coordinates.
     loadings_df <- loadings_df0 %>% bind_rows(loadings_df)
     res <- res %>% dplyr::bind_rows(loadings_df)
+    # fill group_by column so that Repeat By on chart works fine. loadings_df does not have values for the group_by column.
+    res <- res %>% tidyr::fill(x$grouped_cols)
     res
   }
   res
