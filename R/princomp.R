@@ -41,8 +41,9 @@ tidy.princomp_exploratory <- function(x, type="sdevs", ...) { #TODO: add test
   else { # should be "scores"
     res <- x$df
     res <- res %>% dplyr::bind_cols(as.data.frame(x$scores))
-    loadings <- rownames_to_column(as.data.frame(x$loadings[,]))
-    res <- res %>% dplyr::bind_rows(loadings)
+    loadings_matrix <- x$loadings[,]
+    loadings_df <- rownames_to_column(as.data.frame(loadings_matrix))
+    res <- res %>% dplyr::bind_rows(loadings_df)
     res
   }
   res
