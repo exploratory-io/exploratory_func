@@ -910,7 +910,7 @@ calc_feature_imp <- function(df,
 
 #' @export
 #' @param type "importance", "evaluation" or "conf_mat". Feature importance, evaluated scores or confusion matrix of training data.
-tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, var.type = "numeric", ...) {
+tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
   switch(
     type,
     importance = {
@@ -1027,22 +1027,23 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, var.type = 
       ) %>% dplyr::arrange(-importance)
       imp_vars_tmp <- imp_df$variable
       imp_vars <- character(0)
-      if (var.type == "numeric") {
-        # keep only numeric variables from important ones
-        for (imp_var in imp_vars_tmp) {
-          if (is.numeric(x$df[[imp_var]])) {
-            imp_vars <- c(imp_vars, imp_var)
-          }
-        }
-      }
-      else {
-        # keep only non-numeric variables from important ones
-        for (imp_var in imp_vars_tmp) {
-          if (!is.numeric(x$df[[imp_var]])) {
-            imp_vars <- c(imp_vars, imp_var)
-          }
-        }
-      }
+      # code to separate numeric and categorical. keeping it for now for possibility of design change
+      # if (var.type == "numeric") {
+      #   # keep only numeric variables from important ones
+      #   for (imp_var in imp_vars_tmp) {
+      #     if (is.numeric(x$df[[imp_var]])) {
+      #       imp_vars <- c(imp_vars, imp_var)
+      #     }
+      #   }
+      # }
+      # else {
+      #   # keep only non-numeric variables from important ones
+      #   for (imp_var in imp_vars_tmp) {
+      #     if (!is.numeric(x$df[[imp_var]])) {
+      #       imp_vars <- c(imp_vars, imp_var)
+      #     }
+      #   }
+      # }
       imp_vars <- imp_vars[1:min(length(imp_vars),6)] # take maximum of 6 most important variables
       imp_vars <- as.character(imp_vars) # for some reason imp_vars is converted to factor at this point. turn it back to character.
       ret <- edarf::partial_dependence(x, vars=imp_vars, data=x$df, n=c(20,20))
@@ -1059,7 +1060,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, var.type = 
       # gather turns x_value into factor if not all variables are in a same data type like numeric.
       # to keep the numeric order in the resulting chart, we do fct_inorder here while x_value is in order.
       # the first factor() is for the case x_value is not already a factor, to avoid error from fct_inorder()
-      #ret <- ret %>% mutate(x_value = forcats::fct_inorder(factor(x_value))) # TODO: if same number appears for different variables, order will be broken.
+      ret <- ret %>% mutate(x_value = forcats::fct_inorder(factor(x_value))) # TODO: if same number appears for different variables, order will be broken.
       ret <- ret %>% mutate(x_name = forcats::fct_relevel(x_name, imp_vars)) # set factor level order so that charts appear in order of importance.
       ret
     },
