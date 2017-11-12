@@ -15,7 +15,7 @@ do_princomp <- function(df,
     stop("grouping column is used as variable columns")
   }
 
-  each_func <- function(df) { # TODO: right now, group_by case throws error.
+  each_func <- function(df) {
     cleaned_df <- df %>% dplyr::select_(.dots=selected_cols) %>%
       drop_na(everything()) # TODO: take care of the case where values of a column are mostly NA
     fit <- princomp(cleaned_df, cor=TRUE) # TODO: make cor an option
