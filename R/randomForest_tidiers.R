@@ -910,7 +910,7 @@ calc_feature_imp <- function(df,
 
 #' @export
 #' @param type "importance", "evaluation" or "conf_mat". Feature importance, evaluated scores or confusion matrix of training data.
-tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
+tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10, ...) {
   switch(
     type,
     importance = {
@@ -1044,7 +1044,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
       #     }
       #   }
       # }
-      imp_vars <- imp_vars[1:min(length(imp_vars),6)] # take maximum of 6 most important variables
+      imp_vars <- imp_vars[1:min(length(imp_vars), n.vars)] # take n.vars most important variables
       imp_vars <- as.character(imp_vars) # for some reason imp_vars is converted to factor at this point. turn it back to character.
       ret <- edarf::partial_dependence(x, vars=imp_vars, data=x$df, n=c(20,20))
       var_cols <- colnames(ret)
