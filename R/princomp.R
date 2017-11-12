@@ -18,6 +18,16 @@ do_princomp <- function(df,
   each_func <- function(df) {
     cleaned_df <- df %>% dplyr::select_(.dots=selected_cols) %>%
       drop_na(everything()) # TODO: take care of the case where values of a column are mostly NA
+
+    # remove columns with only one unique value
+    cols_copy <- colnames(cleaned_df)
+    for (col in cols_copy) {
+      unique_val <- unique(cleaned_df[[col]])
+      if (length(unique_val) == 1) {
+        cleaned_df <- cleaned_df[colnames(cleaned_df) != col]
+      }
+    }
+
     fit <- princomp(cleaned_df, cor=TRUE) # TODO: make cor an option
     fit$df <- df # add original df to model so that we can bind_col it for output.
     class(fit) <- c("princomp_exploratory", class(fit))
