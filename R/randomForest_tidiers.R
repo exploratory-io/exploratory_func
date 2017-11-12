@@ -1025,9 +1025,10 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
         variable = names(imp),
         importance = imp
       ) %>% dplyr::arrange(-importance)
-      imp_vars_tmp <- imp_df$variable
-      imp_vars <- character(0)
+      imp_vars <- imp_df$variable
       # code to separate numeric and categorical. keeping it for now for possibility of design change
+      # imp_vars_tmp <- imp_df$variable
+      # imp_vars <- character(0)
       # if (var.type == "numeric") {
       #   # keep only numeric variables from important ones
       #   for (imp_var in imp_vars_tmp) {
