@@ -714,8 +714,8 @@ rf_partial_dependence <- function(df, ...) {
 calc_feature_imp <- function(df,
                              target,
                              ...,
-                             max_nrow = 50000, # down from 200000 when we added pertial dependence
-                             max_sample_size = 25000, # down from 100000 when we added pertial dependence
+                             max_nrow = 50000, # down from 200000 when we added partial dependence
+                             max_sample_size = 25000, # down from 100000 when we added partial dependence
                              ntree = 20,
                              nodesize = 12,
                              target_n = 20,
