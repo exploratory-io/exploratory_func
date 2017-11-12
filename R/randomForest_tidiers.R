@@ -697,13 +697,27 @@ rf_evaluation <- function(data, ...) {
   tidy(data, model, type = "evaluation", ...)
 }
 
+#' wrapper for tidy type partial dependence
+#' @export
+rf_partial_dependence <- function(df, ...) { # TODO: write test for this.
+  res <- df %>% tidy(model, type="partial_dependence", ...)
+  grouped_col <- grouped_by(df) # when called from analytics view, this should be a single column or empty.
+  if (length(grouped_col) > 0) {
+    res <- res %>% dplyr::ungroup() # ungroup to mutate group_by column.
+    # add variable name to the group_by column, so that chart is repeated by the combination of group_by column and variable name.
+    res[[grouped_col]] <- paste(as.character(res[[grouped_col]]), res$x_name)
+    res <- res %>% dplyr::group_by_(.dots=grouped_col) # put back group_by for consistency
+  }
+  res
+}
+
 #' get feature importance for multi class classification using randomForest
 #' @export
 calc_feature_imp <- function(df,
                              target,
                              ...,
-                             max_nrow = 200000,
-                             max_sample_size = 100000,
+                             max_nrow = 50000, # down from 200000 when we added partial dependence
+                             max_sample_size = 25000, # down from 100000 when we added partial dependence
                              ntree = 20,
                              nodesize = 12,
                              target_n = 20,
@@ -877,6 +891,7 @@ calc_feature_imp <- function(df,
       rf$terms_mapping <- names(name_map)
       rf$y <- model.response(model_df)
       names(rf$terms_mapping) <- name_map
+      rf$df <- model_df
       rf
     }, error = function(e){
       if(length(grouped_cols) > 0) {
@@ -897,7 +912,7 @@ calc_feature_imp <- function(df,
 
 #' @export
 #' @param type "importance", "evaluation" or "conf_mat". Feature importance, evaluated scores or confusion matrix of training data.
-tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
+tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10, ...) {
   switch(
     type,
     importance = {
@@ -1002,6 +1017,53 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
       ) %>%
         dplyr::filter(!is.na(predicted_value))
 
+      ret
+    },
+    partial_dependence = {
+      # return partial dependence
+      imp <- ranger::importance(x)
+      imp_df <- data.frame(
+        variable = names(imp),
+        importance = imp
+      ) %>% dplyr::arrange(-importance)
+      imp_vars <- imp_df$variable
+      # code to separate numeric and categorical. keeping it for now for possibility of design change
+      # imp_vars_tmp <- imp_df$variable
+      # imp_vars <- character(0)
+      # if (var.type == "numeric") {
+      #   # keep only numeric variables from important ones
+      #   for (imp_var in imp_vars_tmp) {
+      #     if (is.numeric(x$df[[imp_var]])) {
+      #       imp_vars <- c(imp_vars, imp_var)
+      #     }
+      #   }
+      # }
+      # else {
+      #   # keep only non-numeric variables from important ones
+      #   for (imp_var in imp_vars_tmp) {
+      #     if (!is.numeric(x$df[[imp_var]])) {
+      #       imp_vars <- c(imp_vars, imp_var)
+      #     }
+      #   }
+      # }
+      imp_vars <- imp_vars[1:min(length(imp_vars), n.vars)] # take n.vars most important variables
+      imp_vars <- as.character(imp_vars) # for some reason imp_vars is converted to factor at this point. turn it back to character.
+      ret <- edarf::partial_dependence(x, vars=imp_vars, data=x$df, n=c(20,20))
+      var_cols <- colnames(ret)
+      var_cols <- var_cols[1:(length(var_cols)-1)] # remove the last column which is the target column in case of regression.
+      var_cols <- var_cols[var_cols %in% colnames(x$df)] # to get list of predictor columns, compare with training df.
+      for (var_col in var_cols) {
+        if (is.numeric(ret[[var_col]])) {
+          ret[[var_col]] <- signif(ret[[var_col]], digits=4) # limit digits before we turn it into a factor.
+        }
+      }
+      ret <- ret %>% gather_("x_name", "x_value", var_cols, na.rm = TRUE, convert = TRUE)
+      ret <- ret %>% gather("y_name", "y_value", -x_name, -x_value, na.rm = TRUE, convert = TRUE)
+      # gather turns x_value into factor if not all variables are in a same data type like numeric.
+      # to keep the numeric order in the resulting chart, we do fct_inorder here while x_value is in order.
+      # the first factor() is for the case x_value is not already a factor, to avoid error from fct_inorder()
+      ret <- ret %>% mutate(x_value = forcats::fct_inorder(factor(x_value))) # TODO: if same number appears for different variables, order will be broken.
+      ret <- ret %>% mutate(x_name = forcats::fct_relevel(x_name, imp_vars)) # set factor level order so that charts appear in order of importance.
       ret
     },
     {
