@@ -40,9 +40,14 @@ tidy.princomp_exploratory <- function(x, type="sdevs", ...) { #TODO: add test
   }
   else { # should be "biplot"
     res <- x$df
-    res <- res %>% dplyr::bind_cols(as.data.frame(x$scores[,1:2])) # keep only Comp.1 and Comp.2 for biplot
+    scores_matrix <- x$scores[,1:2] # keep only Comp.1 and Comp.2 for biplot
+    max_abs_score <- max(abs(scores_matrix))
+    res <- res %>% dplyr::bind_cols(as.data.frame(scores_matrix))
     loadings_matrix <- x$loadings[,1:2] # keep only Comp.1 and Comp.2 for biplot
-    loadings_matrix <- loadings_matrix * 10
+    max_abs_loading <- max(abs(loadings_matrix))
+    scale_ratio <- max_abs_score/max_abs_loading
+    # scale loading_matrix so that the scale of measures and data points matches in the scatter plot.
+    loadings_matrix <- loadings_matrix * scale_ratio
     loadings_df <- rownames_to_column(as.data.frame(loadings_matrix), var="measure_name") #TODO: what if name conflicts?
     loadings_df <- loadings_df %>% rename(Measures=Comp.2) # use different column name for Comp.2 of measures.
     loadings_df0 <- loadings_df %>% mutate(Comp.1=0, Measures=0) # create df for origin of coordinates.
