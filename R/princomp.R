@@ -39,7 +39,11 @@ tidy.princomp_exploratory <- function(x, type="sdevs", ...) { #TODO: add test
       mutate(key = fct_inorder(key)) # fct_inorder is to make order on chart right, e.g. Comp.2 before Comp.10
   }
   else { # should be "scores"
-    res <- as.data.frame(x$scores)
+    res <- x$df
+    res <- res %>% dplyr::bind_cols(as.data.frame(x$scores))
+    loadings <- rownames_to_column(as.data.frame(x$loadings[,]))
+    res <- res %>% dplyr::bind_rows(loadings)
+    res
   }
   res
 }
