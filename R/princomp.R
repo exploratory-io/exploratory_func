@@ -45,8 +45,8 @@ tidy.princomp_exploratory <- function(x, type="sdevs", ...) { #TODO: add test
       mutate(rowname = fct_inorder(rowname)) # fct_inorder is to make order on chart right, e.g. Comp.2 before Comp.10
   }
   else if (type == "loadings") {
-    res <- rownames_to_column(as.data.frame(x$loadings[,])) %>% gather(key, value, starts_with("Comp."), na.rm = TRUE, convert = TRUE) %>%
-      mutate(key = fct_inorder(key)) # fct_inorder is to make order on chart right, e.g. Comp.2 before Comp.10
+    res <- rownames_to_column(as.data.frame(x$loadings[,]), var="measure") %>% gather(component, value, starts_with("Comp."), na.rm = TRUE, convert = TRUE) %>%
+      mutate(component = fct_inorder(component)) # fct_inorder is to make order on chart right, e.g. Comp.2 before Comp.10
   }
   else { # should be "biplot"
     res <- x$df
