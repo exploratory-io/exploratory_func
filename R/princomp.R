@@ -38,11 +38,12 @@ tidy.princomp_exploratory <- function(x, type="sdevs", ...) { #TODO: add test
     res <- rownames_to_column(as.data.frame(x$loadings[,])) %>% gather(key, value, starts_with("Comp."), na.rm = TRUE, convert = TRUE) %>%
       mutate(key = fct_inorder(key)) # fct_inorder is to make order on chart right, e.g. Comp.2 before Comp.10
   }
-  else { # should be "scores"
+  else { # should be "biplot"
     res <- x$df
     res <- res %>% dplyr::bind_cols(as.data.frame(x$scores[,1:2])) # keep only Comp.1 and Comp.2 for biplot
     loadings_matrix <- x$loadings[,1:2] # keep only Comp.1 and Comp.2 for biplot
-    loadings_df <- rownames_to_column(as.data.frame(loadings_matrix))
+    loadings_matrix <- loadings_matrix * 10
+    loadings_df <- rownames_to_column(as.data.frame(loadings_matrix), var="measure") #TODO: what if name conflicts?
     loadings_df <- loadings_df %>% rename(Comp.2_2=Comp.2) # use different column name for Comp.2 of measures.
     loadings_df0 <- loadings_df %>% mutate(Comp.1=0, Comp.2_2=0) # create df for origin of coordinates.
     loadings_df <- loadings_df0 %>% bind_rows(loadings_df)
