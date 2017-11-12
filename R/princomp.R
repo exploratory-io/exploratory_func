@@ -39,10 +39,13 @@ do_princomp <- function(df,
 
 #' extracts results from princomp as a dataframe
 #' @export
-tidy.princomp_exploratory <- function(x, type="sdevs", ...) { #TODO: add test
-  if (type == "sdevs") {
-    res <- rownames_to_column(as.data.frame(x$sdev)) %>%
-      mutate(rowname = fct_inorder(rowname)) # fct_inorder is to make order on chart right, e.g. Comp.2 before Comp.10
+tidy.princomp_exploratory <- function(x, type="variances", ...) { #TODO: add test
+  if (type == "variances") {
+    browser() # TODO: remove!
+    res <- as.data.frame(x$sdev*x$sdev) # square it to make it variance
+    colnames(res)[1] <- "variance"
+    res <- rownames_to_column(res, var="component") %>% # square it to make it variance
+      mutate(component = fct_inorder(component)) # fct_inorder is to make order on chart right, e.g. Comp.2 before Comp.10
   }
   else if (type == "loadings") {
     res <- rownames_to_column(as.data.frame(x$loadings[,]), var="measure") %>% gather(component, value, starts_with("Comp."), na.rm = TRUE, convert = TRUE) %>%
