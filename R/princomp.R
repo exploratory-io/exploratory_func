@@ -2,7 +2,7 @@
 #' @export
 do_princomp <- function(df,
                         ...
-                       ) {
+                       ) { # TODO: write test
   # this evaluates select arguments like starts_with
   selected_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
 
