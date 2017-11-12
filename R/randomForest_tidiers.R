@@ -697,7 +697,9 @@ rf_evaluation <- function(data, ...) {
   tidy(data, model, type = "evaluation", ...)
 }
 
-rf_partial_dependence <- function(df, ...) {
+#' wrapper for tidy type partial dependence
+#' @export
+rf_partial_dependence <- function(df, ...) { # TODO: write test for this.
   res <- df %>% tidy(model, type="partial_dependence", ...)
   grouped_col <- grouped_by(df) # when called from analytics view, this should be a single column or empty.
   if (length(grouped_col) > 0) {
@@ -1019,7 +1021,6 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
     },
     partial_dependence = {
       # return partial dependence
-      browser() # TODO: remove!
       imp <- ranger::importance(x)
       imp_df <- data.frame(
         variable = names(imp),
