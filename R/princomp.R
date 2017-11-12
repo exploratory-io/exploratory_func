@@ -16,8 +16,8 @@ do_princomp <- function(df,
   }
 
   each_func <- function(df) {
-    cleaned_df <- df %>% dplyr::select_(.dots=selected_cols) %>%
-      drop_na(everything()) # TODO: take care of the case where values of a column are mostly NA
+    filtered_df <- df %>% drop_na_(selected_cols) # TODO: take care of the case where values of a column are mostly NA
+    cleaned_df <- filtered_df %>% dplyr::select_(.dots=selected_cols)
 
     # remove columns with only one unique value
     cols_copy <- colnames(cleaned_df)
@@ -29,7 +29,7 @@ do_princomp <- function(df,
     }
 
     fit <- princomp(cleaned_df, cor=TRUE) # TODO: make cor an option
-    fit$df <- df # add original df to model so that we can bind_col it for output.
+    fit$df <- filtered_df # add filtered df to model so that we can bind_col it for output. It needs to be the filtered one to match row number.
     fit$grouped_cols <- grouped_cols
     class(fit) <- c("princomp_exploratory", class(fit))
     fit
@@ -42,7 +42,6 @@ do_princomp <- function(df,
 #' @export
 tidy.princomp_exploratory <- function(x, type="variances", ...) { #TODO: add test
   if (type == "variances") {
-    browser() # TODO: remove!
     res <- as.data.frame(x$sdev*x$sdev) # square it to make it variance
     colnames(res)[1] <- "variance"
     res <- rownames_to_column(res, var="component") %>% # square it to make it variance
