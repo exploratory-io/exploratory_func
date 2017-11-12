@@ -43,7 +43,9 @@ tidy.princomp_exploratory <- function(x, type="sdevs", ...) { #TODO: add test
     res <- res %>% dplyr::bind_cols(as.data.frame(x$scores[,1:2])) # keep only Comp.1 and Comp.2 for biplot
     loadings_matrix <- x$loadings[,1:2] # keep only Comp.1 and Comp.2 for biplot
     loadings_df <- rownames_to_column(as.data.frame(loadings_matrix))
-    loadings_df <- loadings_df %>% rename(Comp.2_2=Comp.2) # use different column name for Comp.2 of measures
+    loadings_df <- loadings_df %>% rename(Comp.2_2=Comp.2) # use different column name for Comp.2 of measures.
+    loadings_df0 <- loadings_df %>% mutate(Comp.1=0, Comp.2_2=0) # create df for origin of coordinates.
+    loadings_df <- loadings_df0 %>% bind_rows(loadings_df)
     res <- res %>% dplyr::bind_rows(loadings_df)
     res
   }
