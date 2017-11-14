@@ -719,6 +719,8 @@ rf_partial_dependence <- function(df, ...) { # TODO: write test for this.
   res
 }
 
+#' applies SMOTE to a data frame
+#' @param target - the binary value column that becomes target of model later.
 #' @export
 do_smote <- function(df,
                      target,
@@ -743,7 +745,7 @@ do_smote <- function(df,
   orig_levels <- levels(output)
   levels(output) <- c("0", "1")
   #output <- factor(output, labels=c("0","1"))
-  df_balanced <- unbalanced::ubSMOTE(input, output, perc.over = 200, perc.under = 200, k = 5)
+  df_balanced <- unbalanced::ubSMOTE(input, output, ...) # defaults are, perc.over = 200, perc.under = 200, k = 5
   df_balanced <- as.data.frame(df_balanced)
 
   # revert the name changes made by ubSMOTE.
