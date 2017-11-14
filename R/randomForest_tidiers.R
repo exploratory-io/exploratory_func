@@ -788,6 +788,7 @@ calc_feature_imp <- function(df,
   df <- df %>%
     dplyr::filter(!is.na(!!target_col))
 
+  browser()
   # cols will be filtered to remove invalid columns
   cols <- selected_cols
 
@@ -795,6 +796,7 @@ calc_feature_imp <- function(df,
     if(all(is.na(df[[col]]))){
       # remove columns if they are all NA
       cols <- setdiff(cols, col)
+      df[[col]] <- NULL # drop the column so that SMOTE will not see it. 
     }
   }
 
@@ -853,6 +855,7 @@ calc_feature_imp <- function(df,
         }
       }
 
+      browser()
       c_cols <- clean_cols
       for(col in clean_cols){
         if(lubridate::is.Date(df[[col]]) || lubridate::is.POSIXct(df[[col]])) {
@@ -903,6 +906,7 @@ calc_feature_imp <- function(df,
           # convert data to factor if predictors are not numeric.
           # and limit the number of levels in factor by fct_lump.
           # we need to convert logical to factor too since na.roughfix only works for numeric or factor.
+          browser()
           df[[col]] <- forcats::fct_explicit_na(forcats::fct_lump(as.factor(df[[col]]), n=predictor_n, ties.method="first"))
         }
       }
@@ -911,8 +915,9 @@ calc_feature_imp <- function(df,
       cols_copy <- c_cols
       for (col in cols_copy) {
         unique_val <- unique(df[[col]])
-        if (length(unique_val[!is.na(unique_val)]) == 1) {
+        if (length(unique_val[!is.na(unique_val)]) <= 1) {
           c_cols <- setdiff(c_cols, col)
+          df[[col]] <- NULL # drop the column so that SMOTE will not see it. 
         }
       }
 
