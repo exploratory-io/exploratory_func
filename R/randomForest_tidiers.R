@@ -731,6 +731,9 @@ do_smote <- function(df,
   output <- factor(df[[target_col]])
   df_balanced <- unbalanced::ubSMOTE(input, output, perc.over = 200, perc.under = 200, k = 5)
   df_balanced <- as.data.frame(df_balanced)
+
+  # revert the name changes made by ubSMOTE.
+  colnames(df_balanced) <- c(colnames(input), target_col)
   df_balanced
 }
 
