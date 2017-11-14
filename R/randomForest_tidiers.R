@@ -706,8 +706,16 @@ rf_partial_dependence <- function(df, ...) { # TODO: write test for this.
     res <- res %>% dplyr::ungroup() # ungroup to mutate group_by column.
     # add variable name to the group_by column, so that chart is repeated by the combination of group_by column and variable name.
     res[[grouped_col]] <- paste(as.character(res[[grouped_col]]), res$x_name)
+    res[[grouped_col]] <- forcats::fct_inorder(factor(res[[grouped_col]])) # set order to appear as facets
     res <- res %>% dplyr::group_by_(.dots=grouped_col) # put back group_by for consistency
   }
+  else {
+    res$x_name <- forcats::fct_inorder(factor(res$x_name)) # set order to appear as facets
+  }
+  # gather we did after edarf::partial_dependence call turned x_value into factor if not all variables were in a same data type like numeric.
+  # to keep the numeric or factor order (e.g. Sun, Mon, Tue) of x_value in the resulting chart, we do fct_inorder here while x_value is in order.
+  # the first factor() is for the case x_value is not already a factor, to avoid error from fct_inorder()
+  res <- res %>% mutate(x_value = forcats::fct_inorder(factor(x_value))) # TODO: if same number appears for different variables, order will be broken.
   res
 }
 
@@ -1059,11 +1067,10 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
       }
       ret <- ret %>% gather_("x_name", "x_value", var_cols, na.rm = TRUE, convert = TRUE)
       ret <- ret %>% gather("y_name", "y_value", -x_name, -x_value, na.rm = TRUE, convert = TRUE)
-      # gather turns x_value into factor if not all variables are in a same data type like numeric.
-      # to keep the numeric order in the resulting chart, we do fct_inorder here while x_value is in order.
-      # the first factor() is for the case x_value is not already a factor, to avoid error from fct_inorder()
-      ret <- ret %>% mutate(x_value = forcats::fct_inorder(factor(x_value))) # TODO: if same number appears for different variables, order will be broken.
       ret <- ret %>% mutate(x_name = forcats::fct_relevel(x_name, imp_vars)) # set factor level order so that charts appear in order of importance.
+      # set order to ret and turn it back to character, so that the order is kept when groups are bound.
+      # if it were kept as factor, when groups are bound, only the factor order from the first group would be respected.
+      ret <- ret %>% arrange(x_name) %>% mutate(x_name = as.character(x_name))
       ret
     },
     {
