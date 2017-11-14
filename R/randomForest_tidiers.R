@@ -744,7 +744,6 @@ do_smote <- function(df,
   output <- fct_infreq(output)
   orig_levels <- levels(output)
   levels(output) <- c("0", "1")
-  #output <- factor(output, labels=c("0","1"))
   df_balanced <- unbalanced::ubSMOTE(input, output, ...) # defaults are, perc.over = 200, perc.under = 200, k = 5
   df_balanced <- as.data.frame(df_balanced)
 
@@ -765,7 +764,7 @@ calc_feature_imp <- function(df,
                              nodesize = 12,
                              target_n = 20,
                              predictor_n = 12, # so that at least months can fit in it.
-                             smote = TRUE
+                             smote = FALSE
                              ){
   # this seems to be the new way of NSE column selection evaluation
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
