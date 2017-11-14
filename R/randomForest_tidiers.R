@@ -763,6 +763,9 @@ calc_feature_imp <- function(df,
 
   grouped_cols <- grouped_by(df)
 
+  # drop unrelated columns so that SMOTE later does not have to deal with them.
+  df <- df %>% dplyr::select_(.dots=c(grouped_cols, selected_cols, target_col))
+
   # remove grouped col or target col
   selected_cols <- setdiff(selected_cols, c(grouped_cols, target_col))
 
@@ -884,6 +887,7 @@ calc_feature_imp <- function(df,
             c_cols <- c(c_cols, hour_col)
             df[[hour_col]] <- factor(lubridate::hour(df[[col]])) # treat hour as category
           }
+          df[[col]] <- NULL # drop original Date/POSIXct column to pass SMOTE later.
         } else if(!is.numeric(df[[col]])) {
           # convert data to factor if predictors are not numeric.
           # and limit the number of levels in factor by fct_lump.
