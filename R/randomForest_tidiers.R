@@ -729,11 +729,15 @@ do_smote <- function(df,
   target_col <- dplyr::select_var(names(df), !! rlang::enquo(target))
   input  <- df[, !(names(df) %in% target_col)]
   output <- factor(df[[target_col]])
+  output <- fct_infreq(output)
+  orig_labels <- labels(output)
+  output <- factor(output, labels=c("0","1"))
   df_balanced <- unbalanced::ubSMOTE(input, output, perc.over = 200, perc.under = 200, k = 5)
   df_balanced <- as.data.frame(df_balanced)
 
   # revert the name changes made by ubSMOTE.
   colnames(df_balanced) <- c(colnames(input), target_col)
+  levels(df_balanced[[target_col]]) <- orig_labels # set original labels
   df_balanced
 }
 
@@ -893,6 +897,12 @@ calc_feature_imp <- function(df,
         if (length(unique_val[!is.na(unique_val)]) == 1) {
           c_cols <- setdiff(c_cols, col)
         }
+      }
+
+      # apply smote if this is binary classification
+      unique_val <- unique(df[[target_col]])
+      if (length(unique_val[!is.na(unique_val)]) == 2) {
+        df <- df %>% do_smote(target_col)
       }
 
       # build formula for randomForest
