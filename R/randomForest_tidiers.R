@@ -724,8 +724,6 @@ do_smote <- function(df,
                      target,
                      ...
                      ){
-  browser()
-
   orig_df <- df
   for(col in colnames(df)){
     if(is.numeric(df[[col]])) {
@@ -788,7 +786,6 @@ calc_feature_imp <- function(df,
   df <- df %>%
     dplyr::filter(!is.na(!!target_col))
 
-  browser()
   # cols will be filtered to remove invalid columns
   cols <- selected_cols
 
@@ -855,7 +852,6 @@ calc_feature_imp <- function(df,
         }
       }
 
-      browser()
       c_cols <- clean_cols
       for(col in clean_cols){
         if(lubridate::is.Date(df[[col]]) || lubridate::is.POSIXct(df[[col]])) {
@@ -906,7 +902,6 @@ calc_feature_imp <- function(df,
           # convert data to factor if predictors are not numeric.
           # and limit the number of levels in factor by fct_lump.
           # we need to convert logical to factor too since na.roughfix only works for numeric or factor.
-          browser()
           df[[col]] <- forcats::fct_explicit_na(forcats::fct_lump(as.factor(df[[col]]), n=predictor_n, ties.method="first"))
         }
       }
@@ -921,7 +916,6 @@ calc_feature_imp <- function(df,
         }
       }
 
-      browser()
       # apply smote if this is binary classification
       unique_val <- unique(df[[clean_target_col]])
       if (length(unique_val[!is.na(unique_val)]) == 2) {
