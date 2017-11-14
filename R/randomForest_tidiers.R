@@ -719,6 +719,21 @@ rf_partial_dependence <- function(df, ...) { # TODO: write test for this.
   res
 }
 
+#' @export
+do_smote <- function(df,
+                     target,
+                     ...
+                     ){
+  # this seems to be the new way of NSE column selection evaluation
+  # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
+  target_col <- dplyr::select_var(names(df), !! rlang::enquo(target))
+  input  <- df[, !(names(df) %in% target_col)]
+  output <- factor(df[[target_col]])
+  df_balanced <- unbalanced::ubSMOTE(input, output, perc.over = 200, perc.under = 200, k = 5)
+  df_balanced <- as.data.frame(df_balanced)
+  df_balanced
+}
+
 #' get feature importance for multi class classification using randomForest
 #' @export
 calc_feature_imp <- function(df,
