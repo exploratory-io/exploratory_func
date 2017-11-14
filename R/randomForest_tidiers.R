@@ -734,7 +734,7 @@ do_smote <- function(df,
     }
   }
   if (nrow(df) == 0) { # if no rows are left, give up smote and return original df.
-    return(orig_df)
+    return(orig_df) # TODO: we should throw error and let user know which columns with NAs to remove.
   }
   # this seems to be the new way of NSE column selection evaluation
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
