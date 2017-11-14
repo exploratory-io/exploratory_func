@@ -810,9 +810,9 @@ calc_feature_imp <- function(df,
   if (!is.numeric(clean_df[[clean_target_col]])) {
     if (!is.logical(clean_df[[clean_target_col]])) {
       # limit the number of levels in factor by fct_lump
-      clean_df[[clean_target_col]] <- forcats::fct_lump(
-        as.factor(clean_df[[clean_target_col]]), n = target_n
-      )
+      clean_df[[clean_target_col]] <- forcats::fct_explicit_na(forcats::fct_lump(
+        as.factor(clean_df[[clean_target_col]]), n = target_n, ties.method="first"
+      ))
     }
     else {
       # we need to convert logical to factor since na.roughfix only works for numeric or factor.
@@ -892,7 +892,7 @@ calc_feature_imp <- function(df,
           # convert data to factor if predictors are not numeric.
           # and limit the number of levels in factor by fct_lump.
           # we need to convert logical to factor too since na.roughfix only works for numeric or factor.
-          df[[col]] <- forcats::fct_lump(as.factor(df[[col]]), n=predictor_n)
+          df[[col]] <- forcats::fct_explicit_na(forcats::fct_lump(as.factor(df[[col]]), n=predictor_n, ties.method="first"))
         }
       }
 
