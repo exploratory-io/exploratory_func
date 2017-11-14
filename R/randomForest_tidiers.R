@@ -1117,7 +1117,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
       # set order to ret and turn it back to character, so that the order is kept when groups are bound.
       # if it were kept as factor, when groups are bound, only the factor order from the first group would be respected.
       ret <- ret %>% arrange(x_name) %>% mutate(x_name = as.character(x_name))
-      ret <- ret %>% mutate(x_name = x$terms_mapping[x_name])
+      ret <- ret %>% mutate(x_name = x$terms_mapping[x_name]) # map variable names to original.
       ret
     },
     {
