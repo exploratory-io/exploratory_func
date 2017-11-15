@@ -725,7 +725,7 @@ rf_partial_dependence <- function(df, ...) { # TODO: write test for this.
 do_smote <- function(df,
                      target,
                      ...
-                     ){
+                     ){ # TODO: add test
   orig_df <- df
   for(col in colnames(df)){
     if(is.numeric(df[[col]])) {
