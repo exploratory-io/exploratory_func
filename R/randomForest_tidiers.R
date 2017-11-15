@@ -747,6 +747,13 @@ do_smote <- function(df,
   df_balanced <- unbalanced::ubSMOTE(input, output, ...) # defaults are, perc.over = 200, perc.under = 200, k = 5
   df_balanced <- as.data.frame(df_balanced)
 
+  # verify that df_balanced still keeps 2 unique values. it seems that SMOTE sometimes undersamples majority too much till it becomes 0.
+  unique_val <- unique(df_balanced[[target_col]])
+  if (length(unique_val[!is.na(unique_val)]) <= 1) {
+    # in this case, give up SMOTE and return original. TODO: look into how to prevent this.
+    return(orig_df)
+  }
+
   # revert the name changes made by ubSMOTE.
   colnames(df_balanced) <- c(colnames(input), target_col)
   levels(df_balanced[[target_col]]) <- orig_levels # set original labels
