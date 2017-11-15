@@ -775,7 +775,8 @@ calc_feature_imp <- function(df,
   grouped_cols <- grouped_by(df)
 
   # drop unrelated columns so that SMOTE later does not have to deal with them.
-  df <- df %>% dplyr::select_(.dots=c(grouped_cols, selected_cols, target_col))
+  # select_ was not able to handle space in target_col. let's do it in base R way.
+  df <- df[,colnames(df) %in% c(grouped_cols, selected_cols, target_col), drop=FALSE]
 
   # remove grouped col or target col
   selected_cols <- setdiff(selected_cols, c(grouped_cols, target_col))
