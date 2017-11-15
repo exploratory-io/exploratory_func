@@ -1,5 +1,14 @@
 context("test tidiers for randomForest")
 
+test_that("test do_smote", {
+  sample_data <- data.frame(
+    y = c("a", "b", "b", "b", "b", "b"),
+    num = runif(6)
+  )
+  res <- do_smote(sample_data, y)
+  expect_equal(class(res), "data.frame")
+})
+
 test_that("test calc_feature_imp when the number of rows of classes is one", {
   sample_data <- data.frame(
     y = c("a", "b", "b", "b", "b", "c"),

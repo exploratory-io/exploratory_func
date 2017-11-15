@@ -715,8 +715,50 @@ rf_partial_dependence <- function(df, ...) { # TODO: write test for this.
   # gather we did after edarf::partial_dependence call turned x_value into factor if not all variables were in a same data type like numeric.
   # to keep the numeric or factor order (e.g. Sun, Mon, Tue) of x_value in the resulting chart, we do fct_inorder here while x_value is in order.
   # the first factor() is for the case x_value is not already a factor, to avoid error from fct_inorder()
-  res <- res %>% mutate(x_value = forcats::fct_inorder(factor(x_value))) # TODO: if same number appears for different variables, order will be broken.
+  res <- res %>% dplyr::mutate(x_value = forcats::fct_inorder(factor(x_value))) # TODO: if same number appears for different variables, order will be broken.
   res
+}
+
+#' applies SMOTE to a data frame
+#' @param target - the binary value column that becomes target of model later.
+#' @export
+do_smote <- function(df,
+                     target,
+                     ...
+                     ){
+  orig_df <- df
+  for(col in colnames(df)){
+    if(is.numeric(df[[col]])) {
+      # for numeric cols, filter NA rows. With NAs, ubSMOTE throws mysterious error like "invalid 'labels'; length 0 should be 1 or 2"
+      df <- df %>% dplyr::filter(!is.na(df[[col]]) & !is.infinite(df[[col]]))
+    }
+  }
+  if (nrow(df) == 0) { # if no rows are left, give up smote and return original df.
+    return(orig_df) # TODO: we should throw error and let user know which columns with NAs to remove.
+  }
+  # this seems to be the new way of NSE column selection evaluation
+  # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
+  target_col <- dplyr::select_var(names(df), !! rlang::enquo(target))
+  input  <- df[, !(names(df) %in% target_col), drop=FALSE] # drop=FALSE is to prevent input from turning into vector when only one column is left.
+  output <- factor(df[[target_col]])
+  output <- forcats::fct_infreq(output)
+  orig_levels <- levels(output)
+  levels(output) <- c("0", "1")
+  df_balanced <- unbalanced::ubSMOTE(input, output, ...) # defaults are, perc.over = 200, perc.under = 200, k = 5
+  df_balanced <- as.data.frame(df_balanced)
+
+  # revert the name changes made by ubSMOTE.
+  colnames(df_balanced) <- c(colnames(input), target_col)
+
+  # verify that df_balanced still keeps 2 unique values. it seems that SMOTE sometimes undersamples majority too much till it becomes 0.
+  unique_val <- unique(df_balanced[[target_col]])
+  if (length(unique_val[!is.na(unique_val)]) <= 1) {
+    # in this case, give up SMOTE and return original. TODO: look into how to prevent this.
+    return(orig_df)
+  }
+
+  levels(df_balanced[[target_col]]) <- orig_levels # set original labels
+  df_balanced
 }
 
 #' get feature importance for multi class classification using randomForest
@@ -729,7 +771,8 @@ calc_feature_imp <- function(df,
                              ntree = 20,
                              nodesize = 12,
                              target_n = 20,
-                             predictor_n = 12 # so that at least months can fit in it.
+                             predictor_n = 12, # so that at least months can fit in it.
+                             smote = FALSE
                              ){
   # this seems to be the new way of NSE column selection evaluation
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
@@ -738,6 +781,10 @@ calc_feature_imp <- function(df,
   selected_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
 
   grouped_cols <- grouped_by(df)
+
+  # drop unrelated columns so that SMOTE later does not have to deal with them.
+  # select_ was not able to handle space in target_col. let's do it in base R way.
+  df <- df[,colnames(df) %in% c(grouped_cols, selected_cols, target_col), drop=FALSE]
 
   # remove grouped col or target col
   selected_cols <- setdiff(selected_cols, c(grouped_cols, target_col))
@@ -757,6 +804,7 @@ calc_feature_imp <- function(df,
     if(all(is.na(df[[col]]))){
       # remove columns if they are all NA
       cols <- setdiff(cols, col)
+      df[[col]] <- NULL # drop the column so that SMOTE will not see it. 
     }
   }
 
@@ -783,9 +831,9 @@ calc_feature_imp <- function(df,
   if (!is.numeric(clean_df[[clean_target_col]])) {
     if (!is.logical(clean_df[[clean_target_col]])) {
       # limit the number of levels in factor by fct_lump
-      clean_df[[clean_target_col]] <- forcats::fct_lump(
-        as.factor(clean_df[[clean_target_col]]), n = target_n
-      )
+      clean_df[[clean_target_col]] <- forcats::fct_explicit_na(forcats::fct_lump(
+        as.factor(clean_df[[clean_target_col]]), n = target_n, ties.method="first"
+      ))
     }
     else {
       # we need to convert logical to factor since na.roughfix only works for numeric or factor.
@@ -860,11 +908,12 @@ calc_feature_imp <- function(df,
             c_cols <- c(c_cols, hour_col)
             df[[hour_col]] <- factor(lubridate::hour(df[[col]])) # treat hour as category
           }
+          df[[col]] <- NULL # drop original Date/POSIXct column to pass SMOTE later.
         } else if(!is.numeric(df[[col]])) {
           # convert data to factor if predictors are not numeric.
           # and limit the number of levels in factor by fct_lump.
           # we need to convert logical to factor too since na.roughfix only works for numeric or factor.
-          df[[col]] <- forcats::fct_lump(as.factor(df[[col]]), n=predictor_n)
+          df[[col]] <- forcats::fct_explicit_na(forcats::fct_lump(as.factor(df[[col]]), n=predictor_n, ties.method="first"))
         }
       }
 
@@ -872,9 +921,16 @@ calc_feature_imp <- function(df,
       cols_copy <- c_cols
       for (col in cols_copy) {
         unique_val <- unique(df[[col]])
-        if (length(unique_val[!is.na(unique_val)]) == 1) {
+        if (length(unique_val[!is.na(unique_val)]) <= 1) {
           c_cols <- setdiff(c_cols, col)
+          df[[col]] <- NULL # drop the column so that SMOTE will not see it. 
         }
+      }
+
+      # apply smote if this is binary classification
+      unique_val <- unique(df[[clean_target_col]])
+      if (smote && length(unique_val[!is.na(unique_val)]) == 2) {
+        df <- df %>% do_smote(clean_target_col)
       }
 
       # build formula for randomForest
@@ -1065,12 +1121,13 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
           ret[[var_col]] <- signif(ret[[var_col]], digits=4) # limit digits before we turn it into a factor.
         }
       }
-      ret <- ret %>% gather_("x_name", "x_value", var_cols, na.rm = TRUE, convert = TRUE)
-      ret <- ret %>% gather("y_name", "y_value", -x_name, -x_value, na.rm = TRUE, convert = TRUE)
-      ret <- ret %>% mutate(x_name = forcats::fct_relevel(x_name, imp_vars)) # set factor level order so that charts appear in order of importance.
+      ret <- ret %>% tidyr::gather_("x_name", "x_value", var_cols, na.rm = TRUE, convert = TRUE)
+      ret <- ret %>% tidyr::gather("y_name", "y_value", -x_name, -x_value, na.rm = TRUE, convert = TRUE)
+      ret <- ret %>% dplyr::mutate(x_name = forcats::fct_relevel(x_name, imp_vars)) # set factor level order so that charts appear in order of importance.
       # set order to ret and turn it back to character, so that the order is kept when groups are bound.
       # if it were kept as factor, when groups are bound, only the factor order from the first group would be respected.
-      ret <- ret %>% arrange(x_name) %>% mutate(x_name = as.character(x_name))
+      ret <- ret %>% dplyr::arrange(x_name) %>% dplyr::mutate(x_name = as.character(x_name))
+      ret <- ret %>% dplyr::mutate(x_name = x$terms_mapping[x_name]) # map variable names to original.
       ret
     },
     {
