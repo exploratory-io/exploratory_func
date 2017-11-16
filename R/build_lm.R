@@ -286,7 +286,12 @@ build_lm.fast <- function(df,
       rf$terms_mapping <- names(name_map)
       names(rf$terms_mapping) <- name_map
       # add special lm_exploratory class for adding extra info at glance().
-      class(rf) <- c("lm_exploratory", class(rf))
+      if (is.null(family)) {
+        class(rf) <- c("lm_exploratory", class(rf))
+      }
+      else {
+        class(rf) <- c("glm_exploratory", class(rf))
+      }
       rf
     }, error = function(e){
       if(length(grouped_cols) > 0) {
