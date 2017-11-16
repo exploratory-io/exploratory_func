@@ -136,6 +136,7 @@ build_lm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, gr
 build_lm.fast <- function(df,
                     target,
                     ...,
+                    family = NULL,
                     max_nrow = 200000,
                     predictor_n = 12, # so that at least months can fit in it.
                     seed = 0
@@ -275,7 +276,12 @@ build_lm.fast <- function(df,
       rhs <- paste0("`", c_cols, "`", collapse = " + ")
       # TODO: This clean_target_col is actually not a cleaned column name since we want lm to show real name. Clean up our variable name.
       fml <- as.formula(paste0("`", clean_target_col, "` ~ ", rhs))
-      rf <- stats::lm(fml, data = df) 
+      if (is.null(family)) {
+        rf <- stats::lm(fml, data = df) 
+      }
+      else {
+        rf <- stats::glm(fml, data = df, family = family) 
+      }
       # these attributes are used in tidy of randomForest TODO: is this good for lm too?
       rf$terms_mapping <- names(name_map)
       names(rf$terms_mapping) <- name_map
