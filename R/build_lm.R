@@ -328,3 +328,22 @@ glance.lm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
   }
   ret
 }
+
+#' special version of glance.lm function to use with build_lm.fast.
+#' @export
+glance.glm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
+  ret <- broom:::glance.glm(x)
+
+  for(var in names(x$xlevels)) { # extract base levels info on factor/character columns from lm model
+    if(pretty.name) {
+      ret[paste0("Base Level of ", var)] <- x$xlevels[[var]][[1]]
+    }
+    else {
+      ret[paste0(var, "_base")] <- x$xlevels[[var]][[1]]
+    }
+  }
+  if(pretty.name) {
+    ret <- ret %>% dplyr::rename(`Null Deviance`=null.deviance, `DF for Null Model`=df.null, `Log Likelihood`=logLik, Deviance=deviance, `Residual DF`=df.residual)
+  }
+  ret
+}
