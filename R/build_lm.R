@@ -137,7 +137,7 @@ build_lm.fast <- function(df,
                     target,
                     ...,
                     model_type = "lm",
-                    max_nrow = 200000,
+                    max_nrow = 50000,
                     predictor_n = 12, # so that at least months can fit in it.
                     seed = 0
                     ){
@@ -152,6 +152,10 @@ build_lm.fast <- function(df,
 
   grouped_cols <- grouped_by(df)
 
+  # drop unrelated columns so that SMOTE later does not have to deal with them.
+  # select_ was not able to handle space in target_col. let's do it in base R way.
+  df <- df[,colnames(df) %in% c(grouped_cols, selected_cols, target_col), drop=FALSE]
+
   # remove grouped col or target col
   selected_cols <- setdiff(selected_cols, c(grouped_cols, target_col))
 
@@ -165,6 +169,16 @@ build_lm.fast <- function(df,
 
   # cols will be filtered to remove invalid columns
   cols <- selected_cols
+
+  browser()
+  for (col in selected_cols) {
+    if(all(is.na(df[[col]]))){
+      # remove columns if they are all NA
+      cols <- setdiff(cols, col)
+      df[[col]] <- NULL # drop the column so that SMOTE will not see it. 
+    }
+  }
+  browser()
 
   # randomForest fails if columns are not clean. TODO is this needed?
   #clean_df <- janitor::clean_names(df)
@@ -248,6 +262,7 @@ build_lm.fast <- function(df,
             c_cols <- c(c_cols, hour_col)
             df[[hour_col]] <- factor(lubridate::hour(df[[col]])) # treat hour as category
           }
+          df[[col]] <- NULL # drop original Date/POSIXct column to pass SMOTE later.
         } else if(!is.numeric(df[[col]])) {
           # convert data to factor if predictors are not numeric or logical
           # and limit the number of levels in factor by fct_lump.
@@ -269,6 +284,7 @@ build_lm.fast <- function(df,
         unique_val <- unique(df[[col]])
         if (length(unique_val[!is.na(unique_val)]) == 1) {
           c_cols <- setdiff(c_cols, col)
+          df[[col]] <- NULL # drop the column so that SMOTE will not see it. 
         }
       }
 
@@ -276,7 +292,9 @@ build_lm.fast <- function(df,
       rhs <- paste0("`", c_cols, "`", collapse = " + ")
       # TODO: This clean_target_col is actually not a cleaned column name since we want lm to show real name. Clean up our variable name.
       fml <- as.formula(paste0("`", clean_target_col, "` ~ ", rhs))
+      browser()
       if (!is.null(model_type) && model_type == "glm") {
+        df <- df %>% do_smote(clean_target_col)
         rf <- stats::glm(fml, data = df, family = "binomial") 
       }
       else {
