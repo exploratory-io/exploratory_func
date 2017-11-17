@@ -376,9 +376,23 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
     },
     conf_mat = {
       target_col <- as.character(lazyeval::f_lhs(x$formula)) # get target column name
+      actual_val = x$model[[target_col]]
+
+      predicted = x$fitted.value > 0.5 # TODO: make threshold adjustable
+      # convert predicted to original set of values. should be either logical, numeric, or factor.
+      predicted <- if (is.logical(actual_val)) {
+        predicted
+      } else if (is.numeric(actual_val)) {
+        as.numeric(predicted)
+      } else if (is.factor(actual_val)){
+        # create a factor vector with the same levels as actual_val
+        # predicted is logical, so should +1 to make it index
+        factor(levels(actual_val)[as.numeric(predicted) + 1], levels(actual_val))
+      }
+
       ret <- data.frame(
-        actual_value = x$model[[target_col]],
-        predicted_value = x$fitted.value > 0.5
+        actual_value = actual_val,
+        predicted_value = predicted
       ) %>%
         dplyr::filter(!is.na(predicted_value))
 
