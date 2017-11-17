@@ -139,6 +139,7 @@ build_lm.fast <- function(df,
                     model_type = "lm",
                     max_nrow = 50000,
                     predictor_n = 12, # so that at least months can fit in it.
+                    smote = FALSE,
                     seed = 0
                     ){
   # TODO: add test
@@ -294,7 +295,9 @@ build_lm.fast <- function(df,
       fml <- as.formula(paste0("`", clean_target_col, "` ~ ", rhs))
       browser()
       if (!is.null(model_type) && model_type == "glm") {
-        df <- df %>% do_smote(clean_target_col)
+        if (smote) {
+          df <- df %>% do_smote(clean_target_col)
+        }
         rf <- stats::glm(fml, data = df, family = "binomial") 
       }
       else {
