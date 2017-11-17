@@ -171,7 +171,6 @@ build_lm.fast <- function(df,
   # cols will be filtered to remove invalid columns
   cols <- selected_cols
 
-  browser()
   for (col in selected_cols) {
     if(all(is.na(df[[col]]))){
       # remove columns if they are all NA
@@ -179,7 +178,6 @@ build_lm.fast <- function(df,
       df[[col]] <- NULL # drop the column so that SMOTE will not see it. 
     }
   }
-  browser()
 
   # randomForest fails if columns are not clean. TODO is this needed?
   #clean_df <- janitor::clean_names(df)
@@ -293,7 +291,6 @@ build_lm.fast <- function(df,
       rhs <- paste0("`", c_cols, "`", collapse = " + ")
       # TODO: This clean_target_col is actually not a cleaned column name since we want lm to show real name. Clean up our variable name.
       fml <- as.formula(paste0("`", clean_target_col, "` ~ ", rhs))
-      browser()
       if (!is.null(model_type) && model_type == "glm") {
         if (smote) {
           df <- df %>% do_smote(clean_target_col)
@@ -378,8 +375,9 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
       ret
     },
     conf_mat = {
+      target_col <- as.character(lazyeval::f_lhs(x$formula)) # get target column name
       ret <- data.frame(
-        actual_value = x$y,
+        actual_value = x$model[[target_col]],
         predicted_value = x$fitted.value > 0.5
       ) %>%
         dplyr::filter(!is.na(predicted_value))
