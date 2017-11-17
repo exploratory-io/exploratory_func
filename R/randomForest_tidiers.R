@@ -726,11 +726,16 @@ do_smote <- function(df,
                      target,
                      ...
                      ){
+  browser()
   orig_df <- df
   for(col in colnames(df)){
     if(is.numeric(df[[col]])) {
       # for numeric cols, filter NA rows. With NAs, ubSMOTE throws mysterious error like "invalid 'labels'; length 0 should be 1 or 2"
       df <- df %>% dplyr::filter(!is.na(df[[col]]) & !is.infinite(df[[col]]))
+    }
+    else if(!is.factor(df[[col]])) {
+      # columns other than numeric have to be factor. otherwise ubSMOTE throws mysterious error like "invalid 'labels'; length 0 should be 1 or 2"
+      df[[col]] <- factor(df[[col]])
     }
   }
   if (nrow(df) == 0) { # if no rows are left, give up smote and return original df.
