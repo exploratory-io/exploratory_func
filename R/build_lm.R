@@ -168,6 +168,19 @@ build_lm.fast <- function(df,
     set.seed(seed)
   }
 
+  if (!is.null(model_type) && model_type == "glm") {
+    if (is.numeric(df[[target_col]])) {
+    }
+    else if (is.factor(df[[target_col]])) {
+    }
+    else if (is.logical(df[[target_col]])) {
+    }
+    else {
+      # make other types factor
+      df[[target_col]] <- factor(df[[target_col]])
+    }
+  }
+
   # cols will be filtered to remove invalid columns
   cols <- selected_cols
 
