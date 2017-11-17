@@ -378,7 +378,17 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
       ret
     },
     conf_mat = {
-      ret <- broom:::augment.lm(x) # it seems that augment.lm takes care of glm too
+      ret <- data.frame(
+        actual_value = x$y,
+        predicted_value = x$fitted.value > 0.5
+      ) %>%
+        dplyr::filter(!is.na(predicted_value))
+
+      # get count if it's classification
+      ret <- ret %>%
+        dplyr::group_by(actual_value, predicted_value) %>%
+        dplyr::summarize(count = n()) %>%
+        dplyr::ungroup()
       ret
     }
   )
