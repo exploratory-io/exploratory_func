@@ -169,14 +169,12 @@ build_lm.fast <- function(df,
   }
 
   if (!is.null(model_type) && model_type == "glm") {
-    if (is.numeric(df[[target_col]])) {
+    unique_val <- unique(df[[target_col]])
+    if (length(unique_val[!is.na(unique_val)]) != 2) {
+      stop(paste0("Column to predict (", target_col, ") must have 2 unique values."))
     }
-    else if (is.factor(df[[target_col]])) {
-    }
-    else if (is.logical(df[[target_col]])) {
-    }
-    else {
-      # make other types factor
+    if (!is.numeric(df[[target_col]]) && !is.factor(df[[target_col]]) && !is.logical(df[[target_col]])) {
+      # make other types factor so that it passes stats::glm call.
       df[[target_col]] <- factor(df[[target_col]])
     }
   }
