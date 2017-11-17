@@ -368,3 +368,18 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add tes
   }
   ret
 }
+
+#' special version of tidy.glm function to use with build_lm.fast.
+#' @export
+tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, ...) { #TODO: add test
+  switch(type,
+    coefficients = {
+      ret <- broom:::tidy.lm(x) # it seems that tidy.lm takes care of glm too
+      ret
+    },
+    conf_mat = {
+      ret <- broom:::augment.lm(x) # it seems that augment.lm takes care of glm too
+      ret
+    }
+  )
+}
