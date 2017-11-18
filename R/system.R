@@ -829,6 +829,7 @@ downloadDataFromGoogleCloudStorage <- function(bucket, folder, download_dir, tok
     }
   });
   files <- list.files(path=download_dir, pattern = ".gz");
+  # pass progress as FALSE to prevent SIGPIPE error on Exploratory Desktop.
   df <- lapply(files, function(file){readr::read_csv(stringr::str_c(download_dir, "/", file), progress = FALSE)}) %>% dplyr::bind_rows()
 }
 
@@ -913,7 +914,6 @@ executeGoogleBigQuery <- function(project, sqlquery, destination_table, page_siz
     # check if the query contains special key word for standardSQL
     # If we do not pass the useLegaySql argument, bigrquery set TRUE for it, so we need to expliclity set it to make standard SQL work.
     isStandardSQL <- stringr::str_detect(sqlquery, "#standardSQL")
-    browser()
     # set envir = parent.frame() to get variables from users environment, not papckage environment
     df <- bigrquery::query_exec(GetoptLong::qq(sqlquery, envir = parent.frame()), project = project, destination_table = destination_table,
                                 page_size = page_size, max_page = max_page, write_disposition = write_disposition, use_legacy_sql = isStandardSQL == FALSE)
