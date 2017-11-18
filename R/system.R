@@ -824,7 +824,7 @@ downloadDataFromGoogleCloudStorage <- function(bucket, folder, download_dir, tok
   # then delete the extracted files from Google Cloud Storage.
   lapply(objects$name, function(name){
     if(stringr::str_detect(name,stringr::str_c(folder, "/"))){
-      googleCloudStorageR::gcs_get_object(name, saveToDisk = str_c(download_dir, "/", stringr::str_replace(name, stringr::str_c(folder, "/"),"")))
+      googleCloudStorageR::gcs_get_object(name, overwrite = TRUE, saveToDisk = str_c(download_dir, "/", stringr::str_replace(name, stringr::str_c(folder, "/"),"")))
       googleCloudStorageR::gcs_delete_object(name, bucket = bucket)
     }
   });
