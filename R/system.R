@@ -772,7 +772,7 @@ submitGoogleBigQueryJob <- function(project, sqlquery, destination_table, write_
   # If we do not pass the useLegaySql argument, bigrquery set TRUE for it, so we need to expliclity set it to make standard SQL work.
   isStandardSQL <- stringr::str_detect(sqlquery, "#standardSQL")
   # set envir = parent.frame() to get variables from users environment, not papckage environment
-  job <- bigrquery::insert_query_job(GetoptLong::qq(sqlquery, envir = parent.frame()), project, destination_table = destination_table, write_disposition = write_disposition, useLegacySql = isStandardSQL == FALSE)
+  job <- bigrquery::insert_query_job(GetoptLong::qq(sqlquery, envir = parent.frame()), project, destination_table = destination_table, write_disposition = write_disposition, use_legacy_sql = isStandardSQL == FALSE)
   job <- bigrquery::wait_for(job)
   isCacheHit <- job$statistics$query$cacheHit
   # if cache hit case, totalBytesProcessed info is not available. So set it as -1
@@ -829,7 +829,8 @@ downloadDataFromGoogleCloudStorage <- function(bucket, folder, download_dir, tok
     }
   });
   files <- list.files(path=download_dir, pattern = ".gz");
-  df <- lapply(files, function(file){readr::read_csv(stringr::str_c(download_dir, "/", file))}) %>% dplyr::bind_rows()
+  # pass progress as FALSE to prevent SIGPIPE error on Exploratory Desktop.
+  df <- lapply(files, function(file){readr::read_csv(stringr::str_c(download_dir, "/", file), progress = FALSE)}) %>% dplyr::bind_rows()
 }
 
 #' API to get a list of buckets from Google Cloud Storage
@@ -915,7 +916,7 @@ executeGoogleBigQuery <- function(project, sqlquery, destination_table, page_siz
     isStandardSQL <- stringr::str_detect(sqlquery, "#standardSQL")
     # set envir = parent.frame() to get variables from users environment, not papckage environment
     df <- bigrquery::query_exec(GetoptLong::qq(sqlquery, envir = parent.frame()), project = project, destination_table = destination_table,
-                                page_size = page_size, max_page = max_page, write_disposition = write_disposition, useLegacySql = isStandardSQL == FALSE)
+                                page_size = page_size, max_page = max_page, write_disposition = write_disposition, use_legacy_sql = isStandardSQL == FALSE)
   }
   df
 }
