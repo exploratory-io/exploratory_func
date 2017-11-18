@@ -726,7 +726,6 @@ do_smote <- function(df,
                      target,
                      ...
                      ){
-  browser()
   orig_df <- df
   for(col in colnames(df)){
     if(is.numeric(df[[col]])) {
