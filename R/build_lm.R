@@ -171,11 +171,16 @@ build_lm.fast <- function(df,
   if (!is.null(model_type) && model_type == "glm") {
     unique_val <- unique(df[[target_col]])
     if (length(unique_val[!is.na(unique_val)]) != 2) {
-      stop(paste0("Column to predict (", target_col, ") must have 2 unique values."))
+      stop(paste0("Column to predict (", target_col, ") with Logistic Regression must have 2 unique values."))
     }
     if (!is.numeric(df[[target_col]]) && !is.factor(df[[target_col]]) && !is.logical(df[[target_col]])) {
       # make other types factor so that it passes stats::glm call.
       df[[target_col]] <- factor(df[[target_col]])
+    }
+  }
+  else { # this means the model is lm
+    if (!is.numeric(df[[target_col]])) {
+      stop(paste0("Column to predict (", target_col, ") with Linear Regression must be numeric"))
     }
   }
 
