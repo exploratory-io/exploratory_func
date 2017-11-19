@@ -170,9 +170,9 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
       }
       forecast <- stats::predict(m, future)
     }
+    # with prophet 2.1, now forecast$ds is POSIXct. Cast it to Date so that full_join works.
+    forecast$ds <- as.Date(forecast$ds)
     ret <- forecast %>% dplyr::full_join(aggregated_data, by = c("ds" = "ds"))
-    # drop t column, which is just scaled time, which does not seem informative.
-    ret <- ret %>% dplyr::select(-t)
     # drop cap_scaled column, which is just scaled capacity, which does not seem informative.
     if ("cap_scaled" %in% colnames(ret)) {
       ret <- ret %>% dplyr::select(-cap_scaled)
