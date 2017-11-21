@@ -839,11 +839,6 @@ calc_feature_imp <- function(df,
         as.factor(clean_df[[clean_target_col]]), n = target_n, ties.method="first"
       ))
     }
-    else {
-      # we need to convert logical to factor since na.roughfix only works for numeric or factor.
-      # for logical set TRUE, FALSE level order for better visualization.
-      clean_df[[clean_target_col]] <- factor(clean_df[[clean_target_col]], levels = c("TRUE", "FALSE"))
-    }
   }
 
   each_func <- function(df) {
@@ -861,9 +856,24 @@ calc_feature_imp <- function(df,
       # in such case.
       # The group with NULL is removed when
       # unnesting the result
-      for (level in levels(df[[target_col]])) {
-        if(sum(df[[target_col]] == level, na.rm = TRUE) == 1) {
+      for (level in levels(df[[clean_target_col]])) {
+        if(sum(df[[clean_target_col]] == level, na.rm = TRUE) == 1) {
           return(NULL)
+        }
+      }
+
+      if (is.logical(df[[clean_target_col]])) {
+        # we need to convert logical to factor since na.roughfix only works for numeric or factor.
+        # for logical set TRUE, FALSE level order for better visualization. but only do it when
+        # the target column actually has both TRUE and FALSE, since edarf::partial_dependence errors out if target
+        # factor column has more levels than actual data.
+        # error from edarf::partial_dependence looks like following.
+        #   Error in factor(x, seq_len(length(unique(data[[target]]))), levels(data[[target]])) : invalid 'labels'; length 2 should be 1 or 1
+        if (length(unique(df[[clean_target_col]])) >= 2) {
+          df[[clean_target_col]] <- factor(df[[clean_target_col]], levels=c("TRUE","FALSE"))
+        }
+        else {
+          df[[clean_target_col]] <- factor(df[[clean_target_col]])
         }
       }
 
@@ -1125,8 +1135,10 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
           ret[[var_col]] <- signif(ret[[var_col]], digits=4) # limit digits before we turn it into a factor.
         }
       }
-      ret <- ret %>% tidyr::gather_("x_name", "x_value", var_cols, na.rm = TRUE, convert = TRUE)
-      ret <- ret %>% tidyr::gather("y_name", "y_value", -x_name, -x_value, na.rm = TRUE, convert = TRUE)
+      ret <- ret %>% tidyr::gather_("x_name", "x_value", var_cols, na.rm = TRUE, convert = FALSE)
+      # convert must be FALSE for y to make sure y_name is always character. otherwise bind_rows internally done
+      # in tidy() errors out because y_name can be, for example, mixture of logical and character.
+      ret <- ret %>% tidyr::gather("y_name", "y_value", -x_name, -x_value, na.rm = TRUE, convert = FALSE)
       ret <- ret %>% dplyr::mutate(x_name = forcats::fct_relevel(x_name, imp_vars)) # set factor level order so that charts appear in order of importance.
       # set order to ret and turn it back to character, so that the order is kept when groups are bound.
       # if it were kept as factor, when groups are bound, only the factor order from the first group would be respected.
