@@ -843,6 +843,7 @@ calc_feature_imp <- function(df,
 
   each_func <- function(df) {
     tryCatch({
+      browser()
       # sample the data because randomForest takes long time
       # if data size is too large
       if (nrow(df) > max_nrow) {
@@ -856,24 +857,24 @@ calc_feature_imp <- function(df,
       # in such case.
       # The group with NULL is removed when
       # unnesting the result
-      for (level in levels(df[[target_col]])) {
-        if(sum(df[[target_col]] == level, na.rm = TRUE) == 1) {
+      for (level in levels(df[[clean_target_col]])) {
+        if(sum(df[[clean_target_col]] == level, na.rm = TRUE) == 1) {
           return(NULL)
         }
       }
 
-      if (is.logical(df[[target_col]])) {
+      if (is.logical(df[[clean_target_col]])) {
         # we need to convert logical to factor since na.roughfix only works for numeric or factor.
         # for logical set TRUE, FALSE level order for better visualization. but only do it when
         # the target column actually has both TRUE and FALSE, since edarf::partial_dependence errors out if target
         # factor column has more levels than actual data.
         # error from edarf::partial_dependence looks like following.
         #   Error in factor(x, seq_len(length(unique(data[[target]]))), levels(data[[target]])) : invalid 'labels'; length 2 should be 1 or 1
-        if (length(unique(df[[target_col]])) >= 2) {
-          df[[target_col]] <- factor(df[[target_col]], levels=c("TRUE","FALSE"))
+        if (length(unique(df[[clean_target_col]])) >= 2) {
+          df[[clean_target_col]] <- factor(df[[clean_target_col]], levels=c("TRUE","FALSE"))
         }
         else {
-          df[[target_col]] <- factor(df[[target_col]])
+          df[[clean_target_col]] <- factor(df[[clean_target_col]])
         }
       }
 
