@@ -15,9 +15,9 @@ test_that("test calc_feature_imp when the number of rows of classes is one", {
     num = runif(6)
   )
 
-  ret <- sample_data %>%
-    calc_feature_imp(y, num) %>%
-    rf_importance()
+  model_df <- sample_data %>%
+    calc_feature_imp(y, num)
+  ret <- model_df %>% rf_importance()
 
   expect_equal(nrow(ret), 0)
 })
@@ -35,15 +35,16 @@ test_that("test calc_feature_imp", {
   ) %>%
     rename(`Tar get` = "target") # check if colname with space works
 
-  ret <- test_data %>%
+  model_df <- test_data %>%
     dplyr::group_by(Group) %>%
     calc_feature_imp(`Tar get`,
                       dplyr::starts_with("cat_"),
                       num_1,
                       num_2)
 
-  conf_mat <- tidy(ret, model, type = "conf_mat", pretty.name = TRUE)
-
+  conf_mat <- tidy(model_df, model, type = "conf_mat", pretty.name = TRUE)
+  ret <- model_df %>% rf_importance()
+  # ret <- model_df %>% rf_partial_dependence() TODO: this errors out
 })
 
 test_that("test calc_feature_imp predicting logical", {
@@ -59,14 +60,16 @@ test_that("test calc_feature_imp predicting logical", {
   ) %>%
     rename(`Tar get` = "target") # check if colname with space works
 
-  ret <- test_data %>%
+  model_df <- test_data %>%
     dplyr::group_by(Group) %>%
     calc_feature_imp(`Tar get`,
                       dplyr::starts_with("cat_"),
                       num_1,
                       num_2)
 
-  conf_mat <- tidy(ret, model, type = "conf_mat", pretty.name = TRUE)
+  conf_mat <- tidy(model_df, model, type = "conf_mat", pretty.name = TRUE)
+  ret <- model_df %>% rf_importance()
+  ret <- model_df %>% rf_partial_dependence()
   # factor order should be TRUE then FALSE.
   expect_equal(levels(conf_mat$actual_value)[1], "TRUE")
   expect_equal(levels(conf_mat$predicted_value)[1], "TRUE")
