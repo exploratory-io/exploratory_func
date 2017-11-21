@@ -100,8 +100,8 @@ do_bayes_ab <- function(df, a_b_identifier, total_count, conversion_rate, prior_
     data_b_conv_total <- sum(round(data_b[[total_count_col]] * data_b[[conversion_rate_col]]), na.rm = TRUE)
 
     # expand the data to TRUE and FALSE raw data
-    bin_a <- c(rep(TRUE, data_a_conv_total), rep(FALSE, data_a_total - data_a_conv_total))
-    bin_b <- c(rep(TRUE, data_b_conv_total), rep(FALSE, data_b_total - data_b_conv_total))
+    bin_a <- c(rep(1, data_a_conv_total), rep(0, data_a_total - data_a_conv_total))
+    bin_b <- c(rep(1, data_b_conv_total), rep(0, data_b_total - data_b_conv_total))
 
     bayes_model <- bayesAB::bayesTest(
       bin_a,
@@ -114,8 +114,6 @@ do_bayes_ab <- function(df, a_b_identifier, total_count, conversion_rate, prior_
     # save factor levels if the AB identifier is 2 levels factor
     if(!is.null(fct_lev)){
       bayes_model$ab_identifier <- fct_lev
-    } else {
-      c(TRUE, FALSE)
     }
 
     bayes_model
@@ -173,16 +171,16 @@ calc_beta_prior <- function(df, rate, ...){
 #' @export
 tidy.bayesTest <- function(x, percentLift = 0, credInt = 0.9, type = "summary", pretty.name = FALSE, ...) {
   if (type == "summary"){
-    each_len <- c(length(x$inputs$A_data), length(x$inputs$B_data))
-    each_success <- c(sum(x$inputs$A_data), sum(x$inputs$B_data))
+    each_len <- c(length(unlist(x$inputs$A_data)), length(unlist(x$inputs$B_data)))
+    each_success <- c(sum(unlist(x$inputs$A_data)), sum(unlist(x$inputs$B_data)))
     each_mean <- each_success / each_len
     # estimation of (A - B) / B
-    lift <- (x$posteriors$Probability$A_probs -x$posteriors$Probability$B_probs)/ x$posteriors$Probability$B_probs
+    lift <- (x$posteriors$Probability$A -x$posteriors$Probability$B)/ x$posteriors$Probability$B
     # get density chart of lift
     d <- density(lift)
     # get the peak of density chart
     expected_lift <- d$x[which.max(d$y)]
-    s <- summary(
+    summary_info <- summary(
       x,
       percentLift = rep(percentLift, length(x$posteriors)),
       credInt = rep(credInt, length(x$posteriors))
@@ -200,11 +198,11 @@ tidy.bayesTest <- function(x, percentLift = 0, credInt = 0.9, type = "summary", 
       total_population = each_len,
       converted = each_success,
       conversion_rate = each_mean,
-      chance_of_being_better = c(s$probability[[1]], 1-s$probability[[1]]) ,
+      chance_of_being_better = c(summary_info$probability[[1]], 1-summary_info$probability[[1]]) ,
       expected_improvement_rate = c(expected_lift, NA_real_),
-      credible_interval_low = c(s$interval$Probability[[1]], NA_real_),
-      credible_interval_high = c(s$interval$Probability[[2]], NA_real_),
-      expected_loss_rate = c(s$posteriorExpectedLoss$Probability, NA_real_),
+      credible_interval_low = c(summary_info$interval$Probability[[1]], NA_real_),
+      credible_interval_high = c(summary_info$interval$Probability[[2]], NA_real_),
+      expected_loss_rate = c(summary_info$posteriorExpectedLoss$Probability, NA_real_),
       stringsAsFactors = FALSE
     )
 
@@ -227,8 +225,8 @@ tidy.bayesTest <- function(x, percentLift = 0, credInt = 0.9, type = "summary", 
     ret
 
   } else if (type == "posteriors") {
-    probability_a = x$posteriors$Probability$A_probs
-    probability_b = x$posteriors$Probability$B_probs
+    probability_a = x$posteriors$Probability$A
+    probability_b = x$posteriors$Probability$B
 
     beta_a <- density(probability_a, n = 2048)
     # rate must be in 0 ~ 1,
@@ -255,7 +253,7 @@ tidy.bayesTest <- function(x, percentLift = 0, credInt = 0.9, type = "summary", 
     dplyr::bind_rows(a_data, b_data)
   } else if (type == "improvement") {
     # estimation of (A - B) / B
-    lift <- (x$posteriors$Probability$A_probs -x$posteriors$Probability$B_probs)/ x$posteriors$Probability$B_probs
+    lift <- (x$posteriors$Probability$A -x$posteriors$Probability$B)/ x$posteriors$Probability$B
 
     lift_hist <- hist(lift, breaks = 50, plot = FALSE)
 
@@ -287,7 +285,7 @@ tidy.bayesTest <- function(x, percentLift = 0, credInt = 0.9, type = "summary", 
 #' @export
 glance.bayesTest <- function(x, percentLift = 0, credInt = 0.9, ...) {
   # Get the peak of estimated density chart of (A - B) / B
-  lift <- (x$posteriors$Probability$A_probs - x$posteriors$Probability$B_probs) / x$posteriors$Probability$B_probs
+  lift <- (x$posteriors$Probability$A - x$posteriors$Probability$B) / x$posteriors$Probability$B
   d <- density(lift)
   expected_lift <- d$x[which.max(d$y)]
 
