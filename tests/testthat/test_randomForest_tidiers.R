@@ -76,6 +76,31 @@ test_that("test calc_feature_imp predicting logical", {
 
 })
 
+test_that("test calc_feature_imp with group_by where a group has only TRUE rows while the other have both TRUE/FALSE", {
+  # if a group has only TRUE rows and factor level has both TRUE/FALSE, edarf::partial_dependence wourd error out.
+  # we adjust factor level for each group to avoid it. this is a test for that logic.
+  set.seed(0)
+  nrow <- 100
+  test_data <- data.frame(
+    target = c(rep(TRUE, 30), sample(c(TRUE,FALSE), nrow - 30, replace = TRUE)), # first 30 is the group that has only TRUE rows.
+    cat_10 = sample(c(letters[1:10], NA_character_), nrow, replace = TRUE),
+    cat_25 = sample(letters[1:25], nrow, replace = TRUE),
+    num_1 = runif(nrow),
+    num_2 = runif(nrow),
+    Group = c(rep(1,30), rep(0,nrow-30)) # first 30 is the group that has only TRUE rows.
+  ) %>%
+    rename(`Tar get` = "target") # check if colname with space works
+
+  model_df <- test_data %>%
+    dplyr::group_by(Group) %>%
+    calc_feature_imp(`Tar get`,
+                      dplyr::starts_with("cat_"),
+                      num_1,
+                      num_2)
+
+  ret <- model_df %>% rf_partial_dependence()
+})
+
 test_that("test randomForest with multinomial classification", {
   test_data <- structure(
     list(
