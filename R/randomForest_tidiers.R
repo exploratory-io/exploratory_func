@@ -843,7 +843,6 @@ calc_feature_imp <- function(df,
 
   each_func <- function(df) {
     tryCatch({
-      browser()
       # sample the data because randomForest takes long time
       # if data size is too large
       if (nrow(df) > max_nrow) {
@@ -1136,8 +1135,10 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
           ret[[var_col]] <- signif(ret[[var_col]], digits=4) # limit digits before we turn it into a factor.
         }
       }
-      ret <- ret %>% tidyr::gather_("x_name", "x_value", var_cols, na.rm = TRUE, convert = TRUE)
-      ret <- ret %>% tidyr::gather("y_name", "y_value", -x_name, -x_value, na.rm = TRUE, convert = TRUE)
+      ret <- ret %>% tidyr::gather_("x_name", "x_value", var_cols, na.rm = TRUE, convert = FALSE)
+      # convert must be FALSE for y to make sure y_name is always character. otherwise bind_rows internally done
+      # in tidy() errors out because y_name can be, for example, mixture of logical and character.
+      ret <- ret %>% tidyr::gather("y_name", "y_value", -x_name, -x_value, na.rm = TRUE, convert = FALSE)
       ret <- ret %>% dplyr::mutate(x_name = forcats::fct_relevel(x_name, imp_vars)) # set factor level order so that charts appear in order of importance.
       # set order to ret and turn it back to character, so that the order is kept when groups are bound.
       # if it were kept as factor, when groups are bound, only the factor order from the first group would be respected.
