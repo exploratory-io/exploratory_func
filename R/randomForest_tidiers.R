@@ -844,6 +844,8 @@ calc_feature_imp <- function(df,
       # for logical set TRUE, FALSE level order for better visualization. but only do it when
       # the target column actually has both TRUE and FALSE, since edarf::partial_dependence errors out if target
       # factor column has more levels than actual data. TODO: Can this issue be caused by group_by??
+      # error from edarf::partial_dependence looks like following.
+      #   Error in factor(x, seq_len(length(unique(data[[target]]))), levels(data[[target]])) : invalid 'labels'; length 2 should be 1 or 1
       if (length(unique(clean_df[[clean_target_col]])) >= 2) {
         clean_df[[clean_target_col]] <- factor(clean_df[[clean_target_col]], levels=c("TRUE","FALSE"))
       }
