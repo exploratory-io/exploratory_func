@@ -147,9 +147,10 @@ refreshGoogleTokenForSheet <- function(tokenFileId){
 #' tokenFileId is a unique value per data farme and is used to create a token cache file
 #' @export
 getTwitterToken <- function(tokenFileId="", useCache=TRUE){
-  if(!requireNamespace("twitteR")){stop("package twitteR must be installed.")}
-  consumer_key = "0lWpnop0HLfWRbpkDEJ0XA"
-  consumer_secret = "xYNUMALkRnvuT3vls48LW7k2XK1l9xjZTLnRv2JaFaM"
+  if(!requireNamespace("rtweet")){stop("package rtweet must be installed.")}
+  consumer_key = "kYrHnqx62YaCoy6g0x967BGBq"
+  #consumer_secret = "xYNUMALkRnvuT3vls48LW7k2XK1l9xjZTLnRv2JaFaM"
+  consumer_secret = "wqP7VhX5yDEGzLL3eHSbT2wDlJvs4OitruIkd18CQZGzsySFuX"
   appName = "twitter"
   endpointType = "twitter"
   # retrieve token info from environment
