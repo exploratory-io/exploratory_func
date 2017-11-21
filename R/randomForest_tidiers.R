@@ -839,20 +839,6 @@ calc_feature_imp <- function(df,
         as.factor(clean_df[[clean_target_col]]), n = target_n, ties.method="first"
       ))
     }
-    else {
-      # we need to convert logical to factor since na.roughfix only works for numeric or factor.
-      # for logical set TRUE, FALSE level order for better visualization. but only do it when
-      # the target column actually has both TRUE and FALSE, since edarf::partial_dependence errors out if target
-      # factor column has more levels than actual data. TODO: Can this issue be caused by group_by??
-      # error from edarf::partial_dependence looks like following.
-      #   Error in factor(x, seq_len(length(unique(data[[target]]))), levels(data[[target]])) : invalid 'labels'; length 2 should be 1 or 1
-      if (length(unique(clean_df[[clean_target_col]])) >= 2) {
-        clean_df[[clean_target_col]] <- factor(clean_df[[clean_target_col]], levels=c("TRUE","FALSE"))
-      }
-      else {
-        clean_df[[clean_target_col]] <- factor(clean_df[[clean_target_col]])
-      }
-    }
   }
 
   each_func <- function(df) {
@@ -873,6 +859,21 @@ calc_feature_imp <- function(df,
       for (level in levels(df[[target_col]])) {
         if(sum(df[[target_col]] == level, na.rm = TRUE) == 1) {
           return(NULL)
+        }
+      }
+
+      if (is.logical(df[[target_col]])) {
+        # we need to convert logical to factor since na.roughfix only works for numeric or factor.
+        # for logical set TRUE, FALSE level order for better visualization. but only do it when
+        # the target column actually has both TRUE and FALSE, since edarf::partial_dependence errors out if target
+        # factor column has more levels than actual data.
+        # error from edarf::partial_dependence looks like following.
+        #   Error in factor(x, seq_len(length(unique(data[[target]]))), levels(data[[target]])) : invalid 'labels'; length 2 should be 1 or 1
+        if (length(unique(df[[target_col]])) >= 2) {
+          df[[target_col]] <- factor(df[[target_col]], levels=c("TRUE","FALSE"))
+        }
+        else {
+          df[[target_col]] <- factor(df[[target_col]])
         }
       }
 
