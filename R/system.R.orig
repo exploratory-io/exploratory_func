@@ -176,14 +176,14 @@ getMongoURL <- function(host = NULL, port, database, username, pass, isSSL=FALSE
       pass = urltools::url_encode(pass)
     }
     if(!is.null(host) && host != ''){
-      url = stringr::str_c("mongodb://", username, ":", pass, "@", host, ":", as.character(port), "/", database)
+    url = stringr::str_c("mongodb://", username, ":", pass, "@", host, ":", as.character(port), "/", database)
     } else if (!is.null(cluster) && cluster != ''){
       url = stringr::str_c("mongodb://", username, ":", pass, "@", cluster, "/", database)
     }
   }
   else {
     if(!is.null(host) & host != ''){
-      url = stringr::str_c("mongodb://", host, ":", as.character(port), "/", database)
+    url = stringr::str_c("mongodb://", host, ":", as.character(port), "/", database)
     } else if (!is.null(cluster) && cluster != ''){
       url = stringr::str_c("mongodb://", cluster, "/", database)
     }
@@ -445,7 +445,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         # of their ODBC driver, at this version.
         # So we no longer need to switch ODBC driver name by OS.
         # We handled this change at v4.1.0.4 by releasing Mac only patch.
-        connstr <- "DRIVER=Dremio Connector"
+          connstr <- "DRIVER=Dremio Connector"
         connstr <- stringr::str_c(connstr, ";HOST=", host, ";ConnectionType=Direct;AuthenticationType=Plain;Catalog=DREMIO;PORT=", port, ";UID=", username, ";PWD=", password)
         conn <- RODBC::odbcDriverConnect(connstr)
       }
@@ -750,11 +750,10 @@ queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, q
 #' @export
 <<<<<<< HEAD
 getTwitter <- function(n=200, lang=NULL,  lastNDays=30, searchString, tokenFileId=NULL, withSentiment = FALSE, ...){
-  if(!requireNamespace("twitteR")){stop("package twitteR must be installed.")}
 =======
 getTwitter <- function(n=200, lang=NULL,  lastNDays=30, searchString, tokenFileId=NULL, withSentiment = FALSE){
+>>>>>>> switch to rtweet
   if(!requireNamespace("rtweet")){stop("package rtweet must be installed.")}
->>>>>>> Switched from twitteR to rtweet.
   loadNamespace("lubridate")
   twitter_token = getTwitterToken(tokenFileId)
   twitter_token = rtweet:::check_token(twitter_token);
@@ -780,6 +779,7 @@ getTwitter <- function(n=200, lang=NULL,  lastNDays=30, searchString, tokenFileI
     tweetList %>% dplyr::mutate(sentiment = get_sentiment(text))
   } else {
     tweetList
+<<<<<<< HEAD
   }
 
 }
@@ -799,6 +799,27 @@ twitterListToDF <- function(twList) {
   if (! classes %in% c('status', 'user', 'directMessage')) {
     stop("Elements of twList are not of an appropriate class")
   }
+=======
+  }
+
+}
+
+twitterListToDF <- function(twList) {
+  if (length(twList) == 0) {
+    stop("Empty list passed to twListToDF")
+  }
+
+  ## if all elements of twList are from a class defined in this
+  ## package, and all of the same class, will collapse these into
+  ## a data.frame and return
+  classes <- unique(sapply(twList, class))
+  if (length(classes) != 1) {
+    stop("Not all elements of twList are of the same class")
+  }
+  if (! classes %in% c('status', 'user', 'directMessage')) {
+    stop("Elements of twList are not of an appropriate class")
+  }
+>>>>>>> switch to rtweet
   do.call('rbind', lapply(twList, as.data.frame))
 }
 

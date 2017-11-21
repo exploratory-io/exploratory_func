@@ -149,7 +149,12 @@ refreshGoogleTokenForSheet <- function(tokenFileId){
 getTwitterToken <- function(tokenFileId="", useCache=TRUE){
   if(!requireNamespace("rtweet")){stop("package rtweet must be installed.")}
   consumer_key = "kYrHnqx62YaCoy6g0x967BGBq"
+<<<<<<< HEAD
+  #consumer_secret = "xYNUMALkRnvuT3vls48LW7k2XK1l9xjZTLnRv2JaFaM"
+  consumer_secret = "wqP7VhX5yDEGzLL3eHSbT2wDlJvs4OitruIkd18CQZGzsySFuX"
+=======
   consumer_secret = "xYNUMALkRnvuT3vls48LW7k2XK1l9xjZTLnRv2JaFaM"
+>>>>>>> switch to rtweet
   appName = "twitter"
   endpointType = "twitter"
   # retrieve token info from environment
@@ -216,7 +221,7 @@ getGoogleTokenForBigQuery <- function(tokenFileId="", useCache=TRUE){
       )
     )
   } else {
-  tokenFileName ="bigquery_token.rds"
+    tokenFileName ="bigquery_token.rds"
     getOAuthToken(clientId, secret, appName, endpointType, scopeList, tokenFileName, tokenFileId, useCache)
   }
 }
