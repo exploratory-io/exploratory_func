@@ -841,8 +841,15 @@ calc_feature_imp <- function(df,
     }
     else {
       # we need to convert logical to factor since na.roughfix only works for numeric or factor.
-      # for logical set TRUE, FALSE level order for better visualization.
-      clean_df[[clean_target_col]] <- factor(clean_df[[clean_target_col]], levels = c("TRUE", "FALSE"))
+      # for logical set TRUE, FALSE level order for better visualization. but only do it when
+      # the target column actually has both TRUE and FALSE, since edarf::partial_dependence errors out if target
+      # factor column has more levels than actual data. TODO: Can this issue be caused by group_by??
+      if (length(unique(clean_df[[clean_target_col]])) >= 2) {
+        clean_df[[clean_target_col]] <- factor(clean_df[[clean_target_col]], levels=c("TRUE","FALSE"))
+      }
+      else {
+        clean_df[[clean_target_col]] <- factor(clean_df[[clean_target_col]])
+      }
     }
   }
 
