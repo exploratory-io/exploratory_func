@@ -1,6 +1,6 @@
 #' do PCA
 #' @export
-do_princomp <- function(df,
+do_prcomp <- function(df,
                         ...
                        ) { # TODO: write test
   # this evaluates select arguments like starts_with
@@ -16,7 +16,7 @@ do_princomp <- function(df,
   }
 
   each_func <- function(df) {
-    filtered_df <- df %>% drop_na_(selected_cols) # TODO: take care of the case where values of a column are mostly NA
+    filtered_df <- df %>% tidyr::drop_na_(selected_cols) # TODO: take care of the case where values of a column are mostly NA
     cleaned_df <- filtered_df %>% dplyr::select_(.dots=selected_cols)
 
     # remove columns with only one unique value
@@ -28,19 +28,19 @@ do_princomp <- function(df,
       }
     }
 
-    fit <- princomp(cleaned_df, cor=TRUE) # TODO: make cor an option
+    fit <- prcomp(cleaned_df, scale=TRUE)
     fit$df <- filtered_df # add filtered df to model so that we can bind_col it for output. It needs to be the filtered one to match row number.
     fit$grouped_cols <- grouped_cols
-    class(fit) <- c("princomp_exploratory", class(fit))
+    class(fit) <- c("prcomp_exploratory", class(fit))
     fit
   }
 
   do_on_each_group(df, each_func, name = "model", with_unnest = FALSE)
 }
 
-#' extracts results from princomp as a dataframe
+#' extracts results from prcomp as a dataframe
 #' @export
-tidy.princomp_exploratory <- function(x, type="variances", ...) { #TODO: add test
+tidy.prcomp_exploratory <- function(x, type="variances", ...) { #TODO: add test
   if (type == "variances") {
     res <- as.data.frame(x$sdev*x$sdev) # square it to make it variance
     colnames(res)[1] <- "variance"
