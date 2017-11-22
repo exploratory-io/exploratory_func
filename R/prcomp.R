@@ -50,15 +50,16 @@ tidy.prcomp_exploratory <- function(x, type="variances", ...) { #TODO: add test
     res <- res %>% dplyr::mutate(cum_pct_variance = cumsum(variance), cum_pct_variance = cum_pct_variance/max(cum_pct_variance)*100)
   }
   else if (type == "loadings") {
-    res <- tibble::rownames_to_column(as.data.frame(x$loadings[,]), var="measure") %>% gather(component, value, starts_with("Comp."), na.rm = TRUE, convert = TRUE) %>%
-      mutate(component = fct_inorder(component)) # fct_inorder is to make order on chart right, e.g. Comp.2 before Comp.10
+    res <- tibble::rownames_to_column(as.data.frame(x$rotation[,]), var="measure")
+    res <- res %>% tidyr::gather(component, value, dplyr::starts_with("PC"), na.rm = TRUE, convert = TRUE)
+    res <- res %>% dplyr::mutate(component = forcats::fct_inorder(component)) # fct_inorder is to make order on chart right, e.g. Comp.2 before Comp.10
   }
   else { # should be "biplot"
     res <- x$df
     scores_matrix <- x$scores[,1:2] # keep only Comp.1 and Comp.2 for biplot
     max_abs_score <- max(abs(scores_matrix))
     res <- res %>% dplyr::bind_cols(as.data.frame(scores_matrix))
-    loadings_matrix <- x$loadings[,1:2] # keep only Comp.1 and Comp.2 for biplot
+    loadings_matrix <- x$rotation[,1:2] # keep only Comp.1 and Comp.2 for biplot
     max_abs_loading <- max(abs(loadings_matrix))
     scale_ratio <- max_abs_score/max_abs_loading
     # scale loading_matrix so that the scale of measures and data points matches in the scatter plot.
