@@ -47,7 +47,9 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=5000, ...) { #
     colnames(res)[1] <- "variance"
     res <- tibble::rownames_to_column(res, var="component") %>% # square it to make it variance
       mutate(component = forcats::fct_inorder(component)) # fct_inorder is to make order on chart right, e.g. PC2 before PC10
-    res <- res %>% dplyr::mutate(cum_pct_variance = cumsum(variance), cum_pct_variance = cum_pct_variance/max(cum_pct_variance)*100)
+    total_variance = sum(res$variance)
+    res <- res %>% dplyr::mutate(cum_pct_variance = cumsum(variance), cum_pct_variance = cum_pct_variance/total_variance*100)
+    res <- res %>% dplyr::mutate(pct_variance = variance/total_variance*100)
   }
   else if (type == "loadings") {
     res <- tibble::rownames_to_column(as.data.frame(x$rotation[,]), var="measure")
