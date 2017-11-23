@@ -1486,7 +1486,7 @@ read_rds_file <- function(file, refhook = NULL){
 #'Wrapper for readr::read_lines to support vector to data frame conversion
 #'@export
 read_raw_lines <- function(file, locale = readr::default_locale(), na = character(),
-                            skip = 0, n_max = Inf, progress = interactive()){
+                            skip = 0, n_max = Inf, progress = FALSE){
   loadNamespace("readr")
   line <- readr::read_lines(file, locale = locale, na = na, skip = skip, n_max = n_max, progress = progress)
   # use line as column name
