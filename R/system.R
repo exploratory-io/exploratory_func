@@ -311,7 +311,7 @@ getDBConnection <- function(type, host, port, databaseName, username = "", passw
     }
   } else if(type == "mysql" || type == "aurora") {
     if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
-    if(!requireNamespace("RMySQL")){stop("package RMySQL must be installed.")}
+    if(!requireNamespace("RMariaDB")){stop("package RMariaDB must be installed.")}
     # use same key "mysql" for aurora too, since it uses
     # queryMySQL() too, which uses the key "mysql"
     key <- paste("mysql", host, port, databaseName, username, sep = ":")
@@ -340,8 +340,8 @@ getDBConnection <- function(type, host, port, databaseName, username = "", passw
       })
     }
     if (is.null(conn)) {
-      drv <- DBI::dbDriver("MySQL")
-      conn = RMySQL::dbConnect(drv, dbname = databaseName, username = username,
+      drv <- DBI::dbDriver("MariaDB")
+      conn = RMariaDB::dbConnect(drv, dbname = databaseName, username = username,
                                password = password, host = host, port = port)
       connection_pool[[key]] <- conn
     }
@@ -628,7 +628,7 @@ queryNeo4j <- function(host, port,  username, password, query, isSSL = FALSE){
 
 #' @export
 queryMySQL <- function(host, port, databaseName, username, password, numOfRows = -1, query){
-  if(!requireNamespace("RMySQL")){stop("package RMySQL must be installed.")}
+  if(!requireNamespace("RMariaDB")){stop("package RMariaDB must be installed.")}
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
   if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
 
@@ -640,14 +640,14 @@ queryMySQL <- function(host, port, databaseName, username, password, numOfRows =
     DBI::dbGetQuery(conn,"set names utf8")
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
-    resultSet <- RMySQL::dbSendQuery(conn, GetoptLong::qq(query, envir = parent.frame()))
-    df <- RMySQL::dbFetch(resultSet, n = numOfRows)
+    resultSet <- RMariaDB::dbSendQuery(conn, GetoptLong::qq(query, envir = parent.frame()))
+    df <- RMariaDB::dbFetch(resultSet, n = numOfRows)
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
     clearDBConnection("mysql", host, port, databaseName, username)
     stop(err)
   })
-  RMySQL::dbClearResult(resultSet)
+  RMariaDB::dbClearResult(resultSet)
   df
 }
 
