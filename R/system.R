@@ -1484,6 +1484,8 @@ read_rds_file <- function(file, refhook = NULL){
 }
 
 #'Wrapper for readr::read_lines to support vector to data frame conversion
+#'It seems readr::read_lines uses -1 for n_max to get all the data.
+#'It does not align with the other readr functions that uses Inf for all the data but we have to follow existing read_lines behavior.
 #'@export
 read_raw_lines <- function(file, locale = readr::default_locale(), na = character(),
                             skip = 0, n_max = -1L, progress = FALSE){
