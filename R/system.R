@@ -1488,7 +1488,6 @@ read_rds_file <- function(file, refhook = NULL){
 read_raw_lines <- function(file, locale = readr::default_locale(), na = character(),
                             skip = 0, n_max = Inf, progress = interactive()){
   loadNamespace("readr")
-    # if it's local file simply call readr::read_delim
   line <- readr::read_lines(file, locale = locale, na = na, skip = skip, n_max = n_max, progress = progress)
   df <- as.data.frame(line)
   df
