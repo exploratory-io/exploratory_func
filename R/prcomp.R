@@ -57,15 +57,17 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=5000, ...) { #
   else { # should be "biplot"
     # prepare loadings matrix
     loadings_matrix <- x$rotation[,1:2] # keep only PC1 and PC2 for biplot
-    max_abs_loading <- max(abs(loadings_matrix))
 
     # prepare scores matrix
     scores_matrix <- x$x[,1:2] # keep only PC1 and PC2 for biplot
+
+    # calculate scale ratio for displaying loadings on the same chart as scores.
+    max_abs_loading <- max(abs(loadings_matrix))
     max_abs_score <- max(abs(scores_matrix))
+    scale_ratio <- max_abs_score/max_abs_loading
 
     res <- x$df
     res <- res %>% dplyr::bind_cols(as.data.frame(scores_matrix))
-    scale_ratio <- max_abs_score/max_abs_loading
     # scale loading_matrix so that the scale of measures and data points matches in the scatter plot.
     loadings_matrix <- loadings_matrix * scale_ratio
     loadings_df <- tibble::rownames_to_column(as.data.frame(loadings_matrix), var="measure_name") #TODO: what if name conflicts?
