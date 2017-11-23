@@ -1489,7 +1489,8 @@ read_raw_lines <- function(file, locale = readr::default_locale(), na = characte
                             skip = 0, n_max = Inf, progress = interactive()){
   loadNamespace("readr")
   line <- readr::read_lines(file, locale = locale, na = na, skip = skip, n_max = n_max, progress = progress)
-  df <- as.data.frame(line)
+  # use line as column name
+  df <- as.data.frame(line=line)
   df
 }
 
