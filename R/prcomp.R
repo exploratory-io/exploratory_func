@@ -56,7 +56,7 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=5000, ...) { #
     res <- res %>% tidyr::gather(component, value, dplyr::starts_with("PC"), na.rm = TRUE, convert = TRUE)
     res <- res %>% dplyr::mutate(component = forcats::fct_inorder(component)) # fct_inorder is to make order on chart right, e.g. PC2 before PC10
   }
-  else { # should be "biplot"
+  else if (type == "biplot") {
     # prepare loadings matrix
     loadings_matrix <- x$rotation[,1:2] # keep only PC1 and PC2 for biplot
 
@@ -86,6 +86,10 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=5000, ...) { #
     # fill group_by column so that Repeat By on chart works fine. loadings_df does not have values for the group_by column.
     res <- res %>% tidyr::fill(x$grouped_cols)
     res
+  }
+  else { # should be data
+    res <- x$df
+    res <- res %>% dplyr::bind_cols(as.data.frame(x$x))
   }
   res
 }
