@@ -1454,7 +1454,7 @@ guess_csv_file_encoding <- function(file,  n_max = 1e4, threshold = 0.20){
 #'Wrapper for readr::read_log to support remote file
 #'@export
 read_log_file <- function(file, col_names = FALSE, col_types = NULL,
-                          skip = 0, n_max = Inf, progress = interactive()){
+                          skip = 0, n_max = Inf, progress = FALSE){
   loadNamespace("readr")
   loadNamespace("stringr")
   if (stringr::str_detect(file, "^https://") ||
@@ -1484,13 +1484,14 @@ read_rds_file <- function(file, refhook = NULL){
 }
 
 #'Wrapper for readr::read_lines to support vector to data frame conversion
+#'It seems readr::read_lines uses -1 for n_max to get all the data.
+#'It does not align with the other readr functions that uses Inf for all the data but we have to follow existing read_lines behavior.
 #'@export
 read_raw_lines <- function(file, locale = readr::default_locale(), na = character(),
-                            skip = 0, n_max = Inf, progress = interactive()){
+                            skip = 0, n_max = -1L, progress = FALSE){
   loadNamespace("readr")
   line <- readr::read_lines(file, locale = locale, na = na, skip = skip, n_max = n_max, progress = progress)
   # use line as column name
-  df <- as.data.frame(line=line)
-  df
+  df <- data.frame(line = line, stringsAsFactors = FALSE)
 }
 
