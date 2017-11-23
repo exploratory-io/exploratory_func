@@ -1483,14 +1483,14 @@ read_rds_file <- function(file, refhook = NULL){
   }
 }
 
-#'Wrapper for readr::rea_lines to support vector to data frame conversion
+#'Wrapper for readr::read_lines to support vector to data frame conversion
 #'@export
 read_raw_lines <- function(file, locale = readr::default_locale(), na = character(),
                             skip = 0, n_max = Inf, progress = interactive()){
   loadNamespace("readr")
     # if it's local file simply call readr::read_delim
-  x <- readr::read_lines(file, locale = locale, na = na, skip = skip, n_max = n_max, progress = progress)
-  df <- as.data.frame(x)
+  line <- readr::read_lines(file, locale = locale, na = na, skip = skip, n_max = n_max, progress = progress)
+  df <- as.data.frame(line)
   df
 }
 
