@@ -67,11 +67,6 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=5000, pretty.n
     # prepare scores matrix
     scores_matrix <- x$x[,1:2] # keep only PC1 and PC2 for biplot
 
-    # calculate scale ratio for displaying loadings on the same chart as scores.
-    max_abs_loading <- max(abs(loadings_matrix))
-    max_abs_score <- max(abs(scores_matrix))
-    scale_ratio <- max_abs_score/max_abs_loading
-
     # sum of number of loading rows times 2 (because it is line between 2 points) and number of score rows should fit in n_sample.
     score_n_sample <- n_sample - nrow(loadings_matrix)*2
 
@@ -80,6 +75,12 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=5000, pretty.n
     if (nrow(res) > score_n_sample) {
       res <- res %>% dplyr::sample_n(score_n_sample)
     }
+
+    # calculate scale ratio for displaying loadings on the same chart as scores.
+    max_abs_loading <- max(abs(loadings_matrix))
+    max_abs_score <- max(abs(c(res$PC1, res$PC2)))
+    scale_ratio <- max_abs_score/max_abs_loading
+
     res <- res %>% rename(Observations=PC2) # name to appear at legend for dots in scatter plot.
     # scale loading_matrix so that the scale of measures and data points matches in the scatter plot.
     loadings_matrix <- loadings_matrix * scale_ratio
