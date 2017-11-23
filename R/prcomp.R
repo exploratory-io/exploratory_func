@@ -40,7 +40,8 @@ do_prcomp <- function(df,
 
 #' extracts results from prcomp as a dataframe
 #' @export
-tidy.prcomp_exploratory <- function(x, type="variances", ...) { #TODO: add test
+#' @param n_sample Sample number for biplot. Default 5000, which is the default of our scatter plot
+tidy.prcomp_exploratory <- function(x, type="variances", n_sample=5000, ...) { #TODO: add test
   if (type == "variances") {
     res <- as.data.frame(x$sdev*x$sdev) # square it to make it variance
     colnames(res)[1] <- "variance"
@@ -54,12 +55,16 @@ tidy.prcomp_exploratory <- function(x, type="variances", ...) { #TODO: add test
     res <- res %>% dplyr::mutate(component = forcats::fct_inorder(component)) # fct_inorder is to make order on chart right, e.g. PC2 before PC10
   }
   else { # should be "biplot"
-    res <- x$df
-    scores_matrix <- x$x[,1:2] # keep only PC1 and PC2 for biplot
-    max_abs_score <- max(abs(scores_matrix))
-    res <- res %>% dplyr::bind_cols(as.data.frame(scores_matrix))
+    # prepare loadings matrix
     loadings_matrix <- x$rotation[,1:2] # keep only PC1 and PC2 for biplot
     max_abs_loading <- max(abs(loadings_matrix))
+
+    # prepare scores matrix
+    scores_matrix <- x$x[,1:2] # keep only PC1 and PC2 for biplot
+    max_abs_score <- max(abs(scores_matrix))
+
+    res <- x$df
+    res <- res %>% dplyr::bind_cols(as.data.frame(scores_matrix))
     scale_ratio <- max_abs_score/max_abs_loading
     # scale loading_matrix so that the scale of measures and data points matches in the scatter plot.
     loadings_matrix <- loadings_matrix * scale_ratio
