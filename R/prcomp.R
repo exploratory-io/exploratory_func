@@ -41,7 +41,7 @@ do_prcomp <- function(df,
 #' extracts results from prcomp as a dataframe
 #' @export
 #' @param n_sample Sample number for biplot. Default 5000, which is the default of our scatter plot
-tidy.prcomp_exploratory <- function(x, type="variances", n_sample=5000, ...) { #TODO: add test
+tidy.prcomp_exploratory <- function(x, type="variances", n_sample=5000, pretty.name=FALSE, ...) { #TODO: add test
   if (type == "variances") {
     res <- as.data.frame(x$sdev*x$sdev) # square it to make it variance
     colnames(res)[1] <- "variance"
@@ -50,6 +50,9 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=5000, ...) { #
     total_variance = sum(res$variance)
     res <- res %>% dplyr::mutate(cum_pct_variance = cumsum(variance), cum_pct_variance = cum_pct_variance/total_variance*100)
     res <- res %>% dplyr::mutate(pct_variance = variance/total_variance*100)
+    #if (pretty.name) {
+      res <- res %>% dplyr::rename(`% Variance`=pct_variance, `Cummulated % Variance`=cum_pct_variance)
+    #}
   }
   else if (type == "loadings") {
     res <- tibble::rownames_to_column(as.data.frame(x$rotation[,]), var="measure")
