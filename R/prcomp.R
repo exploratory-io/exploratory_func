@@ -55,6 +55,7 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=5000, ...) { #
     res <- tibble::rownames_to_column(as.data.frame(x$rotation[,]), var="measure")
     res <- res %>% tidyr::gather(component, value, dplyr::starts_with("PC"), na.rm = TRUE, convert = TRUE)
     res <- res %>% dplyr::mutate(component = forcats::fct_inorder(component)) # fct_inorder is to make order on chart right, e.g. PC2 before PC10
+    res <- res %>% dplyr::mutate(value = value^2) # square it to make it squared cosine. the original value is cosine.
   }
   else if (type == "biplot") {
     # prepare loadings matrix
