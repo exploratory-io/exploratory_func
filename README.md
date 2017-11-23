@@ -15,3 +15,5 @@ library(exploratory)
 Take a look at 
 [How to Develop](https://github.com/exploratory-io/exploratory_func/wiki/How-to-Develop) document.
 
+## License
+exploratory R package is [MIT licensed](https://github.com/exploratory-io/exploratory_func/blob/master/LICENSE.md).
