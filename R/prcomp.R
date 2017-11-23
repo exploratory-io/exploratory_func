@@ -77,6 +77,7 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=5000, ...) { #
     if (nrow(res) > score_n_sample) {
       res <- res %>% dplyr::sample_n(score_n_sample)
     }
+    res <- res %>% rename(Observations=PC2) # name to appear at legend for dots in scatter plot.
     # scale loading_matrix so that the scale of measures and data points matches in the scatter plot.
     loadings_matrix <- loadings_matrix * scale_ratio
     loadings_df <- tibble::rownames_to_column(as.data.frame(loadings_matrix), var="measure_name") #TODO: what if name conflicts?
