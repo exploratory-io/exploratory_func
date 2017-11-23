@@ -70,6 +70,7 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=5000, pretty.n
     # sum of number of loading rows times 2 (because it is line between 2 points) and number of score rows should fit in n_sample.
     score_n_sample <- n_sample - nrow(loadings_matrix)*2
 
+    # table of observations. bind original data so that color can be used later.
     res <- x$df
     res <- res %>% dplyr::bind_cols(as.data.frame(scores_matrix))
     if (nrow(res) > score_n_sample) {
