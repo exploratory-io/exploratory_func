@@ -1143,6 +1143,16 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
       # set order to ret and turn it back to character, so that the order is kept when groups are bound.
       # if it were kept as factor, when groups are bound, only the factor order from the first group would be respected.
       ret <- ret %>% dplyr::arrange(x_name) %>% dplyr::mutate(x_name = as.character(x_name))
+
+      # create mapping from column name to facet chart type based on whether the column is numeric.
+      chart_type_map <-c()
+      for(col in colnames(x$df)) {
+        chart_type_map <- c(chart_type_map, is.numeric(x$df[[col]]))
+      }
+      chart_type_map <- ifelse(chart_type_map, "line", "scatter")
+      names(chart_type_map) <- colnames(x$df)
+      
+      ret <- ret %>%  dplyr::mutate(chart_type = chart_type_map[x_name])
       ret <- ret %>% dplyr::mutate(x_name = x$terms_mapping[x_name]) # map variable names to original.
       ret
     },

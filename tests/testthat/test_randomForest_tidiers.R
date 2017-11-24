@@ -1,3 +1,6 @@
+# how to run this test:
+# devtools::test(filter="randomForest_tidiers")
+
 context("test tidiers for randomForest")
 
 test_that("test do_smote", {
