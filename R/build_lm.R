@@ -368,6 +368,19 @@ glance.lm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
 glance.glm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
   ret <- broom:::glance.glm(x)
 
+  # calculate model p-value since glm does not provide it as is.
+  # https://stats.stackexchange.com/questions/129958/glm-in-r-which-pvalue-represents-the-goodness-of-fit-of-entire-model
+  f0 <- x$formula # copy formula as a basis for null model.
+  lazyeval::f_rhs(f0) <- 1 # create null model formula.
+  x0 <- glm(f0, x$data, family = x$family) # build null model.
+  pvalue <- with(anova(x0,x),pchisq(Deviance,Df,lower.tail=FALSE)[2]) 
+  if(pretty.name) {
+    ret <- ret %>% dplyr::mutate(`P Value`=pvalue)
+  }
+  else {
+    ret <- ret %>% dplyr::mutate(p.value=pvalue)
+  }
+
   for(var in names(x$xlevels)) { # extract base levels info on factor/character columns from lm model
     if(pretty.name) {
       ret[paste0("Base Level of ", var)] <- x$xlevels[[var]][[1]]
@@ -376,6 +389,7 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add tes
       ret[paste0(var, "_base")] <- x$xlevels[[var]][[1]]
     }
   }
+
   if(pretty.name) {
     ret <- ret %>% dplyr::rename(`Null Deviance`=null.deviance, `DF for Null Model`=df.null, `Log Likelihood`=logLik, Deviance=deviance, `Residual DF`=df.residual)
   }
