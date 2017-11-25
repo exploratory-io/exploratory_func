@@ -101,10 +101,3 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=5000, pretty.n
   res
 }
 
-#' set parameter for prcomp analytics view
-#' @export
-set_prcomp_analytics_params <- function(model_df) {
-  variances_df <- model_df %>% tidy(model, type="variances")
-  user_env$analytics_params <<- c(PC1_PCT_VARIANCE=variances_df$pct_variance[[1]], PC2_PCT_VARIANCE=variances_df$pct_variance[[2]])
-  model_df
-}
