@@ -381,7 +381,8 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add tes
     ret <- ret %>% dplyr::mutate(p.value=pvalue)
   }
   
-  predicted <- ifelse(x$fitted.value > 0.5, 1, 0)
+  # Calculate F Score, Accuracy Rate, Misclassification Rate, Precision, Recall, Data Size
+  predicted <- ifelse(x$fitted.value > 0.5, 1, 0) #TODO make threshold adjustable
   ret2 <- evaluate_classification(x$y, predicted, 1, pretty.name = pretty.name)
   ret2 <- ret2[, 2:6]
   ret <- ret %>% bind_cols(ret2)

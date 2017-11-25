@@ -989,6 +989,7 @@ calc_feature_imp <- function(df,
 }
 
 #' TODO: not really for external use. hide it.
+#' TODO: use this other places doing similar thing.
 #' @export
 evaluate_classification <- function(actual, predicted, class, pretty.name = FALSE) {
   tp <- sum(actual == class & predicted == class, na.rm = TRUE)
