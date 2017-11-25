@@ -295,9 +295,9 @@ tidy.randomForest.classification <- function(x, pretty.name = FALSE, type = "imp
       )
 
       names(ret) <- if(pretty.name){
-        c("Class", "F Score", "Accuracy Rate", "Missclassification Rate", "Precision", "Recall", "Data Size")
+        c("Class", "F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall", "Data Size")
       } else {
-        c("class", "f_score", "accuracy_rate", "missclassification_rate", "precision", "recall", "data_size")
+        c("class", "f_score", "accuracy_rate", "misclassification_rate", "precision", "recall", "data_size")
       }
       ret
     }
@@ -427,9 +427,9 @@ glance.randomForest.classification <- function(x, pretty.name = FALSE,  ...) {
     )
 
     names(ret) <- if(pretty.name){
-      paste(class, c("F Score", "Precision", "Missclassification Rate", "Recall", "Accuracy"), sep = " ")
+      paste(class, c("F Score", "Precision", "Misclassification Rate", "Recall", "Accuracy"), sep = " ")
     } else {
-      paste(class, c("f_score", "precision", "missclassification_rate", "recall", "accuracy"), sep = "_")
+      paste(class, c("f_score", "precision", "misclassification_rate", "recall", "accuracy"), sep = "_")
     }
     ret
   }
@@ -1054,9 +1054,9 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
           )
 
           names(ret) <- if(pretty.name){
-            c("Class", "F Score", "Accuracy Rate", "Missclassification Rate", "Precision", "Recall", "Data Size")
+            c("Class", "F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall", "Data Size")
           } else {
-            c("class", "f_score", "accuracy_rate", "missclassification_rate", "precision", "recall", "data_size")
+            c("class", "f_score", "accuracy_rate", "misclassification_rate", "precision", "recall", "data_size")
           }
           ret
         }
