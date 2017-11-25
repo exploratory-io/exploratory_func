@@ -1,3 +1,6 @@
+# how to run this test:
+# devtools::test(filter="randomForest_tidiers")
+
 context("test tidiers for randomForest")
 
 test_that("test do_smote", {
@@ -70,6 +73,7 @@ test_that("test calc_feature_imp predicting logical", {
   conf_mat <- tidy(model_df, model, type = "conf_mat", pretty.name = TRUE)
   ret <- model_df %>% rf_importance()
   ret <- model_df %>% rf_partial_dependence()
+  ret <- model_df %>% rf_evaluation()
   # factor order should be TRUE then FALSE.
   expect_equal(levels(conf_mat$actual_value)[1], "TRUE")
   expect_equal(levels(conf_mat$predicted_value)[1], "TRUE")

@@ -100,3 +100,4 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=5000, pretty.n
   }
   res
 }
+
