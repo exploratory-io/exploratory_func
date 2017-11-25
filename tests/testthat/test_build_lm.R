@@ -143,6 +143,8 @@ test_that("prediction with target column name with space by build_lm.fast", {
   test_data <- dplyr::bind_rows(test_data, test_data)
 
   model_data <- build_lm.fast(test_data, `CANCELLED X`, `Carrier Name`, CARRIER, DISTANCE)
+  ret <- model_data %>% broom::glance(model)
+  ret <- model_data %>% broom::tidy(model)
   ret <- model_data %>% broom::augment(model)
 
   expect_true(nrow(ret) > 0)
@@ -164,7 +166,9 @@ test_that("prediction with glm model with SMOTE by build_lm.fast", {
   test_data <- dplyr::bind_rows(test_data, test_data)
 
   model_data <- build_lm.fast(test_data, `CANCELLED X`, `Carrier Name`, CARRIER, DISTANCE, model_type = "glm", smote=TRUE)
+  ret <- model_data %>% broom::glance(model)
   ret <- model_data %>% broom::tidy(model)
+  ret <- model_data %>% broom::augment(model)
 
   expect_true(nrow(ret) > 0)
 })
