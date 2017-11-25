@@ -988,6 +988,8 @@ calc_feature_imp <- function(df,
   do_on_each_group(clean_df, each_func, name = "model", with_unnest = FALSE)
 }
 
+#' TODO: not really for external use. hide it.
+#' @export
 evaluate_classification <- function(actual, predicted, class, pretty.name = FALSE) {
   tp <- sum(actual == class & predicted == class, na.rm = TRUE)
   tn <- sum(actual != class & predicted != class, na.rm = TRUE)
