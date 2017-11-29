@@ -1042,12 +1042,13 @@ do_survfit <- function(df, time, status, start_time = NULL, end_time = NULL, tim
 
   ret <- df %>% build_model(model_func = survival::survfit, formula = fml, ...) %>% broom::tidy(model)
 
+  # for better viz, add time=0 row for each group when it is not already there.
   add_time_zero_row_each <- function(df) {
     if(!is.null(grouped_col)){
       # drop grouping columns
       df <- df[, !colnames(df) %in% grouped_col]
     }
-    if (nrow(df[df$time==0,]) == 0) {
+    if (nrow(df[df$time==0,]) == 0) { # do this only when time=0 row is not already there.
       df <- rbind(data.frame(time=0, n.risk=df$n.risk[1], n.event=0, n.censor=0, estimate=1, std.error=0, conf.high=1, conf.low=1), df)
     }
     df
