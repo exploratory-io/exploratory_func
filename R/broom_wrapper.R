@@ -1001,6 +1001,8 @@ prediction_survfit <- function(df, newdata = NULL, ...){
 do_survfit <- function(df, time, status, start_time = NULL, end_time = NULL, time_unit = "day", ...){
   validate_empty_data(df)
 
+  grouped_col <- grouped_by(df)
+
   # substitute is needed because time can be
   # NSE column name and it throws an evaluation error
   # without it
@@ -1039,6 +1041,21 @@ do_survfit <- function(df, time, status, start_time = NULL, end_time = NULL, tim
   }
 
   ret <- df %>% build_model(model_func = survival::survfit, formula = fml, ...) %>% broom::tidy(model)
+
+  add_time_zero_row_each <- function(df) {
+    if(!is.null(grouped_col)){
+      # drop grouping columns
+      df <- df[, !colnames(df) %in% grouped_col]
+    }
+    df
+  }
+
+  tmp_col <- avoid_conflict(colnames(ret), "tmp_col")
+  ret <- ret %>%
+    dplyr::do_(.dots=setNames(list(~add_time_zero_row_each(.)), tmp_col)) %>%
+    dplyr::ungroup()
+  ret <- ret %>%  unnest_with_drop_(tmp_col)
+
   colnames(ret)[colnames(ret) == "n.risk"] <- "n_risk"
   colnames(ret)[colnames(ret) == "n.event"] <- "n_event"
   colnames(ret)[colnames(ret) == "n.censor"] <- "n_censor"
