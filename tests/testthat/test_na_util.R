@@ -171,3 +171,17 @@ test_that("test fill_between", {
   expect_equal(ret[["col_3"]], factor(c(NA, "a", "a", "b", NA)))
 })
 
+test_that("test fill_between with .direction=up", {
+  test_data <- data.frame(
+    c(NA, 1, NA, 2, NA),
+    c(NA, "a", NA, "b", NA),
+    factor(c(NA, "a", NA, "b", NA)),
+    stringsAsFactors=FALSE
+  )
+  colnames(test_data) <- c("col 1", "col-2", "col_3")
+  ret <- test_data %>%
+    fill_between(`col 1`,`col-2`, col_3, .direction="up")
+  expect_equal(ret[["col 1"]], c(NA, 1, 2, 2, NA))
+  expect_equal(ret[["col-2"]], c(NA, "a", "b", "b", NA))
+  expect_equal(ret[["col_3"]], factor(c(NA, "a", "b", "b", NA)))
+})
