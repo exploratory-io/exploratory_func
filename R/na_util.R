@@ -97,6 +97,10 @@ fill_between_v <- function(v, .direction="down") {
   else { # for "up"
     ret <- ifelse(!is.na(filled_downward), filled_upward, NA)
   }
+  if (is.factor(v)) { # if it was factor, get it back to factor since ifelse converts it to integer.
+    ret <- factor(ret)
+    levels(ret)<-levels(v)
+  }
   ret
 }
 
