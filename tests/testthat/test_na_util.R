@@ -156,3 +156,15 @@ test_that("test impute_na with undefined type", {
   }, "va is not supported as type")
 })
 
+test_that("test fill_between", {
+  test_data <- data.frame(
+    c(NA, 1, NA, 2, NA),
+    c(NA, "a", NA, "b", NA)
+  )
+  colnames(test_data) <- c("col 1", "col-2")
+  ret <- test_data %>%
+    fill_between(`col 1`,`col-2`)
+  expect_equal(ret[["col 1"]], c(NA, 1, 1, 2, NA))
+  expect_equal(ret[["col-2"]], c(NA, "a", "a", "b", NA))
+})
+
