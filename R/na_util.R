@@ -88,6 +88,7 @@ impute_na <- function(target, type = mean, val = 0, ...) {
 
 # same as zoo::na.locf, but fills only between non-NA values.
 # e.g. fill_between_v(c(NA,2,NA,3,NA)) returns c(NA, 2, 2, 3,NA).
+#' @param .direction "down" or "up".
 fill_between_v <- function(v, .direction="down") {
   filled_downward<-zoo::na.locf(v, na.rm = FALSE)
   filled_upward<-zoo::na.locf(v, fromLast = TRUE, na.rm = FALSE)
@@ -104,8 +105,9 @@ fill_between_v <- function(v, .direction="down") {
   ret
 }
 
-#' @export
 # same as tidyr::fill, but fills only between non-NA values.
+#' @param .direction "down" or "up".
+#' @export
 fill_between <- function(df, ..., .direction="down") {
   # this evaluates select arguments like starts_with
   selected_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
