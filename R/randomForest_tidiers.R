@@ -257,48 +257,7 @@ tidy.randomForest.classification <- function(x, pretty.name = FALSE, type = "imp
     predicted <- x[["predicted"]]
 
     per_level <- function(class) {
-      tp <- sum(actual == class & predicted == class, na.rm = TRUE)
-      tn <- sum(actual != class & predicted != class, na.rm = TRUE)
-      fp <- sum(actual != class & predicted == class, na.rm = TRUE)
-      fn <- sum(actual == class & predicted != class, na.rm = TRUE)
-
-      precision <- tp / (tp + fp)
-      # this avoids NA
-      if(tp+fp == 0) {
-        precision <- 0
-      }
-
-      recall <- tp / (tp + fn)
-      # this avoids NA
-      if(tn+fn == 0) {
-        recall <- 0
-      }
-
-      accuracy <- (tp + tn) / (tp + fp + tn + fn)
-
-      f_score <- 2 * ((precision * recall) / (precision + recall))
-      # this avoids NA
-      if(precision + recall == 0) {
-        f_score <- 0
-      }
-
-      data_size <- sum(actual == class)
-
-      ret <- data.frame(
-        class,
-        f_score,
-        accuracy,
-        1- accuracy,
-        precision,
-        recall,
-        data_size
-      )
-
-      names(ret) <- if(pretty.name){
-        c("Class", "F Score", "Accuracy Rate", "Missclassification Rate", "Precision", "Recall", "Data Size")
-      } else {
-        c("class", "f_score", "accuracy_rate", "missclassification_rate", "precision", "recall", "data_size")
-      }
+      ret <- evaluate_classification(actual, predicted, class, pretty.name = pretty.name)
       ret
     }
 
@@ -427,9 +386,9 @@ glance.randomForest.classification <- function(x, pretty.name = FALSE,  ...) {
     )
 
     names(ret) <- if(pretty.name){
-      paste(class, c("F Score", "Precision", "Missclassification Rate", "Recall", "Accuracy"), sep = " ")
+      paste(class, c("F Score", "Precision", "Misclassification Rate", "Recall", "Accuracy"), sep = " ")
     } else {
-      paste(class, c("f_score", "precision", "missclassification_rate", "recall", "accuracy"), sep = "_")
+      paste(class, c("f_score", "precision", "misclassification_rate", "recall", "accuracy"), sep = "_")
     }
     ret
   }
@@ -839,11 +798,6 @@ calc_feature_imp <- function(df,
         as.factor(clean_df[[clean_target_col]]), n = target_n, ties.method="first"
       ))
     }
-    else {
-      # we need to convert logical to factor since na.roughfix only works for numeric or factor.
-      # for logical set TRUE, FALSE level order for better visualization.
-      clean_df[[clean_target_col]] <- factor(clean_df[[clean_target_col]], levels = c("TRUE", "FALSE"))
-    }
   }
 
   each_func <- function(df) {
@@ -861,9 +815,24 @@ calc_feature_imp <- function(df,
       # in such case.
       # The group with NULL is removed when
       # unnesting the result
-      for (level in levels(df[[target_col]])) {
-        if(sum(df[[target_col]] == level, na.rm = TRUE) == 1) {
+      for (level in levels(df[[clean_target_col]])) {
+        if(sum(df[[clean_target_col]] == level, na.rm = TRUE) == 1) {
           return(NULL)
+        }
+      }
+
+      if (is.logical(df[[clean_target_col]])) {
+        # we need to convert logical to factor since na.roughfix only works for numeric or factor.
+        # for logical set TRUE, FALSE level order for better visualization. but only do it when
+        # the target column actually has both TRUE and FALSE, since edarf::partial_dependence errors out if target
+        # factor column has more levels than actual data.
+        # error from edarf::partial_dependence looks like following.
+        #   Error in factor(x, seq_len(length(unique(data[[target]]))), levels(data[[target]])) : invalid 'labels'; length 2 should be 1 or 1
+        if (length(unique(df[[clean_target_col]])) >= 2) {
+          df[[clean_target_col]] <- factor(df[[clean_target_col]], levels=c("TRUE","FALSE"))
+        }
+        else {
+          df[[clean_target_col]] <- factor(df[[clean_target_col]])
         }
       }
 
@@ -978,6 +947,55 @@ calc_feature_imp <- function(df,
   do_on_each_group(clean_df, each_func, name = "model", with_unnest = FALSE)
 }
 
+#' TODO: not really for external use. hide it.
+#' TODO: use this other places doing similar thing.
+#' @export
+evaluate_classification <- function(actual, predicted, class, pretty.name = FALSE) {
+  tp <- sum(actual == class & predicted == class, na.rm = TRUE)
+  tn <- sum(actual != class & predicted != class, na.rm = TRUE)
+  fp <- sum(actual != class & predicted == class, na.rm = TRUE)
+  fn <- sum(actual == class & predicted != class, na.rm = TRUE)
+
+  precision <- tp / (tp + fp)
+  # this avoids NA
+  if(tp+fp == 0) {
+    precision <- 0
+  }
+
+  recall <- tp / (tp + fn)
+  # this avoids NA
+  if(tn+fn == 0) {
+    recall <- 0
+  }
+
+  accuracy <- (tp + tn) / (tp + fp + tn + fn)
+
+  f_score <- 2 * ((precision * recall) / (precision + recall))
+  # this avoids NA
+  if(precision + recall == 0) {
+    f_score <- 0
+  }
+
+  data_size <- sum(actual == class)
+
+  ret <- data.frame(
+    class,
+    f_score,
+    accuracy,
+    1- accuracy,
+    precision,
+    recall,
+    data_size
+  )
+
+  names(ret) <- if(pretty.name){
+    c("Class", "F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall", "Data Size")
+  } else {
+    c("class", "f_score", "accuracy_rate", "misclassification_rate", "precision", "recall", "data_size")
+  }
+  ret
+}
+
 #' @export
 #' @param type "importance", "evaluation" or "conf_mat". Feature importance, evaluated scores or confusion matrix of training data.
 tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10, ...) {
@@ -1006,48 +1024,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
         predicted <- x$predictions
 
         per_level <- function(class) {
-          tp <- sum(actual == class & predicted == class, na.rm = TRUE)
-          tn <- sum(actual != class & predicted != class, na.rm = TRUE)
-          fp <- sum(actual != class & predicted == class, na.rm = TRUE)
-          fn <- sum(actual == class & predicted != class, na.rm = TRUE)
-
-          precision <- tp / (tp + fp)
-          # this avoids NA
-          if(tp+fp == 0) {
-            precision <- 0
-          }
-
-          recall <- tp / (tp + fn)
-          # this avoids NA
-          if(tn+fn == 0) {
-            recall <- 0
-          }
-
-          accuracy <- (tp + tn) / (tp + fp + tn + fn)
-
-          f_score <- 2 * ((precision * recall) / (precision + recall))
-          # this avoids NA
-          if(precision + recall == 0) {
-            f_score <- 0
-          }
-
-          data_size <- sum(actual == class)
-
-          ret <- data.frame(
-            class,
-            f_score,
-            accuracy,
-            1- accuracy,
-            precision,
-            recall,
-            data_size
-          )
-
-          names(ret) <- if(pretty.name){
-            c("Class", "F Score", "Accuracy Rate", "Missclassification Rate", "Precision", "Recall", "Data Size")
-          } else {
-            c("class", "f_score", "accuracy_rate", "missclassification_rate", "precision", "recall", "data_size")
-          }
+          ret <- evaluate_classification(actual, predicted, class, pretty.name = pretty.name)
           ret
         }
 
@@ -1125,12 +1102,24 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
           ret[[var_col]] <- signif(ret[[var_col]], digits=4) # limit digits before we turn it into a factor.
         }
       }
-      ret <- ret %>% tidyr::gather_("x_name", "x_value", var_cols, na.rm = TRUE, convert = TRUE)
-      ret <- ret %>% tidyr::gather("y_name", "y_value", -x_name, -x_value, na.rm = TRUE, convert = TRUE)
+      ret <- ret %>% tidyr::gather_("x_name", "x_value", var_cols, na.rm = TRUE, convert = FALSE)
+      # convert must be FALSE for y to make sure y_name is always character. otherwise bind_rows internally done
+      # in tidy() errors out because y_name can be, for example, mixture of logical and character.
+      ret <- ret %>% tidyr::gather("y_name", "y_value", -x_name, -x_value, na.rm = TRUE, convert = FALSE)
       ret <- ret %>% dplyr::mutate(x_name = forcats::fct_relevel(x_name, imp_vars)) # set factor level order so that charts appear in order of importance.
       # set order to ret and turn it back to character, so that the order is kept when groups are bound.
       # if it were kept as factor, when groups are bound, only the factor order from the first group would be respected.
       ret <- ret %>% dplyr::arrange(x_name) %>% dplyr::mutate(x_name = as.character(x_name))
+
+      # create mapping from column name to facet chart type based on whether the column is numeric.
+      chart_type_map <-c()
+      for(col in colnames(x$df)) {
+        chart_type_map <- c(chart_type_map, is.numeric(x$df[[col]]))
+      }
+      chart_type_map <- ifelse(chart_type_map, "line", "scatter")
+      names(chart_type_map) <- colnames(x$df)
+      
+      ret <- ret %>%  dplyr::mutate(chart_type = chart_type_map[x_name])
       ret <- ret %>% dplyr::mutate(x_name = x$terms_mapping[x_name]) # map variable names to original.
       ret
     },

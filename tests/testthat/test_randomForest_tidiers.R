@@ -1,3 +1,6 @@
+# how to run this test:
+# devtools::test(filter="randomForest_tidiers")
+
 context("test tidiers for randomForest")
 
 test_that("test do_smote", {
@@ -15,9 +18,9 @@ test_that("test calc_feature_imp when the number of rows of classes is one", {
     num = runif(6)
   )
 
-  ret <- sample_data %>%
-    calc_feature_imp(y, num) %>%
-    rf_importance()
+  model_df <- sample_data %>%
+    calc_feature_imp(y, num)
+  ret <- model_df %>% rf_importance()
 
   expect_equal(nrow(ret), 0)
 })
@@ -35,15 +38,16 @@ test_that("test calc_feature_imp", {
   ) %>%
     rename(`Tar get` = "target") # check if colname with space works
 
-  ret <- test_data %>%
+  model_df <- test_data %>%
     dplyr::group_by(Group) %>%
     calc_feature_imp(`Tar get`,
                       dplyr::starts_with("cat_"),
                       num_1,
                       num_2)
 
-  conf_mat <- tidy(ret, model, type = "conf_mat", pretty.name = TRUE)
-
+  conf_mat <- tidy(model_df, model, type = "conf_mat", pretty.name = TRUE)
+  ret <- model_df %>% rf_importance()
+  # ret <- model_df %>% rf_partial_dependence() TODO: this errors out
 })
 
 test_that("test calc_feature_imp predicting logical", {
@@ -59,18 +63,46 @@ test_that("test calc_feature_imp predicting logical", {
   ) %>%
     rename(`Tar get` = "target") # check if colname with space works
 
-  ret <- test_data %>%
+  model_df <- test_data %>%
     dplyr::group_by(Group) %>%
     calc_feature_imp(`Tar get`,
                       dplyr::starts_with("cat_"),
                       num_1,
                       num_2)
 
-  conf_mat <- tidy(ret, model, type = "conf_mat", pretty.name = TRUE)
+  conf_mat <- tidy(model_df, model, type = "conf_mat", pretty.name = TRUE)
+  ret <- model_df %>% rf_importance()
+  ret <- model_df %>% rf_partial_dependence()
+  ret <- model_df %>% rf_evaluation()
   # factor order should be TRUE then FALSE.
   expect_equal(levels(conf_mat$actual_value)[1], "TRUE")
   expect_equal(levels(conf_mat$predicted_value)[1], "TRUE")
 
+})
+
+test_that("test calc_feature_imp with group_by where a group has only TRUE rows while the other have both TRUE/FALSE", {
+  # if a group has only TRUE rows and factor level has both TRUE/FALSE, edarf::partial_dependence wourd error out.
+  # we adjust factor level for each group to avoid it. this is a test for that logic.
+  set.seed(0)
+  nrow <- 100
+  test_data <- data.frame(
+    target = c(rep(TRUE, 30), sample(c(TRUE,FALSE), nrow - 30, replace = TRUE)), # first 30 is the group that has only TRUE rows.
+    cat_10 = sample(c(letters[1:10], NA_character_), nrow, replace = TRUE),
+    cat_25 = sample(letters[1:25], nrow, replace = TRUE),
+    num_1 = runif(nrow),
+    num_2 = runif(nrow),
+    Group = c(rep(1,30), rep(0,nrow-30)) # first 30 is the group that has only TRUE rows.
+  ) %>%
+    rename(`Tar get` = "target") # check if colname with space works
+
+  model_df <- test_data %>%
+    dplyr::group_by(Group) %>%
+    calc_feature_imp(`Tar get`,
+                      dplyr::starts_with("cat_"),
+                      num_1,
+                      num_2)
+
+  ret <- model_df %>% rf_partial_dependence()
 })
 
 test_that("test randomForest with multinomial classification", {
