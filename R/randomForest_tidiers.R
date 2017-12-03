@@ -722,11 +722,10 @@ do_smote <- function(df,
     return(orig_df)
   }
 
+  levels(df_balanced[[target_col]]) <- orig_levels # set original labels
+
   if (was_target_logical) {
     df_balanced[[target_col]] <- as.logical(df_balanced[[target_col]]) # turn it back to logical.
-  }
-  else {
-    levels(df_balanced[[target_col]]) <- orig_levels # set original labels
   }
   df_balanced
 }
