@@ -12,6 +12,17 @@ test_that("test do_smote", {
   expect_equal(class(res), "data.frame")
 })
 
+test_that("test do_smote with logical", {
+  sample_data <- data.frame(
+    y = c(TRUE, rep(FALSE,5)),
+    num = runif(6)
+  )
+  res <- do_smote(sample_data, y)
+  expect_equal(class(res), "data.frame")
+  expect_equal(class(res$y), "logical")
+  expect_equal(any(is.na(res$y)), FALSE) # no NA is expected
+})
+
 test_that("test calc_feature_imp when the number of rows of classes is one", {
   sample_data <- data.frame(
     y = c("a", "b", "b", "b", "b", "c"),
