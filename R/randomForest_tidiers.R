@@ -685,6 +685,10 @@ do_smote <- function(df,
                      target,
                      ...
                      ){
+  # this seems to be the new way of NSE column selection evaluation
+  # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
+  target_col <- dplyr::select_var(names(df), !! rlang::enquo(target))
+
   orig_df <- df
   for(col in colnames(df)){
     if(is.numeric(df[[col]])) {
@@ -699,9 +703,6 @@ do_smote <- function(df,
   if (nrow(df) == 0) { # if no rows are left, give up smote and return original df.
     return(orig_df) # TODO: we should throw error and let user know which columns with NAs to remove.
   }
-  # this seems to be the new way of NSE column selection evaluation
-  # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
-  target_col <- dplyr::select_var(names(df), !! rlang::enquo(target))
   input  <- df[, !(names(df) %in% target_col), drop=FALSE] # drop=FALSE is to prevent input from turning into vector when only one column is left.
   output <- factor(df[[target_col]])
   output <- forcats::fct_infreq(output)
