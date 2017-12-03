@@ -688,6 +688,7 @@ do_smote <- function(df,
   # this seems to be the new way of NSE column selection evaluation
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
   target_col <- dplyr::select_var(names(df), !! rlang::enquo(target))
+  was_target_logical <- is.logical(df[[target_col]]) # record if the target was logical originally and turn it back to logical if so.
 
   orig_df <- df
   for(col in colnames(df)){
@@ -721,7 +722,12 @@ do_smote <- function(df,
     return(orig_df)
   }
 
-  levels(df_balanced[[target_col]]) <- orig_levels # set original labels
+  if (was_target_logical) {
+    df_balanced[[target_col]] <- as.logical(df_balanced[[target_col]]) # turn it back to logical.
+  }
+  else {
+    levels(df_balanced[[target_col]]) <- orig_levels # set original labels
+  }
   df_balanced
 }
 
