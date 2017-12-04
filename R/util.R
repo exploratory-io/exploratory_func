@@ -459,6 +459,17 @@ list_concat <- function(..., collapse = FALSE){
   ret
 }
 
+#' wrapper around sample_n to avoid error caused by fewer rows than n.
+#' @export
+sample_rows <- function(df, n, ...) {
+  if (nrow(df) > n) {
+    dplyr::sample_n(df, n, ...)
+  }
+  else {
+    df
+  }
+}
+
 #' replace sequence of spaces or periods with
 #' single space or period, then trim spaces on both ends.
 #' @export
