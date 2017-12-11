@@ -282,3 +282,10 @@ test_that("test randomForest with multinomial classification", {
   pred_test_ret <- prediction(model_ret, data = "test")
   pred_test_ret <- prediction(model_ret, data = "newdata", data_frame = test_data)
 })
+
+test_that("test evaluate_classification", {
+  actual <- c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0)
+  predicted <- c(1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0)
+  ret <- evaluate_classification(actual, predicted, 1)
+  expect_equal(class(ret), "data.frame")
+})
