@@ -85,6 +85,7 @@ test_that("test calc_feature_imp predicting logical", {
   ret <- model_df %>% rf_importance()
   ret <- model_df %>% rf_partial_dependence()
   ret <- model_df %>% rf_evaluation()
+  ret <- model_df %>% rf_evaluation_by_class()
   # factor order should be TRUE then FALSE.
   expect_equal(levels(conf_mat$actual_value)[1], "TRUE")
   expect_equal(levels(conf_mat$predicted_value)[1], "TRUE")

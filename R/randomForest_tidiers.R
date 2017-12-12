@@ -656,6 +656,12 @@ rf_evaluation <- function(data, ...) {
   tidy(data, model, type = "evaluation", ...)
 }
 
+#' wrapper for tidy type importance
+#' @export
+rf_evaluation_by_class <- function(data, ...) {
+  tidy(data, model, type = "evaluation_by_class", ...)
+}
+
 #' wrapper for tidy type partial dependence
 #' @export
 rf_partial_dependence <- function(df, ...) { # TODO: write test for this.
