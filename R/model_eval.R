@@ -303,7 +303,7 @@ evaluate_multi_ <- function(df, pred_label_col, actual_val_col, pretty.name = FA
   if (pretty.name){
     colnames(ret)[colnames(ret) == "micro_f_score"] <- "Micro-Averaged F Score"
     colnames(ret)[colnames(ret) == "macro_f_score"] <- "Macro-Averaged F Score"
-    colnames(ret)[colnames(ret) == "accuracy_rate"] <- "Accuracy Rage"
+    colnames(ret)[colnames(ret) == "accuracy_rate"] <- "Accuracy Rate"
     colnames(ret)[colnames(ret) == "misclassification_rate"] <- "Misclassification Rate"
   }
 
