@@ -1028,7 +1028,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
         glance(x, pretty.name = pretty.name, ...)
       } else {
         predicted <- x$predictions
-        evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual")
+        evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
       }
     },
     evaluation_by_class = {

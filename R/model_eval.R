@@ -225,7 +225,7 @@ evaluate_multi <- function(df, pred_label, actual_val, ...) {
 #' @param pred_label_col Predicted label colmun name
 #' @param actual_val_col Actual label column name
 #' @export
-evaluate_multi_ <- function(df, pred_label_col, actual_val_col, ...) {
+evaluate_multi_ <- function(df, pred_label_col, actual_val_col, pretty.name = FALSE, ...) {
   validate_empty_data(df)
 
   evaluate_multi_each <- function(df){
@@ -278,12 +278,22 @@ evaluate_multi_ <- function(df, pred_label_col, actual_val_col, ...) {
     # this is to change column name
     accuracy_rate <- accuracy
 
-    data.frame(
-      micro_f_score,
-      macro_f_score,
-      accuracy_rate,
-      misclassification_rate
-    )
+    if (pretty.name) {
+      data.frame(
+        `Micro-Averaged F Score`=micro_f_score,
+        `Macro-Averaged F Score`=macro_f_score,
+        `Accuracy Rage`=accuracy_rate,
+        `Misclassification Rate`=misclassification_rate
+      )
+    }
+    else {
+      data.frame(
+        micro_f_score,
+        macro_f_score,
+        accuracy_rate,
+        misclassification_rate
+      )
+    }
   }
 
   group_cols <- grouped_by(df)
