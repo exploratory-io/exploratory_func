@@ -36,7 +36,7 @@ test_that("test calc_feature_imp when the number of rows of classes is one", {
   expect_equal(nrow(ret), 0)
 })
 
-test_that("test calc_feature_imp", {
+test_that("test calc_feature_imp predicting multi-class", {
   set.seed(0)
   nrow <- 100
   test_data <- data.frame(
@@ -59,6 +59,8 @@ test_that("test calc_feature_imp", {
   conf_mat <- tidy(model_df, model, type = "conf_mat", pretty.name = TRUE)
   ret <- model_df %>% rf_importance()
   # ret <- model_df %>% rf_partial_dependence() TODO: this errors out
+  ret <- model_df %>% rf_evaluation()
+  ret <- model_df %>% rf_evaluation_by_class()
 })
 
 test_that("test calc_feature_imp predicting logical", {

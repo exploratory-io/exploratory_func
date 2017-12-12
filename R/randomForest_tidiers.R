@@ -976,7 +976,7 @@ evaluate_classification <- function(actual, predicted, class, pretty.name = FALS
 
   recall <- tp / (tp + fn)
   # this avoids NA
-  if(tn+fn == 0) {
+  if(tp+fn == 0) {
     recall <- 0
   }
 
