@@ -41,9 +41,9 @@ test_that("test calc_feature_imp predicting multi-class", {
   nrow <- 100
   test_data <- data.frame(
     target = c(NA_character_, sample(letters[1:4], nrow-2, replace = TRUE), NA_character_),
-    cat_10 = sample(c(letters[1:10], NA_character_), nrow, replace = TRUE),
+    `cat 10` = sample(c(letters[1:10], NA_character_), nrow, replace = TRUE),
     cat_25 = sample(letters[1:25], nrow, replace = TRUE),
-    num_1 = runif(nrow),
+    `num 1` = runif(nrow),
     num_2 = runif(nrow),
     Group = rbinom(nrow, 2, 0.5)
   ) %>%
@@ -52,8 +52,9 @@ test_that("test calc_feature_imp predicting multi-class", {
   model_df <- test_data %>%
     dplyr::group_by(Group) %>%
     calc_feature_imp(`Tar get`,
-                      dplyr::starts_with("cat_"),
-                      num_1,
+                     `cat 10`,
+                     cat_25,
+                      `num 1`,
                       num_2)
 
   conf_mat <- tidy(model_df, model, type = "conf_mat", pretty.name = TRUE)
