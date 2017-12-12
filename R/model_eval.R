@@ -278,22 +278,12 @@ evaluate_multi_ <- function(df, pred_label_col, actual_val_col, pretty.name = FA
     # this is to change column name
     accuracy_rate <- accuracy
 
-    if (pretty.name) {
-      data.frame(
-        `Micro-Averaged F Score`=micro_f_score,
-        `Macro-Averaged F Score`=macro_f_score,
-        `Accuracy Rage`=accuracy_rate,
-        `Misclassification Rate`=misclassification_rate
-      )
-    }
-    else {
-      data.frame(
-        micro_f_score,
-        macro_f_score,
-        accuracy_rate,
-        misclassification_rate
-      )
-    }
+    data.frame(
+      micro_f_score,
+      macro_f_score,
+      accuracy_rate,
+      misclassification_rate
+    )
   }
 
   group_cols <- grouped_by(df)
@@ -309,6 +299,13 @@ evaluate_multi_ <- function(df, pred_label_col, actual_val_col, pretty.name = FA
     dplyr::do_(.dots=setNames(list(~evaluate_multi_each(.)), tmp_col)) %>%
     dplyr::ungroup() %>%
     unnest_with_drop_(tmp_col)
+
+  if (pretty.name){
+    colnames(ret)[colnames(ret) == "micro_f_score"] <- "Micro-Averaged F Score"
+    colnames(ret)[colnames(ret) == "macro_f_score"] <- "Macro-Averaged F Score"
+    colnames(ret)[colnames(ret) == "accuracy_rate"] <- "Accuracy Rage"
+    colnames(ret)[colnames(ret) == "misclassification_rate"] <- "Misclassification Rate"
+  }
 
   ret
 }

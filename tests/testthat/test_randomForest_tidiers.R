@@ -59,7 +59,6 @@ test_that("test calc_feature_imp predicting multi-class", {
   conf_mat <- tidy(model_df, model, type = "conf_mat", pretty.name = TRUE)
   ret <- model_df %>% rf_importance()
   # ret <- model_df %>% rf_partial_dependence() TODO: this errors out
-  browser()
   ret <- model_df %>% rf_evaluation(pretty.name=TRUE)
   ret <- model_df %>% rf_evaluation_by_class(pretty.name=TRUE)
 })
@@ -87,7 +86,6 @@ test_that("test calc_feature_imp predicting logical", {
   conf_mat <- tidy(model_df, model, type = "conf_mat", pretty.name = TRUE)
   ret <- model_df %>% rf_importance()
   ret <- model_df %>% rf_partial_dependence()
-  browser()
   ret <- model_df %>% rf_evaluation(pretty.name=TRUE)
   ret <- model_df %>% rf_evaluation_by_class(pretty.name=TRUE)
   # factor order should be TRUE then FALSE.
