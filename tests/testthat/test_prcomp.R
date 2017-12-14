@@ -11,8 +11,8 @@ test_that("do_prcomp", {
 })
 
 test_that("do_prcomp with strange column name", {
-  df <- mtcars %>% rename('Cy l' = cyl)
-  model_df <- do_prcomp(mtcars, `Cy l`, mpg, hp)
+  df <- mtcars %>% rename(`Cy l` = cyl)
+  model_df <- do_prcomp(df, `Cy l`, mpg, hp)
   model_df %>% tidy(model, type="variances")
   model_df %>% tidy(model, type="loadings")
   model_df %>% tidy(model, type="biplot")
