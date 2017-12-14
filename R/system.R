@@ -417,7 +417,9 @@ getDBConnection <- function(type, host, port, databaseName, username = "", passw
         if(.Platform$OS.type == "windows"){ # Dremio Connector is only available for Win for now..
           connstr <- "DRIVER=Dremio Connector"
         } else {
-          connstr <- "DRIVER=Dremio ODBC Driver"
+          #temporary fix for dremio driver name change
+          connstr <- "DRIVER=Dremio Connector"
+          #connstr <- "DRIVER=Dremio ODBC Driver"
         }
         connstr <- stringr::str_c(connstr, ";HOST=", host, ";ConnectionType=Direct;AuthenticationType=Plain;Catalog=DREMIO;PORT=", port, ";UID=", username, ";PWD=", password)
         conn <- RODBC::odbcDriverConnect(connstr)
