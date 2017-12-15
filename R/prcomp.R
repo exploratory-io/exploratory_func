@@ -18,7 +18,7 @@ do_prcomp <- function(df,
   each_func <- function(df) {
     filtered_df <- df %>% tidyr::drop_na_(selected_cols) # TODO: take care of the case where values of a column are mostly NA
     # select_ was not able to handle space in target_col. let's do it in base R way.
-    cleaned_df <- filtered_df[,colnames(df) %in% selected_cols, drop=FALSE]
+    cleaned_df <- filtered_df[,colnames(filtered_df) %in% selected_cols, drop=FALSE]
 
     # remove columns with only one unique value
     cols_copy <- colnames(cleaned_df)
