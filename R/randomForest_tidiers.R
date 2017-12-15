@@ -656,6 +656,12 @@ rf_evaluation <- function(data, ...) {
   tidy(data, model, type = "evaluation", ...)
 }
 
+#' wrapper for tidy type importance
+#' @export
+rf_evaluation_by_class <- function(data, ...) {
+  tidy(data, model, type = "evaluation_by_class", ...)
+}
+
 #' wrapper for tidy type partial dependence
 #' @export
 rf_partial_dependence <- function(df, ...) { # TODO: write test for this.
@@ -970,7 +976,7 @@ evaluate_classification <- function(actual, predicted, class, pretty.name = FALS
 
   recall <- tp / (tp + fn)
   # this avoids NA
-  if(tn+fn == 0) {
+  if(tp+fn == 0) {
     recall <- 0
   }
 
@@ -1028,20 +1034,26 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
         glance(x, pretty.name = pretty.name, ...)
       } else {
         predicted <- x$predictions
+        evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
+      }
+    },
+    evaluation_by_class = {
+      # get evaluation scores from training data
+      actual <- x$y
+      predicted <- x$predictions
 
-        per_level <- function(class) {
-          ret <- evaluate_classification(actual, predicted, class, pretty.name = pretty.name)
-          ret
-        }
+      per_level <- function(class) {
+        ret <- evaluate_classification(actual, predicted, class, pretty.name = pretty.name)
+        ret
+      }
 
-        if(x$classification_type == "binary") {
-          ret <- per_level(levels(actual)[2])
-          # remove class column
-          ret <- ret[, 2:6]
-          ret
-        } else {
-          dplyr::bind_rows(lapply(levels(actual), per_level))
-        }
+      if(x$classification_type == "binary") {
+        ret <- per_level(levels(actual)[2])
+        # remove class column
+        ret <- ret[, 2:6]
+        ret
+      } else {
+        dplyr::bind_rows(lapply(levels(actual), per_level))
       }
     },
     conf_mat = {
