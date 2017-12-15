@@ -41,13 +41,15 @@ test_that("test calc_feature_imp predicting multi-class", {
   nrow <- 100
   test_data <- data.frame(
     target = c(NA_character_, sample(letters[1:4], nrow-2, replace = TRUE), NA_character_),
-    `cat 10` = sample(c(letters[1:10], NA_character_), nrow, replace = TRUE),
+    cat_10 = sample(c(letters[1:10], NA_character_), nrow, replace = TRUE),
     cat_25 = sample(letters[1:25], nrow, replace = TRUE),
-    `num 1` = runif(nrow),
+    num_1 = runif(nrow),
     num_2 = runif(nrow),
     Group = rbinom(nrow, 2, 0.5)
   ) %>%
-    rename(`Tar get` = "target") # check if colname with space works
+    # check if colname with space works
+    # creating those columns in data.frame replaces spaces with .
+    rename(`Tar get` = "target", `cat 10` = cat_10, `num 1` = num_1)
 
   model_df <- test_data %>%
     dplyr::group_by(Group) %>%
