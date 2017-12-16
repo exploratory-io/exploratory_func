@@ -80,6 +80,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
   df <- df[!is.na(df[[time_col]]), ]
 
   do_prophet_each <- function(df){
+    # filter the part of holidays df for this group.
     holidays_df <- NULL
     if (!is.null(holidays)) {
       holidays_df <- holidays
@@ -89,6 +90,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
         }
       }
     }
+    # filter the part of cap df (future df) for this group.
     cap_df <- NULL
     if (!is.null(cap) && is.data.frame(cap)) {
       cap_df <- cap
@@ -150,6 +152,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
         m <- prophet::prophet(aggregated_data, growth = "logistic", weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
       }
       else {
+        # if future data frame is without cap, use it just as a future data frame.
         m <- prophet::prophet(aggregated_data, growth = "linear", weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
       }
       forecast <- stats::predict(m, cap_df)
