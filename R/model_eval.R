@@ -230,9 +230,12 @@ evaluate_multi_ <- function(df, pred_label_col, actual_val_col, pretty.name = FA
 
   evaluate_multi_each <- function(df){
     actual_values_raw <- df[[actual_val_col]]
-    # as.character() is work around for the case actual_val_col is factor
+    # as.character() so that we can compare factors with same label but with different integer values as the same thing.
     actual_values <- as.character(actual_values_raw)
-    pred_values <- df[[pred_label_col]]
+    # if actual_values is character, pred_values needs to be character too,
+    # to get correct unique_label, since if one is char and another is factor
+    # unique_label will count factor and character values separatedly.
+    pred_values <- as.character(df[[pred_label_col]])
 
     # make values factor so that missing values can be included in conf_mat
     concat <- c(actual_values, pred_values)
