@@ -1018,6 +1018,8 @@ evaluate_classification <- function(actual, predicted, class, pretty.name = FALS
 }
 
 # with binary probability prediction model from ranger, take the level with bigger probability as the predicted value.
+#' @export
+# not really an external function but exposing for test. TODO: find better way.
 get_binary_predicted_value_from_probability <- function(x) {
   # x$predictions is 2-diminsional matrix with 2 columns for the 2 categories. values in the matrix is the probabilities.
   # TODO: thought x$predictions was 3 dimensinal array with tree dimension from the doc and independently running ranger,
