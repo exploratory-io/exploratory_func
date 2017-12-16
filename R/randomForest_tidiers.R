@@ -801,6 +801,7 @@ calc_feature_imp <- function(df,
   clean_target_col <- name_map[target_col]
   clean_cols <- name_map[cols]
 
+  classification_type <- NULL
   # if target is numeric, it is regression but
   # if not, it is classification
   if (!is.numeric(clean_df[[clean_target_col]])) {
@@ -809,6 +810,13 @@ calc_feature_imp <- function(df,
       clean_df[[clean_target_col]] <- forcats::fct_explicit_na(forcats::fct_lump(
         as.factor(clean_df[[clean_target_col]]), n = target_n, ties.method="first"
       ))
+
+      if (length(unique(clean_df[[clean_target_col]])) == 2) {
+        classification_type <- "binary" 
+      }
+    }
+    else {
+      classification_type <- "binary" 
     }
   }
 
@@ -937,7 +945,7 @@ calc_feature_imp <- function(df,
         probability = TRUE
       )
       # these attributes are used in tidy of randomForest
-      rf$classification_type <- "multi"
+      rf$classification_type <- classification_type
       rf$terms_mapping <- names(name_map)
       rf$y <- model.response(model_df)
       names(rf$terms_mapping) <- name_map
@@ -1030,7 +1038,6 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
     evaluation = {
       # get evaluation scores from training data
       actual <- x$y
-      browser()
 
       if(is.numeric(actual)){
         glance(x, pretty.name = pretty.name, ...)
@@ -1050,15 +1057,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
         ret <- evaluate_classification(actual, predicted, class, pretty.name = pretty.name)
         ret
       }
-
-      if(x$classification_type == "binary") {
-        ret <- per_level(levels(actual)[2])
-        # remove class column
-        ret <- ret[, 2:6]
-        ret
-      } else {
-        dplyr::bind_rows(lapply(levels(actual), per_level))
-      }
+      dplyr::bind_rows(lapply(levels(actual), per_level))
     },
     conf_mat = {
       # return confusion matrix
