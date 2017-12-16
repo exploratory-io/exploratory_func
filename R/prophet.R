@@ -40,7 +40,7 @@ do_prophet <- function(df, time, value = NULL, ...){
 #' @param uncertainty.samples - Number of simulations made for calculating uncertainty intervals. Default is 1000.
 #' @export
 do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "day", include_history = TRUE,
-                        fun.aggregate = sum, cap = NULL, growth = NULL, weekly.seasonality = TRUE, yearly.seasonality = TRUE, ...){
+                        fun.aggregate = sum, cap = NULL, growth = NULL, weekly.seasonality = TRUE, yearly.seasonality = TRUE, holidays = NULL, ...){
   validate_empty_data(df)
 
   # we are making default for weekly/yearly.seasonality TRUE since 'auto' does not behave well.
@@ -80,6 +80,25 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
   df <- df[!is.na(df[[time_col]]), ]
 
   do_prophet_each <- function(df){
+    holidays_df <- NULL
+    if (!is.null(holidays)) {
+      holidays_df <- holidays
+      for (a_grouped_col in grouped_col) {
+        if (!is.null(holidays_df[[a_grouped_col]])) {
+          holidays_df <- holidays_df[holidays_df[[a_grouped_col]] == df[[a_grouped_col]][[1]],]
+        }
+      }
+    }
+    cap_df <- NULL
+    if (!is.null(cap) && is.data.frame(cap)) {
+      cap_df <- cap
+      for (a_grouped_col in grouped_col) {
+        if (!is.null(cap_df[[a_grouped_col]])) {
+          cap_df <- cap_df[cap_df[[a_grouped_col]] == df[[a_grouped_col]][[1]],]
+        }
+      }
+    }
+
     if(!is.null(grouped_col)){
       # drop grouping columns
       df <- df[, !colnames(df) %in% grouped_col]
@@ -127,18 +146,23 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
     if (!is.null(cap) && is.data.frame(cap)) {
       # in this case, cap is the future data frame with cap, specified by user.
       # this is a back door to allow user to specify cap column.
-      m <- prophet::prophet(aggregated_data, growth = "logistic", weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, ...)
-      forecast <- stats::predict(m, cap)
+      if (!is.null(cap$cap)) {
+        m <- prophet::prophet(aggregated_data, growth = "logistic", weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
+      }
+      else {
+        m <- prophet::prophet(aggregated_data, growth = "linear", weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
+      }
+      forecast <- stats::predict(m, cap_df)
     }
     else {
       if (!is.null(cap)) { # set cap if it is there
         aggregated_data[["cap"]] <- cap
       }
       if (!is.null(cap)) { # if cap is set, use logistic. otherwise use linear.
-        m <- prophet::prophet(aggregated_data, growth = "logistic", weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, ...)
+        m <- prophet::prophet(aggregated_data, growth = "logistic", weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
       }
       else {
-        m <- prophet::prophet(aggregated_data, growth = "linear", weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, ...)
+        m <- prophet::prophet(aggregated_data, growth = "linear", weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
       }
       future <- prophet::make_future_dataframe(m, periods = periods, freq = time_unit, include_history = include_history) #includes past dates
       if (!is.null(cap)) { # set cap to future table too, if it is there
@@ -146,9 +170,9 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
       }
       forecast <- stats::predict(m, future)
     }
+    # with prophet 2.1, now forecast$ds is POSIXct. Cast it to Date so that full_join works.
+    forecast$ds <- as.Date(forecast$ds)
     ret <- forecast %>% dplyr::full_join(aggregated_data, by = c("ds" = "ds"))
-    # drop t column, which is just scaled time, which does not seem informative.
-    ret <- ret %>% dplyr::select(-t)
     # drop cap_scaled column, which is just scaled capacity, which does not seem informative.
     if ("cap_scaled" %in% colnames(ret)) {
       ret <- ret %>% dplyr::select(-cap_scaled)
