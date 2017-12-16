@@ -1042,16 +1042,24 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
       if(is.numeric(actual)){
         glance(x, pretty.name = pretty.name, ...)
       } else {
-        #predicted <- x$predictions
-        predicted <- x$forest$levels[apply(x$predictions, 1, function(x){if(x[1]>x[2]) 1 else 2})]
+        if (x$classification_type == "binary") {
+          predicted <- factor(x$forest$levels[apply(x$predictions, 1, function(x){if(x[1]>x[2]) 1 else 2})], levels=x$forest$levels)
+        }
+        else {
+          predicted <- x$predictions
+        }
         evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
       }
     },
     evaluation_by_class = {
       # get evaluation scores from training data
       actual <- x$y
-      #predicted <- x$predictions
-      predicted <- x$forest$levels[apply(x$predictions, 1, function(x){if(x[1]>x[2]) 1 else 2})]
+      if (x$classification_type == "binary") {
+        predicted <-factor(x$forest$levels[apply(x$predictions, 1, function(x){if(x[1]>x[2]) 1 else 2})], levels=x$forest$levels)
+      }
+      else {
+        predicted <- x$predictions
+      }
 
       per_level <- function(class) {
         ret <- evaluate_classification(actual, predicted, class, pretty.name = pretty.name)
@@ -1061,10 +1069,16 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
     },
     conf_mat = {
       # return confusion matrix
+      if (x$classification_type == "binary") {
+        predicted <-factor(x$forest$levels[apply(x$predictions, 1, function(x){if(x[1]>x[2]) 1 else 2})], levels=x$forest$levels)
+      }
+      else {
+        predicted <- x$predictions
+      }
+
       ret <- data.frame(
         actual_value = x$y,
-        predicted_value = factor(x$forest$levels[apply(x$predictions, 1, function(x){if(x[1]>x[2]) 1 else 2})], levels=x$forest$levels)
-        #predicted_value = x$predictions
+        predicted_value = predicted
       ) %>%
         dplyr::filter(!is.na(predicted_value))
 
@@ -1078,10 +1092,15 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
     },
     scatter = {
       # return actual and predicted value pairs
+      if (x$classification_type == "binary") {
+        predicted <-factor(x$forest$levels[apply(x$predictions, 1, function(x){if(x[1]>x[2]) 1 else 2})], levels=x$forest$levels)
+      }
+      else {
+        predicted <- x$predictions
+      }
       ret <- data.frame(
         expected_value = x$y,
-        predicted_value = x$forest$levels[apply(x$predictions, 1, function(x){if(x[1]>x[2]) 1 else 2})]
-        #predicted_value = x$predictions
+        predicted_value = predicted
       ) %>%
         dplyr::filter(!is.na(predicted_value))
 
