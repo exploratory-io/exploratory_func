@@ -801,7 +801,7 @@ calc_feature_imp <- function(df,
   clean_target_col <- name_map[target_col]
   clean_cols <- name_map[cols]
 
-  classification_type <- NULL
+  classification_type <- "multi" # default value. ignored when it is regression.
   # if target is numeric, it is regression but
   # if not, it is classification
   if (!is.numeric(clean_df[[clean_target_col]])) {
@@ -942,7 +942,7 @@ calc_feature_imp <- function(df,
         num.trees = ntree,
         min.node.size = nodesize,
         sample.fraction = sample.fraction,
-        probability = TRUE
+        probability = (classification_type == "binary") # build probability tree for AUC only for binary classification.
       )
       # these attributes are used in tidy of randomForest
       rf$classification_type <- classification_type
