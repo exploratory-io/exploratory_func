@@ -933,7 +933,8 @@ calc_feature_imp <- function(df,
         importance = "impurity",
         num.trees = ntree,
         min.node.size = nodesize,
-        sample.fraction = sample.fraction
+        sample.fraction = sample.fraction,
+        probability = TRUE
       )
       # these attributes are used in tidy of randomForest
       rf$classification_type <- "multi"
@@ -1029,6 +1030,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
     evaluation = {
       # get evaluation scores from training data
       actual <- x$y
+      browser()
 
       if(is.numeric(actual)){
         glance(x, pretty.name = pretty.name, ...)
@@ -1060,7 +1062,8 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
       # return confusion matrix
       ret <- data.frame(
         actual_value = x$y,
-        predicted_value = x$predictions
+        predicted_value = x$forest$levels[apply(x$predictions, 1, function(x){if(x[1]>x[2]) 1 else 2})]
+        #predicted_value = x$predictions
       ) %>%
         dplyr::filter(!is.na(predicted_value))
 
@@ -1076,7 +1079,8 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
       # return actual and predicted value pairs
       ret <- data.frame(
         expected_value = x$y,
-        predicted_value = x$predictions
+        predicted_value = x$forest$levels[apply(x$predictions, 1, function(x){if(x[1]>x[2]) 1 else 2})]
+        #predicted_value = x$predictions
       ) %>%
         dplyr::filter(!is.na(predicted_value))
 
