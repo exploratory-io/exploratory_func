@@ -1057,7 +1057,11 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
         else {
           predicted <- x$predictions
         }
-        evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
+        ret <- evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
+        if (x$classification_type == "binary") {
+          ret <- ret %>% mutate(AUC = AUC)
+        }
+        ret
       }
     },
     evaluation_by_class = {
