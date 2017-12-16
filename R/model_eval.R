@@ -225,7 +225,7 @@ evaluate_multi <- function(df, pred_label, actual_val, ...) {
 #' @param pred_label_col Predicted label colmun name
 #' @param actual_val_col Actual label column name
 #' @export
-evaluate_multi_ <- function(df, pred_label_col, actual_val_col, ...) {
+evaluate_multi_ <- function(df, pred_label_col, actual_val_col, pretty.name = FALSE, ...) {
   validate_empty_data(df)
 
   evaluate_multi_each <- function(df){
@@ -299,6 +299,13 @@ evaluate_multi_ <- function(df, pred_label_col, actual_val_col, ...) {
     dplyr::do_(.dots=setNames(list(~evaluate_multi_each(.)), tmp_col)) %>%
     dplyr::ungroup() %>%
     unnest_with_drop_(tmp_col)
+
+  if (pretty.name){
+    colnames(ret)[colnames(ret) == "micro_f_score"] <- "Micro-Averaged F Score"
+    colnames(ret)[colnames(ret) == "macro_f_score"] <- "Macro-Averaged F Score"
+    colnames(ret)[colnames(ret) == "accuracy_rate"] <- "Accuracy Rate"
+    colnames(ret)[colnames(ret) == "misclassification_rate"] <- "Misclassification Rate"
+  }
 
   ret
 }

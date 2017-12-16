@@ -136,8 +136,10 @@ build_lm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, gr
 build_lm.fast <- function(df,
                     target,
                     ...,
-                    max_nrow = 200000,
+                    model_type = "lm",
+                    max_nrow = 50000,
                     predictor_n = 12, # so that at least months can fit in it.
+                    smote = FALSE,
                     seed = 0
                     ){
   # TODO: add test
@@ -151,6 +153,10 @@ build_lm.fast <- function(df,
 
   grouped_cols <- grouped_by(df)
 
+  # drop unrelated columns so that SMOTE later does not have to deal with them.
+  # select_ was not able to handle space in target_col. let's do it in base R way.
+  df <- df[,colnames(df) %in% c(grouped_cols, selected_cols, target_col), drop=FALSE]
+
   # remove grouped col or target col
   selected_cols <- setdiff(selected_cols, c(grouped_cols, target_col))
 
@@ -162,8 +168,32 @@ build_lm.fast <- function(df,
     set.seed(seed)
   }
 
+  if (!is.null(model_type) && model_type == "glm") {
+    unique_val <- unique(df[[target_col]])
+    if (length(unique_val[!is.na(unique_val)]) != 2) {
+      stop(paste0("Column to predict (", target_col, ") with Logistic Regression must have 2 unique values."))
+    }
+    if (!is.numeric(df[[target_col]]) && !is.factor(df[[target_col]]) && !is.logical(df[[target_col]])) {
+      # make other types factor so that it passes stats::glm call.
+      df[[target_col]] <- factor(df[[target_col]])
+    }
+  }
+  else { # this means the model is lm
+    if (!is.numeric(df[[target_col]])) {
+      stop(paste0("Column to predict (", target_col, ") with Linear Regression must be numeric"))
+    }
+  }
+
   # cols will be filtered to remove invalid columns
   cols <- selected_cols
+
+  for (col in selected_cols) {
+    if(all(is.na(df[[col]]))){
+      # remove columns if they are all NA
+      cols <- setdiff(cols, col)
+      df[[col]] <- NULL # drop the column so that SMOTE will not see it. 
+    }
+  }
 
   # randomForest fails if columns are not clean. TODO is this needed?
   #clean_df <- janitor::clean_names(df)
@@ -247,6 +277,7 @@ build_lm.fast <- function(df,
             c_cols <- c(c_cols, hour_col)
             df[[hour_col]] <- factor(lubridate::hour(df[[col]])) # treat hour as category
           }
+          df[[col]] <- NULL # drop original Date/POSIXct column to pass SMOTE later.
         } else if(!is.numeric(df[[col]])) {
           # convert data to factor if predictors are not numeric or logical
           # and limit the number of levels in factor by fct_lump.
@@ -268,6 +299,7 @@ build_lm.fast <- function(df,
         unique_val <- unique(df[[col]])
         if (length(unique_val[!is.na(unique_val)]) == 1) {
           c_cols <- setdiff(c_cols, col)
+          df[[col]] <- NULL # drop the column so that SMOTE will not see it. 
         }
       }
 
@@ -275,12 +307,25 @@ build_lm.fast <- function(df,
       rhs <- paste0("`", c_cols, "`", collapse = " + ")
       # TODO: This clean_target_col is actually not a cleaned column name since we want lm to show real name. Clean up our variable name.
       fml <- as.formula(paste0("`", clean_target_col, "` ~ ", rhs))
-      rf <- stats::lm(fml, data = df) 
+      if (!is.null(model_type) && model_type == "glm") {
+        if (smote) {
+          df <- df %>% do_smote(clean_target_col)
+        }
+        rf <- stats::glm(fml, data = df, family = "binomial") 
+      }
+      else {
+        rf <- stats::lm(fml, data = df) 
+      }
       # these attributes are used in tidy of randomForest TODO: is this good for lm too?
       rf$terms_mapping <- names(name_map)
       names(rf$terms_mapping) <- name_map
       # add special lm_exploratory class for adding extra info at glance().
-      class(rf) <- c("lm_exploratory", class(rf))
+      if (!is.null(model_type) && model_type == "glm") {
+        class(rf) <- c("glm_exploratory", class(rf))
+      }
+      else {
+        class(rf) <- c("lm_exploratory", class(rf))
+      }
       rf
     }, error = function(e){
       if(length(grouped_cols) > 0) {
@@ -316,4 +361,100 @@ glance.lm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
     ret <- ret %>% dplyr::rename(`R Squared`=r.squared, `Adj R Squared`=adj.r.squared, `Root Mean Square Error`=sigma, `F Ratio`=statistic, `P Value`=p.value, DF=df, `Log Likelihood`=logLik, Deviance=deviance, `Residual DF`=df.residual)
   }
   ret
+}
+
+#' special version of glance.lm function to use with build_lm.fast.
+#' @export
+glance.glm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
+  ret <- broom:::glance.glm(x)
+
+  # calculate model p-value since glm does not provide it as is.
+  # https://stats.stackexchange.com/questions/129958/glm-in-r-which-pvalue-represents-the-goodness-of-fit-of-entire-model
+  f0 <- x$formula # copy formula as a basis for null model.
+  lazyeval::f_rhs(f0) <- 1 # create null model formula.
+  x0 <- glm(f0, x$data, family = x$family) # build null model.
+  pvalue <- with(anova(x0,x),pchisq(Deviance,Df,lower.tail=FALSE)[2]) 
+  if(pretty.name) {
+    ret <- ret %>% dplyr::mutate(`P Value`=pvalue)
+  }
+  else {
+    ret <- ret %>% dplyr::mutate(p.value=pvalue)
+  }
+  
+  # Calculate F Score, Accuracy Rate, Misclassification Rate, Precision, Recall, Data Size
+  predicted <- ifelse(x$fitted.value > 0.5, 1, 0) #TODO make threshold adjustable
+  ret2 <- evaluate_classification(x$y, predicted, 1, pretty.name = pretty.name)
+  ret2 <- ret2[, 2:6]
+  ret <- ret %>% bind_cols(ret2)
+
+  for(var in names(x$xlevels)) { # extract base levels info on factor/character columns from lm model
+    if(pretty.name) {
+      ret[paste0("Base Level of ", var)] <- x$xlevels[[var]][[1]]
+    }
+    else {
+      ret[paste0(var, "_base")] <- x$xlevels[[var]][[1]]
+    }
+  }
+
+  if(pretty.name) {
+    ret <- ret %>% dplyr::rename(`Null Deviance`=null.deviance, `DF for Null Model`=df.null, `Log Likelihood`=logLik, Deviance=deviance, `Residual DF`=df.residual)
+  }
+  ret
+}
+
+#' special version of tidy.lm function to use with build_lm.fast.
+#' @export
+tidy.lm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
+  ret <- broom:::tidy.lm(x) # it seems that tidy.lm takes care of glm too
+  ret <- ret %>% mutate(conf.high=estimate+1.96*std.error, conf.low=estimate-1.96*std.error)
+  if (pretty.name) {
+    ret <- ret %>% rename(Term=term, Coefficient=estimate, `Std Error`=std.error,
+                          `t Ratio`=statistic, `P Value`=p.value, `Conf Low`=conf.low, `Conf High`=conf.high)
+  }
+  ret
+}
+
+#' special version of tidy.glm function to use with build_lm.fast.
+#' @export
+tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, ...) { #TODO: add test
+  switch(type,
+    coefficients = {
+      ret <- broom:::tidy.lm(x) # it seems that tidy.lm takes care of glm too
+      ret <- ret %>% mutate(conf.high=estimate+1.96*std.error, conf.low=estimate-1.96*std.error, odds_ratio=exp(estimate))
+      if (pretty.name) {
+        ret <- ret %>% rename(Term=term, Coefficient=estimate, `Std Error`=std.error,
+                              `t Ratio`=statistic, `P Value`=p.value, `Conf Low`=conf.low, `Conf High`=conf.high, `Odds Ratio`=odds_ratio)
+      }
+      ret
+    },
+    conf_mat = {
+      target_col <- as.character(lazyeval::f_lhs(x$formula)) # get target column name
+      actual_val = x$model[[target_col]]
+
+      predicted = x$fitted.value > 0.5 # TODO: make threshold adjustable
+      # convert predicted to original set of values. should be either logical, numeric, or factor.
+      predicted <- if (is.logical(actual_val)) {
+        predicted
+      } else if (is.numeric(actual_val)) {
+        as.numeric(predicted)
+      } else if (is.factor(actual_val)){
+        # create a factor vector with the same levels as actual_val
+        # predicted is logical, so should +1 to make it index
+        factor(levels(actual_val)[as.numeric(predicted) + 1], levels(actual_val))
+      }
+
+      ret <- data.frame(
+        actual_value = actual_val,
+        predicted_value = predicted
+      ) %>%
+        dplyr::filter(!is.na(predicted_value))
+
+      # get count if it's classification
+      ret <- ret %>%
+        dplyr::group_by(actual_value, predicted_value) %>%
+        dplyr::summarize(count = n()) %>%
+        dplyr::ungroup()
+      ret
+    }
+  )
 }

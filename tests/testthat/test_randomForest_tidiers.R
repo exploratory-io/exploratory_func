@@ -1,4 +1,27 @@
+# how to run this test:
+# devtools::test(filter="randomForest_tidiers")
+
 context("test tidiers for randomForest")
+
+test_that("test do_smote", {
+  sample_data <- data.frame(
+    y = c("a", "b", "b", "b", "b", "b"),
+    num = runif(6)
+  )
+  res <- do_smote(sample_data, y)
+  expect_equal(class(res), "data.frame")
+})
+
+test_that("test do_smote with logical", {
+  sample_data <- data.frame(
+    y = c(TRUE, rep(FALSE,5)),
+    num = runif(6)
+  )
+  res <- do_smote(sample_data, y)
+  expect_equal(class(res), "data.frame")
+  expect_equal(class(res$y), "logical")
+  expect_equal(any(is.na(res$y)), FALSE) # no NA is expected
+})
 
 test_that("test calc_feature_imp when the number of rows of classes is one", {
   sample_data <- data.frame(
@@ -6,14 +29,14 @@ test_that("test calc_feature_imp when the number of rows of classes is one", {
     num = runif(6)
   )
 
-  ret <- sample_data %>%
-    calc_feature_imp(y, num) %>%
-    rf_importance()
+  model_df <- sample_data %>%
+    calc_feature_imp(y, num)
+  ret <- model_df %>% rf_importance()
 
   expect_equal(nrow(ret), 0)
 })
 
-test_that("test calc_feature_imp", {
+test_that("test calc_feature_imp predicting multi-class", {
   set.seed(0)
   nrow <- 100
   test_data <- data.frame(
@@ -24,17 +47,23 @@ test_that("test calc_feature_imp", {
     num_2 = runif(nrow),
     Group = rbinom(nrow, 2, 0.5)
   ) %>%
-    rename(`Tar get` = "target") # check if colname with space works
+    # check if colname with space works
+    # creating those columns in data.frame replaces spaces with .
+    rename(`Tar get` = "target", `cat 10` = cat_10, `num 1` = num_1)
 
-  ret <- test_data %>%
+  model_df <- test_data %>%
     dplyr::group_by(Group) %>%
     calc_feature_imp(`Tar get`,
-                      dplyr::starts_with("cat_"),
-                      num_1,
+                     `cat 10`,
+                     cat_25,
+                      `num 1`,
                       num_2)
 
-  conf_mat <- tidy(ret, model, type = "conf_mat", pretty.name = TRUE)
-
+  conf_mat <- tidy(model_df, model, type = "conf_mat", pretty.name = TRUE)
+  ret <- model_df %>% rf_importance()
+  # ret <- model_df %>% rf_partial_dependence() TODO: this errors out
+  ret <- model_df %>% rf_evaluation(pretty.name=TRUE)
+  ret <- model_df %>% rf_evaluation_by_class(pretty.name=TRUE)
 })
 
 test_that("test calc_feature_imp predicting logical", {
@@ -50,18 +79,47 @@ test_that("test calc_feature_imp predicting logical", {
   ) %>%
     rename(`Tar get` = "target") # check if colname with space works
 
-  ret <- test_data %>%
+  model_df <- test_data %>%
     dplyr::group_by(Group) %>%
     calc_feature_imp(`Tar get`,
                       dplyr::starts_with("cat_"),
                       num_1,
                       num_2)
 
-  conf_mat <- tidy(ret, model, type = "conf_mat", pretty.name = TRUE)
+  conf_mat <- tidy(model_df, model, type = "conf_mat", pretty.name = TRUE)
+  ret <- model_df %>% rf_importance()
+  ret <- model_df %>% rf_partial_dependence()
+  ret <- model_df %>% rf_evaluation(pretty.name=TRUE)
+  ret <- model_df %>% rf_evaluation_by_class(pretty.name=TRUE)
   # factor order should be TRUE then FALSE.
   expect_equal(levels(conf_mat$actual_value)[1], "TRUE")
   expect_equal(levels(conf_mat$predicted_value)[1], "TRUE")
 
+})
+
+test_that("test calc_feature_imp with group_by where a group has only TRUE rows while the other have both TRUE/FALSE", {
+  # if a group has only TRUE rows and factor level has both TRUE/FALSE, edarf::partial_dependence wourd error out.
+  # we adjust factor level for each group to avoid it. this is a test for that logic.
+  set.seed(0)
+  nrow <- 100
+  test_data <- data.frame(
+    target = c(rep(TRUE, 30), sample(c(TRUE,FALSE), nrow - 30, replace = TRUE)), # first 30 is the group that has only TRUE rows.
+    cat_10 = sample(c(letters[1:10], NA_character_), nrow, replace = TRUE),
+    cat_25 = sample(letters[1:25], nrow, replace = TRUE),
+    num_1 = runif(nrow),
+    num_2 = runif(nrow),
+    Group = c(rep(1,30), rep(0,nrow-30)) # first 30 is the group that has only TRUE rows.
+  ) %>%
+    rename(`Tar get` = "target") # check if colname with space works
+
+  model_df <- test_data %>%
+    dplyr::group_by(Group) %>%
+    calc_feature_imp(`Tar get`,
+                      dplyr::starts_with("cat_"),
+                      num_1,
+                      num_2)
+
+  ret <- model_df %>% rf_partial_dependence()
 })
 
 test_that("test randomForest with multinomial classification", {
@@ -229,4 +287,11 @@ test_that("test randomForest with multinomial classification", {
   pred_train_ret <- prediction(model_ret, data = "training")
   pred_test_ret <- prediction(model_ret, data = "test")
   pred_test_ret <- prediction(model_ret, data = "newdata", data_frame = test_data)
+})
+
+test_that("test evaluate_classification", {
+  actual <- c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0)
+  predicted <- c(1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0)
+  ret <- evaluate_classification(actual, predicted, 1)
+  expect_equal(class(ret), "data.frame")
 })
