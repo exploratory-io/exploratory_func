@@ -1064,7 +1064,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
       # return confusion matrix
       ret <- data.frame(
         actual_value = x$y,
-        predicted_value = x$forest$levels[apply(x$predictions, 1, function(x){if(x[1]>x[2]) 1 else 2})]
+        predicted_value = factor(x$forest$levels[apply(x$predictions, 1, function(x){if(x[1]>x[2]) 1 else 2})], levels=x$forest$levels)
         #predicted_value = x$predictions
       ) %>%
         dplyr::filter(!is.na(predicted_value))
