@@ -1017,6 +1017,15 @@ evaluate_classification <- function(actual, predicted, class, pretty.name = FALS
   ret
 }
 
+# with binary probability prediction model from ranger, take the level with bigger probability as the predicted value.
+get_binary_predicted_value_from_probability <- function(x) {
+  # x$predictions is 2-diminsional matrix with 2 columns for the 2 categories. values in the matrix is the probabilities.
+  # TODO: thought x$predictions was 3 dimensinal array with tree dimension from the doc and independently running ranger,
+  # but looks like it is already averaged? look into it.
+  predicted <- factor(x$forest$levels[apply(x$predictions, 1, function(x){if(x[1]>x[2]) 1 else 2})], levels=x$forest$levels)
+  predicted
+}
+
 #' @export
 #' @param type "importance", "evaluation" or "conf_mat". Feature importance, evaluated scores or confusion matrix of training data.
 tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10, ...) {
@@ -1043,8 +1052,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
         glance(x, pretty.name = pretty.name, ...)
       } else {
         if (x$classification_type == "binary") {
-          # TODO: thought x$predictions was 3 dimensinal array with tree dimension, but looks like it is already averaged? look into it.
-          predicted <- factor(x$forest$levels[apply(x$predictions, 1, function(x){if(x[1]>x[2]) 1 else 2})], levels=x$forest$levels)
+          predicted <- get_binary_predicted_value_from_probability(x)
           predicted_probability <- x$predictions[,1]
           # calculate AUC from ROC
           roc_df <- data.frame(actual = (as.integer(actual)==1), predicted_probability = predicted_probability)
@@ -1068,7 +1076,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
       # get evaluation scores from training data
       actual <- x$y
       if (x$classification_type == "binary") {
-        predicted <-factor(x$forest$levels[apply(x$predictions, 1, function(x){if(x[1]>x[2]) 1 else 2})], levels=x$forest$levels)
+        predicted <- get_binary_predicted_value_from_probability(x)
       }
       else {
         predicted <- x$predictions
@@ -1083,7 +1091,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
     conf_mat = {
       # return confusion matrix
       if (x$classification_type == "binary") {
-        predicted <-factor(x$forest$levels[apply(x$predictions, 1, function(x){if(x[1]>x[2]) 1 else 2})], levels=x$forest$levels)
+        predicted <- get_binary_predicted_value_from_probability(x)
       }
       else {
         predicted <- x$predictions
@@ -1106,7 +1114,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
     scatter = {
       # return actual and predicted value pairs
       if (x$classification_type == "binary") {
-        predicted <-factor(x$forest$levels[apply(x$predictions, 1, function(x){if(x[1]>x[2]) 1 else 2})], levels=x$forest$levels)
+        predicted <- get_binary_predicted_value_from_probability(x)
       }
       else {
         predicted <- x$predictions
