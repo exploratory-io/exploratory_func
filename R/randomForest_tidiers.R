@@ -1035,14 +1035,16 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
       if(is.numeric(actual)){
         glance(x, pretty.name = pretty.name, ...)
       } else {
-        predicted <- x$predictions
+        #predicted <- x$predictions
+        predicted <- x$forest$levels[apply(x$predictions, 1, function(x){if(x[1]>x[2]) 1 else 2})]
         evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
       }
     },
     evaluation_by_class = {
       # get evaluation scores from training data
       actual <- x$y
-      predicted <- x$predictions
+      #predicted <- x$predictions
+      predicted <- x$forest$levels[apply(x$predictions, 1, function(x){if(x[1]>x[2]) 1 else 2})]
 
       per_level <- function(class) {
         ret <- evaluate_classification(actual, predicted, class, pretty.name = pretty.name)
