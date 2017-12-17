@@ -801,6 +801,7 @@ calc_feature_imp <- function(df,
   clean_target_col <- name_map[target_col]
   clean_cols <- name_map[cols]
 
+  classification_type <- "multi" # default value. ignored when it is regression.
   # if target is numeric, it is regression but
   # if not, it is classification
   if (!is.numeric(clean_df[[clean_target_col]])) {
@@ -809,6 +810,13 @@ calc_feature_imp <- function(df,
       clean_df[[clean_target_col]] <- forcats::fct_explicit_na(forcats::fct_lump(
         as.factor(clean_df[[clean_target_col]]), n = target_n, ties.method="first"
       ))
+
+      if (length(unique(clean_df[[clean_target_col]])) == 2) {
+        classification_type <- "binary" 
+      }
+    }
+    else {
+      classification_type <- "binary" 
     }
   }
 
@@ -933,10 +941,11 @@ calc_feature_imp <- function(df,
         importance = "impurity",
         num.trees = ntree,
         min.node.size = nodesize,
-        sample.fraction = sample.fraction
+        sample.fraction = sample.fraction,
+        probability = (classification_type == "binary") # build probability tree for AUC only for binary classification.
       )
       # these attributes are used in tidy of randomForest
-      rf$classification_type <- "multi"
+      rf$classification_type <- classification_type
       rf$terms_mapping <- names(name_map)
       rf$y <- model.response(model_df)
       names(rf$terms_mapping) <- name_map
@@ -1008,6 +1017,17 @@ evaluate_classification <- function(actual, predicted, class, pretty.name = FALS
   ret
 }
 
+# with binary probability prediction model from ranger, take the level with bigger probability as the predicted value.
+#' @export
+# not really an external function but exposing for test. TODO: find better way.
+get_binary_predicted_value_from_probability <- function(x) {
+  # x$predictions is 2-diminsional matrix with 2 columns for the 2 categories. values in the matrix is the probabilities.
+  # TODO: thought x$predictions was 3 dimensinal array with tree dimension from the doc and independently running ranger,
+  # but looks like it is already averaged? look into it.
+  predicted <- factor(x$forest$levels[apply(x$predictions, 1, function(x){if(x[1]>x[2]) 1 else 2})], levels=x$forest$levels)
+  predicted
+}
+
 #' @export
 #' @param type "importance", "evaluation" or "conf_mat". Feature importance, evaluated scores or confusion matrix of training data.
 tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10, ...) {
@@ -1033,34 +1053,60 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
       if(is.numeric(actual)){
         glance(x, pretty.name = pretty.name, ...)
       } else {
-        predicted <- x$predictions
-        evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
+        if (x$classification_type == "binary") {
+          predicted <- get_binary_predicted_value_from_probability(x)
+          predicted_probability <- x$predictions[,1]
+          # calculate AUC from ROC
+          roc_df <- data.frame(actual = (as.integer(actual)==1), predicted_probability = predicted_probability)
+          roc <- roc_df %>% do_roc_(actual_val_col = "actual", pred_prob_col = "predicted_probability")
+          # use numeric index so that it won't be disturbed by name change
+          # 2 should be false positive rate (x axis) and 1 should be true positive rate (yaxis)
+          # calculate the area under the plots
+          auc <- sum((roc[[2]] - dplyr::lag(roc[[2]])) * roc[[1]], na.rm = TRUE)
+        }
+        else {
+          predicted <- x$predictions
+        }
+        ret <- evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
+        if (x$classification_type == "binary") {
+          if (pretty.name) {
+            ret <- ret %>% mutate(AUC = auc)
+          }
+          else {
+            ret <- ret %>% mutate(auc = auc)
+          }
+        }
+        ret
       }
     },
     evaluation_by_class = {
       # get evaluation scores from training data
       actual <- x$y
-      predicted <- x$predictions
+      if (x$classification_type == "binary") {
+        predicted <- get_binary_predicted_value_from_probability(x)
+      }
+      else {
+        predicted <- x$predictions
+      }
 
       per_level <- function(class) {
         ret <- evaluate_classification(actual, predicted, class, pretty.name = pretty.name)
         ret
       }
-
-      if(x$classification_type == "binary") {
-        ret <- per_level(levels(actual)[2])
-        # remove class column
-        ret <- ret[, 2:6]
-        ret
-      } else {
-        dplyr::bind_rows(lapply(levels(actual), per_level))
-      }
+      dplyr::bind_rows(lapply(levels(actual), per_level))
     },
     conf_mat = {
       # return confusion matrix
+      if (x$classification_type == "binary") {
+        predicted <- get_binary_predicted_value_from_probability(x)
+      }
+      else {
+        predicted <- x$predictions
+      }
+
       ret <- data.frame(
         actual_value = x$y,
-        predicted_value = x$predictions
+        predicted_value = predicted
       ) %>%
         dplyr::filter(!is.na(predicted_value))
 
@@ -1074,9 +1120,15 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
     },
     scatter = {
       # return actual and predicted value pairs
+      if (x$classification_type == "binary") {
+        predicted <- get_binary_predicted_value_from_probability(x)
+      }
+      else {
+        predicted <- x$predictions
+      }
       ret <- data.frame(
         expected_value = x$y,
-        predicted_value = x$predictions
+        predicted_value = predicted
       ) %>%
         dplyr::filter(!is.na(predicted_value))
 

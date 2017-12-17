@@ -87,6 +87,12 @@ test_that("test calc_feature_imp predicting logical", {
                       num_2)
 
   conf_mat <- tidy(model_df, model, type = "conf_mat", pretty.name = TRUE)
+
+  # test get_binary_predicted_value_from_probability
+  model <- model_df$model[[1]]
+  predicted_values <- get_binary_predicted_value_from_probability(model)
+  expect_equal(levels(predicted_values), c("TRUE","FALSE"))
+
   ret <- model_df %>% rf_importance()
   ret <- model_df %>% rf_partial_dependence()
   ret <- model_df %>% rf_evaluation(pretty.name=TRUE)
