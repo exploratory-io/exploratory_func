@@ -188,6 +188,7 @@ refreshTwitterToken <- function(tokenFileId){
 #' @export
 getGoogleTokenForBigQuery <- function(tokenFileId="", useCache=TRUE){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
+
   clientId <- "1066595427418-aeppbdhi7bj7g0osn8jpj4p6r9vus7ci.apps.googleusercontent.com"
   secret <-  "wGVbD4fttv_shYreB3PXcjDY"
   scopeList = c("https://www.googleapis.com/auth/bigquery",
@@ -195,9 +196,27 @@ getGoogleTokenForBigQuery <- function(tokenFileId="", useCache=TRUE){
             "https://www.googleapis.com/auth/devstorage.read_write")
   appName = "google"
   endpointType = "google"
-  tokenFileName ="bigquery_token.rds"
-  token <-getOAuthToken(clientId, secret, appName, endpointType, scopeList, tokenFileName, tokenFileId, useCache)
-  token
+  # retrieve token info from environment
+  # main purpose is to enable server refresh
+  token_info <- getTokenInfo("googlebigquery") # this should be googlesheets but our plunin is already named googlebigquery
+  if(!is.null(token_info)){
+    HttrOAuthToken2.0$new(
+      authorize = "https://accounts.google.com/o/oauth2/auth",
+      access = "https://accounts.google.com/o/oauth2/token",
+      validate = "https://www.googleapis.com/oauth2/v1/tokeninfo",
+      revoke = "https://accounts.google.com/o/oauth2/revoke",
+      appname = appName,
+      credentials = list(
+        access_token = token_info$access_token,
+        refresh_token = token_info$refresh_token,
+        token_type = token_info$token_type,
+        expires_in = token_info$expires_in
+      )
+    )
+  } else {
+    tokenFileName ="bigquery_token.rds"
+    getOAuthToken(clientId, secret, appName, endpointType, scopeList, tokenFileName, tokenFileId, useCache)
+  }
 }
 
 #' API to refresh token
