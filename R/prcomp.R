@@ -81,11 +81,11 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=5000, pretty.n
           # make categorical columns into factor with NA level, so that legend will show NA.
           # if we leave them as real NA, legend for NA would not be shown on biplot chart,
           # since we supress it not to show NAs from the lines for measures.
-          res[[orig_col]] <- forcats::fct_explicit_na(as.factor(res[[orig_col]]))
+          res[[orig_col]] <- forcats::fct_explicit_na(as.factor(res[[orig_col]]), na_level="(NA)")
         }
         else {
           # make logical columns into factor with NA level, so that legend will show NA.
-          res[[orig_col]] <- forcats::fct_explicit_na(factor(res[[orig_col]], levels = c("TRUE","FALSE")))
+          res[[orig_col]] <- forcats::fct_explicit_na(factor(res[[orig_col]], levels = c("TRUE","FALSE")), na_level="(NA)")
         }
       }
     }
