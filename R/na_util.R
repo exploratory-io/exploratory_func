@@ -111,10 +111,28 @@ fill_between_v <- function(v, .direction="down") {
 fill_between <- function(df, ..., .direction="down") {
   # this evaluates select arguments like starts_with
   selected_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
+  grouped_col <- grouped_by(df)
 
-  # fill each specified columns.
-  for (col in selected_cols) {
-    df[[col]] <- fill_between_v(df[[col]], .direction=.direction)
+  each_func <- function(df) {
+    if(!is.null(grouped_col)){
+      # drop grouping columns
+      df <- df[, !colnames(df) %in% grouped_col]
+    }
+    # fill each specified columns.
+    for (col in selected_cols) {
+      df[[col]] <- fill_between_v(df[[col]], .direction=.direction)
+    }
+    df
   }
-  df
+
+  tmp_col <- avoid_conflict(colnames(df), "tmp_col")
+  df <- df %>%
+    dplyr::do_(.dots=setNames(list(~each_func(.)), tmp_col)) %>%
+    dplyr::ungroup()
+  df <- df %>%  unnest_with_drop_(tmp_col)
+
+  if (length(grouped_col) > 0) { # set group back
+    df <- df %>% group_by_(.dots=grouped_col)
+  }
+  df 
 }
