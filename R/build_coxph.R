@@ -72,10 +72,10 @@ build_coxph.fast <- function(df,
                     predictor_n = 12, # so that at least months can fit in it.
                     seed = 0
                     ){
-  # TODO: add test
   # TODO: cleanup code only aplicable to randomForest. this func was started from copy of calc_feature_imp, and still adjusting for lm. 
 
-  # this seems to be the new way of NSE column selection evaluation
+  # using the new way of NSE column selection evaluation
+  # ref: http://dplyr.tidyverse.org/articles/programming.html
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
   time_col <- dplyr::select_var(names(df), !! rlang::enquo(time))
   status_col <- dplyr::select_var(names(df), !! rlang::enquo(status))
