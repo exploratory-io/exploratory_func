@@ -51,7 +51,7 @@ build_lda <- function(df, document, token, count = NULL,
   colnames(df) <- make.unique(colnames(df), sep = "")
 
   if(!is.null(group_cols)){
-    df <- dplyr::group_by(df, !!!(colnames(df)[group_col_index]))
+    df <- dplyr::group_by_(df, .dots =  colnames(df)[group_col_index])
   } else {
     df <- dplyr::ungroup(df)
   }

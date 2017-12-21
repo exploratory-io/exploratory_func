@@ -58,7 +58,7 @@ build_model_ <- function(data, model_func, seed = 0, test_rate = 0, group_cols =
   colnames(processed) <- make.unique(colnames(processed), sep = "")
 
   if(!is.null(group_cols)){
-    processed <- dplyr::group_by(processed, !!!(colnames(processed)[group_col_index]))
+    processed <- dplyr::group_by_(processed, .dots = colnames(processed)[group_col_index])
   } else if (!dplyr::is.grouped_df(processed)){
     # need to be grouped to nest
     processed <- processed %>%
