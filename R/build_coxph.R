@@ -68,7 +68,7 @@ build_coxph.fast <- function(df,
                     time,
                     status,
                     ...,
-                    max_nrow = 50000,
+                    max_nrow = 50000, # With 50000 rows, taking 6 to 7 seconds on late-2016 Macbook Pro.
                     predictor_n = 12, # so that at least months can fit in it.
                     seed = 0
                     ){
@@ -95,7 +95,7 @@ build_coxph.fast <- function(df,
     set.seed(seed)
   }
 
-  # check status_col. TODO revisit!!
+  # check status_col.
   if (!is.numeric(df[[status_col]]) && !is.logical(df[[status_col]])) {
     stop(paste0("Status column (", status_col, ")  must be logical or numeric with values of 1 (dead) or 0 (alive)."))
   }
@@ -153,8 +153,7 @@ build_coxph.fast <- function(df,
       df <- df %>%
         dplyr::filter(!is.na(df[[time_col]])) # this form does not handle group_by. so moved into each_func from outside.
 
-      # sample the data because randomForest takes long time
-      # if data size is too large #TODO: find appropriate size for cox.
+      # sample the data for performance if data size is too large.
       if (nrow(df) > max_nrow) {
         df <- df %>%
           dplyr::sample_n(max_nrow)
