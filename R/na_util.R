@@ -132,7 +132,11 @@ fill_between <- function(df, ..., .direction="down") {
   df <- df %>%  unnest_with_drop_(tmp_col)
 
   if (length(grouped_col) > 0) { # set group back
-    df <- df %>% group_by(!!!grouped_col)
+    # group_by_ fails with column name with space.
+    # tried group_by(!!!grouped_col), but
+    # this messes up the result of grouped_by().
+    # TODO: come up with a solution.
+    df <- df %>% group_by_(.dots=grouped_col)
   }
   df 
 }
