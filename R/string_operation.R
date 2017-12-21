@@ -156,8 +156,7 @@ do_tokenize <- function(df, input, token = "words", keep_cols = FALSE,  drop = T
     tokenize_df <- df[,c(doc_id, input_col)]
     sentences <- tidytext::unnest_tokens_(tokenize_df, output_col, input_col, token="sentences", drop=TRUE, ...)
 
-    # as.symbol is used for colum names with backticks
-    grouped <- dplyr::group_by_(sentences, .dots=list( as.symbol(doc_id)))
+    grouped <- dplyr::group_by(sentences, !!!doc_id)
 
     # put sentence_id
     sentence_id <- avoid_conflict(colnames(df), "sentence_id")

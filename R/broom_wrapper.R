@@ -445,7 +445,7 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
   colnames(ret)[colnames(ret) == ".cooksd"] <- avoid_conflict(colnames(ret), "cooks_distance")
   colnames(ret)[colnames(ret) == ".std.resid"] <- avoid_conflict(colnames(ret), "standardised_residuals")
 
-  dplyr::group_by_(ret, .dots = grouping_cols)
+  dplyr::group_by(ret, !!!grouping_cols)
 }
 
 #' prediction wrapper to set predicted labels
