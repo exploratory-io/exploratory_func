@@ -132,7 +132,7 @@ fill_between <- function(df, ..., .direction="down") {
   df <- df %>%  unnest_with_drop_(tmp_col)
 
   if (length(grouped_col) > 0) { # set group back
-    df <- df %>% group_by_(.dots=grouped_col)
+    df <- df %>% group_by(!!!grouped_col)
   }
   df 
 }
