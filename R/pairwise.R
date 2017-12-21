@@ -319,13 +319,15 @@ do_dist.cols <- function(df,
   grouped_column <- grouped_by(df)
   label_col <- col_name(substitute(label))
 
-  select_dots <- lazyeval::lazy_dots(...)
+  # using the new way of NSE column selection evaluation
+  # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
+  select_dots <- dplyr::select_vars(names(df), !!! rlang::quos(...))
 
   cnames <- avoid_conflict(grouped_column, c("pair.name.x", "pair.name.y", "value"))
 
   # this is executed on each group
   calc_dist_each <- function(df){
-    mat <- df %>%  dplyr::select_(.dots=select_dots) %>%  as.matrix()
+    mat <- df %>%  dplyr::select(!!!select_dots) %>%  as.matrix()
 
     # sort the column name so that the output of pair.name.1 and pair.name.2 will be sorted
     # it's better to be sorted so that heatmap in exploratory can be triangle if distinct is TRUE
