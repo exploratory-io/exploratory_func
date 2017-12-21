@@ -260,3 +260,30 @@ build_coxph.fast <- function(df,
 
   do_on_each_group(clean_df, each_func, name = "model", with_unnest = FALSE)
 }
+
+#' special version of tidy.lm function to use with build_coxph.fast.
+#' @export
+tidy.coxph_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
+  browser()
+  ret <- broom:::tidy.coxph(x) # it seems that tidy.lm takes care of glm too
+  ret <- ret %>% dplyr::mutate(
+    hazard_ratio = exp(estimate)
+  )
+  if (pretty.name){
+    colnames(ret)[colnames(ret) == "term"] <- "Term"
+    colnames(ret)[colnames(ret) == "statistic"] <- "t Ratio"
+    colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
+    colnames(ret)[colnames(ret) == "std.error"] <- "Std Error"
+    colnames(ret)[colnames(ret) == "estimate"] <- "Estimate"
+    colnames(ret)[colnames(ret) == "conf.low"] <- "Conf Low"
+    colnames(ret)[colnames(ret) == "conf.high"] <- "Conf High"
+    colnames(ret)[colnames(ret) == "hazard_ratio"] <- "Hazard Ratio"
+  } else {
+    colnames(ret)[colnames(ret) == "statistic"] <- "t_ratio"
+    colnames(ret)[colnames(ret) == "p.value"] <- "p_value"
+    colnames(ret)[colnames(ret) == "std.error"] <- "std_error"
+    colnames(ret)[colnames(ret) == "conf.low"] <- "conf_low"
+    colnames(ret)[colnames(ret) == "conf.high"] <- "conf_high"
+  }
+  ret
+}
