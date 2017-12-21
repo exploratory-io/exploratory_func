@@ -261,10 +261,9 @@ build_coxph.fast <- function(df,
   do_on_each_group(clean_df, each_func, name = "model", with_unnest = FALSE)
 }
 
-#' special version of tidy.lm function to use with build_coxph.fast.
+#' special version of tidy.coxph function to use with build_coxph.fast.
 #' @export
 tidy.coxph_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
-  browser()
   ret <- broom:::tidy.coxph(x) # it seems that tidy.lm takes care of glm too
   ret <- ret %>% dplyr::mutate(
     hazard_ratio = exp(estimate)
@@ -284,6 +283,45 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add tes
     colnames(ret)[colnames(ret) == "std.error"] <- "std_error"
     colnames(ret)[colnames(ret) == "conf.low"] <- "conf_low"
     colnames(ret)[colnames(ret) == "conf.high"] <- "conf_high"
+  }
+  ret
+}
+
+#' special version of glance.coxph function to use with build_coxph.fast.
+#' @export
+glance.coxph_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
+  ret <- broom:::glance.coxph(x, model, pretty.name = pretty.name, ...)
+
+  for(var in names(x$xlevels)) { # extract base levels info on factor/character columns from lm model
+    if(pretty.name) {
+      ret[paste0("Base Level of ", var)] <- x$xlevels[[var]][[1]]
+    }
+    else {
+      ret[paste0(var, "_base")] <- x$xlevels[[var]][[1]]
+    }
+  }
+  if(pretty.name) {
+    colnames(ret)[colnames(ret) == "r.squared"] <- "R Squared"
+    colnames(ret)[colnames(ret) == "adj.r.squared"] <- "Adj R Squared"
+    colnames(ret)[colnames(ret) == "sigma"] <- "Root Mean Square Error"
+    colnames(ret)[colnames(ret) == "statistic"] <- "F Ratio"
+    colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
+    colnames(ret)[colnames(ret) == "df"] <- "DF"
+    colnames(ret)[colnames(ret) == "logLik"] <- "Log Likelihood"
+    colnames(ret)[colnames(ret) == "deviance"] <- "Deviance"
+    colnames(ret)[colnames(ret) == "df.residual"] <- "Residual DF"
+    # for coxph
+    colnames(ret)[colnames(ret) == "n"] <- "Number of Rows"
+    colnames(ret)[colnames(ret) == "nevent"] <- "Number of Events"
+    colnames(ret)[colnames(ret) == "statistic.log"] <- "Likelihood Ratio Test"
+    colnames(ret)[colnames(ret) == "p.value.log"] <- "Likelihood Ratio Test P Value"
+    colnames(ret)[colnames(ret) == "statistic.sc"] <- "Score Test"
+    colnames(ret)[colnames(ret) == "p.value.sc"] <- "Score Test P Value"
+    colnames(ret)[colnames(ret) == "statistic.wald"] <- "Wald Test"
+    colnames(ret)[colnames(ret) == "p.value.wald"] <- "Wald Test P Value"
+    colnames(ret)[colnames(ret) == "r.squared.max"] <- "R Squared Max"
+    colnames(ret)[colnames(ret) == "concordance"] <- "Concordance"
+    colnames(ret)[colnames(ret) == "std.error.concordance"] <- "Std Error Concordance"
   }
   ret
 }
