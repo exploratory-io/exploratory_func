@@ -6,7 +6,7 @@
 #' "days", "weeks", "months" or "years" uses a number and get data from that time ago.
 #' @param date_since From when data should be returned.
 #' @export
-get_stripe_data <- function(endpoint,
+get_stripe_data <- function(endpoint = "balance/history"",
                             date_type = "exact",
                             date_since = NULL,
                             query_string = ""
