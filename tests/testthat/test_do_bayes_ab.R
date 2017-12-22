@@ -14,7 +14,8 @@ test_that("test do_bayes_ab test with summary output", {
   full_data <- dplyr::bind_rows(data_a, data_b) %>%
     mutate(grouping = rbinom(n(), 1, 0.3)) %>%
     group_by(grouping)
-  ret <- do_bayes_ab(full_data, group, access_count, click, type = "summary")
+  full_data <- full_data %>% rename(`access count`=access_count, `cli ck`=click)
+  ret <- do_bayes_ab(full_data, group, `access count`, `cli ck`, type = "summary")
   expect_equal(nrow(ret), 4)
 })
 
