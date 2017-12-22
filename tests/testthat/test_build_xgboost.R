@@ -128,10 +128,11 @@ test_that("test build_xgboost", {
     class = c("tbl_df", "tbl", "data.frame"), .Names = c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE"))
 
   test_data[["weight"]] <- seq(nrow(test_data))
+  test_data <- test_data %>% rename(`CAN CELLED`=CANCELLED, `DIS TANCE`=DISTANCE)
   model_ret <- build_model(
     test_data,
     model_func = xgboost_binary,
-    formula = CANCELLED ~ DISTANCE,
+    formula = `CAN CELLED` ~ `DIS TANCE`,
     nrounds = 5,
     eval_metric = "auc",
     verbose = 0

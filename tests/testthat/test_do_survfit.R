@@ -26,7 +26,8 @@ test_that("test do_survfit", {
                                                                          "Ukraine", "United Arab Emirates", "United Kingdom", "United States",
                                                                          "Uruguay", "Venezuela", "Vietnam", "Zambia"), class = "factor")),
                     row.names = c(NA,-10L), class = c("tbl_df", "tbl", "data.frame"), .Names = c("weeks_on_service","is_churned", "os", "country"))
-  ret <- data %>% do_survfit(weeks_on_service, is_churned)
+  data <- data %>% rename(`weeks on service`=weeks_on_service, `is churned`=is_churned)
+  ret <- data %>% do_survfit(`weeks on service`, `is churned`)
 
 
 })

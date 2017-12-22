@@ -192,7 +192,8 @@ test_that("test fill_between with group_by", {
     c("a","a","a","a","a","b","b","b","b","b"),
     stringsAsFactors=FALSE
   )
-  #TODO when this is "col 1", "col-2", this test fails at group_by_ inside fill_between.
+  # TODO: this fails with following column name.
+  # colnames(test_data) <- c("col 1", "col-2")
   colnames(test_data) <- c("col1", "col2")
   ret <- test_data %>%
     group_by(`col2`) %>%

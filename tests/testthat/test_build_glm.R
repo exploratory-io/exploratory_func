@@ -8,7 +8,8 @@ test_that("test build_glm summary output ", {
     category = rep(letters[1:4], 5),
     with_NA = rep(c(letters[5:6], NA, NA), 5)
   )
-  trial <- test_df %>% build_glm(num1 ~ num2 + category + with_NA, weights = weights)
+  test_df <- test_df %>% rename(`num 1`=num1, `num 2`=num2)
+  trial <- test_df %>% build_glm(`num 1` ~ `num 2` + category + with_NA, weights = weights)
 
   expect_equal(colnames(trial), c(".test_index", "source.data", "model", ".model_metadata"))
 

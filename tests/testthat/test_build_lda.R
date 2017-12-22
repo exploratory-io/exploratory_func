@@ -17,8 +17,9 @@ test_that("build_lda", {
                                           )), .Names = c("LessonId", "Lesson"), row.names = c(102L, 337L,
                                                                                               289L, 1123L, 628L, 1257L, 812L, 1170L, 1616L, 619L), class = "data.frame")
 
+  input_df <- input_df %>% rename(`Lesson Id`=LessonId)
   tokenized <- input_df %>% do_tokenize(Lesson, keep_cols = TRUE)
-  ret <- build_lda(tokenized, LessonId, token, n_topics=3)
+  ret <- build_lda(tokenized, `Lesson Id`, token, n_topics=3)
   tidy_ret <- tidy(ret, model)
 
   expect_equal(colnames(tidy_ret), c("topic", "term", "beta"))

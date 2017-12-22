@@ -6,8 +6,9 @@ test_that("test do_apriori", {
     product = rep(paste("product",seq(5), sep=""), 12),
     number = seq(60)
   )
+  test_df <- test_df %>% rename(`na me`=name, `pro duct`=product)
   ret <- suppressWarnings({
-    do_apriori(test_df, name, product, min_support=0.000000000000000001)
+    do_apriori(test_df, `na me`, `pro duct`, min_support=0.000000000000000001)
   })
   expect_equal(colnames(ret), c("lhs", "rhs", "support", "confidence", "lift"))
   expect_true(is.character(ret[, "lhs"] ))

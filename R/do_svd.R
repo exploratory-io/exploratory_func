@@ -254,7 +254,9 @@ do_svd.cols <- function(df,
   grouped_col <- grouped_by(df)
   label_col <- col_name(substitute(label))
 
-  select_dots <- lazyeval::lazy_dots(...)
+  # using the new way of NSE column selection evaluation
+  # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
+  select_dots <- dplyr::select_vars(names(df), !!! rlang::quos(...))
 
   value_colname <- avoid_conflict(grouped_col, "value")
 
@@ -262,7 +264,7 @@ do_svd.cols <- function(df,
   do_svd_each <- function(df){
     # create matrix by selected columns
     selected_df <- df %>%
-      dplyr::select_(.dots=select_dots)
+      dplyr::select(!!!select_dots)
     matrix <- selected_df %>%
       as.matrix() %>%
       na.omit() # this removes rows which have any NA

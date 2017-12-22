@@ -215,7 +215,7 @@ assign_cluster <- function(df, source_data){
   }
 
   # drop unnecessary columns
-  df <- dplyr::select_(df, .dots = c("model", grouping_cols))
+  df <- dplyr::select(df, !!!c("model", grouping_cols))
   # augment data by each row
   # ungroup is needed because grouping is reseted by bind_cols
 
@@ -613,7 +613,7 @@ prediction_coxph <- function(df, time = NULL, threshold = 0.5, ...){
       ret <- ret %>% dplyr::mutate(predicted_probability = 1 - exp(-cumhaz_base * exp(predicted_value)))
       ret
     }))
-  ret <- ret %>% dplyr::select_(c("ret", group_by_names))
+  ret <- ret %>% dplyr::select(!!!c("ret", group_by_names))
   ret <- ret %>% unnest_with_drop()
 
   # set it back to non-group-by state that is same as predict() output.
@@ -811,7 +811,7 @@ model_stats <- function(df, pretty.name = FALSE, ...){
       }
       ret
     })) %>%
-    dplyr::select_(c("ret", group_by_names)) %>%
+    dplyr::select(!!!c("ret", group_by_names)) %>%
     unnest_with_drop()
 
   # set it back to non-group-by state that is same as glance() output.
