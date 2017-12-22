@@ -6,12 +6,13 @@ test_that("test do_svd skv with NA", {
     col = rep(paste("col", 1:3), each = 4),
     value = seq(12)
   )
+  test_df <- test_df %>% rename(`ro w`=row, `co l`=col, `val ue`=value)
 
   test_df$value[[3]] <- NA_real_
 
-  ret <- do_svd(test_df, skv = c("row", "col", "value"))
+  ret <- do_svd(test_df, skv = c("ro w", "co l", "val ue"))
 
-  expect_equal(colnames(ret), c("row", "new.dimension", "value.new"))
+  expect_equal(colnames(ret), c("ro w", "new.dimension", "value.new"))
 })
 
 

@@ -4,6 +4,9 @@
 context("test tidiers for gam")
 
 test_that("test glance", {
+  # TODO: with columns with space, error happens.
+  #mtcars2 <- mtcars %>% rename(`cy l`=cyl, `mp g`=mpg)
+  #gam_model <- mgcv::gam(data=mtcars2, `cy l`~`mp g`)
   gam_model <- mgcv::gam(data=mtcars, cyl~mpg)
   class(gam_model) <- c("gam_exploratory",class(gam_model))
   res <- broom::glance(gam_model)
