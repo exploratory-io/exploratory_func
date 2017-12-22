@@ -89,17 +89,19 @@ test_that("test another data frame prediction by multinom", {
                                     "race", "sex", "capital-gain", "capital-loss", "hours-per-week", "native-country", "is_greater_than_50k"
                          ),
                          row.names = c(NA, -10L), class = c("tbl_df", "tbl", "data.frame"))
+  train_data <- train_data %>% rename(`capital gain`=`capital-gain`)
   model_ret <- train_data %>%
     dplyr::group_by(sex) %>%
     dplyr::mutate(`education-num` = as.numeric(`education-num`)) %>%
-    dplyr::select(age, `hours-per-week`, `capital-loss`, `capital-gain`, relationship, `education-num`) %>%
-    build_multinom(formula = relationship ~ .)
+    dplyr::select(age, `hours-per-week`, `capital-loss`, `capital gain`, relationship, `education-num`) %>%
+    build_multinom(formula = relationship ~ age+`hours-per-week`+`capital-loss`+`capital gain`+`education-num`)
 
   expect_error({
     prediction(model_ret, data = "newdata", data_frame = test_data)
   })
 
   test_data[["education-num"]] <- as.numeric(test_data[["education-num"]])
+  test_data <- test_data %>% rename(`capital gain`=`capital-gain`)
   prediction_ret <- prediction(model_ret, data = "newdata", data_frame = test_data)
   expect_true(nrow(prediction_ret) > 1)
 })
