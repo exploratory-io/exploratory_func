@@ -8,7 +8,7 @@
 #' @param include_empty This works only when endpoint is export/1.0/campaignSubscriberActivity.
 #' If set to TRUE, a record for every email address sent to will be returned even if there is no activity data.
 #' @export
-get_mailchimp_data <- function(endpoint = "explort/1.0/list", date_type = "exact", date_since = NULL, include_empty = TRUE){
+get_mailchimp_data <- function(endpoint = "explort/1.0/list", date_type = "exact", date_since = NULL, include_empty = TRUE, ...){
   token_info <- getTokenInfo("mailchimp")
   # this is data center id like "us-13"
   dc <- ""

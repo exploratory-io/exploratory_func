@@ -19,7 +19,7 @@ uploadGoogleSheet <- function(filepath, title, overwrite = FALSE){
 #' @param firstRowAsHeader - argument to control if you want to treat first row as header
 #' @param commentChar - treat the character as comment.
 #' @export
-getGoogleSheet <- function(title, sheetName, skipNRows = 0, treatTheseAsNA, firstRowAsHeader = TRUE, commentChar, tokenFileId=NULL){
+getGoogleSheet <- function(title, sheetName, skipNRows = 0, treatTheseAsNA, firstRowAsHeader = TRUE, commentChar, tokenFileId=NULL, ...){
   if(!requireNamespace("googlesheets")){stop("package googlesheets must be installed.")}
   token <- getGoogleTokenForSheet(tokenFileId)
   googlesheets::gs_auth(token)
