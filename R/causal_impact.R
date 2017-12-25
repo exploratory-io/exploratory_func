@@ -278,7 +278,7 @@ do_market_impact_ <- function(df, time_col, value_col, market_col, target_market
 
   # grouping should be kept
   if(length(grouped_col) != 0){
-    ret <- dplyr::group_by_(ret, grouped_col)
+    ret <- dplyr::group_by(ret, !!!rlang::syms(grouped_col))
   }
   ret
 }
