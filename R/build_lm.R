@@ -54,7 +54,7 @@ build_lm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, gr
   colnames(data) <- make.unique(colnames(data), sep = "")
 
   if(!is.null(group_cols)){
-    data <- dplyr::group_by_(data, .dots =  colnames(data)[group_col_index])
+    data <- dplyr::group_by(data, !!!rlang::syms(colnames(data)[group_col_index]))
   } else if (!dplyr::is.grouped_df(data)) {
     # grouping is necessary for tidyr::nest to work so putting one value columns
     data <- data %>%
