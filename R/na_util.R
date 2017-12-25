@@ -136,7 +136,7 @@ fill_between <- function(df, ..., .direction="down") {
     # tried group_by(!!!grouped_col), but
     # this messes up the result of grouped_by().
     # TODO: come up with a solution.
-    df <- df %>% group_by_(.dots=grouped_col)
+    df <- df %>% group_by(!!!rlang::syms(grouped_col))
   }
   df 
 }

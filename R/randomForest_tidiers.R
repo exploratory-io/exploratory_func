@@ -672,7 +672,7 @@ rf_partial_dependence <- function(df, ...) { # TODO: write test for this.
     # add variable name to the group_by column, so that chart is repeated by the combination of group_by column and variable name.
     res[[grouped_col]] <- paste(as.character(res[[grouped_col]]), res$x_name)
     res[[grouped_col]] <- forcats::fct_inorder(factor(res[[grouped_col]])) # set order to appear as facets
-    res <- res %>% dplyr::group_by_(.dots=grouped_col) # put back group_by for consistency
+    res <- res %>% dplyr::group_by(!!!rlang::syms(grouped_col)) # put back group_by for consistency
   }
   else {
     res$x_name <- forcats::fct_inorder(factor(res$x_name)) # set order to appear as facets
