@@ -204,7 +204,7 @@ assign_cluster <- function(df, source_data){
   source <- if(any(colnames(source_data) %in% grouping_cols)){
     # nest the source data by each group
     source_data %>%
-      dplyr::group_by_(.dots = grouping_cols) %>%
+      dplyr::group_by(!!!rlang::syms(grouping_cols)) %>%
       tidyr::nest()
   } else {
     # put one value column so that all data can be nested
@@ -597,7 +597,7 @@ prediction_coxph <- function(df, time = NULL, threshold = 0.5, ...){
     df <- df %>% dplyr::mutate(dummy_group_col = 1) %>% dplyr::group_by(dummy_group_col)
   }
   else {
-    df <- df %>% dplyr::group_by_(group_by_names)
+    df <- df %>% dplyr::group_by(!!!rlang::syms(group_by_names))
   }
 
   # add predicted_probability, actual_status, and predicted_status
@@ -637,7 +637,7 @@ prediction_coxph <- function(df, time = NULL, threshold = 0.5, ...){
   }
   ret <- ret %>% dplyr::mutate(actual_status = if_else((.[[time_colname]] <= time & .[[status_colname]] == true_value), TRUE, if_else(.[[time_colname]] >= time, FALSE, NA)))
   if (length(group_by_names) > 0) {
-    ret <- ret %>% dplyr::group_by_(group_by_names) # group it back again.
+    ret <- ret %>% dplyr::group_by(!!!rlang::syms(group_by_names)) # group it back again.
   }
 
   if (is.numeric(true_value)) {
@@ -791,7 +791,7 @@ model_stats <- function(df, pretty.name = FALSE, ...){
     df <- df %>% dplyr::mutate(dummy_group_col = 1) %>% dplyr::group_by(dummy_group_col)
   }
   else {
-    df <- df %>% dplyr::group_by_(group_by_names)
+    df <- df %>% dplyr::group_by(!!!rlang::syms(group_by_names))
   }
 
   ret <- df %>%
