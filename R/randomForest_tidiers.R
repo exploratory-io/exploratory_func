@@ -708,7 +708,8 @@ do_smote <- function(df,
     }
     else if(!is.factor(df[[col]])) {
       # columns other than numeric have to be factor. otherwise ubSMOTE throws mysterious error like "invalid 'labels'; length 0 should be 1 or 2"
-      df[[col]] <- factor(df[[col]])
+      # also, turn NA into explicit level. Otherwise ubSMOTE throws "invalid 'labels'; length 0 should be 1 or 2" for this case too.
+      df[[col]] <- forcats::fct_explicit_na(as.factor(df[[col]]))
     }
   }
   if (nrow(df) == 0) { # if no rows are left, give up smote and return original df.
