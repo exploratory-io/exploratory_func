@@ -1,6 +1,7 @@
 #' Get mailchimp data
 #' @param endpoint Name of target data to access under api.mailchimp.com
-#' e.g. "reports", "lists/members"
+#' e.g. "reports"
+#' default is export/1.0/list, which is for "members"
 #' @param date_type Type of date_since argument. Can be "exact", "days", "weeks", "months" or "years".
 #' "exact" uses exact date like "2016-01-01".
 #' "days", "weeks", "months" or "years" uses a number and get data since that much time ago.
@@ -8,7 +9,7 @@
 #' @param include_empty This works only when endpoint is export/1.0/campaignSubscriberActivity.
 #' If set to TRUE, a record for every email address sent to will be returned even if there is no activity data.
 #' @export
-get_mailchimp_data <- function(endpoint, date_type = "exact", date_since = NULL, include_empty = TRUE){
+get_mailchimp_data <- function(endpoint = "export/1.0/list", date_type = "exact", date_since = NULL, include_empty = TRUE, ...){
   token_info <- getTokenInfo("mailchimp")
   # this is data center id like "us-13"
   dc <- ""
