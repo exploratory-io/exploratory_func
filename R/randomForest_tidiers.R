@@ -750,7 +750,7 @@ calc_feature_imp <- function(df,
                              target,
                              ...,
                              max_nrow = 50000, # down from 200000 when we added partial dependence
-                             max_sample_size = 25000, # down from 100000 when we added partial dependence
+                             max_sample_size = NULL, # half of max_nrow. down from 100000 when we added partial dependence
                              ntree = 20,
                              nodesize = 12,
                              target_n = 20,
@@ -941,6 +941,9 @@ calc_feature_imp <- function(df,
 
       # all or max_sample_size data will be used for randomForest
       # to grow a tree
+      if (is.null(max_sample_size)) { # default to half of max_nrow
+        max_sample_size = max_nrow/2
+      }
       sample.fraction <- min(c(max_sample_size / max_nrow, 1))
 
       rf <- ranger::ranger(
