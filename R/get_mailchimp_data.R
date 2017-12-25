@@ -1,6 +1,7 @@
 #' Get mailchimp data
 #' @param endpoint Name of target data to access under api.mailchimp.com
-#' e.g. "reports", "lists/members"
+#' e.g. "reports"
+#' default is export/1.0/list, which is for "members"
 #' @param date_type Type of date_since argument. Can be "exact", "days", "weeks", "months" or "years".
 #' "exact" uses exact date like "2016-01-01".
 #' "days", "weeks", "months" or "years" uses a number and get data since that much time ago.
