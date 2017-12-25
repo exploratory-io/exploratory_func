@@ -695,6 +695,10 @@ do_smote <- function(df,
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
   target_col <- dplyr::select_var(names(df), !! rlang::enquo(target))
   was_target_logical <- is.logical(df[[target_col]]) # record if the target was logical originally and turn it back to logical if so.
+  orig_levels_order <- NULL
+  if (is.factor(df[[target_col]])) { # if target is factor, remember original factor order and set it back later.
+    orig_levels_order <- levels(df[[target_col]])
+  }
 
   orig_df <- df
   for(col in colnames(df)){
@@ -728,10 +732,13 @@ do_smote <- function(df,
     return(orig_df)
   }
 
-  levels(df_balanced[[target_col]]) <- orig_levels # set original labels
+  levels(df_balanced[[target_col]]) <- orig_levels # set original labels before turning it into 0/1.
 
   if (was_target_logical) {
     df_balanced[[target_col]] <- as.logical(df_balanced[[target_col]]) # turn it back to logical.
+  }
+  if (!is.null(orig_levels_order)) { # if target was factor, set original factor order. note this is different from orig_levels.
+    df_balanced[[target_col]] <- forcats::fct_relevel(df_balanced[[target_col]], orig_levels_order)
   }
   df_balanced
 }
