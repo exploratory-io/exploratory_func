@@ -414,11 +414,12 @@ getDBConnection <- function(type, host, port, databaseName, username = "", passw
         }
         conn <- eval(parse(text=connstr))
       } else if (host != "") { # for dremio direct access
-        if(.Platform$OS.type == "windows"){ # Dremio Connector is only available for Win for now..
-          connstr <- "DRIVER=Dremio Connector"
-        } else {
-          connstr <- "DRIVER=Dremio ODBC Driver"
-        }
+        # Until Dremio ODBC Driver 1.3.14.1043 for Mac, Dremio ODBC driver's name was
+        # "Dremio ODBC Driver" on Mac, but it changed to "Dremio Connector", which is same as the Window version
+        # of their ODBC driver, at this version.
+        # So we no longer need to switch ODBC driver name by OS.
+        # We handled this change at v4.1.0.4 by releasing Mac only patch.
+        connstr <- "DRIVER=Dremio Connector"
         connstr <- stringr::str_c(connstr, ";HOST=", host, ";ConnectionType=Direct;AuthenticationType=Plain;Catalog=DREMIO;PORT=", port, ";UID=", username, ";PWD=", password)
         conn <- RODBC::odbcDriverConnect(connstr)
       }
