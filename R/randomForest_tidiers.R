@@ -737,7 +737,7 @@ do_smote <- function(df,
   if (was_target_logical) {
     df_balanced[[target_col]] <- as.logical(df_balanced[[target_col]]) # turn it back to logical.
   }
-  if (orig_levels_order) { # if target was factor, set original factor order. note this is different from orig_levels.
+  if (!is.null(orig_levels_order)) { # if target was factor, set original factor order. note this is different from orig_levels.
     df_balanced[[target_col]] <- forcats::fct_relevel(df_balanced[[target_col]], orig_levels_order)
   }
   df_balanced
