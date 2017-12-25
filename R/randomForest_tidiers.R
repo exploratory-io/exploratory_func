@@ -687,7 +687,7 @@ rf_partial_dependence <- function(df, ...) { # TODO: write test for this.
 #' applies SMOTE to a data frame
 #' @param target - the binary value column that becomes target of model later.
 #' @export
-do_smote <- function(df,
+exp_balance <- function(df,
                      target,
                      ...
                      ){
@@ -708,7 +708,8 @@ do_smote <- function(df,
     }
     else if(!is.factor(df[[col]])) {
       # columns other than numeric have to be factor. otherwise ubSMOTE throws mysterious error like "invalid 'labels'; length 0 should be 1 or 2"
-      df[[col]] <- factor(df[[col]])
+      # also, turn NA into explicit level. Otherwise ubSMOTE throws "invalid 'labels'; length 0 should be 1 or 2" for this case too.
+      df[[col]] <- forcats::fct_explicit_na(as.factor(df[[col]]))
     }
   }
   if (nrow(df) == 0) { # if no rows are left, give up smote and return original df.
@@ -749,7 +750,7 @@ calc_feature_imp <- function(df,
                              target,
                              ...,
                              max_nrow = 50000, # down from 200000 when we added partial dependence
-                             max_sample_size = 25000, # down from 100000 when we added partial dependence
+                             max_sample_size = NULL, # half of max_nrow. down from 100000 when we added partial dependence
                              ntree = 20,
                              nodesize = 12,
                              target_n = 20,
@@ -930,7 +931,7 @@ calc_feature_imp <- function(df,
       # apply smote if this is binary classification
       unique_val <- unique(df[[clean_target_col]])
       if (smote && length(unique_val[!is.na(unique_val)]) == 2) {
-        df <- df %>% do_smote(clean_target_col)
+        df <- df %>% exp_balance(clean_target_col)
       }
 
       # build formula for randomForest
@@ -940,6 +941,9 @@ calc_feature_imp <- function(df,
 
       # all or max_sample_size data will be used for randomForest
       # to grow a tree
+      if (is.null(max_sample_size)) { # default to half of max_nrow
+        max_sample_size = max_nrow/2
+      }
       sample.fraction <- min(c(max_sample_size / max_nrow, 1))
 
       rf <- ranger::ranger(

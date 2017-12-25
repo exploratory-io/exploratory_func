@@ -3,21 +3,32 @@
 
 context("test tidiers for randomForest")
 
-test_that("test do_smote", {
+test_that("test exp_balance with character", {
   sample_data <- data.frame(
     y = c("a", "b", "b", "b", "b", "b"),
     num = runif(6)
   )
-  res <- do_smote(sample_data, y)
+  res <- exp_balance(sample_data, y)
   expect_equal(class(res), "data.frame")
 })
 
-test_that("test do_smote with logical", {
+test_that("test exp_balance with factor", {
+  sample_data <- data.frame(
+    y = factor(c("a", "b", "b", "b", "b", "b")),
+    num = runif(6)
+  )
+  res <- exp_balance(sample_data, y)
+  expect_equal(class(res), "data.frame")
+  expect_equal(class(res$y), "factor")
+  expect_equal(levels(res$y), c("a","b"))
+})
+
+test_that("test exp_balance with logical", {
   sample_data <- data.frame(
     y = c(TRUE, rep(FALSE,5)),
     num = runif(6)
   )
-  res <- do_smote(sample_data, y)
+  res <- exp_balance(sample_data, y)
   expect_equal(class(res), "data.frame")
   expect_equal(class(res$y), "logical")
   expect_equal(any(is.na(res$y)), FALSE) # no NA is expected
