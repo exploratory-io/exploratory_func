@@ -687,7 +687,7 @@ rf_partial_dependence <- function(df, ...) { # TODO: write test for this.
 #' applies SMOTE to a data frame
 #' @param target - the binary value column that becomes target of model later.
 #' @export
-do_smote <- function(df,
+exp_balance <- function(df,
                      target,
                      ...
                      ){
@@ -931,7 +931,7 @@ calc_feature_imp <- function(df,
       # apply smote if this is binary classification
       unique_val <- unique(df[[clean_target_col]])
       if (smote && length(unique_val[!is.na(unique_val)]) == 2) {
-        df <- df %>% do_smote(clean_target_col)
+        df <- df %>% exp_balance(clean_target_col)
       }
 
       # build formula for randomForest

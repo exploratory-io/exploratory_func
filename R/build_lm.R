@@ -309,7 +309,7 @@ build_lm.fast <- function(df,
       fml <- as.formula(paste0("`", clean_target_col, "` ~ ", rhs))
       if (!is.null(model_type) && model_type == "glm") {
         if (smote) {
-          df <- df %>% do_smote(clean_target_col)
+          df <- df %>% exp_balance(clean_target_col)
         }
         rf <- stats::glm(fml, data = df, family = "binomial") 
       }
