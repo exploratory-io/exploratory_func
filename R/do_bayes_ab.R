@@ -16,18 +16,18 @@
 #' @param seed Random seed for bayes test to estimate probability density.
 #' @export
 do_bayes_ab <- function(df, a_b_identifier, total_count, conversion_rate, prior_mean = NULL, prior_sd = NULL, type = "model", seed = 0, ...){
+  # this seems to be the new way of NSE column selection evaluation
+  # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
+  a_b_identifier_col <- dplyr::select_var(names(df), !! rlang::enquo(a_b_identifier))
+  total_count_col <- dplyr::select_var(names(df), !! rlang::enquo(total_count))
+  conversion_rate_col <- dplyr::select_var(names(df), !! rlang::enquo(conversion_rate))
+
   set.seed(seed)
 
   # when type is prior, no need to evaluate other parameters
   # but when prior_mean or prior_sd is NULL, it will be guessed by
   # conversion_rate_col, so this should be run
   if (type != "prior" || (is.null(prior_mean) || is.null(prior_sd))) {
-    # this seems to be the new way of NSE column selection evaluation
-    # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
-    a_b_identifier_col <- dplyr::select_var(names(df), !! rlang::enquo(a_b_identifier))
-    total_count_col <- dplyr::select_var(names(df), !! rlang::enquo(total_count))
-    conversion_rate_col <- dplyr::select_var(names(df), !! rlang::enquo(conversion_rate))
-
     # make a_b identifier column to factor if they are numeric or character
     if (is.character(df[[a_b_identifier_col]]) || is.numeric(df[[a_b_identifier_col]])) {
       df[[a_b_identifier_col]] <- forcats::fct_inorder(as.character(df[[a_b_identifier_col]]))
