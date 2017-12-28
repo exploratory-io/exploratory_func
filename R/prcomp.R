@@ -17,6 +17,9 @@ do_prcomp <- function(df,
 
   each_func <- function(df) {
     filtered_df <- df %>% tidyr::drop_na_(selected_cols) # TODO: take care of the case where values of a column are mostly NA
+    if (nrow(filtered_df) == 0) { # skip this group if no row is left.
+      return(NULL)
+    }
     # select_ was not able to handle space in target_col. let's do it in base R way.
     cleaned_df <- filtered_df[,colnames(filtered_df) %in% selected_cols, drop=FALSE]
 
@@ -27,6 +30,9 @@ do_prcomp <- function(df,
       if (length(unique_val) == 1) {
         cleaned_df <- cleaned_df[colnames(cleaned_df) != col]
       }
+    }
+    if (col(cleaned_df) == 0) { # skip this group if no column is left.
+      return(NULL)
     }
 
     fit <- prcomp(cleaned_df, scale=TRUE)
