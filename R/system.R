@@ -879,17 +879,17 @@ getDataFromGoogleBigQueryTableViaCloudStorage <- function(bucketProjectId, dataS
 
 #' Get data from google big query
 #' @param projectId - Google BigQuery project id
-#' @param sqlquery - SQL query to get data
-#' @param destination_table - Google BigQuery table where query result is saved
-#' @param page_size - Number of items per page.
-#' @param max_page - maximum number of pages to retrieve.
-#' @param write_deposition - controls how your BigQuery write operation applies to an existing table.
+#' @param query - SQL query to get data
+#' @param destinationTable - Google BigQuery table where query result is saved
+#' @param pageSize - Number of items per page.
+#' @param maxPage - maximum number of pages to retrieve.
+#' @param writeDeposition - controls how your BigQuery write operation applies to an existing table.
 #' @param tokenFileId - file id for auth token
 #' @param bucketProjectId - Id of the Project where Google Cloud Storage Bucket belongs
 #' @param bucket - Google Cloud Storage Bucket
 #' @param folder - Folder under Google Cloud Storage Bucket where temp files are extracted.
 #' @export
-executeGoogleBigQuery <- function(project, sqlquery, destination_table, page_size = 100000, max_page = 10, write_disposition = "WRITE_TRUNCATE", tokenFileId, bucketProjectId, bucket=NULL, folder=NULL, ...){
+executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 100000, maxPage = 10, writeDisposition = "WRITE_TRUNCATE", tokenFileId, bucketProjectId, bucket=NULL, folder=NULL, ...){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
   if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
@@ -900,13 +900,13 @@ executeGoogleBigQuery <- function(project, sqlquery, destination_table, page_siz
   # if bucket is set, use Google Cloud Storage for extract and download
   if(!is.null(bucket) && !is.na(bucket) && bucket != "" && !is.null(folder) && !is.na(folder) && folder != ""){
     # destination_table looks like 'exploratory-bigquery-project:exploratory_dataset.exploratory_bq_preview_table'
-    dataSetTable = stringr::str_split(stringr::str_replace(destination_table, stringr::str_c(bucketProjectId,":"),""),"\\.")
+    dataSetTable = stringr::str_split(stringr::str_replace(destinationTable, stringr::str_c(bucketProjectId,":"),""),"\\.")
     dataSet = dataSetTable[[1]][1]
     table = dataSetTable[[1]][2]
     bqtable <- NULL
-    sqlquery <- convertUserInputToUtf8(sqlquery)
+    query <- convertUserInputToUtf8(query)
     # submit a query to get a result (for refresh data frame case)
-    result <- exploratory::submitGoogleBigQueryJob(bucketProjectId, sqlquery, destination_table, write_disposition = "WRITE_TRUNCATE", tokenFileId);
+    result <- exploratory::submitGoogleBigQueryJob(bucketProjectId, query, destinationTable, writeDisposition = "WRITE_TRUNCATE", tokenFileId);
     # extranct result from Google BigQuery to Google Cloud Storage and import
     df <- getDataFromGoogleBigQueryTableViaCloudStorage(bucketProjectId, dataSet, table, bucket, folder, tokenFileId)
   } else {
@@ -914,10 +914,10 @@ executeGoogleBigQuery <- function(project, sqlquery, destination_table, page_siz
     bigrquery::set_access_cred(token)
     # check if the query contains special key word for standardSQL
     # If we do not pass the useLegaySql argument, bigrquery set TRUE for it, so we need to expliclity set it to make standard SQL work.
-    isStandardSQL <- stringr::str_detect(sqlquery, "#standardSQL")
+    isStandardSQL <- stringr::str_detect(query, "#standardSQL")
     # set envir = parent.frame() to get variables from users environment, not papckage environment
-    df <- bigrquery::query_exec(GetoptLong::qq(sqlquery, envir = parent.frame()), project = project, destination_table = destination_table,
-                                page_size = page_size, max_page = max_page, write_disposition = write_disposition, use_legacy_sql = isStandardSQL == FALSE)
+    df <- bigrquery::query_exec(GetoptLong::qq(query, envir = parent.frame()), project = project, destination_table = destinationTable,
+                                page_size = pageSize, max_page = maxPage, write_disposition = writeDisposition, use_legacy_sql = isStandardSQL == FALSE)
   }
   df
 }
