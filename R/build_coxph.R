@@ -101,7 +101,7 @@ build_coxph.fast <- function(df,
   }
   if (is.numeric(df[[status_col]])) {
     unique_val <- unique(df[[status_col]])
-    if (all(sort(unique_val[!is.na(unique_val)]) == c(0,1))) {
+    if (!all(sort(unique_val[!is.na(unique_val)]) == c(0,1))) {
       stop(paste0("Status column (", status_col, ")  must be logical or numeric with values of 1 (dead) or 0 (alive)."))
     }
   }
