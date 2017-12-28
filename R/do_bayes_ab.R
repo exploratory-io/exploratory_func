@@ -22,6 +22,11 @@ do_bayes_ab <- function(df, a_b_identifier, total_count, conversion_rate, prior_
   total_count_col <- dplyr::select_var(names(df), !! rlang::enquo(total_count))
   conversion_rate_col <- dplyr::select_var(names(df), !! rlang::enquo(conversion_rate))
 
+  df <- df %>%
+    dplyr::filter(!is.na(!!rlang::sym(a_b_identifier_col)) &
+                  !is.na(!!rlang::sym(total_count_col)) &
+                  !is.na(!!rlang::sym(conversion_rate_col)))
+
   set.seed(seed)
 
   # when type is prior, no need to evaluate other parameters
