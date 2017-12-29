@@ -101,7 +101,9 @@ build_coxph.fast <- function(df,
   }
   if (is.numeric(df[[status_col]])) {
     unique_val <- unique(df[[status_col]])
-    if (!all(sort(unique_val[!is.na(unique_val)]) == c(0,1))) {
+    sorted_unique_val <- sort(unique_val[!is.na(unique_val)])
+    if (!all(sorted_unique_val == c(0,1)) & !all(sorted_unique_val == c(1,2))) {
+      # we allow 1,2 too since survivial works with it, but we are not promoting it for simplicity.
       stop(paste0("Status column (", status_col, ")  must be logical or numeric with values of 1 (dead) or 0 (alive)."))
     }
   }
