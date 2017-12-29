@@ -938,7 +938,7 @@ calc_feature_imp <- function(df,
       # apply smote if this is binary classification
       unique_val <- unique(df[[clean_target_col]])
       if (smote && length(unique_val[!is.na(unique_val)]) == 2) {
-        df <- df %>% exp_balance(clean_target_col)
+        df <- df %>% exp_balance(clean_target_col, sample=FALSE) # since we already sampled, no further sample.
       }
 
       # build formula for randomForest
