@@ -107,7 +107,7 @@ test_that("test do_bayes_ab test with ", {
   full_data <- dplyr::bind_rows(data_a, data_b) %>%
     mutate(group = rbinom(n(), 1, 0.3)) %>%
     group_by(group)
-  ret <- do_bayes_ab(full_data, data_b, access_count, click, prior_mean = 0.5, prior_sd = 0.2, type = "prior")
+  ret <- do_bayes_ab(full_data, data_b, access_count, click_rate, prior_mean = 0.5, prior_sd = 0.2, type = "prior")
   expect_true(!all(ret$probability_density == 1))
 })
 
