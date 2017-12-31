@@ -703,7 +703,7 @@ exp_balance <- function(df,
   }
   grouped_col <- grouped_by(df)
 
-  do_causal_impact_each <- function(df) {
+  each_func <- function(df) {
 
     # sample data since smote can be slow when data is big.
     if (sample && nrow(df) > max_nrow) {
@@ -761,7 +761,7 @@ exp_balance <- function(df,
 
   tmp_col <- avoid_conflict(grouped_col, "tmp")
   ret <- df %>%
-    dplyr::do_(.dots=setNames(list(~do_causal_impact_each(.)), tmp_col)) %>%
+    dplyr::do_(.dots=setNames(list(~each_func(.)), tmp_col)) %>%
     dplyr::ungroup() %>%
     tidyr::unnest_(tmp_col)
 
