@@ -711,12 +711,14 @@ exp_balance <- function(df,
     }
 
     orig_df <- df
+    factorized_cols <- c()
     for(col in colnames(df)){
       if(is.numeric(df[[col]])) {
         # for numeric cols, filter NA rows. With NAs, ubSMOTE throws mysterious error like "invalid 'labels'; length 0 should be 1 or 2"
         df <- df %>% dplyr::filter(!is.na(df[[col]]) & !is.infinite(df[[col]]))
       }
       else if(!is.factor(df[[col]])) {
+        factorized_cols <- c(factorized_cols, col)
         # columns other than numeric have to be factor. otherwise ubSMOTE throws mysterious error like "invalid 'labels'; length 0 should be 1 or 2"
         # also, turn NA into explicit level. Otherwise ubSMOTE throws "invalid 'labels'; length 0 should be 1 or 2" for this case too.
         df <- df %>% dplyr::mutate(!!rlang::sym(col):=forcats::fct_explicit_na(as.factor(!!rlang::sym(col))))
@@ -750,6 +752,9 @@ exp_balance <- function(df,
     }
     if (!is.null(orig_levels_order)) { # if target was factor, set original factor order. note this is different from orig_levels.
       df_balanced[[target_col]] <- forcats::fct_relevel(df_balanced[[target_col]], orig_levels_order)
+    }
+    for(col in factorized_cols) { # set factorized columns back to character. TODO: take care of other types.
+      df_balanced[[col]] <- as.character(df_balanced[[col]])
     }
     df_balanced
   }
