@@ -837,6 +837,9 @@ calc_feature_imp <- function(df,
 
   each_func <- function(df) {
     tryCatch({
+      if (is.factor(df[[clean_target_col]])) { # to avoid error in edarf::partial_dependence(), remove levels that is not used in this group.
+        df[[clean_target_col]] <- forcats::fct_drop(df[[clean_target_col]])
+      }
       # sample the data because randomForest takes long time
       # if data size is too large
       if (nrow(df) > max_nrow) {
