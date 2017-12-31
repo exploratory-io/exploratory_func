@@ -764,6 +764,8 @@ exp_balance <- function(df,
   if(length(grouped_col) != 0){
     ret <- dplyr::group_by(ret, !!!rlang::syms(grouped_col))
   }
+  # bring target_col at the beginning
+  ret <- ret %>% select(!!rlang::sym(target_col), dplyr::everything())
   ret
 }
 
