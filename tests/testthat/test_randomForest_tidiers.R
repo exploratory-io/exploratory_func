@@ -9,7 +9,7 @@ test_that("test exp_balance with character", {
     num = runif(6)
   )
   res <- exp_balance(sample_data, y)
-  expect_equal(class(res), "data.frame")
+  expect_true("data.frame" %in% class(res))
 })
 
 test_that("test exp_balance with factor", {
@@ -18,7 +18,7 @@ test_that("test exp_balance with factor", {
     num = runif(6)
   )
   res <- exp_balance(sample_data, y)
-  expect_equal(class(res), "data.frame")
+  expect_true("data.frame" %in% class(res))
   expect_equal(class(res$y), "factor")
   expect_equal(levels(res$y), c("a","b"))
 })
@@ -29,7 +29,7 @@ test_that("test exp_balance with logical", {
     num = runif(6)
   )
   res <- exp_balance(sample_data, y)
-  expect_equal(class(res), "data.frame")
+  expect_true("data.frame" %in% class(res))
   expect_equal(class(res$y), "logical")
   expect_equal(any(is.na(res$y)), FALSE) # no NA is expected
 })

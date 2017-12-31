@@ -701,54 +701,70 @@ exp_balance <- function(df,
   if (is.factor(df[[target_col]])) { # if target is factor, remember original factor order and set it back later.
     orig_levels_order <- levels(df[[target_col]])
   }
+  grouped_col <- grouped_by(df)
 
-  # sample data since smote can be slow when data is big.
-  if (sample && nrow(df) > max_nrow) {
-    df <- df %>% dplyr::sample_n(max_nrow)
-  }
+  do_causal_impact_each <- function(df) {
 
-  orig_df <- df
-  for(col in colnames(df)){
-    if(is.numeric(df[[col]])) {
-      # for numeric cols, filter NA rows. With NAs, ubSMOTE throws mysterious error like "invalid 'labels'; length 0 should be 1 or 2"
-      df <- df %>% dplyr::filter(!is.na(df[[col]]) & !is.infinite(df[[col]]))
+    # sample data since smote can be slow when data is big.
+    if (sample && nrow(df) > max_nrow) {
+      df <- df %>% dplyr::sample_n(max_nrow)
     }
-    else if(!is.factor(df[[col]])) {
-      # columns other than numeric have to be factor. otherwise ubSMOTE throws mysterious error like "invalid 'labels'; length 0 should be 1 or 2"
-      # also, turn NA into explicit level. Otherwise ubSMOTE throws "invalid 'labels'; length 0 should be 1 or 2" for this case too.
-      df[[col]] <- forcats::fct_explicit_na(as.factor(df[[col]]))
+
+    orig_df <- df
+    for(col in colnames(df)){
+      if(is.numeric(df[[col]])) {
+        # for numeric cols, filter NA rows. With NAs, ubSMOTE throws mysterious error like "invalid 'labels'; length 0 should be 1 or 2"
+        df <- df %>% dplyr::filter(!is.na(df[[col]]) & !is.infinite(df[[col]]))
+      }
+      else if(!is.factor(df[[col]])) {
+        # columns other than numeric have to be factor. otherwise ubSMOTE throws mysterious error like "invalid 'labels'; length 0 should be 1 or 2"
+        # also, turn NA into explicit level. Otherwise ubSMOTE throws "invalid 'labels'; length 0 should be 1 or 2" for this case too.
+        df[[col]] <- forcats::fct_explicit_na(as.factor(df[[col]]))
+      }
     }
-  }
-  if (nrow(df) == 0) { # if no rows are left, give up smote and return original df.
-    return(orig_df) # TODO: we should throw error and let user know which columns with NAs to remove.
-  }
-  input  <- df[, !(names(df) %in% target_col), drop=FALSE] # drop=FALSE is to prevent input from turning into vector when only one column is left.
-  output <- factor(df[[target_col]])
-  output <- forcats::fct_infreq(output)
-  orig_levels <- levels(output)
-  levels(output) <- c("0", "1")
-  df_balanced <- unbalanced::ubSMOTE(input, output, ...) # defaults are, perc.over = 200, perc.under = 200, k = 5
-  df_balanced <- as.data.frame(df_balanced)
+    if (nrow(df) == 0) { # if no rows are left, give up smote and return original df.
+      return(orig_df) # TODO: we should throw error and let user know which columns with NAs to remove.
+    }
+    input  <- df[, !(names(df) %in% target_col), drop=FALSE] # drop=FALSE is to prevent input from turning into vector when only one column is left.
+    output <- factor(df[[target_col]])
+    output <- forcats::fct_infreq(output)
+    orig_levels <- levels(output)
+    levels(output) <- c("0", "1")
+    df_balanced <- unbalanced::ubSMOTE(input, output, ...) # defaults are, perc.over = 200, perc.under = 200, k = 5
+    df_balanced <- as.data.frame(df_balanced)
 
-  # revert the name changes made by ubSMOTE.
-  colnames(df_balanced) <- c(colnames(input), target_col)
+    # revert the name changes made by ubSMOTE.
+    colnames(df_balanced) <- c(colnames(input), target_col)
 
-  # verify that df_balanced still keeps 2 unique values. it seems that SMOTE sometimes undersamples majority too much till it becomes 0.
-  unique_val <- unique(df_balanced[[target_col]])
-  if (length(unique_val[!is.na(unique_val)]) <= 1) {
-    # in this case, give up SMOTE and return original. TODO: look into how to prevent this.
-    return(orig_df)
+    # verify that df_balanced still keeps 2 unique values. it seems that SMOTE sometimes undersamples majority too much till it becomes 0.
+    unique_val <- unique(df_balanced[[target_col]])
+    if (length(unique_val[!is.na(unique_val)]) <= 1) {
+      # in this case, give up SMOTE and return original. TODO: look into how to prevent this.
+      return(orig_df)
+    }
+
+    levels(df_balanced[[target_col]]) <- orig_levels # set original labels before turning it into 0/1.
+
+    if (was_target_logical) {
+      df_balanced[[target_col]] <- as.logical(df_balanced[[target_col]]) # turn it back to logical.
+    }
+    if (!is.null(orig_levels_order)) { # if target was factor, set original factor order. note this is different from orig_levels.
+      df_balanced[[target_col]] <- forcats::fct_relevel(df_balanced[[target_col]], orig_levels_order)
+    }
+    df_balanced
   }
 
-  levels(df_balanced[[target_col]]) <- orig_levels # set original labels before turning it into 0/1.
+  tmp_col <- avoid_conflict(grouped_col, "tmp")
+  ret <- df %>%
+    dplyr::do_(.dots=setNames(list(~do_causal_impact_each(.)), tmp_col)) %>%
+    dplyr::ungroup() %>%
+    tidyr::unnest_(tmp_col)
 
-  if (was_target_logical) {
-    df_balanced[[target_col]] <- as.logical(df_balanced[[target_col]]) # turn it back to logical.
+  # grouping should be kept
+  if(length(grouped_col) != 0){
+    ret <- dplyr::group_by(ret, !!!rlang::syms(grouped_col))
   }
-  if (!is.null(orig_levels_order)) { # if target was factor, set original factor order. note this is different from orig_levels.
-    df_balanced[[target_col]] <- forcats::fct_relevel(df_balanced[[target_col]], orig_levels_order)
-  }
-  df_balanced
+  ret
 }
 
 #' get feature importance for multi class classification using randomForest
