@@ -1194,6 +1194,9 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
         }
       }
       ret <- ret %>% tidyr::gather_("x_name", "x_value", var_cols, na.rm = TRUE, convert = FALSE)
+      # sometimes x_value comes as numeric and not character, and it was causing error from bind_rows internally done
+      # in tidy().
+      ret <- ret %>% dplyr::mutate(x_value = as.character(x_value))
       # convert must be FALSE for y to make sure y_name is always character. otherwise bind_rows internally done
       # in tidy() errors out because y_name can be, for example, mixture of logical and character.
       ret <- ret %>% tidyr::gather("y_name", "y_value", -x_name, -x_value, na.rm = TRUE, convert = FALSE)
