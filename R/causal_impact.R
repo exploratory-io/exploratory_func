@@ -32,7 +32,7 @@ tidy.bsts <- function(x) {
 
 #' NSE version of do_market_impact
 #' @export
-do_market_impact <- function(df, time, value, market, ...) {
+do_market_impact <- function(df, time, value = NULL, market, ...) { # value = NULL is necessary to take no column for Number of Rows aggregation
   time_col <- col_name(substitute(time))
   value_col <- col_name(substitute(value))
   market_col <- col_name(substitute(market))
