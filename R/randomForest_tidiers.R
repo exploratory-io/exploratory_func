@@ -718,20 +718,25 @@ exp_balance <- function(df,
       df <- df %>% dplyr::sample_n(max_nrow)
     }
 
-    orig_df <- df
     factorized_cols <- c()
     for(col in colnames(df)){
       if(col == target_col) { # skip target_col
       }
-      else if(is.numeric(df[[col]])) {
-        # for numeric cols, filter NA rows. With NAs, ubSMOTE throws mysterious error like "invalid 'labels'; length 0 should be 1 or 2"
-        df <- df %>% dplyr::filter(!is.na(df[[col]]) & !is.infinite(df[[col]]))
-      }
-      else if(!is.factor(df[[col]])) {
+      else if(!is.factor(df[[col]]) && is.numeric(df[[col]])) {
         factorized_cols <- c(factorized_cols, col)
         # columns other than numeric have to be factor. otherwise ubSMOTE throws mysterious error like "invalid 'labels'; length 0 should be 1 or 2"
         # also, turn NA into explicit level. Otherwise ubSMOTE throws "invalid 'labels'; length 0 should be 1 or 2" for this case too.
         df <- df %>% dplyr::mutate(!!rlang::sym(col):=forcats::fct_explicit_na(as.factor(!!rlang::sym(col))))
+      }
+    }
+
+    # record orig_df at this point so that the data type reverting works fine later when we have to return this instead of smoted df.
+    orig_df <- df
+
+    for(col in colnames(df)){
+      if(is.numeric(df[[col]])) {
+        # for numeric cols, filter NA rows. With NAs, ubSMOTE throws mysterious error like "invalid 'labels'; length 0 should be 1 or 2"
+        df <- df %>% dplyr::filter(!is.na(df[[col]]) & !is.infinite(df[[col]]))
       }
     }
     browser()
