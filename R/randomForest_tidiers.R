@@ -701,8 +701,11 @@ exp_balance <- function(df,
   was_target_character <- is.character(df[[target_col]])
   was_target_factor <- is.factor(df[[target_col]])
   was_target_numeric <- is.numeric(df[[target_col]])
+  if (was_target_numeric) { # if target is numeric, make if factor first, to remember original values as factor levels and set it back later.
+    df[[target_col]] <- factor(df[[target_col]])
+  }
   orig_levels_order <- NULL
-  if (was_target_factor) { # if target is factor, remember original factor order and set it back later.
+  if (was_target_factor || was_target_numeric) { # if target is factor, remember original factor order and set it back later.
     orig_levels_order <- levels(df[[target_col]])
   }
   grouped_col <- grouped_by(df)
@@ -765,6 +768,11 @@ exp_balance <- function(df,
     if (!is.null(orig_levels_order)) { # if target was factor, set original factor order. note this is different from orig_levels.
       df_balanced[[target_col]] <- forcats::fct_relevel(df_balanced[[target_col]], orig_levels_order)
     }
+    if (was_target_numeric) {
+      # turn it back to numeric. as.character is necessary to get back to original values rather than the factor level integer.
+      df_balanced[[target_col]] <- as.numeric(as.character(df_balanced[[target_col]]))
+    }
+
     for(col in factorized_cols) { # set factorized columns back to character. TODO: take care of other types.
       df_balanced[[col]] <- as.character(df_balanced[[col]])
     }
