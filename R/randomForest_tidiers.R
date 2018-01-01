@@ -685,7 +685,7 @@ rf_partial_dependence <- function(df, ...) { # TODO: write test for this.
 }
 
 #' applies SMOTE to a data frame
-#' @param target - the binary value column that becomes target of model later.
+#' @param target - the binary value column that becomes target of model later. can be logical, factor, character or numeric.
 #' @export
 exp_balance <- function(df,
                      target,
@@ -695,15 +695,20 @@ exp_balance <- function(df,
                      ) {
   # this seems to be the new way of NSE column selection evaluation
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
+  browser()
   target_col <- dplyr::select_var(names(df), !! rlang::enquo(target))
   was_target_logical <- is.logical(df[[target_col]]) # record if the target was logical originally and turn it back to logical if so.
+  was_target_character <- is.character(df[[target_col]])
+  was_target_factor <- is.factor(df[[target_col]])
+  was_target_numeric <- is.numeric(df[[target_col]])
   orig_levels_order <- NULL
-  if (is.factor(df[[target_col]])) { # if target is factor, remember original factor order and set it back later.
+  if (was_target_factor) { # if target is factor, remember original factor order and set it back later.
     orig_levels_order <- levels(df[[target_col]])
   }
   grouped_col <- grouped_by(df)
 
   each_func <- function(df) {
+    browser()
 
     # sample data since smote can be slow when data is big.
     if (sample && nrow(df) > max_nrow) {
@@ -713,7 +718,9 @@ exp_balance <- function(df,
     orig_df <- df
     factorized_cols <- c()
     for(col in colnames(df)){
-      if(is.numeric(df[[col]])) {
+      if(col == target_col) { # skip target_col
+      }
+      else if(is.numeric(df[[col]])) {
         # for numeric cols, filter NA rows. With NAs, ubSMOTE throws mysterious error like "invalid 'labels'; length 0 should be 1 or 2"
         df <- df %>% dplyr::filter(!is.na(df[[col]]) & !is.infinite(df[[col]]))
       }
@@ -724,6 +731,7 @@ exp_balance <- function(df,
         df <- df %>% dplyr::mutate(!!rlang::sym(col):=forcats::fct_explicit_na(as.factor(!!rlang::sym(col))))
       }
     }
+    browser()
     if (nrow(df) == 0) { # if no rows are left, give up smote and return original df.
       return(orig_df) # TODO: we should throw error and let user know which columns with NAs to remove.
     }
@@ -747,8 +755,12 @@ exp_balance <- function(df,
 
     levels(df_balanced[[target_col]]) <- orig_levels # set original labels before turning it into 0/1.
 
+    browser()
     if (was_target_logical) {
       df_balanced[[target_col]] <- as.logical(df_balanced[[target_col]]) # turn it back to logical.
+    }
+    if (was_target_character) {
+      df_balanced[[target_col]] <- as.character(df_balanced[[target_col]]) # turn it back to character 
     }
     if (!is.null(orig_levels_order)) { # if target was factor, set original factor order. note this is different from orig_levels.
       df_balanced[[target_col]] <- forcats::fct_relevel(df_balanced[[target_col]], orig_levels_order)
