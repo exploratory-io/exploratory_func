@@ -736,24 +736,26 @@ exp_balance <- function(df,
     }
     browser()
     if (nrow(df) == 0) { # if no rows are left, give up smote and return original df.
-      return(orig_df) # TODO: we should throw error and let user know which columns with NAs to remove.
+      df_balanced <- orig_df # TODO: we should throw error and let user know which columns with NAs to remove.
     }
-    input  <- df[, !(names(df) %in% target_col), drop=FALSE] # drop=FALSE is to prevent input from turning into vector when only one column is left.
-    output <- factor(df[[target_col]])
-    output <- forcats::fct_infreq(output)
-    orig_levels <- levels(output)
-    levels(output) <- c("0", "1")
-    df_balanced <- unbalanced::ubSMOTE(input, output, ...) # defaults are, perc.over = 200, perc.under = 200, k = 5
-    df_balanced <- as.data.frame(df_balanced)
+    else {
+      input  <- df[, !(names(df) %in% target_col), drop=FALSE] # drop=FALSE is to prevent input from turning into vector when only one column is left.
+      output <- factor(df[[target_col]])
+      output <- forcats::fct_infreq(output)
+      orig_levels <- levels(output)
+      levels(output) <- c("0", "1")
+      df_balanced <- unbalanced::ubSMOTE(input, output, ...) # defaults are, perc.over = 200, perc.under = 200, k = 5
+      df_balanced <- as.data.frame(df_balanced)
 
-    # revert the name changes made by ubSMOTE.
-    colnames(df_balanced) <- c(colnames(input), target_col)
+      # revert the name changes made by ubSMOTE.
+      colnames(df_balanced) <- c(colnames(input), target_col)
 
-    # verify that df_balanced still keeps 2 unique values. it seems that SMOTE sometimes undersamples majority too much till it becomes 0.
-    unique_val <- unique(df_balanced[[target_col]])
-    if (length(unique_val[!is.na(unique_val)]) <= 1) {
-      # in this case, give up SMOTE and return original. TODO: look into how to prevent this.
-      return(orig_df)
+      # verify that df_balanced still keeps 2 unique values. it seems that SMOTE sometimes undersamples majority too much till it becomes 0.
+      unique_val <- unique(df_balanced[[target_col]])
+      if (length(unique_val[!is.na(unique_val)]) <= 1) {
+        # in this case, give up SMOTE and return original. TODO: look into how to prevent this.
+        df_balanced <- orig_df
+      }
     }
 
     levels(df_balanced[[target_col]]) <- orig_levels # set original labels before turning it into 0/1.
