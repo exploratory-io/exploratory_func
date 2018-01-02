@@ -712,6 +712,7 @@ exp_balance <- function(df,
   grouped_col <- grouped_by(df)
 
   each_func <- function(df) {
+    browser()
 
     # sample data since smote can be slow when data is big.
     if (sample && nrow(df) > max_nrow) {
@@ -722,7 +723,7 @@ exp_balance <- function(df,
     for(col in colnames(df)){
       if(col == target_col) { # skip target_col
       }
-      else if(!is.factor(df[[col]]) && is.numeric(df[[col]])) {
+      else if(!is.factor(df[[col]]) && !is.numeric(df[[col]])) {
         factorized_cols <- c(factorized_cols, col)
         # columns other than numeric have to be factor. otherwise ubSMOTE throws mysterious error like "invalid 'labels'; length 0 should be 1 or 2"
         # also, turn NA into explicit level. Otherwise ubSMOTE throws "invalid 'labels'; length 0 should be 1 or 2" for this case too.
