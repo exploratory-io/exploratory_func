@@ -1,5 +1,7 @@
 context("test anomaly detection functions")
 
+#TODO write test to check that negative/positive anomaly is actuall negative/positive compared to expected values.
+
 test_that("do_anomary_detection with aggregation", {
   data("raw_data", package = "AnomalyDetection")
   raw_data$timestamp <- as.POSIXct(raw_data$timestamp)
