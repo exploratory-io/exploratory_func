@@ -694,6 +694,7 @@ exp_balance <- function(df,
                      verbose = FALSE,
                      ...
                      ) {
+  browser()
   # this seems to be the new way of NSE column selection evaluation
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
   target_col <- dplyr::select_var(names(df), !! rlang::enquo(target))
@@ -732,8 +733,13 @@ exp_balance <- function(df,
     # record orig_df at this point so that the data type reverting works fine later when we have to return this instead of smoted df.
     orig_df <- df
 
+    # filter rows after recording orig_df.
     for(col in colnames(df)){
-      if(is.numeric(df[[col]])) {
+      if(col == target_col) {
+        # filter NA rows from target column, regardless of the type.
+        df <- df %>% dplyr::filter(!is.na(df[[col]]))
+      }
+      else if(is.numeric(df[[col]])) {
         # for numeric cols, filter NA rows. With NAs, ubSMOTE throws mysterious error like "invalid 'labels'; length 0 should be 1 or 2"
         df <- df %>% dplyr::filter(!is.na(df[[col]]) & !is.infinite(df[[col]]))
       }
@@ -747,6 +753,7 @@ exp_balance <- function(df,
       output <- forcats::fct_infreq(output)
       orig_levels <- levels(output)
       levels(output) <- c("0", "1")
+      browser()
       df_balanced <- unbalanced::ubSMOTE(input, output, verbose=verbose, ...) # defaults are, perc.over = 200, perc.under = 200, k = 5
       df_balanced <- as.data.frame(df_balanced)
 
