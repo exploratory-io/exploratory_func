@@ -1139,7 +1139,6 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
       ret
     },
     evaluation = {
-      browser()
       # get evaluation scores from training data
       actual <- x$y
 
