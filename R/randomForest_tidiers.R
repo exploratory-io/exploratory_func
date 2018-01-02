@@ -1045,7 +1045,7 @@ calc_feature_imp <- function(df,
 #' TODO: use this other places doing similar thing.
 #' @export
 #' @param multi_class - TRUE when we need class and data_size, which we show for multiclass classification case.
-evaluate_classification <- function(actual, predicted, class, multi_class = TRUE, pretty.name = FALSE) {
+evaluate_classification <- function(actual, predicted, class, multi_class = TRUE, pretty.name = FALSE) { #TODO user better name for class not to confuse with class()
   tp <- sum(actual == class & predicted == class, na.rm = TRUE)
   tn <- sum(actual != class & predicted != class, na.rm = TRUE)
   fp <- sum(actual != class & predicted == class, na.rm = TRUE)
