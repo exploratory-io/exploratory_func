@@ -1137,7 +1137,12 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
           # 2 should be false positive rate (x axis) and 1 should be true positive rate (yaxis)
           # calculate the area under the plots
           auc <- sum((roc[[2]] - dplyr::lag(roc[[2]])) * roc[[1]], na.rm = TRUE)
-          ret <- evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
+          if (is.factor(x$y) && "TRUE" %in% levels(x$y)) { # target was logical and converted to factor.
+            ret <- evaluate_classification(actual, predicted, "TRUE", pretty.name = pretty.name)
+          }
+          else {
+            ret <- evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
+          }
         }
         else {
           predicted <- x$predictions
