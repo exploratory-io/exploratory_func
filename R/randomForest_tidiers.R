@@ -1120,6 +1120,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
       ret
     },
     evaluation = {
+      browser()
       # get evaluation scores from training data
       actual <- x$y
 
@@ -1136,11 +1137,12 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
           # 2 should be false positive rate (x axis) and 1 should be true positive rate (yaxis)
           # calculate the area under the plots
           auc <- sum((roc[[2]] - dplyr::lag(roc[[2]])) * roc[[1]], na.rm = TRUE)
+          ret <- evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
         }
         else {
           predicted <- x$predictions
+          ret <- evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
         }
-        ret <- evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
         if (x$classification_type == "binary") {
           if (pretty.name) {
             ret <- ret %>% mutate(AUC = auc)
