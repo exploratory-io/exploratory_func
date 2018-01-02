@@ -81,7 +81,6 @@ do_anomaly_detection_ <- function(
   # integrated into a function and used in do_anomaly_detection_each
   get_anomalies <- function(data, exp_value_tmp, direction, e_value, value_col, ...){
     # exp_value_tmp is temporary expected values to be overwritten
-    browser()
     anom <- tryCatch({
       AnomalyDetection::AnomalyDetectionTs(data, direction = direction, e_value = e_value, ...)$anoms
     }, error = function(e){
@@ -98,7 +97,6 @@ do_anomaly_detection_ <- function(
       val <- ifelse(ret, data[[value_col]], NA_real_)
       if(e_value){
         # replace anomaly values with expected values to create expected base line.
-        #expected_val <- ifelse(ret, anom[["expected_value"]], exp_value_tmp)
         expected_val <- exp_value_tmp
         anom_idx <- 1
         for (i in 1:length(ret)) {
