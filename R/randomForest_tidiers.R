@@ -1044,7 +1044,8 @@ calc_feature_imp <- function(df,
 #' TODO: not really for external use. hide it.
 #' TODO: use this other places doing similar thing.
 #' @export
-evaluate_classification <- function(actual, predicted, class, pretty.name = FALSE) {
+#' @param multi_class - TRUE when we need class and data_size, which we show for multiclass classification case.
+evaluate_classification <- function(actual, predicted, class, multi_class = TRUE, pretty.name = FALSE) { #TODO user better name for class not to confuse with class()
   tp <- sum(actual == class & predicted == class, na.rm = TRUE)
   tn <- sum(actual != class & predicted != class, na.rm = TRUE)
   fp <- sum(actual != class & predicted == class, na.rm = TRUE)
@@ -1070,22 +1071,41 @@ evaluate_classification <- function(actual, predicted, class, pretty.name = FALS
     f_score <- 0
   }
 
-  data_size <- sum(actual == class)
-
-  ret <- data.frame(
-    class,
-    f_score,
-    accuracy,
-    1- accuracy,
-    precision,
-    recall,
-    data_size
-  )
+  if (multi_class) {
+    data_size <- sum(actual == class)
+  
+    ret <- data.frame(
+      class,
+      f_score,
+      accuracy,
+      1- accuracy,
+      precision,
+      recall,
+      data_size
+    )
+  }
+  else { # class, data_size is not necessary when it is binary classification with TRUE/FALSE
+    ret <- data.frame(
+      f_score,
+      accuracy,
+      1- accuracy,
+      precision,
+      recall
+    )
+  }
 
   names(ret) <- if(pretty.name){
-    c("Class", "F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall", "Data Size")
+    if (multi_class) {
+      c("Class", "F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall", "Data Size")
+    } else {
+      c("F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall")
+    }
   } else {
-    c("class", "f_score", "accuracy_rate", "misclassification_rate", "precision", "recall", "data_size")
+    if (multi_class) {
+      c("class", "f_score", "accuracy_rate", "misclassification_rate", "precision", "recall", "data_size")
+    } else {
+      c("f_score", "accuracy_rate", "misclassification_rate", "precision", "recall")
+    }
   }
   ret
 }
@@ -1136,11 +1156,17 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
           # 2 should be false positive rate (x axis) and 1 should be true positive rate (yaxis)
           # calculate the area under the plots
           auc <- sum((roc[[2]] - dplyr::lag(roc[[2]])) * roc[[1]], na.rm = TRUE)
+          if (is.factor(x$y) && "TRUE" %in% levels(x$y)) { # target was logical and converted to factor.
+            ret <- evaluate_classification(actual, predicted, "TRUE", multi_class = FALSE, pretty.name = pretty.name)
+          }
+          else {
+            ret <- evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
+          }
         }
         else {
           predicted <- x$predictions
+          ret <- evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
         }
-        ret <- evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
         if (x$classification_type == "binary") {
           if (pretty.name) {
             ret <- ret %>% mutate(AUC = auc)
