@@ -1118,7 +1118,7 @@ typeConvert <- function(x) {
 
 #' Create a data frame from the given object that can be transformed to data frame.
 #' @export
-toDataFrame <- function(x) {
+toDataFrame <- function(x, guessDataType = TRUE) {
   if(is.data.frame(x)) {
     df <- x
   } else if (is.matrix(x)) {
@@ -1127,7 +1127,12 @@ toDataFrame <- function(x) {
     # just in case for other data type case in future
     df <- as.data.frame(x, stringsAsFactors = FALSE)
   }
-  return(typeConvert(df))
+  # if guessDataType is FALSE, return data frame as is.
+  if(guessDataType == FALSE){
+    df
+  } else {
+    typeConvert(df)
+  }
 }
 
 #' API to create a temporary environment for RDATA staging
