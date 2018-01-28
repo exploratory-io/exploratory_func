@@ -278,10 +278,17 @@ build_lm.fast <- function(df,
             df[[hour_col]] <- factor(lubridate::hour(df[[col]])) # treat hour as category
           }
           df[[col]] <- NULL # drop original Date/POSIXct column to pass SMOTE later.
-        } else if(!is.numeric(df[[col]])) {
+        } else if(is.factor(df[[col]])) {
           # 1. if the data is ordered factor, turn it into unordered. For ordered factor,
           #    lm/glm takes polynomial terms (Linear, Quadratic, Cubic, and so on) and use them as variables,
           #    which we do not want for this function.
+          if (length(levels(df[[col]]) >= 12) {
+            df[[col]] <- fct_other(factor(df[[col]], ordered=FALSE), keep=levels(df[[col]])[1:10])
+          }
+          else {
+            df[[col]] <- factor(df[[col]], ordered=FALSE)
+          }
+        } else if(!is.numeric(df[[col]])) {
           # 2. convert data to factor if predictors are not numeric or logical
           #    and limit the number of levels in factor by fct_lump.
           #    we use ties.method to handle the case where there are many unique values. (without it, they all survive fct_lump.)
