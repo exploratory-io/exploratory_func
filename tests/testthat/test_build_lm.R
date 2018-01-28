@@ -141,6 +141,7 @@ test_that("prediction with target column name with space by build_lm.fast", {
   # duplicate rows to make some predictable data
   # otherwise, the number of rows of the result of prediction becomes 0
   test_data <- dplyr::bind_rows(test_data, test_data)
+  test_data <- test_data %>% mutate(CARRIER = factor(CARRIER, ordered=TRUE)) # test handling of ordered factor
 
   model_data <- build_lm.fast(test_data, `CANCELLED X`, `Carrier Name`, CARRIER, DISTANCE)
   ret <- model_data %>% broom::glance(model)
@@ -164,6 +165,7 @@ test_that("prediction with glm model with SMOTE by build_lm.fast", {
   # duplicate rows to make some predictable data
   # otherwise, the number of rows of the result of prediction becomes 0
   test_data <- dplyr::bind_rows(test_data, test_data)
+  test_data <- test_data %>% mutate(CARRIER = factor(CARRIER, ordered=TRUE)) # test handling of ordered factor
 
   model_data <- build_lm.fast(test_data, `CANCELLED X`, `Carrier Name`, CARRIER, DISTANCE, model_type = "glm", smote=FALSE)
   ret <- model_data %>% broom::glance(model, pretty.name=TRUE)
