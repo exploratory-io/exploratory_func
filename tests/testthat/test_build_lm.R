@@ -145,6 +145,8 @@ test_that("prediction with target column name with space by build_lm.fast", {
 
   model_data <- build_lm.fast(test_data, `CANCELLED X`, `Carrier Name`, CARRIER, DISTANCE)
   ret <- model_data %>% broom::glance(model)
+  # TODO: the returned coefficients does not show all input variables. 
+  # most likely due to too few rows. look into it and add check for the values in the returned df. 
   ret <- model_data %>% broom::tidy(model)
   ret <- model_data %>% broom::augment(model)
 
