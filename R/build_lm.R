@@ -282,7 +282,7 @@ build_lm.fast <- function(df,
           # 1. if the data is ordered factor, turn it into unordered. For ordered factor,
           #    lm/glm takes polynomial terms (Linear, Quadratic, Cubic, and so on) and use them as variables,
           #    which we do not want for this function.
-          if (length(levels(df[[col]]) >= 12) {
+          if (length(levels(df[[col]])) >= 12) {
             df[[col]] <- fct_other(factor(df[[col]], ordered=FALSE), keep=levels(df[[col]])[1:10])
           }
           else {
