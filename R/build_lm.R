@@ -279,7 +279,8 @@ build_lm.fast <- function(df,
           }
           df[[col]] <- NULL # drop original Date/POSIXct column to pass SMOTE later.
         } else if(is.factor(df[[col]])) {
-          # 1. if the data is ordered factor, turn it into unordered. For ordered factor,
+          # 1. if the data is factor, respect the levels and keep first 10 levels, and make others "Others" level.
+          # 2. if the data is ordered factor, turn it into unordered. For ordered factor,
           #    lm/glm takes polynomial terms (Linear, Quadratic, Cubic, and so on) and use them as variables,
           #    which we do not want for this function.
           if (length(levels(df[[col]])) >= 12) {
@@ -289,12 +290,12 @@ build_lm.fast <- function(df,
             df[[col]] <- factor(df[[col]], ordered=FALSE)
           }
         } else if(!is.numeric(df[[col]])) {
-          # 2. convert data to factor if predictors are not numeric or logical
+          # 1. convert data to factor if predictors are not numeric or logical
           #    and limit the number of levels in factor by fct_lump.
           #    we use ties.method to handle the case where there are many unique values. (without it, they all survive fct_lump.)
           #    TODO: see if ties.method would make sense for calc_feature_imp.
-          # 3. turn NA into (Missing) factor level so that lm will not drop all the rows.
-          df[[col]] <- forcats::fct_explicit_na(forcats::fct_lump(factor(df[[col]], ordered=FALSE), n=predictor_n, ties.method="first"))
+          # 2. turn NA into (Missing) factor level so that lm will not drop all the rows.
+          df[[col]] <- forcats::fct_explicit_na(forcats::fct_lump(as.factor(df[[col]]), n=predictor_n, ties.method="first"))
         } else {
           # for numeric cols, filter NA rows, because lm will anyway do this internally, and errors out
           # if the remaining rows are with single value in any predictor column.
