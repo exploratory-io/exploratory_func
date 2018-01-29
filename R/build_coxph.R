@@ -209,16 +209,24 @@ build_coxph.fast <- function(df,
             df[[hour_col]] <- factor(lubridate::hour(df[[col]])) # treat hour as category
           }
           df[[col]] <- NULL # drop original Date/POSIXct column to pass SMOTE later.
-        } else if(!is.numeric(df[[col]])) {
-          # 1. if the data is ordered factor, turn it into unordered. For ordered factor,
+        } else if(is.factor(df[[col]])) {
+          # 1. if the data is factor, respect the levels and keep first 10 levels, and make others "Others" level.
+          # 2. if the data is ordered factor, turn it into unordered. For ordered factor,
           #    coxph takes polynomial terms (Linear, Quadratic, Cubic, and so on) and use them as variables,
           #    which we do not want for this function.
-          # 2. convert data to factor if predictors are not numeric or logical
+          if (length(levels(df[[col]])) >= 12) {
+            df[[col]] <- fct_other(factor(df[[col]], ordered=FALSE), keep=levels(df[[col]])[1:10])
+          }
+          else {
+            df[[col]] <- factor(df[[col]], ordered=FALSE)
+          }
+        } else if(!is.numeric(df[[col]])) {
+          # 1. convert data to factor if predictors are not numeric or logical
           #    and limit the number of levels in factor by fct_lump.
           #    we use ties.method to handle the case where there are many unique values. (without it, they all survive fct_lump.)
           #    TODO: see if ties.method would make sense for calc_feature_imp.
-          # 3. turn NA into (Missing) factor level so that lm will not drop all the rows.
-          df[[col]] <- forcats::fct_explicit_na(forcats::fct_lump(factor(df[[col]], ordered=FALSE), n=predictor_n, ties.method="first"))
+          # 2. turn NA into (Missing) factor level so that coxph will not drop all the rows.
+          df[[col]] <- forcats::fct_explicit_na(forcats::fct_lump(as.factor(df[[col]]), n=predictor_n, ties.method="first"))
         } else {
           # for numeric cols, filter NA rows, because lm will anyway do this internally, and errors out
           # if the remaining rows are with single value in any predictor column.
