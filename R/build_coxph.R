@@ -188,12 +188,12 @@ build_coxph.fast <- function(df,
 
           c_cols <- c(c_cols, absolute_time_col, wday_col, day_col, yday_col, month_col, year_col)
           df[[absolute_time_col]] <- as.numeric(df[[col]])
-          # turn it into character since if it is factor, the name of term is broken
-          df[[wday_col]] <- as.character(lubridate::wday(df[[col]], label=TRUE))
+          # turn it into unordered factor since if it is ordered factor, the name of term is broken
+          df[[wday_col]] <- factor(lubridate::wday(df[[col]], label=TRUE), ordered=FALSE)
           df[[day_col]] <- lubridate::day(df[[col]])
           df[[yday_col]] <- lubridate::yday(df[[col]])
-          # turn it into character since if it is factor, the name of term is broken
-          df[[month_col]] <- as.character(lubridate::month(df[[col]], label=TRUE))
+          # turn it into unordered factor since if it is ordered factor, the name of term is broken
+          df[[month_col]] <- factor(lubridate::month(df[[col]], label=TRUE), ordered=FALSE)
           df[[year_col]] <- lubridate::year(df[[col]])
           if(lubridate::is.POSIXct(df[[col]])) {
             hour_col <- avoid_conflict(colnames(df), paste0(col, "_hour"))
@@ -209,12 +209,23 @@ build_coxph.fast <- function(df,
             df[[hour_col]] <- factor(lubridate::hour(df[[col]])) # treat hour as category
           }
           df[[col]] <- NULL # drop original Date/POSIXct column to pass SMOTE later.
+        } else if(is.factor(df[[col]])) {
+          # 1. if the data is factor, respect the levels and keep first 10 levels, and make others "Others" level.
+          # 2. if the data is ordered factor, turn it into unordered. For ordered factor,
+          #    coxph takes polynomial terms (Linear, Quadratic, Cubic, and so on) and use them as variables,
+          #    which we do not want for this function.
+          if (length(levels(df[[col]])) >= 12) {
+            df[[col]] <- fct_other(factor(df[[col]], ordered=FALSE), keep=levels(df[[col]])[1:10])
+          }
+          else {
+            df[[col]] <- factor(df[[col]], ordered=FALSE)
+          }
         } else if(!is.numeric(df[[col]])) {
-          # convert data to factor if predictors are not numeric or logical
-          # and limit the number of levels in factor by fct_lump.
-          # we use ties.method to handle the case where there are many unique values. (without it, they all survive fct_lump.)
-          # TODO: see if ties.method would make sense for calc_feature_imp.
-          # also, turn NA into (Missing) factor level so that lm will not drop all the rows.
+          # 1. convert data to factor if predictors are not numeric or logical
+          #    and limit the number of levels in factor by fct_lump.
+          #    we use ties.method to handle the case where there are many unique values. (without it, they all survive fct_lump.)
+          #    TODO: see if ties.method would make sense for calc_feature_imp.
+          # 2. turn NA into (Missing) factor level so that coxph will not drop all the rows.
           df[[col]] <- forcats::fct_explicit_na(forcats::fct_lump(as.factor(df[[col]]), n=predictor_n, ties.method="first"))
         } else {
           # for numeric cols, filter NA rows, because lm will anyway do this internally, and errors out
