@@ -260,6 +260,7 @@ build_lm.fast <- function(df,
           # turn it into unordered factor since if it is ordered factor,
           # lm/glm takes polynomial terms (Linear, Quadratic, Cubic, and so on) and use them as variables,
           # which we do not want for this function.
+          # Reference: https://hlplab.wordpress.com/2008/01/28/the-mysterious-l-q-and-c/
           df[[wday_col]] <- factor(lubridate::wday(df[[col]], label=TRUE), ordered=FALSE)
           df[[day_col]] <- lubridate::day(df[[col]])
           df[[yday_col]] <- lubridate::yday(df[[col]])
