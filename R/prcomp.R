@@ -17,7 +17,11 @@ do_prcomp <- function(df,
 
   each_func <- function(df) {
     filtered_df <- df %>% tidyr::drop_na_(selected_cols) # TODO: take care of the case where values of a column are mostly NA
-    cleaned_df <- filtered_df %>% dplyr::select_(.dots=selected_cols)
+    if (nrow(filtered_df) == 0) { # skip this group if no row is left.
+      return(NULL)
+    }
+    # select_ was not able to handle space in target_col. let's do it in base R way.
+    cleaned_df <- filtered_df[,colnames(filtered_df) %in% selected_cols, drop=FALSE]
 
     # remove columns with only one unique value
     cols_copy <- colnames(cleaned_df)
@@ -26,6 +30,9 @@ do_prcomp <- function(df,
       if (length(unique_val) == 1) {
         cleaned_df <- cleaned_df[colnames(cleaned_df) != col]
       }
+    }
+    if (col(cleaned_df) == 0) { # skip this group if no column is left.
+      return(NULL)
     }
 
     fit <- prcomp(cleaned_df, scale=TRUE)
@@ -72,6 +79,23 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=5000, pretty.n
 
     # table of observations. bind original data so that color can be used later.
     res <- x$df
+
+    orig_cols <- colnames(res)
+    for (orig_col in orig_cols) {
+      if (!is.numeric(res[[orig_col]])) {
+        if (!is.logical(res[[orig_col]])) {
+          # make categorical columns into factor with NA level, so that legend will show NA.
+          # if we leave them as real NA, legend for NA would not be shown on biplot chart,
+          # since we supress it not to show NAs from the lines for measures.
+          res[[orig_col]] <- forcats::fct_explicit_na(as.factor(res[[orig_col]]), na_level="(NA)")
+        }
+        else {
+          # make logical columns into factor with NA level, so that legend will show NA.
+          res[[orig_col]] <- forcats::fct_explicit_na(factor(res[[orig_col]], levels = c("TRUE","FALSE")), na_level="(NA)")
+        }
+      }
+    }
+
     res <- res %>% dplyr::bind_cols(as.data.frame(scores_matrix))
     if (nrow(res) > score_n_sample) {
       res <- res %>% dplyr::sample_n(score_n_sample)

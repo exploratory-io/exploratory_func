@@ -97,15 +97,17 @@ test_that("test data frame prediction by xgboost with group", {
   model_ret <- train_data %>%
     dplyr::group_by(sex) %>%
     dplyr::mutate(`education-num` = as.numeric(`education-num`)) %>%
-    dplyr::select(age, `hours-per-week`, `capital-loss`, `capital-gain`, relationship, `education-num`) %>%
+    dplyr::rename(`hours per week` = `hours-per-week`) %>%
+    dplyr::select(age, `hours per week`, `capital-loss`, `capital-gain`, relationship, `education-num`) %>%
     build_model(
       model_func = xgboost_reg,
-      formula = age ~ .,
+      formula = age ~ `hours per week`+`capital-loss`+`capital-gain`+relationship+`education-num`,
       nrounds = 5,
       sparse = FALSE
     )
 
   test_data[["education-num"]] <- as.numeric(test_data[["education-num"]])
+  test_data <- test_data %>% dplyr::rename(`hours per week` = `hours-per-week`)
   prediction_ret <- prediction(model_ret, data = "newdata", data_frame = test_data)
   expect_true(!"source.data" %in% colnames(prediction_ret))
 })

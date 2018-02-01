@@ -125,7 +125,7 @@ sparse_cast <- function(data, row, col, val=NULL, fun.aggregate=sum, count = FAL
       fml <- as.formula(paste0("~", as.character(substitute(fun.aggregate)), "(", val, ")"))
 
       # execute the formula to each row and col pair
-      data <- dplyr::group_by_(data, .dots=list(as.symbol(row), as.symbol(col))) %>%
+      data <- dplyr::group_by(data, !!!rlang::syms(c(row, col))) %>%
         dplyr::summarise_(.dots=setNames(list(fml), val)) %>%
         dplyr::ungroup()
     }
@@ -276,7 +276,7 @@ group_exclude <- function(df, ...){
   excluded <- setdiff(colnames(df), cols)
   # exclude list column to avoid error from dplyr::group_by
   target <- excluded[!sapply(df[,excluded], is.list)]
-  dplyr::group_by_(df, .dots=target)
+  dplyr::group_by(df, !!!rlang::syms(target))
 }
 
 #' prevent conflict of 2 character vectors and avoid it by adding .new to elements in the second
@@ -457,6 +457,17 @@ list_concat <- function(..., collapse = FALSE){
   }
 
   ret
+}
+
+#' wrapper around sample_n to avoid error caused by fewer rows than size.
+#' @export
+sample_rows <- function(df, size, ...) {
+  if (nrow(df) > size) {
+    dplyr::sample_n(df, size, ...)
+  }
+  else {
+    df
+  }
 }
 
 #' replace sequence of spaces or periods with
@@ -877,7 +888,7 @@ pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = N
 
   # grouping should be kept
   if(length(grouped_col) != 0){
-    ret <- dplyr::group_by_(ret, grouped_col)
+    ret <- dplyr::group_by(ret, !!!rlang::syms(grouped_col))
   }
   ret
 }

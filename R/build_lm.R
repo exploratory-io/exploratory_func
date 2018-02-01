@@ -54,7 +54,7 @@ build_lm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, gr
   colnames(data) <- make.unique(colnames(data), sep = "")
 
   if(!is.null(group_cols)){
-    data <- dplyr::group_by_(data, .dots =  colnames(data)[group_col_index])
+    data <- dplyr::group_by(data, !!!rlang::syms(colnames(data)[group_col_index]))
   } else if (!dplyr::is.grouped_df(data)) {
     # grouping is necessary for tidyr::nest to work so putting one value columns
     data <- data %>%
@@ -309,7 +309,7 @@ build_lm.fast <- function(df,
       fml <- as.formula(paste0("`", clean_target_col, "` ~ ", rhs))
       if (!is.null(model_type) && model_type == "glm") {
         if (smote) {
-          df <- df %>% do_smote(clean_target_col)
+          df <- df %>% exp_balance(clean_target_col, sample=FALSE) # no further sampling
         }
         rf <- stats::glm(fml, data = df, family = "binomial") 
       }
@@ -387,6 +387,15 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add tes
   ret2 <- ret2[, 2:6]
   ret <- ret %>% bind_cols(ret2)
 
+  # calculate AUC from ROC
+  roc_df <- data.frame(actual = x$y, predicted_probability = x$fitted.value)
+  roc <- roc_df %>% do_roc_(actual_val_col = "actual", pred_prob_col = "predicted_probability")
+  # use numeric index so that it won't be disturbed by name change
+  # 2 should be false positive rate (x axis) and 1 should be true positive rate (yaxis)
+  # calculate the area under the plots
+  auc <- sum((roc[[2]] - dplyr::lag(roc[[2]])) * roc[[1]], na.rm = TRUE)
+  ret$auc <- auc
+
   for(var in names(x$xlevels)) { # extract base levels info on factor/character columns from lm model
     if(pretty.name) {
       ret[paste0("Base Level of ", var)] <- x$xlevels[[var]][[1]]
@@ -397,7 +406,7 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add tes
   }
 
   if(pretty.name) {
-    ret <- ret %>% dplyr::rename(`Null Deviance`=null.deviance, `DF for Null Model`=df.null, `Log Likelihood`=logLik, Deviance=deviance, `Residual DF`=df.residual)
+    ret <- ret %>% dplyr::rename(`Null Deviance`=null.deviance, `DF for Null Model`=df.null, `Log Likelihood`=logLik, Deviance=deviance, `Residual DF`=df.residual, `AUC`=auc)
   }
   ret
 }

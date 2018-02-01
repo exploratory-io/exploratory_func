@@ -1,12 +1,15 @@
 context("test anomaly detection functions")
 
+#TODO write test to check that negative/positive anomaly is actuall negative/positive compared to expected values.
+
 test_that("do_anomary_detection with aggregation", {
   data("raw_data", package = "AnomalyDetection")
   raw_data$timestamp <- as.POSIXct(raw_data$timestamp)
+  raw_data <- raw_data %>% rename(`time stamp`=timestamp) # test column name with space
   first_ten <- raw_data %>% dplyr::slice(1:10)
   raw_data <- dplyr::bind_rows(raw_data, first_ten)
   ret <- raw_data %>%
-    do_anomaly_detection(timestamp, e_value=TRUE, time_unit = "hour")
+    do_anomaly_detection(`time stamp`, e_value=TRUE, time_unit = "hour")
 })
 
 test_that("do_anomary_detection", {

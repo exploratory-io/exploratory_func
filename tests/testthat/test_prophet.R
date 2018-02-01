@@ -3,8 +3,9 @@ context("test prophet functions")
 test_that("do_prophet with aggregation", {
   data("raw_data", package = "AnomalyDetection")
   raw_data$timestamp <- as.POSIXct(raw_data$timestamp)
+  raw_data <- raw_data %>% rename(`time stamp`=timestamp, `cou nt`=count)
   ret <- raw_data %>%
-    do_prophet(timestamp, count, 10, time_unit = "day")
+    do_prophet(`time stamp`, `cou nt`, 10, time_unit = "day")
 })
 
 test_that("do_prophet grouped case", {

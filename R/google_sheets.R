@@ -10,13 +10,21 @@ uploadGoogleSheet <- function(filepath, title, overwrite = FALSE){
   sheet <- googlesheets::gs_upload(filepath, title, overwrite = overwrite)
 }
 
+#' API to get google sheet data
 #' @export
-getGoogleSheet <- function(title, sheetNumber, skipNRows, treatTheseAsNA, firstRowAsHeader, commentChar, tokenFileId=NULL){
+#' @param title name of a sheet on Google Sheets.
+#' @param sheetName name of a sheet of the Google Sheets
+#' @param skipNRows - rows to skip loading
+#' @param treatTheseAsNA - character vector that each item represents NA
+#' @param firstRowAsHeader - argument to control if you want to treat first row as header
+#' @param commentChar - treat the character as comment.
+#' @export
+getGoogleSheet <- function(title, sheetName, skipNRows = 0, treatTheseAsNA, firstRowAsHeader = TRUE, commentChar, tokenFileId=NULL, ...){
   if(!requireNamespace("googlesheets")){stop("package googlesheets must be installed.")}
   token <- getGoogleTokenForSheet(tokenFileId)
   googlesheets::gs_auth(token)
   gsheet <- googlesheets::gs_title(title)
-  df <- gsheet %>% googlesheets::gs_read(ws = sheetNumber, skip = skipNRows, na = treatTheseAsNA, col_names = firstRowAsHeader, comment = commentChar)
+  df <- gsheet %>% googlesheets::gs_read(ws = sheetName, skip = skipNRows, na = treatTheseAsNA, col_names = firstRowAsHeader, comment = commentChar)
   df
 }
 

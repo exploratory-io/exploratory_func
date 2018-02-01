@@ -134,7 +134,7 @@ readPasswordRDS = function(sourceName, userName){
 
 #' github issues plugin script
 #' @export
-getGithubIssues <- function(username, password, owner, repository){
+getGithubIssues <- function(username, password, owner, repository, ...){
   # read stored password
   loadNamespace("stringr")
   loadNamespace("httr")
@@ -195,7 +195,7 @@ getMongoURL <- function(host, port, database, username, pass, isSSL=FALSE, authS
 
 
 #' @export
-queryMongoDB <- function(host, port, database, collection, username, password, query = "{}", isFlatten, limit=0, isSSL=FALSE, authSource=NULL, fields="{}", sort="{}", skip=0, queryType = "find", pipeline="{}"){
+queryMongoDB <- function(host, port, database, collection, username, password, query = "{}", flatten, limit=100, isSSL=FALSE, authSource=NULL, fields="{}", sort="{}", skip=0, queryType = "find", pipeline="{}", ...){
   if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
   loadNamespace("jsonlite")
   if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
@@ -228,7 +228,7 @@ queryMongoDB <- function(host, port, database, collection, username, password, q
     stop(err)
   })
   result <-data
-  if (isFlatten) {
+  if (flatten) {
     result <- jsonlite::flatten(data)
   }
   if (nrow(result)==0) {
@@ -414,11 +414,12 @@ getDBConnection <- function(type, host, port, databaseName, username = "", passw
         }
         conn <- eval(parse(text=connstr))
       } else if (host != "") { # for dremio direct access
-        if(.Platform$OS.type == "windows"){ # Dremio Connector is only available for Win for now..
-          connstr <- "DRIVER=Dremio Connector"
-        } else {
-          connstr <- "DRIVER=Dremio ODBC Driver"
-        }
+        # Until Dremio ODBC Driver 1.3.14.1043 for Mac, Dremio ODBC driver's name was
+        # "Dremio ODBC Driver" on Mac, but it changed to "Dremio Connector", which is same as the Window version
+        # of their ODBC driver, at this version.
+        # So we no longer need to switch ODBC driver name by OS.
+        # We handled this change at v4.1.0.4 by releasing Mac only patch.
+        connstr <- "DRIVER=Dremio Connector"
         connstr <- stringr::str_c(connstr, ";HOST=", host, ";ConnectionType=Direct;AuthenticationType=Plain;Catalog=DREMIO;PORT=", port, ";UID=", username, ";PWD=", password)
         conn <- RODBC::odbcDriverConnect(connstr)
       }
@@ -605,7 +606,7 @@ executeGenericQuery <- function(type, host, port, databaseName, username, passwo
 }
 
 #' @export
-queryNeo4j <- function(host, port,  username, password, query, isSSL = FALSE){
+queryNeo4j <- function(host, port,  username, password, query, isSSL = FALSE, ...){
   if(!requireNamespace("RNeo4j")){stop("package RNeo4j must be installed.")}
   if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
 
@@ -627,7 +628,7 @@ queryNeo4j <- function(host, port,  username, password, query, isSSL = FALSE){
 
 
 #' @export
-queryMySQL <- function(host, port, databaseName, username, password, numOfRows = -1, query){
+queryMySQL <- function(host, port, databaseName, username, password, numOfRows = -1, query, ...){
   if(!requireNamespace("RMySQL")){stop("package RMySQL must be installed.")}
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
   if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
@@ -652,7 +653,7 @@ queryMySQL <- function(host, port, databaseName, username, password, numOfRows =
 }
 
 #' @export
-queryPostgres <- function(host, port, databaseName, username, password, numOfRows = -1, query){
+queryPostgres <- function(host, port, databaseName, username, password, numOfRows = -1, query, ...){
   if(!requireNamespace("RPostgreSQL")){stop("package RPostgreSQL must be installed.")}
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
   if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
@@ -676,7 +677,7 @@ queryPostgres <- function(host, port, databaseName, username, password, numOfRow
 }
 
 #' @export
-queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, query, stringsAsFactors = FALSE, host="", port=""){
+queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, query, stringsAsFactors = FALSE, host="", port="", ...){
   if(!requireNamespace("RODBC")){stop("package RODBC must be installed.")}
   if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
 
@@ -717,7 +718,7 @@ queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, q
 #' @param tokenFileId - File id for aut
 #' @param withSentiment - Whether there should be sentiment column caluculated by get_sentiment.
 #' @export
-getTwitter <- function(n=200, lang=NULL,  lastNDays=30, searchString, tokenFileId=NULL, withSentiment = FALSE){
+getTwitter <- function(n=200, lang=NULL,  lastNDays=30, searchString, tokenFileId=NULL, withSentiment = FALSE, ...){
   if(!requireNamespace("twitteR")){stop("package twitteR must be installed.")}
   loadNamespace("lubridate")
 
@@ -756,7 +757,7 @@ getTwitter <- function(n=200, lang=NULL,  lastNDays=30, searchString, tokenFileI
 
 #' API to submit a Google Big Query Job
 #' @export
-submitGoogleBigQueryJob <- function(project, sqlquery, destination_table, write_disposition = "WRITE_TRUNCATE", tokenFieldId){
+submitGoogleBigQueryJob <- function(project, sqlquery, destination_table, write_disposition = "WRITE_TRUNCATE", tokenFieldId, ...){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
   if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
@@ -863,7 +864,7 @@ saveGoogleBigQueryResultAs <- function(projectId, sourceDatasetId, sourceTableId
 #' @param folder - Folder under Google Cloud Storage Bucket where temp files are extracted.
 #' @param tokenFileId - file id for auth token
 #' @export
-getDataFromGoogleBigQueryTableViaCloudStorage <- function(bucketProjectId, dataSet, table, bucket, folder, tokenFileId){
+getDataFromGoogleBigQueryTableViaCloudStorage <- function(bucketProjectId, dataSet, table, bucket, folder, tokenFileId, ...){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
 
@@ -878,17 +879,17 @@ getDataFromGoogleBigQueryTableViaCloudStorage <- function(bucketProjectId, dataS
 
 #' Get data from google big query
 #' @param projectId - Google BigQuery project id
-#' @param sqlquery - SQL query to get data
-#' @param destination_table - Google BigQuery table where query result is saved
-#' @param page_size - Number of items per page.
-#' @param max_page - maximum number of pages to retrieve.
-#' @param write_deposition - controls how your BigQuery write operation applies to an existing table.
+#' @param query - SQL query to get data
+#' @param destinationTable - Google BigQuery table where query result is saved
+#' @param pageSize - Number of items per page.
+#' @param maxPage - maximum number of pages to retrieve.
+#' @param writeDeposition - controls how your BigQuery write operation applies to an existing table.
 #' @param tokenFileId - file id for auth token
 #' @param bucketProjectId - Id of the Project where Google Cloud Storage Bucket belongs
 #' @param bucket - Google Cloud Storage Bucket
 #' @param folder - Folder under Google Cloud Storage Bucket where temp files are extracted.
 #' @export
-executeGoogleBigQuery <- function(project, sqlquery, destination_table, page_size = 100000, max_page = 10, write_disposition = "WRITE_TRUNCATE", tokenFileId, bucketProjectId, bucket=NULL, folder=NULL){
+executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 100000, maxPage = 10, writeDisposition = "WRITE_TRUNCATE", tokenFileId, bucketProjectId, bucket=NULL, folder=NULL, ...){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
   if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
@@ -899,13 +900,13 @@ executeGoogleBigQuery <- function(project, sqlquery, destination_table, page_siz
   # if bucket is set, use Google Cloud Storage for extract and download
   if(!is.null(bucket) && !is.na(bucket) && bucket != "" && !is.null(folder) && !is.na(folder) && folder != ""){
     # destination_table looks like 'exploratory-bigquery-project:exploratory_dataset.exploratory_bq_preview_table'
-    dataSetTable = stringr::str_split(stringr::str_replace(destination_table, stringr::str_c(bucketProjectId,":"),""),"\\.")
+    dataSetTable = stringr::str_split(stringr::str_replace(destinationTable, stringr::str_c(bucketProjectId,":"),""),"\\.")
     dataSet = dataSetTable[[1]][1]
     table = dataSetTable[[1]][2]
     bqtable <- NULL
-    sqlquery <- convertUserInputToUtf8(sqlquery)
+    query <- convertUserInputToUtf8(query)
     # submit a query to get a result (for refresh data frame case)
-    result <- exploratory::submitGoogleBigQueryJob(bucketProjectId, sqlquery, destination_table, write_disposition = "WRITE_TRUNCATE", tokenFileId);
+    result <- exploratory::submitGoogleBigQueryJob(bucketProjectId, query, destinationTable, writeDisposition = "WRITE_TRUNCATE", tokenFileId);
     # extranct result from Google BigQuery to Google Cloud Storage and import
     df <- getDataFromGoogleBigQueryTableViaCloudStorage(bucketProjectId, dataSet, table, bucket, folder, tokenFileId)
   } else {
@@ -913,10 +914,10 @@ executeGoogleBigQuery <- function(project, sqlquery, destination_table, page_siz
     bigrquery::set_access_cred(token)
     # check if the query contains special key word for standardSQL
     # If we do not pass the useLegaySql argument, bigrquery set TRUE for it, so we need to expliclity set it to make standard SQL work.
-    isStandardSQL <- stringr::str_detect(sqlquery, "#standardSQL")
+    isStandardSQL <- stringr::str_detect(query, "#standardSQL")
     # set envir = parent.frame() to get variables from users environment, not papckage environment
-    df <- bigrquery::query_exec(GetoptLong::qq(sqlquery, envir = parent.frame()), project = project, destination_table = destination_table,
-                                page_size = page_size, max_page = max_page, write_disposition = write_disposition, use_legacy_sql = isStandardSQL == FALSE)
+    df <- bigrquery::query_exec(GetoptLong::qq(query, envir = parent.frame()), project = project, destination_table = destinationTable,
+                                page_size = pageSize, max_page = maxPage, write_disposition = writeDisposition, use_legacy_sql = isStandardSQL == FALSE)
   }
   df
 }
@@ -1117,7 +1118,7 @@ typeConvert <- function(x) {
 
 #' Create a data frame from the given object that can be transformed to data frame.
 #' @export
-toDataFrame <- function(x) {
+toDataFrame <- function(x, guessDataType = TRUE) {
   if(is.data.frame(x)) {
     df <- x
   } else if (is.matrix(x)) {
@@ -1126,7 +1127,12 @@ toDataFrame <- function(x) {
     # just in case for other data type case in future
     df <- as.data.frame(x, stringsAsFactors = FALSE)
   }
-  return(typeConvert(df))
+  # if guessDataType is FALSE, return data frame as is.
+  if(guessDataType == FALSE){
+    df
+  } else {
+    typeConvert(df)
+  }
 }
 
 #' API to create a temporary environment for RDATA staging

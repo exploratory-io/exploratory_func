@@ -17,7 +17,7 @@ do_princomp <- function(df,
 
   each_func <- function(df) {
     filtered_df <- df %>% drop_na_(selected_cols) # TODO: take care of the case where values of a column are mostly NA
-    cleaned_df <- filtered_df %>% dplyr::select_(.dots=selected_cols)
+    cleaned_df <- filtered_df %>% dplyr::select(!!!selected_cols)
 
     # remove columns with only one unique value
     cols_copy <- colnames(cleaned_df)

@@ -656,6 +656,12 @@ rf_evaluation <- function(data, ...) {
   tidy(data, model, type = "evaluation", ...)
 }
 
+#' wrapper for tidy type importance
+#' @export
+rf_evaluation_by_class <- function(data, ...) {
+  tidy(data, model, type = "evaluation_by_class", ...)
+}
+
 #' wrapper for tidy type partial dependence
 #' @export
 rf_partial_dependence <- function(df, ...) { # TODO: write test for this.
@@ -666,7 +672,7 @@ rf_partial_dependence <- function(df, ...) { # TODO: write test for this.
     # add variable name to the group_by column, so that chart is repeated by the combination of group_by column and variable name.
     res[[grouped_col]] <- paste(as.character(res[[grouped_col]]), res$x_name)
     res[[grouped_col]] <- forcats::fct_inorder(factor(res[[grouped_col]])) # set order to appear as facets
-    res <- res %>% dplyr::group_by_(.dots=grouped_col) # put back group_by for consistency
+    res <- res %>% dplyr::group_by(!!!rlang::syms(grouped_col)) # put back group_by for consistency
   }
   else {
     res$x_name <- forcats::fct_inorder(factor(res$x_name)) # set order to appear as facets
@@ -679,49 +685,122 @@ rf_partial_dependence <- function(df, ...) { # TODO: write test for this.
 }
 
 #' applies SMOTE to a data frame
-#' @param target - the binary value column that becomes target of model later.
+#' @param target - the binary value column that becomes target of model later. can be logical, factor, character or numeric.
 #' @export
-do_smote <- function(df,
+exp_balance <- function(df,
                      target,
+                     max_nrow=50000,
+                     sample=TRUE,
+                     verbose = FALSE,
                      ...
-                     ){
-  orig_df <- df
-  for(col in colnames(df)){
-    if(is.numeric(df[[col]])) {
-      # for numeric cols, filter NA rows. With NAs, ubSMOTE throws mysterious error like "invalid 'labels'; length 0 should be 1 or 2"
-      df <- df %>% dplyr::filter(!is.na(df[[col]]) & !is.infinite(df[[col]]))
-    }
-    else if(!is.factor(df[[col]])) {
-      # columns other than numeric have to be factor. otherwise ubSMOTE throws mysterious error like "invalid 'labels'; length 0 should be 1 or 2"
-      df[[col]] <- factor(df[[col]])
-    }
-  }
-  if (nrow(df) == 0) { # if no rows are left, give up smote and return original df.
-    return(orig_df) # TODO: we should throw error and let user know which columns with NAs to remove.
-  }
+                     ) {
   # this seems to be the new way of NSE column selection evaluation
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
   target_col <- dplyr::select_var(names(df), !! rlang::enquo(target))
-  input  <- df[, !(names(df) %in% target_col), drop=FALSE] # drop=FALSE is to prevent input from turning into vector when only one column is left.
-  output <- factor(df[[target_col]])
-  output <- forcats::fct_infreq(output)
-  orig_levels <- levels(output)
-  levels(output) <- c("0", "1")
-  df_balanced <- unbalanced::ubSMOTE(input, output, ...) # defaults are, perc.over = 200, perc.under = 200, k = 5
-  df_balanced <- as.data.frame(df_balanced)
+  was_target_logical <- is.logical(df[[target_col]]) # record if the target was logical originally and turn it back to logical if so.
+  was_target_character <- is.character(df[[target_col]])
+  was_target_factor <- is.factor(df[[target_col]])
+  was_target_numeric <- is.numeric(df[[target_col]])
+  if (was_target_numeric) { # if target is numeric, make if factor first, to remember original values as factor levels and set it back later.
+    df[[target_col]] <- factor(df[[target_col]])
+  }
+  orig_levels_order <- NULL
+  if (was_target_factor || was_target_numeric) { # if target is factor, remember original factor order and set it back later.
+    orig_levels_order <- levels(df[[target_col]])
+  }
+  grouped_col <- grouped_by(df)
 
-  # revert the name changes made by ubSMOTE.
-  colnames(df_balanced) <- c(colnames(input), target_col)
+  each_func <- function(df) {
 
-  # verify that df_balanced still keeps 2 unique values. it seems that SMOTE sometimes undersamples majority too much till it becomes 0.
-  unique_val <- unique(df_balanced[[target_col]])
-  if (length(unique_val[!is.na(unique_val)]) <= 1) {
-    # in this case, give up SMOTE and return original. TODO: look into how to prevent this.
-    return(orig_df)
+    # sample data since smote can be slow when data is big.
+    if (sample && nrow(df) > max_nrow) {
+      df <- df %>% dplyr::sample_n(max_nrow)
+    }
+
+    factorized_cols <- c()
+    for(col in colnames(df)){
+      if(col == target_col) { # skip target_col
+      }
+      else if(!is.factor(df[[col]]) && !is.numeric(df[[col]])) {
+        factorized_cols <- c(factorized_cols, col)
+        # columns other than numeric have to be factor. otherwise ubSMOTE throws mysterious error like "invalid 'labels'; length 0 should be 1 or 2"
+        # also, turn NA into explicit level. Otherwise ubSMOTE throws "invalid 'labels'; length 0 should be 1 or 2" for this case too.
+        df <- df %>% dplyr::mutate(!!rlang::sym(col):=forcats::fct_explicit_na(as.factor(!!rlang::sym(col))))
+      }
+    }
+
+    # record orig_df at this point so that the data type reverting works fine later when we have to return this instead of smoted df.
+    orig_df <- df
+
+    # filter rows after recording orig_df.
+    for(col in colnames(df)){
+      if(col == target_col) {
+        # filter NA rows from target column, regardless of the type.
+        df <- df %>% dplyr::filter(!is.na(df[[col]]))
+      }
+      else if(is.numeric(df[[col]])) {
+        # for numeric cols, filter NA rows. With NAs, ubSMOTE throws mysterious error like "invalid 'labels'; length 0 should be 1 or 2"
+        df <- df %>% dplyr::filter(!is.na(df[[col]]) & !is.infinite(df[[col]]))
+      }
+    }
+    if (nrow(df) == 0) { # if no rows are left, give up smote and return original df.
+      df_balanced <- orig_df # TODO: we should throw error and let user know which columns with NAs to remove.
+    }
+    else {
+      input  <- df[, !(names(df) %in% target_col), drop=FALSE] # drop=FALSE is to prevent input from turning into vector when only one column is left.
+      output <- factor(df[[target_col]])
+      output <- forcats::fct_infreq(output)
+      orig_levels <- levels(output)
+      levels(output) <- c("0", "1")
+      df_balanced <- unbalanced::ubSMOTE(input, output, verbose=verbose, ...) # defaults are, perc.over = 200, perc.under = 200, k = 5
+      df_balanced <- as.data.frame(df_balanced)
+
+      # revert the name changes made by ubSMOTE.
+      colnames(df_balanced) <- c(colnames(input), target_col)
+
+      # verify that df_balanced still keeps 2 unique values. it seems that SMOTE sometimes undersamples majority too much till it becomes 0.
+      unique_val <- unique(df_balanced[[target_col]])
+      if (length(unique_val[!is.na(unique_val)]) <= 1) {
+        # in this case, give up SMOTE and return original. TODO: look into how to prevent this.
+        df_balanced <- orig_df
+      }
+    }
+
+    levels(df_balanced[[target_col]]) <- orig_levels # set original labels before turning it into 0/1.
+
+    if (was_target_logical) {
+      df_balanced[[target_col]] <- as.logical(df_balanced[[target_col]]) # turn it back to logical.
+    }
+    if (was_target_character) {
+      df_balanced[[target_col]] <- as.character(df_balanced[[target_col]]) # turn it back to character 
+    }
+    if (!is.null(orig_levels_order)) { # if target was factor, set original factor order. note this is different from orig_levels.
+      df_balanced[[target_col]] <- forcats::fct_relevel(df_balanced[[target_col]], orig_levels_order)
+    }
+    if (was_target_numeric) {
+      # turn it back to numeric. as.character is necessary to get back to original values rather than the factor level integer.
+      df_balanced[[target_col]] <- as.numeric(as.character(df_balanced[[target_col]]))
+    }
+
+    for(col in factorized_cols) { # set factorized columns back to character. TODO: take care of other types.
+      df_balanced[[col]] <- as.character(df_balanced[[col]])
+    }
+    df_balanced
   }
 
-  levels(df_balanced[[target_col]]) <- orig_levels # set original labels
-  df_balanced
+  tmp_col <- avoid_conflict(grouped_col, "tmp")
+  ret <- df %>%
+    dplyr::do_(.dots=setNames(list(~each_func(.)), tmp_col)) %>%
+    dplyr::ungroup() %>%
+    tidyr::unnest_(tmp_col)
+
+  # grouping should be kept
+  if(length(grouped_col) != 0){
+    ret <- dplyr::group_by(ret, !!!rlang::syms(grouped_col))
+  }
+  # bring target_col at the beginning
+  ret <- ret %>% select(!!rlang::sym(target_col), dplyr::everything())
+  ret
 }
 
 #' get feature importance for multi class classification using randomForest
@@ -730,7 +809,7 @@ calc_feature_imp <- function(df,
                              target,
                              ...,
                              max_nrow = 50000, # down from 200000 when we added partial dependence
-                             max_sample_size = 25000, # down from 100000 when we added partial dependence
+                             max_sample_size = NULL, # half of max_nrow. down from 100000 when we added partial dependence
                              ntree = 20,
                              nodesize = 12,
                              target_n = 20,
@@ -789,6 +868,7 @@ calc_feature_imp <- function(df,
   clean_target_col <- name_map[target_col]
   clean_cols <- name_map[cols]
 
+  classification_type <- "multi" # default value. ignored when it is regression.
   # if target is numeric, it is regression but
   # if not, it is classification
   if (!is.numeric(clean_df[[clean_target_col]])) {
@@ -797,11 +877,21 @@ calc_feature_imp <- function(df,
       clean_df[[clean_target_col]] <- forcats::fct_explicit_na(forcats::fct_lump(
         as.factor(clean_df[[clean_target_col]]), n = target_n, ties.method="first"
       ))
+
+      if (length(unique(clean_df[[clean_target_col]])) == 2) {
+        classification_type <- "binary" 
+      }
+    }
+    else {
+      classification_type <- "binary" 
     }
   }
 
   each_func <- function(df) {
     tryCatch({
+      if (is.factor(df[[clean_target_col]])) { # to avoid error in edarf::partial_dependence(), remove levels that is not used in this group.
+        df[[clean_target_col]] <- forcats::fct_drop(df[[clean_target_col]])
+      }
       # sample the data because randomForest takes long time
       # if data size is too large
       if (nrow(df) > max_nrow) {
@@ -903,7 +993,7 @@ calc_feature_imp <- function(df,
       # apply smote if this is binary classification
       unique_val <- unique(df[[clean_target_col]])
       if (smote && length(unique_val[!is.na(unique_val)]) == 2) {
-        df <- df %>% do_smote(clean_target_col)
+        df <- df %>% exp_balance(clean_target_col, sample=FALSE) # since we already sampled, no further sample.
       }
 
       # build formula for randomForest
@@ -913,6 +1003,9 @@ calc_feature_imp <- function(df,
 
       # all or max_sample_size data will be used for randomForest
       # to grow a tree
+      if (is.null(max_sample_size)) { # default to half of max_nrow
+        max_sample_size = max_nrow/2
+      }
       sample.fraction <- min(c(max_sample_size / max_nrow, 1))
 
       rf <- ranger::ranger(
@@ -921,10 +1014,11 @@ calc_feature_imp <- function(df,
         importance = "impurity",
         num.trees = ntree,
         min.node.size = nodesize,
-        sample.fraction = sample.fraction
+        sample.fraction = sample.fraction,
+        probability = (classification_type == "binary") # build probability tree for AUC only for binary classification.
       )
       # these attributes are used in tidy of randomForest
-      rf$classification_type <- "multi"
+      rf$classification_type <- classification_type
       rf$terms_mapping <- names(name_map)
       rf$y <- model.response(model_df)
       names(rf$terms_mapping) <- name_map
@@ -950,7 +1044,8 @@ calc_feature_imp <- function(df,
 #' TODO: not really for external use. hide it.
 #' TODO: use this other places doing similar thing.
 #' @export
-evaluate_classification <- function(actual, predicted, class, pretty.name = FALSE) {
+#' @param multi_class - TRUE when we need class and data_size, which we show for multiclass classification case.
+evaluate_classification <- function(actual, predicted, class, multi_class = TRUE, pretty.name = FALSE) { #TODO user better name for class not to confuse with class()
   tp <- sum(actual == class & predicted == class, na.rm = TRUE)
   tn <- sum(actual != class & predicted != class, na.rm = TRUE)
   fp <- sum(actual != class & predicted == class, na.rm = TRUE)
@@ -964,7 +1059,7 @@ evaluate_classification <- function(actual, predicted, class, pretty.name = FALS
 
   recall <- tp / (tp + fn)
   # this avoids NA
-  if(tn+fn == 0) {
+  if(tp+fn == 0) {
     recall <- 0
   }
 
@@ -976,24 +1071,54 @@ evaluate_classification <- function(actual, predicted, class, pretty.name = FALS
     f_score <- 0
   }
 
-  data_size <- sum(actual == class)
-
-  ret <- data.frame(
-    class,
-    f_score,
-    accuracy,
-    1- accuracy,
-    precision,
-    recall,
-    data_size
-  )
+  if (multi_class) {
+    data_size <- sum(actual == class)
+  
+    ret <- data.frame(
+      class,
+      f_score,
+      accuracy,
+      1- accuracy,
+      precision,
+      recall,
+      data_size
+    )
+  }
+  else { # class, data_size is not necessary when it is binary classification with TRUE/FALSE
+    ret <- data.frame(
+      f_score,
+      accuracy,
+      1- accuracy,
+      precision,
+      recall
+    )
+  }
 
   names(ret) <- if(pretty.name){
-    c("Class", "F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall", "Data Size")
+    if (multi_class) {
+      c("Class", "F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall", "Data Size")
+    } else {
+      c("F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall")
+    }
   } else {
-    c("class", "f_score", "accuracy_rate", "misclassification_rate", "precision", "recall", "data_size")
+    if (multi_class) {
+      c("class", "f_score", "accuracy_rate", "misclassification_rate", "precision", "recall", "data_size")
+    } else {
+      c("f_score", "accuracy_rate", "misclassification_rate", "precision", "recall")
+    }
   }
   ret
+}
+
+# with binary probability prediction model from ranger, take the level with bigger probability as the predicted value.
+#' @export
+# not really an external function but exposing for test. TODO: find better way.
+get_binary_predicted_value_from_probability <- function(x) {
+  # x$predictions is 2-diminsional matrix with 2 columns for the 2 categories. values in the matrix is the probabilities.
+  # TODO: thought x$predictions was 3 dimensinal array with tree dimension from the doc and independently running ranger,
+  # but looks like it is already averaged? look into it.
+  predicted <- factor(x$forest$levels[apply(x$predictions, 1, function(x){if(x[1]>x[2]) 1 else 2})], levels=x$forest$levels)
+  predicted
 }
 
 #' @export
@@ -1021,28 +1146,66 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
       if(is.numeric(actual)){
         glance(x, pretty.name = pretty.name, ...)
       } else {
-        predicted <- x$predictions
-
-        per_level <- function(class) {
-          ret <- evaluate_classification(actual, predicted, class, pretty.name = pretty.name)
-          ret
+        if (x$classification_type == "binary") {
+          predicted <- get_binary_predicted_value_from_probability(x)
+          predicted_probability <- x$predictions[,1]
+          # calculate AUC from ROC
+          roc_df <- data.frame(actual = (as.integer(actual)==1), predicted_probability = predicted_probability)
+          roc <- roc_df %>% do_roc_(actual_val_col = "actual", pred_prob_col = "predicted_probability")
+          # use numeric index so that it won't be disturbed by name change
+          # 2 should be false positive rate (x axis) and 1 should be true positive rate (yaxis)
+          # calculate the area under the plots
+          auc <- sum((roc[[2]] - dplyr::lag(roc[[2]])) * roc[[1]], na.rm = TRUE)
+          if (is.factor(x$y) && "TRUE" %in% levels(x$y)) { # target was logical and converted to factor.
+            ret <- evaluate_classification(actual, predicted, "TRUE", multi_class = FALSE, pretty.name = pretty.name)
+          }
+          else {
+            ret <- evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
+          }
         }
-
-        if(x$classification_type == "binary") {
-          ret <- per_level(levels(actual)[2])
-          # remove class column
-          ret <- ret[, 2:6]
-          ret
-        } else {
-          dplyr::bind_rows(lapply(levels(actual), per_level))
+        else {
+          predicted <- x$predictions
+          ret <- evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
         }
+        if (x$classification_type == "binary") {
+          if (pretty.name) {
+            ret <- ret %>% mutate(AUC = auc)
+          }
+          else {
+            ret <- ret %>% mutate(auc = auc)
+          }
+        }
+        ret
       }
+    },
+    evaluation_by_class = {
+      # get evaluation scores from training data
+      actual <- x$y
+      if (x$classification_type == "binary") {
+        predicted <- get_binary_predicted_value_from_probability(x)
+      }
+      else {
+        predicted <- x$predictions
+      }
+
+      per_level <- function(class) {
+        ret <- evaluate_classification(actual, predicted, class, pretty.name = pretty.name)
+        ret
+      }
+      dplyr::bind_rows(lapply(levels(actual), per_level))
     },
     conf_mat = {
       # return confusion matrix
+      if (x$classification_type == "binary") {
+        predicted <- get_binary_predicted_value_from_probability(x)
+      }
+      else {
+        predicted <- x$predictions
+      }
+
       ret <- data.frame(
         actual_value = x$y,
-        predicted_value = x$predictions
+        predicted_value = predicted
       ) %>%
         dplyr::filter(!is.na(predicted_value))
 
@@ -1056,9 +1219,15 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
     },
     scatter = {
       # return actual and predicted value pairs
+      if (x$classification_type == "binary") {
+        predicted <- get_binary_predicted_value_from_probability(x)
+      }
+      else {
+        predicted <- x$predictions
+      }
       ret <- data.frame(
         expected_value = x$y,
-        predicted_value = x$predictions
+        predicted_value = predicted
       ) %>%
         dplyr::filter(!is.na(predicted_value))
 
@@ -1103,6 +1272,9 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
         }
       }
       ret <- ret %>% tidyr::gather_("x_name", "x_value", var_cols, na.rm = TRUE, convert = FALSE)
+      # sometimes x_value comes as numeric and not character, and it was causing error from bind_rows internally done
+      # in tidy().
+      ret <- ret %>% dplyr::mutate(x_value = as.character(x_value))
       # convert must be FALSE for y to make sure y_name is always character. otherwise bind_rows internally done
       # in tidy() errors out because y_name can be, for example, mixture of logical and character.
       ret <- ret %>% tidyr::gather("y_name", "y_value", -x_name, -x_value, na.rm = TRUE, convert = FALSE)

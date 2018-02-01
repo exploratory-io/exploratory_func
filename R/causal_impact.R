@@ -32,7 +32,7 @@ tidy.bsts <- function(x) {
 
 #' NSE version of do_market_impact
 #' @export
-do_market_impact <- function(df, time, value, market, ...) {
+do_market_impact <- function(df, time, value = NULL, market, ...) { # value = NULL is necessary to take no column for Number of Rows aggregation
   time_col <- col_name(substitute(time))
   value_col <- col_name(substitute(value))
   market_col <- col_name(substitute(market))
@@ -278,7 +278,7 @@ do_market_impact_ <- function(df, time_col, value_col, market_col, target_market
 
   # grouping should be kept
   if(length(grouped_col) != 0){
-    ret <- dplyr::group_by_(ret, grouped_col)
+    ret <- dplyr::group_by(ret, !!!rlang::syms(grouped_col))
   }
   ret
 }

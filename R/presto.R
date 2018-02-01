@@ -1,5 +1,5 @@
 #' @export
-queryPresto <- function(host, port, username, password, schema, catalog, numOfRows = -1, query){
+queryPresto <- function(host, port, username, password, schema, catalog, numOfRows = -1, query, ...){
 
   # read stored password
   pass = saveOrReadPassword("presto", username, password)

@@ -225,14 +225,17 @@ evaluate_multi <- function(df, pred_label, actual_val, ...) {
 #' @param pred_label_col Predicted label colmun name
 #' @param actual_val_col Actual label column name
 #' @export
-evaluate_multi_ <- function(df, pred_label_col, actual_val_col, ...) {
+evaluate_multi_ <- function(df, pred_label_col, actual_val_col, pretty.name = FALSE, ...) {
   validate_empty_data(df)
 
   evaluate_multi_each <- function(df){
     actual_values_raw <- df[[actual_val_col]]
-    # as.character() is work around for the case actual_val_col is factor
+    # as.character() so that we can compare factors with same label but with different integer values as the same thing.
     actual_values <- as.character(actual_values_raw)
-    pred_values <- df[[pred_label_col]]
+    # if actual_values is character, pred_values needs to be character too,
+    # to get correct unique_label, since if one is char and another is factor
+    # unique_label will count factor and character values separatedly.
+    pred_values <- as.character(df[[pred_label_col]])
 
     # make values factor so that missing values can be included in conf_mat
     concat <- c(actual_values, pred_values)
@@ -299,6 +302,13 @@ evaluate_multi_ <- function(df, pred_label_col, actual_val_col, ...) {
     dplyr::do_(.dots=setNames(list(~evaluate_multi_each(.)), tmp_col)) %>%
     dplyr::ungroup() %>%
     unnest_with_drop_(tmp_col)
+
+  if (pretty.name){
+    colnames(ret)[colnames(ret) == "micro_f_score"] <- "Micro-Averaged F Score"
+    colnames(ret)[colnames(ret) == "macro_f_score"] <- "Macro-Averaged F Score"
+    colnames(ret)[colnames(ret) == "accuracy_rate"] <- "Accuracy Rate"
+    colnames(ret)[colnames(ret) == "misclassification_rate"] <- "Misclassification Rate"
+  }
 
   ret
 }

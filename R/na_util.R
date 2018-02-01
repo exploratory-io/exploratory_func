@@ -85,3 +85,58 @@ impute_na <- function(target, type = mean, val = 0, ...) {
     })
   }
 }
+
+# same as zoo::na.locf, but fills only between non-NA values.
+# e.g. fill_between_v(c(NA,2,NA,3,NA)) returns c(NA, 2, 2, 3,NA).
+#' @param .direction "down" or "up".
+fill_between_v <- function(v, .direction="down") {
+  filled_downward<-zoo::na.locf(v, na.rm = FALSE)
+  filled_upward<-zoo::na.locf(v, fromLast = TRUE, na.rm = FALSE)
+  if (.direction == "down") {
+    ret <- ifelse(!is.na(filled_upward), filled_downward, NA)
+  }
+  else { # for "up"
+    ret <- ifelse(!is.na(filled_downward), filled_upward, NA)
+  }
+  if (is.factor(v)) { # if it was factor, get it back to factor since ifelse converts it to integer.
+    ret <- factor(ret)
+    levels(ret)<-levels(v)
+  }
+  ret
+}
+
+# same as tidyr::fill, but fills only between non-NA values.
+#' @param .direction "down" or "up".
+#' @export
+fill_between <- function(df, ..., .direction="down") {
+  # this evaluates select arguments like starts_with
+  selected_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
+  grouped_col <- grouped_by(df)
+
+  each_func <- function(df) {
+    if(!is.null(grouped_col)){
+      # drop grouping columns
+      df <- df[, !colnames(df) %in% grouped_col]
+    }
+    # fill each specified columns.
+    for (col in selected_cols) {
+      df[[col]] <- fill_between_v(df[[col]], .direction=.direction)
+    }
+    df
+  }
+
+  tmp_col <- avoid_conflict(colnames(df), "tmp_col")
+  df <- df %>%
+    dplyr::do_(.dots=setNames(list(~each_func(.)), tmp_col)) %>%
+    dplyr::ungroup()
+  df <- df %>%  unnest_with_drop_(tmp_col)
+
+  if (length(grouped_col) > 0) { # set group back
+    # group_by_ fails with column name with space.
+    # tried group_by(!!!grouped_col), but
+    # this messes up the result of grouped_by().
+    # TODO: come up with a solution.
+    df <- df %>% group_by(!!!rlang::syms(grouped_col))
+  }
+  df 
+}

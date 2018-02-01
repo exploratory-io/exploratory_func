@@ -3,13 +3,35 @@
 
 context("test tidiers for randomForest")
 
-test_that("test do_smote", {
+test_that("test exp_balance with character", {
   sample_data <- data.frame(
     y = c("a", "b", "b", "b", "b", "b"),
     num = runif(6)
   )
-  res <- do_smote(sample_data, y)
-  expect_equal(class(res), "data.frame")
+  res <- exp_balance(sample_data, y)
+  expect_true("data.frame" %in% class(res))
+})
+
+test_that("test exp_balance with factor", {
+  sample_data <- data.frame(
+    y = factor(c("a", "b", "b", "b", "b", "b")),
+    num = runif(6)
+  )
+  res <- exp_balance(sample_data, y)
+  expect_true("data.frame" %in% class(res))
+  expect_equal(class(res$y), "factor")
+  expect_equal(levels(res$y), c("a","b"))
+})
+
+test_that("test exp_balance with logical", {
+  sample_data <- data.frame(
+    y = c(TRUE, rep(FALSE,5)),
+    num = runif(6)
+  )
+  res <- exp_balance(sample_data, y)
+  expect_true("data.frame" %in% class(res))
+  expect_equal(class(res$y), "logical")
+  expect_equal(any(is.na(res$y)), FALSE) # no NA is expected
 })
 
 test_that("test calc_feature_imp when the number of rows of classes is one", {
@@ -25,7 +47,7 @@ test_that("test calc_feature_imp when the number of rows of classes is one", {
   expect_equal(nrow(ret), 0)
 })
 
-test_that("test calc_feature_imp", {
+test_that("test calc_feature_imp predicting multi-class", {
   set.seed(0)
   nrow <- 100
   test_data <- data.frame(
@@ -36,18 +58,23 @@ test_that("test calc_feature_imp", {
     num_2 = runif(nrow),
     Group = rbinom(nrow, 2, 0.5)
   ) %>%
-    rename(`Tar get` = "target") # check if colname with space works
+    # check if colname with space works
+    # creating those columns in data.frame replaces spaces with .
+    rename(`Tar get` = "target", `cat 10` = cat_10, `num 1` = num_1)
 
   model_df <- test_data %>%
     dplyr::group_by(Group) %>%
     calc_feature_imp(`Tar get`,
-                      dplyr::starts_with("cat_"),
-                      num_1,
+                     `cat 10`,
+                     cat_25,
+                      `num 1`,
                       num_2)
 
   conf_mat <- tidy(model_df, model, type = "conf_mat", pretty.name = TRUE)
   ret <- model_df %>% rf_importance()
-  # ret <- model_df %>% rf_partial_dependence() TODO: this errors out
+  ret <- model_df %>% rf_partial_dependence()
+  ret <- model_df %>% rf_evaluation(pretty.name=TRUE) # TODO test that output is different from binary classification with TRUE/FALSE
+  ret <- model_df %>% rf_evaluation_by_class(pretty.name=TRUE)
 })
 
 test_that("test calc_feature_imp predicting logical", {
@@ -71,9 +98,16 @@ test_that("test calc_feature_imp predicting logical", {
                       num_2)
 
   conf_mat <- tidy(model_df, model, type = "conf_mat", pretty.name = TRUE)
+
+  # test get_binary_predicted_value_from_probability
+  model <- model_df$model[[1]]
+  predicted_values <- get_binary_predicted_value_from_probability(model)
+  expect_equal(levels(predicted_values), c("TRUE","FALSE"))
+
   ret <- model_df %>% rf_importance()
   ret <- model_df %>% rf_partial_dependence()
-  ret <- model_df %>% rf_evaluation()
+  ret <- model_df %>% rf_evaluation(pretty.name=TRUE) # TODO test that output is different from multiclass classification
+  ret <- model_df %>% rf_evaluation_by_class(pretty.name=TRUE)
   # factor order should be TRUE then FALSE.
   expect_equal(levels(conf_mat$actual_value)[1], "TRUE")
   expect_equal(levels(conf_mat$predicted_value)[1], "TRUE")
@@ -270,4 +304,11 @@ test_that("test randomForest with multinomial classification", {
   pred_train_ret <- prediction(model_ret, data = "training")
   pred_test_ret <- prediction(model_ret, data = "test")
   pred_test_ret <- prediction(model_ret, data = "newdata", data_frame = test_data)
+})
+
+test_that("test evaluate_classification", {
+  actual <- c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0)
+  predicted <- c(1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0)
+  ret <- evaluate_classification(actual, predicted, 1)
+  expect_equal(class(ret), "data.frame")
 })

@@ -96,8 +96,15 @@ do_anomaly_detection_ <- function(
       # NA_real_(NA compatible with numeric valeus) is used for non-anomaly data
       val <- ifelse(ret, data[[value_col]], NA_real_)
       if(e_value){
-        # positive anomaly values overwrite expected_values
-        expected_val <- ifelse(ret, anom[["expected_value"]], exp_value_tmp)
+        # replace anomaly values with expected values to create expected base line.
+        expected_val <- exp_value_tmp
+        anom_idx <- 1
+        for (i in 1:length(ret)) {
+          if (ret[[i]]) {
+            expected_val[[i]] <- anom$expected_value[[anom_idx]]
+            anom_idx <- anom_idx + 1
+          }
+        }
       }
     } else {
       # no anomaly case
