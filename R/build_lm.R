@@ -257,11 +257,13 @@ build_lm.fast <- function(df,
 
           c_cols <- c(c_cols, absolute_time_col, wday_col, day_col, yday_col, month_col, year_col)
           df[[absolute_time_col]] <- as.numeric(df[[col]])
-          # turn it into unordered factor since if it is ordered factor, the name of term is broken
+          # turn it into unordered factor since if it is ordered factor,
+          # lm/glm takes polynomial terms (Linear, Quadratic, Cubic, and so on) and use them as variables,
+          # which we do not want for this function.
           df[[wday_col]] <- factor(lubridate::wday(df[[col]], label=TRUE), ordered=FALSE)
           df[[day_col]] <- lubridate::day(df[[col]])
           df[[yday_col]] <- lubridate::yday(df[[col]])
-          # turn it into unordered factor since if it is ordered factor, the name of term is broken
+          # turn it into unordered factor for the same reason as wday.
           df[[month_col]] <- factor(lubridate::month(df[[col]], label=TRUE), ordered=FALSE)
           df[[year_col]] <- lubridate::year(df[[col]])
           if(lubridate::is.POSIXct(df[[col]])) {
