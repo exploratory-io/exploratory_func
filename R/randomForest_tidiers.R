@@ -977,6 +977,10 @@ calc_feature_imp <- function(df,
           # and limit the number of levels in factor by fct_lump.
           # we need to convert logical to factor too since na.roughfix only works for numeric or factor.
           df[[col]] <- forcats::fct_explicit_na(forcats::fct_lump(as.factor(df[[col]]), n=predictor_n, ties.method="first"))
+        } else {
+          # filter Inf/-Inf to avoid following error from ranger.
+          # Error in seq.default(min(x, na.rm = TRUE), max(x, na.rm = TRUE), length.out = length.out) : 'from' must be a finite number
+          df <- df %>% dplyr::filter(!is.infinite(df[[col]]))
         }
       }
 
