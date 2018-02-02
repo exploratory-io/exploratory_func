@@ -52,12 +52,14 @@ exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, t
 
   each_func1 <- function(df) {
     ret <- survival::survfit(fml, data = df)
+    class(ret) <- c("survfit_exploratory", class(fit))
     ret
   }
 
   each_func2 <- function(df) {
     if (cohort_col != "1") {
       ret <- survival::survdiff(fml, data = df)
+      class(ret) <- c("survdiff_exploratory", class(fit))
     }
     else {
       ret <- NULL
