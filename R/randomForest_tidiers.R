@@ -968,7 +968,7 @@ calc_feature_imp <- function(df,
         } else {
           # filter Inf/-Inf to avoid following error from ranger.
           # Error in seq.default(min(x, na.rm = TRUE), max(x, na.rm = TRUE), length.out = length.out) : 'from' must be a finite number
-          df <- df %>% dplyr::filter(!is.infinite(df[[col]]))
+          df <- df %>% dplyr::filter(!is.infinite(.[[col]]))
         }
       }
 
