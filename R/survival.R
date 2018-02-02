@@ -73,6 +73,15 @@ exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, t
 #' @export
 tidy.survfit_exploratory <- function(x, ...) {
   ret <- broom:::tidy.survfit(x, ...)
+
+  colnames(ret)[colnames(ret) == "n.risk"] <- "n_risk"
+  colnames(ret)[colnames(ret) == "n.event"] <- "n_event"
+  colnames(ret)[colnames(ret) == "n.censor"] <- "n_censor"
+  colnames(ret)[colnames(ret) == "std.error"] <- "std_error"
+  colnames(ret)[colnames(ret) == "conf.low"] <- "conf_low"
+  colnames(ret)[colnames(ret) == "conf.high"] <- "conf_high"
+  colnames(ret)[colnames(ret) == "strata"] <- "cohort"
+  ret
 }
 
 #' @export
