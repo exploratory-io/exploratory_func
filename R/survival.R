@@ -1,10 +1,17 @@
 
 #' tidy after generating survfit
 #' @export
-exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, time_unit = "day", ...){
+exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, time_unit = "day", cohort = NULL, ...){
   validate_empty_data(df)
 
   grouped_col <- grouped_by(df)
+
+  if (!is.null(cohort)) {
+    cohort_col <- col_name(substitute(cohort))
+  }
+  else {
+    cohort_col <- "1"
+  }
 
   # substitute is needed because time can be
   # NSE column name and it throws an evaluation error
@@ -34,13 +41,13 @@ exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, t
                                 "1")
     # we are ceiling survival time to make it integer in the specified time unit.
     # this is to make resulting survival curve to have integer data point in the specified time unit.
-    fml <- as.formula(paste0("survival::Surv(ceiling(as.numeric(`", end_time_col, "`-`", start_time_col, "`, units = \"days\")/", time_unit_days_str, "), `", substitute(status), "`) ~ 1"))
+    fml <- as.formula(paste0("survival::Surv(ceiling(as.numeric(`", end_time_col, "`-`", start_time_col, "`, units = \"days\")/", time_unit_days_str, "), `", substitute(status), "`) ~ ", cohort_col))
   }
   else {
     # need to compose formula with non-standard evaluation.
     # simply using time and status in formula here results in a formula that literally looks at
     # "time" columun and "status" column, which is not what we want.
-    fml <- as.formula(paste0("survival::Surv(`", substitute(time), "`,`", substitute(status), "`) ~ 1"))
+    fml <- as.formula(paste0("survival::Surv(`", substitute(time), "`,`", substitute(status), "`) ~ ", cohort_col))
   }
 
   each_func <- function(df) {
