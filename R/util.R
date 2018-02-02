@@ -1207,3 +1207,19 @@ do_on_each_group <- function(df, func, params = quote(list()), name = "tmp", wit
     ret
   }
 }
+
+#' @export
+do_on_each_group_2 <- function(df, func1, func2, params1 = quote(list()), params2 = quote(list()),
+                               name1 = "model1", name2 = "model2") {
+  name1 <- avoid_conflict(colnames(df), name1)
+  name2 <- avoid_conflict(colnames(df), name2)
+  # This is a list of arguments in do clause
+  args1 <- append(list(quote(.)), rlang::lang_args(params1))
+  args2 <- append(list(quote(.)), rlang::lang_args(params2))
+  call1 <- rlang::new_language(func1, rlang::as_pairlist(args1))
+  call2 <- rlang::new_language(func2, rlang::as_pairlist(args2))
+  ret <- df %>%
+    # UQ and UQE evaluates those variables
+    dplyr::do(rlang::UQ(name1) := rlang::UQE(call1), rlang::UQ(name2) := rlang::UQE(call2))
+  ret
+}
