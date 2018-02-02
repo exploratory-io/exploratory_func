@@ -52,14 +52,14 @@ exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, t
 
   each_func1 <- function(df) {
     ret <- survival::survfit(fml, data = df)
-    class(ret) <- c("survfit_exploratory", class(fit))
+    class(ret) <- c("survfit_exploratory", class(ret))
     ret
   }
 
   each_func2 <- function(df) {
     if (cohort_col != "1") {
       ret <- survival::survdiff(fml, data = df)
-      class(ret) <- c("survdiff_exploratory", class(fit))
+      class(ret) <- c("survdiff_exploratory", class(ret))
     }
     else {
       ret <- NULL
@@ -68,4 +68,19 @@ exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, t
   }
 
   do_on_each_group_2(df, each_func1, each_func2)
+}
+
+#' @export
+tidy.survfit_exploratory <- function(x, ...) {
+  ret <- broom:::tidy.survfit(x, ...)
+}
+
+#' @export
+tidy.survdiff_exploratory <- function(x, ...) {
+  ret <- broom:::tidy.survdiff(x, ...)
+}
+
+#' @export
+glance.survdiff_exploratory <- function(x, ...) {
+  ret <- broom:::glance.survdiff(x, ...)
 }
