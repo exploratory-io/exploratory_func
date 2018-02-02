@@ -28,6 +28,7 @@ test_that("test exp_survival", {
                     row.names = c(NA,-10L), class = c("tbl_df", "tbl", "data.frame"), .Names = c("weeks_on_service","is_churned", "os", "country"))
   data <- data %>% rename(`weeks on service`=weeks_on_service, `is churned`=is_churned)
   ret <- data %>% exp_survival(`weeks on service`, `is churned`, cohort=os)
+  ret <- data %>% exp_survival(`weeks on service`, `is churned`)
 
 
 })
