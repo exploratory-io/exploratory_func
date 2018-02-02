@@ -6,7 +6,7 @@ exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, t
 
   grouped_col <- grouped_by(df)
 
-  if (!is.null(cohort)) {
+  if (!is.null(substitute(cohort))) {
     cohort_col <- col_name(substitute(cohort))
   }
   else {
