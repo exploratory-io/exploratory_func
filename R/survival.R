@@ -50,9 +50,20 @@ exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, t
     fml <- as.formula(paste0("survival::Surv(`", substitute(time), "`,`", substitute(status), "`) ~ ", cohort_col))
   }
 
-  each_func <- function(df) {
+  each_func1 <- function(df) {
     ret <- survival::survfit(fml, data = df)
     ret
   }
-  do_on_each_group(df, each_func, name = "model", with_unnest = FALSE)
+
+  each_func2 <- function(df) {
+    if (cohort_col != "1") {
+      ret <- survival::survdiff(fml, data = df)
+    }
+    else {
+      ret <- NULL
+    }
+    ret
+  }
+
+  do_on_each_group_2(df, each_func1, each_func2)
 }
