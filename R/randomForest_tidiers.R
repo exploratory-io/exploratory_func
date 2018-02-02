@@ -899,18 +899,6 @@ calc_feature_imp <- function(df,
           dplyr::sample_n(max_nrow)
       }
 
-      # Return NULL if there is only one row
-      # for a class of target variable because
-      # rondomForest enters infinite loop
-      # in such case.
-      # The group with NULL is removed when
-      # unnesting the result
-      for (level in levels(df[[clean_target_col]])) {
-        if(sum(df[[clean_target_col]] == level, na.rm = TRUE) == 1) {
-          return(NULL)
-        }
-      }
-
       if (is.logical(df[[clean_target_col]])) {
         # we need to convert logical to factor since na.roughfix only works for numeric or factor.
         # for logical set TRUE, FALSE level order for better visualization. but only do it when
@@ -977,8 +965,27 @@ calc_feature_imp <- function(df,
           # and limit the number of levels in factor by fct_lump.
           # we need to convert logical to factor too since na.roughfix only works for numeric or factor.
           df[[col]] <- forcats::fct_explicit_na(forcats::fct_lump(as.factor(df[[col]]), n=predictor_n, ties.method="first"))
+        } else {
+          # filter Inf/-Inf to avoid following error from ranger.
+          # Error in seq.default(min(x, na.rm = TRUE), max(x, na.rm = TRUE), length.out = length.out) : 'from' must be a finite number
+          df <- df %>% dplyr::filter(!is.infinite(.[[col]]))
         }
       }
+
+      # This check should be done after all possible filtering.
+      # Return NULL if there is only one row
+      # for a class of target variable because
+      # rondomForest enters infinite loop
+      # in such case.
+      # The group with NULL is removed when
+      # unnesting the result
+      # TODO: Should we just filter such row and go on??
+      for (level in levels(df[[clean_target_col]])) {
+        if(sum(df[[clean_target_col]] == level, na.rm = TRUE) == 1) {
+          return(NULL)
+        }
+      }
+
 
       # remove columns with only one unique value
       cols_copy <- c_cols
