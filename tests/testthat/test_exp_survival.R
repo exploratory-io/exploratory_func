@@ -2,8 +2,8 @@ context("test exp_survival")
 
 test_that("test exp_survival", {
   # log simulation data
-  data <- structure(list(weeks_on_service = c(18, 13, 0, 7, 0, 0, 1, 0,
-                                              0, 0), is_churned = c(TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE,
+  data <- structure(list(weeks_on_service = c(18, 13, 1, 7, 1, 1, 2, 1,
+                                              1, 1), is_churned = c(TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE,
                                                                     TRUE, FALSE, TRUE), os = structure(c(1L, 2L, 1L, 1L, 2L, 2L,
                                                                                                          2L, 2L, 2L, 1L), .Label = c("Windows", "Mac"), class = "factor"),
                          country = structure(c(13L, 82L, 27L, 82L, 82L, 27L, 13L,
