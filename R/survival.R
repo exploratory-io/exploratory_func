@@ -82,7 +82,6 @@ tidy.survfit_exploratory <- function(x, ...) {
     df
   }
 
-  browser()
   if ("strata" %in% colnames(ret)) {
     nested <- ret %>% group_by(strata) %>% nest()
     nested <- nested %>% mutate(data=purrr::map(data,~add_time_zero_row_each(.)))
