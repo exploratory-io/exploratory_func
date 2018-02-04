@@ -29,6 +29,7 @@ test_that("test exp_survival", {
   data <- data %>% rename(`weeks on service`=weeks_on_service, `is churned`=is_churned)
   ret <- data %>% exp_survival(`weeks on service`, `is churned`, cohort=os)
   browser()
+  ret <- ret %>% tidy(model1)
   ret <- data %>% exp_survival(`weeks on service`, `is churned`)
 
 

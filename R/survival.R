@@ -74,6 +74,24 @@ exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, t
 tidy.survfit_exploratory <- function(x, ...) {
   ret <- broom:::tidy.survfit(x, ...)
 
+  # for better viz, add time=0 row for each group when it is not already there.
+  add_time_zero_row_each <- function(df) {
+    if (nrow(df[df$time==0,]) == 0) { # do this only when time=0 row is not already there.
+      df <- rbind(data.frame(time=0, n.risk=df$n.risk[1], n.event=0, n.censor=0, estimate=1, std.error=0, conf.high=1, conf.low=1), df)
+    }
+    df
+  }
+
+  browser()
+  if ("strata" %in% colnames(ret)) {
+    nested <- ret %>% group_by(strata) %>% nest()
+    nested <- nested %>% mutate(data=purrr::map(data,~add_time_zero_row_each(.)))
+    ret <- unnest(nested)
+  }
+  else {
+    ret <- add_time_zero_row_each(ret)
+  }
+
   colnames(ret)[colnames(ret) == "n.risk"] <- "n_risk"
   colnames(ret)[colnames(ret) == "n.event"] <- "n_event"
   colnames(ret)[colnames(ret) == "n.censor"] <- "n_censor"
