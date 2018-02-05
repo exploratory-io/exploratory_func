@@ -57,6 +57,15 @@ exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, t
         },
         wday = {
           df[[cohort_col]] <- lubridate::wday(df[[cohort_col]], label=TRUE)
+        },
+        hour = {
+          df[[cohort_col]] <- lubridate::hour(df[[cohort_col]])
+        },
+        minute = {
+          df[[cohort_col]] <- lubridate::minute(df[[cohort_col]])
+        },
+        second = {
+          df[[cohort_col]] <- lubridate::second(df[[cohort_col]])
         })
     }
   }
