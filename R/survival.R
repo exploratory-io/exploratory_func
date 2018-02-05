@@ -1,13 +1,64 @@
 
 #' tidy after generating survfit
 #' @export
-exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, time_unit = "day", cohort = NULL, ...){
+exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, time_unit = "day", cohort = NULL, cohort_func = NULL, ...){
   validate_empty_data(df)
 
   grouped_col <- grouped_by(df)
 
   if (!is.null(substitute(cohort))) {
     cohort_col <- col_name(substitute(cohort))
+    if (!is.null(cohort_func)) {
+      switch(cohort_func,
+        fltoyear = {
+          df[[cohort_col]] <- lubridate::floor_date(df[[cohort_col]], unit="year")
+        },
+        fltohalfyear = {
+          df[[cohort_col]] <- lubridate::floor_date(df[[cohort_col]], unit="halfyear")
+        },
+        fltoquarter = {
+          df[[cohort_col]] <- lubridate::floor_date(df[[cohort_col]], unit="quarter")
+        },
+        fltobimonth = {
+          df[[cohort_col]] <- lubridate::floor_date(df[[cohort_col]], unit="bimonth")
+        },
+        fltomonth = {
+          df[[cohort_col]] <- lubridate::floor_date(df[[cohort_col]], unit="month")
+        },
+        fltoweek = {
+          df[[cohort_col]] <- lubridate::floor_date(df[[cohort_col]], unit="week")
+        },
+        fltoday = {
+          df[[cohort_col]] <- lubridate::floor_date(df[[cohort_col]], unit="day")
+        },
+        year = {
+          df[[cohort_col]] <- lubridate::year(df[[cohort_col]])
+        },
+        halfyear = {
+          df[[cohort_col]] <- (lubridate::month(df[[cohort_col]])+5) %/% 6
+        },
+        quarter = {
+          df[[cohort_col]] <- lubridate::quarter(df[[cohort_col]])
+        },
+        bimonth = {
+          df[[cohort_col]] <- (lubridate::month(df[[cohort_col]])+1) %/% 2
+        },
+        month = {
+          df[[cohort_col]] <- lubridate::month(df[[cohort_col]])
+        },
+        monthname = {
+          df[[cohort_col]] <- lubridate::month(df[[cohort_col]], label=TRUE)
+        },
+        week = {
+          df[[cohort_col]] <- lubridate::week(df[[cohort_col]])
+        },
+        day = {
+          df[[cohort_col]] <- lubridate::day(df[[cohort_col]])
+        },
+        wday = {
+          df[[cohort_col]] <- lubridate::wday(df[[cohort_col]], label=TRUE)
+        })
+    }
   }
   else {
     cohort_col <- "1"
@@ -57,7 +108,6 @@ exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, t
   }
 
   each_func2 <- function(df) {
-    browser()
     ret <- NULL
     if (cohort_col != "1" && length(unique(df[[cohort_col]])) > 1) {
       tryCatch({
