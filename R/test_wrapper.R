@@ -236,10 +236,14 @@ tidy.chisq_exploratory <- function(x, type = "observed") {
     ret <- ret %>% rownames_to_column(var = x$var1)
   }
   if (type == "residuals") {
-    browser()
-    ret <- as.data.frame(x$residuals)
-    ret <- ret %>% rownames_to_column(var = x$var1)
-    ret <- ret %>% gather(!!rlang::sym(x$var2), "residual", -!!rlang::sym(x$var1))
+    resid_df <- as.data.frame(x$residuals)
+    resid_df <- resid_df %>% rownames_to_column(var = x$var1)
+    resid_df <- resid_df %>% gather(!!rlang::sym(x$var2), "residual", -!!rlang::sym(x$var1))
+    obs_df <- as.data.frame(x$observed)
+    obs_df <- obs_df %>% rownames_to_column(var = x$var1)
+    obs_df <- obs_df %>% gather(!!rlang::sym(x$var2), "observed", -!!rlang::sym(x$var1))
+    ret <- obs_df %>% left_join(resid_df, by=c(x$var1, x$var2))
+    ret <- ret %>% mutate(residual = 100*residual^2/x$statistic)
   }
   ret
 }
