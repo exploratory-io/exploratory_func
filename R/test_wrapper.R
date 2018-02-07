@@ -200,5 +200,22 @@ exp_chisq <- function(df, col1, col2, value = NULL, ...) {
   value_col <- col_name(substitute(value))
   formula = as.formula(paste0('`', col1_col, '`~`', col2_col, '`'))
   pivotted_df <- pivot_(df, formula, value_col = value_col, fun.aggregate = sum, fill = 0)
-  pivotted_df
+
+  pivotted_df <- pivotted_df %>% column_to_rownames(var=col1_col)
+
+  chisq.test_each <- function(df) {
+    x <- pivotted_df %>% as.matrix()
+    chisq.test(x = x, ...)
+  }
+
+  # Calculation is executed in each group.
+  # Storing the result in this tmp_col and
+  # unnesting the result.
+  # If the original data frame is grouped by "tmp",
+  # overwriting it should be avoided,
+  # so avoid_conflict is used here.
+  tmp_col <- avoid_conflict(colnames(pivotted_df), "model")
+  ret <- df %>%
+    dplyr::do_(.dots = setNames(list(~chisq.test_each(.)), tmp_col))
+  ret
 }
