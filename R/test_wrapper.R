@@ -204,7 +204,7 @@ exp_chisq <- function(df, var1, var2, value = NULL, ...) {
   pivotted_df <- pivot_(df, formula, value_col = value_col, fun.aggregate = sum, fill = 0)
 
   chisq.test_each <- function(df) {
-    if (!is.null(grouped_col)) {
+    if (length(grouped_col) > 0) {
       df <- df %>% select(-!!rlang::sym(grouped_col))
     }
     df <- df %>% column_to_rownames(var=var1_col)
