@@ -231,9 +231,13 @@ exp_chisq <- function(df, var1, var2, value = NULL, ...) {
 
 #' @export
 tidy.chisq_exploratory <- function(x, type = "observed") {
-  browser()
   if (type == "observed") {
-    ret = as.data.frame(x$observed)
+    ret <- as.data.frame(x$observed)
+    ret <- ret %>% rownames_to_column(var = x$var1)
+  }
+  if (type == "residuals") {
+    ret <- as.data.frame(x$residuals)
+    ret <- ret %>% rownames_to_column(var = x$var1)
   }
   ret
 }
