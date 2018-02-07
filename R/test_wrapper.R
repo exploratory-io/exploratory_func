@@ -236,8 +236,10 @@ tidy.chisq_exploratory <- function(x, type = "observed") {
     ret <- ret %>% rownames_to_column(var = x$var1)
   }
   if (type == "residuals") {
+    browser()
     ret <- as.data.frame(x$residuals)
     ret <- ret %>% rownames_to_column(var = x$var1)
+    ret <- ret %>% gather(!!rlang::sym(x$var2), "residual", -!!rlang::sym(x$var1))
   }
   ret
 }
