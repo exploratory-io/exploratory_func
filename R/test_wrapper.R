@@ -225,3 +225,12 @@ exp_chisq <- function(df, col1, col2, value = NULL, ...) {
     dplyr::do_(.dots = setNames(list(~chisq.test_each(.)), tmp_col))
   ret
 }
+
+#' @export
+tidy.chisq_exploratory <- function(x, type = "observed") {
+  browser()
+  if (type == "observed") {
+    ret = as.data.frame(x$observed)
+  }
+  ret
+}
