@@ -192,3 +192,8 @@ test_that("test chisq.test with p column", {
   expect_equal(nrow(ret), 1)
 
 })
+
+test_that("test exp_chisq", {
+  ret <- exp_chisq(mtcars, gear, carb)
+  browser()
+})

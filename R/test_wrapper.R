@@ -192,3 +192,13 @@ do_chisq.test_ <- function(df,
     dplyr::ungroup() %>%
     unnest_with_drop_(tmp_col)
 }
+
+#' @export
+exp_chisq <- function(df, col1, col2, value = NULL, ...) {
+  col1_col <- col_name(substitute(col1))
+  col2_col <- col_name(substitute(col2))
+  value_col <- col_name(substitute(value))
+  formula = as.formula(paste0('`', col1_col, '`~`', col2_col, '`'))
+  pivotted_df <- pivot_(df, formula, value_col = value_col, fun.aggregate = sum, fill = 0)
+  pivotted_df
+}
