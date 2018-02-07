@@ -194,11 +194,18 @@ do_chisq.test_ <- function(df,
 }
 
 #' @export
-exp_chisq <- function(df, var1, var2, value = NULL, ...) {
+exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, ...) {
   var1_col <- col_name(substitute(var1))
   var2_col <- col_name(substitute(var2))
   value_col <- col_name(substitute(value))
   grouped_col <- grouped_by(df)
+
+  if (!is.null(func1)) {
+    df <- df %>% mutate(!!rlang::sym(var1_col) := extract_from_date(!!rlang::sym(var1_col), type=func1))
+  }
+  if (!is.null(func2)) {
+    df <- df %>% mutate(!!rlang::sym(var2_col) := extract_from_date(!!rlang::sym(var2_col), type=func2))
+  }
 
   formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
   pivotted_df <- pivot_(df, formula, value_col = value_col, fun.aggregate = sum, fill = 0)
