@@ -1223,3 +1223,67 @@ do_on_each_group_2 <- function(df, func1, func2, params1 = quote(list()), params
     dplyr::do(rlang::UQ(name1) := rlang::UQE(call1), rlang::UQ(name2) := rlang::UQE(call2))
   ret
 }
+
+#' @export
+extract_from_date <- function(x, type = "fltoyear") {
+  ret <- NULL
+  switch(type,
+    fltoyear = {
+      ret <- lubridate::floor_date(x, unit="year")
+    },
+    fltohalfyear = {
+      ret <- lubridate::floor_date(x, unit="halfyear")
+    },
+    fltoquarter = {
+      ret <- lubridate::floor_date(x, unit="quarter")
+    },
+    fltobimonth = {
+      ret <- lubridate::floor_date(x, unit="bimonth")
+    },
+    fltomonth = {
+      ret <- lubridate::floor_date(x, unit="month")
+    },
+    fltoweek = {
+      ret <- lubridate::floor_date(x, unit="week")
+    },
+    fltoday = {
+      ret <- lubridate::floor_date(x, unit="day")
+    },
+    year = {
+      ret <- lubridate::year(x)
+    },
+    halfyear = {
+      ret <- (lubridate::month(x)+5) %/% 6
+    },
+    quarter = {
+      ret <- lubridate::quarter(x)
+    },
+    bimonth = {
+      ret <- (lubridate::month(x)+1) %/% 2
+    },
+    month = {
+      ret <- lubridate::month(x)
+    },
+    monthname = {
+      ret <- lubridate::month(x, label=TRUE)
+    },
+    week = {
+      ret <- lubridate::week(x)
+    },
+    day = {
+      ret <- lubridate::day(x)
+    },
+    wday = {
+      ret <- lubridate::wday(x, label=TRUE)
+    },
+    hour = {
+      ret <- lubridate::hour(x)
+    },
+    minute = {
+      ret <- lubridate::minute(x)
+    },
+    second = {
+      ret <- lubridate::second(x)
+    })
+  ret
+}
