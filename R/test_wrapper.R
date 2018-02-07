@@ -210,6 +210,7 @@ exp_chisq <- function(df, col1, col2, value = NULL, ...) {
     df <- df %>% column_to_rownames(var=col1_col)
     x <- df %>% as.matrix()
     model <- chisq.test(x = x, ...)
+    class(model) <- c("chisq_exploratory", class(model))
     model
   }
 
