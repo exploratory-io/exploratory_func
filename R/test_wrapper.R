@@ -250,7 +250,7 @@ tidy.chisq_exploratory <- function(x, type = "observed") {
     obs_df <- obs_df %>% rownames_to_column(var = x$var1)
     obs_df <- obs_df %>% gather(!!rlang::sym(x$var2), "observed", -!!rlang::sym(x$var1))
     ret <- obs_df %>% left_join(resid_df, by=c(x$var1, x$var2))
-    ret <- ret %>% mutate(residual = 100*residual^2/x$statistic)
+    ret <- ret %>% mutate(contrib = 100*residual^2/x$statistic) # add percent contribution too.
   }
   ret
 }
