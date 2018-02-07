@@ -194,20 +194,20 @@ do_chisq.test_ <- function(df,
 }
 
 #' @export
-exp_chisq <- function(df, col1, col2, value = NULL, ...) {
-  col1_col <- col_name(substitute(col1))
-  col2_col <- col_name(substitute(col2))
+exp_chisq <- function(df, var1, var2, value = NULL, ...) {
+  var1_col <- col_name(substitute(var1))
+  var2_col <- col_name(substitute(var2))
   value_col <- col_name(substitute(value))
   grouped_col <- grouped_by(df)
 
-  formula = as.formula(paste0('`', col1_col, '`~`', col2_col, '`'))
+  formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
   pivotted_df <- pivot_(df, formula, value_col = value_col, fun.aggregate = sum, fill = 0)
 
   chisq.test_each <- function(df) {
     if (!is.null(grouped_col)) {
       df <- df %>% select(-!!rlang::sym(grouped_col))
     }
-    df <- df %>% column_to_rownames(var=col1_col)
+    df <- df %>% column_to_rownames(var=var1_col)
     x <- df %>% as.matrix()
     model <- chisq.test(x = x, ...)
     class(model) <- c("chisq_exploratory", class(model))
