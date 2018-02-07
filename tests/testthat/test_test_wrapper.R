@@ -193,8 +193,12 @@ test_that("test chisq.test with p column", {
 
 })
 
-test_that("test exp_chisq", {
-  ret <- exp_chisq(mtcars, gear, carb)
-  ret <- exp_chisq(mtcars, gear, carb, value=cyl)
+#test_that("test exp_chisq", {
+#  ret <- exp_chisq(mtcars, gear, carb)
+#  ret <- exp_chisq(mtcars, gear, carb, value=cyl)
+#})
+
+test_that("test exp_chisq with group_by", {
+  ret <- mtcars %>% group_by(vs) %>% exp_chisq(gear, carb)
   browser()
 })
