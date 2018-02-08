@@ -202,5 +202,6 @@ test_that("test exp_chisq", {
 test_that("test exp_chisq with group_by", {
   ret <- mtcars %>% group_by(vs) %>% exp_chisq(gear, carb, value=cyl)
   observed <- ret %>% broom::tidy(model, type="observed")
+  summary <- ret %>% broom::glance(model)
   residuals <- ret %>% broom::tidy(model, type="residuals")
 })
