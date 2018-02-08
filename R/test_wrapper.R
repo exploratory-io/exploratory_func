@@ -194,7 +194,7 @@ do_chisq.test_ <- function(df,
 }
 
 #' @export
-exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, ...) {
+exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, fun.aggregate = sum, ...) {
   var1_col <- col_name(substitute(var1))
   var2_col <- col_name(substitute(var2))
   value_col <- col_name(substitute(value))
@@ -217,7 +217,7 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
   }
 
   formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
-  pivotted_df <- pivot_(df, formula, value_col = value_col, fun.aggregate = sum, fill = 0)
+  pivotted_df <- pivot_(df, formula, value_col = value_col, fun.aggregate = fun.aggregate, fill = 0)
 
   chisq.test_each <- function(df) {
     if (length(grouped_col) > 0) {
