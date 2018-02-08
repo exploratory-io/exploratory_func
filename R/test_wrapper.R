@@ -259,5 +259,6 @@ tidy.chisq_exploratory <- function(x, type = "observed") {
 glance.chisq_exploratory <- function(x) {
   # ret <- x %>% broom:::glance.htest() # for some reason this does not work. just do it like following.
   ret <- data.frame(statistic=x$statistic, parameter=x$parameter, p.value=x$p.value)
+  ret <- ret %>% rename(`Chi-Square`=statistic, DF=parameter, `P Value`=p.value)
   ret
 }
