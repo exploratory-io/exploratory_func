@@ -200,11 +200,20 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
   value_col <- col_name(substitute(value))
   grouped_col <- grouped_by(df)
 
-  if (!is.null(func1)) {
+  if (!is.null(func1) && (is.Date(df[[var1_col]]) || is.POSIXct(df[[var1_col]]))) {
     df <- df %>% mutate(!!rlang::sym(var1_col) := extract_from_date(!!rlang::sym(var1_col), type=func1))
   }
-  if (!is.null(func2)) {
+  if (!is.null(func2) && (is.Date(df[[var2_col]]) || is.POSIXct(df[[var2_col]]))) {
     df <- df %>% mutate(!!rlang::sym(var2_col) := extract_from_date(!!rlang::sym(var2_col), type=func2))
+  }
+
+  var1_levels <- NULL
+  var2_levels <- NULL
+  if (is.factor(df[[var1_col]])) {
+    var1_levels <- levels(df[[var1_col]])
+  }
+  if (is.factor(df[[var2_col]])) {
+    var2_levels <- levels(df[[var2_col]])
   }
 
   formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
@@ -220,6 +229,8 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
     # add variable name info to the model
     model$var1 <- var1_col
     model$var2 <- var2_col
+    model$var1_levels <- var1_levels
+    model$var2_levels <- var2_levels
     class(model) <- c("chisq_exploratory", class(model))
     model
   }
@@ -251,6 +262,12 @@ tidy.chisq_exploratory <- function(x, type = "observed") {
     obs_df <- obs_df %>% gather(!!rlang::sym(x$var2), "observed", -!!rlang::sym(x$var1))
     ret <- obs_df %>% left_join(resid_df, by=c(x$var1, x$var2))
     ret <- ret %>% mutate(contrib = 100*residual^2/x$statistic) # add percent contribution too.
+    if (!is.null(x$var1_levels)) {
+      ret[[x$var1]] <- factor(ret[[x$var1]], levels=x$var1_levels)
+    }
+    if (!is.null(x$var2_levels)) {
+      ret[[x$var2]] <- factor(ret[[x$var2]], levels=x$var2_levels)
+    }
   }
   ret
 }
