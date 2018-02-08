@@ -194,7 +194,7 @@ test_that("test chisq.test with p column", {
 })
 
 test_that("test exp_chisq", {
-  ret <- exp_chisq(mtcars, gear, carb)
+  ret <- exp_chisq(mtcars %>% mutate(gear=factor(gear)), gear, carb) # factor order should be kept in the model
   ret <- exp_chisq(mtcars, gear, carb, value=cyl)
   ret
 })
