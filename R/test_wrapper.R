@@ -265,11 +265,19 @@ tidy.chisq_exploratory <- function(x, type = "observed") {
     resid_df <- as.data.frame(x$residuals)
     resid_df <- resid_df %>% rownames_to_column(var = x$var1)
     resid_df <- resid_df %>% gather(!!rlang::sym(x$var2), "residual", -!!rlang::sym(x$var1))
+
     obs_df <- as.data.frame(x$observed)
     obs_df <- obs_df %>% rownames_to_column(var = x$var1)
     obs_df <- obs_df %>% gather(!!rlang::sym(x$var2), "observed", -!!rlang::sym(x$var1))
-    ret <- obs_df %>% left_join(resid_df, by=c(x$var1, x$var2))
+
+    raw_resid_df <- as.data.frame(x$observed - x$expected) # x$residual is standardized, but here, take raw difference between observed and expected. 
+    raw_resid_df <- raw_resid_df %>% rownames_to_column(var = x$var1)
+    raw_resid_df <- raw_resid_df %>% gather(!!rlang::sym(x$var2), "raw_residual", -!!rlang::sym(x$var1))
+
+    ret <- obs_df %>% left_join(resid_df, by=c(x$var1, x$var2)) # join residual column 
+    ret <- ret %>% left_join(raw_resid_df, by=c(x$var1, x$var2)) # join raw_residual column
     ret <- ret %>% mutate(contrib = 100*residual^2/x$statistic) # add percent contribution too.
+
     if (!is.null(x$var1_levels)) {
       ret[[x$var1]] <- factor(ret[[x$var1]], levels=x$var1_levels)
     }
