@@ -173,7 +173,7 @@ tidy.survdiff_exploratory <- function(x, ...) {
 glance.survdiff_exploratory <- function(x, ...) {
   ret <- broom:::glance.survdiff(x, ...)
   colnames(ret)[colnames(ret) == "statistic"] <- "Chi-Square"
-  colnames(ret)[colnames(ret) == "df"] <- "DF"
+  colnames(ret)[colnames(ret) == "df"] <- "Degree of Freedom"
   colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
   ret
 }
