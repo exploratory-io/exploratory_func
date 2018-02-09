@@ -295,3 +295,49 @@ glance.chisq_exploratory <- function(x) {
   ret <- ret %>% rename(`Chi-Square`=statistic, `Degree of Freedom`=parameter, `P Value`=p.value)
   ret
 }
+
+#' @export
+exp_ttest <- function(df, var1, var2, func2 = NULL, ...) {
+  var1_col <- col_name(substitute(var1))
+  var2_col <- col_name(substitute(var2))
+  grouped_col <- grouped_by(df)
+
+  if (!is.null(func2) && (is.Date(df[[var2_col]]) || is.POSIXct(df[[var2_col]]))) {
+    df <- df %>% mutate(!!rlang::sym(var2_col) := extract_from_date(!!rlang::sym(var2_col), type=func2))
+  }
+  
+  if (n_distinct(df[[var2_col]]) < 2) {
+    stop(paste0("Variable Column (", var2_col, ") has to have 2 or more kinds of values."))
+  }
+
+  formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
+
+  ttest_each <- function(df) {
+    model <- t.test(formula, data = df, ...)
+    class(model) <- c("ttest_exploratory", class(model))
+    model$data <- df
+    model
+  }
+
+  # Calculation is executed in each group.
+  # Storing the result in this tmp_col and
+  # unnesting the result.
+  # If the original data frame is grouped by "tmp",
+  # overwriting it should be avoided,
+  # so avoid_conflict is used here.
+  tmp_col <- avoid_conflict(colnames(df), "model")
+  ret <- df %>%
+    dplyr::do_(.dots = setNames(list(~ttest_each(.)), tmp_col))
+  ret
+}
+
+#' @export
+tidy.ttest_exploratory <- function(x, type="model") {
+  if (type == "model") {
+    ret <- broom:::tidy.htest(x)
+  }
+  else { # type == "data"
+    ret <- x$data
+  }
+  ret
+}

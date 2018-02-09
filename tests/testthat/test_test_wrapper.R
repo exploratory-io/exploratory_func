@@ -205,3 +205,9 @@ test_that("test exp_chisq with group_by", {
   summary <- ret %>% broom::glance(model)
   residuals <- ret %>% broom::tidy(model, type="residuals")
 })
+
+test_that("test exp_ttest", {
+  ret <- exp_ttest(mtcars, mpg, am)
+  browser()
+  ret
+})
