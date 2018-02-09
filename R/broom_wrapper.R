@@ -827,7 +827,7 @@ model_stats <- function(df, pretty.name = FALSE, ...){
     colnames(ret)[colnames(ret) == "sigma"] <- "Root Mean Square Error"
     colnames(ret)[colnames(ret) == "statistic"] <- "F Ratio"
     colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
-    colnames(ret)[colnames(ret) == "df"] <- "DF"
+    colnames(ret)[colnames(ret) == "df"] <- "Degree of Freedom"
     colnames(ret)[colnames(ret) == "logLik"] <- "Log Likelihood"
     colnames(ret)[colnames(ret) == "deviance"] <- "Deviance"
     colnames(ret)[colnames(ret) == "df.residual"] <- "Residual DF"
@@ -905,7 +905,7 @@ model_anova <- function(df, pretty.name = FALSE){
     colnames(ret)[colnames(ret) == "meansq"] <- "Mean Square"
     colnames(ret)[colnames(ret) == "statistic"] <- "F Ratio"
     colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
-    colnames(ret)[colnames(ret) == "df"] <- "DF"
+    colnames(ret)[colnames(ret) == "df"] <- "Degree of Freedom"
     # for glm anova
     colnames(ret)[colnames(ret) == "Resid..Df"] <- "Residual DF"
     colnames(ret)[colnames(ret) == "Resid..Dev"] <- "Residual Deviance"

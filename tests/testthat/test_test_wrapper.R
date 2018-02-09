@@ -192,3 +192,16 @@ test_that("test chisq.test with p column", {
   expect_equal(nrow(ret), 1)
 
 })
+
+test_that("test exp_chisq", {
+  ret <- exp_chisq(mtcars %>% mutate(gear=factor(gear)), gear, carb) # factor order should be kept in the model
+  ret <- exp_chisq(mtcars, gear, carb, value=cyl)
+  ret
+})
+
+test_that("test exp_chisq with group_by", {
+  ret <- mtcars %>% group_by(vs) %>% exp_chisq(gear, carb, value=cyl)
+  observed <- ret %>% broom::tidy(model, type="observed")
+  summary <- ret %>% broom::glance(model)
+  residuals <- ret %>% broom::tidy(model, type="residuals")
+})

@@ -192,3 +192,106 @@ do_chisq.test_ <- function(df,
     dplyr::ungroup() %>%
     unnest_with_drop_(tmp_col)
 }
+
+#' @export
+exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, fun.aggregate = sum, ...) {
+  var1_col <- col_name(substitute(var1))
+  var2_col <- col_name(substitute(var2))
+  value_col <- col_name(substitute(value))
+  grouped_col <- grouped_by(df)
+
+  if (!is.null(func1) && (is.Date(df[[var1_col]]) || is.POSIXct(df[[var1_col]]))) {
+    df <- df %>% mutate(!!rlang::sym(var1_col) := extract_from_date(!!rlang::sym(var1_col), type=func1))
+  }
+  if (!is.null(func2) && (is.Date(df[[var2_col]]) || is.POSIXct(df[[var2_col]]))) {
+    df <- df %>% mutate(!!rlang::sym(var2_col) := extract_from_date(!!rlang::sym(var2_col), type=func2))
+  }
+  
+  if (n_distinct(df[[var1_col]]) < 2) {
+    stop(paste0("Variable Column (", var1_col, ") has to have 2 or more kinds of values."))
+  }
+  if (n_distinct(df[[var2_col]]) < 2) {
+    stop(paste0("Variable Column (", var2_col, ") has to have 2 or more kinds of values."))
+  }
+
+  var1_levels <- NULL
+  var2_levels <- NULL
+  if (is.factor(df[[var1_col]])) {
+    var1_levels <- levels(df[[var1_col]])
+  }
+  if (is.factor(df[[var2_col]])) {
+    var2_levels <- levels(df[[var2_col]])
+  }
+
+  formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
+  # pivot_ does pivot for each group.
+  pivotted_df <- pivot_(df, formula, value_col = value_col, fun.aggregate = fun.aggregate, fill = 0)
+
+  chisq.test_each <- function(df) {
+    if (length(grouped_col) > 0) {
+      df <- df %>% select(-!!rlang::sym(grouped_col))
+    }
+    df <- df %>% column_to_rownames(var=var1_col)
+    x <- df %>% as.matrix()
+    model <- chisq.test(x = x, ...)
+    # add variable name info to the model
+    model$var1 <- var1_col
+    model$var2 <- var2_col
+    model$var1_levels <- var1_levels
+    model$var2_levels <- var2_levels
+    class(model) <- c("chisq_exploratory", class(model))
+    model
+  }
+
+  # Calculation is executed in each group.
+  # Storing the result in this tmp_col and
+  # unnesting the result.
+  # If the original data frame is grouped by "tmp",
+  # overwriting it should be avoided,
+  # so avoid_conflict is used here.
+  tmp_col <- avoid_conflict(colnames(pivotted_df), "model")
+  ret <- pivotted_df %>%
+    dplyr::do_(.dots = setNames(list(~chisq.test_each(.)), tmp_col))
+  ret
+}
+
+#' @export
+tidy.chisq_exploratory <- function(x, type = "observed") {
+  if (type == "observed") {
+    ret <- as.data.frame(x$observed)
+    ret <- ret %>% rownames_to_column(var = x$var1)
+  }
+  if (type == "residuals") {
+    resid_df <- as.data.frame(x$residuals)
+    resid_df <- resid_df %>% rownames_to_column(var = x$var1)
+    resid_df <- resid_df %>% gather(!!rlang::sym(x$var2), "residual", -!!rlang::sym(x$var1))
+
+    obs_df <- as.data.frame(x$observed)
+    obs_df <- obs_df %>% rownames_to_column(var = x$var1)
+    obs_df <- obs_df %>% gather(!!rlang::sym(x$var2), "observed", -!!rlang::sym(x$var1))
+
+    raw_resid_df <- as.data.frame(x$observed - x$expected) # x$residual is standardized, but here, take raw difference between observed and expected. 
+    raw_resid_df <- raw_resid_df %>% rownames_to_column(var = x$var1)
+    raw_resid_df <- raw_resid_df %>% gather(!!rlang::sym(x$var2), "raw_residual", -!!rlang::sym(x$var1))
+
+    ret <- obs_df %>% left_join(resid_df, by=c(x$var1, x$var2)) # join residual column 
+    ret <- ret %>% left_join(raw_resid_df, by=c(x$var1, x$var2)) # join raw_residual column
+    ret <- ret %>% mutate(contrib = 100*residual^2/x$statistic) # add percent contribution too.
+
+    if (!is.null(x$var1_levels)) {
+      ret[[x$var1]] <- factor(ret[[x$var1]], levels=x$var1_levels)
+    }
+    if (!is.null(x$var2_levels)) {
+      ret[[x$var2]] <- factor(ret[[x$var2]], levels=x$var2_levels)
+    }
+  }
+  ret
+}
+
+#' @export
+glance.chisq_exploratory <- function(x) {
+  # ret <- x %>% broom:::glance.htest() # for some reason this does not work. just do it like following.
+  ret <- data.frame(statistic=x$statistic, parameter=x$parameter, p.value=x$p.value)
+  ret <- ret %>% rename(`Chi-Square`=statistic, `Degree of Freedom`=parameter, `P Value`=p.value)
+  ret
+}

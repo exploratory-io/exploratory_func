@@ -562,3 +562,11 @@ test_that("test non_na_pct", {
   expect_true(ret == 60)
 })
 
+test_that("test extract_from_date", {
+  data <- as.Date(c("2018-01-23", "2018-01-25", NA, NA))
+  ret <- extract_from_date(data, type="year")
+  expect_equal(ret, c(2018,2018,NA,NA))
+  ret <- extract_from_date(data, type="fltoyear")
+  expect_equal(ret, as.Date(c("2018-01-01","2018-01-01",NA,NA)))
+})
+
