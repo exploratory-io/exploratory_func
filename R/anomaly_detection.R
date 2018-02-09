@@ -194,7 +194,7 @@ do_anomaly_detection_ <- function(
     }
     aggregated_data <- df_zoo %>%
       as.data.frame() %>%
-      dplyr::mutate(time = index(df_zoo)) %>%
+      dplyr::mutate(time = zoo::index(df_zoo)) %>%
       # bring time column first
       dplyr::select(time, everything())
 
