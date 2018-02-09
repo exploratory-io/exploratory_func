@@ -1,5 +1,6 @@
 
-#' tidy after generating survfit
+#' Function for Survival Analysis view.
+#' It does survfit and survdiff.
 #' @export
 exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, time_unit = "day", cohort = NULL, cohort_func = NULL, ...){
   validate_empty_data(df)
@@ -110,12 +111,14 @@ exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, t
     fml <- as.formula(paste0("survival::Surv(`", substitute(time), "`,`", substitute(status), "`) ~ ", cohort_col))
   }
 
+  # calls survfit for each group.
   each_func1 <- function(df) {
     ret <- survival::survfit(fml, data = df)
     class(ret) <- c("survfit_exploratory", class(ret))
     ret
   }
 
+  # calls survdiff (log rank test) for each group.
   each_func2 <- function(df) {
     ret <- NULL
     if (cohort_col != "1" && length(unique(df[[cohort_col]])) > 1) {
