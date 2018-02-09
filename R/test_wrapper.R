@@ -206,6 +206,13 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
   if (!is.null(func2) && (is.Date(df[[var2_col]]) || is.POSIXct(df[[var2_col]]))) {
     df <- df %>% mutate(!!rlang::sym(var2_col) := extract_from_date(!!rlang::sym(var2_col), type=func2))
   }
+  
+  if (n_distinct(df[[var1_col]]) < 2) {
+    stop(paste0("Variable Column (", var1_col, ") has to have 2 or more kinds of values."))
+  }
+  if (n_distinct(df[[var2_col]]) < 2) {
+    stop(paste0("Variable Column (", var2_col, ") has to have 2 or more kinds of values."))
+  }
 
   var1_levels <- NULL
   var2_levels <- NULL
@@ -217,6 +224,7 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
   }
 
   formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
+  # pivot_ does pivot for each group.
   pivotted_df <- pivot_(df, formula, value_col = value_col, fun.aggregate = fun.aggregate, fill = 0)
 
   chisq.test_each <- function(df) {
