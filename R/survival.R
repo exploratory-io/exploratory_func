@@ -14,11 +14,12 @@ exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, t
     }
   }
   else {
+    # no cohort column is set. Just draw a single survival curve.
     cohort_col <- "1"
   }
 
   # substitute is needed because time can be
-  # NSE column name and it throws an evaluation error
+  # NSE (non-standard evaluation) column name and it throws an evaluation error
   # without it
   if (is.null(substitute(time))) {
     start_time_col <- col_name(substitute(start_time))
