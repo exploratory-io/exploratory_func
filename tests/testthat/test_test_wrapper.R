@@ -209,5 +209,6 @@ test_that("test exp_chisq with group_by", {
 test_that("test exp_ttest", {
   ret <- exp_ttest(mtcars, mpg, am)
   browser()
+  ret <- exp_ttest(mtcars, mpg, gear)
   ret
 })

@@ -313,7 +313,12 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, ...) {
   formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
 
   ttest_each <- function(df) {
-    model <- t.test(formula, data = df, ...)
+    if (n_distinct(df[[var2_col]]) == 2) {
+      model <- t.test(formula, data = df, ...)
+    }
+    else { # use ANOVA instead if there are more than 2 classes.
+      model <- aov(formula, data = df, ...)
+    }
     class(model) <- c("ttest_exploratory", class(model))
     model$data <- df
     model
@@ -332,9 +337,25 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, ...) {
 }
 
 #' @export
+glance.ttest_exploratory <- function(x) {
+  if ("aov" %in% class(x)) {
+    ret <- broom:::tidy.aov(x) %>% slice(1:1) # there is no glance.aov. take first row of tidy.aov.
+  }
+  else {
+    ret <- broom:::glance.htest(x)
+  }
+  ret
+}
+
+#' @export
 tidy.ttest_exploratory <- function(x, type="model") {
   if (type == "model") {
-    ret <- broom:::tidy.htest(x)
+    if ("aov" %in% class(x)) {
+      ret <- broom:::tidy.aov(x)
+    }
+    else {
+      ret <- broom:::tidy.htest(x)
+    }
   }
   else { # type == "data"
     ret <- x$data
