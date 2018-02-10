@@ -310,10 +310,17 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, ...) {
     stop(paste0("Variable Column (", var2_col, ") has to have 2 or more kinds of values."))
   }
 
+  if (n_distinct(df[[var2_col]]) == 2) {
+    model_type <- "ttest"
+  }
+  else {
+    model_type <- "anova"
+  }
+
   formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
 
   ttest_each <- function(df) {
-    if (n_distinct(df[[var2_col]]) == 2) {
+    if (model_type == "ttest") {
       model <- t.test(formula, data = df, ...)
     }
     else { # use ANOVA instead if there are more than 2 classes.
