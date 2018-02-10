@@ -231,7 +231,7 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
     if (length(grouped_col) > 0) {
       df <- df %>% select(-!!rlang::sym(grouped_col))
     }
-    df <- df %>% column_to_rownames(var=var1_col)
+    df <- df %>% tibble::column_to_rownames(var=var1_col)
     x <- df %>% as.matrix()
     model <- chisq.test(x = x, ...)
     # add variable name info to the model
@@ -259,20 +259,20 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
 tidy.chisq_exploratory <- function(x, type = "observed") {
   if (type == "observed") {
     ret <- as.data.frame(x$observed)
-    ret <- ret %>% rownames_to_column(var = x$var1)
+    ret <- ret %>% tibble::rownames_to_column(var = x$var1)
   }
   if (type == "residuals") {
     resid_df <- as.data.frame(x$residuals)
-    resid_df <- resid_df %>% rownames_to_column(var = x$var1)
-    resid_df <- resid_df %>% gather(!!rlang::sym(x$var2), "residual", -!!rlang::sym(x$var1))
+    resid_df <- resid_df %>% tibble::rownames_to_column(var = x$var1)
+    resid_df <- resid_df %>% tidyr::gather(!!rlang::sym(x$var2), "residual", -!!rlang::sym(x$var1))
 
     obs_df <- as.data.frame(x$observed)
-    obs_df <- obs_df %>% rownames_to_column(var = x$var1)
-    obs_df <- obs_df %>% gather(!!rlang::sym(x$var2), "observed", -!!rlang::sym(x$var1))
+    obs_df <- obs_df %>% tibble::rownames_to_column(var = x$var1)
+    obs_df <- obs_df %>% tidyr::gather(!!rlang::sym(x$var2), "observed", -!!rlang::sym(x$var1))
 
     raw_resid_df <- as.data.frame(x$observed - x$expected) # x$residual is standardized, but here, take raw difference between observed and expected. 
-    raw_resid_df <- raw_resid_df %>% rownames_to_column(var = x$var1)
-    raw_resid_df <- raw_resid_df %>% gather(!!rlang::sym(x$var2), "raw_residual", -!!rlang::sym(x$var1))
+    raw_resid_df <- raw_resid_df %>% tibble::rownames_to_column(var = x$var1)
+    raw_resid_df <- raw_resid_df %>% tidyr::gather(!!rlang::sym(x$var2), "raw_residual", -!!rlang::sym(x$var1))
 
     ret <- obs_df %>% left_join(resid_df, by=c(x$var1, x$var2)) # join residual column 
     ret <- ret %>% left_join(raw_resid_df, by=c(x$var1, x$var2)) # join raw_residual column
