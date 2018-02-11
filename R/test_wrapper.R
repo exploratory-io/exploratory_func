@@ -306,26 +306,14 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, ...) {
     df <- df %>% mutate(!!rlang::sym(var2_col) := extract_from_date(!!rlang::sym(var2_col), type=func2))
   }
   
-  if (n_distinct(df[[var2_col]]) < 2) {
-    stop(paste0("Variable Column (", var2_col, ") has to have 2 or more kinds of values."))
-  }
-
-  if (n_distinct(df[[var2_col]]) == 2) {
-    model_type <- "ttest"
-  }
-  else {
-    model_type <- "anova"
+  if (n_distinct(df[[var2_col]]) != 2) {
+    stop(paste0("Variable Column (", var2_col, ") has to have 2 kinds of values."))
   }
 
   formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
 
   ttest_each <- function(df) {
-    if (model_type == "ttest") {
-      model <- t.test(formula, data = df, ...)
-    }
-    else { # use ANOVA instead if there are more than 2 classes.
-      model <- aov(formula, data = df, ...)
-    }
+    model <- t.test(formula, data = df, ...)
     class(model) <- c("ttest_exploratory", class(model))
     model$data <- df
     model
@@ -345,37 +333,21 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, ...) {
 
 #' @export
 glance.ttest_exploratory <- function(x) {
-  if ("aov" %in% class(x)) {
-    ret <- broom:::tidy.aov(x) %>% slice(1:1) # there is no glance.aov. take first row of tidy.aov.
-  }
-  else {
-    ret <- broom:::glance.htest(x) # for t-test. the returned content is same as tidy.
-  }
+  ret <- broom:::glance.htest(x) # for t-test. the returned content is same as tidy.
   ret
 }
 
 #' @export
 tidy.ttest_exploratory <- function(x, type="model") {
   if (type == "model") {
-    if ("aov" %in% class(x)) {
-      ret <- broom:::tidy.aov(x)
-      ret <- ret %>% dplyr::rename(Term=term,
-                                   `F Ratio`=statistic,
-                                   `P Value`=p.value,
-                                   `Degree of Freedom`=df,
-                                   `Sum of Squares`=sumsq,
-                                   `Mean Square`=meansq)
-    }
-    else {
-      ret <- broom:::tidy.htest(x)
-      ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
-        dplyr::rename(`t Ratio`=statistic,
-                      `P Value`=p.value,
-                      `Degree of Freedom`=parameter,
-                      Difference=estimate,
-                      `Conf High`=conf.high,
-                      `Conf Low`=conf.low)
-    }
+    ret <- broom:::tidy.htest(x)
+    ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
+      dplyr::rename(`t Ratio`=statistic,
+                    `P Value`=p.value,
+                    `Degree of Freedom`=parameter,
+                    Difference=estimate,
+                    `Conf High`=conf.high,
+                    `Conf Low`=conf.low)
   }
   else { # type == "data"
     ret <- x$data
