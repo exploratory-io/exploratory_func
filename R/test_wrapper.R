@@ -400,12 +400,13 @@ glance.anova_exploratory <- function(x) {
 tidy.anova_exploratory <- function(x, type="model") {
   if (type == "model") {
     ret <- broom:::tidy.aov(x)
-    ret <- ret %>% dplyr::rename(Term=term,
-                                 `F Ratio`=statistic,
-                                 `P Value`=p.value,
-                                 `Degree of Freedom`=df,
-                                 `Sum of Squares`=sumsq,
-                                 `Mean Square`=meansq)
+    ret <- ret %>% dplyr::select(term, statistic, p.value, df, sumsq, meansq) %>%
+      dplyr::rename(Term=term,
+                    `F Ratio`=statistic,
+                    `P Value`=p.value,
+                    `Degree of Freedom`=df,
+                    `Sum of Squares`=sumsq,
+                    `Mean Square`=meansq)
   }
   else { # type == "data"
     ret <- x$data
