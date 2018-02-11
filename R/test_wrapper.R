@@ -315,6 +315,8 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, ...) {
   ttest_each <- function(df) {
     model <- t.test(formula, data = df, ...)
     class(model) <- c("ttest_exploratory", class(model))
+    model$var1 <- var1_col
+    model$var2 <- var2_col
     model$data <- df
     model
   }
@@ -348,6 +350,17 @@ tidy.ttest_exploratory <- function(x, type="model") {
                     Difference=estimate,
                     `Conf High`=conf.high,
                     `Conf Low`=conf.low)
+  }
+  else if (type == "data_summary") {
+    ret <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
+      dplyr::summarize(`Number of Rows`=length(!!rlang::sym(x$var1)),
+                       Mean=mean(!!rlang::sym(x$var1), na.rm=TRUE),
+                       `Std Deviation`=sd(!!rlang::sym(x$var1), na.rm=TRUE),
+                       # std error definition: https://www.rdocumentation.org/packages/plotrix/versions/3.7/topics/std.error
+                       `Std Error of Mean`=sd(!!rlang::sym(x$var1), na.rm=TRUE)/sqrt(sum(!is.na(!!rlang::sym(x$var1)))),
+                       # TODO confidence interval
+                       `Minimum`=min(!!rlang::sym(x$var1), na.rm=TRUE),
+                       `Maximum`=max(!!rlang::sym(x$var1), na.rm=TRUE))
   }
   else { # type == "data"
     ret <- x$data
