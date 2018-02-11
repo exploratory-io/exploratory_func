@@ -349,7 +349,7 @@ glance.ttest_exploratory <- function(x) {
     ret <- broom:::tidy.aov(x) %>% slice(1:1) # there is no glance.aov. take first row of tidy.aov.
   }
   else {
-    ret <- broom:::glance.htest(x)
+    ret <- broom:::glance.htest(x) # for t-test. the returned content is same as tidy.
   }
   ret
 }
@@ -359,9 +359,22 @@ tidy.ttest_exploratory <- function(x, type="model") {
   if (type == "model") {
     if ("aov" %in% class(x)) {
       ret <- broom:::tidy.aov(x)
+      ret <- ret %>% dplyr::rename(Term=term,
+                                   `F Ratio`=statistic,
+                                   `P Value`=p.value,
+                                   `Degree of Freedom`=df,
+                                   `Sum of Squares`=sumsq,
+                                   `Mean Square`=meansq)
     }
     else {
       ret <- broom:::tidy.htest(x)
+      ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
+        dplyr::rename(`t Ratio`=statistic,
+                      `P Value`=p.value,
+                      `Degree of Freedom`=parameter,
+                      Difference=estimate,
+                      `Conf High`=conf.high,
+                      `Conf Low`=conf.low)
     }
   }
   else { # type == "data"
