@@ -411,7 +411,15 @@ tidy.anova_exploratory <- function(x, type="model") {
                     `Mean Square`=meansq)
   }
   else if (type == "data_summary") {
-    ret <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>% dplyr::summarize(`Number of Rows`=length(!!rlang::sym(x$var1)), Mean=mean(!!rlang::sym(x$var1), na.rm=TRUE))
+    ret <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
+      dplyr::summarize(`Number of Rows`=length(!!rlang::sym(x$var1)),
+                       Mean=mean(!!rlang::sym(x$var1), na.rm=TRUE),
+                       `Std Deviation`=sd(!!rlang::sym(x$var1), na.rm=TRUE),
+                       # std error definition: https://www.rdocumentation.org/packages/plotrix/versions/3.7/topics/std.error
+                       `Std Error of Mean`=sd(!!rlang::sym(x$var1), na.rm=TRUE)/sqrt(sum(!is.na(!!rlang::sym(x$var1)))),
+                       # TODO confidence interval
+                       `Minimum`=min(!!rlang::sym(x$var1), na.rm=TRUE),
+                       `Maximum`=max(!!rlang::sym(x$var1), na.rm=TRUE))
   }
   else { # type == "data"
     ret <- x$data
