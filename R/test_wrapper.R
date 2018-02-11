@@ -374,6 +374,8 @@ exp_anova <- function(df, var1, var2, func2 = NULL, ...) {
   anova_each <- function(df) {
     model <- aov(formula, data = df, ...)
     class(model) <- c("anova_exploratory", class(model))
+    model$var1 <- var1_col
+    model$var2 <- var2_col
     model$data <- df
     model
   }
@@ -407,6 +409,9 @@ tidy.anova_exploratory <- function(x, type="model") {
                     `Degree of Freedom`=df,
                     `Sum of Squares`=sumsq,
                     `Mean Square`=meansq)
+  }
+  else if (type == "data_summary") {
+    ret <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>% dplyr::summarize(`Number of Rows`=length(!!rlang::sym(x$var1)), Mean=mean(!!rlang::sym(x$var1), na.rm=TRUE))
   }
   else { # type == "data"
     ret <- x$data

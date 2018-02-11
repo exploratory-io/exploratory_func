@@ -213,6 +213,7 @@ test_that("test exp_ttest", {
 
 test_that("test exp_anova", {
   ret <- exp_anova(mtcars, mpg, am)
+  browser()
   ret <- exp_anova(mtcars, mpg, gear)
   ret
 })
