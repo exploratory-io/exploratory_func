@@ -353,7 +353,7 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
                     `Conf High`=conf.high,
                     `Conf Low`=conf.low)
   }
-  else if (type == "data_summary") {
+  else if (type == "data_summary") { #TODO consolidate with code in tidy.anova_exploratory
     conf_threshold = 1 - (1 - conf_level)/2
     ret <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
       dplyr::summarize(`Number of Rows`=length(!!rlang::sym(x$var1)),
@@ -438,7 +438,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
                     `Sum of Squares`=sumsq,
                     `Mean Square`=meansq)
   }
-  else if (type == "data_summary") {
+  else if (type == "data_summary") { #TODO consolidate with code in tidy.ttest_exploratory
     conf_threshold = 1 - (1 - conf_level)/2
     ret <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
       dplyr::summarize(`Number of Rows`=length(!!rlang::sym(x$var1)),
