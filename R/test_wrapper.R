@@ -342,7 +342,7 @@ glance.ttest_exploratory <- function(x) {
 }
 
 #' @export
-tidy.ttest_exploratory <- function(x, type="model") {
+tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
   if (type == "model") {
     ret <- broom:::tidy.htest(x)
     ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
@@ -353,7 +353,8 @@ tidy.ttest_exploratory <- function(x, type="model") {
                     `Conf High`=conf.high,
                     `Conf Low`=conf.low)
   }
-  else if (type == "data_summary") {
+  else if (type == "data_summary") { #TODO consolidate with code in tidy.anova_exploratory
+    conf_threshold = 1 - (1 - conf_level)/2
     ret <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
       dplyr::summarize(`Number of Rows`=length(!!rlang::sym(x$var1)),
                        Mean=mean(!!rlang::sym(x$var1), na.rm=TRUE),
@@ -362,10 +363,18 @@ tidy.ttest_exploratory <- function(x, type="model") {
                        `Std Error of Mean`=sd(!!rlang::sym(x$var1), na.rm=TRUE)/sqrt(sum(!is.na(!!rlang::sym(x$var1)))),
                        # Note: Use qt (t distribution) instead of qnorm (normal distribution) here.
                        # For more detail take a look at 10.5.1 A slight mistake in the formula of "Learning Statistics with R" 
-                       `Conf High` = Mean + `Std Error of Mean` * qt(p=.975, df=`Number of Rows`-1),
-                       `Conf Low` = Mean - `Std Error of Mean` * qt(p=.975, df=`Number of Rows`-1),
+                       `Conf High` = Mean + `Std Error of Mean` * qt(p=conf_level, df=`Number of Rows`-1),
+                       `Conf Low` = Mean - `Std Error of Mean` * qt(p=conf_level, df=`Number of Rows`-1),
                        `Minimum`=min(!!rlang::sym(x$var1), na.rm=TRUE),
-                       `Maximum`=max(!!rlang::sym(x$var1), na.rm=TRUE))
+                       `Maximum`=max(!!rlang::sym(x$var1), na.rm=TRUE)) %>%
+      dplyr::select(`Number of Rows`,
+                    Mean,
+                    `Conf Low`,
+                    `Conf High`,
+                    `Std Error of Mean`,
+                    `Std Deviation`,
+                    `Minimum`,
+                    `Maximum`)
   }
   else { # type == "data"
     ret <- x$data
@@ -418,7 +427,7 @@ glance.anova_exploratory <- function(x) {
 }
 
 #' @export
-tidy.anova_exploratory <- function(x, type="model") {
+tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
   if (type == "model") {
     ret <- broom:::tidy.aov(x)
     ret <- ret %>% dplyr::select(term, statistic, p.value, df, sumsq, meansq) %>%
@@ -429,7 +438,8 @@ tidy.anova_exploratory <- function(x, type="model") {
                     `Sum of Squares`=sumsq,
                     `Mean Square`=meansq)
   }
-  else if (type == "data_summary") {
+  else if (type == "data_summary") { #TODO consolidate with code in tidy.ttest_exploratory
+    conf_threshold = 1 - (1 - conf_level)/2
     ret <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
       dplyr::summarize(`Number of Rows`=length(!!rlang::sym(x$var1)),
                        Mean=mean(!!rlang::sym(x$var1), na.rm=TRUE),
@@ -438,10 +448,18 @@ tidy.anova_exploratory <- function(x, type="model") {
                        `Std Error of Mean`=sd(!!rlang::sym(x$var1), na.rm=TRUE)/sqrt(sum(!is.na(!!rlang::sym(x$var1)))),
                        # Note: Use qt (t distribution) instead of qnorm (normal distribution) here.
                        # For more detail take a look at 10.5.1 A slight mistake in the formula of "Learning Statistics with R" 
-                       `Conf High` = Mean + `Std Error of Mean` * qt(p=.975, df=`Number of Rows`-1),
-                       `Conf Low` = Mean - `Std Error of Mean` * qt(p=.975, df=`Number of Rows`-1),
+                       `Conf High` = Mean + `Std Error of Mean` * qt(p=conf_threshold, df=`Number of Rows`-1),
+                       `Conf Low` = Mean - `Std Error of Mean` * qt(p=conf_threshold, df=`Number of Rows`-1),
                        `Minimum`=min(!!rlang::sym(x$var1), na.rm=TRUE),
-                       `Maximum`=max(!!rlang::sym(x$var1), na.rm=TRUE))
+                       `Maximum`=max(!!rlang::sym(x$var1), na.rm=TRUE)) %>%
+      dplyr::select(`Number of Rows`,
+                    Mean,
+                    `Conf Low`,
+                    `Conf High`,
+                    `Std Error of Mean`,
+                    `Std Deviation`,
+                    `Minimum`,
+                    `Maximum`)
   }
   else { # type == "data"
     ret <- x$data
