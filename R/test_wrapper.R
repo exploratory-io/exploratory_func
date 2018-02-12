@@ -358,7 +358,10 @@ tidy.ttest_exploratory <- function(x, type="model") {
                        `Std Deviation`=sd(!!rlang::sym(x$var1), na.rm=TRUE),
                        # std error definition: https://www.rdocumentation.org/packages/plotrix/versions/3.7/topics/std.error
                        `Std Error of Mean`=sd(!!rlang::sym(x$var1), na.rm=TRUE)/sqrt(sum(!is.na(!!rlang::sym(x$var1)))),
-                       # TODO confidence interval
+                       # Note: Use qt (t distribution) instead of qnorm (normal distribution) here.
+                       # For more detail take a look at 10.5.1 A slight mistake in the formula of "Learning Statistics with R" 
+                       `Conf High` = Mean + `Std Error of Mean` * qt(p=.975, df=`Number of Rows`-1),
+                       `Conf Low` = Mean - `Std Error of Mean` * qt(p=.975, df=`Number of Rows`-1),
                        `Minimum`=min(!!rlang::sym(x$var1), na.rm=TRUE),
                        `Maximum`=max(!!rlang::sym(x$var1), na.rm=TRUE))
   }
@@ -430,7 +433,10 @@ tidy.anova_exploratory <- function(x, type="model") {
                        `Std Deviation`=sd(!!rlang::sym(x$var1), na.rm=TRUE),
                        # std error definition: https://www.rdocumentation.org/packages/plotrix/versions/3.7/topics/std.error
                        `Std Error of Mean`=sd(!!rlang::sym(x$var1), na.rm=TRUE)/sqrt(sum(!is.na(!!rlang::sym(x$var1)))),
-                       # TODO confidence interval
+                       # Note: Use qt (t distribution) instead of qnorm (normal distribution) here.
+                       # For more detail take a look at 10.5.1 A slight mistake in the formula of "Learning Statistics with R" 
+                       `Conf High` = Mean + `Std Error of Mean` * qt(p=.975, df=`Number of Rows`-1),
+                       `Conf Low` = Mean - `Std Error of Mean` * qt(p=.975, df=`Number of Rows`-1),
                        `Minimum`=min(!!rlang::sym(x$var1), na.rm=TRUE),
                        `Maximum`=max(!!rlang::sym(x$var1), na.rm=TRUE))
   }
