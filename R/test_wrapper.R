@@ -193,6 +193,7 @@ do_chisq.test_ <- function(df,
     unnest_with_drop_(tmp_col)
 }
 
+#' Chi-Square test wrapper for Analytics View
 #' @export
 exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, fun.aggregate = sum, ...) {
   var1_col <- col_name(substitute(var1))
@@ -296,6 +297,7 @@ glance.chisq_exploratory <- function(x) {
   ret
 }
 
+#' t-test wrapper for Analytics View
 #' @export
 exp_ttest <- function(df, var1, var2, func2 = NULL, ...) {
   var1_col <- col_name(substitute(var1))
@@ -371,6 +373,7 @@ tidy.ttest_exploratory <- function(x, type="model") {
   ret
 }
 
+#' ANOVA wrapper for Analytics View
 #' @export
 exp_anova <- function(df, var1, var2, func2 = NULL, ...) {
   var1_col <- col_name(substitute(var1))
