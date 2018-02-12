@@ -193,6 +193,7 @@ do_chisq.test_ <- function(df,
     unnest_with_drop_(tmp_col)
 }
 
+#' Chi-Square test wrapper for Analytics View
 #' @export
 exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, fun.aggregate = sum, ...) {
   var1_col <- col_name(substitute(var1))
@@ -231,7 +232,7 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
     if (length(grouped_col) > 0) {
       df <- df %>% select(-!!rlang::sym(grouped_col))
     }
-    df <- df %>% column_to_rownames(var=var1_col)
+    df <- df %>% tibble::column_to_rownames(var=var1_col)
     x <- df %>% as.matrix()
     model <- chisq.test(x = x, ...)
     # add variable name info to the model
@@ -259,20 +260,20 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
 tidy.chisq_exploratory <- function(x, type = "observed") {
   if (type == "observed") {
     ret <- as.data.frame(x$observed)
-    ret <- ret %>% rownames_to_column(var = x$var1)
+    ret <- ret %>% tibble::rownames_to_column(var = x$var1)
   }
   if (type == "residuals") {
     resid_df <- as.data.frame(x$residuals)
-    resid_df <- resid_df %>% rownames_to_column(var = x$var1)
-    resid_df <- resid_df %>% gather(!!rlang::sym(x$var2), "residual", -!!rlang::sym(x$var1))
+    resid_df <- resid_df %>% tibble::rownames_to_column(var = x$var1)
+    resid_df <- resid_df %>% tidyr::gather(!!rlang::sym(x$var2), "residual", -!!rlang::sym(x$var1))
 
     obs_df <- as.data.frame(x$observed)
-    obs_df <- obs_df %>% rownames_to_column(var = x$var1)
-    obs_df <- obs_df %>% gather(!!rlang::sym(x$var2), "observed", -!!rlang::sym(x$var1))
+    obs_df <- obs_df %>% tibble::rownames_to_column(var = x$var1)
+    obs_df <- obs_df %>% tidyr::gather(!!rlang::sym(x$var2), "observed", -!!rlang::sym(x$var1))
 
     raw_resid_df <- as.data.frame(x$observed - x$expected) # x$residual is standardized, but here, take raw difference between observed and expected. 
-    raw_resid_df <- raw_resid_df %>% rownames_to_column(var = x$var1)
-    raw_resid_df <- raw_resid_df %>% gather(!!rlang::sym(x$var2), "raw_residual", -!!rlang::sym(x$var1))
+    raw_resid_df <- raw_resid_df %>% tibble::rownames_to_column(var = x$var1)
+    raw_resid_df <- raw_resid_df %>% tidyr::gather(!!rlang::sym(x$var2), "raw_residual", -!!rlang::sym(x$var1))
 
     ret <- obs_df %>% left_join(resid_df, by=c(x$var1, x$var2)) # join residual column 
     ret <- ret %>% left_join(raw_resid_df, by=c(x$var1, x$var2)) # join raw_residual column
@@ -293,5 +294,157 @@ glance.chisq_exploratory <- function(x) {
   # ret <- x %>% broom:::glance.htest() # for some reason this does not work. just do it like following.
   ret <- data.frame(statistic=x$statistic, parameter=x$parameter, p.value=x$p.value)
   ret <- ret %>% rename(`Chi-Square`=statistic, `Degree of Freedom`=parameter, `P Value`=p.value)
+  ret
+}
+
+#' t-test wrapper for Analytics View
+#' @export
+exp_ttest <- function(df, var1, var2, func2 = NULL, ...) {
+  var1_col <- col_name(substitute(var1))
+  var2_col <- col_name(substitute(var2))
+  grouped_col <- grouped_by(df)
+
+  if (!is.null(func2) && (is.Date(df[[var2_col]]) || is.POSIXct(df[[var2_col]]))) {
+    df <- df %>% mutate(!!rlang::sym(var2_col) := extract_from_date(!!rlang::sym(var2_col), type=func2))
+  }
+  
+  if (n_distinct(df[[var2_col]]) != 2) {
+    stop(paste0("Variable Column (", var2_col, ") has to have 2 kinds of values."))
+  }
+
+  formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
+
+  ttest_each <- function(df) {
+    model <- t.test(formula, data = df, ...)
+    class(model) <- c("ttest_exploratory", class(model))
+    model$var1 <- var1_col
+    model$var2 <- var2_col
+    model$data <- df
+    model
+  }
+
+  # Calculation is executed in each group.
+  # Storing the result in this tmp_col and
+  # unnesting the result.
+  # If the original data frame is grouped by "tmp",
+  # overwriting it should be avoided,
+  # so avoid_conflict is used here.
+  tmp_col <- avoid_conflict(colnames(df), "model")
+  ret <- df %>%
+    dplyr::do_(.dots = setNames(list(~ttest_each(.)), tmp_col))
+  ret
+}
+
+#' @export
+glance.ttest_exploratory <- function(x) {
+  ret <- broom:::glance.htest(x) # for t-test. the returned content is same as tidy.
+  ret
+}
+
+#' @export
+tidy.ttest_exploratory <- function(x, type="model") {
+  if (type == "model") {
+    ret <- broom:::tidy.htest(x)
+    ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
+      dplyr::rename(`t Ratio`=statistic,
+                    `P Value`=p.value,
+                    `Degree of Freedom`=parameter,
+                    Difference=estimate,
+                    `Conf High`=conf.high,
+                    `Conf Low`=conf.low)
+  }
+  else if (type == "data_summary") {
+    ret <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
+      dplyr::summarize(`Number of Rows`=length(!!rlang::sym(x$var1)),
+                       Mean=mean(!!rlang::sym(x$var1), na.rm=TRUE),
+                       `Std Deviation`=sd(!!rlang::sym(x$var1), na.rm=TRUE),
+                       # std error definition: https://www.rdocumentation.org/packages/plotrix/versions/3.7/topics/std.error
+                       `Std Error of Mean`=sd(!!rlang::sym(x$var1), na.rm=TRUE)/sqrt(sum(!is.na(!!rlang::sym(x$var1)))),
+                       # Note: Use qt (t distribution) instead of qnorm (normal distribution) here.
+                       # For more detail take a look at 10.5.1 A slight mistake in the formula of "Learning Statistics with R" 
+                       `Conf High` = Mean + `Std Error of Mean` * qt(p=.975, df=`Number of Rows`-1),
+                       `Conf Low` = Mean - `Std Error of Mean` * qt(p=.975, df=`Number of Rows`-1),
+                       `Minimum`=min(!!rlang::sym(x$var1), na.rm=TRUE),
+                       `Maximum`=max(!!rlang::sym(x$var1), na.rm=TRUE))
+  }
+  else { # type == "data"
+    ret <- x$data
+  }
+  ret
+}
+
+#' ANOVA wrapper for Analytics View
+#' @export
+exp_anova <- function(df, var1, var2, func2 = NULL, ...) {
+  var1_col <- col_name(substitute(var1))
+  var2_col <- col_name(substitute(var2))
+  grouped_col <- grouped_by(df)
+
+  if (!is.null(func2) && (is.Date(df[[var2_col]]) || is.POSIXct(df[[var2_col]]))) {
+    df <- df %>% mutate(!!rlang::sym(var2_col) := extract_from_date(!!rlang::sym(var2_col), type=func2))
+  }
+  
+  if (n_distinct(df[[var2_col]]) < 2) {
+    stop(paste0("Variable Column (", var2_col, ") has to have 2 or more kinds of values."))
+  }
+
+  formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
+
+  anova_each <- function(df) {
+    model <- aov(formula, data = df, ...)
+    class(model) <- c("anova_exploratory", class(model))
+    model$var1 <- var1_col
+    model$var2 <- var2_col
+    model$data <- df
+    model
+  }
+
+  # Calculation is executed in each group.
+  # Storing the result in this tmp_col and
+  # unnesting the result.
+  # If the original data frame is grouped by "tmp",
+  # overwriting it should be avoided,
+  # so avoid_conflict is used here.
+  tmp_col <- avoid_conflict(colnames(df), "model")
+  ret <- df %>%
+    dplyr::do_(.dots = setNames(list(~anova_each(.)), tmp_col))
+  ret
+}
+
+#' @export
+glance.anova_exploratory <- function(x) {
+  ret <- broom:::tidy.aov(x) %>% slice(1:1) # there is no glance.aov. take first row of tidy.aov.
+  ret
+}
+
+#' @export
+tidy.anova_exploratory <- function(x, type="model") {
+  if (type == "model") {
+    ret <- broom:::tidy.aov(x)
+    ret <- ret %>% dplyr::select(term, statistic, p.value, df, sumsq, meansq) %>%
+      dplyr::rename(Term=term,
+                    `F Ratio`=statistic,
+                    `P Value`=p.value,
+                    `Degree of Freedom`=df,
+                    `Sum of Squares`=sumsq,
+                    `Mean Square`=meansq)
+  }
+  else if (type == "data_summary") {
+    ret <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
+      dplyr::summarize(`Number of Rows`=length(!!rlang::sym(x$var1)),
+                       Mean=mean(!!rlang::sym(x$var1), na.rm=TRUE),
+                       `Std Deviation`=sd(!!rlang::sym(x$var1), na.rm=TRUE),
+                       # std error definition: https://www.rdocumentation.org/packages/plotrix/versions/3.7/topics/std.error
+                       `Std Error of Mean`=sd(!!rlang::sym(x$var1), na.rm=TRUE)/sqrt(sum(!is.na(!!rlang::sym(x$var1)))),
+                       # Note: Use qt (t distribution) instead of qnorm (normal distribution) here.
+                       # For more detail take a look at 10.5.1 A slight mistake in the formula of "Learning Statistics with R" 
+                       `Conf High` = Mean + `Std Error of Mean` * qt(p=.975, df=`Number of Rows`-1),
+                       `Conf Low` = Mean - `Std Error of Mean` * qt(p=.975, df=`Number of Rows`-1),
+                       `Minimum`=min(!!rlang::sym(x$var1), na.rm=TRUE),
+                       `Maximum`=max(!!rlang::sym(x$var1), na.rm=TRUE))
+  }
+  else { # type == "data"
+    ret <- x$data
+  }
   ret
 }
