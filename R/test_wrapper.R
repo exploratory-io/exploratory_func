@@ -365,7 +365,15 @@ tidy.ttest_exploratory <- function(x, type="model") {
                        `Conf High` = Mean + `Std Error of Mean` * qt(p=.975, df=`Number of Rows`-1),
                        `Conf Low` = Mean - `Std Error of Mean` * qt(p=.975, df=`Number of Rows`-1),
                        `Minimum`=min(!!rlang::sym(x$var1), na.rm=TRUE),
-                       `Maximum`=max(!!rlang::sym(x$var1), na.rm=TRUE))
+                       `Maximum`=max(!!rlang::sym(x$var1), na.rm=TRUE)) %>%
+      dplyr::select(`Number of Rows`,
+                    Mean,
+                    `Conf Low`,
+                    `Conf High`,
+                    `Std Error of Mean`,
+                    `Std Deviation`,
+                    `Minimum`,
+                    `Maximum`)
   }
   else { # type == "data"
     ret <- x$data
@@ -441,7 +449,15 @@ tidy.anova_exploratory <- function(x, type="model") {
                        `Conf High` = Mean + `Std Error of Mean` * qt(p=.975, df=`Number of Rows`-1),
                        `Conf Low` = Mean - `Std Error of Mean` * qt(p=.975, df=`Number of Rows`-1),
                        `Minimum`=min(!!rlang::sym(x$var1), na.rm=TRUE),
-                       `Maximum`=max(!!rlang::sym(x$var1), na.rm=TRUE))
+                       `Maximum`=max(!!rlang::sym(x$var1), na.rm=TRUE)) %>%
+      dplyr::select(`Number of Rows`,
+                    Mean,
+                    `Conf Low`,
+                    `Conf High`,
+                    `Std Error of Mean`,
+                    `Std Deviation`,
+                    `Minimum`,
+                    `Maximum`)
   }
   else { # type == "data"
     ret <- x$data
