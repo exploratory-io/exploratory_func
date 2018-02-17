@@ -214,8 +214,8 @@ build_coxph.fast <- function(df,
           # 2. if the data is ordered factor, turn it into unordered. For ordered factor,
           #    coxph takes polynomial terms (Linear, Quadratic, Cubic, and so on) and use them as variables,
           #    which we do not want for this function.
-          if (length(levels(df[[col]])) >= 12) {
-            df[[col]] <- fct_other(factor(df[[col]], ordered=FALSE), keep=levels(df[[col]])[1:10])
+          if (length(levels(df[[col]])) >= predictor_n + 2) {
+            df[[col]] <- fct_other(factor(df[[col]], ordered=FALSE), keep=levels(df[[col]])[1:predictor_n])
           }
           else {
             df[[col]] <- factor(df[[col]], ordered=FALSE)
