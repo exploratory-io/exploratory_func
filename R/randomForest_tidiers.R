@@ -875,7 +875,7 @@ calc_feature_imp <- function(df,
     if (!is.logical(clean_df[[clean_target_col]])) {
       # limit the number of levels in factor by fct_lump
       clean_df[[clean_target_col]] <- forcats::fct_explicit_na(forcats::fct_lump(
-        fct_infreq(as.factor(clean_df[[clean_target_col]])), n = target_n, ties.method="first"
+        as.factor(clean_df[[clean_target_col]]), n = target_n, ties.method="first"
       ))
 
       if (length(unique(clean_df[[clean_target_col]])) == 2) {
