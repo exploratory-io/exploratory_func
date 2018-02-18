@@ -372,7 +372,7 @@ glance.lm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
     }
   }
   if(pretty.name) {
-    ret <- ret %>% dplyr::rename(`R Squared`=r.squared, `Adj R Squared`=adj.r.squared, `Root Mean Square Error`=sigma, `F Ratio`=statistic, `P Value`=p.value, `Degree of Freedom`=df, `Log Likelihood`=logLik, Deviance=deviance, `Residual DF`=df.residual)
+    ret <- ret %>% dplyr::rename(`R Squared`=r.squared, `Adj R Squared`=adj.r.squared, `RMSE`=sigma, `F Ratio`=statistic, `P Value`=p.value, `Degree of Freedom`=df, `Log Likelihood`=logLik, Deviance=deviance, `Residual DF`=df.residual)
   }
   ret
 }
