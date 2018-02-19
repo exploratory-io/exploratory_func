@@ -277,7 +277,13 @@ tidy.chisq_exploratory <- function(x, type = "observed") {
 
     ret <- obs_df %>% left_join(resid_df, by=c(x$var1, x$var2)) # join residual column 
     ret <- ret %>% left_join(raw_resid_df, by=c(x$var1, x$var2)) # join raw_residual column
-    ret <- ret %>% mutate(contrib = 100*residual^2/x$statistic) # add percent contribution too.
+    browser()
+    if (is.nan(x$statistic) || x$statistic <= 0) {
+      ret <- ret %>% mutate(contrib = 0) # avoid division by 0
+    }
+    else {
+      ret <- ret %>% mutate(contrib = 100*residual^2/x$statistic) # add percent contribution too.
+    }
 
     if (!is.null(x$var1_levels)) {
       ret[[x$var1]] <- factor(ret[[x$var1]], levels=x$var1_levels)
