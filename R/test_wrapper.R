@@ -515,6 +515,9 @@ tidy.shapiro_exploratory <- function(x, type = "model") {
     x$qq
   }
   else {
-    x$model_summary
+    ret <- x$model_summary
+    ret <- ret %>% select(-method)
+    ret <- ret %>% rename(`Statistic`=statistic, `P Value`=p.value)
+    ret
   }
 }
