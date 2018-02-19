@@ -91,6 +91,10 @@ build_coxph.fast <- function(df,
     stop("grouping column is used as variable columns")
   }
 
+  if (predictor_n < 2) {
+    stop("Max # of categories for explanatory vars must be at least 2.")
+  }
+
   if(!is.null(seed)){
     set.seed(seed)
   }

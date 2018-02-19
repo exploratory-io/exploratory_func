@@ -839,6 +839,14 @@ calc_feature_imp <- function(df,
     stop("grouping column is used as variable columns")
   }
 
+  if (target_n < 2) {
+    stop("Max # of categories for target var must be at least 2.")
+  }
+
+  if (predictor_n < 2) {
+    stop("Max # of categories for explanatory vars must be at least 2.")
+  }
+
   # remove NA because it's not permitted for randomForest
   df <- df %>%
     dplyr::filter(!is.na(!!target_col))
