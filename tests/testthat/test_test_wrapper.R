@@ -219,3 +219,9 @@ test_that("test exp_anova", {
   ret %>% tidy(model, type="data_summary")
   ret
 })
+
+test_that("test check_normality", {
+  browser()
+  ret <- check_normality(mtcars, mpg, gear)
+  ret
+})

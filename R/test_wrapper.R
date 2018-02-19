@@ -472,3 +472,48 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
   }
   ret
 }
+
+#' @export
+check_normality<- function(df, ..., diag=FALSE) {
+  selected_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
+  
+  shapiro_each <- function(df) {
+    df.qq <- data.frame()
+    df.model <- data.frame()
+　  for (col in selected_cols) {
+　    # set plot.it to FALSE to disable plotting (avoid launching another window)
+　    res <- stats::qqnorm(df[[col]], plot.it=FALSE)  
+　    df.qq <- dplyr::bind_rows(df.qq, data.frame(x=res$x, y=res$y, col=col))
+
+      res <- shapiro.test(df[[col]]) %>% tidy() %>% dplyr::mutate(col=col)
+　    df.model <- dplyr::bind_rows(df.model, res)
+    }
+
+    model <- list()
+    model$qq <- df.qq
+    model$model_summary <- df.model
+    class(model) <- c("shapiro_exploratory", class(model))
+    model
+  }
+
+  # Calculation is executed in each group.
+  # Storing the result in this tmp_col and
+  # unnesting the result.
+  # If the original data frame is grouped by "tmp",
+  # overwriting it should be avoided,
+  # so avoid_conflict is used here.
+  tmp_col <- avoid_conflict(colnames(df), "model")
+  ret <- df %>%
+    dplyr::do_(.dots = setNames(list(~shapiro_each(.)), tmp_col))
+  ret
+}
+
+#' @export
+tidy.shapiro_exploratory <- function(x, type = "model") {
+  if (type == "qq") {
+    x$qq
+  }
+  else {
+    x$model_summary
+  }
+}
