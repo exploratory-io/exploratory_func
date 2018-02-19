@@ -95,7 +95,7 @@ test_that("test calc_feature_imp predicting logical", {
     calc_feature_imp(`Tar get`,
                       dplyr::starts_with("cat_"),
                       num_1,
-                      num_2)
+                      num_2, predictor_n = 6)
 
   conf_mat <- tidy(model_df, model, type = "conf_mat", pretty.name = TRUE)
 
