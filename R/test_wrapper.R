@@ -372,7 +372,8 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
                        `Conf Low` = Mean - `Std Error of Mean` * qt(p=conf_level, df=`Number of Rows`-1),
                        `Minimum`=min(!!rlang::sym(x$var1), na.rm=TRUE),
                        `Maximum`=max(!!rlang::sym(x$var1), na.rm=TRUE)) %>%
-      dplyr::select(`Number of Rows`,
+      dplyr::select(!!rlang::sym(x$var2),
+                    `Number of Rows`,
                     Mean,
                     `Conf Low`,
                     `Conf High`,
@@ -457,7 +458,8 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
                        `Conf Low` = Mean - `Std Error of Mean` * qt(p=conf_threshold, df=`Number of Rows`-1),
                        `Minimum`=min(!!rlang::sym(x$var1), na.rm=TRUE),
                        `Maximum`=max(!!rlang::sym(x$var1), na.rm=TRUE)) %>%
-      dplyr::select(`Number of Rows`,
+      dplyr::select(!!rlang::sym(x$var2),
+                    `Number of Rows`,
                     Mean,
                     `Conf Low`,
                     `Conf High`,
