@@ -140,7 +140,7 @@ build_lm.fast <- function(df,
                     max_nrow = 50000,
                     predictor_n = 12, # so that at least months can fit in it.
                     smote = FALSE,
-                    seed = 0
+                    seed = NULL
                     ){
   # TODO: add test
   # TODO: cleanup code only aplicable to randomForest. this func was started from copy of calc_feature_imp, and still adjusting for lm. 
@@ -162,6 +162,10 @@ build_lm.fast <- function(df,
 
   if (any(c(target_col, selected_cols) %in% grouped_cols)) {
     stop("grouping column is used as variable columns")
+  }
+
+  if (predictor_n < 2) {
+    stop("Max # of categories for explanatory vars must be at least 2.")
   }
 
   if(!is.null(seed)){
@@ -286,8 +290,8 @@ build_lm.fast <- function(df,
           # 2. if the data is ordered factor, turn it into unordered. For ordered factor,
           #    lm/glm takes polynomial terms (Linear, Quadratic, Cubic, and so on) and use them as variables,
           #    which we do not want for this function.
-          if (length(levels(df[[col]])) >= 12) {
-            df[[col]] <- fct_other(factor(df[[col]], ordered=FALSE), keep=levels(df[[col]])[1:10])
+          if (length(levels(df[[col]])) >= predictor_n + 2) {
+            df[[col]] <- fct_other(factor(df[[col]], ordered=FALSE), keep=levels(df[[col]])[1:predictor_n])
           }
           else {
             df[[col]] <- factor(df[[col]], ordered=FALSE)
@@ -298,7 +302,7 @@ build_lm.fast <- function(df,
           #    we use ties.method to handle the case where there are many unique values. (without it, they all survive fct_lump.)
           #    TODO: see if ties.method would make sense for calc_feature_imp.
           # 2. turn NA into (Missing) factor level so that lm will not drop all the rows.
-          df[[col]] <- forcats::fct_explicit_na(forcats::fct_lump(as.factor(df[[col]]), n=predictor_n, ties.method="first"))
+          df[[col]] <- forcats::fct_explicit_na(forcats::fct_lump(fct_infreq(as.factor(df[[col]])), n=predictor_n, ties.method="first"))
         } else {
           # for numeric cols, filter NA rows, because lm will anyway do this internally, and errors out
           # if the remaining rows are with single value in any predictor column.
@@ -372,7 +376,7 @@ glance.lm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
     }
   }
   if(pretty.name) {
-    ret <- ret %>% dplyr::rename(`R Squared`=r.squared, `Adj R Squared`=adj.r.squared, `Root Mean Square Error`=sigma, `F Ratio`=statistic, `P Value`=p.value, `Degree of Freedom`=df, `Log Likelihood`=logLik, Deviance=deviance, `Residual DF`=df.residual)
+    ret <- ret %>% dplyr::rename(`R Squared`=r.squared, `Adj R Squared`=adj.r.squared, `RMSE`=sigma, `F Ratio`=statistic, `P Value`=p.value, `Degree of Freedom`=df, `Log Likelihood`=logLik, Deviance=deviance, `Residual DF`=df.residual)
   }
   ret
 }

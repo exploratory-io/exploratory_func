@@ -70,7 +70,7 @@ build_coxph.fast <- function(df,
                     ...,
                     max_nrow = 50000, # With 50000 rows, taking 6 to 7 seconds on late-2016 Macbook Pro.
                     predictor_n = 12, # so that at least months can fit in it.
-                    seed = 0
+                    seed = NULL
                     ){
   # TODO: cleanup code only aplicable to randomForest. this func was started from copy of calc_feature_imp, and still adjusting for lm. 
 
@@ -89,6 +89,10 @@ build_coxph.fast <- function(df,
 
   if (any(c(time_col, status_col, selected_cols) %in% grouped_cols)) {
     stop("grouping column is used as variable columns")
+  }
+
+  if (predictor_n < 2) {
+    stop("Max # of categories for explanatory vars must be at least 2.")
   }
 
   if(!is.null(seed)){
@@ -214,19 +218,19 @@ build_coxph.fast <- function(df,
           # 2. if the data is ordered factor, turn it into unordered. For ordered factor,
           #    coxph takes polynomial terms (Linear, Quadratic, Cubic, and so on) and use them as variables,
           #    which we do not want for this function.
-          if (length(levels(df[[col]])) >= 12) {
-            df[[col]] <- fct_other(factor(df[[col]], ordered=FALSE), keep=levels(df[[col]])[1:10])
+          if (length(levels(df[[col]])) >= predictor_n + 2) {
+            df[[col]] <- fct_other(factor(df[[col]], ordered=FALSE), keep=levels(df[[col]])[1:predictor_n])
           }
           else {
             df[[col]] <- factor(df[[col]], ordered=FALSE)
           }
         } else if(!is.numeric(df[[col]])) {
-          # 1. convert data to factor if predictors are not numeric or logical
-          #    and limit the number of levels in factor by fct_lump.
+          # 1. convert data to factor if predictors are not numeric or logical.
+          # 2. sort levels by frequency so that base level is the most frequent category.
+          # 3. limit the number of levels in factor by fct_lump.
           #    we use ties.method to handle the case where there are many unique values. (without it, they all survive fct_lump.)
-          #    TODO: see if ties.method would make sense for calc_feature_imp.
-          # 2. turn NA into (Missing) factor level so that coxph will not drop all the rows.
-          df[[col]] <- forcats::fct_explicit_na(forcats::fct_lump(as.factor(df[[col]]), n=predictor_n, ties.method="first"))
+          # 4. turn NA into (Missing) factor level so that lm will not drop all the rows.
+          df[[col]] <- forcats::fct_explicit_na(forcats::fct_lump(fct_infreq(as.factor(df[[col]])), n=predictor_n, ties.method="first"))
         } else {
           # for numeric cols, filter NA rows, because lm will anyway do this internally, and errors out
           # if the remaining rows are with single value in any predictor column.
