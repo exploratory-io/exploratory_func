@@ -277,7 +277,6 @@ tidy.chisq_exploratory <- function(x, type = "observed") {
 
     ret <- obs_df %>% left_join(resid_df, by=c(x$var1, x$var2)) # join residual column 
     ret <- ret %>% left_join(raw_resid_df, by=c(x$var1, x$var2)) # join raw_residual column
-    browser()
     if (is.nan(x$statistic) || x$statistic <= 0) {
       ret <- ret %>% mutate(contrib = 0) # avoid division by 0
     }
@@ -474,7 +473,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
 }
 
 #' @export
-check_normality<- function(df, ..., diag=FALSE) {
+exp_normality<- function(df, ..., diag=FALSE) {
   selected_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
   
   shapiro_each <- function(df) {

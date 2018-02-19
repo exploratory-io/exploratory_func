@@ -220,8 +220,7 @@ test_that("test exp_anova", {
   ret
 })
 
-test_that("test check_normality", {
-  browser()
-  ret <- check_normality(mtcars, mpg, gear)
+test_that("test exp_normality", {
+  ret <- exp_normality(mtcars, mpg, gear)
   ret
 })
