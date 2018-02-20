@@ -495,8 +495,9 @@ qqline_data <- function (y, datax = FALSE, distribution = qnorm, probs = c(0.25,
 }
 
 
+#' @param n_sample - Downsample to this size before shapiro test. Note that this is not applied for qq data. 
 #' @export
-exp_normality<- function(df, ..., n_sample = 5000) {
+exp_normality<- function(df, ..., n_sample = 50) {
   selected_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
   
   shapiro_each <- function(df) {
@@ -510,9 +511,11 @@ exp_normality<- function(df, ..., n_sample = 5000) {
 
       # bind reference line data too.
       ref_res <- qqline_data(df[[col]])
-      ref_min_y <- ref_res[[1]] + ref_res[[2]] * min(res$x)
-      ref_max_y <- ref_res[[1]] + ref_res[[2]] * max(res$x)
-　    df.qqline <- dplyr::bind_rows(df.qqline, data.frame(x=c(min(res$x),max(res$x)), refline_y=c(ref_min_y,ref_max_y), col=col))
+      min_x <- min(res$x, na.rm=TRUE)
+      max_x <- max(res$x, na.rm=TRUE)
+      ref_min_y <- ref_res[[1]] + ref_res[[2]] * min_x
+      ref_max_y <- ref_res[[1]] + ref_res[[2]] * max_x
+　    df.qqline <- dplyr::bind_rows(df.qqline, data.frame(x=c(min_x, max_x), refline_y=c(ref_min_y,ref_max_y), col=col))
 
       if (n_sample > 5000) {
         n_sample <- 5000 # shapiro.test takes only up to max of 5000 samples. 
