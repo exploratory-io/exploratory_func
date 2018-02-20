@@ -553,9 +553,16 @@ exp_normality<- function(df, ..., n_sample = 5000) {
 }
 
 #' @export
-tidy.shapiro_exploratory <- function(x, type = "model", conf_level=0.95) {
+tidy.shapiro_exploratory <- function(x, type = "model", conf_level=0.95, n_sample=5000) {
   if (type == "qq") {
-    x$qq
+    if (length(x$qq) > n_sample) {
+      sampled_qq_df <- dplyr::sample_n(x$qq, n_sample)
+    }
+    else {
+      sampled_qq_df <- x$qq
+    }
+　  ret <- dplyr::bind_rows(sampled_qq_df, x$qqline)
+    ret
   }
   else {
     ret <- x$model_summary
