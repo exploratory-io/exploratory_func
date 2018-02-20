@@ -224,6 +224,5 @@ test_that("test exp_normality", {
   ret <- exp_normality(mtcars, mpg, gear, n_sample=20)
   qq <- ret %>% tidy(model, type="qq")
   model_summary <- ret %>% tidy(model, type="model_summary", conf_level=0.9)
-  browser()
   ret
 })

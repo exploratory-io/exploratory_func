@@ -271,7 +271,8 @@ tidy.chisq_exploratory <- function(x, type = "observed") {
     obs_df <- obs_df %>% tibble::rownames_to_column(var = x$var1)
     obs_df <- obs_df %>% tidyr::gather(!!rlang::sym(x$var2), "observed", -!!rlang::sym(x$var1))
 
-    raw_resid_df <- as.data.frame(x$observed - x$expected) # x$residual is standardized, but here, take raw difference between observed and expected. 
+    # raw_resid_df <- as.data.frame(x$observed - x$expected) # x$residual is standardized, but here, take raw difference between observed and expected. 
+    raw_resid_df <- as.data.frame((x$observed - x$expected)/x$expected) # x$residual is standardized, but here, take raw difference between observed and expected. 
     raw_resid_df <- raw_resid_df %>% tibble::rownames_to_column(var = x$var1)
     raw_resid_df <- raw_resid_df %>% tidyr::gather(!!rlang::sym(x$var2), "raw_residual", -!!rlang::sym(x$var1))
 
