@@ -474,6 +474,26 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
   ret
 }
 
+
+# qqline function that does not draw line and instead return intercept and slope
+qqline_data <- function (y, datax = FALSE, distribution = qnorm, probs = c(0.25, 0.75), qtype = 7, ...) 
+{
+  stopifnot(length(probs) == 2, is.function(distribution))
+  y <- quantile(y, probs, names = FALSE, type = qtype, na.rm = TRUE)
+  x <- distribution(probs)
+  if (datax) {
+    slope <- diff(x)/diff(y)
+    int <- x[1L] - slope * y[1L]
+  }
+  else {
+    slope <- diff(y)/diff(x)
+    int <- y[1L] - slope * x[1L]
+  }
+  
+  list(int, slope) # intercept and slope
+}
+
+
 #' @export
 exp_normality<- function(df, ..., diag=FALSE) {
   selected_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
@@ -483,8 +503,14 @@ exp_normality<- function(df, ..., diag=FALSE) {
     df.model <- data.frame()
 　  for (col in selected_cols) {
 　    # set plot.it to FALSE to disable plotting (avoid launching another window)
-　    res <- stats::qqnorm(df[[col]], plot.it=FALSE)  
+　    res <- stats::qqnorm(df[[col]], plot.it=FALSE)
 　    df.qq <- dplyr::bind_rows(df.qq, data.frame(x=res$x, y=res$y, col=col))
+
+      # bind reference line data too.
+      ref_res <- qqline_data(df[[col]])
+      ref_min_y <- ref_res[[1]] + ref_res[[2]] * min(res$x)
+      ref_max_y <- ref_res[[1]] + ref_res[[2]] * max(res$x)
+　    df.qq <- dplyr::bind_rows(df.qq, data.frame(x=c(min(res$x),max(res$x)), refline_y=c(ref_min_y,ref_max_y), col=col))
 
       if (length(df[[col]]) > 5000) { # shapiro.test takes only up to max of 5000 samples. 
         col_to_test <- sample(df[[col]], 5000)
