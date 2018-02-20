@@ -550,14 +550,15 @@ exp_normality<- function(df, ..., n_sample = 5000) {
 }
 
 #' @export
-tidy.shapiro_exploratory <- function(x, type = "model") {
+tidy.shapiro_exploratory <- function(x, type = "model", conf_level=0.95) {
   if (type == "qq") {
     x$qq
   }
   else {
     ret <- x$model_summary
+    ret <- ret %>% mutate(normal=p.value>(1-conf_level))
     ret <- ret %>% select(-method)
-    ret <- ret %>% rename(`Column`=col, `Statistic`=statistic, `P Value`=p.value, `Sample Size`=sample_size)
+    ret <- ret %>% rename(`Column`=col, `Statistic`=statistic, `P Value`=p.value, `Normal Distribution`=normal, `Sample Size`=sample_size)
     ret
   }
 }
