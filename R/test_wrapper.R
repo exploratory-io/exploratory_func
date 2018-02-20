@@ -486,7 +486,17 @@ exp_normality<- function(df, ..., diag=FALSE) {
 　    res <- stats::qqnorm(df[[col]], plot.it=FALSE)  
 　    df.qq <- dplyr::bind_rows(df.qq, data.frame(x=res$x, y=res$y, col=col))
 
-      res <- shapiro.test(df[[col]]) %>% tidy() %>% dplyr::mutate(col=col)
+      if (length(df[[col]]) > 5000) { # shapiro.test takes only up to max of 5000 samples. 
+        col_to_test <- sample(df[[col]], 5000)
+        sample_size <- 5000
+      }
+      else {
+        col_to_test <- df[[col]]
+        sample_size <- length(col_to_test)
+      }
+      res <- shapiro.test(col_to_test) %>% tidy() %>%
+        dplyr::mutate(col=col, sample_size=sample_size) %>%
+        dplyr::select(col, everything())
 　    df.model <- dplyr::bind_rows(df.model, res)
     }
 
@@ -517,7 +527,7 @@ tidy.shapiro_exploratory <- function(x, type = "model") {
   else {
     ret <- x$model_summary
     ret <- ret %>% select(-method)
-    ret <- ret %>% rename(`Statistic`=statistic, `P Value`=p.value)
+    ret <- ret %>% rename(`Column`=col, `Statistic`=statistic, `P Value`=p.value, `Sample Size`=sample_size)
     ret
   }
 }
