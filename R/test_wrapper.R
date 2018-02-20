@@ -501,6 +501,7 @@ exp_normality<- function(df, ..., n_sample = 5000) {
   
   shapiro_each <- function(df) {
     df.qq <- data.frame()
+    df.qqline <- data.frame()
     df.model <- data.frame()
 　  for (col in selected_cols) {
 　    # set plot.it to FALSE to disable plotting (avoid launching another window)
@@ -511,7 +512,7 @@ exp_normality<- function(df, ..., n_sample = 5000) {
       ref_res <- qqline_data(df[[col]])
       ref_min_y <- ref_res[[1]] + ref_res[[2]] * min(res$x)
       ref_max_y <- ref_res[[1]] + ref_res[[2]] * max(res$x)
-　    df.qq <- dplyr::bind_rows(df.qq, data.frame(x=c(min(res$x),max(res$x)), refline_y=c(ref_min_y,ref_max_y), col=col))
+　    df.qqline <- dplyr::bind_rows(df.qqline, data.frame(x=c(min(res$x),max(res$x)), refline_y=c(ref_min_y,ref_max_y), col=col))
 
       if (n_sample > 5000) {
         n_sample <- 5000 # shapiro.test takes only up to max of 5000 samples. 
@@ -533,6 +534,7 @@ exp_normality<- function(df, ..., n_sample = 5000) {
 
     model <- list()
     model$qq <- df.qq
+    model$qqline <- df.qqline
     model$model_summary <- df.model
     class(model) <- c("shapiro_exploratory", class(model))
     model
