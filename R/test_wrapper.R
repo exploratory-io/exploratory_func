@@ -279,9 +279,14 @@ tidy.chisq_exploratory <- function(x, type = "observed") {
     resid_raw_df <- resid_raw_df %>% tibble::rownames_to_column(var = x$var1)
     resid_raw_df <- resid_raw_df %>% tidyr::gather(!!rlang::sym(x$var2), "residual_raw", -!!rlang::sym(x$var1))
 
-    ret <- obs_df %>% left_join(resid_df, by=c(x$var1, x$var2)) # join residual column 
+    resid_ratio_df <- as.data.frame((x$observed - x$expected)/x$expected) # x$residual is standardized, but here, take raw difference between observed and expected. 
+    resid_ratio_df <- resid_ratio_df %>% tibble::rownames_to_column(var = x$var1)
+    resid_ratio_df <- resid_ratio_df %>% tidyr::gather(!!rlang::sym(x$var2), "residual_ratio", -!!rlang::sym(x$var1))
+
+    ret <- obs_df %>% left_join(expected_df, by=c(x$var1, x$var2)) # join expected column 
+    ret <- ret %>% left_join(resid_df, by=c(x$var1, x$var2)) # join expected column
     ret <- ret %>% left_join(resid_raw_df, by=c(x$var1, x$var2)) # join residual_raw column
-    ret <- ret %>% left_join(expected_df, by=c(x$var1, x$var2)) # join expected column
+    ret <- ret %>% left_join(resid_ratio_df, by=c(x$var1, x$var2)) # join residual_ratio column
     if (is.nan(x$statistic) || x$statistic <= 0) {
       ret <- ret %>% mutate(contrib = 0) # avoid division by 0
     }
