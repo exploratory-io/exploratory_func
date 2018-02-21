@@ -263,10 +263,6 @@ tidy.chisq_exploratory <- function(x, type = "observed") {
     ret <- ret %>% tibble::rownames_to_column(var = x$var1)
   }
   if (type == "residuals") {
-    resid_df <- as.data.frame(x$residuals)
-    resid_df <- resid_df %>% tibble::rownames_to_column(var = x$var1)
-    resid_df <- resid_df %>% tidyr::gather(!!rlang::sym(x$var2), "residual", -!!rlang::sym(x$var1))
-
     obs_df <- as.data.frame(x$observed)
     obs_df <- obs_df %>% tibble::rownames_to_column(var = x$var1)
     obs_df <- obs_df %>% tidyr::gather(!!rlang::sym(x$var2), "observed", -!!rlang::sym(x$var1))
@@ -274,6 +270,10 @@ tidy.chisq_exploratory <- function(x, type = "observed") {
     expected_df <- as.data.frame(x$expected)
     expected_df <- expected_df %>% tibble::rownames_to_column(var = x$var1)
     expected_df <- expected_df %>% tidyr::gather(!!rlang::sym(x$var2), "expected", -!!rlang::sym(x$var1))
+
+    resid_df <- as.data.frame(x$residuals)
+    resid_df <- resid_df %>% tibble::rownames_to_column(var = x$var1)
+    resid_df <- resid_df %>% tidyr::gather(!!rlang::sym(x$var2), "residual", -!!rlang::sym(x$var1))
 
     resid_raw_df <- as.data.frame(x$observed - x$expected) # x$residual is standardized, but here, take raw difference between observed and expected. 
     resid_raw_df <- resid_raw_df %>% tibble::rownames_to_column(var = x$var1)
