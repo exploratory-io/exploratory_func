@@ -564,6 +564,8 @@ exp_normality<- function(df, ..., n_sample = 50) {
   ret
 }
 
+#' @param n_sample - Downsample qq-plot data down to this number.
+#'                   This is to make sure qq-line part of the data would not be sampled out in qq scatter plot.
 #' @export
 tidy.shapiro_exploratory <- function(x, type = "model", conf_level=0.95, n_sample=NULL) {
   if (type == "qq") {
