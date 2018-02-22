@@ -331,7 +331,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       }
     }
     if (is.null(conn)) {
-      url = getMongoURL(host, port, databaseName, username, password, isSSL, authSource, cluster, additionalParams)
+      url = getMongoURL(host = host, port = port, database = databaseName, username = username, pass = password, isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParams)
       conn <- mongolite::mongo(collection, url = url)
       connection_pool[[key]] <- conn
     }
