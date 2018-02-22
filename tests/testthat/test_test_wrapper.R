@@ -219,3 +219,10 @@ test_that("test exp_anova", {
   ret %>% tidy(model, type="data_summary")
   ret
 })
+
+test_that("test exp_normality", {
+  ret <- exp_normality(mtcars, mpg, gear, n_sample=20)
+  qq <- ret %>% tidy(model, type="qq", n_sample=30)
+  model_summary <- ret %>% tidy(model, type="model_summary", conf_level=0.9)
+  ret
+})
