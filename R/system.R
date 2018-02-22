@@ -166,7 +166,7 @@ getGithubIssues <- function(username, password, owner, repository, ...){
 }
 
 
-getMongoURL <- function(host, port, database, username, pass, isSSL=FALSE, authSource=NULL) {
+getMongoURL <- function(host = NULL, port, database, username, pass, isSSL=FALSE, authSource=NULL, cluster = NULL, additionalParams = NULL) {
   loadNamespace("stringr")
   loadNamespace("urltools")
 
@@ -175,10 +175,18 @@ getMongoURL <- function(host, port, database, username, pass, isSSL=FALSE, authS
       # mongodb connection URL uses @ as a separator so need to encode password for those special characters.
       pass = urltools::url_encode(pass)
     }
-    url = stringr::str_c("mongodb://", username, ":", pass, "@", host, ":", as.character(port), "/", database)
+    if(!is.null(host) && host != ''){
+      url = stringr::str_c("mongodb://", username, ":", pass, "@", host, ":", as.character(port), "/", database)
+    } else if (!is.null(cluster) && cluster != ''){
+      url = stringr::str_c("mongodb://", username, ":", pass, "@", cluster, "/", database)
+    }
   }
   else {
-    url = stringr::str_c("mongodb://", host, ":", as.character(port), "/", database)
+    if(!is.null(host) & host != ''){
+      url = stringr::str_c("mongodb://", host, ":", as.character(port), "/", database)
+    } else if (!is.null(cluster) && cluster != ''){
+      url = stringr::str_c("mongodb://", cluster, "/", database)
+    }
   }
   if(isSSL){
     url = stringr::str_c(url, "?ssl=true")
@@ -190,12 +198,21 @@ getMongoURL <- function(host, port, database, username, pass, isSSL=FALSE, authS
       url = stringr::str_c(url, "?authSource=", authSource)
     }
   }
+  if(!is.null(additionalParams) && additionalParams != ''){
+    if(isSSL || !is.null(authSource) && authSource != "") {
+      url = stringr::str_c(url, "&", additionalParams)
+    } else {
+      url = stringr::str_c(url, "?", additionalParams)
+    }
+  }
   return (url)
 }
 
 
 #' @export
-queryMongoDB <- function(host, port, database, collection, username, password, query = "{}", flatten, limit=100, isSSL=FALSE, authSource=NULL, fields="{}", sort="{}", skip=0, queryType = "find", pipeline="{}", ...){
+queryMongoDB <- function(host = NULL, port = "", database, collection, username, password, query = "{}", flatten,
+                         limit=100, isSSL=FALSE, authSource=NULL, fields="{}", sort="{}",
+                         skip=0, queryType = "find", pipeline="{}", cluster = NULL, additionalParamas = NULL, ...){
   if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
   loadNamespace("jsonlite")
   if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
@@ -203,7 +220,7 @@ queryMongoDB <- function(host, port, database, collection, username, password, q
   # read stored password
   pass = saveOrReadPassword("mongodb", username, password)
   # get connection from connection pool
-  con <- getDBConnection("mongodb", host, port, database, username, pass, collection = collection, isSSL = isSSL, authSource = authSource)
+  con <- getDBConnection("mongodb", host, port, database, username, pass, collection = collection, isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParamas)
   if(fields == ""){
     fields = "{}"
   }
@@ -242,18 +259,19 @@ queryMongoDB <- function(host, port, database, collection, username, password, q
 
 #' Returns a data frame that has names of the collections in its "name" column.
 #' @export
-getMongoCollectionNames <- function(host, port, database, username, password, isSSL=FALSE, authSource=NULL){
+getMongoCollectionNames <- function(host = "", port = "", database = "", username = "",
+                                    password ="", isSSL=FALSE, authSource=NULL, cluster = NULL, additionalParams = "", ...){
   collection = "test" # dummy collection name. mongo command seems to work even if the collection does not exist.
   loadNamespace("jsonlite")
   if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
   pass = saveOrReadPassword("mongodb", username, password)
-  con <- getDBConnection("mongodb", host, port, database, username, pass, collection = collection, isSSL = isSSL, authSource = authSource)
+  con <- getDBConnection("mongodb", host, port, database, username, pass, collection = collection, isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParams)
   # command to list collections.
   # con$command is our addition in our mongolite fork.
   result <- con$command(command = '{"listCollections":1}')
   # need to check existence of ok column of result dataframe first to avoid error in error check.
   if (!("ok" %in% colnames(result)) || !result$ok) {
-    clearDBConnection("mongodb", host, port, database, username, collection = collection, isSSL = isSSL, authSource = authSource)
+    clearDBConnection("mongodb", host, port, database, username, collection = collection, isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParams)
     stop("listCollections command failed");
   }
   # TODO: does "firstBatch" mean it is possible there are more?
@@ -264,15 +282,17 @@ getMongoCollectionNames <- function(host, port, database, username, password, is
 #' Returns the total number of rows stored in the target table.
 #' At this moment only mongdb is supported.
 #' @export
-getMongoCollectionNumberOfRows <- function(host, port, database, username, password, collection, isSSL=FALSE, authSource=NULL){
+getMongoCollectionNumberOfRows <- function(host = NULL, port = "", database = "",
+                                           username = "", password = "", collection = "",
+                                           isSSL=FALSE, authSource=NULL, cluster = NULL, additionalParams = "", ...){
   loadNamespace("jsonlite")
   if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
   pass = saveOrReadPassword("mongodb", username, password)
-  con <- getDBConnection("mongodb", host, port, database, username, pass, collection = collection, isSSL = isSSL, authSource = authSource)
+  con <- getDBConnection("mongodb", host, port, database, username, pass, collection = collection, isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParams)
   tryCatch({
     result <- con$count()
   }, error = function(err) {
-    clearDBConnection("mongodb", host, port, database, username, collection = collection, isSSL = isSSL, authSource = authSource)
+    clearDBConnection("mongodb", host, port, database, username, collection = collection, isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParams)
     stop(err)
   })
   return(result)
@@ -282,16 +302,22 @@ getMongoCollectionNumberOfRows <- function(host, port, database, username, passw
 #' Returns specified connection from pool if it exists in the pool.
 #' If not, new connection is created and returned.
 #' @export
-getDBConnection <- function(type, host, port, databaseName, username = "", password = "", catalog = "", schema = "", dsn="", additionalParams = "",
-                            collection = "", isSSL = FALSE, authSource = NULL) {
+getDBConnection <- function(type, host = NULL, port = "", databaseName = "", username = "", password = "", catalog = "", schema = "", dsn="", additionalParams = "",
+                            collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL) {
 
   drv = NULL
   conn = NULL
+  key = NULL
   if(type == "mongodb") {
     if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
     loadNamespace("jsonlite")
     if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
-    key <- paste("mongodb", host, port, databaseName, collection, username, toString(isSSL), authSource, sep = ":")
+    if(!is.null(host) && host != ''){
+      key <- paste("mongodb", host, port, databaseName, collection, username, toString(isSSL), authSource, additionalParams, sep = ":")
+    } else if (!is.null(cluster) && cluster != '') {
+      key <- paste("mongodb", cluster, databaseName, collection, username, toString(isSSL), authSource, additionalParams, sep = ":")
+    }
+
     conn <- connection_pool[[key]]
     if (!is.null(conn)){
       # command to ping to check connection validity.
@@ -305,7 +331,7 @@ getDBConnection <- function(type, host, port, databaseName, username = "", passw
       }
     }
     if (is.null(conn)) {
-      url = getMongoURL(host, port, databaseName, username, password, isSSL, authSource)
+      url = getMongoURL(host, port, databaseName, username, password, isSSL, authSource, cluster, additionalParams)
       conn <- mongolite::mongo(collection, url = url)
       connection_pool[[key]] <- conn
     }
@@ -461,11 +487,15 @@ getDBConnection <- function(type, host, port, databaseName, username = "", passw
 #' When there is an error from a connection, we should call this so that next call to getDBConnection
 #' would return a newly created connection.
 #' @export
-clearDBConnection <- function(type, host, port, databaseName, username, catalog = "", schema = "", dsn="", additionalParams = "",
-                              collection = "", isSSL = FALSE, authSource = NULL) {
+clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, username, catalog = "", schema = "", dsn="", additionalParams = "",
+                              collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL) {
   if (type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora")) { #TODO: implement for other types too
     if (type %in% c("mongodb")) {
-      key <- paste("mongodb", host, port, databaseName, collection, username, toString(isSSL), authSource, sep = ":")
+      if(!is.na(host) && host != ''){
+        key <- paste("mongodb", host, port, databaseName, collection, username, toString(isSSL), authSource, additionalParams, sep = ":")
+      } else if (!is.na(cluster) && cluster != '') {
+        key <- paste("mongodb", cluster, databaseName, collection, username, toString(isSSL), authSource, additionalParams, sep = ":")
+      }
       conn <- connection_pool[[key]]
       if (!is.null(conn)) {
         rm(conn)
