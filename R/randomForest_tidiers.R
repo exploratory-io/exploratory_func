@@ -746,7 +746,7 @@ exp_balance <- function(df,
     if (nrow(df) == 0) { # if no rows are left, give up smote and return original df.
       df_balanced <- orig_df # TODO: we should throw error and let user know which columns with NAs to remove.
     }
-    if (n_distinct(df[[target_col]]) != 2) {
+    else if (n_distinct(df[[target_col]]) != 2) {
       # if filtering NAs makes unique values of target col less than 2, give up smote and return original df.
       df_balanced <- orig_df # TODO: we should throw error and let user know which columns with NAs to remove.
     }
@@ -768,9 +768,9 @@ exp_balance <- function(df,
         # in this case, give up SMOTE and return original. TODO: look into how to prevent this.
         df_balanced <- orig_df
       }
+      levels(df_balanced[[target_col]]) <- orig_levels # set original labels before turning it into 0/1.
     }
 
-    levels(df_balanced[[target_col]]) <- orig_levels # set original labels before turning it into 0/1.
 
     if (was_target_logical) {
       df_balanced[[target_col]] <- as.logical(df_balanced[[target_col]]) # turn it back to logical.
