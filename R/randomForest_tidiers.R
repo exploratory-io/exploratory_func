@@ -701,7 +701,7 @@ exp_balance <- function(df,
   was_target_character <- is.character(df[[target_col]])
   was_target_factor <- is.factor(df[[target_col]])
   was_target_numeric <- is.numeric(df[[target_col]])
-  if (was_target_numeric) { # if target is numeric, make if factor first, to remember original values as factor levels and set it back later.
+  if (was_target_numeric) { # if target is numeric, make it factor first, to remember original values as factor levels and set it back later.
     df[[target_col]] <- factor(df[[target_col]])
   }
   orig_levels_order <- NULL
@@ -744,6 +744,10 @@ exp_balance <- function(df,
       }
     }
     if (nrow(df) == 0) { # if no rows are left, give up smote and return original df.
+      df_balanced <- orig_df # TODO: we should throw error and let user know which columns with NAs to remove.
+    }
+    if (n_distinct(df[[target_col]]) != 2) {
+      # if filtering NAs makes unique values of target col less than 2, give up smote and return original df.
       df_balanced <- orig_df # TODO: we should throw error and let user know which columns with NAs to remove.
     }
     else {
