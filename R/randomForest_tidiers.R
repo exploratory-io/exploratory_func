@@ -740,6 +740,7 @@ exp_balance <- function(df,
       }
       else if(is.numeric(df[[col]])) {
         # for numeric cols, filter NA rows. With NAs, ubSMOTE throws mysterious error like "invalid 'labels'; length 0 should be 1 or 2"
+        # TODO: we should probably warn if more than half of rows are filtered by a column, so that user can remove that column.
         df <- df %>% dplyr::filter(!is.na(df[[col]]) & !is.infinite(df[[col]]))
       }
     }
@@ -747,6 +748,7 @@ exp_balance <- function(df,
       df_balanced <- orig_df # TODO: we should throw error and let user know which columns with NAs to remove.
     }
     else if (n_distinct(df[[target_col]]) != 2) {
+      # TODO: add test for this case.
       # if filtering NAs makes unique values of target col less than 2, give up smote and return original df.
       df_balanced <- orig_df # TODO: we should throw error and let user know which columns with NAs to remove.
     }
