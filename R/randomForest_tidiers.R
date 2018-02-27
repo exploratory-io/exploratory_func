@@ -747,7 +747,7 @@ exp_balance <- function(df,
     if (nrow(df) == 0) { # if no rows are left, give up smote and return original df.
       df_balanced <- orig_df # TODO: we should throw error and let user know which columns with NAs to remove.
     }
-    else if (n_distinct(df[[target_col]]) != 2) {
+    else if (n_distinct(df[[target_col]]) < 2) {
       # TODO: add test for this case.
       # if filtering NAs makes unique values of target col less than 2, give up smote and return original df.
       df_balanced <- orig_df # TODO: we should throw error and let user know which columns with NAs to remove.
