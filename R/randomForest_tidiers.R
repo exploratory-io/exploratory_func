@@ -701,7 +701,7 @@ exp_balance <- function(df,
   was_target_character <- is.character(df[[target_col]])
   was_target_factor <- is.factor(df[[target_col]])
   was_target_numeric <- is.numeric(df[[target_col]])
-  if (was_target_numeric) { # if target is numeric, make if factor first, to remember original values as factor levels and set it back later.
+  if (was_target_numeric) { # if target is numeric, make it factor first, to remember original values as factor levels and set it back later.
     df[[target_col]] <- factor(df[[target_col]])
   }
   orig_levels_order <- NULL
@@ -740,10 +740,16 @@ exp_balance <- function(df,
       }
       else if(is.numeric(df[[col]])) {
         # for numeric cols, filter NA rows. With NAs, ubSMOTE throws mysterious error like "invalid 'labels'; length 0 should be 1 or 2"
+        # TODO: we should probably warn if more than half of rows are filtered by a column, so that user can remove that column.
         df <- df %>% dplyr::filter(!is.na(df[[col]]) & !is.infinite(df[[col]]))
       }
     }
     if (nrow(df) == 0) { # if no rows are left, give up smote and return original df.
+      df_balanced <- orig_df # TODO: we should throw error and let user know which columns with NAs to remove.
+    }
+    else if (n_distinct(df[[target_col]]) < 2) {
+      # TODO: add test for this case.
+      # if filtering NAs makes unique values of target col less than 2, give up smote and return original df.
       df_balanced <- orig_df # TODO: we should throw error and let user know which columns with NAs to remove.
     }
     else {
@@ -764,9 +770,9 @@ exp_balance <- function(df,
         # in this case, give up SMOTE and return original. TODO: look into how to prevent this.
         df_balanced <- orig_df
       }
+      levels(df_balanced[[target_col]]) <- orig_levels # set original labels before turning it into 0/1.
     }
 
-    levels(df_balanced[[target_col]]) <- orig_levels # set original labels before turning it into 0/1.
 
     if (was_target_logical) {
       df_balanced[[target_col]] <- as.logical(df_balanced[[target_col]]) # turn it back to logical.
