@@ -317,7 +317,7 @@ glance.chisq_exploratory <- function(x) {
 exp_ttest <- function(df, var1, var2, func2 = NULL, ...) {
   var1_col <- col_name(substitute(var1))
   var2_col <- col_name(substitute(var2))
-  grouped_col <- grouped_by(df)
+  grouped_cols <- grouped_by(df)
 
   if (!is.null(func2) && (is.Date(df[[var2_col]]) || is.POSIXct(df[[var2_col]]))) {
     df <- df %>% mutate(!!rlang::sym(var2_col) := extract_from_date(!!rlang::sym(var2_col), type=func2))
@@ -330,12 +330,26 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, ...) {
   formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
 
   ttest_each <- function(df) {
-    model <- t.test(formula, data = df, ...)
-    class(model) <- c("ttest_exploratory", class(model))
-    model$var1 <- var1_col
-    model$var2 <- var2_col
-    model$data <- df
-    model
+    tryCatch({
+      model <- t.test(formula, data = df, ...)
+      class(model) <- c("ttest_exploratory", class(model))
+      model$var1 <- var1_col
+      model$var2 <- var2_col
+      model$data <- df
+      model
+    }, error = function(e){
+      if(length(grouped_cols) > 0) {
+        # Ignore the error if
+        # it is caused by subset of
+        # grouped data frame
+        # to show result of
+        # data frames that succeed.
+        # For example, error can happen if one of the groups does not have both values (e.g. both TRUE and FALSE) of var2.
+        NULL
+      } else {
+        stop(e)
+      }
+    })
   }
 
   # Calculation is executed in each group.
@@ -403,7 +417,7 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
 exp_anova <- function(df, var1, var2, func2 = NULL, ...) {
   var1_col <- col_name(substitute(var1))
   var2_col <- col_name(substitute(var2))
-  grouped_col <- grouped_by(df)
+  grouped_cols <- grouped_by(df)
 
   if (!is.null(func2) && (is.Date(df[[var2_col]]) || is.POSIXct(df[[var2_col]]))) {
     df <- df %>% mutate(!!rlang::sym(var2_col) := extract_from_date(!!rlang::sym(var2_col), type=func2))
@@ -416,12 +430,26 @@ exp_anova <- function(df, var1, var2, func2 = NULL, ...) {
   formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
 
   anova_each <- function(df) {
-    model <- aov(formula, data = df, ...)
-    class(model) <- c("anova_exploratory", class(model))
-    model$var1 <- var1_col
-    model$var2 <- var2_col
-    model$data <- df
-    model
+    tryCatch({
+      model <- aov(formula, data = df, ...)
+      class(model) <- c("anova_exploratory", class(model))
+      model$var1 <- var1_col
+      model$var2 <- var2_col
+      model$data <- df
+      model
+    }, error = function(e){
+      if(length(grouped_cols) > 0) {
+        # Ignore the error if
+        # it is caused by subset of
+        # grouped data frame
+        # to show result of
+        # data frames that succeed.
+        # For example, error can happen if one of the groups has only one unique value in its set of var2.
+        NULL
+      } else {
+        stop(e)
+      }
+    })
   }
 
   # Calculation is executed in each group.

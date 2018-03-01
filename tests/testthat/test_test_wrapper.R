@@ -212,10 +212,24 @@ test_that("test exp_ttest", {
   ret
 })
 
+test_that("test exp_ttest with group_by", {
+  ret <- mtcars %>% group_by(vs) %>% exp_ttest(mpg, am)
+  ret %>% tidy(model, type="data_summary")
+  ret
+})
+
 test_that("test exp_anova", {
   ret <- exp_anova(mtcars, mpg, am)
   ret %>% tidy(model, type="data_summary")
   ret <- exp_anova(mtcars, mpg, gear)
+  ret %>% tidy(model, type="data_summary")
+  ret
+})
+
+test_that("test exp_anova with group_by", {
+  ret <- mtcars %>% group_by(vs) %>% exp_anova(mpg, am)
+  ret %>% tidy(model, type="data_summary")
+  ret <- mtcars %>% group_by(vs) %>% exp_anova(mpg, gear)
   ret %>% tidy(model, type="data_summary")
   ret
 })
