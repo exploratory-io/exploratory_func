@@ -339,11 +339,12 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, ...) {
       model
     }, error = function(e){
       if(length(grouped_cols) > 0) {
-        # ignore the error if
+        # Ignore the error if
         # it is caused by subset of
         # grouped data frame
         # to show result of
-        # data frames that succeed
+        # data frames that succeed.
+        # For example, error can happen if one of the groups does not have both values (e.g. both TRUE and FALSE) of var2.
         NULL
       } else {
         stop(e)
@@ -438,11 +439,12 @@ exp_anova <- function(df, var1, var2, func2 = NULL, ...) {
       model
     }, error = function(e){
       if(length(grouped_cols) > 0) {
-        # ignore the error if
+        # Ignore the error if
         # it is caused by subset of
         # grouped data frame
         # to show result of
-        # data frames that succeed
+        # data frames that succeed.
+        # For example, error can happen if one of the groups has only one unique value in its set of var2.
         NULL
       } else {
         stop(e)
