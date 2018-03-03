@@ -434,6 +434,10 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add tes
 tidy.lm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
   ret <- broom:::tidy.lm(x) # it seems that tidy.lm takes care of glm too
   ret <- ret %>% mutate(conf.high=estimate+1.96*std.error, conf.low=estimate-1.96*std.error)
+  # since broom skips coefficients with NA value, which means removed by lm because of multi-collinearity,
+  # put it back to show them.
+  removed_coef_df <- data.frame(term=names(x$coefficients[is.na(x$coefficients)]))
+  ret <- ret %>% bind_rows(removed_coef_df)
   if (pretty.name) {
     ret <- ret %>% rename(Term=term, Coefficient=estimate, `Std Error`=std.error,
                           `t Ratio`=statistic, `P Value`=p.value, `Conf Low`=conf.low, `Conf High`=conf.high)
@@ -447,6 +451,10 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
   switch(type,
     coefficients = {
       ret <- broom:::tidy.lm(x) # it seems that tidy.lm takes care of glm too
+      # since broom skips coefficients with NA value, which means removed by lm because of multi-collinearity,
+      # put it back to show them.
+      removed_coef_df <- data.frame(term=names(x$coefficients[is.na(x$coefficients)]))
+      ret <- ret %>% bind_rows(removed_coef_df)
       ret <- ret %>% mutate(conf.high=estimate+1.96*std.error, conf.low=estimate-1.96*std.error, odds_ratio=exp(estimate))
       if (pretty.name) {
         ret <- ret %>% rename(Term=term, Coefficient=estimate, `Std Error`=std.error,
