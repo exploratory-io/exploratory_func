@@ -52,7 +52,7 @@ exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, t
     # need to compose formula with non-standard evaluation.
     # simply using time and status in formula here results in a formula that literally looks at
     # "time" columun and "status" column, which is not what we want.
-    fml <- as.formula(paste0("survival::Surv(`", substitute(time), "`,`", substitute(status), "`) ~ ", cohort_col))
+    fml <- as.formula(paste0("survival::Surv(`", substitute(time), "`,`", substitute(status), "`) ~ `", cohort_col, "`"))
   }
 
   # calls survfit for each group.
