@@ -437,7 +437,7 @@ tidy.lm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
   # since broom skips coefficients with NA value, which means removed by lm because of multi-collinearity,
   # put it back to show them.
   # reference: https://stats.stackexchange.com/questions/25804/why-would-r-return-na-as-a-lm-coefficient
-  removed_coef_df <- data.frame(term=names(x$coefficients[is.na(x$coefficients)]))
+  removed_coef_df <- data.frame(term=names(x$coefficients[is.na(x$coefficients)]), Note="Dropped due to perfect multicollinearity")
   ret <- ret %>% bind_rows(removed_coef_df)
   if (pretty.name) {
     ret <- ret %>% rename(Term=term, Coefficient=estimate, `Std Error`=std.error,
