@@ -436,6 +436,7 @@ tidy.lm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
   ret <- ret %>% mutate(conf.high=estimate+1.96*std.error, conf.low=estimate-1.96*std.error)
   # since broom skips coefficients with NA value, which means removed by lm because of multi-collinearity,
   # put it back to show them.
+  # reference: https://stats.stackexchange.com/questions/25804/why-would-r-return-na-as-a-lm-coefficient
   removed_coef_df <- data.frame(term=names(x$coefficients[is.na(x$coefficients)]))
   ret <- ret %>% bind_rows(removed_coef_df)
   if (pretty.name) {
@@ -453,6 +454,7 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
       ret <- broom:::tidy.lm(x) # it seems that tidy.lm takes care of glm too
       # since broom skips coefficients with NA value, which means removed by lm because of multi-collinearity,
       # put it back to show them.
+      # reference: https://stats.stackexchange.com/questions/25804/why-would-r-return-na-as-a-lm-coefficient
       removed_coef_df <- data.frame(term=names(x$coefficients[is.na(x$coefficients)]))
       ret <- ret %>% bind_rows(removed_coef_df)
       ret <- ret %>% mutate(conf.high=estimate+1.96*std.error, conf.low=estimate-1.96*std.error, odds_ratio=exp(estimate))
