@@ -46,7 +46,7 @@ exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, t
                                 "1")
     # we are ceiling survival time to make it integer in the specified time unit.
     # this is to make resulting survival curve to have integer data point in the specified time unit.
-    fml <- as.formula(paste0("survival::Surv(ceiling(as.numeric(`", end_time_col, "`-`", start_time_col, "`, units = \"days\")/", time_unit_days_str, "), `", substitute(status), "`) ~ ", cohort_col))
+    fml <- as.formula(paste0("survival::Surv(ceiling(as.numeric(`", end_time_col, "`-`", start_time_col, "`, units = \"days\")/", time_unit_days_str, "), `", substitute(status), "`) ~ `", cohort_col, "`"))
   }
   else {
     # need to compose formula with non-standard evaluation.
