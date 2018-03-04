@@ -666,6 +666,7 @@ rf_evaluation_by_class <- function(data, ...) {
 #' @export
 rf_partial_dependence <- function(df, ...) { # TODO: write test for this.
   res <- df %>% tidy(model, type="partial_dependence", ...)
+  browser()
   grouped_col <- grouped_by(df) # when called from analytics view, this should be a single column or empty.
   if (length(grouped_col) > 0) {
     res <- res %>% dplyr::ungroup() # ungroup to mutate group_by column.
@@ -1264,6 +1265,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
       ret
     },
     partial_dependence = {
+      browser()
       # return partial dependence
       imp <- ranger::importance(x)
       imp_df <- data.frame(
@@ -1306,7 +1308,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
       # in tidy().
       ret <- ret %>% dplyr::mutate(x_value = as.character(x_value))
       # convert must be FALSE for y to make sure y_name is always character. otherwise bind_rows internally done
-      # in tidy() errors out because y_name can be, for example, mixture of logical and character.
+      # in tidy() to bind outputs from different groups errors out because y_value can be, for example, mixture of logical and character.
       ret <- ret %>% tidyr::gather("y_name", "y_value", -x_name, -x_value, na.rm = TRUE, convert = FALSE)
       ret <- ret %>% dplyr::mutate(x_name = forcats::fct_relevel(x_name, imp_vars)) # set factor level order so that charts appear in order of importance.
       # set order to ret and turn it back to character, so that the order is kept when groups are bound.
