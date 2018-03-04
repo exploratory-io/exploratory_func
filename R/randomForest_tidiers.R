@@ -666,7 +666,6 @@ rf_evaluation_by_class <- function(data, ...) {
 #' @export
 rf_partial_dependence <- function(df, ...) { # TODO: write test for this.
   res <- df %>% tidy(model, type="partial_dependence", ...)
-  browser()
   grouped_col <- grouped_by(df) # when called from analytics view, this should be a single column or empty.
   if (length(grouped_col) > 0) {
     res <- res %>% dplyr::ungroup() # ungroup to mutate group_by column.
@@ -1265,7 +1264,6 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
       ret
     },
     partial_dependence = {
-      browser()
       # return partial dependence
       imp <- ranger::importance(x)
       imp_df <- data.frame(
@@ -1315,7 +1313,14 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
       # if it were kept as factor, when groups are bound, only the factor order from the first group would be respected.
       ret <- ret %>% dplyr::arrange(x_name) %>% dplyr::mutate(x_name = as.character(x_name))
 
-      # create mapping from column name to facet chart type based on whether the column is numeric.
+      # if y_name (target categorical values) consists of only TRUE/FALSE convert it to logical
+      # so that legend order is TRUE then FALSE on the chart.
+      # TODO: idealy we should remember the original factor levels of target categorical values to respect it too.
+      if (all(ret$y_name %in% c("TRUE","FALSE"))) {
+        ret <- ret %>%  dplyr::mutate(y_name = as.logical(y_name))
+      }
+
+      # create mapping from column name (x_name) to facet chart type based on whether the column is numeric.
       chart_type_map <-c()
       for(col in colnames(x$df)) {
         chart_type_map <- c(chart_type_map, is.numeric(x$df[[col]]))
