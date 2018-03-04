@@ -1322,12 +1322,9 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
       # if it were kept as factor, when groups are bound, only the factor order from the first group would be respected.
       ret <- ret %>% dplyr::arrange(x_name) %>% dplyr::mutate(x_name = as.character(x_name))
 
-      # if y_name (target categorical values) consists of only TRUE/FALSE convert it to logical
-      # so that legend order is TRUE then FALSE on the chart.
-      # TODO: idealy we should remember the original factor levels of target categorical values to respect it too.
-      #if (all(ret$y_name %in% c("TRUE","FALSE"))) {
-      #  ret <- ret %>%  dplyr::mutate(y_name = as.logical(y_name))
-      #}
+      # Set original factor level back so that legend order is correct on the chart.
+      # In case of logical, c("TRUE","FALSE") is stored in orig_level, so that we can
+      # use it here either way.
       if (!is.null(x$orig_levels)) {
         ret <- ret %>%  dplyr::mutate(y_name = factor(y_name, levels=x$orig_levels))
       }
