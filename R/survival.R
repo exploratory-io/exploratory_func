@@ -98,16 +98,18 @@ tidy.survfit_exploratory <- function(x, ...) {
     }
     df
   }
-  browser()
 
   if ("strata" %in% colnames(ret)) {
     nested <- ret %>% group_by(strata) %>% nest()
     nested <- nested %>% mutate(data=purrr::map(data,~add_time_zero_row_each(.)))
     ret <- unnest(nested)
+    # remove ".cohort=" part from strata values.
+    ret <- ret %>% mutate(strata = stringr::str_remove(strata,"^\\.cohort\\="))
   }
   else {
     ret <- add_time_zero_row_each(ret)
   }
+  browser()
 
   colnames(ret)[colnames(ret) == "n.risk"] <- "n_risk"
   colnames(ret)[colnames(ret) == "n.event"] <- "n_event"
