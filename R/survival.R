@@ -8,7 +8,12 @@ exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, t
   grouped_col <- grouped_by(df)
 
   if (!is.null(substitute(cohort))) {
-    cohort_col <- col_name(substitute(cohort))
+    orig_cohort_col <- col_name(substitute(cohort))
+    # rename cohort column to workaround the case where the column name has space in it.
+    # https://github.com/therneau/survival/issues/41
+    colnames(df)[colnames(df) == orig_cohort_col] <- ".cohort" #TODO avoid conflict, and adjust cohort output value from survfit.
+    cohort_col <- ".cohort"
+
     if (!is.null(cohort_func)) {
       df[[cohort_col]] <- extract_from_date(df[[cohort_col]], type=cohort_func)
     }
@@ -93,6 +98,7 @@ tidy.survfit_exploratory <- function(x, ...) {
     }
     df
   }
+  browser()
 
   if ("strata" %in% colnames(ret)) {
     nested <- ret %>% group_by(strata) %>% nest()
@@ -116,6 +122,8 @@ tidy.survfit_exploratory <- function(x, ...) {
 #' @export
 tidy.survdiff_exploratory <- function(x, ...) {
   ret <- broom:::tidy.survdiff(x, ...)
+  browser()
+  ret
 }
 
 #' @export
@@ -124,5 +132,6 @@ glance.survdiff_exploratory <- function(x, ...) {
   colnames(ret)[colnames(ret) == "statistic"] <- "Chi-Square"
   colnames(ret)[colnames(ret) == "df"] <- "Degree of Freedom"
   colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
+  browser()
   ret
 }
