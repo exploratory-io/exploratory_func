@@ -853,6 +853,14 @@ calc_feature_imp <- function(df,
     stop("Max # of categories for explanatory vars must be at least 2.")
   }
 
+  orig_levels <- NULL
+  if (is.factor(df[[target_col]])) {
+    orig_levels <- levels(df[[target_col]])
+  }
+  else if (is.logical(df[[target_col]])) {
+    orig_levels <- c("TRUE","FALSE")
+  }
+
   # remove NA because it's not permitted for randomForest
   df <- df %>%
     dplyr::filter(!is.na(!!target_col))
@@ -1049,6 +1057,7 @@ calc_feature_imp <- function(df,
       )
       # these attributes are used in tidy of randomForest
       rf$classification_type <- classification_type
+      rf$orig_levels <- orig_levels
       rf$terms_mapping <- names(name_map)
       rf$y <- model.response(model_df)
       names(rf$terms_mapping) <- name_map
@@ -1316,8 +1325,11 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
       # if y_name (target categorical values) consists of only TRUE/FALSE convert it to logical
       # so that legend order is TRUE then FALSE on the chart.
       # TODO: idealy we should remember the original factor levels of target categorical values to respect it too.
-      if (all(ret$y_name %in% c("TRUE","FALSE"))) {
-        ret <- ret %>%  dplyr::mutate(y_name = as.logical(y_name))
+      #if (all(ret$y_name %in% c("TRUE","FALSE"))) {
+      #  ret <- ret %>%  dplyr::mutate(y_name = as.logical(y_name))
+      #}
+      if (!is.null(x$orig_levels)) {
+        ret <- ret %>%  dplyr::mutate(y_name = factor(y_name, levels=x$orig_levels))
       }
 
       # create mapping from column name (x_name) to facet chart type based on whether the column is numeric.
