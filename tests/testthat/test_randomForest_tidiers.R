@@ -62,7 +62,40 @@ test_that("test calc_feature_imp predicting multi-class", {
     # creating those columns in data.frame replaces spaces with .
     rename(`Tar get` = "target", `cat 10` = cat_10, `num 1` = num_1)
 
+  # target is character
   model_df <- test_data %>%
+    dplyr::group_by(Group) %>%
+    calc_feature_imp(`Tar get`,
+                     `cat 10`,
+                     cat_25,
+                      `num 1`,
+                      num_2)
+
+  conf_mat <- tidy(model_df, model, type = "conf_mat", pretty.name = TRUE)
+  ret <- model_df %>% rf_importance()
+  ret <- model_df %>% rf_partial_dependence()
+  ret <- model_df %>% rf_evaluation(pretty.name=TRUE) # TODO test that output is different from binary classification with TRUE/FALSE
+  ret <- model_df %>% rf_evaluation_by_class(pretty.name=TRUE)
+
+  # make target facter and try again
+  factor_test_data <- test_data %>% mutate(`Tar get`=factor(`Tar get`))
+  model_df <- factor_test_data %>%
+    dplyr::group_by(Group) %>%
+    calc_feature_imp(`Tar get`,
+                     `cat 10`,
+                     cat_25,
+                      `num 1`,
+                      num_2)
+
+  conf_mat <- tidy(model_df, model, type = "conf_mat", pretty.name = TRUE)
+  ret <- model_df %>% rf_importance()
+  ret <- model_df %>% rf_partial_dependence()
+  ret <- model_df %>% rf_evaluation(pretty.name=TRUE) # TODO test that output is different from binary classification with TRUE/FALSE
+  ret <- model_df %>% rf_evaluation_by_class(pretty.name=TRUE)
+
+  # make target ordered facter and try again
+  ordered_factor_test_data <- test_data %>% mutate(`Tar get`=factor(`Tar get`, ordered=TRUE))
+  model_df <- ordered_factor_test_data %>%
     dplyr::group_by(Group) %>%
     calc_feature_imp(`Tar get`,
                      `cat 10`,

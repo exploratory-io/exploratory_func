@@ -8,14 +8,21 @@ exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, t
   grouped_col <- grouped_by(df)
 
   if (!is.null(substitute(cohort))) {
-    cohort_col <- col_name(substitute(cohort))
+    orig_cohort_col <- col_name(substitute(cohort))
+    # rename cohort column to workaround the case where the column name has space in it.
+    # https://github.com/therneau/survival/issues/41
+    colnames(df)[colnames(df) == orig_cohort_col] <- ".cohort" #TODO avoid conflict, and adjust cohort output value from survfit.
+    cohort_col <- ".cohort"
+
     if (!is.null(cohort_func)) {
       df[[cohort_col]] <- extract_from_date(df[[cohort_col]], type=cohort_func)
     }
+    quoted_cohort_col <- paste0("`", cohort_col, "`")
   }
   else {
     # no cohort column is set. Just draw a single survival curve.
     cohort_col <- "1"
+    quoted_cohort_col <- "1" # no need to quote column name since it is not column.
   }
 
   # substitute is needed because time can be
@@ -46,13 +53,13 @@ exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, t
                                 "1")
     # we are ceiling survival time to make it integer in the specified time unit.
     # this is to make resulting survival curve to have integer data point in the specified time unit.
-    fml <- as.formula(paste0("survival::Surv(ceiling(as.numeric(`", end_time_col, "`-`", start_time_col, "`, units = \"days\")/", time_unit_days_str, "), `", substitute(status), "`) ~ ", cohort_col))
+    fml <- as.formula(paste0("survival::Surv(ceiling(as.numeric(`", end_time_col, "`-`", start_time_col, "`, units = \"days\")/", time_unit_days_str, "), `", substitute(status), "`) ~ ", quoted_cohort_col))
   }
   else {
     # need to compose formula with non-standard evaluation.
     # simply using time and status in formula here results in a formula that literally looks at
     # "time" columun and "status" column, which is not what we want.
-    fml <- as.formula(paste0("survival::Surv(`", substitute(time), "`,`", substitute(status), "`) ~ ", cohort_col))
+    fml <- as.formula(paste0("survival::Surv(`", substitute(time), "`,`", substitute(status), "`) ~ ", quoted_cohort_col))
   }
 
   # calls survfit for each group.
@@ -96,6 +103,8 @@ tidy.survfit_exploratory <- function(x, ...) {
     nested <- ret %>% group_by(strata) %>% nest()
     nested <- nested %>% mutate(data=purrr::map(data,~add_time_zero_row_each(.)))
     ret <- unnest(nested)
+    # remove ".cohort=" part from strata values.
+    ret <- ret %>% mutate(strata = stringr::str_remove(strata,"^\\.cohort\\="))
   }
   else {
     ret <- add_time_zero_row_each(ret)
@@ -111,9 +120,12 @@ tidy.survfit_exploratory <- function(x, ...) {
   ret
 }
 
+# Result from this function is not exposed on UI yet.
 #' @export
 tidy.survdiff_exploratory <- function(x, ...) {
   ret <- broom:::tidy.survdiff(x, ...)
+  # TODO: rename .cohort column to original name
+  ret
 }
 
 #' @export

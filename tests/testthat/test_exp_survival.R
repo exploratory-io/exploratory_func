@@ -26,11 +26,13 @@ test_that("test exp_survival", {
                                                                          "Ukraine", "United Arab Emirates", "United Kingdom", "United States",
                                                                          "Uruguay", "Venezuela", "Vietnam", "Zambia"), class = "factor")),
                     row.names = c(NA,-10L), class = c("tbl_df", "tbl", "data.frame"), .Names = c("weeks_on_service","is_churned", "os", "country"))
-  data <- data %>% rename(`weeks on service`=weeks_on_service, `is churned`=is_churned)
-  ret <- data %>% exp_survival(`weeks on service`, `is churned`, cohort=os)
-  ret <- ret %>% tidy(model1)
+  data <- data %>% rename(`weeks on service`=weeks_on_service, `is churned`=is_churned, `o s`=os)
+  ret <- data %>% exp_survival(`weeks on service`, `is churned`, cohort=`o s`)
+  ret1 <- ret %>% tidy(model1)
+  ret2 <- ret %>% tidy(model2)
   ret <- data %>% exp_survival(`weeks on service`, `is churned`)
-  ret <- ret %>% tidy(model1)
+  ret1 <- ret %>% tidy(model1)
+  ret2 <- ret %>% tidy(model2)
 
 
 })

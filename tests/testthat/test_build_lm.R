@@ -179,5 +179,12 @@ test_that("prediction with glm model with SMOTE by build_lm.fast", {
   ret <- model_data %>% broom::tidy(model)
   ret <- model_data %>% broom::augment(model)
 
+  # test for perfect multicollinearity case.
+  reduced_test_data <- test_data %>% tail(3)
+  model_data <- build_lm.fast(reduced_test_data, `CANCELLED X`, `Carrier Name`, CARRIER, DISTANCE, model_type = "glm", smote=FALSE)
+  ret <- model_data %>% broom::glance(model, pretty.name=TRUE)
+  ret <- model_data %>% broom::tidy(model, pretty.name=TRUE)
+  ret <- model_data %>% broom::augment(model, pretty.name=TRUE)
+
   expect_true(nrow(ret) > 0)
 })
