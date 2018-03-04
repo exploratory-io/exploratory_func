@@ -109,7 +109,6 @@ tidy.survfit_exploratory <- function(x, ...) {
   else {
     ret <- add_time_zero_row_each(ret)
   }
-  browser()
 
   colnames(ret)[colnames(ret) == "n.risk"] <- "n_risk"
   colnames(ret)[colnames(ret) == "n.event"] <- "n_event"
@@ -121,10 +120,11 @@ tidy.survfit_exploratory <- function(x, ...) {
   ret
 }
 
+# Result from this function is not exposed on UI yet.
 #' @export
 tidy.survdiff_exploratory <- function(x, ...) {
   ret <- broom:::tidy.survdiff(x, ...)
-  browser()
+  # TODO: rename .cohort column to original name
   ret
 }
 
@@ -134,6 +134,5 @@ glance.survdiff_exploratory <- function(x, ...) {
   colnames(ret)[colnames(ret) == "statistic"] <- "Chi-Square"
   colnames(ret)[colnames(ret) == "df"] <- "Degree of Freedom"
   colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
-  browser()
   ret
 }
