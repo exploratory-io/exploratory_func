@@ -12,10 +12,12 @@ exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, t
     if (!is.null(cohort_func)) {
       df[[cohort_col]] <- extract_from_date(df[[cohort_col]], type=cohort_func)
     }
+    quoted_cohort_col <- paste0("`", cohort_col, "`")
   }
   else {
     # no cohort column is set. Just draw a single survival curve.
     cohort_col <- "1"
+    quoted_cohort_col <- "1" # no need to quote column name since it is not column.
   }
 
   # substitute is needed because time can be
@@ -46,13 +48,13 @@ exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, t
                                 "1")
     # we are ceiling survival time to make it integer in the specified time unit.
     # this is to make resulting survival curve to have integer data point in the specified time unit.
-    fml <- as.formula(paste0("survival::Surv(ceiling(as.numeric(`", end_time_col, "`-`", start_time_col, "`, units = \"days\")/", time_unit_days_str, "), `", substitute(status), "`) ~ `", cohort_col, "`"))
+    fml <- as.formula(paste0("survival::Surv(ceiling(as.numeric(`", end_time_col, "`-`", start_time_col, "`, units = \"days\")/", time_unit_days_str, "), `", substitute(status), "`) ~ ", quoted_cohort_col))
   }
   else {
     # need to compose formula with non-standard evaluation.
     # simply using time and status in formula here results in a formula that literally looks at
     # "time" columun and "status" column, which is not what we want.
-    fml <- as.formula(paste0("survival::Surv(`", substitute(time), "`,`", substitute(status), "`) ~ `", cohort_col, "`"))
+    fml <- as.formula(paste0("survival::Surv(`", substitute(time), "`,`", substitute(status), "`) ~ ", quoted_cohort_col))
   }
 
   # calls survfit for each group.
