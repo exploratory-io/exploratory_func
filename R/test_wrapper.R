@@ -547,7 +547,7 @@ exp_normality<- function(df, ..., n_sample = 50) {
     df.qqline <- data.frame()
     df.model <- data.frame()
 　  for (col in selected_cols) {
-      if (n_distinct(df[[col]]) <= 1) {
+      if (n_distinct(df[[col]], na.rm=TRUE) <= 1) {
         # skip if the column has only 1 unique value, to avoid error.
         # TODO: show what happened in the summary table.
       }
