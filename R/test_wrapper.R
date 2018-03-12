@@ -195,7 +195,12 @@ do_chisq.test_ <- function(df,
 
 #' Chi-Square test wrapper for Analytics View
 #' @export
-exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, fun.aggregate = sum, ...) {
+exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, fun.aggregate = sum, correct = FALSE, ...) {
+  # We are turning off Yates's correction by default because...
+  # 1. It seems that it is commonly discussed that it is overly conservative and not necessary.
+  #    https://en.wikipedia.org/wiki/Yates%27s_correction_for_continuity
+  #    https://aue.repo.nii.ac.jp/?action=repository_uri&item_id=785&file_id=15&file_no=1
+  # 2. With Yates's correction residuals do not add up to chi-square value, which makes contributions not adding up to 100%.
   var1_col <- col_name(substitute(var1))
   var2_col <- col_name(substitute(var2))
   value_col <- col_name(substitute(value))
@@ -234,7 +239,7 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
     }
     df <- df %>% tibble::column_to_rownames(var=var1_col)
     x <- df %>% as.matrix()
-    model <- chisq.test(x = x, ...)
+    model <- chisq.test(x = x, correct = correct, ...)
     # add variable name info to the model
     model$var1 <- var1_col
     model$var2 <- var2_col
