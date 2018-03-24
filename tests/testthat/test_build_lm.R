@@ -132,18 +132,19 @@ test_that("prediction with target column name with space by build_lm.fast", {
   test_data <- structure(
     list(
       `CANCELLED X` = c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0),
+      `logical col` = c(TRUE, FALSE, TRUE, FALSE, FALSE, TRUE, FALSE, FALSE, NA, TRUE, FALSE, NA, FALSE, TRUE, FALSE, TRUE, FALSE, FALSE, FALSE, FALSE),
       `Carrier Name` = c("Delta Air Lines", "American Eagle", "American Airlines", "Southwest Airlines", "SkyWest Airlines", "Southwest Airlines", "Southwest Airlines", "Delta Air Lines", "Southwest Airlines", "Atlantic Southeast Airlines", "American Airlines", "Southwest Airlines", "US Airways", "US Airways", "Delta Air Lines", "Atlantic Southeast Airlines", NA, "Atlantic Southeast Airlines", "Delta Air Lines", "Delta Air Lines"),
       CARRIER = c("DL", "MQ", "AA", "DL", "MQ", "AA", "DL", "DL", "MQ", "AA", "AA", "WN", "US", "US", "DL", "EV", "9E", "EV", "DL", "DL"),
       # testing filtering of Inf, -Inf, NA here.
       DISTANCE = c(Inf, -Inf, NA, 187, 273, 1062, 583, 240, 1123, 851, 852, 862, 361, 507, 1020, 1092, 342, 489, 1184, 545)), row.names = c(NA, -20L),
-    class = c("tbl_df", "tbl", "data.frame"), .Names = c("CANCELLED X", "Carrier Name", "CARRIER", "DISTANCE"))
+    class = c("tbl_df", "tbl", "data.frame"), .Names = c("CANCELLED X", "logical col", "Carrier Name", "CARRIER", "DISTANCE"))
 
   # duplicate rows to make some predictable data
   # otherwise, the number of rows of the result of prediction becomes 0
   test_data <- dplyr::bind_rows(test_data, test_data)
   test_data <- test_data %>% mutate(CARRIER = factor(CARRIER, ordered=TRUE)) # test handling of ordered factor
 
-  model_data <- build_lm.fast(test_data, `CANCELLED X`, `Carrier Name`, CARRIER, DISTANCE, predictor_n = 3)
+  model_data <- build_lm.fast(test_data, `CANCELLED X`, `logical col`, `Carrier Name`, CARRIER, DISTANCE, predictor_n = 3)
   ret <- model_data %>% broom::glance(model)
   # TODO: the returned coefficients does not show all input variables. 
   # most likely due to too few rows. look into it and add check for the values in the returned df. 
@@ -151,7 +152,7 @@ test_that("prediction with target column name with space by build_lm.fast", {
   ret <- model_data %>% broom::augment(model)
 
   expect_true(nrow(ret) > 0)
-  expect_equal(colnames(ret), c("CANCELLED.X", "Carrier.Name","CARRIER","DISTANCE",".fitted",".se.fit",".resid",".hat",".sigma",".cooksd",".std.resid"))
+  expect_equal(colnames(ret), c("CANCELLED.X", "logical.col", "Carrier.Name","CARRIER","DISTANCE",".fitted",".se.fit",".resid",".hat",".sigma",".cooksd",".std.resid"))
 })
 
 test_that("prediction with glm model with SMOTE by build_lm.fast", {
