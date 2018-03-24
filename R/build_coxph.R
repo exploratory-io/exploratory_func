@@ -225,7 +225,7 @@ build_coxph.fast <- function(df,
             df[[col]] <- factor(df[[col]], ordered=FALSE)
           }
         } else if(is.logical(df[[col]])) {
-          # 1. convert data to factor if predictors are logical
+          # 1. convert data to factor if predictors are logical. (as.factor() on logical always puts FALSE as the first level, which is what we want for predictor.)
           # 2. turn NA into (Missing) factor level so that lm will not drop all the rows.
           df[[col]] <- forcats::fct_explicit_na(as.factor(df[[col]]))
         } else if(!is.numeric(df[[col]])) {
