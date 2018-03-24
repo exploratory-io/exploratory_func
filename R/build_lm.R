@@ -296,6 +296,10 @@ build_lm.fast <- function(df,
           else {
             df[[col]] <- factor(df[[col]], ordered=FALSE)
           }
+        } else if(is.logical(df[[col]])) {
+          # 1. convert data to factor if predictors are logical
+          # 2. turn NA into (Missing) factor level so that lm will not drop all the rows.
+          df[[col]] <- forcats::fct_explicit_na(as.factor(df[[col]]))
         } else if(!is.numeric(df[[col]])) {
           # 1. convert data to factor if predictors are not numeric or logical
           #    and limit the number of levels in factor by fct_lump.
