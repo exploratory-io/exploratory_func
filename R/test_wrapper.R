@@ -546,15 +546,15 @@ exp_normality<- function(df, ..., n_sample = 50) {
     df.qq <- data.frame()
     df.qqline <- data.frame()
     df.model <- data.frame()
-　  for (col in selected_cols) {
+    for (col in selected_cols) {
       if (n_distinct(df[[col]], na.rm=TRUE) <= 1) {
         # skip if the column has only 1 unique value or only NAs, to avoid error.
         # TODO: show what happened in the summary table.
       }
       else {
-　      # set plot.it to FALSE to disable plotting (avoid launching another window)
-　      res <- stats::qqnorm(df[[col]], plot.it=FALSE)
-　      df.qq <- dplyr::bind_rows(df.qq, data.frame(x=res$x, y=res$y, col=col))
+        # set plot.it to FALSE to disable plotting (avoid launching another window)
+        res <- stats::qqnorm(df[[col]], plot.it=FALSE)
+        df.qq <- dplyr::bind_rows(df.qq, data.frame(x=res$x, y=res$y, col=col))
 
         # bind reference line data too.
         ref_res <- qqline_data(df[[col]])
@@ -562,7 +562,7 @@ exp_normality<- function(df, ..., n_sample = 50) {
         max_x <- max(res$x, na.rm=TRUE)
         ref_min_y <- ref_res[[1]] + ref_res[[2]] * min_x
         ref_max_y <- ref_res[[1]] + ref_res[[2]] * max_x
-　      df.qqline <- dplyr::bind_rows(df.qqline, data.frame(x=c(min_x, max_x), refline_y=c(ref_min_y,ref_max_y), col=col))
+        df.qqline <- dplyr::bind_rows(df.qqline, data.frame(x=c(min_x, max_x), refline_y=c(ref_min_y,ref_max_y), col=col))
 
         if (n_sample > 5000) {
           n_sample <- 5000 # shapiro.test takes only up to max of 5000 samples. 
@@ -579,7 +579,7 @@ exp_normality<- function(df, ..., n_sample = 50) {
         res <- shapiro.test(col_to_test) %>% tidy() %>%
           dplyr::mutate(col=col, sample_size=sample_size) %>%
           dplyr::select(col, everything())
-　      df.model <- dplyr::bind_rows(df.model, res)
+        df.model <- dplyr::bind_rows(df.model, res)
       }
     }
 
@@ -614,7 +614,7 @@ tidy.shapiro_exploratory <- function(x, type = "model", conf_level=0.95, n_sampl
     else {
       sampled_qq_df <- x$qq
     }
-　  ret <- dplyr::bind_rows(sampled_qq_df, x$qqline)
+    ret <- dplyr::bind_rows(sampled_qq_df, x$qqline)
     ret
   }
   else {
