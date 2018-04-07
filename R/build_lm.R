@@ -296,6 +296,8 @@ build_lm.fast <- function(df,
           else {
             df[[col]] <- factor(df[[col]], ordered=FALSE)
           }
+          # turn NA into (Missing) factor level. Without this, lm or glm drops rows internally.
+          df[[col]] <- forcats::fct_explicit_na(df[[col]])
         } else if(is.logical(df[[col]])) {
           # 1. convert data to factor if predictors are logical. (as.factor() on logical always puts FALSE as the first level, which is what we want for predictor.)
           # 2. turn NA into (Missing) factor level so that lm will not drop all the rows.
