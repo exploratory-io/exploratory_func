@@ -70,7 +70,7 @@ build_coxph.fast <- function(df,
                     ...,
                     max_nrow = 50000, # With 50000 rows, taking 6 to 7 seconds on late-2016 Macbook Pro.
                     predictor_n = 12, # so that at least months can fit in it.
-                    seed = 0
+                    seed = NULL
                     ){
   # TODO: cleanup code only aplicable to randomForest. this func was started from copy of calc_feature_imp, and still adjusting for lm. 
 
@@ -89,6 +89,10 @@ build_coxph.fast <- function(df,
 
   if (any(c(time_col, status_col, selected_cols) %in% grouped_cols)) {
     stop("grouping column is used as variable columns")
+  }
+
+  if (predictor_n < 2) {
+    stop("Max # of categories for explanatory vars must be at least 2.")
   }
 
   if(!is.null(seed)){
@@ -188,12 +192,12 @@ build_coxph.fast <- function(df,
 
           c_cols <- c(c_cols, absolute_time_col, wday_col, day_col, yday_col, month_col, year_col)
           df[[absolute_time_col]] <- as.numeric(df[[col]])
-          # turn it into character since if it is factor, the name of term is broken
-          df[[wday_col]] <- as.character(lubridate::wday(df[[col]], label=TRUE))
+          # turn it into unordered factor since if it is ordered factor, the name of term is broken
+          df[[wday_col]] <- factor(lubridate::wday(df[[col]], label=TRUE), ordered=FALSE)
           df[[day_col]] <- lubridate::day(df[[col]])
           df[[yday_col]] <- lubridate::yday(df[[col]])
-          # turn it into character since if it is factor, the name of term is broken
-          df[[month_col]] <- as.character(lubridate::month(df[[col]], label=TRUE))
+          # turn it into unordered factor since if it is ordered factor, the name of term is broken
+          df[[month_col]] <- factor(lubridate::month(df[[col]], label=TRUE), ordered=FALSE)
           df[[year_col]] <- lubridate::year(df[[col]])
           if(lubridate::is.POSIXct(df[[col]])) {
             hour_col <- avoid_conflict(colnames(df), paste0(col, "_hour"))
@@ -209,13 +213,28 @@ build_coxph.fast <- function(df,
             df[[hour_col]] <- factor(lubridate::hour(df[[col]])) # treat hour as category
           }
           df[[col]] <- NULL # drop original Date/POSIXct column to pass SMOTE later.
+        } else if(is.factor(df[[col]])) {
+          # 1. if the data is factor, respect the levels and keep first 10 levels, and make others "Others" level.
+          # 2. if the data is ordered factor, turn it into unordered. For ordered factor,
+          #    coxph takes polynomial terms (Linear, Quadratic, Cubic, and so on) and use them as variables,
+          #    which we do not want for this function.
+          if (length(levels(df[[col]])) >= predictor_n + 2) {
+            df[[col]] <- fct_other(factor(df[[col]], ordered=FALSE), keep=levels(df[[col]])[1:predictor_n])
+          }
+          else {
+            df[[col]] <- factor(df[[col]], ordered=FALSE)
+          }
+        } else if(is.logical(df[[col]])) {
+          # 1. convert data to factor if predictors are logical. (as.factor() on logical always puts FALSE as the first level, which is what we want for predictor.)
+          # 2. turn NA into (Missing) factor level so that lm will not drop all the rows.
+          df[[col]] <- forcats::fct_explicit_na(as.factor(df[[col]]))
         } else if(!is.numeric(df[[col]])) {
-          # convert data to factor if predictors are not numeric or logical
-          # and limit the number of levels in factor by fct_lump.
-          # we use ties.method to handle the case where there are many unique values. (without it, they all survive fct_lump.)
-          # TODO: see if ties.method would make sense for calc_feature_imp.
-          # also, turn NA into (Missing) factor level so that lm will not drop all the rows.
-          df[[col]] <- forcats::fct_explicit_na(forcats::fct_lump(as.factor(df[[col]]), n=predictor_n, ties.method="first"))
+          # 1. convert data to factor if predictors are not numeric or logical.
+          # 2. sort levels by frequency so that base level is the most frequent category.
+          # 3. limit the number of levels in factor by fct_lump.
+          #    we use ties.method to handle the case where there are many unique values. (without it, they all survive fct_lump.)
+          # 4. turn NA into (Missing) factor level so that lm will not drop all the rows.
+          df[[col]] <- forcats::fct_explicit_na(forcats::fct_lump(fct_infreq(as.factor(df[[col]])), n=predictor_n, ties.method="first"))
         } else {
           # for numeric cols, filter NA rows, because lm will anyway do this internally, and errors out
           # if the remaining rows are with single value in any predictor column.
@@ -308,7 +327,7 @@ glance.coxph_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add t
     colnames(ret)[colnames(ret) == "sigma"] <- "Root Mean Square Error"
     colnames(ret)[colnames(ret) == "statistic"] <- "F Ratio"
     colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
-    colnames(ret)[colnames(ret) == "df"] <- "DF"
+    colnames(ret)[colnames(ret) == "df"] <- "Degree of Freedom"
     colnames(ret)[colnames(ret) == "logLik"] <- "Log Likelihood"
     colnames(ret)[colnames(ret) == "deviance"] <- "Deviance"
     colnames(ret)[colnames(ret) == "df.residual"] <- "Residual DF"

@@ -297,7 +297,7 @@ do_tfidf <- function(df, group, term, idf_log_scale = log, tf_weight="raw", norm
 #' @export
 stem_word <- function(...){
   loadNamespace("quanteda")
-  quanteda::wordstem(...)
+  quanteda::char_wordstem(...)
 }
 
 #' Generate ngram in groups.

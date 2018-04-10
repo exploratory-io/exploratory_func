@@ -701,7 +701,7 @@ exp_balance <- function(df,
   was_target_character <- is.character(df[[target_col]])
   was_target_factor <- is.factor(df[[target_col]])
   was_target_numeric <- is.numeric(df[[target_col]])
-  if (was_target_numeric) { # if target is numeric, make if factor first, to remember original values as factor levels and set it back later.
+  if (was_target_numeric) { # if target is numeric, make it factor first, to remember original values as factor levels and set it back later.
     df[[target_col]] <- factor(df[[target_col]])
   }
   orig_levels_order <- NULL
@@ -740,10 +740,16 @@ exp_balance <- function(df,
       }
       else if(is.numeric(df[[col]])) {
         # for numeric cols, filter NA rows. With NAs, ubSMOTE throws mysterious error like "invalid 'labels'; length 0 should be 1 or 2"
+        # TODO: we should probably warn if more than half of rows are filtered by a column, so that user can remove that column.
         df <- df %>% dplyr::filter(!is.na(df[[col]]) & !is.infinite(df[[col]]))
       }
     }
     if (nrow(df) == 0) { # if no rows are left, give up smote and return original df.
+      df_balanced <- orig_df # TODO: we should throw error and let user know which columns with NAs to remove.
+    }
+    else if (n_distinct(df[[target_col]]) < 2) {
+      # TODO: add test for this case.
+      # if filtering NAs makes unique values of target col less than 2, give up smote and return original df.
       df_balanced <- orig_df # TODO: we should throw error and let user know which columns with NAs to remove.
     }
     else {
@@ -764,9 +770,9 @@ exp_balance <- function(df,
         # in this case, give up SMOTE and return original. TODO: look into how to prevent this.
         df_balanced <- orig_df
       }
+      levels(df_balanced[[target_col]]) <- orig_levels # set original labels before turning it into 0/1.
     }
 
-    levels(df_balanced[[target_col]]) <- orig_levels # set original labels before turning it into 0/1.
 
     if (was_target_logical) {
       df_balanced[[target_col]] <- as.logical(df_balanced[[target_col]]) # turn it back to logical.
@@ -814,8 +820,12 @@ calc_feature_imp <- function(df,
                              nodesize = 12,
                              target_n = 20,
                              predictor_n = 12, # so that at least months can fit in it.
-                             smote = FALSE
+                             smote = FALSE,
+                             seed = NULL
                              ){
+  if(!is.null(seed)){
+    set.seed(seed)
+  }
   # this seems to be the new way of NSE column selection evaluation
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
   target_col <- dplyr::select_var(names(df), !! rlang::enquo(target))
@@ -833,6 +843,22 @@ calc_feature_imp <- function(df,
 
   if (any(c(target_col, selected_cols) %in% grouped_cols)) {
     stop("grouping column is used as variable columns")
+  }
+
+  if (target_n < 2) {
+    stop("Max # of categories for target var must be at least 2.")
+  }
+
+  if (predictor_n < 2) {
+    stop("Max # of categories for explanatory vars must be at least 2.")
+  }
+
+  orig_levels <- NULL
+  if (is.factor(df[[target_col]])) {
+    orig_levels <- levels(df[[target_col]])
+  }
+  else if (is.logical(df[[target_col]])) {
+    orig_levels <- c("TRUE","FALSE")
   }
 
   # remove NA because it's not permitted for randomForest
@@ -899,18 +925,6 @@ calc_feature_imp <- function(df,
           dplyr::sample_n(max_nrow)
       }
 
-      # Return NULL if there is only one row
-      # for a class of target variable because
-      # rondomForest enters infinite loop
-      # in such case.
-      # The group with NULL is removed when
-      # unnesting the result
-      for (level in levels(df[[clean_target_col]])) {
-        if(sum(df[[clean_target_col]] == level, na.rm = TRUE) == 1) {
-          return(NULL)
-        }
-      }
-
       if (is.logical(df[[clean_target_col]])) {
         # we need to convert logical to factor since na.roughfix only works for numeric or factor.
         # for logical set TRUE, FALSE level order for better visualization. but only do it when
@@ -972,13 +986,37 @@ calc_feature_imp <- function(df,
             df[[hour_col]] <- factor(lubridate::hour(df[[col]])) # treat hour as category
           }
           df[[col]] <- NULL # drop original Date/POSIXct column to pass SMOTE later.
+        } else if(is.factor(df[[col]])) {
+          # if the data is factor, respect the levels and keep first 10 levels, and make others "Others" level.
+          if (length(levels(df[[col]])) >= predictor_n + 2) {
+            df[[col]] <- fct_other(df[[col]], keep=levels(df[[col]])[1:predictor_n])
+          }
         } else if(!is.numeric(df[[col]])) {
           # convert data to factor if predictors are not numeric.
           # and limit the number of levels in factor by fct_lump.
           # we need to convert logical to factor too since na.roughfix only works for numeric or factor.
           df[[col]] <- forcats::fct_explicit_na(forcats::fct_lump(as.factor(df[[col]]), n=predictor_n, ties.method="first"))
+        } else {
+          # filter Inf/-Inf to avoid following error from ranger.
+          # Error in seq.default(min(x, na.rm = TRUE), max(x, na.rm = TRUE), length.out = length.out) : 'from' must be a finite number
+          df <- df %>% dplyr::filter(!is.infinite(.[[col]]))
         }
       }
+
+      # This check should be done after all possible filtering.
+      # Return NULL if there is only one row
+      # for a class of target variable because
+      # rondomForest enters infinite loop
+      # in such case.
+      # The group with NULL is removed when
+      # unnesting the result
+      # TODO: Should we just filter such row and go on??
+      for (level in levels(df[[clean_target_col]])) {
+        if(sum(df[[clean_target_col]] == level, na.rm = TRUE) == 1) {
+          return(NULL)
+        }
+      }
+
 
       # remove columns with only one unique value
       cols_copy <- c_cols
@@ -1019,6 +1057,7 @@ calc_feature_imp <- function(df,
       )
       # these attributes are used in tidy of randomForest
       rf$classification_type <- classification_type
+      rf$orig_levels <- orig_levels
       rf$terms_mapping <- names(name_map)
       rf$y <- model.response(model_df)
       names(rf$terms_mapping) <- name_map
@@ -1276,14 +1315,21 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
       # in tidy().
       ret <- ret %>% dplyr::mutate(x_value = as.character(x_value))
       # convert must be FALSE for y to make sure y_name is always character. otherwise bind_rows internally done
-      # in tidy() errors out because y_name can be, for example, mixture of logical and character.
+      # in tidy() to bind outputs from different groups errors out because y_value can be, for example, mixture of logical and character.
       ret <- ret %>% tidyr::gather("y_name", "y_value", -x_name, -x_value, na.rm = TRUE, convert = FALSE)
       ret <- ret %>% dplyr::mutate(x_name = forcats::fct_relevel(x_name, imp_vars)) # set factor level order so that charts appear in order of importance.
       # set order to ret and turn it back to character, so that the order is kept when groups are bound.
       # if it were kept as factor, when groups are bound, only the factor order from the first group would be respected.
       ret <- ret %>% dplyr::arrange(x_name) %>% dplyr::mutate(x_name = as.character(x_name))
 
-      # create mapping from column name to facet chart type based on whether the column is numeric.
+      # Set original factor level back so that legend order is correct on the chart.
+      # In case of logical, c("TRUE","FALSE") is stored in orig_level, so that we can
+      # use it here either way.
+      if (!is.null(x$orig_levels)) {
+        ret <- ret %>%  dplyr::mutate(y_name = factor(y_name, levels=x$orig_levels))
+      }
+
+      # create mapping from column name (x_name) to facet chart type based on whether the column is numeric.
       chart_type_map <-c()
       for(col in colnames(x$df)) {
         chart_type_map <- c(chart_type_map, is.numeric(x$df[[col]]))

@@ -192,3 +192,436 @@ do_chisq.test_ <- function(df,
     dplyr::ungroup() %>%
     unnest_with_drop_(tmp_col)
 }
+
+#' Chi-Square test wrapper for Analytics View
+#' @export
+exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, fun.aggregate = sum, correct = FALSE, ...) {
+  # We are turning off Yates's correction by default because...
+  # 1. It seems that it is commonly discussed that it is overly conservative and not necessary.
+  #    https://en.wikipedia.org/wiki/Yates%27s_correction_for_continuity
+  #    https://aue.repo.nii.ac.jp/?action=repository_uri&item_id=785&file_id=15&file_no=1
+  # 2. With Yates's correction residuals do not add up to chi-square value, which makes contributions not adding up to 100%.
+  var1_col <- col_name(substitute(var1))
+  var2_col <- col_name(substitute(var2))
+  value_col <- col_name(substitute(value))
+  grouped_col <- grouped_by(df)
+
+  if (!is.null(func1) && (is.Date(df[[var1_col]]) || is.POSIXct(df[[var1_col]]))) {
+    df <- df %>% mutate(!!rlang::sym(var1_col) := extract_from_date(!!rlang::sym(var1_col), type=func1))
+  }
+  if (!is.null(func2) && (is.Date(df[[var2_col]]) || is.POSIXct(df[[var2_col]]))) {
+    df <- df %>% mutate(!!rlang::sym(var2_col) := extract_from_date(!!rlang::sym(var2_col), type=func2))
+  }
+  
+  if (n_distinct(df[[var1_col]]) < 2) {
+    stop(paste0("Variable Column (", var1_col, ") has to have 2 or more kinds of values."))
+  }
+  if (n_distinct(df[[var2_col]]) < 2) {
+    stop(paste0("Variable Column (", var2_col, ") has to have 2 or more kinds of values."))
+  }
+
+  var1_levels <- NULL
+  var2_levels <- NULL
+  if (is.factor(df[[var1_col]])) {
+    var1_levels <- levels(df[[var1_col]])
+  }
+  if (is.factor(df[[var2_col]])) {
+    var2_levels <- levels(df[[var2_col]])
+  }
+
+  formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
+  # pivot_ does pivot for each group.
+  pivotted_df <- pivot_(df, formula, value_col = value_col, fun.aggregate = fun.aggregate, fill = 0)
+
+  chisq.test_each <- function(df) {
+    if (length(grouped_col) > 0) {
+      df <- df %>% select(-!!rlang::sym(grouped_col))
+    }
+    df <- df %>% tibble::column_to_rownames(var=var1_col)
+    x <- df %>% as.matrix()
+    model <- chisq.test(x = x, correct = correct, ...)
+    # add variable name info to the model
+    model$var1 <- var1_col
+    model$var2 <- var2_col
+    model$var1_levels <- var1_levels
+    model$var2_levels <- var2_levels
+    class(model) <- c("chisq_exploratory", class(model))
+    model
+  }
+
+  # Calculation is executed in each group.
+  # Storing the result in this tmp_col and
+  # unnesting the result.
+  # If the original data frame is grouped by "tmp",
+  # overwriting it should be avoided,
+  # so avoid_conflict is used here.
+  tmp_col <- avoid_conflict(colnames(pivotted_df), "model")
+  ret <- pivotted_df %>%
+    dplyr::do_(.dots = setNames(list(~chisq.test_each(.)), tmp_col))
+  ret
+}
+
+#' @export
+tidy.chisq_exploratory <- function(x, type = "observed") {
+  if (type == "observed") {
+    ret <- as.data.frame(x$observed)
+    ret <- ret %>% tibble::rownames_to_column(var = x$var1)
+  }
+  if (type == "residuals") {
+    obs_df <- as.data.frame(x$observed)
+    obs_df <- obs_df %>% tibble::rownames_to_column(var = x$var1)
+    obs_df <- obs_df %>% tidyr::gather(!!rlang::sym(x$var2), "observed", -!!rlang::sym(x$var1))
+
+    expected_df <- as.data.frame(x$expected)
+    expected_df <- expected_df %>% tibble::rownames_to_column(var = x$var1)
+    expected_df <- expected_df %>% tidyr::gather(!!rlang::sym(x$var2), "expected", -!!rlang::sym(x$var1))
+
+    resid_df <- as.data.frame(x$residuals)
+    resid_df <- resid_df %>% tibble::rownames_to_column(var = x$var1)
+    resid_df <- resid_df %>% tidyr::gather(!!rlang::sym(x$var2), "residual", -!!rlang::sym(x$var1))
+
+    resid_raw_df <- as.data.frame(x$observed - x$expected) # x$residual is standardized, but here, take raw difference between observed and expected. 
+    resid_raw_df <- resid_raw_df %>% tibble::rownames_to_column(var = x$var1)
+    resid_raw_df <- resid_raw_df %>% tidyr::gather(!!rlang::sym(x$var2), "residual_raw", -!!rlang::sym(x$var1))
+
+    resid_ratio_df <- as.data.frame((x$observed - x$expected)/x$expected) # x$residual is standardized, but here, take raw difference between observed and expected. 
+    resid_ratio_df <- resid_ratio_df %>% tibble::rownames_to_column(var = x$var1)
+    resid_ratio_df <- resid_ratio_df %>% tidyr::gather(!!rlang::sym(x$var2), "residual_ratio", -!!rlang::sym(x$var1))
+
+    ret <- obs_df %>% left_join(expected_df, by=c(x$var1, x$var2)) # join expected column 
+    ret <- ret %>% left_join(resid_df, by=c(x$var1, x$var2)) # join expected column
+    ret <- ret %>% left_join(resid_raw_df, by=c(x$var1, x$var2)) # join residual_raw column
+    ret <- ret %>% left_join(resid_ratio_df, by=c(x$var1, x$var2)) # join residual_ratio column
+    if (is.nan(x$statistic) || x$statistic <= 0) {
+      ret <- ret %>% mutate(contrib = 0) # avoid division by 0
+    }
+    else {
+      ret <- ret %>% mutate(contrib = 100*residual^2/x$statistic) # add percent contribution too.
+    }
+
+    if (!is.null(x$var1_levels)) {
+      ret[[x$var1]] <- factor(ret[[x$var1]], levels=x$var1_levels)
+    }
+    if (!is.null(x$var2_levels)) {
+      ret[[x$var2]] <- factor(ret[[x$var2]], levels=x$var2_levels)
+    }
+  }
+  ret
+}
+
+#' @export
+glance.chisq_exploratory <- function(x) {
+  # ret <- x %>% broom:::glance.htest() # for some reason this does not work. just do it like following.
+  ret <- data.frame(statistic=x$statistic, parameter=x$parameter, p.value=x$p.value)
+  ret <- ret %>% rename(`Chi-Square`=statistic, `Degree of Freedom`=parameter, `P Value`=p.value)
+  ret
+}
+
+#' t-test wrapper for Analytics View
+#' @export
+exp_ttest <- function(df, var1, var2, func2 = NULL, ...) {
+  var1_col <- col_name(substitute(var1))
+  var2_col <- col_name(substitute(var2))
+  grouped_cols <- grouped_by(df)
+
+  if (!is.null(func2) && (is.Date(df[[var2_col]]) || is.POSIXct(df[[var2_col]]))) {
+    df <- df %>% mutate(!!rlang::sym(var2_col) := extract_from_date(!!rlang::sym(var2_col), type=func2))
+  }
+  
+  if (n_distinct(df[[var2_col]]) != 2) {
+    stop(paste0("Variable Column (", var2_col, ") has to have 2 kinds of values."))
+  }
+
+  formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
+
+  ttest_each <- function(df) {
+    tryCatch({
+      model <- t.test(formula, data = df, ...)
+      class(model) <- c("ttest_exploratory", class(model))
+      model$var1 <- var1_col
+      model$var2 <- var2_col
+      model$data <- df
+      model
+    }, error = function(e){
+      if(length(grouped_cols) > 0) {
+        # Ignore the error if
+        # it is caused by subset of
+        # grouped data frame
+        # to show result of
+        # data frames that succeed.
+        # For example, error can happen if one of the groups does not have both values (e.g. both TRUE and FALSE) of var2.
+        NULL
+      } else {
+        stop(e)
+      }
+    })
+  }
+
+  # Calculation is executed in each group.
+  # Storing the result in this tmp_col and
+  # unnesting the result.
+  # If the original data frame is grouped by "tmp",
+  # overwriting it should be avoided,
+  # so avoid_conflict is used here.
+  tmp_col <- avoid_conflict(colnames(df), "model")
+  ret <- df %>%
+    dplyr::do_(.dots = setNames(list(~ttest_each(.)), tmp_col))
+  ret
+}
+
+#' @export
+glance.ttest_exploratory <- function(x) {
+  ret <- broom:::glance.htest(x) # for t-test. the returned content is same as tidy.
+  ret
+}
+
+#' @export
+tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
+  if (type == "model") {
+    ret <- broom:::tidy.htest(x)
+    ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
+      dplyr::rename(`t Ratio`=statistic,
+                    `P Value`=p.value,
+                    `Degree of Freedom`=parameter,
+                    Difference=estimate,
+                    `Conf High`=conf.high,
+                    `Conf Low`=conf.low)
+  }
+  else if (type == "data_summary") { #TODO consolidate with code in tidy.anova_exploratory
+    conf_threshold = 1 - (1 - conf_level)/2
+    ret <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
+      dplyr::summarize(`Number of Rows`=length(!!rlang::sym(x$var1)),
+                       Mean=mean(!!rlang::sym(x$var1), na.rm=TRUE),
+                       `Std Deviation`=sd(!!rlang::sym(x$var1), na.rm=TRUE),
+                       # std error definition: https://www.rdocumentation.org/packages/plotrix/versions/3.7/topics/std.error
+                       `Std Error of Mean`=sd(!!rlang::sym(x$var1), na.rm=TRUE)/sqrt(sum(!is.na(!!rlang::sym(x$var1)))),
+                       # Note: Use qt (t distribution) instead of qnorm (normal distribution) here.
+                       # For more detail take a look at 10.5.1 A slight mistake in the formula of "Learning Statistics with R" 
+                       `Conf High` = Mean + `Std Error of Mean` * qt(p=conf_level, df=`Number of Rows`-1),
+                       `Conf Low` = Mean - `Std Error of Mean` * qt(p=conf_level, df=`Number of Rows`-1),
+                       `Minimum`=min(!!rlang::sym(x$var1), na.rm=TRUE),
+                       `Maximum`=max(!!rlang::sym(x$var1), na.rm=TRUE)) %>%
+      dplyr::select(!!rlang::sym(x$var2),
+                    `Number of Rows`,
+                    Mean,
+                    `Conf Low`,
+                    `Conf High`,
+                    `Std Error of Mean`,
+                    `Std Deviation`,
+                    `Minimum`,
+                    `Maximum`)
+  }
+  else { # type == "data"
+    ret <- x$data
+  }
+  ret
+}
+
+#' ANOVA wrapper for Analytics View
+#' @export
+exp_anova <- function(df, var1, var2, func2 = NULL, ...) {
+  var1_col <- col_name(substitute(var1))
+  var2_col <- col_name(substitute(var2))
+  grouped_cols <- grouped_by(df)
+
+  if (!is.null(func2) && (is.Date(df[[var2_col]]) || is.POSIXct(df[[var2_col]]))) {
+    df <- df %>% mutate(!!rlang::sym(var2_col) := extract_from_date(!!rlang::sym(var2_col), type=func2))
+  }
+  
+  if (n_distinct(df[[var2_col]]) < 2) {
+    stop(paste0("Variable Column (", var2_col, ") has to have 2 or more kinds of values."))
+  }
+
+  formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
+
+  anova_each <- function(df) {
+    tryCatch({
+      model <- aov(formula, data = df, ...)
+      class(model) <- c("anova_exploratory", class(model))
+      model$var1 <- var1_col
+      model$var2 <- var2_col
+      model$data <- df
+      model
+    }, error = function(e){
+      if(length(grouped_cols) > 0) {
+        # Ignore the error if
+        # it is caused by subset of
+        # grouped data frame
+        # to show result of
+        # data frames that succeed.
+        # For example, error can happen if one of the groups has only one unique value in its set of var2.
+        NULL
+      } else {
+        stop(e)
+      }
+    })
+  }
+
+  # Calculation is executed in each group.
+  # Storing the result in this tmp_col and
+  # unnesting the result.
+  # If the original data frame is grouped by "tmp",
+  # overwriting it should be avoided,
+  # so avoid_conflict is used here.
+  tmp_col <- avoid_conflict(colnames(df), "model")
+  ret <- df %>%
+    dplyr::do_(.dots = setNames(list(~anova_each(.)), tmp_col))
+  ret
+}
+
+#' @export
+glance.anova_exploratory <- function(x) {
+  ret <- broom:::tidy.aov(x) %>% slice(1:1) # there is no glance.aov. take first row of tidy.aov.
+  ret
+}
+
+#' @export
+tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
+  if (type == "model") {
+    ret <- broom:::tidy.aov(x)
+    ret <- ret %>% dplyr::select(term, statistic, p.value, df, sumsq, meansq) %>%
+      dplyr::rename(Term=term,
+                    `F Ratio`=statistic,
+                    `P Value`=p.value,
+                    `Degree of Freedom`=df,
+                    `Sum of Squares`=sumsq,
+                    `Mean Square`=meansq)
+  }
+  else if (type == "data_summary") { #TODO consolidate with code in tidy.ttest_exploratory
+    conf_threshold = 1 - (1 - conf_level)/2
+    ret <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
+      dplyr::summarize(`Number of Rows`=length(!!rlang::sym(x$var1)),
+                       Mean=mean(!!rlang::sym(x$var1), na.rm=TRUE),
+                       `Std Deviation`=sd(!!rlang::sym(x$var1), na.rm=TRUE),
+                       # std error definition: https://www.rdocumentation.org/packages/plotrix/versions/3.7/topics/std.error
+                       `Std Error of Mean`=sd(!!rlang::sym(x$var1), na.rm=TRUE)/sqrt(sum(!is.na(!!rlang::sym(x$var1)))),
+                       # Note: Use qt (t distribution) instead of qnorm (normal distribution) here.
+                       # For more detail take a look at 10.5.1 A slight mistake in the formula of "Learning Statistics with R" 
+                       `Conf High` = Mean + `Std Error of Mean` * qt(p=conf_threshold, df=`Number of Rows`-1),
+                       `Conf Low` = Mean - `Std Error of Mean` * qt(p=conf_threshold, df=`Number of Rows`-1),
+                       `Minimum`=min(!!rlang::sym(x$var1), na.rm=TRUE),
+                       `Maximum`=max(!!rlang::sym(x$var1), na.rm=TRUE)) %>%
+      dplyr::select(!!rlang::sym(x$var2),
+                    `Number of Rows`,
+                    Mean,
+                    `Conf Low`,
+                    `Conf High`,
+                    `Std Error of Mean`,
+                    `Std Deviation`,
+                    `Minimum`,
+                    `Maximum`)
+  }
+  else { # type == "data"
+    ret <- x$data
+  }
+  ret
+}
+
+
+# qqline function that does not draw line and instead return intercept and slope
+qqline_data <- function (y, datax = FALSE, distribution = qnorm, probs = c(0.25, 0.75), qtype = 7, ...) 
+{
+  stopifnot(length(probs) == 2, is.function(distribution))
+  y <- quantile(y, probs, names = FALSE, type = qtype, na.rm = TRUE)
+  x <- distribution(probs)
+  if (datax) {
+    slope <- diff(x)/diff(y)
+    int <- x[1L] - slope * y[1L]
+  }
+  else {
+    slope <- diff(y)/diff(x)
+    int <- y[1L] - slope * x[1L]
+  }
+  
+  list(int, slope) # intercept and slope
+}
+
+
+#' @param n_sample - Downsample to this size before shapiro test. Note that this is not applied for qq data. 
+#' @export
+exp_normality<- function(df, ..., n_sample = 50) {
+  selected_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
+  
+  shapiro_each <- function(df) {
+    df.qq <- data.frame()
+    df.qqline <- data.frame()
+    df.model <- data.frame()
+    for (col in selected_cols) {
+      if (n_distinct(df[[col]], na.rm=TRUE) <= 1) {
+        # skip if the column has only 1 unique value or only NAs, to avoid error.
+        # TODO: show what happened in the summary table.
+      }
+      else {
+        # set plot.it to FALSE to disable plotting (avoid launching another window)
+        res <- stats::qqnorm(df[[col]], plot.it=FALSE)
+        df.qq <- dplyr::bind_rows(df.qq, data.frame(x=res$x, y=res$y, col=col))
+
+        # bind reference line data too.
+        ref_res <- qqline_data(df[[col]])
+        min_x <- min(res$x, na.rm=TRUE)
+        max_x <- max(res$x, na.rm=TRUE)
+        ref_min_y <- ref_res[[1]] + ref_res[[2]] * min_x
+        ref_max_y <- ref_res[[1]] + ref_res[[2]] * max_x
+        df.qqline <- dplyr::bind_rows(df.qqline, data.frame(x=c(min_x, max_x), refline_y=c(ref_min_y,ref_max_y), col=col))
+
+        if (n_sample > 5000) {
+          n_sample <- 5000 # shapiro.test takes only up to max of 5000 samples. 
+        }
+
+        if (length(df[[col]]) > n_sample) {
+          col_to_test <- sample(df[[col]], n_sample)
+          sample_size <- n_sample
+        }
+        else {
+          col_to_test <- df[[col]]
+          sample_size <- length(col_to_test)
+        }
+        res <- shapiro.test(col_to_test) %>% tidy() %>%
+          dplyr::mutate(col=col, sample_size=sample_size) %>%
+          dplyr::select(col, everything())
+        df.model <- dplyr::bind_rows(df.model, res)
+      }
+    }
+
+    model <- list()
+    model$qq <- df.qq
+    model$qqline <- df.qqline
+    model$model_summary <- df.model
+    class(model) <- c("shapiro_exploratory", class(model))
+    model
+  }
+
+  # Calculation is executed in each group.
+  # Storing the result in this tmp_col and
+  # unnesting the result.
+  # If the original data frame is grouped by "tmp",
+  # overwriting it should be avoided,
+  # so avoid_conflict is used here.
+  tmp_col <- avoid_conflict(colnames(df), "model")
+  ret <- df %>%
+    dplyr::do_(.dots = setNames(list(~shapiro_each(.)), tmp_col))
+  ret
+}
+
+#' @param n_sample - Downsample qq-plot data down to this number.
+#'                   This is to make sure qq-line part of the data would not be sampled out in qq scatter plot.
+#' @export
+tidy.shapiro_exploratory <- function(x, type = "model", conf_level=0.95, n_sample=NULL) {
+  if (type == "qq") {
+    if (!is.null(n_sample) && nrow(x$qq) > n_sample) {
+      sampled_qq_df <- dplyr::sample_n(x$qq, n_sample)
+    }
+    else {
+      sampled_qq_df <- x$qq
+    }
+    ret <- dplyr::bind_rows(sampled_qq_df, x$qqline)
+    ret
+  }
+  else {
+    ret <- x$model_summary
+    ret <- ret %>% mutate(normal=p.value>(1-conf_level))
+    ret <- ret %>% select(-method)
+    ret <- ret %>% rename(`Column`=col, `Statistic`=statistic, `P Value`=p.value, `Normal Distribution`=normal, `Sample Size`=sample_size)
+    ret
+  }
+}

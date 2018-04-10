@@ -192,3 +192,52 @@ test_that("test chisq.test with p column", {
   expect_equal(nrow(ret), 1)
 
 })
+
+test_that("test exp_chisq", {
+  ret <- exp_chisq(mtcars %>% mutate(gear=factor(gear)), gear, carb) # factor order should be kept in the model
+  ret <- exp_chisq(mtcars, gear, carb, value=cyl)
+  ret
+})
+
+test_that("test exp_chisq with group_by", {
+  ret <- mtcars %>% group_by(vs) %>% exp_chisq(gear, carb, value=cyl)
+  observed <- ret %>% broom::tidy(model, type="observed")
+  summary <- ret %>% broom::glance(model)
+  residuals <- ret %>% broom::tidy(model, type="residuals")
+})
+
+test_that("test exp_ttest", {
+  ret <- exp_ttest(mtcars, mpg, am)
+  ret %>% tidy(model, type="data_summary")
+  ret
+})
+
+test_that("test exp_ttest with group_by", {
+  ret <- mtcars %>% group_by(vs) %>% exp_ttest(mpg, am)
+  ret %>% tidy(model, type="data_summary")
+  ret
+})
+
+test_that("test exp_anova", {
+  ret <- exp_anova(mtcars, mpg, am)
+  ret %>% tidy(model, type="data_summary")
+  ret <- exp_anova(mtcars, mpg, gear)
+  ret %>% tidy(model, type="data_summary")
+  ret
+})
+
+test_that("test exp_anova with group_by", {
+  ret <- mtcars %>% group_by(vs) %>% exp_anova(mpg, am)
+  ret %>% tidy(model, type="data_summary")
+  ret <- mtcars %>% group_by(vs) %>% exp_anova(mpg, gear)
+  ret %>% tidy(model, type="data_summary")
+  ret
+})
+
+test_that("test exp_normality", {
+  df <- mtcars %>% mutate(dummy=c(NA, rep(1,n()-1))) # test for column with always same value, except for NA.
+  ret <- df %>% exp_normality(mpg, gear, dummy, n_sample=20)
+  qq <- ret %>% tidy(model, type="qq", n_sample=30)
+  model_summary <- ret %>% tidy(model, type="model_summary", conf_level=0.9)
+  ret
+})
