@@ -149,15 +149,13 @@ refreshGoogleTokenForSheet <- function(tokenFileId){
 getTwitterToken <- function(tokenFileId="", useCache=TRUE){
   if(!requireNamespace("rtweet")){stop("package rtweet must be installed.")}
   consumer_key = "kYrHnqx62YaCoy6g0x967BGBq"
-  consumer_secret = "xYNUMALkRnvuT3vls48LW7k2XK1l9xjZTLnRv2JaFaM"
+  consumer_secret = "wqP7VhX5yDEGzLL3eHSbT2wDlJvs4OitruIkd18CQZGzsySFuX"
   appName = "twitter"
   endpointType = "twitter"
   # retrieve token info from environment
   # main purpose is to enable server refresh
   token_info <- getTokenInfo("twitter")
-  browser()
   if(!is.null(token_info)){
-    browser()
     HttrOAuthToken1.0$new(
       request = "https://api.twitter.com/oauth/request_token",
       authorize = "https://api.twitter.com/oauth/authenticate",
