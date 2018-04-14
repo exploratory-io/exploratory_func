@@ -213,7 +213,7 @@ getGoogleTokenForBigQuery <- function(tokenFileId="", useCache=TRUE){
       )
     )
   } else {
-  tokenFileName ="bigquery_token.rds"
+    tokenFileName ="bigquery_token.rds"
     getOAuthToken(clientId, secret, appName, endpointType, scopeList, tokenFileName, tokenFileId, useCache)
   }
 }
