@@ -753,7 +753,6 @@ getTwitter <- function(n=200, lang=NULL,  lastNDays=30, searchString, tokenFileI
   loadNamespace("lubridate")
   twitter_token = getTwitterToken(tokenFileId)
   twitter_token = rtweet:::check_token(twitter_token);
-  browser()
   # this parameter needs to be character with YYYY-MM-DD format
   # to get the latest tweets, pass NULL for until
   until = NULL
@@ -769,7 +768,6 @@ getTwitter <- function(n=200, lang=NULL,  lastNDays=30, searchString, tokenFileI
   # convert search string to UTF-8 before sending it on the wire on windows.
   searchString <- convertUserInputToUtf8(searchString)
   tweetList <- rtweet::search_tweets(q = searchString, token = twitter_token, n = n, lang = lang, verbose = TRUE, since = since, unitl = until, locale = locale, geocode = geocode, type = resultType,  retryonratelimit=TRUE)
-  #tweetList <- rtweet::search_tweets(q = searchString,n = n,type = resultType, retryonratelimit=TRUE)
   if(withSentiment){
     # calculate sentiment
     tweetList %>% dplyr::mutate(sentiment = get_sentiment(text))
