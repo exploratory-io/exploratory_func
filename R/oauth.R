@@ -149,6 +149,7 @@ refreshGoogleTokenForSheet <- function(tokenFileId){
 getTwitterToken <- function(tokenFileId="", useCache=TRUE){
   if(!requireNamespace("twitteR")){stop("package twitteR must be installed.")}
   consumer_key = "0lWpnop0HLfWRbpkDEJ0XA"
+  consumer_secret = "xYNUMALkRnvuT3vls48LW7k2XK1l9xjZTLnRv2JaFaM"
   appName = "twitter"
   endpointType = "twitter"
   # retrieve token info from environment
@@ -161,7 +162,7 @@ getTwitterToken <- function(tokenFileId="", useCache=TRUE){
       access = "https://api.twitter.com/oauth/access_token",
       appname = "twitter",
       key = consumer_key,
-      secret = token_info$consumer_sc,
+      secret = consumer_secret,
       credentials = list(
         oauth_token = token_info$oauth_token,
         oauth_token_secret = token_info$oauth_token_secret,
