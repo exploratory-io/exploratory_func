@@ -749,11 +749,11 @@ queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, q
 #' @param withSentiment - Whether there should be sentiment column caluculated by get_sentiment.
 #' @export
 getTwitter <- function(n=200, lang=NULL,  lastNDays=30, searchString, tokenFileId=NULL, withSentiment = FALSE, ...){
-  if(!requireNamespace("twitteR")){stop("package twitteR must be installed.")}
+  if(!requireNamespace("rtweet")){stop("package rtweet must be installed.")}
   loadNamespace("lubridate")
-
   twitter_token = getTwitterToken(tokenFileId)
-  twitteR::use_oauth_token(twitter_token)
+  twitter_token = rtweet:::check_token(twitter_token);
+  browser()
   # this parameter needs to be character with YYYY-MM-DD format
   # to get the latest tweets, pass NULL for until
   until = NULL
@@ -768,19 +768,33 @@ getTwitter <- function(n=200, lang=NULL,  lastNDays=30, searchString, tokenFileI
 
   # convert search string to UTF-8 before sending it on the wire on windows.
   searchString <- convertUserInputToUtf8(searchString)
-  tweetList <- twitteR::searchTwitter(searchString, n, lang, since, until, locale, geocode, sinceID, maxID, resultType, retryOnRateLimit)
-  # conver list to data frame
-  if(length(tweetList)>0){
-    ret <- twitteR::twListToDF(tweetList)
-    if(withSentiment){
-      # calculate sentiment
-      ret %>% dplyr::mutate(sentiment = get_sentiment(text))
-    } else {
-      ret
-    }
+  tweetList <- rtweet::search_tweets(q = searchString, token = twitter_token, n = n, lang = lang, verbose = TRUE, since = since, unitl = until, locale = locale, geocode = geocode, type = resultType,  retryonratelimit=TRUE)
+  #tweetList <- rtweet::search_tweets(q = searchString,n = n,type = resultType, retryonratelimit=TRUE)
+  if(withSentiment){
+    # calculate sentiment
+    tweetList %>% dplyr::mutate(sentiment = get_sentiment(text))
   } else {
-    stop('No Tweets found.')
+    tweetList
   }
+
+}
+
+twitterListToDF <- function(twList) {
+  if (length(twList) == 0) {
+    stop("Empty list passed to twListToDF")
+  }
+
+  ## if all elements of twList are from a class defined in this
+  ## package, and all of the same class, will collapse these into
+  ## a data.frame and return
+  classes <- unique(sapply(twList, class))
+  if (length(classes) != 1) {
+    stop("Not all elements of twList are of the same class")
+  }
+  if (! classes %in% c('status', 'user', 'directMessage')) {
+    stop("Elements of twList are not of an appropriate class")
+  }
+  do.call('rbind', lapply(twList, as.data.frame))
 }
 
 
