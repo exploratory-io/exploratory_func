@@ -749,11 +749,10 @@ queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, q
 #' @param withSentiment - Whether there should be sentiment column caluculated by get_sentiment.
 #' @export
 getTwitter <- function(n=200, lang=NULL,  lastNDays=30, searchString, tokenFileId=NULL, withSentiment = FALSE, ...){
-  if(!requireNamespace("twitteR")){stop("package twitteR must be installed.")}
+  if(!requireNamespace("rtweet")){stop("package rtweet must be installed.")}
   loadNamespace("lubridate")
-
   twitter_token = getTwitterToken(tokenFileId)
-  twitteR::use_oauth_token(twitter_token)
+  twitter_token = rtweet:::check_token(twitter_token);
   # this parameter needs to be character with YYYY-MM-DD format
   # to get the latest tweets, pass NULL for until
   until = NULL
@@ -768,21 +767,19 @@ getTwitter <- function(n=200, lang=NULL,  lastNDays=30, searchString, tokenFileI
 
   # convert search string to UTF-8 before sending it on the wire on windows.
   searchString <- convertUserInputToUtf8(searchString)
-  tweetList <- twitteR::searchTwitter(searchString, n, lang, since, until, locale, geocode, sinceID, maxID, resultType, retryOnRateLimit)
-  # conver list to data frame
+  tweetList <- rtweet::search_tweets(q = searchString, token = twitter_token, n = n, lang = lang, verbose = TRUE, since = since, unitl = until, locale = locale, geocode = geocode, type = resultType,  retryonratelimit=TRUE)
   if(length(tweetList)>0){
-    ret <- twitteR::twListToDF(tweetList)
     if(withSentiment){
       # calculate sentiment
-      ret %>% dplyr::mutate(sentiment = get_sentiment(text))
+      tweetList %>% dplyr::mutate(sentiment = get_sentiment(text))
     } else {
-      ret
+      tweetList
     }
   } else {
     stop('No Tweets found.')
   }
-}
 
+}
 
 
 #' API to submit a Google Big Query Job
