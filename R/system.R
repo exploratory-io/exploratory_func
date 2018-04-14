@@ -176,14 +176,14 @@ getMongoURL <- function(host = NULL, port, database, username, pass, isSSL=FALSE
       pass = urltools::url_encode(pass)
     }
     if(!is.null(host) && host != ''){
-    url = stringr::str_c("mongodb://", username, ":", pass, "@", host, ":", as.character(port), "/", database)
+      url = stringr::str_c("mongodb://", username, ":", pass, "@", host, ":", as.character(port), "/", database)
     } else if (!is.null(cluster) && cluster != ''){
       url = stringr::str_c("mongodb://", username, ":", pass, "@", cluster, "/", database)
     }
   }
   else {
     if(!is.null(host) & host != ''){
-    url = stringr::str_c("mongodb://", host, ":", as.character(port), "/", database)
+      url = stringr::str_c("mongodb://", host, ":", as.character(port), "/", database)
     } else if (!is.null(cluster) && cluster != ''){
       url = stringr::str_c("mongodb://", cluster, "/", database)
     }
@@ -445,7 +445,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         # of their ODBC driver, at this version.
         # So we no longer need to switch ODBC driver name by OS.
         # We handled this change at v4.1.0.4 by releasing Mac only patch.
-          connstr <- "DRIVER=Dremio Connector"
+        connstr <- "DRIVER=Dremio Connector"
         connstr <- stringr::str_c(connstr, ";HOST=", host, ";ConnectionType=Direct;AuthenticationType=Plain;Catalog=DREMIO;PORT=", port, ";UID=", username, ";PWD=", password)
         conn <- RODBC::odbcDriverConnect(connstr)
       }
