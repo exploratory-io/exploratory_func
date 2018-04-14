@@ -777,25 +777,6 @@ getTwitter <- function(n=200, lang=NULL,  lastNDays=30, searchString, tokenFileI
 
 }
 
-twitterListToDF <- function(twList) {
-  if (length(twList) == 0) {
-    stop("Empty list passed to twListToDF")
-  }
-
-  ## if all elements of twList are from a class defined in this
-  ## package, and all of the same class, will collapse these into
-  ## a data.frame and return
-  classes <- unique(sapply(twList, class))
-  if (length(classes) != 1) {
-    stop("Not all elements of twList are of the same class")
-  }
-  if (! classes %in% c('status', 'user', 'directMessage')) {
-    stop("Elements of twList are not of an appropriate class")
-  }
-  do.call('rbind', lapply(twList, as.data.frame))
-}
-
-
 
 #' API to submit a Google Big Query Job
 #' @export
