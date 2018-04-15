@@ -6,6 +6,12 @@ test_that("do_prophet with aggregation", {
   raw_data <- raw_data %>% rename(`time stamp`=timestamp, `cou nt`=count)
   ret <- raw_data %>%
     do_prophet(`time stamp`, `cou nt`, 10, time_unit = "day")
+  ret <- raw_data %>%
+    do_prophet(`time stamp`, `cou nt`, 10, time_unit = "hour")
+  ret <- raw_data %>%
+    do_prophet(`time stamp`, `cou nt`, 10, time_unit = "minute")
+  ret <- raw_data %>%
+    do_prophet(`time stamp`, `cou nt`, 10, time_unit = "second")
 })
 
 test_that("do_prophet grouped case", {

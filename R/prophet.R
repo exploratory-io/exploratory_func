@@ -167,7 +167,19 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
       else {
         m <- prophet::prophet(aggregated_data, growth = "linear", weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
       }
-      future <- prophet::make_future_dataframe(m, periods = periods, freq = time_unit, include_history = include_history) #includes past dates
+      if (time_unit == "hour") {
+        time_unit_for_future_dataframe = 3600
+      }
+      else if (time_unit == "minute") {
+        time_unit_for_future_dataframe = 60
+      }
+      else if (time_unit == "second") {
+        time_unit_for_future_dataframe = 1
+      }
+      else {
+        time_unit_for_future_dataframe = time_unit
+      }
+      future <- prophet::make_future_dataframe(m, periods = periods, freq = time_unit_for_future_dataframe, include_history = include_history) #includes past dates
       if (!is.null(cap)) { # set cap to future table too, if it is there
         future[["cap"]] <- cap
       }
