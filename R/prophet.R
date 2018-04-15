@@ -136,8 +136,6 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
         dplyr::summarise(y = n())
     }
 
-    # ds column should be Date. TODO: really??
-    aggregated_data[["ds"]] <- as.Date(aggregated_data[["ds"]])
     if (time_unit != "day") { # if time_unit is larger than day (the next level is week), having weekly.seasonality does not make sense.
       weekly.seasonality = FALSE
     }
@@ -185,8 +183,10 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
       }
       forecast <- stats::predict(m, future)
     }
-    # with prophet 0.2.1, now forecast$ds is POSIXct. Cast it to Date so that full_join works.
-    forecast$ds <- as.Date(forecast$ds)
+    # with prophet 0.2.1, now forecast$ds is POSIXct. Cast it to Date when necessary so that full_join works.
+    if (is.Date(aggregated_data$ds)) {
+      forecast$ds <- as.Date(forecast$ds)
+    }
     ret <- forecast %>% dplyr::full_join(aggregated_data, by = c("ds" = "ds"))
     # drop cap_scaled column, which is just scaled capacity, which does not seem informative.
     if ("cap_scaled" %in% colnames(ret)) {
