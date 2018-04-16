@@ -183,6 +183,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
       }
       forecast <- stats::predict(m, future)
     }
+    browser()
     # with prophet 0.2.1, now forecast$ds is POSIXct. Cast it to Date when necessary so that full_join works.
     if (is.Date(aggregated_data$ds)) {
       forecast$ds <- as.Date(forecast$ds)
@@ -192,6 +193,10 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
     if ("cap_scaled" %in% colnames(ret)) {
       ret <- ret %>% dplyr::select(-cap_scaled)
     }
+    # TODO: Maybe we should take average when MCMC is used and there are multiple delta values for each channge point.
+    changepoints_df <- data.frame(ds = m$changepoints, slope_change = m$params$delta[1,])
+    ret <- ret %>% dplyr::left_join(changepoints_df, by = c("ds" = "ds"))
+
     # adjust order of output columns
     if ("cap.y" %in% colnames(ret)) { # cap.y exists only when cap is used.
       if ("yearly_upper" %in% colnames(ret)) { # yearly_upper/lower exists only when yearly.seasonality is TRUE
