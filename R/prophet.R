@@ -40,7 +40,7 @@ do_prophet <- function(df, time, value = NULL, ...){
 #' @param uncertainty.samples - Number of simulations made for calculating uncertainty intervals. Default is 1000.
 #' @export
 do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "day", include_history = TRUE,
-                        fun.aggregate = sum, cap = NULL, growth = NULL, weekly.seasonality = TRUE, yearly.seasonality = TRUE, holidays = NULL, ...){
+                        fun.aggregate = sum, cap = NULL, floor = NULL, growth = NULL, weekly.seasonality = TRUE, yearly.seasonality = TRUE, holidays = NULL, ...){
   validate_empty_data(df)
 
   # we are making default for weekly/yearly.seasonality TRUE since 'auto' does not behave well.
@@ -158,6 +158,9 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
     else {
       if (!is.null(cap)) { # set cap if it is there
         aggregated_data[["cap"]] <- cap
+        if (!is.null(floor)) { # set floor if it is there
+          aggregated_data[["floor"]] <- floor
+        }
       }
       if (!is.null(cap)) { # if cap is set, use logistic. otherwise use linear.
         m <- prophet::prophet(aggregated_data, growth = "logistic", weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
@@ -180,6 +183,9 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
       future <- prophet::make_future_dataframe(m, periods = periods, freq = time_unit_for_future_dataframe, include_history = include_history) #includes past dates
       if (!is.null(cap)) { # set cap to future table too, if it is there
         future[["cap"]] <- cap
+        if (!is.null(floor)) { # set floor if it is there
+          future[["floor"]] <- floor
+        }
       }
       forecast <- stats::predict(m, future)
     }
@@ -195,6 +201,10 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
     }
     # TODO: Maybe we should take average when MCMC is used and there are multiple delta values for each channge point.
     changepoints_df <- data.frame(ds = m$changepoints, slope_change = m$params$delta[1,])
+    # m$changepoints is POSIXct. Cast it to Date when necessary so that left_join works.
+    if (is.Date(aggregated_data$ds)) {
+      changepoints_df$ds <- as.Date(changepoints_df$ds)
+    }
     ret <- ret %>% dplyr::left_join(changepoints_df, by = c("ds" = "ds"))
 
     # adjust order of output columns
