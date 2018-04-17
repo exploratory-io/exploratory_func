@@ -39,7 +39,7 @@ do_prophet <- function(df, time, value = NULL, ...){
 #' @param interval.width - Width of uncertainty intervals.
 #' @param uncertainty.samples - Number of simulations made for calculating uncertainty intervals. Default is 1000.
 #' @export
-do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "day", include_history = TRUE, test_mode = FALSE,
+do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "day", include_history = TRUE, test_mode = TRUE,
                         fun.aggregate = sum, cap = NULL, floor = NULL, growth = NULL, weekly.seasonality = TRUE, yearly.seasonality = TRUE, holidays = NULL, ...){
   validate_empty_data(df)
 
@@ -212,6 +212,10 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
     }
     ret <- ret %>% dplyr::left_join(changepoints_df, by = c("ds" = "ds"))
 
+    if (test_mode) {
+      ret <- ret %>% dplyr::mutate(is_test = seq(1,n()) > n() - periods) # FALSE for training period, TRUE for test period.
+    }
+
     # adjust order of output columns
     if ("cap.y" %in% colnames(ret)) { # cap.y exists only when cap is used.
       if ("yearly_upper" %in% colnames(ret)) { # yearly_upper/lower exists only when yearly.seasonality is TRUE
@@ -309,8 +313,32 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
   # thanks to avoid_conflict that is used before,
   # this doesn't overwrite grouping columns.
   tmp_col <- avoid_conflict(colnames(df), "tmp_col")
-  test <- df %>%
+  ret <- df %>%
     dplyr::do_(.dots=setNames(list(~do_prophet_each(.)), tmp_col)) %>%
     dplyr::ungroup()
-  test %>%  unnest_with_drop_(tmp_col)
+  ret <- ret %>%  unnest_with_drop_(tmp_col)
+
+  if (length(grouped_col) > 0) {
+    ret <- ret %>% dplyr::group_by(!!!rlang::syms(grouped_col))
+  }
+  ret
+}
+
+
+#' @export
+mae <- function(actual, predicted) {
+  ret <- mean(abs(actual-predicted), na.rm=TRUE)
+  ret
+}
+
+#' @export
+rmse <- function(actual, predicted) {
+  ret <- sqrt(mean((actual-predicted)^2, na.rm=TRUE))
+  ret
+}
+
+#' @export
+mape <- function(actual, predicted) {
+  ret <- mean(abs((actual-predicted)/actual) * 100, na.rm=TRUE)
+  ret
 }
