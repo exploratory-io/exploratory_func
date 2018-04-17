@@ -39,7 +39,7 @@ do_prophet <- function(df, time, value = NULL, ...){
 #' @param interval.width - Width of uncertainty intervals.
 #' @param uncertainty.samples - Number of simulations made for calculating uncertainty intervals. Default is 1000.
 #' @export
-do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "day", include_history = TRUE,
+do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "day", include_history = TRUE, test_mode = FALSE,
                         fun.aggregate = sum, cap = NULL, floor = NULL, growth = NULL, weekly.seasonality = TRUE, yearly.seasonality = TRUE, holidays = NULL, ...){
   validate_empty_data(df)
 
@@ -143,30 +143,35 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
     # if (time_unit == "year") { # if time_unit is year (the largest unit), having yearly.seasonality does not make sense.
     #   yearly.seasonality = FALSE
     # }
+    training_data = aggregated_data
+    if (test_mode) {
+      training_data <- training_data %>% head(-periods)
+    }
+
     if (!is.null(cap) && is.data.frame(cap)) {
       # in this case, cap is the future data frame with cap, specified by user.
       # this is a back door to allow user to specify cap column.
       if (!is.null(cap$cap)) {
-        m <- prophet::prophet(aggregated_data, growth = "logistic", weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
+        m <- prophet::prophet(training_data, growth = "logistic", weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
       }
       else {
         # if future data frame is without cap, use it just as a future data frame.
-        m <- prophet::prophet(aggregated_data, growth = "linear", weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
+        m <- prophet::prophet(training_data, growth = "linear", weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
       }
       forecast <- stats::predict(m, cap_df)
     }
     else {
       if (!is.null(cap)) { # set cap if it is there
-        aggregated_data[["cap"]] <- cap
+        training_data[["cap"]] <- cap
         if (!is.null(floor)) { # set floor if it is there
-          aggregated_data[["floor"]] <- floor
+          training_data[["floor"]] <- floor
         }
       }
       if (!is.null(cap)) { # if cap is set, use logistic. otherwise use linear.
-        m <- prophet::prophet(aggregated_data, growth = "logistic", weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
+        m <- prophet::prophet(training_data, growth = "logistic", weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
       }
       else {
-        m <- prophet::prophet(aggregated_data, growth = "linear", weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
+        m <- prophet::prophet(training_data, growth = "linear", weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
       }
       if (time_unit == "hour") {
         time_unit_for_future_dataframe = 3600
