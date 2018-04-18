@@ -326,19 +326,58 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
 
 
 #' @export
-mae <- function(actual, predicted) {
+mae <- function(actual, predicted, is_test) {
+  actual <- actual[is_test]
+  predicted <- predicted[is_test]
   ret <- mean(abs(actual-predicted), na.rm=TRUE)
   ret
 }
 
 #' @export
-rmse <- function(actual, predicted) {
+rmse <- function(actual, predicted, is_test) {
+  actual <- actual[is_test]
+  predicted <- predicted[is_test]
   ret <- sqrt(mean((actual-predicted)^2, na.rm=TRUE))
   ret
 }
 
 #' @export
-mape <- function(actual, predicted) {
+mape <- function(actual, predicted, is_test) {
+  actual <- actual[is_test]
+  predicted <- predicted[is_test]
   ret <- mean(abs((actual-predicted)/actual) * 100, na.rm=TRUE)
   ret
 }
+
+# https://stackoverflow.com/questions/11092536/forecast-accuracy-no-mase-with-two-vectors-as-arguments
+computeMASE <- function(forecast, train, test, period){
+
+  # forecast - forecasted values
+  # train - data used for forecasting .. used to find scaling factor
+  # test - actual data used for finding MASE.. same length as forecast
+  # period - in case of seasonal data.. if not, use 1
+
+  forecast <- as.vector(forecast)
+  train <- as.vector(train)
+  test <- as.vector(test)
+
+  n <- length(train)
+  scalingFactor <- sum(abs(train[(period+1):n] - train[1:(n-period)])) / (n-period)
+
+  et <- abs(test-forecast)
+  qt <- et/scalingFactor
+  meanMASE <- mean(qt)
+  return(meanMASE)
+}
+
+mase <- function(actual, predicted, is_test, period = 1) {
+  train <- actual[!is_test]
+  test <- actual[is_test]
+  forecast <- predicted[is_test]
+  ret <- computeMASE(forecast, train, test, period)
+  ret
+}
+
+
+
+
