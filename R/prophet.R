@@ -212,7 +212,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
     ret <- ret %>% dplyr::left_join(changepoints_df, by = c("ds" = "ds"))
 
     if (test_mode) {
-      ret <- ret %>% dplyr::mutate(is_test = seq(1,n()) > n() - periods) # FALSE for training period, TRUE for test period.
+      ret <- ret %>% dplyr::mutate(is_test_data = seq(1,n()) > n() - periods) # FALSE for training period, TRUE for test period.
     }
 
     # adjust order of output columns
@@ -327,11 +327,11 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
 #' Calculate MAE.
 #' @param actual - Actual value.
 #' @param predicted - Predicted value.
-#' @param is_test - logical vector that indicates test data portion of actual and predicted.
+#' @param is_test_data - logical vector that indicates test data portion of actual and predicted.
 #' @export
-mae <- function(actual, predicted, is_test) {
-  actual <- actual[is_test]
-  predicted <- predicted[is_test]
+mae <- function(actual, predicted, is_test_data) {
+  actual <- actual[is_test_data]
+  predicted <- predicted[is_test_data]
   ret <- mean(abs(actual-predicted), na.rm=TRUE)
   ret
 }
@@ -339,11 +339,11 @@ mae <- function(actual, predicted, is_test) {
 #' Calculate RMSE.
 #' @param actual - Actual value.
 #' @param predicted - Predicted value.
-#' @param is_test - logical vector that indicates test data portion of actual and predicted.
+#' @param is_test_data - logical vector that indicates test data portion of actual and predicted.
 #' @export
-rmse <- function(actual, predicted, is_test) {
-  actual <- actual[is_test]
-  predicted <- predicted[is_test]
+rmse <- function(actual, predicted, is_test_data) {
+  actual <- actual[is_test_data]
+  predicted <- predicted[is_test_data]
   ret <- sqrt(mean((actual-predicted)^2, na.rm=TRUE))
   ret
 }
@@ -351,11 +351,11 @@ rmse <- function(actual, predicted, is_test) {
 #' Calculate MAPE.
 #' @param actual - Actual value.
 #' @param predicted - Predicted value.
-#' @param is_test - logical vector that indicates test data portion of actual and predicted.
+#' @param is_test_data - logical vector that indicates test data portion of actual and predicted.
 #' @export
-mape <- function(actual, predicted, is_test) {
-  actual <- actual[is_test]
-  predicted <- predicted[is_test]
+mape <- function(actual, predicted, is_test_data) {
+  actual <- actual[is_test_data]
+  predicted <- predicted[is_test_data]
   ret <- mean(abs((actual-predicted)/actual) * 100, na.rm=TRUE)
   ret
 }
@@ -384,11 +384,11 @@ computeMASE <- function(forecast, train, test, period){
 #' Calculate MASE.
 #' @param actual - Actual value.
 #' @param predicted - Predicted value.
-#' @param is_test - logical vector that indicates test data portion of actual and predicted.
-mase <- function(actual, predicted, is_test, period = 1) {
-  train <- actual[!is_test]
-  test <- actual[is_test]
-  forecast <- predicted[is_test]
+#' @param is_test_data - logical vector that indicates test data portion of actual and predicted.
+mase <- function(actual, predicted, is_test_data, period = 1) {
+  train <- actual[!is_test_data]
+  test <- actual[is_test_data]
+  forecast <- predicted[is_test_data]
   ret <- computeMASE(forecast, train, test, period)
   ret
 }
