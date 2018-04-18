@@ -13,6 +13,10 @@ test_that("do_prophet with aggregation", {
   #   do_prophet(`time stamp`, `cou nt`, 10, time_unit = "minute")
   # ret <- raw_data %>%
   #   do_prophet(`time stamp`, `cou nt`, 10, time_unit = "second")
+
+  # test for test mode.
+  ret <- raw_data %>%
+    do_prophet(`time stamp`, `cou nt`, 2, time_unit = "day", test_mode=TRUE)
 })
 
 test_that("do_prophet grouped case", {
