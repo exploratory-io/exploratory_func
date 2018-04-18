@@ -8,10 +8,11 @@ test_that("do_prophet with aggregation", {
     do_prophet(`time stamp`, `cou nt`, 10, time_unit = "day")
   ret <- raw_data %>%
     do_prophet(`time stamp`, `cou nt`, 10, time_unit = "hour")
-  ret <- raw_data %>%
-    do_prophet(`time stamp`, `cou nt`, 10, time_unit = "minute")
-  ret <- raw_data %>%
-    do_prophet(`time stamp`, `cou nt`, 10, time_unit = "second")
+  # comment out for now since the following takes time. TODO: modify data and make it faster.
+  # ret <- raw_data %>%
+  #   do_prophet(`time stamp`, `cou nt`, 10, time_unit = "minute")
+  # ret <- raw_data %>%
+  #   do_prophet(`time stamp`, `cou nt`, 10, time_unit = "second")
 })
 
 test_that("do_prophet grouped case", {

@@ -39,7 +39,7 @@ do_prophet <- function(df, time, value = NULL, ...){
 #' @param interval.width - Width of uncertainty intervals.
 #' @param uncertainty.samples - Number of simulations made for calculating uncertainty intervals. Default is 1000.
 #' @export
-do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "day", include_history = TRUE, test_mode = TRUE,
+do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "day", include_history = TRUE, test_mode = FALSE,
                         fun.aggregate = sum, cap = NULL, floor = NULL, growth = NULL, weekly.seasonality = TRUE, yearly.seasonality = TRUE, holidays = NULL, ...){
   validate_empty_data(df)
 
@@ -194,7 +194,6 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
       }
       forecast <- stats::predict(m, future)
     }
-    browser()
     # with prophet 0.2.1, now forecast$ds is POSIXct. Cast it to Date when necessary so that full_join works.
     if (is.Date(aggregated_data$ds)) {
       forecast$ds <- as.Date(forecast$ds)
