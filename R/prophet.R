@@ -324,6 +324,10 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
 }
 
 
+#' Calculate MAE.
+#' @param actual - Actual value.
+#' @param predicted - Predicted value.
+#' @param is_test - logical vector that indicates test data portion of actual and predicted.
 #' @export
 mae <- function(actual, predicted, is_test) {
   actual <- actual[is_test]
@@ -332,6 +336,10 @@ mae <- function(actual, predicted, is_test) {
   ret
 }
 
+#' Calculate RMSE.
+#' @param actual - Actual value.
+#' @param predicted - Predicted value.
+#' @param is_test - logical vector that indicates test data portion of actual and predicted.
 #' @export
 rmse <- function(actual, predicted, is_test) {
   actual <- actual[is_test]
@@ -340,6 +348,10 @@ rmse <- function(actual, predicted, is_test) {
   ret
 }
 
+#' Calculate MAPE.
+#' @param actual - Actual value.
+#' @param predicted - Predicted value.
+#' @param is_test - logical vector that indicates test data portion of actual and predicted.
 #' @export
 mape <- function(actual, predicted, is_test) {
   actual <- actual[is_test]
@@ -369,6 +381,10 @@ computeMASE <- function(forecast, train, test, period){
   return(meanMASE)
 }
 
+#' Calculate MASE.
+#' @param actual - Actual value.
+#' @param predicted - Predicted value.
+#' @param is_test - logical vector that indicates test data portion of actual and predicted.
 mase <- function(actual, predicted, is_test, period = 1) {
   train <- actual[!is_test]
   test <- actual[is_test]
