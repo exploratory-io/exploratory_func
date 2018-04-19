@@ -39,8 +39,8 @@ do_prophet <- function(df, time, value = NULL, ...){
 #' @param interval.width - Width of uncertainty intervals.
 #' @param uncertainty.samples - Number of simulations made for calculating uncertainty intervals. Default is 1000.
 #' @export
-do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "day", include_history = TRUE,
-                        fun.aggregate = sum, cap = NULL, growth = NULL, weekly.seasonality = TRUE, yearly.seasonality = TRUE, holidays = NULL, ...){
+do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "day", include_history = TRUE, test_mode = FALSE,
+                        fun.aggregate = sum, cap = NULL, floor = NULL, growth = NULL, weekly.seasonality = TRUE, yearly.seasonality = TRUE, holidays = NULL, ...){
   validate_empty_data(df)
 
   # we are making default for weekly/yearly.seasonality TRUE since 'auto' does not behave well.
@@ -136,8 +136,6 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
         dplyr::summarise(y = n())
     }
 
-    # ds column should be Date. TODO: really??
-    aggregated_data[["ds"]] <- as.Date(aggregated_data[["ds"]])
     if (time_unit != "day") { # if time_unit is larger than day (the next level is week), having weekly.seasonality does not make sense.
       weekly.seasonality = FALSE
     }
@@ -145,41 +143,78 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
     # if (time_unit == "year") { # if time_unit is year (the largest unit), having yearly.seasonality does not make sense.
     #   yearly.seasonality = FALSE
     # }
+    training_data = aggregated_data
+    if (test_mode) {
+      training_data <- training_data %>% head(-periods)
+    }
+
     if (!is.null(cap) && is.data.frame(cap)) {
       # in this case, cap is the future data frame with cap, specified by user.
       # this is a back door to allow user to specify cap column.
       if (!is.null(cap$cap)) {
-        m <- prophet::prophet(aggregated_data, growth = "logistic", weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
+        m <- prophet::prophet(training_data, growth = "logistic", weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
       }
       else {
         # if future data frame is without cap, use it just as a future data frame.
-        m <- prophet::prophet(aggregated_data, growth = "linear", weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
+        m <- prophet::prophet(training_data, growth = "linear", weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
       }
       forecast <- stats::predict(m, cap_df)
     }
     else {
       if (!is.null(cap)) { # set cap if it is there
-        aggregated_data[["cap"]] <- cap
+        training_data[["cap"]] <- cap
+        if (!is.null(floor)) { # set floor if it is there
+          training_data[["floor"]] <- floor
+        }
       }
       if (!is.null(cap)) { # if cap is set, use logistic. otherwise use linear.
-        m <- prophet::prophet(aggregated_data, growth = "logistic", weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
+        m <- prophet::prophet(training_data, growth = "logistic", weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
       }
       else {
-        m <- prophet::prophet(aggregated_data, growth = "linear", weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
+        m <- prophet::prophet(training_data, growth = "linear", weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
       }
-      future <- prophet::make_future_dataframe(m, periods = periods, freq = time_unit, include_history = include_history) #includes past dates
+      if (time_unit == "hour") {
+        time_unit_for_future_dataframe = 3600
+      }
+      else if (time_unit == "minute") {
+        time_unit_for_future_dataframe = 60
+      }
+      else if (time_unit == "second") {
+        time_unit_for_future_dataframe = 1
+      }
+      else {
+        time_unit_for_future_dataframe = time_unit
+      }
+      future <- prophet::make_future_dataframe(m, periods = periods, freq = time_unit_for_future_dataframe, include_history = include_history) #includes past dates
       if (!is.null(cap)) { # set cap to future table too, if it is there
         future[["cap"]] <- cap
+        if (!is.null(floor)) { # set floor if it is there
+          future[["floor"]] <- floor
+        }
       }
       forecast <- stats::predict(m, future)
     }
-    # with prophet 0.2.1, now forecast$ds is POSIXct. Cast it to Date so that full_join works.
-    forecast$ds <- as.Date(forecast$ds)
+    # with prophet 0.2.1, now forecast$ds is POSIXct. Cast it to Date when necessary so that full_join works.
+    if (is.Date(aggregated_data$ds)) {
+      forecast$ds <- as.Date(forecast$ds)
+    }
     ret <- forecast %>% dplyr::full_join(aggregated_data, by = c("ds" = "ds"))
     # drop cap_scaled column, which is just scaled capacity, which does not seem informative.
     if ("cap_scaled" %in% colnames(ret)) {
       ret <- ret %>% dplyr::select(-cap_scaled)
     }
+    # TODO: Maybe we should take average when MCMC is used and there are multiple delta values for each channge point.
+    changepoints_df <- data.frame(ds = m$changepoints, slope_change = m$params$delta[1,])
+    # m$changepoints is POSIXct. Cast it to Date when necessary so that left_join works.
+    if (is.Date(aggregated_data$ds)) {
+      changepoints_df$ds <- as.Date(changepoints_df$ds)
+    }
+    ret <- ret %>% dplyr::left_join(changepoints_df, by = c("ds" = "ds"))
+
+    if (test_mode) {
+      ret <- ret %>% dplyr::mutate(is_test_data = seq(1,n()) > n() - periods) # FALSE for training period, TRUE for test period.
+    }
+
     # adjust order of output columns
     if ("cap.y" %in% colnames(ret)) { # cap.y exists only when cap is used.
       if ("yearly_upper" %in% colnames(ret)) { # yearly_upper/lower exists only when yearly.seasonality is TRUE
@@ -277,8 +312,17 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
   # thanks to avoid_conflict that is used before,
   # this doesn't overwrite grouping columns.
   tmp_col <- avoid_conflict(colnames(df), "tmp_col")
-  test <- df %>%
+  ret <- df %>%
     dplyr::do_(.dots=setNames(list(~do_prophet_each(.)), tmp_col)) %>%
     dplyr::ungroup()
-  test %>%  unnest_with_drop_(tmp_col)
+  ret <- ret %>%  unnest_with_drop_(tmp_col)
+
+  if (length(grouped_col) > 0) {
+    ret <- ret %>% dplyr::group_by(!!!rlang::syms(grouped_col))
+  }
+  ret
 }
+
+
+
+
