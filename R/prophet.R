@@ -325,8 +325,8 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
 
 
 #' Calculate MAE.
-#' @param actual - Actual value.
-#' @param predicted - Predicted value.
+#' @param actual - Vector that includes actual value. The part is_test_data is FALSE should be actual value.
+#' @param predicted - Vector that includes predicted value. The part is_test_data is TRUE should be predicted value.
 #' @param is_test_data - logical vector that indicates test data portion of actual and predicted.
 #' @export
 mae <- function(actual, predicted, is_test_data) {
@@ -337,8 +337,8 @@ mae <- function(actual, predicted, is_test_data) {
 }
 
 #' Calculate RMSE.
-#' @param actual - Actual value.
-#' @param predicted - Predicted value.
+#' @param actual - Vector that includes actual value. The part is_test_data is FALSE should be actual value.
+#' @param predicted - Vector that includes predicted value. The part is_test_data is TRUE should be predicted value.
 #' @param is_test_data - logical vector that indicates test data portion of actual and predicted.
 #' @export
 rmse <- function(actual, predicted, is_test_data) {
@@ -349,8 +349,8 @@ rmse <- function(actual, predicted, is_test_data) {
 }
 
 #' Calculate MAPE.
-#' @param actual - Actual value.
-#' @param predicted - Predicted value.
+#' @param actual - Vector that includes actual value. The part is_test_data is FALSE should be actual value.
+#' @param predicted - Vector that includes predicted value. The part is_test_data is TRUE should be predicted value.
 #' @param is_test_data - logical vector that indicates test data portion of actual and predicted.
 #' @export
 mape <- function(actual, predicted, is_test_data) {
@@ -382,8 +382,8 @@ computeMASE <- function(forecast, train, test, period){
 }
 
 #' Calculate MASE.
-#' @param actual - Actual value.
-#' @param predicted - Predicted value.
+#' @param actual - Vector that includes actual value. The part is_test_data is FALSE should be actual value.
+#' @param predicted - Vector that includes predicted value. The part is_test_data is TRUE should be predicted value.
 #' @param is_test_data - logical vector that indicates test data portion of actual and predicted.
 mase <- function(actual, predicted, is_test_data, period = 1) {
   train <- actual[!is_test_data]
