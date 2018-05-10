@@ -100,11 +100,11 @@ tidy.survfit_exploratory <- function(x, ...) {
   }
 
   if ("strata" %in% colnames(ret)) {
-    nested <- ret %>% group_by(strata) %>% nest()
-    nested <- nested %>% mutate(data=purrr::map(data,~add_time_zero_row_each(.)))
-    ret <- unnest(nested)
+    nested <- ret %>% dplyr::group_by(strata) %>% tidyr::nest()
+    nested <- nested %>% dplyr::mutate(data=purrr::map(data,~add_time_zero_row_each(.)))
+    ret <- tidyr::unnest(nested)
     # remove ".cohort=" part from strata values.
-    ret <- ret %>% mutate(strata = stringr::str_remove(strata,"^\\.cohort\\="))
+    ret <- ret %>% dplyr::mutate(strata = stringr::str_remove(strata,"^\\.cohort\\="))
   }
   else {
     ret <- add_time_zero_row_each(ret)
