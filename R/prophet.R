@@ -195,7 +195,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
       forecast <- stats::predict(m, future)
     }
     # with prophet 0.2.1, now forecast$ds is POSIXct. Cast it to Date when necessary so that full_join works.
-    if (is.Date(aggregated_data$ds)) {
+    if (lubridate::is.Date(aggregated_data$ds)) {
       forecast$ds <- as.Date(forecast$ds)
     }
     ret <- forecast %>% dplyr::full_join(aggregated_data, by = c("ds" = "ds"))
@@ -206,7 +206,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
     # TODO: Maybe we should take average when MCMC is used and there are multiple delta values for each channge point.
     changepoints_df <- data.frame(ds = m$changepoints, slope_change = m$params$delta[1,])
     # m$changepoints is POSIXct. Cast it to Date when necessary so that left_join works.
-    if (is.Date(aggregated_data$ds)) {
+    if (lubridate::is.Date(aggregated_data$ds)) {
       changepoints_df$ds <- as.Date(changepoints_df$ds)
     }
     ret <- ret %>% dplyr::left_join(changepoints_df, by = c("ds" = "ds"))

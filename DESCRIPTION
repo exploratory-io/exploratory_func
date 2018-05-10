@@ -43,7 +43,9 @@ Imports:
     iterators,
     scales,
     zoo,
-    dtw
+    dtw,
+    snakecase,
+    textshape
 Suggests:
     testthat,
     twitteR,
