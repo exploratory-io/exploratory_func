@@ -237,8 +237,11 @@ queryMongoDB <- function(host = NULL, port = "", database, collection, username,
       query <- convertUserInputToUtf8(query)
       fields <- convertUserInputToUtf8(fields)
       sort <- convertUserInputToUtf8(sort)
-      # set envir = parent.frame() to get variables from users environment, not papckage environment
-      data <- con$find(query = GetoptLong::qq(query, envir = parent.frame()), limit=limit, fields=fields, sort = sort, skip = skip)
+      # set envir = parent.frame() to get variables from users environment, not package environment
+      query <- GetoptLong::qq(query, envir = parent.frame())
+      # convert js query into mongo JSON, which mongolite understands.
+      query <- jsToMongoJson(query)
+      data <- con$find(query = query, limit=limit, fields=fields, sort = sort, skip = skip)
     }
   }, error = function(err) {
     clearDBConnection("mongodb", host, port, database, username, collection = collection, isSSL = isSSL, authSource = authSource)
