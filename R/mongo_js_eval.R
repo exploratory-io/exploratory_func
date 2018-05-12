@@ -492,6 +492,15 @@ jsToMongoJson <- function(js) {
       return {$regex:regex.source, $options:regex.flags};
     }
   }"))
-  
-  ct$eval(paste0(c('JSON.stringify(traverse(', js, '))')))
+
+  tryCatch({
+    ct$assign("evaluated", V8::JS(js))
+  }, error = function(err) {
+    if (err$message == "SyntaxError: Unexpected end of input") {
+       err$message <- paste0(err$message, '. Closing brackets might be missing.')
+    }
+    err$message <- paste0(err$message, ' Query String: ', js)
+    stop(err)
+  })
+  ct$eval('JSON.stringify(traverse(evaluated))')
 }
