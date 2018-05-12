@@ -43,7 +43,8 @@ Imports:
     iterators,
     scales,
     zoo,
-    dtw
+    dtw,
+    V8
 Suggests:
     testthat,
     twitteR,
