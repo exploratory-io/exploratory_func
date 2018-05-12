@@ -1,4 +1,3 @@
-library(V8)
 
 bson_objectid_browserified <- "(function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c='function'==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error(\"Cannot find module '\"+i+\"'\");throw a.code='MODULE_NOT_FOUND',a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u='function'==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(require,module,exports){
 (function (global){
@@ -379,27 +378,27 @@ process.umask = function() { return 0; };
 
 jsToMongoJson <- function(js) {
   # Create V8 javascript context.
-  ct <- v8()
+  ct <- V8::v8()
 
   ct$eval(bson_objectid_browserified)
   # Define necessary js functions.
-  ct$assign("MinKey", JS("{
+  ct$assign("MinKey", V8::JS("{
       $minKey: 1
   }"))
-  ct$assign("MaxKey", JS("{
+  ct$assign("MaxKey", V8::JS("{
       $maxKey: 1
   }"))
-  ct$assign("NumberLong", JS("function(numberStr) {
+  ct$assign("NumberLong", V8::JS("function(numberStr) {
       return {$numberLong: numberStr.toString()};
   }"))
-  ct$assign("NumberInt", JS("function(number) {
+  ct$assign("NumberInt", V8::JS("function(number) {
       // Looks like $numberInt does not exist.
       // Work it around by using $numberLong instead.
       // When use in query condition, it should not make difference.
       // https://jira.mongodb.org/browse/SERVER-11957
       return {$numberLong: number.toString()};
   }"))
-  ct$assign("ObjectId", JS("function(id) {
+  ct$assign("ObjectId", V8::JS("function(id) {
       var oid = ObjectID(id);
       // Mark the object as a mock ObjectId.
       // We do this because the following does not work
@@ -409,27 +408,27 @@ jsToMongoJson <- function(js) {
       oid.mongo_objectid_mock = true;
       return oid;
   }"))
-  ct$assign("DBRef", JS("function(name, id) {
+  ct$assign("DBRef", V8::JS("function(name, id) {
       return {$ref: name, $id: id};
   }"))
-  ct$assign("Timestamp", JS("function(t, i) {
+  ct$assign("Timestamp", V8::JS("function(t, i) {
       return {$timestamp: {t:t, i:i}};
   }"))
-  ct$assign("BinData", JS("function(t, bindata) {
+  ct$assign("BinData", V8::JS("function(t, bindata) {
       // This function returns the following same object for both BinData() and new BinData().
       return {$binary: bindata, $type:t.toString(16)};
   }"))
 
-  ct$assign("ISODate", JS("function(dateStr) {
+  ct$assign("ISODate", V8::JS("function(dateStr) {
     return new Date(dateStr);
   }"))
 
-  ct$assign("UUID", JS("function(uuidHexStr) {
+  ct$assign("UUID", V8::JS("function(uuidHexStr) {
     return context.BinData(3, new Buffer(uuidHexStr,'hex').toString('base64'));
   }"))
 
   
-  ct$assign("traverse", JS("function(x) {
+  ct$assign("traverse", V8::JS("function(x) {
     if (isArray(x) || ((typeof x === 'object') && (x !== null))) {
       traverseObject(x);
     } else {
@@ -439,12 +438,12 @@ jsToMongoJson <- function(js) {
   }"))
   
   # Checks if an object is an Array. Part of object tree travarsal scheme.
-  ct$assign("isArray", JS("function(o) {
+  ct$assign("isArray", V8::JS("function(o) {
     return Object.prototype.toString.call(o) === '[object Array]';
   }"))
   
   # Traverse array or object. Part of object tree travarsal scheme.
-  ct$assign("traverseObject", JS("function(obj) {
+  ct$assign("traverseObject", V8::JS("function(obj) {
     for (var key in obj) {
       if (obj.hasOwnProperty(key)) {
         // Use following debug log to trace type of visited objects.
@@ -475,7 +474,7 @@ jsToMongoJson <- function(js) {
   }"))
   
   # Converts js RegExp object to mongo json.
-  ct$assign("regexToMongoJson", JS("function(regex) {
+  ct$assign("regexToMongoJson", V8::JS("function(regex) {
     if (regex.$regex) {
       // Take care of following cases where $regex is already there, but with regex object rather than string.
       // { $regex: /pattern/, $options: '<options>' }
