@@ -1,4 +1,10 @@
+# This file is for jsToMongoJson function.
+# It converts Mongo Shell style query (essentially js) to Mongo JSON query, mongolite can understand.
+# We used to do this in Exploratory's js, but to schedule js queries, for example, that use Date.now(),
+# this had to be done R. We use V8 package to have js engine inside R.
 
+# browserified objectid.js. https://github.com/williamkapke/bson-objectid/blob/master/objectid.js
+# TODO: make it a separate file for readability.
 bson_objectid_browserified <- "(function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c='function'==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error(\"Cannot find module '\"+i+\"'\");throw a.code='MODULE_NOT_FOUND',a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u='function'==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(require,module,exports){
 (function (global){
 global.ObjectID = require('bson-objectid');
