@@ -1,0 +1,13 @@
+context("test mongo js query evaluation by V8")
+
+test_that("jsToMongoJson should translate js to mongo json", {
+  res <- jsToMongoJson('{a:{$gt:new ISODate("2018-05-05T20:23:24.497Z")}}')
+  res <- jsToMongoJson('{a:{$gt:ObjectId("5af74ddef45e47233abba0f6").getTimestamp()}}')
+  expect_equal("{\"a\":{\"$gt\":{\"$date\":\"2018-05-12T20:26:06.000Z\"}}}", res)
+  res <- jsToMongoJson('{a:{$gt:ObjectId("5af74ddef45e47233abba0f6").toString()}}')
+  expect_equal("{\"a\":{\"$gt\":\"5af74ddef45e47233abba0f6\"}}", res)
+  res <- jsToMongoJson('{a:{$gt:ObjectId("5af74ddef45e47233abba0f6").valueOf()}}')
+  expect_equal("{\"a\":{\"$gt\":{\"$oid\":\"5af74ddef45e47233abba0f6\"}}}", res)
+  res <- jsToMongoJson('{a:{$gt:ObjectId("5af74ddef45e47233abba0f6")}}')
+  expect_equal("{\"a\":{\"$gt\":{\"$oid\":\"5af74ddef45e47233abba0f6\"}}}", res)
+})
