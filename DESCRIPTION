@@ -45,7 +45,8 @@ Imports:
     zoo,
     dtw,
     snakecase,
-    textshape
+    textshape,
+    V8
 Suggests:
     testthat,
     twitteR,
