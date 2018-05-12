@@ -215,7 +215,10 @@ queryMongoDB <- function(host, port, database, collection, username, password, q
     if(queryType == "aggregate"){
       pipeline <- convertUserInputToUtf8(pipeline)
       # set envir = parent.frame() to get variables from users environment, not papckage environment
-      data <- con$aggregate(pipeline = GetoptLong::qq(pipeline, envir = parent.frame()))
+      pipeline <- GetoptLong::qq(pipeline, envir = parent.frame())
+      # convert js query into mongo JSON, which mongolite understands.
+      pipeline <- jsToMongoJson(pipeline)
+      data <- con$aggregate(pipeline = pipeline)
     } else if (queryType == "find") {
       query <- convertUserInputToUtf8(query)
       fields <- convertUserInputToUtf8(fields)
@@ -224,6 +227,8 @@ queryMongoDB <- function(host, port, database, collection, username, password, q
       query <- GetoptLong::qq(query, envir = parent.frame())
       # convert js query into mongo JSON, which mongolite understands.
       query <- jsToMongoJson(query)
+      fields <- jsToMongoJson(fields)
+      sort <- jsToMongoJson(sort)
       data <- con$find(query = query, limit=limit, fields=fields, sort = sort, skip = skip)
     }
   }, error = function(err) {
