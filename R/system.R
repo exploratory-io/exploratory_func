@@ -232,13 +232,21 @@ queryMongoDB <- function(host = NULL, port = "", database, collection, username,
     if(queryType == "aggregate"){
       pipeline <- convertUserInputToUtf8(pipeline)
       # set envir = parent.frame() to get variables from users environment, not papckage environment
-      data <- con$aggregate(pipeline = GetoptLong::qq(pipeline, envir = parent.frame()))
+      pipeline <- GetoptLong::qq(pipeline, envir = parent.frame())
+      # convert js query into mongo JSON, which mongolite understands.
+      pipeline <- jsToMongoJson(pipeline)
+      data <- con$aggregate(pipeline = pipeline)
     } else if (queryType == "find") {
       query <- convertUserInputToUtf8(query)
       fields <- convertUserInputToUtf8(fields)
       sort <- convertUserInputToUtf8(sort)
-      # set envir = parent.frame() to get variables from users environment, not papckage environment
-      data <- con$find(query = GetoptLong::qq(query, envir = parent.frame()), limit=limit, fields=fields, sort = sort, skip = skip)
+      # set envir = parent.frame() to get variables from users environment, not package environment
+      query <- GetoptLong::qq(query, envir = parent.frame())
+      # convert js query into mongo JSON, which mongolite understands.
+      query <- jsToMongoJson(query)
+      fields <- jsToMongoJson(fields)
+      sort <- jsToMongoJson(sort)
+      data <- con$find(query = query, limit=limit, fields=fields, sort = sort, skip = skip)
     }
   }, error = function(err) {
     clearDBConnection("mongodb", host, port, database, username, collection = collection, isSSL = isSSL, authSource = authSource)
