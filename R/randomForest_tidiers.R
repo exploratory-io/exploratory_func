@@ -989,7 +989,7 @@ calc_feature_imp <- function(df,
         } else if(is.factor(df[[col]])) {
           # if the data is factor, respect the levels and keep first 10 levels, and make others "Others" level.
           if (length(levels(df[[col]])) >= predictor_n + 2) {
-            df[[col]] <- fct_other(df[[col]], keep=levels(df[[col]])[1:predictor_n])
+            df[[col]] <- forcats::fct_other(df[[col]], keep=levels(df[[col]])[1:predictor_n])
           }
         } else if(!is.numeric(df[[col]])) {
           # convert data to factor if predictors are not numeric.
