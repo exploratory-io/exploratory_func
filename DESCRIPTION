@@ -14,11 +14,10 @@ Notes:
     broom is to expose augment, tidy and glance functions.
     urltools is loaded to avoid an error "Error : .onLoad failed in loadNamespace() for 'urltools'".
 Depends:
-    broom, 
-    urltools
 Imports:
+    broom, 
+    urltools,
     dplyr,
-    broom,
     tibble,
     jsonlite,
     countrycode,
@@ -32,7 +31,6 @@ Imports:
     Matrix,
     rvest,
     stats,
-    urltools,
     anonymizer,
     forcats,
     tidytext,

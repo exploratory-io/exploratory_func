@@ -329,7 +329,7 @@ tidy.randomForest.regression <- function(x, pretty.name = FALSE, ...) {
 #' @export
 tidy.randomForest.unsupervised <- function(x, ...) {
   imp_m <- as.data.frame(x[["importance"]])
-  imp_m <- fix_data_frame(imp_m)
+  imp_m <- broom::fix_data_frame(imp_m)
   names(imp_m) <- rename_groups(names(imp_m))
   imp_sd <- x[["importanceSD"]]
 
@@ -647,25 +647,25 @@ rename_groups <- function(n) {
 #' wrapper for tidy type importance
 #' @export
 rf_importance <- function(data, ...) {
-  tidy(data, model, type = "importance", ...)
+  broom::tidy(data, model, type = "importance", ...)
 }
 
 #' wrapper for tidy type importance
 #' @export
 rf_evaluation <- function(data, ...) {
-  tidy(data, model, type = "evaluation", ...)
+  broom::tidy(data, model, type = "evaluation", ...)
 }
 
 #' wrapper for tidy type importance
 #' @export
 rf_evaluation_by_class <- function(data, ...) {
-  tidy(data, model, type = "evaluation_by_class", ...)
+  broom::tidy(data, model, type = "evaluation_by_class", ...)
 }
 
 #' wrapper for tidy type partial dependence
 #' @export
 rf_partial_dependence <- function(df, ...) { # TODO: write test for this.
-  res <- df %>% tidy(model, type="partial_dependence", ...)
+  res <- df %>% broom::tidy(model, type="partial_dependence", ...)
   grouped_col <- grouped_by(df) # when called from analytics view, this should be a single column or empty.
   if (length(grouped_col) > 0) {
     res <- res %>% dplyr::ungroup() # ungroup to mutate group_by column.
