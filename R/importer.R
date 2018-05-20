@@ -25,16 +25,16 @@ anonymize <- function(vec, algo = "sha256", seed = 0, chars = letters, n_chars =
 }
 
 # Importing tidy is needed to define tidy methods to other classes
-#' @importFrom tidytext tidy
+#' @importFrom broom tidy
 #' @export
 tidy
 
 # Importing glance is needed to define glance methods to other classes
-#' @importFrom tidytext glance
+#' @importFrom broom glance
 #' @export
 glance
 
 # Importing augment is needed to define augment methods to other classes
-#' @importFrom tidytext augment
+#' @importFrom broom augment
 #' @export
 augment
