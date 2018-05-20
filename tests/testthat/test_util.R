@@ -570,3 +570,11 @@ test_that("test extract_from_date", {
   expect_equal(ret, as.Date(c("2018-01-01","2018-01-01",NA,NA)))
 })
 
+test_that("test %in_or_all%", {
+  ret <- c(1,2,3) %in_or_all% c(1,2)
+  expect_equal(ret, c(TRUE, TRUE, FALSE)
+  ret <- c(1,2,3) %in_or_all% NULL
+  expect_equal(ret, c(TRUE, TRUE, TRUE)
+  ret <- c(1,2,3) %in_or_all% c()
+  expect_equal(ret, c(TRUE, TRUE, TRUE)
+})
