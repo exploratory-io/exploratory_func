@@ -1373,9 +1373,9 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 #' @export
 `%in_or_all%` <- function(x,y) {
   if (is.null(y)) {
-    return(TRUE)
+    return(!(x %in% y))
   }
   else {
-    return (x %in% y)
+    return(x %in% y)
   }
 }
