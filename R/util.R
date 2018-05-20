@@ -1357,6 +1357,7 @@ computeMASE <- function(forecast, train, test, period){
 #' @param actual - Vector that includes actual value. The part is_test_data is FALSE should be actual value.
 #' @param predicted - Vector that includes predicted value. The part is_test_data is TRUE should be predicted value.
 #' @param is_test_data - logical vector that indicates test data portion of actual and predicted.
+#' @export
 mase <- function(actual, predicted, is_test_data, period = 1) {
   train <- actual[!is_test_data]
   test <- actual[is_test_data]
@@ -1366,3 +1367,15 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 }
 
 
+#' Return result of %in% if y is not empty or NULL. Otherwise return TRUE.
+#' We use this for filter condition controlled by a variable so that filtering is effectively
+#' skipped when the variable is empty or NULL.
+#' @export
+`%in_or_all%` <- function(x,y) {
+  if (is.null(y)) {
+    return(TRUE)
+  }
+  else {
+    return (x %in% y)
+  }
+}
