@@ -199,6 +199,13 @@ test_that("test exp_chisq", {
   ret
 })
 
+test_that("test exp_chisq with logical", {
+  model_df <- exp_chisq(mtcars %>% mutate(gear=gear>3, carb=carb>3), gear, carb) # factor order should be kept in the model
+  ret <- model_df %>% tidy(model, type="residuals")
+  expect_equal(class(ret$gear), "logical")
+  expect_equal(class(ret$carb), "logical")
+})
+
 test_that("test exp_chisq with group_by", {
   ret <- mtcars %>% group_by(vs) %>% exp_chisq(gear, carb, value=cyl)
   observed <- ret %>% broom::tidy(model, type="observed")

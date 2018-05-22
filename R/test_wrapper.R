@@ -222,6 +222,9 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
 
   var1_levels <- NULL
   var2_levels <- NULL
+  # preserve class of var1 and var2 so that we can cast them back to original class later.
+  var1_class <- class(df[[var1_col]])
+  var2_class <- class(df[[var2_col]])
   if (is.factor(df[[var1_col]])) {
     var1_levels <- levels(df[[var1_col]])
   }
@@ -243,6 +246,8 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
     # add variable name info to the model
     model$var1 <- var1_col
     model$var2 <- var2_col
+    model$var1_class <- var1_class
+    model$var2_class <- var2_class
     model$var1_levels <- var1_levels
     model$var2_levels <- var2_levels
     class(model) <- c("chisq_exploratory", class(model))
@@ -304,6 +309,13 @@ tidy.chisq_exploratory <- function(x, type = "observed") {
     }
     if (!is.null(x$var2_levels)) {
       ret[[x$var2]] <- factor(ret[[x$var2]], levels=x$var2_levels)
+    }
+    # if original class of var1, var2 was logical, return them as logical.
+    if (x$var1_class == "logical") {
+      ret[[x$var1]] <- as.logical(ret[[x$var1]])
+    }
+    if (x$var2_class == "logical") {
+      ret[[x$var2]] <- as.logical(ret[[x$var2]])
     }
   }
   ret
