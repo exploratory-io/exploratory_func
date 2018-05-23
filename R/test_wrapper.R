@@ -626,7 +626,13 @@ tidy.shapiro_exploratory <- function(x, type = "model", conf_level=0.95, n_sampl
     else {
       sampled_qq_df <- x$qq
     }
+
+    normal_df <- x$model_summary %>%
+      dplyr::mutate(normal = p.value > (1-conf_level)) %>%
+      dplyr::select(col, normal)
+
     ret <- dplyr::bind_rows(sampled_qq_df, x$qqline)
+    ret <- ret %>% dplyr::left_join(normal_df, by="col")
     ret
   }
   else {
