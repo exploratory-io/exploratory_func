@@ -627,11 +627,13 @@ tidy.shapiro_exploratory <- function(x, type = "model", signif_level=0.05, n_sam
       sampled_qq_df <- x$qq
     }
 
+    # table with TRUE/FALSE result on normality of each column.
     normal_df <- x$model_summary %>%
       dplyr::mutate(normal = p.value > signif_level) %>%
       dplyr::select(col, normal)
 
     ret <- dplyr::bind_rows(sampled_qq_df, x$qqline)
+    # join normality result so that we can show histogram with colors based on it.
     ret <- ret %>% dplyr::left_join(normal_df, by="col")
     ret
   }
