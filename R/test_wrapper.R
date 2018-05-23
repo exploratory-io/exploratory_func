@@ -618,7 +618,7 @@ exp_normality<- function(df, ..., n_sample = 50) {
 #' @param n_sample - Downsample qq-plot data down to this number.
 #'                   This is to make sure qq-line part of the data would not be sampled out in qq scatter plot.
 #' @export
-tidy.shapiro_exploratory <- function(x, type = "model", conf_level=0.95, n_sample=NULL) {
+tidy.shapiro_exploratory <- function(x, type = "model", signif_level=0.05, n_sample=NULL) {
   if (type == "qq") {
     if (!is.null(n_sample) && nrow(x$qq) > n_sample) {
       sampled_qq_df <- dplyr::sample_n(x$qq, n_sample)
@@ -626,14 +626,22 @@ tidy.shapiro_exploratory <- function(x, type = "model", conf_level=0.95, n_sampl
     else {
       sampled_qq_df <- x$qq
     }
+
+    # table with TRUE/FALSE result on normality of each column.
+    normal_df <- x$model_summary %>%
+      dplyr::mutate(normal = p.value > signif_level) %>%
+      dplyr::select(col, normal)
+
     ret <- dplyr::bind_rows(sampled_qq_df, x$qqline)
+    # join normality result so that we can show histogram with colors based on it.
+    ret <- ret %>% dplyr::left_join(normal_df, by="col")
     ret
   }
   else {
     ret <- x$model_summary
-    ret <- ret %>% mutate(normal=p.value>(1-conf_level))
-    ret <- ret %>% select(-method)
-    ret <- ret %>% rename(`Column`=col, `Statistic`=statistic, `P Value`=p.value, `Normal Distribution`=normal, `Sample Size`=sample_size)
+    ret <- ret %>% dplyr::mutate(normal = p.value > signif_level)
+    ret <- ret %>% dplyr::select(-method)
+    ret <- ret %>% dplyr::rename(`Column`=col, `Statistic`=statistic, `P Value`=p.value, `Normal Distribution`=normal, `Sample Size`=sample_size)
     ret
   }
 }

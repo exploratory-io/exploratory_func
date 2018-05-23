@@ -245,6 +245,6 @@ test_that("test exp_normality", {
   df <- mtcars %>% mutate(dummy=c(NA, rep(1,n()-1))) # test for column with always same value, except for NA.
   ret <- df %>% exp_normality(mpg, gear, dummy, n_sample=20)
   qq <- ret %>% tidy(model, type="qq", n_sample=30)
-  model_summary <- ret %>% tidy(model, type="model_summary", conf_level=0.9)
+  model_summary <- ret %>% tidy(model, type="model_summary", signif_level=0.1)
   ret
 })
