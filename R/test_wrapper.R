@@ -550,8 +550,11 @@ qqline_data <- function (y, datax = FALSE, distribution = qnorm, probs = c(0.25,
 
 
 #' @param n_sample - Downsample to this size before shapiro test. Note that this is not applied for qq data. 
+#' @param n_sample_qq - Downsample qq-plot data down to this number.
+#'                   This is to make sure qq-line part of the data would not be sampled out in qq scatter plot.
+#'                   Default 4500 is to make room for qqline rows. (default sample size by scatter plot data query is 5000)
 #' @export
-exp_normality<- function(df, ..., n_sample = 50) {
+exp_normality<- function(df, ..., n_sample = 50, n_sample_qq = 4500) {
   selected_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
   
   shapiro_each <- function(df) {
@@ -597,6 +600,12 @@ exp_normality<- function(df, ..., n_sample = 50) {
 
     model <- list()
     model$qq <- df.qq
+    if (!is.null(n_sample_qq) && nrow(df$qq) > n_sample_qq) {
+      model$sampled_qq <- dplyr::sample_n(df$qq, n_sample_qq)
+    }
+    else {
+      model$sampled_qq <- df$qq
+    }
     model$qqline <- df.qqline
     model$model_summary <- df.model
     class(model) <- c("shapiro_exploratory", class(model))
