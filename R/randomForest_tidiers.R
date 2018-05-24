@@ -821,6 +821,7 @@ calc_feature_imp <- function(df,
                              target_n = 20,
                              predictor_n = 12, # so that at least months can fit in it.
                              smote = FALSE,
+                             max_pd_vars = 10, # number of most important variables to calculate partial dependences on.
                              seed = NULL
                              ){
   if(!is.null(seed)){
@@ -1055,6 +1056,38 @@ calc_feature_imp <- function(df,
         sample.fraction = sample.fraction,
         probability = (classification_type == "binary") # build probability tree for AUC only for binary classification.
       )
+
+      # return partial dependence
+      imp <- ranger::importance(rf)
+      imp_df <- data.frame(
+        variable = names(imp),
+        importance = imp
+      ) %>% dplyr::arrange(-importance)
+      imp_vars <- imp_df$variable
+      # code to separate numeric and categorical. keeping it for now for possibility of design change
+      # imp_vars_tmp <- imp_df$variable
+      # imp_vars <- character(0)
+      # if (var.type == "numeric") {
+      #   # keep only numeric variables from important ones
+      #   for (imp_var in imp_vars_tmp) {
+      #     if (is.numeric(model_df[[imp_var]])) {
+      #       imp_vars <- c(imp_vars, imp_var)
+      #     }
+      #   }
+      # }
+      # else {
+      #   # keep only non-numeric variables from important ones
+      #   for (imp_var in imp_vars_tmp) {
+      #     if (!is.numeric(model_df[[imp_var]])) {
+      #       imp_vars <- c(imp_vars, imp_var)
+      #     }
+      #   }
+      # }
+      imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
+      imp_vars <- as.character(imp_vars) # for some reason imp_vars is converted to factor at this point. turn it back to character.
+      rf$imp_vars <- imp_vars
+      rf$partial_dependence <- edarf::partial_dependence(rf, vars=imp_vars, data=model_df, n=c(20,20))
+
       # these attributes are used in tidy of randomForest
       rf$classification_type <- classification_type
       rf$orig_levels <- orig_levels
@@ -1162,7 +1195,7 @@ get_binary_predicted_value_from_probability <- function(x) {
 
 #' @export
 #' @param type "importance", "evaluation" or "conf_mat". Feature importance, evaluated scores or confusion matrix of training data.
-tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10, ...) {
+tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
   switch(
     type,
     importance = {
@@ -1274,34 +1307,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
     },
     partial_dependence = {
       # return partial dependence
-      imp <- ranger::importance(x)
-      imp_df <- data.frame(
-        variable = names(imp),
-        importance = imp
-      ) %>% dplyr::arrange(-importance)
-      imp_vars <- imp_df$variable
-      # code to separate numeric and categorical. keeping it for now for possibility of design change
-      # imp_vars_tmp <- imp_df$variable
-      # imp_vars <- character(0)
-      # if (var.type == "numeric") {
-      #   # keep only numeric variables from important ones
-      #   for (imp_var in imp_vars_tmp) {
-      #     if (is.numeric(x$df[[imp_var]])) {
-      #       imp_vars <- c(imp_vars, imp_var)
-      #     }
-      #   }
-      # }
-      # else {
-      #   # keep only non-numeric variables from important ones
-      #   for (imp_var in imp_vars_tmp) {
-      #     if (!is.numeric(x$df[[imp_var]])) {
-      #       imp_vars <- c(imp_vars, imp_var)
-      #     }
-      #   }
-      # }
-      imp_vars <- imp_vars[1:min(length(imp_vars), n.vars)] # take n.vars most important variables
-      imp_vars <- as.character(imp_vars) # for some reason imp_vars is converted to factor at this point. turn it back to character.
-      ret <- edarf::partial_dependence(x, vars=imp_vars, data=x$df, n=c(20,20))
+      ret <- x$partial_dependence
       var_cols <- colnames(ret)
       var_cols <- var_cols[1:(length(var_cols)-1)] # remove the last column which is the target column in case of regression.
       var_cols <- var_cols[var_cols %in% colnames(x$df)] # to get list of predictor columns, compare with training df.
@@ -1317,7 +1323,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
       # convert must be FALSE for y to make sure y_name is always character. otherwise bind_rows internally done
       # in tidy() to bind outputs from different groups errors out because y_value can be, for example, mixture of logical and character.
       ret <- ret %>% tidyr::gather("y_name", "y_value", -x_name, -x_value, na.rm = TRUE, convert = FALSE)
-      ret <- ret %>% dplyr::mutate(x_name = forcats::fct_relevel(x_name, imp_vars)) # set factor level order so that charts appear in order of importance.
+      ret <- ret %>% dplyr::mutate(x_name = forcats::fct_relevel(x_name, x$imp_vars)) # set factor level order so that charts appear in order of importance.
       # set order to ret and turn it back to character, so that the order is kept when groups are bound.
       # if it were kept as factor, when groups are bound, only the factor order from the first group would be respected.
       ret <- ret %>% dplyr::arrange(x_name) %>% dplyr::mutate(x_name = as.character(x_name))
