@@ -1126,11 +1126,12 @@ unnest_without_empty_ <- function(data, nested_col){
   }
 }
 
-#' Count FALSE in a vector
+#' Count FALSE in a vector.
 #' @param x vector
 #' @export
 false_count <- function(x){
-  sum(!x)
+  # It should return 0 even if it is all NA values. 
+  sum(!x, na.rm=T)
 }
 
 #' Count NA in a vector
