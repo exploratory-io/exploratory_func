@@ -821,7 +821,7 @@ calc_feature_imp <- function(df,
                              target_n = 20,
                              predictor_n = 12, # so that at least months can fit in it.
                              smote = FALSE,
-                             max_imp_vars = 10, # number of most important variables to calculate partial dependences on.
+                             max_pd_vars = 10, # number of most important variables to calculate partial dependences on.
                              seed = NULL
                              ){
   if(!is.null(seed)){
@@ -1083,7 +1083,7 @@ calc_feature_imp <- function(df,
       #     }
       #   }
       # }
-      imp_vars <- imp_vars[1:min(length(imp_vars), max_imp_vars)] # take max_imp_vars most important variables
+      imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
       imp_vars <- as.character(imp_vars) # for some reason imp_vars is converted to factor at this point. turn it back to character.
       rf$imp_vars <- imp_vars
       rf$partial_dependence <- edarf::partial_dependence(rf, vars=imp_vars, data=model_df, n=c(20,20))
