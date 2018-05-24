@@ -665,7 +665,6 @@ rf_evaluation_by_class <- function(data, ...) {
 #' wrapper for tidy type partial dependence
 #' @export
 rf_partial_dependence <- function(df, ...) { # TODO: write test for this.
-  browser()
   res <- df %>% broom::tidy(model, type="partial_dependence", ...)
   grouped_col <- grouped_by(df) # when called from analytics view, this should be a single column or empty.
   if (length(grouped_col) > 0) {
@@ -1071,7 +1070,7 @@ calc_feature_imp <- function(df,
       # if (var.type == "numeric") {
       #   # keep only numeric variables from important ones
       #   for (imp_var in imp_vars_tmp) {
-      #     if (is.numeric(x$df[[imp_var]])) {
+      #     if (is.numeric(model_df[[imp_var]])) {
       #       imp_vars <- c(imp_vars, imp_var)
       #     }
       #   }
@@ -1079,12 +1078,11 @@ calc_feature_imp <- function(df,
       # else {
       #   # keep only non-numeric variables from important ones
       #   for (imp_var in imp_vars_tmp) {
-      #     if (!is.numeric(x$df[[imp_var]])) {
+      #     if (!is.numeric(model_df[[imp_var]])) {
       #       imp_vars <- c(imp_vars, imp_var)
       #     }
       #   }
       # }
-      browser()
       imp_vars <- imp_vars[1:min(length(imp_vars), n.vars)] # take n.vars most important variables
       imp_vars <- as.character(imp_vars) # for some reason imp_vars is converted to factor at this point. turn it back to character.
       rf$imp_vars <- imp_vars
@@ -1308,39 +1306,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, n.vars = 10
       ret
     },
     partial_dependence = {
-      browser()
       # return partial dependence
-      # imp <- ranger::importance(x)
-      # imp_df <- data.frame(
-      #   variable = names(imp),
-      #   importance = imp
-      # ) %>% dplyr::arrange(-importance)
-      # imp_vars <- imp_df$variable
-
-      # code to separate numeric and categorical. keeping it for now for possibility of design change
-      # imp_vars_tmp <- imp_df$variable
-      # imp_vars <- character(0)
-      # if (var.type == "numeric") {
-      #   # keep only numeric variables from important ones
-      #   for (imp_var in imp_vars_tmp) {
-      #     if (is.numeric(x$df[[imp_var]])) {
-      #       imp_vars <- c(imp_vars, imp_var)
-      #     }
-      #   }
-      # }
-      # else {
-      #   # keep only non-numeric variables from important ones
-      #   for (imp_var in imp_vars_tmp) {
-      #     if (!is.numeric(x$df[[imp_var]])) {
-      #       imp_vars <- c(imp_vars, imp_var)
-      #     }
-      #   }
-      # }
-
-      # imp_vars <- imp_vars[1:min(length(imp_vars), n.vars)] # take n.vars most important variables
-      # imp_vars <- as.character(imp_vars) # for some reason imp_vars is converted to factor at this point. turn it back to character.
-      # ret <- edarf::partial_dependence(x, vars=imp_vars, data=x$df, n=c(20,20))
-
       ret <- x$partial_dependence
       var_cols <- colnames(ret)
       var_cols <- var_cols[1:(length(var_cols)-1)] # remove the last column which is the target column in case of regression.
