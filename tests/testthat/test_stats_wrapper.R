@@ -410,7 +410,7 @@ test_that("do_cmdscale undefined column name error", {
 })
 
 test_that("do_cmdscale all 0 distances error", {
-  data <- data.frame(var1 = c(1, 1, 2, 2), var2 = c(1, 2, 1, 2), val = c(0,0,0,0))
+  data <- data.frame(var1 = c(1, 2, 3, 4), var2 = c(4, 1, 2, 3), val = c(0,0,0,0))
   expect_error({
     do_cmdscale(data, var1, var2, val)
   }, "All distances are 0. Multidimensional scaling cannot be calculated.")
