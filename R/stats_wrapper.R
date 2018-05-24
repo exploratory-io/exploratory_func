@@ -228,6 +228,12 @@ do_cmdscale_ <- function(df,
 
   # this is executed on each group
   do_cmdscale_each <- function(df){
+    if (all(df[[value_col]]==0)) {
+      # cmdscale() returns broken dataframe with only a column
+      # for the names of points and no columns for coordinate values,
+      # which would break processing after that.
+      stop("All distances are 0. Multidimensional scaling cannot be calculated.")
+    }
     mat <- simple_cast(
       df,
       pair1_col,
