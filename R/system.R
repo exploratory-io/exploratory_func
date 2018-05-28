@@ -206,7 +206,7 @@ getMongoURL <- function(host = NULL, port, database, username, pass, isSSL=FALSE
     }
   }
   if(!is.null(timeout) && timeout != ''){
-    if(stringr::str_detect(url, '?')) {
+    if(stringr::str_detect(url, '\\?')) {
       url = stringr::str_c(url, '&socketTimeoutMS=', timeout)
     } else {
       url = stringr::str_c(url, '?socketTimeoutMS=', timeout)
