@@ -21,7 +21,7 @@ row_as_header <- function(df, row_index = 1, prefix = "", clean_names = TRUE){
   ret <- safe_slice(df, row_index, remove = TRUE)
   colnames(ret) <- names
   if (clean_names) {
-    ret <- janitor::clean_names(ret)
+    ret <- janitor::clean_names(ret, case="old_janitor")
   }
   ret
 }

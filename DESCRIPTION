@@ -1,24 +1,18 @@
 Package: exploratory
 Type: Package
 Title: R package for Exploratory
-Version: 0.7.1.1
-Date: 2017-11-23
+Version: 0.7.1.6
+Date: 2018-05-23
 Authors@R: c(person("Yosuke", "Yasuda", email = "double.y.919.quick@gmail.com", role = c("aut", "cre")))
 URL: https://github.com/exploratory-io/exploratory_func
 Description: Functions for Exploratory
 License: MIT
 LazyData: TRUE
 Encoding: UTF-8
-Notes: 
-    Depends section is to load namespaces to environment when loading exploratory.
-    broom is to expose augment, tidy and glance functions.
-    urltools is loaded to avoid an error "Error : .onLoad failed in loadNamespace() for 'urltools'".
-Depends:
-    broom, 
-    urltools
 Imports:
+    broom, 
+    urltools,
     dplyr,
-    broom,
     tibble,
     jsonlite,
     countrycode,
@@ -32,7 +26,6 @@ Imports:
     Matrix,
     rvest,
     stats,
-    urltools,
     anonymizer,
     forcats,
     tidytext,
@@ -43,7 +36,10 @@ Imports:
     iterators,
     scales,
     zoo,
-    dtw
+    dtw,
+    snakecase,
+    textshape,
+    V8
 Suggests:
     testthat,
     twitteR,

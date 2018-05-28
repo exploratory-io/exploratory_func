@@ -1294,3 +1294,88 @@ extract_from_date <- function(x, type = "fltoyear") {
     })
   ret
 }
+
+
+#' Calculate MAE.
+#' @param actual - Vector that includes actual value. The part is_test_data is FALSE should be actual value.
+#' @param predicted - Vector that includes predicted value. The part is_test_data is TRUE should be predicted value.
+#' @param is_test_data - logical vector that indicates test data portion of actual and predicted.
+#' @export
+mae <- function(actual, predicted, is_test_data) {
+  actual <- actual[is_test_data]
+  predicted <- predicted[is_test_data]
+  ret <- mean(abs(actual-predicted), na.rm=TRUE)
+  ret
+}
+
+#' Calculate RMSE.
+#' @param actual - Vector that includes actual value. The part is_test_data is FALSE should be actual value.
+#' @param predicted - Vector that includes predicted value. The part is_test_data is TRUE should be predicted value.
+#' @param is_test_data - logical vector that indicates test data portion of actual and predicted.
+#' @export
+rmse <- function(actual, predicted, is_test_data) {
+  actual <- actual[is_test_data]
+  predicted <- predicted[is_test_data]
+  ret <- sqrt(mean((actual-predicted)^2, na.rm=TRUE))
+  ret
+}
+
+#' Calculate MAPE.
+#' @param actual - Vector that includes actual value. The part is_test_data is FALSE should be actual value.
+#' @param predicted - Vector that includes predicted value. The part is_test_data is TRUE should be predicted value.
+#' @param is_test_data - logical vector that indicates test data portion of actual and predicted.
+#' @export
+mape <- function(actual, predicted, is_test_data) {
+  actual <- actual[is_test_data]
+  predicted <- predicted[is_test_data]
+  ret <- mean(abs((actual-predicted)/actual) * 100, na.rm=TRUE)
+  ret
+}
+
+# https://stackoverflow.com/questions/11092536/forecast-accuracy-no-mase-with-two-vectors-as-arguments
+computeMASE <- function(forecast, train, test, period){
+
+  # forecast - forecasted values
+  # train - data used for forecasting .. used to find scaling factor
+  # test - actual data used for finding MASE.. same length as forecast
+  # period - in case of seasonal data.. if not, use 1
+
+  forecast <- as.vector(forecast)
+  train <- as.vector(train)
+  test <- as.vector(test)
+
+  n <- length(train)
+  scalingFactor <- sum(abs(train[(period+1):n] - train[1:(n-period)])) / (n-period)
+
+  et <- abs(test-forecast)
+  qt <- et/scalingFactor
+  meanMASE <- mean(qt)
+  return(meanMASE)
+}
+
+#' Calculate MASE.
+#' @param actual - Vector that includes actual value. The part is_test_data is FALSE should be actual value.
+#' @param predicted - Vector that includes predicted value. The part is_test_data is TRUE should be predicted value.
+#' @param is_test_data - logical vector that indicates test data portion of actual and predicted.
+#' @export
+mase <- function(actual, predicted, is_test_data, period = 1) {
+  train <- actual[!is_test_data]
+  test <- actual[is_test_data]
+  forecast <- predicted[is_test_data]
+  ret <- computeMASE(forecast, train, test, period)
+  ret
+}
+
+
+#' Return result of %in% if y is not empty or NULL. Otherwise return TRUE.
+#' We use this for filter condition controlled by a variable so that filtering is effectively
+#' skipped when the variable is empty or NULL.
+#' @export
+`%in_or_all%` <- function(x,y) {
+  if (is.null(y)) {
+    return(!(x %in% y))
+  }
+  else {
+    return(x %in% y)
+  }
+}

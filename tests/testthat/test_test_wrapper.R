@@ -199,6 +199,13 @@ test_that("test exp_chisq", {
   ret
 })
 
+test_that("test exp_chisq with logical", {
+  model_df <- exp_chisq(mtcars %>% mutate(gear=gear>3, carb=carb>3), gear, carb) # factor order should be kept in the model
+  ret <- model_df %>% tidy(model, type="residuals")
+  expect_equal(class(ret$gear), "logical")
+  expect_equal(class(ret$carb), "logical")
+})
+
 test_that("test exp_chisq with group_by", {
   ret <- mtcars %>% group_by(vs) %>% exp_chisq(gear, carb, value=cyl)
   observed <- ret %>% broom::tidy(model, type="observed")
@@ -236,8 +243,8 @@ test_that("test exp_anova with group_by", {
 
 test_that("test exp_normality", {
   df <- mtcars %>% mutate(dummy=c(NA, rep(1,n()-1))) # test for column with always same value, except for NA.
-  ret <- df %>% exp_normality(mpg, gear, dummy, n_sample=20)
-  qq <- ret %>% tidy(model, type="qq", n_sample=30)
-  model_summary <- ret %>% tidy(model, type="model_summary", conf_level=0.9)
+  ret <- df %>% exp_normality(mpg, gear, dummy, n_sample=20, n_sample_qq=30)
+  qq <- ret %>% tidy(model, type="qq")
+  model_summary <- ret %>% tidy(model, type="model_summary", signif_level=0.1)
   ret
 })

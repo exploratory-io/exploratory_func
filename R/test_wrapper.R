@@ -222,6 +222,9 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
 
   var1_levels <- NULL
   var2_levels <- NULL
+  # preserve class of var1 and var2 so that we can cast them back to original class later.
+  var1_class <- class(df[[var1_col]])
+  var2_class <- class(df[[var2_col]])
   if (is.factor(df[[var1_col]])) {
     var1_levels <- levels(df[[var1_col]])
   }
@@ -243,6 +246,8 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
     # add variable name info to the model
     model$var1 <- var1_col
     model$var2 <- var2_col
+    model$var1_class <- var1_class
+    model$var2_class <- var2_class
     model$var1_levels <- var1_levels
     model$var2_levels <- var2_levels
     class(model) <- c("chisq_exploratory", class(model))
@@ -304,6 +309,13 @@ tidy.chisq_exploratory <- function(x, type = "observed") {
     }
     if (!is.null(x$var2_levels)) {
       ret[[x$var2]] <- factor(ret[[x$var2]], levels=x$var2_levels)
+    }
+    # if original class of var1, var2 was logical, return them as logical.
+    if (x$var1_class == "logical") {
+      ret[[x$var1]] <- as.logical(ret[[x$var1]])
+    }
+    if (x$var2_class == "logical") {
+      ret[[x$var2]] <- as.logical(ret[[x$var2]])
     }
   }
   ret
@@ -538,8 +550,11 @@ qqline_data <- function (y, datax = FALSE, distribution = qnorm, probs = c(0.25,
 
 
 #' @param n_sample - Downsample to this size before shapiro test. Note that this is not applied for qq data. 
+#' @param n_sample_qq - Downsample qq-plot data down to this number.
+#'                   This is to make sure qq-line part of the data would not be sampled out in qq scatter plot.
+#'                   Default 4500 is to make room for qqline rows. (default sample size by scatter plot data query is 5000)
 #' @export
-exp_normality<- function(df, ..., n_sample = 50) {
+exp_normality<- function(df, ..., n_sample = 50, n_sample_qq = 4500) {
   selected_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
   
   shapiro_each <- function(df) {
@@ -585,6 +600,12 @@ exp_normality<- function(df, ..., n_sample = 50) {
 
     model <- list()
     model$qq <- df.qq
+    if (!is.null(n_sample_qq) && nrow(df.qq) > n_sample_qq) {
+      model$sampled_qq <- dplyr::sample_n(df.qq, n_sample_qq)
+    }
+    else {
+      model$sampled_qq <- df.qq
+    }
     model$qqline <- df.qqline
     model$model_summary <- df.model
     class(model) <- c("shapiro_exploratory", class(model))
@@ -603,25 +624,31 @@ exp_normality<- function(df, ..., n_sample = 50) {
   ret
 }
 
-#' @param n_sample - Downsample qq-plot data down to this number.
-#'                   This is to make sure qq-line part of the data would not be sampled out in qq scatter plot.
 #' @export
-tidy.shapiro_exploratory <- function(x, type = "model", conf_level=0.95, n_sample=NULL) {
-  if (type == "qq") {
-    if (!is.null(n_sample) && nrow(x$qq) > n_sample) {
-      sampled_qq_df <- dplyr::sample_n(x$qq, n_sample)
+tidy.shapiro_exploratory <- function(x, type = "model", signif_level=0.05) {
+  if (type == "qq" || type == "histogram") {
+    if (type == "qq") {
+      sampled_qq_df <- x$sampled_qq
     }
     else {
       sampled_qq_df <- x$qq
     }
+
+    # table with TRUE/FALSE result on normality of each column.
+    normal_df <- x$model_summary %>%
+      dplyr::mutate(normal = p.value > signif_level) %>%
+      dplyr::select(col, normal)
+
     ret <- dplyr::bind_rows(sampled_qq_df, x$qqline)
+    # join normality result so that we can show histogram with colors based on it.
+    ret <- ret %>% dplyr::left_join(normal_df, by="col")
     ret
   }
   else {
     ret <- x$model_summary
-    ret <- ret %>% mutate(normal=p.value>(1-conf_level))
-    ret <- ret %>% select(-method)
-    ret <- ret %>% rename(`Column`=col, `Statistic`=statistic, `P Value`=p.value, `Normal Distribution`=normal, `Sample Size`=sample_size)
+    ret <- ret %>% dplyr::mutate(normal = p.value > signif_level)
+    ret <- ret %>% dplyr::select(-method)
+    ret <- ret %>% dplyr::rename(`Column`=col, `Statistic`=statistic, `P Value`=p.value, `Normal Distribution`=normal, `Sample Size`=sample_size)
     ret
   }
 }
