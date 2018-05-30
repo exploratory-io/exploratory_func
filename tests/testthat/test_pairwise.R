@@ -174,9 +174,7 @@ test_that("test do_dist with cmd_scale with normalize", {
     do_dist(skv = c("row", "col", "val"), diag=TRUE, cmdscale_k = 3, normalize=TRUE)
 
   expect_equal(ncol(result_kv), 4)
-  expect_equal(result_kv[[2]], result_kv[[2]])
-  expect_equal(result_kv[[3]], result_kv[[3]])
-  expect_equal(result_kv[[4]], result_kv[[4]])
+  expect_equal(result_kv[[2]], c(-0.124,-1.16, -1.61, 2.89), tolerance=0.01)
 })
 
 test_that("test do_dist.kv diag TRUE", {
