@@ -164,7 +164,7 @@ do_dist.kv_ <- function(df,
     mat <- t(mat)
 
     if (normalize) {
-      # normalize each column.
+      # normalize each key.
       # where normalization should take place is debatable.
       # we may want to do it outside of group_by to have uniform definition of distance across groups.
       # on the other hand, a good definition of distance for a group might not work well for another group,
@@ -310,7 +310,6 @@ do_kl_dist.kv_ <- function(df,
 #' @param diag If similarity between itself should be returned or not.
 #' @param method Type of calculation. https://cran.r-project.org/web/packages/proxy/vignettes/overview.pdf
 #' @param p The power of the Minkowski distance.
-#' @param normalize Whether to normalize columns.
 #' @export
 do_dist.cols <- function(df,
                          ...,
@@ -321,7 +320,6 @@ do_dist.cols <- function(df,
                          diag=FALSE,
                          method="euclidean",
                          p=2,
-                         normalize=FALSE,
                          cmdscale_k = NULL){
   validate_empty_data(df)
 
@@ -343,14 +341,6 @@ do_dist.cols <- function(df,
   # this is executed on each group
   calc_dist_each <- function(df){
     mat <- df %>%  dplyr::select(!!!select_dots) %>%  as.matrix()
-    if (normalize) {
-      # normalize each column.
-      # where normalization should take place is debatable.
-      # we may want to do it outside of group_by to have uniform definition of distance across groups.
-      # on the other hand, a good definition of distance for a group might not work well for another group,
-      # in which case normalization per group might be better...
-      mat <- scale(mat)
-    }
 
     # sort the column name so that the output of pair.name.1 and pair.name.2 will be sorted
     # it's better to be sorted so that heatmap in exploratory can be triangle if distinct is TRUE
