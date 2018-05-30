@@ -163,6 +163,29 @@ test_that("test do_dist with cmd_scale", {
   expect_equal(result_kv[[4]], result_kv[[4]])
 })
 
+test_that("test do_dist with cmd_scale with normalize", {
+  loadNamespace("dplyr")
+  browser()
+  test_df <- data.frame(
+    row=rep(paste("row", seq(4)), each=6),
+    col=rep(paste("col", seq(6)), 4) ,
+    val=c(seq(7),seq(7),seq(10))
+  )
+  result_kv <- test_df %>%
+    do_dist(skv = c("row", "col", "val"), diag=TRUE, cmdscale_k = 3, normalize=TRUE)
+
+  result_cols <- test_df %>%
+    tidyr::spread(col, val) %>% dplyr::select(-row) %>%
+    do_dist(dplyr::everything(), diag=TRUE, cmdscale_k = 3, normalize=TRUE)
+
+
+  expect_equal(ncol(result_kv), 4)
+  expect_equal(ncol(result_cols), 4)
+  expect_equal(result_kv[[2]], result_kv[[2]])
+  expect_equal(result_kv[[3]], result_kv[[3]])
+  expect_equal(result_kv[[4]], result_kv[[4]])
+})
+
 test_that("test do_dist.kv diag TRUE", {
   loadNamespace("dplyr")
   result <- (

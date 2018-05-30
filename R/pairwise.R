@@ -161,6 +161,8 @@ do_dist.kv_ <- function(df,
         na.rm = TRUE
       )
 
+    mat <- t(mat)
+
     if (normalize) {
       # normalize each column.
       # where normalization should take place is debatable.
@@ -169,8 +171,6 @@ do_dist.kv_ <- function(df,
       # in which case normalization per group might be better...
       mat <- scale(mat)
     }
-
-    mat <- t(mat)
 
     # Dist is actually an atomic vector of upper half so upper and diag arguments don't matter
     dist <- stats::dist(mat, method=method, diag=FALSE, p=p)
