@@ -1471,7 +1471,9 @@ read_delim_file <- function(file, delim, quote = '"',
                       locale = locale, na = na, quoted_na = quoted_na, comment = comment, trim_ws = trim_ws, skip = skip, n_max = n_max, guess_max = guess_max, progress = progress)
   } else {
     # if it's local file simply call readr::read_delim
-    readr::read_delim(file, delim, quote = quote, escape_backslash = escape_backslash, escape_double = escape_double, col_names = col_names, col_types = col_types,
+    # reading through file() is to be able to read files with path that includes multibyte chars.
+    # without it, error is thrown from inside read_delim.
+    readr::read_delim(file(file), delim, quote = quote, escape_backslash = escape_backslash, escape_double = escape_double, col_names = col_names, col_types = col_types,
                       locale = locale, na = na, quoted_na = quoted_na, comment = comment, trim_ws = trim_ws, skip = skip, n_max = n_max, guess_max = guess_max, progress = progress)
   }
 }
@@ -1488,7 +1490,9 @@ guess_csv_file_encoding <- function(file,  n_max = 1e4, threshold = 0.20){
     readr::guess_encoding(tmp, n_max, threshold)
   } else {
     # if it's local file simply call readr::read_delim
-    readr::guess_encoding(file, n_max, threshold)
+    # reading through read_lines_raw(file()) is to be able to read files with path that includes multibyte chars.
+    # without it, error is thrown from inside guess_encoding. 
+    readr::guess_encoding(readr::read_lines_raw(file(file), n_max), threshold=threshold)
   }
 }
 
