@@ -157,8 +157,18 @@ do_dist.kv_ <- function(df,
         fun.aggregate=fun.aggregate,
         time_unit = time_unit,
         na.rm = TRUE
-      ) %>%
-      t()
+      )
+
+    if (normalize) {
+      # normalize each column.
+      # where normalization should take place is debatable.
+      # we may want to do it outside of group_by to have uniform definition of distance across groups.
+      # on the other hand, a good definition of distance for a group might not work well for another group,
+      # in which case normalization per group might be better...
+      mat <- scale(mat)
+    }
+
+    mat <- t(mat)
 
     # Dist is actually an atomic vector of upper half so upper and diag arguments don't matter
     dist <- stats::dist(mat, method=method, diag=FALSE, p=p)
