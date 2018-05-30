@@ -158,9 +158,7 @@ test_that("test do_dist with cmd_scale", {
 
   expect_equal(ncol(result_kv), 4)
   expect_equal(ncol(result_cols), 4)
-  expect_equal(result_kv[[2]], result_kv[[2]])
-  expect_equal(result_kv[[3]], result_kv[[3]])
-  expect_equal(result_kv[[4]], result_kv[[4]])
+  expect_equal(result_kv[[2]], c(-22.045408, -7.348469, 7.348469, 22.045408), tolerance=0.01)
 })
 
 test_that("test do_dist with cmd_scale with normalize", {
