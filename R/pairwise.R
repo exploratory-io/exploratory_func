@@ -109,6 +109,7 @@ do_dist.kv <- function(df, subject, key, value = NULL, ...){
 #' @param diag If similarity between itself should be returned or not.
 #' @param method Type of calculation. https://cran.r-project.org/web/packages/proxy/vignettes/overview.pdf
 #' @param p P parameter for "minkowski" method.
+#' @param normalize Whether to normalize values for each key. 
 #' @param cmdscale_k Number of dimention to map the result.
 #' @param time_unit Unit of time to aggregate key_col if key_col is Date or POSIXct#' @param time_unit Unit of time to aggregate key_col if key_col is Date or POSIXct. NULL doesn't aggregate.
 #' @export
@@ -122,6 +123,7 @@ do_dist.kv_ <- function(df,
                         diag=FALSE,
                         method="euclidean",
                         p=2,
+                        normalize=FALSE,
                         cmdscale_k = NULL,
                         time_unit = NULL){
   validate_empty_data(df)
