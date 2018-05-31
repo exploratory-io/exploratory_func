@@ -19,12 +19,12 @@ exp_bayes_ab <- function(df, a_b_identifier, converted, count, prior_mean = NULL
   # this seems to be the new way of NSE column selection evaluation
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
   a_b_identifier_col <- dplyr::select_var(names(df), !! rlang::enquo(a_b_identifier))
-  total_count_col <- dplyr::select_var(names(df), !! rlang::enquo(total_count))
+  count_col <- dplyr::select_var(names(df), !! rlang::enquo(count))
   converted_col <- dplyr::select_var(names(df), !! rlang::enquo(converted))
 
   df <- df %>%
     dplyr::filter(!is.na(!!rlang::sym(a_b_identifier_col)) &
-                  !is.na(!!rlang::sym(total_count_col)) &
+                  !is.na(!!rlang::sym(count_col)) &
                   !is.na(!!rlang::sym(converted_col)))
 
   set.seed(seed)
@@ -95,11 +95,11 @@ exp_bayes_ab <- function(df, a_b_identifier, converted, count, prior_mean = NULL
     data_b <- df[!df[[a_b_identifier_col]], ]
 
     # calculate sum of total count
-    data_a_total <- sum(data_a[[total_count_col]], na.rm = TRUE)
-    data_b_total <- sum(data_b[[total_count_col]], na.rm = TRUE)
+    data_a_total <- sum(data_a[[count_col]], na.rm = TRUE)
+    data_b_total <- sum(data_b[[count_col]], na.rm = TRUE)
     # calculate sum of success count
-    data_a_conv_total <- sum(round(data_a[[total_count_col]] * data_a[[conversion_rate_col]]), na.rm = TRUE)
-    data_b_conv_total <- sum(round(data_b[[total_count_col]] * data_b[[conversion_rate_col]]), na.rm = TRUE)
+    data_a_conv_total <- sum(round(data_a[[count_col]] * data_a[[conversion_rate_col]]), na.rm = TRUE)
+    data_b_conv_total <- sum(round(data_b[[count_col]] * data_b[[conversion_rate_col]]), na.rm = TRUE)
 
     # expand the data to TRUE and FALSE raw data
     bin_a <- c(rep(1, data_a_conv_total), rep(0, data_a_total - data_a_conv_total))
