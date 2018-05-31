@@ -59,7 +59,7 @@ exp_bayes_ab <- function(df, a_b_identifier, converted, count, prior_mean = NULL
 
   # this will be executed to each group
   each_func <- function(df, ...){
-    if(prior_mean <= 0 || 1 <= prior_mean) {
+    if(!is.null(prior_mean) && (prior_mean <= 0 || 1 <= prior_mean)) {
       stop("Average of CR must be between 0 and 1")
     }
 
