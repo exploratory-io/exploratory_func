@@ -59,27 +59,22 @@ exp_bayes_ab <- function(df, a_b_identifier, converted, count, prior_mean = NULL
 
   # this will be executed to each group
   each_func <- function(df, ...){
-    group_prior_mean <- if(is.null(prior_mean)){
-      prior_mean #TODO
-    } else {
-      prior_mean
-    }
-
-    group_prior_sd <- if(is.null(prior_sd)){
-      prior_sd #TODO
-    } else {
-      prior_sd
-    }
-
-    if(group_prior_mean <= 0 || 1 <= group_prior_mean) {
+    if(prior_mean <= 0 || 1 <= prior_mean) {
       stop("Average of CR must be between 0 and 1")
     }
 
     # calculate alpha and beta
     # https://stats.stackexchange.com/questions/12232/calculating-the-parameters-of-a-beta-distribution-using-the-mean-and-variance
-    group_prior_var <- group_prior_sd^2
-    alpha <- ((1 - group_prior_mean) / group_prior_var - 1 / group_prior_mean) * group_prior_mean ^ 2
-    beta <- alpha * (1 / group_prior_mean - 1)
+    if (!is.null(prior_mean) && !is.null(prior_sd)) {
+      prior_var <- prior_sd^2
+      alpha <- ((1 - prior_mean) / prior_var - 1 / prior_mean) * prior_mean ^ 2
+      beta <- alpha * (1 / prior_mean - 1)
+    }
+    else {
+      # assume uniform distribution as prior
+      alpha <- 1
+      beta <- 1
+    }
 
     # validate alpha and beta
     # when they are invalid, sd is too large
