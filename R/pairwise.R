@@ -109,6 +109,7 @@ do_dist.kv <- function(df, subject, key, value = NULL, ...){
 #' @param diag If similarity between itself should be returned or not.
 #' @param method Type of calculation. https://cran.r-project.org/web/packages/proxy/vignettes/overview.pdf
 #' @param p P parameter for "minkowski" method.
+#' @param normalize Whether to normalize values for each key. 
 #' @param cmdscale_k Number of dimention to map the result.
 #' @param time_unit Unit of time to aggregate key_col if key_col is Date or POSIXct#' @param time_unit Unit of time to aggregate key_col if key_col is Date or POSIXct. NULL doesn't aggregate.
 #' @export
@@ -122,6 +123,7 @@ do_dist.kv_ <- function(df,
                         diag=FALSE,
                         method="euclidean",
                         p=2,
+                        normalize=FALSE,
                         cmdscale_k = NULL,
                         time_unit = NULL){
   validate_empty_data(df)
@@ -157,8 +159,18 @@ do_dist.kv_ <- function(df,
         fun.aggregate=fun.aggregate,
         time_unit = time_unit,
         na.rm = TRUE
-      ) %>%
-      t()
+      )
+
+    mat <- t(mat)
+
+    if (normalize) {
+      # normalize each key.
+      # where normalization should take place is debatable.
+      # we may want to do it outside of group_by to have uniform definition of distance across groups.
+      # on the other hand, a good definition of distance for a group might not work well for another group,
+      # in which case normalization per group might be better...
+      mat <- scale(mat)
+    }
 
     # Dist is actually an atomic vector of upper half so upper and diag arguments don't matter
     dist <- stats::dist(mat, method=method, diag=FALSE, p=p)
@@ -297,6 +309,7 @@ do_kl_dist.kv_ <- function(df,
 #' TRUE makes it easy to filter group names.
 #' @param diag If similarity between itself should be returned or not.
 #' @param method Type of calculation. https://cran.r-project.org/web/packages/proxy/vignettes/overview.pdf
+#' @param p The power of the Minkowski distance.
 #' @export
 do_dist.cols <- function(df,
                          ...,

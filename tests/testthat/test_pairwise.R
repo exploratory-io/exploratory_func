@@ -158,9 +158,21 @@ test_that("test do_dist with cmd_scale", {
 
   expect_equal(ncol(result_kv), 4)
   expect_equal(ncol(result_cols), 4)
-  expect_equal(result_kv[[2]], result_kv[[2]])
-  expect_equal(result_kv[[3]], result_kv[[3]])
-  expect_equal(result_kv[[4]], result_kv[[4]])
+  expect_equal(result_kv[[2]], c(-22.045408, -7.348469, 7.348469, 22.045408), tolerance=0.01)
+})
+
+test_that("test do_dist with cmd_scale with normalize", {
+  loadNamespace("dplyr")
+  test_df <- data.frame(
+    row=rep(paste("row", seq(4)), each=6),
+    col=rep(paste("col", seq(6)), 4) ,
+    val=c(seq(7),seq(7),seq(10))
+  )
+  result_kv <- test_df %>%
+    do_dist(skv = c("row", "col", "val"), diag=TRUE, cmdscale_k = 3, normalize=TRUE)
+
+  expect_equal(ncol(result_kv), 4)
+  expect_equal(result_kv[[2]], c(-0.124,-1.16, -1.61, 2.89), tolerance=0.01)
 })
 
 test_that("test do_dist.kv diag TRUE", {
