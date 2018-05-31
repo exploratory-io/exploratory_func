@@ -166,7 +166,7 @@ getGithubIssues <- function(username, password, owner, repository, ...){
 }
 
 
-getMongoURL <- function(host = NULL, port, database, username, pass, isSSL=FALSE, authSource=NULL, cluster = NULL, additionalParams = NULL, timeout = NULL) {
+getMongoURL <- function(host = NULL, port, database, username, pass, isSSL=FALSE, authSource=NULL, cluster = NULL, timeout = NULL, additionalParams = NULL, ...) {
   loadNamespace("stringr")
   loadNamespace("urltools")
 
@@ -219,7 +219,7 @@ getMongoURL <- function(host = NULL, port, database, username, pass, isSSL=FALSE
 #' @export
 queryMongoDB <- function(host = NULL, port = "", database, collection, username, password, query = "{}", flatten,
                          limit=100, isSSL=FALSE, authSource=NULL, fields="{}", sort="{}",
-                         skip=0, queryType = "find", pipeline="{}", cluster = NULL, additionalParamas = NULL, timeout = NULL, ...){
+                         skip=0, queryType = "find", pipeline="{}", cluster = NULL, timeout = NULL, additionalParamas = NULL, ...){
   if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
   loadNamespace("jsonlite")
   if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
