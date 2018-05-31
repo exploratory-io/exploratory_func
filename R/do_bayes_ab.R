@@ -29,7 +29,11 @@ exp_bayes_ab <- function(df, a_b_identifier, converted, count, prior_mean = NULL
 
   set.seed(seed)
 
-  # convert input. TODO: adjust following comments which might not make sense any more.
+  if (!is.logical(df[[converted_col]])) {
+    stop("converted column must be logical.")
+  }
+
+  # convert input. TODO: revisit following comments which might not make sense any more.
   # when type is prior, no need to evaluate other parameters
   # but when prior_mean or prior_sd is NULL, it will be guessed by
   # conversion_rate_col, so this should be run.
@@ -94,12 +98,17 @@ exp_bayes_ab <- function(df, a_b_identifier, converted, count, prior_mean = NULL
     data_a <- df[df[[a_b_identifier_col]], ]
     data_b <- df[!df[[a_b_identifier_col]], ]
 
+    # get a, b converted subset data
+    data_a_conv <- data_a[data_a[[converted_col]], ]
+    data_b_conv <- data_b[data_b[[converted_col]], ]
+
     # calculate sum of total count
     data_a_total <- sum(data_a[[count_col]], na.rm = TRUE)
     data_b_total <- sum(data_b[[count_col]], na.rm = TRUE)
+
     # calculate sum of success count
-    data_a_conv_total <- sum(round(data_a[[count_col]] * data_a[[conversion_rate_col]]), na.rm = TRUE)
-    data_b_conv_total <- sum(round(data_b[[count_col]] * data_b[[conversion_rate_col]]), na.rm = TRUE)
+    data_a_conv_total <- sum(data_a_conv[[count_col]], na.rm = TRUE)
+    data_b_conv_total <- sum(data_b_conv[[count_col]], na.rm = TRUE)
 
     # expand the data to TRUE and FALSE raw data
     bin_a <- c(rep(1, data_a_conv_total), rep(0, data_a_total - data_a_conv_total))
