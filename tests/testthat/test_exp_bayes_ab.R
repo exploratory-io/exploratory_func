@@ -26,6 +26,10 @@ test_that("test exp_bayes_ab test with summary output", {
   # without prior
   ret <- exp_bayes_ab(full_data, converted, group, count, type = "summary")
   expect_equal(nrow(ret), 4)
+
+  # without count
+  ret <- exp_bayes_ab(full_data, converted, group, , type = "summary")
+  expect_equal(nrow(ret), 4)
 })
 
 #TODO: do the same set of tests as test_do_bayes_ab.R

@@ -15,12 +15,21 @@
 #' * improvement - Output coordinate of histogram of lift, which is the ratio of performance improvement of A over B. The formula is (A - B) / B.
 #' @param seed Random seed for bayes test to estimate probability density.
 #' @export
-exp_bayes_ab <- function(df, converted, a_b_identifier, count, prior_mean = NULL, prior_sd = NULL, type = "model", seed = 0, ...){
+exp_bayes_ab <- function(df, converted, a_b_identifier, count = NULL, prior_mean = NULL, prior_sd = NULL, type = "model", seed = 0, ...){
   # this seems to be the new way of NSE column selection evaluation
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
   a_b_identifier_col <- dplyr::select_var(names(df), !! rlang::enquo(a_b_identifier))
-  count_col <- dplyr::select_var(names(df), !! rlang::enquo(count))
   converted_col <- dplyr::select_var(names(df), !! rlang::enquo(converted))
+
+  if (!is.null(count)) {
+    # The following new way cannot handle the case where count is not specified. Using old substitute().
+    # count_col <- dplyr::select_var(names(df), !! rlang::enquo(count))
+    count_col <- col_name(substitute(count))
+  }
+  else {
+    df <- df %>% dplyr::mutate(count_tmp_=1)
+    count_col <- "count_tmp_" # TODO: avoid column name collision
+  }
 
   df <- df %>%
     dplyr::filter(!is.na(!!rlang::sym(a_b_identifier_col)) &
