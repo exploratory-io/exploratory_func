@@ -1,5 +1,155 @@
 #' Run bayesTest from bayesAB package
 #' @param df Data frame to run bayes ab test
+#' @param converted Logical column that tells if the data for the row is converted or not.
+#' @param a_b_identifier A column with 2 unique values to distinguish groups
+#' @param count Column of the count
+#' @param prior_mean Mean of prior beta distribution
+#' @param prior_sd Standard deviation of prior beta distribution
+#' The default value with 0.5 prior_mean is uniform distribution
+#' 0.288675 is the sd of [0,1] uniform distribution sqrt(1/3 -1/2 + 1/4)
+#' @param type Type of output
+#' * model - Returns a data frame with bayesTest model.
+#' * summary - Output summary of the result of the test.
+#' * prior - Output coordinates of prior density chart.
+#' * posteriors - Output coordinates of posterior density chart of the success rate.
+#' * improvement - Output coordinate of histogram of lift, which is the ratio of performance improvement of A over B. The formula is (A - B) / B.
+#' @param seed Random seed for bayes test to estimate probability density.
+#' @export
+exp_bayes_ab <- function(df, converted, a_b_identifier, count = NULL, prior_mean = NULL, prior_sd = NULL, type = "model", seed = 0, ...){
+  # this seems to be the new way of NSE column selection evaluation
+  # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
+  a_b_identifier_col <- dplyr::select_var(names(df), !! rlang::enquo(a_b_identifier))
+  converted_col <- dplyr::select_var(names(df), !! rlang::enquo(converted))
+
+  if (!is.null(count)) {
+    # The following new way cannot handle the case where count is not specified. Using old substitute().
+    # count_col <- dplyr::select_var(names(df), !! rlang::enquo(count))
+    count_col <- col_name(substitute(count))
+  }
+  else {
+    df <- df %>% dplyr::mutate(count_tmp_=1)
+    count_col <- "count_tmp_" # TODO: avoid column name collision
+  }
+
+  df <- df %>%
+    dplyr::filter(!is.na(!!rlang::sym(a_b_identifier_col)) &
+                  !is.na(!!rlang::sym(count_col)) &
+                  !is.na(!!rlang::sym(converted_col)))
+
+  set.seed(seed)
+
+  if (!is.logical(df[[converted_col]])) {
+    stop("converted column must be logical.")
+  }
+
+  # convert input. TODO: revisit following comments which might not make sense any more.
+  # when type is prior, no need to evaluate other parameters
+  # but when prior_mean or prior_sd is NULL, it will be guessed by
+  # conversion_rate_col, so this should be run.
+  if (type != "prior" || (is.null(prior_mean) || is.null(prior_sd))) {
+    # make a_b identifier column to factor if they are numeric or character
+    if (is.character(df[[a_b_identifier_col]]) || is.numeric(df[[a_b_identifier_col]])) {
+      df[[a_b_identifier_col]] <- forcats::fct_inorder(as.character(df[[a_b_identifier_col]]))
+    }
+
+    # convert a_b_identifier_col from factor to logical
+    fct_lev <- NULL
+    if (is.factor(df[[a_b_identifier_col]])) {
+      fct_lev <- levels(df[[a_b_identifier_col]])
+      if (length(levels(df[[a_b_identifier_col]])) != 2) {
+        stop("A/B must be 2 unique identifiers")
+      }
+      # first factor is group A, so TRUE and FALSE should be swapped
+      df[[a_b_identifier_col]] <- !as.logical(as.integer(df[[a_b_identifier_col]]) - 1)
+    }
+  }
+
+  grouped_col <- grouped_by(df)
+
+  # this will be executed to each group
+  each_func <- function(df, ...){
+    if(!is.null(prior_mean) && (prior_mean <= 0 || 1 <= prior_mean)) {
+      stop("Average of CR must be between 0 and 1")
+    }
+
+    # calculate alpha and beta
+    # https://stats.stackexchange.com/questions/12232/calculating-the-parameters-of-a-beta-distribution-using-the-mean-and-variance
+    if (!is.null(prior_mean) && !is.null(prior_sd)) {
+      prior_var <- prior_sd^2
+      alpha <- ((1 - prior_mean) / prior_var - 1 / prior_mean) * prior_mean ^ 2
+      beta <- alpha * (1 / prior_mean - 1)
+    }
+    else {
+      # assume uniform distribution as prior
+      alpha <- 1
+      beta <- 1
+    }
+
+    # validate alpha and beta
+    # when they are invalid, sd is too large
+    if (!(!is.na(alpha) && !is.na(beta) && alpha > 0 && beta > 0)){
+      stop("SD of CR is too large to create prior beta distribution. Please try smaller value.")
+    }
+
+    if (type == "prior") {
+      # this returns coordinates of density chart of prior
+      return(data.frame(
+        conversion_rate_pct = seq(0, 1, 0.001) * 100,
+        probability_density = dbeta(seq(0, 1, 0.001), shape1 = alpha, shape2 = beta)
+      ))
+    }
+    # get a, b subset data
+    data_a <- df[df[[a_b_identifier_col]], ]
+    data_b <- df[!df[[a_b_identifier_col]], ]
+
+    # get a, b converted subset data
+    data_a_conv <- data_a[data_a[[converted_col]], ]
+    data_b_conv <- data_b[data_b[[converted_col]], ]
+
+    # calculate sum of total count
+    data_a_total <- sum(data_a[[count_col]], na.rm = TRUE)
+    data_b_total <- sum(data_b[[count_col]], na.rm = TRUE)
+
+    # calculate sum of success count
+    data_a_conv_total <- sum(data_a_conv[[count_col]], na.rm = TRUE)
+    data_b_conv_total <- sum(data_b_conv[[count_col]], na.rm = TRUE)
+
+    # expand the data to TRUE and FALSE raw data
+    bin_a <- c(rep(1, data_a_conv_total), rep(0, data_a_total - data_a_conv_total))
+    bin_b <- c(rep(1, data_b_conv_total), rep(0, data_b_total - data_b_conv_total))
+
+    bayes_model <- bayesAB::bayesTest(
+      bin_a,
+      bin_b,
+      priors = c(alpha = alpha, beta = beta),
+      n_samples = 1e5,
+      distribution = 'bernoulli'
+    )
+
+    # save factor levels if the AB identifier is 2 levels factor
+    if(!is.null(fct_lev)){
+      bayes_model$ab_identifier <- fct_lev
+    }
+
+    bayes_model
+  }
+
+  ret <- do_on_each_group(df, each_func, name = "model", with_unnest = FALSE, params = substitute(list(...)))
+
+  if(type == "model"){
+    ret
+  } else if (type == "prior") {
+    # expand nested data frame of prior distribution
+    ret %>%
+      dplyr::ungroup() %>%
+      unnest_with_drop(model)
+  } else {
+    tidy(ret, model, type = type, ...)
+  }
+}
+
+#' Run bayesTest from bayesAB package
+#' @param df Data frame to run bayes ab test
 #' @param a_b_identifier A column with 2 unique values to distinguish groups
 #' @param total_count Column of the total count
 #' @param conversion_rate Column of the rate of success
