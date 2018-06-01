@@ -816,7 +816,6 @@ submitGoogleBigQueryJob <- function(project, sqlquery, destination_table, write_
   # If we do not pass the useLegaySql argument, bigrquery set TRUE for it, so we need to expliclity set it to make standard SQL work.
   isStandardSQL <- stringr::str_detect(sqlquery, "#standardSQL")
   # set envir = parent.frame() to get variables from users environment, not papckage environment
-  # job <- bigrquery::insert_query_job(GetoptLong::qq(sqlquery, envir = parent.frame()), project, destination_table = destination_table, write_disposition = write_disposition, use_legacy_sql = isStandardSQL == FALSE)
   job <- bigrquery::bq_perform_query(query = GetoptLong::qq(sqlquery, envir = parent.frame()), billing = project,  use_legacy_sql = !isStandardSQL)
   bigrquery::bq_job_wait(job)
   meta <- bigrquery::bq_job_meta(job)
