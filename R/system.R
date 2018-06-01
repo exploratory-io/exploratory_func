@@ -816,26 +816,26 @@ submitGoogleBigQueryJob <- function(project, sqlquery, destination_table, write_
   # If we do not pass the useLegaySql argument, bigrquery set TRUE for it, so we need to expliclity set it to make standard SQL work.
   isStandardSQL <- stringr::str_detect(sqlquery, "#standardSQL")
   # set envir = parent.frame() to get variables from users environment, not papckage environment
-  job <- bigrquery::insert_query_job(GetoptLong::qq(sqlquery, envir = parent.frame()), project, destination_table = destination_table, write_disposition = write_disposition, use_legacy_sql = isStandardSQL == FALSE)
-  job <- bigrquery::wait_for(job)
-  isCacheHit <- job$statistics$query$cacheHit
+  job <- bigrquery::bq_perform_query(query = GetoptLong::qq(sqlquery, envir = parent.frame()), billing = project,  use_legacy_sql = !isStandardSQL)
+  bigrquery::bq_job_wait(job)
+  meta <- bigrquery::bq_job_meta(job)
+  isCacheHit <- meta$statistics$query$cacheHit
   # if cache hit case, totalBytesProcessed info is not available. So set it as -1
-  totalBytesProcessed <- ifelse(isCacheHit, -1, job$statistics$totalBytesProcessed)
+  totalBytesProcessed <- ifelse(isCacheHit, -1, meta$statistics$totalBytesProcessed)
   # if cache hit case, recordsWritten info is not avalable. So set it as -1
-  numOfRowsProcessed <- ifelse(isCacheHit, -1, job$statistics$query$queryPlan[[1]]$recordsWritten)
-  dest <- job$configuration$query$destinationTable
+  numOfRowsProcessed <- ifelse(isCacheHit, -1, meta$statistics$query$queryPlan[[1]]$recordsWritten)
+  dest <- meta$configuration$query$destinationTable
   result <- data.frame(tableId = dest$tableId, datasetId = dest$datasetId, numOfRows = numOfRowsProcessed, totalBytesProcessed = totalBytesProcessed)
 }
 
 #' API to get a data from google BigQuery table
 #' @export
-getDataFromGoogleBigQueryTable <- function(project, dataset, table, page_size = 10000, max_page, tokenFileId){
+getDataFromGoogleBigQueryTable <- function(project, dataset, table, page_size = 10000, max_page, tokenFileId, max_connections = 8){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   token <- getGoogleTokenForBigQuery(tokenFileId)
   bigrquery::set_access_cred(token)
-
-  bigrquery::list_tabledata(project, dataset, table, page_size = page_size,
-                 table_info = NULL, max_pages = max_page)
+  tb <- bigrquery::bq_table(project = project, dataset = dataset, table = table)
+  bigrquery::bq_table_download(tb,  page_size = page_size, max_results = max_page, quiet = TRUE, max_connections = max_connections)
 }
 
 #' API to extract data from google BigQuery table to Google Cloud Storage
@@ -932,7 +932,7 @@ getDataFromGoogleBigQueryTableViaCloudStorage <- function(bucketProjectId, dataS
 #' @param bucket - Google Cloud Storage Bucket
 #' @param folder - Folder under Google Cloud Storage Bucket where temp files are extracted.
 #' @export
-executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 100000, maxPage = 10, writeDisposition = "WRITE_TRUNCATE", tokenFileId, bucketProjectId, bucket=NULL, folder=NULL, ...){
+executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 100000, maxPage = 10, writeDisposition = "WRITE_TRUNCATE", tokenFileId, bucketProjectId, bucket=NULL, folder=NULL, max_connections = 8, ...){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
   if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
@@ -949,7 +949,7 @@ executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 1
     bqtable <- NULL
     query <- convertUserInputToUtf8(query)
     # submit a query to get a result (for refresh data frame case)
-    result <- exploratory::submitGoogleBigQueryJob(bucketProjectId, query, destinationTable, writeDisposition = "WRITE_TRUNCATE", tokenFileId);
+    result <- exploratory::submitGoogleBigQueryJob(project = bucketProjectId, sqlquery = query, tokenFieldId =  tokenFileId);
     # extranct result from Google BigQuery to Google Cloud Storage and import
     df <- getDataFromGoogleBigQueryTableViaCloudStorage(bucketProjectId, dataSet, table, bucket, folder, tokenFileId)
   } else {
@@ -959,8 +959,8 @@ executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 1
     # If we do not pass the useLegaySql argument, bigrquery set TRUE for it, so we need to expliclity set it to make standard SQL work.
     isStandardSQL <- stringr::str_detect(query, "#standardSQL")
     # set envir = parent.frame() to get variables from users environment, not papckage environment
-    df <- bigrquery::query_exec(GetoptLong::qq(query, envir = parent.frame()), project = project, destination_table = destinationTable,
-                                page_size = pageSize, max_page = maxPage, write_disposition = writeDisposition, use_legacy_sql = isStandardSQL == FALSE)
+    tb <- bigrquery::bq_project_query(x = project, query = GetoptLong::qq(query, envir = parent.frame()), quiet = TRUE, use_legacy_sql = !isStandardSQL)
+    df <- bigrquery::bq_table_download(x = tb, max_results = Inf, page_size = pageSize, max_connections = max_connections, quiet = TRUE)
   }
   df
 }
@@ -1499,7 +1499,7 @@ guess_csv_file_encoding <- function(file,  n_max = 1e4, threshold = 0.20){
   } else {
     # if it's local file simply call readr::read_delim
     # reading through read_lines_raw(file()) is to be able to read files with path that includes multibyte chars.
-    # without it, error is thrown from inside guess_encoding. 
+    # without it, error is thrown from inside guess_encoding.
     readr::guess_encoding(readr::read_lines_raw(file(file), n_max), threshold=threshold)
   }
 }
