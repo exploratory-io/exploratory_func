@@ -830,12 +830,12 @@ submitGoogleBigQueryJob <- function(project, sqlquery, destination_table, write_
 
 #' API to get a data from google BigQuery table
 #' @export
-getDataFromGoogleBigQueryTable <- function(project, dataset, table, page_size = 10000, max_page, tokenFileId, max_connection = 8){
+getDataFromGoogleBigQueryTable <- function(project, dataset, table, page_size = 10000, max_page, tokenFileId, max_connections = 8){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   token <- getGoogleTokenForBigQuery(tokenFileId)
   bigrquery::set_access_cred(token)
   tb <- bigrquery::bq_table(project = project, dataset = dataset, table = table)
-  bigrquery::bq_table_download(tb,  page_size = page_size, max_results = max_page, quiet = TRUE, max_connections = max_connection)
+  bigrquery::bq_table_download(tb,  page_size = page_size, max_results = max_page, quiet = TRUE, max_connections = max_connections)
 }
 
 #' API to extract data from google BigQuery table to Google Cloud Storage
@@ -932,7 +932,7 @@ getDataFromGoogleBigQueryTableViaCloudStorage <- function(bucketProjectId, dataS
 #' @param bucket - Google Cloud Storage Bucket
 #' @param folder - Folder under Google Cloud Storage Bucket where temp files are extracted.
 #' @export
-executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 100000, maxPage = 10, writeDisposition = "WRITE_TRUNCATE", tokenFileId, bucketProjectId, bucket=NULL, folder=NULL, max_connection = 8, ...){
+executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 100000, maxPage = 10, writeDisposition = "WRITE_TRUNCATE", tokenFileId, bucketProjectId, bucket=NULL, folder=NULL, max_connections = 8, ...){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
   if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
@@ -960,7 +960,7 @@ executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 1
     isStandardSQL <- stringr::str_detect(query, "#standardSQL")
     # set envir = parent.frame() to get variables from users environment, not papckage environment
     tb <- bigrquery::bq_project_query(x = project, query = GetoptLong::qq(query, envir = parent.frame()), quiet = TRUE, use_legacy_sql = !isStandardSQL)
-    df <- bigrquery::bq_table_download(x = tb, max_results = Inf, page_size = pageSize, max_connections = max_connection, quiet = TRUE)
+    df <- bigrquery::bq_table_download(x = tb, max_results = Inf, page_size = pageSize, max_connections = max_connections, quiet = TRUE)
   }
   df
 }
