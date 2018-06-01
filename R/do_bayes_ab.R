@@ -21,7 +21,7 @@ exp_bayes_ab <- function(df, converted, a_b_identifier, count = NULL, prior_mean
   a_b_identifier_col <- dplyr::select_var(names(df), !! rlang::enquo(a_b_identifier))
   converted_col <- dplyr::select_var(names(df), !! rlang::enquo(converted))
 
-  if (!is.null(count)) {
+  if (!is.null(substitute(count))) {
     # The following new way cannot handle the case where count is not specified. Using old substitute().
     # count_col <- dplyr::select_var(names(df), !! rlang::enquo(count))
     count_col <- col_name(substitute(count))
