@@ -204,12 +204,18 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
       ret <- ret %>% dplyr::select(-cap_scaled)
     }
     # TODO: Maybe we should take average when MCMC is used and there are multiple delta values for each channge point.
-    changepoints_df <- data.frame(ds = m$changepoints, slope_change = m$params$delta[1,])
-    # m$changepoints is POSIXct. Cast it to Date when necessary so that left_join works.
-    if (lubridate::is.Date(aggregated_data$ds)) {
-      changepoints_df$ds <- as.Date(changepoints_df$ds)
+    if (!is.numeric(m$changepoints)) { # m$changepoints seems to become numeric single 0 when empty.
+      changepoints_df <- data.frame(ds = m$changepoints, slope_change = m$params$delta[1,])
+      # m$changepoints is POSIXct. Cast it to Date when necessary so that left_join works.
+      if (lubridate::is.Date(aggregated_data$ds)) {
+        changepoints_df$ds <- as.Date(changepoints_df$ds)
+      }
+      ret <- ret %>% dplyr::left_join(changepoints_df, by = c("ds" = "ds"))
     }
-    ret <- ret %>% dplyr::left_join(changepoints_df, by = c("ds" = "ds"))
+    else {
+      # there is no changepoint.
+      ret <- ret %>% dplyr::mutate(slope_change = NA_real_)
+    }
 
     if (test_mode) {
       ret <- ret %>% dplyr::mutate(is_test_data = seq(1,n()) > n() - periods) # FALSE for training period, TRUE for test period.
