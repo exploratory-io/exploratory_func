@@ -300,7 +300,7 @@ getMongoCollectionNames <- function(host = "", port = "", database = "", usernam
 getMongoCollectionNumberOfRows <- function(host = NULL, port = "", database = "",
                                            username = "", password = "", collection = "",
                                            isSSL=FALSE, authSource=NULL, cluster = NULL, additionalParams = "",
-                                           timeout = timeout, ...){
+                                           timeout = NULL, ...){
   loadNamespace("jsonlite")
   if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
   pass = saveOrReadPassword("mongodb", username, password)
