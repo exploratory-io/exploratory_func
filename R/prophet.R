@@ -205,7 +205,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
     }
     # TODO: Maybe we should take average when MCMC is used and there are multiple delta values for each channge point.
     if (!is.numeric(m$changepoints)) { # m$changepoints seems to become numeric single 0 when empty.
-      changepoints_df <- data.frame(ds = m$changepoints, slope_change = m$params$delta[1,])
+      changepoints_df <- data.frame(ds = m$changepoints, trend_change = m$params$delta[1,])
       # m$changepoints is POSIXct. Cast it to Date when original data (aggregated_data$ds) is Date so that left_join works.
       if (lubridate::is.Date(aggregated_data$ds)) {
         changepoints_df$ds <- as.Date(changepoints_df$ds)
@@ -214,7 +214,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
     }
     else {
       # there is no changepoint.
-      ret <- ret %>% dplyr::mutate(slope_change = NA_real_)
+      ret <- ret %>% dplyr::mutate(trend_change = NA_real_)
     }
 
     if (test_mode) {
