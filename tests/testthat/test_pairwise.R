@@ -151,12 +151,34 @@ test_that("test do_dist with cmd_scale", {
   )
   result_kv <- test_df %>%
     do_dist(skv = c("row", "col", "val"), diag=TRUE, cmdscale_k = 3)
+  # it seems result_kv can be 3 or 2 dimensional with this data,
+  # since axis3 gets near 0.
+  #
+  # 3 dimensional result (got on Mac).
+  #
+  # # A tibble: 4 x 4
+  #   row    axis1        axis2         axis3
+  #   <chr>  <dbl>        <dbl>         <dbl>
+  # 1 row 1 -22.0   0.000000613  0           
+  # 2 row 2  -7.35 -0.000000167  0.0000000359
+  # 3 row 3   7.35  0.000000167  0.000000111 
+  # 4 row 4  22.0   0.000000501 -0.0000000250
+  #
+  # 2 dimensional result (got on Linux).
+  #
+  # # A tibble: 4 x 3
+  #   row    axis1        axis2
+  #   <chr>  <dbl>        <dbl>
+  # 1 row 1 -22.0   0.000000613
+  # 2 row 2  -7.35 -0.000000167
+  # 3 row 3   7.35  0.000000167
+  # 4 row 4  22.0   0.000000501
 
   result_cols <- test_df %>%
     tidyr::spread(col, val) %>% dplyr::select(-row) %>%
     do_dist(dplyr::everything(), diag=TRUE, cmdscale_k = 3)
 
-  expect_equal(ncol(result_kv), 4)
+  expect_true(ncol(result_kv) %in% c(4,3))
   expect_equal(ncol(result_cols), 4)
   expect_equal(result_kv[[2]], c(-22.045408, -7.348469, 7.348469, 22.045408), tolerance=0.01)
 })
