@@ -763,8 +763,9 @@ queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, q
 #' @param searchString - Query to search.
 #' @param tokenFileId - File id for aut
 #' @param withSentiment - Whether there should be sentiment column caluculated by get_sentiment.
+#' @param includeRts - Whether result should include retweets or not.
 #' @export
-getTwitter <- function(n=200, lang=NULL,  lastNDays=30, searchString, tokenFileId=NULL, withSentiment = FALSE, ...){
+getTwitter <- function(n=200, lang=NULL,  lastNDays=7, searchString, tokenFileId=NULL, withSentiment = FALSE, includeRts = FALSE, ...){
   if(!requireNamespace("rtweet")){stop("package rtweet must be installed.")}
   loadNamespace("lubridate")
   twitter_token = getTwitterToken(tokenFileId)
@@ -783,7 +784,9 @@ getTwitter <- function(n=200, lang=NULL,  lastNDays=30, searchString, tokenFileI
 
   # convert search string to UTF-8 before sending it on the wire on windows.
   searchString <- convertUserInputToUtf8(searchString)
-  tweetList <- rtweet::search_tweets(q = searchString, token = twitter_token, n = n, lang = lang, verbose = TRUE, since = since, unitl = until, locale = locale, geocode = geocode, type = resultType,  retryonratelimit=TRUE)
+  tweetList <- rtweet::search_tweets(q = searchString, token = twitter_token, n = n, lang = lang, verbose = TRUE, since = since,
+                                     unitl = until, locale = locale, geocode = geocode, include_rts = includeRts,
+                                     type = resultType,  retryonratelimit=TRUE)
   if(length(tweetList)>0){
     if(withSentiment){
       # calculate sentiment
