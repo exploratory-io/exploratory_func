@@ -173,7 +173,8 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
     # but now, filter them out again.
     # by doing so, we affect future table, and skip prediction (interpolation)
     # for all missing date/time, which could be expensive if the training data is sparse.
-    training_data <- training_data %>% dplyr::filter(!is.na(y))
+    # keep the last row even if it does not have training data, to mark the end of training period, which is the start of test period.
+    training_data <- training_data %>% dplyr::filter(!is.na(y) | row_number() == n())
 
     if (!is.null(cap) && is.data.frame(cap)) {
       # in this case, cap is the future data frame with cap, specified by user.
