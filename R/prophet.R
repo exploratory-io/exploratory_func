@@ -135,13 +135,25 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
         dplyr::group_by(ds) %>%
         dplyr::summarise(y = n())
     }
+
     # fill aggregated_data$ds with missing data/time.
-    browser()
-    ts <- seq.POSIXt(as.POSIXct(min(aggregated_data$ds)), as.POSIXct(max(aggregated_data$ds)), by=time_unit)
+    # this is necessary to make forecast period correspond with test period in test mode when there is missing date/time in original aggregated_data$ds.
+
+    if (time_unit == "minute") {
+      time_unit_for_seq = "min"
+    }
+    else if (time_unit == "second") {
+      time_unit_for_seq = "sec"
+    }
+    else {
+      time_unit_for_seq = time_unit
+    }
+    ts <- seq.POSIXt(as.POSIXct(min(aggregated_data$ds)), as.POSIXct(max(aggregated_data$ds)), by=time_unit_for_seq)
     if (lubridate::is.Date(aggregated_data$ds)) {
       ts <- as.Date(ts)
     }
     ts_df <- data.frame(ds=ts)
+    # ts_df has to be the left-hand side to keep the row order according to time order.
     aggregated_data <- dplyr::full_join(ts_df, aggregated_data, by = c("ds" = "ds"))
     
 
