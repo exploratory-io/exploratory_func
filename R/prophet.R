@@ -136,27 +136,6 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
         dplyr::summarise(y = n())
     }
 
-    # fill aggregated_data$ds with missing data/time.
-    # this is necessary to make forecast period correspond with test period in test mode when there is missing date/time in original aggregated_data$ds.
-
-    if (time_unit == "minute") {
-      time_unit_for_seq <- "min"
-    }
-    else if (time_unit == "second") {
-      time_unit_for_seq <- "sec"
-    }
-    else {
-      time_unit_for_seq <- time_unit
-    }
-    ts <- seq.POSIXt(as.POSIXct(min(aggregated_data$ds)), as.POSIXct(max(aggregated_data$ds)), by=time_unit_for_seq)
-    if (lubridate::is.Date(aggregated_data$ds)) {
-      ts <- as.Date(ts)
-    }
-    ts_df <- data.frame(ds=ts)
-    # ts_df has to be the left-hand side to keep the row order according to time order.
-    filled_aggregated_data <- dplyr::full_join(ts_df, aggregated_data, by = c("ds" = "ds"))
-    
-
     if (time_unit != "day") { # if time_unit is larger than day (the next level is week), having weekly.seasonality does not make sense.
       weekly.seasonality <- FALSE
     }
@@ -164,17 +143,42 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
     # if (time_unit == "year") { # if time_unit is year (the largest unit), having yearly.seasonality does not make sense.
     #   yearly.seasonality = FALSE
     # }
-    training_data <- filled_aggregated_data
-    if (test_mode) {
-      training_data <- training_data %>% head(-periods)
-    }
 
-    # we got correct set of training data by filling missing date/time,
-    # but now, filter them out again.
-    # by doing so, we affect future table, and skip prediction (interpolation)
-    # for all missing date/time, which could be expensive if the training data is sparse.
-    # keep the last row even if it does not have training data, to mark the end of training period, which is the start of test period.
-    training_data <- training_data %>% dplyr::filter(!is.na(y) | row_number() == n())
+
+    if (test_mode) {
+      # fill aggregated_data$ds with missing data/time.
+      # this is necessary to make forecast period correspond with test period in test mode when there is missing date/time in original aggregated_data$ds.
+
+      if (time_unit == "minute") {
+        time_unit_for_seq <- "min"
+      }
+      else if (time_unit == "second") {
+        time_unit_for_seq <- "sec"
+      }
+      else {
+        time_unit_for_seq <- time_unit
+      }
+      ts <- seq.POSIXt(as.POSIXct(min(aggregated_data$ds)), as.POSIXct(max(aggregated_data$ds)), by=time_unit_for_seq)
+      if (lubridate::is.Date(aggregated_data$ds)) {
+        ts <- as.Date(ts)
+      }
+      ts_df <- data.frame(ds=ts)
+      # ts_df has to be the left-hand side to keep the row order according to time order.
+      filled_aggregated_data <- dplyr::full_join(ts_df, aggregated_data, by = c("ds" = "ds"))
+      
+      training_data <- filled_aggregated_data
+      training_data <- training_data %>% head(-periods)
+
+      # we got correct set of training data by filling missing date/time,
+      # but now, filter them out again.
+      # by doing so, we affect future table, and skip prediction (interpolation)
+      # for all missing date/time, which could be expensive if the training data is sparse.
+      # keep the last row even if it does not have training data, to mark the end of training period, which is the start of test period.
+      training_data <- training_data %>% dplyr::filter(!is.na(y) | row_number() == n())
+    }
+    else {
+      training_data <- aggregated_data
+    }
 
     if (!is.null(cap) && is.data.frame(cap)) {
       # in this case, cap is the future data frame with cap, specified by user.
