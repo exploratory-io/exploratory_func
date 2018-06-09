@@ -135,6 +135,15 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
         dplyr::group_by(ds) %>%
         dplyr::summarise(y = n())
     }
+    # fill aggregated_data$ds with missing data/time.
+    browser()
+    ts <- seq.POSIXt(as.POSIXct(min(aggregated_data$ds)), as.POSIXct(max(aggregated_data$ds)), by=time_unit)
+    if (lubridate::is.Date(aggregated_data$ds)) {
+      ts <- as.Date(ts)
+    }
+    ts_df <- data.frame(ds=ts)
+    aggregated_data <- dplyr::full_join(ts_df, aggregated_data, by = c("ds" = "ds"))
+    
 
     if (time_unit != "day") { # if time_unit is larger than day (the next level is week), having weekly.seasonality does not make sense.
       weekly.seasonality = FALSE
