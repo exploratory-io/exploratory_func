@@ -140,13 +140,13 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
     # this is necessary to make forecast period correspond with test period in test mode when there is missing date/time in original aggregated_data$ds.
 
     if (time_unit == "minute") {
-      time_unit_for_seq = "min"
+      time_unit_for_seq <- "min"
     }
     else if (time_unit == "second") {
-      time_unit_for_seq = "sec"
+      time_unit_for_seq <- "sec"
     }
     else {
-      time_unit_for_seq = time_unit
+      time_unit_for_seq <- time_unit
     }
     ts <- seq.POSIXt(as.POSIXct(min(aggregated_data$ds)), as.POSIXct(max(aggregated_data$ds)), by=time_unit_for_seq)
     if (lubridate::is.Date(aggregated_data$ds)) {
@@ -154,20 +154,26 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
     }
     ts_df <- data.frame(ds=ts)
     # ts_df has to be the left-hand side to keep the row order according to time order.
-    aggregated_data <- dplyr::full_join(ts_df, aggregated_data, by = c("ds" = "ds"))
+    filled_aggregated_data <- dplyr::full_join(ts_df, aggregated_data, by = c("ds" = "ds"))
     
 
     if (time_unit != "day") { # if time_unit is larger than day (the next level is week), having weekly.seasonality does not make sense.
-      weekly.seasonality = FALSE
+      weekly.seasonality <- FALSE
     }
     # disabling this logic for now, since setting yearly.seasonality FALSE disables weekly.seasonality too.
     # if (time_unit == "year") { # if time_unit is year (the largest unit), having yearly.seasonality does not make sense.
     #   yearly.seasonality = FALSE
     # }
-    training_data = aggregated_data
+    training_data <- filled_aggregated_data
     if (test_mode) {
       training_data <- training_data %>% head(-periods)
     }
+
+    # we got correct set of training data by filling missing date/time,
+    # but now, filter them out again.
+    # by doing so, we affect future table, and skip prediction (interpolation)
+    # for all missing date/time, which could be expensive if the training data is sparse.
+    training_data <- training_data %>% dplyr::filter(!is.na(y))
 
     if (!is.null(cap) && is.data.frame(cap)) {
       # in this case, cap is the future data frame with cap, specified by user.
