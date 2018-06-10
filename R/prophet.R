@@ -13,7 +13,7 @@ do_prophet <- function(df, time, value = NULL, ...){
 #' @param time_col - Column that has time data
 #' @param value_col - Column that has value data
 #' @param periods - Number of time periods (e.g. days. unit is determined by time_unit) to forecast.
-#' @param time_unit - "second", "minute", "hour", "day", "week", "month", "quarter", or "year"
+#' @param time_unit - "second"/"sec", "minute"/"min", "hour", "day", "week", "month", "quarter", or "year".
 #' @param include_history - Whether to include history data in forecast or not.
 #' @param fun.aggregate - Function to aggregate values.
 #' @param ... - extra values to be passed to prophet::prophet. listed below.
@@ -56,6 +56,13 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
   library("prophet")
 
   grouped_col <- grouped_by(df)
+
+  if (time_unit == "min") {
+    time_unit <- "minute"
+  }
+  else if (time_unit == "sec") {
+    time_unit <- "second"
+  }
 
   # column name validation
   if(!time_col %in% colnames(df)){
