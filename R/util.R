@@ -1345,11 +1345,11 @@ computeMASE <- function(forecast, train, test, period){
   test <- as.vector(test)
 
   n <- length(train)
-  scalingFactor <- sum(abs(train[(period+1):n] - train[1:(n-period)])) / (n-period)
+  scalingFactor <- mean(abs(train[(period+1):n] - train[1:(n-period)]), na.rm=TRUE)
 
   et <- abs(test-forecast)
   qt <- et/scalingFactor
-  meanMASE <- mean(qt)
+  meanMASE <- mean(qt, na.rm=TRUE)
   return(meanMASE)
 }
 

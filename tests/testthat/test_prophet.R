@@ -15,8 +15,11 @@ test_that("do_prophet with aggregation", {
   #   do_prophet(`time stamp`, `cou nt`, 10, time_unit = "second")
 
   # test for test mode.
+  raw_data$`cou nt`[[length(raw_data$`cou nt`) - 2]] <- NA # inject NA near the end to test #9211
   ret <- raw_data %>%
     do_prophet(`time stamp`, `cou nt`, 2, time_unit = "day", test_mode=TRUE)
+  # verify that the last forecasted_value is not NA to test #9211
+  expect_true(!is.na(ret$forecasted_value[[length(ret$forecasted_value)]]))
 })
 
 test_that("do_prophet grouped case", {

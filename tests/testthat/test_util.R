@@ -578,3 +578,15 @@ test_that("test %in_or_all%", {
   ret <- c(1,2,3) %in_or_all% c()
   expect_equal(ret, c(TRUE, TRUE, TRUE))
 })
+
+test_that("test mase", {
+  data <- data.frame(`actual` = c(1,2,NA,2,2.5,3,NA,4),
+                     `predicted` = c(1,2,3,3,3,2,4,4),
+                     `is_test_data` = c(F,F,F,F,F,T,T,T)) %>%
+    dplyr::rename(`ac tual` = actual,
+                  `pre dicted` = predicted,
+                  `is test data` = is_test_data)
+
+  ret <- data %>% dplyr::summarize(`ma se` = exploratory::mase(`ac tual`, `pre dicted`, `is test data`))
+  expect_equal(ret$`ma se`, 0.667, tolerance=0.01)
+})
