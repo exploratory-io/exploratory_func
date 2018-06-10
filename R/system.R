@@ -964,7 +964,7 @@ executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 1
     # check if the query contains special key word for standardSQL
     # If we do not pass the useLegaySql argument, bigrquery set TRUE for it, so we need to expliclity set it to make standard SQL work.
     isStandardSQL <- stringr::str_detect(query, "#standardSQL")
-    if(!isStandardSQL && useStandardSQL) {
+    if(!isStandardSQL && useStandardSQL) { # honor value provided by parameter
       isStandardSQL = TRUE;
     }
     # set envir = parent.frame() to get variables from users environment, not papckage environment
