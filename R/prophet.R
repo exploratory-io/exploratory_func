@@ -165,9 +165,18 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
       else {
         time_unit_for_seq <- time_unit
       }
-      ts <- seq.POSIXt(as.POSIXct(min(aggregated_data$ds)), as.POSIXct(max(aggregated_data$ds)), by=time_unit_for_seq)
-      if (lubridate::is.Date(aggregated_data$ds)) {
-        ts <- as.Date(ts)
+      # Create periodical sequence of time to fill missing date/time
+      if (time_unit %in% c("hour", "minute", "second")) { # Use seq.POSIXt for unit smaller than day.
+        ts <- seq.POSIXt(as.POSIXct(min(aggregated_data$ds)), as.POSIXct(max(aggregated_data$ds)), by=time_unit_for_seq)
+        if (lubridate::is.Date(aggregated_data$ds)) {
+          ts <- as.Date(ts)
+        }
+      }
+      else { # Use seq.Date for unit of day or larger. Using seq.POSIXct for month does not always give first day of month.
+        ts <- seq.Date(as.Date(min(aggregated_data$ds)), as.Date(max(aggregated_data$ds)), by=time_unit_for_seq)
+        if (!lubridate::is.Date(aggregated_data$ds)) {
+          ts <- as.POSIXct(ts)
+        }
       }
       ts_df <- data.frame(ds=ts)
       # ts_df has to be the left-hand side to keep the row order according to time order.
