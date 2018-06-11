@@ -153,8 +153,11 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
 
 
     if (test_mode) {
-      # fill aggregated_data$ds with missing data/time.
-      # this is necessary to make forecast period correspond with test period in test mode when there is missing date/time in original aggregated_data$ds.
+      # Remove end of aggregated_data as test data to make training data.
+
+      # Fill aggregated_data$ds with missing data/time.
+      # This is necessary to make forecast period correspond with test period in test mode when there is missing date/time in original aggregated_data$ds.
+      # Note that this is only for the purpose of correctly determine where to start test period, and we remove those filled data once that purpose is met.
 
       if (time_unit == "minute") {
         time_unit_for_seq <- "min"
