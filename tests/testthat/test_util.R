@@ -590,3 +590,13 @@ test_that("test mase", {
   ret <- data %>% dplyr::summarize(`ma se` = exploratory::mase(`ac tual`, `pre dicted`, `is test data`))
   expect_equal(ret$`ma se`, 0.667, tolerance=0.01)
 })
+
+test_that("test true_count", {
+  ret <- true_count(c(T,T,T,F,F,NA))
+  expect_equal(ret, 3)
+})
+
+test_that("test false_count", {
+  ret <- false_count(c(T,T,T,F,F,NA))
+  expect_equal(ret, 2)
+})
