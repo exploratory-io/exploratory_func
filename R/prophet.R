@@ -143,7 +143,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
         dplyr::summarise(y = n())
     }
 
-    if (time_unit != "day") { # if time_unit is larger than day (the next level is week), having weekly.seasonality does not make sense.
+    if (time_unit %in% c("week", "month", "quarter", "year")) { # if time_unit is larger than day (the next level is week), having weekly.seasonality does not make sense.
       weekly.seasonality <- FALSE
     }
     # disabling this logic for now, since setting yearly.seasonality FALSE disables weekly.seasonality too.
