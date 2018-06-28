@@ -251,6 +251,12 @@ test_that("test %nin%", {
   expect_equal(ret, c(T,F,F,T))
 })
 
+test_that("list_n", {
+  test_list <- list(seq(1), seq(2), seq(3))
+  ret <- list_n(test_list)
+  expect_equal(ret, c(1, 2, 3))
+})
+
 test_that("list_extract", {
   test_list <- list(seq(1), seq(2), seq(3))
   def_ret <- list_extract(test_list)
