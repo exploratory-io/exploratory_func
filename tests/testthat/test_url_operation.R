@@ -98,3 +98,19 @@ test_that("param", {
   ret <- url_param(url, "ref_src")
   expect_equal(ret, c("twsrc^google|twcamp^serp|twgr^author", "test", NA))
 })
+
+test_that("url encode", {
+  url <- c(
+    " 　林", NA
+  )
+  ret <- url_encode(url)
+  expect_equal(ret, c("%20%e3%80%80%e6%9e%97", NA))
+})
+
+test_that("url decode", {
+  url <- c(
+    "%20%e3%80%80%e6%9e%97", NA
+  )
+  ret <- url_encode(url)
+  expect_equal(ret, c(" 　林", NA))
+})
