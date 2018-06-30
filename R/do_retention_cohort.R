@@ -1,5 +1,5 @@
 #' Run timeseries cohort analysis
-#' @param df - Data frame to run bayes ab test
+#' @param df - Data frame to run do_cohort
 #' @param time - time column
 #' @param value - value to aggregate
 #' @param cohort - value used to define cohort. if it is time, will be aggregated by cohort_time_unit.
