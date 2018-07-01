@@ -606,3 +606,10 @@ test_that("test false_count", {
   ret <- false_count(c(T,T,T,F,F,NA))
   expect_equal(ret, 2)
 })
+
+test_that("test get_confint", {
+  mean_vals <- c(0,1,NA)
+  sd_vals <- c(1,1,1) 
+  ret <- get_confint(mean_vals, sd_vals, conf_int = 0.975)
+  expect_equal(ret, c(1.959964, 2.959964, NA), tolerance=0.0001)
+})

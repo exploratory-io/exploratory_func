@@ -123,6 +123,7 @@ test_that("test build_glm and broom tidy", {
 
 test_that("test build_glm and broom", {
   if(requireNamespace("broom")){
+    browser()
     result <- test_df %>%
       build_glm(vec1~vec2, augment=TRUE)
     expect_equal(nrow(result), 10)
