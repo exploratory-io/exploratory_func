@@ -40,5 +40,4 @@ any_error <- function(test_results) {
   result_classes <- purrr::map(flattened, function(x){attr(x,"class")})
   # return TRUE if there is any result with class "expectation_error".
   purrr::some(result_classes, function(x){"expectation_error" %in% x})
-  TRUE
 }
