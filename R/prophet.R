@@ -376,7 +376,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
   if (length(grouped_col) > 0) {
     ret <- ret %>% dplyr::group_by(!!!rlang::syms(grouped_col))
   }
-  FALSE
+  ret
 }
 
 
