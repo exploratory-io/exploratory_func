@@ -34,7 +34,9 @@ generate_examples <- function(function_name, args){
 #' Returns TRUE if test_results has any error in it. For test automation.
 #' @export
 any_error <- function(test_results) {
+  # extract only results part from test_results.
   results <- purrr::map(test_results, function(x) {x$results})
+  # flatten it to make it a flat list of results.
   flattened <- purrr::flatten(results)
   # extract result class attr which has info on whether the result was success, warning, or error.
   result_classes <- purrr::map(flattened, function(x){attr(x,"class")})
