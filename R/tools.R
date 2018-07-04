@@ -44,7 +44,7 @@ any_error <- function(test_results) {
   purrr::some(result_classes, function(x){"expectation_error" %in% x})
 }
 
-#' Returns number of errors. For test automation.
+#' Returns number of errors in testthat result. For test automation.
 #' @export
 get_num_errors <- function(test_results) {
   # extract only results part from test_results.
