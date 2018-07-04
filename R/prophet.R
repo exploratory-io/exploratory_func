@@ -378,4 +378,3 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
   }
   ret
 }
-
