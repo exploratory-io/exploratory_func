@@ -459,6 +459,7 @@ jsToMongoJson <- function(js) {
   # This means we need to convert hex to base64 by ourselves here.
   # since there is no Buffer class to convert hex to base64 on bare V8,
   # we use hexToBase64 we just defined in hex_to_base64_code. 
+  # TODO: make sure this works with uuid hex string separated by -, which is common.
   ct$assign("UUID", V8::JS("function(uuidHexStr) {
     return BinData(3, hexToBase64(uuidHexStr));
   }"))
