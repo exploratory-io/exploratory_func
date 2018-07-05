@@ -57,3 +57,4 @@ get_num_errors <- function(test_results) {
   errors <- purrr::keep(result_classes, function(x){"expectation_error" %in% x})
   length(errors)
 }
+
