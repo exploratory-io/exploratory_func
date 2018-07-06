@@ -626,3 +626,11 @@ test_that("test str_count_all", {
                          data.frame(.count=c(0,1), .pattern=c("very","汚い"), stringsAsFactors = F),
                          data.frame(.count=c(NA_integer_,NA_integer_), .pattern=c("very","汚い"), stringsAsFactors = F)))
 })
+
+test_that("test safe_slice", {
+  mat <- matrix(c(1,NA,3,NA,5,6,7,8,NA), 3,3)
+  ret1 <- safe_slice(mat,1)
+  expect_equal(ret1, matrix(c(1,NA,7),1,3))
+  ret2 <- safe_slice(mat,1, remove=TRUE)
+  expect_equal(ret2, matrix(c(NA,3,5,6,8,NA),2,3))
+})
