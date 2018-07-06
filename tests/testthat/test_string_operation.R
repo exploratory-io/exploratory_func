@@ -272,3 +272,15 @@ test_that("sentimentr", {
     ret <- sentimentr::sentiment(sentences)
   }
 })
+
+test_that("get_sentiment", {
+  if(requireNamespace("sentimentr")){
+    sentences <- c(
+      "I feel bad.",
+      "I'm not so happy",
+      "You look very cheerful."
+    )
+    ret <- get_sentiment(sentences)
+    expect_equal(ret, c(-0.4330127, -0.3750000, 0.6750000), tolerance=0.05)
+  }
+})
