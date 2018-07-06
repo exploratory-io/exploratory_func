@@ -613,3 +613,8 @@ test_that("test get_confint", {
   ret <- get_confint(mean_vals, sd_vals, conf_int = 0.975)
   expect_equal(ret, c(1.959964, 2.959964, NA), tolerance=0.0001)
 })
+
+test_that("test str_clean", {
+  ret <- str_clean(c("  not a very  tidy sentence ", " 汚い  文章 ", NA))
+  expect_equal(ret, c("not a very tidy sentence", "汚い 文章", NA))
+})
