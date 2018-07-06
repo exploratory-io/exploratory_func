@@ -618,3 +618,11 @@ test_that("test str_clean", {
   ret <- str_clean(c("  not a very  tidy sentence ", " 汚い  文章 ", NA))
   expect_equal(ret, c("not a very tidy sentence", "汚い 文章", NA))
 })
+
+test_that("test str_count_all", {
+  # TODO: NA handling in remove.zero = TRUE case.
+  ret <- str_count_all(c("  not a very  tidy sentence ", " 汚い  文章 ", NA), c("very", "汚い"), remove.zero = FALSE)
+  expect_equal(ret, list(data.frame(.count=c(1,0), .pattern=c("very","汚い"), stringsAsFactors = F),
+                         data.frame(.count=c(0,1), .pattern=c("very","汚い"), stringsAsFactors = F),
+                         data.frame(.count=c(NA_integer_,NA_integer_), .pattern=c("very","汚い"), stringsAsFactors = F)))
+})
