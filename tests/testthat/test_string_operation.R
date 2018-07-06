@@ -284,3 +284,8 @@ test_that("get_sentiment", {
     expect_equal(ret, c(-0.4330127, -0.3750000, 0.6750000), tolerance=0.05)
   }
 })
+
+test_that("stem_word", {
+  ret <- stem_word(c("impingement","feline"))
+  expect_equal(ret, c("imping" "felin"))
+})
