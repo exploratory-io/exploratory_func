@@ -287,5 +287,5 @@ test_that("get_sentiment", {
 
 test_that("stem_word", {
   ret <- stem_word(c("impingement","feline"))
-  expect_equal(ret, c("imping" "felin"))
+  expect_equal(ret, c("imping", "felin"))
 })

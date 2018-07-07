@@ -111,7 +111,7 @@ test_that("url decode", {
   url <- c(
     "%20%e3%80%80%e6%9e%97", NA
   )
-  ret <- url_encode(url)
+  ret <- url_decode(url)
   expect_equal(ret, c(" 　林", NA))
 })
 

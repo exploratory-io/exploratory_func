@@ -10,5 +10,5 @@ test_that("add_row", {
   df <- data.frame(x = 1:3, y = 3:1)
   ret <- add_row(df, x = 4, y = NA)
   expect_equal(ret$x[[4]], 4)
-  expect_equal(ret$y[[4]], NA)
+  expect_equal(ret$y[[4]], NA_integer_)
 })
