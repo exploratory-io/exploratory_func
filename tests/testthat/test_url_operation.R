@@ -114,3 +114,8 @@ test_that("url decode", {
   ret <- url_encode(url)
   expect_equal(ret, c(" 　林", NA))
 })
+
+test_that("url param removal", {
+  ret <- param_remove(c("http://me.com/test?testp=1&testp2=xxx&パラ1=1&パラ2=2",NA),keys = c("testp","パラ1"))
+  expect_equal(ret, c("http://me.com/test?testp2=xxx", NA))
+})
