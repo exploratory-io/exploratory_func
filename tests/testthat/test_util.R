@@ -634,3 +634,13 @@ test_that("test safe_slice", {
   ret2 <- safe_slice(mat,1, remove=TRUE)
   expect_equal(ret2, matrix(c(NA,3,5,6,8,NA),2,3))
 })
+
+test_that("test sameple_rows", {
+  df <-data.frame(x=c(1,NA,3),y=c(2,3,NA)) 
+  df <-setNames(df,c("x 1", "列 2"))
+  ret <- df %>% sample_rows(2)
+  expect_equal(nrow(ret), 2)
+  ret <- df %>% sample_rows(5)
+  expect_equal(nrow(ret), 3)
+})
+
