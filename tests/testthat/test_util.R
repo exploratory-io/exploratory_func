@@ -644,3 +644,22 @@ test_that("test sameple_rows", {
   expect_equal(nrow(ret), 3)
 })
 
+test_that("test unnest_without_empty", {
+  df <- data.frame(x=c(1,2,3))
+  # create empty row in y
+  df$y <- lapply(c(1,0,2),function(x){rep(1,x)})
+  # TODO: regular unnest returns the same result as unnest_without_empty.
+  # not sure what was the case unnest_without_empty was required at this point.
+  # maybe we don't need unnest_without_empty anymore??
+  ret <- df %>% unnest_without_empty(y)
+  expect_equal(ret, data.frame(x=c(1,3,3),y=c(1,1,1)))
+
+  # create empty row in y
+  df$y <- lapply(c(1,0,2),function(x){data.frame(z=rep(1,x), w=rep(2,x))})
+  # TODO: regular unnest returns the same result as unnest_without_empty.
+  # not sure what was the case unnest_without_empty was required at this point.
+  # maybe we don't need unnest_without_empty anymore??
+  ret <- df %>% unnest_without_empty(y)
+  expect_equal(ret, data.frame(x=c(1,3,3),z=c(1,1,1),w=c(2,2,2)))
+})
+
