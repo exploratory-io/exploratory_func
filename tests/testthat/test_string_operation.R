@@ -1,6 +1,6 @@
 context("test string operation functions")
 
-test_df <- data.frame(input = c("Hello world!", "This is a data frame for test. This is second sentence."), stringsAsFactors = FALSE)
+test_df <- data.frame(input = c("Hello world!", "This is a data frame for test. This is second sentence.", NA), stringsAsFactors = FALSE)
 test_df <- test_df %>% rename(`文字 列`=input)
 
 test_that("is_stopword", {
