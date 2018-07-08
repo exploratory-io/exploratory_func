@@ -120,13 +120,15 @@ test_that("test avoid_conflict", {
 test_that("test grouped_by", {
   loadNamespace("dplyr")
   test_df <- data.frame(
-    col1=rep(paste("col1", seq(2)), 5),
+    col1=c(rep(paste("col1", seq(2)), 4), NA, NA), # inject NA for test
     col2=rep(paste("col2", seq(2)), each=5),
     col3=paste("col3", seq(10))
   )
-  df <- dplyr::group_by(test_df, col1, col2)
+  colnames(test_df) <- c("col 1", "col 2", "col 3")
+  test_df
+  df <- dplyr::group_by(test_df, `col 1`, `col 2`)
   ret <- grouped_by(df)
-  expect_equal(ret, c("col1", "col2"))
+  expect_equal(ret, c("col 1", "col 2"))
 })
 
 test_that("test simple_cast colnames are sorted", {
