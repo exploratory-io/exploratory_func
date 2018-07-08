@@ -44,7 +44,7 @@ test_that("test exp_bayes_ab test with summary output with Japanese column names
   data_a <- data.frame(
     access_count = round(runif(50) * 100 + 100)
   ) %>%
-    dplyr::mutate(click = 0.2 + 0.8 * runif(nrow(.)), `gro up` = "a")
+    dplyr::mutate(click = 0.2 + 0.8 * runif(nrow(.)), `グループ 列` = "a")
 
   data_a$click[[5]] <- NA # inject NA for test
 
