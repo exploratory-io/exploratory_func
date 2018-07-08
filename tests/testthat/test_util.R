@@ -76,12 +76,13 @@ test_that("sparse_cast", {
     col = rep(paste("col", seq(4)), 5),
     val = rep(c(NA,1,0,0), 5)
   )
-  mat <- sparse_cast(test_df, "row", "col", "val")
+  colnames(test_df) <- c("ro w", "co l", "va l")
+  mat <- sparse_cast(test_df, "ro w", "co l", "va l")
 
   expect_equal(dim(mat), c(5, 4))
   expect_equal(dimnames(mat), list(paste("row", seq(5)), paste("col", seq(4))))
 
-  mat <- sparse_cast(test_df, "row", "col")
+  mat <- sparse_cast(test_df, "ro w", "co l")
   expect_equal(dim(mat), c(5, 4))
 })
 
