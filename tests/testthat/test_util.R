@@ -9,13 +9,14 @@ test_that("test pivot with empty data frame", {
 
 test_that("test upper_gather", {
   mat <- matrix(seq(20),nrow=5, ncol=4)
+  mat[[15]] <- NA # inject NA
   # use col03 to break sorted state
-  colnames(mat) <- c("col1","col2","col03", "col4")
+  colnames(mat) <- c("col 1","col 2","col 03", "col 4")
   result <- upper_gather(mat)
   expect_equal( typeof(result[[2]]), "character")
   expect_equal(result[[1]], sort(result[[1]]))
-  expect_equal(result[result[[1]]==3 & result[[2]]=="col4", 3][[1]], 18)
-  expect_equal(result[result[[1]]==2 & result[[2]]=="col03", 3][[1]], 12)
+  expect_equal(result[result[[1]]==3 & result[[2]]=="col 4", 3][[1]], 18)
+  expect_equal(result[result[[1]]==2 & result[[2]]=="col 03", 3][[1]], 12)
   expect_equal(nrow(result), 6)
 })
 
@@ -59,13 +60,14 @@ test_that("test upper_gather with vector diag true", {
 
 test_that("test group_exclude", {
   test_df <- data.frame(
-    col1=rep(paste("col1", seq(2)), 5),
-    col2=rep(paste("col2", seq(2)), each=5),
-    col3=paste("col3", seq(10))
+    col1=c(rep(paste("col 1", seq(2)), 4), NA, NA), # inject NA for test
+    col2=rep(paste("col 2", seq(2)), each=5),
+    col3=paste("col 3", seq(10))
     )
+  colnames(test_df) <- c("col 1", "col 2", "col 3")
   test_df$list <- as.list(paste("list", seq(10)))
-  ret <- group_exclude(test_df, col1, col2)
-  expect_equal(colnames(attr(ret, "label")), "col3")
+  ret <- group_exclude(test_df, `col 1`, `col 2`)
+  expect_equal(colnames(attr(ret, "label")), "col 3")
 })
 
 test_that("sparse_cast", {
