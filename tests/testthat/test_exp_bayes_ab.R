@@ -6,6 +6,9 @@ test_that("test exp_bayes_ab test with summary output", {
     access_count = round(runif(50) * 100 + 100)
   ) %>%
     dplyr::mutate(click = 0.2 + 0.8 * runif(nrow(.)), `gro up` = "a")
+
+  data_a$click[[5]] <- NA # inject NA for test
+
   data_b <- data.frame(
     access_count = round(runif(20) * 20 + 20)
   ) %>%
