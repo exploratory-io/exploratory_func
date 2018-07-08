@@ -86,6 +86,22 @@ test_that("sparse_cast", {
   expect_equal(dim(mat), c(5, 4))
 })
 
+test_that("sparse_cast with japanese column names", {
+  test_df <- data.frame(
+    row = rep(paste("row", 6-seq(5)), each=4),
+    col = rep(paste("col", seq(4)), 5),
+    val = rep(c(NA,1,0,0), 5)
+  )
+  colnames(test_df) <- c("行 列", "列 列", "値 列")
+  mat <- sparse_cast(test_df, "行 列", "列 列", "値 列")
+
+  expect_equal(dim(mat), c(5, 4))
+  expect_equal(dimnames(mat), list(paste("row", seq(5)), paste("col", seq(4))))
+
+  mat <- sparse_cast(test_df, "行 列", "列 列")
+  expect_equal(dim(mat), c(5, 4))
+})
+
 test_that("test group_exclude one col", {
   test_df <- data.frame(
     col1=rep(paste("col1", seq(2)), 5)
