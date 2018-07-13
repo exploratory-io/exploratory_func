@@ -151,7 +151,6 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
     #   yearly.seasonality = FALSE
     # }
 
-
     if (test_mode) {
       # Remove end of aggregated_data as test data to make training data.
 
@@ -379,7 +378,3 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
   }
   ret
 }
-
-
-
-
