@@ -58,18 +58,6 @@ test_that("test upper_gather with vector diag true", {
   expect_equal(nrow(result), 10)
 })
 
-test_that("test group_exclude", {
-  test_df <- data.frame(
-    col1=c(rep(paste("col 1", seq(2)), 4), NA, NA), # inject NA for test
-    col2=rep(paste("col 2", seq(2)), each=5),
-    col3=paste("col 3", seq(10))
-    )
-  colnames(test_df) <- c("col 1", "col 2", "col 3")
-  test_df$list <- as.list(paste("list", seq(10)))
-  ret <- group_exclude(test_df, `col 1`, `col 2`)
-  expect_equal(colnames(attr(ret, "label")), "col 3")
-})
-
 test_that("sparse_cast", {
   test_df <- data.frame(
     row = rep(paste("row", 6-seq(5)), each=4),
@@ -100,14 +88,6 @@ test_that("sparse_cast with japanese column names", {
 
   mat <- sparse_cast(test_df, "行 列", "列 列")
   expect_equal(dim(mat), c(5, 4))
-})
-
-test_that("test group_exclude one col", {
-  test_df <- data.frame(
-    col1=rep(paste("col1", seq(2)), 5)
-  )
-  ret <- group_exclude(test_df, col1)
-  expect_equal(attr(ret, "label"), NULL)
 })
 
 test_that("test avoid_conflict", {
