@@ -125,7 +125,13 @@ do_tokenize <- function(df, input, token = "words", keep_cols = FALSE,  drop = T
   loadNamespace("tidytext")
   loadNamespace("stringr")
 
-  input_col <- col_name(substitute(input))
+  orig_input_col <- col_name(substitute(input))
+  input_col <- avoid_conflict(colnames(df), "input") 
+  # since unnest_tokens_ does not handle column with space well, rename column name temporarily.
+  # the following does not work with error that says := is unknown. do it base-R way.
+  # df <- dplyr::rename(!!rlang::sym(input_col) := !!rlang::sym(orig_input_col))
+  colnames(df)[colnames(df) == orig_input_col] <- input_col
+
   output_col <- avoid_conflict(colnames(df), col_name(substitute(output)))
   # This is to prevent encoding error
   df[[input_col]] <- stringr::str_conv(df[[input_col]], "utf-8")
@@ -171,10 +177,16 @@ do_tokenize <- function(df, input, token = "words", keep_cols = FALSE,  drop = T
       df[[input_col]] <- NULL
     }
 
-    dplyr::right_join(df, tokenized, by=doc_id)
+    ret <- dplyr::right_join(df, tokenized, by=doc_id)
   } else {
-    tidytext::unnest_tokens_(df, col_name(substitute(output)), col_name(substitute(input)),token=token, drop=drop, ...)
+    ret <- tidytext::unnest_tokens_(df, col_name(substitute(output)), input_col, token=token, drop=drop, ...)
   }
+
+  # set the column name to original.
+  # the following does not work with error that says := is unknown. do it base-R way.
+  # ret <- ret %>% dplyr::rename(!!rlang::sym(orig_input_col) := !!rlang::sym(input_col))
+  colnames(ret)[colnames(ret) == input_col] <- orig_input_col
+  ret
 }
 
 #' Get idf for terms

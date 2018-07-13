@@ -269,16 +269,6 @@ upper_gather <- function(mat, names=NULL, diag=NULL, cnames = c("Var1", "Var2", 
   }
 }
 
-#' group by other columns so that next action can preserve as many columns as possible
-group_exclude <- function(df, ...){
-  loadNamespace("dplyr")
-  cols <- as.character(substitute(list(...)))[-1]
-  excluded <- setdiff(colnames(df), cols)
-  # exclude list column to avoid error from dplyr::group_by
-  target <- excluded[!sapply(df[,excluded], is.list)]
-  dplyr::group_by(df, !!!rlang::syms(target))
-}
-
 #' prevent conflict of 2 character vectors and avoid it by adding .new to elements in the second
 #' @export
 avoid_conflict <- function(origin, new, suffix = ".new"){
@@ -1126,11 +1116,18 @@ unnest_without_empty_ <- function(data, nested_col){
   }
 }
 
+#' Count TRUE in a vector
+#' @param x vector
+#' @export
+true_count <- function(x){
+  sum(x, na.rm = TRUE)
+}
+
 #' Count FALSE in a vector
 #' @param x vector
 #' @export
 false_count <- function(x){
-  sum(!x)
+  sum(!x, na.rm = TRUE)
 }
 
 #' Count NA in a vector
