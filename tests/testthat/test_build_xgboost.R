@@ -89,24 +89,26 @@ test_that("test xgboost_binary with not clean names", {
   expect_true(all(between(prediction_ret$predicted_probability, 0,1)))
 })
 
-test_that("test xgboost_binary with not clean Japanese names", {
-  test_data <- data.frame(
-    label = rep(c(T,F,F), 100),
-    num1 =  rep(c(seq(2),NA), 100) + runif(100), # include NA for test.
-    num2 = rep(seq(3), 100) + runif(100)
-  )
-  colnames(test_data) <- c("ラベル 1", "数値 1", "数値 2")
-  model_ret <- build_model(
-    test_data,
-    model_func = xgboost_binary,
-    formula = `ラベル 1` ~ `数値 1` + `数値 2`,
-    nrounds = 5,
-    na.action = na.omit
+if (Sys.info()["sysname"] != "Windows") {
+  test_that("test xgboost_binary with not clean Japanese names", {
+    test_data <- data.frame(
+      label = rep(c(T,F,F), 100),
+      num1 =  rep(c(seq(2),NA), 100) + runif(100), # include NA for test.
+      num2 = rep(seq(3), 100) + runif(100)
     )
-  prediction_ret <- prediction(model_ret)
-  expect_true(class(prediction_ret$predicted_probability) == "numeric")
-  expect_true(all(between(prediction_ret$predicted_probability, 0,1)))
-})
+    colnames(test_data) <- c("ラベル 1", "数値 1", "数値 2")
+    model_ret <- build_model(
+      test_data,
+      model_func = xgboost_binary,
+      formula = `ラベル 1` ~ `数値 1` + `数値 2`,
+      nrounds = 5,
+      na.action = na.omit
+      )
+    prediction_ret <- prediction(model_ret)
+    expect_true(class(prediction_ret$predicted_probability) == "numeric")
+    expect_true(all(between(prediction_ret$predicted_probability, 0,1)))
+  })
+}
 
 test_that("test xgboost_reg with not clean names", {
   test_data <- data.frame(
@@ -126,23 +128,25 @@ test_that("test xgboost_reg with not clean names", {
   expect_true(class(prediction_ret$predicted_value) == "numeric")
 })
 
-test_that("test xgboost_reg with not clean Japanese names", {
-  test_data <- data.frame(
-    label = rep(seq(3) * 5, 100),
-    num1 =  rep(c(seq(2),NA), 100) + runif(100), # include NA for test.
-    num2 = rep(seq(3), 100) + runif(100)
-  )
-  colnames(test_data) <- c("ラベル 1", "数値 1", "数値 2")
-  model_ret <- build_model(
-    test_data,
-    model_func = xgboost_reg,
-    formula = `ラベル 1` ~ `数値 1` + `数値 2`,
-    nrounds = 5,
-    na.action = na.omit
+if (Sys.info()["sysname"] != "Windows") {
+  test_that("test xgboost_reg with not clean Japanese names", {
+    test_data <- data.frame(
+      label = rep(seq(3) * 5, 100),
+      num1 =  rep(c(seq(2),NA), 100) + runif(100), # include NA for test.
+      num2 = rep(seq(3), 100) + runif(100)
     )
-  prediction_ret <- prediction(model_ret)
-  expect_true(class(prediction_ret$predicted_value) == "numeric")
-})
+    colnames(test_data) <- c("ラベル 1", "数値 1", "数値 2")
+    model_ret <- build_model(
+      test_data,
+      model_func = xgboost_reg,
+      formula = `ラベル 1` ~ `数値 1` + `数値 2`,
+      nrounds = 5,
+      na.action = na.omit
+      )
+    prediction_ret <- prediction(model_ret)
+    expect_true(class(prediction_ret$predicted_value) == "numeric")
+  })
+}
 
 test_that("test xgboost_reg with add_prediction", {
   train_data <- data.frame(
@@ -192,23 +196,25 @@ test_that("test xgboost_multi with not clean names and NA", {
   expect_true(all(prediction_ret$predicted_label %in% c(5, 10, 15)))
 })
 
-test_that("test xgboost_multi with not clean Japanese names and NA", {
-  test_data <- data.frame(
-    label = rep(seq(3) * 5, 100),
-    num1 =  rep(c(seq(2),NA), 100) + runif(100), # include NA for test.
-    num2 = rep(seq(3), 100) + runif(100)
-  )
-  colnames(test_data) <- c("ラベル 1", "数値 1", "数値 2")
-  model_ret <- build_model(
-    test_data,
-    model_func = xgboost_multi,
-    formula = `ラベル 1` ~ `数値 1` + `数値 2`,
-    nrounds = 5,
-    na.action = na.omit
+if (Sys.info()["sysname"] != "Windows") {
+  test_that("test xgboost_multi with not clean Japanese names and NA", {
+    test_data <- data.frame(
+      label = rep(seq(3) * 5, 100),
+      num1 =  rep(c(seq(2),NA), 100) + runif(100), # include NA for test.
+      num2 = rep(seq(3), 100) + runif(100)
     )
-  prediction_ret <- prediction(model_ret)
-  expect_true(all(prediction_ret$predicted_label %in% c(5, 10, 15)))
-})
+    colnames(test_data) <- c("ラベル 1", "数値 1", "数値 2")
+    model_ret <- build_model(
+      test_data,
+      model_func = xgboost_multi,
+      formula = `ラベル 1` ~ `数値 1` + `数値 2`,
+      nrounds = 5,
+      na.action = na.omit
+      )
+    prediction_ret <- prediction(model_ret)
+    expect_true(all(prediction_ret$predicted_label %in% c(5, 10, 15)))
+  })
+}
 
 test_that("test build_xgboost", {
   test_data <- structure(
