@@ -878,9 +878,11 @@ calc_feature_imp <- function(df,
   }
 
   # randomForest fails if columns are not clean
-  clean_df <- janitor::clean_names(df)
+  # clean_df <- janitor::clean_names(df)
+  clean_df <- df
   # this mapping will be used to restore column names
-  name_map <- colnames(clean_df)
+  # name_map <- colnames(clean_df)
+  name_map <- paste0("c",1:length(colnames(df)))
   names(name_map) <- colnames(df)
 
   # clean_names changes column names
