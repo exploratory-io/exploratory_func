@@ -1439,9 +1439,13 @@ download_data_file <- function(url, type){
 
 #'Wrapper for openxlsx::read.xlsx to support remote file
 #'@export
-read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf){
+read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, detectDates = FALSE, ...){
   loadNamespace("openxlsx")
-  openxlsx::read.xlsx(xlsxFile = path, sheet = sheet, colNames = col_names, startRow = skip+1, na.strings = na, skipEmptyRows = FALSE, skipEmptyCols = FALSE)
+  if(n_max != Inf) {
+    openxlsx::read.xlsx(xlsxFile = path, rows=c(skip:n_max), sheet = sheet, colNames = col_names, startRow = skip, na.strings = na, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, detectDates = detectDates)
+  } else {
+    openxlsx::read.xlsx(xlsxFile = path, sheet = sheet, colNames = col_names, startRow = skip, na.strings = na, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, detectDates = detectDates)
+  }
 }
 
 #'Wrapper for openxlsx::getSheetNames to support remote file
