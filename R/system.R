@@ -1437,36 +1437,18 @@ download_data_file <- function(url, type){
   }
 }
 
-#'Wrapper for readxl::read_excel to support remote file
+#'Wrapper for openxlsx::read.xlsx to support remote file
 #'@export
 read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf){
-  loadNamespace("readxl")
-  loadNamespace("stringr")
-  if (stringr::str_detect(path, "^https://") ||
-      stringr::str_detect(path, "^http://") ||
-      stringr::str_detect(path, "^ftp://")) {
-    tmp <- download_data_file(path, "excel")
-    readxl::read_excel(tmp, sheet = sheet, col_names = col_names, col_types = col_types, na = na, trim_ws = trim_ws, skip = skip, n_max = n_max)
-  } else {
-    # if it's local file simply call readxl::read_excel
-    readxl::read_excel(path, sheet = sheet, col_names = col_names, col_types = col_types, na = na, trim_ws = trim_ws, skip = skip, n_max = n_max)
-  }
+  loadNamespace("openxlsx")
+  openxlsx::read.xlsx(xlsxFile = path, sheet = sheet, colNames = col_names, startRow = skip+1, na.strings = na, skipEmptyRows = FALSE, skipEmptyCols = FALSE)
 }
 
-#'Wrapper for readxl::excel_sheets to support remote file
+#'Wrapper for openxlsx::getSheetNames to support remote file
 #'@export
 get_excel_sheets <- function(path){
-  loadNamespace("readxl")
-  loadNamespace("stringr")
-  if (stringr::str_detect(path, "^https://") ||
-      stringr::str_detect(path, "^http://") ||
-      stringr::str_detect(path, "^ftp://")) {
-    tmp <- download_data_file(path, "excel")
-    readxl::excel_sheets(tmp)
-  } else {
-    # if it's local file simply call readxl::read_excel
-    readxl::excel_sheets(path)
-  }
+  loadNamespace("openxlsx")
+  openxlsx::getSheetNames(path)
 }
 
 #'Wrapper for readr::read_delim to support remote file
