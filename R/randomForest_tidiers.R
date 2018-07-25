@@ -1376,6 +1376,27 @@ glance.ranger <- function(x, pretty.name = FALSE, ...) {
 }
 
 #' @export
+glance.rpart <- function(x, pretty.name = FALSE, ...) {
+  actual <- x$y
+  predicted <- predict(x)
+  rmse_val <- rmse(actual, predicted)
+  ret <- data.frame(
+    root_mean_square_error = rmse_val
+    #r_squared = x$r.squared
+  )
+
+  if(pretty.name){
+    map = list(
+      `Root Mean Square Error` = as.symbol("root_mean_square_error")
+      #`R Squared` = as.symbol("r_squared")
+    )
+    ret <- ret %>%
+      dplyr::rename(!!!map)
+  }
+  ret
+}
+
+#' @export
 exp_rpart <- function(df,
                       target,
                       ...) {
@@ -1414,6 +1435,25 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
       )
 
       ret
+    },
+    evaluation = {
+      # get evaluation scores from training data
+      actual <- x$y
+
+      if(is.numeric(actual)){
+        glance(x, pretty.name = pretty.name, ...)
+      } else {
+        if (x$classification_type == "binary") {
+          predicted <- get_binary_predicted_value_from_probability(x)
+          predicted_probability <- x$predictions[,1]
+          ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = FALSE)
+        }
+        else {
+          predicted <- x$predictions
+          ret <- evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
+        }
+        ret
+      }
     },
     {
       stop(paste0("type ", type, " is not defined"))

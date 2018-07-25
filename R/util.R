@@ -1310,9 +1310,11 @@ mae <- function(actual, predicted, is_test_data) {
 #' @param predicted - Vector that includes predicted value. The part is_test_data is TRUE should be predicted value.
 #' @param is_test_data - logical vector that indicates test data portion of actual and predicted.
 #' @export
-rmse <- function(actual, predicted, is_test_data) {
-  actual <- actual[is_test_data]
-  predicted <- predicted[is_test_data]
+rmse <- function(actual, predicted, is_test_data=NULL) {
+  if (!is.null(is_test_data)) {
+    actual <- actual[is_test_data]
+    predicted <- predicted[is_test_data]
+  }
   ret <- sqrt(mean((actual-predicted)^2, na.rm=TRUE))
   ret
 }
