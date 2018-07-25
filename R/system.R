@@ -1437,20 +1437,46 @@ download_data_file <- function(url, type){
   }
 }
 
-#'Wrapper for readxl::read_excel to support remote file
+#'Wrapper for openxlsx::read.xlsx (in case of .xlsx file) and readxl::read_excel (in case of old .xls file)
+#'Use openxlsx::read.xlsx since it's memory footprint is less than that of readxl::read_excel and this creates benefit for users with less memory like Windows 32 bit users.
 #'@export
-read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf){
-  loadNamespace("readxl")
-  loadNamespace("stringr")
-  if (stringr::str_detect(path, "^https://") ||
-      stringr::str_detect(path, "^http://") ||
-      stringr::str_detect(path, "^ftp://")) {
-    tmp <- download_data_file(path, "excel")
-    readxl::read_excel(tmp, sheet = sheet, col_names = col_names, col_types = col_types, na = na, trim_ws = trim_ws, skip = skip, n_max = n_max)
-  } else {
-    # if it's local file simply call readxl::read_excel
-    readxl::read_excel(path, sheet = sheet, col_names = col_names, col_types = col_types, na = na, trim_ws = trim_ws, skip = skip, n_max = n_max)
+read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl  = FALSE, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, ...){
+  loadNamespace("openxlsx")
+  loadNamespace('readr')
+  loadNamespace('stringr')
+  df <- NULL
+  # for .xlsx file extension
+  if(stringr::str_detect(path, '\\.xlsx') & use_readxl == FALSE) {
+    if(n_max != Inf) {
+      df <- openxlsx::read.xlsx(xlsxFile = path, rows=(skip+1):n_max, sheet = sheet, colNames = col_names, na.strings = na, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols , check.names = check.names, detectDates = detectDates)
+    } else {
+      df <- openxlsx::read.xlsx(xlsxFile = path, sheet = sheet, colNames = col_names, startRow = skip+1, na.strings = na, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols, check.names = check.names, detectDates = detectDates)
+    }
+    # trim white space needs to be done first since it cleans column names
+    if(trim_ws == TRUE) {
+      # use trimws from base to remove ending and trailing white space for character columns
+      df <- data.frame(lapply(df, function(x) if(class(x)=="character") trimws(x) else(x)), stringsAsFactors=F)
+    }
+    # preserve original column name for backward comaptibility (ref: https://github.com/awalker89/openxlsx/issues/102)
+    colnames(df) <- openxlsx::read.xlsx(xlsxFile = path, sheet = sheet, rows = (skip+1), check.names = FALSE, colNames = FALSE) %>% as.character()
+    if(col_names == FALSE) {
+      # For backward comatilibity, use X__1, X__2, .. for default column names
+      columnNames <- paste("X", 1:ncol(df), sep = "__")
+      colnames(df) <- columnNames
+    }
+  } else { # for old .xls file extension
+    if (stringr::str_detect(path, "^https://") ||
+        stringr::str_detect(path, "^http://") ||
+        stringr::str_detect(path, "^ftp://")) {
+      # need to download first since readxl::read_excel cannot work with URL.
+      tmp <- download_data_file(path, "excel")
+      df <- readxl::read_excel(tmp, sheet = sheet, col_names = col_names, col_types = col_types, na = na, trim_ws = trim_ws, skip = skip, n_max = n_max)
+    } else {
+      # if it's local file simply call readxl::read_excel
+      df <- readxl::read_excel(path, sheet = sheet, col_names = col_names, col_types = col_types, na = na, trim_ws = trim_ws, skip = skip, n_max = n_max)
+    }
   }
+  df
 }
 
 #'Wrapper for readxl::excel_sheets to support remote file
