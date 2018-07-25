@@ -1380,15 +1380,16 @@ glance.rpart <- function(x, pretty.name = FALSE, ...) {
   actual <- x$y
   predicted <- predict(x)
   rmse_val <- rmse(actual, predicted)
+  r_squared_val <- r_squared(actual, predicted)
   ret <- data.frame(
-    root_mean_square_error = rmse_val
-    #r_squared = x$r.squared
+    root_mean_square_error = rmse_val,
+    r_squared = r_squared_val
   )
 
   if(pretty.name){
     map = list(
-      `Root Mean Square Error` = as.symbol("root_mean_square_error")
-      #`R Squared` = as.symbol("r_squared")
+      `Root Mean Square Error` = as.symbol("root_mean_square_error"),
+      `R Squared` = as.symbol("r_squared")
     )
     ret <- ret %>%
       dplyr::rename(!!!map)
