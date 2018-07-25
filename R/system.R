@@ -1446,9 +1446,9 @@ read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL,
   loadNamespace('stringr')
   df <- NULL
   # for .xlsx file extension
-  if(stringr::str_detect(path, '.xlsx')) {
+  if(stringr::str_detect(path, '\\.xlsx')) {
     if(n_max != Inf) {
-      df <- openxlsx::read.xlsx(xlsxFile = path, rows=skip+1:n_max, sheet = sheet, colNames = col_names, na.strings = na, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols , check.names = check.names, detectDates = detectDates)
+      df <- openxlsx::read.xlsx(xlsxFile = path, rows=(skip+1):n_max, sheet = sheet, colNames = col_names, na.strings = na, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols , check.names = check.names, detectDates = detectDates)
     } else {
       df <- openxlsx::read.xlsx(xlsxFile = path, sheet = sheet, colNames = col_names, startRow = skip+1, na.strings = na, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols, check.names = check.names, detectDates = detectDates)
     }
