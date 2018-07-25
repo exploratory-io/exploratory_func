@@ -1480,8 +1480,8 @@ read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL,
 #'Wrapper for readxl::excel_sheets to support remote file
 #'@export
 get_excel_sheets <- function(path){
-  loadNamespace("readxl")	+  loadNamespace("openxlsx")
-  loadNamespace("stringr")	+  openxlsx::getSheetNames(path)
+  loadNamespace("readxl")
+  loadNamespace("stringr")
   if (stringr::str_detect(path, "^https://") ||
       stringr::str_detect(path, "^http://") ||
       stringr::str_detect(path, "^ftp://")) {
