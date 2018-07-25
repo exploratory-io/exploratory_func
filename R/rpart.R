@@ -19,3 +19,27 @@ exp_rpart <- function(df,
 
   do_on_each_group(df, each_func, name = "model", with_unnest = FALSE)
 }
+
+#' @export
+#' @param type "importance", "evaluation" or "conf_mat". Feature importance, evaluated scores or confusion matrix of training data.
+tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
+  switch(
+    type,
+    importance = {
+      # return variable importance
+
+      imp <- x$variable.importance
+
+      ret <- data.frame(
+        variable = names(imp),
+        importance = imp,
+        stringsAsFactors = FALSE
+      )
+
+      ret
+    },
+    {
+      stop(paste0("type ", type, " is not defined"))
+    }
+  )
+}
