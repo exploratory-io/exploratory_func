@@ -1194,13 +1194,37 @@ get_binary_predicted_value_from_probability <- function(x) {
 }
 
 #' @export
+# not really an external function but exposing for sharing with rpart.R TODO: find better way.
+evaluate_binary_classification <- function(actual, predicted, predicted_probability, pretty.name = FALSE) {
+  # calculate AUC from ROC
+  roc_df <- data.frame(actual = (as.integer(actual)==1), predicted_probability = predicted_probability)
+  roc <- roc_df %>% do_roc_(actual_val_col = "actual", pred_prob_col = "predicted_probability")
+  # use numeric index so that it won't be disturbed by name change
+  # 2 should be false positive rate (x axis) and 1 should be true positive rate (yaxis)
+  # calculate the area under the plots
+  auc <- sum((roc[[2]] - dplyr::lag(roc[[2]])) * roc[[1]], na.rm = TRUE)
+  if (is.factor(actual) && "TRUE" %in% levels(actual)) { # target was logical and converted to factor.
+    ret <- evaluate_classification(actual, predicted, "TRUE", multi_class = FALSE, pretty.name = pretty.name)
+  }
+  else {
+    ret <- evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
+  }
+  if (pretty.name) {
+    ret <- ret %>% mutate(AUC = auc)
+  }
+  else {
+    ret <- ret %>% mutate(auc = auc)
+  }
+  ret
+}
+
+#' @export
 #' @param type "importance", "evaluation" or "conf_mat". Feature importance, evaluated scores or confusion matrix of training data.
 tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
   switch(
     type,
     importance = {
       # return variable importance
-
       imp <- ranger::importance(x)
 
       ret <- data.frame(
@@ -1221,31 +1245,11 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
         if (x$classification_type == "binary") {
           predicted <- get_binary_predicted_value_from_probability(x)
           predicted_probability <- x$predictions[,1]
-          # calculate AUC from ROC
-          roc_df <- data.frame(actual = (as.integer(actual)==1), predicted_probability = predicted_probability)
-          roc <- roc_df %>% do_roc_(actual_val_col = "actual", pred_prob_col = "predicted_probability")
-          # use numeric index so that it won't be disturbed by name change
-          # 2 should be false positive rate (x axis) and 1 should be true positive rate (yaxis)
-          # calculate the area under the plots
-          auc <- sum((roc[[2]] - dplyr::lag(roc[[2]])) * roc[[1]], na.rm = TRUE)
-          if (is.factor(x$y) && "TRUE" %in% levels(x$y)) { # target was logical and converted to factor.
-            ret <- evaluate_classification(actual, predicted, "TRUE", multi_class = FALSE, pretty.name = pretty.name)
-          }
-          else {
-            ret <- evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
-          }
+          ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = FALSE)
         }
         else {
           predicted <- x$predictions
           ret <- evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
-        }
-        if (x$classification_type == "binary") {
-          if (pretty.name) {
-            ret <- ret %>% mutate(AUC = auc)
-          }
-          else {
-            ret <- ret %>% mutate(auc = auc)
-          }
         }
         ret
       }
