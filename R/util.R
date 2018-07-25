@@ -1293,6 +1293,15 @@ extract_from_date <- function(x, type = "fltoyear") {
 }
 
 
+#' Calculate R-Squared 
+#' @export
+r_squared <- function (x, y) {
+  # https://stackoverflow.com/questions/40901445/function-to-calculate-r2-r-squared-in-r
+  # complete.obs is to ignore NAs.
+  # https://stackoverflow.com/questions/31412514/na-values-not-being-excluded-in-cor
+  cor(x, y, use="complete.obs") ^ 2
+}
+
 #' Calculate MAE.
 #' @param actual - Vector that includes actual value. The part is_test_data is FALSE should be actual value.
 #' @param predicted - Vector that includes predicted value. The part is_test_data is TRUE should be predicted value.
