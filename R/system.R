@@ -1452,12 +1452,13 @@ read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL,
     } else {
       df <- openxlsx::read.xlsx(xlsxFile = path, sheet = sheet, colNames = col_names, startRow = skip+1, na.strings = na, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols, check.names = check.names, detectDates = detectDates)
     }
-    # preserve original column name for backward comaptibility (ref: https://github.com/awalker89/openxlsx/issues/102)
-    df <- df %>% magrittr::set_colnames(openxlsx::read.xlsx(xlsxFile = path, sheet, rows = skip+1, check.names = FALSE, colNames = FALSE) %>% as.character())
+    # trim white space needs to be done first since it cleans column names
     if(trim_ws == TRUE) {
       # use trimws from base to remove ending and trailing white space for character columns
       df <- data.frame(lapply(df, function(x) if(class(x)=="character") trimws(x) else(x)), stringsAsFactors=F)
     }
+    # preserve original column name for backward comaptibility (ref: https://github.com/awalker89/openxlsx/issues/102)
+    colnames(df) <- openxlsx::read.xlsx(xlsxFile = path, sheet = sheet, rows = (skip+1), check.names = FALSE, colNames = FALSE) %>% as.character()
     if(col_names == FALSE) {
       # For backward comatilibity, use X__1, X__2, .. for default column names
       columnNames <- paste("X", 1:ncol(df), sep = "__")
