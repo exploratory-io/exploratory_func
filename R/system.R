@@ -1438,6 +1438,7 @@ download_data_file <- function(url, type){
 }
 
 #'Wrapper for openxlsx::read.xlsx (in case of .xlsx file) and readxl::read_excel (in case of old .xls file)
+#'Use openxlsx::read.xlsx since it's memory footprint is less than that of readxl::read_excel and this creates benefit for users with less memory like Windows 32 bit users.
 #'@export
 read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, ...){
   loadNamespace("openxlsx")
@@ -1447,7 +1448,7 @@ read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL,
   # for .xlsx file extension
   if(stringr::str_detect(path, '.xlsx')) {
     if(n_max != Inf) {
-      df <- openxlsx::read.xlsx(xlsxFile = path, rows=c(skip+1:n_max), sheet = sheet, colNames = col_names, na.strings = na, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols , check.names = check.names, detectDates = detectDates)
+      df <- openxlsx::read.xlsx(xlsxFile = path, rows=skip+1:n_max, sheet = sheet, colNames = col_names, na.strings = na, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols , check.names = check.names, detectDates = detectDates)
     } else {
       df <- openxlsx::read.xlsx(xlsxFile = path, sheet = sheet, colNames = col_names, startRow = skip+1, na.strings = na, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols, check.names = check.names, detectDates = detectDates)
     }
