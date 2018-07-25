@@ -1477,11 +1477,20 @@ read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL,
   df
 }
 
-#'Wrapper for openxlsx::getSheetNames to support remote file
+#'Wrapper for readxl::excel_sheets to support remote file
 #'@export
 get_excel_sheets <- function(path){
-  loadNamespace("openxlsx")
-  openxlsx::getSheetNames(path)
+  loadNamespace("readxl")	+  loadNamespace("openxlsx")
+  loadNamespace("stringr")	+  openxlsx::getSheetNames(path)
+  if (stringr::str_detect(path, "^https://") ||
+      stringr::str_detect(path, "^http://") ||
+      stringr::str_detect(path, "^ftp://")) {
+    tmp <- download_data_file(path, "excel")
+    readxl::excel_sheets(tmp)
+  } else {
+    # if it's local file simply call readxl::read_excel
+    readxl::excel_sheets(path)
+  }
 }
 
 #'Wrapper for readr::read_delim to support remote file
