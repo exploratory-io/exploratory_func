@@ -1536,26 +1536,21 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
         actual <- x$y
         glance(x, pretty.name = pretty.name, ...)
       } else {
+        actual <- get_actual_class_rpart(x)
+        predicted <- get_predicted_class_rpart(x)
         # unlike ranger, x$y of rpart in this case is integer. convert it to factor to make use of common functions.
         if (x$classification_type == "binary") {
           if (class(x$y) == "logical") {
-            actual <- factor(x$y, levels=c("TRUE","FALSE"))
             predicted_probability <- predict(x)
           }
           else {
-            ylevels <- attr(x,"ylevels")
-            actual <- factor(ylevels[x$y], levels=ylevels)
             predicted_probability <- predict(x)[,1]
           }
-          predicted <- get_binary_predicted_value_from_probability_rpart(x)
           ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = pretty.name)
         }
         else {
           # multiclass case
-          ylevels <- attr(x,"ylevels")
           # TODO: rpart returns probability of each class, but we are not fully making use of them.
-          predicted <- get_multiclass_predicted_value_from_probability_rpart(x)
-          actual <- factor(ylevels[x$y], levels=ylevels)
           ret <- evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
         }
         ret
