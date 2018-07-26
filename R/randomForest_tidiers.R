@@ -1422,11 +1422,14 @@ exp_rpart <- function(df,
 
   grouped_cols <- grouped_by(df)
 
+  classification_type <- get_classification_type(clean_df[[clean_target_col]])
+
   each_func <- function(df) {
     rhs <- paste0("`", selected_cols, "`", collapse = " + ")
     fml <- as.formula(paste0("`", target_col, "`", " ~ ", rhs))
-    model_df <- rpart::rpart(fml, df)
-    model_df
+    model <- rpart::rpart(fml, df)
+    model$classification_type <- classification_type
+    model
   }
 
   do_on_each_group(df, each_func, name = "model", with_unnest = FALSE)
