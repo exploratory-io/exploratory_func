@@ -1299,6 +1299,7 @@ r_squared <- function (x, y) {
   # https://stackoverflow.com/questions/40901445/function-to-calculate-r2-r-squared-in-r
   # complete.obs is to ignore NAs.
   # https://stackoverflow.com/questions/31412514/na-values-not-being-excluded-in-cor
+  # TODO: revisit this again. How can R square be a function of only cor??
   cor(x, y, use="complete.obs") ^ 2
 }
 
