@@ -1482,13 +1482,14 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
         if (x$classification_type == "binary") {
           if (class(x$y) == "logical") {
             actual <- factor(x$y, levels=c("TRUE","FALSE"))
+            predicted_probability <- predict(x)
           }
           else {
             ylevels <- attr(x,"ylevels")
             actual <- factor(ylevels[x$y], levels=ylevels)
+            predicted_probability <- predict(x)[,1]
           }
           predicted <- get_binary_predicted_value_from_probability_rpart(x)
-          predicted_probability <- predict(x)[,1]
           ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = FALSE)
         }
         else {
@@ -1498,7 +1499,7 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
         ret
       }
     },
-    scatter = {
+    scatter = { # we assume this is called only for regression.
       predicted <- predict(x)
       ret <- data.frame(
         expected_value = x$y,
