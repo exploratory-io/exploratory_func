@@ -1439,9 +1439,16 @@ exp_rpart <- function(df,
 #' @export
 # not really an external function but exposing for test. TODO: find better way.
 get_binary_predicted_value_from_probability_rpart <- function(x) {
-  # predict(x) is 2-diminsional matrix with 2 columns for the 2 categories. values in the matrix is the probabilities.
-  ylevels <- attr(x,"ylevels")
-  predicted <- factor(ylevels[apply(predict(x), 1, function(x){if(x[1]>x[2]) 1 else 2})], levels=ylevels)
+  if (class(x$y) == "logical") {
+    # predict(x) is numeric vector of probability of being TRUE.
+    ylevels <- c("TRUE", "FALSE")
+    predicted <- factor(predict(x) > 0.5, levels=ylevels)
+  }
+  else {
+    # predict(x) is 2-diminsional matrix with 2 columns for the 2 categories. values in the matrix is the probabilities.
+    ylevels <- attr(x,"ylevels")
+    predicted <- factor(ylevels[apply(predict(x), 1, function(x){if(x[1]>x[2]) 1 else 2})], levels=ylevels)
+  }
   predicted
 }
 
@@ -1464,6 +1471,7 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
       ret
     },
     evaluation = {
+      browser()
       # get evaluation scores from training data
 
       if(x$classification_type == "regression"){
@@ -1471,9 +1479,14 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
         glance(x, pretty.name = pretty.name, ...)
       } else {
         # unlike ranger, x$y of rpart in this case is integer. convert it to factor to make use of common functions.
-        ylevels <- attr(x,"ylevels")
-        actual <- factor(ylevels[x$y], levels=ylevels)
         if (x$classification_type == "binary") {
+          if (class(x$y) == "logical") {
+            actual <- factor(x$y, levels=c("TRUE","FALSE"))
+          }
+          else {
+            ylevels <- attr(x,"ylevels")
+            actual <- factor(ylevels[x$y], levels=ylevels)
+          }
           predicted <- get_binary_predicted_value_from_probability_rpart(x)
           predicted_probability <- predict(x)[,1]
           ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = FALSE)
