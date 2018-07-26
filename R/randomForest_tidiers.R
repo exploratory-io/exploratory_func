@@ -1569,6 +1569,25 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
       }
       dplyr::bind_rows(lapply(ylevels, per_level))
     },
+    conf_mat = {
+      # return confusion matrix
+      actual <- get_actual_class_rpart(x)
+      predicted <- get_predicted_class_rpart(x)
+
+      ret <- data.frame(
+        actual_value = actual,
+        predicted_value = predicted
+      ) %>%
+        dplyr::filter(!is.na(predicted_value))
+
+      # get count if it's classification
+      ret <- ret %>%
+        dplyr::group_by(actual_value, predicted_value) %>%
+        dplyr::summarize(count = n()) %>%
+        dplyr::ungroup()
+
+      ret
+    },
     scatter = { # we assume this is called only for regression.
       predicted <- predict(x)
       ret <- data.frame(
