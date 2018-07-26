@@ -1456,6 +1456,16 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
         ret
       }
     },
+    scatter = {
+      predicted <- predict(x)
+      ret <- data.frame(
+        expected_value = x$y,
+        predicted_value = predicted
+      ) %>%
+        dplyr::filter(!is.na(predicted_value))
+
+      ret
+    },
     {
       stop(paste0("type ", type, " is not defined"))
     }
