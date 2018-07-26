@@ -895,16 +895,18 @@ calc_feature_imp <- function(df,
   clean_target_col <- name_map[target_col]
   clean_cols <- name_map[cols]
 
+  if (!is.numeric(clean_df[[clean_target_col]]) && !is.logical(clean_df[[clean_target_col]])) {
+    # limit the number of levels in factor by fct_lump
+    clean_df[[clean_target_col]] <- forcats::fct_explicit_na(forcats::fct_lump(
+      as.factor(clean_df[[clean_target_col]]), n = target_n, ties.method="first"
+    ))
+  }
+
   classification_type <- "multi" # default value. ignored when it is regression.
   # if target is numeric, it is regression but
   # if not, it is classification
   if (!is.numeric(clean_df[[clean_target_col]])) {
     if (!is.logical(clean_df[[clean_target_col]])) {
-      # limit the number of levels in factor by fct_lump
-      clean_df[[clean_target_col]] <- forcats::fct_explicit_na(forcats::fct_lump(
-        as.factor(clean_df[[clean_target_col]]), n = target_n, ties.method="first"
-      ))
-
       if (length(unique(clean_df[[clean_target_col]])) == 2) {
         classification_type <- "binary" 
       }
