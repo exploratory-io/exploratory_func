@@ -1470,6 +1470,7 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
         actual <- x$y
         glance(x, pretty.name = pretty.name, ...)
       } else {
+        # unlike ranger, x$y of rpart in this case is integer. convert it to factor to make use of common functions.
         ylevels <- attr(x,"ylevels")
         actual <- factor(ylevels[x$y], levels=ylevels)
         if (x$classification_type == "binary") {
