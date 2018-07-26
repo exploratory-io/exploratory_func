@@ -830,6 +830,82 @@ get_classification_type <- function(v) {
   }
 }
 
+clean_df <- function(df, target_col, selected_cols, grouped_cols, target_n, predictor_n) {
+  # drop unrelated columns so that SMOTE later does not have to deal with them.
+  # select_ was not able to handle space in target_col. let's do it in base R way.
+  df <- df[,colnames(df) %in% c(grouped_cols, selected_cols, target_col), drop=FALSE]
+
+  # remove grouped col or target col
+  selected_cols <- setdiff(selected_cols, c(grouped_cols, target_col))
+
+  if (any(c(target_col, selected_cols) %in% grouped_cols)) {
+    stop("grouping column is used as variable columns")
+  }
+
+  if (target_n < 2) {
+    stop("Max # of categories for target var must be at least 2.")
+  }
+
+  if (predictor_n < 2) {
+    stop("Max # of categories for explanatory vars must be at least 2.")
+  }
+
+  orig_levels <- NULL
+  if (is.factor(df[[target_col]])) {
+    orig_levels <- levels(df[[target_col]])
+  }
+  else if (is.logical(df[[target_col]])) {
+    orig_levels <- c("TRUE","FALSE")
+  }
+
+  # remove NA because it's not permitted for randomForest
+  df <- df %>%
+    dplyr::filter(!is.na(!!target_col))
+
+  # cols will be filtered to remove invalid columns
+  cols <- selected_cols
+
+  for (col in selected_cols) {
+    if(all(is.na(df[[col]]))){
+      # remove columns if they are all NA
+      cols <- setdiff(cols, col)
+      df[[col]] <- NULL # drop the column so that SMOTE will not see it. 
+    }
+  }
+
+  # randomForest fails if columns are not clean
+  clean_df <- janitor::clean_names(df)
+  # this mapping will be used to restore column names
+  name_map <- colnames(clean_df)
+  names(name_map) <- colnames(df)
+
+  # clean_names changes column names
+  # without chaning grouping column name
+  # information in the data frame
+  # and it causes an error,
+  # so the value of grouping columns
+  # should be still the names of grouping columns
+  name_map[grouped_cols] <- grouped_cols
+  colnames(clean_df) <- name_map
+
+  clean_target_col <- name_map[target_col]
+  clean_cols <- name_map[cols]
+
+  if (!is.numeric(clean_df[[clean_target_col]]) && !is.logical(clean_df[[clean_target_col]])) {
+    # limit the number of levels in factor by fct_lump
+    clean_df[[clean_target_col]] <- forcats::fct_explicit_na(forcats::fct_lump(
+      as.factor(clean_df[[clean_target_col]]), n = target_n, ties.method="first"
+    ))
+  }
+
+  ret <- new.env()
+  ret$clean_df <- clean_df
+  ret$name_map <- name_map
+  ret$clean_target_col <- clean_target_col
+  ret$clean_cols <- clean_cols
+  ret
+}
+
 #' get feature importance for multi class classification using randomForest
 #' @export
 calc_feature_imp <- function(df,
@@ -1410,81 +1486,6 @@ glance.rpart <- function(x, pretty.name = FALSE, ...) {
   ret
 }
 
-clean_df <- function(df, target_col, selected_cols, grouped_cols, target_n, predictor_n) {
-  # drop unrelated columns so that SMOTE later does not have to deal with them.
-  # select_ was not able to handle space in target_col. let's do it in base R way.
-  df <- df[,colnames(df) %in% c(grouped_cols, selected_cols, target_col), drop=FALSE]
-
-  # remove grouped col or target col
-  selected_cols <- setdiff(selected_cols, c(grouped_cols, target_col))
-
-  if (any(c(target_col, selected_cols) %in% grouped_cols)) {
-    stop("grouping column is used as variable columns")
-  }
-
-  if (target_n < 2) {
-    stop("Max # of categories for target var must be at least 2.")
-  }
-
-  if (predictor_n < 2) {
-    stop("Max # of categories for explanatory vars must be at least 2.")
-  }
-
-  orig_levels <- NULL
-  if (is.factor(df[[target_col]])) {
-    orig_levels <- levels(df[[target_col]])
-  }
-  else if (is.logical(df[[target_col]])) {
-    orig_levels <- c("TRUE","FALSE")
-  }
-
-  # remove NA because it's not permitted for randomForest
-  df <- df %>%
-    dplyr::filter(!is.na(!!target_col))
-
-  # cols will be filtered to remove invalid columns
-  cols <- selected_cols
-
-  for (col in selected_cols) {
-    if(all(is.na(df[[col]]))){
-      # remove columns if they are all NA
-      cols <- setdiff(cols, col)
-      df[[col]] <- NULL # drop the column so that SMOTE will not see it. 
-    }
-  }
-
-  # randomForest fails if columns are not clean
-  clean_df <- janitor::clean_names(df)
-  # this mapping will be used to restore column names
-  name_map <- colnames(clean_df)
-  names(name_map) <- colnames(df)
-
-  # clean_names changes column names
-  # without chaning grouping column name
-  # information in the data frame
-  # and it causes an error,
-  # so the value of grouping columns
-  # should be still the names of grouping columns
-  name_map[grouped_cols] <- grouped_cols
-  colnames(clean_df) <- name_map
-
-  clean_target_col <- name_map[target_col]
-  clean_cols <- name_map[cols]
-
-  if (!is.numeric(clean_df[[clean_target_col]]) && !is.logical(clean_df[[clean_target_col]])) {
-    # limit the number of levels in factor by fct_lump
-    clean_df[[clean_target_col]] <- forcats::fct_explicit_na(forcats::fct_lump(
-      as.factor(clean_df[[clean_target_col]]), n = target_n, ties.method="first"
-    ))
-  }
-
-  ret <- new.env()
-  ret$clean_df <- clean_df
-  ret$name_map <- name_map
-  ret$clean_target_col <- clean_target_col
-  ret$clean_cols <- clean_cols
-  ret
-}
 
 #' @export
 exp_rpart <- function(df,
