@@ -1455,6 +1455,16 @@ get_binary_predicted_value_from_probability_rpart <- function(x) {
   predicted
 }
 
+get_multiclass_predicted_value_from_probability_rpart <- function(x) {
+  ylevels <- attr(x,"ylevels")
+  predicted_mat <- predict(x)
+  # ties are broken randomly to be even.
+  # TODO: move this to model building step so that there is no randomness in analytics viz preprocessor.
+  predicted_idx <- max.col(predicted_mat, ties.method = "random")
+  predicted <- factor(ylevels[predicted_idx], levels=ylevels)
+  predicted
+}
+
 #' @export
 #' @param type "importance", "evaluation" or "conf_mat". Feature importance, evaluated scores or confusion matrix of training data.
 tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
@@ -1474,7 +1484,6 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
       ret
     },
     evaluation = {
-      browser()
       # get evaluation scores from training data
 
       if(x$classification_type == "regression"){
@@ -1496,7 +1505,11 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
           ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = FALSE)
         }
         else {
-          predicted <- predict(x)
+          # multiclass case
+          ylevels <- attr(x,"ylevels")
+          # TODO: rpart returns probability of each class, but we are not fully making use of them.
+          predicted <- get_multiclass_predicted_value_from_probability_rpart(x)
+          actual <- factor(ylevels[x$y], levels=ylevels)
           ret <- evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
         }
         ret
