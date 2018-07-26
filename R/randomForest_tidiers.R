@@ -898,6 +898,126 @@ clean_df <- function(df, target_col, selected_cols, grouped_cols, target_n, pred
   ret
 }
 
+clean_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols) {
+  if (is.factor(df[[clean_target_col]])) { # to avoid error in edarf::partial_dependence(), remove levels that is not used in this group.
+    df[[clean_target_col]] <- forcats::fct_drop(df[[clean_target_col]])
+  }
+  # sample the data because randomForest takes long time
+  # if data size is too large
+  if (nrow(df) > max_nrow) {
+    df <- df %>%
+      dplyr::sample_n(max_nrow)
+  }
+
+  if (is.logical(df[[clean_target_col]])) {
+    # we need to convert logical to factor since na.roughfix only works for numeric or factor.
+    # for logical set TRUE, FALSE level order for better visualization. but only do it when
+    # the target column actually has both TRUE and FALSE, since edarf::partial_dependence errors out if target
+    # factor column has more levels than actual data.
+    # error from edarf::partial_dependence looks like following.
+    #   Error in factor(x, seq_len(length(unique(data[[target]]))), levels(data[[target]])) : invalid 'labels'; length 2 should be 1 or 1
+    if (length(unique(df[[clean_target_col]])) >= 2) {
+      df[[clean_target_col]] <- factor(df[[clean_target_col]], levels=c("TRUE","FALSE"))
+    }
+    else {
+      df[[clean_target_col]] <- factor(df[[clean_target_col]])
+    }
+  }
+
+  c_cols <- clean_cols
+  for(col in clean_cols){
+    if(lubridate::is.Date(df[[col]]) || lubridate::is.POSIXct(df[[col]])) {
+      c_cols <- setdiff(c_cols, col)
+
+      absolute_time_col <- avoid_conflict(colnames(df), paste0(col, "_abs_time"))
+      wday_col <- avoid_conflict(colnames(df), paste0(col, "_day_of_week"))
+      day_col <- avoid_conflict(colnames(df), paste0(col, "_day_of_month"))
+      yday_col <- avoid_conflict(colnames(df), paste0(col, "_day_of_year"))
+      month_col <- avoid_conflict(colnames(df), paste0(col, "_month"))
+      year_col <- avoid_conflict(colnames(df), paste0(col, "_year"))
+      new_name <- c(absolute_time_col, wday_col, day_col, yday_col, month_col, year_col)
+      names(new_name) <- paste(
+        names(name_map)[name_map == col],
+        c(
+          "_abs_time",
+          "_day_of_week",
+          "_day_of_month",
+          "_day_of_year",
+          "_month",
+          "_year"
+        ), sep="")
+
+      name_map <- c(name_map, new_name)
+
+      c_cols <- c(c_cols, absolute_time_col, wday_col, day_col, yday_col, month_col, year_col)
+      df[[absolute_time_col]] <- as.numeric(df[[col]])
+      df[[wday_col]] <- lubridate::wday(df[[col]], label=TRUE)
+      df[[day_col]] <- lubridate::day(df[[col]])
+      df[[yday_col]] <- lubridate::yday(df[[col]])
+      df[[month_col]] <- lubridate::month(df[[col]], label=TRUE)
+      df[[year_col]] <- lubridate::year(df[[col]])
+      if(lubridate::is.POSIXct(df[[col]])) {
+        hour_col <- avoid_conflict(colnames(df), paste0(col, "_hour"))
+        new_name <- c(hour_col)
+        names(new_name) <- paste(
+          names(name_map)[name_map == col],
+          c(
+            "_hour"
+          ), sep="")
+        name_map <- c(name_map, new_name)
+
+        c_cols <- c(c_cols, hour_col)
+        df[[hour_col]] <- factor(lubridate::hour(df[[col]])) # treat hour as category
+      }
+      df[[col]] <- NULL # drop original Date/POSIXct column to pass SMOTE later.
+    } else if(is.factor(df[[col]])) {
+      # if the data is factor, respect the levels and keep first 10 levels, and make others "Others" level.
+      if (length(levels(df[[col]])) >= predictor_n + 2) {
+        df[[col]] <- forcats::fct_other(df[[col]], keep=levels(df[[col]])[1:predictor_n])
+      }
+    } else if(!is.numeric(df[[col]])) {
+      # convert data to factor if predictors are not numeric.
+      # and limit the number of levels in factor by fct_lump.
+      # we need to convert logical to factor too since na.roughfix only works for numeric or factor.
+      df[[col]] <- forcats::fct_explicit_na(forcats::fct_lump(as.factor(df[[col]]), n=predictor_n, ties.method="first"))
+    } else {
+      # filter Inf/-Inf to avoid following error from ranger.
+      # Error in seq.default(min(x, na.rm = TRUE), max(x, na.rm = TRUE), length.out = length.out) : 'from' must be a finite number
+      df <- df %>% dplyr::filter(!is.infinite(.[[col]]))
+    }
+  }
+
+  # This check should be done after all possible filtering.
+  # Return NULL if there is only one row
+  # for a class of target variable because
+  # rondomForest enters infinite loop
+  # in such case.
+  # The group with NULL is removed when
+  # unnesting the result
+  # TODO: Should we just filter such row and go on??
+  for (level in levels(df[[clean_target_col]])) {
+    if(sum(df[[clean_target_col]] == level, na.rm = TRUE) == 1) {
+      return(NULL)
+    }
+  }
+
+
+  # remove columns with only one unique value
+  cols_copy <- c_cols
+  for (col in cols_copy) {
+    unique_val <- unique(df[[col]])
+    if (length(unique_val[!is.na(unique_val)]) <= 1) {
+      c_cols <- setdiff(c_cols, col)
+      df[[col]] <- NULL # drop the column so that SMOTE will not see it. 
+    }
+  }
+
+  ret <- new.env()
+  ret$df <- df
+  ret$c_cols <- c_cols
+  ret
+}
+
 #' get feature importance for multi class classification using randomForest
 #' @export
 calc_feature_imp <- function(df,
