@@ -1442,7 +1442,7 @@ download_data_file <- function(url, type){
 #'@export
 read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl  = FALSE, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, ...){
   loadNamespace("openxlsx")
-  loadNamespace('readr')
+  loadNamespace('readxl')
   loadNamespace('stringr')
   df <- NULL
   # for .xlsx file extension
