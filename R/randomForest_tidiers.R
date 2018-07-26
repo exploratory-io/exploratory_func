@@ -1515,6 +1515,34 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
         ret
       }
     },
+    evaluation_by_class = {
+      # get evaluation scores from training data
+
+      if (x$classification_type == "binary") {
+        if (class(x$y) == "logical") {
+          ylevels <- c("TRUE", "FALSE")
+          actual <- factor(x$y, levels=ylevels)
+        }
+        else {
+          ylevels <- attr(x,"ylevels")
+          actual <- factor(ylevels[x$y], levels=ylevels)
+        }
+        predicted <- get_binary_predicted_value_from_probability_rpart(x)
+      }
+      else {
+        # multiclass case
+        ylevels <- attr(x,"ylevels")
+        # TODO: rpart returns probability of each class, but we are not fully making use of them.
+        predicted <- get_multiclass_predicted_value_from_probability_rpart(x)
+        actual <- factor(ylevels[x$y], levels=ylevels)
+      }
+
+      per_level <- function(class) {
+        ret <- evaluate_classification(actual, predicted, class, pretty.name = pretty.name)
+        ret
+      }
+      dplyr::bind_rows(lapply(ylevels, per_level))
+    },
     scatter = { # we assume this is called only for regression.
       predicted <- predict(x)
       ret <- data.frame(
