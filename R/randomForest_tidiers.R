@@ -1465,6 +1465,52 @@ get_multiclass_predicted_value_from_probability_rpart <- function(x) {
   predicted
 }
 
+get_actual_class_rpart <- function(x) {
+  if (x$classification_type == "binary") {
+    if (class(x$y) == "logical") {
+      ylevels <- c("TRUE", "FALSE")
+      actual <- factor(x$y, levels=ylevels)
+    }
+    else {
+      ylevels <- attr(x,"ylevels")
+      actual <- factor(ylevels[x$y], levels=ylevels)
+    }
+  }
+  else {
+    # multiclass case
+    ylevels <- attr(x,"ylevels")
+    # TODO: rpart returns probability of each class, but we are not fully making use of them.
+    actual <- factor(ylevels[x$y], levels=ylevels)
+  }
+  actual
+}
+
+get_class_levels <- function(x) {
+  if (x$classification_type == "binary") {
+    if (class(x$y) == "logical") {
+      ylevels <- c("TRUE", "FALSE")
+    }
+    else {
+      ylevels <- attr(x,"ylevels")
+    }
+  }
+  else {
+    # multiclass case
+    ylevels <- attr(x,"ylevels")
+  }
+  ylevels
+}
+
+get_predicted_class_rpart <- function(x) {
+  if (x$classification_type == "binary") {
+    predicted <- get_binary_predicted_value_from_probability_rpart(x)
+  }
+  else {
+    predicted <- get_multiclass_predicted_value_from_probability_rpart(x)
+  }
+  predicted
+}
+
 #' @export
 #' @param type "importance", "evaluation" or "conf_mat". Feature importance, evaluated scores or confusion matrix of training data.
 tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
@@ -1518,24 +1564,9 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
     evaluation_by_class = {
       # get evaluation scores from training data
 
-      if (x$classification_type == "binary") {
-        if (class(x$y) == "logical") {
-          ylevels <- c("TRUE", "FALSE")
-          actual <- factor(x$y, levels=ylevels)
-        }
-        else {
-          ylevels <- attr(x,"ylevels")
-          actual <- factor(ylevels[x$y], levels=ylevels)
-        }
-        predicted <- get_binary_predicted_value_from_probability_rpart(x)
-      }
-      else {
-        # multiclass case
-        ylevels <- attr(x,"ylevels")
-        # TODO: rpart returns probability of each class, but we are not fully making use of them.
-        predicted <- get_multiclass_predicted_value_from_probability_rpart(x)
-        actual <- factor(ylevels[x$y], levels=ylevels)
-      }
+      actual <- get_actual_class_rpart(x)
+      predicted <- get_predicted_class_rpart(x)
+      ylevels <- get_class_levels(x)
 
       per_level <- function(class) {
         ret <- evaluate_classification(actual, predicted, class, pretty.name = pretty.name)
