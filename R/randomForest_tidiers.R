@@ -1258,7 +1258,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
         if (x$classification_type == "binary") {
           predicted <- get_binary_predicted_value_from_probability(x)
           predicted_probability <- x$predictions[,1]
-          ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = FALSE)
+          ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = pretty.name)
         }
         else {
           predicted <- x$predictions
@@ -1502,7 +1502,7 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
             predicted_probability <- predict(x)[,1]
           }
           predicted <- get_binary_predicted_value_from_probability_rpart(x)
-          ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = FALSE)
+          ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = pretty.name)
         }
         else {
           # multiclass case
