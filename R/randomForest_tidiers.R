@@ -1410,27 +1410,7 @@ glance.rpart <- function(x, pretty.name = FALSE, ...) {
   ret
 }
 
-#' @export
-exp_rpart <- function(df,
-                      target,
-                      ...,
-                      max_nrow = 50000, # down from 200000 when we added partial dependence
-                      target_n = 20,
-                      predictor_n = 12, # so that at least months can fit in it.
-                      smote = FALSE,
-                      seed = NULL
-                      ) {
-  if(!is.null(seed)){
-    set.seed(seed)
-  }
-  # this seems to be the new way of NSE column selection evaluation
-  # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
-  target_col <- dplyr::select_var(names(df), !! rlang::enquo(target))
-  # this evaluates select arguments like starts_with
-  selected_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
-
-  grouped_cols <- grouped_by(df)
-
+clean_df <- function(df, target_col, selected_cols, grouped_cols, target_n, predictor_n) {
   # drop unrelated columns so that SMOTE later does not have to deal with them.
   # select_ was not able to handle space in target_col. let's do it in base R way.
   df <- df[,colnames(df) %in% c(grouped_cols, selected_cols, target_col), drop=FALSE]
@@ -1497,6 +1477,42 @@ exp_rpart <- function(df,
       as.factor(clean_df[[clean_target_col]]), n = target_n, ties.method="first"
     ))
   }
+
+  ret <- new.env()
+  ret$clean_df <- clean_df
+  ret$name_map <- name_map
+  ret$clean_target_col <- clean_target_col
+  ret$clean_cols <- clean_cols
+  ret
+}
+
+#' @export
+exp_rpart <- function(df,
+                      target,
+                      ...,
+                      max_nrow = 50000, # down from 200000 when we added partial dependence
+                      target_n = 20,
+                      predictor_n = 12, # so that at least months can fit in it.
+                      smote = FALSE,
+                      seed = NULL
+                      ) {
+  if(!is.null(seed)){
+    set.seed(seed)
+  }
+  # this seems to be the new way of NSE column selection evaluation
+  # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
+  target_col <- dplyr::select_var(names(df), !! rlang::enquo(target))
+  # this evaluates select arguments like starts_with
+  selected_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
+
+  grouped_cols <- grouped_by(df)
+
+  clean_ret <- clean_df(df, target_col, selected_cols, grouped_cols, target_n, predictor_n)
+
+  clean_df <- clean_ret$clean_df
+  name_map <- clean_ret$name_map
+  clean_target_col <- clean_ret$clean_target_col
+  clean_cols <- clean_ret$clean_cols
 
   classification_type <- get_classification_type(clean_df[[clean_target_col]])
 
