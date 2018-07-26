@@ -1422,7 +1422,7 @@ exp_rpart <- function(df,
 
   grouped_cols <- grouped_by(df)
 
-  classification_type <- get_classification_type(clean_df[[clean_target_col]])
+  classification_type <- get_classification_type(df[[target_col]])
 
   each_func <- function(df) {
     rhs <- paste0("`", selected_cols, "`", collapse = " + ")
@@ -1433,6 +1433,16 @@ exp_rpart <- function(df,
   }
 
   do_on_each_group(df, each_func, name = "model", with_unnest = FALSE)
+}
+
+# with binary probability prediction model from ranger, take the level with bigger probability as the predicted value.
+#' @export
+# not really an external function but exposing for test. TODO: find better way.
+get_binary_predicted_value_from_probability_rpart <- function(x) {
+  # predict(x) is 2-diminsional matrix with 2 columns for the 2 categories. values in the matrix is the probabilities.
+  ylevels <- attr(x,"ylevels")
+  predicted <- factor(ylevels[apply(predict(x), 1, function(x){if(x[1]>x[2]) 1 else 2})], levels=ylevels)
+  predicted
 }
 
 #' @export
@@ -1455,18 +1465,20 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
     },
     evaluation = {
       # get evaluation scores from training data
-      actual <- x$y
+      browser()
 
-      if(is.numeric(actual)){
+      if(x$classification_type == "regression"){
+        actual <- x$y
         glance(x, pretty.name = pretty.name, ...)
       } else {
+        actual <- attr(x, "ylevel")[x$y]
         if (x$classification_type == "binary") {
-          predicted <- get_binary_predicted_value_from_probability(x)
-          predicted_probability <- x$predictions[,1]
+          predicted <- get_binary_predicted_value_from_probability_rpart(x)
+          predicted_probability <- predict(x)[,1]
           ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = FALSE)
         }
         else {
-          predicted <- x$predictions
+          predicted <- predict(x)
           ret <- evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
         }
         ret
