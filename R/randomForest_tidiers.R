@@ -1427,6 +1427,9 @@ exp_rpart <- function(df,
   each_func <- function(df) {
     rhs <- paste0("`", selected_cols, "`", collapse = " + ")
     fml <- as.formula(paste0("`", target_col, "`", " ~ ", rhs))
+    # especially multiclass classification seems to take forever when number of unique values of predictors are many.
+    # fct_lump is essential here.
+    # http://grokbase.com/t/r/r-help/051sayg38p/r-multi-class-classification-using-rpart
     model <- rpart::rpart(fml, df)
     model$classification_type <- classification_type
     model
