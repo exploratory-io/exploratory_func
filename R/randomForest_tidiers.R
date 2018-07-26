@@ -1465,13 +1465,13 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
     },
     evaluation = {
       # get evaluation scores from training data
-      browser()
 
       if(x$classification_type == "regression"){
         actual <- x$y
         glance(x, pretty.name = pretty.name, ...)
       } else {
-        actual <- attr(x, "ylevel")[x$y]
+        ylevels <- attr(x,"ylevels")
+        actual <- factor(ylevels[x$y], levels=ylevels)
         if (x$classification_type == "binary") {
           predicted <- get_binary_predicted_value_from_probability_rpart(x)
           predicted_probability <- predict(x)[,1]
