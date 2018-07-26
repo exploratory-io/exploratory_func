@@ -1413,7 +1413,16 @@ glance.rpart <- function(x, pretty.name = FALSE, ...) {
 #' @export
 exp_rpart <- function(df,
                       target,
-                      ...) {
+                      ...,
+                      max_nrow = 50000, # down from 200000 when we added partial dependence
+                      target_n = 20,
+                      predictor_n = 12, # so that at least months can fit in it.
+                      smote = FALSE,
+                      seed = NULL
+                      ) {
+  if(!is.null(seed)){
+    set.seed(seed)
+  }
   # this seems to be the new way of NSE column selection evaluation
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
   target_col <- dplyr::select_var(names(df), !! rlang::enquo(target))
@@ -1422,11 +1431,78 @@ exp_rpart <- function(df,
 
   grouped_cols <- grouped_by(df)
 
-  classification_type <- get_classification_type(df[[target_col]])
+  # drop unrelated columns so that SMOTE later does not have to deal with them.
+  # select_ was not able to handle space in target_col. let's do it in base R way.
+  df <- df[,colnames(df) %in% c(grouped_cols, selected_cols, target_col), drop=FALSE]
+
+  # remove grouped col or target col
+  selected_cols <- setdiff(selected_cols, c(grouped_cols, target_col))
+
+  if (any(c(target_col, selected_cols) %in% grouped_cols)) {
+    stop("grouping column is used as variable columns")
+  }
+
+  if (target_n < 2) {
+    stop("Max # of categories for target var must be at least 2.")
+  }
+
+  if (predictor_n < 2) {
+    stop("Max # of categories for explanatory vars must be at least 2.")
+  }
+
+  orig_levels <- NULL
+  if (is.factor(df[[target_col]])) {
+    orig_levels <- levels(df[[target_col]])
+  }
+  else if (is.logical(df[[target_col]])) {
+    orig_levels <- c("TRUE","FALSE")
+  }
+
+  # remove NA because it's not permitted for randomForest
+  df <- df %>%
+    dplyr::filter(!is.na(!!target_col))
+
+  # cols will be filtered to remove invalid columns
+  cols <- selected_cols
+
+  for (col in selected_cols) {
+    if(all(is.na(df[[col]]))){
+      # remove columns if they are all NA
+      cols <- setdiff(cols, col)
+      df[[col]] <- NULL # drop the column so that SMOTE will not see it. 
+    }
+  }
+
+  # randomForest fails if columns are not clean
+  clean_df <- janitor::clean_names(df)
+  # this mapping will be used to restore column names
+  name_map <- colnames(clean_df)
+  names(name_map) <- colnames(df)
+
+  # clean_names changes column names
+  # without chaning grouping column name
+  # information in the data frame
+  # and it causes an error,
+  # so the value of grouping columns
+  # should be still the names of grouping columns
+  name_map[grouped_cols] <- grouped_cols
+  colnames(clean_df) <- name_map
+
+  clean_target_col <- name_map[target_col]
+  clean_cols <- name_map[cols]
+
+  if (!is.numeric(clean_df[[clean_target_col]]) && !is.logical(clean_df[[clean_target_col]])) {
+    # limit the number of levels in factor by fct_lump
+    clean_df[[clean_target_col]] <- forcats::fct_explicit_na(forcats::fct_lump(
+      as.factor(clean_df[[clean_target_col]]), n = target_n, ties.method="first"
+    ))
+  }
+
+  classification_type <- get_classification_type(clean_df[[clean_target_col]])
 
   each_func <- function(df) {
-    rhs <- paste0("`", selected_cols, "`", collapse = " + ")
-    fml <- as.formula(paste0("`", target_col, "`", " ~ ", rhs))
+    rhs <- paste0("`", clean_cols, "`", collapse = " + ")
+    fml <- as.formula(paste0("`", clean_target_col, "`", " ~ ", rhs))
     # especially multiclass classification seems to take forever when number of unique values of predictors are many.
     # fct_lump is essential here.
     # http://grokbase.com/t/r/r-help/051sayg38p/r-multi-class-classification-using-rpart
@@ -1435,7 +1511,7 @@ exp_rpart <- function(df,
     model
   }
 
-  do_on_each_group(df, each_func, name = "model", with_unnest = FALSE)
+  do_on_each_group(clean_df, each_func, name = "model", with_unnest = FALSE)
 }
 
 # with binary probability prediction model from ranger, take the level with bigger probability as the predicted value.
