@@ -809,6 +809,27 @@ exp_balance <- function(df,
   ret
 }
 
+get_classification_type <- function(v) {
+  # if target is numeric, it is regression but
+  # if not, it is classification
+  if (!is.numeric(v)) {
+    if (!is.logical(v)) {
+      if (length(unique(v)) == 2) {
+        classification_type <- "binary" 
+      }
+      else {
+        classification_type <- "multi" 
+      }
+    }
+    else {
+      classification_type <- "binary" 
+    }
+  }
+  else {
+    classification_type <- "regression" 
+  }
+}
+
 #' get feature importance for multi class classification using randomForest
 #' @export
 calc_feature_imp <- function(df,
@@ -904,22 +925,7 @@ calc_feature_imp <- function(df,
 
   # if target is numeric, it is regression but
   # if not, it is classification
-  if (!is.numeric(clean_df[[clean_target_col]])) {
-    if (!is.logical(clean_df[[clean_target_col]])) {
-      if (length(unique(clean_df[[clean_target_col]])) == 2) {
-        classification_type <- "binary" 
-      }
-      else {
-        classification_type <- "multi" 
-      }
-    }
-    else {
-      classification_type <- "binary" 
-    }
-  }
-  else {
-    classification_type <- "regression" 
-  }
+  classification_type <- get_classification_type(clean_df[[clean_target_col]])
 
   each_func <- function(df) {
     tryCatch({
