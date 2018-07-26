@@ -1485,7 +1485,7 @@ get_actual_class_rpart <- function(x) {
   actual
 }
 
-get_class_levels <- function(x) {
+get_class_levels_rpart <- function(x) {
   if (x$classification_type == "binary") {
     if (class(x$y) == "logical") {
       ylevels <- c("TRUE", "FALSE")
@@ -1561,7 +1561,7 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
 
       actual <- get_actual_class_rpart(x)
       predicted <- get_predicted_class_rpart(x)
-      ylevels <- get_class_levels(x)
+      ylevels <- get_class_levels_rpart(x)
 
       per_level <- function(class) {
         ret <- evaluate_classification(actual, predicted, class, pretty.name = pretty.name)
