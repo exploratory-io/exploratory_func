@@ -902,7 +902,6 @@ calc_feature_imp <- function(df,
     ))
   }
 
-  classification_type <- "multi" # default value. ignored when it is regression.
   # if target is numeric, it is regression but
   # if not, it is classification
   if (!is.numeric(clean_df[[clean_target_col]])) {
@@ -910,10 +909,16 @@ calc_feature_imp <- function(df,
       if (length(unique(clean_df[[clean_target_col]])) == 2) {
         classification_type <- "binary" 
       }
+      else {
+        classification_type <- "multi" 
+      }
     }
     else {
       classification_type <- "binary" 
     }
+  }
+  else {
+    classification_type <- "regression" 
   }
 
   each_func <- function(df) {
