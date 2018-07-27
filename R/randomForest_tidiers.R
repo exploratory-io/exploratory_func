@@ -1137,8 +1137,8 @@ calc_feature_imp <- function(df,
       rf$classification_type <- classification_type
       rf$orig_levels <- orig_levels
       rf$terms_mapping <- names(name_map)
-      rf$y <- model.response(model_df)
       names(rf$terms_mapping) <- name_map
+      rf$y <- model.response(model_df)
       rf$df <- model_df
       rf
     }, error = function(e){
@@ -1496,6 +1496,8 @@ exp_rpart <- function(df,
       # http://grokbase.com/t/r/r-help/051sayg38p/r-multi-class-classification-using-rpart
       model <- rpart::rpart(fml, df)
       model$classification_type <- classification_type
+      model$terms_mapping <- names(name_map)
+      names(model$terms_mapping) <- name_map
       model
     }, error = function(e){
       if(length(grouped_cols) > 0) {
@@ -1598,7 +1600,7 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
       imp <- x$variable.importance
 
       ret <- data.frame(
-        variable = names(imp),
+        variable = x$terms_mapping[names(imp)],
         importance = imp,
         stringsAsFactors = FALSE
       )
