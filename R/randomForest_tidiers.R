@@ -1496,6 +1496,12 @@ exp_rpart <- function(df,
       fml <- as.formula(paste0("`", clean_target_col, "`", " ~ ", rhs))
       model <- rpart::rpart(fml, df)
       model$classification_type <- classification_type
+      if (classification_type %in% c("binary", "multi")) {
+        # we need to call this here rather than in tidy(),
+        # since there is randomness involved in breaking tie
+        # of multiclass classification.
+        model$predicted_class <- get_predicted_class_rpart(model)
+      }
       model$terms_mapping <- names(name_map)
       names(model$terms_mapping) <- name_map
       model
@@ -1615,7 +1621,7 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
         glance(x, pretty.name = pretty.name, ...)
       } else {
         actual <- get_actual_class_rpart(x)
-        predicted <- get_predicted_class_rpart(x)
+        predicted <- x$predicted_class
         # unlike ranger, x$y of rpart in this case is integer. convert it to factor to make use of common functions.
         if (x$classification_type == "binary") {
           if (class(x$y) == "logical") {
@@ -1638,7 +1644,7 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
       # get evaluation scores from training data
 
       actual <- get_actual_class_rpart(x)
-      predicted <- get_predicted_class_rpart(x)
+      predicted <- x$predicted_class
       ylevels <- get_class_levels_rpart(x)
 
       per_level <- function(class) {
@@ -1650,7 +1656,7 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
     conf_mat = {
       # return confusion matrix
       actual <- get_actual_class_rpart(x)
-      predicted <- get_predicted_class_rpart(x)
+      predicted <- x$predicted_class
 
       ret <- data.frame(
         actual_value = actual,
