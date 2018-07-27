@@ -830,7 +830,7 @@ get_classification_type <- function(v) {
   }
 }
 
-clean_df <- function(df, target_col, selected_cols, grouped_cols, target_n, predictor_n) {
+cleanup_df <- function(df, target_col, selected_cols, grouped_cols, target_n, predictor_n) {
   # drop unrelated columns so that SMOTE later does not have to deal with them.
   # select_ was not able to handle space in target_col. let's do it in base R way.
   df <- df[,colnames(df) %in% c(grouped_cols, selected_cols, target_col), drop=FALSE]
@@ -898,7 +898,7 @@ clean_df <- function(df, target_col, selected_cols, grouped_cols, target_n, pred
   ret
 }
 
-clean_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, name_map, predictor_n) {
+cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, name_map, predictor_n) {
   if (is.factor(df[[clean_target_col]])) { # to avoid error in edarf::partial_dependence(), remove levels that is not used in this group.
     df[[clean_target_col]] <- forcats::fct_drop(df[[clean_target_col]])
   }
@@ -1053,7 +1053,7 @@ calc_feature_imp <- function(df,
     orig_levels <- c("TRUE","FALSE")
   }
 
-  clean_ret <- clean_df(df, target_col, selected_cols, grouped_cols, target_n, predictor_n)
+  clean_ret <- cleanup_df(df, target_col, selected_cols, grouped_cols, target_n, predictor_n)
 
   clean_df <- clean_ret$clean_df
   name_map <- clean_ret$name_map
@@ -1066,7 +1066,7 @@ calc_feature_imp <- function(df,
 
   each_func <- function(df) {
     tryCatch({
-      clean_df_ret <- clean_df_per_group(df, clean_target_col, max_nrow, clean_cols, name_map, predictor_n)
+      clean_df_ret <- cleanup_df_per_group(df, clean_target_col, max_nrow, clean_cols, name_map, predictor_n)
       if (is.null(clean_df_ret)) {
         return(NULL) # skip this group
       }
@@ -1464,7 +1464,7 @@ exp_rpart <- function(df,
 
   grouped_cols <- grouped_by(df)
 
-  clean_ret <- clean_df(df, target_col, selected_cols, grouped_cols, target_n, predictor_n)
+  clean_ret <- cleanup_df(df, target_col, selected_cols, grouped_cols, target_n, predictor_n)
 
   clean_df <- clean_ret$clean_df
   name_map <- clean_ret$name_map
@@ -1478,7 +1478,7 @@ exp_rpart <- function(df,
       # especially multiclass classification seems to take forever when number of unique values of predictors are many.
       # fct_lump is essential here.
       # http://grokbase.com/t/r/r-help/051sayg38p/r-multi-class-classification-using-rpart
-      clean_df_ret <- clean_df_per_group(df, clean_target_col, max_nrow, clean_cols, name_map, predictor_n)
+      clean_df_ret <- cleanup_df_per_group(df, clean_target_col, max_nrow, clean_cols, name_map, predictor_n)
       if (is.null(clean_df_ret)) {
         return(NULL) # skip this group
       }
