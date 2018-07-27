@@ -1534,7 +1534,8 @@ exp_rpart <- function(df,
 
   ret <- do_on_each_group(clean_df, each_func, name = "model", with_unnest = FALSE)
   # add special class .model to pass column type validation at viz layer.
-  class(ret$model) <- c("list", ".model")
+  # also add .model.rpart so that a step created by this function is viewable with Exploratory for debugging.
+  class(ret$model) <- c("list", ".model", ".model.rpart")
   ret
 }
 
