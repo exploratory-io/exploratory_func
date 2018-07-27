@@ -1483,6 +1483,12 @@ exp_rpart <- function(df,
       c_cols <- clean_df_ret$c_cols
       name_map <- clean_df_ret$name_map
 
+      # apply smote if this is binary classification
+      unique_val <- unique(df[[clean_target_col]])
+      if (smote && length(unique_val[!is.na(unique_val)]) == 2) {
+        df <- df %>% exp_balance(clean_target_col, sample=FALSE) # since we already sampled, no further sample.
+      }
+
       rhs <- paste0("`", c_cols, "`", collapse = " + ")
       fml <- as.formula(paste0("`", clean_target_col, "`", " ~ ", rhs))
       # especially multiclass classification seems to take forever when number of unique values of predictors are many.
