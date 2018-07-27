@@ -830,7 +830,7 @@ get_classification_type <- function(v) {
   }
 }
 
-cleanup_df <- function(df, target_col, selected_cols, grouped_cols, target_n, predictor_n) {
+cleanup_df <- function(df, target_col, selected_cols, grouped_cols, target_n, predictor_n, map_name=TRUE) {
   # drop unrelated columns so that SMOTE later does not have to deal with them.
   # select_ was not able to handle space in target_col. let's do it in base R way.
   df <- df[,colnames(df) %in% c(grouped_cols, selected_cols, target_col), drop=FALSE]
@@ -865,20 +865,33 @@ cleanup_df <- function(df, target_col, selected_cols, grouped_cols, target_n, pr
     }
   }
 
-  # randomForest fails if columns are not clean
-  clean_df <- janitor::clean_names(df)
-  # this mapping will be used to restore column names
-  name_map <- colnames(clean_df)
-  names(name_map) <- colnames(df)
+  if (map_name) {
+    # randomForest fails if columns are not clean
+    clean_df <- janitor::clean_names(df)
+    # this mapping will be used to restore column names
+    name_map <- colnames(clean_df)
+    names(name_map) <- colnames(df)
 
-  # clean_names changes column names
-  # without chaning grouping column name
-  # information in the data frame
-  # and it causes an error,
-  # so the value of grouping columns
-  # should be still the names of grouping columns
-  name_map[grouped_cols] <- grouped_cols
-  colnames(clean_df) <- name_map
+    # clean_names changes column names
+    # without chaning grouping column name
+    # information in the data frame
+    # and it causes an error,
+    # so the value of grouping columns
+    # should be still the names of grouping columns
+    name_map[grouped_cols] <- grouped_cols
+    colnames(clean_df) <- name_map
+  }
+  else {
+    # do not do mapping.
+    # we need this mode for rpart since the plotting will be done directly from the model
+    # and we want original column names to appear.
+    # fortunately, rpart seems to be robust enough against strange column names
+    # even on sjis windows.
+    # just create a map with same names so that the rest of the code works.
+    clean_df <- df
+    name_map <- colnames(df)
+    names(name_map) <- colnames(df)
+  }
 
   clean_target_col <- name_map[target_col]
   clean_cols <- name_map[cols]
@@ -1464,7 +1477,7 @@ exp_rpart <- function(df,
 
   grouped_cols <- grouped_by(df)
 
-  clean_ret <- cleanup_df(df, target_col, selected_cols, grouped_cols, target_n, predictor_n)
+  clean_ret <- cleanup_df(df, target_col, selected_cols, grouped_cols, target_n, predictor_n, map_name=FALSE)
 
   clean_df <- clean_ret$clean_df
   name_map <- clean_ret$name_map
