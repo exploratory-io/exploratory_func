@@ -1474,7 +1474,15 @@ exp_rpart <- function(df,
   classification_type <- get_classification_type(clean_df[[clean_target_col]])
 
   each_func <- function(df) {
-    rhs <- paste0("`", clean_cols, "`", collapse = " + ")
+    clean_df_ret <- clean_df_per_group(df, clean_target_col, max_nrow, clean_cols, name_map, predictor_n)
+    if (is.null(clean_df_ret)) {
+      return(NULL) # skip this group
+    }
+    df <- clean_df_ret$df
+    c_cols <- clean_df_ret$c_cols
+    name_map <- clean_df_ret$name_map
+
+    rhs <- paste0("`", c_cols, "`", collapse = " + ")
     fml <- as.formula(paste0("`", clean_target_col, "`", " ~ ", rhs))
     # especially multiclass classification seems to take forever when number of unique values of predictors are many.
     # fct_lump is essential here.
