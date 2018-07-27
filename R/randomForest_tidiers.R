@@ -1475,6 +1475,9 @@ exp_rpart <- function(df,
 
   each_func <- function(df) {
     tryCatch({
+      # especially multiclass classification seems to take forever when number of unique values of predictors are many.
+      # fct_lump is essential here.
+      # http://grokbase.com/t/r/r-help/051sayg38p/r-multi-class-classification-using-rpart
       clean_df_ret <- clean_df_per_group(df, clean_target_col, max_nrow, clean_cols, name_map, predictor_n)
       if (is.null(clean_df_ret)) {
         return(NULL) # skip this group
@@ -1491,9 +1494,6 @@ exp_rpart <- function(df,
 
       rhs <- paste0("`", c_cols, "`", collapse = " + ")
       fml <- as.formula(paste0("`", clean_target_col, "`", " ~ ", rhs))
-      # especially multiclass classification seems to take forever when number of unique values of predictors are many.
-      # fct_lump is essential here.
-      # http://grokbase.com/t/r/r-help/051sayg38p/r-multi-class-classification-using-rpart
       model <- rpart::rpart(fml, df)
       model$classification_type <- classification_type
       model$terms_mapping <- names(name_map)
