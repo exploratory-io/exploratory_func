@@ -867,9 +867,14 @@ cleanup_df <- function(df, target_col, selected_cols, grouped_cols, target_n, pr
 
   if (map_name) {
     # randomForest fails if columns are not clean
-    clean_df <- janitor::clean_names(df)
-    # this mapping will be used to restore column names
-    name_map <- colnames(clean_df)
+    clean_df <- df
+
+    # This mapping will be used to restore column names
+    # We used to use janitor::clean_names(df), but
+    # since we are setting the names back anyway,
+    # we can use names like c1, c2 which is guaranteed to be safe
+    # regardless of original column names.
+    name_map <- paste0("c",1:length(colnames(df)))
     names(name_map) <- colnames(df)
 
     # clean_names changes column names
