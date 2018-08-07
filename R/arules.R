@@ -104,3 +104,56 @@ do_apriori <- function(df, subject, key, minlen=1, maxlen=10, min_support=0.1, m
   }
   ret
 }
+
+get_arules_graph_data <- function(rules) {
+  # Give names to the rules. groceries is the dataframe that is the result of the Market Basket Analysis.
+  rules <- rules %>% dplyr::mutate(rule = row_number(), rule = str_c("Rule ",parse_character(rule)))
+  
+  # Create a dataframe for the relationships from rules to right-hand side products.
+  rule_rhs_edges <- rules %>%
+    dplyr::select(rule, rhs) %>%
+    dplyr::rename(from = rule, to = rhs)
+  
+  # Create a dataframe for the relationships from left-hand side products to the Rules.
+  lhs_rule_edges <- rules %>%
+    separate_rows(lhs, sep = "\\s*\\,\\s*") %>%
+    dplyr::select(lhs, rule) %>%
+    dplyr::rename(from = lhs, to = rule)
+  
+  # Create a dataframe for all the relationships in the graph by binding the above 2 dataframes.
+  edges <- lhs_rule_edges %>%
+    bind_rows(rule_rhs_edges)
+  
+  product_names <- unique(c(lhs_rule_edges$from, rule_rhs_edges$to))
+  
+  rule_vertices <- rules %>% dplyr::select(rule, support, confidence, lift) %>% dplyr::rename(name=rule)
+  products_vertices <- data.frame(name=product_names, support=0, confidence=0, lift=0, stringsAsFactors = FALSE)
+  vertices_data <- rule_vertices %>%
+    bind_rows(products_vertices)
+  
+  ret <- list(edges=edges, vertices=vertices_data)
+  ret <- data.frame(model=I(list(ret))) # return as data.frame. TODO: handle group_by
+  ret
+}
+
+# Code to plot the result with igraph:
+#
+# vertices <- graph_data$vertices %>%
+#   mutate(size=support * 4000) %>%
+#   mutate(color=apply(c_scale(confidence), 1, function(x) rgb(x[1]/255,x[2]/255,x[3]/255, alpha=0.8) ))
+# edges <- graph_data$edges
+# 
+# require(igraph)
+# # Set random seed for reproducibility of the chart.
+# set.seed(0)
+# 
+# # Create a graph object
+# g <- graph.data.frame(edges, directed=TRUE, vertices = vertices)
+# # Do not display name of rules
+# modify_label <- function(x) {if_else(str_detect(x,"^Rule "), "", x)}
+# labels <- modify_label(V(g)$name)
+# 
+# # Plot the graph
+# par(mar=c(0,0,0,0)) 
+# plot(g, edge.arrow.size=0.5, vertex.label=labels, vertex.label.family="sans", vertex.label.color=rgb(0.4,0.4,0.4), vertex.label.cex=0.9, vertex.frame.color=rgb(1,0.5,0.5))
+ 
