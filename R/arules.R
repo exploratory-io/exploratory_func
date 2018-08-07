@@ -133,6 +133,7 @@ get_arules_graph_data <- function(rules) {
   
   ret <- list(edges=edges, vertices=vertices_data)
   ret <- data.frame(model=I(list(ret))) # return as data.frame. TODO: handle group_by
+  class(ret$model) <- c("list", ".model", ".model.arules_graph")
   ret
 }
 
