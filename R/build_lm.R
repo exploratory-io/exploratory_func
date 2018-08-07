@@ -137,6 +137,7 @@ build_lm.fast <- function(df,
                     target,
                     ...,
                     model_type = "lm",
+                    model_family = NULL,
                     max_nrow = 50000,
                     predictor_n = 12, # so that at least months can fit in it.
                     smote = FALSE,
@@ -152,6 +153,10 @@ build_lm.fast <- function(df,
   selected_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
 
   grouped_cols <- grouped_by(df)
+
+  if (model_type  == "glm" && is.null(model_family)) {
+    model_family = "binomial" # default for glm is logistic regression.
+  }
 
   # drop unrelated columns so that SMOTE later does not have to deal with them.
   # select_ was not able to handle space in target_col. let's do it in base R way.
@@ -331,11 +336,11 @@ build_lm.fast <- function(df,
       rhs <- paste0("`", c_cols, "`", collapse = " + ")
       # TODO: This clean_target_col is actually not a cleaned column name since we want lm to show real name. Clean up our variable name.
       fml <- as.formula(paste0("`", clean_target_col, "` ~ ", rhs))
-      if (!is.null(model_type) && model_type == "glm") {
+      if (model_type == "glm") {
         if (smote) {
           df <- df %>% exp_balance(clean_target_col, sample=FALSE) # no further sampling
         }
-        rf <- stats::glm(fml, data = df, family = "binomial") 
+        rf <- stats::glm(fml, data = df, family = model_family) 
       }
       else {
         rf <- stats::lm(fml, data = df) 
@@ -344,7 +349,7 @@ build_lm.fast <- function(df,
       rf$terms_mapping <- names(name_map)
       names(rf$terms_mapping) <- name_map
       # add special lm_exploratory class for adding extra info at glance().
-      if (!is.null(model_type) && model_type == "glm") {
+      if (model_type == "glm") {
         class(rf) <- c("glm_exploratory", class(rf))
       }
       else {
