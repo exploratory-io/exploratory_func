@@ -412,7 +412,7 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add tes
     ret <- ret %>% dplyr::mutate(p.value=pvalue)
   }
   
-  if (x$family$family == 'binamial') { # only for logistic regression.
+  if (x$family$family %in% c('binomial', 'quasibinomial')) { # only for logistic regression.
     # Calculate F Score, Accuracy Rate, Misclassification Rate, Precision, Recall, Data Size
     predicted <- ifelse(x$fitted.value > 0.5, 1, 0) #TODO make threshold adjustable
     ret2 <- evaluate_classification(x$y, predicted, 1, pretty.name = pretty.name)
@@ -439,7 +439,7 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add tes
   }
 
   if(pretty.name) {
-    if (x$family$family == 'binamial') { # for logistic regression.
+    if (x$family$family %in% c('binomial', 'quasibinomial')) { # for binomial regressions.
       ret <- ret %>% dplyr::rename(`Null Deviance`=null.deviance, `DF for Null Model`=df.null, `Log Likelihood`=logLik, Deviance=deviance, `Residual DF`=df.residual, `AUC`=auc) %>%
         dplyr::select(`F Score`, `Accuracy Rate`, `Misclassification Rate`, `Precision`, `Recall`, `AUC`, `P Value`, `Log Likelihood`, `AIC`, `BIC`, `Deviance`, `Null Deviance`, `DF for Null Model`, everything())
     }
