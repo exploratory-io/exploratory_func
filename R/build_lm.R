@@ -177,7 +177,8 @@ build_lm.fast <- function(df,
     set.seed(seed)
   }
 
-  if (!is.null(model_type) && model_type == "glm") {
+  if (!is.null(model_type) && model_type == "glm" && model_family == "binomial") {
+    # logistic regression case. TODO: do we need to handle other binary classification model?
     unique_val <- unique(df[[target_col]])
     if (length(unique_val[!is.na(unique_val)]) != 2) {
       stop(paste0("Column to predict (", target_col, ") with Logistic Regression must have 2 unique values."))
@@ -187,8 +188,9 @@ build_lm.fast <- function(df,
       df[[target_col]] <- factor(df[[target_col]])
     }
   }
-  else { # this means the model is lm
+  else { # this means the model is lm or glm with family other than binomial
     if (!is.numeric(df[[target_col]])) {
+      # TODO: message should handle other than lm too.
       stop(paste0("Column to predict (", target_col, ") with Linear Regression must be numeric"))
     }
   }
