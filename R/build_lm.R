@@ -177,11 +177,11 @@ build_lm.fast <- function(df,
     set.seed(seed)
   }
 
-  if (!is.null(model_type) && model_type == "glm" && model_family == "binomial") {
-    # logistic regression case. TODO: do we need to handle other binary classification model?
+  if (!is.null(model_type) && model_type == "glm" && model_family %in% c("binomial", "quasibinomial")) {
+    # binomial case.
     unique_val <- unique(df[[target_col]])
     if (length(unique_val[!is.na(unique_val)]) != 2) {
-      stop(paste0("Column to predict (", target_col, ") with Logistic Regression must have 2 unique values."))
+      stop(paste0("Column to predict (", target_col, ") with Binomial Regression must have 2 unique values."))
     }
     if (!is.numeric(df[[target_col]]) && !is.factor(df[[target_col]]) && !is.logical(df[[target_col]])) {
       # make other types factor so that it passes stats::glm call.
@@ -490,13 +490,13 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
         }
       }
       ret <- ret %>% mutate(conf.high=estimate+1.96*std.error, conf.low=estimate-1.96*std.error)
-      if (x$family$family == "binomial") {
+      if (x$family$family == "binomial") { # odds ratio is only for logistic regression
         ret <- ret %>% mutate(odds_ratio=exp(estimate))
       }
       if (pretty.name) {
         ret <- ret %>% rename(Term=term, Coefficient=estimate, `Std Error`=std.error,
                               `t Ratio`=statistic, `P Value`=p.value, `Conf Low`=conf.low, `Conf High`=conf.high)
-        if (x$family$family == "binomial") {
+        if (x$family$family == "binomial") { # odds ratio is only for logistic regression
           ret <- ret %>% rename(`Odds Ratio`=odds_ratio)
         }
       }
