@@ -412,20 +412,22 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add tes
     ret <- ret %>% dplyr::mutate(p.value=pvalue)
   }
   
-  # Calculate F Score, Accuracy Rate, Misclassification Rate, Precision, Recall, Data Size
-  predicted <- ifelse(x$fitted.value > 0.5, 1, 0) #TODO make threshold adjustable
-  ret2 <- evaluate_classification(x$y, predicted, 1, pretty.name = pretty.name)
-  ret2 <- ret2[, 2:6]
-  ret <- ret %>% bind_cols(ret2)
+  if (x$family$family == 'binamial') { # only for logistic regression.
+    # Calculate F Score, Accuracy Rate, Misclassification Rate, Precision, Recall, Data Size
+    predicted <- ifelse(x$fitted.value > 0.5, 1, 0) #TODO make threshold adjustable
+    ret2 <- evaluate_classification(x$y, predicted, 1, pretty.name = pretty.name)
+    ret2 <- ret2[, 2:6]
+    ret <- ret %>% bind_cols(ret2)
 
-  # calculate AUC from ROC
-  roc_df <- data.frame(actual = x$y, predicted_probability = x$fitted.value)
-  roc <- roc_df %>% do_roc_(actual_val_col = "actual", pred_prob_col = "predicted_probability")
-  # use numeric index so that it won't be disturbed by name change
-  # 2 should be false positive rate (x axis) and 1 should be true positive rate (yaxis)
-  # calculate the area under the plots
-  auc <- sum((roc[[2]] - dplyr::lag(roc[[2]])) * roc[[1]], na.rm = TRUE)
-  ret$auc <- auc
+    # calculate AUC from ROC
+    roc_df <- data.frame(actual = x$y, predicted_probability = x$fitted.value)
+    roc <- roc_df %>% do_roc_(actual_val_col = "actual", pred_prob_col = "predicted_probability")
+    # use numeric index so that it won't be disturbed by name change
+    # 2 should be false positive rate (x axis) and 1 should be true positive rate (yaxis)
+    # calculate the area under the plots
+    auc <- sum((roc[[2]] - dplyr::lag(roc[[2]])) * roc[[1]], na.rm = TRUE)
+    ret$auc <- auc
+  }
 
   for(var in names(x$xlevels)) { # extract base levels info on factor/character columns from lm model
     if(pretty.name) {
@@ -437,9 +439,14 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add tes
   }
 
   if(pretty.name) {
-    ret <- ret %>% dplyr::rename(`Null Deviance`=null.deviance, `DF for Null Model`=df.null, `Log Likelihood`=logLik, Deviance=deviance, `Residual DF`=df.residual, `AUC`=auc) %>%
-      dplyr::select(`F Score`, `Accuracy Rate`, `Misclassification Rate`, `Precision`, `Recall`, `AUC`, `P Value`, `Log Likelihood`, `AIC`, `BIC`, `Deviance`, `Null Deviance`, `DF for Null Model`, everything())
-
+    if (x$family$family == 'binamial') { # for logistic regression.
+      ret <- ret %>% dplyr::rename(`Null Deviance`=null.deviance, `DF for Null Model`=df.null, `Log Likelihood`=logLik, Deviance=deviance, `Residual DF`=df.residual, `AUC`=auc) %>%
+        dplyr::select(`F Score`, `Accuracy Rate`, `Misclassification Rate`, `Precision`, `Recall`, `AUC`, `P Value`, `Log Likelihood`, `AIC`, `BIC`, `Deviance`, `Null Deviance`, `DF for Null Model`, everything())
+    }
+    else { # for other numeric regressions.
+      ret <- ret %>% dplyr::rename(`Null Deviance`=null.deviance, `DF for Null Model`=df.null, `Log Likelihood`=logLik, Deviance=deviance, `Residual DF`=df.residual) %>%
+        dplyr::select(`P Value`, `Log Likelihood`, `AIC`, `BIC`, `Deviance`, `Null Deviance`, `DF for Null Model`, everything())
+    }
   }
   ret
 }
