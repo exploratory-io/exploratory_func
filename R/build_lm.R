@@ -489,10 +489,16 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
           ret <- ret %>% rename(Note=note)
         }
       }
-      ret <- ret %>% mutate(conf.high=estimate+1.96*std.error, conf.low=estimate-1.96*std.error, odds_ratio=exp(estimate))
+      ret <- ret %>% mutate(conf.high=estimate+1.96*std.error, conf.low=estimate-1.96*std.error)
+      if (x$family$family == "binomial") {
+        ret <- ret %>% mutate(odds_ratio=exp(estimate))
+      }
       if (pretty.name) {
         ret <- ret %>% rename(Term=term, Coefficient=estimate, `Std Error`=std.error,
-                              `t Ratio`=statistic, `P Value`=p.value, `Conf Low`=conf.low, `Conf High`=conf.high, `Odds Ratio`=odds_ratio)
+                              `t Ratio`=statistic, `P Value`=p.value, `Conf Low`=conf.low, `Conf High`=conf.high)
+        if (x$family$family == "binomial") {
+          ret <- ret %>% rename(`Odds Ratio`=odds_ratio)
+        }
       }
       ret
     },
