@@ -1,8 +1,14 @@
 #' do PCA
 #' @export
-do_prcomp <- function(df,
-                        ...
-                       ) { # TODO: write test
+do_prcomp <- function(df, ...,
+                      centers=3, # build_kmeans.cols arguments.
+                      iter.max = 10,
+                      nstart = 1,
+                      algorithm = "Hartigan-Wong",
+                      trace = FALSE,
+                      keep.source = TRUE,
+                      seed=0,
+                      augment=TRUE) { # TODO: write test
   # this evaluates select arguments like starts_with
   selected_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
 
