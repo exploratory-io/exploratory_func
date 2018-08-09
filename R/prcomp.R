@@ -114,6 +114,11 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=5000, pretty.n
     }
 
     res <- res %>% dplyr::bind_cols(as.data.frame(scores_matrix))
+
+    if (!is.null(x$kmeans)) { # add cluster column if with kmeans.
+      res <- res %>% dplyr::mutate(cluster=factor(x$kmeans$cluster))
+    }
+
     if (nrow(res) > score_n_sample) {
       res <- res %>% dplyr::sample_n(score_n_sample)
     }
@@ -139,7 +144,7 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=5000, pretty.n
     res <- x$df
     res <- res %>% dplyr::bind_cols(as.data.frame(x$x))
     if (!is.null(x$kmeans)) {
-      res <- res %>% dplyr::mutate(cluster=x$kmeans$cluster)
+      res <- res %>% dplyr::mutate(cluster=factor(x$kmeans$cluster))
     }
   }
   res
