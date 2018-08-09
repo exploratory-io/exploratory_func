@@ -138,6 +138,9 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=5000, pretty.n
   else { # should be data
     res <- x$df
     res <- res %>% dplyr::bind_cols(as.data.frame(x$x))
+    if (!is.null(x$kmeans)) {
+      res <- res %>% dplyr::mutate(cluster=x$kmeans$cluster)
+    }
   }
   res
 }
