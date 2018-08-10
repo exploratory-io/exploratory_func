@@ -8,11 +8,20 @@ exp_kmeans <- function(df, ...,
                        trace = FALSE,
                        seed=0) {
 
-  do_prcomp(df, ...,
-            centers=centers, # build_kmeans.cols arguments.
-            iter.max = iter.max,
-            nstart = nstart,
-            algorithm = algorithm,
-            trace = trace,
-            seed=seed)
+  ret <- do_prcomp(df, ...)
+  ret <- ret %>% dplyr::mutate(model = purrr::map(model, function(x) {
+    kmeans_df <- as.data.frame(x$x)
+    kmeans_model <- kmeans_df %>% build_kmeans.cols(everything(),
+                                                 centers=centers,
+                                                 iter.max = iter.max,
+                                                 nstart = nstart,
+                                                 algorithm = algorithm,
+                                                 trace = trace,
+                                                 seed=seed,
+                                                 keep.source=FALSE,
+                                                 augment=FALSE)
+    x$kmeans <- kmeans_model$model[[1]] #TODO: is just calling kmeans() directly enough?
+    x
+  }))
+  ret
 }
