@@ -57,6 +57,7 @@ exp_kmeans <- function(df, ...,
     }))
   }
   else {
+    ret <- ret %>% ungroup()
     ret <- ret %>% dplyr::mutate(model = purrr::map(model, function(x) {
       kmeans_df <- as.data.frame(x$x)
       ret <- iterate_kmeans(kmeans_df,
@@ -69,5 +70,5 @@ exp_kmeans <- function(df, ...,
       ret
     }))
   }
-  ret
+  ret %>% rowwise()
 }
