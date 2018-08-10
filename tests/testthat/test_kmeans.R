@@ -23,3 +23,15 @@ test_that("exp_kemans with strange column name", {
   model_df %>% tidy(model, type="data")
   model_df %>% tidy(model, type="gathered_data")
 })
+
+test_that("exp_kmeans elbow method mode", {
+  df <- mtcars %>% mutate(new_col = c(rep("A", n() - 10), rep("B", 10)))
+  model_df <- exp_kmeans(df, cyl, mpg, hp, elbow_method_mode=TRUE)
+})
+
+test_that("exp_kmeans elbow method mode with group_by", {
+          browser()
+  df <- mtcars %>% mutate(new_col = c(rep("A", n() - 10), rep("B", 10)))
+  df <- df %>% group_by(new_col)
+  model_df <- exp_kmeans(df, cyl, mpg, hp, elbow_method_mode=TRUE)
+})
