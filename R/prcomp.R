@@ -1,12 +1,6 @@
 #' do PCA
 #' @export
-do_prcomp <- function(df, ...,
-                      centers=3, # build_kmeans.cols arguments.
-                      iter.max = 10,
-                      nstart = 1,
-                      algorithm = "Hartigan-Wong",
-                      trace = FALSE,
-                      seed=0) { # TODO: write test
+do_prcomp <- function(df, ...) { # TODO: write test
   # this evaluates select arguments like starts_with
   selected_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
 
@@ -40,19 +34,6 @@ do_prcomp <- function(df, ...,
     }
 
     fit <- prcomp(cleaned_df, scale=TRUE)
-    if (centers > 0) { # do k-means
-      kmeans_df <- as.data.frame(fit$x)
-      kmeans_model <- kmeans_df %>% build_kmeans.cols(everything(),
-                                                   centers=centers,
-                                                   iter.max = iter.max,
-                                                   nstart = nstart,
-                                                   algorithm = algorithm,
-                                                   trace = trace,
-                                                   seed=seed,
-                                                   keep.source=FALSE,
-                                                   augment=FALSE)
-      fit$kmeans <- kmeans_model$model[[1]] #TODO: is just calling kmeans() directly enough?
-    }
     fit$df <- filtered_df # add filtered df to model so that we can bind_col it for output. It needs to be the filtered one to match row number.
     fit$grouped_cols <- grouped_cols
     class(fit) <- c("prcomp_exploratory", class(fit))
