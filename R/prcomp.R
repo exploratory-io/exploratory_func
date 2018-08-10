@@ -131,6 +131,7 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=5000, pretty.n
     if (type == "gathered_data") { # for boxplot. this is only when with kmeans.
       column_names <- attr(x$rotation, "dimname")[[1]] 
       res <- res %>% select(!!c(column_names,"cluster"))
+      res <- res %>% mutate(row_id=seq(n)) # row_id for line representation.
       res <- res %>% gather(key="key",value="value",!!column_names)
     }
   }
