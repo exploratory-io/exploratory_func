@@ -143,6 +143,11 @@ do_apriori <- function(df, subject, key, minlen=1, maxlen=10, min_support=0.1, m
 }
 
 get_arules_graph_data <- function(rules) {
+  rules <- rules %>% dplyr::top_n(30, support) # limit within 30 rules so that they can be visualized comfortably.
+  if (nrow(rules) > 30) { # this means there are ties. remove the rows with minimum support to fit within 30 rules.
+    rules <- rules %>% dplyr::filter(support != min(support))
+  }
+
   # Give names to the rules. groceries is the dataframe that is the result of the Market Basket Analysis.
   rules <- rules %>% dplyr::mutate(rule = row_number(), rule = str_c("Rule ",parse_character(rule)))
   
