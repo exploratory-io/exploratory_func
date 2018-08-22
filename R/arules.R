@@ -1,7 +1,7 @@
 #' Find association rules from itemsets.
 #' It calculates support, confidence and lift values from combinations of items.
 #' @export
-do_apriori <- function(df, subject, key, minlen=1, maxlen=10, min_support=0.1, max_support=1, min_confidence=0.5, lhs=NULL, rhs=NULL){
+do_apriori_ <- function(df, subject_col, key_col, minlen=1, maxlen=10, min_support=0.1, max_support=1, min_confidence=0.5, lhs=NULL, rhs=NULL){
   validate_empty_data(df)
 
   loadNamespace("dplyr")
@@ -9,8 +9,6 @@ do_apriori <- function(df, subject, key, minlen=1, maxlen=10, min_support=0.1, m
   loadNamespace("arules")
   loadNamespace("stringr")
 
-  subject_col <- col_name(substitute(subject))
-  key_col <- col_name(substitute(key))
   if(subject_col %nin% colnames(df)){
     stop(paste(subject_col, "is not in colums", sep=" "))
   }
@@ -103,6 +101,15 @@ do_apriori <- function(df, subject, key, minlen=1, maxlen=10, min_support=0.1, m
     stop("No rule was found. Smaller minimum support or minimum confidence might find rules.")
   }
   ret
+}
+
+#' Find association rules from itemsets.
+#' It calculates support, confidence and lift values from combinations of items.
+#' @export
+do_apriori <- function(df, subject, key, minlen=1, maxlen=10, min_support=0.1, max_support=1, min_confidence=0.5, lhs=NULL, rhs=NULL){
+  subject_col <- col_name(substitute(subject))
+  key_col <- col_name(substitute(key))
+  do_apriori_(df, subject_col, key_col, minlen, maxlen, min_support, max_support, min_confidence, lhs, rhs)
 }
 
 get_arules_graph_data <- function(rules) {
