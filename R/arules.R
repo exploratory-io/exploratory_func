@@ -1,7 +1,6 @@
 #' Find association rules from itemsets.
 #' It calculates support, confidence and lift values from combinations of items.
-#' @export
-do_apriori_ <- function(df, subject_col, key_col, minlen=1, maxlen=10, min_support=0.1, max_support=1, min_confidence=0.5, lhs=NULL, rhs=NULL){
+do_apriori_internal <- function(df, subject_col, key_col, minlen=1, maxlen=10, min_support=0.1, max_support=1, min_confidence=0.5, lhs=NULL, rhs=NULL){
   validate_empty_data(df)
 
   loadNamespace("dplyr")
@@ -101,6 +100,13 @@ do_apriori_ <- function(df, subject_col, key_col, minlen=1, maxlen=10, min_suppo
     stop("No rule was found. Smaller minimum support or minimum confidence might find rules.")
   }
   ret
+}
+
+#' Find association rules from itemsets.
+#' It calculates support, confidence and lift values from combinations of items.
+#' @export
+do_apriori_ <- function(df, subject_col, key_col, minlen=1, maxlen=10, min_support=0.1, max_support=1, min_confidence=0.5, lhs=NULL, rhs=NULL){
+  do_apriori_internal(df, subject_col, key_col, minlen, maxlen, min_support, max_support, min_confidence, lhs, rhs)
 }
 
 #' Find association rules from itemsets.
