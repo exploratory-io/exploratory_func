@@ -127,6 +127,7 @@ get_arules_graph_data <- function(rules) {
   product_names <- unique(c(lhs_rule_edges$from, rule_rhs_edges$to))
   
   rule_vertices <- rules %>% dplyr::select(rule, support, confidence, lift) %>% dplyr::rename(name=rule)
+  rule_vertices <- rule_vertices %>% dplyr::mutate(support = support/max(support)*15) # normalize support so that the largest circle size is always 15.
   products_vertices <- data.frame(name=product_names, support=0, confidence=0, lift=0, stringsAsFactors = FALSE)
   vertices_data <- rule_vertices %>%
     bind_rows(products_vertices)
@@ -140,7 +141,7 @@ get_arules_graph_data <- function(rules) {
 # Code to plot the result with igraph:
 #
 # vertices <- graph_data$vertices %>%
-#   mutate(size=support * 4000) %>%
+#   mutate(size=support) %>%
 #   mutate(color=apply(c_scale(confidence), 1, function(x) rgb(x[1]/255,x[2]/255,x[3]/255, alpha=0.8) ))
 # edges <- graph_data$edges
 # 
