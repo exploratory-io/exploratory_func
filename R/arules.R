@@ -106,7 +106,31 @@ do_apriori_internal <- function(df, subject_col, key_col, minlen=1, maxlen=10, m
 #' It calculates support, confidence and lift values from combinations of items.
 #' @export
 do_apriori_ <- function(df, subject_col, key_col, minlen=1, maxlen=10, min_support=0.1, max_support=1, min_confidence=0.5, lhs=NULL, rhs=NULL){
-  do_apriori_internal(df, subject_col, key_col, minlen, maxlen, min_support, max_support, min_confidence, lhs, rhs)
+  if (min_support == "auto") { # search for min_support that returns some rules.
+    ret <- NULL
+    curr_min_support = 0.1
+    while (curr_min_support > 0.00001) {
+      browser()
+      ret <- tryCatch(do_apriori_internal(df, subject_col, key_col, minlen, maxlen, curr_min_support, max_support, min_confidence, lhs, rhs), error=function(e) {
+        browser()
+        if (e$message == "No rule was found. Smaller minimum support or minimum confidence might find rules.") { #TODO: this matching is dumb.. 
+          TRUE
+        }
+        else {
+          stop(e)
+        }
+      })
+      if (is.logical(ret) && ret == TRUE) {
+        curr_min_support <- curr_min_support/10
+        next
+      }
+      break
+    }
+    ret
+  }
+  else {
+    do_apriori_internal(df, subject_col, key_col, minlen, maxlen, min_support, max_support, min_confidence, lhs, rhs)
+  }
 }
 
 #' Find association rules from itemsets.
