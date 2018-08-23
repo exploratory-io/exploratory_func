@@ -236,6 +236,18 @@ js_glue_transformer <- function(code, envir) {
   glue::collapse(val, sep=", ")
 }
 
+odbc_glue_transformer <- function(code, envir) {
+  val <- eval(parse(text = code), envir)
+  if (is.character(val) || is.factor(val)) {
+    # escape for SQL
+    val <- gsub("'", "''", val, fixed=TRUE) # both Oracle and SQL Server escapes single quote by doubling them.
+    val <- paste0("'", val, "'") # both Oracle and SQL Server quotes strings with single quote.
+  }
+  # TODO: How should we handle logical, Date, POSIXct, POSIXlt?
+  #       Does expression like 1e+10 work?
+  glue::collapse(val, sep=", ")
+}
+
 #' @export
 queryMongoDB <- function(host = NULL, port = "", database, collection, username, password, query = "{}", flatten,
                          limit=100, isSSL=FALSE, authSource=NULL, fields="{}", sort="{}",
@@ -747,7 +759,9 @@ queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, q
   tryCatch({
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
-    df <- RODBC::sqlQuery(conn, GetoptLong::qq(query, envir = parent.frame()), max = numOfRows, stringsAsFactors=stringsAsFactors)
+    query <- glue::glue(query, .transformer=odbc_glue_transformer, .envir = parent.frame())
+    df <- RODBC::sqlQuery(conn, query,
+                          max = numOfRows, stringsAsFactors=stringsAsFactors)
     if (!is.data.frame(df)) {
       # when it is error, RODBC::sqlQuery() does not stop() (throw) with error most of the cases.
       # in such cases, df is a character vecter rather than a data.frame.
