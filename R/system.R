@@ -215,6 +215,25 @@ getMongoURL <- function(host = NULL, port, database, username, pass, isSSL=FALSE
   return (url)
 }
 
+# glue transformer for mongo js query.
+# supports character, factor, logical, Date, POSIXct, POSIXlt, and numeric.
+js_glue_transformer <- function(code, envir) {
+  val <- eval(parse(text = code), envir)
+  if (is.character(val) || is.factor(val)) {
+    # escape for js
+    val <- gsub("\\", "\\\\", val, fixed=TRUE)
+    val <- gsub("\"", "\\\"", val, fixed=TRUE)
+    val <- paste0('"', val, '"')
+  }
+  else if (is.logical(val)) {
+    val <- ifelse(val, "true", "false")
+  }
+  else if (lubridate::is.Date(val) || lubridate::is.POSIXt(val)) {
+    val <- paste0("new Date(\"", readr::parse_character(val), "\")")
+  }
+  # for numeric it should work as is. expression like 1e+10 works on js too.
+  glue::collapse(val, sep=", ")
+}
 
 #' @export
 queryMongoDB <- function(host = NULL, port = "", database, collection, username, password, query = "{}", flatten,
