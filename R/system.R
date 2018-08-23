@@ -864,7 +864,8 @@ submitGoogleBigQueryJob <- function(project, sqlquery, destination_table, write_
     isStandardSQL = TRUE; # honor value provided by paramerer
   }
   # set envir = parent.frame() to get variables from users environment, not papckage environment
-  job <- bigrquery::bq_perform_query(query = GetoptLong::qq(sqlquery, envir = parent.frame()), billing = project,  use_legacy_sql = !isStandardSQL)
+  sqlquery <- glue::glue(sqlquery, .transformer=bigquery_glue_transformer, .envir = parent.frame())
+  job <- bigrquery::bq_perform_query(query = sqlquery, billing = project,  use_legacy_sql = !isStandardSQL)
   bigrquery::bq_job_wait(job)
   meta <- bigrquery::bq_job_meta(job)
   isCacheHit <- meta$statistics$query$cacheHit
@@ -1009,7 +1010,8 @@ executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 1
       isStandardSQL = TRUE;
     }
     # set envir = parent.frame() to get variables from users environment, not papckage environment
-    tb <- bigrquery::bq_project_query(x = project, query = GetoptLong::qq(query, envir = parent.frame()), quiet = TRUE, use_legacy_sql = !isStandardSQL)
+    query <- glue::glue(query, .transformer=bigquery_glue_transformer, .envir = parent.frame())
+    tb <- bigrquery::bq_project_query(x = project, query = query, quiet = TRUE, use_legacy_sql = !isStandardSQL)
     df <- bigrquery::bq_table_download(x = tb, max_results = Inf, page_size = pageSize, max_connections = max_connections, quiet = TRUE)
   }
   df
