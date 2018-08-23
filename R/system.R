@@ -347,7 +347,6 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
   if(type == "mongodb") {
     if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
     loadNamespace("jsonlite")
-    if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
     if(!is.null(host) && host != ''){
       key <- paste("mongodb", host, port, databaseName, collection, username, toString(isSSL), authSource, additionalParams, sep = ":")
     } else if (!is.null(cluster) && cluster != '') {
@@ -457,7 +456,6 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     # do those package loading only when we need to use odbc in this if statement,
     # so that we will not have error at our server environemnt where RODBC is not there.
     if(!requireNamespace("RODBC")){stop("package RODBC must be installed.")}
-    if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
 
     loadNamespace("RODBC")
     connect <- function() {
@@ -697,7 +695,6 @@ queryNeo4j <- function(host, port,  username, password, query, isSSL = FALSE, ..
 queryMySQL <- function(host, port, databaseName, username, password, numOfRows = -1, query, ...){
   if(!requireNamespace("RMySQL")){stop("package RMySQL must be installed.")}
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
-  if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
 
   # read stored password
   pass = saveOrReadPassword("mysql", username, password)
@@ -744,7 +741,6 @@ queryPostgres <- function(host, port, databaseName, username, password, numOfRow
 #' @export
 queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, query, stringsAsFactors = FALSE, host="", port="", ...){
   if(!requireNamespace("RODBC")){stop("package RODBC must be installed.")}
-  if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
 
   conn <- getDBConnection("odbc", host, port, NULL, username, password, dsn = dsn, additionalParams = additionalParams)
   tryCatch({
@@ -824,11 +820,7 @@ getTwitter <- function(n=200, lang=NULL,  lastNDays=7, searchString, tokenFileId
 #' @export
 submitGoogleBigQueryJob <- function(project, sqlquery, destination_table, write_disposition = "WRITE_TRUNCATE", tokenFieldId, useStandardSQL = FALSE,  ...){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
-  if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
   if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
-
-  #GetoptLong uses stringr and str_c is called without stringr:: so need to use "require" instead of "requireNamespace"
-  if(!require("stringr")){stop("package stringr must be installed.")}
 
   token <- getGoogleTokenForBigQuery(tokenFieldId)
   bigrquery::set_access_cred(token)
@@ -959,7 +951,6 @@ getDataFromGoogleBigQueryTableViaCloudStorage <- function(bucketProjectId, dataS
 #' @export
 executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 100000, maxPage = 10, writeDisposition = "WRITE_TRUNCATE", tokenFileId, bucketProjectId, bucket=NULL, folder=NULL, max_connections = 8, useStandardSQL = FALSE, ...){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
-  if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
   if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
 
   token <- getGoogleTokenForBigQuery(tokenFileId)
