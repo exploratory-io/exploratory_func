@@ -249,6 +249,21 @@ odbc_glue_transformer <- function(code, envir) {
   glue::collapse(val, sep=", ")
 }
 
+bigquery_glue_transformer <- function(code, envir) {
+  val <- eval(parse(text = code), envir)
+  if (is.character(val) || is.factor(val)) {
+    # escape for Standard SQL for bigquery
+    # https://cloud.google.com/bigquery/docs/reference/standard-sql/lexical
+    # escape for js
+    val <- gsub("\\", "\\\\", val, fixed=TRUE)
+    val <- gsub("\"", "\\\"", val, fixed=TRUE)
+    val <- paste0('"', val, '"')
+  }
+  # TODO: How should we handle logical, Date, POSIXct, POSIXlt?
+  #       Does expression like 1e+10 work?
+  glue::collapse(val, sep=", ")
+}
+
 #' @export
 queryMongoDB <- function(host = NULL, port = "", database, collection, username, password, query = "{}", flatten,
                          limit=100, isSSL=FALSE, authSource=NULL, fields="{}", sort="{}",
