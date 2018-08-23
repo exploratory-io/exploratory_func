@@ -217,6 +217,7 @@ getMongoURL <- function(host = NULL, port, database, username, pass, isSSL=FALSE
 
 # glue transformer for mongo js query.
 # supports character, factor, logical, Date, POSIXct, POSIXlt, and numeric.
+# TODO: do we need to handle NA?
 js_glue_transformer <- function(code, envir) {
   val <- eval(parse(text = code), envir)
   if (is.character(val) || is.factor(val)) {
