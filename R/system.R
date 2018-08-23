@@ -240,6 +240,7 @@ odbc_glue_transformer <- function(code, envir) {
   val <- eval(parse(text = code), envir)
   if (is.character(val) || is.factor(val)) {
     # escape for SQL
+    # TODO: check if this makes sense for Dremio and Athena
     val <- gsub("'", "''", val, fixed=TRUE) # both Oracle and SQL Server escapes single quote by doubling them.
     val <- paste0("'", val, "'") # both Oracle and SQL Server quotes strings with single quote.
   }
