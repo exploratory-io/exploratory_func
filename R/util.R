@@ -1292,7 +1292,6 @@ extract_from_date <- function(x, type = "fltoyear") {
   ret
 }
 
-
 #' Calculate R-Squared 
 #' @export
 r_squared <- function (x, y) {
