@@ -241,7 +241,6 @@ queryMongoDB <- function(host = NULL, port = "", database, collection, username,
                          skip=0, queryType = "find", pipeline="{}", cluster = NULL, timeout = NULL, additionalParamas = NULL, ...){
   if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
   loadNamespace("jsonlite")
-  if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
 
   # read stored password
   pass = saveOrReadPassword("mongodb", username, password)
@@ -723,7 +722,6 @@ queryMySQL <- function(host, port, databaseName, username, password, numOfRows =
 queryPostgres <- function(host, port, databaseName, username, password, numOfRows = -1, query, ...){
   if(!requireNamespace("RPostgreSQL")){stop("package RPostgreSQL must be installed.")}
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
-  if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
 
   # read stored password
   pass = saveOrReadPassword("postgres", username, password)
@@ -732,7 +730,7 @@ queryPostgres <- function(host, port, databaseName, username, password, numOfRow
   tryCatch({
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
-    resultSet <- RPostgreSQL::dbSendQuery(conn, GetoptLong::qq(query, envir = parent.frame()))
+    resultSet <- RPostgreSQL::dbSendQuery(conn, glue::glue_sql(query, .con = conn, .envir = parent.frame()))
     df <- DBI::dbFetch(resultSet, n = numOfRows)
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
