@@ -84,6 +84,14 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
     df <- df[!is.na(df[[value_col]]), ]
   }
 
+  summarise_args <- list() # default empty list
+  if (!is.na(regressors) && !is.na(funs.aggregate.regressors)) {
+    summarise_args <- purrr::map2(funs.aggregate.regressors, regressors, function(func, cname) {
+      quo(UQ(func)(UQ(rlang::sym(cname))))
+    })
+    names(summarise_args) <- regressors
+  }
+
   # remove NA data
   df <- df[!is.na(df[[time_col]]), ]
 
@@ -127,7 +135,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
         # we saw a case where rstan crashes with the last row with 0 y value.
         dplyr::filter(!is.na(value)) %>%
         dplyr::group_by(ds) %>%
-        dplyr::summarise(y = fun.aggregate(value), cap = fun.aggregate(cap_col))
+        dplyr::summarise(y = fun.aggregate(value), cap = fun.aggregate(cap_col), !!!summarise_args)
     } else if (!is.null(value_col)){
       data.frame(
         ds = lubridate::floor_date(df[[time_col]], unit = time_unit),
@@ -135,13 +143,13 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
       ) %>%
         dplyr::filter(!is.na(value)) %>% # remove NA so that we do not pass data with NA, NaN, or 0 to prophet
         dplyr::group_by(ds) %>%
-        dplyr::summarise(y = fun.aggregate(value))
+        dplyr::summarise(y = fun.aggregate(value), !!!summarise_args)
     } else {
       data.frame(
         ds = lubridate::floor_date(df[[time_col]], unit = time_unit)
       ) %>%
         dplyr::group_by(ds) %>%
-        dplyr::summarise(y = n())
+        dplyr::summarise(y = n(), !!!summarise_args)
     }
 
     if (time_unit %in% c("week", "month", "quarter", "year")) { # if time_unit is larger than day (the next level is week), having weekly.seasonality does not make sense.
