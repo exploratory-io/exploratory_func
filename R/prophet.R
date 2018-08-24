@@ -41,7 +41,7 @@ do_prophet <- function(df, time, value = NULL, ...){
 #' @export
 do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "day", include_history = TRUE, test_mode = FALSE,
                         fun.aggregate = sum, cap = NULL, floor = NULL, growth = NULL, weekly.seasonality = TRUE, yearly.seasonality = TRUE, holidays = NULL,
-                        regressors, funs.aggregate.regressors = NULL, ...){
+                        regressors = NULL, funs.aggregate.regressors = NULL, ...){
   validate_empty_data(df)
 
   # we are making default for weekly/yearly.seasonality TRUE since 'auto' does not behave well.
@@ -85,7 +85,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
   }
 
   summarise_args <- list() # default empty list
-  if (!is.na(regressors) && !is.na(funs.aggregate.regressors)) {
+  if (!is.null(regressors) && !is.null(funs.aggregate.regressors)) {
     summarise_args <- purrr::map2(funs.aggregate.regressors, regressors, function(func, cname) {
       quo(UQ(func)(UQ(rlang::sym(cname))))
     })
