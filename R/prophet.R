@@ -40,7 +40,8 @@ do_prophet <- function(df, time, value = NULL, ...){
 #' @param uncertainty.samples - Number of simulations made for calculating uncertainty intervals. Default is 1000.
 #' @export
 do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "day", include_history = TRUE, test_mode = FALSE,
-                        fun.aggregate = sum, cap = NULL, floor = NULL, growth = NULL, weekly.seasonality = TRUE, yearly.seasonality = TRUE, holidays = NULL, ...){
+                        fun.aggregate = sum, cap = NULL, floor = NULL, growth = NULL, weekly.seasonality = TRUE, yearly.seasonality = TRUE, holidays = NULL,
+                        regressors, funs.aggregate.regressors = NULL, ...){
   validate_empty_data(df)
 
   # we are making default for weekly/yearly.seasonality TRUE since 'auto' does not behave well.
