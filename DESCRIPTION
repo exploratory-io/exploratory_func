@@ -55,7 +55,6 @@ Suggests:
     bigrquery,
     googleCloudStorageR,
     googleAuthR,
-    GetoptLong,
     gtrendsR,
     arules,
     slam,
