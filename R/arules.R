@@ -183,9 +183,13 @@ get_arules_graph_data <- function(rules) {
 
 # Code to plot the result with igraph:
 #
+# c_scale <- colorRamp(c("white","red"))
+#
 # vertices <- graph_data$vertices %>%
-#   mutate(size=support) %>%
-#   mutate(color=apply(c_scale(confidence), 1, function(x) rgb(x[1]/255,x[2]/255,x[3]/255, alpha=0.8) ))
+#   mutate(size=support/max(support)*15) %>%   # normalize support so that the largest circle size is always 15.
+#          # normalize confidence to fully utilize color scale.
+#   mutate(color=apply(c_scale((confidence - min(confidence))/(max(confidence)-min(confidence))), 1, function(x) rgb(x[1]/255,x[2]/255,x[3]/255, alpha=0.8) ))
+#
 # edges <- graph_data$edges
 # 
 # require(igraph)
