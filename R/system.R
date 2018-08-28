@@ -217,7 +217,6 @@ getMongoURL <- function(host = NULL, port, database, username, pass, isSSL=FALSE
 
 # glue transformer for mongo js query.
 # supports character, factor, logical, Date, POSIXct, POSIXlt, and numeric.
-# TODO: do we need to handle NA?
 js_glue_transformer <- function(code, envir) {
   val <- eval(parse(text = code), envir)
   if (is.character(val) || is.factor(val)) {
@@ -232,6 +231,10 @@ js_glue_transformer <- function(code, envir) {
   else if (lubridate::is.Date(val) || lubridate::is.POSIXt(val)) {
     val <- paste0("new Date(\"", readr::parse_character(val), "\")")
   }
+  # Interpret NA to null.
+  # https://docs.mongodb.com/manual/tutorial/query-for-null-fields/
+  val <- ifelse(is.na(val), "null", val)
+
   # for numeric it should work as is. expression like 1e+10 works on js too.
   glue::collapse(val, sep=", ")
 }
