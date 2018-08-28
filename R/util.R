@@ -1295,10 +1295,10 @@ extract_from_date <- function(x, type = "fltoyear") {
 
 #' Calculate R-Squared 
 #' @export
-r_squared <- function (x, y) {
+r_squared <- function (actual, predicted) {
   # https://stats.stackexchange.com/questions/230556/calculate-r-square-in-r-for-two-vectors
   # https://en.wikipedia.org/wiki/Coefficient_of_determination
-  ret <- 1 - (sum((actual-predict )^2, na.rm=TRUE)/sum((actual-mean(actual, na.rm=TRUE))^2, na.rm=TRUE))
+  ret <- 1 - (sum((actual-predicted)^2, na.rm=TRUE)/sum((actual-mean(actual, na.rm=TRUE))^2, na.rm=TRUE))
   ret
 }
 
