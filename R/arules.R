@@ -169,8 +169,9 @@ get_arules_graph_data <- function(rules) {
   product_names <- unique(c(lhs_rule_edges$from, rule_rhs_edges$to))
   
   rule_vertices <- rules %>% dplyr::select(rule, support, confidence, lift) %>% dplyr::rename(name=rule)
-  rule_vertices <- rule_vertices %>% dplyr::mutate(support = support/max(support)*15) # normalize support so that the largest circle size is always 15.
-  products_vertices <- data.frame(name=product_names, support=0, confidence=0, lift=0, stringsAsFactors = FALSE)
+  # set min of rule confidence as dummy confidence value for product vertices, so that min/max does not change
+  # even after bind_rows. this helps when normalizing for color scale later.
+  products_vertices <- data.frame(name=product_names, support=0, confidence=min(rule_vertices$confidence), lift=0, stringsAsFactors = FALSE)
   vertices_data <- rule_vertices %>%
     bind_rows(products_vertices)
   
