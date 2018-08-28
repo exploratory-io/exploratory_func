@@ -249,6 +249,7 @@ odbc_glue_transformer <- function(code, envir) {
   }
   # TODO: How should we handle logical, Date, POSIXct, POSIXlt?
   #       Does expression like 1e+10 work?
+  # TODO: Need to handle NA here. Find out appropriate way.
   glue::collapse(val, sep=", ")
 }
 
@@ -264,6 +265,7 @@ bigquery_glue_transformer <- function(code, envir) {
   }
   # TODO: How should we handle logical, Date, POSIXct, POSIXlt?
   #       Does expression like 1e+10 work?
+  # TODO: Need to handle NA here. Find out appropriate way.
   glue::collapse(val, sep=", ")
 }
 
