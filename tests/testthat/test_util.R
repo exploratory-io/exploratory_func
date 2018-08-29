@@ -664,3 +664,7 @@ test_that("test unnest_without_empty", {
   expect_equal(ret, data.frame(x=c(1,3,3),z=c(1,1,1),w=c(2,2,2)))
 })
 
+test_that("r_squared", {
+  res <- r_squared(c(1,2,3,4,5), c(3,4,2,4,7))
+  expect_equal(res, -0.3, tolerance = 0.001)
+})
