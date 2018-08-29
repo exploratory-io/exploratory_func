@@ -33,6 +33,7 @@ exp_kmeans <- function(df, ...,
                        nstart = 1,
                        algorithm = "Hartigan-Wong",
                        trace = FALSE,
+                       n_pcs = NULL,
                        seed=0,
                        elbow_method_mode=FALSE,
                        max_centers = 10
@@ -43,6 +44,9 @@ exp_kmeans <- function(df, ...,
   if (!elbow_method_mode) {
     ret <- ret %>% dplyr::mutate(model = purrr::map(model, function(x) {
       kmeans_df <- as.data.frame(x$x)
+      if (!is.null(n_pcs)) {
+        kmeans_df <- kmeans_df %>% dplyr::select(1:n_pcs) # keep only n_pcs principal components
+      }
       kmeans_model <- kmeans_df %>% build_kmeans.cols(everything(),
                                                    centers=centers,
                                                    iter.max = iter.max,
@@ -52,7 +56,7 @@ exp_kmeans <- function(df, ...,
                                                    seed=seed,
                                                    keep.source=FALSE,
                                                    augment=FALSE)
-      x$kmeans <- kmeans_model$model[[1]] #TODO: is just calling kmeans() directly enough?
+      x$kmeans <- kmeans_model$model[[1]]
       x
     }))
   }
