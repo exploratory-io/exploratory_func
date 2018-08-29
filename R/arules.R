@@ -110,9 +110,7 @@ do_apriori_ <- function(df, subject_col, key_col, minlen=1, maxlen=10, min_suppo
     ret <- NULL
     curr_min_support = 0.1
     while (curr_min_support > 0.00001) {
-      browser()
       ret <- tryCatch(do_apriori_internal(df, subject_col, key_col, minlen, maxlen, curr_min_support, max_support, min_confidence, lhs, rhs), error=function(e) {
-        browser()
         if (e$message == "No rule was found. Smaller minimum support or minimum confidence might find rules.") { #TODO: this matching is dumb.. 
           TRUE
         }
