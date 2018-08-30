@@ -123,10 +123,10 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=5000, pretty.n
   }
   else { # should be data or gathered_data
     res <- x$df
-    res <- res %>% dplyr::bind_cols(as.data.frame(x$x))
     if (!is.null(x$kmeans)) {
       res <- res %>% dplyr::mutate(cluster=factor(x$kmeans$cluster))
     }
+    res <- res %>% dplyr::bind_cols(as.data.frame(x$x))
 
     if (type == "gathered_data") { # for boxplot. this is only when with kmeans.
       column_names <- attr(x$rotation, "dimname")[[1]] 
