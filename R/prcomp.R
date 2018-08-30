@@ -46,7 +46,7 @@ do_prcomp <- function(df, ...) { # TODO: write test
 #' extracts results from prcomp as a dataframe
 #' @export
 #' @param n_sample Sample number for biplot. Default 5000, which is the default of our scatter plot
-tidy.prcomp_exploratory <- function(x, type="variances", n_sample=5000, pretty.name=FALSE, ...) { #TODO: add test
+tidy.prcomp_exploratory <- function(x, type="variances", n_sample=5000, pretty.name=FALSE, normalize_data=FALSE, ...) { #TODO: add test
   if (type == "variances") {
     res <- as.data.frame(x$sdev*x$sdev) # square it to make it variance
     colnames(res)[1] <- "variance"
@@ -127,9 +127,12 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=5000, pretty.n
       res <- res %>% dplyr::mutate(cluster=factor(x$kmeans$cluster))
     }
     res <- res %>% dplyr::bind_cols(as.data.frame(x$x))
+    column_names <- attr(x$rotation, "dimname")[[1]] 
+    if (normalize_data) {
+      res <- res %>% mutate_at(column_names, exploratory::normalize)
+    }
 
     if (type == "gathered_data") { # for boxplot. this is only when with kmeans.
-      column_names <- attr(x$rotation, "dimname")[[1]] 
       res <- res %>% select(!!c(column_names,"cluster"))
       res <- res %>% mutate(row_id=seq(n)) # row_id for line representation.
       res <- res %>% gather(key="key",value="value",!!column_names)
