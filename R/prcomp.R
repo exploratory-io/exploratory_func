@@ -46,7 +46,7 @@ do_prcomp <- function(df, ...) { # TODO: write test
 #' extracts results from prcomp as a dataframe
 #' @export
 #' @param n_sample Sample number for biplot. Default 5000, which is the default of our scatter plot
-tidy.prcomp_exploratory <- function(x, type="variances", n_sample=5000, pretty.name=FALSE, normalize_data=FALSE, ...) { #TODO: add test
+tidy.prcomp_exploratory <- function(x, type="variances", n_sample=5000, pretty.name=FALSE, normalize_data=FALSE, n_sample_gathered_data=NULL, ...) { #TODO: add test
   if (type == "variances") {
     res <- as.data.frame(x$sdev*x$sdev) # square it to make it variance
     colnames(res)[1] <- "variance"
@@ -130,6 +130,11 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=5000, pretty.n
     column_names <- attr(x$rotation, "dimname")[[1]] 
     if (normalize_data) {
       res <- res %>% mutate_at(column_names, exploratory::normalize)
+    }
+
+    if (!is.null(n_sample_gathered_data)) {
+      n_sample_orig_data <- floor(n_sample_gathered_data / length(column_name))
+      res <- res %>% dplyr::sample_n(n_sample_orig_data)
     }
 
     if (type == "gathered_data") { # for boxplot. this is only when with kmeans.
