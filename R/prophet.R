@@ -83,6 +83,12 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
     }
   }
 
+  if(!is.null(regressors)) {
+    if(is.null(value_col)){
+      stop("Value column must be specified to make forecast with extra regressors.")
+    }
+  }
+
   summarise_args <- list() # default empty list
   if (!is.null(regressors) && !is.null(funs.aggregate.regressors)) {
     summarise_args <- purrr::map2(funs.aggregate.regressors, regressors, function(func, cname) {

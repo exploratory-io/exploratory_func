@@ -121,6 +121,7 @@ test_that("do_prophet with extra regressor", {
 test_that("do_prophet test mode with extra regressor", {
   ts <- seq.Date(as.Date("2010-01-01"), as.Date("2012-01-01"), by="day")
   raw_data <- data.frame(timestamp=ts, data=runif(length(ts)))
+  raw_data$data[[length(ts) - 2]] <- NA # inject NA near the end to test #9211
   # here refressor data is till 2013-01-01, but the part after 2012-01-01 should be ignored.
   ts2 <- seq.Date(as.Date("2010-01-01"), as.Date("2013-01-01"), by="day")
   regressor_data <- data.frame(timestamp=ts2, regressor=runif(length(ts2)))
