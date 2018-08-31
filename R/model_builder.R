@@ -150,8 +150,8 @@ build_kmeans.cols <- function(df, ...,
                             trace = FALSE,
                             keep.source = TRUE,
                             seed=0,
-                            augment=TRUE,
-                            group_cols = c()){
+                            augment=TRUE
+                            ){
   validate_empty_data(df)
 
   loadNamespace("dplyr")
