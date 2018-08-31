@@ -137,6 +137,14 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
       df <- df %>% dplyr::filter(!is.na(UQ(rlang::sym(value_col))))
       max_floored_date <- lubridate::floor_date(max(df[[time_col]]), unit = time_unit)
       future_df <- future_df %>% dplyr::filter(lubridate::floor_date(UQ(rlang::sym(value_col)), unit = time_unit) > max_floored_date)
+
+      aggregated_future_data <- future_df %>%
+        dplyr::transmute(
+          ds = lubridate::floor_date(UQ(rlang::sym(time_col)), unit = time_unit),
+          !!!rlang::syms(regressors)
+        ) %>%
+        dplyr::group_by(ds) %>%
+        dplyr::summarise(!!!summarise_args)
     }
 
     # note that prophet only takes columns with predetermined names like ds, y, cap, as input
