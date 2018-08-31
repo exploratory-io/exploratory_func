@@ -1,4 +1,4 @@
-
+# internal function to iterate number of centers (k) from 1 to max_centers for elbow method to find optimal k.
 iterate_kmeans <- function(df, max_centers = 10,
                            iter.max = 10,
                            nstart = 1,

@@ -137,7 +137,7 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=5000, pretty.n
       res <- res %>% dplyr::sample_n(n_sample_orig_data)
     }
 
-    if (type == "gathered_data") { # for boxplot. this is only when with kmeans.
+    if (type == "gathered_data") { # for boxplot and paralell coordinates. this is only when with kmeans.
       res <- res %>% select(!!c(column_names,"cluster"))
       res <- res %>% mutate(row_id=seq(n())) # row_id for line representation.
       res <- res %>% gather(key="key",value="value",!!column_names)
