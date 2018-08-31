@@ -92,6 +92,13 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
     names(summarise_args) <- regressors
   }
 
+  filter_args <- list() # default empty list
+  if (!is.null(regressors)) {
+    filter_args <- purrr::map(regressors, function(cname) {
+      quo(!is.na(UQ(rlang::sym(cname))))
+    })
+  }
+
   # remove NA data
   df <- df[!is.na(df[[time_col]]), ]
 
@@ -120,6 +127,12 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
     if(!is.null(grouped_col)){
       # drop grouping columns
       df <- df[, !colnames(df) %in% grouped_col]
+    }
+
+    if (!is.null(regressors)) { # extra regressor case
+      # filter NAs on regressor columns
+      df <- df %>% dplyr::filter(!!!filter_args)
+      df <- df %>% dplyr::mutate(floored_time = lubridate::floor_date(df[[time_col]], unit = time_unit))
     }
 
     # note that prophet only takes columns with predetermined names like ds, y, cap, as input
