@@ -256,6 +256,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
         # if future data frame is without cap, use it just as a future data frame.
       }
       m <- prophet::prophet(training_data, fit = FALSE, growth = growth, weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
+      # add regressors to the model.
       if (!is.null(regressors)) {
         for (regressor in regressors) {
           m <- add_regressor(m, regressor)
@@ -298,7 +299,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
       }
       future <- prophet::make_future_dataframe(m, periods = periods, freq = time_unit_for_future_dataframe, include_history = include_history) #includes past dates
       if (!is.null(regressors)) {
-        regressor_data <- aggregated_data %>% # TODO: handle case with cap
+        regressor_data <- aggregated_data %>%
           dplyr::select(-y) %>%
           dplyr::bind_rows(aggregated_future_data)
         if (lubridate::is.Date(regressor_data$ds)) { # make ds POSIXct so that inner_join works. TODO: is is possible that future$ds is POSIXlt??
