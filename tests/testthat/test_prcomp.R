@@ -9,7 +9,6 @@ test_that("do_prcomp", {
   model_df %>% tidy(model, type="loadings")
   model_df %>% tidy(model, type="biplot")
   model_df %>% tidy(model, type="data")
-  res <- model_df %>% tidy(model, type="gathered_data")
 })
 
 test_that("do_prcomp with strange column name", {
@@ -21,5 +20,4 @@ test_that("do_prcomp with strange column name", {
   model_df %>% tidy(model, type="loadings")
   model_df %>% tidy(model, type="biplot")
   model_df %>% tidy(model, type="data")
-  model_df %>% tidy(model, type="gathered_data")
 })
