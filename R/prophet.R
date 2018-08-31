@@ -131,11 +131,12 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
     if (!is.null(regressors)) { # extra regressor case. separate the df into history and future based on the value is filled or not.
       # filter NAs on regressor columns
       df <- df %>% dplyr::filter(!!!filter_args)
-      future_df <- df
-      df <- df %>% dplyr::filter(!is.na(UQ(rlang::sym(value_col))))
+      future_df <- df # keep all rows before df is filtered out.
+      df <- df %>% dplyr::filter(!is.na(UQ(rlang::sym(value_col)))) # keep the rows that has values. the ones that do not are for future regressors
       max_floored_date <- lubridate::floor_date(max(df[[time_col]]), unit = time_unit)
       future_df <- future_df %>% dplyr::filter(lubridate::floor_date(UQ(rlang::sym(time_col)), unit = time_unit) > max_floored_date)
 
+      # TODO: in test mode, this is not really necessary. optimize.
       aggregated_future_data <- future_df %>%
         dplyr::transmute(
           ds = lubridate::floor_date(UQ(rlang::sym(time_col)), unit = time_unit),
@@ -144,7 +145,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
         dplyr::group_by(ds) %>%
         dplyr::summarise(!!!summarise_args)
     }
-    else if(!is.null(value_col)) { # if value column is specified (i.e. value is not number of rows), filter NA rows.
+    else if(!is.null(value_col)) { # no-extra regressor case. if value column is specified (i.e. value is not number of rows), filter NA rows.
       df <- df[!is.na(df[[value_col]]), ]
     }
 
@@ -298,7 +299,9 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
           regressor_data$ds <- as.POSIXct(regressor_data$ds)
         }
         future <- future %>%
-          dplyr::inner_join(regressor_data, by=c('ds'='ds')) # inner_join to keep only rows with regressor values.
+          # inner_join to keep only rows with regressor values.
+          # this works for test mode too, since aggregated_future_data part is ignored by inner_join.
+          dplyr::inner_join(regressor_data, by=c('ds'='ds'))
       }
       if (!is.null(cap)) { # set cap to future table too, if it is there
         future[["cap"]] <- cap
