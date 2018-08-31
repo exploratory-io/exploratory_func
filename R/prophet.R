@@ -240,12 +240,13 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
       # in this case, cap is the future data frame with cap, specified by user.
       # this is a back door to allow user to specify cap column.
       if (!is.null(cap$cap)) {
-        m <- prophet::prophet(training_data, growth = "logistic", weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
+        growth <- "logistic"
       }
       else {
+        growth <- "linear"
         # if future data frame is without cap, use it just as a future data frame.
-        m <- prophet::prophet(training_data, growth = "linear", weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
       }
+      m <- prophet::prophet(training_data, growth = growth, weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
       forecast <- stats::predict(m, cap_df)
     }
     else {
@@ -256,11 +257,12 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
         }
       }
       if (!is.null(cap)) { # if cap is set, use logistic. otherwise use linear.
-        m <- prophet::prophet(training_data, growth = "logistic", weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
+        growth <- "logistic"
       }
       else {
-        m <- prophet::prophet(training_data, growth = "linear", weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
+        growth <- "linear"
       }
+      m <- prophet::prophet(training_data, growth = growth, weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
       if (time_unit == "hour") {
         time_unit_for_future_dataframe = 3600
       }
