@@ -45,8 +45,9 @@ do_prcomp <- function(df, ...) { # TODO: write test
 
 #' extracts results from prcomp as a dataframe
 #' @export
-#' @param n_sample Sample number for biplot. Default 5000, which is the default of our scatter plot
-tidy.prcomp_exploratory <- function(x, type="variances", n_sample=5000, pretty.name=FALSE, normalize_data=FALSE, n_sample_gathered_data=NULL, ...) { #TODO: add test
+#' @param n_sample Sample number for biplot. Default 5000, which is the default of our scatter plot.
+#'        we use it for gathered_data for parallel coordinates too. sampling is applied before gather.
+tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.name=FALSE, normalize_data=FALSE, ...) { #TODO: add test
   if (type == "variances") {
     res <- as.data.frame(x$sdev*x$sdev) # square it to make it variance
     colnames(res)[1] <- "variance"
@@ -72,6 +73,9 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=5000, pretty.n
     # prepare scores matrix
     scores_matrix <- x$x[,1:2] # keep only PC1 and PC2 for biplot
 
+    if (is.null(n_sample)) { # set default of 5000 for biplot case.
+      n_sample = 5000
+    }
     # sum of number of loading rows times 2 (because it is line between 2 points) and number of score rows should fit in n_sample.
     score_n_sample <- n_sample - nrow(loadings_matrix)*2
 
@@ -132,9 +136,10 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=5000, pretty.n
       res <- res %>% mutate_at(column_names, exploratory::normalize)
     }
 
-    if (!is.null(n_sample_gathered_data)) {
-      n_sample_orig_data <- floor(n_sample_gathered_data / length(column_names))
-      res <- res %>% dplyr::sample_n(n_sample_orig_data)
+    if (!is.null(n_sample)) { # default is no sampling.
+      # limit n_sample so that no more dots are created than the max that can be plotted on scatter plot, which is 5000.
+      n_sample <- min(n_sample, floor(5000 / length(column_names)))
+      res <- res %>% dplyr::sample_n(n_sample)
     }
 
     if (type == "gathered_data") { # for boxplot and paralell coordinates. this is only when with kmeans.
