@@ -81,7 +81,6 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
     if(value_col %in% grouped_col){
       stop(paste0(value_col, " is grouped. Please ungroup it."))
     }
-    # df <- df[!is.na(df[[value_col]]), ] TODO: can we just remove this for regressor support??
   }
 
   summarise_args <- list() # default empty list
@@ -129,8 +128,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
       df <- df[, !colnames(df) %in% grouped_col]
     }
 
-    # extra regressor case. separate the df into history and future based on the value is filled or not.
-    if (!is.null(regressors)) {
+    if (!is.null(regressors)) { # extra regressor case. separate the df into history and future based on the value is filled or not.
       # filter NAs on regressor columns
       df <- df %>% dplyr::filter(!!!filter_args)
       future_df <- df
@@ -146,6 +144,10 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
         dplyr::group_by(ds) %>%
         dplyr::summarise(!!!summarise_args)
     }
+    else if(!is.null(value_col)) { # if value column is specified (i.e. value is not number of rows), filter NA rows.
+      df <- df[!is.na(df[[value_col]]), ]
+    }
+
 
     # note that prophet only takes columns with predetermined names like ds, y, cap, as input
     aggregated_data <- if (!is.null(value_col) && ("cap" %in% colnames(df))) {
