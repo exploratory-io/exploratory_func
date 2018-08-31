@@ -129,10 +129,14 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
       df <- df[, !colnames(df) %in% grouped_col]
     }
 
-    if (!is.null(regressors)) { # extra regressor case
+    # extra regressor case. separate the df into history and future based on the value is filled or not.
+    if (!is.null(regressors)) {
       # filter NAs on regressor columns
       df <- df %>% dplyr::filter(!!!filter_args)
-      df <- df %>% dplyr::mutate(floored_time = lubridate::floor_date(df[[time_col]], unit = time_unit))
+      future_df <- df
+      df <- df %>% dplyr::filter(!is.na(UQ(rlang::sym(value_col))))
+      max_floored_date <- lubridate::floor_date(max(df[[time_col]]), unit = time_unit)
+      future_df <- future_df %>% dplyr::filter(lubridate::floor_date(UQ(rlang::sym(value_col)), unit = time_unit) > max_floored_date)
     }
 
     # note that prophet only takes columns with predetermined names like ds, y, cap, as input
