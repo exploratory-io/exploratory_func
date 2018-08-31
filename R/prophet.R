@@ -247,7 +247,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
         # if future data frame is without cap, use it just as a future data frame.
       }
       m <- prophet::prophet(training_data, fit = FALSE, growth = growth, weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
-      if (!is.na(regressors)) {
+      if (!is.null(regressors)) {
         for (regressor in regressors) {
           m <- add_regressor(m, regressor)
         }
@@ -269,7 +269,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
         growth <- "linear"
       }
       m <- prophet::prophet(training_data, fit = FALSE, growth = growth, weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
-      if (!is.na(regressors)) {
+      if (!is.null(regressors)) {
         for (regressor in regressors) {
           m <- add_regressor(m, regressor)
         }
@@ -288,6 +288,8 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
         time_unit_for_future_dataframe = time_unit
       }
       future <- prophet::make_future_dataframe(m, periods = periods, freq = time_unit_for_future_dataframe, include_history = include_history) #includes past dates
+      if (!is.null(regressors)) {
+      }
       if (!is.null(cap)) { # set cap to future table too, if it is there
         future[["cap"]] <- cap
         if (!is.null(floor)) { # set floor if it is there
