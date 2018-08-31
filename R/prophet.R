@@ -81,7 +81,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
     if(value_col %in% grouped_col){
       stop(paste0(value_col, " is grouped. Please ungroup it."))
     }
-    df <- df[!is.na(df[[value_col]]), ]
+    # df <- df[!is.na(df[[value_col]]), ] TODO: can we just remove this for regressor support??
   }
 
   summarise_args <- list() # default empty list
