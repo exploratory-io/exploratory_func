@@ -289,6 +289,11 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
       }
       future <- prophet::make_future_dataframe(m, periods = periods, freq = time_unit_for_future_dataframe, include_history = include_history) #includes past dates
       if (!is.null(regressors)) {
+        regressor_data <- aggregated_data %>% # TODO: handle case with cap
+          dplyr::select(-y) %>%
+          dplyr::bind_rows(aggregated_future_data)
+        future <- future %>%
+          dplyr::inner_join(regressor_data, by=c('ds'='ds')) # inner_join to keep only rows with regressor values.
       }
       if (!is.null(cap)) { # set cap to future table too, if it is there
         future[["cap"]] <- cap
