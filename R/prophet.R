@@ -151,30 +151,34 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
     aggregated_data <- if (!is.null(value_col) && ("cap" %in% colnames(df))) {
       # preserve cap column if it is there, so that cap argument as future data frame works.
       # apply same aggregation as value to cap.
-      data.frame(
-        ds = lubridate::floor_date(df[[time_col]], unit = time_unit),
-        value = df[[value_col]],
-        cap_col = df$cap
-      ) %>%
+      df %>%
+        dplyr::transmute(
+          ds = lubridate::floor_date(UQ(rlang::sym(time_col)), unit = time_unit),
+          value = UQ(rlang::sym(value_col)),
+          cap_col = cap,
+          !!!rlang::syms(regressors) # this should be able to handle regressor=NULL case fine.
+        ) %>%
         # remove NA so that we do not pass data with NA, NaN, or 0 to prophet, which we are not very sure what would happen.
         # we saw a case where rstan crashes with the last row with 0 y value.
         dplyr::filter(!is.na(value)) %>%
         dplyr::group_by(ds) %>%
         dplyr::summarise(y = fun.aggregate(value), cap = fun.aggregate(cap_col), !!!summarise_args)
     } else if (!is.null(value_col)){
-      data.frame(
-        ds = lubridate::floor_date(df[[time_col]], unit = time_unit),
-        value = df[[value_col]]
-      ) %>%
+      df %>%
+        dplyr::transmute(
+          ds = lubridate::floor_date(UQ(rlang::sym(time_col)), unit = time_unit),
+          value = UQ(rlang::sym(value_col)),
+          !!!rlang::syms(regressors) # this should be able to handle regressor=NULL case fine.
+        ) %>%
         dplyr::filter(!is.na(value)) %>% # remove NA so that we do not pass data with NA, NaN, or 0 to prophet
         dplyr::group_by(ds) %>%
         dplyr::summarise(y = fun.aggregate(value), !!!summarise_args)
-    } else {
+    } else { # in this case we do not support extra regressors since there is no way to detect bounndary between history and future
       data.frame(
         ds = lubridate::floor_date(df[[time_col]], unit = time_unit)
       ) %>%
         dplyr::group_by(ds) %>%
-        dplyr::summarise(y = n(), !!!summarise_args)
+        dplyr::summarise(y = n())
     }
 
     if (time_unit %in% c("week", "month", "quarter", "year")) { # if time_unit is larger than day (the next level is week), having weekly.seasonality does not make sense.
