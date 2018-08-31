@@ -247,6 +247,11 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
         # if future data frame is without cap, use it just as a future data frame.
       }
       m <- prophet::prophet(training_data, fit = FALSE, growth = growth, weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
+      if (!is.na(regressors)) {
+        for (regressor in regressors) {
+          m <- add_regressor(m, regressor)
+        }
+      }
       m <- fit.prophet(m, training_data)
       forecast <- stats::predict(m, cap_df)
     }
@@ -264,6 +269,11 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
         growth <- "linear"
       }
       m <- prophet::prophet(training_data, fit = FALSE, growth = growth, weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
+      if (!is.na(regressors)) {
+        for (regressor in regressors) {
+          m <- add_regressor(m, regressor)
+        }
+      }
       m <- fit.prophet(m, training_data)
       if (time_unit == "hour") {
         time_unit_for_future_dataframe = 3600
