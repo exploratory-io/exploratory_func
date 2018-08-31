@@ -105,6 +105,19 @@ test_that("do_prophet test mode with year as time units", {
   expect_true(!is.na(ret$forecasted_value[[length(ret$forecasted_value)]]))
 })
 
+test_that("do_prophet with extra regressor", {
+  ts <- seq.Date(as.Date("2010-01-01"), as.Date("2012-01-01"), by="day")
+  raw_data <- data.frame(timestamp=ts, data=runif(length(ts)))
+  ts2 <- seq.Date(as.Date("2010-01-01"), as.Date("2013-01-01"), by="day")
+  regressor_data <- data.frame(timestamp=ts2, regressor=runif(length(ts2)))
+  combined_data <- raw_data %>% full_join(regressor_data, by=c("timestamp"="timestamp"))
+  ret <- combined_data %>%
+    do_prophet(timestamp, data, 10, time_unit = "day", regressors = c("regressor"), funs.aggregate.regressors = c(mean))
+  # verify that the last forecasted_value is not NA
+  expect_true(!is.na(ret$forecasted_value[[length(ret$forecasted_value)]]))
+  expect_equal(ret$timestamp[[length(ret$timestamp)]], as.Date("2012-01-11"))
+})
+
 
 test_that("do_prophet grouped case", {
   data("raw_data", package = "AnomalyDetection")
