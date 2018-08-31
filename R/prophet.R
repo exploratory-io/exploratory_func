@@ -136,7 +136,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
       future_df <- df
       df <- df %>% dplyr::filter(!is.na(UQ(rlang::sym(value_col))))
       max_floored_date <- lubridate::floor_date(max(df[[time_col]]), unit = time_unit)
-      future_df <- future_df %>% dplyr::filter(lubridate::floor_date(UQ(rlang::sym(value_col)), unit = time_unit) > max_floored_date)
+      future_df <- future_df %>% dplyr::filter(lubridate::floor_date(UQ(rlang::sym(time_col)), unit = time_unit) > max_floored_date)
 
       aggregated_future_data <- future_df %>%
         dplyr::transmute(
@@ -292,6 +292,9 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
         regressor_data <- aggregated_data %>% # TODO: handle case with cap
           dplyr::select(-y) %>%
           dplyr::bind_rows(aggregated_future_data)
+        if (lubridate::is.Date(regressor_data$ds)) { # make ds POSIXct so that inner_join works. TODO: is is possible that future$ds is POSIXlt??
+          regressor_data$ds <- as.POSIXct(regressor_data$ds)
+        }
         future <- future %>%
           dplyr::inner_join(regressor_data, by=c('ds'='ds')) # inner_join to keep only rows with regressor values.
       }
