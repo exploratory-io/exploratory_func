@@ -89,6 +89,11 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
     }
   }
 
+  if (!is.null(cap) && !is.data.frame(cap) && !is.null(floor) && cap <= floor) {
+    # validate this case. otherwise, the error will be misterious "missing value where TRUE/FALSE needed".
+    stop("cap must be greater than floor.")
+  }
+
   summarise_args <- list() # default empty list
   if (!is.null(regressors) && !is.null(funs.aggregate.regressors)) {
     summarise_args <- purrr::map2(funs.aggregate.regressors, regressors, function(func, cname) {
