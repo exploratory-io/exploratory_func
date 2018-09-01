@@ -2,11 +2,16 @@
 
 #' NSE version of do_prophet_
 #' @export
-do_prophet <- function(df, time, value = NULL, holiday = NULL, ...){
+do_prophet <- function(df, time, value = NULL, periods, holiday = NULL, ...){
   time_col <- col_name(substitute(time))
   value_col <- col_name(substitute(value))
-  holiday_col <- col_name(substitute(holiday))
-  do_prophet_(df, time_col, value_col, holiday_col = holiday_col, ...)
+  if (!is.null(holiday)) {
+    holiday_col <- col_name(substitute(holiday))
+  }
+  else {
+    holiday_col <- NULL
+  }
+  do_prophet_(df, time_col, value_col, periods, holiday_col = holiday_col, ...)
 }
 
 #' Forecast time series data
