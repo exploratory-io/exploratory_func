@@ -2,10 +2,11 @@
 
 #' NSE version of do_prophet_
 #' @export
-do_prophet <- function(df, time, value = NULL, ...){
+do_prophet <- function(df, time, value = NULL, holiday = NULL, ...){
   time_col <- col_name(substitute(time))
   value_col <- col_name(substitute(value))
-  do_prophet_(df, time_col, value_col, ...)
+  holiday_col <- col_name(substitute(holiday))
+  do_prophet_(df, time_col, value_col, holiday_col = holiday_col, ...)
 }
 
 #' Forecast time series data
@@ -40,7 +41,8 @@ do_prophet <- function(df, time, value = NULL, ...){
 #' @param uncertainty.samples - Number of simulations made for calculating uncertainty intervals. Default is 1000.
 #' @export
 do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "day", include_history = TRUE, test_mode = FALSE,
-                        fun.aggregate = sum, cap = NULL, floor = NULL, growth = NULL, weekly.seasonality = TRUE, yearly.seasonality = TRUE, holidays = NULL,
+                        fun.aggregate = sum, cap = NULL, floor = NULL, growth = NULL, weekly.seasonality = TRUE, yearly.seasonality = TRUE,
+                        holiday_col = NULL, holidays = NULL,
                         regressors = NULL, funs.aggregate.regressors = NULL, ...){
   validate_empty_data(df)
 
