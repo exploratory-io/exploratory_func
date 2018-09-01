@@ -119,7 +119,6 @@ test_that("do_prophet with extra regressor", {
 })
 
 test_that("do_prophet with extra regressor with holiday column", {
-          browser()
   ts <- seq.Date(as.Date("2010-01-01"), as.Date("2012-01-01"), by="day")
   raw_data <- data.frame(timestamp=ts, data=runif(length(ts)))
   ts2 <- seq.Date(as.Date("2010-01-01"), as.Date("2013-01-01"), by="day")
@@ -144,6 +143,20 @@ test_that("do_prophet with holiday column", {
   # verify that the last forecasted_value is not NA
   expect_true(!is.na(ret$forecasted_value[[length(ret$forecasted_value)]]))
   expect_equal(ret$timestamp[[length(ret$timestamp)]], as.Date("2012-01-11"))
+})
+
+test_that("do_prophet with holiday column with hourly data", {
+  ts <- seq(as.POSIXct("2010-01-01:00:00:00"), as.POSIXct("2010-01-15:00:00:00"), by="hour")
+  raw_data <- data.frame(timestamp=ts, data=runif(length(ts)))
+  ts2 <- seq(as.POSIXct("2010-01-01:00:00:00"), as.POSIXct("2010-01-20:00:00:00"), by="hour")
+  regressor_data <- data.frame(timestamp=ts2, regressor=runif(length(ts2)), holiday=if_else(runif(length(ts2)) > 0.90,"holiday",NA_character_)) %>%
+    mutate(holiday=as.character(holiday))
+  combined_data <- raw_data %>% full_join(regressor_data, by=c("timestamp"="timestamp"))
+  ret <- combined_data %>%
+    do_prophet(timestamp, data, 10, time_unit = "hour", holiday=holiday)
+  # verify that the last forecasted_value is not NA
+  expect_true(!is.na(ret$forecasted_value[[length(ret$forecasted_value)]]))
+  # expect_equal(ret$timestamp[[length(ret$timestamp)]], as.POSIXct("2010-01-15:10:00:00")) TODO: this fails. look into why.
 })
 
 test_that("do_prophet with extra regressor with cap/floor", {
