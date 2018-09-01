@@ -141,6 +141,17 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
       }
     }
 
+    # extract holiday df from main df
+    if (is.null(holidays_df) && !is.null(holiday_col)) {
+      holidays_df <- df %>%
+        dplyr::transmute(
+          ds = lubridate::floor_date(UQ(rlang::sym(time_col)), unit = time_unit),
+          holiday = UQ(rlang::sym(holiday_col))
+        ) %>%
+        dplyr::group_by(ds) %>%
+        dplyr::summarise(holiday = first(holiday[!is.na(holiday)])) # take first non-NA value for aggregation.
+    }
+
     if(!is.null(grouped_col)){
       # drop grouping columns
       df <- df[, !colnames(df) %in% grouped_col]
