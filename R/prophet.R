@@ -146,6 +146,10 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
         dplyr::group_by(ds) %>%
         dplyr::summarise(holiday = first(holiday[!is.na(holiday)])) %>% # take first non-NA value for aggregation.
         dplyr::filter(!is.na(holiday))
+      # Passing empty dataframe causes prophet error: "Column `ds` is of unsupported type NULL". Set it back to NULL if empty.
+      if (nrow(holidays_df) == 0) {
+        holidays_df <- NULL
+      }
     }
 
     if(!is.null(grouped_col)){
