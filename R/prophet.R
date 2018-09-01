@@ -5,12 +5,7 @@
 do_prophet <- function(df, time, value = NULL, periods, holiday = NULL, ...){
   time_col <- col_name(substitute(time))
   value_col <- col_name(substitute(value))
-  if (!is.null(holiday)) {
-    holiday_col <- col_name(substitute(holiday))
-  }
-  else {
-    holiday_col <- NULL
-  }
+  holiday_col <- col_name(substitute(holiday))
   do_prophet_(df, time_col, value_col, periods, holiday_col = holiday_col, ...)
 }
 
@@ -149,7 +144,8 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
           holiday = UQ(rlang::sym(holiday_col))
         ) %>%
         dplyr::group_by(ds) %>%
-        dplyr::summarise(holiday = first(holiday[!is.na(holiday)])) # take first non-NA value for aggregation.
+        dplyr::summarise(holiday = first(holiday[!is.na(holiday)])) %>% # take first non-NA value for aggregation.
+        dplyr::filter(!is.na(holiday))
     }
 
     if(!is.null(grouped_col)){
