@@ -215,6 +215,59 @@ getMongoURL <- function(host = NULL, port, database, username, pass, isSSL=FALSE
   return (url)
 }
 
+# glue transformer for mongo js query.
+# supports character, factor, logical, Date, POSIXct, POSIXlt, and numeric.
+js_glue_transformer <- function(code, envir) {
+  val <- eval(parse(text = code), envir)
+  if (is.character(val) || is.factor(val)) {
+    # escape for js
+    val <- gsub("\\", "\\\\", val, fixed=TRUE)
+    val <- gsub("\"", "\\\"", val, fixed=TRUE)
+    val <- paste0('"', val, '"')
+  }
+  else if (is.logical(val)) {
+    val <- ifelse(val, "true", "false")
+  }
+  else if (lubridate::is.Date(val) || lubridate::is.POSIXt(val)) {
+    val <- paste0("new Date(\"", readr::parse_character(val), "\")")
+  }
+  # Interpret NA to null.
+  # https://docs.mongodb.com/manual/tutorial/query-for-null-fields/
+  val <- ifelse(is.na(val), "null", val)
+
+  # for numeric it should work as is. expression like 1e+10 works on js too.
+  glue::collapse(val, sep=", ")
+}
+
+odbc_glue_transformer <- function(code, envir) {
+  val <- eval(parse(text = code), envir)
+  if (is.character(val) || is.factor(val)) {
+    # escape for SQL
+    # TODO: check if this makes sense for Dremio and Athena
+    val <- gsub("'", "''", val, fixed=TRUE) # both Oracle and SQL Server escapes single quote by doubling them.
+    val <- paste0("'", val, "'") # both Oracle and SQL Server quotes strings with single quote.
+  }
+  # TODO: How should we handle logical, Date, POSIXct, POSIXlt?
+  #       Does expression like 1e+10 work?
+  # TODO: Need to handle NA here. Find out appropriate way.
+  glue::collapse(val, sep=", ")
+}
+
+bigquery_glue_transformer <- function(code, envir) {
+  val <- eval(parse(text = code), envir)
+  if (is.character(val) || is.factor(val)) {
+    # escape for Standard SQL for bigquery
+    # https://cloud.google.com/bigquery/docs/reference/standard-sql/lexical
+    # escape for js
+    val <- gsub("\\", "\\\\", val, fixed=TRUE)
+    val <- gsub("\"", "\\\"", val, fixed=TRUE)
+    val <- paste0('"', val, '"')
+  }
+  # TODO: How should we handle logical, Date, POSIXct, POSIXlt?
+  #       Does expression like 1e+10 work?
+  # TODO: Need to handle NA here. Find out appropriate way.
+  glue::collapse(val, sep=", ")
+}
 
 #' @export
 queryMongoDB <- function(host = NULL, port = "", database, collection, username, password, query = "{}", flatten,
@@ -222,7 +275,6 @@ queryMongoDB <- function(host = NULL, port = "", database, collection, username,
                          skip=0, queryType = "find", pipeline="{}", cluster = NULL, timeout = NULL, additionalParamas = NULL, ...){
   if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
   loadNamespace("jsonlite")
-  if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
 
   # read stored password
   pass = saveOrReadPassword("mongodb", username, password)
@@ -238,8 +290,9 @@ queryMongoDB <- function(host = NULL, port = "", database, collection, username,
   tryCatch({
     if(queryType == "aggregate"){
       pipeline <- convertUserInputToUtf8(pipeline)
-      # set envir = parent.frame() to get variables from users environment, not papckage environment
-      pipeline <- GetoptLong::qq(pipeline, envir = parent.frame())
+      # set .envir = parent.frame() to get variables from users environment, not papckage environment
+      # use <<>> instead of default {} to avoid conflict with js syntax. @{} did not work because }} can appear in js.
+      pipeline <- glue::glue(pipeline, .transformer=js_glue_transformer, .open = "<<", .close = ">>", .envir = parent.frame())
       # convert js query into mongo JSON, which mongolite understands.
       pipeline <- jsToMongoJson(pipeline)
       data <- con$aggregate(pipeline = pipeline)
@@ -247,8 +300,9 @@ queryMongoDB <- function(host = NULL, port = "", database, collection, username,
       query <- convertUserInputToUtf8(query)
       fields <- convertUserInputToUtf8(fields)
       sort <- convertUserInputToUtf8(sort)
-      # set envir = parent.frame() to get variables from users environment, not package environment
-      query <- GetoptLong::qq(query, envir = parent.frame())
+      # set .envir = parent.frame() to get variables from users environment, not papckage environment
+      # use <<>> instead of default {} to avoid conflict with js syntax. @{} did not work because }} can appear in js.
+      query <- glue::glue(query, .transformer=js_glue_transformer, .open = "<<", .close = ">>", .envir = parent.frame())
       # convert js query into mongo JSON, which mongolite understands.
       query <- jsToMongoJson(query)
       fields <- jsToMongoJson(fields)
@@ -327,7 +381,6 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
   if(type == "mongodb") {
     if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
     loadNamespace("jsonlite")
-    if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
     if(!is.null(host) && host != ''){
       key <- paste("mongodb", host, port, databaseName, collection, username, toString(isSSL), authSource, additionalParams, sep = ":")
     } else if (!is.null(cluster) && cluster != '') {
@@ -437,7 +490,6 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     # do those package loading only when we need to use odbc in this if statement,
     # so that we will not have error at our server environemnt where RODBC is not there.
     if(!requireNamespace("RODBC")){stop("package RODBC must be installed.")}
-    if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
 
     loadNamespace("RODBC")
     connect <- function() {
@@ -626,7 +678,7 @@ executeGenericQuery <- function(type, host, port, databaseName, username, passwo
   tryCatch({
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
-    resultSet <- DBI::dbSendQuery(conn, GetoptLong::qq(query, envir = parent.frame()))
+    resultSet <- DBI::dbSendQuery(conn, glue::glue_sql(query, .con = conn, .envir = parent.frame()))
     df <- DBI::dbFetch(resultSet)
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
@@ -677,7 +729,6 @@ queryNeo4j <- function(host, port,  username, password, query, isSSL = FALSE, ..
 queryMySQL <- function(host, port, databaseName, username, password, numOfRows = -1, query, ...){
   if(!requireNamespace("RMySQL")){stop("package RMySQL must be installed.")}
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
-  if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
 
   # read stored password
   pass = saveOrReadPassword("mysql", username, password)
@@ -687,7 +738,7 @@ queryMySQL <- function(host, port, databaseName, username, password, numOfRows =
     DBI::dbGetQuery(conn,"set names utf8")
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
-    resultSet <- RMySQL::dbSendQuery(conn, GetoptLong::qq(query, envir = parent.frame()))
+    resultSet <- RMySQL::dbSendQuery(conn, glue::glue_sql(query, .con = conn, .envir = parent.frame()))
     df <- RMySQL::dbFetch(resultSet, n = numOfRows)
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
@@ -702,7 +753,6 @@ queryMySQL <- function(host, port, databaseName, username, password, numOfRows =
 queryPostgres <- function(host, port, databaseName, username, password, numOfRows = -1, query, ...){
   if(!requireNamespace("RPostgreSQL")){stop("package RPostgreSQL must be installed.")}
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
-  if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
 
   # read stored password
   pass = saveOrReadPassword("postgres", username, password)
@@ -711,7 +761,7 @@ queryPostgres <- function(host, port, databaseName, username, password, numOfRow
   tryCatch({
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
-    resultSet <- RPostgreSQL::dbSendQuery(conn, GetoptLong::qq(query, envir = parent.frame()))
+    resultSet <- RPostgreSQL::dbSendQuery(conn, glue::glue_sql(query, .con = conn, .envir = parent.frame()))
     df <- DBI::dbFetch(resultSet, n = numOfRows)
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
@@ -725,13 +775,14 @@ queryPostgres <- function(host, port, databaseName, username, password, numOfRow
 #' @export
 queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, query, stringsAsFactors = FALSE, host="", port="", ...){
   if(!requireNamespace("RODBC")){stop("package RODBC must be installed.")}
-  if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
 
   conn <- getDBConnection("odbc", host, port, NULL, username, password, dsn = dsn, additionalParams = additionalParams)
   tryCatch({
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
-    df <- RODBC::sqlQuery(conn, GetoptLong::qq(query, envir = parent.frame()), max = numOfRows, stringsAsFactors=stringsAsFactors)
+    query <- glue::glue(query, .transformer=odbc_glue_transformer, .envir = parent.frame())
+    df <- RODBC::sqlQuery(conn, query,
+                          max = numOfRows, stringsAsFactors=stringsAsFactors)
     if (!is.data.frame(df)) {
       # when it is error, RODBC::sqlQuery() does not stop() (throw) with error most of the cases.
       # in such cases, df is a character vecter rather than a data.frame.
@@ -805,11 +856,7 @@ getTwitter <- function(n=200, lang=NULL,  lastNDays=7, searchString, tokenFileId
 #' @export
 submitGoogleBigQueryJob <- function(project, sqlquery, destination_table, write_disposition = "WRITE_TRUNCATE", tokenFieldId, useStandardSQL = FALSE,  ...){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
-  if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
   if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
-
-  #GetoptLong uses stringr and str_c is called without stringr:: so need to use "require" instead of "requireNamespace"
-  if(!require("stringr")){stop("package stringr must be installed.")}
 
   token <- getGoogleTokenForBigQuery(tokenFieldId)
   bigrquery::set_access_cred(token)
@@ -822,7 +869,8 @@ submitGoogleBigQueryJob <- function(project, sqlquery, destination_table, write_
     isStandardSQL = TRUE; # honor value provided by paramerer
   }
   # set envir = parent.frame() to get variables from users environment, not papckage environment
-  job <- bigrquery::bq_perform_query(query = GetoptLong::qq(sqlquery, envir = parent.frame()), billing = project,  use_legacy_sql = !isStandardSQL)
+  sqlquery <- glue::glue(sqlquery, .transformer=bigquery_glue_transformer, .envir = parent.frame())
+  job <- bigrquery::bq_perform_query(query = sqlquery, billing = project,  use_legacy_sql = !isStandardSQL)
   bigrquery::bq_job_wait(job)
   meta <- bigrquery::bq_job_meta(job)
   isCacheHit <- meta$statistics$query$cacheHit
@@ -940,7 +988,6 @@ getDataFromGoogleBigQueryTableViaCloudStorage <- function(bucketProjectId, dataS
 #' @export
 executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 100000, maxPage = 10, writeDisposition = "WRITE_TRUNCATE", tokenFileId, bucketProjectId, bucket=NULL, folder=NULL, max_connections = 8, useStandardSQL = FALSE, ...){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
-  if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
   if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
 
   token <- getGoogleTokenForBigQuery(tokenFileId)
@@ -968,7 +1015,8 @@ executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 1
       isStandardSQL = TRUE;
     }
     # set envir = parent.frame() to get variables from users environment, not papckage environment
-    tb <- bigrquery::bq_project_query(x = project, query = GetoptLong::qq(query, envir = parent.frame()), quiet = TRUE, use_legacy_sql = !isStandardSQL)
+    query <- glue::glue(query, .transformer=bigquery_glue_transformer, .envir = parent.frame())
+    tb <- bigrquery::bq_project_query(x = project, query = query, quiet = TRUE, use_legacy_sql = !isStandardSQL)
     df <- bigrquery::bq_table_download(x = tb, max_results = Inf, page_size = pageSize, max_connections = max_connections, quiet = TRUE)
   }
   df

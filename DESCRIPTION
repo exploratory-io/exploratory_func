@@ -1,8 +1,8 @@
 Package: exploratory
 Type: Package
 Title: R package for Exploratory
-Version: 0.7.2.8
-Date: 2018-07-14
+Version: 0.7.3.0
+Date: 2018-08-31
 Authors@R: c(person("Yosuke", "Yasuda", email = "double.y.919.quick@gmail.com", role = c("aut", "cre")))
 URL: https://github.com/exploratory-io/exploratory_func
 Description: Functions for Exploratory
@@ -55,7 +55,6 @@ Suggests:
     bigrquery,
     googleCloudStorageR,
     googleAuthR,
-    GetoptLong,
     gtrendsR,
     arules,
     slam,
