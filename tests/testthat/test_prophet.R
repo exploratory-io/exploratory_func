@@ -146,7 +146,7 @@ test_that("do_prophet with holiday column", {
   expect_equal(ret$timestamp[[length(ret$timestamp)]], as.Date("2012-01-11"))
 })
 
-test_that("do_prophet with holiday column with monthly data", {
+test_that("do_prophet with regressor with holiday column with monthly data", {
   ts <- seq.Date(as.Date("2010-01-01"), as.Date("2012-01-01"), by="month")
   raw_data <- data.frame(timestamp=ts, data=runif(length(ts)))
   ts2 <- seq.Date(as.Date("2010-01-01"), as.Date("2013-01-01"), by="month")
@@ -155,7 +155,7 @@ test_that("do_prophet with holiday column with monthly data", {
     rename(`holi day`=holiday)
   combined_data <- raw_data %>% full_join(regressor_data, by=c("timestamp"="timestamp"))
   ret <- combined_data %>%
-    do_prophet(timestamp, data, 10, time_unit = "month", holiday=`holi day`)
+    do_prophet(timestamp, data, 10, time_unit = "month", regressors = c("regressor"), funs.aggregate.regressors = c(mean), holiday=`holi day`)
   # verify that the last forecasted_value is not NA
   expect_true(!is.na(ret$forecasted_value[[length(ret$forecasted_value)]]))
   expect_equal(ret$timestamp[[length(ret$timestamp)]], as.Date("2012-11-01"))
