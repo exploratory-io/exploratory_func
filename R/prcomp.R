@@ -104,7 +104,7 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
       res <- res %>% dplyr::mutate(cluster=factor(x$kmeans$cluster))
     }
 
-    if (nrow(res) > score_n_sample) {
+    if (nrow(res) > score_n_sample) { # this condition is necessary to avoid error from sample_n().
       res <- res %>% dplyr::sample_n(score_n_sample)
     }
 
@@ -139,7 +139,9 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
     if (!is.null(n_sample)) { # default is no sampling.
       # limit n_sample so that no more dots are created than the max that can be plotted on scatter plot, which is 5000.
       n_sample <- min(n_sample, floor(5000 / length(column_names)))
-      res <- res %>% dplyr::sample_n(n_sample)
+      if (nrow(res) > n_sample) { # this condition is necessary to avoid error from sample_n().
+        res <- res %>% dplyr::sample_n(n_sample)
+      }
     }
 
     if (type == "gathered_data") { # for boxplot and paralell coordinates. this is only when with kmeans.
