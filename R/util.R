@@ -1130,6 +1130,20 @@ false_count <- function(x){
   sum(!x, na.rm = TRUE)
 }
 
+#' Percentage of TRUE in a vector
+#' @param x vector
+#' @export
+true_pct <- function(x){
+  sum(x, na.rm =!all(is.na(x))) / length(x) * 100
+}
+
+#' Percentage of FALSE in a vector
+#' @param x vector
+#' @export
+false_pct <- function(x){
+  sum(!x, na.rm =!all(is.na(x))) / length(x) * 100
+}
+
 #' Count NA in a vector
 #' @param x vector
 #' @export
