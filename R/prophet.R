@@ -2,7 +2,7 @@
 
 #' NSE version of do_prophet_
 #' @export
-do_prophet <- function(df, time, value = NULL, periods, holiday = NULL, ...){
+do_prophet <- function(df, time, value = NULL, periods = 10, holiday = NULL, ...){
   time_col <- col_name(substitute(time))
   value_col <- col_name(substitute(value))
   holiday_col <- col_name(substitute(holiday))
@@ -40,7 +40,7 @@ do_prophet <- function(df, time, value = NULL, periods, holiday = NULL, ...){
 #' @param interval.width - Width of uncertainty intervals.
 #' @param uncertainty.samples - Number of simulations made for calculating uncertainty intervals. Default is 1000.
 #' @export
-do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "day", include_history = TRUE, test_mode = FALSE,
+do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit = "day", include_history = TRUE, test_mode = FALSE,
                         fun.aggregate = sum, cap = NULL, floor = NULL, growth = NULL, weekly.seasonality = TRUE, yearly.seasonality = TRUE,
                         holiday_col = NULL, holidays = NULL,
                         regressors = NULL, funs.aggregate.regressors = NULL, ...){
