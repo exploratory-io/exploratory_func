@@ -171,6 +171,7 @@ test_that("prediction with glm family (binomial) and link (probit) with target c
   test_data <- dplyr::bind_rows(test_data, test_data)
   test_data <- test_data %>% mutate(CARRIER = factor(CARRIER, ordered=TRUE)) # test handling of ordered factor
 
+  model_data <- build_lm.fast(test_data, `CANCELLED X`, `logical col`, `Carrier Name`, CARRIER, DISTANCE, predictor_n = 3, model_type = "glm", family = "poisson", link = "log")
   model_data <- build_lm.fast(test_data, `CANCELLED X`, `logical col`, `Carrier Name`, CARRIER, DISTANCE, predictor_n = 3, model_type = "glm", family = "binomial", link = "probit")
   ret <- model_data %>% broom::glance(model)
   # TODO: the returned coefficients does not show all input variables. 
