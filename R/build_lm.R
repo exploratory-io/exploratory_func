@@ -137,7 +137,8 @@ build_lm.fast <- function(df,
                     target,
                     ...,
                     model_type = "lm",
-                    model_family = NULL,
+                    family = NULL,
+                    link = NULL,
                     max_nrow = 50000,
                     predictor_n = 12, # so that at least months can fit in it.
                     smote = FALSE,
@@ -154,8 +155,8 @@ build_lm.fast <- function(df,
 
   grouped_cols <- grouped_by(df)
 
-  if (model_type  == "glm" && is.null(model_family)) {
-    model_family = "binomial" # default for glm is logistic regression.
+  if (model_type  == "glm" && is.null(family)) {
+    family = "binomial" # default for glm is logistic regression.
   }
 
   # drop unrelated columns so that SMOTE later does not have to deal with them.
@@ -177,7 +178,7 @@ build_lm.fast <- function(df,
     set.seed(seed)
   }
 
-  if (!is.null(model_type) && model_type == "glm" && model_family %in% c("binomial", "quasibinomial")) {
+  if (!is.null(model_type) && model_type == "glm" && family %in% c("binomial", "quasibinomial")) {
     # binomial case.
     unique_val <- unique(df[[target_col]])
     if (length(unique_val[!is.na(unique_val)]) != 2) {
@@ -342,7 +343,39 @@ build_lm.fast <- function(df,
         if (smote) {
           df <- df %>% exp_balance(clean_target_col, sample=FALSE) # no further sampling
         }
-        rf <- stats::glm(fml, data = df, family = model_family) 
+        if (is.null(link)) {
+          rf <- stats::glm(fml, data = df, family = family) 
+        }
+        else {
+          if (family == "gaussian") {
+            family_arg <- stats::gaussian(link=link)
+          }
+          else if (family == "binomial") {
+            family_arg <- stats::binomial(link=link)
+          }
+          else if (family == "Gamma") {
+            family_arg <- stats::Gamma(link=link)
+          }
+          else if (family == "inverse.gaussian") {
+            family_arg <- stats::inverse.gaussian(link=link)
+          }
+          else if (family == "poisson") {
+            family_arg <- stats::poisson(link=link)
+          }
+          else if (family == "quasi") {
+            family_arg <- stats::quasi(link=link)
+          }
+          else if (family == "quasibinomial") {
+            family_arg <- stats::quasibinomial(link=link)
+          }
+          else if (family == "quasipoisson") {
+            family_arg <- stats::quasipoisson(link=link)
+          }
+          else { # default gaussian
+            family_arg <- stats::gaussian(link=link)
+          }
+          rf <- stats::glm(fml, data = df, family = family_arg) 
+        }
       }
       else {
         rf <- stats::lm(fml, data = df) 

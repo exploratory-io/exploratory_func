@@ -23,7 +23,7 @@ test_that("exp_kemans with strange column name", {
   model_df %>% tidy(model, type="biplot")
   model_df %>% tidy(model, type="data")
   model_df %>% tidy(model, type="gathered_data")
-  res <- model_df %>% tidy(model, type="gathered_data", normalize_data=TRUE, n_sample=20)
+  res <- model_df %>% tidy(model, type="gathered_data", normalize_data=TRUE, n_sample=100) # testing n_sample more than nrow()
 })
 
 test_that("exp_kmeans elbow method mode", {

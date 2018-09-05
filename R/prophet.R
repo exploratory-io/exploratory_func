@@ -85,10 +85,12 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
     }
   }
 
-  if(!is.null(regressors)) {
-    if(is.null(value_col)){
+  if(!is.null(regressors) && is.null(value_col)){
       stop("Value column must be specified to make forecast with extra regressors.")
-    }
+  }
+
+  if(!is.null(holiday_col) && is.null(value_col)){
+      stop("Value column must be specified to make forecast with Holiday column.")
   }
 
   if (!is.null(cap) && !is.data.frame(cap) && !is.null(floor) && cap <= floor) {
