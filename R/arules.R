@@ -147,6 +147,9 @@ get_arules_graph_data <- function(rules, max_rules=30, rules_metric="support") {
     if (!(rules_metric == "confidence" && min(rules$confidence) == 1)) { # exception is when supports for all rules are 1.0.
       rules <- rules %>% dplyr::filter(UQ(rlang::sym(rules_metric)) != min(UQ(rlang::sym(rules_metric))))
     }
+    else {
+      rules <- rules %>% sample_n(max_rules) # in this case, just sample so that plotting will not take very long time.
+    }
   }
 
   # Give names to the rules. groceries is the dataframe that is the result of the Market Basket Analysis.
