@@ -145,7 +145,7 @@ do_tokenize <- function(df, input, token = "words", keep_cols = FALSE,  drop = T
     # always put document_id to know what document the tokens are from
     doc_id <- avoid_conflict(colnames(df), "document_id")
     # this is SE version of dplyr::mutate(df, doc_id = row_number())
-    df <- dplyr::mutate_(df, .dots=setNames(list(~row_number()),doc_id))
+    df <- dplyr::mutate_(df, .dots=setNames(list(~dplyr::row_number()),doc_id))
   }
 
   if(token %in% c("words", "characters") && with_id){
@@ -167,7 +167,7 @@ do_tokenize <- function(df, input, token = "words", keep_cols = FALSE,  drop = T
 
     # put sentence_id
     sentence_id <- avoid_conflict(colnames(df), "sentence_id")
-    tokenize_df <- dplyr::mutate_(grouped, .dots=setNames(list(~row_number()), sentence_id))
+    tokenize_df <- dplyr::mutate_(grouped, .dots=setNames(list(~dplyr::row_number()), sentence_id))
 
     # split into tokens
     tokenize_df <- dplyr::ungroup(tokenize_df)

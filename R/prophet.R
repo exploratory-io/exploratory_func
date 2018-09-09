@@ -267,7 +267,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
       # by doing so, we affect future table, and skip prediction (interpolation)
       # for all missing date/time, which could be expensive if the training data is sparse.
       # keep the last row even if it does not have training data, to mark the end of training period, which is the start of test period.
-      training_data <- training_data %>% dplyr::filter(!is.na(y) | row_number() == n())
+      training_data <- training_data %>% dplyr::filter(!is.na(y) | dplyr::row_number() == n())
     }
     else {
       training_data <- aggregated_data
