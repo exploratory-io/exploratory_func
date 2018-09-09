@@ -29,7 +29,7 @@ do_prcomp <- function(df, ..., normalize_data=TRUE) { # TODO: write test
         cleaned_df <- cleaned_df[colnames(cleaned_df) != col]
       }
     }
-    if (col(cleaned_df) == 0) { # skip this group if no column is left.
+    if (length(colnames(cleaned_df)) == 0) { # skip this group if no column is left.
       return(NULL)
     }
 
