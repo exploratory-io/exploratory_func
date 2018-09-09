@@ -1215,8 +1215,8 @@ do_on_each_group <- function(df, func, params = quote(list()), name = "tmp", wit
   args <- append(list(quote(.)), rlang::lang_args(params))
   call <- rlang::new_language(func, rlang::as_pairlist(args))
   ret <- df %>%
-    # UQ and UQE evaluates those variables
-    dplyr::do(rlang::UQ(name) := rlang::UQE(call))
+    # UQ and UQ(get_expr()) evaluates those variables
+    dplyr::do(rlang::UQ(name) := rlang::UQ(rlang::get_expr(call)))
   if(with_unnest){
     ret %>%
       dplyr::ungroup() %>%
@@ -1237,8 +1237,8 @@ do_on_each_group_2 <- function(df, func1, func2, params1 = quote(list()), params
   call1 <- rlang::new_language(func1, rlang::as_pairlist(args1))
   call2 <- rlang::new_language(func2, rlang::as_pairlist(args2))
   ret <- df %>%
-    # UQ and UQE evaluates those variables
-    dplyr::do(rlang::UQ(name1) := rlang::UQE(call1), rlang::UQ(name2) := rlang::UQE(call2))
+    # UQ and UQ(get_expr()) evaluates those variables
+    dplyr::do(rlang::UQ(name1) := rlang::UQ(rlang::get_expr(call1)), rlang::UQ(name2) := rlang::UQ(rlang::get_expr(call2)))
   ret
 }
 
