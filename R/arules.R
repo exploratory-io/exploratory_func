@@ -140,9 +140,9 @@ do_apriori <- function(df, subject, key, minlen=1, maxlen=10, min_support=0.1, m
   do_apriori_(df, subject_col, key_col, minlen, maxlen, min_support, max_support, min_confidence, lhs, rhs)
 }
 
-get_arules_graph_data <- function(rules) {
-  rules <- rules %>% dplyr::top_n(30, support) # limit within 30 rules so that they can be visualized comfortably.
-  if (nrow(rules) > 30) { # this means there are ties. remove the rows with minimum support to fit within 30 rules.
+get_arules_graph_data <- function(rules, max_rules=30) {
+  rules <- rules %>% dplyr::top_n(max_rules, support) # limit within 30 rules so that they can be visualized comfortably.
+  if (nrow(rules) > max_rules) { # this means there are ties. remove the rows with minimum support to fit within 30 rules.
     rules <- rules %>% dplyr::filter(support != min(support))
   }
 
