@@ -27,6 +27,7 @@ test_that("test do_apriori with lhs", {
   })
   expect_equal(colnames(ret), c("lhs", "rhs", "support", "confidence", "lift"))
   expect_true(all(ret[, "lhs"] == "name1"))
+  get_arules_graph_data(ret)
 })
 
 test_that("test do_apriori with lhs and rhs", {
