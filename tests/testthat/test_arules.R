@@ -12,7 +12,7 @@ test_that("test do_apriori", {
   })
   expect_equal(colnames(ret), c("lhs", "rhs", "support", "confidence", "lift"))
   expect_true(is.character(ret[, "lhs"] ))
-  expect_true(any(ret[, "lhs"] == ""))
+  expect_true(!any(ret[, "lhs"] == "")) # There should be at least 1 lhs item since by default minimum number of lhs is 1.
 })
 
 test_that("test do_apriori with lhs", {
