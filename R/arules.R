@@ -49,8 +49,8 @@ do_apriori_internal <- function(df, subject_col, key_col, minlen=1, maxlen=10, m
       rules <- arules::apriori(
         mat,
         parameter = list(
-          minlen=minlen,
-          maxlen=maxlen,
+          minlen=minlen+1, # +1 is to avoid rule with nothing on the lhs. https://cran.r-project.org/web/packages/arules/arules.pdf
+          maxlen=maxlen+1,
           support=min_support,
           confidence = min_confidence,
           target="rules",
