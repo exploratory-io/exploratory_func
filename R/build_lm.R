@@ -137,6 +137,8 @@ build_lm.fast <- function(df,
                     target,
                     ...,
                     model_type = "lm",
+                    family = NULL,
+                    link = NULL,
                     max_nrow = 50000,
                     predictor_n = 12, # so that at least months can fit in it.
                     smote = FALSE,
@@ -152,6 +154,10 @@ build_lm.fast <- function(df,
   selected_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
 
   grouped_cols <- grouped_by(df)
+
+  if (model_type  == "glm" && is.null(family)) {
+    family = "binomial" # default for glm is logistic regression.
+  }
 
   # drop unrelated columns so that SMOTE later does not have to deal with them.
   # select_ was not able to handle space in target_col. let's do it in base R way.
@@ -172,18 +178,20 @@ build_lm.fast <- function(df,
     set.seed(seed)
   }
 
-  if (!is.null(model_type) && model_type == "glm") {
+  if (!is.null(model_type) && model_type == "glm" && family %in% c("binomial", "quasibinomial")) {
+    # binomial case.
     unique_val <- unique(df[[target_col]])
     if (length(unique_val[!is.na(unique_val)]) != 2) {
-      stop(paste0("Column to predict (", target_col, ") with Logistic Regression must have 2 unique values."))
+      stop(paste0("Column to predict (", target_col, ") with Binomial Regression must have 2 unique values."))
     }
     if (!is.numeric(df[[target_col]]) && !is.factor(df[[target_col]]) && !is.logical(df[[target_col]])) {
       # make other types factor so that it passes stats::glm call.
       df[[target_col]] <- factor(df[[target_col]])
     }
   }
-  else { # this means the model is lm
+  else { # this means the model is lm or glm with family other than binomial
     if (!is.numeric(df[[target_col]])) {
+      # TODO: message should handle other than lm too.
       stop(paste0("Column to predict (", target_col, ") with Linear Regression must be numeric"))
     }
   }
@@ -331,11 +339,43 @@ build_lm.fast <- function(df,
       rhs <- paste0("`", c_cols, "`", collapse = " + ")
       # TODO: This clean_target_col is actually not a cleaned column name since we want lm to show real name. Clean up our variable name.
       fml <- as.formula(paste0("`", clean_target_col, "` ~ ", rhs))
-      if (!is.null(model_type) && model_type == "glm") {
+      if (model_type == "glm") {
         if (smote) {
           df <- df %>% exp_balance(clean_target_col, sample=FALSE) # no further sampling
         }
-        rf <- stats::glm(fml, data = df, family = "binomial") 
+        if (is.null(link)) {
+          rf <- stats::glm(fml, data = df, family = family) 
+        }
+        else {
+          if (family == "gaussian") {
+            family_arg <- stats::gaussian(link=link)
+          }
+          else if (family == "binomial") {
+            family_arg <- stats::binomial(link=link)
+          }
+          else if (family == "Gamma") {
+            family_arg <- stats::Gamma(link=link)
+          }
+          else if (family == "inverse.gaussian") {
+            family_arg <- stats::inverse.gaussian(link=link)
+          }
+          else if (family == "poisson") {
+            family_arg <- stats::poisson(link=link)
+          }
+          else if (family == "quasi") {
+            family_arg <- stats::quasi(link=link)
+          }
+          else if (family == "quasibinomial") {
+            family_arg <- stats::quasibinomial(link=link)
+          }
+          else if (family == "quasipoisson") {
+            family_arg <- stats::quasipoisson(link=link)
+          }
+          else { # default gaussian
+            family_arg <- stats::gaussian(link=link)
+          }
+          rf <- stats::glm(fml, data = df, family = family_arg) 
+        }
       }
       else {
         rf <- stats::lm(fml, data = df) 
@@ -344,7 +384,7 @@ build_lm.fast <- function(df,
       rf$terms_mapping <- names(name_map)
       names(rf$terms_mapping) <- name_map
       # add special lm_exploratory class for adding extra info at glance().
-      if (!is.null(model_type) && model_type == "glm") {
+      if (model_type == "glm") {
         class(rf) <- c("glm_exploratory", class(rf))
       }
       else {
@@ -405,20 +445,22 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add tes
     ret <- ret %>% dplyr::mutate(p.value=pvalue)
   }
   
-  # Calculate F Score, Accuracy Rate, Misclassification Rate, Precision, Recall, Data Size
-  predicted <- ifelse(x$fitted.value > 0.5, 1, 0) #TODO make threshold adjustable
-  ret2 <- evaluate_classification(x$y, predicted, 1, pretty.name = pretty.name)
-  ret2 <- ret2[, 2:6]
-  ret <- ret %>% bind_cols(ret2)
+  if (x$family$family %in% c('binomial', 'quasibinomial')) { # only for logistic regression.
+    # Calculate F Score, Accuracy Rate, Misclassification Rate, Precision, Recall, Data Size
+    predicted <- ifelse(x$fitted.value > 0.5, 1, 0) #TODO make threshold adjustable
+    ret2 <- evaluate_classification(x$y, predicted, 1, pretty.name = pretty.name)
+    ret2 <- ret2[, 2:6]
+    ret <- ret %>% bind_cols(ret2)
 
-  # calculate AUC from ROC
-  roc_df <- data.frame(actual = x$y, predicted_probability = x$fitted.value)
-  roc <- roc_df %>% do_roc_(actual_val_col = "actual", pred_prob_col = "predicted_probability")
-  # use numeric index so that it won't be disturbed by name change
-  # 2 should be false positive rate (x axis) and 1 should be true positive rate (yaxis)
-  # calculate the area under the plots
-  auc <- sum((roc[[2]] - dplyr::lag(roc[[2]])) * roc[[1]], na.rm = TRUE)
-  ret$auc <- auc
+    # calculate AUC from ROC
+    roc_df <- data.frame(actual = x$y, predicted_probability = x$fitted.value)
+    roc <- roc_df %>% do_roc_(actual_val_col = "actual", pred_prob_col = "predicted_probability")
+    # use numeric index so that it won't be disturbed by name change
+    # 2 should be false positive rate (x axis) and 1 should be true positive rate (yaxis)
+    # calculate the area under the plots
+    auc <- sum((roc[[2]] - dplyr::lag(roc[[2]])) * roc[[1]], na.rm = TRUE)
+    ret$auc <- auc
+  }
 
   for(var in names(x$xlevels)) { # extract base levels info on factor/character columns from lm model
     if(pretty.name) {
@@ -430,9 +472,14 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add tes
   }
 
   if(pretty.name) {
-    ret <- ret %>% dplyr::rename(`Null Deviance`=null.deviance, `DF for Null Model`=df.null, `Log Likelihood`=logLik, Deviance=deviance, `Residual DF`=df.residual, `AUC`=auc) %>%
-      dplyr::select(`F Score`, `Accuracy Rate`, `Misclassification Rate`, `Precision`, `Recall`, `AUC`, `P Value`, `Log Likelihood`, `AIC`, `BIC`, `Deviance`, `Null Deviance`, `DF for Null Model`, everything())
-
+    if (x$family$family %in% c('binomial', 'quasibinomial')) { # for binomial regressions.
+      ret <- ret %>% dplyr::rename(`Null Deviance`=null.deviance, `DF for Null Model`=df.null, `Log Likelihood`=logLik, Deviance=deviance, `Residual DF`=df.residual, `AUC`=auc) %>%
+        dplyr::select(`F Score`, `Accuracy Rate`, `Misclassification Rate`, `Precision`, `Recall`, `AUC`, `P Value`, `Log Likelihood`, `AIC`, `BIC`, `Deviance`, `Null Deviance`, `DF for Null Model`, everything())
+    }
+    else { # for other numeric regressions.
+      ret <- ret %>% dplyr::rename(`Null Deviance`=null.deviance, `DF for Null Model`=df.null, `Log Likelihood`=logLik, Deviance=deviance, `Residual DF`=df.residual) %>%
+        dplyr::select(`P Value`, `Log Likelihood`, `AIC`, `BIC`, `Deviance`, `Null Deviance`, `DF for Null Model`, everything())
+    }
   }
   ret
 }
@@ -475,10 +522,16 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
           ret <- ret %>% rename(Note=note)
         }
       }
-      ret <- ret %>% mutate(conf.high=estimate+1.96*std.error, conf.low=estimate-1.96*std.error, odds_ratio=exp(estimate))
+      ret <- ret %>% mutate(conf.high=estimate+1.96*std.error, conf.low=estimate-1.96*std.error)
+      if (x$family$family == "binomial") { # odds ratio is only for logistic regression
+        ret <- ret %>% mutate(odds_ratio=exp(estimate))
+      }
       if (pretty.name) {
         ret <- ret %>% rename(Term=term, Coefficient=estimate, `Std Error`=std.error,
-                              `t Ratio`=statistic, `P Value`=p.value, `Conf Low`=conf.low, `Conf High`=conf.high, `Odds Ratio`=odds_ratio)
+                              `t Ratio`=statistic, `P Value`=p.value, `Conf Low`=conf.low, `Conf High`=conf.high)
+        if (x$family$family == "binomial") { # odds ratio is only for logistic regression
+          ret <- ret %>% rename(`Odds Ratio`=odds_ratio)
+        }
       }
       ret
     },

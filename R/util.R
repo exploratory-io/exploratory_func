@@ -1130,6 +1130,20 @@ false_count <- function(x){
   sum(!x, na.rm = TRUE)
 }
 
+#' Percentage of TRUE in a vector
+#' @param x vector
+#' @export
+true_pct <- function(x){
+  sum(x, na.rm =!all(is.na(x))) / length(x) * 100
+}
+
+#' Percentage of FALSE in a vector
+#' @param x vector
+#' @export
+false_pct <- function(x){
+  sum(!x, na.rm =!all(is.na(x))) / length(x) * 100
+}
+
 #' Count NA in a vector
 #' @param x vector
 #' @export
@@ -1292,15 +1306,13 @@ extract_from_date <- function(x, type = "fltoyear") {
   ret
 }
 
-
 #' Calculate R-Squared 
 #' @export
-r_squared <- function (x, y) {
-  # https://stackoverflow.com/questions/40901445/function-to-calculate-r2-r-squared-in-r
-  # complete.obs is to ignore NAs.
-  # https://stackoverflow.com/questions/31412514/na-values-not-being-excluded-in-cor
-  # TODO: revisit this again. How can R square be a function of only cor??
-  cor(x, y, use="complete.obs") ^ 2
+r_squared <- function (actual, predicted) {
+  # https://stats.stackexchange.com/questions/230556/calculate-r-square-in-r-for-two-vectors
+  # https://en.wikipedia.org/wiki/Coefficient_of_determination
+  ret <- 1 - (sum((actual-predicted)^2, na.rm=TRUE)/sum((actual-mean(actual, na.rm=TRUE))^2, na.rm=TRUE))
+  ret
 }
 
 #' Calculate MAE.

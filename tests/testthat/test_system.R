@@ -129,3 +129,8 @@ test_that("countycode", {
   expect_equal(ret2, c("24005", "24510", "24510"))
 })
 
+test_that("js_glue_transformer", {
+  v <- c(T,F,NA)
+  res <- glue::glue("{v}", .transformer=js_glue_transformer)
+  expect_equal(as.character(res), "true, false, null")
+})

@@ -2,10 +2,11 @@
 
 #' NSE version of do_prophet_
 #' @export
-do_prophet <- function(df, time, value = NULL, ...){
+do_prophet <- function(df, time, value = NULL, periods = 10, holiday = NULL, ...){
   time_col <- col_name(substitute(time))
   value_col <- col_name(substitute(value))
-  do_prophet_(df, time_col, value_col, ...)
+  holiday_col <- col_name(substitute(holiday))
+  do_prophet_(df, time_col, value_col, periods, holiday_col = holiday_col, ...)
 }
 
 #' Forecast time series data
@@ -39,8 +40,10 @@ do_prophet <- function(df, time, value = NULL, ...){
 #' @param interval.width - Width of uncertainty intervals.
 #' @param uncertainty.samples - Number of simulations made for calculating uncertainty intervals. Default is 1000.
 #' @export
-do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "day", include_history = TRUE, test_mode = FALSE,
-                        fun.aggregate = sum, cap = NULL, floor = NULL, growth = NULL, weekly.seasonality = TRUE, yearly.seasonality = TRUE, holidays = NULL, ...){
+do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit = "day", include_history = TRUE, test_mode = FALSE,
+                        fun.aggregate = sum, cap = NULL, floor = NULL, growth = NULL, weekly.seasonality = TRUE, yearly.seasonality = TRUE,
+                        holiday_col = NULL, holidays = NULL,
+                        regressors = NULL, funs.aggregate.regressors = NULL, ...){
   validate_empty_data(df)
 
   # we are making default for weekly/yearly.seasonality TRUE since 'auto' does not behave well.
@@ -80,7 +83,34 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
     if(value_col %in% grouped_col){
       stop(paste0(value_col, " is grouped. Please ungroup it."))
     }
-    df <- df[!is.na(df[[value_col]]), ]
+  }
+
+  if(!is.null(regressors) && is.null(value_col)){
+      stop("Value column must be specified to make forecast with extra regressors.")
+  }
+
+  if(!is.null(holiday_col) && is.null(value_col)){
+      stop("Value column must be specified to make forecast with Holiday column.")
+  }
+
+  if (!is.null(cap) && !is.data.frame(cap) && !is.null(floor) && cap <= floor) {
+    # validate this case. otherwise, the error will be misterious "missing value where TRUE/FALSE needed".
+    stop("cap must be greater than floor.")
+  }
+
+  summarise_args <- list() # default empty list
+  if (!is.null(regressors) && !is.null(funs.aggregate.regressors)) {
+    summarise_args <- purrr::map2(funs.aggregate.regressors, regressors, function(func, cname) {
+      quo(UQ(func)(UQ(rlang::sym(cname))))
+    })
+    names(summarise_args) <- regressors
+  }
+
+  filter_args <- list() # default empty list
+  if (!is.null(regressors)) {
+    filter_args <- purrr::map(regressors, function(cname) {
+      quo(!is.na(UQ(rlang::sym(cname))))
+    })
   }
 
   # remove NA data
@@ -108,34 +138,79 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
       }
     }
 
+    # extract holiday df from main df
+    if (is.null(holidays_df) && !is.null(holiday_col)) {
+      holidays_df <- df %>%
+        dplyr::transmute(
+          ds = lubridate::floor_date(UQ(rlang::sym(time_col)), unit = time_unit),
+          holiday = UQ(rlang::sym(holiday_col))
+        ) %>%
+        dplyr::group_by(ds) %>%
+        dplyr::summarise(holiday = first(holiday[!is.na(holiday)])) %>% # take first non-NA value for aggregation.
+        dplyr::filter(!is.na(holiday))
+      # Passing empty dataframe causes prophet error: "Column `ds` is of unsupported type NULL". Set it back to NULL if empty.
+      if (nrow(holidays_df) == 0) {
+        holidays_df <- NULL
+      }
+    }
+
     if(!is.null(grouped_col)){
       # drop grouping columns
       df <- df[, !colnames(df) %in% grouped_col]
     }
 
+    if (!is.null(regressors)) { # extra regressor case. separate the df into history and future based on the value is filled or not.
+      # filter NAs on regressor columns
+      df <- df %>% dplyr::filter(!!!filter_args)
+      future_df <- df # keep all rows before df is filtered out.
+      df <- df %>% dplyr::filter(!is.na(UQ(rlang::sym(value_col)))) # keep the rows that has values. the ones that do not are for future regressors
+      max_floored_date <- lubridate::floor_date(max(df[[time_col]]), unit = time_unit)
+      future_df <- future_df %>% dplyr::filter(lubridate::floor_date(UQ(rlang::sym(time_col)), unit = time_unit) > max_floored_date)
+
+      # TODO: in test mode, this is not really necessary. optimize.
+      aggregated_future_data <- future_df %>%
+        dplyr::transmute(
+          ds = lubridate::floor_date(UQ(rlang::sym(time_col)), unit = time_unit),
+          !!!rlang::syms(regressors)
+        ) %>%
+        dplyr::group_by(ds) %>%
+        dplyr::summarise(!!!summarise_args)
+    }
+    else if (!is.null(holiday_col)) { # even if there is no extra regressor, if holiday column is there, we need to strip future holiday rows.
+      df <- df %>% dplyr::filter(!is.na(UQ(rlang::sym(value_col)))) # keep the rows that has values. the ones that do not are future holiday rows. 
+    }
+    else if(!is.null(value_col)) { # no-extra regressor case. if value column is specified (i.e. value is not number of rows), filter NA rows.
+      df <- df[!is.na(df[[value_col]]), ]
+    }
+
+
     # note that prophet only takes columns with predetermined names like ds, y, cap, as input
     aggregated_data <- if (!is.null(value_col) && ("cap" %in% colnames(df))) {
       # preserve cap column if it is there, so that cap argument as future data frame works.
       # apply same aggregation as value to cap.
-      data.frame(
-        ds = lubridate::floor_date(df[[time_col]], unit = time_unit),
-        value = df[[value_col]],
-        cap_col = df$cap
-      ) %>%
+      df %>%
+        dplyr::transmute(
+          ds = lubridate::floor_date(UQ(rlang::sym(time_col)), unit = time_unit),
+          value = UQ(rlang::sym(value_col)),
+          cap_col = cap,
+          !!!rlang::syms(regressors) # this should be able to handle regressor=NULL case fine.
+        ) %>%
         # remove NA so that we do not pass data with NA, NaN, or 0 to prophet, which we are not very sure what would happen.
         # we saw a case where rstan crashes with the last row with 0 y value.
         dplyr::filter(!is.na(value)) %>%
         dplyr::group_by(ds) %>%
-        dplyr::summarise(y = fun.aggregate(value), cap = fun.aggregate(cap_col))
+        dplyr::summarise(y = fun.aggregate(value), cap = fun.aggregate(cap_col), !!!summarise_args)
     } else if (!is.null(value_col)){
-      data.frame(
-        ds = lubridate::floor_date(df[[time_col]], unit = time_unit),
-        value = df[[value_col]]
-      ) %>%
+      df %>%
+        dplyr::transmute(
+          ds = lubridate::floor_date(UQ(rlang::sym(time_col)), unit = time_unit),
+          value = UQ(rlang::sym(value_col)),
+          !!!rlang::syms(regressors) # this should be able to handle regressor=NULL case fine.
+        ) %>%
         dplyr::filter(!is.na(value)) %>% # remove NA so that we do not pass data with NA, NaN, or 0 to prophet
         dplyr::group_by(ds) %>%
-        dplyr::summarise(y = fun.aggregate(value))
-    } else {
+        dplyr::summarise(y = fun.aggregate(value), !!!summarise_args)
+    } else { # in this case we do not support extra regressors since there is no way to detect bounndary between history and future
       data.frame(
         ds = lubridate::floor_date(df[[time_col]], unit = time_unit)
       ) %>%
@@ -202,12 +277,20 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
       # in this case, cap is the future data frame with cap, specified by user.
       # this is a back door to allow user to specify cap column.
       if (!is.null(cap$cap)) {
-        m <- prophet::prophet(training_data, growth = "logistic", weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
+        growth <- "logistic"
       }
       else {
+        growth <- "linear"
         # if future data frame is without cap, use it just as a future data frame.
-        m <- prophet::prophet(training_data, growth = "linear", weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
       }
+      m <- prophet::prophet(training_data, fit = FALSE, growth = growth, weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
+      # add regressors to the model.
+      if (!is.null(regressors)) {
+        for (regressor in regressors) {
+          m <- add_regressor(m, regressor)
+        }
+      }
+      m <- fit.prophet(m, training_data)
       forecast <- stats::predict(m, cap_df)
     }
     else {
@@ -218,11 +301,18 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
         }
       }
       if (!is.null(cap)) { # if cap is set, use logistic. otherwise use linear.
-        m <- prophet::prophet(training_data, growth = "logistic", weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
+        growth <- "logistic"
       }
       else {
-        m <- prophet::prophet(training_data, growth = "linear", weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
+        growth <- "linear"
       }
+      m <- prophet::prophet(training_data, fit = FALSE, growth = growth, weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
+      if (!is.null(regressors)) {
+        for (regressor in regressors) {
+          m <- add_regressor(m, regressor)
+        }
+      }
+      m <- fit.prophet(m, training_data)
       if (time_unit == "hour") {
         time_unit_for_future_dataframe = 3600
       }
@@ -236,6 +326,18 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods, time_unit = "da
         time_unit_for_future_dataframe = time_unit
       }
       future <- prophet::make_future_dataframe(m, periods = periods, freq = time_unit_for_future_dataframe, include_history = include_history) #includes past dates
+      if (!is.null(regressors)) {
+        regressor_data <- aggregated_data %>%
+          dplyr::select(-y) %>%
+          dplyr::bind_rows(aggregated_future_data)
+        if (lubridate::is.Date(regressor_data$ds)) { # make ds POSIXct so that inner_join works. TODO: is is possible that future$ds is POSIXlt??
+          regressor_data$ds <- as.POSIXct(regressor_data$ds)
+        }
+        future <- future %>%
+          # inner_join to keep only rows with regressor values.
+          # this works for test mode too, since aggregated_future_data part is ignored by inner_join.
+          dplyr::inner_join(regressor_data, by=c('ds'='ds'))
+      }
       if (!is.null(cap)) { # set cap to future table too, if it is there
         future[["cap"]] <- cap
         if (!is.null(floor)) { # set floor if it is there
