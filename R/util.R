@@ -1400,3 +1400,10 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
     return(x %in% y)
   }
 }
+
+#' Column reorder function we use from Reorder steps of Exploratory.
+#' @export
+reorder_cols <- function(df, ...) {
+  dplyr::select(df, !!!rlang::quos(...), dplyr::everything())
+}
+
