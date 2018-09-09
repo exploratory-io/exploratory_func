@@ -33,13 +33,14 @@ exp_kmeans <- function(df, ...,
                        nstart = 1,
                        algorithm = "Hartigan-Wong",
                        trace = FALSE,
+                       normalize_data = TRUE,
                        n_pcs = NULL,
                        seed=0,
                        elbow_method_mode=FALSE,
                        max_centers = 10
                        ) {
 
-  ret <- do_prcomp(df, ...)
+  ret <- do_prcomp(df, normalize_data=normalize_data, ...)
 
   if (!elbow_method_mode) {
     ret <- ret %>% dplyr::mutate(model = purrr::map(model, function(x) {

@@ -1,6 +1,6 @@
 #' do PCA
 #' @export
-do_prcomp <- function(df, ...) { # TODO: write test
+do_prcomp <- function(df, ..., normalize_data=TRUE) { # TODO: write test
   # this evaluates select arguments like starts_with
   selected_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
 
@@ -33,7 +33,7 @@ do_prcomp <- function(df, ...) { # TODO: write test
       return(NULL)
     }
 
-    fit <- prcomp(cleaned_df, scale=TRUE)
+    fit <- prcomp(cleaned_df, scale.=normalize_data)
     fit$df <- filtered_df # add filtered df to model so that we can bind_col it for output. It needs to be the filtered one to match row number.
     fit$grouped_cols <- grouped_cols
     class(fit) <- c("prcomp_exploratory", class(fit))
