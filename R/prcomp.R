@@ -32,7 +32,7 @@ do_prcomp <- function(df, ..., normalize_data=TRUE) { # TODO: write test
     if (length(colnames(cleaned_df)) == 0) { # skip this group if no column is left.
       return(NULL)
     }
-
+    # "scale." is the column name. There is no such operator like ".=". 
     fit <- prcomp(cleaned_df, scale.=normalize_data)
     fit$df <- filtered_df # add filtered df to model so that we can bind_col it for output. It needs to be the filtered one to match row number.
     fit$grouped_cols <- grouped_cols
