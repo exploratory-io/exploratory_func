@@ -153,7 +153,7 @@ get_arules_graph_data <- function(rules, max_rules=30, rules_metric="support") {
   }
 
   # Give names to the rules. groceries is the dataframe that is the result of the Market Basket Analysis.
-  rules <- rules %>% mutate(rule = row_number(), rule = stringr::str_c("Rule ",readr::parse_character(rule)))
+  rules <- rules %>% dplyr::mutate(rule = row_number(), rule = stringr::str_c("Rule ",readr::parse_character(rule)))
   
   # Create a dataframe for the relationships from rules to right-hand side products.
   rule_rhs_edges <- rules %>%
