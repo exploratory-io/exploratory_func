@@ -153,7 +153,7 @@ get_arules_graph_data <- function(rules, max_rules=30, rules_metric="support") {
   }
 
   # Give names to the rules. groceries is the dataframe that is the result of the Market Basket Analysis.
-  rules <- rules %>% mutate(rule = row_number(), rule = stringr::str_c("Rule ",parse_character(rule)))
+  rules <- rules %>% mutate(rule = row_number(), rule = stringr::str_c("Rule ",readr::parse_character(rule)))
   
   # Create a dataframe for the relationships from rules to right-hand side products.
   rule_rhs_edges <- rules %>%
@@ -162,13 +162,13 @@ get_arules_graph_data <- function(rules, max_rules=30, rules_metric="support") {
   
   # Create a dataframe for the relationships from left-hand side products to the Rules.
   lhs_rule_edges <- rules %>%
-    separate_rows(lhs, sep = "\\s*\\,\\s*") %>%
+    tidyr::separate_rows(lhs, sep = "\\s*\\,\\s*") %>%
     dplyr::select(lhs, rule) %>%
     dplyr::rename(from = lhs, to = rule)
   
   # Create a dataframe for all the relationships in the graph by binding the above 2 dataframes.
   edges <- lhs_rule_edges %>%
-    bind_rows(rule_rhs_edges)
+    dplyr::bind_rows(rule_rhs_edges)
   
   product_names <- unique(c(lhs_rule_edges$from, rule_rhs_edges$to))
   
@@ -177,7 +177,7 @@ get_arules_graph_data <- function(rules, max_rules=30, rules_metric="support") {
   # even after bind_rows. this helps when normalizing for color scale later.
   products_vertices <- data.frame(name=product_names, support=0, confidence=min(rule_vertices$confidence), lift=0, stringsAsFactors = FALSE)
   vertices_data <- rule_vertices %>%
-    bind_rows(products_vertices)
+    dplyr::bind_rows(products_vertices)
   
   ret <- list(edges=edges, vertices=vertices_data)
   ret <- data.frame(model=I(list(ret))) # return as data.frame. TODO: handle group_by
