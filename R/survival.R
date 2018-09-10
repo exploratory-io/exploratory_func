@@ -65,6 +65,11 @@ exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, t
   # calls survfit for each group.
   each_func1 <- function(df) {
     ret <- survival::survfit(fml, data = df)
+    # strata is ignored by survfit if all rows have same value.
+    # In such case, we need to put it back later. Record the value in the model.
+    if (cohort_col != "1" && length(unique(df[[cohort_col]])) == 1) {
+      ret$single_strata_value = df[[cohort_col]][[1]]
+    }
     class(ret) <- c("survfit_exploratory", class(ret))
     ret
   }
@@ -105,6 +110,10 @@ tidy.survfit_exploratory <- function(x, ...) {
     ret <- tidyr::unnest(nested)
     # remove ".cohort=" part from strata values.
     ret <- ret %>% dplyr::mutate(strata = stringr::str_remove(strata,"^\\.cohort\\="))
+  }
+  else if (!is.null(x$single_strata_value)) { # put back single strata value ignored by survfit.
+    ret <- add_time_zero_row_each(ret)
+    ret <- ret %>% dplyr::mutate(strata = as.character(x$single_strata_value))
   }
   else {
     ret <- add_time_zero_row_each(ret)
