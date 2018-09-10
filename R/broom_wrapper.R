@@ -576,9 +576,10 @@ prediction_coxph <- function(df, time = NULL, threshold = 0.5, ...){
   status_colname <- surv_vars[[2]]
 
   # get group columns.
-  # we assume that columns of model df other than the ones with reserved name are all group columns.
+  # we assume that columns of model df other than the ones with reserved name (added by build_model() in build_model.R) are all group columns.
+  # TODO: centralize the list of those column names.
   model_df_colnames = colnames(df)
-  group_by_names <- model_df_colnames[!model_df_colnames %in% c("source.data", ".test_index", "model")]
+  group_by_names <- model_df_colnames[!model_df_colnames %in% c("source.data", ".test_index", "model", ".model_metadata")]
 
   # when pre-grouped, prediction() result is grouped.
   # but when not pre-grouped, it is without grouping.
