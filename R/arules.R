@@ -49,8 +49,8 @@ do_apriori_internal <- function(df, subject_col, key_col, minlen=1, maxlen=10, m
       rules <- arules::apriori(
         mat,
         parameter = list(
-          minlen=minlen,
-          maxlen=maxlen,
+          minlen=minlen+1, # +1 is to avoid rule with nothing on the lhs. https://cran.r-project.org/web/packages/arules/arules.pdf
+          maxlen=maxlen+1,
           support=min_support,
           confidence = min_confidence,
           target="rules",
@@ -140,14 +140,20 @@ do_apriori <- function(df, subject, key, minlen=1, maxlen=10, min_support=0.1, m
   do_apriori_(df, subject_col, key_col, minlen, maxlen, min_support, max_support, min_confidence, lhs, rhs)
 }
 
-get_arules_graph_data <- function(rules) {
-  rules <- rules %>% dplyr::top_n(30, support) # limit within 30 rules so that they can be visualized comfortably.
-  if (nrow(rules) > 30) { # this means there are ties. remove the rows with minimum support to fit within 30 rules.
-    rules <- rules %>% dplyr::filter(support != min(support))
+# rules_metric can be "support", "confidence", or "lift".
+get_arules_graph_data <- function(rules, max_rules=30, rules_metric="support") {
+  rules <- rules %>% dplyr::top_n(max_rules, UQ(rlang::sym(rules_metric))) # limit within 30 rules so that they can be visualized comfortably.
+  if (nrow(rules) > max_rules) { # this means there are ties. remove the rows with minimum support to fit within 30 rules.
+    if (!(rules_metric == "confidence" && min(rules$confidence) == 1)) { # exception is when supports for all rules are 1.0.
+      rules <- rules %>% dplyr::filter(UQ(rlang::sym(rules_metric)) != min(UQ(rlang::sym(rules_metric))))
+    }
+    else {
+      rules <- rules %>% sample_n(max_rules) # in this case, just sample so that plotting will not take very long time.
+    }
   }
 
   # Give names to the rules. groceries is the dataframe that is the result of the Market Basket Analysis.
-  rules <- rules %>% dplyr::mutate(rule = row_number(), rule = str_c("Rule ",parse_character(rule)))
+  rules <- rules %>% dplyr::mutate(rule = row_number(), rule = stringr::str_c("Rule ",readr::parse_character(rule)))
   
   # Create a dataframe for the relationships from rules to right-hand side products.
   rule_rhs_edges <- rules %>%
@@ -156,13 +162,13 @@ get_arules_graph_data <- function(rules) {
   
   # Create a dataframe for the relationships from left-hand side products to the Rules.
   lhs_rule_edges <- rules %>%
-    separate_rows(lhs, sep = "\\s*\\,\\s*") %>%
+    tidyr::separate_rows(lhs, sep = "\\s*\\,\\s*") %>%
     dplyr::select(lhs, rule) %>%
     dplyr::rename(from = lhs, to = rule)
   
   # Create a dataframe for all the relationships in the graph by binding the above 2 dataframes.
   edges <- lhs_rule_edges %>%
-    bind_rows(rule_rhs_edges)
+    dplyr::bind_rows(rule_rhs_edges)
   
   product_names <- unique(c(lhs_rule_edges$from, rule_rhs_edges$to))
   
@@ -171,7 +177,7 @@ get_arules_graph_data <- function(rules) {
   # even after bind_rows. this helps when normalizing for color scale later.
   products_vertices <- data.frame(name=product_names, support=0, confidence=min(rule_vertices$confidence), lift=0, stringsAsFactors = FALSE)
   vertices_data <- rule_vertices %>%
-    bind_rows(products_vertices)
+    dplyr::bind_rows(products_vertices)
   
   ret <- list(edges=edges, vertices=vertices_data)
   ret <- data.frame(model=I(list(ret))) # return as data.frame. TODO: handle group_by

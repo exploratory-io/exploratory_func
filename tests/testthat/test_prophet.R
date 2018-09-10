@@ -162,6 +162,7 @@ test_that("do_prophet with regressor with holiday column with monthly data", {
 })
 
 test_that("do_prophet with holiday column with hourly data", {
+  Sys.setenv(TZ="UTC") # set time zone for test stability.
   ts <- seq(as.POSIXct("2010-01-01 00:00:00"), as.POSIXct("2010-01-15 00:00:00"), by="hour")
   raw_data <- data.frame(timestamp=ts, data=runif(length(ts)))
   ts2 <- seq(as.POSIXct("2010-01-01 00:00:00"), as.POSIXct("2010-01-20 00:00:00"), by="hour")

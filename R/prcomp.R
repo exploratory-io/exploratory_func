@@ -1,8 +1,8 @@
 #' do PCA
 #' @export
-do_prcomp <- function(df, ...) { # TODO: write test
+do_prcomp <- function(df, ..., normalize_data=TRUE) { # TODO: write test
   # this evaluates select arguments like starts_with
-  selected_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
+  selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
 
   grouped_cols <- grouped_by(df)
 
@@ -29,11 +29,11 @@ do_prcomp <- function(df, ...) { # TODO: write test
         cleaned_df <- cleaned_df[colnames(cleaned_df) != col]
       }
     }
-    if (col(cleaned_df) == 0) { # skip this group if no column is left.
+    if (length(colnames(cleaned_df)) == 0) { # skip this group if no column is left.
       return(NULL)
     }
-
-    fit <- prcomp(cleaned_df, scale=TRUE)
+    # "scale." is an argument name. There is no such operator like ".=". 
+    fit <- prcomp(cleaned_df, scale.=normalize_data)
     fit$df <- filtered_df # add filtered df to model so that we can bind_col it for output. It needs to be the filtered one to match row number.
     fit$grouped_cols <- grouped_cols
     class(fit) <- c("prcomp_exploratory", class(fit))
