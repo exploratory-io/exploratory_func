@@ -7,6 +7,8 @@ exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, t
 
   grouped_col <- grouped_by(df)
 
+  orig_levels <- NULL
+
   if (!is.null(substitute(cohort))) {
     orig_cohort_col <- col_name(substitute(cohort))
     # rename cohort column to workaround the case where the column name has space in it.
@@ -18,6 +20,14 @@ exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, t
       df[[cohort_col]] <- extract_from_date(df[[cohort_col]], type=cohort_func)
     }
     quoted_cohort_col <- paste0("`", cohort_col, "`")
+
+    # keep original factor levels to set them back later.
+    if (is.factor(df[[cohort_col]])) {
+      orig_levels <- levels(df[[cohort_col]])
+    }
+    else if (is.logical(df[[cohort_col]])) {
+      orig_levels <- c("TRUE","FALSE")
+    }
   }
   else {
     # no cohort column is set. Just draw a single survival curve.
@@ -70,6 +80,7 @@ exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, t
     if (cohort_col != "1" && length(unique(df[[cohort_col]])) == 1) {
       ret$single_strata_value = df[[cohort_col]][[1]]
     }
+    ret$orig_levels <- orig_levels
     class(ret) <- c("survfit_exploratory", class(ret))
     ret
   }
@@ -110,6 +121,12 @@ tidy.survfit_exploratory <- function(x, ...) {
     ret <- tidyr::unnest(nested)
     # remove ".cohort=" part from strata values.
     ret <- ret %>% dplyr::mutate(strata = stringr::str_remove(strata,"^\\.cohort\\="))
+    # Set original factor level back so that legend order is correct on the chart.
+    # In case of logical, c("TRUE","FALSE") is stored in orig_level, so that we can
+    # use it here either way.
+    if (!is.null(x$orig_levels)) {
+      ret <- ret %>%  dplyr::mutate(strata = factor(strata, levels=x$orig_levels))
+    }
   }
   else if (!is.null(x$single_strata_value)) { # put back single strata value ignored by survfit.
     ret <- add_time_zero_row_each(ret)
