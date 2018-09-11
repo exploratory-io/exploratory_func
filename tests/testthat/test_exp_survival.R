@@ -33,11 +33,22 @@ test_that("test exp_survival", {
   ret <- data %>% exp_survival(`weeks on service`, `is churned`)
   ret1 <- ret %>% tidy(model1)
   ret2 <- ret %>% tidy(model2)
+
   data2 <- data %>% mutate(`o s` = "Windows") # test single value cohort case
-  ret <- data %>% exp_survival(`weeks on service`, `is churned`, cohort=`o s`)
+  ret <- data2 %>% exp_survival(`weeks on service`, `is churned`, cohort=`o s`)
   ret1 <- ret %>% tidy(model1)
   expect_true(!is.null(ret1$cohort))
   ret2 <- ret %>% tidy(model2)
 
+  data3 <- data %>% mutate(`o s` = factor(`o s`)) # test cohort as factor
+  ret <- data3 %>% exp_survival(`weeks on service`, `is churned`, cohort=`o s`)
+  ret1 <- ret %>% tidy(model1)
+  expect_true(is.factor(ret1$cohort)) # factor levels should be kept
+  ret2 <- ret %>% tidy(model2)
 
+  data3 <- data %>% mutate(`o s` = `o s` == "Windows") # test cohort as logical 
+  ret <- data3 %>% exp_survival(`weeks on service`, `is churned`, cohort=`o s`)
+  ret1 <- ret %>% tidy(model1)
+  expect_true(is.factor(ret1$cohort))
+  ret2 <- ret %>% tidy(model2)
 })
