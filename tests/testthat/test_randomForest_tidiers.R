@@ -169,7 +169,10 @@ test_that("test calc_feature_imp with group_by where a group has only TRUE rows 
                       num_1,
                       num_2)
 
+  ret <- model_df %>% rf_importance()
   ret <- model_df %>% rf_partial_dependence()
+  ret <- model_df %>% rf_evaluation(pretty.name=TRUE) # TODO test that output is different from multiclass classification
+  ret <- model_df %>% rf_evaluation_by_class(pretty.name=TRUE)
 })
 
 test_that("test randomForest with multinomial classification", {

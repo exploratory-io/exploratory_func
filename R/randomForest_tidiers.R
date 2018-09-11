@@ -1252,7 +1252,14 @@ get_binary_predicted_value_from_probability <- function(x) {
   # x$predictions is 2-diminsional matrix with 2 columns for the 2 categories. values in the matrix is the probabilities.
   # TODO: thought x$predictions was 3 dimensinal array with tree dimension from the doc and independently running ranger,
   # but looks like it is already averaged? look into it.
-  predicted <- factor(x$forest$levels[apply(x$predictions, 1, function(x){if(x[1]>x[2]) 1 else 2})], levels=x$forest$levels)
+  predicted <- factor(x$forest$levels[apply(x$predictions, 1, function(x){
+    if(is.na(x[2])){ # take care of the case where x$predictions has only 1 column. possible when there are only one value in training data.
+      1
+    }
+    else {
+      if(x[1]>x[2]) 1 else 2
+    }
+  })], levels=x$forest$levels)
   predicted
 }
 
