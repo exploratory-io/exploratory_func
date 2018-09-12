@@ -493,6 +493,13 @@ prediction_binary <- function(df, threshold = 0.5, ...){
     }
   }
 
+  # if there is terms_mapping for randomForest, use the original column name
+  if ("randomForest" %in% class(first_model)) {
+    if (!is.na(first_model$terms_mapping) && !is.na(first_model$terms_mapping[[actual_col]])) {
+      actual_col <- first_model$terms_mapping[[actual_col]]
+    }
+  }
+
   actual_val <- ret[[actual_col]]
   actual_logical <- as.logical(as.numeric(actual_val))
 
