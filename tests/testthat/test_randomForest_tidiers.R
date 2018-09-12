@@ -205,14 +205,14 @@ test_that("test randomForest with binary classification", {
       DISTANCE = c(1587, 173, 646, 187, 273, 1062, 583, 240, 1123, 851, 852, 862, 361, 507, 1020, 1092, 342, 489, 1184, 545)), row.names = c(NA, -20L),
     class = c("tbl_df", "tbl", "data.frame"), .Names = c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE"))
 
-  test_data[["IS_AA"]] <- test_data$CARRIER == "AA"
+  test_data[["IS AA"]] <- test_data$CARRIER == "AA" # test target column name with space
   model_ret <- build_model(test_data,
                            model_func = randomForestBinary,
-                           formula = IS_AA ~ DISTANCE,
+                           formula = `IS AA` ~ DISTANCE,
                            test_rate = 0.3)
   coef_ret <- model_coef(model_ret)
   model_stats <- model_stats(model_ret, pretty.name = TRUE)
-  pred_train_ret <- prediction_binary(model_ret, data = "training")
+  pred_train_ret <- prediction_binary(model_ret, data = "training", threshold = "f_score") # test f_score which had issue with target column name with space once.
   pred_test_ret <- prediction_binary(model_ret, data = "test")
   pred_test_ret <- prediction_binary(model_ret, data = "newdata", data_frame = test_data)
 })
