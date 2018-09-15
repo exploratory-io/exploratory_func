@@ -311,11 +311,24 @@ tidy.chisq_exploratory <- function(x, type = "observed") {
       ret[[x$var2]] <- factor(ret[[x$var2]], levels=x$var2_levels)
     }
     # if original class of var1, var2 was logical, return them as logical.
-    if (x$var1_class == "logical") {
+    if ("logical" %in% x$var1_class) {
       ret[[x$var1]] <- as.logical(ret[[x$var1]])
     }
-    if (x$var2_class == "logical") {
+    else if ("integer" %in% x$var1_class) {
+      ret[[x$var1]] <- as.integer(ret[[x$var1]])
+    }
+    else if ("numeric" %in% x$var1_class) {
+      ret[[x$var1]] <- as.numeric(ret[[x$var1]])
+    }
+
+    if ("logical" %in% x$var2_class) {
       ret[[x$var2]] <- as.logical(ret[[x$var2]])
+    }
+    else if ("integer" %in% x$var2_class) {
+      ret[[x$var2]] <- as.integer(ret[[x$var2]])
+    }
+    else if ("numeric" %in% x$var2_class) {
+      ret[[x$var2]] <- as.numeric(ret[[x$var2]])
     }
   }
   ret
