@@ -1,7 +1,6 @@
 context("test string operation functions")
 
 test_df <- data.frame(input = c("Hello world!", "This is a data frame for test. This is second sentence.", NA), stringsAsFactors = FALSE)
-test_df <- test_df %>% rename(`文字 列`=input)
 
 test_that("is_stopword", {
   test_vec <- c("the", "yourself", "Test", "test")
@@ -80,7 +79,7 @@ test_that("test word_to_sentiment to groupd_df", {
 
 test_that("do_tokenize with drop=FALSE", {
   result <- test_df %>%
-    do_tokenize(`文字 列`, drop=F)
+    do_tokenize(input, drop=F)
   expect_equal(result$token[[1]], "hello")
   expect_equal(ncol(result), 4)
 })
@@ -90,9 +89,8 @@ test_that("do_tokenize with keep_cols = TRUE", {
     input = c("Hello world!", "This is a data frame for test. This is second sentence."),
     extra_col = seq(2),
     stringsAsFactors = FALSE)
-  test_df <- test_df %>% rename(`文字 列`=input)
   result <- test_df %>%
-    do_tokenize(`文字 列`, keep_cols = TRUE, drop = TRUE)
+    do_tokenize(input, keep_cols = TRUE, drop = TRUE)
   expect_equal(result$token[[1]], "hello")
   expect_equal(ncol(result), 4)
 })
@@ -102,16 +100,15 @@ test_that("do_tokenize with keep_cols = TRUE with sentences", {
     input = c("Hello world!", "This is a data frame for test. This is second sentence."),
     extra_col = seq(2),
     stringsAsFactors = FALSE)
-  test_df <- test_df %>% rename(`文字 列`=input)
   result <- test_df %>%
-    do_tokenize(`文字 列`, drop=FALSE, token = "sentences", keep_cols = TRUE)
+    do_tokenize(input, drop=FALSE, token = "sentences", keep_cols = TRUE)
   expect_equal(result$token[[1]], "hello world!")
   expect_equal(ncol(result), 4)
 })
 
 test_that("do_tokenize with token=words", {
   result <- test_df %>%
-    do_tokenize(`文字 列`, token="words", keep_cols = TRUE)
+    do_tokenize(input, token="words", keep_cols = TRUE)
   expect_equal(result$token[[1]], "hello")
   expect_equal(ncol(result), 3)
 })
@@ -120,7 +117,7 @@ test_that("do_tokenize when names conflict", {
   df <- test_df
   df$document_id <- seq(nrow(df))
   result <- df %>%
-    do_tokenize(`文字 列`, token="words", keep_cols = TRUE)
+    do_tokenize(input, token="words", keep_cols = TRUE)
   expect_equal(result$token[[1]], "hello")
   expect_equal(ncol(result), 4)
   expect_equal(colnames(result)[[2]],"document_id.new")
@@ -128,14 +125,14 @@ test_that("do_tokenize when names conflict", {
 
 test_that("do_tokenize with token=sentence", {
   result <- test_df %>%
-    do_tokenize(`文字 列`, token="sentences")
+    do_tokenize(input, token="sentences")
   expect_equal(result$token[[1]], "hello world!")
   expect_equal(ncol(result), 2)
 })
 
 test_that("do_tokenize should work with output", {
   result <- test_df %>%
-    do_tokenize(`文字 列`, output=sentence, token="sentences")
+    do_tokenize(input, output=sentence, token="sentences")
   expect_equal(result$sentence[[2]], "this is a data frame for test.")
 })
 

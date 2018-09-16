@@ -74,22 +74,6 @@ test_that("sparse_cast", {
   expect_equal(dim(mat), c(5, 4))
 })
 
-test_that("sparse_cast with japanese column names", {
-  test_df <- data.frame(
-    row = rep(paste("row", 6-seq(5)), each=4),
-    col = rep(paste("col", seq(4)), 5),
-    val = rep(c(NA,1,0,0), 5)
-  )
-  colnames(test_df) <- c("行 列", "列 列", "値 列")
-  mat <- sparse_cast(test_df, "行 列", "列 列", "値 列")
-
-  expect_equal(dim(mat), c(5, 4))
-  expect_equal(dimnames(mat), list(paste("row", seq(5)), paste("col", seq(4))))
-
-  mat <- sparse_cast(test_df, "行 列", "列 列")
-  expect_equal(dim(mat), c(5, 4))
-})
-
 test_that("test avoid_conflict", {
   origin <- c("name1", "name1.new", "name2")
   new <- c("name1", "name2")
@@ -616,16 +600,16 @@ test_that("test get_confint", {
 })
 
 test_that("test str_clean", {
-  ret <- str_clean(c("  not a very  tidy sentence ", " 汚い  文章 ", NA))
-  expect_equal(ret, c("not a very tidy sentence", "汚い 文章", NA))
+  ret <- str_clean(c("  not a very  tidy sentence ", " dirty  text ", NA))
+  expect_equal(ret, c("not a very tidy sentence", "dirty text", NA))
 })
 
 test_that("test str_count_all", {
   # TODO: NA handling in remove.zero = TRUE case.
-  ret <- str_count_all(c("  not a very  tidy sentence ", " 汚い  文章 ", NA), c("very", "汚い"), remove.zero = FALSE)
-  expect_equal(ret, list(data.frame(.count=c(1,0), .pattern=c("very","汚い"), stringsAsFactors = F),
-                         data.frame(.count=c(0,1), .pattern=c("very","汚い"), stringsAsFactors = F),
-                         data.frame(.count=c(NA_integer_,NA_integer_), .pattern=c("very","汚い"), stringsAsFactors = F)))
+  ret <- str_count_all(c("  not a very  tidy sentence ", " dirty  text ", NA), c("very", "dirty"), remove.zero = FALSE)
+  expect_equal(ret, list(data.frame(.count=c(1,0), .pattern=c("very","dirty"), stringsAsFactors = F),
+                         data.frame(.count=c(0,1), .pattern=c("very","dirty"), stringsAsFactors = F),
+                         data.frame(.count=c(NA_integer_,NA_integer_), .pattern=c("very","dirty"), stringsAsFactors = F)))
 })
 
 test_that("test safe_slice", {
@@ -638,7 +622,7 @@ test_that("test safe_slice", {
 
 test_that("test sameple_rows", {
   df <-data.frame(x=c(1,NA,3),y=c(2,3,NA)) 
-  df <-setNames(df,c("x 1", "列 2"))
+  df <-setNames(df,c("x 1", "col 2"))
   ret <- df %>% sample_rows(2)
   expect_equal(nrow(ret), 2)
   ret <- df %>% sample_rows(5)

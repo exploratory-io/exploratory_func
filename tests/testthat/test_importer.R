@@ -1,9 +1,9 @@
 context("test imported functions")
 
 test_that("anonymize", {
-  vec <- c("Hideaki", "林 秀明", NA, "Hideaki Hayashi", "Hideaki", "林 秀明", NA, "Hideaki Hayashi")
+  vec <- c("Hideaki", NA, "Hideaki Hayashi", "Hideaki", NA, "Hideaki Hayashi")
   ret <- anonymize(vec)
-  expect_equal(ret[1:4], ret[5:8]) # verify that same name goes to same anonymized name.
+  expect_equal(ret[1:3], ret[4:6]) # verify that same name goes to same anonymized name.
 })
 
 test_that("add_row", {
