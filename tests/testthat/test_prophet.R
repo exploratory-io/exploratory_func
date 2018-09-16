@@ -173,7 +173,7 @@ test_that("do_prophet with holiday column with hourly data", {
     do_prophet(timestamp, data, 10, time_unit = "hour", holiday=holiday)
   # verify that the last forecasted_value is not NA
   expect_true(!is.na(ret$forecasted_value[[length(ret$forecasted_value)]]))
-  expect_equal(ret$timestamp[[length(ret$timestamp)]], as.POSIXct("2010-01-15 10:00:00"))
+  expect_equal(ret$timestamp[[length(ret$timestamp)]], as.POSIXct("2010-01-15 10:00:00", tz="UTC"))
 })
 
 test_that("do_prophet with extra regressor with cap/floor", {
