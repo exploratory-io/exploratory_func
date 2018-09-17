@@ -1,8 +1,9 @@
 
 #' Function for Survival Analysis view.
 #' It does survfit and survdiff.
+#' @param end_time_fill - "max", "today", or actual value or string expresion of Date.
 #' @export
-exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, time_unit = "day", cohort = NULL, cohort_func = NULL, ...){
+exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, end_time_fill = "max", time_unit = "day", cohort = NULL, cohort_func = NULL, ...){
   validate_empty_data(df)
 
   grouped_col <- grouped_by(df)
@@ -44,7 +45,17 @@ exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, t
     if (!is.null(substitute(end_time))) { # if end_time exists, fill NA with today()
       end_time_col <- col_name(substitute(end_time))
       df[[end_time_col]] <- as.Date(df[[end_time_col]]) # convert to Date in case it is POSIXct.
-      df[[end_time_col]] <- impute_na(df[[end_time_col]] ,type = "value", val=lubridate::today())
+      # set value to fill NAs of end time
+      if (end_time_fill == "max") {
+        end_time_fill_val <- max(df[[start_time_col]], df[[end_time_col]], na.rm = TRUE)
+      }
+      else if (end_time_fill == "today") {
+        end_time_fill_val <- lubridate::today()
+      }
+      else {
+        end_time_fill_val <- as.Date(end_time_fill)
+      }
+      df[[end_time_col]] <- impute_na(df[[end_time_col]] ,type = "value", val=end_time_fill_val)
     }
     else { # if end_time does not exist, create .end_time column with value of today()
       end_time_col <- avoid_conflict(colnames(df), ".end_time")
