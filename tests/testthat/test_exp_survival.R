@@ -26,7 +26,17 @@ test_that("test exp_survival", {
                                                                          "Ukraine", "United Arab Emirates", "United Kingdom", "United States",
                                                                          "Uruguay", "Venezuela", "Vietnam", "Zambia"), class = "factor")),
                     row.names = c(NA,-10L), class = c("tbl_df", "tbl", "data.frame"), .Names = c("weeks_on_service","is_churned", "os", "country"))
-  data <- data %>% rename(`weeks on service`=weeks_on_service, `is churned`=is_churned, `o s`=os)
+  data <- data %>% mutate(start_date = as.Date("2018-09-15")+lubridate::weeks(weeks_on_service))
+  data <- data %>% mutate(end_date = start_date+lubridate::weeks(weeks_on_service))
+  data <- data %>% rename(`weeks on service`=weeks_on_service, `is churned`=is_churned, `o s`=os, `start date`=start_date, `end date`=end_date)
+
+  ret <- data %>% exp_survival(NULL, `is churned`, start_time=`start date`, end_time=`end date`, cohort=`o s`)
+  ret1 <- ret %>% tidy(model1)
+  ret2 <- ret %>% tidy(model2)
+  ret <- data %>% exp_survival(NULL, `is churned`, start_time=`start date`, end_time=`end date`)
+  ret1 <- ret %>% tidy(model1)
+  ret2 <- ret %>% tidy(model2)
+
   ret <- data %>% exp_survival(`weeks on service`, `is churned`, cohort=`o s`)
   ret1 <- ret %>% tidy(model1)
   ret2 <- ret %>% tidy(model2)
