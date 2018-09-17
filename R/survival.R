@@ -47,7 +47,7 @@ exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, e
       df[[end_time_col]] <- as.Date(df[[end_time_col]]) # convert to Date in case it is POSIXct.
       # set value to fill NAs of end time
       if (end_time_fill == "max") {
-        end_time_fill_val <- max(df[[end_time_col]], na.rm = TRUE)
+        end_time_fill_val <- max(df[[start_time_col]], df[[end_time_col]], na.rm = TRUE)
       }
       else if (end_time_fill == "today") {
         end_time_fill_val <- lubridate::today()
