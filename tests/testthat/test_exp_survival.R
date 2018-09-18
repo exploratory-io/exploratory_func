@@ -67,5 +67,8 @@ test_that("test exp_survival", {
   ret <- data %>% exp_survival(NULL, `is churned`, start_time=`start date`, end_time=`end date`, end_time_fill="2020-01-01")
   ret1 <- ret %>% tidy(model1)
   ret2 <- ret %>% tidy(model2)
+  ret <- data %>% exp_survival(NULL, `is churned`, start_time=`start date`, end_time=`end date`, end_time_fill=as.Date("2020-01-01"))
+  ret1 <- ret %>% tidy(model1)
+  ret2 <- ret %>% tidy(model2)
 
 })
