@@ -106,7 +106,7 @@ fill_between_v <- function(v, .direction="down") {
 }
 
 # same as tidyr::fill, but fills only between non-NA values.
-#' @param .direction "down" or "up".
+#' @param .direction "down" or "up". (dot-prefixed name honoring dplyr::fill())
 #' @export
 fill_between <- function(df, ..., .direction="down") {
   # this evaluates select arguments like starts_with
