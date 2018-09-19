@@ -93,12 +93,12 @@ impute_na <- function(target, type = mean, val = 0, ...) {
 fill_between_v <- function(v, .direction="down", value=NULL) {
   filled_downward<-zoo::na.locf(v, na.rm = FALSE)
   filled_upward<-zoo::na.locf(v, fromLast = TRUE, na.rm = FALSE)
-  if (!is.na(value)) {
+  if (!is.null(value)) {
     ret <- v
     ret[is.na(ret)] <- value
     ret <- ifelse(!is.na(filled_upward) & !is.na(filled_downward), ret, NA)
   }
-  if (.direction == "down") {
+  else if (.direction == "down") {
     ret <- ifelse(!is.na(filled_upward), filled_downward, NA)
   }
   else { # for "up"
@@ -114,6 +114,8 @@ fill_between_v <- function(v, .direction="down", value=NULL) {
 # Same as tidyr::fill, but fills only between non-NA values.
 #' @param .direction - "down" or "up". (Dot-prefixed name honoring dplyr::fill())
 #' @param value - Specific value to fill NA. (Obviously, when specified, .direction has no effect.)
+#'                Note that this is used for all the specified columns regardless of data type,
+#'                which can result in conversion of column data type.
 #' @export
 fill_between <- function(df, ..., .direction="down", value=NULL) {
   # this evaluates select arguments like starts_with
