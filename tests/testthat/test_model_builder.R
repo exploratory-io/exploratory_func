@@ -126,7 +126,12 @@ test_that("test build_glm and broom", {
     result <- test_df %>%
       build_glm(vec1~vec2, augment=TRUE)
     expect_equal(nrow(result), 10)
-    expect_equal(ncol(result), ncol(test_df)+10)
+    if (Sys.info()["machine"] == "x86") { # On windows 32 bit, .cooksd and .std.resid is not returned with this data due to Residual Deviance reduced to 0.
+      expect_equal(ncol(result), ncol(test_df)+8)
+    }
+    else {
+      expect_equal(ncol(result), ncol(test_df)+10)
+    }
   }
 })
 
