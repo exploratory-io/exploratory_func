@@ -184,7 +184,7 @@ test_that("test do_dist with cmd_scale", {
   # this expectation used to be like following, but added abs to allow results with flipped sign,
   # which is also correct. For some reason this happens on windows 32bit.
   # expect_equal(result_kv[[2]], c(-22.045408, -7.348469, 7.348469, 22.045408), tolerance=0.01)
-  expect_equal(abs(result_kv[[2]]), c(-22.045408, -7.348469, 7.348469, 22.045408), tolerance=0.01)
+  expect_equal(abs(result_kv[[2]]), c(22.045408, 7.348469, 7.348469, 22.045408), tolerance=0.01)
 })
 
 test_that("test do_dist with cmd_scale with normalize", {
