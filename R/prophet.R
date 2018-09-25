@@ -440,11 +440,15 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
     }
 
     # revive original column names (time_col, value_col)
-    colnames(ret)[colnames(ret) == "ds"] <- avoid_conflict(colnames(ret), time_col)
+    if (time_col != "ds") { # if time_col happens to be "ds", do not do this, since it will make the column name "ds.new".
+      colnames(ret)[colnames(ret) == "ds"] <- avoid_conflict(colnames(ret), time_col)
+    }
     if (is.null(value_col)) {
       value_col <- "count"
     }
-    colnames(ret)[colnames(ret) == "y"] <- avoid_conflict(colnames(ret), value_col)
+    if (value_col != "y") { # if value_col happens to be "y", do not do this, since it will make the column name "y.new".
+      colnames(ret)[colnames(ret) == "y"] <- avoid_conflict(colnames(ret), value_col)
+    }
 
     # adjust column name style
     colnames(ret)[colnames(ret) == "yhat"] <- avoid_conflict(colnames(ret), "forecasted_value")
