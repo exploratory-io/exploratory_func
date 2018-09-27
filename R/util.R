@@ -1407,3 +1407,11 @@ reorder_cols <- function(df, ...) {
   dplyr::select(df, !!!rlang::quos(...), dplyr::everything())
 }
 
+#' @export
+excel_numeric_to_date <- function(date_num, date_system = "modern",
+                                  include_time = FALSE, round_seconds = TRUE) {
+  # working around https://github.com/sfirke/janitor/issues/241
+  # by applying as.numeric on the input in case it is integer.
+  janitor::excel_numeric_to_date(as.numeric(date_num), date_system = date_system,
+                                 include_time = include_time, round_seconds = round_seconds)
+}
