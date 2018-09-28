@@ -652,3 +652,9 @@ test_that("r_squared", {
   res <- r_squared(c(1,2,3,4,5), c(3,4,2,4,7))
   expect_equal(res, -0.3, tolerance = 0.001)
 })
+
+test_that("excel_numeric_to_date", {
+  res <- exploratory::excel_numeric_to_date(50000L) # test integer input
+  expect_equal(res, as.Date("2036-11-21"))
+})
+
