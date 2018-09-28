@@ -1516,6 +1516,14 @@ exp_rpart <- function(df,
       if (smote && length(unique_val[!is.na(unique_val)]) == 2) {
         df <- df %>% exp_balance(clean_target_col, sample=FALSE) # since we already sampled, no further sample.
       }
+      # if target is categorical (not numeric) and only 1 unique value (or all NA), throw error.
+      if ("numeric" %nin% class(clean_target_col) &&
+          "integer" %nin% class(clean_target_col) &&
+          length(unique_val[!is.na(unique_val)]) <= 1) {
+        # We might want to skip and show the status in Summary when we support Repeat By,
+        # but for now just throw error to show.
+        stop("Categorical Target Variable must have 2 or more unique values.")
+      }
 
       rhs <- paste0("`", c_cols, "`", collapse = " + ")
       fml <- as.formula(paste0("`", clean_target_col, "`", " ~ ", rhs))
