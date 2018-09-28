@@ -43,4 +43,10 @@ test_that("exp_rpart multiclass classification", {
   res <- model_df %>% tidy(model, type="conf_mat")
 })
 
+test_that("exp_rpart throws error with classification with only one unique value", {
+  expect_error({
+    flight2 <- flight %>% filter(`ORIGIN STATE ABR` %in% c("CA"))
+    model_df <- flight2 %>% exp_rpart(`ORIGIN STATE ABR`,`DEP DELAY`)
+  }, "Categorical Target Variable must have 2 or more unique values.")
+})
 
