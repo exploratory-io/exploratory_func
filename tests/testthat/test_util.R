@@ -657,4 +657,3 @@ test_that("excel_numeric_to_date", {
   res <- exploratory::excel_numeric_to_date(50000L) # test integer input
   expect_equal(res, as.Date("2036-11-21"))
 })
-
