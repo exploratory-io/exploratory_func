@@ -430,7 +430,6 @@ test_that("move_col", {
 
   right_to_left <- move_col(test_data, "f", 2)
   expect_equal(colnames(right_to_left), c("a", "f", "b", "c", "d", "e", "g"))
-
 })
 
 test_that("unixtime_to_datetime", {
