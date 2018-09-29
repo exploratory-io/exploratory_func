@@ -395,7 +395,6 @@ test_that("list_concat with multiple list", {
 
   expect_equal(length(ret1_collapse), 1)
   expect_equal(ret1_collapse[[1]], c(NA, NA, NA, NA, "a", "c", "1", "3", "a", "c", "3", "5", "6", "6"))
-
 })
 
 test_that("test expand_args", {
