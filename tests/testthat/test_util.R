@@ -395,7 +395,6 @@ test_that("list_concat with multiple list", {
 
   expect_equal(length(ret1_collapse), 1)
   expect_equal(ret1_collapse[[1]], c(NA, NA, NA, NA, "a", "c", "1", "3", "a", "c", "3", "5", "6", "6"))
-
 })
 
 test_that("test expand_args", {
@@ -430,7 +429,6 @@ test_that("move_col", {
 
   right_to_left <- move_col(test_data, "f", 2)
   expect_equal(colnames(right_to_left), c("a", "f", "b", "c", "d", "e", "g"))
-
 })
 
 test_that("unixtime_to_datetime", {
@@ -651,4 +649,9 @@ test_that("test unnest_without_empty", {
 test_that("r_squared", {
   res <- r_squared(c(1,2,3,4,5), c(3,4,2,4,7))
   expect_equal(res, -0.3, tolerance = 0.001)
+})
+
+test_that("excel_numeric_to_date", {
+  res <- exploratory::excel_numeric_to_date(50000L) # test integer input
+  expect_equal(res, as.Date("2036-11-21"))
 })
