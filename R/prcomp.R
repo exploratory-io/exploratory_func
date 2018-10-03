@@ -154,4 +154,3 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
   }
   res
 }
-
