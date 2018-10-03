@@ -101,7 +101,8 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
     res <- res %>% dplyr::bind_cols(as.data.frame(scores_matrix))
 
     if (!is.null(x$kmeans)) { # add cluster column if with kmeans.
-      res <- res %>% dplyr::mutate(cluster=factor(x$kmeans$cluster))
+      # res <- res %>% dplyr::mutate(cluster=factor(x$kmeans$cluster)) # this caused error when input had column x.
+      res$cluster <- factor(x$kmeans$cluster)
     }
 
     if (nrow(res) > score_n_sample) { # this condition is necessary to avoid error from sample_n().
@@ -128,7 +129,8 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
   else { # should be data or gathered_data
     res <- x$df
     if (!is.null(x$kmeans)) {
-      res <- res %>% dplyr::mutate(cluster=factor(x$kmeans$cluster))
+      # res <- res %>% dplyr::mutate(cluster=factor(x$kmeans$cluster)) # this caused error when input had column x.
+      res$cluster <- factor(x$kmeans$cluster)
     }
     res <- res %>% dplyr::bind_cols(as.data.frame(x$x))
     column_names <- attr(x$rotation, "dimname")[[1]] 
