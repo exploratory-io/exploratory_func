@@ -916,7 +916,7 @@ cleanup_df <- function(df, target_col, selected_cols, grouped_cols, target_n, pr
   ret
 }
 
-cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, name_map, predictor_n) {
+cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, name_map, predictor_n, revert_logical_levels=TRUE) {
   if (is.factor(df[[clean_target_col]])) { # to avoid error in edarf::partial_dependence(), remove levels that is not used in this group.
     df[[clean_target_col]] <- forcats::fct_drop(df[[clean_target_col]])
   }
@@ -935,7 +935,13 @@ cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, nam
     # error from edarf::partial_dependence looks like following.
     #   Error in factor(x, seq_len(length(unique(data[[target]]))), levels(data[[target]])) : invalid 'labels'; length 2 should be 1 or 1
     if (length(unique(df[[clean_target_col]])) >= 2) {
-      df[[clean_target_col]] <- factor(df[[clean_target_col]], levels=c("TRUE","FALSE"))
+      if (revert_logical_levels) { # random forest case. For viz, revert order
+        levels <- c("TRUE","FALSE")
+      }
+      else { # rpart case, we cannot revert because it messes up probability displayed on rpart.plot image.
+        levels <- c("FALSE","TRUE")
+      }
+      df[[clean_target_col]] <- factor(df[[clean_target_col]], levels=levels)
     }
     else {
       df[[clean_target_col]] <- factor(df[[clean_target_col]])
@@ -1503,7 +1509,7 @@ exp_rpart <- function(df,
       # especially multiclass classification seems to take forever when number of unique values of predictors are many.
       # fct_lump is essential here.
       # http://grokbase.com/t/r/r-help/051sayg38p/r-multi-class-classification-using-rpart
-      clean_df_ret <- cleanup_df_per_group(df, clean_target_col, max_nrow, clean_cols, name_map, predictor_n)
+      clean_df_ret <- cleanup_df_per_group(df, clean_target_col, max_nrow, clean_cols, name_map, predictor_n, revert_logical_levels=FALSE)
       if (is.null(clean_df_ret)) {
         return(NULL) # skip this group
       }
@@ -1608,7 +1614,7 @@ get_actual_class_rpart <- function(x) {
 
 get_class_levels_rpart <- function(x) {
   if (x$classification_type == "binary") {
-    if (class(x$y) == "logical") {
+    if (class(x$y) == "logical") { # TODO: is this really possible for rpart? looks this returns "integer" when original input is logical.
       ylevels <- c("TRUE", "FALSE")
     }
     else {
@@ -1688,12 +1694,26 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
         ret <- evaluate_classification(actual, predicted, class, pretty.name = pretty.name)
         ret
       }
+      # for rpart, factor levels for logical case is kept in FALSE, TRUE order not to mess up rpart.plot.
+      # so need to revert it now, right before visualization.
+      if (length(ylevels) == 2 & all(ylevels == c("FALSE", "TRUE"))) {
+        ylevels <- c("TRUE", "FALSE")
+      }
       dplyr::bind_rows(lapply(ylevels, per_level))
     },
     conf_mat = {
       # return confusion matrix
       actual <- get_actual_class_rpart(x)
       predicted <- x$predicted_class
+
+      # for rpart, factor levels for logical case is kept in FALSE, TRUE order not to mess up rpart.plot.
+      # so need to revert it now, right before visualization.
+      if (is.factor(actual) && length(levels(actual)) == 2 && all(levels(actual) == c("FALSE","TRUE"))) {
+        actual <- forcats::fct_rev(actual)
+      }
+      if (is.factor(predicted) && length(levels(predicted)) == 2 && all(levels(predicted) == c("FALSE","TRUE"))) {
+        predicted <- forcats::fct_rev(predicted)
+      }
 
       ret <- data.frame(
         actual_value = actual,
