@@ -228,7 +228,9 @@ test_that("test exp_chisq with group_by", {
 })
 
 test_that("test exp_ttest", {
-  ret <- exp_ttest(mtcars, mpg, am)
+  mtcars2 <- mtcars
+  mtcars2$am[[1]] <- NA # test NA filtering
+  ret <- exp_ttest(mtcars2, mpg, am)
   ret %>% tidy(model, type="data_summary")
   ret
 })
