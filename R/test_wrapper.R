@@ -350,11 +350,17 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, ...) {
   grouped_cols <- grouped_by(df)
 
   if (!is.null(func2) && (is.Date(df[[var2_col]]) || is.POSIXct(df[[var2_col]]))) {
-    df <- df %>% mutate(!!rlang::sym(var2_col) := extract_from_date(!!rlang::sym(var2_col), type=func2))
+    df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_date(!!rlang::sym(var2_col), type=func2))
   }
   
-  if (n_distinct(df[[var2_col]]) != 2) {
-    stop(paste0("Variable Column (", var2_col, ") has to have 2 kinds of values."))
+  n_distinct_res <- n_distinct(df[[var2_col]]) # save n_distinct result to avoid repeating the relatively expensive call.
+  if (n_distinct_res != 2) {
+    if (n_distinct_res == 3 && any(is.na(df[[var2_col]]))) { # automatically filter NA to make number of category 2, if it is the 3rd category.
+      df <- df %>% dplyr::filter(!is.na(!!rlang::sym(var2_col)))
+    }
+    else {
+      stop(paste0("Variable Column (", var2_col, ") has to have 2 kinds of values."))
+    }
   }
 
   formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
