@@ -1,7 +1,6 @@
 context("test prophet holiday effect feature")
 
 test_that("do_prophet with holiday column", {
-  browser()
   ts <- seq.Date(as.Date("2010-01-01"), as.Date("2012-01-01"), by="day")
   raw_data <- data.frame(timestamp=ts, data=runif(length(ts)))
   ts2 <- seq.Date(as.Date("2010-01-01"), as.Date("2013-01-01"), by="day")
