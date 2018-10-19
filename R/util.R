@@ -1172,6 +1172,20 @@ non_na_pct <- function(x){
   sum(!is.na(x)) / length(x) * 100
 }
 
+#' Ratio of NA in a vector
+#' @param x vector
+#' @export
+na_ratio <- function(x){
+  sum(is.na(x)) / length(x)
+}
+
+#' Ratio of Non NA in a vector
+#' @param x vector
+#' @export
+non_na_raio <- function(x){
+  sum(!is.na(x)) / length(x)
+}
+
 #' This is a wrapper of tidyr::unnest
 #' to change the default of .drop,
 #' so that it always drops other list
