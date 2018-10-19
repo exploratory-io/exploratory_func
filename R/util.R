@@ -1182,7 +1182,7 @@ na_ratio <- function(x){
 #' Ratio of Non NA in a vector
 #' @param x vector
 #' @export
-non_na_raio <- function(x){
+non_na_ratio <- function(x){
   sum(!is.na(x)) / length(x)
 }
 
