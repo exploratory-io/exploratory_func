@@ -53,9 +53,10 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
   # since there seems to be cases where 'auto' on yearly.seasonality triggers this situation, we are using TRUE as default.
   # we have not seen any issue on 'auto' on weekly.seasonality, but are not using it for now just to be careful.
 
-  loadNamespace("dplyr")
   # For some reason this needs to be library() instead of loadNamespace() to avoid error.
   # Bug in prophet?
+  # Also, without this library("prophet"), we get the following error for some reason on Exploratory. TODO: check where this error is from.
+  # "Values in your data may be all 0. If you are using group_by, one of your group's values may be all 0."
   library("prophet")
 
   grouped_col <- grouped_by(df)
@@ -290,7 +291,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
           m <- add_regressor(m, regressor)
         }
       }
-      m <- fit.prophet(m, training_data)
+      m <- prophet::fit.prophet(m, training_data)
       forecast <- stats::predict(m, cap_df)
     }
     else {
@@ -312,7 +313,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
           m <- add_regressor(m, regressor)
         }
       }
-      m <- fit.prophet(m, training_data)
+      m <- prophet::fit.prophet(m, training_data)
       if (time_unit == "hour") {
         time_unit_for_future_dataframe = 3600
       }
