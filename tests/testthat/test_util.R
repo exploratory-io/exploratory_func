@@ -539,6 +539,12 @@ test_that("test na_pct", {
   expect_true(ret == 40)
 })
 
+test_that("test na_ratio", {
+  data <- c("a", "b", NA, "c", NA, "d", "e", "f", NA, NA)
+  ret <- na_ratio(data)
+  expect_true(ret == 0.4)
+})
+
 test_that("test non_na_count", {
   data <- c("a", "b", NA, "c", NA, "d", "e", "f", NA, NA)
   ret <- non_na_count(data)
@@ -549,6 +555,12 @@ test_that("test non_na_pct", {
   data <- c("a", "b", NA, "c", NA, "d", "e", "f", NA, NA)
   ret <- non_na_pct(data)
   expect_true(ret == 60)
+})
+
+test_that("test non_na_ratio", {
+  data <- c("a", "b", NA, "c", NA, "d", "e", "f", NA, NA)
+  ret <- non_na_ratio(data)
+  expect_true(ret == 0.6)
 })
 
 test_that("test extract_from_date", {
