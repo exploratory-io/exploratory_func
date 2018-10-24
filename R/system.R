@@ -1595,7 +1595,7 @@ guess_csv_file_encoding <- function(file,  n_max = 1e4, threshold = 0.20){
     readr::guess_encoding(tmp, n_max, threshold)
   } else {
     # If it's local file simply call readr::read_delim.
-    # reading through read_lines_raw(file()) is to be able to read files with path that includes multibyte chars.
+    # Reading through read_lines_raw(file()) is to be able to read files with path that includes multibyte chars.
     # without it, error is thrown from inside guess_encoding.
     # Since file() call has about 1 sec overhead at first read (most likely read-ahead), we do this selectively
     # only when multibyte characters are in the path.
