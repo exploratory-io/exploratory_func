@@ -125,7 +125,7 @@ do_apriori_ <- function(df, subject_col, key_col, minlen=1, maxlen=10, min_suppo
       break
     }
     if (is.logical(ret) && ret == TRUE) { # after auto search for min_support, still no rule found.
-      stop("No rule was found. Smaller minimum support (less than 0.00001) or minimum confidence might find rules.")
+      stop("There is no rules found with the criteria. You might want to set smaller minimum support or confidence values from the property to find the rules.")
     }
     ret
   }
