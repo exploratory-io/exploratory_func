@@ -928,7 +928,9 @@ downloadDataFromGoogleCloudStorage <- function(bucket, folder, download_dir, tok
   });
   files <- list.files(path=download_dir, pattern = ".gz");
   # pass progress as FALSE to prevent SIGPIPE error on Exploratory Desktop.
-  df <- lapply(files, function(file){readr::read_csv(stringr::str_c(download_dir, "/", file), progress = FALSE)}) %>% dplyr::bind_rows()
+  # To avoid the issue that bind_rows throws an error due to column data type mismatch,
+  # First, import all the csv files with column data types as character, then convert the column data types with readr::type_convert.
+  df <- lapply(files, function(file){readr::read_csv(stringr::str_c(download_dir, "/", file), col_types = readr::cols(.default = "c"), progress = FALSE)}) %>% dplyr::bind_rows() %>% readr::type_convert()
 }
 
 #' API to get a list of buckets from Google Cloud Storage
