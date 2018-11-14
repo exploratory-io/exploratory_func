@@ -35,4 +35,7 @@ test_that("jsToMongoJson should translate js to mongo json", {
   jsQueryStr <- '{a:/abc/}'
   jsonQueryStr <- jsToMongoJson(jsQueryStr)
   expect_equal(jsonQueryStr, '{"a":{"$regex":"abc","$options":""}}')
+  jsQueryStr <- '{a:/abc/i}'
+  jsonQueryStr <- jsToMongoJson(jsQueryStr)
+  expect_equal(jsonQueryStr, '{"a":{"$regex":"abc","$options":"i"}}')
 })
