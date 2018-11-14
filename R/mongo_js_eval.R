@@ -525,8 +525,10 @@ jsToMongoJson <- function(js) {
       }
     }
     else {
-      // TODO: regex.flag does not return value on V8. Look into it.
-      return {$regex:regex.source, $options:(regex.flags || '')};
+      // We do the following to get regex flags since regex.flags does not return value on V8.
+      var regex_str_arr = regex.toString().split('/');
+      var flags = regex_str_arr[regex_str_arr.length - 1]
+      return {$regex:regex.source, $options:flags};
     }
   }"))
 
