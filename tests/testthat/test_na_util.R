@@ -186,6 +186,27 @@ test_that("test fill_between with .direction=up", {
   expect_equal(ret[["col_3"]], factor(c(NA, "a", "b", "b", NA)))
 })
 
+test_that("test fill_between with value", {
+  test_data <- data.frame(
+    c(NA, 1, NA, 2, NA),
+    c(NA, "a", NA, "b", NA),
+    factor(c(NA, "a", NA, "b", NA)),
+    stringsAsFactors=FALSE
+  )
+  colnames(test_data) <- c("col 1", "col-2", "col_3")
+  ret <- test_data %>%
+    fill_between(`col 1`, `col-2`, `col_3`, value=0)
+  expect_equal(ret[["col 1"]], c(NA, 1, 0, 2, NA))
+  expect_equal(ret[["col-2"]], c(NA, "a", "0", "b", NA))
+  expect_equal(ret[["col_3"]], factor(c(NA, "a", NA, "b", NA))) # since 0 does not make sense as this factor.
+
+  ret <- test_data %>%
+    fill_between(`col 1`, `col-2`, `col_3`, value="a")
+  expect_equal(ret[["col 1"]], c(NA, "1", "a", "2", NA))
+  expect_equal(ret[["col-2"]], c(NA, "a", "a", "b", NA))
+  expect_equal(ret[["col_3"]], factor(c(NA, "a", "a", "b", NA)))
+})
+
 test_that("test fill_between with group_by", {
   test_data <- data.frame(
     c(NA,1,NA,2,NA,1,NA,2,NA,NA),

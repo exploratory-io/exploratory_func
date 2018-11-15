@@ -1,11 +1,14 @@
 
 #' Function for Survival Analysis view.
 #' It does survfit and survdiff.
+#' @param end_time_fill - "max", "today", or actual value or string expresion of Date.
 #' @export
-exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, time_unit = "day", cohort = NULL, cohort_func = NULL, ...){
+exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, end_time_fill = "max", time_unit = "day", cohort = NULL, cohort_func = NULL, ...){
   validate_empty_data(df)
 
   grouped_col <- grouped_by(df)
+
+  orig_levels <- NULL
 
   if (!is.null(substitute(cohort))) {
     orig_cohort_col <- col_name(substitute(cohort))
@@ -18,6 +21,14 @@ exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, t
       df[[cohort_col]] <- extract_from_date(df[[cohort_col]], type=cohort_func)
     }
     quoted_cohort_col <- paste0("`", cohort_col, "`")
+
+    # keep original factor levels to set them back later.
+    if (is.factor(df[[cohort_col]])) {
+      orig_levels <- levels(df[[cohort_col]])
+    }
+    else if (is.logical(df[[cohort_col]])) {
+      orig_levels <- c("TRUE","FALSE")
+    }
   }
   else {
     # no cohort column is set. Just draw a single survival curve.
@@ -34,7 +45,17 @@ exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, t
     if (!is.null(substitute(end_time))) { # if end_time exists, fill NA with today()
       end_time_col <- col_name(substitute(end_time))
       df[[end_time_col]] <- as.Date(df[[end_time_col]]) # convert to Date in case it is POSIXct.
-      df[[end_time_col]] <- impute_na(df[[end_time_col]] ,type = "value", val=lubridate::today())
+      # set value to fill NAs of end time
+      if (is.character(end_time_fill) && end_time_fill == "max") { # type check before comparison is necessary to avoid error.
+        end_time_fill_val <- max(df[[start_time_col]], df[[end_time_col]], na.rm = TRUE)
+      }
+      else if (is.character(end_time_fill) && end_time_fill == "today") {
+        end_time_fill_val <- lubridate::today()
+      }
+      else {
+        end_time_fill_val <- as.Date(end_time_fill)
+      }
+      df[[end_time_col]] <- impute_na(df[[end_time_col]] ,type = "value", val=end_time_fill_val)
     }
     else { # if end_time does not exist, create .end_time column with value of today()
       end_time_col <- avoid_conflict(colnames(df), ".end_time")
@@ -65,6 +86,12 @@ exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, t
   # calls survfit for each group.
   each_func1 <- function(df) {
     ret <- survival::survfit(fml, data = df)
+    # strata is ignored by survfit if all rows have same value.
+    # In such case, we need to put it back later. Record the value in the model.
+    if (cohort_col != "1" && length(unique(df[[cohort_col]])) == 1) {
+      ret$single_strata_value = df[[cohort_col]][[1]]
+    }
+    ret$orig_levels <- orig_levels
     class(ret) <- c("survfit_exploratory", class(ret))
     ret
   }
@@ -105,6 +132,16 @@ tidy.survfit_exploratory <- function(x, ...) {
     ret <- tidyr::unnest(nested)
     # remove ".cohort=" part from strata values.
     ret <- ret %>% dplyr::mutate(strata = stringr::str_remove(strata,"^\\.cohort\\="))
+    # Set original factor level back so that legend order is correct on the chart.
+    # In case of logical, c("TRUE","FALSE") is stored in orig_level, so that we can
+    # use it here either way.
+    if (!is.null(x$orig_levels)) {
+      ret <- ret %>%  dplyr::mutate(strata = factor(strata, levels=x$orig_levels))
+    }
+  }
+  else if (!is.null(x$single_strata_value)) { # put back single strata value ignored by survfit.
+    ret <- add_time_zero_row_each(ret)
+    ret <- ret %>% dplyr::mutate(strata = as.character(x$single_strata_value))
   }
   else {
     ret <- add_time_zero_row_each(ret)

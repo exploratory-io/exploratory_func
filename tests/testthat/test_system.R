@@ -122,3 +122,15 @@ test_that("test select_columns with exclude option",{
 
 })
 
+test_that("countycode", {
+  ret1 <- countycode(c("California", "CA"),c("San Francisco", "San Francisco"))
+  expect_equal(ret1, c("06075", "06075"))
+  ret2 <- countycode(c("MD", "MD", "MD"),c("Baltimore", "Baltimore City", "City of Baltimore"))
+  expect_equal(ret2, c("24005", "24510", "24510"))
+})
+
+test_that("js_glue_transformer", {
+  v <- c(T,F,NA)
+  res <- glue::glue("{v}", .transformer=js_glue_transformer)
+  expect_equal(as.character(res), "true, false, null")
+})

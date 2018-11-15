@@ -1,10 +1,8 @@
 #' do PCA
 #' @export
-do_prcomp <- function(df,
-                        ...
-                       ) { # TODO: write test
+do_prcomp <- function(df, ..., normalize_data=TRUE) { # TODO: write test
   # this evaluates select arguments like starts_with
-  selected_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
+  selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
 
   grouped_cols <- grouped_by(df)
 
@@ -31,11 +29,11 @@ do_prcomp <- function(df,
         cleaned_df <- cleaned_df[colnames(cleaned_df) != col]
       }
     }
-    if (col(cleaned_df) == 0) { # skip this group if no column is left.
+    if (length(colnames(cleaned_df)) == 0) { # skip this group if no column is left.
       return(NULL)
     }
-
-    fit <- prcomp(cleaned_df, scale=TRUE)
+    # "scale." is an argument name. There is no such operator like ".=". 
+    fit <- prcomp(cleaned_df, scale.=normalize_data)
     fit$df <- filtered_df # add filtered df to model so that we can bind_col it for output. It needs to be the filtered one to match row number.
     fit$grouped_cols <- grouped_cols
     class(fit) <- c("prcomp_exploratory", class(fit))
@@ -47,8 +45,9 @@ do_prcomp <- function(df,
 
 #' extracts results from prcomp as a dataframe
 #' @export
-#' @param n_sample Sample number for biplot. Default 5000, which is the default of our scatter plot
-tidy.prcomp_exploratory <- function(x, type="variances", n_sample=5000, pretty.name=FALSE, ...) { #TODO: add test
+#' @param n_sample Sample number for biplot. Default 5000, which is the default of our scatter plot.
+#'        we use it for gathered_data for parallel coordinates too. sampling is applied before gather.
+tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.name=FALSE, normalize_data=FALSE, ...) { #TODO: add test
   if (type == "variances") {
     res <- as.data.frame(x$sdev*x$sdev) # square it to make it variance
     colnames(res)[1] <- "variance"
@@ -74,6 +73,9 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=5000, pretty.n
     # prepare scores matrix
     scores_matrix <- x$x[,1:2] # keep only PC1 and PC2 for biplot
 
+    if (is.null(n_sample)) { # set default of 5000 for biplot case.
+      n_sample = 5000
+    }
     # sum of number of loading rows times 2 (because it is line between 2 points) and number of score rows should fit in n_sample.
     score_n_sample <- n_sample - nrow(loadings_matrix)*2
 
@@ -97,7 +99,13 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=5000, pretty.n
     }
 
     res <- res %>% dplyr::bind_cols(as.data.frame(scores_matrix))
-    if (nrow(res) > score_n_sample) {
+
+    if (!is.null(x$kmeans)) { # add cluster column if with kmeans.
+      # res <- res %>% dplyr::mutate(cluster=factor(x$kmeans$cluster)) # this caused error when input had column x.
+      res$cluster <- factor(x$kmeans$cluster)
+    }
+
+    if (nrow(res) > score_n_sample) { # this condition is necessary to avoid error from sample_n().
       res <- res %>% dplyr::sample_n(score_n_sample)
     }
 
@@ -118,10 +126,31 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=5000, pretty.n
     res <- res %>% tidyr::fill(x$grouped_cols)
     res
   }
-  else { # should be data
+  else { # should be data or gathered_data
     res <- x$df
+    if (!is.null(x$kmeans)) {
+      # res <- res %>% dplyr::mutate(cluster=factor(x$kmeans$cluster)) # this caused error when input had column x.
+      res$cluster <- factor(x$kmeans$cluster)
+    }
     res <- res %>% dplyr::bind_cols(as.data.frame(x$x))
+    column_names <- attr(x$rotation, "dimname")[[1]] 
+    if (normalize_data) {
+      res <- res %>% mutate_at(column_names, exploratory::normalize)
+    }
+
+    if (!is.null(n_sample)) { # default is no sampling.
+      # limit n_sample so that no more dots are created than the max that can be plotted on scatter plot, which is 5000.
+      n_sample <- min(n_sample, floor(5000 / length(column_names)))
+      if (nrow(res) > n_sample) { # this condition is necessary to avoid error from sample_n().
+        res <- res %>% dplyr::sample_n(n_sample)
+      }
+    }
+
+    if (type == "gathered_data") { # for boxplot and paralell coordinates. this is only when with kmeans.
+      res <- res %>% dplyr::select(!!c(column_names,"cluster"))
+      res <- res %>% dplyr::mutate(row_id=seq(n())) # row_id for line representation.
+      res <- res %>% tidyr::gather(key="key",value="value",!!column_names)
+    }
   }
   res
 }
-

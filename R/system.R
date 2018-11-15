@@ -215,6 +215,59 @@ getMongoURL <- function(host = NULL, port, database, username, pass, isSSL=FALSE
   return (url)
 }
 
+# glue transformer for mongo js query.
+# supports character, factor, logical, Date, POSIXct, POSIXlt, and numeric.
+js_glue_transformer <- function(code, envir) {
+  val <- eval(parse(text = code), envir)
+  if (is.character(val) || is.factor(val)) {
+    # escape for js
+    val <- gsub("\\", "\\\\", val, fixed=TRUE)
+    val <- gsub("\"", "\\\"", val, fixed=TRUE)
+    val <- paste0('"', val, '"')
+  }
+  else if (is.logical(val)) {
+    val <- ifelse(val, "true", "false")
+  }
+  else if (lubridate::is.Date(val) || lubridate::is.POSIXt(val)) {
+    val <- paste0("new Date(\"", readr::parse_character(val), "\")")
+  }
+  # Interpret NA to null.
+  # https://docs.mongodb.com/manual/tutorial/query-for-null-fields/
+  val <- ifelse(is.na(val), "null", val)
+
+  # for numeric it should work as is. expression like 1e+10 works on js too.
+  glue::collapse(val, sep=", ")
+}
+
+odbc_glue_transformer <- function(code, envir) {
+  val <- eval(parse(text = code), envir)
+  if (is.character(val) || is.factor(val)) {
+    # escape for SQL
+    # TODO: check if this makes sense for Dremio and Athena
+    val <- gsub("'", "''", val, fixed=TRUE) # both Oracle and SQL Server escapes single quote by doubling them.
+    val <- paste0("'", val, "'") # both Oracle and SQL Server quotes strings with single quote.
+  }
+  # TODO: How should we handle logical, Date, POSIXct, POSIXlt?
+  #       Does expression like 1e+10 work?
+  # TODO: Need to handle NA here. Find out appropriate way.
+  glue::collapse(val, sep=", ")
+}
+
+bigquery_glue_transformer <- function(code, envir) {
+  val <- eval(parse(text = code), envir)
+  if (is.character(val) || is.factor(val)) {
+    # escape for Standard SQL for bigquery
+    # https://cloud.google.com/bigquery/docs/reference/standard-sql/lexical
+    # escape for js
+    val <- gsub("\\", "\\\\", val, fixed=TRUE)
+    val <- gsub("\"", "\\\"", val, fixed=TRUE)
+    val <- paste0('"', val, '"')
+  }
+  # TODO: How should we handle logical, Date, POSIXct, POSIXlt?
+  #       Does expression like 1e+10 work?
+  # TODO: Need to handle NA here. Find out appropriate way.
+  glue::collapse(val, sep=", ")
+}
 
 #' @export
 queryMongoDB <- function(host = NULL, port = "", database, collection, username, password, query = "{}", flatten,
@@ -222,7 +275,6 @@ queryMongoDB <- function(host = NULL, port = "", database, collection, username,
                          skip=0, queryType = "find", pipeline="{}", cluster = NULL, timeout = NULL, additionalParamas = NULL, ...){
   if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
   loadNamespace("jsonlite")
-  if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
 
   # read stored password
   pass = saveOrReadPassword("mongodb", username, password)
@@ -238,8 +290,9 @@ queryMongoDB <- function(host = NULL, port = "", database, collection, username,
   tryCatch({
     if(queryType == "aggregate"){
       pipeline <- convertUserInputToUtf8(pipeline)
-      # set envir = parent.frame() to get variables from users environment, not papckage environment
-      pipeline <- GetoptLong::qq(pipeline, envir = parent.frame())
+      # set .envir = parent.frame() to get variables from users environment, not papckage environment
+      # use <<>> instead of default {} to avoid conflict with js syntax. @{} did not work because }} can appear in js.
+      pipeline <- glue::glue(pipeline, .transformer=js_glue_transformer, .open = "<<", .close = ">>", .envir = parent.frame())
       # convert js query into mongo JSON, which mongolite understands.
       pipeline <- jsToMongoJson(pipeline)
       data <- con$aggregate(pipeline = pipeline)
@@ -247,8 +300,9 @@ queryMongoDB <- function(host = NULL, port = "", database, collection, username,
       query <- convertUserInputToUtf8(query)
       fields <- convertUserInputToUtf8(fields)
       sort <- convertUserInputToUtf8(sort)
-      # set envir = parent.frame() to get variables from users environment, not package environment
-      query <- GetoptLong::qq(query, envir = parent.frame())
+      # set .envir = parent.frame() to get variables from users environment, not papckage environment
+      # use <<>> instead of default {} to avoid conflict with js syntax. @{} did not work because }} can appear in js.
+      query <- glue::glue(query, .transformer=js_glue_transformer, .open = "<<", .close = ">>", .envir = parent.frame())
       # convert js query into mongo JSON, which mongolite understands.
       query <- jsToMongoJson(query)
       fields <- jsToMongoJson(fields)
@@ -327,7 +381,6 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
   if(type == "mongodb") {
     if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
     loadNamespace("jsonlite")
-    if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
     if(!is.null(host) && host != ''){
       key <- paste("mongodb", host, port, databaseName, collection, username, toString(isSSL), authSource, additionalParams, sep = ":")
     } else if (!is.null(cluster) && cluster != '') {
@@ -437,7 +490,6 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     # do those package loading only when we need to use odbc in this if statement,
     # so that we will not have error at our server environemnt where RODBC is not there.
     if(!requireNamespace("RODBC")){stop("package RODBC must be installed.")}
-    if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
 
     loadNamespace("RODBC")
     connect <- function() {
@@ -626,7 +678,7 @@ executeGenericQuery <- function(type, host, port, databaseName, username, passwo
   tryCatch({
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
-    resultSet <- DBI::dbSendQuery(conn, GetoptLong::qq(query, envir = parent.frame()))
+    resultSet <- DBI::dbSendQuery(conn, glue::glue_sql(query, .con = conn, .envir = parent.frame()))
     df <- DBI::dbFetch(resultSet)
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
@@ -677,7 +729,6 @@ queryNeo4j <- function(host, port,  username, password, query, isSSL = FALSE, ..
 queryMySQL <- function(host, port, databaseName, username, password, numOfRows = -1, query, ...){
   if(!requireNamespace("RMySQL")){stop("package RMySQL must be installed.")}
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
-  if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
 
   # read stored password
   pass = saveOrReadPassword("mysql", username, password)
@@ -687,7 +738,7 @@ queryMySQL <- function(host, port, databaseName, username, password, numOfRows =
     DBI::dbGetQuery(conn,"set names utf8")
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
-    resultSet <- RMySQL::dbSendQuery(conn, GetoptLong::qq(query, envir = parent.frame()))
+    resultSet <- RMySQL::dbSendQuery(conn, glue::glue_sql(query, .con = conn, .envir = parent.frame()))
     df <- RMySQL::dbFetch(resultSet, n = numOfRows)
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
@@ -702,7 +753,6 @@ queryMySQL <- function(host, port, databaseName, username, password, numOfRows =
 queryPostgres <- function(host, port, databaseName, username, password, numOfRows = -1, query, ...){
   if(!requireNamespace("RPostgreSQL")){stop("package RPostgreSQL must be installed.")}
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
-  if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
 
   # read stored password
   pass = saveOrReadPassword("postgres", username, password)
@@ -711,7 +761,7 @@ queryPostgres <- function(host, port, databaseName, username, password, numOfRow
   tryCatch({
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
-    resultSet <- RPostgreSQL::dbSendQuery(conn, GetoptLong::qq(query, envir = parent.frame()))
+    resultSet <- RPostgreSQL::dbSendQuery(conn, glue::glue_sql(query, .con = conn, .envir = parent.frame()))
     df <- DBI::dbFetch(resultSet, n = numOfRows)
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
@@ -725,13 +775,14 @@ queryPostgres <- function(host, port, databaseName, username, password, numOfRow
 #' @export
 queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, query, stringsAsFactors = FALSE, host="", port="", ...){
   if(!requireNamespace("RODBC")){stop("package RODBC must be installed.")}
-  if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
 
   conn <- getDBConnection("odbc", host, port, NULL, username, password, dsn = dsn, additionalParams = additionalParams)
   tryCatch({
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
-    df <- RODBC::sqlQuery(conn, GetoptLong::qq(query, envir = parent.frame()), max = numOfRows, stringsAsFactors=stringsAsFactors)
+    query <- glue::glue(query, .transformer=odbc_glue_transformer, .envir = parent.frame())
+    df <- RODBC::sqlQuery(conn, query,
+                          max = numOfRows, stringsAsFactors=stringsAsFactors)
     if (!is.data.frame(df)) {
       # when it is error, RODBC::sqlQuery() does not stop() (throw) with error most of the cases.
       # in such cases, df is a character vecter rather than a data.frame.
@@ -805,11 +856,7 @@ getTwitter <- function(n=200, lang=NULL,  lastNDays=7, searchString, tokenFileId
 #' @export
 submitGoogleBigQueryJob <- function(project, sqlquery, destination_table, write_disposition = "WRITE_TRUNCATE", tokenFieldId, useStandardSQL = FALSE,  ...){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
-  if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
   if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
-
-  #GetoptLong uses stringr and str_c is called without stringr:: so need to use "require" instead of "requireNamespace"
-  if(!require("stringr")){stop("package stringr must be installed.")}
 
   token <- getGoogleTokenForBigQuery(tokenFieldId)
   bigrquery::set_access_cred(token)
@@ -822,7 +869,8 @@ submitGoogleBigQueryJob <- function(project, sqlquery, destination_table, write_
     isStandardSQL = TRUE; # honor value provided by paramerer
   }
   # set envir = parent.frame() to get variables from users environment, not papckage environment
-  job <- bigrquery::bq_perform_query(query = GetoptLong::qq(sqlquery, envir = parent.frame()), billing = project,  use_legacy_sql = !isStandardSQL)
+  sqlquery <- glue::glue(sqlquery, .transformer=bigquery_glue_transformer, .envir = parent.frame())
+  job <- bigrquery::bq_perform_query(query = sqlquery, billing = project,  use_legacy_sql = !isStandardSQL)
   bigrquery::bq_job_wait(job)
   meta <- bigrquery::bq_job_meta(job)
   isCacheHit <- meta$statistics$query$cacheHit
@@ -880,7 +928,9 @@ downloadDataFromGoogleCloudStorage <- function(bucket, folder, download_dir, tok
   });
   files <- list.files(path=download_dir, pattern = ".gz");
   # pass progress as FALSE to prevent SIGPIPE error on Exploratory Desktop.
-  df <- lapply(files, function(file){readr::read_csv(stringr::str_c(download_dir, "/", file), progress = FALSE)}) %>% dplyr::bind_rows()
+  # To avoid the issue that bind_rows throws an error due to column data type mismatch,
+  # First, import all the csv files with column data types as character, then convert the column data types with readr::type_convert.
+  df <- lapply(files, function(file){readr::read_csv(stringr::str_c(download_dir, "/", file), col_types = readr::cols(.default = "c"), progress = FALSE)}) %>% dplyr::bind_rows() %>% readr::type_convert()
 }
 
 #' API to get a list of buckets from Google Cloud Storage
@@ -940,7 +990,6 @@ getDataFromGoogleBigQueryTableViaCloudStorage <- function(bucketProjectId, dataS
 #' @export
 executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 100000, maxPage = 10, writeDisposition = "WRITE_TRUNCATE", tokenFileId, bucketProjectId, bucket=NULL, folder=NULL, max_connections = 8, useStandardSQL = FALSE, ...){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
-  if(!requireNamespace("GetoptLong")){stop("package GetoptLong must be installed.")}
   if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
 
   token <- getGoogleTokenForBigQuery(tokenFileId)
@@ -968,7 +1017,8 @@ executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 1
       isStandardSQL = TRUE;
     }
     # set envir = parent.frame() to get variables from users environment, not papckage environment
-    tb <- bigrquery::bq_project_query(x = project, query = GetoptLong::qq(query, envir = parent.frame()), quiet = TRUE, use_legacy_sql = !isStandardSQL)
+    query <- glue::glue(query, .transformer=bigquery_glue_transformer, .envir = parent.frame())
+    tb <- bigrquery::bq_project_query(x = project, query = query, quiet = TRUE, use_legacy_sql = !isStandardSQL)
     df <- bigrquery::bq_table_download(x = tb, max_results = Inf, page_size = pageSize, max_connections = max_connections, quiet = TRUE)
   }
   df
@@ -1437,20 +1487,55 @@ download_data_file <- function(url, type){
   }
 }
 
-#'Wrapper for readxl::read_excel to support remote file
+#'Wrapper for openxlsx::read.xlsx (in case of .xlsx file) and readxl::read_excel (in case of old .xls file)
+#'Use openxlsx::read.xlsx since it's memory footprint is less than that of readxl::read_excel and this creates benefit for users with less memory like Windows 32 bit users.
 #'@export
-read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf){
-  loadNamespace("readxl")
-  loadNamespace("stringr")
-  if (stringr::str_detect(path, "^https://") ||
-      stringr::str_detect(path, "^http://") ||
-      stringr::str_detect(path, "^ftp://")) {
-    tmp <- download_data_file(path, "excel")
-    readxl::read_excel(tmp, sheet = sheet, col_names = col_names, col_types = col_types, na = na, trim_ws = trim_ws, skip = skip, n_max = n_max)
-  } else {
-    # if it's local file simply call readxl::read_excel
-    readxl::read_excel(path, sheet = sheet, col_names = col_names, col_types = col_types, na = na, trim_ws = trim_ws, skip = skip, n_max = n_max)
+read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, ...){
+  loadNamespace("openxlsx")
+  loadNamespace('readxl')
+  loadNamespace('stringr')
+  if(is.null(use_readxl)){
+    # check if it's running on 32bit machine.
+    if(.Machine$sizeof.pointer == 4) {
+      # to avoid out of memory use openxlsx instead of readxl
+      use_readxl = FALSE
+    } else {
+      use_readxl = TRUE
+    }
   }
+  df <- NULL
+  # for .xlsx file extension
+  if(stringr::str_detect(path, '\\.xlsx') & use_readxl == FALSE) {
+    if(n_max != Inf) {
+      df <- openxlsx::read.xlsx(xlsxFile = path, rows=(skip+1):n_max, sheet = sheet, colNames = col_names, na.strings = na, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols , check.names = check.names, detectDates = detectDates)
+    } else {
+      df <- openxlsx::read.xlsx(xlsxFile = path, sheet = sheet, colNames = col_names, startRow = skip+1, na.strings = na, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols, check.names = check.names, detectDates = detectDates)
+    }
+    # trim white space needs to be done first since it cleans column names
+    if(trim_ws == TRUE) {
+      # use trimws from base to remove ending and trailing white space for character columns
+      df <- data.frame(lapply(df, function(x) if(class(x)=="character") trimws(x) else(x)), stringsAsFactors=F)
+    }
+    # preserve original column name for backward comaptibility (ref: https://github.com/awalker89/openxlsx/issues/102)
+    colnames(df) <- openxlsx::read.xlsx(xlsxFile = path, sheet = sheet, rows = (skip+1), check.names = FALSE, colNames = FALSE) %>% as.character()
+    if(col_names == FALSE) {
+      # For backward comatilibity, use X__1, X__2, .. for default column names
+      columnNames <- paste("X", 1:ncol(df), sep = "__")
+      colnames(df) <- columnNames
+    }
+  } else { # for old .xls file extension
+    if (stringr::str_detect(path, "^https://") ||
+        stringr::str_detect(path, "^http://") ||
+        stringr::str_detect(path, "^ftp://")) {
+      # need to download first since readxl::read_excel cannot work with URL.
+      tmp <- download_data_file(path, "excel")
+      df <- readxl::read_excel(tmp, sheet = sheet, col_names = col_names, col_types = col_types, na = na, trim_ws = trim_ws, skip = skip, n_max = n_max)
+    } else {
+      # if it's local file simply call readxl::read_excel
+      df <- readxl::read_excel(path, sheet = sheet, col_names = col_names, col_types = col_types, na = na, trim_ws = trim_ws, skip = skip, n_max = n_max)
+    }
+  }
+  df
 }
 
 #'Wrapper for readxl::excel_sheets to support remote file
@@ -1490,8 +1575,13 @@ read_delim_file <- function(file, delim, quote = '"',
     # if it's local file simply call readr::read_delim
     # reading through file() is to be able to read files with path that includes multibyte chars.
     # without it, error is thrown from inside read_delim.
-    readr::read_delim(file(file), delim, quote = quote, escape_backslash = escape_backslash, escape_double = escape_double, col_names = col_names, col_types = col_types,
+    file_path <- file
+    if(stringi::stri_enc_mark(file) != "ASCII"){
+      file_path <- file(file)
+    }
+    readr::read_delim(file_path, delim, quote = quote, escape_backslash = escape_backslash, escape_double = escape_double, col_names = col_names, col_types = col_types,
                       locale = locale, na = na, quoted_na = quoted_na, comment = comment, trim_ws = trim_ws, skip = skip, n_max = n_max, guess_max = guess_max, progress = progress)
+
   }
 }
 
@@ -1506,10 +1596,17 @@ guess_csv_file_encoding <- function(file,  n_max = 1e4, threshold = 0.20){
     tmp <- download_data_file(file, "csv")
     readr::guess_encoding(tmp, n_max, threshold)
   } else {
-    # if it's local file simply call readr::read_delim
-    # reading through read_lines_raw(file()) is to be able to read files with path that includes multibyte chars.
+    # If it's local file simply call readr::read_delim.
+    # Reading through read_lines_raw(file()) is to be able to read files with path that includes multibyte chars.
     # without it, error is thrown from inside guess_encoding.
-    readr::guess_encoding(readr::read_lines_raw(file(file), n_max), threshold=threshold)
+    # Since file() call has about 1 sec overhead at first read (most likely read-ahead), we do this selectively
+    # only when multibyte characters are in the path.
+    if(stringi::stri_enc_mark(file) == "ASCII"){
+      encode <- readr::guess_encoding(file, n_max=n_max, threshold=threshold)
+    } else {
+      encode <- readr::guess_encoding(readr::read_lines_raw(file(file), n_max=n_max), threshold=threshold)
+    }
+    encode
   }
 }
 

@@ -9,13 +9,14 @@ test_that("test pivot with empty data frame", {
 
 test_that("test upper_gather", {
   mat <- matrix(seq(20),nrow=5, ncol=4)
+  mat[[15]] <- NA # inject NA
   # use col03 to break sorted state
-  colnames(mat) <- c("col1","col2","col03", "col4")
+  colnames(mat) <- c("col 1","col 2","col 03", "col 4")
   result <- upper_gather(mat)
   expect_equal( typeof(result[[2]]), "character")
   expect_equal(result[[1]], sort(result[[1]]))
-  expect_equal(result[result[[1]]==3 & result[[2]]=="col4", 3][[1]], 18)
-  expect_equal(result[result[[1]]==2 & result[[2]]=="col03", 3][[1]], 12)
+  expect_equal(result[result[[1]]==3 & result[[2]]=="col 4", 3][[1]], 18)
+  expect_equal(result[result[[1]]==2 & result[[2]]=="col 03", 3][[1]], 12)
   expect_equal(nrow(result), 6)
 })
 
@@ -57,38 +58,20 @@ test_that("test upper_gather with vector diag true", {
   expect_equal(nrow(result), 10)
 })
 
-test_that("test group_exclude", {
-  test_df <- data.frame(
-    col1=rep(paste("col1", seq(2)), 5),
-    col2=rep(paste("col2", seq(2)), each=5),
-    col3=paste("col3", seq(10))
-    )
-  test_df$list <- as.list(paste("list", seq(10)))
-  ret <- group_exclude(test_df, col1, col2)
-  expect_equal(colnames(attr(ret, "label")), "col3")
-})
-
 test_that("sparse_cast", {
   test_df <- data.frame(
     row = rep(paste("row", 6-seq(5)), each=4),
     col = rep(paste("col", seq(4)), 5),
     val = rep(c(NA,1,0,0), 5)
   )
-  mat <- sparse_cast(test_df, "row", "col", "val")
+  colnames(test_df) <- c("ro w", "co l", "va l")
+  mat <- sparse_cast(test_df, "ro w", "co l", "va l")
 
   expect_equal(dim(mat), c(5, 4))
   expect_equal(dimnames(mat), list(paste("row", seq(5)), paste("col", seq(4))))
 
-  mat <- sparse_cast(test_df, "row", "col")
+  mat <- sparse_cast(test_df, "ro w", "co l")
   expect_equal(dim(mat), c(5, 4))
-})
-
-test_that("test group_exclude one col", {
-  test_df <- data.frame(
-    col1=rep(paste("col1", seq(2)), 5)
-  )
-  ret <- group_exclude(test_df, col1)
-  expect_equal(attr(ret, "label"), NULL)
 })
 
 test_that("test avoid_conflict", {
@@ -101,13 +84,15 @@ test_that("test avoid_conflict", {
 test_that("test grouped_by", {
   loadNamespace("dplyr")
   test_df <- data.frame(
-    col1=rep(paste("col1", seq(2)), 5),
+    col1=c(rep(paste("col1", seq(2)), 4), NA, NA), # inject NA for test
     col2=rep(paste("col2", seq(2)), each=5),
     col3=paste("col3", seq(10))
   )
-  df <- dplyr::group_by(test_df, col1, col2)
+  colnames(test_df) <- c("col 1", "col 2", "col 3")
+  test_df
+  df <- dplyr::group_by(test_df, `col 1`, `col 2`)
   ret <- grouped_by(df)
-  expect_equal(ret, c("col1", "col2"))
+  expect_equal(ret, c("col 1", "col 2"))
 })
 
 test_that("test simple_cast colnames are sorted", {
@@ -249,6 +234,12 @@ test_that("test mat_to_df", {
 test_that("test %nin%", {
   ret <- c(1,3,NA,2) %nin% c(3, NA)
   expect_equal(ret, c(T,F,F,T))
+})
+
+test_that("list_n", {
+  test_list <- list(seq(1), seq(2), seq(3))
+  ret <- list_n(test_list)
+  expect_equal(ret, c(1, 2, 3))
 })
 
 test_that("list_extract", {
@@ -404,7 +395,6 @@ test_that("list_concat with multiple list", {
 
   expect_equal(length(ret1_collapse), 1)
   expect_equal(ret1_collapse[[1]], c(NA, NA, NA, NA, "a", "c", "1", "3", "a", "c", "3", "5", "6", "6"))
-
 })
 
 test_that("test expand_args", {
@@ -439,7 +429,6 @@ test_that("move_col", {
 
   right_to_left <- move_col(test_data, "f", 2)
   expect_equal(colnames(right_to_left), c("a", "f", "b", "c", "d", "e", "g"))
-
 })
 
 test_that("unixtime_to_datetime", {
@@ -550,6 +539,12 @@ test_that("test na_pct", {
   expect_true(ret == 40)
 })
 
+test_that("test na_ratio", {
+  data <- c("a", "b", NA, "c", NA, "d", "e", "f", NA, NA)
+  ret <- na_ratio(data)
+  expect_true(ret == 0.4)
+})
+
 test_that("test non_na_count", {
   data <- c("a", "b", NA, "c", NA, "d", "e", "f", NA, NA)
   ret <- non_na_count(data)
@@ -560,6 +555,12 @@ test_that("test non_na_pct", {
   data <- c("a", "b", NA, "c", NA, "d", "e", "f", NA, NA)
   ret <- non_na_pct(data)
   expect_true(ret == 60)
+})
+
+test_that("test non_na_ratio", {
+  data <- c("a", "b", NA, "c", NA, "d", "e", "f", NA, NA)
+  ret <- non_na_ratio(data)
+  expect_true(ret == 0.6)
 })
 
 test_that("test extract_from_date", {
@@ -589,4 +590,80 @@ test_that("test mase", {
 
   ret <- data %>% dplyr::summarize(`ma se` = exploratory::mase(`ac tual`, `pre dicted`, `is test data`))
   expect_equal(ret$`ma se`, 0.667, tolerance=0.01)
+})
+
+test_that("test true_count", {
+  ret <- true_count(c(T,T,T,F,F,NA))
+  expect_equal(ret, 3)
+})
+
+test_that("test false_count", {
+  ret <- false_count(c(T,T,T,F,F,NA))
+  expect_equal(ret, 2)
+})
+
+test_that("test get_confint", {
+  mean_vals <- c(0,1,NA)
+  sd_vals <- c(1,1,1) 
+  ret <- get_confint(mean_vals, sd_vals, conf_int = 0.975)
+  expect_equal(ret, c(1.959964, 2.959964, NA), tolerance=0.0001)
+})
+
+test_that("test str_clean", {
+  ret <- str_clean(c("  not a very  tidy sentence ", " dirty  text ", NA))
+  expect_equal(ret, c("not a very tidy sentence", "dirty text", NA))
+})
+
+test_that("test str_count_all", {
+  # TODO: NA handling in remove.zero = TRUE case.
+  ret <- str_count_all(c("  not a very  tidy sentence ", " dirty  text ", NA), c("very", "dirty"), remove.zero = FALSE)
+  expect_equal(ret, list(data.frame(.count=c(1,0), .pattern=c("very","dirty"), stringsAsFactors = F),
+                         data.frame(.count=c(0,1), .pattern=c("very","dirty"), stringsAsFactors = F),
+                         data.frame(.count=c(NA_integer_,NA_integer_), .pattern=c("very","dirty"), stringsAsFactors = F)))
+})
+
+test_that("test safe_slice", {
+  mat <- matrix(c(1,NA,3,NA,5,6,7,8,NA), 3,3)
+  ret1 <- safe_slice(mat,1)
+  expect_equal(ret1, matrix(c(1,NA,7),1,3))
+  ret2 <- safe_slice(mat,1, remove=TRUE)
+  expect_equal(ret2, matrix(c(NA,3,5,6,8,NA),2,3))
+})
+
+test_that("test sameple_rows", {
+  df <-data.frame(x=c(1,NA,3),y=c(2,3,NA)) 
+  df <-setNames(df,c("x 1", "col 2"))
+  ret <- df %>% sample_rows(2)
+  expect_equal(nrow(ret), 2)
+  ret <- df %>% sample_rows(5)
+  expect_equal(nrow(ret), 3)
+})
+
+test_that("test unnest_without_empty", {
+  df <- data.frame(x=c(1,2,3))
+  # create empty row in y
+  df$y <- lapply(c(1,0,2),function(x){rep(1,x)})
+  # TODO: regular unnest returns the same result as unnest_without_empty.
+  # not sure what was the case unnest_without_empty was required at this point.
+  # maybe we don't need unnest_without_empty anymore??
+  ret <- df %>% unnest_without_empty(y)
+  expect_equal(ret, data.frame(x=c(1,3,3),y=c(1,1,1)))
+
+  # create empty row in y
+  df$y <- lapply(c(1,0,2),function(x){data.frame(z=rep(1,x), w=rep(2,x))})
+  # TODO: regular unnest returns the same result as unnest_without_empty.
+  # not sure what was the case unnest_without_empty was required at this point.
+  # maybe we don't need unnest_without_empty anymore??
+  ret <- df %>% unnest_without_empty(y)
+  expect_equal(ret, data.frame(x=c(1,3,3),z=c(1,1,1),w=c(2,2,2)))
+})
+
+test_that("r_squared", {
+  res <- r_squared(c(1,2,3,4,5), c(3,4,2,4,7))
+  expect_equal(res, -0.3, tolerance = 0.001)
+})
+
+test_that("excel_numeric_to_date", {
+  res <- exploratory::excel_numeric_to_date(50000L) # test integer input
+  expect_equal(res, as.Date("2036-11-21"))
 })

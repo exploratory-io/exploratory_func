@@ -269,16 +269,6 @@ upper_gather <- function(mat, names=NULL, diag=NULL, cnames = c("Var1", "Var2", 
   }
 }
 
-#' group by other columns so that next action can preserve as many columns as possible
-group_exclude <- function(df, ...){
-  loadNamespace("dplyr")
-  cols <- as.character(substitute(list(...)))[-1]
-  excluded <- setdiff(colnames(df), cols)
-  # exclude list column to avoid error from dplyr::group_by
-  target <- excluded[!sapply(df[,excluded], is.list)]
-  dplyr::group_by(df, !!!rlang::syms(target))
-}
-
 #' prevent conflict of 2 character vectors and avoid it by adding .new to elements in the second
 #' @export
 avoid_conflict <- function(origin, new, suffix = ".new"){
@@ -1126,11 +1116,32 @@ unnest_without_empty_ <- function(data, nested_col){
   }
 }
 
+#' Count TRUE in a vector
+#' @param x vector
+#' @export
+true_count <- function(x){
+  sum(x, na.rm = TRUE)
+}
+
 #' Count FALSE in a vector
 #' @param x vector
 #' @export
 false_count <- function(x){
-  sum(!x)
+  sum(!x, na.rm = TRUE)
+}
+
+#' Percentage of TRUE in a vector
+#' @param x vector
+#' @export
+true_pct <- function(x){
+  sum(x, na.rm =!all(is.na(x))) / length(x) * 100
+}
+
+#' Percentage of FALSE in a vector
+#' @param x vector
+#' @export
+false_pct <- function(x){
+  sum(!x, na.rm =!all(is.na(x))) / length(x) * 100
 }
 
 #' Count NA in a vector
@@ -1159,6 +1170,20 @@ na_pct <- function(x){
 #' @export
 non_na_pct <- function(x){
   sum(!is.na(x)) / length(x) * 100
+}
+
+#' Ratio of NA in a vector
+#' @param x vector
+#' @export
+na_ratio <- function(x){
+  sum(is.na(x)) / length(x)
+}
+
+#' Ratio of Non NA in a vector
+#' @param x vector
+#' @export
+non_na_ratio <- function(x){
+  sum(!is.na(x)) / length(x)
 }
 
 #' This is a wrapper of tidyr::unnest
@@ -1204,8 +1229,8 @@ do_on_each_group <- function(df, func, params = quote(list()), name = "tmp", wit
   args <- append(list(quote(.)), rlang::lang_args(params))
   call <- rlang::new_language(func, rlang::as_pairlist(args))
   ret <- df %>%
-    # UQ and UQE evaluates those variables
-    dplyr::do(rlang::UQ(name) := rlang::UQE(call))
+    # UQ and UQ(get_expr()) evaluates those variables
+    dplyr::do(rlang::UQ(name) := rlang::UQ(rlang::get_expr(call)))
   if(with_unnest){
     ret %>%
       dplyr::ungroup() %>%
@@ -1226,8 +1251,8 @@ do_on_each_group_2 <- function(df, func1, func2, params1 = quote(list()), params
   call1 <- rlang::new_language(func1, rlang::as_pairlist(args1))
   call2 <- rlang::new_language(func2, rlang::as_pairlist(args2))
   ret <- df %>%
-    # UQ and UQE evaluates those variables
-    dplyr::do(rlang::UQ(name1) := rlang::UQE(call1), rlang::UQ(name2) := rlang::UQE(call2))
+    # UQ and UQ(get_expr()) evaluates those variables
+    dplyr::do(rlang::UQ(name1) := rlang::UQ(rlang::get_expr(call1)), rlang::UQ(name2) := rlang::UQ(rlang::get_expr(call2)))
   ret
 }
 
@@ -1295,6 +1320,14 @@ extract_from_date <- function(x, type = "fltoyear") {
   ret
 }
 
+#' Calculate R-Squared 
+#' @export
+r_squared <- function (actual, predicted) {
+  # https://stats.stackexchange.com/questions/230556/calculate-r-square-in-r-for-two-vectors
+  # https://en.wikipedia.org/wiki/Coefficient_of_determination
+  ret <- 1 - (sum((actual-predicted)^2, na.rm=TRUE)/sum((actual-mean(actual, na.rm=TRUE))^2, na.rm=TRUE))
+  ret
+}
 
 #' Calculate MAE.
 #' @param actual - Vector that includes actual value. The part is_test_data is FALSE should be actual value.
@@ -1313,9 +1346,11 @@ mae <- function(actual, predicted, is_test_data) {
 #' @param predicted - Vector that includes predicted value. The part is_test_data is TRUE should be predicted value.
 #' @param is_test_data - logical vector that indicates test data portion of actual and predicted.
 #' @export
-rmse <- function(actual, predicted, is_test_data) {
-  actual <- actual[is_test_data]
-  predicted <- predicted[is_test_data]
+rmse <- function(actual, predicted, is_test_data=NULL) {
+  if (!is.null(is_test_data)) {
+    actual <- actual[is_test_data]
+    predicted <- predicted[is_test_data]
+  }
   ret <- sqrt(mean((actual-predicted)^2, na.rm=TRUE))
   ret
 }
@@ -1378,4 +1413,19 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
   else {
     return(x %in% y)
   }
+}
+
+#' Column reorder function we use from Reorder steps of Exploratory.
+#' @export
+reorder_cols <- function(df, ...) {
+  dplyr::select(df, !!!rlang::quos(...), dplyr::everything())
+}
+
+#' @export
+excel_numeric_to_date <- function(date_num, date_system = "modern",
+                                  include_time = FALSE, round_seconds = TRUE) {
+  # working around https://github.com/sfirke/janitor/issues/241
+  # by applying as.numeric on the input in case it is integer.
+  janitor::excel_numeric_to_date(as.numeric(date_num), date_system = date_system,
+                                 include_time = include_time, round_seconds = round_seconds)
 }

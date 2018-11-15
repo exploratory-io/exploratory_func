@@ -809,6 +809,240 @@ exp_balance <- function(df,
   ret
 }
 
+get_classification_type <- function(v) {
+  # if target is numeric, it is regression but
+  # if not, it is classification
+  if (!is.numeric(v)) {
+    if (!is.logical(v)) {
+      if (length(unique(v)) == 2) {
+        classification_type <- "binary" 
+      }
+      else {
+        classification_type <- "multi" 
+      }
+    }
+    else {
+      classification_type <- "binary" 
+    }
+  }
+  else {
+    classification_type <- "regression" 
+  }
+}
+
+cleanup_df <- function(df, target_col, selected_cols, grouped_cols, target_n, predictor_n, map_name=TRUE) {
+  # drop unrelated columns so that SMOTE later does not have to deal with them.
+  # select_ was not able to handle space in target_col. let's do it in base R way.
+  df <- df[,colnames(df) %in% c(grouped_cols, selected_cols, target_col), drop=FALSE]
+
+  # remove grouped col or target col
+  selected_cols <- setdiff(selected_cols, c(grouped_cols, target_col))
+
+  if (any(c(target_col, selected_cols) %in% grouped_cols)) {
+    stop("grouping column is used as variable columns")
+  }
+
+  if (target_n < 2) {
+    stop("Max # of categories for target var must be at least 2.")
+  }
+
+  if (predictor_n < 2) {
+    stop("Max # of categories for explanatory vars must be at least 2.")
+  }
+
+  # remove NA because it's not permitted for randomForest
+  df <- df %>%
+    dplyr::filter(!is.na(!!target_col))
+
+  # cols will be filtered to remove invalid columns
+  cols <- selected_cols
+
+  for (col in selected_cols) {
+    if(all(is.na(df[[col]]))){
+      # remove columns if they are all NA
+      cols <- setdiff(cols, col)
+      df[[col]] <- NULL # drop the column so that SMOTE will not see it. 
+    }
+  }
+
+  if (map_name) {
+    # randomForest fails if columns are not clean
+    clean_df <- df
+
+    # This mapping will be used to restore column names
+    # We used to use janitor::clean_names(df), but
+    # since we are setting the names back anyway,
+    # we can use names like c1, c2 which is guaranteed to be safe
+    # regardless of original column names.
+    name_map <- paste0("c",1:length(colnames(df)))
+    names(name_map) <- colnames(df)
+
+    # clean_names changes column names
+    # without chaning grouping column name
+    # information in the data frame
+    # and it causes an error,
+    # so the value of grouping columns
+    # should be still the names of grouping columns
+    name_map[grouped_cols] <- grouped_cols
+    colnames(clean_df) <- name_map
+  }
+  else {
+    # do not do mapping.
+    # we need this mode for rpart since the plotting will be done directly from the model
+    # and we want original column names to appear.
+    # fortunately, rpart seems to be robust enough against strange column names
+    # even on sjis windows.
+    # just create a map with same names so that the rest of the code works.
+    clean_df <- df
+    name_map <- colnames(df)
+    names(name_map) <- colnames(df)
+  }
+
+  clean_target_col <- name_map[target_col]
+  clean_cols <- name_map[cols]
+
+  if (!is.numeric(clean_df[[clean_target_col]]) && !is.logical(clean_df[[clean_target_col]])) {
+    # limit the number of levels in factor by fct_lump
+    clean_df[[clean_target_col]] <- forcats::fct_explicit_na(forcats::fct_lump(
+      as.factor(clean_df[[clean_target_col]]), n = target_n, ties.method="first"
+    ))
+  }
+
+  ret <- new.env()
+  ret$clean_df <- clean_df
+  ret$name_map <- name_map
+  ret$clean_target_col <- clean_target_col
+  ret$clean_cols <- clean_cols
+  ret
+}
+
+cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, name_map, predictor_n, revert_logical_levels=TRUE) {
+  if (is.factor(df[[clean_target_col]])) { # to avoid error in edarf::partial_dependence(), remove levels that is not used in this group.
+    df[[clean_target_col]] <- forcats::fct_drop(df[[clean_target_col]])
+  }
+  # sample the data because randomForest takes long time
+  # if data size is too large
+  if (nrow(df) > max_nrow) {
+    df <- df %>%
+      dplyr::sample_n(max_nrow)
+  }
+
+  if (is.logical(df[[clean_target_col]])) {
+    # we need to convert logical to factor since na.roughfix only works for numeric or factor.
+    # for logical set TRUE, FALSE level order for better visualization. but only do it when
+    # the target column actually has both TRUE and FALSE, since edarf::partial_dependence errors out if target
+    # factor column has more levels than actual data.
+    # error from edarf::partial_dependence looks like following.
+    #   Error in factor(x, seq_len(length(unique(data[[target]]))), levels(data[[target]])) : invalid 'labels'; length 2 should be 1 or 1
+    if (length(unique(df[[clean_target_col]])) >= 2) {
+      if (revert_logical_levels) { # random forest case. For viz, revert order
+        levels <- c("TRUE","FALSE")
+      }
+      else { # rpart case, we cannot revert because it messes up probability displayed on rpart.plot image.
+        levels <- c("FALSE","TRUE")
+      }
+      df[[clean_target_col]] <- factor(df[[clean_target_col]], levels=levels)
+    }
+    else {
+      df[[clean_target_col]] <- factor(df[[clean_target_col]])
+    }
+  }
+
+  c_cols <- clean_cols
+  for(col in clean_cols){
+    if(lubridate::is.Date(df[[col]]) || lubridate::is.POSIXct(df[[col]])) {
+      c_cols <- setdiff(c_cols, col)
+
+      absolute_time_col <- avoid_conflict(colnames(df), paste0(col, "_abs_time"))
+      wday_col <- avoid_conflict(colnames(df), paste0(col, "_day_of_week"))
+      day_col <- avoid_conflict(colnames(df), paste0(col, "_day_of_month"))
+      yday_col <- avoid_conflict(colnames(df), paste0(col, "_day_of_year"))
+      month_col <- avoid_conflict(colnames(df), paste0(col, "_month"))
+      year_col <- avoid_conflict(colnames(df), paste0(col, "_year"))
+      new_name <- c(absolute_time_col, wday_col, day_col, yday_col, month_col, year_col)
+      names(new_name) <- paste(
+        names(name_map)[name_map == col],
+        c(
+          "_abs_time",
+          "_day_of_week",
+          "_day_of_month",
+          "_day_of_year",
+          "_month",
+          "_year"
+        ), sep="")
+
+      name_map <- c(name_map, new_name)
+
+      c_cols <- c(c_cols, absolute_time_col, wday_col, day_col, yday_col, month_col, year_col)
+      df[[absolute_time_col]] <- as.numeric(df[[col]])
+      df[[wday_col]] <- lubridate::wday(df[[col]], label=TRUE)
+      df[[day_col]] <- lubridate::day(df[[col]])
+      df[[yday_col]] <- lubridate::yday(df[[col]])
+      df[[month_col]] <- lubridate::month(df[[col]], label=TRUE)
+      df[[year_col]] <- lubridate::year(df[[col]])
+      if(lubridate::is.POSIXct(df[[col]])) {
+        hour_col <- avoid_conflict(colnames(df), paste0(col, "_hour"))
+        new_name <- c(hour_col)
+        names(new_name) <- paste(
+          names(name_map)[name_map == col],
+          c(
+            "_hour"
+          ), sep="")
+        name_map <- c(name_map, new_name)
+
+        c_cols <- c(c_cols, hour_col)
+        df[[hour_col]] <- factor(lubridate::hour(df[[col]])) # treat hour as category
+      }
+      df[[col]] <- NULL # drop original Date/POSIXct column to pass SMOTE later.
+    } else if(is.factor(df[[col]])) {
+      # if the data is factor, respect the levels and keep first 10 levels, and make others "Others" level.
+      if (length(levels(df[[col]])) >= predictor_n + 2) {
+        df[[col]] <- forcats::fct_other(df[[col]], keep=levels(df[[col]])[1:predictor_n])
+      }
+    } else if(!is.numeric(df[[col]])) {
+      # convert data to factor if predictors are not numeric.
+      # and limit the number of levels in factor by fct_lump.
+      # we need to convert logical to factor too since na.roughfix only works for numeric or factor.
+      df[[col]] <- forcats::fct_explicit_na(forcats::fct_lump(as.factor(df[[col]]), n=predictor_n, ties.method="first"))
+    } else {
+      # filter Inf/-Inf to avoid following error from ranger.
+      # Error in seq.default(min(x, na.rm = TRUE), max(x, na.rm = TRUE), length.out = length.out) : 'from' must be a finite number
+      df <- df %>% dplyr::filter(!is.infinite(.[[col]]))
+    }
+  }
+
+  # This check should be done after all possible filtering.
+  # Return NULL if there is only one row
+  # for a class of target variable because
+  # rondomForest enters infinite loop
+  # in such case.
+  # The group with NULL is removed when
+  # unnesting the result
+  # TODO: Should we just filter such row and go on??
+  for (level in levels(df[[clean_target_col]])) {
+    if(sum(df[[clean_target_col]] == level, na.rm = TRUE) == 1) {
+      return(NULL)
+    }
+  }
+
+
+  # remove columns with only one unique value
+  cols_copy <- c_cols
+  for (col in cols_copy) {
+    unique_val <- unique(df[[col]])
+    if (length(unique_val[!is.na(unique_val)]) <= 1) {
+      c_cols <- setdiff(c_cols, col)
+      df[[col]] <- NULL # drop the column so that SMOTE will not see it. 
+    }
+  }
+
+  ret <- new.env()
+  ret$df <- df
+  ret$c_cols <- c_cols
+  ret$name_map <- name_map
+  ret
+}
+
 #' get feature importance for multi class classification using randomForest
 #' @export
 calc_feature_imp <- function(df,
@@ -835,25 +1069,6 @@ calc_feature_imp <- function(df,
 
   grouped_cols <- grouped_by(df)
 
-  # drop unrelated columns so that SMOTE later does not have to deal with them.
-  # select_ was not able to handle space in target_col. let's do it in base R way.
-  df <- df[,colnames(df) %in% c(grouped_cols, selected_cols, target_col), drop=FALSE]
-
-  # remove grouped col or target col
-  selected_cols <- setdiff(selected_cols, c(grouped_cols, target_col))
-
-  if (any(c(target_col, selected_cols) %in% grouped_cols)) {
-    stop("grouping column is used as variable columns")
-  }
-
-  if (target_n < 2) {
-    stop("Max # of categories for target var must be at least 2.")
-  }
-
-  if (predictor_n < 2) {
-    stop("Max # of categories for explanatory vars must be at least 2.")
-  }
-
   orig_levels <- NULL
   if (is.factor(df[[target_col]])) {
     orig_levels <- levels(df[[target_col]])
@@ -862,172 +1077,26 @@ calc_feature_imp <- function(df,
     orig_levels <- c("TRUE","FALSE")
   }
 
-  # remove NA because it's not permitted for randomForest
-  df <- df %>%
-    dplyr::filter(!is.na(!!target_col))
+  clean_ret <- cleanup_df(df, target_col, selected_cols, grouped_cols, target_n, predictor_n)
 
-  # cols will be filtered to remove invalid columns
-  cols <- selected_cols
+  clean_df <- clean_ret$clean_df
+  name_map <- clean_ret$name_map
+  clean_target_col <- clean_ret$clean_target_col
+  clean_cols <- clean_ret$clean_cols
 
-  for (col in selected_cols) {
-    if(all(is.na(df[[col]]))){
-      # remove columns if they are all NA
-      cols <- setdiff(cols, col)
-      df[[col]] <- NULL # drop the column so that SMOTE will not see it. 
-    }
-  }
-
-  # randomForest fails if columns are not clean
-  clean_df <- janitor::clean_names(df)
-  # this mapping will be used to restore column names
-  name_map <- colnames(clean_df)
-  names(name_map) <- colnames(df)
-
-  # clean_names changes column names
-  # without chaning grouping column name
-  # information in the data frame
-  # and it causes an error,
-  # so the value of grouping columns
-  # should be still the names of grouping columns
-  name_map[grouped_cols] <- grouped_cols
-  colnames(clean_df) <- name_map
-
-  clean_target_col <- name_map[target_col]
-  clean_cols <- name_map[cols]
-
-  classification_type <- "multi" # default value. ignored when it is regression.
   # if target is numeric, it is regression but
   # if not, it is classification
-  if (!is.numeric(clean_df[[clean_target_col]])) {
-    if (!is.logical(clean_df[[clean_target_col]])) {
-      # limit the number of levels in factor by fct_lump
-      clean_df[[clean_target_col]] <- forcats::fct_explicit_na(forcats::fct_lump(
-        as.factor(clean_df[[clean_target_col]]), n = target_n, ties.method="first"
-      ))
-
-      if (length(unique(clean_df[[clean_target_col]])) == 2) {
-        classification_type <- "binary" 
-      }
-    }
-    else {
-      classification_type <- "binary" 
-    }
-  }
+  classification_type <- get_classification_type(clean_df[[clean_target_col]])
 
   each_func <- function(df) {
     tryCatch({
-      if (is.factor(df[[clean_target_col]])) { # to avoid error in edarf::partial_dependence(), remove levels that is not used in this group.
-        df[[clean_target_col]] <- forcats::fct_drop(df[[clean_target_col]])
+      clean_df_ret <- cleanup_df_per_group(df, clean_target_col, max_nrow, clean_cols, name_map, predictor_n)
+      if (is.null(clean_df_ret)) {
+        return(NULL) # skip this group
       }
-      # sample the data because randomForest takes long time
-      # if data size is too large
-      if (nrow(df) > max_nrow) {
-        df <- df %>%
-          dplyr::sample_n(max_nrow)
-      }
-
-      if (is.logical(df[[clean_target_col]])) {
-        # we need to convert logical to factor since na.roughfix only works for numeric or factor.
-        # for logical set TRUE, FALSE level order for better visualization. but only do it when
-        # the target column actually has both TRUE and FALSE, since edarf::partial_dependence errors out if target
-        # factor column has more levels than actual data.
-        # error from edarf::partial_dependence looks like following.
-        #   Error in factor(x, seq_len(length(unique(data[[target]]))), levels(data[[target]])) : invalid 'labels'; length 2 should be 1 or 1
-        if (length(unique(df[[clean_target_col]])) >= 2) {
-          df[[clean_target_col]] <- factor(df[[clean_target_col]], levels=c("TRUE","FALSE"))
-        }
-        else {
-          df[[clean_target_col]] <- factor(df[[clean_target_col]])
-        }
-      }
-
-      c_cols <- clean_cols
-      for(col in clean_cols){
-        if(lubridate::is.Date(df[[col]]) || lubridate::is.POSIXct(df[[col]])) {
-          c_cols <- setdiff(c_cols, col)
-
-          absolute_time_col <- avoid_conflict(colnames(df), paste0(col, "_abs_time"))
-          wday_col <- avoid_conflict(colnames(df), paste0(col, "_day_of_week"))
-          day_col <- avoid_conflict(colnames(df), paste0(col, "_day_of_month"))
-          yday_col <- avoid_conflict(colnames(df), paste0(col, "_day_of_year"))
-          month_col <- avoid_conflict(colnames(df), paste0(col, "_month"))
-          year_col <- avoid_conflict(colnames(df), paste0(col, "_year"))
-          new_name <- c(absolute_time_col, wday_col, day_col, yday_col, month_col, year_col)
-          names(new_name) <- paste(
-            names(name_map)[name_map == col],
-            c(
-              "_abs_time",
-              "_day_of_week",
-              "_day_of_month",
-              "_day_of_year",
-              "_month",
-              "_year"
-            ), sep="")
-
-          name_map <- c(name_map, new_name)
-
-          c_cols <- c(c_cols, absolute_time_col, wday_col, day_col, yday_col, month_col, year_col)
-          df[[absolute_time_col]] <- as.numeric(df[[col]])
-          df[[wday_col]] <- lubridate::wday(df[[col]], label=TRUE)
-          df[[day_col]] <- lubridate::day(df[[col]])
-          df[[yday_col]] <- lubridate::yday(df[[col]])
-          df[[month_col]] <- lubridate::month(df[[col]], label=TRUE)
-          df[[year_col]] <- lubridate::year(df[[col]])
-          if(lubridate::is.POSIXct(df[[col]])) {
-            hour_col <- avoid_conflict(colnames(df), paste0(col, "_hour"))
-            new_name <- c(hour_col)
-            names(new_name) <- paste(
-              names(name_map)[name_map == col],
-              c(
-                "_hour"
-              ), sep="")
-            name_map <- c(name_map, new_name)
-
-            c_cols <- c(c_cols, hour_col)
-            df[[hour_col]] <- factor(lubridate::hour(df[[col]])) # treat hour as category
-          }
-          df[[col]] <- NULL # drop original Date/POSIXct column to pass SMOTE later.
-        } else if(is.factor(df[[col]])) {
-          # if the data is factor, respect the levels and keep first 10 levels, and make others "Others" level.
-          if (length(levels(df[[col]])) >= predictor_n + 2) {
-            df[[col]] <- forcats::fct_other(df[[col]], keep=levels(df[[col]])[1:predictor_n])
-          }
-        } else if(!is.numeric(df[[col]])) {
-          # convert data to factor if predictors are not numeric.
-          # and limit the number of levels in factor by fct_lump.
-          # we need to convert logical to factor too since na.roughfix only works for numeric or factor.
-          df[[col]] <- forcats::fct_explicit_na(forcats::fct_lump(as.factor(df[[col]]), n=predictor_n, ties.method="first"))
-        } else {
-          # filter Inf/-Inf to avoid following error from ranger.
-          # Error in seq.default(min(x, na.rm = TRUE), max(x, na.rm = TRUE), length.out = length.out) : 'from' must be a finite number
-          df <- df %>% dplyr::filter(!is.infinite(.[[col]]))
-        }
-      }
-
-      # This check should be done after all possible filtering.
-      # Return NULL if there is only one row
-      # for a class of target variable because
-      # rondomForest enters infinite loop
-      # in such case.
-      # The group with NULL is removed when
-      # unnesting the result
-      # TODO: Should we just filter such row and go on??
-      for (level in levels(df[[clean_target_col]])) {
-        if(sum(df[[clean_target_col]] == level, na.rm = TRUE) == 1) {
-          return(NULL)
-        }
-      }
-
-
-      # remove columns with only one unique value
-      cols_copy <- c_cols
-      for (col in cols_copy) {
-        unique_val <- unique(df[[col]])
-        if (length(unique_val[!is.na(unique_val)]) <= 1) {
-          c_cols <- setdiff(c_cols, col)
-          df[[col]] <- NULL # drop the column so that SMOTE will not see it. 
-        }
-      }
+      df <- clean_df_ret$df
+      c_cols <- clean_df_ret$c_cols
+      name_map <- clean_df_ret$name_map
 
       # apply smote if this is binary classification
       unique_val <- unique(df[[clean_target_col]])
@@ -1092,8 +1161,8 @@ calc_feature_imp <- function(df,
       rf$classification_type <- classification_type
       rf$orig_levels <- orig_levels
       rf$terms_mapping <- names(name_map)
-      rf$y <- model.response(model_df)
       names(rf$terms_mapping) <- name_map
+      rf$y <- model.response(model_df)
       rf$df <- model_df
       rf
     }, error = function(e){
@@ -1189,8 +1258,40 @@ get_binary_predicted_value_from_probability <- function(x) {
   # x$predictions is 2-diminsional matrix with 2 columns for the 2 categories. values in the matrix is the probabilities.
   # TODO: thought x$predictions was 3 dimensinal array with tree dimension from the doc and independently running ranger,
   # but looks like it is already averaged? look into it.
-  predicted <- factor(x$forest$levels[apply(x$predictions, 1, function(x){if(x[1]>x[2]) 1 else 2})], levels=x$forest$levels)
+  predicted <- factor(x$forest$levels[apply(x$predictions, 1, function(x){
+    if(is.na(x[2])){ # take care of the case where x$predictions has only 1 column. possible when there are only one value in training data.
+      1
+    }
+    else {
+      if(x[1]>x[2]) 1 else 2
+    }
+  })], levels=x$forest$levels)
   predicted
+}
+
+#' @export
+# not really an external function but exposing for sharing with rpart.R TODO: find better way.
+evaluate_binary_classification <- function(actual, predicted, predicted_probability, pretty.name = FALSE) {
+  # calculate AUC from ROC
+  roc_df <- data.frame(actual = (as.integer(actual)==1), predicted_probability = predicted_probability)
+  roc <- roc_df %>% do_roc_(actual_val_col = "actual", pred_prob_col = "predicted_probability")
+  # use numeric index so that it won't be disturbed by name change
+  # 2 should be false positive rate (x axis) and 1 should be true positive rate (yaxis)
+  # calculate the area under the plots
+  auc <- sum((roc[[2]] - dplyr::lag(roc[[2]])) * roc[[1]], na.rm = TRUE)
+  if (is.factor(actual) && "TRUE" %in% levels(actual)) { # target was logical and converted to factor.
+    ret <- evaluate_classification(actual, predicted, "TRUE", multi_class = FALSE, pretty.name = pretty.name)
+  }
+  else {
+    ret <- evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
+  }
+  if (pretty.name) {
+    ret <- ret %>% mutate(AUC = auc)
+  }
+  else {
+    ret <- ret %>% mutate(auc = auc)
+  }
+  ret
 }
 
 #' @export
@@ -1200,7 +1301,6 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
     type,
     importance = {
       # return variable importance
-
       imp <- ranger::importance(x)
 
       ret <- data.frame(
@@ -1221,31 +1321,11 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
         if (x$classification_type == "binary") {
           predicted <- get_binary_predicted_value_from_probability(x)
           predicted_probability <- x$predictions[,1]
-          # calculate AUC from ROC
-          roc_df <- data.frame(actual = (as.integer(actual)==1), predicted_probability = predicted_probability)
-          roc <- roc_df %>% do_roc_(actual_val_col = "actual", pred_prob_col = "predicted_probability")
-          # use numeric index so that it won't be disturbed by name change
-          # 2 should be false positive rate (x axis) and 1 should be true positive rate (yaxis)
-          # calculate the area under the plots
-          auc <- sum((roc[[2]] - dplyr::lag(roc[[2]])) * roc[[1]], na.rm = TRUE)
-          if (is.factor(x$y) && "TRUE" %in% levels(x$y)) { # target was logical and converted to factor.
-            ret <- evaluate_classification(actual, predicted, "TRUE", multi_class = FALSE, pretty.name = pretty.name)
-          }
-          else {
-            ret <- evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
-          }
+          ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = pretty.name)
         }
         else {
           predicted <- x$predictions
           ret <- evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
-        }
-        if (x$classification_type == "binary") {
-          if (pretty.name) {
-            ret <- ret %>% mutate(AUC = auc)
-          }
-          else {
-            ret <- ret %>% mutate(auc = auc)
-          }
         }
         ret
       }
@@ -1369,4 +1449,298 @@ glance.ranger <- function(x, pretty.name = FALSE, ...) {
   }
 
   ret
+}
+
+#' @export
+glance.rpart <- function(x, pretty.name = FALSE, ...) {
+  actual <- x$y
+  predicted <- predict(x)
+  rmse_val <- rmse(actual, predicted)
+  r_squared_val <- r_squared(actual, predicted)
+  ret <- data.frame(
+    root_mean_square_error = rmse_val,
+    r_squared = r_squared_val
+  )
+
+  if(pretty.name){
+    map = list(
+      `Root Mean Square Error` = as.symbol("root_mean_square_error"),
+      `R Squared` = as.symbol("r_squared")
+    )
+    ret <- ret %>%
+      dplyr::rename(!!!map)
+  }
+  ret
+}
+
+
+#' @export
+exp_rpart <- function(df,
+                      target,
+                      ...,
+                      max_nrow = 50000, # down from 200000 when we added partial dependence
+                      target_n = 20,
+                      predictor_n = 12, # so that at least months can fit in it.
+                      smote = FALSE,
+                      seed = NULL
+                      ) {
+  if(!is.null(seed)){
+    set.seed(seed)
+  }
+  # this seems to be the new way of NSE column selection evaluation
+  # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
+  target_col <- dplyr::select_var(names(df), !! rlang::enquo(target))
+  # this evaluates select arguments like starts_with
+  selected_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
+
+  grouped_cols <- grouped_by(df)
+
+  clean_ret <- cleanup_df(df, target_col, selected_cols, grouped_cols, target_n, predictor_n, map_name=FALSE)
+
+  clean_df <- clean_ret$clean_df
+  name_map <- clean_ret$name_map
+  clean_target_col <- clean_ret$clean_target_col
+  clean_cols <- clean_ret$clean_cols
+
+  classification_type <- get_classification_type(clean_df[[clean_target_col]])
+
+  each_func <- function(df) {
+    tryCatch({
+      # especially multiclass classification seems to take forever when number of unique values of predictors are many.
+      # fct_lump is essential here.
+      # http://grokbase.com/t/r/r-help/051sayg38p/r-multi-class-classification-using-rpart
+      clean_df_ret <- cleanup_df_per_group(df, clean_target_col, max_nrow, clean_cols, name_map, predictor_n, revert_logical_levels=FALSE)
+      if (is.null(clean_df_ret)) {
+        return(NULL) # skip this group
+      }
+      df <- clean_df_ret$df
+      c_cols <- clean_df_ret$c_cols
+      name_map <- clean_df_ret$name_map
+
+      # apply smote if this is binary classification
+      unique_val <- unique(df[[clean_target_col]])
+      if (smote && length(unique_val[!is.na(unique_val)]) == 2) {
+        df <- df %>% exp_balance(clean_target_col, sample=FALSE) # since we already sampled, no further sample.
+      }
+      # if target is categorical (not numeric) and only 1 unique value (or all NA), throw error.
+      if ("numeric" %nin% class(clean_target_col) &&
+          "integer" %nin% class(clean_target_col) &&
+          length(unique_val[!is.na(unique_val)]) <= 1) {
+        # We might want to skip and show the status in Summary when we support Repeat By,
+        # but for now just throw error to show.
+        stop("Categorical Target Variable must have 2 or more unique values.")
+      }
+
+      rhs <- paste0("`", c_cols, "`", collapse = " + ")
+      fml <- as.formula(paste0("`", clean_target_col, "`", " ~ ", rhs))
+      model <- rpart::rpart(fml, df)
+      model$classification_type <- classification_type
+      if (classification_type %in% c("binary", "multi")) {
+        # we need to call this here rather than in tidy(),
+        # since there is randomness involved in breaking tie
+        # of multiclass classification.
+        model$predicted_class <- get_predicted_class_rpart(model)
+      }
+      model$terms_mapping <- names(name_map)
+      names(model$terms_mapping) <- name_map
+      model
+    }, error = function(e){
+      if(length(grouped_cols) > 0) {
+        # ignore the error if
+        # it is caused by subset of
+        # grouped data frame
+        # to show result of
+        # data frames that succeed
+        NULL
+      } else {
+        stop(e)
+      }
+    })
+  }
+
+  ret <- do_on_each_group(clean_df, each_func, name = "model", with_unnest = FALSE)
+  # add special class .model to pass column type validation at viz layer.
+  # also add .model.rpart so that a step created by this function is viewable with Exploratory for debugging.
+  class(ret$model) <- c("list", ".model", ".model.rpart")
+  ret
+}
+
+# with binary probability prediction model from ranger, take the level with bigger probability as the predicted value.
+#' @export
+# not really an external function but exposing for test. TODO: find better way.
+get_binary_predicted_value_from_probability_rpart <- function(x) {
+  if (class(x$y) == "logical") {
+    # predict(x) is numeric vector of probability of being TRUE.
+    ylevels <- c("TRUE", "FALSE")
+    predicted <- factor(predict(x) > 0.5, levels=ylevels)
+  }
+  else {
+    # predict(x) is 2-diminsional matrix with 2 columns for the 2 categories. values in the matrix is the probabilities.
+    ylevels <- attr(x,"ylevels")
+    predicted <- factor(ylevels[apply(predict(x), 1, function(x){if(x[1]>x[2]) 1 else 2})], levels=ylevels)
+  }
+  predicted
+}
+
+get_multiclass_predicted_value_from_probability_rpart <- function(x) {
+  ylevels <- attr(x,"ylevels")
+  predicted_mat <- predict(x)
+  # ties are broken randomly to be even.
+  # TODO: move this to model building step so that there is no randomness in analytics viz preprocessor.
+  predicted_idx <- max.col(predicted_mat, ties.method = "random")
+  predicted <- factor(ylevels[predicted_idx], levels=ylevels)
+  predicted
+}
+
+get_actual_class_rpart <- function(x) {
+  if (x$classification_type == "binary") {
+    if (class(x$y) == "logical") {
+      ylevels <- c("TRUE", "FALSE")
+      actual <- factor(x$y, levels=ylevels)
+    }
+    else {
+      ylevels <- attr(x,"ylevels")
+      actual <- factor(ylevels[x$y], levels=ylevels)
+    }
+  }
+  else {
+    # multiclass case
+    ylevels <- attr(x,"ylevels")
+    # TODO: rpart returns probability of each class, but we are not fully making use of them.
+    actual <- factor(ylevels[x$y], levels=ylevels)
+  }
+  actual
+}
+
+get_class_levels_rpart <- function(x) {
+  if (x$classification_type == "binary") {
+    if (class(x$y) == "logical") { # TODO: is this really possible for rpart? looks this returns "integer" when original input is logical.
+      ylevels <- c("TRUE", "FALSE")
+    }
+    else {
+      ylevels <- attr(x,"ylevels")
+    }
+  }
+  else {
+    # multiclass case
+    ylevels <- attr(x,"ylevels")
+  }
+  ylevels
+}
+
+get_predicted_class_rpart <- function(x) {
+  if (x$classification_type == "binary") {
+    predicted <- get_binary_predicted_value_from_probability_rpart(x)
+  }
+  else {
+    predicted <- get_multiclass_predicted_value_from_probability_rpart(x)
+  }
+  predicted
+}
+
+#' @export
+#' @param type "importance", "evaluation" or "conf_mat". Feature importance, evaluated scores or confusion matrix of training data.
+tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
+  switch(
+    type,
+    importance = {
+      # return variable importance
+
+      imp <- x$variable.importance
+
+      ret <- data.frame(
+        variable = x$terms_mapping[names(imp)],
+        importance = imp,
+        stringsAsFactors = FALSE
+      )
+
+      ret
+    },
+    evaluation = {
+      # get evaluation scores from training data
+
+      if(x$classification_type == "regression"){
+        actual <- x$y
+        glance(x, pretty.name = pretty.name, ...)
+      } else {
+        actual <- get_actual_class_rpart(x)
+        predicted <- x$predicted_class
+        # unlike ranger, x$y of rpart in this case is integer. convert it to factor to make use of common functions.
+        if (x$classification_type == "binary") {
+          if (class(x$y) == "logical") {
+            predicted_probability <- predict(x)
+          }
+          else {
+            predicted_probability <- predict(x)[,1]
+          }
+          ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = pretty.name)
+        }
+        else {
+          # multiclass case
+          # TODO: rpart returns probability of each class, but we are not fully making use of them.
+          ret <- evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
+        }
+        ret
+      }
+    },
+    evaluation_by_class = {
+      # get evaluation scores from training data
+
+      actual <- get_actual_class_rpart(x)
+      predicted <- x$predicted_class
+      ylevels <- get_class_levels_rpart(x)
+
+      per_level <- function(class) {
+        ret <- evaluate_classification(actual, predicted, class, pretty.name = pretty.name)
+        ret
+      }
+      # for rpart, factor levels for logical case is kept in FALSE, TRUE order not to mess up rpart.plot.
+      # so need to revert it now, right before visualization.
+      if (length(ylevels) == 2 & all(ylevels == c("FALSE", "TRUE"))) {
+        ylevels <- c("TRUE", "FALSE")
+      }
+      dplyr::bind_rows(lapply(ylevels, per_level))
+    },
+    conf_mat = {
+      # return confusion matrix
+      actual <- get_actual_class_rpart(x)
+      predicted <- x$predicted_class
+
+      # for rpart, factor levels for logical case is kept in FALSE, TRUE order not to mess up rpart.plot.
+      # so need to revert it now, right before visualization.
+      if (is.factor(actual) && length(levels(actual)) == 2 && all(levels(actual) == c("FALSE","TRUE"))) {
+        actual <- forcats::fct_rev(actual)
+      }
+      if (is.factor(predicted) && length(levels(predicted)) == 2 && all(levels(predicted) == c("FALSE","TRUE"))) {
+        predicted <- forcats::fct_rev(predicted)
+      }
+
+      ret <- data.frame(
+        actual_value = actual,
+        predicted_value = predicted
+      ) %>%
+        dplyr::filter(!is.na(predicted_value))
+
+      # get count if it's classification
+      ret <- ret %>%
+        dplyr::group_by(actual_value, predicted_value) %>%
+        dplyr::summarize(count = n()) %>%
+        dplyr::ungroup()
+
+      ret
+    },
+    scatter = { # we assume this is called only for regression.
+      predicted <- predict(x)
+      ret <- data.frame(
+        expected_value = x$y,
+        predicted_value = predicted
+      ) %>%
+        dplyr::filter(!is.na(predicted_value))
+
+      ret
+    },
+    {
+      stop(paste0("type ", type, " is not defined"))
+    }
+  )
 }

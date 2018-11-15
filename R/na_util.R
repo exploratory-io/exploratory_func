@@ -89,10 +89,16 @@ impute_na <- function(target, type = mean, val = 0, ...) {
 # same as zoo::na.locf, but fills only between non-NA values.
 # e.g. fill_between_v(c(NA,2,NA,3,NA)) returns c(NA, 2, 2, 3,NA).
 #' @param .direction "down" or "up".
-fill_between_v <- function(v, .direction="down") {
+#' @param value - Specific value to fill NA. (Obviously, when specified, .direction has no effect.)
+fill_between_v <- function(v, .direction="down", value=NULL) {
   filled_downward<-zoo::na.locf(v, na.rm = FALSE)
   filled_upward<-zoo::na.locf(v, fromLast = TRUE, na.rm = FALSE)
-  if (.direction == "down") {
+  if (!is.null(value)) {
+    ret <- v
+    ret[is.na(ret)] <- value
+    ret <- ifelse(!is.na(filled_upward) & !is.na(filled_downward), ret, NA)
+  }
+  else if (.direction == "down") {
     ret <- ifelse(!is.na(filled_upward), filled_downward, NA)
   }
   else { # for "up"
@@ -105,10 +111,13 @@ fill_between_v <- function(v, .direction="down") {
   ret
 }
 
-# same as tidyr::fill, but fills only between non-NA values.
-#' @param .direction "down" or "up".
+# Same as tidyr::fill, but fills only between non-NA values.
+#' @param .direction - "down" or "up". (Dot-prefixed name honoring dplyr::fill())
+#' @param value - Specific value to fill NA. (Obviously, when specified, .direction has no effect.)
+#'                Note that this is used for all the specified columns regardless of data type,
+#'                which can result in conversion of column data type.
 #' @export
-fill_between <- function(df, ..., .direction="down") {
+fill_between <- function(df, ..., .direction="down", value=NULL) {
   # this evaluates select arguments like starts_with
   selected_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
   grouped_col <- grouped_by(df)
@@ -120,7 +129,7 @@ fill_between <- function(df, ..., .direction="down") {
     }
     # fill each specified columns.
     for (col in selected_cols) {
-      df[[col]] <- fill_between_v(df[[col]], .direction=.direction)
+      df[[col]] <- fill_between_v(df[[col]], .direction=.direction, value=value)
     }
     df
   }

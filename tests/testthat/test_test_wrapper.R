@@ -200,10 +200,24 @@ test_that("test exp_chisq", {
 })
 
 test_that("test exp_chisq with logical", {
-  model_df <- exp_chisq(mtcars %>% mutate(gear=gear>3, carb=carb>3), gear, carb) # factor order should be kept in the model
+  model_df <- exp_chisq(mtcars %>% mutate(gear=gear>3, carb=carb>3), gear, carb) # logical type should be kept in the model
   ret <- model_df %>% tidy(model, type="residuals")
   expect_equal(class(ret$gear), "logical")
   expect_equal(class(ret$carb), "logical")
+})
+
+test_that("test exp_chisq with numeric", {
+  model_df <- exp_chisq(mtcars , gear, carb) # numeric type should be kept in the model
+  ret <- model_df %>% tidy(model, type="residuals")
+  expect_equal(class(ret$gear), "numeric")
+  expect_equal(class(ret$carb), "numeric")
+})
+
+test_that("test exp_chisq with integer", {
+  model_df <- exp_chisq(mtcars %>% mutate(gear=as.integer(gear), carb=as.integer(carb)), gear, carb) # integer type should be kept in the model
+  ret <- model_df %>% tidy(model, type="residuals")
+  expect_equal(class(ret$gear), "integer")
+  expect_equal(class(ret$carb), "integer")
 })
 
 test_that("test exp_chisq with group_by", {
@@ -214,7 +228,9 @@ test_that("test exp_chisq with group_by", {
 })
 
 test_that("test exp_ttest", {
-  ret <- exp_ttest(mtcars, mpg, am)
+  mtcars2 <- mtcars
+  mtcars2$am[[1]] <- NA # test NA filtering
+  ret <- exp_ttest(mtcars2, mpg, am)
   ret %>% tidy(model, type="data_summary")
   ret
 })
