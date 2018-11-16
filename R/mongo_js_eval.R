@@ -382,11 +382,32 @@ process.umask = function() { return 0; };
 
 },{}]},{},[1]);"
 
+# source originated from : https://stackoverflow.com/questions/23190056/hex-to-base64-converter-for-javascript
+hex_to_base64_code <- 'var tableStr = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  var table = tableStr.split("");
+  var btoa = function (bin) {
+    for (var i = 0, j = 0, len = bin.length / 3, base64 = []; i < len; ++i) {
+      var a = bin.charCodeAt(j++), b = bin.charCodeAt(j++), c = bin.charCodeAt(j++);
+      if ((a | b | c) > 255) throw new Error("String contains an invalid character");
+      base64[base64.length] = table[a >> 2] + table[((a << 4) & 63) | (b >> 4)] +
+                              (isNaN(b) ? "=" : table[((b << 2) & 63) | (c >> 6)]) +
+                              (isNaN(b + c) ? "=" : table[c & 63]);
+    }
+    return base64.join("");
+  };
+  var hexToBase64 = function (str) {
+    return btoa(String.fromCharCode.apply(null,
+      str.replace(/\\r|\\n/g, "").replace(/([\\da-fA-F]{2}) ?/g, "0x$1 ").replace(/ +$/, "").split(" "))
+    );
+  };'
+
+
 jsToMongoJson <- function(js) {
   # Create V8 javascript context.
   ct <- V8::v8()
 
   ct$eval(bson_objectid_browserified)
+  ct$eval(hex_to_base64_code)
   # Define necessary js functions.
   ct$assign("MinKey", V8::JS("{
       $minKey: 1
@@ -429,10 +450,18 @@ jsToMongoJson <- function(js) {
     return new Date(dateStr);
   }"))
 
+  # It seems there is new $uuid notation.
+  # https://groups.google.com/forum/#!msg/vertx/2uynNUXeoY8/Dlj9tkZqur8J
+  # but it is not officially documented,
+  # and it did not return correct query result with mongodb v3.0.7 on Mac.
+  # So we still stick to $binary notation, which actually worked with mongodb v3.0.7.
+  # This means we need to convert hex to base64 by ourselves here.
+  # since there is no Buffer class to convert hex to base64 on bare V8,
+  # we use hexToBase64 we just defined in hex_to_base64_code. 
+  # TODO: make sure this works with uuid hex string separated by -, which is common.
   ct$assign("UUID", V8::JS("function(uuidHexStr) {
-    return context.BinData(3, new Buffer(uuidHexStr,'hex').toString('base64'));
+    return BinData(3, hexToBase64(uuidHexStr));
   }"))
-
   
   ct$assign("traverse", V8::JS("function(x) {
     if (isArray(x) || ((typeof x === 'object') && (x !== null))) {
@@ -495,7 +524,10 @@ jsToMongoJson <- function(js) {
       }
     }
     else {
-      return {$regex:regex.source, $options:regex.flags};
+      // We do the following to get regex flags since regex.flags does not return value on V8.
+      var regex_str_arr = regex.toString().split('/');
+      var flags = regex_str_arr[regex_str_arr.length - 1]
+      return {$regex:regex.source, $options:flags};
     }
   }"))
 
