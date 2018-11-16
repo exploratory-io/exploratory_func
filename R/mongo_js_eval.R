@@ -453,9 +453,8 @@ jsToMongoJson <- function(js) {
   # It seems there is new $uuid notation.
   # https://groups.google.com/forum/#!msg/vertx/2uynNUXeoY8/Dlj9tkZqur8J
   # but it is not officially documented,
-  # and it did not return correct query result with mongodb v3.0.7 which happened to be on 
-  # Hideaki's macbook pro.
-  # So we still stick to $binary nonation, which actually worked with mongodb v3.0.7.
+  # and it did not return correct query result with mongodb v3.0.7 on Mac.
+  # So we still stick to $binary notation, which actually worked with mongodb v3.0.7.
   # This means we need to convert hex to base64 by ourselves here.
   # since there is no Buffer class to convert hex to base64 on bare V8,
   # we use hexToBase64 we just defined in hex_to_base64_code. 
