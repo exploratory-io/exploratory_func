@@ -1432,5 +1432,9 @@ excel_numeric_to_date <- function(date_num, date_system = "modern",
 
 #' @export
 toJSON <- function(...) {
-  jsonlite::toJSON(...)
+  orig_locale <- Sys.getlocale("LC_CTYPE")
+  Sys.setlocale("LC_CTYPE", "English_United States.1252")
+  res <- jsonlite::toJSON(...)
+  Sys.setlocale("LC_CTYPE", orig_locale)
+  res
 }
