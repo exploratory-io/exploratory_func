@@ -822,7 +822,6 @@ queryPostgres <- function(host, port, databaseName, username, password, numOfRow
 #' @export
 queryAWSAthena <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", query = "", numOfRows = 0, stringsAsFactors = FALSE, ...){
   if(!requireNamespace("RODBC")){stop("package RODBC must be installed.")}
-  browser()
   conn <- getAWSAthenaConnection(driver = driver, region = region, authenticationType = authenticationType, s3OutputLocation = s3OutputLocation, user = user, password = password, additionalParams = additionalParams)
   tryCatch({
     query <- convertUserInputToUtf8(query)
