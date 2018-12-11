@@ -425,7 +425,7 @@ clearAWSConnection <- function(driver = "", region = "", authenticationType = "I
 #' If not, new connection is created and returned.
 #' @export
 getDBConnection <- function(type, host = NULL, port = "", databaseName = "", username = "", password = "", catalog = "", schema = "", dsn="", additionalParams = "",
-                            collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, timeout = NULL, ...) {
+                            collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, timeout = NULL) {
 
   drv = NULL
   conn = NULL
