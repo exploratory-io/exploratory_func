@@ -402,11 +402,11 @@ getAWSAthenaConnection <- function(driver = "", region = "", authenticationType 
   conn
 }
 
-#' Clears AWS Connection.
+#' Clears AWS Athena Connection.
 #' @export
-clearAWSConnection <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", ...){
+clearAWSAthenaConnection <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", ...){
   key <- stringr::str_c("AwsRegion=",  region, ";AuthenticationType=", authenticationType, ";uid=", user,
-                                     ";pwd=", password, ";S3OutputLocation=", s3OutputLocation, ";driver=", driver)
+                        ";pwd=", password, ";S3OutputLocation=", s3OutputLocation, ";driver=", driver)
   if(additionalParams != "") {
     key <- stringr::str_c(key,";", additionalParams)
   }
@@ -837,7 +837,7 @@ queryAWSAthena <- function(driver = "", region = "", authenticationType = "IAM C
     if (!is.data.frame(df)) {
       # when it is error, RODBC::sqlQuery() does not stop() (throw) with error most of the cases.
       # in such cases, df is a character vecter rather than a data.frame.
-      clearAWSConnection(driver = driver, region = region, authenticationType = authenticationType, s3OutputLocation = s3OutputLocation,
+      clearAWSAthenaConnection(driver = driver, region = region, authenticationType = authenticationType, s3OutputLocation = s3OutputLocation,
                         user = user, password = password, additionalParams = additionalParams)
       stop(paste(df, collapse = "\n"))
     }
@@ -852,7 +852,7 @@ queryAWSAthena <- function(driver = "", region = "", authenticationType = "IAM C
   }, error = function(err) {
     # for some cases like conn not being an open connection, sqlQuery still throws error. handle it here.
     # clear connection in pool so that new connection will be used for the next try
-    clearAWSConnection(driver = driver, region = region, authenticationType = authenticationType, s3OutputLocation = s3OutputLocation,
+    clearAWSAthenaConnection(driver = driver, region = region, authenticationType = authenticationType, s3OutputLocation = s3OutputLocation,
                        user = user, password = password, additionalParams = additionalParams)
     stop(err)
   })
