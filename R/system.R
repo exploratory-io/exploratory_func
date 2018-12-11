@@ -400,10 +400,13 @@ getAWSAthenaConnection <- function(driver = "", region = "", authenticationType 
   conn
 }
 
-clearAWSConnection <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", uid = "", pwd = "", additionalParams = "", ...){
-  key <- stringr::str_c("AuthenticationType=", authenticationType, ";", "uid=", uid, ";", "pwd=", pwd, ";", pwd, "S3OutputLocation=", s3OutputLocation, ";", "driver=", driver, "rows_at_time=1024")
+#' Clears AWS Connection.
+#' @export
+clearAWSConnection <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", ...){
+  key <- stringr::str_c("AwsRegion=",  region, ";AuthenticationType=", authenticationType, ";uid=", user,
+                                     ";pwd=", password, ";S3OutputLocation=", s3OutputLocation, ";driver=", driver)
   if(additionalParams != "") {
-    key <- stringr::str_c(connectionString,";", additionalParams)
+    key <- stringr::str_c(key,";", additionalParams)
   }
   conn <- connection_pool[[key]]
   if (!is.null(conn)) {
