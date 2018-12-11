@@ -368,7 +368,7 @@ getMongoCollectionNumberOfRows <- function(host = NULL, port = "", database = ""
   return(result)
 }
 
-#' Returns the AWS connection.
+#' Returns a AWS Athena connection.
 #' @export
 getAWSAthenaConnection <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", ...) {
   loadNamespace("RODBC")
