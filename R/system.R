@@ -392,6 +392,8 @@ getAWSAthenaConnection <- function(driver = "", region = "", authenticationType 
     conn <- connection_pool[[connectionString]]
   }
   if (is.null(conn)) {
+    #https://www.rdocumentation.org/packages/RODBC/versions/1.3-15/topics/odbcConnect
+    #For better performance, set max value (i.e. 1024) for rows_at_time's
     conn <- RODBC::odbcDriverConnect(connection = connectionString, rows_at_time = 1024)
     if (user_env$pool_connection) { # pool connection if connection pooling is on.
       connection_pool[[connectionString]] <- conn
