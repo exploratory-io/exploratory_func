@@ -134,3 +134,15 @@ test_that("js_glue_transformer", {
   res <- glue::glue("{v}", .transformer=js_glue_transformer)
   expect_equal(as.character(res), "true, false, null")
 })
+
+test_that("odbc_glue_transformer", {
+  v <- c(1,2,3)
+  res <- glue::glue("{v*}", .transformer=odbc_glue_transformer)
+  expect_equal(as.character(res), "1, 2, 3")
+})
+
+test_that("bigquery_glue_transformer", {
+  v <- c(1,2,3)
+  res <- glue::glue("{v*}", .transformer=bigquery_glue_transformer)
+  expect_equal(as.character(res), "1, 2, 3")
+})
