@@ -12,7 +12,6 @@ test_that("test clean_data_frame",{
   expect_equal(colnames(result), c("a", "a.1", "b.c", "b.d"))
 })
 
-
 test_that("test parse_html_tables",{
   result <- parse_html_tables('https://www.cbinsights.com/research-unicorn-companies')
   expect_equal(length(result), 1)
