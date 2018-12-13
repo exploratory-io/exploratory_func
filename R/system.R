@@ -380,6 +380,56 @@ getMongoCollectionNumberOfRows <- function(host = NULL, port = "", database = ""
   return(result)
 }
 
+#' Returns a Amazon Athena connection.
+#' @export
+getAmazonAthenaConnection <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", ...) {
+  loadNamespace("RODBC")
+  loadNamespace("stringr")
+  if(!requireNamespace("RODBC")){stop("package RODBC must be installed.")}
+  if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
+
+  # if platform is Linux use predefined one
+  if(Sys.info()["sysname"]=="Linux"){
+    driver <-  "/opt/simba/athenaodbc/lib/64/libathenaodbc_sb64.so";
+  }
+  connectionString <- stringr::str_c("AwsRegion=",  region, ";AuthenticationType=", authenticationType, ";uid=", user,
+                                     ";pwd=", password, ";S3OutputLocation=", s3OutputLocation, ";driver=", driver)
+  if(additionalParams != "") {
+    connectionString <- stringr::str_c(connectionString,";", additionalParams)
+  }
+  conn <- NULL
+  if (user_env$pool_connection) {
+    conn <- connection_pool[[connectionString]]
+  }
+  if (is.null(conn)) {
+    #https://www.rdocumentation.org/packages/RODBC/versions/1.3-15/topics/odbcConnect
+    #For better performance, set max value (i.e. 1024) for rows_at_time
+    conn <- RODBC::odbcDriverConnect(connection = connectionString, rows_at_time = 1024)
+    if (user_env$pool_connection) { # pool connection if connection pooling is on.
+      connection_pool[[connectionString]] <- conn
+    }
+  }
+  conn
+}
+
+#' Clears AWS Athena Connection.
+#' @export
+clearAmazonAthenaConnection <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", ...){
+  key <- stringr::str_c("AwsRegion=",  region, ";AuthenticationType=", authenticationType, ";uid=", user,
+                        ";pwd=", password, ";S3OutputLocation=", s3OutputLocation, ";driver=", driver)
+  if(additionalParams != "") {
+    key <- stringr::str_c(key,";", additionalParams)
+  }
+  conn <- connection_pool[[key]]
+  if (!is.null(conn)) {
+    tryCatch({ # try to close connection and ignore error
+      RODBC::odbcClose(conn)
+    }, warning = function(w) {
+    }, error = function(e) {
+    })
+  }
+  rm(list = key, envir = connection_pool)
+}
 
 #' Returns specified connection from pool if it exists in the pool.
 #' If not, new connection is created and returned.
@@ -783,6 +833,42 @@ queryPostgres <- function(host, port, databaseName, username, password, numOfRow
   RPostgreSQL::dbClearResult(resultSet)
   df
 }
+
+#' @export
+queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", query = "", numOfRows = 0, stringsAsFactors = FALSE, ...){
+  if(!requireNamespace("RODBC")){stop("package RODBC must be installed.")}
+  conn <- getAmazonAthenaConnection(driver = driver, region = region, authenticationType = authenticationType, s3OutputLocation = s3OutputLocation, user = user, password = password, additionalParams = additionalParams)
+  tryCatch({
+    query <- convertUserInputToUtf8(query)
+    # set envir = parent.frame() to get variables from users environment, not papckage environment
+    query <- glue::glue(query, .transformer=odbc_glue_transformer, .envir = parent.frame())
+    df <- RODBC::sqlQuery(conn, query,
+                          max = numOfRows, stringsAsFactors=stringsAsFactors)
+    if (!is.data.frame(df)) {
+      # when it is error, RODBC::sqlQuery() does not stop() (throw) with error most of the cases.
+      # in such cases, df is a character vecter rather than a data.frame.
+      clearAmazonAthenaConnection(driver = driver, region = region, authenticationType = authenticationType, s3OutputLocation = s3OutputLocation,
+                        user = user, password = password, additionalParams = additionalParams)
+      stop(paste(df, collapse = "\n"))
+    }
+    if (!user_env$pool_connection) {
+      # close connection if not pooling.
+      tryCatch({ # try to close connection and ignore error
+        RODBC::odbcClose(conn)
+      }, warning = function(w) {
+      }, error = function(e) {
+      })
+    }
+  }, error = function(err) {
+    # for some cases like conn not being an open connection, sqlQuery still throws error. handle it here.
+    # clear connection in pool so that new connection will be used for the next try
+    clearAmazonAthenaConnection(driver = driver, region = region, authenticationType = authenticationType, s3OutputLocation = s3OutputLocation,
+                       user = user, password = password, additionalParams = additionalParams)
+    stop(err)
+  })
+  df
+}
+
 
 #' @export
 queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, query, stringsAsFactors = FALSE, host="", port="", ...){
