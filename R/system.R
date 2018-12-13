@@ -370,11 +370,9 @@ getMongoCollectionNumberOfRows <- function(host = NULL, port = "", database = ""
 
 #' Returns a AWS Athena connection.
 #' @export
-getAWSAthenaConnection <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", ...) {
+getAmazonAthenaConnection <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", ...) {
   loadNamespace("RODBC")
-  loadNamespace("DBI")
   loadNamespace("stringr")
-  if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
   if(!requireNamespace("RODBC")){stop("package RODBC must be installed.")}
   if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
 
@@ -404,7 +402,7 @@ getAWSAthenaConnection <- function(driver = "", region = "", authenticationType 
 
 #' Clears AWS Athena Connection.
 #' @export
-clearAWSAthenaConnection <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", ...){
+clearAmazonAthenaConnection <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", ...){
   key <- stringr::str_c("AwsRegion=",  region, ";AuthenticationType=", authenticationType, ";uid=", user,
                         ";pwd=", password, ";S3OutputLocation=", s3OutputLocation, ";driver=", driver)
   if(additionalParams != "") {
@@ -825,9 +823,9 @@ queryPostgres <- function(host, port, databaseName, username, password, numOfRow
 }
 
 #' @export
-queryAWSAthena <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", query = "", numOfRows = 0, stringsAsFactors = FALSE, ...){
+queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", query = "", numOfRows = 0, stringsAsFactors = FALSE, ...){
   if(!requireNamespace("RODBC")){stop("package RODBC must be installed.")}
-  conn <- getAWSAthenaConnection(driver = driver, region = region, authenticationType = authenticationType, s3OutputLocation = s3OutputLocation, user = user, password = password, additionalParams = additionalParams)
+  conn <- getAmazonAthenaConnection(driver = driver, region = region, authenticationType = authenticationType, s3OutputLocation = s3OutputLocation, user = user, password = password, additionalParams = additionalParams)
   tryCatch({
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
@@ -837,7 +835,7 @@ queryAWSAthena <- function(driver = "", region = "", authenticationType = "IAM C
     if (!is.data.frame(df)) {
       # when it is error, RODBC::sqlQuery() does not stop() (throw) with error most of the cases.
       # in such cases, df is a character vecter rather than a data.frame.
-      clearAWSAthenaConnection(driver = driver, region = region, authenticationType = authenticationType, s3OutputLocation = s3OutputLocation,
+      clearAmazonAthenaConnection(driver = driver, region = region, authenticationType = authenticationType, s3OutputLocation = s3OutputLocation,
                         user = user, password = password, additionalParams = additionalParams)
       stop(paste(df, collapse = "\n"))
     }
@@ -852,7 +850,7 @@ queryAWSAthena <- function(driver = "", region = "", authenticationType = "IAM C
   }, error = function(err) {
     # for some cases like conn not being an open connection, sqlQuery still throws error. handle it here.
     # clear connection in pool so that new connection will be used for the next try
-    clearAWSAthenaConnection(driver = driver, region = region, authenticationType = authenticationType, s3OutputLocation = s3OutputLocation,
+    clearAmazonAthenaConnection(driver = driver, region = region, authenticationType = authenticationType, s3OutputLocation = s3OutputLocation,
                        user = user, password = password, additionalParams = additionalParams)
     stop(err)
   })
