@@ -12,7 +12,6 @@ test_that("test clean_data_frame",{
   expect_equal(colnames(result), c("a", "a.1", "b.c", "b.d"))
 })
 
-
 test_that("test parse_html_tables",{
   result <- parse_html_tables('https://www.cbinsights.com/research-unicorn-companies')
   expect_equal(length(result), 1)
@@ -133,4 +132,22 @@ test_that("js_glue_transformer", {
   v <- c(T,F,NA)
   res <- glue::glue("{v}", .transformer=js_glue_transformer)
   expect_equal(as.character(res), "true, false, null")
+})
+
+test_that("odbc_glue_transformer", {
+  v <- c(1,2,3)
+  res <- glue::glue("{v*}", .transformer=odbc_glue_transformer)
+  expect_equal(as.character(res), "1, 2, 3")
+  v <- c("a","b","c")
+  res <- glue::glue("{v*}", .transformer=odbc_glue_transformer)
+  expect_equal(as.character(res), "'a', 'b', 'c'") # Not sure if this behavior works for all types of databases.
+})
+
+test_that("bigquery_glue_transformer", {
+  v <- c(1,2,3)
+  res <- glue::glue("{v*}", .transformer=bigquery_glue_transformer)
+  expect_equal(as.character(res), "1, 2, 3")
+  v <- c("a","b","c")
+  res <- glue::glue("{v*}", .transformer=bigquery_glue_transformer)
+  expect_equal(as.character(res), '"a", "b", "c"')
 })

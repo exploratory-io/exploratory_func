@@ -240,6 +240,12 @@ js_glue_transformer <- function(code, envir) {
 }
 
 odbc_glue_transformer <- function(code, envir) {
+  # We always collapse, but to keep syntax same as glue's default, take care of * at the end of code.
+  should_collapse <- grepl("[*]$", code)
+  if (should_collapse) {
+    code <- sub("[*]$", "", code)
+  }
+
   val <- eval(parse(text = code), envir)
   if (is.character(val) || is.factor(val)) {
     # escape for SQL
@@ -254,6 +260,12 @@ odbc_glue_transformer <- function(code, envir) {
 }
 
 bigquery_glue_transformer <- function(code, envir) {
+  # We always collapse, but to keep syntax same as glue's default, take care of * at the end of code.
+  should_collapse <- grepl("[*]$", code)
+  if (should_collapse) {
+    code <- sub("[*]$", "", code)
+  }
+
   val <- eval(parse(text = code), envir)
   if (is.character(val) || is.factor(val)) {
     # escape for Standard SQL for bigquery
