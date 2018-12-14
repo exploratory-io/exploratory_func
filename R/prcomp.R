@@ -146,8 +146,11 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
       }
     }
 
-    if (type == "gathered_data") { # for boxplot and paralell coordinates. this is only when with kmeans.
-      res <- res %>% dplyr::select(!!c(column_names,"cluster"))
+    if (type == "gathered_data") { # for boxplot and parallel coordinates. this is only when with kmeans.
+      # We used to drop columns other than cluster and ones used for clustering like this commented out line,
+      # to keep only the data we use, but since we are showing Subject Column value
+      # on parallel coordinates, we need to keep other columns, which would include Subject Column.
+      # res <- res %>% dplyr::select(!!c(column_names,"cluster"))
       res <- res %>% dplyr::mutate(row_id=seq(n())) # row_id for line representation.
       res <- res %>% tidyr::gather(key="key",value="value",!!column_names)
     }
