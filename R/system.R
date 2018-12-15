@@ -1201,9 +1201,10 @@ convertToJSON  <- function(x) {
 }
 
 #' Workaround for toJSON output getting affected by SJIS damemoji characters
-#' when LC_CTYPE is set to CP932 (SJIS).
-#' Switch LC_CTYPE to CP1252 before calling jsonlite::toJSON, 
+#' when LC_CTYPE is set to Windows Code Page 932 (SJIS).
+#' Switch LC_CTYPE to Windows Code Page 1252 (Latin-1) before calling jsonlite::toJSON, 
 #' and switch it back to the original setting when done.
+#' We do this since the JSON output is not broken under LC_CTYPE of Code Page 1252.
 #' @export
 toJSON <- function(...) {
   tryCatch({
