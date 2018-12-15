@@ -1430,6 +1430,10 @@ excel_numeric_to_date <- function(date_num, date_system = "modern",
                                  include_time = include_time, round_seconds = round_seconds)
 }
 
+#' Workaround for toJSON output getting affected by SJIS damemoji characters
+#' when LC_CTYPE is set to CP932 (SJIS).
+#' Switch LC_CTYPE to CP1252 before calling jsonlite::toJSON, 
+#' and switch it back to the original setting when done.
 #' @export
 toJSON <- function(...) {
   tryCatch({
