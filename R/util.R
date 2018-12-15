@@ -1429,3 +1429,4 @@ excel_numeric_to_date <- function(date_num, date_system = "modern",
   janitor::excel_numeric_to_date(as.numeric(date_num), date_system = date_system,
                                  include_time = include_time, round_seconds = round_seconds)
 }
+

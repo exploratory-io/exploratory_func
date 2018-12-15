@@ -1298,6 +1298,30 @@ convertToJSON  <- function(x) {
   jsonlite::toJSON(.tmp.tojson)
 }
 
+#' Workaround for toJSON output getting affected by SJIS damemoji characters
+#' when LC_CTYPE is set to Windows Code Page 932 (SJIS).
+#' Switch LC_CTYPE to Windows Code Page 1252 (Latin-1) before calling jsonlite::toJSON, 
+#' and switch it back to the original setting when done.
+#' We do this since the JSON output is not broken under LC_CTYPE of Code Page 1252.
+#' Since JSON output is in UTF-8 even on Windows, we should not have to go through
+#' SJIS on the output path in the first place.
+#' @export
+toJSON <- function(...) {
+  tryCatch({
+    if (Sys.info()["sysname"] == "Windows") {
+      orig_locale <- Sys.getlocale("LC_CTYPE")
+      Sys.setlocale("LC_CTYPE", "English_United States.1252")
+    }
+    res <- jsonlite::toJSON(...)
+  },
+  finally={
+    if (Sys.info()["sysname"] == "Windows") {
+      Sys.setlocale("LC_CTYPE", orig_locale)
+    }
+  })
+  res
+}
+
 #' Gives you a connection object based on the given
 #' file locator string. It supports file path or URL now.
 #' x - URL or file path
