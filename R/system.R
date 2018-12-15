@@ -1205,6 +1205,8 @@ convertToJSON  <- function(x) {
 #' Switch LC_CTYPE to Windows Code Page 1252 (Latin-1) before calling jsonlite::toJSON, 
 #' and switch it back to the original setting when done.
 #' We do this since the JSON output is not broken under LC_CTYPE of Code Page 1252.
+#' Since JSON output is in UTF-8 even on Windows, we should not have to go through
+#' SJIS on the output path in the first place.
 #' @export
 toJSON <- function(...) {
   tryCatch({
