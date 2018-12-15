@@ -208,7 +208,10 @@ do_anomaly_detection_ <- function(
     colnames(aggregated_data) <- c(time_col, value_col)
 
     # time column should be posixct, otherwise AnomalyDetection::AnomalyDetectionTs throws an error
-    aggregated_data[[time_col]] <- as.POSIXct(aggregated_data[[time_col]])
+    if (!is.POSIXct(aggregated_data[[time_col]])) {
+      aggregated_data[[time_col]] <- with_tz(as.POSIXct(aggregated_data[[time_col]], tz="GMT"), tzone="GMT")
+    }
+
     data_for_anom <- aggregated_data
 
     # this will be overwritten by expected values
