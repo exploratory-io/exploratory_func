@@ -218,7 +218,11 @@ do_anomaly_detection_ <- function(
 
     colnames(aggregated_data) <- c(time_col, value_col)
 
-    # time column should be posixct, otherwise AnomalyDetection::AnomalyDetectionTs throws an error
+    # time column should be posixct, otherwise AnomalyDetection::AnomalyDetectionTs throws an error.
+    # tz="GMT" given to as.POSIXct does not really matter since as.POSIXct on Date seems to always
+    # interpret input Date as GMT, and output POSIXct is always with default timezone.
+    # To sync the date part of output POSIXct to the input Date, we need to convert it back to GMT
+    # with with_tz.
     if (!is.POSIXct(aggregated_data[[time_col]])) {
       aggregated_data[[time_col]] <- with_tz(as.POSIXct(aggregated_data[[time_col]], tz="GMT"), tzone="GMT")
     }
