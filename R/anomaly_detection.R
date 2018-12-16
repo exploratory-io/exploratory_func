@@ -125,39 +125,27 @@ do_anomaly_detection_ <- function(
       df <- df[, !colnames(df) %in% grouped_col]
     }
 
+    time_col_values <- if (time_unit %in% c("day", "week", "month", "quarter", "year")) {
+      lubridate::floor_date(as.Date(df[[time_col]], tz = lubridate::tz(df[[time_col]])), unit = time_unit)
+    } else {
+      lubridate::floor_date(df[[time_col]], unit = time_unit)
+    }
+
     aggregated_data <- if (!is.null(value_col)){
-      if (time_unit == "day") {
-        data.frame(
-          time = lubridate::floor_date(as.Date(df[[time_col]], tz = lubridate::tz(df[[time_col]])), unit = time_unit),
-          value = df[[value_col]]
-        ) %>%
-          dplyr::filter(!is.na(value)) %>% # filter out NA so that aggregate function does not need to handle NA
-          dplyr::group_by(time) %>%
-          dplyr::summarise(val = fun.aggregate(value))
-      } else {
-        data.frame(
-          time = lubridate::floor_date(df[[time_col]], unit = time_unit),
-          value = df[[value_col]]
-        ) %>%
-          dplyr::filter(!is.na(value)) %>% # filter out NA so that aggregate function does not need to handle NA
-          dplyr::group_by(time) %>%
-          dplyr::summarise(val = fun.aggregate(value))
-      }
+      data.frame(
+        time = time_col_values,
+        value = df[[value_col]]
+      ) %>%
+        dplyr::filter(!is.na(value)) %>% # filter out NA so that aggregate function does not need to handle NA
+        dplyr::group_by(time) %>%
+        dplyr::summarise(val = fun.aggregate(value))
     } else {
       value_col <- avoid_conflict(time_col, "count")
-      if (time_unit == "day") {
-        data.frame(
-          time = lubridate::floor_date(as.Date(df[[time_col]], tz = lubridate::tz(df[[time_col]])), unit = time_unit)
-        ) %>%
-          dplyr::group_by(time) %>%
-          dplyr::summarise(count = n())
-      } else {
-        data.frame(
-          time = lubridate::floor_date(df[[time_col]], unit = time_unit)
-        ) %>%
-          dplyr::group_by(time) %>%
-          dplyr::summarise(count = n())
-      }
+      data.frame(
+        time = time_col_values
+      ) %>%
+        dplyr::group_by(time) %>%
+        dplyr::summarise(count = n())
     }
 
     # complete the date time with NA
