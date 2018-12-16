@@ -49,7 +49,16 @@ test_that("do_anomary_detection with Date data", {
   raw_data <- data.frame(timestamp=ts, y=runif(length(ts)))
   ret <- raw_data %>%
     do_anomaly_detection(timestamp, y, time_unit = "day")
-  # Check that start and end of output matches with that of input. Once there was an issue that break this due to handling of timezone.
+  # Check that start and end of output matches with that of input. Once there was an issue that broke this due to handling of timezone.
   expect_equal(as.Date(ret$timestamp[1], tz="GMT"), as.Date("2010-01-01"))
   expect_equal(as.Date(ret$timestamp[length(ret$timestamp)], tz="GMT"), as.Date("2010-12-31"))
+})
+
+test_that("do_anomary_detection with daily POSIXct data with timezone with daylight saving days.", {
+  ts <- lubridate::with_tz(as.POSIXct(seq.Date(as.Date("2010-01-01"), as.Date("2010-12-31"), by="day")), tz="America/Los_Angeles")
+  raw_data <- data.frame(timestamp=ts, y=runif(length(ts)))
+  ret <- raw_data %>%
+    do_anomaly_detection(timestamp, y, time_unit = "day", na_fill_type = "value", na_fill_value = 0)
+  # Check that aggretated value at a daylight saving day has a valid value. Once there was an issue that broke this.
+  expect_true(ret$y[200] > 0)
 })
