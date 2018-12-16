@@ -43,3 +43,13 @@ test_that("do_anomary_detection without value_col", {
   ret <- raw_data %>%
     do_anomaly_detection(timestamp, e_value=TRUE, time_unit = "hour")
 })
+
+test_that("do_anomary_detection with Date data", {
+  ts <- seq.Date(as.Date("2010-01-01"), as.Date("2010-12-31"), by="day")
+  raw_data <- data.frame(timestamp=ts, y=runif(length(ts)))
+  ret <- raw_data %>%
+    do_anomaly_detection(timestamp, y, time_unit = "day")
+  # Check that start and end of output matches with that of input. Once there was an issue that break this due to handling of timezone.
+  expect_equal(as.Date(ret$timestamp[1], tz="GMT"), as.Date("2010-01-01"))
+  expect_equal(as.Date(ret$timestamp[length(ret$timestamp)], tz="GMT"), as.Date("2010-12-31"))
+})
