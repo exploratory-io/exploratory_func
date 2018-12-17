@@ -66,6 +66,18 @@ do_anomaly_detection_ <- function(
     df <- df[!is.na(df[[value_col]]), ]
   }
 
+  if(is.Date(df[[time_col]]) {
+    if (time_unit %nin% c("day")) {
+      stop("Aggregation level has to be day for Date.")
+    }
+  } else if(lubridate::is.POSIXct(df[[time_col]]) {
+    if (time_unit %nin% c("day", "hour", "min", "sec")) {
+      stop("Aggregation level has to be day, hour, min, or sec for POSIXct.")
+    }
+  } else {
+    stop(paste0(time_col, " is not either Date or POSIXct."))
+  }
+
   # remove NA data
   df <- df[!is.na(df[[time_col]]), ]
 
