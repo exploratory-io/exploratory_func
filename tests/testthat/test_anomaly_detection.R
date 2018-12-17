@@ -73,7 +73,7 @@ test_that("do_anomary_detection with missin days filled", {
   # Check that missing values are filled with previous valid value.
   expect_true(ret$y[5] == ret$y[6] & ret$y[6] == ret$y[7])
 
-  # Test previous value fill.
+  # Test interpolate value fill.
   ret <- raw_data %>%
     do_anomaly_detection(timestamp, y, time_unit = "day", na_fill_type = "interpolate")
   # Check that missing values are filled linearly.
