@@ -18,10 +18,10 @@ do_anomaly_detection <- function(df, time, value = NULL, ...){
 #' This automatically becomes TRUE if the data is longer than 30 days.
 #' @param e_value Whether expected values should be returned.
 #' @param na_fill_type - Type of NA fill:
-#'                       "spline" - Spline interpolation.
-#'                       "interpolate" - Linear interpolation.
-#'                       "previous" - Fill with last previous non-NA value.
+#'                       "previous" - Fill with previous non-NA value.
 #'                       "value" - Fill with the value of na_fill_value.
+#'                       "interpolate" - Linear interpolation.
+#'                       "spline" - Spline interpolation.
 #'                       NULL - Skip NA fill. Use this only when you know there is no NA.
 #' @param na_fill_value - Value to fill NA when na_fill_type is "value"
 #' @param ... extra values to be passed to AnomalyDetection::AnomalyDetectionTs.
@@ -35,7 +35,9 @@ do_anomaly_detection_ <- function(
   direction="both",
   e_value=TRUE,
   longterm = NULL,
-  na_fill_type = "value",
+  # The default is previous. It used to be zero fill, but we found it inconvenient,
+  # since it often creates false anomalies in data like stock price where there is no data for weekend.
+  na_fill_type = "previous", 
   na_fill_value = 0,
   ...){
   validate_empty_data(df)
