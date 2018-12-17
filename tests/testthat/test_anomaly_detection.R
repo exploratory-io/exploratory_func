@@ -88,4 +88,3 @@ test_that("do_anomary_detection with missin days filled", {
   expect_equal(ret$y[6], 0)
   expect_equal(ret$y[7], 0)
 })
-
