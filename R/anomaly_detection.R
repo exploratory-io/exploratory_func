@@ -139,13 +139,13 @@ do_anomaly_detection_ <- function(
       df <- df[, !colnames(df) %in% grouped_col]
     }
 
-    time_col_values <- if (time_unit %in% c("day", "week", "month", "quarter", "year")) {
+    time_col_values <- if (time_unit %in% c("day")) {
       # In this case, convert (possibly) from POSIXct to Date first.
       # If we did this without converting POSIXct to Date, floor_date works, but later at complete stage,
       # data day-light-saving days would be skipped, since the times seq.POSIXt gives and floor_date does not match.
       # We give the time column's timezone to as.Date, so that the POSIXct to Date conversion is done
       # based on that timezone.
-      lubridate::floor_date(as.Date(df[[time_col]], tz = lubridate::tz(df[[time_col]])), unit = time_unit)
+      lubridate::as.Date(df[[time_col]], tz = lubridate::tz(df[[time_col]]))
     } else {
       lubridate::floor_date(df[[time_col]], unit = time_unit)
     }
