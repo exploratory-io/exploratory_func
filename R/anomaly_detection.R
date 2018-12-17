@@ -66,7 +66,7 @@ do_anomaly_detection_ <- function(
     df <- df[!is.na(df[[value_col]]), ]
   }
 
-  if(is.Date(df[[time_col]])) {
+  if(lubridate::is.Date(df[[time_col]])) {
     if (time_unit %nin% c("day")) {
       stop("Aggregation level has to be day for Date.")
     }
