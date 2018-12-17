@@ -223,8 +223,8 @@ do_anomaly_detection_ <- function(
     # interpret input Date as GMT, and output POSIXct is always with default timezone.
     # To sync the date part of output POSIXct to the input Date, we need to convert it back to GMT
     # with with_tz.
-    if (!is.POSIXct(aggregated_data[[time_col]])) {
-      aggregated_data[[time_col]] <- with_tz(as.POSIXct(aggregated_data[[time_col]], tz="GMT"), tzone="GMT")
+    if (!lubridate::is.POSIXct(aggregated_data[[time_col]])) {
+      aggregated_data[[time_col]] <- lubridate::with_tz(as.POSIXct(aggregated_data[[time_col]], tz="GMT"), tzone="GMT")
     }
 
     data_for_anom <- aggregated_data
