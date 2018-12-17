@@ -66,11 +66,11 @@ do_anomaly_detection_ <- function(
     df <- df[!is.na(df[[value_col]]), ]
   }
 
-  if(is.Date(df[[time_col]]) {
+  if(is.Date(df[[time_col]])) {
     if (time_unit %nin% c("day")) {
       stop("Aggregation level has to be day for Date.")
     }
-  } else if(lubridate::is.POSIXct(df[[time_col]]) {
+  } else if(lubridate::is.POSIXct(df[[time_col]])) {
     if (time_unit %nin% c("day", "hour", "min", "sec")) {
       stop("Aggregation level has to be day, hour, min, or sec for POSIXct.")
     }
@@ -145,7 +145,7 @@ do_anomaly_detection_ <- function(
       # data day-light-saving days would be skipped, since the times seq.POSIXt gives and floor_date does not match.
       # We give the time column's timezone to as.Date, so that the POSIXct to Date conversion is done
       # based on that timezone.
-      lubridate::as.Date(df[[time_col]], tz = lubridate::tz(df[[time_col]]))
+      as.Date(df[[time_col]], tz = lubridate::tz(df[[time_col]]))
     } else {
       lubridate::floor_date(df[[time_col]], unit = time_unit)
     }
