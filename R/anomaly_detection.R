@@ -18,10 +18,10 @@ do_anomaly_detection <- function(df, time, value = NULL, ...){
 #' This automatically becomes TRUE if the data is longer than 30 days.
 #' @param e_value Whether expected values should be returned.
 #' @param na_fill_type - Type of NA fill:
-#'                       "spline" - Spline interpolation.
-#'                       "interpolate" - Linear interpolation.
-#'                       "previous" - Fill with last previous non-NA value.
+#'                       "previous" - Fill with previous non-NA value.
 #'                       "value" - Fill with the value of na_fill_value.
+#'                       "interpolate" - Linear interpolation.
+#'                       "spline" - Spline interpolation.
 #'                       NULL - Skip NA fill. Use this only when you know there is no NA.
 #' @param na_fill_value - Value to fill NA when na_fill_type is "value"
 #' @param ... extra values to be passed to AnomalyDetection::AnomalyDetectionTs.
@@ -35,7 +35,9 @@ do_anomaly_detection_ <- function(
   direction="both",
   e_value=TRUE,
   longterm = NULL,
-  na_fill_type = "value",
+  # The default is previous. It used to be zero fill, but we found it inconvenient,
+  # since it often creates false anomalies in data like stock price where there is no data for weekend.
+  na_fill_type = "previous", 
   na_fill_value = 0,
   ...){
   validate_empty_data(df)
@@ -62,6 +64,18 @@ do_anomaly_detection_ <- function(
       stop(paste0(value_col, " is grouped. Please ungroup it."))
     }
     df <- df[!is.na(df[[value_col]]), ]
+  }
+
+  if(lubridate::is.Date(df[[time_col]])) {
+    if (time_unit %nin% c("day")) {
+      stop("Aggregation level has to be day for Date.")
+    }
+  } else if(lubridate::is.POSIXct(df[[time_col]])) {
+    if (time_unit %nin% c("day", "hour", "min", "sec")) {
+      stop("Aggregation level has to be day, hour, min, or sec for POSIXct.")
+    }
+  } else {
+    stop(paste0(time_col, " is not either Date or POSIXct."))
   }
 
   # remove NA data
@@ -125,9 +139,20 @@ do_anomaly_detection_ <- function(
       df <- df[, !colnames(df) %in% grouped_col]
     }
 
+    time_col_values <- if (time_unit %in% c("day")) {
+      # In this case, convert (possibly) from POSIXct to Date first.
+      # If we did this without converting POSIXct to Date, floor_date works, but later at complete stage,
+      # data day-light-saving days would be skipped, since the times seq.POSIXt gives and floor_date does not match.
+      # We give the time column's timezone to as.Date, so that the POSIXct to Date conversion is done
+      # based on that timezone.
+      as.Date(df[[time_col]], tz = lubridate::tz(df[[time_col]]))
+    } else {
+      lubridate::floor_date(df[[time_col]], unit = time_unit)
+    }
+
     aggregated_data <- if (!is.null(value_col)){
       data.frame(
-        time = lubridate::floor_date(df[[time_col]], unit = time_unit),
+        time = time_col_values,
         value = df[[value_col]]
       ) %>%
         dplyr::filter(!is.na(value)) %>% # filter out NA so that aggregate function does not need to handle NA
@@ -136,7 +161,7 @@ do_anomaly_detection_ <- function(
     } else {
       value_col <- avoid_conflict(time_col, "count")
       data.frame(
-        time = lubridate::floor_date(df[[time_col]], unit = time_unit)
+        time = time_col_values
       ) %>%
         dplyr::group_by(time) %>%
         dplyr::summarise(count = n())
@@ -207,8 +232,15 @@ do_anomaly_detection_ <- function(
 
     colnames(aggregated_data) <- c(time_col, value_col)
 
-    # time column should be posixct, otherwise AnomalyDetection::AnomalyDetectionTs throws an error
-    aggregated_data[[time_col]] <- as.POSIXct(aggregated_data[[time_col]])
+    # time column should be posixct, otherwise AnomalyDetection::AnomalyDetectionTs throws an error.
+    # tz="GMT" given to as.POSIXct does not really matter since as.POSIXct on Date seems to always
+    # interpret input Date as GMT, and output POSIXct is always with default timezone.
+    # To sync the date part of output POSIXct to the input Date, we need to convert it back to GMT
+    # with with_tz.
+    if (!lubridate::is.POSIXct(aggregated_data[[time_col]])) {
+      aggregated_data[[time_col]] <- lubridate::with_tz(as.POSIXct(aggregated_data[[time_col]], tz="GMT"), tzone="GMT")
+    }
+
     data_for_anom <- aggregated_data
 
     # this will be overwritten by expected values
