@@ -65,7 +65,7 @@ test_that("do_anomary_detection with daily POSIXct data with timezone with dayli
 
 test_that("do_anomary_detection with missin days filled", {
   ts <- seq.Date(as.Date("2018-01-01"), as.Date("2018-12-31"), by="day")
-  raw_data <- data.frame(timestamp=ts, y=runif(length(ts))) %>% filter(wday(timestamp) %nin% c(1,7))
+  raw_data <- data.frame(timestamp=ts, y=runif(length(ts))) %>% filter(lubridate::wday(timestamp) %nin% c(1,7))
 
   # Test previous value fill.
   ret <- raw_data %>%
