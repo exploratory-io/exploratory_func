@@ -832,7 +832,9 @@ queryPostgres <- function(host, port, databaseName, username, password, numOfRow
   tryCatch({
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
-    resultSet <- RPostgreSQL::dbSendQuery(conn, glue::glue_sql(query, .con = conn, .envir = parent.frame()))
+    # glue_sql does not quote Date or POSIXct. Let's use our odbc_glue_transformer here.
+    query <- glue::glue(query, .transformer=odbc_glue_transformer, .envir = parent.frame())
+    resultSet <- RPostgreSQL::dbSendQuery(conn, query)
     df <- DBI::dbFetch(resultSet, n = numOfRows)
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
