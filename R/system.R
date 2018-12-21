@@ -253,7 +253,16 @@ odbc_glue_transformer <- function(code, envir) {
     val <- gsub("'", "''", val, fixed=TRUE) # both Oracle and SQL Server escapes single quote by doubling them.
     val <- paste0("'", val, "'") # both Oracle and SQL Server quotes strings with single quote.
   }
-  # TODO: How should we handle logical, Date, POSIXct, POSIXlt?
+  else if (lubridate::is.Date(val)) {
+    val <- as.character(val)
+    val <- paste0("'", val, "'") # Athena and PostgreSQL quotes date with single quote. e.g. '2019-01-01'
+  }
+  else if (lubridate::is.POSIXt(val)) {
+    val <- as.character(val)
+    val <- paste0("'", val, "'") # Athena and PostgreSQL quotes timestamp with single quote. e.g. '2019-01-01 00:00:00'
+  }
+
+  # TODO: How should we handle logical?
   #       Does expression like 1e+10 work?
   # TODO: Need to handle NA here. Find out appropriate way.
   glue::collapse(val, sep=", ")
