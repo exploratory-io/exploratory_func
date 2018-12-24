@@ -149,10 +149,10 @@ test_that("sql_glue_transformer", {
   res <- glue_exploratory("@{ `v` }", .transformer=sql_glue_transformer)
   expect_equal(as.character(res), "'a', 'b', 'c'") # Not sure if this behavior works for all types of databases.
 
-  exploratory_env$dept_names <- c("Sales","HR","CEO's secretary")
+  exploratory_env$dept_names <- c("Sales","HR","CEO's secretary", "Data Science\\Statistics")
   exploratory_env$empid_above <- 1100
   res <- glue_exploratory("select * from emp where deptname in (@{dept_names}) and empid > @{empid_above}", .transformer=sql_glue_transformer)
-  expect_equal(as.character(res), "select * from emp where deptname in ('Sales', 'HR', 'CEO''s secretary') and empid > 1100")
+  expect_equal(as.character(res), "select * from emp where deptname in ('Sales', 'HR', 'CEO''s secretary', 'Data Science\\Statistics') and empid > 1100")
 })
 
 test_that("bigquery_glue_transformer", {
@@ -166,8 +166,8 @@ test_that("bigquery_glue_transformer", {
   res <- glue_exploratory("@{ `v` }", .transformer=bigquery_glue_transformer)
   expect_equal(as.character(res), "'a', 'b', 'c'") # Not sure if this behavior works for all types of databases.
 
-  exploratory_env$dept_names <- c("Sales","HR","CEO's secretary")
+  exploratory_env$dept_names <- c("Sales","HR","CEO's secretary", "Data Science\\Statistics")
   exploratory_env$empid_above <- 1100
   res <- glue_exploratory("select * from emp where deptname in (@{dept_names}) and empid > @{empid_above}", .transformer=bigquery_glue_transformer)
-  expect_equal(as.character(res), "select * from emp where deptname in ('Sales', 'HR', 'CEO\\'s secretary') and empid > 1100")
+  expect_equal(as.character(res), "select * from emp where deptname in ('Sales', 'HR', 'CEO\\'s secretary', 'Data Science\\\\Statistics') and empid > 1100")
 })
