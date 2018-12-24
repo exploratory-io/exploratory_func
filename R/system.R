@@ -313,10 +313,9 @@ bigquery_glue_transformer <- function(code, envir) {
   if (is.character(val) || is.factor(val)) {
     # escape for Standard SQL for bigquery
     # https://cloud.google.com/bigquery/docs/reference/standard-sql/lexical
-    # escape for js
-    val <- gsub("\\", "\\\\", val, fixed=TRUE)
-    val <- gsub("\"", "\\\"", val, fixed=TRUE)
-    val <- paste0('"', val, '"')
+    val <- gsub("\\", "\\\\", val, fixed=TRUE) # Escape literal backslash
+    val <- gsub("\'", "\\\'", val, fixed=TRUE) # Escape literal single quote
+    val <- paste0("'", val, "'")
   }
   else if (lubridate::is.Date(val)) {
     val <- as.character(val)
