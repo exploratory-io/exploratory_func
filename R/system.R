@@ -275,11 +275,16 @@ odbc_glue_transformer <- function(code, envir) {
 }
 
 bigquery_glue_transformer <- function(code, envir) {
-  # We always collapse, but to keep syntax same as glue's default, take care of * at the end of code.
-  should_collapse <- grepl("[*]$", code)
-  if (should_collapse) {
-    code <- sub("[*]$", "", code)
+  # Trim white spaces.
+  code <- trimws(code)
+
+  # Strip quote by ``.
+  should_strip <- grepl("^`.+`$", code)
+  if (should_strip) {
+    code <- sub("^`", "", code)
+    code <- sub("`$", "", code)
   }
+  code <- paste0("exploratory_env$`", code, "`")
 
   val <- eval(parse(text = code), envir)
   if (is.character(val) || is.factor(val)) {
@@ -290,9 +295,19 @@ bigquery_glue_transformer <- function(code, envir) {
     val <- gsub("\"", "\\\"", val, fixed=TRUE)
     val <- paste0('"', val, '"')
   }
-  # TODO: How should we handle logical, Date, POSIXct, POSIXlt?
+  else if (lubridate::is.Date(val)) {
+    val <- as.character(val)
+    val <- paste0("'", val, "'") # Athena and PostgreSQL quotes date with single quote. e.g. '2019-01-01'
+  }
+  else if (lubridate::is.POSIXt(val)) {
+    val <- as.character(val)
+    val <- paste0("'", val, "'") # Athena and PostgreSQL quotes timestamp with single quote. e.g. '2019-01-01 00:00:00'
+  }
+
+  # TODO: How should we handle logical?
   #       Does expression like 1e+10 work?
   # TODO: Need to handle NA here. Find out appropriate way.
+  # We always collapse, unlike glue_sql.
   glue::collapse(val, sep=", ")
 }
 
