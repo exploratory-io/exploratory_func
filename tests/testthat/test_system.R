@@ -129,8 +129,9 @@ test_that("countycode", {
 })
 
 test_that("js_glue_transformer", {
-  v <- c(T,F,NA)
-  res <- glue::glue("{v}", .transformer=js_glue_transformer)
+  exploratory_env <- new.env()
+  exploratory_env$v <- c(T,F,NA)
+  res <- glue::glue("@{v}", .transformer=js_glue_transformer, .open="@{", .close="}")
   expect_equal(as.character(res), "true, false, null")
 })
 

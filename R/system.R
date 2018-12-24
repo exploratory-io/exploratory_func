@@ -218,6 +218,16 @@ getMongoURL <- function(host = NULL, port, database, username, pass, isSSL=FALSE
 # glue transformer for mongo js query.
 # supports character, factor, logical, Date, POSIXct, POSIXlt, and numeric.
 js_glue_transformer <- function(code, envir) {
+  # Trim white spaces.
+  code <- trimws(code)
+
+  # Strip quote by ``.
+  should_strip <- grepl("^`.+`$", code)
+  if (should_strip) {
+    code <- sub("^`", "", code)
+    code <- sub("`$", "", code)
+  }
+  code <- paste0("exploratory_env$`", code, "`")
   val <- eval(parse(text = code), envir)
   if (is.character(val) || is.factor(val)) {
     # escape for js
