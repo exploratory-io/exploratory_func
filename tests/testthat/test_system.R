@@ -133,6 +133,11 @@ test_that("js_glue_transformer", {
   exploratory_env$v <- c(T,F,NA)
   res <- glue::glue("@{v}", .transformer=js_glue_transformer, .open="@{", .close="}")
   expect_equal(as.character(res), "true, false, null")
+  exploratory_env$v <- 1
+  query <- "{a: {x: @{v}}}" 
+  query <- stringr::str_replace_all(query, "\\@\\{([^\\}]+)\\}", "<<<\\1>>>")
+  res <- glue::glue(query, .transformer=js_glue_transformer, .open="<<<", .close=">>>")
+  expect_equal(as.character(res), "{a: {x: 1}}")
 })
 
 test_that("odbc_glue_transformer", {
@@ -140,12 +145,9 @@ test_that("odbc_glue_transformer", {
   exploratory_env$v <- c(1,2,3)
   res <- glue::glue("@{ v }", .transformer=odbc_glue_transformer, .open="@{", .close="}")
   expect_equal(as.character(res), "1, 2, 3")
-  exploratory_env$v <- 1
-  res <- glue::glue("{a: {x: @{v}}} ", .transformer=odbc_glue_transformer, .open="@{", .close="}")
-  expect_equal(as.character(res), "{a: {x: 1}}")
   exploratory_env$v <- c("a","b","c")
-  res <- glue::glue("[@{ `v` }]", .transformer=odbc_glue_transformer, .open="@{", .close="}")
-  expect_equal(as.character(res), "['a', 'b', 'c']") # Not sure if this behavior works for all types of databases.
+  res <- glue::glue("@{ `v` }", .transformer=odbc_glue_transformer, .open="@{", .close="}")
+  expect_equal(as.character(res), "'a', 'b', 'c'") # Not sure if this behavior works for all types of databases.
 })
 
 test_that("bigquery_glue_transformer", {
