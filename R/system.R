@@ -791,7 +791,7 @@ executeGenericQuery <- function(type, host, port, databaseName, username, passwo
   tryCatch({
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
-    resultSet <- DBI::dbSendQuery(conn, glue::glue_sql(query, .con = conn, .envir = parent.frame()))
+    resultSet <- DBI::dbSendQuery(conn, glue_exploratory(query, .transformer = sql_glue_transformer, .envir = parent.frame()))
     df <- DBI::dbFetch(resultSet)
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
@@ -851,7 +851,7 @@ queryMySQL <- function(host, port, databaseName, username, password, numOfRows =
     DBI::dbGetQuery(conn,"set names utf8")
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
-    resultSet <- RMySQL::dbSendQuery(conn, glue::glue_sql(query, .con = conn, .envir = parent.frame()))
+    resultSet <- RMySQL::dbSendQuery(conn, glue_exploratory(query, .transformer = sql_glue_transformer, .envir = parent.frame()))
     df <- RMySQL::dbFetch(resultSet, n = numOfRows)
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
