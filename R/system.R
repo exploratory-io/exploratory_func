@@ -344,7 +344,7 @@ queryMongoDB <- function(host = NULL, port = "", database, collection, username,
       pipeline <- convertUserInputToUtf8(pipeline)
       # set .envir = parent.frame() to get variables from users environment, not papckage environment
       # use <<>> instead of default {} to avoid conflict with js syntax. @{} did not work because }} can appear in js.
-      pipeline <- glue::glue(pipeline, .transformer=js_glue_transformer, .open = "<<", .close = ">>", .envir = parent.frame())
+      pipeline <- glue::glue(pipeline, .transformer=js_glue_transformer, .open = "@{", .close = "}", .envir = parent.frame())
       # convert js query into mongo JSON, which mongolite understands.
       pipeline <- jsToMongoJson(pipeline)
       data <- con$aggregate(pipeline = pipeline)
@@ -354,7 +354,7 @@ queryMongoDB <- function(host = NULL, port = "", database, collection, username,
       sort <- convertUserInputToUtf8(sort)
       # set .envir = parent.frame() to get variables from users environment, not papckage environment
       # use <<>> instead of default {} to avoid conflict with js syntax. @{} did not work because }} can appear in js.
-      query <- glue::glue(query, .transformer=js_glue_transformer, .open = "<<", .close = ">>", .envir = parent.frame())
+      query <- glue::glue(query, .transformer=js_glue_transformer, .open = "@{", .close = "}", .envir = parent.frame())
       # convert js query into mongo JSON, which mongolite understands.
       query <- jsToMongoJson(query)
       fields <- jsToMongoJson(fields)
