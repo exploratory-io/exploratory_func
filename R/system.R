@@ -215,6 +215,19 @@ getMongoURL <- function(host = NULL, port, database, username, pass, isSSL=FALSE
   return (url)
 }
 
+# Wrapper around glue::glue() to resolve our @{} parameter notation.
+# We need this since glue::glue() escapes '}}' into '}', which makes it
+# hard to use inside js code. Even in SQL, expression like '{d @{date_param}}'
+# which would happen in SQL Server's SQL would not work with the original
+# glue::glue() behavior.
+glue_exploratory <- function(text, transformer, envir) {
+  # Internally, replace a{ and } with <<< and >>>.
+  text <- stringr::str_replace_all(text, "\\@\\{([^\\}]+)\\}", "<<<\\1>>>")
+  # Then, call glue::glue().
+  ret <- glue::glue(text, .transformer=transformer, .open = "<<<", .close = ">>>", .envir = envir)
+  ret
+}
+
 # glue transformer for mongo js query.
 # supports character, factor, logical, Date, POSIXct, POSIXlt, and numeric.
 js_glue_transformer <- function(code, envir) {
