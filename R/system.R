@@ -839,7 +839,7 @@ queryPostgres <- function(host, port, databaseName, username, password, numOfRow
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
     # glue_sql does not quote Date or POSIXct. Let's use our odbc_glue_transformer here.
-    query <- glue::glue(query, .transformer=odbc_glue_transformer, .envir = parent.frame())
+    query <- glue::glue(query, .transformer=odbc_glue_transformer, .open="@{", .close="}", .envir = parent.frame())
     resultSet <- RPostgreSQL::dbSendQuery(conn, query)
     df <- DBI::dbFetch(resultSet, n = numOfRows)
   }, error = function(err) {
@@ -858,7 +858,7 @@ queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IA
   tryCatch({
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
-    query <- glue::glue(query, .transformer=odbc_glue_transformer, .envir = parent.frame())
+    query <- glue::glue(query, .transformer=odbc_glue_transformer, .open="@{", .close="}", .envir = parent.frame())
     df <- RODBC::sqlQuery(conn, query,
                           max = numOfRows, stringsAsFactors=stringsAsFactors)
     if (!is.data.frame(df)) {
@@ -895,7 +895,7 @@ queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, q
   tryCatch({
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
-    query <- glue::glue(query, .transformer=odbc_glue_transformer, .envir = parent.frame())
+    query <- glue::glue(query, .transformer=odbc_glue_transformer, .open="@{", .close="}", .envir = parent.frame())
     df <- RODBC::sqlQuery(conn, query,
                           max = numOfRows, stringsAsFactors=stringsAsFactors)
     if (!is.data.frame(df)) {
