@@ -137,10 +137,10 @@ test_that("js_glue_transformer", {
 test_that("odbc_glue_transformer", {
   exploratory_env <- new.env()
   exploratory_env$v <- c(1,2,3)
-  res <- glue::glue("@{v}", .transformer=odbc_glue_transformer, .open="@{", .close="}")
+  res <- glue::glue("@{ v }", .transformer=odbc_glue_transformer, .open="@{", .close="}")
   expect_equal(as.character(res), "1, 2, 3")
   exploratory_env$v <- c("a","b","c")
-  res <- glue::glue("{v*}", .transformer=odbc_glue_transformer)
+  res <- glue::glue("@{ `v` }", .transformer=odbc_glue_transformer, .open="@{", .close="}")
   expect_equal(as.character(res), "'a', 'b', 'c'") # Not sure if this behavior works for all types of databases.
 })
 

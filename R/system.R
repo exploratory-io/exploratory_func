@@ -240,8 +240,15 @@ js_glue_transformer <- function(code, envir) {
 }
 
 odbc_glue_transformer <- function(code, envir) {
-  # TODO: trim code etc.
+  # Trim white spaces.
+  code <- trimws(code)
 
+  # Strip quote by ``.
+  should_strip <- grepl("^`.+`$", code)
+  if (should_strip) {
+    code <- sub("^`", "", code)
+    code <- sub("`$", "", code)
+  }
   code <- paste0("exploratory_env$`", code, "`")
 
   val <- eval(parse(text = code), envir)
