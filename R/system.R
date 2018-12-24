@@ -240,11 +240,9 @@ js_glue_transformer <- function(code, envir) {
 }
 
 odbc_glue_transformer <- function(code, envir) {
-  # We always collapse, but to keep syntax same as glue's default, take care of * at the end of code.
-  should_collapse <- grepl("[*]$", code)
-  if (should_collapse) {
-    code <- sub("[*]$", "", code)
-  }
+  # TODO: trim code etc.
+
+  code <- paste0("exploratory_env$`", code, "`")
 
   val <- eval(parse(text = code), envir)
   if (is.character(val) || is.factor(val)) {
@@ -265,6 +263,7 @@ odbc_glue_transformer <- function(code, envir) {
   # TODO: How should we handle logical?
   #       Does expression like 1e+10 work?
   # TODO: Need to handle NA here. Find out appropriate way.
+  # We always collapse, unlike glue_sql.
   glue::collapse(val, sep=", ")
 }
 
