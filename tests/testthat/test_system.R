@@ -131,12 +131,10 @@ test_that("countycode", {
 test_that("js_glue_transformer", {
   exploratory_env <- new.env()
   exploratory_env$v <- c(T,F,NA)
-  res <- glue::glue("@{v}", .transformer=js_glue_transformer, .open="@{", .close="}")
+  res <- glue_exploratory("@{v}", transformer=js_glue_transformer)
   expect_equal(as.character(res), "true, false, null")
   exploratory_env$v <- 1
-  query <- "{a: {x: @{v}}}" 
-  query <- stringr::str_replace_all(query, "\\@\\{([^\\}]+)\\}", "<<<\\1>>>")
-  res <- glue::glue(query, .transformer=js_glue_transformer, .open="<<<", .close=">>>")
+  res <- glue_exploratory("{a: {x: @{v}}}", transformer=js_glue_transformer)
   expect_equal(as.character(res), "{a: {x: 1}}")
 })
 

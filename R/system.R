@@ -220,7 +220,7 @@ getMongoURL <- function(host = NULL, port, database, username, pass, isSSL=FALSE
 # hard to use inside js code. Even in SQL, expression like '{d @{date_param}}'
 # which would happen in SQL Server's SQL would not work with the original
 # glue::glue() behavior.
-glue_exploratory <- function(text, transformer, envir) {
+glue_exploratory <- function(text, transformer, envir = parent.frame()) {
   # Internally, replace a{ and } with <<< and >>>.
   text <- stringr::str_replace_all(text, "\\@\\{([^\\}]+)\\}", "<<<\\1>>>")
   # Then, call glue::glue().
