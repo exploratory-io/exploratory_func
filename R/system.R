@@ -220,11 +220,11 @@ getMongoURL <- function(host = NULL, port, database, username, pass, isSSL=FALSE
 # hard to use inside js code. Even in SQL, expression like '{d @{date_param}}'
 # which would happen in SQL Server's SQL would not work with the original
 # glue::glue() behavior.
-glue_exploratory <- function(text, transformer, envir = parent.frame()) {
+glue_exploratory <- function(text, .transformer, .envir = parent.frame()) {
   # Internally, replace a{ and } with <<< and >>>.
   text <- stringr::str_replace_all(text, "\\@\\{([^\\}]+)\\}", "<<<\\1>>>")
   # Then, call glue::glue().
-  ret <- glue::glue(text, .transformer=transformer, .open = "<<<", .close = ">>>", .envir = envir)
+  ret <- glue::glue(text, .transformer = .transformer, .open = "<<<", .close = ">>>", .envir = .envir)
   ret
 }
 
@@ -356,9 +356,7 @@ queryMongoDB <- function(host = NULL, port = "", database, collection, username,
     if(queryType == "aggregate"){
       pipeline <- convertUserInputToUtf8(pipeline)
       # set .envir = parent.frame() to get variables from users environment, not papckage environment
-      # use <<>> instead of default {} to avoid conflict with js syntax. @{} did not work because }} can appear in js.
-      pipeline <- stringr::str_replace_all(pipeline, "\\@\\{([^\\}]+)\\}", "<<<\\1>>>")
-      pipeline <- glue::glue(pipeline, .transformer=js_glue_transformer, .open = "<<<", .close = ">>>", .envir = parent.frame())
+      pipeline <- glue_exploratory(pipeline, .transformer=js_glue_transformer, .envir = parent.frame())
       # convert js query into mongo JSON, which mongolite understands.
       pipeline <- jsToMongoJson(pipeline)
       data <- con$aggregate(pipeline = pipeline)
@@ -367,9 +365,7 @@ queryMongoDB <- function(host = NULL, port = "", database, collection, username,
       fields <- convertUserInputToUtf8(fields)
       sort <- convertUserInputToUtf8(sort)
       # set .envir = parent.frame() to get variables from users environment, not papckage environment
-      # use <<>> instead of default {} to avoid conflict with js syntax. @{} did not work because }} can appear in js.
-      pipeline <- stringr::str_replace_all(pipeline, "\\@\\{([^\\}]+)\\}", "<<<\\1>>>")
-      query <- glue::glue(query, .transformer=js_glue_transformer, .open = "<<<", .close = ">>>", .envir = parent.frame())
+      query <- glue_exploratory(query, .transformer=js_glue_transformer, .envir = parent.frame())
       # convert js query into mongo JSON, which mongolite understands.
       query <- jsToMongoJson(query)
       fields <- jsToMongoJson(fields)
