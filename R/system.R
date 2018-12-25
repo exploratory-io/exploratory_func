@@ -215,9 +215,32 @@ getMongoURL <- function(host = NULL, port, database, username, pass, isSSL=FALSE
   return (url)
 }
 
+# Wrapper around glue::glue() to resolve our @{} parameter notation.
+# We need this since glue::glue() escapes '}}' into '}', which makes it
+# hard to use inside js code. Even in SQL, expression like '{d @{date_param}}'
+# which would happen in SQL Server's SQL would not work with the original
+# glue::glue() behavior.
+glue_exploratory <- function(text, .transformer, .envir = parent.frame()) {
+  # Internally, replace a{ and } with <<< and >>>.
+  text <- stringr::str_replace_all(text, "\\@\\{([^\\}]+)\\}", "<<<\\1>>>")
+  # Then, call glue::glue().
+  ret <- glue::glue(text, .transformer = .transformer, .open = "<<<", .close = ">>>", .envir = .envir)
+  ret
+}
+
 # glue transformer for mongo js query.
 # supports character, factor, logical, Date, POSIXct, POSIXlt, and numeric.
 js_glue_transformer <- function(code, envir) {
+  # Trim white spaces.
+  code <- trimws(code)
+
+  # Strip quote by ``.
+  should_strip <- grepl("^`.+`$", code)
+  if (should_strip) {
+    code <- sub("^`", "", code)
+    code <- sub("`$", "", code)
+  }
+  code <- paste0("exploratory_env$`", code, "`")
   val <- eval(parse(text = code), envir)
   if (is.character(val) || is.factor(val)) {
     # escape for js
@@ -239,12 +262,17 @@ js_glue_transformer <- function(code, envir) {
   glue::collapse(val, sep=", ")
 }
 
-odbc_glue_transformer <- function(code, envir) {
-  # We always collapse, but to keep syntax same as glue's default, take care of * at the end of code.
-  should_collapse <- grepl("[*]$", code)
-  if (should_collapse) {
-    code <- sub("[*]$", "", code)
+sql_glue_transformer <- function(code, envir) {
+  # Trim white spaces.
+  code <- trimws(code)
+
+  # Strip quote by ``.
+  should_strip <- grepl("^`.+`$", code)
+  if (should_strip) {
+    code <- sub("^`", "", code)
+    code <- sub("`$", "", code)
   }
+  code <- paste0("exploratory_env$`", code, "`")
 
   val <- eval(parse(text = code), envir)
   if (is.character(val) || is.factor(val)) {
@@ -253,31 +281,55 @@ odbc_glue_transformer <- function(code, envir) {
     val <- gsub("'", "''", val, fixed=TRUE) # both Oracle and SQL Server escapes single quote by doubling them.
     val <- paste0("'", val, "'") # both Oracle and SQL Server quotes strings with single quote.
   }
-  # TODO: How should we handle logical, Date, POSIXct, POSIXlt?
+  else if (lubridate::is.Date(val)) {
+    val <- as.character(val)
+    val <- paste0("'", val, "'") # Athena and PostgreSQL quotes date with single quote. e.g. '2019-01-01'
+  }
+  else if (lubridate::is.POSIXt(val)) {
+    val <- as.character(val)
+    val <- paste0("'", val, "'") # Athena and PostgreSQL quotes timestamp with single quote. e.g. '2019-01-01 00:00:00'
+  }
+
+  # TODO: How should we handle logical?
   #       Does expression like 1e+10 work?
   # TODO: Need to handle NA here. Find out appropriate way.
+  # We always collapse, unlike glue_sql.
   glue::collapse(val, sep=", ")
 }
 
 bigquery_glue_transformer <- function(code, envir) {
-  # We always collapse, but to keep syntax same as glue's default, take care of * at the end of code.
-  should_collapse <- grepl("[*]$", code)
-  if (should_collapse) {
-    code <- sub("[*]$", "", code)
+  # Trim white spaces.
+  code <- trimws(code)
+
+  # Strip quote by ``.
+  should_strip <- grepl("^`.+`$", code)
+  if (should_strip) {
+    code <- sub("^`", "", code)
+    code <- sub("`$", "", code)
   }
+  code <- paste0("exploratory_env$`", code, "`")
 
   val <- eval(parse(text = code), envir)
   if (is.character(val) || is.factor(val)) {
     # escape for Standard SQL for bigquery
     # https://cloud.google.com/bigquery/docs/reference/standard-sql/lexical
-    # escape for js
-    val <- gsub("\\", "\\\\", val, fixed=TRUE)
-    val <- gsub("\"", "\\\"", val, fixed=TRUE)
-    val <- paste0('"', val, '"')
+    val <- gsub("\\", "\\\\", val, fixed=TRUE) # Escape literal backslash
+    val <- gsub("\'", "\\\'", val, fixed=TRUE) # Escape literal single quote
+    val <- paste0("'", val, "'")
   }
-  # TODO: How should we handle logical, Date, POSIXct, POSIXlt?
+  else if (lubridate::is.Date(val)) {
+    val <- as.character(val)
+    val <- paste0("'", val, "'") # Athena and PostgreSQL quotes date with single quote. e.g. '2019-01-01'
+  }
+  else if (lubridate::is.POSIXt(val)) {
+    val <- as.character(val)
+    val <- paste0("'", val, "'") # Athena and PostgreSQL quotes timestamp with single quote. e.g. '2019-01-01 00:00:00'
+  }
+
+  # TODO: How should we handle logical?
   #       Does expression like 1e+10 work?
   # TODO: Need to handle NA here. Find out appropriate way.
+  # We always collapse, unlike glue_sql.
   glue::collapse(val, sep=", ")
 }
 
@@ -303,8 +355,7 @@ queryMongoDB <- function(host = NULL, port = "", database, collection, username,
     if(queryType == "aggregate"){
       pipeline <- convertUserInputToUtf8(pipeline)
       # set .envir = parent.frame() to get variables from users environment, not papckage environment
-      # use <<>> instead of default {} to avoid conflict with js syntax. @{} did not work because }} can appear in js.
-      pipeline <- glue::glue(pipeline, .transformer=js_glue_transformer, .open = "<<", .close = ">>", .envir = parent.frame())
+      pipeline <- glue_exploratory(pipeline, .transformer=js_glue_transformer, .envir = parent.frame())
       # convert js query into mongo JSON, which mongolite understands.
       pipeline <- jsToMongoJson(pipeline)
       data <- con$aggregate(pipeline = pipeline)
@@ -313,8 +364,7 @@ queryMongoDB <- function(host = NULL, port = "", database, collection, username,
       fields <- convertUserInputToUtf8(fields)
       sort <- convertUserInputToUtf8(sort)
       # set .envir = parent.frame() to get variables from users environment, not papckage environment
-      # use <<>> instead of default {} to avoid conflict with js syntax. @{} did not work because }} can appear in js.
-      query <- glue::glue(query, .transformer=js_glue_transformer, .open = "<<", .close = ">>", .envir = parent.frame())
+      query <- glue_exploratory(query, .transformer=js_glue_transformer, .envir = parent.frame())
       # convert js query into mongo JSON, which mongolite understands.
       query <- jsToMongoJson(query)
       fields <- jsToMongoJson(fields)
@@ -740,7 +790,7 @@ executeGenericQuery <- function(type, host, port, databaseName, username, passwo
   tryCatch({
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
-    resultSet <- DBI::dbSendQuery(conn, glue::glue_sql(query, .con = conn, .envir = parent.frame()))
+    resultSet <- DBI::dbSendQuery(conn, glue_exploratory(query, .transformer = sql_glue_transformer, .envir = parent.frame()))
     df <- DBI::dbFetch(resultSet)
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
@@ -800,7 +850,7 @@ queryMySQL <- function(host, port, databaseName, username, password, numOfRows =
     DBI::dbGetQuery(conn,"set names utf8")
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
-    resultSet <- RMySQL::dbSendQuery(conn, glue::glue_sql(query, .con = conn, .envir = parent.frame()))
+    resultSet <- RMySQL::dbSendQuery(conn, glue_exploratory(query, .transformer = sql_glue_transformer, .envir = parent.frame()))
     df <- RMySQL::dbFetch(resultSet, n = numOfRows)
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
@@ -823,7 +873,9 @@ queryPostgres <- function(host, port, databaseName, username, password, numOfRow
   tryCatch({
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
-    resultSet <- RPostgreSQL::dbSendQuery(conn, glue::glue_sql(query, .con = conn, .envir = parent.frame()))
+    # glue_sql does not quote Date or POSIXct. Let's use our sql_glue_transformer here.
+    query <- glue_exploratory(query, .transformer=sql_glue_transformer, .envir = parent.frame())
+    resultSet <- RPostgreSQL::dbSendQuery(conn, query)
     df <- DBI::dbFetch(resultSet, n = numOfRows)
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
@@ -841,7 +893,7 @@ queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IA
   tryCatch({
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
-    query <- glue::glue(query, .transformer=odbc_glue_transformer, .envir = parent.frame())
+    query <- glue_exploratory(query, .transformer=sql_glue_transformer, .envir = parent.frame())
     df <- RODBC::sqlQuery(conn, query,
                           max = numOfRows, stringsAsFactors=stringsAsFactors)
     if (!is.data.frame(df)) {
@@ -878,7 +930,7 @@ queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, q
   tryCatch({
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
-    query <- glue::glue(query, .transformer=odbc_glue_transformer, .envir = parent.frame())
+    query <- glue_exploratory(query, .transformer=sql_glue_transformer, .envir = parent.frame())
     df <- RODBC::sqlQuery(conn, query,
                           max = numOfRows, stringsAsFactors=stringsAsFactors)
     if (!is.data.frame(df)) {
@@ -967,7 +1019,7 @@ submitGoogleBigQueryJob <- function(project, sqlquery, destination_table, write_
     isStandardSQL = TRUE; # honor value provided by paramerer
   }
   # set envir = parent.frame() to get variables from users environment, not papckage environment
-  sqlquery <- glue::glue(sqlquery, .transformer=bigquery_glue_transformer, .envir = parent.frame())
+  sqlquery <- glue_exploratory(sqlquery, .transformer=bigquery_glue_transformer, .envir = parent.frame())
   job <- bigrquery::bq_perform_query(query = sqlquery, billing = project,  use_legacy_sql = !isStandardSQL)
   bigrquery::bq_job_wait(job)
   meta <- bigrquery::bq_job_meta(job)
@@ -1115,7 +1167,7 @@ executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 1
       isStandardSQL = TRUE;
     }
     # set envir = parent.frame() to get variables from users environment, not papckage environment
-    query <- glue::glue(query, .transformer=bigquery_glue_transformer, .envir = parent.frame())
+    query <- glue_exploratory(query, .transformer=bigquery_glue_transformer, .envir = parent.frame())
     tb <- bigrquery::bq_project_query(x = project, query = query, quiet = TRUE, use_legacy_sql = !isStandardSQL)
     df <- bigrquery::bq_table_download(x = tb, max_results = Inf, page_size = pageSize, max_connections = max_connections, quiet = TRUE)
   }
