@@ -30,3 +30,12 @@ test_that("do_prophet with NA fill options", {
   expect_true(!is.na(ret$y[[6]]))
   expect_true(!is.na(ret$y[[7]]))
 })
+
+test_that("do_prophet with daily POSIXct data with timezone with daylight saving days.", {
+  ts <- lubridate::with_tz(as.POSIXct(seq.Date(as.Date("2010-01-01"), as.Date("2010-12-31"), by="day")), tz="America/Los_Angeles")
+  raw_data <- data.frame(timestamp=ts, y=runif(length(ts)))
+  ret <- raw_data %>%
+    do_prophet(timestamp, y, 10, time_unit = "day", na_fill_type = "previous")
+  # Check that aggretated value at a daylight saving day has a valid value. Once there was an issue that broke this.
+  expect_true(ret$y[200] > 0)
+})
