@@ -125,7 +125,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
   df <- df[!is.na(df[[time_col]]), ]
 
   do_prophet_each <- function(df){
-    # filter the part of holidays df for this group.
+    # filter the part of external holidays df for this group.
     holidays_df <- NULL
     if (!is.null(holidays)) {
       holidays_df <- holidays
@@ -135,7 +135,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
         }
       }
     }
-    # filter the part of cap df (future df) for this group.
+    # filter the part of external cap df (future df) for this group.
     cap_df <- NULL
     if (!is.null(cap) && is.data.frame(cap)) {
       cap_df <- cap
