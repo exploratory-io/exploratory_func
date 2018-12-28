@@ -164,7 +164,11 @@ fill_ts_na <- function(target, time, type = "previous", val = 0) {
   # when some date or time are missing,
   # AnomalyDetection::AnomalyDetectionTs throws this error
   # "Anom detection needs at least 2 periods worth of data"
-  if (type == "spline") {
+  if (is.null(type)) {
+    # skip when it is NULL. this is for the case caller is confident that
+    # there is no NA and want to skip overhead of checking for NA.
+  }
+  else if (type == "spline") {
     df_zoo <- zoo::na.spline(df_zoo)
   }
   else if (type == "interpolate") {
@@ -181,10 +185,6 @@ fill_ts_na <- function(target, time, type = "previous", val = 0) {
   # }
   else if (type == "value") {
     df_zoo <- zoo::na.fill(df_zoo, val)
-  }
-  else if (is.null(type)) {
-    # skip when it is NULL. this is for the case caller is confident that
-    # there is no NA and want to skip overhead of checking for NA.
   }
   else {
     stop(paste0(type, " is not a valid option for NA fill type."))

@@ -18,11 +18,11 @@ do_prophet <- function(df, time, value = NULL, periods = 10, holiday = NULL, ...
 #' @param include_history - Whether to include history data in forecast or not.
 #' @param fun.aggregate - Function to aggregate values.
 #' @param na_fill_type - Type of NA fill:
+#'                       NULL - Skip NA fill. Default behavior.
 #'                       "previous" - Fill with previous non-NA value.
 #'                       "value" - Fill with the value of na_fill_value.
 #'                       "interpolate" - Linear interpolation.
 #'                       "spline" - Spline interpolation.
-#'                       NULL - Skip NA fill. Use this only when you know there is no NA.
 #' @param na_fill_value - Value to fill NA when na_fill_type is "value"
 #' @param ... - extra values to be passed to prophet::prophet. listed below.
 #' @param growth - This parameter used to specify type of Trend, which can be "linear" or "logistic",
@@ -48,7 +48,7 @@ do_prophet <- function(df, time, value = NULL, periods = 10, holiday = NULL, ...
 #' @param uncertainty.samples - Number of simulations made for calculating uncertainty intervals. Default is 1000.
 #' @export
 do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit = "day", include_history = TRUE, test_mode = FALSE,
-                        fun.aggregate = sum, na_fill_type = "previous", na_fill_value = 0,
+                        fun.aggregate = sum, na_fill_type = NULL, na_fill_value = 0,
                         cap = NULL, floor = NULL, growth = NULL, weekly.seasonality = TRUE, yearly.seasonality = TRUE,
                         holiday_col = NULL, holidays = NULL,
                         regressors = NULL, funs.aggregate.regressors = NULL, ...){
@@ -225,6 +225,9 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
         dplyr::group_by(ds) %>%
         dplyr::summarise(y = n())
     }
+
+    # fill NAs in y with zoo
+    aggregated_data <- aggregated_data %>% dplyr::mutate(y = fill_ts_na(y, ds, type = na_fill_type, val = na_fill_value))
 
     if (time_unit %in% c("week", "month", "quarter", "year")) { # if time_unit is larger than day (the next level is week), having weekly.seasonality does not make sense.
       weekly.seasonality <- FALSE
