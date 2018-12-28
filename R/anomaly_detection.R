@@ -37,7 +37,7 @@ fill_ts_na <- function(target, time, type = "previous", val = 0) {
   #   df_zoo <- zoo::na.StructTS(df_zoo)
   # }
   else if (type == "value") {
-    df_zoo <- zoo::na.fill(df_zoo, na_fill_value)
+    df_zoo <- zoo::na.fill(df_zoo, val)
   }
   else if (is.null(type)) {
     # skip when it is NULL. this is for the case caller is confident that
@@ -207,7 +207,7 @@ do_anomaly_detection_ <- function(
         time = time_col_values
       ) %>%
         dplyr::group_by(time) %>%
-        dplyr::summarise(count = n())
+        dplyr::summarise(val = n())
     }
 
     # complete the date time with NA
@@ -222,49 +222,10 @@ do_anomaly_detection_ <- function(
     }
 
     # fill na with zoo
-
-    # keep time_col column, since we will drop it in the next step,
-    # but will need it to compose zoo object.
     time_points_vec <- aggregated_data[["time"]]
-
-    # drop time_col.
-    input_df <- aggregated_data[, colnames(aggregated_data) != "time"]
-
-    df_zoo <- zoo::zoo(input_df, time_points_vec)
-    # fill NAs in the input
-    # when some date or time are missing,
-    # AnomalyDetection::AnomalyDetectionTs throws this error
-    # "Anom detection needs at least 2 periods worth of data"
-    if (na_fill_type == "spline") {
-      df_zoo <- zoo::na.spline(df_zoo)
-    }
-    else if (na_fill_type == "interpolate") {
-      df_zoo <- zoo::na.approx(df_zoo)
-    }
-    else if (na_fill_type == "previous") {
-      df_zoo <- zoo::na.locf(df_zoo)
-    }
-    # TODO: Getting this error with some input with na.StructTS().
-    #       Error in rowSums(tsSmooth(StructTS(y))[, -2]) : 'x' must be an array of at least two dimensions
-    #
-    # else if (na_fill_type == "StructTS") {
-    #   df_zoo <- zoo::na.StructTS(df_zoo)
-    # }
-    else if (na_fill_type == "value") {
-      df_zoo <- zoo::na.fill(df_zoo, na_fill_value)
-    }
-    else if (is.null(na_fill_type)) {
-      # skip when it is NULL. this is for the case caller is confident that
-      # there is no NA and want to skip overhead of checking for NA.
-    }
-    else {
-      stop(paste0(na_fill_type, " is not a valid na_fill_type option."))
-    }
-    aggregated_data <- df_zoo %>%
-      as.data.frame() %>%
-      dplyr::mutate(time = zoo::index(df_zoo)) %>%
-      # bring time column first
-      dplyr::select(time, everything())
+    values_vec <- aggregated_data[["val"]]
+    filled_values_vec <- fill_ts_na(values_vec, time_points_vec, type = na_fill_type, val = na_fill_value)
+    aggregated_data <- data.frame(time=time_points_vec, val=filled_values_vec)
 
     if (is.null(longterm)){
       # set longterm to TRUE if the data range is
