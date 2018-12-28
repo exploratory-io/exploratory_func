@@ -162,7 +162,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
     if (is.null(holidays_df) && !is.null(holiday_col)) {
       holidays_df <- df %>%
         dplyr::transmute(
-          ds = lubridate::floor_date(UQ(rlang::sym(time_col)), unit = time_unit),
+          ds = UQ(rlang::sym(time_col)),
           holiday = UQ(rlang::sym(holiday_col))
         ) %>%
         dplyr::group_by(ds) %>%
@@ -184,13 +184,13 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
       df <- df %>% dplyr::filter(!!!filter_args)
       future_df <- df # keep all rows before df is filtered out.
       df <- df %>% dplyr::filter(!is.na(UQ(rlang::sym(value_col)))) # keep the rows that has values. the ones that do not are for future regressors
-      max_floored_date <- lubridate::floor_date(max(df[[time_col]]), unit = time_unit)
-      future_df <- future_df %>% dplyr::filter(lubridate::floor_date(UQ(rlang::sym(time_col)), unit = time_unit) > max_floored_date)
+      max_floored_date <- max(df[[time_col]])
+      future_df <- future_df %>% dplyr::filter(UQ(rlang::sym(time_col)) > max_floored_date)
 
       # TODO: in test mode, this is not really necessary. optimize.
       aggregated_future_data <- future_df %>%
         dplyr::transmute(
-          ds = lubridate::floor_date(UQ(rlang::sym(time_col)), unit = time_unit),
+          ds = UQ(rlang::sym(time_col)),
           !!!rlang::syms(regressors)
         ) %>%
         dplyr::group_by(ds) %>%
@@ -210,7 +210,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
       # apply same aggregation as value to cap.
       df %>%
         dplyr::transmute(
-          ds = lubridate::floor_date(UQ(rlang::sym(time_col)), unit = time_unit),
+          ds = UQ(rlang::sym(time_col)),
           value = UQ(rlang::sym(value_col)),
           cap_col = cap,
           !!!rlang::syms(regressors) # this should be able to handle regressor=NULL case fine.
@@ -223,7 +223,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
     } else if (!is.null(value_col)){
       df %>%
         dplyr::transmute(
-          ds = lubridate::floor_date(UQ(rlang::sym(time_col)), unit = time_unit),
+          ds = UQ(rlang::sym(time_col)),
           value = UQ(rlang::sym(value_col)),
           !!!rlang::syms(regressors) # this should be able to handle regressor=NULL case fine.
         ) %>%
@@ -232,7 +232,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
         dplyr::summarise(y = fun.aggregate(value), !!!summarise_args)
     } else { # in this case we do not support extra regressors since there is no way to detect bounndary between history and future
       data.frame(
-        ds = lubridate::floor_date(df[[time_col]], unit = time_unit)
+        ds = df[[time_col]]
       ) %>%
         dplyr::group_by(ds) %>%
         dplyr::summarise(y = n())
