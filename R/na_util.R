@@ -159,6 +159,7 @@ fill_between <- function(df, ..., .direction="down", value=NULL) {
 #'                       NULL - Skip NA fill. Use this only when you know there is no NA.
 #' @param val - Value to fill NA when na_fill_type is "value"
 fill_ts_na <- function(target, time, type = "previous", val = 0) {
+  browser()
   df_zoo <- zoo::zoo(target, time)
   # fill NAs in the input
   # when some date or time are missing,
