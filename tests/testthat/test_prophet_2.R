@@ -36,6 +36,6 @@ test_that("do_prophet with daily POSIXct data with timezone with daylight saving
   raw_data <- data.frame(timestamp=ts, y=runif(length(ts)))
   ret <- raw_data %>%
     do_prophet(timestamp, y, 10, time_unit = "day", na_fill_type = "previous")
-  # Check that aggretated value at a daylight saving day has a valid value. Once there was an issue that broke this.
+  # Check that aggretated value at a daylight saving day has a valid value. Once there was an issue that broke this with Anomaly Detection, which has similar logic.
   expect_true(ret$y[200] > 0)
 })
