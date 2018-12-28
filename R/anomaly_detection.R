@@ -178,7 +178,10 @@ do_anomaly_detection_ <- function(
       stop("time must be Date or POSIXct.")
     }
 
-    # fill na with zoo
+    # fill NAs in the input
+    # when some date or time are missing,
+    # AnomalyDetection::AnomalyDetectionTs throws this error
+    # "Anom detection needs at least 2 periods worth of data"
     time_points_vec <- aggregated_data[["time"]]
     values_vec <- aggregated_data[["val"]]
     filled_values_vec <- fill_ts_na(values_vec, time_points_vec, type = na_fill_type, val = na_fill_value)

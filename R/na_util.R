@@ -160,10 +160,6 @@ fill_between <- function(df, ..., .direction="down", value=NULL) {
 #' @param val - Value to fill NA when na_fill_type is "value"
 fill_ts_na <- function(target, time, type = "previous", val = 0) {
   df_zoo <- zoo::zoo(target, time)
-  # fill NAs in the input
-  # when some date or time are missing,
-  # AnomalyDetection::AnomalyDetectionTs throws this error
-  # "Anom detection needs at least 2 periods worth of data"
   if (is.null(type)) {
     # skip when it is NULL. this is for the case caller is confident that
     # there is no NA and want to skip overhead of checking for NA.
