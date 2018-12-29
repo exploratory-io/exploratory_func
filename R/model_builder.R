@@ -45,6 +45,7 @@ build_kmeans.kv_ <- function(df,
                              nstart = 1,
                              algorithm = "Hartigan-Wong",
                              trace = FALSE,
+                             normalize_data = TRUE,
                              keep.source = TRUE,
                              seed=0,
                              augment=TRUE,
@@ -86,6 +87,9 @@ build_kmeans.kv_ <- function(df,
       fill=fill,
       na.rm = TRUE
     )
+    if (normalize_data) { # Normalize data if specified so.
+      mat <- scale(mat)
+    }
     rownames(mat) <- NULL # this prevents warning about discarding row names of the matrix
     kmeans_ret <- tryCatch({
       kmeans(mat, centers = centers, iter.max = 10, nstart = nstart, algorithm = algorithm, trace = trace)},
