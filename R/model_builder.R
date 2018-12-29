@@ -89,6 +89,9 @@ build_kmeans.kv_ <- function(df,
     )
     if (normalize_data) { # Normalize data if specified so.
       mat <- scale(mat)
+      # Column with zero variance will be filled with NaN because of division by 0.
+      # Replace them with 0.
+      mat[is.nan(mat)] <- 0
     }
     rownames(mat) <- NULL # this prevents warning about discarding row names of the matrix
     kmeans_ret <- tryCatch({
@@ -192,6 +195,9 @@ build_kmeans.cols <- function(df, ...,
       mat <- as_numeric_matrix_(df, columns = selected_column)
       if (normalize_data) { # Normalize data if specified so.
         mat <- scale(mat)
+        # Column with zero variance will be filled with NaN because of division by 0.
+        # Replace them with 0.
+        mat[is.nan(mat)] <- 0
       }
       kmeans(mat, centers = centers, iter.max = 10, nstart = nstart, algorithm = algorithm, trace = trace)
     }, error = function(e) {
