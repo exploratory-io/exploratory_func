@@ -148,6 +148,7 @@ build_kmeans.cols <- function(df, ...,
                             nstart = 1,
                             algorithm = "Hartigan-Wong",
                             trace = FALSE,
+                            normalize_data = TRUE,
                             keep.source = TRUE,
                             seed=0,
                             augment=TRUE
@@ -185,6 +186,9 @@ build_kmeans.cols <- function(df, ...,
         stop("No data after removing NA")
       }
       mat <- as_numeric_matrix_(df, columns = selected_column)
+      if (normalize_data) { # Normalize data if specified so.
+        mat <- scale(mat)
+      }
       kmeans(mat, centers = centers, iter.max = 10, nstart = nstart, algorithm = algorithm, trace = trace)
     }, error = function(e) {
       if(e$message == "invalid first argument"){
