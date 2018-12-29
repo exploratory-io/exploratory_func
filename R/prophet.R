@@ -17,6 +17,13 @@ do_prophet <- function(df, time, value = NULL, periods = 10, holiday = NULL, ...
 #' @param time_unit - "second"/"sec", "minute"/"min", "hour", "day", "week", "month", "quarter", or "year".
 #' @param include_history - Whether to include history data in forecast or not.
 #' @param fun.aggregate - Function to aggregate values.
+#' @param na_fill_type - Type of NA fill:
+#'                       NULL - Skip NA fill. Default behavior.
+#'                       "previous" - Fill with previous non-NA value.
+#'                       "value" - Fill with the value of na_fill_value.
+#'                       "interpolate" - Linear interpolation.
+#'                       "spline" - Spline interpolation.
+#' @param na_fill_value - Value to fill NA when na_fill_type is "value"
 #' @param ... - extra values to be passed to prophet::prophet. listed below.
 #' @param growth - This parameter used to specify type of Trend, which can be "linear" or "logistic",
 #'        but now we determine this automatically by cap. It is here just to avoid throwing error from prophet,
@@ -41,7 +48,8 @@ do_prophet <- function(df, time, value = NULL, periods = 10, holiday = NULL, ...
 #' @param uncertainty.samples - Number of simulations made for calculating uncertainty intervals. Default is 1000.
 #' @export
 do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit = "day", include_history = TRUE, test_mode = FALSE,
-                        fun.aggregate = sum, cap = NULL, floor = NULL, growth = NULL, weekly.seasonality = TRUE, yearly.seasonality = TRUE,
+                        fun.aggregate = sum, na_fill_type = NULL, na_fill_value = 0,
+                        cap = NULL, floor = NULL, growth = NULL, weekly.seasonality = TRUE, yearly.seasonality = TRUE,
                         holiday_col = NULL, holidays = NULL,
                         regressors = NULL, funs.aggregate.regressors = NULL, ...){
   validate_empty_data(df)
@@ -113,11 +121,11 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
     })
   }
 
-  # remove NA data
+  # remove rows with NA time
   df <- df[!is.na(df[[time_col]]), ]
 
   do_prophet_each <- function(df){
-    # filter the part of holidays df for this group.
+    # filter the part of external holidays df for this group.
     holidays_df <- NULL
     if (!is.null(holidays)) {
       holidays_df <- holidays
@@ -127,7 +135,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
         }
       }
     }
-    # filter the part of cap df (future df) for this group.
+    # filter the part of external cap df (future df) for this group.
     cap_df <- NULL
     if (!is.null(cap) && is.data.frame(cap)) {
       cap_df <- cap
@@ -138,11 +146,23 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
       }
     }
 
+    df[[time_col]] <- if (time_unit %in% c("day", "week", "month", "quarter", "year")) {
+      # Take care of issue that happened in anomaly detection here for prophet too.
+      # In this case, convert (possibly) from POSIXct to Date first.
+      # If we did this without converting POSIXct to Date, floor_date works, but later at complete stage,
+      # data on day-light-saving days would be skipped, since the times seq.POSIXt gives and floor_date does not match.
+      # We give the time column's timezone to as.Date, so that the POSIXct to Date conversion is done
+      # based on that timezone.
+      lubridate::floor_date(as.Date(df[[time_col]], tz = lubridate::tz(df[[time_col]])), unit = time_unit)
+    } else {
+      lubridate::floor_date(df[[time_col]], unit = time_unit)
+    }
+
     # extract holiday df from main df
     if (is.null(holidays_df) && !is.null(holiday_col)) {
       holidays_df <- df %>%
         dplyr::transmute(
-          ds = lubridate::floor_date(UQ(rlang::sym(time_col)), unit = time_unit),
+          ds = UQ(rlang::sym(time_col)),
           holiday = UQ(rlang::sym(holiday_col))
         ) %>%
         dplyr::group_by(ds) %>%
@@ -164,13 +184,13 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
       df <- df %>% dplyr::filter(!!!filter_args)
       future_df <- df # keep all rows before df is filtered out.
       df <- df %>% dplyr::filter(!is.na(UQ(rlang::sym(value_col)))) # keep the rows that has values. the ones that do not are for future regressors
-      max_floored_date <- lubridate::floor_date(max(df[[time_col]]), unit = time_unit)
-      future_df <- future_df %>% dplyr::filter(lubridate::floor_date(UQ(rlang::sym(time_col)), unit = time_unit) > max_floored_date)
+      max_floored_date <- max(df[[time_col]])
+      future_df <- future_df %>% dplyr::filter(UQ(rlang::sym(time_col)) > max_floored_date)
 
       # TODO: in test mode, this is not really necessary. optimize.
       aggregated_future_data <- future_df %>%
         dplyr::transmute(
-          ds = lubridate::floor_date(UQ(rlang::sym(time_col)), unit = time_unit),
+          ds = UQ(rlang::sym(time_col)),
           !!!rlang::syms(regressors)
         ) %>%
         dplyr::group_by(ds) %>%
@@ -190,7 +210,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
       # apply same aggregation as value to cap.
       df %>%
         dplyr::transmute(
-          ds = lubridate::floor_date(UQ(rlang::sym(time_col)), unit = time_unit),
+          ds = UQ(rlang::sym(time_col)),
           value = UQ(rlang::sym(value_col)),
           cap_col = cap,
           !!!rlang::syms(regressors) # this should be able to handle regressor=NULL case fine.
@@ -203,7 +223,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
     } else if (!is.null(value_col)){
       df %>%
         dplyr::transmute(
-          ds = lubridate::floor_date(UQ(rlang::sym(time_col)), unit = time_unit),
+          ds = UQ(rlang::sym(time_col)),
           value = UQ(rlang::sym(value_col)),
           !!!rlang::syms(regressors) # this should be able to handle regressor=NULL case fine.
         ) %>%
@@ -212,11 +232,28 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
         dplyr::summarise(y = fun.aggregate(value), !!!summarise_args)
     } else { # in this case we do not support extra regressors since there is no way to detect bounndary between history and future
       data.frame(
-        ds = lubridate::floor_date(df[[time_col]], unit = time_unit)
+        ds = df[[time_col]]
       ) %>%
         dplyr::group_by(ds) %>%
         dplyr::summarise(y = n())
     }
+
+    # TODO: Check if this would not have daylight saving days issue we had with anomaly detection.
+    if (!is.null(na_fill_type)) {
+      # complete the date time with NA
+      aggregated_data <- if(inherits(aggregated_data$ds, "Date")){
+        aggregated_data %>%
+          tidyr::complete(ds = seq.Date(min(ds), max(ds), by = time_unit))
+      } else if(inherits(aggregated_data$ds, "POSIXct")) {
+        aggregated_data %>%
+          tidyr::complete(ds = seq.POSIXt(min(ds), max(ds), by = time_unit))
+      } else {
+        stop("time must be Date or POSIXct.")
+      }
+      # fill NAs in y with zoo
+      aggregated_data <- aggregated_data %>% dplyr::mutate(y = fill_ts_na(y, ds, type = na_fill_type, val = na_fill_value))
+    }
+
 
     if (time_unit %in% c("week", "month", "quarter", "year")) { # if time_unit is larger than day (the next level is week), having weekly.seasonality does not make sense.
       weekly.seasonality <- FALSE
