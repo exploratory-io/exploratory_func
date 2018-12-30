@@ -188,6 +188,14 @@ build_lm.fast <- function(df,
       # make other types factor so that it passes stats::glm call.
       df[[target_col]] <- factor(df[[target_col]])
     }
+    # record original factor levels.
+    orig_levels <- NULL
+    if (is.factor(df[[target_col]])) {
+      orig_levels <- levels(df[[target_col]])
+    }
+    else if (is.logical(df[[target_col]])) {
+      orig_levels <- c("TRUE","FALSE")
+    }
   }
   else { # this means the model is lm or glm with family other than binomial
     if (!is.numeric(df[[target_col]])) {
@@ -383,6 +391,7 @@ build_lm.fast <- function(df,
       # these attributes are used in tidy of randomForest TODO: is this good for lm too?
       rf$terms_mapping <- names(name_map)
       names(rf$terms_mapping) <- name_map
+      rf$orig_levels <- orig_levels
       # add special lm_exploratory class for adding extra info at glance().
       if (model_type == "glm") {
         class(rf) <- c("glm_exploratory", class(rf))
