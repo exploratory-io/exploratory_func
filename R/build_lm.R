@@ -460,6 +460,8 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add tes
     # calculate the area under the plots
     auc <- sum((roc[[2]] - dplyr::lag(roc[[2]])) * roc[[1]], na.rm = TRUE)
     ret$auc <- auc
+    ret$actual_positive <- sum(x$y == 1, na.rm = TRUE)
+    ret$actual_negative <- sum(x$y != 1, na.rm = TRUE)
   }
 
   for(var in names(x$xlevels)) { # extract base levels info on factor/character columns from lm model
