@@ -1,6 +1,6 @@
 #' do PCA
 #' @export
-do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL) { # TODO: write test
+do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, seed = NULL) { # TODO: write test
   # this evaluates select arguments like starts_with
   selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
 
@@ -11,6 +11,10 @@ do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL) { # TODO: w
 
   if (any(selected_cols %in% grouped_cols)) {
     stop("grouping column is used as variable columns")
+  }
+
+  if(!is.null(seed)) { # Set seed before starting to call sample_n.
+    set.seed(seed)
   }
 
   each_func <- function(df) {
