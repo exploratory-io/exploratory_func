@@ -491,7 +491,11 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add tes
         pos_label <- x$orig_levels[2]
         neg_label <- x$orig_levels[1]
       }
-      else { # This should be numeric case. TODO: Figure out the rule.
+      else {
+        # This should be only numeric case.
+        # In case of 0 and 1, this is making sense.
+        # But it seems the input can be numbers between 0 and 1 like 0.5 too.
+        # TODO: Look into how to handle such case.
         pos_label <- "TRUE"
         neg_label <- "FALSE"
       }
