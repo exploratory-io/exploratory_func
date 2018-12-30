@@ -194,7 +194,7 @@ build_lm.fast <- function(df,
       orig_levels <- levels(df[[target_col]])
     }
     else if (is.logical(df[[target_col]])) {
-      orig_levels <- c("TRUE","FALSE")
+      orig_levels <- c("FALSE","TRUE")
     }
   }
   else { # this means the model is lm or glm with family other than binomial
@@ -485,9 +485,18 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add tes
 
   if(pretty.name) {
     if (x$family$family %in% c('binomial', 'quasibinomial')) { # for binomial regressions.
-      ret <- ret %>% dplyr::rename(`Null Deviance`=null.deviance, `DF for Null Model`=df.null, `Log Likelihood`=logLik, Deviance=deviance, `Residual DF`=df.residual, `AUC`=auc,
-                                   `Data Size for TRUE`=positives, `Data Size for FALSE`=negatives) %>%
-        dplyr::select(`F Score`, `Accuracy Rate`, `Misclassification Rate`, `Precision`, `Recall`, `AUC`, `Data Size for TRUE`, `Data Size for FALSE`, `P Value`, `Log Likelihood`, `AIC`, `BIC`, `Deviance`, `Null Deviance`, `DF for Null Model`, everything())
+      ret <- ret %>% dplyr::rename(`Null Deviance`=null.deviance, `DF for Null Model`=df.null, `Log Likelihood`=logLik, Deviance=deviance, `Residual DF`=df.residual, `AUC`=auc) %>%
+        dplyr::select(`F Score`, `Accuracy Rate`, `Misclassification Rate`, `Precision`, `Recall`, `AUC`, positives, negatives, `P Value`, `Log Likelihood`, `AIC`, `BIC`, `Deviance`, `Null Deviance`, `DF for Null Model`, everything())
+      if (!is.null(x$orig_levels)) { 
+        pos_label <- x$orig_levels[2]
+        neg_label <- x$orig_levels[1]
+      }
+      else { # This should be numeric case. TODO: Figure out the rule.
+        pos_label <- "TRUE"
+        neg_label <- "FALSE"
+      }
+      colnames(ret)[colnames(ret) == "positives"] <- paste0("Data Size for ", pos_label)
+      colnames(ret)[colnames(ret) == "negatives"] <- paste0("Data Size for ", neg_label)
     }
     else { # for other numeric regressions.
       ret <- ret %>% dplyr::rename(`Null Deviance`=null.deviance, `DF for Null Model`=df.null, `Log Likelihood`=logLik, Deviance=deviance, `Residual DF`=df.residual) %>%
