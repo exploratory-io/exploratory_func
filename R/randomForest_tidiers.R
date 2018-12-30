@@ -1432,6 +1432,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
     })
 }
 
+# This is used from Analytics View only when classification type is regression.
 #' @export
 glance.ranger <- function(x, pretty.name = FALSE, ...) {
   ret <- data.frame(
@@ -1451,6 +1452,7 @@ glance.ranger <- function(x, pretty.name = FALSE, ...) {
   ret
 }
 
+# This is used from Analytics View only when classification type is regression.
 #' @export
 glance.rpart <- function(x, pretty.name = FALSE, ...) {
   actual <- x$y
