@@ -45,6 +45,7 @@ build_kmeans.kv_ <- function(df,
                              nstart = 1,
                              algorithm = "Hartigan-Wong",
                              trace = FALSE,
+                             normalize_data = TRUE,
                              keep.source = TRUE,
                              seed=0,
                              augment=TRUE,
@@ -86,6 +87,12 @@ build_kmeans.kv_ <- function(df,
       fill=fill,
       na.rm = TRUE
     )
+    if (normalize_data) { # Normalize data if specified so.
+      mat <- scale(mat)
+      # Column with zero variance will be filled with NaN because of division by 0.
+      # Replace them with 0.
+      mat[is.nan(mat)] <- 0
+    }
     rownames(mat) <- NULL # this prevents warning about discarding row names of the matrix
     kmeans_ret <- tryCatch({
       kmeans(mat, centers = centers, iter.max = 10, nstart = nstart, algorithm = algorithm, trace = trace)},
@@ -148,6 +155,7 @@ build_kmeans.cols <- function(df, ...,
                             nstart = 1,
                             algorithm = "Hartigan-Wong",
                             trace = FALSE,
+                            normalize_data = TRUE,
                             keep.source = TRUE,
                             seed=0,
                             augment=TRUE
@@ -185,6 +193,12 @@ build_kmeans.cols <- function(df, ...,
         stop("No data after removing NA")
       }
       mat <- as_numeric_matrix_(df, columns = selected_column)
+      if (normalize_data) { # Normalize data if specified so.
+        mat <- scale(mat)
+        # Column with zero variance will be filled with NaN because of division by 0.
+        # Replace them with 0.
+        mat[is.nan(mat)] <- 0
+      }
       kmeans(mat, centers = centers, iter.max = 10, nstart = nstart, algorithm = algorithm, trace = trace)
     }, error = function(e) {
       if(e$message == "invalid first argument"){
