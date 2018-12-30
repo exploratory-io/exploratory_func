@@ -4,7 +4,7 @@ context("test prcomp functions")
 
 test_that("do_prcomp", {
   df <- mtcars %>% mutate(new_col = c(rep("A", n() - 10), rep("B", 10)))
-  model_df <- do_prcomp(df, cyl, mpg, hp)
+  model_df <- do_prcomp(df, cyl, mpg, hp, max_nrow=30)
   model_df %>% tidy(model, type="variances")
   model_df %>% tidy(model, type="loadings")
   model_df %>% tidy(model, type="biplot")
