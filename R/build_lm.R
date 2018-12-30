@@ -460,6 +460,7 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add tes
     # calculate the area under the plots
     auc <- sum((roc[[2]] - dplyr::lag(roc[[2]])) * roc[[1]], na.rm = TRUE)
     ret$auc <- auc
+    # Show number of rows for positive case and negative case, especially so that result of SMOTE is visible.
     ret$positives <- sum(x$y == 1, na.rm = TRUE)
     ret$negatives <- sum(x$y != 1, na.rm = TRUE)
   }
