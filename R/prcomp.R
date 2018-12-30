@@ -1,6 +1,6 @@
 #' do PCA
 #' @export
-do_prcomp <- function(df, ..., normalize_data=TRUE) { # TODO: write test
+do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL) { # TODO: write test
   # this evaluates select arguments like starts_with
   selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
 
@@ -17,6 +17,11 @@ do_prcomp <- function(df, ..., normalize_data=TRUE) { # TODO: write test
     filtered_df <- df %>% tidyr::drop_na_(selected_cols) # TODO: take care of the case where values of a column are mostly NA
     if (nrow(filtered_df) == 0) { # skip this group if no row is left.
       return(NULL)
+    }
+    # sample the data for quicker turn around on UI,
+    # if data size is larger than specified max_nrow.
+    if (!is.null(max_nrow) && nrow(df) > max_nrow) {
+      filtered_df <- filtered_df %>% dplyr::sample_n(max_nrow)
     }
     # select_ was not able to handle space in target_col. let's do it in base R way.
     cleaned_df <- filtered_df[,colnames(filtered_df) %in% selected_cols, drop=FALSE]

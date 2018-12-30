@@ -35,12 +35,13 @@ exp_kmeans <- function(df, ...,
                        trace = FALSE,
                        normalize_data = TRUE,
                        n_pcs = NULL,
+                       max_nrow = NULL,
                        seed=0,
                        elbow_method_mode=FALSE,
                        max_centers = 10
                        ) {
 
-  ret <- do_prcomp(df, normalize_data=normalize_data, ...)
+  ret <- do_prcomp(df, normalize_data = normalize_data, max_nrow = max_nrow, ...)
 
   if (!elbow_method_mode) {
     ret <- ret %>% dplyr::mutate(model = purrr::map(model, function(x) {
