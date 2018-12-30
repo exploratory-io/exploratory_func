@@ -192,6 +192,9 @@ build_lm.fast <- function(df,
     orig_levels <- NULL
     if (is.factor(df[[target_col]])) {
       orig_levels <- levels(df[[target_col]])
+      # Keep only the ones that actually are used.
+      # One with larger index seems to be treated as TRUE (i.e. 1 in model$y) by glm.
+      orig_levels <- orig_levels[orig_levels %in% unique_val]
     }
     else if (is.logical(df[[target_col]])) {
       orig_levels <- c("FALSE","TRUE")
