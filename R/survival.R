@@ -178,9 +178,14 @@ tidy.survdiff_exploratory <- function(x, ...) {
 
 #' @export
 glance.survdiff_exploratory <- function(x, ...) {
-  ret <- broom:::glance.survdiff(x, ...)
-  colnames(ret)[colnames(ret) == "statistic"] <- "Chi-Square"
-  colnames(ret)[colnames(ret) == "df"] <- "Degree of Freedom"
-  colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
+  if (is.null(x$error)) {
+    ret <- broom:::glance.survdiff(x, ...)
+    colnames(ret)[colnames(ret) == "statistic"] <- "Chi-Square"
+    colnames(ret)[colnames(ret) == "df"] <- "Degree of Freedom"
+    colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
+  }
+  else {
+    ret <- data.frame(Note = x$error$message)
+  }
   ret
 }

@@ -45,6 +45,7 @@ test_that("test exp_survival", {
   ret1 <- ret %>% tidy(model1)
   expect_true(!is.null(ret1$cohort))
   ret2 <- ret %>% tidy(model2)
+  ret3 <- ret %>% glance(model2)
 
   data3 <- data %>% mutate(`o s` = factor(`o s`)) # test cohort as factor
   ret <- data3 %>% exp_survival(`weeks on service`, `is churned`, cohort=`o s`)
