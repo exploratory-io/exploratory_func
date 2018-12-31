@@ -178,6 +178,7 @@ build_lm.fast <- function(df,
     set.seed(seed)
   }
 
+  orig_levels <- NULL # For recording original factor levels for binary classification, to show data size for each class in Summary View.
   if (!is.null(model_type) && model_type == "glm" && family %in% c("binomial", "quasibinomial")) {
     # binomial case.
     unique_val <- unique(df[[target_col]])
@@ -187,6 +188,16 @@ build_lm.fast <- function(df,
     if (!is.numeric(df[[target_col]]) && !is.factor(df[[target_col]]) && !is.logical(df[[target_col]])) {
       # make other types factor so that it passes stats::glm call.
       df[[target_col]] <- factor(df[[target_col]])
+    }
+    # record original factor levels.
+    if (is.factor(df[[target_col]])) {
+      orig_levels <- levels(df[[target_col]])
+      # Keep only the ones that actually are used.
+      # One with larger index seems to be treated as TRUE (i.e. 1 in model$y) by glm.
+      orig_levels <- orig_levels[orig_levels %in% unique_val]
+    }
+    else if (is.logical(df[[target_col]])) {
+      orig_levels <- c("FALSE","TRUE")
     }
   }
   else { # this means the model is lm or glm with family other than binomial
@@ -383,6 +394,7 @@ build_lm.fast <- function(df,
       # these attributes are used in tidy of randomForest TODO: is this good for lm too?
       rf$terms_mapping <- names(name_map)
       names(rf$terms_mapping) <- name_map
+      rf$orig_levels <- orig_levels
       # add special lm_exploratory class for adding extra info at glance().
       if (model_type == "glm") {
         class(rf) <- c("glm_exploratory", class(rf))
@@ -460,6 +472,9 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add tes
     # calculate the area under the plots
     auc <- sum((roc[[2]] - dplyr::lag(roc[[2]])) * roc[[1]], na.rm = TRUE)
     ret$auc <- auc
+    # Show number of rows for positive case and negative case, especially so that result of SMOTE is visible.
+    ret$positives <- sum(x$y == 1, na.rm = TRUE)
+    ret$negatives <- sum(x$y != 1, na.rm = TRUE)
   }
 
   for(var in names(x$xlevels)) { # extract base levels info on factor/character columns from lm model
@@ -474,7 +489,21 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add tes
   if(pretty.name) {
     if (x$family$family %in% c('binomial', 'quasibinomial')) { # for binomial regressions.
       ret <- ret %>% dplyr::rename(`Null Deviance`=null.deviance, `DF for Null Model`=df.null, `Log Likelihood`=logLik, Deviance=deviance, `Residual DF`=df.residual, `AUC`=auc) %>%
-        dplyr::select(`F Score`, `Accuracy Rate`, `Misclassification Rate`, `Precision`, `Recall`, `AUC`, `P Value`, `Log Likelihood`, `AIC`, `BIC`, `Deviance`, `Null Deviance`, `DF for Null Model`, everything())
+        dplyr::select(`F Score`, `Accuracy Rate`, `Misclassification Rate`, `Precision`, `Recall`, `AUC`, positives, negatives, `P Value`, `Log Likelihood`, `AIC`, `BIC`, `Deviance`, `Null Deviance`, `DF for Null Model`, everything())
+      if (!is.null(x$orig_levels)) { 
+        pos_label <- x$orig_levels[2]
+        neg_label <- x$orig_levels[1]
+      }
+      else {
+        # This should be only numeric case.
+        # In case of 0 and 1, this is making sense.
+        # But it seems the input can be numbers between 0 and 1 like 0.5 too.
+        # TODO: Look into how to handle such case.
+        pos_label <- "TRUE"
+        neg_label <- "FALSE"
+      }
+      colnames(ret)[colnames(ret) == "positives"] <- paste0("Data Size for ", pos_label)
+      colnames(ret)[colnames(ret) == "negatives"] <- paste0("Data Size for ", neg_label)
     }
     else { # for other numeric regressions.
       ret <- ret %>% dplyr::rename(`Null Deviance`=null.deviance, `DF for Null Model`=df.null, `Log Likelihood`=logLik, Deviance=deviance, `Residual DF`=df.residual) %>%
