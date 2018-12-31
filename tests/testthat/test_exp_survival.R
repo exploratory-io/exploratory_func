@@ -39,6 +39,7 @@ test_that("test exp_survival", {
   ret1 <- ret %>% tidy(model1)
   ret2 <- ret %>% tidy(model2)
 
+  browser()
   data2 <- data %>% mutate(`o s` = "Windows") # test single value cohort case
   ret <- data2 %>% exp_survival(`weeks on service`, `is churned`, cohort=`o s`)
   ret1 <- ret %>% tidy(model1)
