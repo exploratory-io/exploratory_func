@@ -100,13 +100,17 @@ exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, e
   each_func2 <- function(df) {
     ret <- NULL
     if (cohort_col != "1") {
-      if (length(unique(df[[cohort_col]])) > 1) {
+      if (length(unique(df[[cohort_col]][!is.na(df[[cohort_col]])])) > 1) {
         tryCatch({
           ret <- survival::survdiff(fml, data = df)
           class(ret) <- c("survdiff_exploratory", class(ret))
         }, error = function(e){
           # error like following is possible. ignore it just for this group, rather than stopping whole thing.
           # Error in solve.default(vv, temp2) : Lapack routine dgesv: system is exactly singular
+          browser()
+          ret_ <- list(error=e)
+          class(ret_) <- c("survdiff_exploratory", class(ret))
+          ret <<- ret_
         })
       }
       else {
