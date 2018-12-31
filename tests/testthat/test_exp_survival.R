@@ -47,6 +47,7 @@ test_that("test exp_survival", {
   expect_true(!is.null(ret1$cohort))
   ret2 <- ret %>% tidy(model2)
   ret3 <- ret %>% glance(model2)
+  expect_true(is.character(ret3$Note)) # There should be Note column with error.
 
   data3 <- data %>% mutate(`o s` = factor(`o s`)) # test cohort as factor
   ret <- data3 %>% exp_survival(`weeks on service`, `is churned`, cohort=`o s`)

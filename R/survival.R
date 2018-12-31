@@ -175,7 +175,7 @@ tidy.survdiff_exploratory <- function(x, ...) {
     # TODO: rename .cohort column to original name
   }
   else {
-    ret <- data.frame(Note = x$error$message)
+    ret <- data.frame(Note = x$error$message, stringsAsFactors = FALSE)
   }
   ret
 }
@@ -189,7 +189,7 @@ glance.survdiff_exploratory <- function(x, ...) {
     colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
   }
   else {
-    ret <- data.frame(Note = x$error$message)
+    ret <- data.frame(Note = x$error$message, stringsAsFactors = FALSE)
   }
   ret
 }
