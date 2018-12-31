@@ -42,7 +42,7 @@ exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, e
   if (is.null(substitute(time))) {
     start_time_col <- col_name(substitute(start_time))
     df[[start_time_col]] <- as.Date(df[[start_time_col]]) # convert to Date in case it is POSIXct.
-    if (!is.null(substitute(end_time))) { # if end_time exists, fill NA with today()
+    if (!is.null(substitute(end_time))) { # if end_time exists, fill NA with the way specified by end_time_fill.
       end_time_col <- col_name(substitute(end_time))
       df[[end_time_col]] <- as.Date(df[[end_time_col]]) # convert to Date in case it is POSIXct.
       # set value to fill NAs of end time
@@ -99,14 +99,24 @@ exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, e
   # calls survdiff (log rank test) for each group.
   each_func2 <- function(df) {
     ret <- NULL
-    if (cohort_col != "1" && length(unique(df[[cohort_col]])) > 1) {
-      tryCatch({
-        ret <- survival::survdiff(fml, data = df)
+    if (cohort_col != "1") {
+      if (length(unique(df[[cohort_col]][!is.na(df[[cohort_col]])])) > 1) {
+        tryCatch({
+          ret <- survival::survdiff(fml, data = df)
+          class(ret) <- c("survdiff_exploratory", class(ret))
+        }, error = function(e){
+          # error like following is possible. ignore it just for this group, rather than stopping whole thing.
+          # Error in solve.default(vv, temp2) : Lapack routine dgesv: system is exactly singular
+          browser()
+          ret_ <- list(error=e)
+          class(ret_) <- c("survdiff_exploratory", class(ret))
+          ret <<- ret_
+        })
+      }
+      else {
+        ret <- list(error=simpleError("Test was not performed because there is only one group."))
         class(ret) <- c("survdiff_exploratory", class(ret))
-      }, error = function(e){
-        # error like following is possible. ignore it just for this group, rather than stopping whole thing.
-        # Error in solve.default(vv, temp2) : Lapack routine dgesv: system is exactly singular
-      })
+      }
     }
     ret
   }
@@ -160,16 +170,26 @@ tidy.survfit_exploratory <- function(x, ...) {
 # Result from this function is not exposed on UI yet.
 #' @export
 tidy.survdiff_exploratory <- function(x, ...) {
-  ret <- broom:::tidy.survdiff(x, ...)
-  # TODO: rename .cohort column to original name
+  if (is.null(x$error)) {
+    ret <- broom:::tidy.survdiff(x, ...)
+    # TODO: rename .cohort column to original name
+  }
+  else {
+    ret <- data.frame(Note = x$error$message, stringsAsFactors = FALSE)
+  }
   ret
 }
 
 #' @export
 glance.survdiff_exploratory <- function(x, ...) {
-  ret <- broom:::glance.survdiff(x, ...)
-  colnames(ret)[colnames(ret) == "statistic"] <- "Chi-Square"
-  colnames(ret)[colnames(ret) == "df"] <- "Degree of Freedom"
-  colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
+  if (is.null(x$error)) {
+    ret <- broom:::glance.survdiff(x, ...)
+    colnames(ret)[colnames(ret) == "statistic"] <- "Chi-Square"
+    colnames(ret)[colnames(ret) == "df"] <- "Degree of Freedom"
+    colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
+  }
+  else {
+    ret <- data.frame(Note = x$error$message, stringsAsFactors = FALSE)
+  }
   ret
 }
