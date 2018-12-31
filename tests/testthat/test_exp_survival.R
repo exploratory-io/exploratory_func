@@ -35,9 +35,11 @@ test_that("test exp_survival", {
   ret <- data %>% exp_survival(`weeks on service`, `is churned`, cohort=`o s`)
   ret1 <- ret %>% tidy(model1)
   ret2 <- ret %>% tidy(model2)
+  ret2 <- ret %>% glance(model2)
   ret <- data %>% exp_survival(`weeks on service`, `is churned`)
   ret1 <- ret %>% tidy(model1)
   ret2 <- ret %>% tidy(model2)
+  ret2 <- ret %>% glance(model2)
 
   browser()
   data2 <- data %>% mutate(`o s` = "Windows") # test single value cohort case
@@ -52,25 +54,31 @@ test_that("test exp_survival", {
   ret1 <- ret %>% tidy(model1)
   expect_true(is.factor(ret1$cohort)) # factor levels should be kept
   ret2 <- ret %>% tidy(model2)
+  ret2 <- ret %>% glance(model2)
 
   data3 <- data %>% mutate(`o s` = `o s` == "Windows") # test cohort as logical 
   ret <- data3 %>% exp_survival(`weeks on service`, `is churned`, cohort=`o s`)
   ret1 <- ret %>% tidy(model1)
   expect_true(is.factor(ret1$cohort))
   ret2 <- ret %>% tidy(model2)
+  ret2 <- ret %>% glance(model2)
 
   # test with start/end time instead of length of time. checking if it runs without error.
   ret <- data %>% exp_survival(NULL, `is churned`, start_time=`start date`, end_time=`end date`, cohort=`o s`)
   ret1 <- ret %>% tidy(model1)
   ret2 <- ret %>% tidy(model2)
+  ret2 <- ret %>% glance(model2)
   ret <- data %>% exp_survival(NULL, `is churned`, start_time=`start date`, end_time=`end date`, end_time_fill="today")
   ret1 <- ret %>% tidy(model1)
   ret2 <- ret %>% tidy(model2)
+  ret2 <- ret %>% glance(model2)
   ret <- data %>% exp_survival(NULL, `is churned`, start_time=`start date`, end_time=`end date`, end_time_fill="2020-01-01")
   ret1 <- ret %>% tidy(model1)
   ret2 <- ret %>% tidy(model2)
+  ret2 <- ret %>% glance(model2)
   ret <- data %>% exp_survival(NULL, `is churned`, start_time=`start date`, end_time=`end date`, end_time_fill=as.Date("2020-01-01"))
   ret1 <- ret %>% tidy(model1)
   ret2 <- ret %>% tidy(model2)
+  ret2 <- ret %>% glance(model2)
 
 })
