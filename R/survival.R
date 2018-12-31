@@ -114,7 +114,7 @@ exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, e
         })
       }
       else {
-        ret <- list(error=simpleError("There is only single cohort in this group."))
+        ret <- list(error=simpleError("Test was not performed because there is only one group."))
         class(ret) <- c("survdiff_exploratory", class(ret))
       }
     }
