@@ -109,6 +109,10 @@ exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, e
           # Error in solve.default(vv, temp2) : Lapack routine dgesv: system is exactly singular
         })
       }
+      else {
+        ret <- list(error=simpleError("There is only single cohort in this group."))
+        class(ret) <- c("survdiff_exploratory", class(ret))
+      }
     }
     ret
   }
@@ -162,8 +166,13 @@ tidy.survfit_exploratory <- function(x, ...) {
 # Result from this function is not exposed on UI yet.
 #' @export
 tidy.survdiff_exploratory <- function(x, ...) {
-  ret <- broom:::tidy.survdiff(x, ...)
-  # TODO: rename .cohort column to original name
+  if (is.null(x$error)) {
+    ret <- broom:::tidy.survdiff(x, ...)
+    # TODO: rename .cohort column to original name
+  }
+  else {
+    ret <- data.frame(Note = x$error$message)
+  }
   ret
 }
 
