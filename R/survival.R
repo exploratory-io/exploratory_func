@@ -42,7 +42,7 @@ exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, e
   if (is.null(substitute(time))) {
     start_time_col <- col_name(substitute(start_time))
     df[[start_time_col]] <- as.Date(df[[start_time_col]]) # convert to Date in case it is POSIXct.
-    if (!is.null(substitute(end_time))) { # if end_time exists, fill NA with today()
+    if (!is.null(substitute(end_time))) { # if end_time exists, fill NA with the way specified by end_time_fill.
       end_time_col <- col_name(substitute(end_time))
       df[[end_time_col]] <- as.Date(df[[end_time_col]]) # convert to Date in case it is POSIXct.
       # set value to fill NAs of end time
