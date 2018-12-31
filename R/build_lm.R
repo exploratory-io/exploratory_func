@@ -178,6 +178,7 @@ build_lm.fast <- function(df,
     set.seed(seed)
   }
 
+  orig_levels <- NULL # For recording original factor levels for binary classification, to show data size for each class in Summary View.
   if (!is.null(model_type) && model_type == "glm" && family %in% c("binomial", "quasibinomial")) {
     # binomial case.
     unique_val <- unique(df[[target_col]])
@@ -189,7 +190,6 @@ build_lm.fast <- function(df,
       df[[target_col]] <- factor(df[[target_col]])
     }
     # record original factor levels.
-    orig_levels <- NULL
     if (is.factor(df[[target_col]])) {
       orig_levels <- levels(df[[target_col]])
       # Keep only the ones that actually are used.
