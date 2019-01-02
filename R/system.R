@@ -1055,8 +1055,12 @@ getGoogleBigQueryTables <- function(project, dataset, tokenFileId=""){
   tryCatch({
     token <- getGoogleTokenForBigQuery(tokenFileId);
     bigrquery::set_access_cred(token)
-    # if we do not pass max_results, it only returnss 50 items. so explicitly set it.
-    tables <- bigrquery::list_tables(project, dataset, page_size=1000000);
+    # if we do not pass max_results (via page_size argument), it only returnss 50 items. so explicitly set it.
+    # See https://cloud.google.com/bigquery/docs/reference/rest/v2/tabledata/list for max_results
+    # If we pass large value to max_results (via page_size argument) like 1,000,000, Google BigQuery gives 
+    # Error: Invalid value at 'max_results.value' (TYPE_UINT32), "1e+06" [badRequest]
+    # so set 10,000 as the default value.
+    tables <- bigrquery::list_tables(project, dataset, page_size=10000);
   }, error = function(err){
     c("")
   })
