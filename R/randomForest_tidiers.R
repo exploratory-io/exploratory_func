@@ -1043,19 +1043,19 @@ cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, nam
   ret
 }
 
-#' get feature importance for multi class classification using randomForest
+#' Get feature importance for multi class classification using randomForest
 #' @export
 calc_feature_imp <- function(df,
                              target,
                              ...,
-                             max_nrow = 50000, # down from 200000 when we added partial dependence
-                             max_sample_size = NULL, # half of max_nrow. down from 100000 when we added partial dependence
+                             max_nrow = 50000, # Down from 200000 when we added partial dependence
+                             max_sample_size = NULL, # Half of max_nrow. down from 100000 when we added partial dependence
                              ntree = 20,
                              nodesize = 12,
                              target_n = 20,
-                             predictor_n = 12, # so that at least months can fit in it.
+                             predictor_n = 12, # So that at least months can fit in it.
                              smote = FALSE,
-                             max_pd_vars = 10, # number of most important variables to calculate partial dependences on.
+                             max_pd_vars = 12, # Number of most important variables to calculate partial dependences on. Default 12 fits well with either 3 or 4 columns of facets. 
                              seed = NULL
                              ){
   if(!is.null(seed)){
