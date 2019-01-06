@@ -279,7 +279,7 @@ sql_glue_transformer <- function(code, envir) {
 
   val <- eval(parse(text = code), envir)
   if (is.null(val)) { # NULL in R is same as empty vector. Print empty string.
-    val <- ""
+    val <- "NULL" # With PostgreSQL, "IN (NULL)" is valid while "IN ()" is syntax error. TODO: Test other databases.
   }
   else if (is.character(val) || is.factor(val)) {
     # escape for SQL
@@ -317,7 +317,7 @@ bigquery_glue_transformer <- function(code, envir) {
 
   val <- eval(parse(text = code), envir)
   if (is.null(val)) { # NULL in R is same as empty vector. Print empty string.
-    val <- ""
+    val <- "NULL" # With BigQuery, "IN (NULL)" is valid while "IN ()" is syntax error.
   }
   else if (is.character(val) || is.factor(val)) {
     # escape for Standard SQL for bigquery
