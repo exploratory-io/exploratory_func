@@ -142,6 +142,10 @@ test_that("js_glue_transformer", {
   exploratory_env$stock_symbols <- c("AAPL", "GOOG")
   res <- glue_exploratory("{stock:{$in:[@{stock_symbols}]}}", .transformer=js_glue_transformer)
   expect_equal(as.character(res), "{stock:{$in:[\"AAPL\", \"GOOG\"]}}")
+
+  exploratory_env$stock_symbols <- c()
+  res <- glue_exploratory("{stock:{$in:[@{stock_symbols}]}}", .transformer=js_glue_transformer)
+  expect_equal(as.character(res), "{stock:{$in:[]}}", "message")
 })
 
 test_that("sql_glue_transformer", {

@@ -242,7 +242,10 @@ js_glue_transformer <- function(code, envir) {
   }
   code <- paste0("exploratory_env$`", code, "`")
   val <- eval(parse(text = code), envir)
-  if (is.character(val) || is.factor(val)) {
+  if (is.null(val)) { # NULL in R is same as empty vector. Print empty string.
+    val <- ""
+  }
+  else if (is.character(val) || is.factor(val)) {
     # escape for js
     val <- gsub("\\", "\\\\", val, fixed=TRUE)
     val <- gsub("\"", "\\\"", val, fixed=TRUE)
