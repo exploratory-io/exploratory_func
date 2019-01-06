@@ -130,12 +130,18 @@ test_that("countycode", {
 
 test_that("js_glue_transformer", {
   exploratory_env <- new.env()
+
   exploratory_env$v <- c(T,F,NA)
   res <- glue_exploratory("@{v}", .transformer=js_glue_transformer)
   expect_equal(as.character(res), "true, false, null")
+
   exploratory_env$v <- 1
   res <- glue_exploratory("{a: {x: @{v}}}", .transformer=js_glue_transformer)
   expect_equal(as.character(res), "{a: {x: 1}}")
+
+  exploratory_env$stock_symbols <- c("AAPL", "GOOG")
+  res <- glue_exploratory("{stock:{$in:[@{stock_symbols}]}}", .transformer=js_glue_transformer)
+  expect_equal(as.character(res), "{stock:{$in:[\"AAPL\", \"GOOG\"]}}")
 })
 
 test_that("sql_glue_transformer", {
