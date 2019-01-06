@@ -619,12 +619,7 @@ exp_normality<- function(df, ..., n_sample = 50, n_sample_qq = 4500) {
 
     model <- list()
     model$qq <- df.qq
-    if (!is.null(n_sample_qq) && nrow(df.qq) > n_sample_qq) {
-      model$sampled_qq <- dplyr::sample_n(df.qq, n_sample_qq)
-    }
-    else {
-      model$sampled_qq <- df.qq
-    }
+    model$sampled_qq <- sample_rows(df.qq, n_sample_qq)
     model$qqline <- df.qqline
     model$model_summary <- df.model
     class(model) <- c("shapiro_exploratory", class(model))

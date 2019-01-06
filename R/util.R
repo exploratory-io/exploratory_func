@@ -452,7 +452,7 @@ list_concat <- function(..., collapse = FALSE){
 #' wrapper around sample_n to avoid error caused by fewer rows than size.
 #' @export
 sample_rows <- function(df, size, ...) {
-  if (nrow(df) > size) {
+  if (!is.null(size) && nrow(df) > size) {
     dplyr::sample_n(df, size, ...)
   }
   else {

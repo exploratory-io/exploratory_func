@@ -248,10 +248,7 @@ build_lm.fast <- function(df,
 
       # sample the data because randomForest takes long time
       # if data size is too large
-      if (nrow(df) > max_nrow) {
-        df <- df %>%
-          dplyr::sample_n(max_nrow)
-      }
+      df <- df %>% sample_rows(max_nrow)
 
       c_cols <- clean_cols
       for(col in clean_cols){

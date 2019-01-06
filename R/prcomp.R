@@ -24,9 +24,8 @@ do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, seed = NULL
     }
     # sample the data for quicker turn around on UI,
     # if data size is larger than specified max_nrow.
-    if (!is.null(max_nrow) && nrow(df) > max_nrow) {
-      filtered_df <- filtered_df %>% dplyr::sample_n(max_nrow)
-    }
+    filtered_df <- filtered_df %>% sample_rows(max_nrow)
+
     # select_ was not able to handle space in target_col. let's do it in base R way.
     cleaned_df <- filtered_df[,colnames(filtered_df) %in% selected_cols, drop=FALSE]
 
@@ -114,9 +113,7 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
       res$cluster <- factor(x$kmeans$cluster)
     }
 
-    if (nrow(res) > score_n_sample) { # this condition is necessary to avoid error from sample_n().
-      res <- res %>% dplyr::sample_n(score_n_sample)
-    }
+    res <- res %>% sample_rows(score_n_sample)
 
     # calculate scale ratio for displaying loadings on the same chart as scores.
     max_abs_loading <- max(abs(loadings_matrix))
@@ -150,9 +147,7 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
     if (!is.null(n_sample)) { # default is no sampling.
       # limit n_sample so that no more dots are created than the max that can be plotted on scatter plot, which is 5000.
       n_sample <- min(n_sample, floor(5000 / length(column_names)))
-      if (nrow(res) > n_sample) { # this condition is necessary to avoid error from sample_n().
-        res <- res %>% dplyr::sample_n(n_sample)
-      }
+      res <- res %>% sample_rows(n_sample)
     }
 
     if (type == "gathered_data") { # for boxplot and parallel coordinates. this is only when with kmeans.

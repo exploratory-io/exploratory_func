@@ -713,8 +713,8 @@ exp_balance <- function(df,
   each_func <- function(df) {
 
     # sample data since smote can be slow when data is big.
-    if (sample && nrow(df) > max_nrow) {
-      df <- df %>% dplyr::sample_n(max_nrow)
+    if (sample) {
+      df <- df %>% sample_rows(max_nrow)
     }
 
     factorized_cols <- c()
@@ -922,10 +922,7 @@ cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, nam
   }
   # sample the data because randomForest takes long time
   # if data size is too large
-  if (nrow(df) > max_nrow) {
-    df <- df %>%
-      dplyr::sample_n(max_nrow)
-  }
+  df <- df %>% sample_rows(max_nrow)
 
   if (is.logical(df[[clean_target_col]])) {
     # we need to convert logical to factor since na.roughfix only works for numeric or factor.
@@ -1043,19 +1040,19 @@ cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, nam
   ret
 }
 
-#' get feature importance for multi class classification using randomForest
+#' Get feature importance for multi class classification using randomForest
 #' @export
 calc_feature_imp <- function(df,
                              target,
                              ...,
-                             max_nrow = 50000, # down from 200000 when we added partial dependence
-                             max_sample_size = NULL, # half of max_nrow. down from 100000 when we added partial dependence
+                             max_nrow = 50000, # Down from 200000 when we added partial dependence
+                             max_sample_size = NULL, # Half of max_nrow. down from 100000 when we added partial dependence
                              ntree = 20,
                              nodesize = 12,
                              target_n = 20,
-                             predictor_n = 12, # so that at least months can fit in it.
+                             predictor_n = 12, # So that at least months can fit in it.
                              smote = FALSE,
-                             max_pd_vars = 10, # number of most important variables to calculate partial dependences on.
+                             max_pd_vars = 12, # Number of most important variables to calculate partial dependences on. Default 12 fits well with either 3 or 4 columns of facets. 
                              seed = NULL
                              ){
   if(!is.null(seed)){
