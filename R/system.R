@@ -278,7 +278,10 @@ sql_glue_transformer <- function(code, envir) {
   code <- paste0("exploratory_env$`", code, "`")
 
   val <- eval(parse(text = code), envir)
-  if (is.character(val) || is.factor(val)) {
+  if (is.null(val)) { # NULL in R is same as empty vector. Print empty string.
+    val <- ""
+  }
+  else if (is.character(val) || is.factor(val)) {
     # escape for SQL
     # TODO: check if this makes sense for Dremio and Athena
     val <- gsub("'", "''", val, fixed=TRUE) # both Oracle and SQL Server escapes single quote by doubling them.
@@ -313,7 +316,10 @@ bigquery_glue_transformer <- function(code, envir) {
   code <- paste0("exploratory_env$`", code, "`")
 
   val <- eval(parse(text = code), envir)
-  if (is.character(val) || is.factor(val)) {
+  if (is.null(val)) { # NULL in R is same as empty vector. Print empty string.
+    val <- ""
+  }
+  else if (is.character(val) || is.factor(val)) {
     # escape for Standard SQL for bigquery
     # https://cloud.google.com/bigquery/docs/reference/standard-sql/lexical
     val <- gsub("\\", "\\\\", val, fixed=TRUE) # Escape literal backslash
