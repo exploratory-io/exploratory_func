@@ -24,7 +24,7 @@ do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, seed = NULL
     }
     # sample the data for quicker turn around on UI,
     # if data size is larger than specified max_nrow.
-    if (!is.null(max_nrow) && nrow(df) > max_nrow) {
+    if (!is.null(max_nrow) && nrow(filtered_df) > max_nrow) {
       filtered_df <- filtered_df %>% dplyr::sample_n(max_nrow)
     }
     # select_ was not able to handle space in target_col. let's do it in base R way.
