@@ -113,9 +113,7 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
       res$cluster <- factor(x$kmeans$cluster)
     }
 
-    if (nrow(res) > score_n_sample) { # this condition is necessary to avoid error from sample_n().
-      res <- res %>% dplyr::sample_n(score_n_sample)
-    }
+    res <- res %>% sample_rows(score_n_sample)
 
     # calculate scale ratio for displaying loadings on the same chart as scores.
     max_abs_loading <- max(abs(loadings_matrix))
@@ -149,9 +147,7 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
     if (!is.null(n_sample)) { # default is no sampling.
       # limit n_sample so that no more dots are created than the max that can be plotted on scatter plot, which is 5000.
       n_sample <- min(n_sample, floor(5000 / length(column_names)))
-      if (nrow(res) > n_sample) { # this condition is necessary to avoid error from sample_n().
-        res <- res %>% dplyr::sample_n(n_sample)
-      }
+      res <- res %>% sample_rows(n_sample)
     }
 
     if (type == "gathered_data") { # for boxplot and parallel coordinates. this is only when with kmeans.
