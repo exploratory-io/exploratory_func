@@ -713,8 +713,8 @@ exp_balance <- function(df,
   each_func <- function(df) {
 
     # sample data since smote can be slow when data is big.
-    if (sample && nrow(df) > max_nrow) {
-      df <- df %>% dplyr::sample_n(max_nrow)
+    if (sample) {
+      df <- df %>% sample_rows(max_nrow)
     }
 
     factorized_cols <- c()
@@ -922,10 +922,7 @@ cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, nam
   }
   # sample the data because randomForest takes long time
   # if data size is too large
-  if (nrow(df) > max_nrow) {
-    df <- df %>%
-      dplyr::sample_n(max_nrow)
-  }
+  df <- df %>% sample_rows(max_nrow)
 
   if (is.logical(df[[clean_target_col]])) {
     # we need to convert logical to factor since na.roughfix only works for numeric or factor.
