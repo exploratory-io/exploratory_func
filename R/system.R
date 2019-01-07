@@ -896,14 +896,14 @@ queryPostgres <- function(host, port, databaseName, username, password, numOfRow
 }
 
 #' @export
-queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", query = "", numOfRows = 0, stringsAsFactors = FALSE, ...){
+queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", query = "", numOfRows = 0, stringsAsFactors = FALSE, as.is = TRUE, ...){
   if(!requireNamespace("RODBC")){stop("package RODBC must be installed.")}
   conn <- getAmazonAthenaConnection(driver = driver, region = region, authenticationType = authenticationType, s3OutputLocation = s3OutputLocation, user = user, password = password, additionalParams = additionalParams)
   tryCatch({
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
     query <- glue_exploratory(query, .transformer=sql_glue_transformer, .envir = parent.frame())
-    df <- RODBC::sqlQuery(conn, query,
+    df <- RODBC::sqlQuery(conn, query, as.is = as.is,
                           max = numOfRows, stringsAsFactors=stringsAsFactors)
     if (!is.data.frame(df)) {
       # when it is error, RODBC::sqlQuery() does not stop() (throw) with error most of the cases.
@@ -932,7 +932,7 @@ queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IA
 
 
 #' @export
-queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, query, stringsAsFactors = FALSE, host="", port="", ...){
+queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, query, stringsAsFactors = FALSE, host="", port="", as.is = TRUE, ...){
   if(!requireNamespace("RODBC")){stop("package RODBC must be installed.")}
 
   conn <- getDBConnection("odbc", host, port, NULL, username, password, dsn = dsn, additionalParams = additionalParams)
@@ -940,8 +940,7 @@ queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, q
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
     query <- glue_exploratory(query, .transformer=sql_glue_transformer, .envir = parent.frame())
-    df <- RODBC::sqlQuery(conn, query,
-                          max = numOfRows, stringsAsFactors=stringsAsFactors)
+    df <- RODBC::sqlQuery(conn, query, as.is = as.is, max = numOfRows, stringsAsFactors=stringsAsFactors)
     if (!is.data.frame(df)) {
       # when it is error, RODBC::sqlQuery() does not stop() (throw) with error most of the cases.
       # in such cases, df is a character vecter rather than a data.frame.
