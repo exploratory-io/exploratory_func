@@ -931,7 +931,19 @@ queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IA
 }
 
 
+#' API to query ODBC database
 #' @export
+#' @param dsn - Data Source Name for the ODBC
+#' @param username - Usernaame of the database
+#' @param password - Password of the database
+#' @param additionalParams - Additional parameters
+#' @param numOfRows - Nuber of rows in result. 0 means fetch all rows
+#' @param query - SQL query
+#' @param stringsAsFactors - Flag to tell if you want to convert character data type to factor data type in result.
+#' @param host - Server where the database is running.
+#' @param port - Database port number
+#' @param as.is - Flag to tell if you honor data types from ODBC
+#'
 queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, query, stringsAsFactors = FALSE, host="", port="", as.is = TRUE, ...){
   if(!requireNamespace("RODBC")){stop("package RODBC must be installed.")}
 
