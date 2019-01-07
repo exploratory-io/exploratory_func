@@ -1,6 +1,8 @@
 #' Find association rules from itemsets.
 #' It calculates support, confidence and lift values from combinations of items.
-do_apriori_internal <- function(df, subject_col, key_col, minlen=1, maxlen=10, min_support=0.1, max_support=1, min_confidence=0.5, lhs=NULL, rhs=NULL){
+do_apriori_internal <- function(df, subject_col, key_col, minlen=1, maxlen=10,
+                                min_support=0.1, max_support=1, min_confidence=0.5, lhs=NULL, rhs=NULL,
+                                max_basket_items = NULL) {
   validate_empty_data(df)
 
   loadNamespace("dplyr")
@@ -23,11 +25,15 @@ do_apriori_internal <- function(df, subject_col, key_col, minlen=1, maxlen=10, m
   # This is executed by each group
   do_apriori_each <- function(df){
 
-    # Limit to top 10 frequent items in each key_col (basket)
-    df <- df %>% group_by(!!rlang::sym(key_col), !!rlang::sym(subject_col)) %>%
-      summarize(.tmp_num_rows = n()) %>%
-      top_n(10, .tmp_num_rows) %>%
-      ungroup()
+    # If there are too many items in a busket, combinations to search tends to explode.
+    # To avoid it, when called from Exploratory Analytics View, we limit items (subject_col)
+    # in baskets (key_col) only to top frequent items in each basket.
+    if (!is.null(max_basket_items)) {
+      df <- df %>% group_by(!!rlang::sym(key_col), !!rlang::sym(subject_col)) %>%
+        summarize(.tmp_num_rows = n()) %>%
+        top_n(max_basket_items, .tmp_num_rows) %>%
+        ungroup()
+    }
 
     mat <- sparse_cast(df, subject_col, key_col)
 
