@@ -22,6 +22,13 @@ do_apriori_internal <- function(df, subject_col, key_col, minlen=1, maxlen=10, m
 
   # This is executed by each group
   do_apriori_each <- function(df){
+
+    # Limit to top 10 frequent items in each key_col (basket)
+    df <- df %>% group_by(!!rlang::sym(key_col), !!rlang::sym(subject_col)) %>%
+      summarize(.tmp_num_rows = n()) %>%
+      top_n(10, .tmp_num_rows) %>%
+      ungroup()
+
     mat <- sparse_cast(df, subject_col, key_col)
 
     # create appearance list
