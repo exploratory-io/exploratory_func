@@ -130,12 +130,22 @@ test_that("countycode", {
 
 test_that("js_glue_transformer", {
   exploratory_env <- new.env()
+
   exploratory_env$v <- c(T,F,NA)
   res <- glue_exploratory("@{v}", .transformer=js_glue_transformer)
   expect_equal(as.character(res), "true, false, null")
+
   exploratory_env$v <- 1
   res <- glue_exploratory("{a: {x: @{v}}}", .transformer=js_glue_transformer)
   expect_equal(as.character(res), "{a: {x: 1}}")
+
+  exploratory_env$stock_symbols <- c("AAPL", "GOOG")
+  res <- glue_exploratory("{stock:{$in:[@{stock_symbols}]}}", .transformer=js_glue_transformer)
+  expect_equal(as.character(res), "{stock:{$in:[\"AAPL\", \"GOOG\"]}}")
+
+  exploratory_env$stock_symbols <- c()
+  res <- glue_exploratory("{stock:{$in:[@{stock_symbols}]}}", .transformer=js_glue_transformer)
+  expect_equal(as.character(res), "{stock:{$in:[]}}", "message")
 })
 
 test_that("sql_glue_transformer", {
@@ -153,6 +163,10 @@ test_that("sql_glue_transformer", {
   exploratory_env$empid_above <- 1100
   res <- glue_exploratory("select * from emp where deptname in (@{dept_names}) and empid > @{empid_above}", .transformer=sql_glue_transformer)
   expect_equal(as.character(res), "select * from emp where deptname in ('Sales', 'HR', 'CEO''s secretary', 'Data Science\\Statistics') and empid > 1100")
+
+  exploratory_env$dept_names <- c()
+  res <- glue_exploratory("select * from emp where deptname in (@{dept_names}) and empid > @{empid_above}", .transformer=sql_glue_transformer)
+  expect_equal(as.character(res), "select * from emp where deptname in (NULL) and empid > 1100")
 })
 
 test_that("bigquery_glue_transformer", {
@@ -170,4 +184,8 @@ test_that("bigquery_glue_transformer", {
   exploratory_env$empid_above <- 1100
   res <- glue_exploratory("select * from emp where deptname in (@{dept_names}) and empid > @{empid_above}", .transformer=bigquery_glue_transformer)
   expect_equal(as.character(res), "select * from emp where deptname in ('Sales', 'HR', 'CEO\\'s secretary', 'Data Science\\\\Statistics') and empid > 1100")
+
+  exploratory_env$dept_names <- c()
+  res <- glue_exploratory("select * from emp where deptname in (@{dept_names}) and empid > @{empid_above}", .transformer=bigquery_glue_transformer)
+  expect_equal(as.character(res), "select * from emp where deptname in (NULL) and empid > 1100")
 })
