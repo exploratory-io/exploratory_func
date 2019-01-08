@@ -1,6 +1,8 @@
 #' Find association rules from itemsets.
 #' It calculates support, confidence and lift values from combinations of items.
-do_apriori_internal <- function(df, subject_col, key_col, minlen=1, maxlen=10, min_support=0.1, max_support=1, min_confidence=0.5, lhs=NULL, rhs=NULL){
+do_apriori_internal <- function(df, subject_col, key_col, minlen=1, maxlen=5,
+                                min_support=0.1, max_support=1, min_confidence=0.5, lhs=NULL, rhs=NULL,
+                                max_basket_items = 10) {
   validate_empty_data(df)
 
   loadNamespace("dplyr")
@@ -22,6 +24,18 @@ do_apriori_internal <- function(df, subject_col, key_col, minlen=1, maxlen=10, m
 
   # This is executed by each group
   do_apriori_each <- function(df){
+
+    # If there are too many items in a busket, combinations to search tends to explode.
+    # To avoid it, when called from Exploratory Analytics View, we limit items (subject_col)
+    # in baskets (key_col) only to top frequent items in each basket.
+    # Default is set to 10 so that default maxlen 5 (we also reduced this from 10) fits in it.
+    if (!is.null(max_basket_items)) {
+      df <- df %>% group_by(!!rlang::sym(key_col), !!rlang::sym(subject_col)) %>%
+        summarize(.tmp_num_rows = n()) %>%
+        top_n(max_basket_items, .tmp_num_rows) %>%
+        ungroup()
+    }
+
     mat <- sparse_cast(df, subject_col, key_col)
 
     # create appearance list
@@ -105,12 +119,13 @@ do_apriori_internal <- function(df, subject_col, key_col, minlen=1, maxlen=10, m
 #' Find association rules from itemsets.
 #' It calculates support, confidence and lift values from combinations of items.
 #' @export
-do_apriori_ <- function(df, subject_col, key_col, minlen=1, maxlen=10, min_support=0.1, max_support=1, min_confidence=0.5, lhs=NULL, rhs=NULL){
+do_apriori_ <- function(df, subject_col, key_col, minlen=1, maxlen=5, min_support=0.1, max_support=1, min_confidence=0.5, lhs=NULL, rhs=NULL, max_basket_items=10){
   if (min_support == "auto") { # search for min_support that returns some rules.
     ret <- NULL
     curr_min_support = 0.1
     while (curr_min_support >= 0.00001) {
-      ret <- tryCatch(do_apriori_internal(df, subject_col, key_col, minlen, maxlen, curr_min_support, max_support, min_confidence, lhs, rhs), error=function(e) {
+      ret <- tryCatch(do_apriori_internal(df, subject_col, key_col, minlen, maxlen, curr_min_support, max_support, min_confidence, lhs, rhs,
+                                          max_basket_items), error=function(e) {
         if (e$message == "No rule was found. Smaller minimum support or minimum confidence might find rules.") { #TODO: this matching is dumb.. 
           TRUE
         }
@@ -130,17 +145,17 @@ do_apriori_ <- function(df, subject_col, key_col, minlen=1, maxlen=10, min_suppo
     ret
   }
   else {
-    do_apriori_internal(df, subject_col, key_col, minlen, maxlen, min_support, max_support, min_confidence, lhs, rhs)
+    do_apriori_internal(df, subject_col, key_col, minlen, maxlen, min_support, max_support, min_confidence, lhs, rhs, max_basket_items)
   }
 }
 
 #' Find association rules from itemsets.
 #' It calculates support, confidence and lift values from combinations of items.
 #' @export
-do_apriori <- function(df, subject, key, minlen=1, maxlen=10, min_support=0.1, max_support=1, min_confidence=0.5, lhs=NULL, rhs=NULL){
+do_apriori <- function(df, subject, key, minlen=1, maxlen=5, min_support=0.1, max_support=1, min_confidence=0.5, lhs=NULL, rhs=NULL, max_basket_items=10){
   subject_col <- col_name(substitute(subject))
   key_col <- col_name(substitute(key))
-  do_apriori_(df, subject_col, key_col, minlen, maxlen, min_support, max_support, min_confidence, lhs, rhs)
+  do_apriori_(df, subject_col, key_col, minlen, maxlen, min_support, max_support, min_confidence, lhs, rhs, max_basket_items)
 }
 
 # rules_metric can be "support", "confidence", or "lift".
