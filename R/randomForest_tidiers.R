@@ -1388,11 +1388,17 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
       var_cols <- colnames(ret)
       var_cols <- var_cols[1:(length(var_cols)-1)] # remove the last column which is the target column in case of regression.
       var_cols <- var_cols[var_cols %in% colnames(x$df)] # to get list of predictor columns, compare with training df.
-      for (var_col in var_cols) {
-        if (is.numeric(ret[[var_col]])) {
-          ret[[var_col]] <- signif(ret[[var_col]], digits=4) # limit digits before we turn it into a factor.
-        }
-      }
+      # We used to do the following, probably for better formatting of numbers, but this had side-effect of
+      # turning close numbers into a same number, when differences among numbers are small compared to their
+      # absolute values. It happened with Date data turned into numeric.
+      # Now we are turning the numbers into factors as is.
+      # Number of unique values should be small (20) here since the grid we specify with edarf is c(20,20).
+      #
+      # for (var_col in var_cols) {
+      #   if (is.numeric(ret[[var_col]])) {
+      #     ret[[var_col]] <- signif(ret[[var_col]], digits=4) # limit digits before we turn it into a factor.
+      #   }
+      # }
       ret <- ret %>% tidyr::gather_("x_name", "x_value", var_cols, na.rm = TRUE, convert = FALSE)
       # sometimes x_value comes as numeric and not character, and it was causing error from bind_rows internally done
       # in tidy().
