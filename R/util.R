@@ -1430,3 +1430,10 @@ excel_numeric_to_date <- function(date_num, date_system = "modern",
                                  include_time = include_time, round_seconds = round_seconds)
 }
 
+#' A utility function for One-hot encoding
+#' @export
+one_hot <- function(df, key) {
+  df <- df %>% mutate(.value = 1, .id = seq(n()))
+  df <- df %>% tidyr::spread(!!rlang::enquo(key), .value, fill = 0, sep = "_") %>% select(-.id)
+}
+
