@@ -667,3 +667,15 @@ test_that("excel_numeric_to_date", {
   res <- exploratory::excel_numeric_to_date(50000L) # test integer input
   expect_equal(res, as.Date("2036-11-21"))
 })
+
+test_that("one_hot", {
+  # numeric column case
+  df <- data.frame(x=c(1,1,2,3))
+  res <- df %>% one_hot(x)
+  expect_equal(res$x_1, c(1,1,0,0))
+
+  # character column case
+  df <- data.frame(x=c("A", "A", "B", "C"))
+  res <- df %>% one_hot(x)
+  expect_equal(res$x_A, c(1,1,0,0))
+})
