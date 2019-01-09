@@ -1433,7 +1433,9 @@ excel_numeric_to_date <- function(date_num, date_system = "modern",
 #' A utility function for One-hot encoding
 #' @export
 one_hot <- function(df, key) {
-  df <- df %>% mutate(.value = 1, .id = seq(n()))
-  df <- df %>% tidyr::spread(!!rlang::enquo(key), .value, fill = 0, sep = "_") %>% select(-.id)
+  # Add unique .id column so that spread will not coalesce multiple rows into one row.
+  df <- df %>% mutate(.tmp_value = 1, .tmp_id = seq(n()))
+  # Spread the column into multiple columns with name <original column name>_<original value> and value of 1 or 0.
+  df %>% tidyr::spread(!!rlang::enquo(key), .tmp_value, fill = 0, sep = "_") %>% select(-.tmp_id)
 }
 
