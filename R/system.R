@@ -255,7 +255,7 @@ js_glue_transformer <- function(code, envir) {
     val <- ifelse(val, "true", "false")
   }
   else if (lubridate::is.Date(val) || lubridate::is.POSIXt(val)) {
-    val <- paste0("new Date(\"", readr::parse_character(val), "\")")
+    val <- paste0("new Date(\"", as.character(val), "\")")
   }
   # Interpret NA to null.
   # https://docs.mongodb.com/manual/tutorial/query-for-null-fields/
