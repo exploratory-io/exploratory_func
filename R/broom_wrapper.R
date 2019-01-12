@@ -30,6 +30,7 @@ augment_glm <- broom::augment
 #' @export
 augment_kmeans <- function(df, model, data){
   validate_empty_data(df)
+  browser()
 
   model_col <- col_name(substitute(model))
   data_col <- col_name(substitute(data))
@@ -48,9 +49,11 @@ augment_kmeans <- function(df, model, data){
     ret
   },
   error = function(e){
+    browser()
     loadNamespace("dplyr")
 
-    if(grepl("arguments imply differing number of rows",e$message)){
+    # if(grepl("arguments imply differing number of rows",e$message)){
+    if(grepl("Column .+ must be length .+ \\(the number of rows\\) or one, not",e$message)){
       # bind .cluster column refering subject names
       grouped_col <- grouped_by(df)
       cluster_col <- avoid_conflict(grouped_col, ".cluster")
