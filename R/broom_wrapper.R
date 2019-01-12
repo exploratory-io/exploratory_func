@@ -30,7 +30,6 @@ augment_glm <- broom::augment
 #' @export
 augment_kmeans <- function(df, model, data){
   validate_empty_data(df)
-  browser()
 
   model_col <- col_name(substitute(model))
   data_col <- col_name(substitute(data))
@@ -49,7 +48,6 @@ augment_kmeans <- function(df, model, data){
     ret
   },
   error = function(e){
-    browser()
     loadNamespace("dplyr")
 
     # Detecting skv case by looking at error message. TODO: This should be done in more reliable way. 
