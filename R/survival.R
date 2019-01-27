@@ -133,6 +133,7 @@ tidy.survfit_exploratory <- function(x, ...) {
     if (nrow(df[df$time==0,]) == 0) { # do this only when time=0 row is not already there.
       df <- rbind(data.frame(time=0, n.risk=df$n.risk[1], n.event=0, n.censor=0, estimate=1, std.error=0, conf.high=1, conf.low=1), df)
     }
+    # Fill data for missing period, as if there was a row for 0 event and 0 censor.
     df <- df %>% tidyr::complete(time=0:max(time))
     df <- df %>% fill_between(n.risk, estimate, std.error, conf.high, conf.low)
     df <- df %>% fill_between(n.event, n.censor, value = 0)
