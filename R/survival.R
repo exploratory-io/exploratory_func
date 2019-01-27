@@ -135,6 +135,8 @@ tidy.survfit_exploratory <- function(x, ...) {
     }
     # Fill data for missing period, as if there was a row for 0 event and 0 censor.
     df <- df %>% tidyr::complete(time=0:max(time))
+    # We will conservatively fill only the rows we added with the above tidyr::complete,
+    # not the rows that were there in the first place, to preserve whatever behavior of survfit.
     df <- df %>% fill_between(n.risk, estimate, std.error, conf.high, conf.low)
     df <- df %>% fill_between(n.event, n.censor, value = 0)
     df
