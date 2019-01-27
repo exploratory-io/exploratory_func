@@ -128,17 +128,23 @@ exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, e
 tidy.survfit_exploratory <- function(x, ...) {
   ret <- broom:::tidy.survfit(x, ...)
 
-  # for better viz, add time=0 row for each group when it is not already there.
-  add_time_zero_row_each <- function(df) {
+  # for line chart and pivot table, add time=0 row when it is not already there, and rows for other missing times for each group.
+  complete_times_each <- function(df) {
     if (nrow(df[df$time==0,]) == 0) { # do this only when time=0 row is not already there.
       df <- rbind(data.frame(time=0, n.risk=df$n.risk[1], n.event=0, n.censor=0, estimate=1, std.error=0, conf.high=1, conf.low=1), df)
     }
+    # Fill data for missing period, as if there was a row for 0 event and 0 censor.
+    df <- df %>% tidyr::complete(time=0:max(time))
+    # We will conservatively fill only the rows we added with the above tidyr::complete,
+    # not the rows that were there in the first place, to preserve whatever behavior of survfit.
+    df <- df %>% fill_between(n.risk, estimate, std.error, conf.high, conf.low)
+    df <- df %>% fill_between(n.event, n.censor, value = 0)
     df
   }
 
   if ("strata" %in% colnames(ret)) {
     nested <- ret %>% dplyr::group_by(strata) %>% tidyr::nest()
-    nested <- nested %>% dplyr::mutate(data=purrr::map(data,~add_time_zero_row_each(.)))
+    nested <- nested %>% dplyr::mutate(data=purrr::map(data,~complete_times_each(.)))
     ret <- tidyr::unnest(nested)
     # remove ".cohort=" part from strata values.
     ret <- ret %>% dplyr::mutate(strata = stringr::str_remove(strata,"^\\.cohort\\="))
@@ -150,11 +156,11 @@ tidy.survfit_exploratory <- function(x, ...) {
     }
   }
   else if (!is.null(x$single_strata_value)) { # put back single strata value ignored by survfit.
-    ret <- add_time_zero_row_each(ret)
+    ret <- complete_times_each(ret)
     ret <- ret %>% dplyr::mutate(strata = as.character(x$single_strata_value))
   }
   else {
-    ret <- add_time_zero_row_each(ret)
+    ret <- complete_times_each(ret)
   }
 
   colnames(ret)[colnames(ret) == "n.risk"] <- "n_risk"
