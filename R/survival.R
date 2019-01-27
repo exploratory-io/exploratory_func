@@ -128,7 +128,7 @@ exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, e
 tidy.survfit_exploratory <- function(x, ...) {
   ret <- broom:::tidy.survfit(x, ...)
 
-  # for better viz, add time=0 row for each group when it is not already there.
+  # for line chart and pivot table, add time=0 row when it is not already there, and rows for other missing times for each group.
   complete_times_each <- function(df) {
     if (nrow(df[df$time==0,]) == 0) { # do this only when time=0 row is not already there.
       df <- rbind(data.frame(time=0, n.risk=df$n.risk[1], n.event=0, n.censor=0, estimate=1, std.error=0, conf.high=1, conf.low=1), df)
