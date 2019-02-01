@@ -106,8 +106,8 @@ do_var.test <- function(df, value, key, ...){
     col_names <- avoid_conflict(grouped_col, vapply(colnames(ret), function(name){
       switch (name,
               estimate = "variance_ratio",
-              num.df = "numerator_degrees_of_freedom",
-              denom.df = "denominator_degrees_of_freedom",
+              `num df` = "numerator_degrees_of_freedom",
+              `denom df` = "denominator_degrees_of_freedom",
               statistic = "f.value",
               name
       )
