@@ -1,5 +1,6 @@
 # Extracts averate marginal fffects from model.
 extract_average_marginal_effects <- function(model, coef_names) {
+  m <- margins::margins(model)
   ame <- coef_names %>% purrr::map(function(x){mean(m[[paste0("dydx_", x)]], na.rm=TRUE)})
   ame <- purrr::flatten_dbl(ame)
   ame
@@ -560,6 +561,7 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
       if (x$family$family == "binomial") { # odds ratio is only for logistic regression
         ret <- ret %>% mutate(odds_ratio=exp(estimate))
       }
+      ret <- ret %>% mutate(average_marginal_effect=extract_average_marginal_effects(x, term))
       if (pretty.name) {
         ret <- ret %>% rename(Term=term, Coefficient=estimate, `Std Error`=std.error,
                               `t Ratio`=statistic, `P Value`=p.value, `Conf Low`=conf.low, `Conf High`=conf.high)
