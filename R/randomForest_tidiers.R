@@ -1761,7 +1761,7 @@ exp_boruta <- function(df,
                        target_n = 20,
                        predictor_n = 12, # So that at least months can fit in it.
                        smote = FALSE,
-                       max_pd_vars = 12, # Number of most important variables to calculate partial dependences on. Default 12 fits well with either 3 or 4 columns of facets. 
+                       max_runs = 20, # Maximal number of importance source runs.
                        seed = NULL
                        ){
   if(!is.null(seed)){
@@ -1826,6 +1826,7 @@ exp_boruta <- function(df,
         fml,
         data = model_df,
         doTrace = 0,
+        maxRuns = max_runs,
         # importance = "impurity", # In calc_feature_imp, we use impurity, but Boruta's getImpRfZ function uses permutation.
         # Following parameters are to be relayed to ranger::ranger through Boruta::Boruta, then Boruta::getImpRfZ.
         num.trees = ntree,
