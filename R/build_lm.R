@@ -1,3 +1,11 @@
+# Extracts averate marginal fffects from model.
+extract_average_marginal_effects <- function(model, coef_names) {
+  ame <- coef_names %>% purrr::map(function(x){mean(m[[paste0("dydx_", x)]], na.rm=TRUE)})
+  ame <- purrr::flatten_dbl(ame)
+  ame
+}
+
+
 #' lm wrapper with do
 #' @return deta frame which has lm model
 #' @param data Data frame to be used as data
