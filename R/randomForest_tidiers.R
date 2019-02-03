@@ -1863,5 +1863,6 @@ tidy.Boruta <- function(x, ...) {
   decisions <- data.frame(variable=names(x$finalDecision), decision=x$finalDecision)
   res <- res %>% dplyr::left_join(decisions, by = "variable") 
   res$variable <- x$terms_mapping[res$variable] # Map variable names back to original.
+  res <- res %>% mutate(variable = fct_reorder(variable, importance, .fun = mean, .desc = TRUE))
   res
 }
