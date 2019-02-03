@@ -1859,6 +1859,8 @@ exp_boruta <- function(df,
 
 tidy.Boruta <- function(x, ...) {
   res <- gather(as.data.frame(x$ImpHistory), "variable","importance")
-  decisions <- data.frame(variable=names(boruta_output$finalDecision), decision=boruta_output$finalDecision)
+  decisions <- data.frame(variable=names(x$finalDecision), decision=x$finalDecision)
   res <- res %>% dplyr::left_join(decisions, by = "variable") 
+  res$variable <- x$terms_mapping[res$variable] # Map variable names back to original.
+  res
 }
