@@ -1857,3 +1857,6 @@ exp_boruta <- function(df,
   do_on_each_group(clean_df, each_func, name = "model", with_unnest = FALSE)
 }
 
+tidy.Boruta <- function(x, ...) {
+  gather(as.data.frame(x$ImpHistory), "variable","importance")
+}
