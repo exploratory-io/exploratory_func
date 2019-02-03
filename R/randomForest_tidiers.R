@@ -1762,6 +1762,7 @@ exp_boruta <- function(df,
                        predictor_n = 12, # So that at least months can fit in it.
                        smote = FALSE,
                        max_runs = 20, # Maximal number of importance source runs.
+                       p_value = 0.01, # Boruta recommends using the default 0.01 for P-value.
                        seed = NULL
                        ){
   if(!is.null(seed)){
@@ -1827,6 +1828,7 @@ exp_boruta <- function(df,
         data = model_df,
         doTrace = 0,
         maxRuns = max_runs,
+        pValue = p_value,
         # importance = "impurity", # In calc_feature_imp, we use impurity, but Boruta's getImpRfZ function uses permutation.
         # Following parameters are to be relayed to ranger::ranger through Boruta::Boruta, then Boruta::getImpRfZ.
         num.trees = ntree,
@@ -1864,5 +1866,6 @@ tidy.Boruta <- function(x, ...) {
   res <- res %>% dplyr::left_join(decisions, by = "variable") 
   res$variable <- x$terms_mapping[res$variable] # Map variable names back to original.
   res <- res %>% mutate(variable = fct_reorder(variable, importance, .fun = mean, .desc = TRUE))
+  res <- res %>% mutate(decision = fct_relevel(decision, "Confirmed", "Tentative", "Rejected"))
   res
 }
