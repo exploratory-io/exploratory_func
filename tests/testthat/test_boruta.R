@@ -13,5 +13,5 @@ context("test Boruta functions")
 test_that("exp_boruta regression", {
   model_df <- flight %>% exp_boruta(`ARR DELAY`,`DEP DELAY`)
   res <- model_df %>% tidy(model)
-  expect_equal(names(res), c("variable", "importance"))
+  expect_equal(names(res), c("variable", "importance", "decision"))
 })
