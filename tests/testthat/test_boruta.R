@@ -15,5 +15,5 @@ test_that("exp_boruta regression", {
   res <- model_df %>% tidy(model)
   expect_equal(names(res), c("variable", "importance", "decision"))
   res <- model_df %>% glance(model, pretty.name = TRUE)
-  expect_equal(names(res), c("Iterations", "Time Taken"))
+  expect_equal(names(res), c("Iterations", "Time Taken (Second)"))
 })
