@@ -1827,7 +1827,7 @@ exp_boruta <- function(df,
         fml,
         data = model_df,
         doTrace = 0,
-        maxRuns = max_runs,
+        maxRuns = max_runs + 1, # It seems Boruta stops at maxRuns - 1 iterations. Add 1 to be less confusing.
         pValue = p_value,
         # importance = "impurity", # In calc_feature_imp, we use impurity, but Boruta's getImpRfZ function uses permutation.
         # Following parameters are to be relayed to ranger::ranger through Boruta::Boruta, then Boruta::getImpRfZ.
