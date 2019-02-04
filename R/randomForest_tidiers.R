@@ -1750,6 +1750,7 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
   )
 }
 
+#' Wrapper for Boruta Analytics View
 #' @export
 exp_boruta <- function(df,
                        target,
