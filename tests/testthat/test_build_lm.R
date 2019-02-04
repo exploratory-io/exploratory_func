@@ -16,6 +16,19 @@ test_that("test build_lm summary output ", {
   expect_lt(length(res), 50) # the output of summary should be less than 50 lines
 })
 
+test_that("test relative importance", {
+  test_df = data.frame(
+    num1 = runif(20),
+    num2 = runif(20),
+    num3 = runif(20),
+    num4 = runif(20)
+  )
+  model_df <- test_df %>% build_lm.fast(num1, num2, num3, num4)
+  ret <- model_df %>% broom::tidy(model)
+  expect_equal(colnames(ret),
+               c("term", "estimate", "std.error", "statistic", "p.value", "conf.high", "conf.low", "lmg", "lmg.high", "lmg.low"))
+})
+
 test_that("test build_lm with keep.source FALSE ", {
   test_df = data.frame(
     num1 = seq(20) / 10.0,

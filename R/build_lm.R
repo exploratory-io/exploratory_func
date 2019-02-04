@@ -391,7 +391,7 @@ build_lm.fast <- function(df,
           # Calculate relative importance. TODO: Expose the arguments. 
           rf$relative_importance <- relaimpo::booteval.relimp(relaimpo::boot.relimp(rf, type = "lmg", b=20, rela = F),bty = "perc", level = 0.95)
         }, error = function(e){
-          # This can fail when columns are not linearly independent. Keep going.
+          # This can fail when columns are not linearly independent. Keep going. TODO: Show error in summary table.
         })
       }
       # these attributes are used in tidy of randomForest TODO: is this good for lm too?
@@ -531,9 +531,22 @@ tidy.lm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
       ret <- ret %>% rename(Note=note)
     }
   }
+  if (!is.null(x$relative_importance)) {
+    # Add columns for relative importance. NA for the first row is for the row for intercept.
+    ret$lmg <- c(NA, x$relative_importance$lmg)
+    ret$lmg.high <- c(NA, x$relative_importance$lmg.upper) # Following naming convention of other columns.
+    ret$lmg.low <- c(NA, x$relative_importance$lmg.lower) # Following naming convention of other columns.
+  }
   if (pretty.name) {
     ret <- ret %>% rename(Term=term, Coefficient=estimate, `Std Error`=std.error,
-                          `t Ratio`=statistic, `P Value`=p.value, `Conf Low`=conf.low, `Conf High`=conf.high)
+                          `t Ratio`=statistic, `P Value`=p.value,
+                          `Conf Low`=conf.low,
+                          `Conf High`=conf.high)
+    if (!is.null(x$relative_importance)) {
+      ret <- ret %>% rename(`Relative Importance`=lmg,
+                            `Relative Importance High`=lmg.high,
+                            `Relative Importance Low`=lmg.low)
+    }
   }
   ret
 }
