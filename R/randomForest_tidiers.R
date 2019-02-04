@@ -1872,9 +1872,9 @@ tidy.Boruta <- function(x, ...) {
 }
 
 glance.Boruta <- function(x, pretty.name = FALSE, ...) {
-  res <- data.frame(iterations = nrow(x$ImpHistory), time_taken = as.numeric(x$timeTaken))
+  res <- data.frame(iterations = nrow(x$ImpHistory), time_taken = as.numeric(x$timeTaken), p_value = x$pValue)
   if (pretty.name) {
-    res <- res %>% dplyr::rename(Iterations = iterations, `Time Taken (Second)` = time_taken)
+    res <- res %>% dplyr::rename(Iterations = iterations, `Time Taken (Second)` = time_taken, `P Value Threshold` = p_value)
   }
   res
 }
