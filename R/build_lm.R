@@ -387,6 +387,12 @@ build_lm.fast <- function(df,
       }
       else {
         rf <- stats::lm(fml, data = df) 
+        tryCatch({
+          # Calculate relative importance. TODO: Expose the arguments. 
+          rf$relative_importance <- relaimpo::booteval.relimp(relaimpo::boot.relimp(rf, type = "lmg", b=20, rela = F),bty = "perc", level = 0.95)
+        }, error = function(e){
+          # This can fail when columns are not linearly independent. Keep going.
+        })
       }
       # these attributes are used in tidy of randomForest TODO: is this good for lm too?
       rf$terms_mapping <- names(name_map)
