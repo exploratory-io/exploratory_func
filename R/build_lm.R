@@ -532,6 +532,7 @@ tidy.lm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
     }
   }
   if (!is.null(x$relative_importance)) {
+    browser()
     # Add columns for relative importance. NA for the first row is for the row for intercept.
     ret$lmg <- c(NA, x$relative_importance$lmg)
     ret$lmg.high <- c(NA, x$relative_importance$lmg.upper) # Following naming convention of other columns.

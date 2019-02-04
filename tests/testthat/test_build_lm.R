@@ -21,9 +21,10 @@ test_that("test relative importance", {
     num1 = runif(20),
     num2 = runif(20),
     num3 = runif(20),
-    num4 = runif(20)
+    num4 = runif(20),
+    cat1 = c(rep("A",5),rep("B",5),rep("C",10))
   )
-  model_df <- test_df %>% build_lm.fast(num1, num2, num3, num4)
+  model_df <- test_df %>% build_lm.fast(num1, num2, num3, num4, cat1)
   ret <- model_df %>% broom::tidy(model)
   expect_equal(colnames(ret),
                c("term", "estimate", "std.error", "statistic", "p.value", "conf.high", "conf.low", "lmg", "lmg.high", "lmg.low"))
