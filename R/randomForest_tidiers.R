@@ -1861,13 +1861,13 @@ exp_boruta <- function(df,
 }
 
 tidy.Boruta <- function(x, ...) {
-  res <- gather(as.data.frame(x$ImpHistory), "variable","importance")
+  res <- tidyr::gather(as.data.frame(x$ImpHistory), "variable","importance")
   decisions <- data.frame(variable=names(x$finalDecision), decision=x$finalDecision)
   res <- res %>% dplyr::left_join(decisions, by = "variable") 
   res$variable <- x$terms_mapping[res$variable] # Map variable names back to original.
   res <- res %>% dplyr::filter(decision %in% c("Confirmed", "Tentative", "Rejected"))
-  res <- res %>% dplyr::mutate(variable = fct_reorder(variable, importance, .fun = mean, .desc = TRUE))
-  res <- res %>% dplyr::mutate(decision = fct_relevel(decision, "Confirmed", "Tentative", "Rejected"))
+  res <- res %>% dplyr::mutate(variable = forcats::fct_reorder(variable, importance, .fun = mean, .desc = TRUE))
+  res <- res %>% dplyr::mutate(decision = forcats::fct_relevel(decision, "Confirmed", "Tentative", "Rejected"))
   res
 }
 
