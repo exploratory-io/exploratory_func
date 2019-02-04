@@ -1865,15 +1865,16 @@ tidy.Boruta <- function(x, ...) {
   decisions <- data.frame(variable=names(x$finalDecision), decision=x$finalDecision)
   res <- res %>% dplyr::left_join(decisions, by = "variable") 
   res$variable <- x$terms_mapping[res$variable] # Map variable names back to original.
-  res <- res %>% mutate(variable = fct_reorder(variable, importance, .fun = mean, .desc = TRUE))
-  res <- res %>% mutate(decision = fct_relevel(decision, "Confirmed", "Tentative", "Rejected"))
+  res <- res %>% dplyr::filter(decision %in% c("Confirmed", "Tentative", "Rejected"))
+  res <- res %>% dplyr::mutate(variable = fct_reorder(variable, importance, .fun = mean, .desc = TRUE))
+  res <- res %>% dplyr::mutate(decision = fct_relevel(decision, "Confirmed", "Tentative", "Rejected"))
   res
 }
 
 glance.Boruta <- function(x, pretty.name = FALSE, ...) {
   res <- data.frame(iterations = nrow(x$ImpHistory), time_taken = as.numeric(x$timeTaken))
   if (pretty.name) {
-    res <- res %>% dplyr::rename(Iterations = iterations, `Time Taken` = time_taken)
+    res <- res %>% dplyr::rename(Iterations = iterations, `Time Taken (Second)` = time_taken)
   }
   res
 }
