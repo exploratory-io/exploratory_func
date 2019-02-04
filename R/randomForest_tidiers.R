@@ -1869,3 +1869,11 @@ tidy.Boruta <- function(x, ...) {
   res <- res %>% mutate(decision = fct_relevel(decision, "Confirmed", "Tentative", "Rejected"))
   res
 }
+
+glance.Boruta <- function(x, pretty.name = FALSE, ...) {
+  res <- data.frame(iterations = nrow(x$ImpHistory), time_taken = as.numeric(x$timeTaken))
+  if (pretty.name) {
+    res <- res %>% dplyr::rename(Iterations = iterations, `Time Taken` = time_taken)
+  }
+  res
+}
