@@ -1762,7 +1762,7 @@ exp_boruta <- function(df,
                        predictor_n = 12, # So that at least months can fit in it.
                        smote = FALSE,
                        max_runs = 20, # Maximal number of importance source runs.
-                       p_value = 0.01, # Boruta recommends using the default 0.01 for P-value.
+                       p_value = 0.05, # Boruta recommends using the default 0.01 for P-value, but we are using 0.05 for consistency with other functions of ours.
                        seed = NULL
                        ){
   if(!is.null(seed)){
