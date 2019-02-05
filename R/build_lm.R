@@ -146,6 +146,7 @@ build_lm.fast <- function(df,
                     relimp_bootstrap_runs = 20,
                     relimp_bootstrap_type = "perc",
                     relimp_conf_level = 0.95,
+                    relimp_relative = TRUE,
                     seed = NULL
                     ){
   # TODO: add test
@@ -395,7 +396,7 @@ build_lm.fast <- function(df,
           # Calculate relative importance. TODO: Expose the arguments. 
           rf$relative_importance <- relaimpo::booteval.relimp(relaimpo::boot.relimp(rf, type = relimp_type,
                                                                                     b = relimp_bootstrap_runs,
-                                                                                    rela = F,
+                                                                                    rela = relimp_relative,
                                                                                     rank = FALSE,
                                                                                     diff = FALSE),
                                                               bty = relimp_bootstrap_type, level = relimp_conf_level)
