@@ -518,38 +518,42 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add tes
 
 #' special version of tidy.lm function to use with build_lm.fast.
 #' @export
-tidy.lm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
-  ret <- broom:::tidy.lm(x) # it seems that tidy.lm takes care of glm too
-  ret <- ret %>% mutate(conf.high=estimate+1.96*std.error, conf.low=estimate-1.96*std.error)
-  if (any(is.na(x$coefficients))) {
-    # since broom skips coefficients with NA value, which means removed by lm because of multi-collinearity,
-    # put it back to show them.
-    # reference: https://stats.stackexchange.com/questions/25804/why-would-r-return-na-as-a-lm-coefficient
-    removed_coef_df <- data.frame(term=names(x$coefficients[is.na(x$coefficients)]), note="Dropped most likely due to perfect multicollinearity.")
-    ret <- ret %>% bind_rows(removed_coef_df)
-    if (pretty.name) {
-      ret <- ret %>% rename(Note=note)
+tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, ...) { #TODO: add test
+  switch(type) {
+    coefficients = {
+      ret <- broom:::tidy.lm(x) # it seems that tidy.lm takes care of glm too
+      ret <- ret %>% mutate(conf.high=estimate+1.96*std.error, conf.low=estimate-1.96*std.error)
+      if (any(is.na(x$coefficients))) {
+        # since broom skips coefficients with NA value, which means removed by lm because of multi-collinearity,
+        # put it back to show them.
+        # reference: https://stats.stackexchange.com/questions/25804/why-would-r-return-na-as-a-lm-coefficient
+        removed_coef_df <- data.frame(term=names(x$coefficients[is.na(x$coefficients)]), note="Dropped most likely due to perfect multicollinearity.")
+        ret <- ret %>% bind_rows(removed_coef_df)
+        if (pretty.name) {
+          ret <- ret %>% rename(Note=note)
+        }
+      }
+      if (!is.null(x$relative_importance)) {
+        browser()
+        # Add columns for relative importance. NA for the first row is for the row for intercept.
+        ret$lmg <- c(NA, x$relative_importance$lmg)
+        ret$lmg.high <- c(NA, x$relative_importance$lmg.upper) # Following naming convention of other columns.
+        ret$lmg.low <- c(NA, x$relative_importance$lmg.lower) # Following naming convention of other columns.
+      }
+      if (pretty.name) {
+        ret <- ret %>% rename(Term=term, Coefficient=estimate, `Std Error`=std.error,
+                              `t Ratio`=statistic, `P Value`=p.value,
+                              `Conf Low`=conf.low,
+                              `Conf High`=conf.high)
+        if (!is.null(x$relative_importance)) {
+          ret <- ret %>% rename(`Relative Importance`=lmg,
+                                `Relative Importance High`=lmg.high,
+                                `Relative Importance Low`=lmg.low)
+        }
+      }
+      ret
     }
   }
-  if (!is.null(x$relative_importance)) {
-    browser()
-    # Add columns for relative importance. NA for the first row is for the row for intercept.
-    ret$lmg <- c(NA, x$relative_importance$lmg)
-    ret$lmg.high <- c(NA, x$relative_importance$lmg.upper) # Following naming convention of other columns.
-    ret$lmg.low <- c(NA, x$relative_importance$lmg.lower) # Following naming convention of other columns.
-  }
-  if (pretty.name) {
-    ret <- ret %>% rename(Term=term, Coefficient=estimate, `Std Error`=std.error,
-                          `t Ratio`=statistic, `P Value`=p.value,
-                          `Conf Low`=conf.low,
-                          `Conf High`=conf.high)
-    if (!is.null(x$relative_importance)) {
-      ret <- ret %>% rename(`Relative Importance`=lmg,
-                            `Relative Importance High`=lmg.high,
-                            `Relative Importance Low`=lmg.low)
-    }
-  }
-  ret
 }
 
 #' special version of tidy.glm function to use with build_lm.fast.
