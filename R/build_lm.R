@@ -142,6 +142,10 @@ build_lm.fast <- function(df,
                     max_nrow = 50000,
                     predictor_n = 12, # so that at least months can fit in it.
                     smote = FALSE,
+                    relimp_type = "lmg",
+                    relimp_bootstrap_runs = 20,
+                    relimp_bootstrap_type = "perc",
+                    relimp_conf_level = 0.95,
                     seed = NULL
                     ){
   # TODO: add test
@@ -389,7 +393,12 @@ build_lm.fast <- function(df,
         rf <- stats::lm(fml, data = df) 
         tryCatch({
           # Calculate relative importance. TODO: Expose the arguments. 
-          rf$relative_importance <- relaimpo::booteval.relimp(relaimpo::boot.relimp(rf, type = "lmg", b=20, rela = F),bty = "perc", level = 0.95)
+          rf$relative_importance <- relaimpo::booteval.relimp(relaimpo::boot.relimp(rf, type = relimp_type,
+                                                                                    b = relimp_bootstrap_runs,
+                                                                                    rela = F,
+                                                                                    rank = FALSE,
+                                                                                    diff = FALSE),
+                                                              bty = relimp_bootstrap_type, level = relimp_conf_level)
         }, error = function(e){
           # This can fail when columns are not linearly independent. Keep going. TODO: Show error in summary table.
         })
