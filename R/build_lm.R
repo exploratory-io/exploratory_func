@@ -570,7 +570,8 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
         ret
       }
       else {
-        NULL # Skip output for this group.
+        ret <- data.frame() # Skip output for this group.
+        ret
       }
     }
   )
