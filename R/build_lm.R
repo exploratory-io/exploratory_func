@@ -544,14 +544,17 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
     relative_importance = {
       if (!is.null(x$relative_importance)) {
         # Add columns for relative importance. NA for the first row is for the row for intercept.
-        lmg <- c(NA, x$relative_importance$lmg)
-        lmg.high <- c(NA, x$relative_importance$lmg.upper) # Following naming convention of other columns.
-        lmg.low <- c(NA, x$relative_importance$lmg.lower) # Following naming convention of other columns.
-        ret <- data.frame(lmg = lmg, lmg.high = lmg.high, lmg.low = lmg.low)
+        browser()
+        term <- x$relative_importance$namen[2:length(x$relative_importance$namen)] # Skip first element, which is the target variable name.
+        lmg <- x$relative_importance$lmg
+        lmg.high <- x$relative_importance$lmg.upper[1,] # Following naming convention of other columns.
+        lmg.low <- x$relative_importance$lmg.lower[1,] # Following naming convention of other columns.
+        ret <- data.frame(term = term, lmg = lmg, lmg.high = lmg.high, lmg.low = lmg.low)
         if (pretty.name) {
-          ret <- ret %>% rename(`Relative Importance`=lmg,
-                                `Relative Importance High`=lmg.high,
-                                `Relative Importance Low`=lmg.low)
+          ret <- ret %>% rename(`Variable` = term,
+                                `Relative Importance` = lmg,
+                                `Relative Importance High` = lmg.high,
+                                `Relative Importance Low` = lmg.low)
         }
         ret
       }
