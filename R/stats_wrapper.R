@@ -188,6 +188,16 @@ do_cor.cols <- function(df, ..., use="pairwise.complete.obs", method="pearson", 
   }
 }
 
+#' @export
+tidy.cor_exploratory <- function(x, type = "cor", ...) { #TODO: add test
+  if (type == "cor") {
+    x$cor
+  }
+  else {
+    x$data
+  }
+}
+
 #' Non standard evaluation version for do_cmdscale_
 #' @return Tidy format of data frame.
 #' @export

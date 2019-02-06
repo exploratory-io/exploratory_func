@@ -122,10 +122,13 @@ test_that("test do_cor.cols", {
 })
 
 test_that("test do_cor.cols with model output", {
-  browser()
   result <- spread_test_df %>%
     do_cor.cols(dplyr::starts_with("var"), return_type = "model")
   expect_equal(colnames(result), "model")
+  result_cor <- result %>% tidy(model, type = "cor")
+  expect_equal(result_cor[["value"]], rep(1, 2))
+  result_data <- result %>% tidy(model, type = "data")
+  expect_equal(colnames(result_data), c("var1", "var2"))
 })
 
 test_that("test do_cor.cols for grouped df", {
