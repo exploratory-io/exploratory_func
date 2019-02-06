@@ -144,6 +144,23 @@ test_that("test do_cor.cols for grouped df", {
   expect_equal(dim(result), c(4, 4))
 })
 
+test_that("test do_cor.cols for grouped df with model output", {
+  loadNamespace("dplyr")
+  group1 <- cbind(spread_test_df, data.frame(group=rep("group1", 4)))
+  group2 <- cbind(spread_test_df, data.frame(group=rep("group2", 4)))
+  group2$var2 <- -group2$var2
+  test_df <- rbind(group1, group2)
+  result <- (
+    test_df
+    %>%  dplyr::group_by(group)
+    %>%  do_cor.cols(dplyr::starts_with("var"), return_type = "model"))
+
+  result_cor <- result %>% tidy(model)
+  expect_equal(dim(result_cor), c(4, 4))
+  result_data <- result %>% tidy(model, type = "data")
+  expect_equal(colnames(result_data), c("var1", "var2", "group"))
+})
+
 test_that("test do_cor.kv for duplicated pair", {
   result <- tidy_test_df %>%  do_cor.kv(cat, dim, val)
   expect_equal(ncol(result), 3)
