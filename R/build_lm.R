@@ -132,6 +132,7 @@ build_lm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, gr
 }
 
 #' builds lm model quickly for analytics view.
+#' @param seed Random seed to control data sampling, SMOTE, and bootstrapping for confidence interval of relative importance.
 #' @export
 build_lm.fast <- function(df,
                     target,
