@@ -70,7 +70,8 @@ do_cor.kv_ <- function(df,
                       distinct = FALSE,
                       diag = FALSE,
                       fill = 0,
-                      fun.aggregate=mean
+                      fun.aggregate = mean,
+                      return_type = "data.frame"
                       )
 {
   validate_empty_data(df)
@@ -117,6 +118,17 @@ do_cor.kv_ <- function(df,
     } else {
       ret <- mat_to_df(cor_mat, cnames=output_cols, diag=diag, na.rm = FALSE)
     }
+
+    if (return_type == "data.frame") {
+      ret # Return correlation data frame as is.
+    }
+    else {
+      # Return cor_exploratory model, which is a set of correlation data frame and the original data.
+      # We use the original data for scatter matrix on Analytics View.
+      ret <- list(cor = ret, data = df)
+      class(ret) <- c("cor_exploratory", class(ret))
+      ret
+    }
   }
   # Calculation is executed in each group.
   # Storing the result in this tmp_col and
@@ -124,11 +136,16 @@ do_cor.kv_ <- function(df,
   # If the original data frame is grouped by "tmp",
   # overwriting it should be avoided,
   # so avoid_conflict is used here.
-  tmp_col <- avoid_conflict(grouped_col, "tmp")
-  df %>%
-    dplyr::do_(.dots=setNames(list(~do_cor_each(.)), tmp_col)) %>%
-    dplyr::ungroup() %>%
-    unnest_with_drop_(tmp_col)
+  if (return_type == "data.frame") {
+    tmp_col <- avoid_conflict(grouped_col, "tmp")
+    df %>%
+      dplyr::do_(.dots=setNames(list(~do_cor_each(.)), tmp_col)) %>%
+      dplyr::ungroup() %>%
+      unnest_with_drop_(tmp_col)
+  }
+  else {
+    do_on_each_group(df, do_cor_each, name = "model", with_unnest = FALSE)
+  }
 }
 
 #'

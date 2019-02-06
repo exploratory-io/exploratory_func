@@ -152,6 +152,17 @@ test_that("test do_cor.kv for duplicated pair", {
   expect_equal(result[["value"]], replicate(2, 1))
 })
 
+test_that("test do_cor.kv with model output", {
+  result <- tidy_test_df %>%  do_cor.kv(cat, dim, val, return_type = "model")
+  result_cor <- result %>% tidy(model, type = "cor")
+  expect_equal(ncol(result_cor), 3)
+  expect_equal(result_cor[["cat.x"]], c("cat1", "cat2"))
+  expect_equal(result_cor[["cat.y"]], c("cat2", "cat1"))
+  expect_equal(result_cor[["value"]], replicate(2, 1))
+  result_data <- result %>% tidy(model, type = "data")
+  expect_equal(colnames(result_data), c("cat", "dim", "val", "dim_na"))
+})
+
 test_that("test do_cor.kv for grouped data frame as subject error", {
   data <- data.frame(group=rep(c(1,2,3), each=6),
                      row = rep(c(1, 1, 2, 2, 3,3), 3),
