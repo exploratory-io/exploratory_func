@@ -132,7 +132,13 @@ build_lm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, gr
 }
 
 #' builds lm model quickly for analytics view.
-#' @param seed Random seed to control data sampling, SMOTE, and bootstrapping for confidence interval of relative importance.
+#' @param relimp_type - Passed down to boot.relimp, but "lmg" is the only practically useful option.
+#' @param relimp_bootstrap_runs - Number of bootstrap iterations. Default 20.
+#' @param relimp_bootstrap_type - Type of bootstrapping, passed down to boot package from inside relaimpo package.
+#'                                Can be "basic", "perc", "bca", or "norm".
+#' @param relimp_conf_level - Confidence level for confidence interval of relative importance values. Default is 0.95.
+#' @param relimp_relative - When TRUE, relative importance values add up to 1. When FALSE they add up to R-Squared.
+#' @param seed - Random seed to control data sampling, SMOTE, and bootstrapping for confidence interval of relative importance.
 #' @export
 build_lm.fast <- function(df,
                     target,
