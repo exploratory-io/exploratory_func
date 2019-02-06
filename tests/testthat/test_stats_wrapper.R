@@ -109,6 +109,30 @@ test_that("do_cor with NA values", {
   }
 })
 
+test_that("do_cor with NA values with model output", {
+  loadNamespace("reshape2")
+  nrow <- 10
+  ncol <- 20
+  vec <- rnorm(nrow * ncol)
+  mat <- matrix(vec, nrow = nrow)
+  melt_mat <- reshape2::melt(mat)
+  colnames(melt_mat)[[2]] <- "Var 2"
+
+  ret <- do_cor(melt_mat, skv = c("Var 2", "Var1", "value"), diag = TRUE, return_type = "model")
+  ret <- ret %>% tidy(model, type = "cor")
+
+  cor_ret <- cor(mat, use = "pairwise.complete.obs")
+  melt_ret <- reshape2::melt(cor_ret)
+
+  for(i in seq(ncol)){
+    for(j in seq(ncol)){
+      mat_answer <- cor_ret[i, j]
+      df_answer <- ret[ret[[1]] == i & ret[[2]] == j, 3][[1]]
+      expect_equal(mat_answer, df_answer)
+    }
+  }
+})
+
 tidy_test_df <- data.frame(
   cat=rep(c("cat1", "cat2"), 20),
   dim = sort(rep(paste0("dim", seq(4)), 5)),
