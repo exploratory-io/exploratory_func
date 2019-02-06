@@ -139,7 +139,7 @@ do_cor.kv_ <- function(df,
 #' @param method Method of calculation. This can be one of "pearson", "kendall", or "spearman".
 #' @return correlations between pairs of columns
 #' @export
-do_cor.cols <- function(df, ..., use="pairwise.complete.obs", method="pearson", distinct=FALSE, diag=FALSE){
+do_cor.cols <- function(df, ..., use="pairwise.complete.obs", method="pearson", distinct=FALSE, diag=FALSE, return_type="data.frame"){
   validate_empty_data(df)
 
   loadNamespace("dplyr")
@@ -164,12 +164,28 @@ do_cor.cols <- function(df, ..., use="pairwise.complete.obs", method="pearson", 
     } else {
       ret <- mat_to_df(cor_mat, cnames=output_cols,diag=diag)
     }
+
+    if (return_type == "data.frame") {
+      ret # Return correlation data frame as is.
+    }
+    else {
+      # Return cor_exploratory model, which is a set of correlation data frame and the original data.
+      # We use the original data for scatter matrix on Analytics View.
+      ret <- list(cor = ret, data = df)
+      class(ret) <- c("cor_exploratory", class(ret))
+      ret
+    }
   }
 
-  df %>%
-    dplyr::do_(.dots=setNames(list(~do_cor_each(.)), output_cols[[1]])) %>%
-    dplyr::ungroup() %>%
-    unnest_with_drop_(output_cols[[1]])
+  if (return_type == "data.frame") {
+    df %>%
+      dplyr::do_(.dots=setNames(list(~do_cor_each(.)), output_cols[[1]])) %>%
+      dplyr::ungroup() %>%
+      unnest_with_drop_(output_cols[[1]])
+  }
+  else {
+    do_on_each_group(df, do_cor_each, name = "model", with_unnest = FALSE)
+  }
 }
 
 #' Non standard evaluation version for do_cmdscale_

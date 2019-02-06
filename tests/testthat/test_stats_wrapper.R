@@ -121,6 +121,13 @@ test_that("test do_cor.cols", {
   expect_equal(result[["value"]], rep(1, 2))
 })
 
+test_that("test do_cor.cols with model output", {
+  browser()
+  result <- spread_test_df %>%
+    do_cor.cols(dplyr::starts_with("var"), return_type = "model")
+  expect_equal(colnames(result), "model")
+})
+
 test_that("test do_cor.cols for grouped df", {
   loadNamespace("dplyr")
   group1 <- cbind(spread_test_df, data.frame(group=rep("group1", 4)))
