@@ -109,6 +109,30 @@ test_that("do_cor with NA values", {
   }
 })
 
+test_that("do_cor with NA values with model output", {
+  loadNamespace("reshape2")
+  nrow <- 10
+  ncol <- 20
+  vec <- rnorm(nrow * ncol)
+  mat <- matrix(vec, nrow = nrow)
+  melt_mat <- reshape2::melt(mat)
+  colnames(melt_mat)[[2]] <- "Var 2"
+
+  ret <- do_cor(melt_mat, skv = c("Var 2", "Var1", "value"), diag = TRUE, return_type = "model")
+  ret <- ret %>% tidy(model, type = "cor")
+
+  cor_ret <- cor(mat, use = "pairwise.complete.obs")
+  melt_ret <- reshape2::melt(cor_ret)
+
+  for(i in seq(ncol)){
+    for(j in seq(ncol)){
+      mat_answer <- cor_ret[i, j]
+      df_answer <- ret[ret[[1]] == i & ret[[2]] == j, 3][[1]]
+      expect_equal(mat_answer, df_answer)
+    }
+  }
+})
+
 tidy_test_df <- data.frame(
   cat=rep(c("cat1", "cat2"), 20),
   dim = sort(rep(paste0("dim", seq(4)), 5)),
@@ -119,6 +143,16 @@ test_that("test do_cor.cols", {
   result <- spread_test_df %>%
     do_cor.cols(dplyr::starts_with("var"))
   expect_equal(result[["value"]], rep(1, 2))
+})
+
+test_that("test do_cor.cols with model output", {
+  result <- spread_test_df %>%
+    do_cor.cols(dplyr::starts_with("var"), return_type = "model")
+  expect_equal(colnames(result), "model")
+  result_cor <- result %>% tidy(model, type = "cor")
+  expect_equal(result_cor[["value"]], rep(1, 2))
+  result_data <- result %>% tidy(model, type = "data")
+  expect_equal(colnames(result_data), c("var1", "var2"))
 })
 
 test_that("test do_cor.cols for grouped df", {
@@ -134,12 +168,40 @@ test_that("test do_cor.cols for grouped df", {
   expect_equal(dim(result), c(4, 4))
 })
 
+test_that("test do_cor.cols for grouped df with model output", {
+  loadNamespace("dplyr")
+  group1 <- cbind(spread_test_df, data.frame(group=rep("group1", 4)))
+  group2 <- cbind(spread_test_df, data.frame(group=rep("group2", 4)))
+  group2$var2 <- -group2$var2
+  test_df <- rbind(group1, group2)
+  result <- (
+    test_df
+    %>%  dplyr::group_by(group)
+    %>%  do_cor.cols(dplyr::starts_with("var"), return_type = "model"))
+
+  result_cor <- result %>% tidy(model)
+  expect_equal(dim(result_cor), c(4, 4))
+  result_data <- result %>% tidy(model, type = "data")
+  expect_equal(colnames(result_data), c("var1", "var2", "group"))
+})
+
 test_that("test do_cor.kv for duplicated pair", {
   result <- tidy_test_df %>%  do_cor.kv(cat, dim, val)
   expect_equal(ncol(result), 3)
   expect_equal(result[["cat.x"]], c("cat1", "cat2"))
   expect_equal(result[["cat.y"]], c("cat2", "cat1"))
   expect_equal(result[["value"]], replicate(2, 1))
+})
+
+test_that("test do_cor.kv with model output", {
+  result <- tidy_test_df %>%  do_cor.kv(cat, dim, val, return_type = "model")
+  result_cor <- result %>% tidy(model, type = "cor")
+  expect_equal(ncol(result_cor), 3)
+  expect_equal(result_cor[["cat.x"]], c("cat1", "cat2"))
+  expect_equal(result_cor[["cat.y"]], c("cat2", "cat1"))
+  expect_equal(result_cor[["value"]], replicate(2, 1))
+  result_data <- result %>% tidy(model, type = "data")
+  expect_equal(colnames(result_data), c("cat", "dim", "val", "dim_na"))
 })
 
 test_that("test do_cor.kv for grouped data frame as subject error", {
