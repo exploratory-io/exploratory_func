@@ -381,6 +381,13 @@ build_lm.fast <- function(df,
       if (model_type == "glm") {
         if (smote) {
           df <- df %>% exp_balance(clean_target_col, sample=FALSE) # no further sampling
+          for(col in names(df)){
+            if(is.factor(df[[col]])) {
+              # margins::marginal_effects() fails if unused factor level exists. Drop them to avoid it.
+              # In case of SMOTE, this has to be done after that. TODO: Do this just once in any case.
+              df[[col]] <- forcats::fct_drop(df[[col]])
+            }
+          }
         }
         if (is.null(link)) {
           rf <- stats::glm(fml, data = df, family = family) 
