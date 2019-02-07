@@ -676,6 +676,8 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
   )
 }
 
+# For some reason, find_data called from inside margins::marginal_effects() fails in Exploratory.
+# Explicitly declaring find_data for our glm_exploratory class works it around.
 #' @export
 find_data.glm_exploratory <- function(model, env = parent.frame(), ...) {
   model$data
