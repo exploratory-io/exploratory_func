@@ -618,7 +618,7 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
       ret <- ret %>% mutate(average_marginal_effect=extract_average_marginal_effects(x, term))
       if (pretty.name) {
         ret <- ret %>% rename(Term=term, Coefficient=estimate, `Std Error`=std.error,
-                              `t Ratio`=statistic, `P Value`=p.value, `Conf Low`=conf.low, `Conf High`=conf.high)
+                              `t Ratio`=statistic, `P Value`=p.value, `Conf Low`=conf.low, `Conf High`=conf.high, `Average Marginal Effect`=average_marginal_effect)
         if (x$family$family == "binomial") { # odds ratio is only for logistic regression
           ret <- ret %>% rename(`Odds Ratio`=odds_ratio)
         }
