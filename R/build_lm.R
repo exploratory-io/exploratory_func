@@ -141,6 +141,13 @@ build_lm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, gr
 }
 
 #' builds lm model quickly for analytics view.
+#' @param relimp_type - Passed down to boot.relimp, but "lmg" is the only practically useful option.
+#' @param relimp_bootstrap_runs - Number of bootstrap iterations. Default 20.
+#' @param relimp_bootstrap_type - Type of bootstrapping, passed down to boot package from inside relaimpo package.
+#'                                Can be "basic", "perc", "bca", or "norm".
+#' @param relimp_conf_level - Confidence level for confidence interval of relative importance values. Default is 0.95.
+#' @param relimp_relative - When TRUE, relative importance values add up to 1. When FALSE they add up to R-Squared.
+#' @param seed - Random seed to control data sampling, SMOTE, and bootstrapping for confidence interval of relative importance.
 #' @export
 build_lm.fast <- function(df,
                     target,
@@ -151,6 +158,11 @@ build_lm.fast <- function(df,
                     max_nrow = 50000,
                     predictor_n = 12, # so that at least months can fit in it.
                     smote = FALSE,
+                    relimp_type = "lmg",
+                    relimp_bootstrap_runs = 20,
+                    relimp_bootstrap_type = "perc",
+                    relimp_conf_level = 0.95,
+                    relimp_relative = TRUE,
                     seed = NULL
                     ){
   # TODO: add test
@@ -396,6 +408,17 @@ build_lm.fast <- function(df,
       }
       else {
         rf <- stats::lm(fml, data = df) 
+        tryCatch({
+          # Calculate relative importance. TODO: Expose the arguments. 
+          rf$relative_importance <- relaimpo::booteval.relimp(relaimpo::boot.relimp(rf, type = relimp_type,
+                                                                                    b = relimp_bootstrap_runs,
+                                                                                    rela = relimp_relative,
+                                                                                    rank = FALSE,
+                                                                                    diff = FALSE),
+                                                              bty = relimp_bootstrap_type, level = relimp_conf_level)
+        }, error = function(e){
+          # This can fail when columns are not linearly independent. Keep going. TODO: Show error in summary table.
+        })
       }
       # these attributes are used in tidy of randomForest TODO: is this good for lm too?
       rf$terms_mapping <- names(name_map)
@@ -521,29 +544,60 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add tes
 
 #' special version of tidy.lm function to use with build_lm.fast.
 #' @export
-tidy.lm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
-  ret <- broom:::tidy.lm(x) # it seems that tidy.lm takes care of glm too
-  ret <- ret %>% mutate(conf.high=estimate+1.96*std.error, conf.low=estimate-1.96*std.error)
-  if (any(is.na(x$coefficients))) {
-    # since broom skips coefficients with NA value, which means removed by lm because of multi-collinearity,
-    # put it back to show them.
-    # reference: https://stats.stackexchange.com/questions/25804/why-would-r-return-na-as-a-lm-coefficient
-    removed_coef_df <- data.frame(term=names(x$coefficients[is.na(x$coefficients)]), note="Dropped most likely due to perfect multicollinearity.")
-    ret <- ret %>% bind_rows(removed_coef_df)
-    if (pretty.name) {
-      ret <- ret %>% rename(Note=note)
+tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, ...) { #TODO: add test
+  margins::margins(x)
+  switch(type,
+    coefficients = {
+      ret <- broom:::tidy.lm(x) # it seems that tidy.lm takes care of glm too
+      ret <- ret %>% mutate(conf.high=estimate+1.96*std.error, conf.low=estimate-1.96*std.error)
+      if (any(is.na(x$coefficients))) {
+        # since broom skips coefficients with NA value, which means removed by lm because of multi-collinearity,
+        # put it back to show them.
+        # reference: https://stats.stackexchange.com/questions/25804/why-would-r-return-na-as-a-lm-coefficient
+        removed_coef_df <- data.frame(term=names(x$coefficients[is.na(x$coefficients)]), note="Dropped most likely due to perfect multicollinearity.")
+        ret <- ret %>% bind_rows(removed_coef_df)
+        if (pretty.name) {
+          ret <- ret %>% rename(Note=note)
+        }
+      }
+      if (pretty.name) {
+        ret <- ret %>% rename(Term=term, Coefficient=estimate, `Std Error`=std.error,
+                              `t Ratio`=statistic, `P Value`=p.value,
+                              `Conf Low`=conf.low,
+                              `Conf High`=conf.high)
+      }
+      ret
+    },
+    relative_importance = {
+      if (!is.null(x$relative_importance)) {
+        # Add columns for relative importance. NA for the first row is for the row for intercept.
+        term <- x$relative_importance$namen[2:length(x$relative_importance$namen)] # Skip first element, which is the target variable name.
+        lmg <- x$relative_importance$lmg
+        lmg.high <- x$relative_importance$lmg.upper[1,] # Following naming convention of other columns.
+        lmg.low <- x$relative_importance$lmg.lower[1,] # Following naming convention of other columns.
+        ret <- data.frame(term = term, lmg = lmg, lmg.high = lmg.high, lmg.low = lmg.low)
+        # Reorder factor by the value of relative importance (lmg).
+        ret <- ret %>% dplyr::mutate(term = forcats::fct_reorder(term, lmg, .fun = sum, .desc = TRUE))
+        if (pretty.name) {
+          ret <- ret %>% rename(`Variable` = term,
+                                `Relative Importance` = lmg,
+                                `Relative Importance High` = lmg.high,
+                                `Relative Importance Low` = lmg.low)
+        }
+        ret
+      }
+      else {
+        ret <- data.frame() # Skip output for this group.
+        ret
+      }
     }
-  }
-  if (pretty.name) {
-    ret <- ret %>% rename(Term=term, Coefficient=estimate, `Std Error`=std.error,
-                          `t Ratio`=statistic, `P Value`=p.value, `Conf Low`=conf.low, `Conf High`=conf.high)
-  }
-  ret
+  )
 }
 
 #' special version of tidy.glm function to use with build_lm.fast.
 #' @export
 tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, ...) { #TODO: add test
+  margins::margins(x)
   switch(type,
     coefficients = {
       ret <- broom:::tidy.lm(x) # it seems that tidy.lm takes care of glm too
@@ -601,4 +655,9 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
       ret
     }
   )
+}
+
+#' @export
+find_data.glm_exploratory <- function(model, env = parent.frame(), ...) {
+  model$data
 }
