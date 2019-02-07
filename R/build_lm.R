@@ -242,8 +242,8 @@ build_lm.fast <- function(df,
   }
 
   # randomForest fails if columns are not clean. TODO is this needed?
-  #clean_df <- janitor::clean_names(df)
-  clean_df <- df # turn off clean_names for lm
+  clean_df <- janitor::clean_names(df)
+  #clean_df <- df # turn off clean_names for lm
   # this mapping will be used to restore column names
   name_map <- colnames(clean_df)
   names(name_map) <- colnames(df)
@@ -267,13 +267,24 @@ build_lm.fast <- function(df,
         # for numeric cols, filter NA rows, because lm will anyway do this internally, and errors out
         # if the remaining rows are with single value in any predictor column.
         # filter Inf/-Inf too to avoid error at lm.
-        dplyr::filter(!is.na(df[[target_col]]) & !is.infinite(df[[target_col]])) # this form does not handle group_by. so moved into each_func from outside.
+        dplyr::filter(!is.na(df[[clean_target_col]]) & !is.infinite(df[[clean_target_col]])) # this form does not handle group_by. so moved into each_func from outside.
 
       # sample the data because randomForest takes long time
       # if data size is too large
       df <- df %>% sample_rows(max_nrow)
 
       c_cols <- clean_cols
+      # To avoid unused factor level that causes margins::marginal_effects() to fail, filtering operation has
+      # to be done before factor level adjustments. Because of that, the for statement below has to
+      # be separate from the for statement after that, and done first.
+      for(col in clean_cols){
+        if(is.numeric(df[[col]])) {
+          # for numeric cols, filter NA rows, because lm will anyway do this internally, and errors out
+          # if the remaining rows are with single value in any predictor column.
+          # filter Inf/-Inf too to avoid error at lm.
+          df <- df %>% dplyr::filter(!is.na(df[[col]]) & !is.infinite(df[[col]]))
+        }
+      }
       for(col in clean_cols){
         if(lubridate::is.Date(df[[col]]) || lubridate::is.POSIXct(df[[col]])) {
           c_cols <- setdiff(c_cols, col)
@@ -325,6 +336,7 @@ build_lm.fast <- function(df,
           }
           df[[col]] <- NULL # drop original Date/POSIXct column to pass SMOTE later.
         } else if(is.factor(df[[col]])) {
+          df[[col]] <- forcats::fct_drop(df[[col]]) # margins::marginal_effects() fails if unused factor level exists. Drop them to avoid it.
           # 1. if the data is factor, respect the levels and keep first 10 levels, and make others "Others" level.
           # 2. if the data is ordered factor, turn it into unordered. For ordered factor,
           #    lm/glm takes polynomial terms (Linear, Quadratic, Cubic, and so on) and use them as variables,
@@ -348,11 +360,6 @@ build_lm.fast <- function(df,
           #    TODO: see if ties.method would make sense for calc_feature_imp.
           # 2. turn NA into (Missing) factor level so that lm will not drop all the rows.
           df[[col]] <- forcats::fct_explicit_na(forcats::fct_lump(forcats::fct_infreq(as.factor(df[[col]])), n=predictor_n, ties.method="first"))
-        } else {
-          # for numeric cols, filter NA rows, because lm will anyway do this internally, and errors out
-          # if the remaining rows are with single value in any predictor column.
-          # filter Inf/-Inf too to avoid error at lm.
-          df <- df %>% dplyr::filter(!is.na(df[[col]]) & !is.infinite(df[[col]]))
         }
       }
 
