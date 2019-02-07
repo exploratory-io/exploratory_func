@@ -241,8 +241,9 @@ build_lm.fast <- function(df,
     }
   }
 
-  # randomForest fails if columns are not clean. TODO is this needed?
-  clean_df <- janitor::clean_names(df)
+  # Replace spaces with dots in column names. margins::marginal_effects() fails without it.
+  clean_df <- df
+  names(clean_df) <- stringr::str_replace_all(names(df), ' ', '.')
   #clean_df <- df # turn off clean_names for lm
   # this mapping will be used to restore column names
   name_map <- colnames(clean_df)
