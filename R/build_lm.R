@@ -536,6 +536,7 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add tes
 #' special version of tidy.lm function to use with build_lm.fast.
 #' @export
 tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, ...) { #TODO: add test
+  margins::margins(x)
   switch(type,
     coefficients = {
       ret <- broom:::tidy.lm(x) # it seems that tidy.lm takes care of glm too
@@ -587,6 +588,7 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
 #' special version of tidy.glm function to use with build_lm.fast.
 #' @export
 tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, ...) { #TODO: add test
+  margins::margins(x)
   switch(type,
     coefficients = {
       ret <- broom:::tidy.lm(x) # it seems that tidy.lm takes care of glm too
@@ -643,4 +645,9 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
       ret
     }
   )
+}
+
+#' @export
+find_data.glm_exploratory <- function(model, env = parent.frame(), ...) {
+  model$data
 }
