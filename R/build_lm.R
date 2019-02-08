@@ -8,7 +8,7 @@ extract_average_marginal_effects <- function(model, terms) {
   alpha=0.05
   interval <- terms %>% purrr::map(function(x){y <- m[[paste0("dydx_", x)]]; qt(1-alpha/2, sum(!is.na(y))) * (sd(y, na.rm=T) / sqrt(sum(!is.na(y))))}) 
   interval <- purrr::flatten_dbl(interval)
-  ret <- data.frame(ame=ame, ame_high=ame+interval, ame_low=ame-interval)
+  ret <- data.frame(ame=ame, ame_low=ame-interval, ame_high=ame+interval)
   ret
 }
 
@@ -641,7 +641,7 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
       ret <- ret %>% dplyr::bind_cols(extract_average_marginal_effects(x, ret$term))
       if (pretty.name) {
         ret <- ret %>% rename(Term=term, Coefficient=estimate, `Std Error`=std.error,
-                              `t Ratio`=statistic, `P Value`=p.value, `Conf Low`=conf.low, `Conf High`=conf.high, `Average Marginal Effect`=ame)
+                              `t Ratio`=statistic, `P Value`=p.value, `Conf Low`=conf.low, `Conf High`=conf.high, `Average Marginal Effect`=ame,`AME Low`=ame_low,`AME High`=ame_high)
         if (x$family$family == "binomial") { # odds ratio is only for logistic regression
           ret <- ret %>% rename(`Odds Ratio`=odds_ratio)
         }
