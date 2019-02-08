@@ -1,22 +1,21 @@
 # Extracts averate marginal fffects from model.
-extract_average_marginal_effects <- function(model) {
-  # Fast versin that only calls margins::margins().
-  # margins::margins() does a lot more than margins::marginal_effects(),
-  # and takes about 10 times more time.
-  #
-  # m <- margins::marginal_effects(model)
-  # ame <- terms %>% purrr::map(function(x){mean(m[[paste0("dydx_", x)]], na.rm=TRUE)})
-  # ame <- purrr::flatten_dbl(ame)
-  # alpha=0.05
-  # interval <- terms %>% purrr::map(function(x){y <- m[[paste0("dydx_", x)]]; qt(1-alpha/2, sum(!is.na(y))) * (sd(y, na.rm=T) / sqrt(sum(!is.na(y))))}) 
-  # interval <- purrr::flatten_dbl(interval)
-  # ret <- data.frame(term=terms, ame=ame, ame_low=ame-interval, ame_high=ame+interval)
-
-  m <- margins::margins(model)
-  ret <- as.data.frame(summary(m))
-  ret <- ret %>% dplyr::rename(term=factor, ame=AME, ame_low=lower, ame_high=upper) %>%
-    dplyr::select(term, ame, ame_low, ame_high) #TODO: look into SE, z, p too.
-  ret
+extract_average_marginal_effects <- function(model, with_interval=FALSE) {
+  if (with_interval) {
+    m <- margins::margins(model)
+    ret <- as.data.frame(summary(m))
+    ret <- ret %>% dplyr::rename(term=factor, ame=AME, ame_low=lower, ame_high=upper) %>%
+      dplyr::select(term, ame, ame_low, ame_high) #TODO: look into SE, z, p too.
+    ret
+  }
+  else {
+    # Fast versin that only calls margins::margins().
+    # margins::margins() does a lot more than margins::marginal_effects(),
+    # and takes about 10 times more time.
+    term <- stringr::str_replace(names(me), "^dydx_", "")
+    ame <- purrr::flatten_dbl(purrr::map(me, function(x){mean(x, na.rm=TRUE)}))
+    ret <- data.frame(term=term, ame=ame)
+    ret
+  }
 }
 
 
@@ -655,7 +654,13 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
       }
       if (pretty.name) {
         ret <- ret %>% rename(Term=term, Coefficient=estimate, `Std Error`=std.error,
-                              `t Ratio`=statistic, `P Value`=p.value, `Conf Low`=conf.low, `Conf High`=conf.high, `Average Marginal Effect`=ame,`AME Low`=ame_low,`AME High`=ame_high)
+                              `t Ratio`=statistic, `P Value`=p.value, `Conf Low`=conf.low, `Conf High`=conf.high)
+        if (!is.null(ret$ame)) {
+          ret <- ret %>% rename(`Average Marginal Effect`=ame)
+        }
+        if (!is.null(ret$ame_low)) {
+          ret <- ret %>% rename(`AME Low`=ame_low,`AME High`=ame_high)
+        }
         if (x$family$family == "binomial") { # odds ratio is only for logistic regression
           ret <- ret %>% rename(`Odds Ratio`=odds_ratio)
         }
