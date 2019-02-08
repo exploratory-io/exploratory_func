@@ -1,14 +1,20 @@
 # Extracts averate marginal fffects from model.
 extract_average_marginal_effects <- function(model, terms) {
+  # Fast versin that only calls margins::margins().
   # margins::margins() does a lot more than margins::marginal_effects(),
   # and takes about 10 times more time.
-  m <- margins::marginal_effects(model)
-  ame <- terms %>% purrr::map(function(x){mean(m[[paste0("dydx_", x)]], na.rm=TRUE)})
-  ame <- purrr::flatten_dbl(ame)
-  alpha=0.05
-  interval <- terms %>% purrr::map(function(x){y <- m[[paste0("dydx_", x)]]; qt(1-alpha/2, sum(!is.na(y))) * (sd(y, na.rm=T) / sqrt(sum(!is.na(y))))}) 
-  interval <- purrr::flatten_dbl(interval)
-  ret <- data.frame(term=terms, ame=ame, ame_low=ame-interval, ame_high=ame+interval)
+  #
+  # m <- margins::marginal_effects(model)
+  # ame <- terms %>% purrr::map(function(x){mean(m[[paste0("dydx_", x)]], na.rm=TRUE)})
+  # ame <- purrr::flatten_dbl(ame)
+  # alpha=0.05
+  # interval <- terms %>% purrr::map(function(x){y <- m[[paste0("dydx_", x)]]; qt(1-alpha/2, sum(!is.na(y))) * (sd(y, na.rm=T) / sqrt(sum(!is.na(y))))}) 
+  # interval <- purrr::flatten_dbl(interval)
+  # ret <- data.frame(term=terms, ame=ame, ame_low=ame-interval, ame_high=ame+interval)
+
+  m <- margins::margins(model)
+  ret <- as.data.frame(summary(m))
+  ret <- ret %>% dplyr::rename(term=factor, ame=AME, ame_low=lower, ame_high=upper) #TODO: look into SE, z, p too.
   ret
 }
 
