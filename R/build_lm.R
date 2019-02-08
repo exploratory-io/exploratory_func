@@ -460,8 +460,10 @@ build_lm.fast <- function(df,
       # add special lm_exploratory class for adding extra info at glance().
       if (model_type == "glm") {
         class(rf) <- c("glm_exploratory", class(rf))
-        # rf$marginal_effects <- extract_average_marginal_effects(rf, names(rf$coefficients)) # Version that uses margin::marginal_effects() for speed.
-        rf$marginal_effects <- extract_average_marginal_effects(rf) # This has to be done after glm_exploratory class name is set.
+        if (family == "binomial" && is.null(link)) { # For now, calculate marginal_effects for logistic regression only. It seems to fail for probit for example.
+          # rf$marginal_effects <- extract_average_marginal_effects(rf, names(rf$coefficients)) # Version that uses margin::marginal_effects() for speed.
+          rf$marginal_effects <- extract_average_marginal_effects(rf) # This has to be done after glm_exploratory class name is set.
+        }
       }
       else {
         class(rf) <- c("lm_exploratory", class(rf))
