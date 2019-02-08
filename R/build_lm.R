@@ -177,6 +177,7 @@ build_lm.fast <- function(df,
                     relimp_relative = TRUE,
                     with_marginal_effects = FALSE,
                     with_marginal_effects_confint = FALSE,
+                    variable_metric = NULL,
                     seed = NULL
                     ){
   # TODO: add test
@@ -189,6 +190,10 @@ build_lm.fast <- function(df,
   selected_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
 
   grouped_cols <- grouped_by(df)
+
+  if (variable_metric == "ame") { # Special argument for integration with Analytics View.
+    with_marginal_effects <- TRUE
+  }
 
   if (model_type  == "glm" && is.null(family)) {
     family = "binomial" # default for glm is logistic regression.
