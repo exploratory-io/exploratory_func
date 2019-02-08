@@ -14,7 +14,8 @@ extract_average_marginal_effects <- function(model, terms) {
 
   m <- margins::margins(model)
   ret <- as.data.frame(summary(m))
-  ret <- ret %>% dplyr::rename(term=factor, ame=AME, ame_low=lower, ame_high=upper) #TODO: look into SE, z, p too.
+  ret <- ret %>% dplyr::rename(term=factor, ame=AME, ame_low=lower, ame_high=upper) %>%
+    dplyr::select(term, ame, ame_low, ame_high) #TODO: look into SE, z, p too.
   ret
 }
 
