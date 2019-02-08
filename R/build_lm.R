@@ -8,7 +8,7 @@ extract_average_marginal_effects <- function(model, terms) {
   alpha=0.05
   interval <- terms %>% purrr::map(function(x){y <- m[[paste0("dydx_", x)]]; qt(1-alpha/2, sum(!is.na(y))) * (sd(y, na.rm=T) / sqrt(sum(!is.na(y))))}) 
   interval <- purrr::flatten_dbl(interval)
-  ret <- data.frame(ame=ame, ame_low=ame-interval, ame_high=ame+interval)
+  ret <- data.frame(term=terms, ame=ame, ame_low=ame-interval, ame_high=ame+interval)
   ret
 }
 
@@ -449,9 +449,11 @@ build_lm.fast <- function(df,
       rf$terms_mapping <- names(name_map)
       names(rf$terms_mapping) <- name_map
       rf$orig_levels <- orig_levels
+
       # add special lm_exploratory class for adding extra info at glance().
       if (model_type == "glm") {
         class(rf) <- c("glm_exploratory", class(rf))
+        rf$marginal_effects <- extract_average_marginal_effects(rf, names(rf$coefficients)) # This has to be done after glm_exploratory class name is set.
       }
       else {
         class(rf) <- c("lm_exploratory", class(rf))
@@ -638,7 +640,9 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
       if (x$family$family == "binomial") { # odds ratio is only for logistic regression
         ret <- ret %>% mutate(odds_ratio=exp(estimate))
       }
-      ret <- ret %>% dplyr::bind_cols(extract_average_marginal_effects(x, ret$term))
+      if (!is.null(x$marginal_effects)) {
+        ret <- ret %>% dplyr::left_join(x$marginal_effects, by="term")
+      }
       if (pretty.name) {
         ret <- ret %>% rename(Term=term, Coefficient=estimate, `Std Error`=std.error,
                               `t Ratio`=statistic, `P Value`=p.value, `Conf Low`=conf.low, `Conf High`=conf.high, `Average Marginal Effect`=ame,`AME Low`=ame_low,`AME High`=ame_high)
