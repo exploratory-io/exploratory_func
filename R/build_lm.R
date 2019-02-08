@@ -191,7 +191,7 @@ build_lm.fast <- function(df,
 
   grouped_cols <- grouped_by(df)
 
-  if (variable_metric == "ame") { # Special argument for integration with Analytics View.
+  if (!is.null(variable_metric)  && variable_metric == "ame") { # Special argument for integration with Analytics View.
     with_marginal_effects <- TRUE
   }
 
@@ -637,7 +637,7 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
 
 #' special version of tidy.glm function to use with build_lm.fast.
 #' @export
-tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, ...) { #TODO: add test
+tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, variable_metric = NULL, ...) { #TODO: add test
   switch(type,
     coefficients = {
       ret <- broom:::tidy.lm(x) # it seems that tidy.lm takes care of glm too
@@ -654,6 +654,9 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
       ret <- ret %>% mutate(conf.high=estimate+1.96*std.error, conf.low=estimate-1.96*std.error)
       if (x$family$family == "binomial") { # odds ratio is only for logistic regression
         ret <- ret %>% mutate(odds_ratio=exp(estimate))
+        if (!is.null(variable_metric) && variable_metric == "odds_ratio") { # For Analytics View, overwrite conf.low/conf.high with those of odds ratio.
+          ret <- ret %>% mutate(conf.low=exp(conf.low), conf.high=exp(conf.high))
+        }
       }
       if (!is.null(x$marginal_effects)) {
         ret <- ret %>% dplyr::left_join(x$marginal_effects, by="term")
