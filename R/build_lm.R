@@ -11,6 +11,7 @@ extract_average_marginal_effects <- function(model, with_confint=FALSE) {
     # Fast versin that only calls margins::margins().
     # margins::margins() does a lot more than margins::marginal_effects(),
     # and takes about 10 times more time.
+    me <- margins::marginal_effects(model)
     term <- stringr::str_replace(names(me), "^dydx_", "")
     ame <- purrr::flatten_dbl(purrr::map(me, function(x){mean(x, na.rm=TRUE)}))
     ret <- data.frame(term=term, ame=ame)

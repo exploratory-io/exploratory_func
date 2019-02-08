@@ -38,7 +38,7 @@ test_that("binary prediction with factor target column", {
   # otherwise, the number of rows of the result of prediction becomes 0
   test_data <- dplyr::bind_rows(test_data, test_data)
 
-  model_data <- build_lm.fast(test_data, `CANCELLED X`, `Carrier Name`, CARRIER, DISTANCE, model_type = "glm", smote=FALSE)
+  model_data <- build_lm.fast(test_data, `CANCELLED X`, `Carrier Name`, CARRIER, DISTANCE, model_type = "glm", smote=FALSE, with_marginal_effects=TRUE, with_marginal_effects_confint=FALSE)
   ret <- model_data %>% broom::glance(model, pretty.name=TRUE)
   expect_equal(ret$`Data Size for Y`, 4) # This ends up to be 4 after doubling
   expect_equal(ret$`Data Size for N`, 30) # This ends up to be 30 after doubling and removing NA rows.
