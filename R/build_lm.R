@@ -1,6 +1,6 @@
 # Extracts averate marginal fffects from model.
-extract_average_marginal_effects <- function(model, with_interval=FALSE) {
-  if (with_interval) {
+extract_average_marginal_effects <- function(model, with_confint=FALSE) {
+  if (with_confint) {
     m <- margins::margins(model)
     ret <- as.data.frame(summary(m))
     ret <- ret %>% dplyr::rename(term=factor, ame=AME, ame_low=lower, ame_high=upper) %>%
@@ -175,6 +175,8 @@ build_lm.fast <- function(df,
                     relimp_bootstrap_type = "perc",
                     relimp_conf_level = 0.95,
                     relimp_relative = TRUE,
+                    with_marginal_effects = FALSE,
+                    with_marginal_effects_confint = FALSE,
                     seed = NULL
                     ){
   # TODO: add test
@@ -459,9 +461,8 @@ build_lm.fast <- function(df,
       # add special lm_exploratory class for adding extra info at glance().
       if (model_type == "glm") {
         class(rf) <- c("glm_exploratory", class(rf))
-        if (family == "binomial" && is.null(link)) { # For now, calculate marginal_effects for logistic regression only. It seems to fail for probit for example.
-          # rf$marginal_effects <- extract_average_marginal_effects(rf, names(rf$coefficients)) # Version that uses margin::marginal_effects() for speed.
-          rf$marginal_effects <- extract_average_marginal_effects(rf) # This has to be done after glm_exploratory class name is set.
+        if (with_marginal_effects) { # For now, we have tested marginal_effects for logistic regression only. It seems to fail for probit for example.
+          rf$marginal_effects <- extract_average_marginal_effects(rf, with_confint=with_marginal_effects_confint) # This has to be done after glm_exploratory class name is set.
         }
       }
       else {
