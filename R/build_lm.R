@@ -171,7 +171,7 @@ build_lm.fast <- function(df,
                     max_nrow = 50000,
                     predictor_n = 12, # so that at least months can fit in it.
                     smote = FALSE,
-                    relimp_type = "lmg",
+                    relimp_type = "first",
                     relimp_bootstrap_runs = 20,
                     relimp_bootstrap_type = "perc",
                     relimp_conf_level = 0.95,
@@ -614,17 +614,17 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
       if (!is.null(x$relative_importance)) {
         # Add columns for relative importance. NA for the first row is for the row for intercept.
         term <- x$relative_importance$namen[2:length(x$relative_importance$namen)] # Skip first element, which is the target variable name.
-        lmg <- x$relative_importance$lmg
-        lmg.high <- x$relative_importance$lmg.upper[1,] # Following naming convention of other columns.
-        lmg.low <- x$relative_importance$lmg.lower[1,] # Following naming convention of other columns.
-        ret <- data.frame(term = term, lmg = lmg, lmg.high = lmg.high, lmg.low = lmg.low)
+        importance <- attr(x$relative_importance, x$relative_importance$type)
+        importance.high <- attr(x$relative_importance, paste0(x$relative_importance$type, ".upper"))[1,] # Following naming convention of other columns.
+        importance.low <- attr(x$relative_importance, paste0(x$relative_importance$type, ".lower"))[1,] # Following naming convention of other columns.
+        ret <- data.frame(term = term, importance = importance, importance.high = importance.high, importance.low = importance.low)
         # Reorder factor by the value of relative importance (lmg).
-        ret <- ret %>% dplyr::mutate(term = forcats::fct_reorder(term, lmg, .fun = sum, .desc = TRUE))
+        ret <- ret %>% dplyr::mutate(term = forcats::fct_reorder(term, importance, .fun = sum, .desc = TRUE))
         if (pretty.name) {
           ret <- ret %>% rename(`Variable` = term,
-                                `Relative Importance` = lmg,
-                                `Relative Importance High` = lmg.high,
-                                `Relative Importance Low` = lmg.low)
+                                `Relative Importance` = importance,
+                                `Relative Importance High` = importance.high,
+                                `Relative Importance Low` = importance.low)
         }
         ret
       }
