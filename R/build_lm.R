@@ -1,5 +1,5 @@
-# Extracts average marginal effects from model.
-extract_average_marginal_effects <- function(model, with_confint=FALSE) {
+# Calculate average marginal effects from model with margins package.
+calc_average_marginal_effects <- function(model, with_confint=FALSE) {
   if (with_confint) {
     m <- margins::margins(model)
     ret <- as.data.frame(summary(m))
@@ -468,7 +468,7 @@ build_lm.fast <- function(df,
       if (model_type == "glm") {
         class(rf) <- c("glm_exploratory", class(rf))
         if (with_marginal_effects) { # For now, we have tested marginal_effects for logistic regression only. It seems to fail for probit for example.
-          rf$marginal_effects <- extract_average_marginal_effects(rf, with_confint=with_marginal_effects_confint) # This has to be done after glm_exploratory class name is set.
+          rf$marginal_effects <- calc_average_marginal_effects(rf, with_confint=with_marginal_effects_confint) # This has to be done after glm_exploratory class name is set.
         }
       }
       else {
