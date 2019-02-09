@@ -1,4 +1,4 @@
-# Extracts averate marginal fffects from model.
+# Extracts average marginal effects from model.
 extract_average_marginal_effects <- function(model, with_confint=FALSE) {
   if (with_confint) {
     m <- margins::margins(model)
