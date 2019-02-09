@@ -1185,7 +1185,7 @@ calc_feature_imp <- function(df,
         names(rf$boruta$terms_mapping) <- name_map
         class(rf$boruta) <- c("Boruta_exploratory", class(rf))
       }
-      class(rf) <- c("ranger_exploratory", class(rf))
+      class(rf) <- c("ranger", class(rf))
       rf
     }, error = function(e){
       if(length(grouped_cols) > 0) {
@@ -1318,7 +1318,7 @@ evaluate_binary_classification <- function(actual, predicted, predicted_probabil
 
 #' @export
 #' @param type "importance", "evaluation" or "conf_mat". Feature importance, evaluated scores or confusion matrix of training data.
-tidy.ranger_exploratory <- function(x, type = "importance", pretty.name = FALSE, ...) {
+tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
   switch(
     type,
     importance = {
@@ -1462,7 +1462,7 @@ tidy.ranger_exploratory <- function(x, type = "importance", pretty.name = FALSE,
 
 # This is used from Analytics View only when classification type is regression.
 #' @export
-glance.ranger_exploratory <- function(x, pretty.name = FALSE, ...) {
+glance.ranger <- function(x, pretty.name = FALSE, ...) {
   ret <- data.frame(
     root_mean_square_error = sqrt(x$prediction.error),
     r_squared = x$r.squared
