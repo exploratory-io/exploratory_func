@@ -76,6 +76,7 @@ test_that("test calc_feature_imp predicting multi-class", {
   ret <- model_df %>% rf_partial_dependence()
   ret <- model_df %>% rf_evaluation(pretty.name=TRUE) # TODO test that output is different from binary classification with TRUE/FALSE
   ret <- model_df %>% rf_evaluation_by_class(pretty.name=TRUE)
+  ret <- model_df %>% tidy(model, type="boruta")
 
   # make target facter and try again
   factor_test_data <- test_data %>% mutate(`Tar get`=factor(`Tar get`))

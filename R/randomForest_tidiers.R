@@ -1455,6 +1455,15 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
       ret <- ret %>% dplyr::mutate(x_name = x$terms_mapping[x_name]) # map variable names to original.
       ret
     },
+    boruta = {
+      if (!is.null(x$boruta)) {
+        ret <- tidy.Boruta_exploratory(x$boruta)
+      }
+      else {
+        ret <- data.frame() # Skip by returning empty data.frame.
+      }
+      ret
+    },
     {
       stop(paste0("type ", type, " is not defined"))
     })
