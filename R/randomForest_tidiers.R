@@ -1178,6 +1178,11 @@ calc_feature_imp <- function(df,
           sample.fraction = sample.fraction,
           probability = (classification_type == "binary") # build probability tree for AUC only for binary classification.
         )
+        # These attributes are used in tidy. They are also at ranger level, but we are making Boruta object self-contained.
+        rf$boruta$classification_type <- classification_type
+        rf$boruta$orig_levels <- orig_levels
+        rf$boruta$terms_mapping <- names(name_map)
+        names(rf$boruta$terms_mapping) <- name_map
       }
       rf
     }, error = function(e){
