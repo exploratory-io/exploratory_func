@@ -154,7 +154,7 @@ build_lm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, gr
 }
 
 #' builds lm model quickly for analytics view.
-#' @param relimp_type - Passed down to boot.relimp, but "lmg" is the only practically useful option.
+#' @param relimp_type - Passed down to boot.relimp, but "lmg" seems to be the recommended option, but is very slow. default is "none".
 #' @param relimp_bootstrap_runs - Number of bootstrap iterations. Default 20.
 #' @param relimp_bootstrap_type - Type of bootstrapping, passed down to boot package from inside relaimpo package.
 #'                                Can be "basic", "perc", "bca", or "norm".
@@ -171,7 +171,7 @@ build_lm.fast <- function(df,
                     max_nrow = 50000,
                     predictor_n = 12, # so that at least months can fit in it.
                     smote = FALSE,
-                    relimp_type = "first",
+                    relimp_type = "none",
                     relimp_bootstrap_runs = 20,
                     relimp_bootstrap_type = "perc",
                     relimp_conf_level = 0.95,
@@ -447,17 +447,19 @@ build_lm.fast <- function(df,
       }
       else {
         rf <- stats::lm(fml, data = df) 
-        tryCatch({
-          # Calculate relative importance. TODO: Expose the arguments. 
-          rf$relative_importance <- relaimpo::booteval.relimp(relaimpo::boot.relimp(rf, type = relimp_type,
-                                                                                    b = relimp_bootstrap_runs,
-                                                                                    rela = relimp_relative,
-                                                                                    rank = FALSE,
-                                                                                    diff = FALSE),
-                                                              bty = relimp_bootstrap_type, level = relimp_conf_level)
-        }, error = function(e){
-          # This can fail when columns are not linearly independent. Keep going. TODO: Show error in summary table.
-        })
+        if (!is.null(relimp_type) && relimp_type != "none") {
+          tryCatch({
+            # Calculate relative importance. TODO: Expose the arguments. 
+            rf$relative_importance <- relaimpo::booteval.relimp(relaimpo::boot.relimp(rf, type = relimp_type,
+                                                                                      b = relimp_bootstrap_runs,
+                                                                                      rela = relimp_relative,
+                                                                                      rank = FALSE,
+                                                                                      diff = FALSE),
+                                                                bty = relimp_bootstrap_type, level = relimp_conf_level)
+          }, error = function(e){
+            # This can fail when columns are not linearly independent. Keep going. TODO: Show error in summary table.
+          })
+        }
       }
       # these attributes are used in tidy of randomForest TODO: is this good for lm too?
       rf$terms_mapping <- names(name_map)
