@@ -1,3 +1,25 @@
+# Calculate average marginal effects from model with margins package.
+calc_average_marginal_effects <- function(model, with_confint=FALSE) {
+  if (with_confint) {
+    m <- margins::margins(model)
+    ret <- as.data.frame(summary(m))
+    ret <- ret %>% dplyr::rename(term=factor, ame=AME, ame_low=lower, ame_high=upper) %>%
+      dplyr::select(term, ame, ame_low, ame_high) #TODO: look into SE, z, p too.
+    ret
+  }
+  else {
+    # Fast versin that only calls margins::margins().
+    # margins::margins() does a lot more than margins::marginal_effects(),
+    # and takes about 10 times more time.
+    me <- margins::marginal_effects(model)
+    term <- stringr::str_replace(names(me), "^dydx_", "")
+    ame <- purrr::flatten_dbl(purrr::map(me, function(x){mean(x, na.rm=TRUE)}))
+    ret <- data.frame(term=term, ame=ame)
+    ret
+  }
+}
+
+
 #' lm wrapper with do
 #' @return deta frame which has lm model
 #' @param data Data frame to be used as data
@@ -154,6 +176,9 @@ build_lm.fast <- function(df,
                     relimp_bootstrap_type = "perc",
                     relimp_conf_level = 0.95,
                     relimp_relative = TRUE,
+                    with_marginal_effects = FALSE,
+                    with_marginal_effects_confint = FALSE,
+                    variable_metric = NULL,
                     seed = NULL
                     ){
   # TODO: add test
@@ -166,6 +191,10 @@ build_lm.fast <- function(df,
   selected_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
 
   grouped_cols <- grouped_by(df)
+
+  if (!is.null(variable_metric)  && variable_metric == "ame") { # Special argument for integration with Analytics View.
+    with_marginal_effects <- TRUE
+  }
 
   if (model_type  == "glm" && is.null(family)) {
     family = "binomial" # default for glm is logistic regression.
@@ -230,9 +259,12 @@ build_lm.fast <- function(df,
     }
   }
 
-  # randomForest fails if columns are not clean. TODO is this needed?
-  #clean_df <- janitor::clean_names(df)
-  clean_df <- df # turn off clean_names for lm
+  # Replace spaces with dots in column names. margins::marginal_effects() fails without it.
+  clean_df <- df
+  # skip cleaning of column names for lm since marginal_effects() is not called.
+  if (model_type != "lm") {
+    names(clean_df) <- stringr::str_replace_all(names(df), ' ', '.')
+  }
   # this mapping will be used to restore column names
   name_map <- colnames(clean_df)
   names(name_map) <- colnames(df)
@@ -256,13 +288,24 @@ build_lm.fast <- function(df,
         # for numeric cols, filter NA rows, because lm will anyway do this internally, and errors out
         # if the remaining rows are with single value in any predictor column.
         # filter Inf/-Inf too to avoid error at lm.
-        dplyr::filter(!is.na(df[[target_col]]) & !is.infinite(df[[target_col]])) # this form does not handle group_by. so moved into each_func from outside.
+        dplyr::filter(!is.na(df[[clean_target_col]]) & !is.infinite(df[[clean_target_col]])) # this form does not handle group_by. so moved into each_func from outside.
 
       # sample the data because randomForest takes long time
       # if data size is too large
       df <- df %>% sample_rows(max_nrow)
 
       c_cols <- clean_cols
+      # To avoid unused factor level that causes margins::marginal_effects() to fail, filtering operation has
+      # to be done before factor level adjustments. Because of that, the for statement below has to
+      # be separate from the for statement after that, and done first.
+      for(col in clean_cols){
+        if(is.numeric(df[[col]])) {
+          # for numeric cols, filter NA rows, because lm will anyway do this internally, and errors out
+          # if the remaining rows are with single value in any predictor column.
+          # filter Inf/-Inf too to avoid error at lm.
+          df <- df %>% dplyr::filter(!is.na(df[[col]]) & !is.infinite(df[[col]]))
+        }
+      }
       for(col in clean_cols){
         if(lubridate::is.Date(df[[col]]) || lubridate::is.POSIXct(df[[col]])) {
           c_cols <- setdiff(c_cols, col)
@@ -314,6 +357,7 @@ build_lm.fast <- function(df,
           }
           df[[col]] <- NULL # drop original Date/POSIXct column to pass SMOTE later.
         } else if(is.factor(df[[col]])) {
+          df[[col]] <- forcats::fct_drop(df[[col]]) # margins::marginal_effects() fails if unused factor level exists. Drop them to avoid it.
           # 1. if the data is factor, respect the levels and keep first 10 levels, and make others "Others" level.
           # 2. if the data is ordered factor, turn it into unordered. For ordered factor,
           #    lm/glm takes polynomial terms (Linear, Quadratic, Cubic, and so on) and use them as variables,
@@ -337,11 +381,6 @@ build_lm.fast <- function(df,
           #    TODO: see if ties.method would make sense for calc_feature_imp.
           # 2. turn NA into (Missing) factor level so that lm will not drop all the rows.
           df[[col]] <- forcats::fct_explicit_na(forcats::fct_lump(forcats::fct_infreq(as.factor(df[[col]])), n=predictor_n, ties.method="first"))
-        } else {
-          # for numeric cols, filter NA rows, because lm will anyway do this internally, and errors out
-          # if the remaining rows are with single value in any predictor column.
-          # filter Inf/-Inf too to avoid error at lm.
-          df <- df %>% dplyr::filter(!is.na(df[[col]]) & !is.infinite(df[[col]]))
         }
       }
 
@@ -362,6 +401,13 @@ build_lm.fast <- function(df,
       if (model_type == "glm") {
         if (smote) {
           df <- df %>% exp_balance(clean_target_col, sample=FALSE) # no further sampling
+          for(col in names(df)){
+            if(is.factor(df[[col]])) {
+              # margins::marginal_effects() fails if unused factor level exists. Drop them to avoid it.
+              # In case of SMOTE, this has to be done after that. TODO: Do this just once in any case.
+              df[[col]] <- forcats::fct_drop(df[[col]])
+            }
+          }
         }
         if (is.null(link)) {
           rf <- stats::glm(fml, data = df, family = family) 
@@ -415,9 +461,13 @@ build_lm.fast <- function(df,
       rf$terms_mapping <- names(name_map)
       names(rf$terms_mapping) <- name_map
       rf$orig_levels <- orig_levels
+
       # add special lm_exploratory class for adding extra info at glance().
       if (model_type == "glm") {
         class(rf) <- c("glm_exploratory", class(rf))
+        if (with_marginal_effects) { # For now, we have tested marginal_effects for logistic regression only. It seems to fail for probit for example.
+          rf$marginal_effects <- calc_average_marginal_effects(rf, with_confint=with_marginal_effects_confint) # This has to be done after glm_exploratory class name is set.
+        }
       }
       else {
         class(rf) <- c("lm_exploratory", class(rf))
@@ -586,7 +636,7 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
 
 #' special version of tidy.glm function to use with build_lm.fast.
 #' @export
-tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, ...) { #TODO: add test
+tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, variable_metric = NULL, ...) { #TODO: add test
   switch(type,
     coefficients = {
       ret <- broom:::tidy.lm(x) # it seems that tidy.lm takes care of glm too
@@ -603,10 +653,22 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
       ret <- ret %>% mutate(conf.high=estimate+1.96*std.error, conf.low=estimate-1.96*std.error)
       if (x$family$family == "binomial") { # odds ratio is only for logistic regression
         ret <- ret %>% mutate(odds_ratio=exp(estimate))
+        if (!is.null(variable_metric) && variable_metric == "odds_ratio") { # For Analytics View, overwrite conf.low/conf.high with those of odds ratio.
+          ret <- ret %>% mutate(conf.low=exp(conf.low), conf.high=exp(conf.high))
+        }
+      }
+      if (!is.null(x$marginal_effects)) {
+        ret <- ret %>% dplyr::left_join(x$marginal_effects, by="term")
       }
       if (pretty.name) {
         ret <- ret %>% rename(Term=term, Coefficient=estimate, `Std Error`=std.error,
                               `t Ratio`=statistic, `P Value`=p.value, `Conf Low`=conf.low, `Conf High`=conf.high)
+        if (!is.null(ret$ame)) {
+          ret <- ret %>% rename(`Average Marginal Effect`=ame)
+        }
+        if (!is.null(ret$ame_low)) {
+          ret <- ret %>% rename(`AME Low`=ame_low,`AME High`=ame_high)
+        }
         if (x$family$family == "binomial") { # odds ratio is only for logistic regression
           ret <- ret %>% rename(`Odds Ratio`=odds_ratio)
         }
@@ -643,4 +705,11 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
       ret
     }
   )
+}
+
+# For some reason, find_data called from inside margins::marginal_effects() fails in Exploratory.
+# Explicitly declaring find_data for our glm_exploratory class works it around.
+#' @export
+find_data.glm_exploratory <- function(model, env = parent.frame(), ...) {
+  model$data
 }
