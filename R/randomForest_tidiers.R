@@ -1183,7 +1183,9 @@ calc_feature_imp <- function(df,
         rf$boruta$orig_levels <- orig_levels
         rf$boruta$terms_mapping <- names(name_map)
         names(rf$boruta$terms_mapping) <- name_map
+        class(rf$boruta) <- c("Boruta_exploratory", class(rf))
       }
+      class(rf) <- c("ranger_exploratory", class(rf)Boruta)
       rf
     }, error = function(e){
       if(length(grouped_cols) > 0) {
@@ -1316,7 +1318,7 @@ evaluate_binary_classification <- function(actual, predicted, predicted_probabil
 
 #' @export
 #' @param type "importance", "evaluation" or "conf_mat". Feature importance, evaluated scores or confusion matrix of training data.
-tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
+tidy.ranger_exploratory <- function(x, type = "importance", pretty.name = FALSE, ...) {
   switch(
     type,
     importance = {
@@ -1460,7 +1462,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
 
 # This is used from Analytics View only when classification type is regression.
 #' @export
-glance.ranger <- function(x, pretty.name = FALSE, ...) {
+glance.ranger_exploratory <- function(x, pretty.name = FALSE, ...) {
   ret <- data.frame(
     root_mean_square_error = sqrt(x$prediction.error),
     r_squared = x$r.squared
@@ -1884,7 +1886,7 @@ exp_boruta <- function(df,
   do_on_each_group(clean_df, each_func, name = "model", with_unnest = FALSE)
 }
 
-tidy.Boruta <- function(x, ...) {
+tidy.Boruta_exploratory <- function(x, ...) {
   res <- tidyr::gather(as.data.frame(x$ImpHistory), "variable","importance")
   decisions <- data.frame(variable=names(x$finalDecision), decision=x$finalDecision)
   res <- res %>% dplyr::left_join(decisions, by = "variable") 
@@ -1896,7 +1898,7 @@ tidy.Boruta <- function(x, ...) {
   res
 }
 
-glance.Boruta <- function(x, pretty.name = FALSE, ...) {
+glance.Boruta_exploratory <- function(x, pretty.name = FALSE, ...) {
   res <- data.frame(iterations = nrow(x$ImpHistory), time_taken = as.numeric(x$timeTaken), p_value = x$pValue)
   if (pretty.name) {
     res <- res %>% dplyr::rename(Iterations = iterations, `Time Taken (Second)` = time_taken, `P Value Threshold` = p_value)
