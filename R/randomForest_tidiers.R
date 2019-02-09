@@ -1053,6 +1053,8 @@ calc_feature_imp <- function(df,
                              predictor_n = 12, # So that at least months can fit in it.
                              smote = FALSE,
                              max_pd_vars = 12, # Number of most important variables to calculate partial dependences on. Default 12 fits well with either 3 or 4 columns of facets. 
+                             max_runs = 20, # Maximal number of importance source runs.
+                             p_value = 0.05, # Boruta recommends using the default 0.01 for P-value, but we are using 0.05 for consistency with other functions of ours.
                              seed = NULL
                              ){
   if(!is.null(seed)){
@@ -1161,6 +1163,19 @@ calc_feature_imp <- function(df,
       names(rf$terms_mapping) <- name_map
       rf$y <- model.response(model_df)
       rf$df <- model_df
+      rf$boruta <- Boruta::Boruta(
+        fml,
+        data = model_df,
+        doTrace = 0,
+        maxRuns = max_runs + 1, # It seems Boruta stops at maxRuns - 1 iterations. Add 1 to be less confusing.
+        pValue = p_value,
+        # importance = "impurity", # In calc_feature_imp, we use impurity, but Boruta's getImpRfZ function uses permutation.
+        # Following parameters are to be relayed to ranger::ranger through Boruta::Boruta, then Boruta::getImpRfZ.
+        num.trees = ntree,
+        min.node.size = nodesize,
+        sample.fraction = sample.fraction,
+        probability = (classification_type == "binary") # build probability tree for AUC only for binary classification.
+      )
       rf
     }, error = function(e){
       if(length(grouped_cols) > 0) {
