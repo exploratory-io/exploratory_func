@@ -262,12 +262,12 @@ build_lm.fast <- function(df,
   # Replace spaces with dots in column names. margins::marginal_effects() fails without it.
   clean_df <- df
   if (model_type == "lm") {
-    # Cleaning of column names for relaimpo. - is not handled well. Replace them with _.
-    names(clean_df) <- stringr::str_replace_all(names(df), '-', '_')
+    # For lm, we can skip column names cleaning, since we do not use marginal_effects().
   }
   else {
     # Cleaning of column names for marginal_effects(). Space is not handled well. Replace them with '.'.
-    names(clean_df) <- stringr::str_replace_all(names(df), ' ', '.')
+    # Also, cleaning of column names for relaimpo. - is not handled well. Replace them with _.
+    names(clean_df) <- stringr::str_replace_all(names(df), ' ', '.') %>% stringr::str_replace_all('-', '_')
   }
   # this mapping will be used to restore column names
   name_map <- colnames(clean_df)
