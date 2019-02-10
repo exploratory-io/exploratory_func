@@ -451,7 +451,7 @@ build_lm.fast <- function(df,
         rf <- stats::lm(fml, data = df) 
         if (!is.null(relimp_type) && relimp_type != "none") {
           tryCatch({
-            # Calculate relative importance. TODO: Expose the arguments. 
+            # Calculate relative importance.
             rf$relative_importance <- relaimpo::booteval.relimp(relaimpo::boot.relimp(rf, type = relimp_type,
                                                                                       b = relimp_bootstrap_runs,
                                                                                       rela = relimp_relative,
