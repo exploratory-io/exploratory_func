@@ -139,6 +139,9 @@ tidy_test_df <- data.frame(
   val=seq(20),
   dim_na=c(paste0("dim", seq(10)), paste0("dim", seq(10)+3)))
 
+# test data for group_by.
+tidy_group_test_df <- dplyr::bind_rows(tidy_test_df, tidy_test_df) %>% dplyr::mutate(grp = c(rep("A",40), rep("B",40)))
+
 test_that("test do_cor.cols", {
   result <- spread_test_df %>%
     do_cor.cols(dplyr::starts_with("var"))
@@ -202,6 +205,18 @@ test_that("test do_cor.kv with model output", {
   expect_equal(result_cor[["value"]], replicate(2, 1))
   result_data <- result %>% tidy(model, type = "data")
   expect_equal(colnames(result_data), c("cat", "dim", "val", "dim_na"))
+})
+
+test_that("test do_cor.kv with group_by with model output", {
+  result <- tidy_group_test_df %>% group_by(grp) %>% do_cor.kv(cat, dim, val, return_type = "model")
+  result_cor <- result %>% tidy(model, type = "cor")
+  expect_equal(ncol(result_cor), 4)
+  expect_equal(result_cor[["grp"]], c("A", "A", "B", "B"))
+  expect_equal(result_cor[["cat.x"]], c("cat1", "cat2", "cat1", "cat2"))
+  expect_equal(result_cor[["cat.y"]], c("cat2", "cat1", "cat2", "cat1"))
+  expect_equal(result_cor[["value"]], replicate(4, 1))
+  result_data <- result %>% tidy(model, type = "data")
+  expect_equal(colnames(result_data), c("cat", "dim", "val", "dim_na", "grp")) # TODO: group column comes as the last column, but it might be easier to understand if it comes first.
 })
 
 test_that("test do_cor.kv for grouped data frame as subject error", {
