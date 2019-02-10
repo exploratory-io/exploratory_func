@@ -1784,6 +1784,7 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
   )
 }
 
+#' Used for separate Boruta Analytics View. Not used now.
 #' Wrapper for Boruta Analytics View
 #' @export
 exp_boruta <- function(df,
@@ -1877,6 +1878,7 @@ exp_boruta <- function(df,
       rf$orig_levels <- orig_levels
       rf$terms_mapping <- names(name_map)
       names(rf$terms_mapping) <- name_map
+      class(rf) <- c("Boruta_exploratory", class(rf))
       rf
     }, error = function(e){
       if(length(grouped_cols) > 0) {
