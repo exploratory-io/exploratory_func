@@ -69,13 +69,14 @@ test_that("test calc_feature_imp predicting multi-class", {
                      `cat 10`,
                      cat_25,
                       `num 1`,
-                      num_2)
+                      num_2, with_boruta=TRUE)
 
   conf_mat <- tidy(model_df, model, type = "conf_mat", pretty.name = TRUE)
   ret <- model_df %>% rf_importance()
   ret <- model_df %>% rf_partial_dependence()
   ret <- model_df %>% rf_evaluation(pretty.name=TRUE) # TODO test that output is different from binary classification with TRUE/FALSE
   ret <- model_df %>% rf_evaluation_by_class(pretty.name=TRUE)
+  ret <- model_df %>% tidy(model, type="boruta")
 
   # make target facter and try again
   factor_test_data <- test_data %>% mutate(`Tar get`=factor(`Tar get`))
@@ -85,13 +86,14 @@ test_that("test calc_feature_imp predicting multi-class", {
                      `cat 10`,
                      cat_25,
                       `num 1`,
-                      num_2)
+                      num_2, with_boruta=TRUE)
 
   conf_mat <- tidy(model_df, model, type = "conf_mat", pretty.name = TRUE)
   ret <- model_df %>% rf_importance()
   ret <- model_df %>% rf_partial_dependence()
   ret <- model_df %>% rf_evaluation(pretty.name=TRUE) # TODO test that output is different from binary classification with TRUE/FALSE
   ret <- model_df %>% rf_evaluation_by_class(pretty.name=TRUE)
+  ret <- model_df %>% tidy(model, type="boruta")
 
   # make target ordered facter and try again
   ordered_factor_test_data <- test_data %>% mutate(`Tar get`=factor(`Tar get`, ordered=TRUE))
@@ -101,13 +103,14 @@ test_that("test calc_feature_imp predicting multi-class", {
                      `cat 10`,
                      cat_25,
                       `num 1`,
-                      num_2)
+                      num_2, with_boruta=TRUE)
 
   conf_mat <- tidy(model_df, model, type = "conf_mat", pretty.name = TRUE)
   ret <- model_df %>% rf_importance()
   ret <- model_df %>% rf_partial_dependence()
   ret <- model_df %>% rf_evaluation(pretty.name=TRUE) # TODO test that output is different from binary classification with TRUE/FALSE
   ret <- model_df %>% rf_evaluation_by_class(pretty.name=TRUE)
+  ret <- model_df %>% tidy(model, type="boruta")
 })
 
 test_that("test calc_feature_imp predicting logical", {
@@ -128,7 +131,7 @@ test_that("test calc_feature_imp predicting logical", {
     calc_feature_imp(`Tar get`,
                       dplyr::starts_with("cat_"),
                       num_1,
-                      num_2, predictor_n = 6)
+                      num_2, predictor_n = 6, with_boruta=TRUE)
 
   conf_mat <- tidy(model_df, model, type = "conf_mat", pretty.name = TRUE)
 
@@ -141,6 +144,7 @@ test_that("test calc_feature_imp predicting logical", {
   ret <- model_df %>% rf_partial_dependence()
   ret <- model_df %>% rf_evaluation(pretty.name=TRUE) # TODO test that output is different from multiclass classification
   ret <- model_df %>% rf_evaluation_by_class(pretty.name=TRUE)
+  ret <- model_df %>% tidy(model, type="boruta")
   # factor order should be TRUE then FALSE.
   expect_equal(levels(conf_mat$actual_value)[1], "TRUE")
   expect_equal(levels(conf_mat$predicted_value)[1], "TRUE")
@@ -167,12 +171,13 @@ test_that("test calc_feature_imp with group_by where a group has only TRUE rows 
     calc_feature_imp(`Tar get`,
                       dplyr::starts_with("cat_"),
                       num_1,
-                      num_2)
+                      num_2, with_boruta=TRUE)
 
   ret <- model_df %>% rf_importance()
   ret <- model_df %>% rf_partial_dependence()
   ret <- model_df %>% rf_evaluation(pretty.name=TRUE) # TODO test that output is different from multiclass classification
   ret <- model_df %>% rf_evaluation_by_class(pretty.name=TRUE)
+  ret <- model_df %>% tidy(model, type="boruta")
 })
 
 test_that("test randomForest with multinomial classification", {

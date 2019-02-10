@@ -1053,6 +1053,9 @@ calc_feature_imp <- function(df,
                              predictor_n = 12, # So that at least months can fit in it.
                              smote = FALSE,
                              max_pd_vars = 12, # Number of most important variables to calculate partial dependences on. Default 12 fits well with either 3 or 4 columns of facets. 
+                             with_boruta = FALSE,
+                             boruta_max_runs = 20, # Maximal number of importance source runs.
+                             boruta_p_value = 0.05, # Boruta recommends using the default 0.01 for P-value, but we are using 0.05 for consistency with other functions of ours.
                              seed = NULL
                              ){
   if(!is.null(seed)){
@@ -1161,6 +1164,27 @@ calc_feature_imp <- function(df,
       names(rf$terms_mapping) <- name_map
       rf$y <- model.response(model_df)
       rf$df <- model_df
+      if (with_boruta) {
+        rf$boruta <- Boruta::Boruta(
+          fml,
+          data = model_df,
+          doTrace = 0,
+          maxRuns = boruta_max_runs + 1, # It seems Boruta stops at maxRuns - 1 iterations. Add 1 to be less confusing.
+          pValue = boruta_p_value,
+          # importance = "impurity", # In calc_feature_imp, we use impurity, but Boruta's getImpRfZ function uses permutation.
+          # Following parameters are to be relayed to ranger::ranger through Boruta::Boruta, then Boruta::getImpRfZ.
+          num.trees = ntree,
+          min.node.size = nodesize,
+          sample.fraction = sample.fraction,
+          probability = (classification_type == "binary") # build probability tree for AUC only for binary classification.
+        )
+        # These attributes are used in tidy. They are also at ranger level, but we are making Boruta object self-contained.
+        rf$boruta$classification_type <- classification_type
+        rf$boruta$orig_levels <- orig_levels
+        rf$boruta$terms_mapping <- names(name_map)
+        names(rf$boruta$terms_mapping) <- name_map
+        class(rf$boruta) <- c("Boruta_exploratory", class(rf))
+      }
       rf
     }, error = function(e){
       if(length(grouped_cols) > 0) {
@@ -1428,6 +1452,15 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
       
       ret <- ret %>%  dplyr::mutate(chart_type = chart_type_map[x_name])
       ret <- ret %>% dplyr::mutate(x_name = x$terms_mapping[x_name]) # map variable names to original.
+      ret
+    },
+    boruta = {
+      if (!is.null(x$boruta)) {
+        ret <- tidy.Boruta_exploratory(x$boruta)
+      }
+      else {
+        ret <- data.frame() # Skip by returning empty data.frame.
+      }
       ret
     },
     {
@@ -1750,6 +1783,7 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
   )
 }
 
+#' Used for separate Boruta Analytics View. Not used now.
 #' Wrapper for Boruta Analytics View
 #' @export
 exp_boruta <- function(df,
@@ -1843,6 +1877,7 @@ exp_boruta <- function(df,
       rf$orig_levels <- orig_levels
       rf$terms_mapping <- names(name_map)
       names(rf$terms_mapping) <- name_map
+      class(rf) <- c("Boruta_exploratory", class(rf))
       rf
     }, error = function(e){
       if(length(grouped_cols) > 0) {
@@ -1861,7 +1896,7 @@ exp_boruta <- function(df,
   do_on_each_group(clean_df, each_func, name = "model", with_unnest = FALSE)
 }
 
-tidy.Boruta <- function(x, ...) {
+tidy.Boruta_exploratory <- function(x, ...) {
   res <- tidyr::gather(as.data.frame(x$ImpHistory), "variable","importance")
   decisions <- data.frame(variable=names(x$finalDecision), decision=x$finalDecision)
   res <- res %>% dplyr::left_join(decisions, by = "variable") 
@@ -1873,7 +1908,7 @@ tidy.Boruta <- function(x, ...) {
   res
 }
 
-glance.Boruta <- function(x, pretty.name = FALSE, ...) {
+glance.Boruta_exploratory <- function(x, pretty.name = FALSE, ...) {
   res <- data.frame(iterations = nrow(x$ImpHistory), time_taken = as.numeric(x$timeTaken), p_value = x$pValue)
   if (pretty.name) {
     res <- res %>% dplyr::rename(Iterations = iterations, `Time Taken (Second)` = time_taken, `P Value Threshold` = p_value)

@@ -24,7 +24,7 @@ test_that("test relative importance", {
     num4 = runif(20),
     cat1 = c(rep("A",5),rep("B",5),rep("C",10))
   )
-  model_df <- test_df %>% build_lm.fast(num1, num2, num3, num4, cat1)
+  model_df <- test_df %>% build_lm.fast(num1, num2, num3, num4, cat1, relimp_type = "first")
   ret <- model_df %>% broom::tidy(model, type="relative_importance")
   expect_equal(colnames(ret), c("term", "importance", "importance.high", "importance.low"))
 })
