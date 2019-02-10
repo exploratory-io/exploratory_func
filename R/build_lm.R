@@ -154,7 +154,7 @@ build_lm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, gr
 }
 
 #' builds lm model quickly for analytics view.
-#' @param relimp_type - Passed down to boot.relimp, but "lmg" is the only practically useful option.
+#' @param relimp_type - Passed down to boot.relimp, but "lmg" seems to be the recommended option, but is very slow. default is "none".
 #' @param relimp_bootstrap_runs - Number of bootstrap iterations. Default 20.
 #' @param relimp_bootstrap_type - Type of bootstrapping, passed down to boot package from inside relaimpo package.
 #'                                Can be "basic", "perc", "bca", or "norm".
@@ -171,7 +171,7 @@ build_lm.fast <- function(df,
                     max_nrow = 50000,
                     predictor_n = 12, # so that at least months can fit in it.
                     smote = FALSE,
-                    relimp_type = "lmg",
+                    relimp_type = "none",
                     relimp_bootstrap_runs = 20,
                     relimp_bootstrap_type = "perc",
                     relimp_conf_level = 0.95,
@@ -261,9 +261,13 @@ build_lm.fast <- function(df,
 
   # Replace spaces with dots in column names. margins::marginal_effects() fails without it.
   clean_df <- df
-  # skip cleaning of column names for lm since marginal_effects() is not called.
-  if (model_type != "lm") {
-    names(clean_df) <- stringr::str_replace_all(names(df), ' ', '.')
+  if (model_type == "lm") {
+    # For lm, we can skip column names cleaning, since we do not use marginal_effects().
+  }
+  else {
+    # Cleaning of column names for marginal_effects(). Space is not handled well. Replace them with '.'.
+    # Also, cleaning of column names for relaimpo. - is not handled well. Replace them with _.
+    names(clean_df) <- stringr::str_replace_all(names(df), ' ', '.') %>% stringr::str_replace_all('-', '_')
   }
   # this mapping will be used to restore column names
   name_map <- colnames(clean_df)
@@ -445,17 +449,19 @@ build_lm.fast <- function(df,
       }
       else {
         rf <- stats::lm(fml, data = df) 
-        tryCatch({
-          # Calculate relative importance. TODO: Expose the arguments. 
-          rf$relative_importance <- relaimpo::booteval.relimp(relaimpo::boot.relimp(rf, type = relimp_type,
-                                                                                    b = relimp_bootstrap_runs,
-                                                                                    rela = relimp_relative,
-                                                                                    rank = FALSE,
-                                                                                    diff = FALSE),
-                                                              bty = relimp_bootstrap_type, level = relimp_conf_level)
-        }, error = function(e){
-          # This can fail when columns are not linearly independent. Keep going. TODO: Show error in summary table.
-        })
+        if (!is.null(relimp_type) && relimp_type != "none") {
+          tryCatch({
+            # Calculate relative importance.
+            rf$relative_importance <- relaimpo::booteval.relimp(relaimpo::boot.relimp(rf, type = relimp_type,
+                                                                                      b = relimp_bootstrap_runs,
+                                                                                      rela = relimp_relative,
+                                                                                      rank = FALSE,
+                                                                                      diff = FALSE),
+                                                                bty = relimp_bootstrap_type, level = relimp_conf_level)
+          }, error = function(e){
+            # This can fail when columns are not linearly independent. Keep going. TODO: Show error in summary table.
+          })
+        }
       }
       # these attributes are used in tidy of randomForest TODO: is this good for lm too?
       rf$terms_mapping <- names(name_map)
@@ -612,17 +618,17 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
       if (!is.null(x$relative_importance)) {
         # Add columns for relative importance. NA for the first row is for the row for intercept.
         term <- x$relative_importance$namen[2:length(x$relative_importance$namen)] # Skip first element, which is the target variable name.
-        lmg <- x$relative_importance$lmg
-        lmg.high <- x$relative_importance$lmg.upper[1,] # Following naming convention of other columns.
-        lmg.low <- x$relative_importance$lmg.lower[1,] # Following naming convention of other columns.
-        ret <- data.frame(term = term, lmg = lmg, lmg.high = lmg.high, lmg.low = lmg.low)
+        importance <- attr(x$relative_importance, x$relative_importance$type)
+        importance.high <- attr(x$relative_importance, paste0(x$relative_importance$type, ".upper"))[1,] # Following naming convention of other columns.
+        importance.low <- attr(x$relative_importance, paste0(x$relative_importance$type, ".lower"))[1,] # Following naming convention of other columns.
+        ret <- data.frame(term = term, importance = importance, importance.high = importance.high, importance.low = importance.low)
         # Reorder factor by the value of relative importance (lmg).
-        ret <- ret %>% dplyr::mutate(term = forcats::fct_reorder(term, lmg, .fun = sum, .desc = TRUE))
+        ret <- ret %>% dplyr::mutate(term = forcats::fct_reorder(term, importance, .fun = sum, .desc = TRUE))
         if (pretty.name) {
           ret <- ret %>% rename(`Variable` = term,
-                                `Relative Importance` = lmg,
-                                `Relative Importance High` = lmg.high,
-                                `Relative Importance Low` = lmg.low)
+                                `Relative Importance` = importance,
+                                `Relative Importance High` = importance.high,
+                                `Relative Importance Low` = importance.low)
         }
         ret
       }
