@@ -1185,7 +1185,6 @@ calc_feature_imp <- function(df,
         names(rf$boruta$terms_mapping) <- name_map
         class(rf$boruta) <- c("Boruta_exploratory", class(rf))
       }
-      class(rf) <- c("ranger", class(rf))
       rf
     }, error = function(e){
       if(length(grouped_cols) > 0) {
