@@ -727,6 +727,17 @@ exp_balance <- function(df,
         # also, turn NA into explicit level. Otherwise ubSMOTE throws "invalid 'labels'; length 0 should be 1 or 2" for this case too.
         df <- df %>% dplyr::mutate(!!rlang::sym(col):=forcats::fct_explicit_na(as.factor(!!rlang::sym(col))))
       }
+      else if(is.factor(df[[col]])) {
+        # if already factor, just turn NAs into explicit levels. 
+        if (is.ordered(df[[col]])) {
+          # if ordered, make it not ordered, since ordered factor columns are filled with NAs by ubSMOTE().
+          df <- df %>% dplyr::mutate(!!rlang::sym(col):=forcats::fct_explicit_na(factor(!!rlang::sym(col), ordered=FALSE)))
+        }
+        else {
+          # if not ordered, just turn NAs into explicit levels.
+          df <- df %>% dplyr::mutate(!!rlang::sym(col):=forcats::fct_explicit_na(!!rlang::sym(col)))
+        }
+      }
     }
 
     # record orig_df at this point so that the data type reverting works fine later when we have to return this instead of smoted df.
