@@ -51,7 +51,8 @@ augment_kmeans <- function(df, model, data){
     loadNamespace("dplyr")
 
     # Detecting skv case by looking at error message. TODO: This should be done in more reliable way. 
-    if(grepl("Column .+ must be length .+ \\(the number of rows\\) or one, not",e$message)){
+    if(grepl("Column .+ must be length .+ \\(the number of rows\\) or one, not",e$message) ||
+       grepl("arguments imply differing number of rows",e$message)){ # This line is so that we pass test even with old (0.4.4) broom.
       # bind .cluster column refering subject names
       grouped_col <- grouped_by(df)
       cluster_col <- avoid_conflict(grouped_col, ".cluster")
