@@ -1053,6 +1053,9 @@ calc_feature_imp <- function(df,
                              predictor_n = 12, # So that at least months can fit in it.
                              smote = FALSE,
                              max_pd_vars = 12, # Number of most important variables to calculate partial dependences on. Default 12 fits well with either 3 or 4 columns of facets. 
+                             with_boruta = FALSE,
+                             boruta_max_runs = 20, # Maximal number of importance source runs.
+                             boruta_p_value = 0.05, # Boruta recommends using the default 0.01 for P-value, but we are using 0.05 for consistency with other functions of ours.
                              seed = NULL
                              ){
   if(!is.null(seed)){
@@ -1161,6 +1164,27 @@ calc_feature_imp <- function(df,
       names(rf$terms_mapping) <- name_map
       rf$y <- model.response(model_df)
       rf$df <- model_df
+      if (with_boruta) {
+        rf$boruta <- Boruta::Boruta(
+          fml,
+          data = model_df,
+          doTrace = 0,
+          maxRuns = boruta_max_runs + 1, # It seems Boruta stops at maxRuns - 1 iterations. Add 1 to be less confusing.
+          pValue = boruta_p_value,
+          # importance = "impurity", # In calc_feature_imp, we use impurity, but Boruta's getImpRfZ function uses permutation.
+          # Following parameters are to be relayed to ranger::ranger through Boruta::Boruta, then Boruta::getImpRfZ.
+          num.trees = ntree,
+          min.node.size = nodesize,
+          sample.fraction = sample.fraction,
+          probability = (classification_type == "binary") # build probability tree for AUC only for binary classification.
+        )
+        # These attributes are used in tidy. They are also at ranger level, but we are making Boruta object self-contained.
+        rf$boruta$classification_type <- classification_type
+        rf$boruta$orig_levels <- orig_levels
+        rf$boruta$terms_mapping <- names(name_map)
+        names(rf$boruta$terms_mapping) <- name_map
+        class(rf$boruta) <- c("Boruta_exploratory", class(rf))
+      }
       rf
     }, error = function(e){
       if(length(grouped_cols) > 0) {
@@ -1428,6 +1452,15 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
       
       ret <- ret %>%  dplyr::mutate(chart_type = chart_type_map[x_name])
       ret <- ret %>% dplyr::mutate(x_name = x$terms_mapping[x_name]) # map variable names to original.
+      ret
+    },
+    boruta = {
+      if (!is.null(x$boruta)) {
+        ret <- tidy.Boruta_exploratory(x$boruta)
+      }
+      else {
+        ret <- data.frame() # Skip by returning empty data.frame.
+      }
       ret
     },
     {
@@ -1748,4 +1781,137 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
       stop(paste0("type ", type, " is not defined"))
     }
   )
+}
+
+#' Used for separate Boruta Analytics View. Not used now.
+#' Wrapper for Boruta Analytics View
+#' @export
+exp_boruta <- function(df,
+                       target,
+                       ...,
+                       max_nrow = 50000, # Down from 200000 when we added partial dependence
+                       max_sample_size = NULL, # Half of max_nrow. down from 100000 when we added partial dependence
+                       ntree = 20,
+                       nodesize = 12,
+                       target_n = 20,
+                       predictor_n = 12, # So that at least months can fit in it.
+                       smote = FALSE,
+                       max_runs = 20, # Maximal number of importance source runs.
+                       p_value = 0.05, # Boruta recommends using the default 0.01 for P-value, but we are using 0.05 for consistency with other functions of ours.
+                       seed = NULL
+                       ){
+  if(!is.null(seed)){
+    set.seed(seed)
+  }
+  # this seems to be the new way of NSE column selection evaluation
+  # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
+  target_col <- dplyr::select_var(names(df), !! rlang::enquo(target))
+  # this evaluates select arguments like starts_with
+  selected_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
+
+  grouped_cols <- grouped_by(df)
+
+  orig_levels <- NULL
+  if (is.factor(df[[target_col]])) {
+    orig_levels <- levels(df[[target_col]])
+  }
+  else if (is.logical(df[[target_col]])) {
+    orig_levels <- c("TRUE","FALSE")
+  }
+
+  clean_ret <- cleanup_df(df, target_col, selected_cols, grouped_cols, target_n, predictor_n)
+
+  clean_df <- clean_ret$clean_df
+  name_map <- clean_ret$name_map
+  clean_target_col <- clean_ret$clean_target_col
+  clean_cols <- clean_ret$clean_cols
+
+  # if target is numeric, it is regression but
+  # if not, it is classification
+  classification_type <- get_classification_type(clean_df[[clean_target_col]])
+
+  each_func <- function(df) {
+    tryCatch({
+      clean_df_ret <- cleanup_df_per_group(df, clean_target_col, max_nrow, clean_cols, name_map, predictor_n)
+      if (is.null(clean_df_ret)) {
+        return(NULL) # skip this group
+      }
+      df <- clean_df_ret$df
+      c_cols <- clean_df_ret$c_cols
+      name_map <- clean_df_ret$name_map
+
+      # apply smote if this is binary classification
+      unique_val <- unique(df[[clean_target_col]])
+      if (smote && length(unique_val[!is.na(unique_val)]) == 2) {
+        df <- df %>% exp_balance(clean_target_col, sample=FALSE) # since we already sampled, no further sample.
+      }
+
+      # build formula for randomForest
+      rhs <- paste0("`", c_cols, "`", collapse = " + ")
+      fml <- as.formula(paste(clean_target_col, " ~ ", rhs))
+      model_df <- model.frame(fml, data = df, na.action = randomForest::na.roughfix)
+
+      # all or max_sample_size data will be used for randomForest
+      # to grow a tree
+      if (is.null(max_sample_size)) { # default to half of max_nrow
+        max_sample_size = max_nrow/2
+      }
+      sample.fraction <- min(c(max_sample_size / max_nrow, 1))
+
+      rf <- Boruta::Boruta(
+        fml,
+        data = model_df,
+        doTrace = 0,
+        maxRuns = max_runs + 1, # It seems Boruta stops at maxRuns - 1 iterations. Add 1 to be less confusing.
+        pValue = p_value,
+        # importance = "impurity", # In calc_feature_imp, we use impurity, but Boruta's getImpRfZ function uses permutation.
+        # Following parameters are to be relayed to ranger::ranger through Boruta::Boruta, then Boruta::getImpRfZ.
+        num.trees = ntree,
+        min.node.size = nodesize,
+        sample.fraction = sample.fraction,
+        probability = (classification_type == "binary") # build probability tree for AUC only for binary classification.
+      )
+
+      # these attributes are used in tidy of randomForest
+      rf$classification_type <- classification_type
+      rf$orig_levels <- orig_levels
+      rf$terms_mapping <- names(name_map)
+      names(rf$terms_mapping) <- name_map
+      class(rf) <- c("Boruta_exploratory", class(rf))
+      rf
+    }, error = function(e){
+      if(length(grouped_cols) > 0) {
+        # ignore the error if
+        # it is caused by subset of
+        # grouped data frame
+        # to show result of
+        # data frames that succeed
+        NULL
+      } else {
+        stop(e)
+      }
+    })
+  }
+
+  do_on_each_group(clean_df, each_func, name = "model", with_unnest = FALSE)
+}
+
+tidy.Boruta_exploratory <- function(x, ...) {
+  res <- tidyr::gather(as.data.frame(x$ImpHistory), "variable","importance")
+  decisions <- data.frame(variable=names(x$finalDecision), decision=x$finalDecision)
+  res <- res %>% dplyr::left_join(decisions, by = "variable") 
+  res$variable <- x$terms_mapping[res$variable] # Map variable names back to original.
+  res <- res %>% dplyr::filter(decision %in% c("Confirmed", "Tentative", "Rejected")) # Remove rows with NA
+  res <- res %>% dplyr::mutate(variable = forcats::fct_reorder(variable, importance, .fun = mean, .desc = TRUE))
+  # Reorder types of decision in the order of more important to less important.
+  res <- res %>% dplyr::mutate(decision = forcats::fct_relevel(decision, "Confirmed", "Tentative", "Rejected"))
+  res
+}
+
+glance.Boruta_exploratory <- function(x, pretty.name = FALSE, ...) {
+  res <- data.frame(iterations = nrow(x$ImpHistory), time_taken = as.numeric(x$timeTaken), p_value = x$pValue)
+  if (pretty.name) {
+    res <- res %>% dplyr::rename(Iterations = iterations, `Time Taken (Second)` = time_taken, `P Value Threshold` = p_value)
+  }
+  res
 }

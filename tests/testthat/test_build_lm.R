@@ -16,6 +16,19 @@ test_that("test build_lm summary output ", {
   expect_lt(length(res), 50) # the output of summary should be less than 50 lines
 })
 
+test_that("test relative importance", {
+  test_df = data.frame(
+    num1 = runif(20),
+    num2 = runif(20),
+    num3 = runif(20),
+    num4 = runif(20),
+    cat1 = c(rep("A",5),rep("B",5),rep("C",10))
+  )
+  model_df <- test_df %>% build_lm.fast(num1, num2, num3, num4, cat1, relimp_type = "first")
+  ret <- model_df %>% broom::tidy(model, type="relative_importance")
+  expect_equal(colnames(ret), c("term", "importance", "importance.high", "importance.low"))
+})
+
 test_that("test build_lm with keep.source FALSE ", {
   test_df = data.frame(
     num1 = seq(20) / 10.0,
@@ -144,7 +157,7 @@ test_that("prediction with target column name with space by build_lm.fast", {
   test_data <- dplyr::bind_rows(test_data, test_data)
   test_data <- test_data %>% mutate(CARRIER = factor(CARRIER, ordered=TRUE)) # test handling of ordered factor
 
-  model_data <- build_lm.fast(test_data, `CANCELLED:X`, `logical col`, `Carrier Name`, CARRIER, DISTANCE, predictor_n = 3)
+  model_data <- build_lm.fast(test_data, `CANCELLED:X`, `logical col`, `Carrier Name`, CARRIER, DISTANCE, predictor_n = 3, with_marginal_effects=TRUE, with_marginal_effects_confint=TRUE)
   ret <- model_data %>% broom::glance(model)
   # TODO: the returned coefficients does not show all input variables. 
   # most likely due to too few rows. look into it and add check for the values in the returned df. 
@@ -212,7 +225,7 @@ if (Sys.info()["sysname"] != "Windows") {
     test_data <- dplyr::bind_rows(test_data, test_data)
     test_data <- test_data %>% mutate(CARRIER = factor(CARRIER, ordered=TRUE)) # test handling of ordered factor
   
-    model_data <- build_lm.fast(test_data, `キャンセル X`, `論理 col`, `航空会社 Name`, CARRIER, DISTANCE, predictor_n = 3)
+    model_data <- build_lm.fast(test_data, `キャンセル X`, `論理 col`, `航空会社 Name`, CARRIER, DISTANCE, predictor_n = 3, with_marginal_effects=TRUE, with_marginal_effects_confint=TRUE)
     ret <- model_data %>% broom::glance(model)
     # TODO: the returned coefficients does not show all input variables. 
     # most likely due to too few rows. look into it and add check for the values in the returned df. 
@@ -239,19 +252,19 @@ test_that("prediction with glm model with SMOTE by build_lm.fast", {
   test_data <- dplyr::bind_rows(test_data, test_data)
   test_data <- test_data %>% mutate(CARRIER = factor(CARRIER, ordered=TRUE)) # test handling of ordered factor
 
-  model_data <- build_lm.fast(test_data, `CANCELLED X`, `Carrier Name`, CARRIER, DISTANCE, model_type = "glm", smote=FALSE)
+  model_data <- build_lm.fast(test_data, `CANCELLED X`, `Carrier Name`, CARRIER, DISTANCE, model_type = "glm", smote=FALSE, with_marginal_effects=TRUE, with_marginal_effects_confint=TRUE)
   ret <- model_data %>% broom::glance(model, pretty.name=TRUE)
   ret <- model_data %>% broom::tidy(model)
   ret <- model_data %>% broom::augment(model)
 
-  model_data <- build_lm.fast(test_data, `CANCELLED X`, `Carrier Name`, CARRIER, DISTANCE, model_type = "glm", smote=TRUE)
+  model_data <- build_lm.fast(test_data, `CANCELLED X`, `Carrier Name`, CARRIER, DISTANCE, model_type = "glm", smote=TRUE, with_marginal_effects=TRUE, with_marginal_effects_confint=TRUE)
   ret <- model_data %>% broom::glance(model, pretty.name=TRUE)
   ret <- model_data %>% broom::tidy(model)
   ret <- model_data %>% broom::augment(model)
 
   # test for perfect multicollinearity case.
   reduced_test_data <- test_data %>% tail(3)
-  model_data <- build_lm.fast(reduced_test_data, `CANCELLED X`, `Carrier Name`, CARRIER, DISTANCE, model_type = "glm", smote=FALSE)
+  model_data <- build_lm.fast(reduced_test_data, `CANCELLED X`, `Carrier Name`, CARRIER, DISTANCE, model_type = "glm", smote=FALSE, with_marginal_effects=TRUE, with_marginal_effects_confint=TRUE)
   ret <- model_data %>% broom::glance(model, pretty.name=TRUE)
   ret <- model_data %>% broom::tidy(model, pretty.name=TRUE)
   ret <- model_data %>% broom::augment(model, pretty.name=TRUE)

@@ -1,8 +1,8 @@
 Package: exploratory
 Type: Package
 Title: R package for Exploratory
-Version: 5.1.0.3
-Date: 2019-01-12
+Version: 5.1.0.4
+Date: 2019-02-10
 Authors@R: c(person("Yosuke", "Yasuda", email = "double.y.919.quick@gmail.com", role = c("aut", "cre")))
 URL: https://github.com/exploratory-io/exploratory_func
 Description: Functions for Exploratory
@@ -11,6 +11,7 @@ LazyData: TRUE
 Encoding: UTF-8
 Imports:
     broom, 
+    prediction, 
     urltools,
     dplyr,
     tibble,
