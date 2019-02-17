@@ -126,7 +126,7 @@ do_tokenize <- function(df, input, token = "words", keep_cols = FALSE,  drop = T
   loadNamespace("stringr")
 
   orig_input_col <- col_name(substitute(input))
-  input_col <- avoid_conflict(colnames(df), "input") 
+  input_col <- avoid_conflict(colnames(df), "input")
   # since unnest_tokens_ does not handle column with space well, rename column name temporarily.
   # the following does not work with error that says := is unknown. do it base-R way.
   # df <- dplyr::rename(!!rlang::sym(input_col) := !!rlang::sym(orig_input_col))
@@ -372,4 +372,19 @@ do_ngram <- function(df, token, sentence, document, maxn=2, sep="_"){
 get_sentiment <- function(text){
   loadNamespace("sentimentr")
   sentimentr::sentiment_by(text)$ave_sentiment
+}
+
+#' Wrapper function for readr::parse_parse_character.
+#' @param n How many tokens should be together as new tokens. This should be numeric vector.
+#' @export
+parse_character <- function(text, ...){
+  loadNamespace("readr")
+  tryCatch(
+    readr::parse_character(text = text, ...),
+    error=function(e){
+      # if readr::parse_character fails,
+      # fallbak to base as.character
+      as.character(text)
+    }
+  )
 }

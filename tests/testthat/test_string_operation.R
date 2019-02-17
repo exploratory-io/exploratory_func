@@ -289,3 +289,9 @@ test_that("stem_word", {
   ret <- stem_word(c("impingement","feline"))
   expect_equal(ret, c("imping", "felin"))
 })
+
+test_that("parse_character", {
+  ret <- exploratory::parse_character(c(1, 2))
+  expect_equal(ret, c("1", "2"))
+})
+
