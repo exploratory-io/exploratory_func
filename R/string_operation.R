@@ -379,12 +379,10 @@ get_sentiment <- function(text){
 #' @export
 parse_character <- function(text, ...){
   loadNamespace("readr")
-  tryCatch(
-    readr::parse_character(text = text, ...),
-    error=function(e){
-      # if readr::parse_character fails,
-      # fallbak to base as.character
+    # For non-character, use base as.character since readr::parse_character fails
+    if(!is.character(text)) {
       as.character(text)
+    } else {
+      readr::parse_character(text = text, ...)
     }
-  )
 }
