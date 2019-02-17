@@ -375,7 +375,7 @@ get_sentiment <- function(text){
 }
 
 #' Wrapper function for readr::parse_parse_character.
-#' @param n How many tokens should be together as new tokens. This should be numeric vector.
+#' @param text to parse
 #' @export
 parse_character <- function(text, ...){
   loadNamespace("readr")
