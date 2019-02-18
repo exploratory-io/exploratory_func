@@ -694,6 +694,16 @@ function(X,Y, max_synth_perc=200, target_minority_perc=40, target_size=NULL, per
   
   data<-cbind(X,Y)
   id.1 <- which(Y == 1)
+
+  #TBD Get majoirty size
+  #TBD Get minority size
+
+  if (is.null(target_size)) {
+    #TBD
+  }
+  else {
+    #TBD
+  }
   
   time<-system.time({
     # generate synthetic cases from these id.1
