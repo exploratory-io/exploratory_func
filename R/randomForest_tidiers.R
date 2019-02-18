@@ -787,6 +787,13 @@ function(X,Y, max_synth_perc=200, target_minority_perc=40, target_size=NULL, per
         else {
           # Not Enough Minority even with SMOTE.
           # SMOTE to the limit and sample down to make target ratio.
+          newExs <- smote_minority(data, max_synth_perc, k)
+          # get the undersample of the "majority class" examples
+          target_majority_size <- as.integer((nrow(newExs) + minority_size) / target_minority_perc * (100 - target_minority_perc))
+          majority_data <- sample_majority(data, target_majority_size)
+          minority_data <- data[id.1,]
+          # the final data set (the undersample + the rare cases + the smoted exs)
+          newdataset <- rbind(majority_data, minority_data, newExs)
         }
       }
       else {
