@@ -378,7 +378,10 @@ get_sentiment <- function(text){
 #' @param text to parse
 #' @export
 parse_character <- function(text, ...){
-  # For non-character, use base as.character since readr::parse_character fails
+  # After updating readr version from 1.1.1 to to 1.3.1,
+  # readr::parse_character now fails for non-characters.
+  # So if the input is not character (e.g. numeric, Date, etc),
+  # use base as.character to avoid the error raised from readr::parse_character.
   if(!is.character(text)) {
     as.character(text)
   } else {
