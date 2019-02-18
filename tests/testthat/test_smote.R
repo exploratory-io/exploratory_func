@@ -8,8 +8,8 @@ context("test smote function exp_balance()")
 
 test_that("test exp_balance with numeric", {
   sample_data <- data.frame(
-    y = c(3, 4, 4, 4, 4, 4),
-    num = runif(6)
+    y = c(rep(3, 5), rep(4, 50)),
+    num = runif(55)
   )
   res <- exp_balance(sample_data, y)
   expect_true("data.frame" %in% class(res))
