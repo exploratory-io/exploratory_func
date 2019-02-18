@@ -107,6 +107,18 @@ test_that("test exp_balance with numeric, not enough minority and not enough maj
   expect_equal(c(3,4) ,sort(unique(res$y)))
 })
 
+test_that("test exp_balance with numeric, not enough minority and not enough majority, not enough minority even with SMOTE for target ratio, with target size", {
+  sample_data <- data.frame(
+    y = c(rep(3, 10), rep(4, 90)),
+    num = runif(100)
+  )
+  # This fails because unbalanced::ubSmoteExs throws error when perc.over is less than 100.
+  res <- exp_balance(sample_data, y, target_size=200)
+  expect_true("data.frame" %in% class(res))
+  expect_equal("numeric" ,class(res$y))
+  expect_equal(c(3,4) ,sort(unique(res$y)))
+})
+
 test_that("test exp_balance with character", {
   sample_data <- data.frame(
     y = c("a", "b", "b", "b", "b", "b"),
