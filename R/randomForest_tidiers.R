@@ -759,6 +759,7 @@ function(X,Y, max_synth_perc=200, target_minority_perc=40, target_size=NULL, per
       else {
         # Not enough majority.
         # No Action. Already above target minority ratio.
+        newdataset <- data
       }
     }
     else {
