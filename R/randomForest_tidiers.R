@@ -704,7 +704,6 @@ function(X,Y, max_synth_perc=200, target_minority_perc=40, target_size=NULL, per
     return(apply(X,1,function(x){any(is.na(x))}))
 
   smote_minority <- function(data, synth_perc, k) {
-    synth_perc <- as.integer(synth_perc)
     newExs <- unbalanced::ubSmoteExs(data[id.1,], "Y", synth_perc, k)   
     row.is.na<-row.has.na(newExs)
     
