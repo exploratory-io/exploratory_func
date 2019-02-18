@@ -1271,7 +1271,14 @@ calc_feature_imp <- function(df,
 
   each_func <- function(df) {
     tryCatch({
-      clean_df_ret <- cleanup_df_per_group(df, clean_target_col, max_nrow, clean_cols, name_map, predictor_n)
+      # If we are to do SMOTE, do not down sample here and let exp_balance handle it.
+      if (smote && length(unique_val[!is.na(unique_val)]) == 2) {
+        sample_size <- NULL
+      }
+      else {
+        sample_size <- max_nrow
+      }
+      clean_df_ret <- cleanup_df_per_group(df, clean_target_col, sample_size, clean_cols, name_map, predictor_n)
       if (is.null(clean_df_ret)) {
         return(NULL) # skip this group
       }
