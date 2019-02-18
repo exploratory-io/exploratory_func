@@ -1708,6 +1708,9 @@ exp_rpart <- function(df,
                       target_n = 20,
                       predictor_n = 12, # so that at least months can fit in it.
                       smote = FALSE,
+                      smote_target_minority_perc = 40,
+                      smote_max_synth_perc = 200,
+                      smote_k = 5,
                       seed = NULL
                       ) {
   if(!is.null(seed)){
@@ -1732,10 +1735,17 @@ exp_rpart <- function(df,
 
   each_func <- function(df) {
     tryCatch({
+      # If we are to do SMOTE, do not down sample here and let exp_balance handle it.
+      if (smote && length(unique_val[!is.na(unique_val)]) == 2) {
+        sample_size <- NULL
+      }
+      else {
+        sample_size <- max_nrow
+      }
       # especially multiclass classification seems to take forever when number of unique values of predictors are many.
       # fct_lump is essential here.
       # http://grokbase.com/t/r/r-help/051sayg38p/r-multi-class-classification-using-rpart
-      clean_df_ret <- cleanup_df_per_group(df, clean_target_col, max_nrow, clean_cols, name_map, predictor_n, revert_logical_levels=FALSE)
+      clean_df_ret <- cleanup_df_per_group(df, clean_target_col, sample_size, clean_cols, name_map, predictor_n, revert_logical_levels=FALSE)
       if (is.null(clean_df_ret)) {
         return(NULL) # skip this group
       }
@@ -1746,7 +1756,7 @@ exp_rpart <- function(df,
       # apply smote if this is binary classification
       unique_val <- unique(df[[clean_target_col]])
       if (smote && length(unique_val[!is.na(unique_val)]) == 2) {
-        df <- df %>% exp_balance(clean_target_col, sample=FALSE) # since we already sampled, no further sample.
+        df <- df %>% exp_balance(clean_target_col, target_size = max_nrow, target_minority_perc = smote_target_minority_perc, max_synth_perc = smote_max_synth_perc, k = smote_k)
       }
       # if target is categorical (not numeric) and only 1 unique value (or all NA), throw error.
       if ("numeric" %nin% class(clean_target_col) &&
@@ -1984,6 +1994,9 @@ exp_boruta <- function(df,
                        target_n = 20,
                        predictor_n = 12, # So that at least months can fit in it.
                        smote = FALSE,
+                       smote_target_minority_perc = 40,
+                       smote_max_synth_perc = 200,
+                       smote_k = 5,
                        max_runs = 20, # Maximal number of importance source runs.
                        p_value = 0.05, # Boruta recommends using the default 0.01 for P-value, but we are using 0.05 for consistency with other functions of ours.
                        seed = NULL
@@ -2020,7 +2033,14 @@ exp_boruta <- function(df,
 
   each_func <- function(df) {
     tryCatch({
-      clean_df_ret <- cleanup_df_per_group(df, clean_target_col, max_nrow, clean_cols, name_map, predictor_n)
+      # If we are to do SMOTE, do not down sample here and let exp_balance handle it.
+      if (smote && length(unique_val[!is.na(unique_val)]) == 2) {
+        sample_size <- NULL
+      }
+      else {
+        sample_size <- max_nrow
+      }
+      clean_df_ret <- cleanup_df_per_group(df, clean_target_col, sample_size, clean_cols, name_map, predictor_n)
       if (is.null(clean_df_ret)) {
         return(NULL) # skip this group
       }
@@ -2031,7 +2051,7 @@ exp_boruta <- function(df,
       # apply smote if this is binary classification
       unique_val <- unique(df[[clean_target_col]])
       if (smote && length(unique_val[!is.na(unique_val)]) == 2) {
-        df <- df %>% exp_balance(clean_target_col, sample=FALSE) # since we already sampled, no further sample.
+        df <- df %>% exp_balance(clean_target_col, target_size = max_nrow, target_minority_perc = smote_target_minority_perc, max_synth_perc = smote_max_synth_perc, k = smote_k)
       }
 
       # build formula for randomForest
