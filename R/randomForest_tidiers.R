@@ -1272,6 +1272,7 @@ calc_feature_imp <- function(df,
   each_func <- function(df) {
     tryCatch({
       # If we are to do SMOTE, do not down sample here and let exp_balance handle it.
+      unique_val <- unique(df[[clean_target_col]])
       if (smote && length(unique_val[!is.na(unique_val)]) == 2) {
         sample_size <- NULL
       }
@@ -1736,6 +1737,7 @@ exp_rpart <- function(df,
   each_func <- function(df) {
     tryCatch({
       # If we are to do SMOTE, do not down sample here and let exp_balance handle it.
+      unique_val <- unique(df[[clean_target_col]])
       if (smote && length(unique_val[!is.na(unique_val)]) == 2) {
         sample_size <- NULL
       }
@@ -2034,6 +2036,7 @@ exp_boruta <- function(df,
   each_func <- function(df) {
     tryCatch({
       # If we are to do SMOTE, do not down sample here and let exp_balance handle it.
+      unique_val <- unique(df[[clean_target_col]])
       if (smote && length(unique_val[!is.na(unique_val)]) == 2) {
         sample_size <- NULL
       }
