@@ -725,6 +725,7 @@ ubSMOTE2 <- function(X,Y, max_synth_perc=200, target_minority_perc=40, target_si
         newExs <- newExs %>% sample_rows(nrow_to_synth)
       }
     }
+    newExs <- newExs %>% dplyr::mutate(synthesized = TRUE)
     newExs
   }
 
@@ -748,14 +749,14 @@ ubSMOTE2 <- function(X,Y, max_synth_perc=200, target_minority_perc=40, target_si
     if (minority_size / (minority_size + majority_size) >= target_minority_perc / 100) {
       # Already enough minority for the ratio even without SMOTE.
       # No Action. Already above target minority ratio.
-      newdataset <- data
+      newdataset <- data %>% dplyr::mutate(synthesized = FALSE)
     }
     else if (minority_size * (100 + max_synth_perc) / 100 / (minority_size * (100 + max_synth_perc) / 100 + majority_size) >= target_minority_perc / 100) {
       # Enough minority with SMOTE. SMOTE necessary number of minority rows.
       target_minority_size <- majority_size / (100 / target_minority_perc - 1)
       synth_perc <- (target_minority_size - minority_size) / minority_size * 100
       newExs <- smote_minority(data, synth_perc, k)
-      newdataset <- rbind(data, newExs)
+      newdataset <- dplyr::bind_rows(data, newExs)
     }
     else {
       # Not enough minority even with SMOTE
@@ -767,7 +768,7 @@ ubSMOTE2 <- function(X,Y, max_synth_perc=200, target_minority_perc=40, target_si
       minority_data <- data[id.1,]
       
       # the final data set (the undersample + the rare cases + the smoted exs)
-      newdataset <- rbind(majority_data, minority_data, newExs)
+      newdataset <- dplyr::bind_rows(majority_data, minority_data, newExs)
     }
   }
   else {
@@ -779,12 +780,13 @@ ubSMOTE2 <- function(X,Y, max_synth_perc=200, target_minority_perc=40, target_si
         # Enough majority. Sample down both
         majority_data <- sample_majority(data, target_majority_size)
         minority_data <- sample_minority(data, target_minority_size)
-        newdataset <- rbind(majority_data, minority_data)
+        newdataset <- dplyr::bind_rows(majority_data, minority_data)
+        newdataset <- newdataset %>% dplyr::mutate(synthesized = FALSE)
       }
       else {
         # Not enough majority.
         # No Action. Already above target minority ratio.
-        newdataset <- data
+        newdataset <- data %>% dplyr::mutate(synthesized = FALSE)
       }
     }
     else {
@@ -797,7 +799,7 @@ ubSMOTE2 <- function(X,Y, max_synth_perc=200, target_minority_perc=40, target_si
           newExs <- smote_minority(data, synth_perc, k)
           majority_data <- sample_majority(data, target_majority_size)
           minority_data <- data[id.1,]
-          newdataset <- rbind(majority_data, minority_data, newExs)
+          newdataset <- dplyr::bind_rows(majority_data, minority_data, newExs)
         }
         else {
           # Not Enough Minority even with SMOTE.
@@ -808,7 +810,7 @@ ubSMOTE2 <- function(X,Y, max_synth_perc=200, target_minority_perc=40, target_si
           majority_data <- sample_majority(data, target_majority_size)
           minority_data <- data[id.1,]
           # the final data set (the undersample + the rare cases + the smoted exs)
-          newdataset <- rbind(majority_data, minority_data, newExs)
+          newdataset <- dplyr::bind_rows(majority_data, minority_data, newExs)
         }
       }
       else {
@@ -816,14 +818,14 @@ ubSMOTE2 <- function(X,Y, max_synth_perc=200, target_minority_perc=40, target_si
         if (minority_size / (majority_size + minority_size) >= target_minority_perc / 100) {
           # Already enough minority for the ratio even without SMOTE.
           # No Action.  Already above target minority ratio.
-          newdataset <- data
+          newdataset <- data %>% dplyr::mutate(synthesized = FALSE)
         }
         else if (minority_size * (100 + max_synth_perc) / 100 / (minority_size * (100 + max_synth_perc) / 100 + majority_size) >= target_minority_perc / 100) {
           # Enough Minority With SMOTE. Just SMOTE minority.
           target_minority_size <- majority_size / (100 / target_minority_perc - 1)
           synth_perc <- (target_minority_size - minority_size) / minority_size * 100
           newExs <- smote_minority(data, synth_perc, k)
-          newdataset <- rbind(data, newExs)
+          newdataset <- dplyr::bind_rows(data, newExs)
         }
         else {
           # Not Enough Minority even with SMOTE.
@@ -835,7 +837,7 @@ ubSMOTE2 <- function(X,Y, max_synth_perc=200, target_minority_perc=40, target_si
           minority_data <- data[id.1,]
           
           # the final data set (the undersample + the rare cases + the smoted exs)
-          newdataset <- rbind(majority_data, minority_data, newExs)
+          newdataset <- dplyr::bind_rows(majority_data, minority_data, newExs)
         }
       }
     }
@@ -843,11 +845,7 @@ ubSMOTE2 <- function(X,Y, max_synth_perc=200, target_minority_perc=40, target_si
   
   #shuffle the order of instances
   newdataset<-newdataset[sample(1:NROW(newdataset)), ]
-  
-  X<-newdataset[ ,-ncol(newdataset)]
-  Y<-newdataset[ ,ncol(newdataset)]
-  
-  return(list(X=X,Y=Y))
+  newdataset
 }
 
 #' applies SMOTE to a data frame
@@ -939,10 +937,9 @@ exp_balance <- function(df,
       orig_levels <- levels(output)
       levels(output) <- c("0", "1")
       df_balanced <- ubSMOTE2(input, output, ...) # defaults are, max_synth_perc=200, target_minority_perc=40, target_size=NULL, k = 5
-      df_balanced <- as.data.frame(df_balanced)
 
       # revert the name changes made by ubSMOTE.
-      colnames(df_balanced) <- c(colnames(input), target_col)
+      colnames(df_balanced) <- c(colnames(input), target_col, "synthesized")
 
       # verify that df_balanced still keeps 2 unique values. it seems that SMOTE sometimes undersamples majority too much till it becomes 0.
       unique_val <- unique(df_balanced[[target_col]])
