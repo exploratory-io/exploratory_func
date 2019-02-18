@@ -703,6 +703,13 @@ function(X,Y, max_synth_perc=200, target_minority_perc=40, target_size=NULL, per
   row.has.na<-function(X)
     return(apply(X,1,function(x){any(is.na(x))}))
 
+  sample_majority <- function(data, size) {
+    # get the undersample of the "majority class" examples
+    selMaj <- sample((1:NROW(data))[-id.1], size, replace=F)
+
+    majority_data <- data[selMaj,]
+  }
+
   if (is.null(target_size)) {
     if (minority_size / (minority_size + majority_size) >= target_minority_perc / 100) {
       # Already enough minority for the ratio even without SMOTE.
