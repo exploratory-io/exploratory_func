@@ -703,13 +703,16 @@ function(X,Y, max_synth_perc=200, target_minority_perc=40, target_size=NULL, per
 
   if (is.null(target_size)) {
     if (minority_size / (minority_size + majority_size) >= target_minority_perc / 100) {
-      # Already enough minority for the ratio even without SMOTE
+      # Already enough minority for the ratio even without SMOTE.
+      # No Action. Already above target minority ratio.
     }
     else if (minority_size * (100 + max_synth_perc) / 100 / (minority_size + majority_size) >= target_minority_perc / 100) {
-      # Enough minority with SMOTE
+      # Enough minority with SMOTE.
     }
     else {
       # Not enough minority even with SMOTE
+      # SMOTE to the limit.
+      newExs <- unbalanced::ubSmoteExs(data[id.1,],"Y",max_synth_perc, k)   
     }
   }
   else {
