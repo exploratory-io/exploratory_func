@@ -754,19 +754,20 @@ function(X,Y, max_synth_perc=200, target_minority_perc=40, target_size=NULL, per
     if (minority_size >= target_minority_size) {
       # Enough minority
       if (majority_size >= target_majority_size) {
-        # Enough majority
+        # Enough majority. Sample down both
       }
       else {
-        # Not enough majority
+        # Not enough majority.
+        # No Action. Already above target minority ratio.
       }
     }
     else {
       # Not enough minority
       if (majority_size >= target_majority_size) {
-        # Enough majority
+        # Enough majority. SMOTE and Sample down
       }
       else {
-        # Not enough majority
+        # Not enough majority. SMOTE to make target ratio.
       }
     }
   }
