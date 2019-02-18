@@ -776,6 +776,13 @@ function(X,Y, max_synth_perc=200, target_minority_perc=40, target_size=NULL, per
       # Not enough minority
       if (majority_size >= target_majority_size) {
         # Enough majority. SMOTE and Sample down
+        if (minority_size * (100 + max_synth_perc) / 100 / (minority_size * (100 + max_synth_perc) / 100 + majority_size) >= target_minority_perc / 100) {
+          # Enough Minority With SMOTE. SMOTE and sample down
+        }
+        else {
+          # Not Enough Minority even with SMOTE.
+          # SMOTE to the limit and sample down to make target ratio.
+        }
       }
       else {
         # Not enough majority. SMOTE to make target ratio.
