@@ -684,7 +684,7 @@ rf_partial_dependence <- function(df, ...) { # TODO: write test for this.
   res
 }
 
-ubSMOTE2 <- function(X,Y, max_synth_perc=200, target_minority_perc=40, target_size=NULL) {
+ubSMOTE2 <- function(X,Y, max_synth_perc=200, target_minority_perc=40, target_size=NULL, k=5) {
   if(!is.factor(Y)) 
     stop("Y has to be a factor")
   if(is.vector(X)) 
@@ -936,7 +936,7 @@ exp_balance <- function(df,
       output <- forcats::fct_infreq(output)
       orig_levels <- levels(output)
       levels(output) <- c("0", "1")
-      df_balanced <- ubSMOTE2(input, output, ...) # defaults are, perc.over = 200, perc.under = 200, k = 5
+      df_balanced <- ubSMOTE2(input, output, ...) # defaults are, max_synth_perc=200, target_minority_perc=40, target_size=NULL, k = 5
       df_balanced <- as.data.frame(df_balanced)
 
       # revert the name changes made by ubSMOTE.
