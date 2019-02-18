@@ -776,8 +776,13 @@ function(X,Y, max_synth_perc=200, target_minority_perc=40, target_size=NULL, per
       # Not enough minority
       if (majority_size >= target_majority_size) {
         # Enough majority. SMOTE and Sample down
-        if (minority_size * (100 + max_synth_perc) / 100 / (minority_size * (100 + max_synth_perc) / 100 + majority_size) >= target_minority_perc / 100) {
+        if (minority_size * (100 + max_synth_perc) / 100 / (minority_size * (100 + max_synth_perc) / 100 + target_majority_size) >= target_minority_perc / 100) {
           # Enough Minority With SMOTE. SMOTE and sample down
+          synth_perc <- (target_minority_size - minority_size) / minority_size * 100
+          newExs <- smote_minority(data, synth_perc, k)
+          majority_data <- sample_majority(data, target_majority_size)
+          minority_data <- data[id.1,]
+          newdataset <- rbind(majority_data, minority_data, newExs)
         }
         else {
           # Not Enough Minority even with SMOTE.
