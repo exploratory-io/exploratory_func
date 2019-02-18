@@ -4,7 +4,7 @@ iterate_kmeans <- function(df, max_centers = 10,
                            nstart = 1,
                            algorithm = "Hartigan-Wong",
                            trace = FALSE,
-                           seed=0,
+                           seed = NULL,
                            elbow_method_mode=FALSE
                            ) {
   n_centers <- seq(max_centers)
@@ -20,7 +20,7 @@ iterate_kmeans <- function(df, max_centers = 10,
                                          keep.source=FALSE,
                                          augment=FALSE)
     ret <- model_df$model[[1]]
-    ret 
+    ret
   }))
   ret %>% rowwise() %>% glance(model)
 }
@@ -36,12 +36,12 @@ exp_kmeans <- function(df, ...,
                        normalize_data = TRUE,
                        n_pcs = NULL,
                        max_nrow = NULL,
-                       seed=0,
+                       seed = NULL,
                        elbow_method_mode=FALSE,
                        max_centers = 10
                        ) {
 
-  # Set seed just once inside do_prcomp where we call sample_n(). 
+  # Set seed just once inside do_prcomp where we call sample_n().
   ret <- do_prcomp(df, normalize_data = normalize_data, max_nrow = max_nrow, seed = seed, ...)
 
   if (!elbow_method_mode) {
