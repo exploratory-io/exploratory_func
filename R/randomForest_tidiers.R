@@ -855,7 +855,6 @@ exp_balance <- function(df,
                      target,
                      max_nrow=50000,
                      sample=TRUE,
-                     verbose = FALSE,
                      ...,
                      seed = NULL
                      ) {
@@ -937,7 +936,7 @@ exp_balance <- function(df,
       output <- forcats::fct_infreq(output)
       orig_levels <- levels(output)
       levels(output) <- c("0", "1")
-      df_balanced <- ubSMOTE2(input, output, verbose=verbose, ...) # defaults are, perc.over = 200, perc.under = 200, k = 5
+      df_balanced <- ubSMOTE2(input, output, ...) # defaults are, perc.over = 200, perc.under = 200, k = 5
       df_balanced <- as.data.frame(df_balanced)
 
       # revert the name changes made by ubSMOTE.
