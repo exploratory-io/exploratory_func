@@ -704,6 +704,7 @@ function(X,Y, max_synth_perc=200, target_minority_perc=40, target_size=NULL, per
     return(apply(X,1,function(x){any(is.na(x))}))
 
   smote_minority <- function(data, synth_perc, k) {
+    synth_perc <- as.integer(synth_perc)
     newExs <- unbalanced::ubSmoteExs(data[id.1,], "Y", synth_perc, k)   
     row.is.na<-row.has.na(newExs)
     
@@ -805,6 +806,10 @@ function(X,Y, max_synth_perc=200, target_minority_perc=40, target_size=NULL, per
         }
         else if (minority_size * (100 + max_synth_perc) / 100 / (minority_size * (100 + max_synth_perc) / 100 + majority_size) >= target_minority_perc / 100) {
           # Enough Minority With SMOTE. Just SMOTE minority.
+          target_minority_size <- majority_size / (100 / target_minority_perc - 1)
+          synth_perc <- (target_minority_size - minority_size) / minority_size * 100
+          newExs <- smote_minority(data, synth_perc, k)
+          newdataset <- rbind(data, newExs)
         }
         else {
           # Not Enough Minority even with SMOTE.
