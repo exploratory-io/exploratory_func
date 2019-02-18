@@ -100,7 +100,6 @@ test_that("test exp_balance with numeric, not enough minority and not enough maj
     y = c(rep(3, 35), rep(4, 65)),
     num = runif(100)
   )
-  # This fails because unbalanced::ubSmoteExs throws error when perc.over is less than 100.
   res <- exp_balance(sample_data, y, target_size=200)
   expect_true("data.frame" %in% class(res))
   expect_equal("numeric" ,class(res$y))
@@ -112,7 +111,6 @@ test_that("test exp_balance with numeric, not enough minority and not enough maj
     y = c(rep(3, 10), rep(4, 90)),
     num = runif(100)
   )
-  # This fails because unbalanced::ubSmoteExs throws error when perc.over is less than 100.
   res <- exp_balance(sample_data, y, target_size=200)
   expect_true("data.frame" %in% class(res))
   expect_equal("numeric" ,class(res$y))
