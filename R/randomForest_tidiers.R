@@ -722,6 +722,13 @@ function(X,Y, max_synth_perc=200, target_minority_perc=40, target_size=NULL, per
     majority_data <- data[selMaj,]
   }
 
+  sample_minority <- function(data, size) {
+    # get the undersample of the "minority class" examples
+    selMin <- sample((1:NROW(data))[id.1], size, replace=F)
+
+    majority_data <- data[selMin,]
+  }
+
   if (is.null(target_size)) {
     if (minority_size / (minority_size + majority_size) >= target_minority_perc / 100) {
       # Already enough minority for the ratio even without SMOTE.
