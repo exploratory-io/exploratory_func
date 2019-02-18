@@ -741,9 +741,12 @@ function(X,Y, max_synth_perc=200, target_minority_perc=40, target_size=NULL, per
   selMaj <- sample((1:NROW(data))[-id.1],
                    as.integer((perc.under/100)*nrow(newExs)),
                    replace=T)
+
+  majority_data <- data[selMaj,]
+  minority_data <- data[id.1,]
   
   # the final data set (the undersample + the rare cases + the smoted exs)
-  newdataset <- rbind(data[selMaj,],data[id.1,],newExs)
+  newdataset <- rbind(majority_data, minority_data, newExs)
   #shuffle the order of instances
   newdataset<-newdataset[sample(1:NROW(newdataset)), ]
   
