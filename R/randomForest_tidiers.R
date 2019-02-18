@@ -801,6 +801,7 @@ function(X,Y, max_synth_perc=200, target_minority_perc=40, target_size=NULL, per
         if (minority_size / (majority_size + minority_size) >= target_minority_perc / 100) {
           # Already enough minority for the ratio even without SMOTE.
           # No Action.  Already above target minority ratio.
+          newdataset <- data
         }
         else if (minority_size * (100 + max_synth_perc) / 100 / (minority_size * (100 + max_synth_perc) / 100 + majority_size) >= target_minority_perc / 100) {
           # Enough Minority With SMOTE. Just SMOTE minority.
