@@ -749,7 +749,26 @@ function(X,Y, max_synth_perc=200, target_minority_perc=40, target_size=NULL, per
     }
   }
   else {
-    #TBD
+    target_majority_size <- as.integer(target_size * (1 - target_minority_perc / 100))
+    target_minority_size <- as.integer(target_size * (target_minority_perc / 100))
+    if (minority_size >= target_minority_size) {
+      # Enough minority
+      if (majority_size >= target_majority_size) {
+        # Enough majority
+      }
+      else {
+        # Not enough majority
+      }
+    }
+    else {
+      # Not enough minority
+      if (majority_size >= target_majority_size) {
+        # Enough majority
+      }
+      else {
+        # Not enough majority
+      }
+    }
   }
   
   #shuffle the order of instances
