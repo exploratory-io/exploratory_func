@@ -732,14 +732,16 @@ ubSMOTE2 <- function(X,Y, max_synth_perc=200, target_minority_perc=40, target_si
     # get the undersample of the "majority class" examples
     selMaj <- sample((1:NROW(data))[-id.1], size, replace=F)
 
-    majority_data <- data[selMaj,]
+    ret <- data[selMaj,]
+    ret
   }
 
   sample_minority <- function(data, size) {
     # get the undersample of the "minority class" examples
     selMin <- sample((1:NROW(data))[id.1], size, replace=F)
 
-    majority_data <- data[selMin,]
+    ret <- data[selMin,]
+    ret
   }
 
   if (is.null(target_size)) {
