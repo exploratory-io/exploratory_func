@@ -684,9 +684,7 @@ rf_partial_dependence <- function(df, ...) { # TODO: write test for this.
   res
 }
 
-ubSMOTE2 <-
-function(X,Y, max_synth_perc=200, target_minority_perc=40, target_size=NULL, perc.over=200,k=5,perc.under=200,verbose=TRUE){
-  
+ubSMOTE2 <- function(X,Y, max_synth_perc=200, target_minority_perc=40, target_size=NULL, perc.over=200,k=5,perc.under=200,verbose=TRUE) {
   if(!is.factor(Y)) 
     stop("Y has to be a factor")
   if(is.vector(X)) 
