@@ -720,7 +720,7 @@ function(X,Y, max_synth_perc=200, target_minority_perc=40, target_size=NULL, per
     }
     else {
       # Not enough minority even with SMOTE
-      # SMOTE to the limit.
+      # SMOTE to the limit and sample down to make target ratio
       newExs <- unbalanced::ubSmoteExs(data[id.1,],"Y",max_synth_perc, k)   
       row.is.na<-row.has.na(newExs)
       
@@ -731,11 +731,8 @@ function(X,Y, max_synth_perc=200, target_minority_perc=40, target_size=NULL, per
       }
       
       # get the undersample of the "majority class" examples
-      selMaj <- sample((1:NROW(data))[-id.1],
-                       as.integer((perc.under/100)*nrow(newExs)),
-                       replace=T)
-
-      majority_data <- data[selMaj,]
+      size <- as.integer((nrow(newExs) + minority_size) / target_minority_perc * (100 - target_minority_perc))
+      majority_data <- sample_majority(data, size)
       minority_data <- data[id.1,]
       
       # the final data set (the undersample + the rare cases + the smoted exs)
