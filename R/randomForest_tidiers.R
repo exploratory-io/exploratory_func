@@ -1230,6 +1230,9 @@ calc_feature_imp <- function(df,
                              target_n = 20,
                              predictor_n = 12, # So that at least months can fit in it.
                              smote = FALSE,
+                             smote_target_minority_perc = 40,
+                             smote_max_synth_perc = 200,
+                             smote_k = 5,
                              max_pd_vars = 12, # Number of most important variables to calculate partial dependences on. Default 12 fits well with either 3 or 4 columns of facets. 
                              with_boruta = FALSE,
                              boruta_max_runs = 20, # Maximal number of importance source runs.
@@ -1279,7 +1282,7 @@ calc_feature_imp <- function(df,
       # apply smote if this is binary classification
       unique_val <- unique(df[[clean_target_col]])
       if (smote && length(unique_val[!is.na(unique_val)]) == 2) {
-        df <- df %>% exp_balance(clean_target_col, sample=FALSE) # since we already sampled, no further sample.
+        df <- df %>% exp_balance(clean_target_col, target_size = max_nrow, target_minority_perc = smote_target_minority_perc, max_synth_perc = smote_max_synth_perc, k = smote_k)
       }
 
       # build formula for randomForest
