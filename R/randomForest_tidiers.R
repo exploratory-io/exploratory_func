@@ -842,7 +842,8 @@ ubSMOTE2 <- function(X,Y, max_synth_perc=200, target_minority_perc=40, target_si
       }
     }
   }
-  
+  # Fill NA in synthesized with FALSE.
+  newdataset <- newdataset %>% mutate(synthesized = if_else(is.na(synthesized), FALSE, synthesized)) 
   #shuffle the order of instances
   newdataset<-newdataset[sample(1:NROW(newdataset)), ]
   newdataset
