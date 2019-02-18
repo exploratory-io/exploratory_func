@@ -46,6 +46,17 @@ test_that("test exp_balance with numeric, enough minority and not enough majorit
     num = runif(100)
   )
   res <- exp_balance(sample_data, y, target_size=100)
+  expect_true("data.frame" %in% class(res))
+  expect_equal("numeric" ,class(res$y))
+  expect_equal(c(3,4) ,sort(unique(res$y)))
+})
+
+test_that("test exp_balance with numeric, enough minority and majority, with target size", {
+  sample_data <- data.frame(
+    y = c(rep(3, 49), rep(4, 51)),
+    num = runif(100)
+  )
+  res <- exp_balance(sample_data, y, target_size=50)
   browser()
   expect_true("data.frame" %in% class(res))
   expect_equal("numeric" ,class(res$y))

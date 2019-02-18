@@ -762,6 +762,9 @@ function(X,Y, max_synth_perc=200, target_minority_perc=40, target_size=NULL, per
       # Enough minority
       if (majority_size >= target_majority_size) {
         # Enough majority. Sample down both
+        majority_data <- sample_majority(data, target_majority_size)
+        minority_data <- sample_minority(data, target_minority_size)
+        newdataset <- rbind(majority_data, minority_data)
       }
       else {
         # Not enough majority.
