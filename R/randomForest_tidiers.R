@@ -695,8 +695,11 @@ function(X,Y, max_synth_perc=200, target_minority_perc=40, target_size=NULL, per
   data<-cbind(X,Y)
   id.1 <- which(Y == 1)
 
-  #TBD Get majoirty size
-  #TBD Get minority size
+  browser()
+  # Get minority size
+  minority_size = length(id.1)
+  # Get majoirty size
+  majority_size = NROW(data) - minority_size
 
   if (is.null(target_size)) {
     #TBD
