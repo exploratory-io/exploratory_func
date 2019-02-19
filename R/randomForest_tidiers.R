@@ -745,13 +745,16 @@ ubSMOTE2 <- function(X,Y, max_synth_perc=200, target_minority_perc=40, target_si
     ret
   }
 
+  # Size of minority data after synthesizing to the max.
+  max_minority_size <- minority_size * (100 + max_synth_perc) / 100
+
   if (is.null(target_size)) {
     if (minority_size / (minority_size + majority_size) >= target_minority_perc / 100) {
       # Already enough minority for the ratio even without SMOTE.
       # No Action. Already above target minority ratio.
       newdataset <- data %>% dplyr::mutate(synthesized = FALSE)
     }
-    else if (minority_size * (100 + max_synth_perc) / 100 / (minority_size * (100 + max_synth_perc) / 100 + majority_size) >= target_minority_perc / 100) {
+    else if (max_minority_size / (max_minority_size + majority_size) >= target_minority_perc / 100) {
       # Enough minority with SMOTE. SMOTE necessary number of minority rows.
       target_minority_size <- majority_size / (100 / target_minority_perc - 1)
       synth_perc <- (target_minority_size - minority_size) / minority_size * 100
@@ -793,7 +796,7 @@ ubSMOTE2 <- function(X,Y, max_synth_perc=200, target_minority_perc=40, target_si
       # Not enough minority
       if (majority_size >= target_majority_size) {
         # Enough majority. SMOTE and Sample down
-        if (minority_size * (100 + max_synth_perc) / 100 / (minority_size * (100 + max_synth_perc) / 100 + target_majority_size) >= target_minority_perc / 100) {
+        if (max_minority_size / (max_minority_size + target_majority_size) >= target_minority_perc / 100) {
           # Enough Minority With SMOTE. SMOTE and sample down
           synth_perc <- (target_minority_size - minority_size) / minority_size * 100
           newExs <- smote_minority(data, synth_perc, k)
@@ -820,7 +823,7 @@ ubSMOTE2 <- function(X,Y, max_synth_perc=200, target_minority_perc=40, target_si
           # No Action.  Already above target minority ratio.
           newdataset <- data %>% dplyr::mutate(synthesized = FALSE)
         }
-        else if (minority_size * (100 + max_synth_perc) / 100 / (minority_size * (100 + max_synth_perc) / 100 + majority_size) >= target_minority_perc / 100) {
+        else if (max_minority_size / (max_minority_size + majority_size) >= target_minority_perc / 100) {
           # Enough Minority With SMOTE. Just SMOTE minority.
           target_minority_size <- majority_size / (100 / target_minority_perc - 1)
           synth_perc <- (target_minority_size - minority_size) / minority_size * 100
