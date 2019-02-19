@@ -172,6 +172,9 @@ build_lm.fast <- function(df,
                     max_nrow = 50000,
                     predictor_n = 12, # so that at least months can fit in it.
                     smote = FALSE,
+                    smote_target_minority_perc = 40,
+                    smote_max_synth_perc = 200,
+                    smote_k = 5,
                     relimp = FALSE,
                     relimp_type = "first",
                     relimp_bootstrap_runs = 20,
@@ -296,9 +299,11 @@ build_lm.fast <- function(df,
         # filter Inf/-Inf too to avoid error at lm.
         dplyr::filter(!is.na(df[[clean_target_col]]) & !is.infinite(df[[clean_target_col]])) # this form does not handle group_by. so moved into each_func from outside.
 
-      # sample the data because randomForest takes long time
-      # if data size is too large
-      df <- df %>% sample_rows(max_nrow)
+      # Sample the data because randomForest takes long time if data size is too large.
+      # If we are to do SMOTE, do not down sample here and let exp_balance handle it so that we do not sample out precious minority data.
+      if (!smote) {
+        df <- df %>% sample_rows(max_nrow)
+      }
 
       c_cols <- clean_cols
       # To avoid unused factor level that causes margins::marginal_effects() to fail, filtering operation has
@@ -406,7 +411,7 @@ build_lm.fast <- function(df,
       fml <- as.formula(paste0("`", clean_target_col, "` ~ ", rhs))
       if (model_type == "glm") {
         if (smote) {
-          df <- df %>% exp_balance(clean_target_col, sample=FALSE) # no further sampling
+          df <- df %>% exp_balance(clean_target_col, target_size = max_nrow, target_minority_perc = smote_target_minority_perc, max_synth_perc = smote_max_synth_perc, k = smote_k)
           for(col in names(df)){
             if(is.factor(df[[col]])) {
               # margins::marginal_effects() fails if unused factor level exists. Drop them to avoid it.

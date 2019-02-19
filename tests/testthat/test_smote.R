@@ -6,13 +6,123 @@
 
 context("test smote function exp_balance()")
 
-test_that("test exp_balance with numeric", {
+
+test_that("test exp_balance with numeric, already enough minority, without target size", {
   sample_data <- data.frame(
-    y = c(3, 4, 4, 4, 4, 4),
-    num = runif(6)
+    y = c(rep(3, 49), rep(4, 51)),
+    num = runif(100)
   )
   res <- exp_balance(sample_data, y)
   expect_true("data.frame" %in% class(res))
+  expect_true("synthesized" %in% names(res))
+  expect_equal("numeric" ,class(res$y))
+  expect_equal(c(3,4) ,sort(unique(res$y)))
+})
+
+test_that("test exp_balance with numeric, enough minority with SMOTE, without target size", {
+  sample_data <- data.frame(
+    y = c(rep(3, 10), rep(4, 30)),
+    num = runif(40)
+  )
+  res <- exp_balance(sample_data, y)
+  expect_true("data.frame" %in% class(res))
+  expect_true("synthesized" %in% names(res))
+  expect_equal("numeric" ,class(res$y))
+  expect_equal(c(3,4) ,sort(unique(res$y)))
+})
+
+test_that("test exp_balance with numeric, not enough minority even with SMOTE, without target size", {
+  sample_data <- data.frame(
+    y = c(rep(3, 5), rep(4, 50)),
+    num = runif(55)
+  )
+  res <- exp_balance(sample_data, y)
+  expect_true("data.frame" %in% class(res))
+  expect_true("synthesized" %in% names(res))
+  expect_equal("numeric" ,class(res$y))
+  expect_equal(c(3,4) ,sort(unique(res$y)))
+})
+
+test_that("test exp_balance with numeric, enough minority and not enough majority, with target size", {
+  sample_data <- data.frame(
+    y = c(rep(3, 49), rep(4, 51)),
+    num = runif(100)
+  )
+  res <- exp_balance(sample_data, y, target_size=100)
+  expect_true("data.frame" %in% class(res))
+  expect_true("synthesized" %in% names(res))
+  expect_equal("numeric" ,class(res$y))
+  expect_equal(c(3,4) ,sort(unique(res$y)))
+})
+
+test_that("test exp_balance with numeric, enough minority and majority, with target size", {
+  sample_data <- data.frame(
+    y = c(rep(3, 49), rep(4, 51)),
+    num = runif(100)
+  )
+  res <- exp_balance(sample_data, y, target_size=50)
+  expect_true("data.frame" %in% class(res))
+  expect_true("synthesized" %in% names(res))
+  expect_equal("numeric" ,class(res$y))
+  expect_equal(c(3,4) ,sort(unique(res$y)))
+})
+
+test_that("test exp_balance with numeric, not enough minority but enough with smote, and enough majority, with target size", {
+  sample_data <- data.frame(
+    y = c(rep(3, 8), rep(4, 92)),
+    num = runif(100)
+  )
+  res <- exp_balance(sample_data, y, target_size=50)
+  expect_true("data.frame" %in% class(res))
+  expect_true("synthesized" %in% names(res))
+  expect_equal("numeric" ,class(res$y))
+  expect_equal(c(3,4) ,sort(unique(res$y)))
+})
+
+test_that("test exp_balance with numeric, not enough minority even with smote, and enough majority, with target size", {
+  sample_data <- data.frame(
+    y = c(rep(3, 3), rep(4, 97)),
+    num = runif(100)
+  )
+  res <- exp_balance(sample_data, y, target_size=50)
+  expect_true("data.frame" %in% class(res))
+  expect_true("synthesized" %in% names(res))
+  expect_equal("numeric" ,class(res$y))
+  expect_equal(c(3,4) ,sort(unique(res$y)))
+})
+
+test_that("test exp_balance with numeric, not enough minority and not enough majority, but enough minority for target ratio, with target size", {
+  sample_data <- data.frame(
+    y = c(rep(3, 40), rep(4, 60)),
+    num = runif(100)
+  )
+  res <- exp_balance(sample_data, y, target_size=200)
+  expect_true("data.frame" %in% class(res))
+  expect_true("synthesized" %in% names(res))
+  expect_equal("numeric" ,class(res$y))
+  expect_equal(c(3,4) ,sort(unique(res$y)))
+})
+
+test_that("test exp_balance with numeric, not enough minority and not enough majority, but enough minority with SMOTE for target ratio, with target size", {
+  sample_data <- data.frame(
+    y = c(rep(3, 35), rep(4, 65)),
+    num = runif(100)
+  )
+  res <- exp_balance(sample_data, y, target_size=200)
+  expect_true("data.frame" %in% class(res))
+  expect_true("synthesized" %in% names(res))
+  expect_equal("numeric" ,class(res$y))
+  expect_equal(c(3,4) ,sort(unique(res$y)))
+})
+
+test_that("test exp_balance with numeric, not enough minority and not enough majority, not enough minority even with SMOTE for target ratio, with target size", {
+  sample_data <- data.frame(
+    y = c(rep(3, 10), rep(4, 90)),
+    num = runif(100)
+  )
+  res <- exp_balance(sample_data, y, target_size=200)
+  expect_true("data.frame" %in% class(res))
+  expect_true("synthesized" %in% names(res))
   expect_equal("numeric" ,class(res$y))
   expect_equal(c(3,4) ,sort(unique(res$y)))
 })
@@ -38,6 +148,18 @@ test_that("test exp_balance with factor", {
   expect_true("data.frame" %in% class(res))
   expect_equal(class(res$y), "factor")
   expect_equal(levels(res$y), c("a","b"))
+})
+
+test_that("test exp_balance with ordered factor with NA as a predictors", {
+  sample_data <- data.frame(
+    y = factor(c("a", "b", "b", "b", "b", "b")),
+    x = factor(c("A", "A", "B", "B", NA, "B"), ordered=TRUE),
+    num = runif(6)
+  )
+  res <- exp_balance(sample_data, y)
+  expect_true("data.frame" %in% class(res))
+  expect_equal(class(res$x), "factor")
+  expect_equal(levels(res$x), c("A", "B", "(Missing)"))
 })
 
 test_that("test exp_balance with logical", {
