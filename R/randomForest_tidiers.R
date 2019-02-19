@@ -684,7 +684,7 @@ rf_partial_dependence <- function(df, ...) { # TODO: write test for this.
   res
 }
 
-ubSMOTE2 <- function(X,Y, max_synth_perc=200, target_minority_perc=40, target_size=NULL, k=5) {
+ubSMOTE2 <- function(X,Y, max_synth_perc=200, target_minority_perc=40, target_size=NULL, k=5, ...) {
   if(!is.factor(Y)) 
     stop("Y has to be a factor")
   if(is.vector(X)) 
@@ -854,7 +854,11 @@ ubSMOTE2 <- function(X,Y, max_synth_perc=200, target_minority_perc=40, target_si
 #' @export
 exp_balance <- function(df,
                      target,
-                     max_nrow=50000,
+                     target_minority_perc = 40,
+                     target_size = 50000,
+                     max_synth_perc = 200,
+                     k = 5,
+                     max_nrow=50000, # max_nrow, sample is pre-5.1 legacy. They are ignored now.
                      sample=TRUE,
                      ...,
                      seed = NULL
@@ -880,10 +884,11 @@ exp_balance <- function(df,
 
   each_func <- function(df) {
 
+    # Old pre 5.1 code, which used to sample data.
     # sample data since smote can be slow when data is big.
-    if (sample) {
-      df <- df %>% sample_rows(max_nrow)
-    }
+    # if (sample) {
+    #   df <- df %>% sample_rows(max_nrow)
+    # }
 
     factorized_cols <- c()
     for(col in colnames(df)){
