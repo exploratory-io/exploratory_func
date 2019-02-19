@@ -157,7 +157,7 @@ build_kmeans.cols <- function(df, ...,
                             trace = FALSE,
                             normalize_data = TRUE,
                             keep.source = TRUE,
-                            seed=0,
+                            seed = NULL,
                             augment=TRUE
                             ){
   validate_empty_data(df)
