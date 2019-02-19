@@ -885,6 +885,8 @@ exp_balance <- function(df,
   each_func <- function(df) {
 
     # Old pre 5.1 code, which used to sample data.
+    # We do not do this any more to avoid sampling precious minority data.
+    #
     # sample data since smote can be slow when data is big.
     # if (sample) {
     #   df <- df %>% sample_rows(max_nrow)
