@@ -2123,7 +2123,7 @@ tidy.Boruta_exploratory <- function(x, ...) {
   res <- res %>% dplyr::left_join(decisions, by = "variable") 
   res$variable <- x$terms_mapping[res$variable] # Map variable names back to original.
   res <- res %>% dplyr::filter(decision %in% c("Confirmed", "Tentative", "Rejected")) # Remove rows with NA
-  res <- res %>% dplyr::mutate(variable = forcats::fct_reorder(variable, importance, .fun = mean, .desc = TRUE))
+  res <- res %>% dplyr::mutate(variable = forcats::fct_reorder(variable, importance, .fun = median, .desc = TRUE))
   # Reorder types of decision in the order of more important to less important.
   res <- res %>% dplyr::mutate(decision = forcats::fct_relevel(decision, "Confirmed", "Tentative", "Rejected"))
   res
