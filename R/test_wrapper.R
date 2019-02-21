@@ -349,8 +349,13 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, ...) {
   var2_col <- col_name(substitute(var2))
   grouped_cols <- grouped_by(df)
 
-  if (!is.null(func2) && (is.Date(df[[var2_col]]) || is.POSIXct(df[[var2_col]]))) {
-    df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_date(!!rlang::sym(var2_col), type=func2))
+  if (!is.null(func2)) {
+    if (is.Date(df[[var2_col]]) || is.POSIXct(df[[var2_col]])) {
+      df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_date(!!rlang::sym(var2_col), type=func2))
+    }
+    else if (is.numeric(df[[var2_col]])) {
+      df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_numeric(!!rlang::sym(var2_col), type=func2))
+    }
   }
   
   n_distinct_res <- n_distinct(df[[var2_col]]) # save n_distinct result to avoid repeating the relatively expensive call.
