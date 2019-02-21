@@ -612,7 +612,6 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
     coefficients = {
       ret <- broom:::tidy.lm(x) # it seems that tidy.lm takes care of glm too
       ret <- ret %>% mutate(conf.high=estimate+1.96*std.error, conf.low=estimate-1.96*std.error)
-      browser()
       if (any(is.na(x$coefficients))) {
         # since broom skips coefficients with NA value, which means removed by lm because of multi-collinearity,
         # put it back to show them.
@@ -686,9 +685,12 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
       if (!is.null(x$marginal_effects)) {
         ret <- ret %>% dplyr::left_join(x$marginal_effects, by="term")
       }
+      base_level_table <- xlevels_to_base_level_table(x$xlevels)
+      ret <- ret %>% dplyr::left_join(base_level_table, by="term")
       if (pretty.name) {
         ret <- ret %>% rename(Term=term, Coefficient=estimate, `Std Error`=std.error,
-                              `t Ratio`=statistic, `P Value`=p.value, `Conf Low`=conf.low, `Conf High`=conf.high)
+                              `t Ratio`=statistic, `P Value`=p.value, `Conf Low`=conf.low, `Conf High`=conf.high,
+                              `Base Level`=base.level)
         if (!is.null(ret$ame)) {
           ret <- ret %>% rename(`Average Marginal Effect`=ame)
         }
