@@ -206,11 +206,21 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
   value_col <- col_name(substitute(value))
   grouped_col <- grouped_by(df)
 
-  if (!is.null(func1) && (is.Date(df[[var1_col]]) || is.POSIXct(df[[var1_col]]))) {
-    df <- df %>% mutate(!!rlang::sym(var1_col) := extract_from_date(!!rlang::sym(var1_col), type=func1))
+  if (!is.null(func1)) {
+    if (is.Date(df[[var1_col]]) || is.POSIXct(df[[var1_col]])) {
+      df <- df %>% dplyr::mutate(!!rlang::sym(var1_col) := extract_from_date(!!rlang::sym(var1_col), type=func1))
+    }
+    else if (is.numeric(df[[var1_col]])) {
+      df <- df %>% dplyr::mutate(!!rlang::sym(var1_col) := extract_from_numeric(!!rlang::sym(var1_col), type=func1))
+    }
   }
-  if (!is.null(func2) && (is.Date(df[[var2_col]]) || is.POSIXct(df[[var2_col]]))) {
-    df <- df %>% mutate(!!rlang::sym(var2_col) := extract_from_date(!!rlang::sym(var2_col), type=func2))
+  if (!is.null(func2)) {
+    if (is.Date(df[[var2_col]]) || is.POSIXct(df[[var2_col]])) {
+      df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_date(!!rlang::sym(var2_col), type=func2))
+    }
+    else if (is.numeric(df[[var2_col]])) {
+      df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_numeric(!!rlang::sym(var2_col), type=func2))
+    }
   }
   
   if (n_distinct(df[[var1_col]]) < 2) {
@@ -460,8 +470,13 @@ exp_anova <- function(df, var1, var2, func2 = NULL, ...) {
   var2_col <- col_name(substitute(var2))
   grouped_cols <- grouped_by(df)
 
-  if (!is.null(func2) && (is.Date(df[[var2_col]]) || is.POSIXct(df[[var2_col]]))) {
-    df <- df %>% mutate(!!rlang::sym(var2_col) := extract_from_date(!!rlang::sym(var2_col), type=func2))
+  if (!is.null(func2)) {
+    if (is.Date(df[[var2_col]]) || is.POSIXct(df[[var2_col]])) {
+      df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_date(!!rlang::sym(var2_col), type=func2))
+    }
+    else if (is.numeric(df[[var2_col]])) {
+      df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_numeric(!!rlang::sym(var2_col), type=func2))
+    }
   }
   
   if (n_distinct(df[[var2_col]]) < 2) {
