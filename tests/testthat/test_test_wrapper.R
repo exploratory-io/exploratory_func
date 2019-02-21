@@ -199,6 +199,11 @@ test_that("test exp_chisq", {
   ret
 })
 
+test_that("test exp_chisq with grouping functions", {
+  ret <- exp_chisq(mtcars, disp, drat, func1="asintby10", func2="asint", value=mpg)
+  ret
+})
+
 test_that("test exp_chisq with logical", {
   model_df <- exp_chisq(mtcars %>% mutate(gear=gear>3, carb=carb>3), gear, carb) # logical type should be kept in the model
   ret <- model_df %>% tidy(model, type="residuals")
@@ -256,6 +261,13 @@ test_that("test exp_anova", {
   ret %>% tidy(model, type="data_summary")
   ret
 })
+
+test_that("test exp_anova with grouping functions", {
+  ret <- exp_anova(mtcars, mpg, disp, func2="asintby10")
+  ret %>% tidy(model, type="data_summary")
+  ret
+})
+
 
 test_that("test exp_anova with group_by", {
   ret <- mtcars %>% group_by(vs) %>% exp_anova(mpg, am)
