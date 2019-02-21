@@ -1320,6 +1320,21 @@ extract_from_date <- function(x, type = "fltoyear") {
   ret
 }
 
+#' @export
+extract_from_numeric <- function(x, type = "asdisc") {
+  switch(type,
+    asdisc = {
+      ret <- x
+    },
+    asint = {
+      ret <- as.integer(x)
+    },
+    asintby10 = {
+      ret <- floor(x/10) * 10
+    })
+  ret
+}
+
 #' Calculate R-Squared 
 #' @export
 r_squared <- function (actual, predicted) {
