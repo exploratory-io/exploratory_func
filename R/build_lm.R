@@ -601,7 +601,7 @@ xlevels_to_base_level_table <- function(xlevels) {
     paste0(if_else(stringr::str_detect(vname,' '),paste0('`',vname,'`'),vname),xlevels[[vname]])
   }))
   base_level <- purrr::flatten_chr(purrr::map(xlevels, function(v){rep(v[[1]],length(v))}))
-  ret <- data.frame(term=term, base_level=base_level)
+  ret <- data.frame(term=term, base.level=base_level)
   ret
 }
 
@@ -623,11 +623,14 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
           ret <- ret %>% rename(Note=note)
         }
       }
+      base_level_table <- xlevels_to_base_level_table(x$xlevels)
+      ret <- ret %>% dplyr::left_join(base_level_table, by="term")
       if (pretty.name) {
         ret <- ret %>% rename(Term=term, Coefficient=estimate, `Std Error`=std.error,
                               `t Ratio`=statistic, `P Value`=p.value,
                               `Conf Low`=conf.low,
-                              `Conf High`=conf.high)
+                              `Conf High`=conf.high,
+                              `Base Level`=base.level)
       }
       ret
     },
