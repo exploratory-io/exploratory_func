@@ -612,6 +612,8 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
     coefficients = {
       ret <- broom:::tidy.lm(x) # it seems that tidy.lm takes care of glm too
       ret <- ret %>% mutate(conf.high=estimate+1.96*std.error, conf.low=estimate-1.96*std.error)
+      base_level_table <- xlevels_to_base_level_table(x$xlevels)
+      ret <- ret %>% dplyr::left_join(base_level_table, by="term")
       if (any(is.na(x$coefficients))) {
         # since broom skips coefficients with NA value, which means removed by lm because of multi-collinearity,
         # put it back to show them.
@@ -622,8 +624,6 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
           ret <- ret %>% rename(Note=note)
         }
       }
-      base_level_table <- xlevels_to_base_level_table(x$xlevels)
-      ret <- ret %>% dplyr::left_join(base_level_table, by="term")
       if (pretty.name) {
         ret <- ret %>% rename(Term=term, Coefficient=estimate, `Std Error`=std.error,
                               `t Ratio`=statistic, `P Value`=p.value,
@@ -665,16 +665,6 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
   switch(type,
     coefficients = {
       ret <- broom:::tidy.lm(x) # it seems that tidy.lm takes care of glm too
-      if (any(is.na(x$coefficients))) {
-        # since broom skips coefficients with NA value, which means removed by lm because of multi-collinearity,
-        # put it back to show them.
-        # reference: https://stats.stackexchange.com/questions/25804/why-would-r-return-na-as-a-lm-coefficient
-        removed_coef_df <- data.frame(term=names(x$coefficients[is.na(x$coefficients)]), note="Dropped most likely due to perfect multicollinearity.")
-        ret <- ret %>% bind_rows(removed_coef_df)
-        if (pretty.name) {
-          ret <- ret %>% rename(Note=note)
-        }
-      }
       ret <- ret %>% mutate(conf.high=estimate+1.96*std.error, conf.low=estimate-1.96*std.error)
       if (x$family$family == "binomial") { # odds ratio is only for logistic regression
         ret <- ret %>% mutate(odds_ratio=exp(estimate))
@@ -687,6 +677,16 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
       }
       base_level_table <- xlevels_to_base_level_table(x$xlevels)
       ret <- ret %>% dplyr::left_join(base_level_table, by="term")
+      if (any(is.na(x$coefficients))) {
+        # since broom skips coefficients with NA value, which means removed by lm because of multi-collinearity,
+        # put it back to show them.
+        # reference: https://stats.stackexchange.com/questions/25804/why-would-r-return-na-as-a-lm-coefficient
+        removed_coef_df <- data.frame(term=names(x$coefficients[is.na(x$coefficients)]), note="Dropped most likely due to perfect multicollinearity.")
+        ret <- ret %>% bind_rows(removed_coef_df)
+        if (pretty.name) {
+          ret <- ret %>% rename(Note=note)
+        }
+      }
       if (pretty.name) {
         ret <- ret %>% rename(Term=term, Coefficient=estimate, `Std Error`=std.error,
                               `t Ratio`=statistic, `P Value`=p.value, `Conf Low`=conf.low, `Conf High`=conf.high,
