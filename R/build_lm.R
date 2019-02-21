@@ -596,6 +596,15 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add tes
   ret
 }
 
+xlevels_to_base_level_table <- function(xlevels) {
+  term <- purrr::flatten_chr(purrr::map(names(xlevels), function(vname) {
+    paste0(if_else(stringr::str_detect(vname,' '),paste0('`',vname,'`'),vname),xlevels[[vname]])
+  }))
+  base_level <- purrr::flatten_chr(purrr::map(xlevels, function(v){rep(v[[1]],length(v))}))
+  ret <- data.frame(term=term, base_level=base_level)
+  ret
+}
+
 #' special version of tidy.lm function to use with build_lm.fast.
 #' @export
 tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, ...) { #TODO: add test
@@ -603,6 +612,7 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
     coefficients = {
       ret <- broom:::tidy.lm(x) # it seems that tidy.lm takes care of glm too
       ret <- ret %>% mutate(conf.high=estimate+1.96*std.error, conf.low=estimate-1.96*std.error)
+      browser()
       if (any(is.na(x$coefficients))) {
         # since broom skips coefficients with NA value, which means removed by lm because of multi-collinearity,
         # put it back to show them.
