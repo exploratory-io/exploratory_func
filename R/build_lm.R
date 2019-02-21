@@ -596,6 +596,7 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add tes
   ret
 }
 
+# Creates a data frame that maps term name to its base level.
 xlevels_to_base_level_table <- function(xlevels) {
   term <- purrr::flatten_chr(purrr::map(names(xlevels), function(vname) {
     paste0(if_else(stringr::str_detect(vname,' '),paste0('`',vname,'`'),vname),xlevels[[vname]])
