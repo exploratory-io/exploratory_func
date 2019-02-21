@@ -286,6 +286,8 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add tes
   ret <- ret %>% dplyr::mutate(
     hazard_ratio = exp(estimate)
   )
+  base_level_table <- xlevels_to_base_level_table(x$xlevels)
+  ret <- ret %>% dplyr::left_join(base_level_table, by="term")
   if (pretty.name){
     colnames(ret)[colnames(ret) == "term"] <- "Term"
     colnames(ret)[colnames(ret) == "statistic"] <- "t Ratio"
@@ -295,6 +297,7 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add tes
     colnames(ret)[colnames(ret) == "conf.low"] <- "Conf Low"
     colnames(ret)[colnames(ret) == "conf.high"] <- "Conf High"
     colnames(ret)[colnames(ret) == "hazard_ratio"] <- "Hazard Ratio"
+    colnames(ret)[colnames(ret) == "base.level"] <- "Base Level"
   } else {
     colnames(ret)[colnames(ret) == "statistic"] <- "t_ratio"
     colnames(ret)[colnames(ret) == "p.value"] <- "p_value"
