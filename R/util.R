@@ -1323,7 +1323,7 @@ extract_from_date <- function(x, type = "fltoyear") {
 #' @export
 extract_from_numeric <- function(x, type = "asdisc") {
   switch(type,
-    asdisc = {
+    asnum = {
       ret <- x
     },
     asint = {
@@ -1331,6 +1331,9 @@ extract_from_numeric <- function(x, type = "asdisc") {
     },
     asintby10 = {
       ret <- floor(x/10) * 10
+    },
+    aschar = {
+      ret <- as.character(x)
     })
   ret
 }
