@@ -947,7 +947,12 @@ exp_balance <- function(df,
       output <- forcats::fct_infreq(output)
       orig_levels <- levels(output)
       levels(output) <- c("0", "1")
-      df_balanced <- ubSMOTE2(input, output, ...) # defaults are, max_synth_perc=200, target_minority_perc=40, target_size=NULL, k = 5
+      df_balanced <- ubSMOTE2(input, output,
+                              target_minority_perc = target_minority_perc,
+                              target_size = target_size,
+                              max_synth_perc = max_synth_perc,
+                              k = k,
+                              ...) # defaults are, max_synth_perc=200, target_minority_perc=40, target_size=NULL, k = 5
 
       # revert the name changes made by ubSMOTE.
       colnames(df_balanced) <- c(colnames(input), target_col, "synthesized")
