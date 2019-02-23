@@ -65,6 +65,7 @@ test_that("test exp_balance with numeric, enough minority and majority, with tar
   expect_true("synthesized" %in% names(res))
   expect_equal("numeric" ,class(res$y))
   expect_equal(c(3,4) ,sort(unique(res$y)))
+  expect_equal(50 ,nrow(res))
 })
 
 test_that("test exp_balance with numeric, not enough minority but enough with smote, and enough majority, with target size", {
