@@ -17,6 +17,8 @@ test_that("test exp_balance with numeric, already enough minority, without targe
   expect_true("synthesized" %in% names(res))
   expect_equal("numeric" ,class(res$y))
   expect_equal(c(3,4) ,sort(unique(res$y)))
+  expect_equal(nrow(res), 100) # res should be as is.
+  expect_equal(nrow(res[res$y==3,]), 49) # res should be as is.
 })
 
 test_that("test exp_balance with numeric, enough minority with SMOTE, without target size", {
