@@ -31,6 +31,8 @@ test_that("test exp_balance with numeric, enough minority with SMOTE, without ta
   expect_true("synthesized" %in% names(res))
   expect_equal("numeric" ,class(res$y))
   expect_equal(c(3,4) ,sort(unique(res$y)))
+  expect_lte(nrow(res), 50)
+  expect_gt(nrow(res[res$y==3,]), 10)
 })
 
 test_that("test exp_balance with numeric, not enough minority even with SMOTE, without target size", {
@@ -43,6 +45,8 @@ test_that("test exp_balance with numeric, not enough minority even with SMOTE, w
   expect_true("synthesized" %in% names(res))
   expect_equal("numeric" ,class(res$y))
   expect_equal(c(3,4) ,sort(unique(res$y)))
+  expect_lte(nrow(res), 38) # Minority is SMOTEd and majority is sampled. Expectation with some slack.
+  expect_gt(nrow(res[res$y==3,]), 7)
 })
 
 test_that("test exp_balance with numeric, enough minority and not enough majority, with target size", {
@@ -55,6 +59,8 @@ test_that("test exp_balance with numeric, enough minority and not enough majorit
   expect_true("synthesized" %in% names(res))
   expect_equal("numeric" ,class(res$y))
   expect_equal(c(3,4) ,sort(unique(res$y)))
+  expect_equal(nrow(res), 100) # res should be as is
+  expect_equal(nrow(res[res$y==3,]), 49)
 })
 
 test_that("test exp_balance with numeric, enough minority and majority, with target size", {
@@ -67,12 +73,13 @@ test_that("test exp_balance with numeric, enough minority and majority, with tar
   expect_true("synthesized" %in% names(res))
   expect_equal("numeric" ,class(res$y))
   expect_equal(c(3,4) ,sort(unique(res$y)))
-  expect_equal(50 ,nrow(res))
+  expect_equal(nrow(res), 50) # Both minority and majority should be sampled down.
+  expect_equal(nrow(res[res$y==3,]), 20)
 })
 
 test_that("test exp_balance with numeric, not enough minority but enough with smote, and enough majority, with target size", {
   sample_data <- data.frame(
-    y = c(rep(3, 8), rep(4, 92)),
+    y = c(rep(3, 12), rep(4, 88)),
     num = runif(100)
   )
   res <- exp_balance(sample_data, y, target_size=50)
@@ -80,18 +87,27 @@ test_that("test exp_balance with numeric, not enough minority but enough with sm
   expect_true("synthesized" %in% names(res))
   expect_equal("numeric" ,class(res$y))
   expect_equal(c(3,4) ,sort(unique(res$y)))
+  expect_lt(nrow(res), 55) # Minority is SMOTEd and majority is sampled down.
+  expect_gt(nrow(res), 45)
+  expect_gt(nrow(res[res$y==3,]), 15)
 })
 
 test_that("test exp_balance with numeric, not enough minority even with smote, and enough majority, with target size", {
   sample_data <- data.frame(
-    y = c(rep(3, 3), rep(4, 97)),
+    y = c(rep(3, 5), rep(4, 95)),
     num = runif(100)
   )
-  res <- exp_balance(sample_data, y, target_size=50)
+  res <- exp_balance(sample_data, y, target_size=50, k=3) # Smaller k, since original minority size is small.
   expect_true("data.frame" %in% class(res))
   expect_true("synthesized" %in% names(res))
   expect_equal("numeric" ,class(res$y))
   expect_equal(c(3,4) ,sort(unique(res$y)))
+  # Minority is SMOTEd to the limit and majority is sampled down to make the ratio.
+  # Ideal result: minority 15, majority 22.5
+  # This one is rather unstable most likely because of too small minority.
+  expect_lte(nrow(res), 40)
+  expect_gte(nrow(res), 30)
+  expect_gt(nrow(res[res$y==3,]), 12)
 })
 
 test_that("test exp_balance with numeric, not enough minority and not enough majority, but enough minority for target ratio, with target size", {
@@ -104,6 +120,8 @@ test_that("test exp_balance with numeric, not enough minority and not enough maj
   expect_true("synthesized" %in% names(res))
   expect_equal("numeric" ,class(res$y))
   expect_equal(c(3,4) ,sort(unique(res$y)))
+  expect_equal(nrow(res), 100) # res should be as is
+  expect_equal(nrow(res[res$y==3,]), 40)
 })
 
 test_that("test exp_balance with numeric, not enough minority and not enough majority, but enough minority with SMOTE for target ratio, with target size", {
@@ -116,6 +134,10 @@ test_that("test exp_balance with numeric, not enough minority and not enough maj
   expect_true("synthesized" %in% names(res))
   expect_equal("numeric" ,class(res$y))
   expect_equal(c(3,4) ,sort(unique(res$y)))
+  # Minority should be SMOTEd to make ratio
+  expect_lte(nrow(res), 130)
+  expect_gte(nrow(res), 1)
+  expect_gt(nrow(res[res$y==3,]), 3)
 })
 
 test_that("test exp_balance with numeric, not enough minority and not enough majority, not enough minority even with SMOTE for target ratio, with target size", {
@@ -128,6 +150,10 @@ test_that("test exp_balance with numeric, not enough minority and not enough maj
   expect_true("synthesized" %in% names(res))
   expect_equal("numeric" ,class(res$y))
   expect_equal(c(3,4) ,sort(unique(res$y)))
+  # Minority should be SMOTEd to the limit and majority should be sampled to make ratio.
+  expect_lte(nrow(res), 85)
+  expect_gte(nrow(res), 65)
+  expect_gt(nrow(res[res$y==3,]), 25)
 })
 
 test_that("test exp_balance with character", {
