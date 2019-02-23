@@ -12,7 +12,7 @@ test_that("test exp_balance with numeric, already enough minority, without targe
     y = c(rep(3, 49), rep(4, 51)),
     num = runif(100)
   )
-  res <- exp_balance(sample_data, y)
+  res <- exp_balance(sample_data, y, target_size = NULL)
   expect_true("data.frame" %in% class(res))
   expect_true("synthesized" %in% names(res))
   expect_equal("numeric" ,class(res$y))
@@ -24,7 +24,7 @@ test_that("test exp_balance with numeric, enough minority with SMOTE, without ta
     y = c(rep(3, 10), rep(4, 30)),
     num = runif(40)
   )
-  res <- exp_balance(sample_data, y)
+  res <- exp_balance(sample_data, y, target_size = NULL)
   expect_true("data.frame" %in% class(res))
   expect_true("synthesized" %in% names(res))
   expect_equal("numeric" ,class(res$y))
@@ -36,7 +36,7 @@ test_that("test exp_balance with numeric, not enough minority even with SMOTE, w
     y = c(rep(3, 5), rep(4, 50)),
     num = runif(55)
   )
-  res <- exp_balance(sample_data, y)
+  res <- exp_balance(sample_data, y, target_size = NULL)
   expect_true("data.frame" %in% class(res))
   expect_true("synthesized" %in% names(res))
   expect_equal("numeric" ,class(res$y))
