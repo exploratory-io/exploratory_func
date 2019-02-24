@@ -489,6 +489,13 @@ str_count_all <- function(text, patterns, remove.zero = TRUE){
   })
 }
 
+#' Normalize characters in the text according to Unicode Normalization Forms.
+#' This is a wrapper around stringi::stri_trans_nfkc to give it a user-friendly name.
+#' @export
+str_normalize <- function(text){
+  stringi::stri_trans_nfkc(text)
+}
+
 #' convert df to numeric matrix
 #' @param colnames Vector of column names or lazy dot for select arg. ex:lazyeval::lazy_dots(...)
 as_numeric_matrix_ <- function(df, columns){
