@@ -241,10 +241,28 @@ test_that("test exp_ttest", {
   ret
 })
 
-test_that("test exp_ttest with varEqual = TRUE", {
+test_that("test exp_ttest with var.equal = TRUE", {
   mtcars2 <- mtcars
   mtcars2$am[[1]] <- NA # test NA filtering
-  ret <- exp_ttest(mtcars2, mpg, am, varEqual = TRUE)
+  ret <- exp_ttest(mtcars2, mpg, am, var.equal = TRUE)
+  ret %>% tidy(model, type="model")
+  ret %>% tidy(model, type="data_summary")
+  ret
+})
+
+test_that("test exp_ttest with alternative = greater", {
+  mtcars2 <- mtcars
+  mtcars2$am[[1]] <- NA # test NA filtering
+  ret <- exp_ttest(mtcars2, mpg, am, alternative = "greater")
+  ret %>% tidy(model, type="model")
+  ret %>% tidy(model, type="data_summary")
+  ret
+})
+
+test_that("test exp_ttest with paired = TRUE", {
+  mtcars2 <- mtcars
+  mtcars2$am[[1]] <- NA # test NA filtering
+  ret <- exp_ttest(mtcars2, mpg, am, paired = FALSE)
   ret %>% tidy(model, type="model")
   ret %>% tidy(model, type="data_summary")
   ret
