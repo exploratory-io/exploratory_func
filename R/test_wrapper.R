@@ -424,6 +424,7 @@ glance.ttest_exploratory <- function(x) {
 #' @export
 tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
   if (type == "model") {
+    browser()
     ret <- broom:::tidy.htest(x)
     ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
       dplyr::rename(`t Ratio`=statistic,

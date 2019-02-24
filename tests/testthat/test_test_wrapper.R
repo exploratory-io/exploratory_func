@@ -241,6 +241,16 @@ test_that("test exp_ttest", {
   ret
 })
 
+test_that("test exp_ttest with varEqual = TRUE", {
+  mtcars2 <- mtcars
+  mtcars2$am[[1]] <- NA # test NA filtering
+  ret <- exp_ttest(mtcars2, mpg, am, varEqual = TRUE)
+  ret %>% tidy(model, type="model")
+  ret %>% tidy(model, type="data_summary")
+  ret
+})
+
+
 test_that("test exp_ttest with asint grouping", {
   mtcars2 <- mtcars
   mtcars2$am[[1]] <- NA # test NA filtering
