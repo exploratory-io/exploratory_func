@@ -425,6 +425,11 @@ glance.ttest_exploratory <- function(x) {
 tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
   if (type == "model") {
     ret <- broom:::tidy.htest(x)
+
+    if (is.null(ret$estimate)) { # estimate is empty when var.equal = TRUE.
+                                 # Looks like an issue from broom. Working it around.
+      ret <- ret %>% dplyr::mutate(estimate = estimate1 - estimate2)
+    }
     ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
       dplyr::rename(`t Ratio`=statistic,
                     `P Value`=p.value,
