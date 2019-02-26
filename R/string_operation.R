@@ -388,3 +388,18 @@ parse_character <- function(text, ...){
     readr::parse_character(text = text, ...)
   }
 }
+
+#' Wrapper function for readr::parse_parse_character.
+#' @param text to parse
+#' @export
+parse_number <- function(text, ...){
+  # readr::parse_number used to allow already numeric input, by doing nothing,
+  # but after  After updating readr version from 1.1.1 to to 1.3.1, it does not allow numeric input anymore.
+  # check if it's numeric or not and return as is if it's numeric other wise call readr::parse_numeric.
+  if(is.numeric(text)) {
+    text
+  } else {
+    readr::parse_number(text = text, ...)
+  }
+}
+
