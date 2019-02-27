@@ -412,7 +412,7 @@ parse_logical <- function(text, ...){
   if(is.logical(text)) {
     text
   } else {
-    readr::parse_logical(text = text, ...)
+    readr::parse_logical(x = text, ...)
   }
 }
 
