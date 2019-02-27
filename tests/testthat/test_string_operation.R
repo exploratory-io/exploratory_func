@@ -295,3 +295,13 @@ test_that("parse_character", {
   expect_equal(ret, c("1", "2"))
 })
 
+test_that("parse_number", {
+  ret <- exploratory::parse_number(c(1, 2.1))
+  expect_equal(ret, c(1, 2.1))
+})
+
+test_that("parse_logical", {
+  ret <- exploratory::parse_logical(c(TRUE, FALSE))
+  expect_equal(ret, c(TRUE, FALSE))
+})
+
