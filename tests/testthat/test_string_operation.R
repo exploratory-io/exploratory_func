@@ -300,17 +300,8 @@ test_that("parse_number", {
   expect_equal(ret, c(1, 2.1))
 })
 
-test_that("parse_double", {
-  ret <- exploratory::parse_double(c(1.0, 2.0))
-  expect_equal(ret, c(1.0, 2.0))
-})
-
 test_that("parse_logical", {
   ret <- exploratory::parse_logical(c(TRUE, FALSE))
   expect_equal(ret, c(TRUE, FALSE))
 })
 
-test_that("parse_integer", {
-  ret <- exploratory::parse_integer(c(1, 5))
-  expect_equal(ret, c(1, 5))
-})

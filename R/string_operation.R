@@ -403,32 +403,6 @@ parse_number <- function(text, ...){
   }
 }
 
-#' Wrapper function for readr::parse_double
-#' @param text to parse
-#' @export
-parse_double <- function(text, ...){
-  # After updating readr version from 1.1.1 to to 1.3.1, it only allows character input.
-  # So if the input is not character (e.g. numeric, Date, etc) either return as.is or NA based on the data type
-  if(is.numeric(text)) {
-    text
-  } else {
-    readr::parse_double(text = text, ...)
-  }
-}
-
-#' Wrapper function for readr::parse_integer
-#' @param text to parse
-#' @export
-parse_integer <- function(text, ...){
-  # After updating readr version from 1.1.1 to to 1.3.1, it only allows character input.
-  # So if the input is not character (e.g. numeric, Date, etc) either return as.is or NA based on the data type
-  if(is.numeric(text)) {
-    text
-  } else {
-    readr::parse_integer(text = text, ...)
-  }
-}
-
 #' Wrapper function for readr::parse_logical
 #' @param text to parse
 #' @export
