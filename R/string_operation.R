@@ -385,7 +385,7 @@ parse_character <- function(text, ...){
   if(!is.character(text)) {
     as.character(text)
   } else {
-    readr::parse_character(text = text, ...)
+    readr::parse_character(text, ...)
   }
 }
 
@@ -399,7 +399,7 @@ parse_number <- function(text, ...){
   if(is.numeric(text)) {
     text
   } else {
-    readr::parse_number(text = text, ...)
+    readr::parse_number(text, ...)
   }
 }
 
@@ -412,7 +412,7 @@ parse_logical <- function(text, ...){
   if(is.logical(text)) {
     text
   } else {
-    readr::parse_logical(x = text, ...)
+    readr::parse_logical(text, ...)
   }
 }
 
