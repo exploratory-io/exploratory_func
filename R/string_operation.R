@@ -398,12 +398,8 @@ parse_number <- function(text, ...){
   # if numeric, return as is
   if(is.numeric(text)) {
     text
-  } else if (is.character(text)) {
-    readr::parse_number(text = text, ...)
   } else {
-    sapply(text, function(x){
-      NA
-    }) %>% unlist()
+    readr::parse_number(text = text, ...)
   }
 }
 
@@ -415,12 +411,8 @@ parse_double <- function(text, ...){
   # So if the input is not character (e.g. numeric, Date, etc) either return as.is or NA based on the data type
   if(is.numeric(text)) {
     text
-  } else if(is.character(text)) {
-    readr::parse_double(text = text, ...)
   } else {
-    sapply(text, function(x){
-      NA
-    }) %>% unlist()
+    readr::parse_double(text = text, ...)
   }
 }
 
@@ -432,12 +424,8 @@ parse_integer <- function(text, ...){
   # So if the input is not character (e.g. numeric, Date, etc) either return as.is or NA based on the data type
   if(is.numeric(text)) {
     text
-  } else if(is.character(text)) {
-    readr::parse_integer(text = text, ...)
   } else {
-    sapply(text, function(x){
-      NA
-    }) %>% unlist()
+    readr::parse_integer(text = text, ...)
   }
 }
 
@@ -449,28 +437,8 @@ parse_logical <- function(text, ...){
   # So if the input is not character (e.g. numeric, Date, etc) either return as.is or NA based on the data type
   if(is.logical(text)) {
     text
-  } else if(is.character(text)) {
-    readr::parse_logical(text = text, ...)
   } else {
-    sapply(text, function(x){
-      NA
-    }) %>% unlist()
+    readr::parse_logical(text = text, ...)
   }
 }
 
-#' Wrapper function for readr::parse_time
-#' @param text to parse
-#' @export
-parse_time <- function(text, ...){
-  # After updating readr version from 1.1.1 to to 1.3.1, it only allows character input.
-  # So if the input is not character (e.g. numeric, Date, etc) either return as.is or NA based on the data type
-  if(is.character(text)) {
-    readr::parse_time(text = text, ...)
-  } else {
-    # With previous readr version, if input text is difftime/hms, this function retuned NA
-    # so return NA in this wrapper function too.
-    sapply(text, function(x){
-      NA
-    }) %>% unlist()
-  }
-}

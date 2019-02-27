@@ -314,8 +314,3 @@ test_that("parse_integer", {
   ret <- exploratory::parse_integer(c(1, 5))
   expect_equal(ret, c(1, 5))
 })
-
-test_that("parse_time", {
-  ret <- exploratory::parse_time(c(1, 10))
-  expect_equal(ret, c(NA, NA))
-})
