@@ -408,7 +408,8 @@ parse_number <- function(text, ...){
 #' @export
 parse_logical <- function(text, ...){
   # After updating readr version from 1.1.1 to to 1.3.1, it only allows character input.
-  # So if the input is not character (e.g. numeric, Date, etc) either return as.is or NA based on the data type
+  # but after updating readr version from 1.1.1 to to 1.3.1, it only allows character input.
+  # if logical, return as is
   if(is.logical(text)) {
     text
   } else {
