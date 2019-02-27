@@ -408,8 +408,7 @@ parse_number <- function(text, ...){
 #' @export
 parse_logical <- function(text, ...){
   # After updating readr version from 1.1.1 to to 1.3.1, it only allows character input.
-  # but after updating readr version from 1.1.1 to to 1.3.1, it only allows character input.
-  # if logical, return as is
+  # So if logical, return as is for backward compatibility
   if(is.logical(text)) {
     text
   } else {
