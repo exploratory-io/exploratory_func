@@ -295,3 +295,27 @@ test_that("parse_character", {
   expect_equal(ret, c("1", "2"))
 })
 
+test_that("parse_number", {
+  ret <- exploratory::parse_number(c(1, 2.1))
+  expect_equal(ret, c(1, 2.1))
+})
+
+test_that("parse_double", {
+  ret <- exploratory::parse_double(c(1.0, 2.0))
+  expect_equal(ret, c(1.0, 2.0))
+})
+
+test_that("parse_logical", {
+  ret <- exploratory::parse_logical(c(TRUE, FALSE))
+  expect_equal(ret, c(TRUE, FALSE))
+})
+
+test_that("parse_integer", {
+  ret <- exploratory::parse_integer(c(1, 5))
+  expect_equal(ret, c(1, 5))
+})
+
+test_that("parse_time", {
+  ret <- exploratory::parse_time(c(1, 10))
+  expect_equal(ret, c(NA, NA))
+})
