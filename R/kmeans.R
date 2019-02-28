@@ -57,7 +57,8 @@ exp_kmeans <- function(df, ...,
                                                    algorithm = algorithm,
                                                    trace = trace,
                                                    keep.source=FALSE,
-                                                   augment=FALSE)
+                                                   augment=FALSE,
+                                                   seed=NULL) # Seed is already done in do_prcomp. Skip it.
       x$kmeans <- kmeans_model$model[[1]]
       x
     }))
@@ -71,7 +72,8 @@ exp_kmeans <- function(df, ...,
                             iter.max = iter.max,
                             nstart = nstart,
                             algorithm = algorithm,
-                            trace = trace)
+                            trace = trace,
+                            seed=NULL) # Seed is already done in do_prcomp. Skip it.
       ret
     }))
   }
