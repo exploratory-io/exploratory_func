@@ -3,7 +3,7 @@
 
 #' integrated build_kmeans
 #' @export
-build_kmeans <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0){
+build_kmeans <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0, seed=0){
   validate_empty_data(df)
 
   if (!is.null(skv)) {
@@ -12,10 +12,10 @@ build_kmeans <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0){
       stop("length of skv has to be 2 or 3")
     }
     value <- if(length(skv) == 2) NULL else skv[[3]]
-    build_kmeans.kv_(df, skv[[1]], skv[[2]], value, fun.aggregate = fun.aggregate, fill = fill, ...)
+    build_kmeans.kv_(df, skv[[1]], skv[[2]], value, fun.aggregate = fun.aggregate, fill = fill, seed=seed, ...)
   } else {
     #.cols pattern
-    build_kmeans.cols(df, ...)
+    build_kmeans.cols(df, seed=seed, ...)
   }
 }
 
@@ -47,7 +47,7 @@ build_kmeans.kv_ <- function(df,
                              trace = FALSE,
                              normalize_data = TRUE,
                              keep.source = TRUE,
-                             seed=NULL,
+                             seed = 0,
                              augment=TRUE,
                              fun.aggregate=mean,
                              fill=0){
@@ -159,7 +159,7 @@ build_kmeans.cols <- function(df, ...,
                             trace = FALSE,
                             normalize_data = TRUE,
                             keep.source = TRUE,
-                            seed = NULL,
+                            seed = 0,
                             augment=TRUE
                             ){
   validate_empty_data(df)
