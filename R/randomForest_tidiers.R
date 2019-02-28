@@ -1252,7 +1252,7 @@ calc_feature_imp <- function(df,
                              with_boruta = FALSE,
                              boruta_max_runs = 20, # Maximal number of importance source runs.
                              boruta_p_value = 0.05, # Boruta recommends using the default 0.01 for P-value, but we are using 0.05 for consistency with other functions of ours.
-                             seed = NULL
+                             seed = 1
                              ){
   if(!is.null(seed)){
     set.seed(seed)
@@ -1727,7 +1727,7 @@ exp_rpart <- function(df,
                       smote_target_minority_perc = 40,
                       smote_max_synth_perc = 200,
                       smote_k = 5,
-                      seed = NULL
+                      seed = 1
                       ) {
   if(!is.null(seed)){
     set.seed(seed)

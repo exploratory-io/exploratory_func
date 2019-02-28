@@ -601,7 +601,7 @@ qqline_data <- function (y, datax = FALSE, distribution = qnorm, probs = c(0.25,
 exp_normality<- function(df, ...,
                          n_sample = 50,
                          n_sample_qq = 4500,
-                         seed = NULL
+                         seed = 1
                          ) {
   if (!is.null(seed)) {
     set.seed(seed)
