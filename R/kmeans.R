@@ -36,7 +36,7 @@ exp_kmeans <- function(df, ...,
                        normalize_data = TRUE,
                        n_pcs = NULL,
                        max_nrow = NULL,
-                       seed = NULL,
+                       seed = 1,
                        elbow_method_mode=FALSE,
                        max_centers = 10
                        ) {

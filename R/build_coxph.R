@@ -70,7 +70,7 @@ build_coxph.fast <- function(df,
                     ...,
                     max_nrow = 50000, # With 50000 rows, taking 6 to 7 seconds on late-2016 Macbook Pro.
                     predictor_n = 12, # so that at least months can fit in it.
-                    seed = NULL
+                    seed = 1
                     ){
   # TODO: cleanup code only aplicable to randomForest. this func was started from copy of calc_feature_imp, and still adjusting for lm. 
 
