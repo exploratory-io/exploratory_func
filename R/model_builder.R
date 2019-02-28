@@ -3,7 +3,7 @@
 
 #' integrated build_kmeans
 #' @export
-build_kmeans <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0, seed=1){
+build_kmeans <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0){
   validate_empty_data(df)
 
   if (!is.null(skv)) {
