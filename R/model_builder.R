@@ -47,7 +47,7 @@ build_kmeans.kv_ <- function(df,
                              trace = FALSE,
                              normalize_data = TRUE,
                              keep.source = TRUE,
-                             seed=0,
+                             seed=NULL,
                              augment=TRUE,
                              fun.aggregate=mean,
                              fill=0){
@@ -58,7 +58,9 @@ build_kmeans.kv_ <- function(df,
   loadNamespace("tidyr")
   loadNamespace("broom")
 
-  set.seed(seed)
+  if (!is.null(seed)) {
+    set.seed(seed)
+  }
 
   row_col <- subject_col
   col_col <- key_col
@@ -166,7 +168,9 @@ build_kmeans.cols <- function(df, ...,
   loadNamespace("lazyeval")
   loadNamespace("tidyr")
   loadNamespace("broom")
-  set.seed(seed)
+  if (!is.null(seed)) {
+    set.seed(seed)
+  }
   select_dots <- lazyeval::lazy_dots(...)
 
   grouped_column <- grouped_by(df)
