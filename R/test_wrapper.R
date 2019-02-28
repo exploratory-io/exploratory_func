@@ -598,7 +598,14 @@ qqline_data <- function (y, datax = FALSE, distribution = qnorm, probs = c(0.25,
 #'                   This is to make sure qq-line part of the data would not be sampled out in qq scatter plot.
 #'                   Default 4500 is to make room for qqline rows. (default sample size by scatter plot data query is 5000)
 #' @export
-exp_normality<- function(df, ..., n_sample = 50, n_sample_qq = 4500) {
+exp_normality<- function(df, ...,
+                         n_sample = 50,
+                         n_sample_qq = 4500,
+                         seed = NULL,
+                         ) {
+  if (!is.null(seed)) {
+    set.seed(seed)
+  }
   selected_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
   
   shapiro_each <- function(df) {
