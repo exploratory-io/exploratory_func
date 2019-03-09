@@ -793,14 +793,14 @@ getListOfColumns <- function(type, host, port, databaseName, username, password,
 
 #' API to execute a query that can be handled with DBI
 #' @export
-executeGenericQuery <- function(type, host, port, databaseName, username, password, query, catalog = "", schema = ""){
+executeGenericQuery <- function(type, host, port, databaseName, username, password, query, catalog = "", schema = "", n = -1){
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
   conn <- getDBConnection(type, host, port, databaseName, username, password, catalog = catalog, schema = schema)
   tryCatch({
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
     resultSet <- DBI::dbSendQuery(conn, glue_exploratory(query, .transformer = sql_glue_transformer, .envir = parent.frame()))
-    df <- DBI::dbFetch(resultSet)
+    df <- DBI::dbFetch(resultSet, n = n)
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
     clearDBConnection(type, host, port, databaseName, username, catalog = catalog, schema = schema)
@@ -1376,7 +1376,7 @@ convertToJSON  <- function(x) {
 
 #' Workaround for toJSON output getting affected by SJIS damemoji characters
 #' when LC_CTYPE is set to Windows Code Page 932 (SJIS).
-#' Switch LC_CTYPE to Windows Code Page 1252 (Latin-1) before calling jsonlite::toJSON, 
+#' Switch LC_CTYPE to Windows Code Page 1252 (Latin-1) before calling jsonlite::toJSON,
 #' and switch it back to the original setting when done.
 #' We do this since the JSON output is not broken under LC_CTYPE of Code Page 1252.
 #' Since JSON output is in UTF-8 even on Windows, we should not have to go through
