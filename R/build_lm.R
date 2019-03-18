@@ -2,10 +2,10 @@
 calc_average_marginal_effects <- function(model, data=NULL, with_confint=FALSE) {
   if (with_confint) {
     if (!is.na(data)) {
-      m <- margins::margins(model)
+      m <- margins::margins(model, data=data)
     }
     else {
-      m <- margins::margins(model, data=data)
+      m <- margins::margins(model)
     }
     ret <- as.data.frame(summary(m))
     ret <- ret %>% dplyr::rename(term=factor, ame=AME, ame_low=lower, ame_high=upper) %>%
@@ -17,10 +17,10 @@ calc_average_marginal_effects <- function(model, data=NULL, with_confint=FALSE) 
     # margins::margins() does a lot more than margins::marginal_effects(),
     # and takes about 10 times more time.
     if (!is.na(data)) {
-      me <- margins::marginal_effects(model)
+      me <- margins::marginal_effects(model, data=data)
     }
     else {
-      me <- margins::marginal_effects(model, data=data)
+      me <- margins::marginal_effects(model)
     }
     term <- stringr::str_replace(names(me), "^dydx_", "")
     ame <- purrr::flatten_dbl(purrr::map(me, function(x){mean(x, na.rm=TRUE)}))
