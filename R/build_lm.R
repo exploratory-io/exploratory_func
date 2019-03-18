@@ -1,7 +1,7 @@
 # Calculate average marginal effects from model with margins package.
 calc_average_marginal_effects <- function(model, data=NULL, with_confint=FALSE) {
   if (with_confint) {
-    if (!is.na(data)) {
+    if (!is.null(data)) {
       m <- margins::margins(model, data=data)
     }
     else {
@@ -16,7 +16,7 @@ calc_average_marginal_effects <- function(model, data=NULL, with_confint=FALSE) 
     # Fast versin that only calls margins::margins().
     # margins::margins() does a lot more than margins::marginal_effects(),
     # and takes about 10 times more time.
-    if (!is.na(data)) {
+    if (!is.null(data)) {
       me <- margins::marginal_effects(model, data=data)
     }
     else {
@@ -420,8 +420,8 @@ build_lm.fast <- function(df,
       # TODO: This clean_target_col is actually not a cleaned column name since we want lm to show real name. Clean up our variable name.
       fml <- as.formula(paste0("`", clean_target_col, "` ~ ", rhs))
       if (model_type == "glm") {
-        df_before_smote <- df
         if (smote) {
+          df_before_smote <- df
           df <- df %>% exp_balance(clean_target_col, target_size = max_nrow, target_minority_perc = smote_target_minority_perc, max_synth_perc = smote_max_synth_perc, k = smote_k)
           for(col in names(df)){
             if(is.factor(df[[col]])) {
