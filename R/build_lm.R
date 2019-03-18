@@ -420,6 +420,7 @@ build_lm.fast <- function(df,
       # TODO: This clean_target_col is actually not a cleaned column name since we want lm to show real name. Clean up our variable name.
       fml <- as.formula(paste0("`", clean_target_col, "` ~ ", rhs))
       if (model_type == "glm") {
+        df_before_smote <- df
         if (smote) {
           df <- df %>% exp_balance(clean_target_col, target_size = max_nrow, target_minority_perc = smote_target_minority_perc, max_synth_perc = smote_max_synth_perc, k = smote_k)
           for(col in names(df)){
@@ -489,7 +490,7 @@ build_lm.fast <- function(df,
       if (model_type == "glm") {
         class(rf) <- c("glm_exploratory", class(rf))
         if (with_marginal_effects) { # For now, we have tested marginal_effects for logistic regression only. It seems to fail for probit for example.
-          rf$marginal_effects <- calc_average_marginal_effects(rf, with_confint=with_marginal_effects_confint) # This has to be done after glm_exploratory class name is set.
+          rf$marginal_effects <- calc_average_marginal_effects(rf, data=df_before_smote, with_confint=with_marginal_effects_confint) # This has to be done after glm_exploratory class name is set.
         }
       }
       else {
