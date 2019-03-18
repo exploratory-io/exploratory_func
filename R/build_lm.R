@@ -436,6 +436,12 @@ build_lm.fast <- function(df,
               }
             }
           }
+          if (with_marginal_effects) {
+            # Sample df_before_smote for speed, but do not remove imbalance here
+            # since we want to know average marginal effect on a data that has
+            # close distribution to the original data.
+            df_before_smote <- df_before_smote %>% sample_rows(max_nrow)
+          }
         }
         if (is.null(link)) {
           rf <- stats::glm(fml, data = df, family = family) 
