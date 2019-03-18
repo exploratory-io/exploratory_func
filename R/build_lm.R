@@ -421,15 +421,19 @@ build_lm.fast <- function(df,
       fml <- as.formula(paste0("`", clean_target_col, "` ~ ", rhs))
       if (model_type == "glm") {
         if (smote) {
-          df_before_smote <- df
+          if (with_marginal_effects) {
+            df_before_smote <- df
+          }
           df <- df %>% exp_balance(clean_target_col, target_size = max_nrow, target_minority_perc = smote_target_minority_perc, max_synth_perc = smote_max_synth_perc, k = smote_k)
           for(col in names(df)){
             if(is.factor(df[[col]])) {
               # margins::marginal_effects() fails if unused factor level exists. Drop them to avoid it.
               # In case of SMOTE, this has to be done after that. TODO: Do this just once in any case.
               df[[col]] <- forcats::fct_drop(df[[col]])
-              df_before_smote <- df_before_smote %>% dplyr::filter(!!rlang::sym(col) %in% levels(df[[col]]))
-              df_before_smote[[col]] <- forcats::fct_drop(df_before_smote[[col]])
+              if (with_marginal_effects) {
+                df_before_smote <- df_before_smote %>% dplyr::filter(!!rlang::sym(col) %in% levels(df[[col]]))
+                df_before_smote[[col]] <- forcats::fct_drop(df_before_smote[[col]])
+              }
             }
           }
         }
