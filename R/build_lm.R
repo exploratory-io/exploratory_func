@@ -428,6 +428,8 @@ build_lm.fast <- function(df,
               # margins::marginal_effects() fails if unused factor level exists. Drop them to avoid it.
               # In case of SMOTE, this has to be done after that. TODO: Do this just once in any case.
               df[[col]] <- forcats::fct_drop(df[[col]])
+              df_before_smote <- df_before_smote %>% dplyr::filter(!!rlang::sym(col) %in% levels(df[[col]]))
+              df_before_smote[[col]] <- forcats::fct_drop(df_before_smote[[col]])
             }
           }
         }
@@ -490,7 +492,12 @@ build_lm.fast <- function(df,
       if (model_type == "glm") {
         class(rf) <- c("glm_exploratory", class(rf))
         if (with_marginal_effects) { # For now, we have tested marginal_effects for logistic regression only. It seems to fail for probit for example.
-          rf$marginal_effects <- calc_average_marginal_effects(rf, data=df_before_smote, with_confint=with_marginal_effects_confint) # This has to be done after glm_exploratory class name is set.
+          if (smote) {
+            rf$marginal_effects <- calc_average_marginal_effects(rf, data=df_before_smote, with_confint=with_marginal_effects_confint) # This has to be done after glm_exploratory class name is set.
+          }
+          else {
+            rf$marginal_effects <- calc_average_marginal_effects(rf, with_confint=with_marginal_effects_confint) # This has to be done after glm_exploratory class name is set.
+          }
         }
       }
       else {
