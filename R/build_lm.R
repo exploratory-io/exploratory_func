@@ -1,7 +1,12 @@
 # Calculate average marginal effects from model with margins package.
-calc_average_marginal_effects <- function(model, with_confint=FALSE) {
+calc_average_marginal_effects <- function(model, data=NULL, with_confint=FALSE) {
   if (with_confint) {
-    m <- margins::margins(model)
+    if (!is.na(data)) {
+      m <- margins::margins(model)
+    }
+    else {
+      m <- margins::margins(model, data=data)
+    }
     ret <- as.data.frame(summary(m))
     ret <- ret %>% dplyr::rename(term=factor, ame=AME, ame_low=lower, ame_high=upper) %>%
       dplyr::select(term, ame, ame_low, ame_high) #TODO: look into SE, z, p too.
@@ -11,7 +16,12 @@ calc_average_marginal_effects <- function(model, with_confint=FALSE) {
     # Fast versin that only calls margins::margins().
     # margins::margins() does a lot more than margins::marginal_effects(),
     # and takes about 10 times more time.
-    me <- margins::marginal_effects(model)
+    if (!is.na(data)) {
+      me <- margins::marginal_effects(model)
+    }
+    else {
+      me <- margins::marginal_effects(model, data=data)
+    }
     term <- stringr::str_replace(names(me), "^dydx_", "")
     ame <- purrr::flatten_dbl(purrr::map(me, function(x){mean(x, na.rm=TRUE)}))
     ret <- data.frame(term=term, ame=ame)
