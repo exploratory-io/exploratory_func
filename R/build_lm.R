@@ -422,6 +422,9 @@ build_lm.fast <- function(df,
       if (model_type == "glm") {
         if (smote) {
           if (with_marginal_effects) {
+            # Keep the version of data before SMOTE,
+            # since we want to know average marginal effect on a data that has
+            # close distribution to the original data.
             df_before_smote <- df
           }
           df <- df %>% exp_balance(clean_target_col, target_size = max_nrow, target_minority_perc = smote_target_minority_perc, max_synth_perc = smote_max_synth_perc, k = smote_k)
@@ -437,9 +440,8 @@ build_lm.fast <- function(df,
             }
           }
           if (with_marginal_effects) {
-            # Sample df_before_smote for speed, but do not remove imbalance here
-            # since we want to know average marginal effect on a data that has
-            # close distribution to the original data.
+            # Sample df_before_smote for speed.
+            # We do not remove imbalance here to keep close distribution to the original data.
             df_before_smote <- df_before_smote %>% sample_rows(max_nrow)
           }
         }
