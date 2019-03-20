@@ -1,7 +1,12 @@
 # Calculate average marginal effects from model with margins package.
-calc_average_marginal_effects <- function(model, with_confint=FALSE) {
+calc_average_marginal_effects <- function(model, data=NULL, with_confint=FALSE) {
   if (with_confint) {
-    m <- margins::margins(model)
+    if (!is.null(data)) {
+      m <- margins::margins(model, data=data)
+    }
+    else {
+      m <- margins::margins(model)
+    }
     ret <- as.data.frame(summary(m))
     ret <- ret %>% dplyr::rename(term=factor, ame=AME, ame_low=lower, ame_high=upper) %>%
       dplyr::select(term, ame, ame_low, ame_high) #TODO: look into SE, z, p too.
@@ -11,7 +16,12 @@ calc_average_marginal_effects <- function(model, with_confint=FALSE) {
     # Fast versin that only calls margins::margins().
     # margins::margins() does a lot more than margins::marginal_effects(),
     # and takes about 10 times more time.
-    me <- margins::marginal_effects(model)
+    if (!is.null(data)) {
+      me <- margins::marginal_effects(model, data=data)
+    }
+    else {
+      me <- margins::marginal_effects(model)
+    }
     term <- stringr::str_replace(names(me), "^dydx_", "")
     ame <- purrr::flatten_dbl(purrr::map(me, function(x){mean(x, na.rm=TRUE)}))
     ret <- data.frame(term=term, ame=ame)
@@ -411,13 +421,28 @@ build_lm.fast <- function(df,
       fml <- as.formula(paste0("`", clean_target_col, "` ~ ", rhs))
       if (model_type == "glm") {
         if (smote) {
+          if (with_marginal_effects) {
+            # Keep the version of data before SMOTE,
+            # since we want to know average marginal effect on a data that has
+            # close distribution to the original data.
+            df_before_smote <- df
+          }
           df <- df %>% exp_balance(clean_target_col, target_size = max_nrow, target_minority_perc = smote_target_minority_perc, max_synth_perc = smote_max_synth_perc, k = smote_k)
           for(col in names(df)){
             if(is.factor(df[[col]])) {
               # margins::marginal_effects() fails if unused factor level exists. Drop them to avoid it.
               # In case of SMOTE, this has to be done after that. TODO: Do this just once in any case.
               df[[col]] <- forcats::fct_drop(df[[col]])
+              if (with_marginal_effects) {
+                df_before_smote <- df_before_smote %>% dplyr::filter(!!rlang::sym(col) %in% levels(df[[col]]))
+                df_before_smote[[col]] <- forcats::fct_drop(df_before_smote[[col]])
+              }
             }
+          }
+          if (with_marginal_effects) {
+            # Sample df_before_smote for speed.
+            # We do not remove imbalance here to keep close distribution to the original data.
+            df_before_smote <- df_before_smote %>% sample_rows(max_nrow)
           }
         }
         if (is.null(link)) {
@@ -479,7 +504,12 @@ build_lm.fast <- function(df,
       if (model_type == "glm") {
         class(rf) <- c("glm_exploratory", class(rf))
         if (with_marginal_effects) { # For now, we have tested marginal_effects for logistic regression only. It seems to fail for probit for example.
-          rf$marginal_effects <- calc_average_marginal_effects(rf, with_confint=with_marginal_effects_confint) # This has to be done after glm_exploratory class name is set.
+          if (smote) {
+            rf$marginal_effects <- calc_average_marginal_effects(rf, data=df_before_smote, with_confint=with_marginal_effects_confint) # This has to be done after glm_exploratory class name is set.
+          }
+          else {
+            rf$marginal_effects <- calc_average_marginal_effects(rf, with_confint=with_marginal_effects_confint) # This has to be done after glm_exploratory class name is set.
+          }
         }
       }
       else {
