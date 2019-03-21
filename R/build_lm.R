@@ -629,7 +629,9 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add tes
 # Creates a data frame that maps term name to its base level.
 xlevels_to_base_level_table <- function(xlevels) {
   term <- purrr::flatten_chr(purrr::map(names(xlevels), function(vname) {
-    paste0(if_else(stringr::str_detect(vname,' '),paste0('`',vname,'`'),vname),xlevels[[vname]])
+    # Quote variable name with backtick if it includes special characters or space.
+    # Special characters to detect besides space. Note that period and underscore should *not* be included here. : ~!@#$%^&*()+={}|:;'<>,/?"[]-\
+    paste0(if_else(stringr::str_detect(vname,"[ ~!@#$%^&*()+={}|:;'<>,/?\"\\[\\]\\-\\\\]"),paste0('`',vname,'`'),vname),xlevels[[vname]])
   }))
   base_level <- purrr::flatten_chr(purrr::map(xlevels, function(v){rep(v[[1]],length(v))}))
   ret <- data.frame(term=term, base.level=base_level)

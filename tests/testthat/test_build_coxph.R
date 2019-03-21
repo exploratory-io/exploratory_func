@@ -2,12 +2,16 @@ context("test build_coxph")
 
 test_that("test build_coxph.fast", {
   df <- survival::lung # this data has NAs.
-  df <- df %>% rename(`ti me`=time, `sta tus`=status, `a ge`=age)
+  df <- df %>% rename(`ti me`=time, `sta tus`=status, `a ge`=age, `se-x`=sex)
   df <- df %>% mutate(ph.ecog = factor(ph.ecog, ordered=TRUE)) # test handling of ordered factor
-  df <- df %>% mutate(sex = sex==1) # test handling of logical
-  model_df <- df %>% build_coxph.fast(`ti me`, `sta tus`, `a ge`, sex, ph.ecog, ph.karno, pat.karno, meal.cal, wt.loss, predictor_n = 2)
+  df <- df %>% mutate(`se-x` = `se-x`==1) # test handling of logical
+  model_df <- df %>% build_coxph.fast(`ti me`, `sta tus`, `a ge`, `se-x`, ph.ecog, ph.karno, pat.karno, meal.cal, wt.loss, predictor_n = 2)
   expect_equal(class(model_df$model[[1]]), c("coxph_exploratory","coxph"))
   ret <- model_df %>% broom::tidy(model)
+  # Verify that base levels are not NA for `se-x` (testing - in the name) columns.
+  ret2 <- ret %>% dplyr::filter(stringr::str_detect(term,"(se-x)")) %>% dplyr::summarize(na_count=sum(is.na(base.level)))
+  expect_equal(ret2$na_count, 0)
+
   ret <- model_df %>% broom::glance(model, pretty.name=TRUE)
 })
 
