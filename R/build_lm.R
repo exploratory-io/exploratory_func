@@ -614,7 +614,7 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
       ret <- broom:::tidy.lm(x) # it seems that tidy.lm takes care of glm too
       ret <- ret %>% mutate(conf.high=estimate+1.96*std.error, conf.low=estimate-1.96*std.error)
       base_level_table <- xlevels_to_base_level_table(x$xlevels)
-      ret <- ret %>% dplyr::left_join(base_level_table, by="term")
+      ret <- ret %>% dplyr::mutate(term=as.character(term)) %>% dplyr::left_join(base_level_table, by="term")
       if (any(is.na(x$coefficients))) {
         # since broom skips coefficients with NA value, which means removed by lm because of multi-collinearity,
         # put it back to show them.
@@ -674,10 +674,10 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
         }
       }
       if (!is.null(x$marginal_effects)) {
-        ret <- ret %>% dplyr::left_join(x$marginal_effects, by="term")
+        ret <- ret %>% dplyr::mutate(term=as.character(term)) %>% dplyr::left_join(x$marginal_effects, by="term")
       }
       base_level_table <- xlevels_to_base_level_table(x$xlevels)
-      ret <- ret %>% dplyr::left_join(base_level_table, by="term")
+      ret <- ret %>% dplyr::mutate(term=as.character(term)) %>% dplyr::left_join(base_level_table, by="term")
       if (any(is.na(x$coefficients))) {
         # since broom skips coefficients with NA value, which means removed by lm because of multi-collinearity,
         # put it back to show them.
