@@ -53,7 +53,7 @@ right_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ig
 
 #' @export
 #' Wrapper function for dplyr's full_join to support case insensitive join.
-full_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ignorecase = FALSE, ......) {
+full_join <- function(x, y, by = NULL, copy = FALSE, suffix = c(".x", ".y"), ignorecase = FALSE, ...) {
   if(ignorecase) {
     insensitive_join(dplyr::full_join)(x = x, y = y, by = by, copy = copy, suffix = suffix)
   } else {
