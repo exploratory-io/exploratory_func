@@ -666,7 +666,10 @@ rf_evaluation_by_class <- function(data, ...) {
 #' @export
 rf_partial_dependence <- function(df, ...) { # TODO: write test for this.
   res <- df %>% broom::tidy(model, type="partial_dependence", ...)
-  grouped_col <- grouped_by(df) # when called from analytics view, this should be a single column or empty.
+  grouped_col <- grouped_by(res) # When called from analytics view, this should be a single column or empty.
+                                 # grouped_by has to be on res rather than on df since dplyr::group_vars
+                                 # does not work on rowwise-grouped data frame.
+
   if (length(grouped_col) > 0) {
     res <- res %>% dplyr::ungroup() # ungroup to mutate group_by column.
     # add variable name to the group_by column, so that chart is repeated by the combination of group_by column and variable name.

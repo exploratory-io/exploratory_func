@@ -74,6 +74,7 @@ test_that("test calc_feature_imp predicting multi-class", {
   conf_mat <- tidy(model_df, model, type = "conf_mat", pretty.name = TRUE)
   ret <- model_df %>% rf_importance()
   ret <- model_df %>% rf_partial_dependence()
+  expect_equal(as.character(ret$Group[1]), "0 cat 10") # Check that format of Group column is good for our Analytics View. 
   ret <- model_df %>% rf_evaluation(pretty.name=TRUE) # TODO test that output is different from binary classification with TRUE/FALSE
   ret <- model_df %>% rf_evaluation_by_class(pretty.name=TRUE)
   ret <- model_df %>% tidy(model, type="boruta")
