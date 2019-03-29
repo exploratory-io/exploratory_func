@@ -1251,6 +1251,7 @@ calc_feature_imp <- function(df,
                              smote_target_minority_perc = 40,
                              smote_max_synth_perc = 200,
                              smote_k = 5,
+                             importance_measure = "permutation", # "permutation" or "impurity".
                              max_pd_vars = 12, # Number of most important variables to calculate partial dependences on. Default 12 fits well with either 3 or 4 columns of facets. 
                              with_boruta = FALSE,
                              boruta_max_runs = 20, # Maximal number of importance source runs.
@@ -1326,7 +1327,7 @@ calc_feature_imp <- function(df,
       rf <- ranger::ranger(
         fml,
         data = model_df,
-        importance = "impurity",
+        importance = importance_measure, # "permutation" or "impurity".
         num.trees = ntree,
         min.node.size = nodesize,
         sample.fraction = sample.fraction,
@@ -1372,13 +1373,19 @@ calc_feature_imp <- function(df,
       rf$y <- model.response(model_df)
       rf$df <- model_df
       if (with_boruta) {
+        if (importance_measure == "impurity") {
+          getImp <- Boruta::getImpRfGini
+        }
+        else { # default to equivalent of "permutation".
+          getImp <- Boruta::getImpRfZ
+        }
         rf$boruta <- Boruta::Boruta(
           fml,
           data = model_df,
           doTrace = 0,
           maxRuns = boruta_max_runs + 1, # It seems Boruta stops at maxRuns - 1 iterations. Add 1 to be less confusing.
           pValue = boruta_p_value,
-          # importance = "impurity", # In calc_feature_imp, we use impurity, but Boruta's getImpRfZ function uses permutation.
+          getImp = getImp,
           # Following parameters are to be relayed to ranger::ranger through Boruta::Boruta, then Boruta::getImpRfZ.
           num.trees = ntree,
           min.node.size = nodesize,
