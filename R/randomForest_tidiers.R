@@ -1397,7 +1397,7 @@ calc_feature_imp <- function(df,
         rf$boruta$orig_levels <- orig_levels
         rf$boruta$terms_mapping <- names(name_map)
         names(rf$boruta$terms_mapping) <- name_map
-        class(rf$boruta) <- c("Boruta_exploratory", class(rf))
+        class(rf$boruta) <- c("Boruta_exploratory", class(rf$boruta))
       }
       rf
     }, error = function(e){
