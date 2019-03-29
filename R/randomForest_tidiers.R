@@ -1236,6 +1236,18 @@ cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, nam
   ret
 }
 
+extract_important_variables_from_boruta <- function(x) {
+  res <- tidyr::gather(as.data.frame(x$ImpHistory), "variable","importance")
+  decisions <- data.frame(variable=names(x$finalDecision), decision=x$finalDecision)
+  res <- res %>% dplyr::left_join(decisions, by = "variable") 
+  res$variable <- x$terms_mapping[res$variable] # Map variable names back to original.
+  res <- res %>% dplyr::filter(decision %in% c("Confirmed", "Tentative", "Rejected")) # Remove rows with NA
+  res <- res %>% dplyr::group_by(variable) %>% dplyr::summarize(importance = median(importance, na.rm = TRUE))
+  res <- res %>% dplyr::arrange(desc(importance))
+  res$variable
+}
+
+
 #' Get feature importance for multi class classification using randomForest
 #' @export
 calc_feature_imp <- function(df,
