@@ -1236,11 +1236,16 @@ cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, nam
   ret
 }
 
-extract_important_variables_from_boruta <- function(x) {
+extract_importance_history_from_boruta <- function(x) {
   res <- tidyr::gather(as.data.frame(x$ImpHistory), "variable","importance")
   decisions <- data.frame(variable=names(x$finalDecision), decision=x$finalDecision)
   res <- res %>% dplyr::left_join(decisions, by = "variable") 
   res <- res %>% dplyr::filter(decision %in% c("Confirmed", "Tentative", "Rejected")) # Remove rows with NA
+  res
+}
+
+extract_important_variables_from_boruta <- function(x) {
+  res <- extract_importance_history_from_boruta(x)
   res <- res %>% dplyr::group_by(variable) %>% dplyr::summarize(importance = median(importance, na.rm = TRUE))
   res <- res %>% dplyr::arrange(desc(importance))
   res$variable
@@ -2153,11 +2158,8 @@ exp_boruta <- function(df,
 }
 
 tidy.Boruta_exploratory <- function(x, ...) {
-  res <- tidyr::gather(as.data.frame(x$ImpHistory), "variable","importance")
-  decisions <- data.frame(variable=names(x$finalDecision), decision=x$finalDecision)
-  res <- res %>% dplyr::left_join(decisions, by = "variable") 
+  res <- extract_importance_history_from_boruta(x)
   res$variable <- x$terms_mapping[res$variable] # Map variable names back to original.
-  res <- res %>% dplyr::filter(decision %in% c("Confirmed", "Tentative", "Rejected")) # Remove rows with NA
   res <- res %>% dplyr::mutate(variable = forcats::fct_reorder(variable, importance, .fun = median, .desc = TRUE))
   # Reorder types of decision in the order of more important to less important.
   res <- res %>% dplyr::mutate(decision = forcats::fct_relevel(decision, "Confirmed", "Tentative", "Rejected"))
