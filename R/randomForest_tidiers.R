@@ -1236,14 +1236,18 @@ cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, nam
   ret
 }
 
+# Extract importance history as a data framea with decisions for each variable.
+# Shadow variables are filtered out.
 extract_importance_history_from_boruta <- function(x) {
   res <- tidyr::gather(as.data.frame(x$ImpHistory), "variable","importance")
   decisions <- data.frame(variable=names(x$finalDecision), decision=x$finalDecision)
   res <- res %>% dplyr::left_join(decisions, by = "variable") 
-  res <- res %>% dplyr::filter(decision %in% c("Confirmed", "Tentative", "Rejected")) # Remove rows with NA
+  res <- res %>% dplyr::filter(decision %in% c("Confirmed", "Tentative", "Rejected")) # Remove rows with NA, which are shadow variables
   res
 }
 
+# Extract vector of column names in the order of importance.
+# Used to determine variables to run partial dependency on.
 extract_important_variables_from_boruta <- function(x) {
   res <- extract_importance_history_from_boruta(x)
   res <- res %>% dplyr::group_by(variable) %>% dplyr::summarize(importance = median(importance, na.rm = TRUE))
