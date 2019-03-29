@@ -1236,6 +1236,26 @@ cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, nam
   ret
 }
 
+# Extract importance history as a data framea with decisions for each variable.
+# Shadow variables are filtered out.
+extract_importance_history_from_boruta <- function(x) {
+  res <- tidyr::gather(as.data.frame(x$ImpHistory), "variable","importance")
+  decisions <- data.frame(variable=names(x$finalDecision), decision=x$finalDecision)
+  res <- res %>% dplyr::left_join(decisions, by = "variable") 
+  res <- res %>% dplyr::filter(decision %in% c("Confirmed", "Tentative", "Rejected")) # Remove rows with NA, which are shadow variables
+  res
+}
+
+# Extract vector of column names in the order of importance.
+# Used to determine variables to run partial dependency on.
+extract_important_variables_from_boruta <- function(x) {
+  res <- extract_importance_history_from_boruta(x)
+  res <- res %>% dplyr::group_by(variable) %>% dplyr::summarize(importance = median(importance, na.rm = TRUE))
+  res <- res %>% dplyr::arrange(desc(importance))
+  res$variable
+}
+
+
 #' Get feature importance for multi class classification using randomForest
 #' @export
 calc_feature_imp <- function(df,
@@ -1251,6 +1271,7 @@ calc_feature_imp <- function(df,
                              smote_target_minority_perc = 40,
                              smote_max_synth_perc = 200,
                              smote_k = 5,
+                             importance_measure = "permutation", # "permutation" or "impurity".
                              max_pd_vars = 12, # Number of most important variables to calculate partial dependences on. Default 12 fits well with either 3 or 4 columns of facets. 
                              with_boruta = FALSE,
                              boruta_max_runs = 20, # Maximal number of importance source runs.
@@ -1323,42 +1344,78 @@ calc_feature_imp <- function(df,
       }
       sample.fraction <- min(c(max_sample_size / max_nrow, 1))
 
+      if (with_boruta) { # Run only either Boruta or ranger::importance.
+        ranger_importance_measure <- "none"
+      }
+      else {
+        # "permutation" or "impurity".
+        ranger_importance_measure <- importance_measure
+      }
       rf <- ranger::ranger(
         fml,
         data = model_df,
-        importance = "impurity",
+        importance = ranger_importance_measure,
         num.trees = ntree,
         min.node.size = nodesize,
         sample.fraction = sample.fraction,
         probability = (classification_type == "binary") # build probability tree for AUC only for binary classification.
       )
-
-      # return partial dependence
-      imp <- ranger::importance(rf)
-      imp_df <- data.frame(
-        variable = names(imp),
-        importance = imp
-      ) %>% dplyr::arrange(-importance)
-      imp_vars <- imp_df$variable
-      # code to separate numeric and categorical. keeping it for now for possibility of design change
-      # imp_vars_tmp <- imp_df$variable
-      # imp_vars <- character(0)
-      # if (var.type == "numeric") {
-      #   # keep only numeric variables from important ones
-      #   for (imp_var in imp_vars_tmp) {
-      #     if (is.numeric(model_df[[imp_var]])) {
-      #       imp_vars <- c(imp_vars, imp_var)
-      #     }
-      #   }
-      # }
-      # else {
-      #   # keep only non-numeric variables from important ones
-      #   for (imp_var in imp_vars_tmp) {
-      #     if (!is.numeric(model_df[[imp_var]])) {
-      #       imp_vars <- c(imp_vars, imp_var)
-      #     }
-      #   }
-      # }
+      if (with_boruta) { # Run only either Boruta or ranger::importance.
+        if (importance_measure == "impurity") {
+          getImp <- Boruta::getImpRfGini
+        }
+        else { # default to equivalent of "permutation".
+          getImp <- Boruta::getImpRfZ
+        }
+        rf$boruta <- Boruta::Boruta(
+          fml,
+          data = model_df,
+          doTrace = 0,
+          maxRuns = boruta_max_runs + 1, # It seems Boruta stops at maxRuns - 1 iterations. Add 1 to be less confusing.
+          pValue = boruta_p_value,
+          getImp = getImp,
+          # Following parameters are to be relayed to ranger::ranger through Boruta::Boruta, then Boruta::getImpRfZ.
+          num.trees = ntree,
+          min.node.size = nodesize,
+          sample.fraction = sample.fraction,
+          probability = (classification_type == "binary") # build probability tree for AUC only for binary classification.
+        )
+        # These attributes are used in tidy. They are also at ranger level, but we are making Boruta object self-contained.
+        rf$boruta$classification_type <- classification_type
+        rf$boruta$orig_levels <- orig_levels
+        rf$boruta$terms_mapping <- names(name_map)
+        names(rf$boruta$terms_mapping) <- name_map
+        class(rf$boruta) <- c("Boruta_exploratory", class(rf$boruta))
+        imp_vars <- extract_important_variables_from_boruta(rf$boruta)
+      }
+      else {
+        # return partial dependence
+        imp <- ranger::importance(rf)
+        imp_df <- data.frame(
+          variable = names(imp),
+          importance = imp
+        ) %>% dplyr::arrange(-importance)
+        imp_vars <- imp_df$variable
+        # code to separate numeric and categorical. keeping it for now for possibility of design change
+        # imp_vars_tmp <- imp_df$variable
+        # imp_vars <- character(0)
+        # if (var.type == "numeric") {
+        #   # keep only numeric variables from important ones
+        #   for (imp_var in imp_vars_tmp) {
+        #     if (is.numeric(model_df[[imp_var]])) {
+        #       imp_vars <- c(imp_vars, imp_var)
+        #     }
+        #   }
+        # }
+        # else {
+        #   # keep only non-numeric variables from important ones
+        #   for (imp_var in imp_vars_tmp) {
+        #     if (!is.numeric(model_df[[imp_var]])) {
+        #       imp_vars <- c(imp_vars, imp_var)
+        #     }
+        #   }
+        # }
+      }
       imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
       imp_vars <- as.character(imp_vars) # for some reason imp_vars is converted to factor at this point. turn it back to character.
       rf$imp_vars <- imp_vars
@@ -1371,27 +1428,6 @@ calc_feature_imp <- function(df,
       names(rf$terms_mapping) <- name_map
       rf$y <- model.response(model_df)
       rf$df <- model_df
-      if (with_boruta) {
-        rf$boruta <- Boruta::Boruta(
-          fml,
-          data = model_df,
-          doTrace = 0,
-          maxRuns = boruta_max_runs + 1, # It seems Boruta stops at maxRuns - 1 iterations. Add 1 to be less confusing.
-          pValue = boruta_p_value,
-          # importance = "impurity", # In calc_feature_imp, we use impurity, but Boruta's getImpRfZ function uses permutation.
-          # Following parameters are to be relayed to ranger::ranger through Boruta::Boruta, then Boruta::getImpRfZ.
-          num.trees = ntree,
-          min.node.size = nodesize,
-          sample.fraction = sample.fraction,
-          probability = (classification_type == "binary") # build probability tree for AUC only for binary classification.
-        )
-        # These attributes are used in tidy. They are also at ranger level, but we are making Boruta object self-contained.
-        rf$boruta$classification_type <- classification_type
-        rf$boruta$orig_levels <- orig_levels
-        rf$boruta$terms_mapping <- names(name_map)
-        names(rf$boruta$terms_mapping) <- name_map
-        class(rf$boruta) <- c("Boruta_exploratory", class(rf))
-      }
       rf
     }, error = function(e){
       if(length(grouped_cols) > 0) {
@@ -2126,11 +2162,8 @@ exp_boruta <- function(df,
 }
 
 tidy.Boruta_exploratory <- function(x, ...) {
-  res <- tidyr::gather(as.data.frame(x$ImpHistory), "variable","importance")
-  decisions <- data.frame(variable=names(x$finalDecision), decision=x$finalDecision)
-  res <- res %>% dplyr::left_join(decisions, by = "variable") 
+  res <- extract_importance_history_from_boruta(x)
   res$variable <- x$terms_mapping[res$variable] # Map variable names back to original.
-  res <- res %>% dplyr::filter(decision %in% c("Confirmed", "Tentative", "Rejected")) # Remove rows with NA
   res <- res %>% dplyr::mutate(variable = forcats::fct_reorder(variable, importance, .fun = median, .desc = TRUE))
   # Reorder types of decision in the order of more important to less important.
   res <- res %>% dplyr::mutate(decision = forcats::fct_relevel(decision, "Confirmed", "Tentative", "Rejected"))
