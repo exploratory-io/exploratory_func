@@ -1333,46 +1333,7 @@ calc_feature_imp <- function(df,
         sample.fraction = sample.fraction,
         probability = (classification_type == "binary") # build probability tree for AUC only for binary classification.
       )
-
-      # return partial dependence
-      imp <- ranger::importance(rf)
-      imp_df <- data.frame(
-        variable = names(imp),
-        importance = imp
-      ) %>% dplyr::arrange(-importance)
-      imp_vars <- imp_df$variable
-      # code to separate numeric and categorical. keeping it for now for possibility of design change
-      # imp_vars_tmp <- imp_df$variable
-      # imp_vars <- character(0)
-      # if (var.type == "numeric") {
-      #   # keep only numeric variables from important ones
-      #   for (imp_var in imp_vars_tmp) {
-      #     if (is.numeric(model_df[[imp_var]])) {
-      #       imp_vars <- c(imp_vars, imp_var)
-      #     }
-      #   }
-      # }
-      # else {
-      #   # keep only non-numeric variables from important ones
-      #   for (imp_var in imp_vars_tmp) {
-      #     if (!is.numeric(model_df[[imp_var]])) {
-      #       imp_vars <- c(imp_vars, imp_var)
-      #     }
-      #   }
-      # }
-      imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
-      imp_vars <- as.character(imp_vars) # for some reason imp_vars is converted to factor at this point. turn it back to character.
-      rf$imp_vars <- imp_vars
-      rf$partial_dependence <- edarf::partial_dependence(rf, vars=imp_vars, data=model_df, n=c(20,20))
-
-      # these attributes are used in tidy of randomForest
-      rf$classification_type <- classification_type
-      rf$orig_levels <- orig_levels
-      rf$terms_mapping <- names(name_map)
-      names(rf$terms_mapping) <- name_map
-      rf$y <- model.response(model_df)
-      rf$df <- model_df
-      if (with_boruta) {
+      if (with_boruta) { # Run only either Boruta or ranger::importance.
         if (importance_measure == "impurity") {
           getImp <- Boruta::getImpRfGini
         }
@@ -1399,6 +1360,46 @@ calc_feature_imp <- function(df,
         names(rf$boruta$terms_mapping) <- name_map
         class(rf$boruta) <- c("Boruta_exploratory", class(rf$boruta))
       }
+      else {
+        # return partial dependence
+        imp <- ranger::importance(rf)
+        imp_df <- data.frame(
+          variable = names(imp),
+          importance = imp
+        ) %>% dplyr::arrange(-importance)
+        imp_vars <- imp_df$variable
+        # code to separate numeric and categorical. keeping it for now for possibility of design change
+        # imp_vars_tmp <- imp_df$variable
+        # imp_vars <- character(0)
+        # if (var.type == "numeric") {
+        #   # keep only numeric variables from important ones
+        #   for (imp_var in imp_vars_tmp) {
+        #     if (is.numeric(model_df[[imp_var]])) {
+        #       imp_vars <- c(imp_vars, imp_var)
+        #     }
+        #   }
+        # }
+        # else {
+        #   # keep only non-numeric variables from important ones
+        #   for (imp_var in imp_vars_tmp) {
+        #     if (!is.numeric(model_df[[imp_var]])) {
+        #       imp_vars <- c(imp_vars, imp_var)
+        #     }
+        #   }
+        # }
+        imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
+        imp_vars <- as.character(imp_vars) # for some reason imp_vars is converted to factor at this point. turn it back to character.
+        rf$imp_vars <- imp_vars
+      }
+      rf$partial_dependence <- edarf::partial_dependence(rf, vars=imp_vars, data=model_df, n=c(20,20))
+
+      # these attributes are used in tidy of randomForest
+      rf$classification_type <- classification_type
+      rf$orig_levels <- orig_levels
+      rf$terms_mapping <- names(name_map)
+      names(rf$terms_mapping) <- name_map
+      rf$y <- model.response(model_df)
+      rf$df <- model_df
       rf
     }, error = function(e){
       if(length(grouped_cols) > 0) {
