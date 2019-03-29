@@ -1240,7 +1240,6 @@ extract_important_variables_from_boruta <- function(x) {
   res <- tidyr::gather(as.data.frame(x$ImpHistory), "variable","importance")
   decisions <- data.frame(variable=names(x$finalDecision), decision=x$finalDecision)
   res <- res %>% dplyr::left_join(decisions, by = "variable") 
-  res$variable <- x$terms_mapping[res$variable] # Map variable names back to original.
   res <- res %>% dplyr::filter(decision %in% c("Confirmed", "Tentative", "Rejected")) # Remove rows with NA
   res <- res %>% dplyr::group_by(variable) %>% dplyr::summarize(importance = median(importance, na.rm = TRUE))
   res <- res %>% dplyr::arrange(desc(importance))
@@ -1371,6 +1370,7 @@ calc_feature_imp <- function(df,
         rf$boruta$terms_mapping <- names(name_map)
         names(rf$boruta$terms_mapping) <- name_map
         class(rf$boruta) <- c("Boruta_exploratory", class(rf$boruta))
+        imp_vars <- extract_important_variables_from_boruta(rf$boruta)
       }
       else {
         # return partial dependence
@@ -1399,10 +1399,10 @@ calc_feature_imp <- function(df,
         #     }
         #   }
         # }
-        imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
-        imp_vars <- as.character(imp_vars) # for some reason imp_vars is converted to factor at this point. turn it back to character.
-        rf$imp_vars <- imp_vars
       }
+      imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
+      imp_vars <- as.character(imp_vars) # for some reason imp_vars is converted to factor at this point. turn it back to character.
+      rf$imp_vars <- imp_vars
       rf$partial_dependence <- edarf::partial_dependence(rf, vars=imp_vars, data=model_df, n=c(20,20))
 
       # these attributes are used in tidy of randomForest
