@@ -1344,7 +1344,7 @@ calc_feature_imp <- function(df,
       }
       sample.fraction <- min(c(max_sample_size / max_nrow, 1))
 
-      if (with_boruta) {
+      if (with_boruta) { # Run only either Boruta or ranger::importance.
         ranger_importance_measure <- "none"
       }
       else {
