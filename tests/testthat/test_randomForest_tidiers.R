@@ -41,7 +41,7 @@ test_that("test calc_feature_imp when the number of rows of classes is one", {
   )
 
   model_df <- sample_data %>%
-    calc_feature_imp(y, num)
+    calc_feature_imp(y, num, importance_measure = "impurity")
   ret <- model_df %>% rf_importance()
 
   expect_equal(nrow(ret), 0)
