@@ -1335,10 +1335,17 @@ calc_feature_imp <- function(df,
       }
       sample.fraction <- min(c(max_sample_size / max_nrow, 1))
 
+      if (with_boruta) {
+        ranger_importance_measure <- "none"
+      }
+      else {
+        # "permutation" or "impurity".
+        ranger_importance_measure <- importance_measure
+      }
       rf <- ranger::ranger(
         fml,
         data = model_df,
-        importance = importance_measure, # "permutation" or "impurity".
+        importance = ranger_importance_measure,
         num.trees = ntree,
         min.node.size = nodesize,
         sample.fraction = sample.fraction,
