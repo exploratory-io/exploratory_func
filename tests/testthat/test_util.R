@@ -668,6 +668,11 @@ test_that("excel_numeric_to_date", {
   expect_equal(res, as.Date("2036-11-21"))
 })
 
+test_that("excel_numeric_to_datetime", {
+  res <- exploratory::excel_numeric_to_datetime(42370.5, tz = "GMT")
+  expect_equal(res, as.POSIXct("2016-01-01 12:00:00",tz = "GMT"))
+})
+
 test_that("one_hot", {
   # numeric column case
   df <- data.frame(x=c(1,1,2,3))
