@@ -1454,6 +1454,14 @@ excel_numeric_to_date <- function(date_num, date_system = "modern",
                                  include_time = include_time, round_seconds = round_seconds)
 }
 
+#' @export
+excel_numeric_to_datetime <- function(datetime_num, tz = "", ...) {
+  res <- openxlsx::convertToDateTime(datetime_num, tz = tz, ...)
+  # Convert output timezone to the specified tz, in addition to reading the number with the tz.
+  res <- lubridate::with_tz(res, tz = tz)
+  res
+}
+
 #' A utility function for One-hot encoding
 #' @export
 one_hot <- function(df, key) {
