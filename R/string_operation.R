@@ -190,7 +190,7 @@ do_tokenize <- function(df, input, token = "words", keep_cols = FALSE,  drop = T
 }
 
 #' Get idf for terms
-calc_idf <- function(group, term, log_scale = log, smooth_idf = FALSE){
+calc_idf <- function(group, term, smooth_idf = FALSE){
   loadNamespace("Matrix")
   loadNamespace("text2vec")
   if(length(group)!=length(term)){
@@ -261,9 +261,8 @@ calc_tf_ <- function(df, group_col, term_col, weight="ratio"){
 #' @param df Data frame which has columns of groups and their terms
 #' @param group Column of group names
 #' @param term Column of terms
-#' @param idf_log_scale
-#' Function to scale IDF. It might be worth trying log2 or log10.
-#' log10 strongly suppress the increase of idf values and log2 does it more weakly.
+#' @param [DEPRECATED] idf_log_scale
+#' Function to scale IDF. "log" function is automatically set, other functions are ignored.
 #' @export
 do_tfidf <- function(df, group, term, idf_log_scale = log, tf_weight="raw", norm="l2"){
   validate_empty_data(df)
@@ -275,6 +274,10 @@ do_tfidf <- function(df, group, term, idf_log_scale = log, tf_weight="raw", norm
     stop("norm argument must be l1, l2 or FALSE")
   }
 
+  if(!missing(idf_log_scale)){
+	warnings("Argument `idf_log_scale` is deprecated. The set value is ignored.")
+  }
+
   group_col <- col_name(substitute(group))
   term_col <- col_name(substitute(term))
 
@@ -284,7 +287,7 @@ do_tfidf <- function(df, group, term, idf_log_scale = log, tf_weight="raw", norm
   cnames <- avoid_conflict(c(group_col, term_col), c("count_of_docs", "tfidf", "tf"))
 
   count_tbl <- calc_tf_(df, group_col, term_col, weight=tf_weight)
-  tfidf <- calc_idf(count_tbl[[group_col]], count_tbl[[term_col]], log_scale = idf_log_scale, smooth_idf = FALSE)
+  tfidf <- calc_idf(count_tbl[[group_col]], count_tbl[[term_col]], smooth_idf = FALSE)
   count_tbl[[cnames[[1]]]] <- tfidf$.df
   count_tbl[[cnames[[2]]]] <- tfidf$.idf * count_tbl[[cnames[[3]]]]
   count_tbl[[cnames[[3]]]] <- NULL
