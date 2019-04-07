@@ -199,8 +199,11 @@ calc_idf <- function(group, term, log_scale = log, smooth_idf = FALSE){
   doc_fact <- as.factor(group)
   term_fact <- as.factor(term)
   sparseMat <- Matrix::sparseMatrix(i = as.numeric(doc_fact), j = as.numeric(term_fact))
-  idf <- text2vec::get_idf(sparseMat, log_scale=log_scale, smooth_idf=smooth_idf)
-  idf <- idf@x[term_fact]
+
+  m_tfidf <- text2vec::TfIdf$new(smooth_idf = smooth_idf, norm = "none")
+  result_tfidf <- m_tfidf$fit_transform(sparseMat)
+  idf <- result_tfidf@x[term_fact]
+
   df <- Matrix::colSums(sparseMat)[term_fact]
   data.frame(.df=df, .idf=idf)
 }
