@@ -1477,10 +1477,21 @@ one_hot <- function(df, key) {
 
 #' @export
 n_distinct <- function(..., na.rm = FALSE) {
-  if (length(rlang::quos(...)) == 1 && !na.rm) {
-    length(unique(...))
+  if (length(rlang::quos(...)) == 1) {
+    if (!na.rm) {
+      length(unique(...))
+    }
+    else {
+      unique_v <- unique(...)
+      length(unique_v[!is.na(unique_v)])
+    }
   }
   else {
-    dplyr::n_distinct(..., na.rm = na.rm)
+    if (!na.rm) {
+      nrow(unique(data.frame(...)))
+    }
+    else {
+      nrow(unique(tidyr::drop_na(data.frame(...))))
+    }
   }
 }
