@@ -684,3 +684,8 @@ test_that("one_hot", {
   res <- df %>% one_hot(x)
   expect_equal(res$x_A, c(1,1,0,0))
 })
+
+test_that("n_distinct", {
+  res <- n_distinct(c(1,2,2,3,3))
+  expect_equal(res, 3)
+})
