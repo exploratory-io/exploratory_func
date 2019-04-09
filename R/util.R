@@ -1475,8 +1475,12 @@ one_hot <- function(df, key) {
   df %>% tidyr::spread(!!rlang::enquo(key), !!rlang::sym(tmp_value_col), fill = 0, sep = "_") %>% select(-!!rlang::sym(tmp_id_col))
 }
 
+#' Temporary work-around for https://github.com/tidyverse/dplyr/issues/977
+#' It seems https://github.com/tidyverse/dplyr/pull/4205 has fixed it.
+#' Will remove this work-around once dplyr release with the above fix is out.
 #' @export
 n_distinct <- function(..., na.rm = FALSE) {
+  # Use length(unique()) since it is much faster under this issue.
   if (length(rlang::quos(...)) == 1) {
     if (!na.rm) {
       length(unique(...))
@@ -1486,12 +1490,7 @@ n_distinct <- function(..., na.rm = FALSE) {
       length(unique_v[!is.na(unique_v)])
     }
   }
-  else {
-    if (!na.rm) {
-      nrow(unique(data.frame(...)))
-    }
-    else {
-      nrow(unique(tidyr::drop_na(data.frame(...))))
-    }
+  else { # Fallback to regular dplyr::n_distinct. Solution with base function was as slow in this case.
+    dplyr::n_distinct(..., na.rm = na.rm)
   }
 }
