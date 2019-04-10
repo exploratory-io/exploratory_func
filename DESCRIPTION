@@ -1,8 +1,8 @@
 Package: exploratory
 Type: Package
 Title: R package for Exploratory
-Version: 5.1.2.2
-Date: 2019-03-31
+Version: 5.1.4.0
+Date: 2019-04-09
 Authors@R: c(person("Yosuke", "Yasuda", email = "double.y.919.quick@gmail.com", role = c("aut", "cre")))
 URL: https://github.com/exploratory-io/exploratory_func
 Description: Functions for Exploratory
