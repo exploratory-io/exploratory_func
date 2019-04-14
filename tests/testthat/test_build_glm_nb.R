@@ -30,6 +30,17 @@ test_that("test build_glm with negative.binomial family(class function)", {
   checkSummaryOutput(trial)
 })
 
+test_that("test build_glm (nb) with init theta params", {
+  trial <- MASS::quine %>%
+    build_glm(Days ~ Sex/(Age + Eth*Lrn),
+              family = MASS::negative.binomial(theta=500))
+  family_arg <- trial$model[[1]]$call %>% as.list() %>% .$family
+
+  expect_equal(family_arg$theta, 500)
+  expect_equal(family_arg %>% as.character() %>% `[`(1),
+               "MASS::negative.binomial")
+ })
+
 test_that("test build_glm (nb) with keep.source FALSE", {
   trial <- MASS::quine %>%
     build_glm(Days ~ Sex/(Age + Eth*Lrn),

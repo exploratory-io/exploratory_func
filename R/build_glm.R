@@ -99,15 +99,18 @@ build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, g
     stop(paste0(paste(grouped_var, collapse = ", "), " are grouping columns. Please remove them from variables."))
   }
 
-  # family
+  # define glm function by the family option
   exclude_arg_names <- c("data", "keep.source", "augment", "group_cols", "test_rate", "seed")
-  if(match.call()$family %>%
+
+  if((match.call()$family %>%
        as.character() %>%
        stringr::str_detect("negative\\.binomial") %>%
        any() %>%
-       dplyr::if_else(is.na(.), FALSE, .)) {
+       dplyr::if_else(is.na(.), FALSE, .)) && (class(list(...)$family) != "family")) {
+
     arg_char <- expand_args(caller, exclude = c(exclude_arg_names, "family", "offset"))
     glm_func_name = "MASS::glm.nb"
+
   } else {
     arg_char <- expand_args(caller, exclude = exclude_arg_names)
     glm_func_name = "stats::glm"
