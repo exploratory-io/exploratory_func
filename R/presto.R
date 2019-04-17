@@ -14,8 +14,11 @@ queryPresto <- function(host, port, username, password = "", schema, catalog, nu
   )
   conn <- RPresto::dbConnect(drv, user = username,
                                 password = pass, host = host, port = port, schema = schema, catalog = catalog, session.timezone = Sys.timezone(location = TRUE))
+  query <- convertUserInputToUtf8(query)
   # set envir = parent.frame() to get variables from users environment, not papckage environment
-  resultSet <- RPresto::dbSendQuery(conn, glue::glue_sql(query, .con = conn, .envir = parent.frame()))
+  # glue_sql does not quote Date or POSIXct. Let's use our sql_glue_transformer here.
+  query <- glue_exploratory(query, .transformer=sql_glue_transformer, .envir = parent.frame())
+  resultSet <- RPresto::dbSendQuery(conn,query)
   df <- DBI::dbFetch(resultSet, n = numOfRows)
   RPresto::dbClearResult(resultSet)
   RPresto::dbDisconnect(conn)
