@@ -6,12 +6,12 @@ queryPresto <- function(host, port, username, password = "", schema, catalog, nu
 
 
   # read stored password
-  pass = saveOrReadPassword("presto", username, password)
-  conn = getDBConnection("presto", host = host, port = port, databaseName = "", username = username, password = pass, catalog = catalog, schema = schema, dsn="", additionalParams = "",
-  collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, timeout = NULL)
+  pass <- saveOrReadPassword("presto", username, password)
+  conn <- getDBConnection("presto", host = host, port = port, databaseName = "", username = username, password = pass, catalog = catalog, schema = schema, dsn="", additionalParams = "",
+                          collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, timeout = NULL)
   tryCatch({
     query <- convertUserInputToUtf8(query)
-    # set envir = parent.frame() to get variables from users environment, not papckage environment
+    # set envir = parent.frame() to get variables from users environment, not package environment
     # glue_sql does not quote Date or POSIXct. Let's use our sql_glue_transformer here.
     query <- glue_exploratory(query, .transformer=sql_glue_transformer, .envir = parent.frame())
     resultSet <- RPresto::dbSendQuery(conn,query)

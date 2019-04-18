@@ -604,7 +604,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
   } else if (type == "presto" || type == "treasuredata") {
     if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
     if(!requireNamespace("RPresto")){stop("package Presto must be installed.")}
-    # use the same key "presto" for presto and treasuredata since they both use
+    # use the same key "presto" for presto and treasuredata since they both use "presto".
     key <- paste("presto", host, port, catalog, schema, username, sep = ":")
     conn <- connection_pool[[key]]
     if (!is.null(conn)){
