@@ -610,7 +610,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     if (!is.null(conn)){
       tryCatch({
         # test connection
-        result <- DBI::dbGetQuery(conn,"select 1")
+        result <- RPresto::dbSendQuery(conn,"select 1")
         if (!is.data.frame(result)) { # it can fail by returning NULL rather than throwing error.
           tryCatch({ # try to close connection and ignore error
             RPresto::dbDisconnect(conn)
@@ -779,14 +779,14 @@ clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, user
 #' @export
 getListOfTables <- function(type, host, port, databaseName = NULL, username, password, catalog = "", schema = ""){
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
-  conn <- getDBConnection(type, host, port, databaseName, username, password)
+  conn <- getDBConnection(type, host, port, databaseName, username, password, catalog, schema)
 
   tryCatch({
     tables <- DBI::dbListTables(conn)
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
     clearDBConnection(type, host, port, databaseName, username, catalog = catalog, schema = schema)
-    if (!type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora")) { # only if conn pool is not used yet
+    if (!type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora", "presto", "treasuredata")) { # only if conn pool is not used yet
       tryCatch({ # try to close connection and ignore error
         DBI::dbDisconnect(conn)
       }, warning = function(w) {
