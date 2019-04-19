@@ -601,12 +601,47 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
                                      password = password, host = host, port = port)
       connection_pool[[key]] <- conn
     }
-  } else if (type == "presto") {
+  } else if (type == "presto" || type == "treasuredata") {
     if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
     if(!requireNamespace("RPresto")){stop("package Presto must be installed.")}
-    loadNamespace("RPresto")
-    drv <- RPresto::Presto()
-    conn <- RPresto::dbConnect(drv, user = username, password = password, host = host, port = port, schema = schema, catalog = catalog, session.timezone = Sys.timezone(location = TRUE))
+    # use the same key "presto" for presto and treasuredata since they both use "presto".
+    key <- paste("presto", host, port, catalog, schema, username, sep = ":")
+    conn <- connection_pool[[key]]
+    if (!is.null(conn)){
+      tryCatch({
+        # test connection
+        result <- RPresto::dbSendQuery(conn,"select 1")
+        if (!is.data.frame(result)) { # it can fail by returning NULL rather than throwing error.
+          tryCatch({ # try to close connection and ignore error
+            RPresto::dbDisconnect(conn)
+          }, warning = function(w) {
+          }, error = function(e) {
+          })
+          conn <- NULL
+          # fall through to getting new connection.
+        }
+      }, error = function(err) {
+        tryCatch({ # try to close connection and ignore error
+          RPresto::dbDisconnect(conn)
+        }, warning = function(w) {
+        }, error = function(e) {
+        })
+        conn <- NULL
+        # fall through to getting new connection.
+      })
+    }
+    if (is.null(conn)) {
+      loadNamespace("RPresto")
+      drv <- RPresto::Presto()
+      # To workaround Presto Authentication issue, set X-Presto-User to http header.
+      # Please refer https://github.com/prestodb/RPresto/issues/103 for details.
+      httr::set_config(
+        httr::add_headers(stringr::str_c("X-Presto-User", username, sep = "="))
+      )
+      conn <- RPresto::dbConnect(drv, user = username,
+                               password = pass, host = host, port = port, schema = schema, catalog = catalog, session.timezone = Sys.timezone(location = TRUE))
+      connection_pool[[key]] <- conn
+    }
   } else if (type == "odbc") {
     # do those package loading only when we need to use odbc in this if statement,
     # so that we will not have error at our server environemnt where RODBC is not there.
@@ -714,6 +749,18 @@ clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, user
         })
       }
     }
+    else if (type %in% c("presto", "treasuredata")) {
+      # they use common key "presto"
+      key <- paste("presto", host, port, catalog, schema, username, sep = ":")
+      conn <- connection_pool[[key]]
+      if (!is.null(conn)) {
+        tryCatch({ # try to close connection and ignore error
+          RPresto::dbDisconnect(conn)
+        }, warning = function(w) {
+        }, error = function(e) {
+        })
+      }
+    }
     else { # odbc
       key <- paste("odbc", dsn, username, additionalParams, sep = ":")
       conn <- connection_pool[[key]]
@@ -732,19 +779,14 @@ clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, user
 #' @export
 getListOfTables <- function(type, host, port, databaseName = NULL, username, password, catalog = "", schema = ""){
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
-  if (type == "presto") {
-    loadNamespace("RPresto")
-    drv <- RPresto::Presto()
-    conn <- RPresto::dbConnect(drv, schema = schema, catalog = catalog, user = username, host = host, port = port)
-  } else {
-    conn <- getDBConnection(type, host, port, databaseName, username, password)
-  }
+  conn <- getDBConnection(type, host, port, databaseName, username, password, catalog, schema)
+
   tryCatch({
     tables <- DBI::dbListTables(conn)
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
     clearDBConnection(type, host, port, databaseName, username, catalog = catalog, schema = schema)
-    if (!type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora")) { # only if conn pool is not used yet
+    if (!type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora", "presto", "treasuredata")) { # only if conn pool is not used yet
       tryCatch({ # try to close connection and ignore error
         DBI::dbDisconnect(conn)
       }, warning = function(w) {
@@ -753,7 +795,7 @@ getListOfTables <- function(type, host, port, databaseName = NULL, username, pas
     }
     stop(err)
   })
-  if (!type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora")) { # only if conn pool is not used yet
+  if (!type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora", "presto", "treasuredata")) { # only if conn pool is not used yet
     tryCatch({ # try to close connection and ignore error
       DBI::dbDisconnect(conn)
     }, warning = function(w) {
@@ -781,7 +823,7 @@ getListOfColumns <- function(type, host, port, databaseName, username, password,
     }
     stop(err)
   })
-  if (!type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora")) { # only if conn pool is not used yet
+  if (!type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora", "presto", "treasuredata")) { # only if conn pool is not used yet
     tryCatch({ # try to close connection and ignore error
       DBI::dbDisconnect(conn)
     }, warning = function(w) {
@@ -804,7 +846,7 @@ executeGenericQuery <- function(type, host, port, databaseName, username, passwo
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
     clearDBConnection(type, host, port, databaseName, username, catalog = catalog, schema = schema)
-    if (!type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora")) { # only if conn pool is not used yet
+    if (!type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora", "presto", "treasuredata")) { # only if conn pool is not used yet
       tryCatch({ # try to close connection and ignore error
         DBI::dbDisconnect(conn)
       }, warning = function(w) {
@@ -814,7 +856,7 @@ executeGenericQuery <- function(type, host, port, databaseName, username, passwo
     stop(err)
   })
   DBI::dbClearResult(resultSet)
-  if (!type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora")) { # only if conn pool is not used yet
+  if (!type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora", "presto", "treasuredata")) { # only if conn pool is not used yet
     tryCatch({ # try to close connection and ignore error
       DBI::dbDisconnect(conn)
     }, warning = function(w) {
@@ -1229,7 +1271,7 @@ getGoogleBigQueryTables <- function(project, dataset, tokenFileId=""){
     bigrquery::set_access_cred(token)
     # if we do not pass max_results (via page_size argument), it only returnss 50 items. so explicitly set it.
     # See https://cloud.google.com/bigquery/docs/reference/rest/v2/tabledata/list for max_results
-    # If we pass large value to max_results (via page_size argument) like 1,000,000, Google BigQuery gives 
+    # If we pass large value to max_results (via page_size argument) like 1,000,000, Google BigQuery gives
     # Error: Invalid value at 'max_results.value' (TYPE_UINT32), "1e+06" [badRequest]
     # so set 10,000 as the default value.
     tables <- bigrquery::list_tables(project, dataset, page_size=10000);
