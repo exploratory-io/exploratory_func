@@ -37,7 +37,22 @@ test_that("test do_apriori with lhs and rhs", {
     number = seq(60)
   )
 
+  ret <- suppressWarnings({
+    do_apriori(test_df, name, product, min_support=0.001, lhs="name1", rhs="name8")
+  })
+  expect_equal(colnames(ret), c("lhs", "rhs", "support", "confidence", "lift"))
+  expect_true(all(ret[, "lhs"] == "name1" & ret[, "rhs"] == "name8"))
+  get_arules_graph_data(ret)
+})
+
+test_that("test do_apriori with no matching rule", {
+  test_df <- data.frame(
+    name = rep(paste("name",seq(20), sep=""), each=3),
+    product = rep(paste("product",seq(5), sep=""), 12),
+    number = seq(60)
+  )
+
   expect_error({
-    do_apriori(test_df, name, product, min_support=0.9, lhs="name1", rhs="name2")
+    do_apriori(test_df, name, product, min_support=0.9, lhs="name1", rhs="name8")
   }, "No matching rule was found")
 })
