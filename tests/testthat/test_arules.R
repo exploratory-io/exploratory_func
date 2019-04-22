@@ -53,6 +53,7 @@ test_that("test do_apriori with no matching rule", {
   )
 
   expect_error({
+    # min_support is set high intentionally so that no matching rule will be found.
     do_apriori(test_df, name, product, min_support=0.9, lhs="name1", rhs="name8")
   }, "No matching rule was found")
 })
