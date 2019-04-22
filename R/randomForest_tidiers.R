@@ -55,6 +55,57 @@ randomForestReg <- function(data, formula, na.action = na.omit, ...) {
   ret
 }
 
+#' @export
+rangerReg <- function(data, formula, ...) {
+  target_col <- all.vars(formula)[[1]]
+
+  if(!is.numeric(data[[target_col]])){
+    stop("Target must be numeric column")
+  }
+
+  original_colnames <- colnames(data)
+
+  target_col_index <- which(colnames(data) == target_col)
+
+  # randomForest must take clean names
+  data <- janitor::clean_names(data)
+  updated_colnames <- colnames(data)
+  names(updated_colnames) <- original_colnames
+
+  # get target col as clean name
+  target_col <- colnames(data)[target_col_index]
+
+  if("." %in% all.vars(lazyeval::f_rhs(formula))){
+    # somehow, mixing numeric and categorical predictors causes an error in randomForest
+    # so use only numeric or logical columns
+    cols <- quantifiable_cols(data)
+    vars <- cols[!cols %in% target_col]
+    formula <- as.formula(paste0(target_col, " ~ ", paste0(vars, collapse = " + ")))
+  } else {
+    vars <- all.vars(formula)
+    newvars <- updated_colnames[vars]
+    formula <- as.formula(paste0(newvars[[1]], " ~ ", paste0(newvars[-1], collapse = " + ")))
+  }
+
+  ret <- tryCatch({
+    ranger::ranger(formula = formula, data = data, ...)
+  }, error = function(e){
+    if (e$message == "NA/NaN/Inf in foreign function call (arg 1)"){
+      # TODO: Should find the root cause of this error because indicating
+      # numerical and categorical predictors doesn't always cause this error
+      stop("Categorical and numerical predictors can't be used at the same time.")
+    }
+    stop(e)
+  })
+
+  # this attribute will be used to get back original column names
+  terms_mapping <- original_colnames
+  names(terms_mapping) <- updated_colnames
+  ret$terms_mapping <- terms_mapping
+
+  ret
+}
+
 #' Random Forest wrapper for classification
 #' This is needed because boolean target starts regression task,
 #' not classification task
