@@ -40,8 +40,8 @@ any_error <- function(test_results) {
   flattened <- purrr::flatten(results)
   # extract result class attr which has info on whether the result was success, warning, or error.
   result_classes <- purrr::map(flattened, function(x){attr(x,"class")})
-  # return TRUE if there is any result with class "expectation_error".
-  purrr::some(result_classes, function(x){"expectation_error" %in% x})
+  # return TRUE if there is any result with class "expectation_error", "expectation_failure", or "error".
+  purrr::some(result_classes, function(x){any(c("expectation_error", "expectation_failure", "error") %in% x)})
 }
 
 #' Returns number of errors in testthat result. For test automation.
@@ -53,7 +53,7 @@ get_num_errors <- function(test_results) {
   flattened <- purrr::flatten(results)
   # extract result class attr which has info on whether the result was success, warning, or error.
   result_classes <- purrr::map(flattened, function(x){attr(x,"class")})
-  # return TRUE if there is any result with class "expectation_error".
-  errors <- purrr::keep(result_classes, function(x){"expectation_error" %in% x})
+  # return TRUE if there is any result with class "expectation_error", "expectation_failure", or "error".
+  errors <- purrr::keep(result_classes, function(x){any(c("expectation_error", "expectation_failure", "error") %in% x)})
   length(errors)
 }
