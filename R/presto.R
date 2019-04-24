@@ -5,9 +5,7 @@ queryPresto <- function(host, port, username, password = "", schema, catalog, nu
   if(!requireNamespace("RPresto")){stop("package RPresto must be installed.")}
 
 
-  # read stored password
-  pass <- saveOrReadPassword("presto", username, password)
-  conn <- getDBConnection("presto", host = host, port = port, databaseName = "", username = username, password = pass, catalog = catalog, schema = schema, dsn="", additionalParams = "",
+  conn <- getDBConnection("presto", host = host, port = port, databaseName = "", username = username, password = password, catalog = catalog, schema = schema, dsn="", additionalParams = "",
                           collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, timeout = NULL)
   tryCatch({
     query <- convertUserInputToUtf8(query)
