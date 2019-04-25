@@ -210,6 +210,31 @@ test_that("prediction with glm family (binomial) and link (probit) with target c
 
   expect_true(nrow(ret) > 0)
   expect_equal(colnames(ret), c("CANCELLED.X", "logical.col", "Carrier.Name","CARRIER","DISTANCE",".fitted",".se.fit",".resid",".hat",".sigma",".cooksd",".std.resid"))
+
+  model_data <- build_lm.fast(test_data,
+                              `CANCELLED X`,
+                              `logical col`,
+                              `Carrier Name`,
+                              CARRIER, DISTANCE,
+                              predictor_n = 3,
+                              model_type = "glm",
+                              link = "log",
+                              family="negativebinomial")
+  ret <- model_data %>% broom::glance(model)
+  expect_equal(colnames(ret),
+               c("null.deviance", "df.null", "logLik",
+                 "AIC", "BIC", "deviance",
+                 "df.residual", "p.value", "logical.col_base",
+                 "Carrier.Name_base", "CARRIER_base"))
+  ret <- model_data %>% broom::tidy(model)
+  expect_equal(colnames(ret),
+               c("term", "estimate", "std.error", "statistic", "p.value",
+               "conf.high", "conf.low", "base.level"))
+
+  ret <- model_data %>% broom::augment(model)
+  expect_equal(colnames(ret),
+               c("CANCELLED.X", "logical.col", "Carrier.Name", "CARRIER", "DISTANCE",
+                 ".fitted", ".resid", ".hat", ".sigma", ".cooksd", ".std.resid"))
 })
 
 if (Sys.info()["sysname"] != "Windows") {

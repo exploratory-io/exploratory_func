@@ -445,7 +445,9 @@ build_lm.fast <- function(df,
             df_before_smote <- df_before_smote %>% sample_rows(max_nrow)
           }
         }
-        if (is.null(link)) {
+
+        # when family is negativebinomial, use MASS::glm.nb
+        if (is.null(link) && family != "negativebinomial") {
           rf <- stats::glm(fml, data = df, family = family) 
         }
         else {
@@ -473,10 +475,32 @@ build_lm.fast <- function(df,
           else if (family == "quasipoisson") {
             family_arg <- stats::quasipoisson(link=link)
           }
+          else if (family == "negativebinomial") {
+            family_arg <- family
+          }
           else { # default gaussian
             family_arg <- stats::gaussian(link=link)
           }
-          rf <- stats::glm(fml, data = df, family = family_arg) 
+
+          if (family_arg == "negativebinomial"){
+            # In MASS::glm.nb function, the link arg must be one of log, sqrt or identity.
+            # So if the other is used, the link arg should be set to "log" which is a default value.
+            if (is.null(link) || (!link %in% c("log", "sqrt", "identity"))){
+              link <- "log"
+            }
+
+            # The argument link in MASS::glm.nb is evaluated by substitution with delay,
+            # so the variable specified in the argument is interpreted as the link argument as it is.
+            # For example, if you execute like MASS::glm.nb(fmt, data = df, link = link), the following error will occur
+            # link "link" not available for poisson family; available links are ‘log’, ‘identity’, ‘sqrt’
+            # Therefore, we used eval to pass the string (log etc.) specified in the argument to link as it is.
+            rf <- eval(parse(text=paste0("MASS::glm.nb(fml, data=df, link=", link, ")")))
+
+            # A model by MASS::glm.nb has not a formula attribute.
+            rf$formula <- fml
+          } else {
+            rf <- stats::glm(fml, data = df, family = family_arg)
+          }
         }
       }
       else {
