@@ -636,10 +636,10 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       # To workaround Presto Authentication issue, set X-Presto-User to http header.
       # Please refer https://github.com/prestodb/RPresto/issues/103 for details.
       httr::set_config(
-        httr::add_headers(stringr::str_c("X-Presto-User", username, sep = "="))
+        httr::add_headers("X-Presto-User"=username)
       )
       conn <- RPresto::dbConnect(drv, user = username,
-                               password = pass, host = host, port = port, schema = schema, catalog = catalog, session.timezone = Sys.timezone(location = TRUE))
+                               password = password, host = host, port = port, schema = schema, catalog = catalog, session.timezone = Sys.timezone(location = TRUE))
       connection_pool[[key]] <- conn
     }
   } else if (type == "odbc") {
