@@ -15,8 +15,6 @@ getGoogleTrends <- function(user,
   loadNamespace("gtrendsR")
   loadNamespace("tidyr")
 
-  password <- saveOrReadPassword("googletrends", user, password)
-
   # this doesn't return error even if login fails, so capture the message
   # if it's successful, it's character(0)
   message <- capture.output(gtrendsR::gconnect(user, password))
