@@ -593,6 +593,16 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add tes
   else {
     ret <- ret %>% dplyr::mutate(p.value=pvalue)
   }
+
+  # For GLM (Negative Binomial)
+  if("negbin" %in% class(x)) {
+    if(pretty.name) {
+      ret <- ret %>% dplyr::mutate(`Theta`=x$theta, `SE Theta`=x$SE.theta)
+    }
+    else {
+      ret <- ret %>% dplyr::mutate(theta=x$theta, SE.theta=x$SE.theta)
+    }
+  }
   
   if (x$family$family %in% c('binomial', 'quasibinomial')) { # only for logistic regression.
     # Calculate F Score, Accuracy Rate, Misclassification Rate, Precision, Recall, Data Size

@@ -224,7 +224,8 @@ test_that("prediction with glm family (binomial) and link (probit) with target c
   expect_equal(colnames(ret),
                c("null.deviance", "df.null", "logLik",
                  "AIC", "BIC", "deviance",
-                 "df.residual", "p.value", "logical.col_base",
+                 "df.residual", "p.value", "theta", "SE.theta",
+                 "logical.col_base",
                  "Carrier.Name_base", "CARRIER_base"))
   ret <- model_data %>% broom::tidy(model)
   expect_equal(colnames(ret),
@@ -299,4 +300,26 @@ test_that("prediction with glm model with SMOTE by build_lm.fast", {
   ret <- model_data %>% broom::augment(model, pretty.name=TRUE)
 
   expect_true(nrow(ret) > 0)
+})
+
+test_that("test GLM (Negative Binomial) summary output", {
+  test_df <- data.frame(
+    num1 = seq(20),
+    num2 = seq(20) - 10,
+    num3 = seq(20) / 10.0
+  )
+  ret <- test_df %>% build_lm.fast(num1, num2, num3,
+                            model_type="glm",
+                            family="negativebinomial")
+  model_ret <- ret %>% broom::glance(model)
+  expect_equal(colnames(model_ret),
+               c("null.deviance", "df.null", "logLik",
+                 "AIC", "BIC", "deviance", "df.residual",
+                 "p.value", "theta", "SE.theta"))
+  model_ret_pretty <- ret %>% broom::glance(model, pretty.name=TRUE)
+  expect_equal(colnames(model_ret_pretty),
+               c("P Value", "Log Likelihood", "AIC",
+                 "BIC", "Deviance", "Null Deviance",
+                 "DF for Null Model", "Residual DF",
+                 "Theta", "SE Theta"))
 })
