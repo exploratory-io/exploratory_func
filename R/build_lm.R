@@ -484,7 +484,7 @@ build_lm.fast <- function(df,
 
           if (family_arg == "negativebinomial"){
             # In MASS::glm.nb function, the link arg must be one of log, sqrt or identity.
-            # So if the other is used, the link arg should be set to "log" which is a default value.
+            # So if the other is used, the link arg should be set to "log" which is the default value.
             if (is.null(link) || (!link %in% c("log", "sqrt", "identity"))){
               link <- "log"
             }
@@ -492,7 +492,7 @@ build_lm.fast <- function(df,
             # The argument link in MASS::glm.nb is evaluated by substitution with delay,
             # so the variable specified in the argument is interpreted as the link argument as it is.
             # For example, if you execute like MASS::glm.nb(fmt, data = df, link = link), the following error will occur
-            # link "link" not available for poisson family; available links are ‘log’, ‘identity’, ‘sqrt’
+            # link "link" not available for poisson family; available links are 'log', 'identity', 'sqrt'
             # Therefore, we used eval to pass the string (log etc.) specified in the argument to link as it is.
             rf <- eval(parse(text=paste0("MASS::glm.nb(fml, data=df, link=", link, ")")))
 
