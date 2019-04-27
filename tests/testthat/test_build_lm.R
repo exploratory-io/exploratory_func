@@ -323,3 +323,38 @@ test_that("test GLM (Negative Binomial) summary output", {
                  "DF for Null Model", "Residual DF",
                  "Theta", "SE Theta"))
 })
+
+test_that("test GLM (Negative Binomial) with group columns", {
+  test_data <- structure(
+    list(
+      `CANCELLED X` = c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0),
+      `Carrier Name` = c("Delta Air Lines", "American Eagle", "American Airlines", "Southwest Airlines", "SkyWest Airlines", "Southwest Airlines", "Southwest Airlines", "Delta Air Lines", "Southwest Airlines", "Atlantic Southeast Airlines", "American Airlines", "Southwest Airlines", "US Airways", "US Airways", "Delta Air Lines", "Atlantic Southeast Airlines", NA, "Atlantic Southeast Airlines", "Delta Air Lines", "Delta Air Lines"),
+      CARRIER = factor(c(NA, "MQ", "AA", "DL", "MQ", "AA", "DL", "DL", "MQ", "AA", "AA", "WN", "US", "US", "DL", "EV", "9E", "EV", "DL", "DL")), # test with factor with NA
+      # testing filtering of Inf, -Inf, NA here.
+      DISTANCE = c(Inf, -Inf, NA, 187, 273, 1062, 583, 240, 1123, 851, 852, 862, 361, 507, 1020, 1092, 342, 489, 1184, 545)), row.names = c(NA, -20L),
+    class = c("tbl_df", "tbl", "data.frame"), .Names = c("CANCELLED X", "Carrier Name", "CARRIER", "DISTANCE"))
+
+  # duplicate rows to make some predictable data
+  # otherwise, the number of rows of the result of prediction becomes 0
+  test_data <- dplyr::bind_rows(test_data, test_data)
+  test_data <- test_data %>% mutate(CARRIER = factor(CARRIER, ordered=TRUE)) # test handling of ordered factor
+
+  ret <- test_data %>% dplyr::group_by(CARRIER) %>%
+           build_lm.fast(`CANCELLED X`,
+                         DISTANCE,
+                         predictor_n = 3,
+                         model_type = "glm",
+                         family = "negativebinomial")
+  expect_equal(length(ret[["CARRIER"]]), 8)
+  model_ret <- ret %>% broom::glance(model)
+  expect_equal(colnames(model_ret),
+               c("CARRIER", "null.deviance", "df.null", "logLik",
+                 "AIC", "BIC", "deviance", "df.residual",
+                 "p.value", "theta", "SE.theta"))
+  model_ret_pretty <- ret %>% broom::glance(model, pretty.name=TRUE)
+  expect_equal(colnames(model_ret_pretty),
+               c("CARRIER","P Value", "Log Likelihood", "AIC",
+                 "BIC", "Deviance", "Null Deviance",
+                 "DF for Null Model", "Residual DF",
+                 "Theta", "SE Theta"))
+})
