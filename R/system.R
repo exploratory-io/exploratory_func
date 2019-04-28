@@ -139,7 +139,6 @@ getGithubIssues <- function(username, password, owner, repository, ...){
   loadNamespace("stringr")
   loadNamespace("httr")
   loadNamespace("dplyr")
-  pass = saveOrReadPassword("github", username, password)
 
   # Body
   endpoint <- stringr::str_c("https://api.github.com/repos/", owner, "/", repository, "/issues")
@@ -149,7 +148,7 @@ getGithubIssues <- function(username, password, owner, repository, ...){
   while(is_next){
     res <- httr::GET(endpoint,
                query = list(state = "all", per_page = 100, page = i),
-               httr::authenticate(username, pass))
+               httr::authenticate(username, password))
     jsondata <- httr::content(res, type = "text", encoding = "UTF-8")
     github_df <- jsonlite::fromJSON(jsondata, flatten = TRUE)
     pages[[i]] <- github_df
@@ -350,9 +349,8 @@ queryMongoDB <- function(host = NULL, port = "", database, collection, username,
   loadNamespace("jsonlite")
 
   # read stored password
-  pass = saveOrReadPassword("mongodb", username, password)
   # get connection from connection pool
-  con <- getDBConnection("mongodb", host, port, database, username, pass, collection = collection, isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParamas, timeout = timeout)
+  con <- getDBConnection("mongodb", host, port, database, username, password, collection = collection, isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParamas, timeout = timeout)
   if(fields == ""){
     fields = "{}"
   }
@@ -404,8 +402,7 @@ getMongoCollectionNames <- function(host = "", port = "", database = "", usernam
   collection = "test" # dummy collection name. mongo command seems to work even if the collection does not exist.
   loadNamespace("jsonlite")
   if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
-  pass = saveOrReadPassword("mongodb", username, password)
-  con <- getDBConnection("mongodb", host, port, database, username, pass, collection = collection, isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParams, timeout = timeout)
+  con <- getDBConnection("mongodb", host, port, database, username, password, collection = collection, isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParams, timeout = timeout)
   # command to list collections.
   # con$command is our addition in our mongolite fork.
   result <- con$command(command = '{"listCollections":1}')
@@ -428,8 +425,7 @@ getMongoCollectionNumberOfRows <- function(host = NULL, port = "", database = ""
                                            timeout = NULL, ...){
   loadNamespace("jsonlite")
   if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
-  pass = saveOrReadPassword("mongodb", username, password)
-  con <- getDBConnection("mongodb", host, port, database, username, pass, collection = collection, isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParams, timeout = timeout)
+  con <- getDBConnection("mongodb", host, port, database, username, password, collection = collection, isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParams, timeout = timeout)
   tryCatch({
     result <- con$count()
   }, error = function(err) {
@@ -636,10 +632,10 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       # To workaround Presto Authentication issue, set X-Presto-User to http header.
       # Please refer https://github.com/prestodb/RPresto/issues/103 for details.
       httr::set_config(
-        httr::add_headers(stringr::str_c("X-Presto-User", username, sep = "="))
+        httr::add_headers("X-Presto-User"=username)
       )
       conn <- RPresto::dbConnect(drv, user = username,
-                               password = pass, host = host, port = port, schema = schema, catalog = catalog, session.timezone = Sys.timezone(location = TRUE))
+                               password = password, host = host, port = port, schema = schema, catalog = catalog, session.timezone = Sys.timezone(location = TRUE))
       connection_pool[[key]] <- conn
     }
   } else if (type == "odbc") {
@@ -876,9 +872,7 @@ queryNeo4j <- function(host, port,  username, password, query, isSSL = FALSE, ..
 
   graph <- NULL
   if(!is.null(username) && !is.null(password)){
-    # read stored password
-    pass = saveOrReadPassword("neo4j", username, password)
-    graph = RNeo4j::startGraph(url, username = username, password = pass)
+    graph = RNeo4j::startGraph(url, username = username, password = password)
   } else {
     graph = RNeo4j::startGraph(url)
   }
@@ -893,10 +887,7 @@ queryMySQL <- function(host, port, databaseName, username, password, numOfRows =
   if(!requireNamespace("RMySQL")){stop("package RMySQL must be installed.")}
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
 
-  # read stored password
-  pass = saveOrReadPassword("mysql", username, password)
-
-  conn <- getDBConnection("mysql", host, port, databaseName, username, pass)
+  conn <- getDBConnection("mysql", host, port, databaseName, username, password)
   tryCatch({
     DBI::dbGetQuery(conn,"set names utf8")
     query <- convertUserInputToUtf8(query)
@@ -917,9 +908,7 @@ queryPostgres <- function(host, port, databaseName, username, password, numOfRow
   if(!requireNamespace("RPostgreSQL")){stop("package RPostgreSQL must be installed.")}
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
 
-  # read stored password
-  pass = saveOrReadPassword("postgres", username, password)
-  conn <- getDBConnection("postgres", host, port, databaseName, username, pass)
+  conn <- getDBConnection("postgres", host, port, databaseName, username, password)
 
   tryCatch({
     query <- convertUserInputToUtf8(query)
