@@ -399,7 +399,10 @@ parse_number <- function(text, ...){
   if(is.numeric(text)) {
     text
   } else {
-    readr::parse_number(text, ...)
+    # For some reason, output from parse_number returns FALSE for
+    # is.vector(), which becomes a problem when it is fed to ranger
+    # as the target variable. To work it around, we apply as.numeric().
+    as.numeric(readr::parse_number(text, ...))
   }
 }
 
