@@ -40,7 +40,8 @@ Imports:
     dtw,
     snakecase,
     textshape,
-    V8
+    V8,
+    forecast
 Suggests:
     testthat,
     twitteR,
@@ -73,4 +74,4 @@ Suggests:
     rgeolocate,
     bayesAB,
     ranger
-RoxygenNote: 6.0.1
+RoxygenNote: 6.1.1
