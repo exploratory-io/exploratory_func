@@ -1,12 +1,5 @@
-#' @export
-do_arima <- function(df, time, value = NULL, periods = 10, ...){
-  time_col <- col_name(substitute(time))
-  value_col <- col_name(substitute(value))
-
-  do_arima_(df, time_col, value_col, periods, ...)
-}
-
 #' Forecast time series data by ARIMA model
+# TODO: write docs
 #' @param df - Data frame
 #' @param time_col - Column that has time data
 #' @param value_col - Column that has value data
@@ -23,13 +16,47 @@ do_arima <- function(df, time, value = NULL, periods = 10, ...){
 #' @param na_fill_value - Value to fill NA when na_fill_type is "value"
 #' @param ... - extra values to be passed to prophet::prophet. listed below.
 #' @export
-do_arima_ <- function(df, time_col, value_col = NULL, periods = 10,
-                     time_unit = "day", include_history = TRUE, test_mode = FALSE,
-                     fun.aggregate = sum, na_fill_type = NULL, na_fill_value = 0, ...){
+do_arima <- function(df, time, ...,
+                     valueColumn = NULL,
+                     time_unit = "day",
+                     periods = 10,
+                     fun.aggregate = sum,
+                     test_mode = FALSE,
+                     d = NA,
+                     D = NA,
+                     max.p = 5,
+                     max.q = 5,
+                     max.P = 2,
+                     max.Q = 2,
+                     max.order = 5,
+                     max.d = 2,
+                     max.D = 1,
+                     start.p = 2,
+                     start.q = 2,
+                     start.P = 1,
+                     start.Q = 1,
+                     stationary = FALSE,
+                     seasonal = TRUE,
+                     ic = "aic",
+                     allowdrift = TRUE,
+                     allowmean = TRUE,
+                     lambda = NULL,
+                     biasadj = FALSE,
+                     test = "kpss",
+                     seasonal.test = "ocsb",
+                     stepwise=FALSE,
+                     parallel = FALSE,
+                     num.cores = 2,
+                     na_fill_type = NULL,
+                     na_fill_value = 0){
   validate_empty_data(df)
 
   loadNamespace("dplyr")
   loadNamespace("forecast")
+
+  time_col <- dplyr::select_var(names(df), !! rlang::enquo(time))
+  value_col <- dplyr::select_var(names(df), !! rlang::enquo(valueColumn))
+  xreg_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
 
   grouped_col <- grouped_by(df)
 
@@ -83,14 +110,11 @@ do_arima_ <- function(df, time_col, value_col = NULL, periods = 10,
     df <- df[!is.na(df[[value_col]]), ]
 
     aggregated_data <- if (!is.null(value_col)){
-      df %>%
-        dplyr::transmute(
-          ds = UQ(rlang::sym(time_col)),
-          value = UQ(rlang::sym(value_col)),
-        ) %>%
+      df %>% select(ds=time_col, value=value_col, xreg_cols) %>%
         dplyr::filter(!is.na(value)) %>% # remove NA so that we do not pass data with NA, NaN, or 0 to arima
         dplyr::group_by(ds) %>%
-        dplyr::summarise(y = fun.aggregate(value))
+        dplyr::summarise_each(fun.aggregate) %>%
+        dplyr::rename(y=value)
     } else {
       data.frame(
         ds = df[[time_col]]
@@ -140,13 +164,48 @@ do_arima_ <- function(df, time_col, value_col = NULL, periods = 10,
       training_data <- aggregated_data
     }
 
-    # TODO: set approciate parameters
+    if(length(xreg_cols) > 0 && test_mode){
+      # xreg in auto.arima must be a character vector or matrix.
+      xreg <- training_data %>% dplyr::select(-ds, -y) %>% as.matrix()
+      # forecast need reggression values (xreg)
+      forecast_xreg <- filled_aggregated_data %>%
+                         dplyr::select(-ds, -y) %>%
+                         tail(periods) %>%
+                         as.matrix()
+    } else {
+      xreg <- NULL
+      forecast_xreg <- NULL
+    }
     m <- forecast::auto.arima(training_data[, "y"],
-                              d=1,
-                              seasonal=FALSE,
-                              stepwise=FALSE)
+                              xreg = xreg,
+                              d = d,
+                              D = D,
+                              max.d = max.d,
+                              max.D = max.D,
+                              max.p = max.p,
+                              max.q = max.q,
+                              max.P = max.P,
+                              max.Q = max.Q,
+                              start.p = start.p,
+                              start.q = start.q,
+                              start.P = start.P,
+                              start.Q = start.Q,
+                              max.order = max.order,
+                              seasonal=seasonal,
+                              stepwise=stepwise,
+                              stationary = FALSE,
+                              ic = ic,
+                              allowdrift = allowdrift,
+                              allowmean = allowmean,
+                              lambda = lambda,
+                              biasadj = biasad,
+                              test = test,
+                              seasonal.test = seasonal.test,
+                              parallel = parallel,
+                              num.cores = num.cores)
 
-    forecast_obj <- forecast::forecast(m, h=periods, level=c(95))
+    forecast_obj <- forecast::forecast(m, xreg=forecast_xreg,
+                                       h=periods, level=c(80))
     forecast_df <- as_tibble(forecast_obj)
     ret <- training_data
 
@@ -154,8 +213,8 @@ do_arima_ <- function(df, time_col, value_col = NULL, periods = 10,
     ret$forecast <- as.numeric(m$fitted) 
     forecast_rows <- tibble(ds=create_ts_seq(ret$ds, max, max, time_unit, start_add=1, to_add=periods),
                             forecast=forecast_df[["Point Forecast"]],
-                            upper=forecast_df[["Hi 95"]],
-                            lower=forecast_df[["Lo 95"]])
+                            upper=forecast_df[["Hi 80"]],
+                            lower=forecast_df[["Lo 80"]])
 
     if (test_mode){
       ret$is_test_data <- FALSE
