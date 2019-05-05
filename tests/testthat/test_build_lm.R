@@ -230,7 +230,6 @@ test_that("prediction with glm family (binomial) and link (probit) with target c
   ret <- model_data %>% broom::tidy(model)
   print(ret)
   print(colnames(ret))
-
   expect_equal(colnames(ret),
                c("term", "estimate", "std.error", "statistic", "p.value",
                "conf.high", "conf.low", "base.level"))
