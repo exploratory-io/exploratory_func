@@ -228,9 +228,13 @@ test_that("prediction with glm family (binomial) and link (probit) with target c
                  "logical.col_base",
                  "Carrier.Name_base", "CARRIER_base"))
   ret <- model_data %>% broom::tidy(model)
-  expect_equal(colnames(ret),
-               c("term", "estimate", "std.error", "statistic", "p.value",
-               "conf.high", "conf.low", "base.level"))
+  expect_colnames <- c("term", "estimate", "std.error", "statistic", "p.value",
+                       "conf.high", "conf.low", "base.level")
+  if(ret %>% dplyr::select(-term,-base.level) %>% is.na(.) %>% any(.)){
+    expect_equal(colnames(ret), c(expect_colnames, "note"))
+  } else {
+    expect_equal(colnames(ret), expect_colnames)
+  }
 
   ret <- model_data %>% broom::augment(model)
   expect_equal(colnames(ret),
