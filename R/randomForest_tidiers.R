@@ -178,6 +178,72 @@ randomForestMulti <- function(data, formula, na.action = na.omit, ...) {
   ret
 }
 
+#' Random Forest wrapper for regression by ranger packages
+#' ranger::ranger don't compute importance by default. So importance_mode args is needed.
+#' @export
+rangerReg <- function(data, formula, na.action = na.omit, importance_mode = "permutation", ...) {
+  target_col <- all.vars(formula)[[1]]
+
+  if(!is.numeric(data[[target_col]])){
+    stop("Target must be numeric column")
+  }
+
+  original_colnames <- colnames(data)
+
+  target_col_index <- which(colnames(data) == target_col)
+
+  # ranger must take clean names
+  data <- janitor::clean_names(data)
+  updated_colnames <- colnames(data)
+  names(updated_colnames) <- original_colnames
+
+  # get target col as clean name
+  target_col <- colnames(data)[target_col_index]
+
+  if("." %in% all.vars(lazyeval::f_rhs(formula))){
+    # somehow, mixing numeric and categorical predictors causes an error in randomForest
+    # so use only numeric or logical columns
+    cols <- quantifiable_cols(data)
+    vars <- cols[!cols %in% target_col]
+    newvars <- vars
+    formula <- as.formula(paste0(target_col, " ~ ", paste0(vars, collapse = " + ")))
+  } else {
+    vars <- all.vars(formula)
+    newvars <- updated_colnames[vars]
+    formula <- as.formula(paste0(newvars[[1]], " ~ ", paste0(newvars[-1], collapse = " + ")))
+  }
+
+  # ranger::ranger can't build model when there are NA values in data
+  names(newvars) <- NULL
+  is_na_atrow <- data %>% dplyr::select(newvars) %>% is.na() %>% apply(1, any)
+  na_atrow <- seq_len(nrow(data))[is_na_atrow]
+  data <- data %>% dplyr::select(newvars) %>% na.action()
+
+  ret <- tryCatch({
+    ranger::ranger(formula = formula, data = data,
+                   importance = importance_mode,
+                   keep.inbag = TRUE, ...)
+  }, error = function(e){
+    if (e$message == "NA/NaN/Inf in foreign function call (arg 1)"){
+      # TODO: Should find the root cause of this error because indicating
+      # numerical and categorical predictors doesn't always cause this error
+      stop("Categorical and numerical predictors can't be used at the same time.")
+    }
+    stop(e)
+  })
+
+  # this attribute will be used to get back original column names
+  terms_mapping <- original_colnames
+  names(terms_mapping) <- updated_colnames
+  ret$terms_mapping <- terms_mapping
+
+  # ranger::ranger has no "na.action" attributes
+  ret[["na.action"]] <- na_atrow
+
+  ret
+}
+
+
 # these are from https://github.com/mdlincoln/broom/blob/e3cdf5f3363ab9514e5b61a56c6277cb0d9899fd/R/rf_tidiers.R
 #' tidy for randomForest model
 #' @export
@@ -639,6 +705,82 @@ augment.randomForest.unsupervised <- function(x, data, ...) {
 #' augment for randomForest model
 #' @export
 augment.randomForest <- augment.randomForest.formula
+
+#' augment for randomForest(ranger) model
+#' @export
+augment.ranger <- function(x, data = NULL, ...) {
+  # Extract data from model
+  # This is from https://github.com/mdlincoln/broom/blob/e3cdf5f3363ab9514e5b61a56c6277cb0d9899fd/R/rf_tidiers.R
+  if (is.null(data)) {
+    if (is.null(x$call$data)) {
+      list <- lapply(all.vars(x$call), as.name)
+      data <- eval(as.call(list(quote(data.frame),list)), parent.frame())
+    } else {
+      data <- eval(x$call$data, parent.frame())
+    }
+  }
+
+  augment.ranger.method <- switch(x[["treetype"]],
+                                        "Classification" = augment.ranger.classification,
+                                        "Regression" = augment.ranger.regression,
+                                        "Unsupervised" = augment.ranger.unsupervised)
+  augment.ranger.method(x, data, ...)
+
+}
+
+augment.ranger.classification <- function(x, data = NULL, ...){
+}
+
+augment.ranger.regression <- function(x, data = NULL, newdata = NULL, ...){
+  predicted_value_col <- avoid_conflict(colnames(newdata), "predicted_value")
+
+  if(!is.null(newdata)) {
+    # create clean name data frame because the model learned by those names
+    cleaned_data <- janitor::clean_names(newdata)
+
+    predicted_val <- predict(x, cleaned_data)
+    newdata[[predicted_value_col]] <- predicted_val
+
+    newdata
+  } else if (!is.null(data)) {
+    predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
+    oob_col <- avoid_conflict(colnames(data), "out_of_bag_times")
+
+    # These are from https://github.com/mdlincoln/broom/blob/e3cdf5f3363ab9514e5b61a56c6277cb0d9899fd/R/rf_tidiers.R
+    # TODO: This seems to be taking care of NA cases. Should review this part later.
+    n_data <- nrow(data)
+    na_at <- seq_len(n_data) %in% as.integer(x[["na.action"]])
+
+    oob_times <- rep(NA_integer_, times = n_data)
+    #oob_times[!na_at] <- x[["oob.times"]]
+
+    predicted <- rep(NA_real_, times = n_data)
+    browser()
+    predicted[!na_at] <- x[["predictions"]]
+
+    local_imp <- x[["localImportance"]]
+    full_imp <- NULL
+
+    if (!is.null(local_imp)) {
+      full_imp <- matrix(data = NA_real_, nrow = nrow(local_imp), ncol = n_data)
+      full_imp[, which(!na_at)] <- local_imp
+      rownames(full_imp) <- rownames(local_imp)
+      full_imp <- as.data.frame(t(full_imp))
+      names(full_imp) <- avoid_conflict(colnames(data),paste("local_importance", names(full_imp), sep = "_"))
+    } else {
+      warning("casewise importance measures are not available. Run randomForest(..., localImp = TRUE) for more detailed results.")
+    }
+
+    data <- dplyr::bind_cols(data, full_imp)
+    data[[oob_col]] <- oob_times
+    data[[predicted_value_col]] <- predicted
+    data
+  }
+}
+
+augment.ranger.unsupervised <- function(x, data = NULL, ...){
+  #TODO
+}
 
 rename_groups <- function(n) {
   ifelse(grepl("^\\d", n), paste0("group_", n), n)
