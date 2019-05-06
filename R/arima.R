@@ -48,14 +48,20 @@ do_arima <- function(df, time, ...,
                      parallel = FALSE,
                      num.cores = 2,
                      na_fill_type = NULL,
-                     na_fill_value = 0){
+                     na_fill_value = 0,
+                     trace = TRUE){
   validate_empty_data(df)
 
   loadNamespace("dplyr")
   loadNamespace("forecast")
 
   time_col <- dplyr::select_var(names(df), !! rlang::enquo(time))
-  value_col <- dplyr::select_var(names(df), !! rlang::enquo(valueColumn))
+
+  # if valueColumns is not set (value is NULL by default)
+  # dplyr::select_var occurs Error
+  value_col <- if(!missing(valueColumn)){
+    dplyr::select_var(names(df), !! rlang::enquo(valueColumn))
+  }
   xreg_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
 
   grouped_col <- grouped_by(df)
@@ -106,21 +112,23 @@ do_arima <- function(df, time, ...,
       df <- df[, !colnames(df) %in% grouped_col]
     }
 
-    # remove rows with NA value_col
-    df <- df[!is.na(df[[value_col]]), ]
-
     aggregated_data <- if (!is.null(value_col)){
-      df %>% select(ds=time_col, value=value_col, xreg_cols) %>%
+      # remove rows with NA value_col
+      df <- df[!is.na(df[[value_col]]), ]
+
+      df %>% dplyr::select(ds=time_col, value=value_col, xreg_cols) %>%
+        dplyr::arrange(ds) %>%
         dplyr::filter(!is.na(value)) %>% # remove NA so that we do not pass data with NA, NaN, or 0 to arima
         dplyr::group_by(ds) %>%
         dplyr::summarise_each(fun.aggregate) %>%
         dplyr::rename(y=value)
     } else {
-      data.frame(
-        ds = df[[time_col]]
-      ) %>%
-        dplyr::group_by(ds) %>%
-        dplyr::summarise(y = n())
+      grouped_df <- df %>% dplyr::select(ds=time_col, xreg_cols) %>% dplyr::arrange(ds) %>% dplyr::group_by(ds)
+
+      # TODO: implement the method that summarize count and summarize_each are executed at the same time
+      count_df <- grouped_df %>% dplyr::summarise(y = n())
+      aggr_df <- grouped_df %>% dplyr::summarise_each(fun.aggregate)
+      count_df %>% dplyr::full_join(aggr_df, by=c("ds"="ds"))
     }
 
     if (!is.null(na_fill_type)) {
@@ -176,75 +184,162 @@ do_arima <- function(df, time, ...,
       xreg <- NULL
       forecast_xreg <- NULL
     }
-    m <- forecast::auto.arima(training_data[, "y"],
-                              xreg = xreg,
-                              d = d,
-                              D = D,
-                              max.d = max.d,
-                              max.D = max.D,
-                              max.p = max.p,
-                              max.q = max.q,
-                              max.P = max.P,
-                              max.Q = max.Q,
-                              start.p = start.p,
-                              start.q = start.q,
-                              start.P = start.P,
-                              start.Q = start.Q,
-                              max.order = max.order,
-                              seasonal=seasonal,
-                              stepwise=stepwise,
-                              stationary = FALSE,
-                              ic = ic,
-                              allowdrift = allowdrift,
-                              allowmean = allowmean,
-                              lambda = lambda,
-                              biasadj = biasad,
-                              test = test,
-                              seasonal.test = seasonal.test,
-                              parallel = parallel,
-                              num.cores = num.cores)
 
-    forecast_obj <- forecast::forecast(m, xreg=forecast_xreg,
+    # auto.arima has no trace objects, just output to stdout/stderr
+    # So, if trace value is needed, the output must be captured.
+    ret <- NULL
+    trace_output <- capture.output({
+      ret <- training_data %>% tidyr::nest() %>%
+               dplyr::mutate(model = purrr::map(data, function(df) {
+                 forecast::auto.arima(training_data[, "y"],
+                                      xreg = xreg,
+                                      d = d,
+                                      D = D,
+                                      max.d = max.d,
+                                      max.D = max.D,
+                                      max.p = max.p,
+                                      max.q = max.q,
+                                      max.P = max.P,
+                                      max.Q = max.Q,
+                                      start.p = start.p,
+                                      start.q = start.q,
+                                      start.P = start.P,
+                                      start.Q = start.Q,
+                                      max.order = max.order,
+                                      seasonal=seasonal,
+                                      stepwise=stepwise,
+                                      stationary = FALSE,
+                                      ic = ic,
+                                      allowdrift = allowdrift,
+                                      allowmean = allowmean,
+                                      lambda = lambda,
+                                      biasadj = biasad,
+                                      test = test,
+                                      seasonal.test = seasonal.test,
+                                      parallel = parallel,
+                                      num.cores = num.cores,
+                                      trace = trace)
+               }))
+    })
+    conn <- textConnection(trace_output)
+    model_traces <- read.table(conn, sep=":")
+    close(conn)
+
+    # Add model traces
+    ret <- ret %>% dplyr::mutate(model_traces = purrr::map(data, function(df){
+      model_traces
+    }))
+
+    # Forecast
+    forecast_obj <- forecast::forecast(ret$model[[1]],
+                                       xreg=forecast_xreg,
                                        h=periods, level=c(80))
+
     forecast_df <- as_tibble(forecast_obj)
-    ret <- training_data
 
     # Extract fitted values for training data.
-    ret$forecast <- as.numeric(m$fitted) 
-    forecast_rows <- tibble(ds=create_ts_seq(ret$ds, max, max, time_unit, start_add=1, to_add=periods),
-                            forecast=forecast_df[["Point Forecast"]],
-                            upper=forecast_df[["Hi 80"]],
-                            lower=forecast_df[["Lo 80"]])
+    ret <- ret %>% dplyr::mutate(data = purrr::map2(data, model, function(df, m){
+      # m$fitted is ts class and column name is "x"
+      # So in order to extract ts values, use m$fitted[, "x"]
+      fitted_values = if(is.null(dim(m$fitted))){
+        # when auto.arima with xreg, m$fitted has no dim.
+        m$fitted
+      } else {
+        m$fitted[, "x"]
+      }
+
+      df %>% dplyr::mutate(forecasted_value=fitted_values)
+    }))
+
+    forecast_rows <- tibble(ds=create_ts_seq(ret$data[[1]]$ds, max, max, time_unit, start_add=1, to_add=periods),
+                            forecasted_value=forecast_df[["Point Forecast"]],
+                            forecasted_value_high=forecast_df[["Hi 80"]],
+                            forecasted_value_low=forecast_df[["Lo 80"]])
 
     if (test_mode){
-      ret$is_test_data <- FALSE
+      ret <- ret %>% dplyr::mutate(data = purrr::map(data, function(df){
+        df$is_test_data <- FALSE
+        df
+      }))
       forecast_rows$y <- tail(filled_aggregated_data, periods)[["y"]]
       forecast_rows$is_test_data <- TRUE 
     }
 
-    ret <- ret %>% dplyr::bind_rows(forecast_rows)
-
-    # revive original column names (time_col, value_col)
-    if (time_col != "ds") { # if time_col happens to be "ds", do not do this, since it will make the column name "ds.new".
-      time_col <- avoid_conflict(colnames(ret), time_col)
-      colnames(ret)[colnames(ret) == "ds"] <- time_col 
-    }
     if (is.null(value_col)) {
       value_col <- "count"
     }
-    if (value_col != "y") { # if value_col happens to be "y", do not do this, since it will make the column name "y.new".
-      value_col <- avoid_conflict(colnames(ret), value_col) 
-      colnames(ret)[colnames(ret) == "y"] <- value_col 
-    }
 
-    # adjust column name style
-    colnames(ret)[colnames(ret) == "forecast"] <- avoid_conflict(colnames(ret), "forecasted_value")
-    colnames(ret)[colnames(ret) == "upper"] <- avoid_conflict(colnames(ret), "forecasted_value_high")
-    colnames(ret)[colnames(ret) == "lower"] <- avoid_conflict(colnames(ret), "forecasted_value_low")
+    # Bind Training Data + Forecast Data
+    # Revive Original column names(time_col, value_col)
+    ret <- ret %>% dplyr::mutate(data = purrr::map(data, function(df){
+      df <- df %>% dplyr::bind_rows(forecast_rows)
+      if (time_col != "ds") { # if time_col happens to be "ds", do not do this, since it will make the column name "ds.new"
+        time_col <- avoid_conflict(colnames(df), time_col)
+        colnames(df)[colnames(df) == "ds"] <- time_col
+      }
+      if (value_col != "y") { # if value_col happens to be "y", do not do this, since it will make the column name "y.new".
+       value_col <- avoid_conflict(colnames(df), value_col)
+       colnames(df)[colnames(df) == "y"] <- value_col
+      }
+
+      df
+    }))
 
     if (test_mode) {
-      ret <- ret %>% dplyr::select(-is_test_data, is_test_data)
+      ret <- ret %>% dplyr::mutate(data=purrr::map(data, function(df) {
+        df %>% dplyr::select(-is_test_data, is_test_data)
+      }))
     }
+
+    ret <- ret %>% dplyr::mutate(model_meta = purrr::map(model, function(m){
+      # TODO: imple broom::glance
+      ar_terms <- m$coef %>% names() %>% .[stringr::str_detect(., "^s?ar[0-9]*")]
+      ma_terms <- m$coef %>% names() %>% .[stringr::str_detect(., "^s?ma[0-9]*")]
+
+      repeatability <- function(m, term_names){
+        abs(polyroot(c(1, coef(m)[term_names])))
+      }
+
+      stationarity <- function(m, term_names){
+        abs(polyroot(c(1, -coef(m)[term_names])))
+      }
+
+      ar_stationarity <- setNames(stationarity(m, ar_terms), as.list(ar_terms))
+      ma_repeatability <- setNames(repeatability(m, ma_terms), as.list(ma_terms))
+
+      df <- data.frame(AIC=m$aic, BIC=m$bic, AICC=m$aicc, as.list(forecast::arimaorder(m)), forecast::accuracy(m))
+
+      if(length(ar_stationarity) > 0){
+        ar_stationarity_df <- as.data.frame(as.list(ar_stationarity)) %>%
+                                dplyr::rename_all(funs(stringr::str_c(., "_stationarity")))
+        df <- merge(df, ar_stationarity_df)
+      }
+
+      if(length(ma_repeatability) > 0){
+        ma_stationarity_df <- as.data.frame(as.list(ma_repeatability)) %>%
+                                 dplyr::rename_all(funs(stringr::str_c(., "_repeatability")))
+        df <- merge(df, ma_stationarity_df)
+      }
+
+      df
+
+    })) %>% dplyr::mutate(test_results = purrr::map(model, function(m) {
+       result <- forecast::checkresiduals(m, plot=FALSE)
+       data.frame(method = result$method, data.name = result$data.name,
+                     `Q*` = result$statistic,
+                     p.value = result$p.value, df = result$parameter)
+    })) %>% dplyr::mutate(residuals = purrr::map(model, function(m) {
+       as.data.frame(residuals(m)) %>%
+         dplyr::mutate(time = row_number()) %>%
+         dplyr::select(time, residuals=x)
+    })) %>% dplyr::mutate(acf = purrr::map(model, function(m) {
+       acf_res <- acf(m$x, plot=FALSE)
+
+       data.frame(lag = acf_res$lag, acf = acf_res$acf)
+    })) %>% dplyr::mutate(kpss_test = purrr::map(data, function(df) {
+       kpss_result <- urca::ur.kpss(df[[value_col]])
+       data.frame(kpss_result@cval, teststat = kpss_result@teststat)
+    }))
 
     ret
   }
@@ -264,6 +359,7 @@ do_arima <- function(df, time, ...,
   if (length(grouped_col) > 0) {
     ret <- ret %>% dplyr::group_by(!!!rlang::syms(grouped_col))
   }
+
   ret
 }
 
