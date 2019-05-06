@@ -310,4 +310,3 @@ test_that("parse_logical", {
   ret <- exploratory::parse_logical(c(TRUE, FALSE))
   expect_equal(ret, c(TRUE, FALSE))
 })
-
