@@ -738,7 +738,7 @@ augment.ranger.regression <- function(x, data = NULL, newdata = NULL, ...){
     # create clean name data frame because the model learned by those names
     cleaned_data <- janitor::clean_names(newdata)
 
-    predicted_val <- predict(x, cleaned_data)
+    predicted_val <- predict(x, cleaned_data)$predictions
     newdata[[predicted_value_col]] <- predicted_val
 
     newdata
@@ -752,10 +752,12 @@ augment.ranger.regression <- function(x, data = NULL, newdata = NULL, ...){
     na_at <- seq_len(n_data) %in% as.integer(x[["na.action"]])
 
     oob_times <- rep(NA_integer_, times = n_data)
-    #oob_times[!na_at] <- x[["oob.times"]]
+
+    # ranger object has inbags.count when keep.inbags is TRUE
+    # oob.times means not "inbags". So oob.times is computed from inbag.counts
+    oob_times[!na_at] <- rowSums(do.call(cbind, x$inbag.counts) == 0)
 
     predicted <- rep(NA_real_, times = n_data)
-    browser()
     predicted[!na_at] <- x[["predictions"]]
 
     local_imp <- x[["localImportance"]]

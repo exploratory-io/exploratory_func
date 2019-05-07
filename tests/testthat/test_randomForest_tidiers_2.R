@@ -14,10 +14,10 @@ test_that("test ranger with regression", {
                            model_func = rangerReg,
                            formula = IS_AA ~ DISTANCE,
                            test_rate = 0.3)
-  #coef_ret <- model_coef(model_ret, pretty.name = TRUE)
-  #stats_ret <- model_stats(model_ret)
-  #pred_train_ret <- prediction(model_ret, data = "training")
-  #pred_test_ret <- prediction(model_ret, data = "test")
-  #pred_test_ret <- prediction(model_ret, data = "newdata", data_frame = test_data)
+  coef_ret <- model_coef(model_ret, pretty.name = TRUE)
+  stats_ret <- model_stats(model_ret)
+  pred_train_ret <- prediction(model_ret, data = "training")
+  pred_test_ret <- prediction(model_ret, data = "test")
+  pred_test_ret <- prediction(model_ret, data = "newdata", data_frame = test_data)
 })
 
