@@ -21,3 +21,24 @@ test_that("test ranger with regression", {
   pred_test_ret <- prediction(model_ret, data = "newdata", data_frame = test_data)
 })
 
+test_that("test randomForest with binary classification", {
+  test_data <- structure(
+    list(
+      CANCELLED = c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0),
+      `Carrier Name` = c("Delta Air Lines", "American Eagle", "American Airlines", "Southwest Airlines", "SkyWest Airlines", "Southwest Airlines", "Southwest Airlines", "Delta Air Lines", "Southwest Airlines", "Atlantic Southeast Airlines", "American Airlines", "Southwest Airlines", "US Airways", "US Airways", "Delta Air Lines", "Atlantic Southeast Airlines", NA, "Atlantic Southeast Airlines", "Delta Air Lines", "Delta Air Lines"),
+      CARRIER = c("DL", "MQ", "AA", "DL", "MQ", "AA", "DL", "DL", "MQ", "AA", "AA", "WN", "US", "US", "DL", "EV", "9E", "EV", "DL", NA), # test NA handling
+      DISTANCE = c(1587, 173, 646, 187, 273, 1062, 583, 240, 1123, 851, 852, 862, 361, 507, 1020, 1092, 342, 489, 1184, 545)), row.names = c(NA, -20L),
+    class = c("tbl_df", "tbl", "data.frame"), .Names = c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE"))
+
+  test_data[["IS AA"]] <- test_data$CARRIER == "AA" # test target column name with space
+  model_ret <- build_model(test_data,
+                           model_func = rangerBinary,
+                           formula = `IS AA` ~ DISTANCE,
+                           test_rate = 0.3)
+  #coef_ret <- model_coef(model_ret)
+  #model_stats <- model_stats(model_ret, pretty.name = TRUE)
+  #pred_train_ret <- prediction_binary(model_ret, data = "training", threshold = "f_score") # test f_score which had issue with target column name with space once.
+  #pred_test_ret <- prediction_binary(model_ret, data = "test")
+  #pred_test_ret <- prediction_binary(model_ret, data = "newdata", data_frame = test_data)
+})
+

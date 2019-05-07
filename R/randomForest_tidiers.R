@@ -243,6 +243,85 @@ rangerReg <- function(data, formula, na.action = na.omit, importance_mode = "per
   ret
 }
 
+#' Random Forest wrapper for classification
+#' This is needed because boolean target starts regression task,
+#' not classification task
+#' Differences from randomForest::randomForest
+#' * When . is used in right hand side of formula,
+#'   only numeric/logical columns are used as predictors.
+#' * terms_mapping attribute is added to model
+#'   for keeping mapping of original column names and cleaned-up column names.
+#' @export
+rangerBinary <- function(data, formula, na.action = na.omit, importance_mode = "permutation", ...) {
+  target_col <- all.vars(formula)[[1]]
+  original_val <- data[[target_col]]
+  original_colnames <- colnames(data)
+
+  target_col_index <- which(colnames(data) == target_col)
+
+  # randomForest must take clean names
+  data <- janitor::clean_names(data)
+  updated_colnames <- colnames(data)
+  # this will be used to get original colmn names later
+  names(updated_colnames) <- original_colnames
+  # get target col as clean name
+  target_col <- colnames(data)[target_col_index]
+
+  data[[target_col]] <- as.factor(data[[target_col]])
+
+  if(!is.logical(original_val) &&
+     length(levels(data[[target_col]] )) != 2){
+    stop("There should be 2 unique values for binary classification.")
+  }
+
+  if("." %in% all.vars(lazyeval::f_rhs(formula))){
+    # somehow, mixing numeric and categorical predictors causes an error in randomForest
+    # so use only numeric or logical columns
+    cols <- quantifiable_cols(data)
+    vars <- cols[!cols %in% target_col]
+    newvars <- vars
+    formula <- as.formula(paste0(target_col, " ~ ", paste0(vars, collapse = " + ")))
+  } else {
+    vars <- all.vars(formula)
+    newvars <- updated_colnames[vars]
+    formula <- as.formula(paste0(newvars[[1]], " ~ ", paste0(newvars[-1], collapse = " + ")))
+  }
+
+  # ranger::ranger can't build model when there are NA values in data
+  names(newvars) <- NULL
+  is_na_atrow <- data %>% dplyr::select(newvars) %>% is.na() %>% apply(1, any)
+  na_atrow <- seq_len(nrow(data))[is_na_atrow]
+  data <- data %>% dplyr::select(newvars) %>% na.action()
+
+  ret <- tryCatch({
+    ranger::ranger(formula = formula, data = data,
+                   importance = importance_mode,
+                   keep.inbag = TRUE, ...)
+  }, error = function(e){
+    if (e$message == "NA/NaN/Inf in foreign function call (arg 1)"){
+      stop("Categorical and numerical predictors can't be used at the same time.")
+    }
+    stop(e)
+  })
+
+  # this attribute will be used to get back original column names
+  terms_mapping <- original_colnames
+  names(terms_mapping) <- updated_colnames
+  ret$terms_mapping <- terms_mapping
+  ret$classification_type = "binary"
+
+  # ranger::ranger has no "na.action" attributes
+  ret[["na.action"]] <- na_atrow
+
+  # use augment.ranger.classification. ranger object already have an attribute named temrs, which has just only column names
+  ret$formula_terms <- terms(formula)
+
+  # compute votes
+  # https://github.com/imbs-hl/ranger/issues/18
+  pred <- predict(ret, data, predict.all = TRUE)
+
+  ret
+}
 
 # these are from https://github.com/mdlincoln/broom/blob/e3cdf5f3363ab9514e5b61a56c6277cb0d9899fd/R/rf_tidiers.R
 #' tidy for randomForest model
@@ -728,7 +807,112 @@ augment.ranger <- function(x, data = NULL, ...) {
 
 }
 
-augment.ranger.classification <- function(x, data = NULL, ...){
+#' augment for randomForest model
+#' @export
+augment.ranger.classification <- function(x, data = NULL, newdata = NULL, ...) {
+  y_name <- all.vars(x$formula_terms)[[1]]
+
+  if(!is.null(newdata)){
+    # janitor::clean_names is called in randomForestClassify,
+    # so it should be called here too
+    cleaned_data <- janitor::clean_names(newdata)
+
+    predicted_value_col <- avoid_conflict(colnames(newdata), "predicted_value")
+
+    if(is.null(x$classification_type)){
+      # just append predicted labels
+      predicted_val <- predict(x, cleaned_data)
+      newdata[[predicted_value_col]] <- predicted_val
+      newdata
+    } else if (x$classification_type == "binary") {
+      # append predicted probability of positive
+      predicted_val <- predict(x, cleaned_data, type = "prob")[, 2]
+      newdata[[predicted_value_col]] <- predicted_val
+      newdata
+    } else if (x$classification_type == "multi") {
+      # append predicted probability for each class, max and labels at max values
+      probs <- predict(x, cleaned_data, type = "prob")
+      ret <- get_multi_predicted_values(probs, newdata[[y_name]])
+      newdata <- dplyr::bind_cols(newdata, ret)
+    }
+  } else if (!is.null(data)) {
+    # create clean name data frame because the model learned by those names
+    cleaned_data <- janitor::clean_names(data)
+
+    # When na.omit is used, case-wise model attributes will only be calculated
+    # for complete cases in the original data. All columns returned with
+    # augment() must be expanded to the length of the full data, inserting NA
+    # for all missing values.
+    oob_col <- avoid_conflict(colnames(data), "out_of_bag_times")
+
+    # These are from https://github.com/mdlincoln/broom/blob/e3cdf5f3363ab9514e5b61a56c6277cb0d9899fd/R/rf_tidiers.R
+    # create index of eliminated rows (na_at) by na.action from model.
+    # since prediction output may have fewer rows than original data because of na.action, 
+    # we cannot augment the data just by binding columns.
+    n_data <- nrow(data)
+    if (is.null(x[["na.action"]])) {
+      na_at <- rep(FALSE, times = n_data)
+    } else {
+      na_at <- seq_len(n_data) %in% as.integer(x[["na.action"]])
+    }
+    # ranger object has inbags.count when keep.inbags is TRUE
+    # oob.times means not "inbags". So oob.times is computed from inbag.counts
+    oob_times <- rep(NA_integer_, times = n_data)
+    oob_times[!na_at] <- rowSums(do.call(cbind, x$inbag.counts) == 0)
+
+    predicted <- rep(NA, times = n_data)
+    predicted[!na_at] <- x[["predictions"]]
+
+    predicted <- same_type(x$forest$levels[predicted], cleaned_data[[y_name]])
+
+    votes <- x[["votes"]]
+    full_votes <- matrix(data = NA, nrow = n_data, ncol = ncol(votes))
+    full_votes[which(!na_at),] <- votes
+    colnames(full_votes) <- colnames(votes)
+    full_votes <- as.data.frame(full_votes)
+    names(full_votes) <- avoid_conflict(colnames(data), paste("votes", names(full_votes), sep = "_"))
+
+    local_imp <- x[["localImportance"]]
+    full_imp <- NULL
+
+    if (!is.null(local_imp)) {
+      full_imp <- matrix(data = NA_real_, nrow = nrow(local_imp), ncol = n_data)
+      full_imp[, which(!na_at)] <- local_imp
+      rownames(full_imp) <- rownames(local_imp)
+      full_imp <- as.data.frame(t(full_imp))
+      names(full_imp) <- avoid_conflict(colnames(data),
+                                        paste("local_inportance", names(full_imp), sep = "_"))
+    } else {
+      warning("casewise importance measures are not available. Run randomForest(..., localImp = TRUE) for more detailed results.")
+    }
+
+    data <- dplyr::bind_cols(data, full_votes, full_imp)
+    data[[oob_col]] <- oob_times
+
+    # this appending part is modified
+    predicted_prob <- predict(x, type = "prob")
+    if(is.null(x$classification_type)){
+      # just append predicted label
+      data[[predicted_value_col]] <- predicted
+    } else if(!is.null(x$classification_type) &&
+       x$classification_type == "binary"){
+      # append predicted probability
+      predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
+      predicted_prob <- predicted_prob[, 2]
+      data[[predicted_value_col]][!na_at] <- predicted_prob
+    } else if (x$classification_type == "multi"){
+      # append predicted probability for each class, max and labels at max values
+      ret <- get_multi_predicted_values(predicted_prob, cleaned_data[[y_name]])
+      for (i in 1:length(ret)) { # for each column
+        # this is basically bind_cols with na_at taken into account.
+        data[[colnames(ret)[[i]]]][!na_at] <- ret[[i]]
+      }
+    }
+
+    data
+  } else {
+    stop("data or newdata have to be indicated.")
+  }
 }
 
 augment.ranger.regression <- function(x, data = NULL, newdata = NULL, ...){
