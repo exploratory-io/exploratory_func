@@ -979,10 +979,6 @@ augment.ranger.regression <- function(x, data = NULL, newdata = NULL, ...){
   }
 }
 
-augment.ranger.unsupervised <- function(x, data = NULL, ...){
-  #TODO
-}
-
 rename_groups <- function(n) {
   ifelse(grepl("^\\d", n), paste0("group_", n), n)
 }
