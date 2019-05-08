@@ -66,4 +66,48 @@ test_that("test ranger with binary classification", {
   expect_equal(colnames(pred_test_newdata_ret), expect_colnames)
 })
 
+test_that("test ranger with multinomial classification", {
+  test_data <- structure(
+    list(
+      CANCELLED = c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0),
+      `Carrier Name` = c("Delta Air Lines", "American Eagle", "American Airlines", "Southwest Airlines", "SkyWest Airlines", "Southwest Airlines", "Southwest Airlines", "Delta Air Lines", "Southwest Airlines", "Atlantic Southeast Airlines", "American Airlines", "Southwest Airlines", "US Airways", "US Airways", "Delta Air Lines", "Atlantic Southeast Airlines", NA, "Atlantic Southeast Airlines", "Delta Air Lines", "Delta Air Lines"),
+      CARRIER = c("DL", "MQ", "AA", "DL", "MQ", "AA", "DL", "DL", "MQ", "AA", "AA", "WN", "US", "US", "DL", "EV", "9E", "EV", "DL", NA), # test NA handling
+      DISTANCE = c(1587, 173, 646, 187, 273, 1062, 583, 240, 1123, 851, 852, 862, 361, 507, 1020, 1092, 342, 489, 1184, 545)), row.names = c(NA, -20L),
+    class = c("tbl_df", "tbl", "data.frame"), .Names = c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE"))
+
+  test_data[["IS_AA"]] <- as.factor(test_data$CARRIER == "AA")
+  model_ret <- build_model(test_data,
+                           model_func = rangerMulti,
+                           formula = CARRIER ~ DISTANCE,
+                           test_rate = 0.3)
+  coef_ret <- model_coef(model_ret)
+  expect_equal(colnames(coef_ret), c("variable", "importance"))
+  model_stats <- model_stats(model_ret, pretty.name = TRUE)
+  expect_colnames <- c("DL F Score","DL Precision","DL Misclassification Rate",
+                       "DL Recall","DL Accuracy","AA F Score","AA Precision",
+                       "AA Misclassification Rate","AA Recall","AA Accuracy",
+                       "MQ F Score","MQ Precision","MQ Misclassification Rate",
+                       "MQ Recall","MQ Accuracy","EV F Score","EV Precision",
+                       "EV Misclassification Rate","EV Recall","EV Accuracy",
+                       "US F Score","US Precision","US Misclassification Rate",
+                       "US Recall","US Accuracy","9E F Score","9E Precision",
+                       "9E Misclassification Rate","9E Recall","9E Accuracy",
+                       "WN F Score","WN Precision","WN Misclassification Rate",
+                       "WN Recall","WN Accuracy")
+  expect_equal(colnames(model_stats), expect_colnames)
+
+  expected_colnames <- c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE",
+                         "IS_AA", "predicted_probability_DL", "predicted_probability_AA",
+                         "predicted_probability_MQ", "predicted_probability_EV", "predicted_probability_US",
+                         "predicted_probability_9E", "predicted_probability_WN", "predicted_probability", "predicted_label")
+
+  pred_train_ret <- prediction(model_ret, data = "training")
+  expect_equal(colnames(pred_train_ret), expected_colnames)
+
+  pred_test_ret <- prediction(model_ret, data = "test")
+  expect_equal(colnames(pred_test_ret), expected_colnames)
+
+  pred_test_newdata_ret <- prediction(model_ret, data = "newdata", data_frame = test_data)
+  expect_equal(colnames(pred_test_newdata_ret), expected_colnames)
+})
 

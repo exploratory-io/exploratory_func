@@ -242,14 +242,7 @@ rangerReg <- function(data, formula, na.action = na.omit, importance_mode = "per
   ret
 }
 
-#' Random Forest wrapper for classification
-#' This is needed because boolean target starts regression task,
-#' not classification task
-#' Differences from randomForest::randomForest
-#' * When . is used in right hand side of formula,
-#'   only numeric/logical columns are used as predictors.
-#' * terms_mapping attribute is added to model
-#'   for keeping mapping of original column names and cleaned-up column names.
+#' Random Forest wrapper for classification by ranger package
 #' @export
 rangerBinary <- function(data, formula, na.action = na.omit, importance_mode = "permutation", ...) {
   target_col <- all.vars(formula)[[1]]
@@ -310,6 +303,83 @@ rangerBinary <- function(data, formula, na.action = na.omit, importance_mode = "
   names(terms_mapping) <- updated_colnames
   ret$terms_mapping <- terms_mapping
   ret$classification_type = "binary"
+
+  # ranger::ranger has no "na.action" attributes
+  ret[["na.action"]] <- na_atrow
+
+  # use augment.ranger.classification. ranger object already have an attribute named temrs, which has just only column names
+  ret$formula_terms <- terms(formula)
+
+  # store actual values of target column
+  ret$y <- data %>% dplyr::pull(newvars[[1]])
+
+  ret
+}
+
+#' Random Forest wrapper for classification by ranger package
+#' This is needed because boolean target starts regression task,
+#' not classification task
+#' @export
+rangerMulti <- function(data, formula, na.action = na.omit, importance_mode = "permutation", ...) {
+  target_col <- all.vars(formula)[[1]]
+  original_val <- data[[target_col]]
+  original_colnames <- colnames(data)
+
+  target_col_index <- which(colnames(data) == target_col)
+
+  # randomForest must take clean names
+  data <- janitor::clean_names(data)
+  updated_colnames <- colnames(data)
+  names(updated_colnames) <- original_colnames
+
+  # get target col as clean name
+  target_col <- colnames(data)[target_col_index]
+
+  data[[target_col]] <- as.factor(data[[target_col]])
+
+  if("." %in% all.vars(lazyeval::f_rhs(formula))){
+    # somehow, mixing numeric and categorical predictors causes an error in randomForest
+    # so use only numeric or logical columns
+    cols <- quantifiable_cols(data)
+    vars <- cols[!cols %in% target_col]
+    newvars <- vars
+    formula <- as.formula(paste0(target_col, " ~ ", paste0(vars, collapse = " + ")))
+  } else {
+    vars <- all.vars(formula)
+    newvars <- updated_colnames[vars]
+    formula <- as.formula(paste0(newvars[[1]], " ~ ", paste0(newvars[-1], collapse = " + ")))
+  }
+
+  # ranger::ranger can't build model when there are NA values in data
+  names(newvars) <- NULL
+  is_na_atrow <- data %>% dplyr::select(newvars) %>% is.na() %>% apply(1, any)
+  na_atrow <- seq_len(nrow(data))[is_na_atrow]
+  data <- data %>% dplyr::select(newvars) %>% na.action()
+
+  ret <- tryCatch({
+    ranger::ranger(formula = formula,
+                   data = data,
+                   importance = importance_mode,
+                   probability = TRUE,
+                   keep.inbag = TRUE, ...)
+  }, error = function(e){
+    if (e$message == "NA/NaN/Inf in foreign function call (arg 1)"){
+      stop("Categorical and numerical predictors can't be used at the same time.")
+    }
+    stop(e)
+  })
+
+  if(is.logical(original_val) ||
+     length(levels(data[[target_col]] )) == 2){
+    ret$classification_type = "binary"
+  } else {
+    ret$classification_type = "multi"
+  }
+
+  # this attribute will be used to get back original column names
+  terms_mapping <- original_colnames
+  names(terms_mapping) <- updated_colnames
+  ret$terms_mapping <- terms_mapping
 
   # ranger::ranger has no "na.action" attributes
   ret[["na.action"]] <- na_atrow
@@ -831,7 +901,7 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, ...) {
     } else if (x$classification_type == "multi") {
       # append predicted probability for each class, max and labels at max values
       probs <- predict(x, cleaned_data, type = "se")
-      ret <- get_multi_predicted_values(probs, newdata[[y_name]])
+      ret <- get_multi_predicted_values(probs$predictions, newdata[[y_name]])
       newdata <- dplyr::bind_cols(newdata, ret)
     }
   } else if (!is.null(data)) {
@@ -869,7 +939,7 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, ...) {
       data[[predicted_value_col]][!na_at] <- predicted_prob
     } else if (x$classification_type == "multi"){
       # append predicted probability for each class, max and labels at max values
-      ret <- get_multi_predicted_values(predicted_prob, cleaned_data[[y_name]])
+      ret <- get_multi_predicted_values(predicted_prob$predictions, cleaned_data[[y_name]])
       for (i in 1:length(ret)) { # for each column
         # this is basically bind_cols with na_at taken into account.
         data[[colnames(ret)[[i]]]][!na_at] <- ret[[i]]

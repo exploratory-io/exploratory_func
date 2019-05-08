@@ -496,7 +496,7 @@ prediction_binary <- function(df, threshold = 0.5, ...){
   }
 
   # if there is terms_mapping for randomForest or ranger, use the original column name
-  if (class(first_model) %in% c("randomForest", "ranger")) {
+  if ("randomForest" %in% class(first_model) || "ranger" %in% class(first_model)) {
     if (!is.na(first_model$terms_mapping) && !is.na(first_model$terms_mapping[[actual_col]])) {
       actual_col <- first_model$terms_mapping[[actual_col]]
     }
