@@ -15,13 +15,22 @@ test_that("test ranger with regression", {
                            formula = IS_AA ~ DISTANCE,
                            test_rate = 0.3)
   coef_ret <- model_coef(model_ret, pretty.name = TRUE)
+  expect_equal(colnames(coef_ret), c("variable", "importance"))
   stats_ret <- model_stats(model_ret)
+  expect_equal(colnames(stats_ret), c("root_mean_square_error", "r_squared"))
+  expected_colnames <- c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE",
+                         "IS_AA", "predicted_value")
   pred_train_ret <- prediction(model_ret, data = "training")
+  expect_equal(colnames(pred_train_ret), expected_colnames)
+
   pred_test_ret <- prediction(model_ret, data = "test")
-  pred_test_ret <- prediction(model_ret, data = "newdata", data_frame = test_data)
+  expect_equal(colnames(pred_test_ret), expected_colnames)
+
+  pred_test_newdata_ret <- prediction(model_ret, data = "newdata", data_frame = test_data)
+  expect_equal(colnames(pred_test_newdata_ret), expected_colnames)
 })
 
-test_that("test randomForest with binary classification", {
+test_that("test ranger with binary classification", {
   test_data <- structure(
     list(
       CANCELLED = c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0),
@@ -35,10 +44,26 @@ test_that("test randomForest with binary classification", {
                            model_func = rangerBinary,
                            formula = `IS AA` ~ DISTANCE,
                            test_rate = 0.3)
-  #coef_ret <- model_coef(model_ret)
-  #model_stats <- model_stats(model_ret, pretty.name = TRUE)
-  #pred_train_ret <- prediction_binary(model_ret, data = "training", threshold = "f_score") # test f_score which had issue with target column name with space once.
-  #pred_test_ret <- prediction_binary(model_ret, data = "test")
-  #pred_test_ret <- prediction_binary(model_ret, data = "newdata", data_frame = test_data)
+  coef_ret <- model_coef(model_ret)
+  expect_equal(colnames(coef_ret), c("variable", "importance"))
+
+  model_stats <- model_stats(model_ret, pretty.name = TRUE)
+  expect_colnames <- c("FALSE F Score", "FALSE Precision", "FALSE Misclassification Rate",
+                       "FALSE Recall", "FALSE Accuracy",
+                       "TRUE F Score", "TRUE Precision", "TRUE Misclassification Rate",
+                       "TRUE Recall", "TRUE Accuracy")
+  expect_equal(colnames(model_stats), expect_colnames)
+
+  pred_train_ret <- prediction_binary(model_ret, data = "training", threshold = "f_score") # test f_score which had issue with target column name with space once.
+  expect_colnames <- c("CANCELLED", "Carrier Name", "CARRIER",
+                       "DISTANCE", "IS AA", "predicted_probability", "predicted_label")
+  expect_equal(colnames(pred_train_ret), expect_colnames)
+
+  pred_test_ret <- prediction_binary(model_ret, data = "test")
+  expect_equal(colnames(pred_test_ret), expect_colnames)
+
+  pred_test_newdata_ret <- prediction_binary(model_ret, data = "newdata", data_frame = test_data)
+  expect_equal(colnames(pred_test_newdata_ret), expect_colnames)
 })
+
 
