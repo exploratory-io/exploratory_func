@@ -296,12 +296,17 @@ test_that("parse_character", {
 })
 
 test_that("parse_number", {
+  # Parse characters
+  ret <- exploratory::parse_number(c("1", "2.1"))
+  expect_equal(ret, c(1, 2.1))
+  expect_true(is.vector(ret))
+  # Pass through input that is already numeric.
   ret <- exploratory::parse_number(c(1, 2.1))
   expect_equal(ret, c(1, 2.1))
+  expect_true(is.vector(ret))
 })
 
 test_that("parse_logical", {
   ret <- exploratory::parse_logical(c(TRUE, FALSE))
   expect_equal(ret, c(TRUE, FALSE))
 })
-
