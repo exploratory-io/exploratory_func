@@ -48,10 +48,8 @@ test_that("test ranger with binary classification", {
   expect_equal(colnames(coef_ret), c("variable", "importance"))
 
   model_stats <- model_stats(model_ret, pretty.name = TRUE)
-  expect_colnames <- c("FALSE F Score", "FALSE Precision", "FALSE Misclassification Rate",
-                       "FALSE Recall", "FALSE Accuracy",
-                       "TRUE F Score", "TRUE Precision", "TRUE Misclassification Rate",
-                       "TRUE Recall", "TRUE Accuracy")
+  expect_colnames <- c("F Score", "Precision", "Misclassification Rate",
+                       "Recall", "Accuracy")
   expect_equal(colnames(model_stats), expect_colnames)
 
   pred_train_ret <- prediction_binary(model_ret, data = "training", threshold = "f_score") # test f_score which had issue with target column name with space once.
@@ -83,17 +81,8 @@ test_that("test ranger with multinomial classification", {
   coef_ret <- model_coef(model_ret)
   expect_equal(colnames(coef_ret), c("variable", "importance"))
   model_stats <- model_stats(model_ret, pretty.name = TRUE)
-  expect_colnames <- c("DL F Score","DL Precision","DL Misclassification Rate",
-                       "DL Recall","DL Accuracy","AA F Score","AA Precision",
-                       "AA Misclassification Rate","AA Recall","AA Accuracy",
-                       "MQ F Score","MQ Precision","MQ Misclassification Rate",
-                       "MQ Recall","MQ Accuracy","EV F Score","EV Precision",
-                       "EV Misclassification Rate","EV Recall","EV Accuracy",
-                       "US F Score","US Precision","US Misclassification Rate",
-                       "US Recall","US Accuracy","9E F Score","9E Precision",
-                       "9E Misclassification Rate","9E Recall","9E Accuracy",
-                       "WN F Score","WN Precision","WN Misclassification Rate",
-                       "WN Recall","WN Accuracy")
+  expect_colnames <- c("Label", "F Score", "Precision", "Misclassification Rate",
+                       "Recall", "Accuracy")
   expect_equal(colnames(model_stats), expect_colnames)
 
   expected_colnames <- c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE",

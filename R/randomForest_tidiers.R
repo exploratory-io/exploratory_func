@@ -952,6 +952,7 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, ...) {
   }
 }
 
+#' @export
 augment.ranger.regression <- function(x, data = NULL, newdata = NULL, ...){
   predicted_value_col <- avoid_conflict(colnames(newdata), "predicted_value")
 
@@ -2059,7 +2060,7 @@ glance.ranger <- function(x, pretty.name = FALSE, ...) {
   glance.ranger.method(x, pretty.name = pretty.name, ...)
 }
 
-
+#' @export
 glance.ranger.regression <- function(x, pretty.name, ...) {
   ret <- data.frame(
     root_mean_square_error = sqrt(x$prediction.error),
@@ -2078,11 +2079,14 @@ glance.ranger.regression <- function(x, pretty.name, ...) {
   ret
 }
 
+#' @export
 glance.ranger.classification <- function(x, pretty.name, ...) {
   actual <- x[["y"]]
-  predicted <- x[["predictions"]]
+  predicted <- apply(x[["predictions"]], 1, function(x){ levels(actual)[which.max(x)] })
+  predicted <- as.factor(predicted)
+  levels(predicted) <- levels(actual)
 
-  per_level <- function(class) {
+  multi_stat <- function(class) {
     # calculate evaluation scores for each class
     tp <- sum(actual == class & predicted == class)
     tn <- sum(actual != class & predicted != class)
@@ -2095,22 +2099,49 @@ glance.ranger.classification <- function(x, pretty.name, ...) {
     f_score <- 2 * ((precision * recall) / (precision + recall))
 
     ret <- data.frame(
+      class,
       f_score,
-      accuracy,
-      1- accuracy,
       precision,
-      recall
+      1 - precision,
+      recall,
+      accuracy
     )
 
     names(ret) <- if(pretty.name){
-      paste(class, c("F Score", "Precision", "Misclassification Rate", "Recall", "Accuracy"), sep = " ")
+      c("Label", "F Score", "Precision", "Misclassification Rate", "Recall", "Accuracy")
     } else {
-      paste(class, c("f_score", "precision", "misclassification_rate", "recall", "accuracy"), sep = "_")
+      c("label", "f_score", "precision", "misclassification_rate", "recall", "accuracy")
     }
     ret
   }
 
-  dplyr::bind_cols(lapply(levels(actual), per_level))
+  single_stat <- function(act, pred) {
+    conf_mat <- table(act, pred)
+    tp <- conf_mat[1]
+    tn <- conf_mat[2]
+    fn <- conf_mat[3]
+    fp <- conf_mat[4]
+    precision <- tp / (tp + fp)
+    recall <- tp / (tp + fn)
+    accuracy <- (tp + tn) / (tp + tn + fp + fn)
+    f_score <- 2 * ((precision * recall) / (precision + recall))
+
+    ret <- data.frame(f_score, precision, 1 - precision, recall, accuracy)
+    names(ret) <- if (pretty.name) {
+      c("F Score", "Precision", "Misclassification Rate", "Recall", "Accuracy")
+    } else {
+      c("f_score", "precision", "misclassification_rate", "recall", "accuracy")
+    }
+
+    ret
+
+  }
+
+  if (x$classification_type == "binary") {
+    single_stat(actual, predicted)
+  } else {
+    dplyr::bind_rows(lapply(levels(actual), multi_stat))
+  }
 }
 
 # This is used from Analytics View only when classification type is regression.
