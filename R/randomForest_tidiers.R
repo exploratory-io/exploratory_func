@@ -239,6 +239,12 @@ rangerReg <- function(data, formula, na.action = na.omit, importance_mode = "per
   # ranger::ranger has no "na.action" attributes
   ret[["na.action"]] <- na_atrow
 
+  # use augment.ranger.classification. ranger object already have an attribute named temrs, which has just only column names
+  ret$formula_terms <- terms(formula)
+
+  # store actual values of target column
+  ret$y <- data %>% dplyr::pull(newvars[[1]])
+
   ret
 }
 
@@ -288,8 +294,8 @@ rangerBinary <- function(data, formula, na.action = na.omit, importance_mode = "
   ret <- tryCatch({
     ranger::ranger(formula = formula,
                    data = data,
-                   keep.inbag = TRUE,
                    probability = TRUE,
+                   keep.inbag = TRUE,
                    importance = importance_mode, ...)
   }, error = function(e){
     if (e$message == "NA/NaN/Inf in foreign function call (arg 1)"){
@@ -359,8 +365,8 @@ rangerMulti <- function(data, formula, na.action = na.omit, importance_mode = "p
   ret <- tryCatch({
     ranger::ranger(formula = formula,
                    data = data,
-                   importance = importance_mode,
                    probability = TRUE,
+                   importance = importance_mode,
                    keep.inbag = TRUE, ...)
   }, error = function(e){
     if (e$message == "NA/NaN/Inf in foreign function call (arg 1)"){
@@ -870,7 +876,8 @@ augment.ranger <- function(x, data = NULL, ...) {
 
 
   augment.ranger.method <- switch(x$treetype,
-                                        "Classification", "Probability estimation" = augment.ranger.classification,
+                                        "Classification" = augment.ranger.classification,
+                                        "Probability estimation" = augment.ranger.classification,
                                         "Regression" = augment.ranger.regression)
   augment.ranger.method(x, data, ...)
 
@@ -887,21 +894,44 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, ...) {
     cleaned_data <- janitor::clean_names(newdata)
 
     predicted_value_col <- avoid_conflict(colnames(newdata), "predicted_value")
+    predicted_probability_col <- avoid_conflict(colnames(newdata), "predicted_probability")
 
+    predictor_variables <- all.vars(x$formula_terms)[-1]
+    is_na_atrow <- cleaned_data %>% dplyr::select(predictor_variables) %>% is.na() %>% apply(1, any)
+    na_atrow <- seq_len(nrow(cleaned_data))[is_na_atrow]
+    cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables) %>% na.omit()
+    predicted_prob <- rep(NA, times = nrow(newdata)) %>% as.numeric()
+    predicted_value <- rep(NA, times = nrow(newdata)) %>% as.numeric()
+ 
     if(is.null(x$classification_type)){
       # just append predicted labels
-      predicted_val <- predict(x, cleaned_data)
+      predicted_val <- predict(x, cleaned_data, type = "se")
       newdata[[predicted_value_col]] <- predicted_val$predictions
       newdata
     } else if (x$classification_type == "binary") {
       # append predicted probability of positive
-      predicted_val <- predict(x, cleaned_data, type = "se")$predictions[, 2]
-      newdata[[predicted_value_col]] <- predicted_val
+      predicted_value <- rep(NA, times = nrow(newdata)) %>% as.logical()
+
+      pred <- predict(x, cleaned_data, type = "se")$predictions
+      pred_prob <- apply(pred, 1, max)
+      pred_value <- x$forest$levels[apply(pred, 1, which.max)] %>% as.logical()
+
+      if (length(na_atrow) > 0) {
+        predicted_prob[-na_atrow] <- pred_prob
+        predicted_value[-na_atrow] <- pred_value
+      } else {
+        predicted_prob <- pred_prob
+        predicted_value <- pred_value
+      }
+      newdata[[predicted_value_col]] <- predicted_value
+      newdata[[predicted_probability_col]] <- predicted_prob
       newdata
     } else if (x$classification_type == "multi") {
       # append predicted probability for each class, max and labels at max values
+      # TODO: fix error
       probs <- predict(x, cleaned_data, type = "se")
-      ret <- get_multi_predicted_values(probs$predictions, newdata[[y_name]])
+      ret <- get_multi_predicted_values(probs$predictions,
+                                        newdata[[x$terms_mapping[y_name]]])
       newdata <- dplyr::bind_cols(newdata, ret)
     }
   } else if (!is.null(data)) {
@@ -920,12 +950,13 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, ...) {
     }
 
     predicted <- rep(NA, times = n_data)
-    predicted[!na_at] <- x[["predictions"]]
 
-    predicted <- same_type(x$forest$levels[predicted], cleaned_data[[y_name]])
+    # convert prediction probability to label
+    predicted[!na_at] <- x$forest$levels[apply(x$predictions, 1, which.max)]
+    predicted <- same_type(predicted, cleaned_data[[y_name]])
 
-    # this appending part is modified
-    predicted_prob <- predict(x, data = cleaned_data, type = "se")
+    predicted_prob <- x$predictions
+
     if(is.null(x$classification_type)){
       # just append predicted label
       data[[predicted_value_col]] <- predicted
@@ -933,13 +964,14 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, ...) {
        x$classification_type == "binary"){
       # append predicted probability
       predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
-
-      # get TRUE probability
-      predicted_prob <- predicted_prob$predictions[, 2] 
-      data[[predicted_value_col]][!na_at] <- predicted_prob
+      predicted_probability_col <- avoid_conflict(colnames(data), "predicted_probability")
+      pred_prob <- apply(predicted_prob, 1, max)
+      pred_value <- x$forest$levels[apply(predicted_prob, 1, which.max)] %>% as.logical()
+      data[[predicted_value_col]][!na_at] <- pred_value
+      data[[predicted_probability_col]][!na_at] <- pred_prob
     } else if (x$classification_type == "multi"){
       # append predicted probability for each class, max and labels at max values
-      ret <- get_multi_predicted_values(predicted_prob$predictions, cleaned_data[[y_name]])
+      ret <- get_multi_predicted_values(predicted_prob, cleaned_data[[y_name]])
       for (i in 1:length(ret)) { # for each column
         # this is basically bind_cols with na_at taken into account.
         data[[colnames(ret)[[i]]]][!na_at] <- ret[[i]]
@@ -960,8 +992,15 @@ augment.ranger.regression <- function(x, data = NULL, newdata = NULL, ...){
     # create clean name data frame because the model learned by those names
     cleaned_data <- janitor::clean_names(newdata)
 
+    predictor_variables <- all.vars(x$formula_terms)[-1]
+    is_na_atrow <- cleaned_data %>% dplyr::select(predictor_variables) %>% is.na() %>% apply(1, any)
+    na_atrow <- seq_len(nrow(cleaned_data))[is_na_atrow]
+    cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables) %>% na.omit()
+    predicted <- rep(NA, times = nrow(newdata)) %>% as.numeric()
+ 
     predicted_val <- predict(x, cleaned_data)$predictions
-    newdata[[predicted_value_col]] <- predicted_val
+    predicted[-na_atrow] <- predicted_val
+    newdata[[predicted_value_col]] <- predicted
 
     newdata
   } else if (!is.null(data)) {
@@ -2055,7 +2094,8 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
 #' @export
 glance.ranger <- function(x, pretty.name = FALSE, ...) {
   glance.ranger.method <- switch(x[["treetype"]],
-                                        "Classification", "Probability estimation" = glance.ranger.classification,
+                                        "Classification" = glance.ranger.classification,
+                                        "Probability estimation" = glance.ranger.classification,
                                         "Regression" = glance.ranger.regression)
   glance.ranger.method(x, pretty.name = pretty.name, ...)
 }
@@ -2082,6 +2122,7 @@ glance.ranger.regression <- function(x, pretty.name, ...) {
 #' @export
 glance.ranger.classification <- function(x, pretty.name, ...) {
   actual <- x[["y"]]
+
   predicted <- apply(x[["predictions"]], 1, function(x){ levels(actual)[which.max(x)] })
   predicted <- as.factor(predicted)
   levels(predicted) <- levels(actual)

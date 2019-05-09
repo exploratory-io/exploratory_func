@@ -556,7 +556,14 @@ prediction_binary <- function(df, threshold = 0.5, ...){
   }
 
   ret[["predicted_label"]] <- label
+
   colnames(ret)[colnames(ret) == prob_col_name] <- "predicted_probability"
+
+  if("ranger" %in% class(first_model)) {
+    ret <- ret %>% select(-predicted_label) %>%
+                   select(everything(), predicted_probability) %>%
+                   rename(predicted_label = predicted_value)
+  }
 
   ret
 }
