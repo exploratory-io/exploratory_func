@@ -561,7 +561,7 @@ prediction_binary <- function(df, threshold = 0.5, ...){
 
   if("ranger" %in% class(first_model)) {
     ret <- ret %>% select(-predicted_label) %>%
-                   select(everything(), predicted_probability) %>%
+                   select(everything(), predicted_probability, predicted_value) %>%
                    rename(predicted_label = predicted_value)
   }
 

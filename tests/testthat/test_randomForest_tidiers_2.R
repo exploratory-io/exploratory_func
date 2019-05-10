@@ -102,3 +102,61 @@ test_that("test ranger with multinomial classification", {
   expect_equal(colnames(pred_test_newdata_ret), expected_colnames)
 })
 
+test_that("ranger.find_na", {
+  df <- structure(
+    list(x = 1:10, y = rep(TRUE, 10)),
+    row.names = c(NA, 10L),
+    class = c("tbl_df", "tbl", "data.frame"), .Names = c("x", "y")
+  )
+  expected_na_at <- 1
+  df[expected_na_at, 1] <- NA
+  expect_equal(ranger.find_na("x", df), expected_na_at)
+
+  expected_na_at <- c(1, 2, 5, 10)
+  df[expected_na_at, 1] <- NA
+  expect_equal(ranger.find_na("x", df), expected_na_at)
+})
+
+
+test_that("ranger.predict_value_from_prob", {
+  df <- structure(
+    list(x = 1:10, y = rep(TRUE, 10), z = c("A", "B", "C", "D", "D", "E", "F", "E", "A", "A")),
+    row.names = c(NA, 10L),
+    class = c("tbl_df", "tbl", "data.frame"), .Names = c("x", "y", "z")
+  )
+  # reangerBinary
+  m_b <- build_model(df, model_func = rangerBinary, formula = y ~ x)$model[[1]]
+  expected_values <- rep("TRUE", 10)
+  expect_equal(
+    ranger.predict_value_from_prob(m_b$forest$levels, m_b$predictions),
+    expected_values
+  )
+
+  # rangerMulti
+  m_m <- build_model(df, model_func = rangerMulti, formula = z ~ x + y)$model[[1]]
+
+  expected_values <- c("D", "A", "A", "A", "A", "A", "A", "A", "D", "A")
+  expect_equal(
+    ranger.predict_value_from_prob(m_m$forest$levels, m_m$predictions),
+    expected_values
+  )
+})
+
+test_that("ranger.set_multi_predicted_values", {
+  df <- structure(
+    list(x = 1:10, y = rep(TRUE, 10), z = c("A", "B", "C", "D", "D", "E", "F", "E", "A", "A")),
+    row.names = c(NA, 10L),
+    class = c("tbl_df", "tbl", "data.frame"), .Names = c("x", "y", "z")
+  )
+  df[1, "x"] <- NA
+  m_m <- build_model(df, model_func = rangerMulti, formula = z ~ x + y)$model[[1]]
+  predicted_value_nona <- ranger.predict_value_from_prob(m_m$forest$levels, m_m$predictions)
+  na_at <- ranger.find_na(c("x", "y"), df) 
+  predicted_value <- ranger.add_narow(predicted_value_nona, nrow(df), na_at)
+  ret <- ranger.set_multi_predicted_values(df, m_m, predicted_value, na_at)
+  expected_colnames <-  c("x", "y", "z",
+                          "predicted_probability_A", "predicted_probability_D", "predicted_probability_E",
+                          "predicted_probability_B", "predicted_probability_C", "predicted_probability_F", "predicted_value")
+  expect_equal(colnames(ret), expected_colnames)
+})
+
