@@ -90,8 +90,6 @@ build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, g
   source_col <- "source.data"
 
   caller <- match.call()
-  # this expands dots arguemtns to character
-  arg_char <- expand_args(caller, exclude = c("data", "keep.source", "augment", "group_cols", "test_rate", "seed"))
 
   # check if grouping columns are in the formula
   grouped_var <- group_col_names[group_col_names %in% fml_vars]
@@ -99,6 +97,28 @@ build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, g
     stop(paste0(grouped_var, " is a grouping column. Please remove it from variables."))
   } else if (length(grouped_var) > 0) {
     stop(paste0(paste(grouped_var, collapse = ", "), " are grouping columns. Please remove them from variables."))
+  }
+
+  # define glm function by the family option
+  exclude_arg_names <- c("data", "keep.source", "augment", "group_cols", "test_rate", "seed")
+
+  # check family argument.
+  # family argument is 1: family object or 2: character or facater
+  # the condition of using MASS::glm.nb is below.
+  # 1. family argument is not family object. Because when it is family object, it should be MASS::negative.binomial
+  #    and use stats::glm(..., family = family)
+  # 2. family argument has negative.binomial characters.
+  has_any_nb_string <- match.call()$family %>% as.character() %>%
+                     stringr::str_detect("negative\\.binomial") %>%
+                     any() %>% dplyr::if_else(is.na(.), FALSE, .)
+  is_not_family_obj <- class(list(...)$family) != "family"
+  if(has_any_nb_string && is_not_family_obj) {
+    arg_char <- expand_args(caller, exclude = c(exclude_arg_names, "family", "offset"))
+    glm_func_name = "MASS::glm.nb"
+
+  } else {
+    arg_char <- expand_args(caller, exclude = exclude_arg_names)
+    glm_func_name = "stats::glm"
   }
 
   ret <- tryCatch({
@@ -112,7 +132,7 @@ build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, g
       dplyr::mutate(model = purrr::map2(source.data, .test_index, function(df, index){
         data <- safe_slice(df, index, remove = TRUE)
         # execute glm with parsed arguments
-        eval(parse(text = paste0("stats::glm(data = data, ", arg_char, ")")))
+        eval(parse(text = paste0(glm_func_name, "(data = data, ", arg_char, ")")))
       })) %>%
       dplyr::mutate(.model_metadata = purrr::map(source.data, function(df){
         if(!is.null(formula)){
