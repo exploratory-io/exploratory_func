@@ -781,6 +781,7 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, ...) {
     # janitor::clean_names is called in randomForestClassify,
     # so it should be called here too
     cleaned_data <- janitor::clean_names(newdata)
+    y_value <- cleaned_data[[y_name]]
 
     predicted_value_col <- avoid_conflict(colnames(newdata), "predicted_value")
     predicted_probability_col <- avoid_conflict(colnames(newdata), "predicted_probability")
@@ -791,7 +792,9 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, ...) {
     cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables) %>% na.omit()
 
     pred_res <- predict(x, cleaned_data, type = "se")
-    predicted_label_nona <- ranger.predict_value_from_prob(x$forest$levels, pred_res$predictions)
+    predicted_label_nona <- ranger.predict_value_from_prob(x$forest$levels,
+                                                           pred_res$predictions,
+                                                           y_value)
     predicted_value <- ranger.add_narow(predicted_label_nona, nrow(newdata), na_atrow)
     predicted_prob <- ranger.add_narow(apply(pred_res$predictions, 1 , max), nrow(newdata), na_atrow)
 
@@ -814,10 +817,13 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, ...) {
   } else if (!is.null(data)) {
     # create clean name data frame because the model learned by those names
     cleaned_data <- janitor::clean_names(data)
+    y_value <- cleaned_data[[y_name]]
     predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
     predicted_probability_col <- avoid_conflict(colnames(data), "predicted_probability")
 
-    predicted_label_nona <- ranger.predict_value_from_prob(x$forest$levels, x$predictions)
+    predicted_label_nona <- ranger.predict_value_from_prob(x$forest$levels,
+                                                           x$predictions,
+                                                           y_value)
     predicted_value <- ranger.add_narow(predicted_label_nona, nrow(data), x$na.action)
     predicted_prob <- ranger.add_narow(apply(x$predictions, 1 , max), nrow(data), x$na.action)
 
@@ -903,8 +909,8 @@ ranger.add_narow <- function(value, n_data, na_atrow){
    }
 }
 
-ranger.predict_value_from_prob <- function(levels_var, pred) {
-  levels_var[apply(pred, 1, which.max)]
+ranger.predict_value_from_prob <- function(levels_var, pred, y_value) {
+  same_type(levels_var[apply(pred, 1, which.max)], y_value)
 }
 
 rename_groups <- function(n) {

@@ -126,9 +126,9 @@ test_that("ranger.predict_value_from_prob", {
   )
   # reangerBinary
   m_b <- build_model(df, model_func = rangerBinary, formula = y ~ x)$model[[1]]
-  expected_values <- rep("TRUE", 10)
+  expected_values <- rep(TRUE, 10)
   expect_equal(
-    ranger.predict_value_from_prob(m_b$forest$levels, m_b$predictions),
+    ranger.predict_value_from_prob(m_b$forest$levels, m_b$predictions, df[["y"]]),
     expected_values
   )
 
@@ -137,7 +137,7 @@ test_that("ranger.predict_value_from_prob", {
 
   expected_values <- c("D", "A", "A", "A", "A", "A", "A", "A", "D", "A")
   expect_equal(
-    ranger.predict_value_from_prob(m_m$forest$levels, m_m$predictions),
+    ranger.predict_value_from_prob(m_m$forest$levels, m_m$predictions, df[["z"]]),
     expected_values
   )
 })
@@ -150,7 +150,9 @@ test_that("ranger.set_multi_predicted_values", {
   )
   df[1, "x"] <- NA
   m_m <- build_model(df, model_func = rangerMulti, formula = z ~ x + y)$model[[1]]
-  predicted_value_nona <- ranger.predict_value_from_prob(m_m$forest$levels, m_m$predictions)
+  predicted_value_nona <- ranger.predict_value_from_prob(m_m$forest$levels,
+                                                         m_m$predictions,
+                                                         df[["z"]])
   na_at <- ranger.find_na(c("x", "y"), df) 
   predicted_value <- ranger.add_narow(predicted_value_nona, nrow(df), na_at)
   ret <- ranger.set_multi_predicted_values(df, m_m, predicted_value, na_at)
