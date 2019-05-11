@@ -712,15 +712,6 @@ model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
       }
     }
   }
-  if ("negbin" %in% class(df$model[[1]])) {
-    x <- df$model[[1]]
-    if(pretty.name) {
-      ret <- ret %>% dplyr::mutate(`Theta`=x$theta, `SE Theta`=x$SE.theta)
-    }
-    else {
-      ret <- ret %>% dplyr::mutate(theta=x$theta, SE.theta=x$SE.theta)
-    }
-  }
   if ("coxph" %in% class(df$model[[1]])) {
     ret <- ret %>% dplyr::mutate(
       hazard_ratio = exp(estimate)
@@ -838,6 +829,15 @@ model_stats <- function(df, pretty.name = FALSE, ...){
     ret <- ret %>% dplyr::ungroup() %>% dplyr::select(-dummy_group_col)
   }
 
+  if ("negbin" %in% class(df$model[[1]])) {
+    x <- df$model[[1]]
+    if(pretty.name) {
+      ret <- ret %>% dplyr::mutate(`Theta`=x$theta, `SE Theta`=x$SE.theta)
+    }
+    else {
+      ret <- ret %>% dplyr::mutate(theta=x$theta, SE.theta=x$SE.theta)
+    }
+  }
 
   # adjust column name style
   if(pretty.name){
