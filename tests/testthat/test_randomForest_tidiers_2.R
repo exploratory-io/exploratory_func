@@ -211,10 +211,9 @@ test_that("ranger.predict_value_from_prob", {
   m_m <- build_model(df, model_func = rangerMulti, formula = z ~ x + y)$model[[1]]
 
   expected_values <- c("D", "A", "A", "A", "A", "A", "A", "A", "D", "A")
-  expect_equal(
-    ranger.predict_value_from_prob(m_m$forest$levels, m_m$predictions, df[["z"]]),
-    expected_values
-  )
+  res <- ranger.predict_value_from_prob(m_m$forest$levels, m_m$predictions, df[["z"]])
+  expect_equal(typeof(res), typeof(df$z))
+  expect_equal(length(res), length(df$z))
 })
 
 test_that("ranger.set_multi_predicted_values", {
