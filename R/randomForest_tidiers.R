@@ -801,7 +801,10 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, ...) {
       newdata
     } else if (x$classification_type == "binary") {
       newdata[[predicted_value_col]] <- predicted_value
-      predicted_prob <- ranger.add_narow(pred_res$predictions[, 2], nrow(newdata), na_atrow)
+      predictions <- pred_res$predictions
+
+      # when the target level is a single, ncol(predictions) is 1.
+      predicted_prob <- ranger.add_narow(pred_res$predictions[, ncol(predictions)], nrow(newdata), na_atrow)
       newdata[[predicted_probability_col]] <- predicted_prob
       newdata
     } else if (x$classification_type == "multi") {
@@ -831,7 +834,8 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, ...) {
       data[[predicted_value_col]] <- predicted_value
     } else if(!is.null(x$classification_type) && x$classification_type == "binary"){
       # append predicted probability
-      predicted_prob <- ranger.add_narow(x$predictions[, 2], nrow(data), x$na.action)
+      predictions <- x$predictions
+      predicted_prob <- ranger.add_narow(x$predictions[, ncol(predictions)], nrow(data), x$na.action)
       data[[predicted_value_col]] <- predicted_value
       data[[predicted_probability_col]] <- predicted_prob
     } else if (x$classification_type == "multi"){

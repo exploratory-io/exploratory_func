@@ -254,3 +254,47 @@ test_that("ranger.set_multi_predicted_values", {
   expect_equal(colnames(ret), expected_colnames)
 })
 
+test_that("in the case of a single target variable single_value ranger with binary classification", {
+  test_data["IS_TRUE"] <- rep(TRUE, nrow(test_data))
+  model_ret <- suppressWarnings({
+      build_model(test_data,
+        model_func = rangerBinary,
+        formula = `IS_TRUE` ~ DISTANCE,
+        test_rate = 0.3)
+  })
+  test_data[1, "IS_TRUE"] <- FALSE
+
+  pred_train_ret <- suppressWarnings(prediction(model_ret, data = "newdata", data_frame = test_data))
+  expect_equal(pred_train_ret[1, "predicted_label"]$predicted_label, NA)
+ 
+})
+
+test_that("in the case of a single target variable single_value ranger with multi classification", {
+  test_data["CATEGORY"] <- rep("MA", nrow(test_data))
+  model_ret <- suppressWarnings({
+      build_model(test_data,
+        model_func = rangerMulti,
+        formula = `CATEGORY` ~ DISTANCE,
+        test_rate = 0.3)
+  })
+  test_data[1, "CATEGORY"] <- "ME"
+
+  pred_train_ret <- suppressWarnings(prediction(model_ret, data = "newdata", data_frame = test_data))
+  expect_equal(pred_train_ret[1, "predicted_label"]$predicted_label, NA_character_)
+ 
+})
+
+test_that("in the case of a unkown target variable of predictiton ranger with multi classification", {
+  model_ret <- suppressWarnings({
+      build_model(test_data,
+        model_func = rangerMulti,
+        formula = `CARRIER` ~ .,
+        test_rate = 0.3)
+  })
+  test_data[1, "CARRIER"] <- "UNKOWN_CARRIER"
+
+  pred_train_ret <- suppressWarnings(prediction(model_ret, data = "newdata", data_frame = test_data))
+  expect_equal(pred_train_ret[1, "predicted_label"]$predicted_label, NA_character_)
+ 
+})
+
