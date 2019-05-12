@@ -46,9 +46,6 @@ test_that("test ranger with binary regression all predictor variables", {
   pred_train_ret <- suppressWarnings(prediction(model_ret, data = "training"))
   expect_equal(colnames(pred_train_ret), expected_colnames)
 
-  pred_test_ret <- prediction(model_ret, data = "test")
-  expect_equal(colnames(pred_test_ret), expected_colnames)
-
   pred_test_newdata_ret <- prediction(model_ret, data = "newdata", data_frame = test_data)
   expect_equal(colnames(pred_test_newdata_ret), expected_colnames)
 })
@@ -67,22 +64,33 @@ test_that("test ranger with binary classification", {
   expect_equal(colnames(coef_ret), c("variable", "importance"))
 
   model_stats <- suppressWarnings(model_stats(model_ret, pretty.name = TRUE))
-  expect_colnames <- c("F Score", "Precision", "Misclassification Rate",
-                       "Recall", "Accuracy")
+  expect_colnames <- c("F Score", "Accuracy Rate", "Misclassification Rate",
+                       "Precision", "Recall")
   expect_equal(colnames(model_stats), expect_colnames)
 
   pred_train_ret <- suppressWarnings(
     prediction_binary(model_ret, data = "training", threshold = "f_score")
   )
   expect_colnames <- c("CANCELLED", "Carrier Name", "CARRIER",
-                       "DISTANCE", "FNUMBER", "IS AA", "predicted_label", "predicted_probability")
+                       "DISTANCE", "FNUMBER", "IS AA", "predicted_probability", "predicted_label")
   expect_equal(colnames(pred_train_ret), expect_colnames)
+
+  pred_train_ret2 <- suppressWarnings(
+    prediction(model_ret, data = "training", threshold = "f_score")
+  )
+  expect_equal(colnames(pred_train_ret2), expect_colnames)
 
   pred_test_ret <- suppressWarnings(prediction_binary(model_ret, data = "test"))
   expect_equal(colnames(pred_test_ret), expect_colnames)
 
+  pred_test_ret2 <- suppressWarnings(prediction(model_ret, data = "test"))
+  expect_equal(colnames(pred_test_ret2), expect_colnames)
+
   pred_test_newdata_ret <- suppressWarnings(prediction_binary(model_ret, data = "newdata", data_frame = test_data))
   expect_equal(colnames(pred_test_newdata_ret), expect_colnames)
+
+  pred_test_newdata_ret2 <- suppressWarnings(prediction_binary(model_ret, data = "newdata", data_frame = test_data))
+  expect_equal(colnames(pred_test_newdata_ret2), expect_colnames)
 })
 
 test_that("test ranger with binary classification (all predictor_varials)", {
@@ -98,22 +106,32 @@ test_that("test ranger with binary classification (all predictor_varials)", {
   expect_equal(colnames(coef_ret), c("variable", "importance"))
 
   model_stats <- suppressWarnings(model_stats(model_ret, pretty.name = TRUE))
-  expect_colnames <- c("F Score", "Precision", "Misclassification Rate",
-                       "Recall", "Accuracy")
+  expect_colnames <- c("F Score", "Accuracy Rate", "Misclassification Rate",
+                       "Precision", "Recall")
   expect_equal(colnames(model_stats), expect_colnames)
 
   pred_train_ret <- suppressWarnings(
     prediction_binary(model_ret, data = "training", threshold = "f_score")
   )
   expect_colnames <- c("CANCELLED", "Carrier Name", "CARRIER",
-                       "DISTANCE", "FNUMBER", "IS AA", "predicted_label", "predicted_probability")
+                       "DISTANCE", "FNUMBER", "IS AA", "predicted_probability", "predicted_label")
   expect_equal(colnames(pred_train_ret), expect_colnames)
+
+  pred_train_ret2 <- suppressWarnings(
+    prediction(model_ret, data = "training", threshold = "f_score")
+  )
+  expect_equal(colnames(pred_train_ret2), expect_colnames)
 
   pred_test_ret <- suppressWarnings(prediction_binary(model_ret, data = "test"))
   expect_equal(colnames(pred_test_ret), expect_colnames)
+  pred_test_ret2 <- suppressWarnings(prediction(model_ret, data = "test"))
+  expect_equal(colnames(pred_test_ret2), expect_colnames)
 
   pred_test_newdata_ret <- suppressWarnings(prediction_binary(model_ret, data = "newdata", data_frame = test_data))
   expect_equal(colnames(pred_test_newdata_ret), expect_colnames)
+
+  pred_test_newdata_ret2 <- suppressWarnings(prediction(model_ret, data = "newdata", data_frame = test_data))
+  expect_equal(colnames(pred_test_newdata_ret2), expect_colnames)
 })
 
 test_that("test ranger with multinomial classification", {
@@ -127,8 +145,8 @@ test_that("test ranger with multinomial classification", {
   coef_ret <- model_coef(model_ret)
   expect_equal(colnames(coef_ret), c("variable", "importance"))
   model_stats <- suppressWarnings(model_stats(model_ret, pretty.name = TRUE))
-  expect_colnames <- c("Label", "F Score", "Precision", "Misclassification Rate",
-                       "Recall", "Accuracy")
+  expect_colnames <- c("Class", "F Score", "Accuracy Rate", "Misclassification Rate",
+                       "Precision", "Recall", "Data Size")
   expect_equal(colnames(model_stats), expect_colnames)
 
   expected_colnames <- c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE", "FNUMBER",
@@ -157,8 +175,8 @@ test_that("test ranger with multinomial classification", {
   coef_ret <- model_coef(model_ret)
   expect_equal(colnames(coef_ret), c("variable", "importance"))
   model_stats <- suppressWarnings(model_stats(model_ret, pretty.name = TRUE))
-  expect_colnames <- c("Label", "F Score", "Precision", "Misclassification Rate",
-                       "Recall", "Accuracy")
+  expect_colnames <- c("Class", "F Score", "Accuracy Rate", "Misclassification Rate",
+                       "Precision", "Recall", "Data Size")
   expect_equal(colnames(model_stats), expect_colnames)
 
   expected_colnames <- c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE", "FNUMBER",

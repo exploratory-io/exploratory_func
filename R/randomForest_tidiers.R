@@ -256,7 +256,6 @@ rangerCore <- function(data, formula, na.action = na.omit,
   ret$y <- data %>% dplyr::pull(target_col)
 
   ret
-
 }
 
 #' Random Forest wrapper for regression by ranger packages
@@ -795,24 +794,26 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, ...) {
                                                            pred_res$predictions,
                                                            y_value)
     predicted_value <- ranger.add_narow(predicted_label_nona, nrow(newdata), na_atrow)
-    predicted_prob <- ranger.add_narow(apply(pred_res$predictions, 1 , max), nrow(newdata), na_atrow)
 
     if(is.null(x$classification_type)){
       # just append predicted labels
-      newdata[[predicted_value_col]] <- predicted_val$predictions
+      newdata[[predicted_value_col]] <- predicted_value
       newdata
     } else if (x$classification_type == "binary") {
       newdata[[predicted_value_col]] <- predicted_value
+      predicted_prob <- ranger.add_narow(pred_res$predictions[, 2], nrow(newdata), na_atrow)
       newdata[[predicted_probability_col]] <- predicted_prob
       newdata
     } else if (x$classification_type == "multi") {
       # append predicted probability for each class, max and labels at max values
+      predicted_prob <- ranger.add_narow(apply(pred_res$predictions, 1 , max), nrow(newdata), na_atrow)
       newdata <- ranger.set_multi_predicted_values(newdata, pred_res, predicted_value, na_atrow)
       newdata[[predicted_probability_col]] <- predicted_prob
-      newdata <- newdata %>% dplyr::rename(predicted_label = predicted_value_col) %>%
-                  dplyr::select(-predicted_label, everything(), predicted_label)
       newdata
     }
+    newdata <- newdata %>% dplyr::rename(predicted_label = predicted_value_col) %>%
+                  dplyr::select(-predicted_label, everything(), predicted_label)
+
   } else if (!is.null(data)) {
     # create clean name data frame because the model learned by those names
     cleaned_data <- janitor::clean_names(data)
@@ -824,23 +825,23 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, ...) {
                                                            x$predictions,
                                                            y_value)
     predicted_value <- ranger.add_narow(predicted_label_nona, nrow(data), x$na.action)
-    predicted_prob <- ranger.add_narow(apply(x$predictions, 1 , max), nrow(data), x$na.action)
 
     if(is.null(x$classification_type)){
       # just append predicted label
       data[[predicted_value_col]] <- predicted_value
     } else if(!is.null(x$classification_type) && x$classification_type == "binary"){
       # append predicted probability
+      predicted_prob <- ranger.add_narow(x$predictions[, 2], nrow(data), x$na.action)
       data[[predicted_value_col]] <- predicted_value
       data[[predicted_probability_col]] <- predicted_prob
     } else if (x$classification_type == "multi"){
+      predicted_prob <- ranger.add_narow(apply(x$predictions, 1 , max), nrow(data), x$na.action)
       data <- ranger.set_multi_predicted_values(data, x, predicted_value, x$na.action)
       data[[predicted_probability_col]] <- predicted_prob
-      data <- data %>% dplyr::rename(predicted_label = predicted_value_col) %>%
-                       dplyr::select(-predicted_label, everything(), predicted_label)
     }
+    data %>% dplyr::rename(predicted_label = predicted_value_col) %>%
+             dplyr::select(-predicted_label, everything(), predicted_label)
 
-    data
   } else {
     stop("data or newdata have to be indicated.")
   }
@@ -2014,13 +2015,14 @@ glance.ranger.regression <- function(x, pretty.name, ...) {
 
 #' @export
 glance.ranger.classification <- function(x, pretty.name, ...) {
-  actual <- x[["y"]]
-
-  predicted <- apply(x[["predictions"]], 1, function(x){ levels(actual)[which.max(x)] })
-  predicted <- as.factor(predicted)
+  # Both actual and predicted have no NA values.
+  actual <- x$y
+  predicted <- ranger.predict_value_from_prob(x$forest$levels, x$predictions, x$y)
   levels(predicted) <- levels(actual)
 
   multi_stat <- function(class) {
+    datasize <- sum(actual == class)
+
     # calculate evaluation scores for each class
     tp <- sum(actual == class & predicted == class)
     tn <- sum(actual != class & predicted != class)
@@ -2035,26 +2037,32 @@ glance.ranger.classification <- function(x, pretty.name, ...) {
     ret <- data.frame(
       class,
       f_score,
+      accuracy,
+      1 - accuracy,
       precision,
-      1 - precision,
       recall,
-      accuracy
+      datasize
     )
 
     names(ret) <- if(pretty.name){
-      c("Label", "F Score", "Precision", "Misclassification Rate", "Recall", "Accuracy")
+      c("Class", "F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall", "Data Size")
     } else {
-      c("label", "f_score", "precision", "misclassification_rate", "recall", "accuracy")
+      c("class", "f_score", "accuracy_rate", "misclassification_rate", "precision", "recall", "data_size")
     }
     ret
   }
 
   single_stat <- function(act, pred) {
+    #       predicted
+    #actual  FALSE TRUE
+    #  FALSE    tn   fp
+    #  TRUE     fn   tp
+
     conf_mat <- table(act, pred)
-    tp <- conf_mat[1]
-    tn <- conf_mat[2]
-    fn <- conf_mat[3]
-    fp <- conf_mat[4]
+    tp <- conf_mat[4]
+    tn <- conf_mat[1]
+    fn <- conf_mat[2]
+    fp <- conf_mat[3]
     precision <- tp / (tp + fp)
     recall <- tp / (tp + fn)
     accuracy <- (tp + tn) / (tp + tn + fp + fn)
@@ -2062,11 +2070,10 @@ glance.ranger.classification <- function(x, pretty.name, ...) {
 
     ret <- data.frame(f_score, precision, 1 - precision, recall, accuracy)
     names(ret) <- if (pretty.name) {
-      c("F Score", "Precision", "Misclassification Rate", "Recall", "Accuracy")
+      c("F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall")
     } else {
-      c("f_score", "precision", "misclassification_rate", "recall", "accuracy")
+      c("f_score", "accuracy_rate", "misclassification_rate", "precision", "recall")
     }
-
     ret
 
   }
