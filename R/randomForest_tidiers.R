@@ -216,7 +216,7 @@ rangerCore <- function(data, formula, na.action = na.omit,
 
   # ranger::ranger can't build model when there are NA values in data
   names(newvars) <- NULL
-  is_na_atrow <- data %>% dplyr::select(newvars) %>% is.na() %>% apply(1, any)
+  is_na_atrow <- data %>% dplyr::select(target_col, newvars) %>% is.na() %>% apply(1, any)
   na_atrow <- seq_len(nrow(data))[is_na_atrow]
 
   # remove NA rows because ranger can't treat NA values.
