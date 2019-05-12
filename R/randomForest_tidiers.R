@@ -205,23 +205,22 @@ rangerCore <- function(data, formula, na.action = na.omit,
   }
 
   if("." %in% all.vars(lazyeval::f_rhs(formula))){
-    # somehow, mixing numeric and categorical predictors causes an error in randomForest
-    # so use only numeric or logical columns
-    cols <- quantifiable_cols(data)
-    vars <- cols[!cols %in% target_col]
-    newvars <- vars
-    formula <- as.formula(paste0(target_col, " ~ ", paste0(vars, collapse = " + ")))
-  } else {
-    vars <- all.vars(formula)
+    original_target_col <- all.vars(formula)[1]
+    vars <- original_colnames[original_colnames != original_target_col]
     newvars <- updated_colnames[vars]
-    formula <- as.formula(paste0(newvars[[1]], " ~ ", paste0(newvars[-1], collapse = " + ")))
+  } else {
+    vars <- all.vars(formula)[-1]
+    newvars <- updated_colnames[vars]
   }
+  formula <- as.formula(paste0(target_col, " ~ ", paste0(newvars, collapse = " + ")))
 
   # ranger::ranger can't build model when there are NA values in data
   names(newvars) <- NULL
   is_na_atrow <- data %>% dplyr::select(newvars) %>% is.na() %>% apply(1, any)
   na_atrow <- seq_len(nrow(data))[is_na_atrow]
-  data <- data %>% dplyr::select(newvars) %>% na.action()
+
+  # remove NA rows because ranger can't treat NA values.
+  data <- data %>% dplyr::select(target_col, newvars) %>% filter_all(all_vars(!is.na(.)))
 
   ret <- tryCatch({
     ranger::ranger(formula = formula,
@@ -254,7 +253,7 @@ rangerCore <- function(data, formula, na.action = na.omit,
   ret$formula_terms <- terms(formula)
 
   # store actual values of target column
-  ret$y <- data %>% dplyr::pull(newvars[[1]])
+  ret$y <- data %>% dplyr::pull(target_col)
 
   ret
 
