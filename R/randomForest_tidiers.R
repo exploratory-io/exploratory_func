@@ -215,9 +215,13 @@ rangerCore <- function(data, formula, na.action = na.omit,
   formula <- as.formula(paste0(target_col, " ~ ", paste0(newvars, collapse = " + ")))
 
   # ranger::ranger can't build model when there are NA values in data
+  # The ranger::raner will generate an error if it contains NA for both explanatory variables and target variables.
+  # Therefore, it is necessary to exclude rows that have NA values in any of those columns.
+  # Since it is necessary to save the information of the column excluded by NA and use it later,
+  # the true/false value of which row has NA value once is judged.
   names(newvars) <- NULL
-  is_na_atrow <- data %>% dplyr::select(target_col, newvars) %>% is.na() %>% apply(1, any)
-  na_atrow <- seq_len(nrow(data))[is_na_atrow]
+  na_atrow_index <- ranger.find_na_index(c(target_col, newvars), data)
+  na_atrow <- ranger.find_na(c(target_col, newvars), data, na_atrow_index)
 
   # remove NA rows because ranger can't treat NA values.
   data <- data %>% dplyr::select(target_col, newvars) %>% filter_all(all_vars(!is.na(.)))
@@ -586,12 +590,13 @@ augment.randomForest.classification <- function(x, data = NULL, newdata = NULL, 
 
     # When na.omit is used, case-wise model attributes will only be calculated
     # for complete cases in the original data. All columns returned with
+    # augment() must be expanded to the length of the full data, inserting NA
     # for all missing values.
     oob_col <- avoid_conflict(colnames(data), "out_of_bag_times")
 
     # These are from https://github.com/mdlincoln/broom/blob/e3cdf5f3363ab9514e5b61a56c6277cb0d9899fd/R/rf_tidiers.R
     # create index of eliminated rows (na_at) by na.action from model.
-    # since prediction output may have fewer rows than original data because of na.action, 
+    # since prediction output may have fewer rows than original data because of na.action,
     # we cannot augment the data just by binding columns.
     n_data <- nrow(data)
     if (is.null(x[["na.action"]])) {
@@ -863,9 +868,9 @@ augment.ranger.regression <- function(x, data = NULL, newdata = NULL, ...){
     na_atrow <- ranger.find_na(predictor_variables, cleaned_data)
 
     cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables) %>% na.omit()
- 
+
     predicted_val <- predict(x, cleaned_data)$predictions
-    newdata[[predicted_value_col]] <- ranger.add_narow(predicted_val, nrow(newdata), na_atrow) 
+    newdata[[predicted_value_col]] <- ranger.add_narow(predicted_val, nrow(newdata), na_atrow)
 
     newdata
   } else if (!is.null(data)) {
@@ -877,6 +882,12 @@ augment.ranger.regression <- function(x, data = NULL, newdata = NULL, ...){
   }
 }
 
+#' In multiclass classification, add prediction probability to each class as a column to data
+#' @param data - data to predict multiclass
+#' @param x - Model object that is the return value of ranger::ranger
+#' @param na_atrow - Numeric vector of which row of data has NA
+#' @param pred_prob_col - Column name suffix of predicted probability column for each class name
+#' @param pred_value_col - Column name for storing prediction class of multiclass classification
 ranger.set_multi_predicted_values <- function(data, x,
                                               predicted_value,
                                               na_atrow,
@@ -894,13 +905,32 @@ ranger.set_multi_predicted_values <- function(data, x,
   data
 }
 
-ranger.find_na <- function(predictor_variables, data){
-  is_na_atrow <- data %>% dplyr::select(predictor_variables) %>% is.na() %>% apply(1, any)
-  na_atrow <- seq_len(nrow(data))[is_na_atrow]
+#' returns the number of the row containing the NA value of data as a numeric vector
+#' @param variables - column name to use for prediction (determine if any of this column contains NA)
+#' @param data - data to predict
+#' @param na_index - Boolean vectors whether or not NA is included (Default: NULL)
+ranger.find_na <- function(variables, data, na_index = NULL){
+  na_atrow_index <- if (is.null(na_index)) {
+    ranger.find_na_index(variables, data)
+  } else {
+    na_index
+  }
+  na_atrow <- seq_len(nrow(data))[na_atrow_index]
 
   return(na_atrow)
 }
 
+#' Returns TRUE / FALSE vectors whether each row contains the NA value in any of the column values specified in variables
+#' @param variables - column name to use for prediction (determine if any of this column contains NA)
+#' @param data - data to predict
+ranger.find_na_index <- function(variables, data) {
+  data %>% dplyr::select(variables) %>% is.na() %>% apply(1, any)
+}
+
+#' Returns NA value included in prediction result excluding NA
+#' @param value - prediction results without NA
+#' @param n_data - original data length
+#' @param na_atrow - row numbers containing the NA value of data
 ranger.add_narow <- function(value, n_data, na_atrow){
    na_at <- seq_len(n_data) %in% as.integer(na_atrow)
    return_value <- rep(NA, time = n_data)
@@ -913,6 +943,10 @@ ranger.add_narow <- function(value, n_data, na_atrow){
    }
 }
 
+#' Return the highest probability label from the matrix of predicted probabilities
+#' @param levels_var - Factor level of label to predict
+#' @param pred - Matrix of prediction probabilities
+#' @param y_value - Actual value to be predicted
 ranger.predict_value_from_prob <- function(levels_var, pred, y_value) {
   same_type(levels_var[apply(pred, 1, which.max)], y_value)
 }
@@ -965,11 +999,11 @@ rf_partial_dependence <- function(df, ...) { # TODO: write test for this.
 }
 
 ubSMOTE2 <- function(X,Y, max_synth_perc=200, target_minority_perc=40, target_size=NULL, k=5, ...) {
-  if(!is.factor(Y)) 
+  if(!is.factor(Y))
     stop("Y has to be a factor")
-  if(is.vector(X)) 
-    stop("X cannot be a vector")  
-  
+  if(is.vector(X))
+    stop("X cannot be a vector")
+
   data<-cbind(X,Y)
   id.1 <- which(Y == 1)
 
@@ -989,9 +1023,9 @@ ubSMOTE2 <- function(X,Y, max_synth_perc=200, target_minority_perc=40, target_si
     else {
       synth_perc_ <- synth_perc
     }
-    newExs <- unbalanced::ubSmoteExs(data[id.1,], "Y", synth_perc_, k)   
+    newExs <- unbalanced::ubSmoteExs(data[id.1,], "Y", synth_perc_, k)
     row.is.na<-row.has.na(newExs)
-    
+
     if(any(row.is.na)) {
       newExs<-newExs[!row.is.na, ]
       colnames(newExs)<-colnames(data)
@@ -1049,7 +1083,7 @@ ubSMOTE2 <- function(X,Y, max_synth_perc=200, target_minority_perc=40, target_si
       target_majority_size <- as.integer((nrow(newExs) + minority_size) / target_minority_perc * (100 - target_minority_perc))
       majority_data <- sample_majority(data, target_majority_size)
       minority_data <- data[id.1,]
-      
+
       # the final data set (the undersample + the rare cases + the smoted exs)
       newdataset <- dplyr::bind_rows(majority_data, minority_data, newExs)
     }
@@ -1118,7 +1152,7 @@ ubSMOTE2 <- function(X,Y, max_synth_perc=200, target_minority_perc=40, target_si
           target_majority_size <- as.integer((nrow(newExs) + minority_size) / target_minority_perc * (100 - target_minority_perc))
           majority_data <- sample_majority(data, target_majority_size)
           minority_data <- data[id.1,]
-          
+
           # the final data set (the undersample + the rare cases + the smoted exs)
           newdataset <- dplyr::bind_rows(majority_data, minority_data, newExs)
         }
@@ -1126,7 +1160,7 @@ ubSMOTE2 <- function(X,Y, max_synth_perc=200, target_minority_perc=40, target_si
     }
   }
   # Fill NA in synthesized with FALSE.
-  newdataset <- newdataset %>% mutate(synthesized = if_else(is.na(synthesized), FALSE, synthesized)) 
+  newdataset <- newdataset %>% mutate(synthesized = if_else(is.na(synthesized), FALSE, synthesized))
   #shuffle the order of instances
   newdataset<-newdataset[sample(1:NROW(newdataset)), ]
   newdataset
@@ -1186,7 +1220,7 @@ exp_balance <- function(df,
         df <- df %>% dplyr::mutate(!!rlang::sym(col):=forcats::fct_explicit_na(as.factor(!!rlang::sym(col))))
       }
       else if(is.factor(df[[col]])) {
-        # if already factor, just turn NAs into explicit levels. 
+        # if already factor, just turn NAs into explicit levels.
         if (is.ordered(df[[col]])) {
           # if ordered, make it not ordered, since ordered factor columns are filled with NAs by ubSMOTE().
           df <- df %>% dplyr::mutate(!!rlang::sym(col):=forcats::fct_explicit_na(factor(!!rlang::sym(col), ordered=FALSE)))
@@ -1251,7 +1285,7 @@ exp_balance <- function(df,
       df_balanced[[target_col]] <- as.logical(df_balanced[[target_col]]) # turn it back to logical.
     }
     if (was_target_character) {
-      df_balanced[[target_col]] <- as.character(df_balanced[[target_col]]) # turn it back to character 
+      df_balanced[[target_col]] <- as.character(df_balanced[[target_col]]) # turn it back to character
     }
     if (!is.null(orig_levels_order)) { # if target was factor, set original factor order. note this is different from orig_levels.
       df_balanced[[target_col]] <- forcats::fct_relevel(df_balanced[[target_col]], orig_levels_order)
@@ -1288,18 +1322,18 @@ get_classification_type <- function(v) {
   if (!is.numeric(v)) {
     if (!is.logical(v)) {
       if (length(unique(v)) == 2) {
-        classification_type <- "binary" 
+        classification_type <- "binary"
       }
       else {
-        classification_type <- "multi" 
+        classification_type <- "multi"
       }
     }
     else {
-      classification_type <- "binary" 
+      classification_type <- "binary"
     }
   }
   else {
-    classification_type <- "regression" 
+    classification_type <- "regression"
   }
 }
 
@@ -1334,7 +1368,7 @@ cleanup_df <- function(df, target_col, selected_cols, grouped_cols, target_n, pr
     if(all(is.na(df[[col]]))){
       # remove columns if they are all NA
       cols <- setdiff(cols, col)
-      df[[col]] <- NULL # drop the column so that SMOTE will not see it. 
+      df[[col]] <- NULL # drop the column so that SMOTE will not see it.
     }
   }
 
@@ -1502,7 +1536,7 @@ cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, nam
     unique_val <- unique(df[[col]])
     if (length(unique_val[!is.na(unique_val)]) <= 1) {
       c_cols <- setdiff(c_cols, col)
-      df[[col]] <- NULL # drop the column so that SMOTE will not see it. 
+      df[[col]] <- NULL # drop the column so that SMOTE will not see it.
     }
   }
 
@@ -1518,7 +1552,7 @@ cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, nam
 extract_importance_history_from_boruta <- function(x) {
   res <- tidyr::gather(as.data.frame(x$ImpHistory), "variable","importance")
   decisions <- data.frame(variable=names(x$finalDecision), decision=x$finalDecision)
-  res <- res %>% dplyr::left_join(decisions, by = "variable") 
+  res <- res %>% dplyr::left_join(decisions, by = "variable")
   res <- res %>% dplyr::filter(decision %in% c("Confirmed", "Tentative", "Rejected")) # Remove rows with NA, which are shadow variables
   res
 }
@@ -1549,7 +1583,7 @@ calc_feature_imp <- function(df,
                              smote_max_synth_perc = 200,
                              smote_k = 5,
                              importance_measure = "permutation", # "permutation" or "impurity".
-                             max_pd_vars = 12, # Number of most important variables to calculate partial dependences on. Default 12 fits well with either 3 or 4 columns of facets. 
+                             max_pd_vars = 12, # Number of most important variables to calculate partial dependences on. Default 12 fits well with either 3 or 4 columns of facets.
                              with_boruta = FALSE,
                              boruta_max_runs = 20, # Maximal number of importance source runs.
                              boruta_p_value = 0.05, # Boruta recommends using the default 0.01 for P-value, but we are using 0.05 for consistency with other functions of ours.
@@ -1755,7 +1789,7 @@ evaluate_classification <- function(actual, predicted, class, multi_class = TRUE
 
   if (multi_class) {
     data_size <- sum(actual == class)
-  
+
     ret <- data.frame(
       class,
       f_score,
@@ -1969,7 +2003,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
       }
       chart_type_map <- ifelse(chart_type_map, "line", "scatter")
       names(chart_type_map) <- colnames(x$df)
-      
+
       ret <- ret %>%  dplyr::mutate(chart_type = chart_type_map[x_name])
       ret <- ret %>% dplyr::mutate(x_name = x$terms_mapping[x_name]) # map variable names to original.
       ret
