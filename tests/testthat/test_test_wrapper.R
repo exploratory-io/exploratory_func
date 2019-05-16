@@ -315,3 +315,12 @@ test_that("test exp_normality", {
   model_summary <- ret %>% tidy(model, type="model_summary", signif_level=0.1)
   ret
 })
+
+test_that("test exp_normality with column with almost always same value", {
+  # test for column with almost always same value, except for NA, to test column prefiltering logic to avoid error.
+  df <- mtcars %>% mutate(dummy=c(NA, 0, rep(1,n()-2)))
+  ret <- df %>% exp_normality(mpg, gear, dummy, n_sample=6, n_sample_qq=30)
+  qq <- ret %>% tidy(model, type="qq")
+  model_summary <- ret %>% tidy(model, type="model_summary", signif_level=0.1)
+  ret
+})
