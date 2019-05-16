@@ -636,6 +636,10 @@ exp_normality<- function(df, ...,
 
         if (length(df[[col]]) > n_sample) {
           col_to_test <- sample(df[[col]], n_sample)
+          # If sampled, check if the column has only 1 unique value or only NAs again, to avoid error.
+          if (n_distinct(col_to_test, na.rm=TRUE) <= 1) {
+            next
+          }
           sample_size <- n_sample
         }
         else {
