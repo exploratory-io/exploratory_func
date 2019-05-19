@@ -148,7 +148,9 @@ add_prediction <- function(df, model_df, conf_int = 0.95, ...){
   # if type.predict argument is not indicated in this function
   # and models have $family$linkinv (basically, glm models have it),
   # both fitted link value column and response value column should appear in the result
-  with_response <- !("type.predict" %in% names(cll)) & !is.null(model_df[["model"]][[1]]$family) & !is.null(model_df[["model"]][[1]]$family$linkinv)
+    with_response <- !("type.predict" %in% names(cll)) &&
+                       any(lapply(df$model, function(s) { "family" %in% names(s) })) &&
+                       any(lapply(df$model, function(s) { !is.null(s$family$linkinv) }))
 
   ret <- tryCatch({
     get_result(model_df, df, aug_args, with_response)
@@ -313,7 +315,9 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
     # and models have $family$linkinv (basically, glm models have it),
     # both fitted link value column and response value column should appear in the result
 
-    with_response <- !("type.predict" %in% names(cll)) && "family" %in% names(df[["model"]][[1]]) && !is.null(df[["model"]][[1]]$family$linkinv)
+    with_response <- !("type.predict" %in% names(cll)) &&
+                       any(lapply(df$model, function(s) { "family" %in% names(s) })) &&
+                       any(lapply(df$model, function(s) { !is.null(s$family$linkinv) }))
 
     ret <- if(test){
       # augment by test data
