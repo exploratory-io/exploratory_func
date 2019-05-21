@@ -446,3 +446,61 @@ test_that("Group GLM - Negative Binomial Destribution with test_rate", {
    })
 })
 
+test_that("Logistic Regression with test_rate", {
+  ret <- test_data %>% build_lm.fast(`CANCELLED X`,
+                                     `ARR_TIME`,
+                                     `DERAY_TIME`,
+                                     `Carrier Name`,
+                                     model_type = "glm",
+                                     test_rate = 0.2)
+  expect_equal(colnames(ret), c("model", ".test_index", "source.data"))
+  test_rownum <- length(ret$.test_index[[1]])
+  training_rownum <- nrow(test_data) - test_rownum
+
+  suppressWarnings({
+    pred_training <- prediction(ret, data = "training")
+    pred_test <- prediction(ret, data = "test")
+    expect_equal(training_rownum, nrow(pred_training))
+    expect_equal(test_rownum, nrow(pred_test))
+
+    expected_cols <- c("CANCELLED.X", "Carrier.Name", "ARR_TIME", "DERAY_TIME",
+                       "predicted_value", "standard_error", "conf_low", "conf_high", "residuals", "hat",
+                       "residual_standard_deviation", "cooks_distance", "standardised_residuals", "predicted_response")
+    expect_equal(colnames(pred_training), expected_cols)
+    expected_cols <- c("CANCELLED.X", "Carrier.Name", "ARR_TIME", "DERAY_TIME", "predicted_value", "standard_error",
+                       "conf_low", "conf_high", "predicted_response")
+    expect_equal(colnames(pred_test), expected_cols)
+   })
+})
+
+test_that("Group Logistic Regression with test_rate", {
+  group_data <- test_data %>% group_by(klass)
+  ret <- group_data %>%
+           build_lm.fast(`CANCELLED X`,
+                        `ARR_TIME`,
+                        model_type = "glm",
+                        test_rate = 0.2)
+  expect_equal(colnames(ret), c("klass", "model", ".test_index", "source.data"))
+  group_nrows <- group_data %>% summarize(n=n()) %>% `[[`("n")
+  test_nrows <- sapply(ret$.test_index, length, simplify=TRUE)
+  training_nrows <- group_nrows - test_nrows
+
+  suppressWarnings({
+    pred_training <- prediction(ret, data = "training")
+    pred_test <- prediction(ret, data = "test")
+    expect_equal(pred_training %>% summarize(n=n()) %>% `[[`("n"),
+                 training_nrows)
+    expect_equal(pred_test %>% summarize(n=n()) %>% `[[`("n"),
+                 test_nrows)
+
+    expected_cols <- c("klass", "CANCELLED.X", "ARR_TIME", "klass1", "predicted_value",
+                       "standard_error", "conf_low", "conf_high", "residuals", "hat", "residual_standard_deviation",
+                       "cooks_distance", "standardised_residuals", "predicted_response")
+    expect_equal(colnames(pred_training), expected_cols)
+
+    expected_cols <- c("klass", "CANCELLED.X", "ARR_TIME", "klass1", "predicted_value",
+                       "standard_error", "conf_low", "conf_high", "predicted_response")
+    expect_equal(colnames(pred_test), expected_cols)
+   })
+})
+
