@@ -521,3 +521,46 @@ test_that("test data frame prediction by xgboost with group", {
   expect_equal(prediction_ret3$predicted_value[!is.na(prediction_ret3$predicted_value)], prediction_ret2$predicted_value[!is.na(prediction_ret2$predicted_value)])
 })
 
+test_that("test prediction_training_and_test by glm", {
+  test_data <- structure(
+      list(
+        `CANCELLED X` = c("N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "Y", "N", "Y", "N"),
+        `Carrier Name` = c("Delta Air Lines", "American Eagle", "American Airlines", "Southwest Airlines", "SkyWest Airlines", "Southwest Airlines", "Southwest Airlines", "Delta Air Lines", "Southwest Airlines", "Atlantic Southeast Airlines", "American Airlines", "Southwest Airlines", "US Airways", "US Airways", "Delta Air Lines", "Atlantic Southeast Airlines", NA, "Atlantic Southeast Airlines", "Delta Air Lines", "Delta Air Lines"),
+        CARRIER = factor(c("AA", "MQ", "AA", "DL", "MQ", "AA", "DL", "DL", "MQ", "AA", "AA", "WN", "US", "US", "DL", "EV", "9E", "EV", "DL", "DL")), # test with factor with NA
+        # testing filtering of Inf, -Inf, NA here.
+        DISTANCE = c(10, 12, 12, 187, 273, 1062, 583, 240, 1123, 851, 852, 862, 361, 507, 1020, 1092, 342, 489, 1184, 545),
+        ARR_TIME = c(10, 32, 321, 342, 123, 98, 10, 21, 80, 211, 121, 87, 821, 213, 213, 923, 121, 76, 34, 50),
+        DERAY_TIME = c(12, 42, 321, 31, 3, 43, 342, 764, 123, 43, 50, 12, 876, 12, 34, 45, 84, 25, 87, 352, 10)
+        ), row.names = c(NA, -20L),
+      class = c("tbl_df", "tbl", "data.frame"), .Names = c("CANCELLED X", "Carrier Name", "CARRIER", "DISTANCE", "ARR_TIME", "DERAY_TIME"))
+  
+  test_data$klass <- c(rep("A", 10), rep("B", 10))
+  model_ret <- test_data %>% build_lm.fast(`DISTANCE`,
+                                     `ARR_TIME`,
+                                     `DERAY_TIME`,
+                                     `Carrier Name`,
+                                     model_type = "lm",
+                                     test_rate = 0.2)
+  ret <- model_ret %>% prediction_training_and_test(.)
+  expected_cols <- c("is_test_data", "Carrier.Name", "DISTANCE", "ARR_TIME",
+                     "DERAY_TIME", "predicted_value", "standard_error",
+                     "conf_low", "conf_high", "residuals", "hat",
+                     "residual_standard_deviation", "cooks_distance",
+                     "standardised_residuals")
+  expect_equal(colnames(ret), expected_cols)
+  grp_model_ret <- test_data %>% dplyr::group_by(klass) %>%
+                     build_lm.fast(`DISTANCE`,
+                                   `ARR_TIME`,
+                                   `DERAY_TIME`,
+                                   `Carrier Name`,
+                                   model_type = "lm",
+                                   test_rate = 0.2)
+  grp_ret <- grp_model_ret %>% prediction_training_and_test(.)
+  expected_cols <- c("klass", "is_test_data", "Carrier.Name", "DISTANCE",
+                     "ARR_TIME", "DERAY_TIME", "predicted_value",
+                     "standard_error", "conf_low", "conf_high", "residuals",
+                     "hat", "residual_standard_deviation",
+                     "cooks_distance", "standardised_residuals")
+  expect_equal(colnames(grp_ret), expected_cols)
+})
+

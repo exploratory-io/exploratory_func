@@ -454,6 +454,43 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
   dplyr::group_by(ret, !!!rlang::syms(grouping_cols))
 }
 
+#' prediction wrapper for both training and test data
+#' @param df Data frame to predict. This should have model column.
+#' @export
+prediction_training_and_test <- function(df, prediction_type="default", ...) {
+  test_index <- df$.test_index[[1]]
+
+  grouped_cols <- colnames(df)[!colnames(df) %in% c("model", ".test_index", "source.data", ".model_metadata")]
+
+  tra_ret <- switch(prediction_type,
+                    default = prediction(df, ...),
+                    binary = prediction_binary(df, ...),
+                    coxph = prediction_coxph(df, ...))
+  ret <- tra_ret %>% dplyr::mutate(is_test_data = FALSE)
+  ret <- if (length(grouped_cols) > 0) {
+    ret %>% dplyr::select(grouped_cols, is_test_data, everything())
+  } else {
+    ret %>% dplyr::select(is_test_data, everything())
+  }
+
+  if (length(test_index) > 0) {
+    test_ret <- switch(prediction_type,
+                    default = prediction(df, data = "test", ...),
+                    binary = prediction_binary(df, data = "test", ...),
+                    coxph = prediction_coxph(df, data = "test", ...))
+    test_ret <- test_ret %>% dplyr::mutate(is_test_data = TRUE)
+
+    test_ret <- if (length(grouped_cols) > 0){
+      test_ret %>% dplyr::select(grouped_cols, is_test_data, everything())
+    } else {
+      test_ret %>% dplyr::select(is_test_data, everything())
+    }
+    ret <- ret %>% dplyr::bind_rows(test_ret)
+  }
+
+  ret
+}
+
 #' prediction wrapper to set predicted labels
 #' @param df Data frame to predict. This should have model column.
 #' @param threshold Threshold value for predicted probability or what to optimize. It can be "f_score", "accuracy", "precision", "sensitivity" or "specificity" to optimize.
