@@ -587,7 +587,12 @@ build_lm.fast <- function(df,
             df[[model_and_data_col]][[1]]$test_index
           })) %>%
           dplyr::mutate(source.data = purrr::map(data, function(df){
-            df[[model_and_data_col]][[1]]$source_data
+            data <- df[[model_and_data_col]][[1]]$source_data
+            if (length(grouped_cols) > 0) {
+              data %>% dplyr::select(-grouped_cols)
+            } else {
+              data
+            }
           })) %>%
           dplyr::select(-data) %>%
           dplyr::rowwise()
@@ -693,6 +698,7 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add tes
         dplyr::select(`P Value`, `Log Likelihood`, `AIC`, `BIC`, `Deviance`, `Null Deviance`, `DF for Null Model`, everything())
     }
   }
+
   ret
 }
 

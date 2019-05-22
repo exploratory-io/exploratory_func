@@ -135,12 +135,12 @@ test_that("Group Linear Regression with test_rate", {
     expect_equal(pred_test %>% summarize(n=n()) %>% `[[`("n"),
                  test_nrows)
 
-    expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "klass1", "predicted_value",
+    expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "predicted_value",
                        "standard_error", "conf_low", "conf_high", "residuals", "hat", "residual_standard_deviation",
                        "cooks_distance", "standardised_residuals")
     expect_equal(colnames(pred_training), expected_cols)
 
-    expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "klass1", "predicted_value",
+    expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "predicted_value",
                        "standard_error", "conf_low", "conf_high")
     expect_equal(colnames(pred_test), expected_cols)
    })
@@ -195,12 +195,12 @@ test_that("Group GLM - Normal Destribution with test_rate", {
     expect_equal(pred_test %>% summarize(n=n()) %>% `[[`("n"),
                  test_nrows)
 
-    expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "klass1", "predicted_value",
+    expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "predicted_value",
                        "standard_error", "conf_low", "conf_high", "residuals", "hat", "residual_standard_deviation",
                        "cooks_distance", "standardised_residuals", "predicted_response")
     expect_equal(colnames(pred_training), expected_cols)
 
-    expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "klass1", "predicted_value",
+    expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "predicted_value",
                        "standard_error", "conf_low", "conf_high", "predicted_response")
     expect_equal(colnames(pred_test), expected_cols)
    })
@@ -255,12 +255,12 @@ test_that("Group GLM - Gamma Destribution with test_rate", {
     expect_equal(pred_test %>% summarize(n=n()) %>% `[[`("n"),
                  test_nrows)
 
-    expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "klass1", "predicted_value",
+    expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "predicted_value",
                        "standard_error", "conf_low", "conf_high", "residuals", "hat", "residual_standard_deviation",
                        "cooks_distance", "standardised_residuals", "predicted_response")
     expect_equal(colnames(pred_training), expected_cols)
 
-    expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "klass1", "predicted_value",
+    expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "predicted_value",
                        "standard_error", "conf_low", "conf_high", "predicted_response")
     expect_equal(colnames(pred_test), expected_cols)
    })
@@ -315,12 +315,12 @@ test_that("Group GLM - Inverse Gaussian Destribution with test_rate", {
     expect_equal(pred_test %>% summarize(n=n()) %>% `[[`("n"),
                  test_nrows)
 
-    expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "klass1", "predicted_value",
+    expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "predicted_value",
                        "standard_error", "conf_low", "conf_high", "residuals", "hat", "residual_standard_deviation",
                        "cooks_distance", "standardised_residuals", "predicted_response")
     expect_equal(colnames(pred_training), expected_cols)
 
-    expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "klass1", "predicted_value",
+    expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "predicted_value",
                        "standard_error", "conf_low", "conf_high", "predicted_response")
     expect_equal(colnames(pred_test), expected_cols)
    })
@@ -375,12 +375,12 @@ test_that("Group GLM - Poisson Destribution with test_rate", {
     expect_equal(pred_test %>% summarize(n=n()) %>% `[[`("n"),
                  test_nrows)
 
-    expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "klass1", "predicted_value",
+    expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "predicted_value",
                        "standard_error", "conf_low", "conf_high", "residuals", "hat", "residual_standard_deviation",
                        "cooks_distance", "standardised_residuals", "predicted_response")
     expect_equal(colnames(pred_training), expected_cols)
 
-    expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "klass1", "predicted_value",
+    expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "predicted_value",
                        "standard_error", "conf_low", "conf_high", "predicted_response")
     expect_equal(colnames(pred_test), expected_cols)
    })
@@ -435,12 +435,12 @@ test_that("Group GLM - Negative Binomial Destribution with test_rate", {
     expect_equal(pred_test %>% summarize(n=n()) %>% `[[`("n"),
                  test_nrows)
 
-    expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "klass1", "predicted_value",
+    expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "predicted_value",
                        "standard_error", "conf_low", "conf_high", "residuals", "hat", "residual_standard_deviation",
                        "cooks_distance", "standardised_residuals", "predicted_response")
     expect_equal(colnames(pred_training), expected_cols)
 
-    expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "klass1", "predicted_value",
+    expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "predicted_value",
                        "standard_error", "conf_low", "conf_high", "predicted_response")
     expect_equal(colnames(pred_test), expected_cols)
    })
@@ -451,6 +451,7 @@ test_that("Logistic Regression with test_rate", {
                                      `ARR_TIME`,
                                      `DERAY_TIME`,
                                      `Carrier Name`,
+                                     family = "binomial",
                                      model_type = "glm",
                                      test_rate = 0.2)
   expect_equal(colnames(ret), c("model", ".test_index", "source.data"))
@@ -479,6 +480,8 @@ test_that("Group Logistic Regression with test_rate", {
            build_lm.fast(`CANCELLED X`,
                         `ARR_TIME`,
                         model_type = "glm",
+                        family = "binomial",
+                        link = "logit",
                         test_rate = 0.2)
   expect_equal(colnames(ret), c("klass", "model", ".test_index", "source.data"))
   group_nrows <- group_data %>% summarize(n=n()) %>% `[[`("n")
@@ -493,12 +496,12 @@ test_that("Group Logistic Regression with test_rate", {
     expect_equal(pred_test %>% summarize(n=n()) %>% `[[`("n"),
                  test_nrows)
 
-    expected_cols <- c("klass", "CANCELLED.X", "ARR_TIME", "klass1", "predicted_value",
+    expected_cols <- c("klass", "CANCELLED.X", "ARR_TIME", "predicted_value",
                        "standard_error", "conf_low", "conf_high", "residuals", "hat", "residual_standard_deviation",
                        "cooks_distance", "standardised_residuals", "predicted_response")
     expect_equal(colnames(pred_training), expected_cols)
 
-    expected_cols <- c("klass", "CANCELLED.X", "ARR_TIME", "klass1", "predicted_value",
+    expected_cols <- c("klass", "CANCELLED.X", "ARR_TIME", "predicted_value",
                        "standard_error", "conf_low", "conf_high", "predicted_response")
     expect_equal(colnames(pred_test), expected_cols)
    })
