@@ -588,7 +588,7 @@ build_lm.fast <- function(df,
           })) %>%
           dplyr::mutate(source.data = purrr::map(data, function(df){
             data <- df[[model_and_data_col]][[1]]$source_data
-            if (length(grouped_cols) > 0) {
+            if (length(grouped_cols) > 0 && !is.null(data)) {
               data %>% dplyr::select(-grouped_cols)
             } else {
               data
