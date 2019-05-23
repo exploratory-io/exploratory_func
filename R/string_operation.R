@@ -262,7 +262,7 @@ calc_tf_ <- function(df, group_col, term_col, weight="ratio"){
 #' @param group Column of group names
 #' @param term Column of terms
 #' @param [DEPRECATED] idf_log_scale
-#' Function to scale IDF. “log” function is always applied to IDF. Setting other functions is ignored
+#' Function to scale IDF. 'log' function is always applied to IDF. Setting other functions is ignored
 #' @export
 do_tfidf <- function(df, group, term, idf_log_scale = log, tf_weight="raw", norm="l2"){
   validate_empty_data(df)
@@ -275,7 +275,7 @@ do_tfidf <- function(df, group, term, idf_log_scale = log, tf_weight="raw", norm
   }
 
   if(!missing(idf_log_scale)){
-	warnings("Argument idf_log_scale is deprecated. Log is always applied to IDF.")
+    warnings("Argument idf_log_scale is deprecated. Log is always applied to IDF.")
   }
 
   group_col <- col_name(substitute(group))
