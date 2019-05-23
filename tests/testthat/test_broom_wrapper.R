@@ -542,11 +542,11 @@ test_that("test prediction_training_and_test by glm", {
                                      model_type = "lm",
                                      test_rate = 0.2)
   ret <- model_ret %>% prediction_training_and_test(.)
-  expected_cols <- c("is_test_data", "Carrier.Name", "DISTANCE", "ARR_TIME",
+  expected_cols <- c("Carrier.Name", "DISTANCE", "ARR_TIME",
                      "DERAY_TIME", "predicted_value", "standard_error",
                      "conf_low", "conf_high", "residuals", "hat",
                      "residual_standard_deviation", "cooks_distance",
-                     "standardised_residuals")
+                     "standardised_residuals", "is_test_data")
   expect_equal(colnames(ret), expected_cols)
   grp_model_ret <- test_data %>% dplyr::group_by(klass) %>%
                      build_lm.fast(`DISTANCE`,
@@ -556,11 +556,11 @@ test_that("test prediction_training_and_test by glm", {
                                    model_type = "lm",
                                    test_rate = 0.2)
   grp_ret <- grp_model_ret %>% prediction_training_and_test(.)
-  expected_cols <- c("klass", "is_test_data", "Carrier.Name", "DISTANCE",
+  expected_cols <- c("klass", "Carrier.Name", "DISTANCE",
                      "ARR_TIME", "DERAY_TIME", "predicted_value",
                      "standard_error", "conf_low", "conf_high", "residuals",
                      "hat", "residual_standard_deviation",
-                     "cooks_distance", "standardised_residuals")
+                     "cooks_distance", "standardised_residuals", "is_test_data")
   expect_equal(colnames(grp_ret), expected_cols)
 })
 

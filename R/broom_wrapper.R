@@ -466,29 +466,20 @@ prediction_training_and_test <- function(df, prediction_type="default", ...) {
                     default = prediction(df, ...),
                     binary = prediction_binary(df, ...),
                     coxph = prediction_coxph(df, ...))
-  ret <- tra_ret %>% dplyr::mutate(is_test_data = FALSE)
-  ret <- if (length(grouped_cols) > 0) {
-    ret %>% dplyr::select(grouped_cols, is_test_data, everything())
-  } else {
-    ret %>% dplyr::select(is_test_data, everything())
-  }
+  ret <- tra_ret %>% dplyr::mutate(is_test_data = FALSE) %>%
+                       dplyr::select(-is_test_data, everything(), is_test_data)
 
   if (length(test_index) > 0) {
     test_ret <- switch(prediction_type,
                     default = prediction(df, data = "test", ...),
                     binary = prediction_binary(df, data = "test", ...),
                     coxph = prediction_coxph(df, data = "test", ...))
-    test_ret <- test_ret %>% dplyr::mutate(is_test_data = TRUE)
-
-    test_ret <- if (length(grouped_cols) > 0){
-      test_ret %>% dplyr::select(grouped_cols, is_test_data, everything())
-    } else {
-      test_ret %>% dplyr::select(is_test_data, everything())
-    }
+    test_ret <- test_ret %>% dplyr::mutate(is_test_data = TRUE) %>%
+                  dplyr::select(-is_test_data, everything(), is_test_data)
     ret <- ret %>% dplyr::bind_rows(test_ret)
   }
 
-  ret
+  ret %>% dplyr::arrange(desc(is_test_data), .by_group = TRUE)
 }
 
 #' prediction wrapper to set predicted labels
