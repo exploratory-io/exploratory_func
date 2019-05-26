@@ -559,7 +559,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     }
   } else if (type == "postgres" || type == "redshift" || type == "vertica") {
     if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
-    if(!requireNamespace("RPostgreSQL")){stop("package RPostgreSQL must be installed.")}
+    if(!requireNamespace("RPostgres")){stop("package RPostgre must be installed.")}
     # use same key "postgres" for redshift and vertica too, since they use
     # queryPostgres() too, which uses the key "postgres"
     key <- paste("postgres", host, port, databaseName, username, sep = ":")
@@ -588,12 +588,13 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       })
     }
     if (is.null(conn)) {
-      drv <- DBI::dbDriver("PostgreSQL")
-      pg_dsn = paste0(
-        'dbname=', databaseName, ' ',
-        'sslmode=prefer'
-      )
-      conn <- RPostgreSQL::dbConnect(drv, dbname=pg_dsn, user = username,
+      # drv <- DBI::dbDriver("PostgreSQL")
+      drv <- RPostgres::Postgres()
+      #pg_dsn = paste0(
+      #  'dbname=', databaseName, ' ',
+      #  'sslmode=prefer'
+      #)
+      conn <- RPostgreSQL::dbConnect(drv, dbname=databaseName, user = username,
                                      password = password, host = host, port = port)
       connection_pool[[key]] <- conn
     }
