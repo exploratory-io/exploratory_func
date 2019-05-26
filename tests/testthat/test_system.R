@@ -190,3 +190,10 @@ test_that("bigquery_glue_transformer", {
   res <- glue_exploratory("select * from emp where deptname in (@{dept_names}) and empid > @{empid_above}", .transformer=bigquery_glue_transformer)
   expect_equal(as.character(res), "select * from emp where deptname in (NULL) and empid > 1100")
 })
+
+test_that("bind_rows", {
+  library(dplyr)
+  res <- mtcars %>% exploratory:::bind_rows(list(acars = mtcars, bcars = mtcars), .id="dataf", firstLabel="firstMtcars")
+  expect_equal(unique(res$dataf), c("firstMtcars", "acars", "bcars"))
+})
+
