@@ -1885,18 +1885,18 @@ read_raw_lines <- function(file, locale = readr::default_locale(), na = characte
 
 #'Wrapper function for dplyr::bind_rows to support named data frames when it's called inside dplyr chain.
 #'@export
-bind_rows <- function(..., .id = NULL, firstLabel = '') {
+bind_rows <- function(..., .id = NULL, first_id = '') {
   # If the dplyr::bind_rows is called within a dplyr chain like df1 %>% dplyr::bind_rows(list(df_2 = df2, df_3 = df3), .id="id"),
   # since df1 does not have a name, the "id" column of the resulting data frame does not have the data frame name for rows from df1.
   # To workaround this issue, set a name to the first data frame with the value specified by fistLabel argument as a pre-process
   # then pass the updated list to dplyr::bind_rows.
-  if(stringr::str_length(firstLabel) >0) {
+  if(stringr::str_length(first_id) >0) {
     x <- dplyr:::flatten_bindable(rlang::dots_values(...))
     x_updated <- list()
     count <- 0
     for (name in names(x)) {
       if(count == 0) {
-        x_updated[[firstLabel]] = x[[1]]
+        x_updated[[first_id]] = x[[1]]
         count <- count + 1
       } else {
         x_updated[[name]] = x[[name]]

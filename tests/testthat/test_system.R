@@ -193,7 +193,7 @@ test_that("bigquery_glue_transformer", {
 
 test_that("bind_rows", {
   library(dplyr)
-  res <- mtcars %>% exploratory:::bind_rows(list(acars = mtcars, bcars = mtcars), .id="dataf", firstLabel="firstMtcars")
+  res <- mtcars %>% exploratory::bind_rows(list(acars = mtcars, bcars = mtcars), .id="dataf", first_id="firstMtcars")
   expect_equal(unique(res$dataf), c("firstMtcars", "acars", "bcars"))
 })
 
