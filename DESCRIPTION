@@ -50,7 +50,7 @@ Suggests:
     lubridate,
     googlesheets,
     DBI,
-    RPostgreSQL,
+    RPostgres,
     RPresto,
     mongolite,
     bigrquery,
