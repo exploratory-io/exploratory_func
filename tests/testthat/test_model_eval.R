@@ -86,7 +86,7 @@ test_that("test evaluate_binary with 2 numeric values", {
 
   predicted[["CANCELLED"]] <- c(4, 2, 4, 2, 4, 2, 4, 2, 4, 2, 2, 4, 2, NA, 2)
   ret <- evaluate_binary(predicted, predicted_response, CANCELLED)
-  # TODO: Is this expectation really needed?
+  # Removed following expectation, since in this case, optimal threshold becomes actually 0, most likely because of imbalanced data.
   # expect_true(ret[["threshold"]] != 0)
 
   predicted[["CANCELLED"]] <- c(2, 4, 4, 2, 2, 4, 4, 2, 2, 2, 3, 4, 2, NA, 2)
