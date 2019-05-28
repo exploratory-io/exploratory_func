@@ -312,3 +312,32 @@ evaluate_multi_ <- function(df, pred_label_col, actual_val_col, pretty.name = FA
 
   ret
 }
+
+#' @export
+evaluate_binary_training_and_test <- function(df, actual_val_col, threshold = "f_score", pretty.name = FALSE, test_rate = 0.0){
+  training_ret <- df %>% broom::glance(model)
+  training_ret$is_test_data <- FALSE
+  ret <- training_ret
+
+  if (test_rate > 0.0) {
+    test_pred_ret <- prediction_binary(df, data = "test")
+
+    # Terms Mapping
+    ## get Model Object
+    m <- df %>% filter(!is.null(model)) %>% `[[`(1, "model", 1)
+    actual_val_col <- m$terms_mapping[m$terms_mapping == actual_val_col] %>% names(.)
+
+    eret <- evaluate_binary_(test_pred_ret, "predicted_probability", actual_val_col, threshold = threshold)
+
+    test_ret <- eret %>% dplyr::mutate(positives = true_positive + false_positive,
+                           negatives = true_negative + false_negative) %>%
+                  dplyr::select(auc = AUC, f_score, accuracy_rate,
+                           misclassification_rate, precision, recall,
+                           positives, negatives)
+    test_ret$is_test_data <- TRUE
+    ret <- ret %>% dplyr::bind_rows(test_ret)
+  }
+
+  ret
+}
+
