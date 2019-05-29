@@ -315,7 +315,7 @@ evaluate_multi_ <- function(df, pred_label_col, actual_val_col, pretty.name = FA
 
 #' @export
 evaluate_binary_training_and_test <- function(df, actual_val_col, threshold = "f_score", pretty.name = FALSE, test_rate = 0.0){
-  training_ret <- df %>% broom::glance(model)
+  training_ret <- df %>% broom::glance(model, threshold = threshold)
   training_ret$is_test_data <- FALSE
   ret <- training_ret
 

@@ -619,7 +619,7 @@ glance.lm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
 
 #' special version of glance.lm function to use with build_lm.fast.
 #' @export
-glance.glm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
+glance.glm_exploratory <- function(x, pretty.name = FALSE, threshold = 0.5, ...) { #TODO: add test
   ret <- broom:::glance.glm(x)
 
   # calculate model p-value since glm does not provide it as is.
@@ -647,6 +647,11 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add tes
   
   if (x$family$family %in% c('binomial', 'quasibinomial')) { # only for logistic regression.
     # Calculate F Score, Accuracy Rate, Misclassification Rate, Precision, Recall, Data Size
+    threshold_value <- if (is.numeric(threshold)) {
+      threshold
+    } else {
+      get_optimized_score(x$y, x$fitted.value, threshold = threshold)$threshold
+    }
     predicted <- ifelse(x$fitted.value > 0.5, 1, 0) #TODO make threshold adjustable
     ret2 <- evaluate_classification(x$y, predicted, 1, pretty.name = pretty.name)
     ret2 <- ret2[, 2:6]
