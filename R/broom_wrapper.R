@@ -458,7 +458,7 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
 #' @param df Data frame to predict. This should have model column.
 #' @export
 prediction_training_and_test <- function(df, prediction_type="default", ...) {
-  test_index <- df$.test_index[[1]]
+  test_index <- df %>% dplyr::filter(!is.null(.test_index)) %>% `[[`(1, ".test_index", 1)
 
   grouped_cols <- colnames(df)[!colnames(df) %in% c("model", ".test_index", "source.data", ".model_metadata")]
 
@@ -467,13 +467,39 @@ prediction_training_and_test <- function(df, prediction_type="default", ...) {
                     binary = prediction_binary(df, ...),
                     coxph = prediction_coxph(df, ...))
   ret <- tra_ret %>% dplyr::mutate(is_test_data = FALSE) %>%
-                       dplyr::select(-is_test_data, everything(), is_test_data)
+                     dplyr::select(-is_test_data, everything(), is_test_data)
 
   if (length(test_index) > 0) {
-    test_ret <- switch(prediction_type,
-                    default = prediction(df, data = "test", ...),
-                    binary = prediction_binary(df, data = "test", ...),
-                    coxph = prediction_coxph(df, data = "test", ...))
+    target_df <- if (length(grouped_cols) > 0) {
+      # like CAR RIER
+      # To avoid errors when passing CAR RIER-like columns to group_by_ in Standard Evaluation,
+      # enclose the column names in back quotes
+      df %>% dplyr::ungroup() %>% dplyr::group_by_(paste0('`', grouped_cols,'`'))
+    } else {
+      df
+    }
+
+    each_func <- function(df){
+      tryCatch({
+        test_ret <- switch(prediction_type,
+                           default = prediction(df, data = "test", ...),
+                           binary = prediction_binary(df, data = "test", ...),
+                           coxph = prediction_coxph(df, data = "test", ...))
+
+        # To prevent the group by column from being stored redundantly as follows:
+        #   klass, klass1
+        test_ret %>% dplyr::ungroup() %>% dplyr::select(-grouped_cols)
+      }, error = function(e){
+        # In the prediction type of function, if there is categorical data which was not at the time of learning at the time of test,
+        # delete the line. Also, if there is too little data prediction functions return the following error
+        #   no data found that can be predicted by the model
+        # When predicting by group by, certain categories may be reduced,
+        # but you may want to predict other categories, so catch errors and return empty data frames.
+        data.frame()
+      })
+    }
+
+    test_ret <- do_on_each_group(target_df, each_func, with_unnest = TRUE)
     test_ret <- test_ret %>% dplyr::mutate(is_test_data = TRUE) %>%
                   dplyr::select(-is_test_data, everything(), is_test_data)
     ret <- ret %>% dplyr::bind_rows(test_ret)
