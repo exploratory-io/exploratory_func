@@ -319,30 +319,47 @@ evaluate_binary_training_and_test <- function(df, actual_val_col, threshold = "f
   training_ret$is_test_data <- FALSE
   ret <- training_ret
 
+  grouped_col <- colnames(df)[!colnames(df) %in% c("model", ".test_index", "source.data")]
+
   if (test_rate > 0.0) {
-    tryCatch({
-      test_pred_ret <- prediction_binary(df, data = "test")
+    each_func <- function(df){
+      if (!is.data.frame(df)) {
+        df <- tribble(~model,   ~.test_index,   ~source.data,
+                      df$model, df$.test_index, df$source.data)
+      }
 
-      # Terms Mapping
-      ## get Model Object
-      m <- df %>% filter(!is.null(model)) %>% `[[`(1, "model", 1)
-      actual_val_col <- m$terms_mapping[m$terms_mapping == actual_val_col] %>% names(.)
+      tryCatch({
+        test_pred_ret <- prediction_binary(df, data = "test")
+  
+        # Terms Mapping
+        ## get Model Object
+        m <- df %>% filter(!is.null(model)) %>% `[[`(1, "model", 1)
+        actual_val_col <- m$terms_mapping[m$terms_mapping == actual_val_col] %>% names(.)
+  
+        eret <- evaluate_binary_(test_pred_ret, "predicted_probability", actual_val_col, threshold = threshold)
+  
+        test_ret <- eret %>% dplyr::mutate(positives = true_positive + false_positive,
+                                           negatives = true_negative + false_negative) %>%
+                             dplyr::select(auc = AUC, f_score, accuracy_rate,
+                                           misclassification_rate, precision, recall,
+                                           positives, negatives)
+        test_ret$is_test_data <- TRUE
+        test_ret
+      }, error = function(e){
+        data.frame()
+      })
+    }
 
-      eret <- evaluate_binary_(test_pred_ret, "predicted_probability", actual_val_col, threshold = threshold)
+    target_df <- if (length(grouped_col) > 0) {
+      df %>% dplyr::group_by_(paste0('`', grouped_col, '`'))
+    } else {
+      df
+    }
 
-      test_ret <- eret %>% dplyr::mutate(positives = true_positive + false_positive,
-                                         negatives = true_negative + false_negative) %>%
-                           dplyr::select(auc = AUC, f_score, accuracy_rate,
-                                         misclassification_rate, precision, recall,
-                                         positives, negatives)
-      test_ret$is_test_data <- TRUE
-      ret <- ret %>% dplyr::bind_rows(test_ret)
-    }, error = function(e) {
-      # TODO: imple handling error
-    })
+    test_ret <- do_on_each_group(target_df, each_func, with_unnest = TRUE)
+    ret <- ret %>% dplyr::bind_rows(test_ret)
   }
 
-  grouped_col <- colnames(df)[!colnames(df) %in% c("model", ".test_index", "source.data")]
   # sort column order
   ret <- ret %>% dplyr::select(f_score, accuracy_rate, misclassification_rate, precision,
                                recall, auc, positives, negatives, p.value, logLik, AIC, BIC,
@@ -375,6 +392,10 @@ evaluate_binary_training_and_test <- function(df, actual_val_col, threshold = "f
         colnames(ret)[colnames(ret) == col] <- paste0("Base Level of ", stringr::str_replace(col, "_base$", ""))
       }
     }
+  }
+
+  if (length(grouped_col) > 0){
+    ret <- ret %>% dplyr::arrange_(paste0("`", grouped_col, "`"))
   }
 
   ret
