@@ -559,7 +559,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     }
   } else if (type == "postgres" || type == "redshift" || type == "vertica") {
     if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
-    if(!requireNamespace("RPostgreSQL")){stop("package RPostgreSQL must be installed.")}
+    if(!requireNamespace("RPostgres")){stop("package RPostgre must be installed.")}
     # use same key "postgres" for redshift and vertica too, since they use
     # queryPostgres() too, which uses the key "postgres"
     key <- paste("postgres", host, port, databaseName, username, sep = ":")
@@ -588,12 +588,8 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       })
     }
     if (is.null(conn)) {
-      drv <- DBI::dbDriver("PostgreSQL")
-      pg_dsn = paste0(
-        'dbname=', databaseName, ' ',
-        'sslmode=prefer'
-      )
-      conn <- RPostgreSQL::dbConnect(drv, dbname=pg_dsn, user = username,
+      drv <- RPostgres::Postgres()
+      conn <- RPostgres::dbConnect(drv, dbname=databaseName, user = username,
                                      password = password, host = host, port = port)
       connection_pool[[key]] <- conn
     }
@@ -905,7 +901,7 @@ queryMySQL <- function(host, port, databaseName, username, password, numOfRows =
 
 #' @export
 queryPostgres <- function(host, port, databaseName, username, password, numOfRows = -1, query, ...){
-  if(!requireNamespace("RPostgreSQL")){stop("package RPostgreSQL must be installed.")}
+  if(!requireNamespace("RPostgres")){stop("package RPostgres must be installed.")}
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
 
   conn <- getDBConnection("postgres", host, port, databaseName, username, password)
@@ -915,14 +911,14 @@ queryPostgres <- function(host, port, databaseName, username, password, numOfRow
     # set envir = parent.frame() to get variables from users environment, not papckage environment
     # glue_sql does not quote Date or POSIXct. Let's use our sql_glue_transformer here.
     query <- glue_exploratory(query, .transformer=sql_glue_transformer, .envir = parent.frame())
-    resultSet <- RPostgreSQL::dbSendQuery(conn, query)
+    resultSet <- RPostgres::dbSendQuery(conn, query)
     df <- DBI::dbFetch(resultSet, n = numOfRows)
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
     clearDBConnection("postgres", host, port, databaseName, username)
     stop(err)
   })
-  RPostgreSQL::dbClearResult(resultSet)
+  RPostgres::dbClearResult(resultSet)
   df
 }
 
