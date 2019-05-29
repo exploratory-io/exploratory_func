@@ -1885,24 +1885,50 @@ read_raw_lines <- function(file, locale = readr::default_locale(), na = characte
 
 #'Wrapper function for dplyr::bind_rows to support named data frames when it's called inside dplyr chain.
 #'@export
-bind_rows <- function(..., .id = NULL, first_id = '') {
+bind_rows <- function(..., .id = NULL, first_id = '', ignore_case = FALSE) {
   # If the dplyr::bind_rows is called within a dplyr chain like df1 %>% dplyr::bind_rows(list(df_2 = df2, df_3 = df3), .id="id"),
   # since df1 does not have a name, the "id" column of the resulting data frame does not have the data frame name for rows from df1.
   # To workaround this issue, set a name to the first data frame with the value specified by fistLabel argument as a pre-process
   # then pass the updated list to dplyr::bind_rows.
-  if(stringr::str_length(first_id) >0) {
+  if(ignore_case | stringr::str_length(first_id) >0) {
     x <- dplyr:::flatten_bindable(rlang::dots_values(...))
     x_updated <- list()
-    count <- 0
-    for (name in names(x)) {
-      if(count == 0) {
-        x_updated[[first_id]] = x[[1]]
+    count <- 0;
+    if(!is.null(names(x))) {
+      for (name in names(x)) {
+        if(stringr::str_length(first_id) >0 & count == 0) {
+          # if ignore_case is set, force character as column data types
+          if(ignore_case) {
+            x_updated[[first_id]] <- dplyr::mutate_all(x[[1]], funs(as.character))
+          } else {
+            x_updated[[first_id]] <- x[[1]]
+          }
+        } else {
+          # force character as column data types
+          if(ignore_case) {
+            x_updated[[name]] <- dplyr::mutate_all(x[[name]], funs(as.character))
+          } else {
+            x_updated[[name]] <- x[[name]]
+          }
+        }
         count <- count + 1
-      } else {
-        x_updated[[name]] = x[[name]]
+      }
+    } else {
+      for(i in 1:length(x)) {
+        # if ignore_case is set, force character as column data types
+        if(ignore_case) {
+          x_updated[[i]] <- dplyr::mutate_all(x[[i]], funs(as.character))
+        } else {
+          x_updated[[first_id]] <- x[[i]]
+        }
       }
     }
-    dplyr::bind_rows(x_updated, .id = .id)
+    #re-evaluate column data types
+    if(ignore_case) {
+      readr::type_convert(dplyr::bind_rows(x_updated, .id = .id))
+    } else {
+      dplyr::bind_rows(x_updated, .id = .id)
+    }
   } else {
     dplyr::bind_rows(..., .id = .id)
   }
