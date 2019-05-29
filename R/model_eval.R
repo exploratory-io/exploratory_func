@@ -320,22 +320,61 @@ evaluate_binary_training_and_test <- function(df, actual_val_col, threshold = "f
   ret <- training_ret
 
   if (test_rate > 0.0) {
-    test_pred_ret <- prediction_binary(df, data = "test")
+    tryCatch({
+      test_pred_ret <- prediction_binary(df, data = "test")
 
-    # Terms Mapping
-    ## get Model Object
-    m <- df %>% filter(!is.null(model)) %>% `[[`(1, "model", 1)
-    actual_val_col <- m$terms_mapping[m$terms_mapping == actual_val_col] %>% names(.)
+      # Terms Mapping
+      ## get Model Object
+      m <- df %>% filter(!is.null(model)) %>% `[[`(1, "model", 1)
+      actual_val_col <- m$terms_mapping[m$terms_mapping == actual_val_col] %>% names(.)
 
-    eret <- evaluate_binary_(test_pred_ret, "predicted_probability", actual_val_col, threshold = threshold)
+      eret <- evaluate_binary_(test_pred_ret, "predicted_probability", actual_val_col, threshold = threshold)
 
-    test_ret <- eret %>% dplyr::mutate(positives = true_positive + false_positive,
-                           negatives = true_negative + false_negative) %>%
-                  dplyr::select(auc = AUC, f_score, accuracy_rate,
-                           misclassification_rate, precision, recall,
-                           positives, negatives)
-    test_ret$is_test_data <- TRUE
-    ret <- ret %>% dplyr::bind_rows(test_ret)
+      test_ret <- eret %>% dplyr::mutate(positives = true_positive + false_positive,
+                                         negatives = true_negative + false_negative) %>%
+                           dplyr::select(auc = AUC, f_score, accuracy_rate,
+                                         misclassification_rate, precision, recall,
+                                         positives, negatives)
+      test_ret$is_test_data <- TRUE
+      ret <- ret %>% dplyr::bind_rows(test_ret)
+    }, error = function(e) {
+      # TODO: imple handling error
+    })
+  }
+
+  grouped_col <- colnames(df)[!colnames(df) %in% c("model", ".test_index", "source.data")]
+  # sort column order
+  ret <- ret %>% dplyr::select(f_score, accuracy_rate, misclassification_rate, precision,
+                               recall, auc, positives, negatives, p.value, logLik, AIC, BIC,
+                               deviance, null.deviance, df.null, df.residual, everything())
+
+  if (length(grouped_col) > 0) {
+    ret <- ret %>% dplyr::select(grouped_col, everything())
+  }
+
+  if (pretty.name){
+    colnames(ret)[colnames(ret) == "f_score"] <- "F Score"
+    colnames(ret)[colnames(ret) == "accuracy_rate"] <- "Accuracy Rate"
+    colnames(ret)[colnames(ret) == "misclassification_rate"] <- "Misclassification Rate"
+    colnames(ret)[colnames(ret) == "precision"] <- "Precision"
+    colnames(ret)[colnames(ret) == "recall"] <- "Recall"
+    colnames(ret)[colnames(ret) == "auc"] <- "AUC"
+    colnames(ret)[colnames(ret) == "positives"] <- "Data Size for TRUE"
+    colnames(ret)[colnames(ret) == "negatives"] <- "Data Size for FALSE"
+    colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
+    colnames(ret)[colnames(ret) == "logLik"] <- "Log Likelihood"
+    colnames(ret)[colnames(ret) == "deviance"] <- "Deviance"
+    colnames(ret)[colnames(ret) == "null.deviance"] <- "Null Deviance"
+    colnames(ret)[colnames(ret) == "df.null"] <- "DF for Null Model"
+    colnames(ret)[colnames(ret) == "df.residual"] <- "Residual DF"
+    colnames(ret)[colnames(ret) == "is_test_data"] <- "Test Data"
+
+    base_cols <- colnames(ret)[stringr::str_detect(colnames(ret) , "_base$")]
+    if (length(base_cols) > 0) {
+      for (col in base_cols) {
+        colnames(ret)[colnames(ret) == col] <- paste0("Base Level of ", stringr::str_replace(col, "_base$", ""))
+      }
+    }
   }
 
   ret
