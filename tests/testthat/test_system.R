@@ -213,7 +213,7 @@ test_that("bind_rows", {
                   test5 = as.factor(c(54,51,36)))
   # if this is dplyr::bind_rows, it fails because of factor vs character data type mismatch.
   # but exploratory::bind_rows works if ignore_case argument is set as TRUE.
-  res3 <- exploratory::bind_rows(data1, data2, ignore_case = TRUE)
+  res3 <- exploratory::bind_rows(data1, data2, force_characeter_data_type = TRUE)
   expect_equal(unique(res3$person), c("A","B","C","D","E","F"))
 })
 
