@@ -69,8 +69,9 @@ test_that("test calc_feature_imp predicting multi-class", {
                      `cat 10`,
                      cat_25,
                       `num 1`,
-                      num_2, with_boruta=TRUE)
-
+                      num_2, with_boruta=TRUE, test_rate = 0.2)
+  
+  ret <- model_df %>% prediction_training_and_test(.)
   conf_mat <- tidy(model_df, model, type = "conf_mat", pretty.name = TRUE)
   # ret <- model_df %>% rf_importance() # Skip this because Boruta is on.
   ret <- model_df %>% rf_partial_dependence()
