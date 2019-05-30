@@ -425,3 +425,11 @@ parse_logical <- function(text, ...){
   }
 }
 
+#'Function to extract text inside the characters like bracket.
+#'@export
+str_extract_inside <- function(column, begin = "(", end = ")") {
+  exp = stringr::str_c("(?<=\\", begin, ").*?(?=\\", end, ")")
+  stringr::str_extract(column, exp)
+}
+
+

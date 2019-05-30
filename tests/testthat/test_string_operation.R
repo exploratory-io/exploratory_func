@@ -310,3 +310,34 @@ test_that("parse_logical", {
   ret <- exploratory::parse_logical(c(TRUE, FALSE))
   expect_equal(ret, c(TRUE, FALSE))
 })
+
+test_that("str_extract_inside", {
+  # bracket ()
+  ret <- exploratory::str_extract_inside("abc(defgh)ijk", begin = "(", end =")")
+  expect_equal(ret, c("defgh"))
+  # curly bracket {}
+  ret <- exploratory::str_extract_inside("abc(defgh)ijk", begin = "{", end ="}")
+  expect_equal(ret, NA_character_)
+  # curly bracket {}
+  ret <- exploratory::str_extract_inside("abc{123456}ijk", begin = "{", end ="}")
+  expect_equal(ret, "123456")
+  # curly bracket []
+  ret <- exploratory::str_extract_inside("abc[123456]ijk", begin = "[", end ="]")
+  expect_equal(ret, "123456")
+  # double quote ""
+  ret <- exploratory::str_extract_inside('abc"123456"ijk', begin = '"', end = '"')
+  expect_equal(ret, "123456")
+  # single quote ''
+  ret <- exploratory::str_extract_inside("abc'123456'ijk", begin = "'", end = "'")
+  expect_equal(ret, "123456")
+  # percent %
+  ret <- exploratory::str_extract_inside("abc%123456%ijk", begin = "%", end = "%")
+  expect_equal(ret, "123456")
+  # percent $
+  ret <- exploratory::str_extract_inside("abc$123456$ijk", begin = "$", end = "$")
+  expect_equal(ret, "123456")
+  # percent * $
+  ret <- exploratory::str_extract_inside("abc*123456$ijk", begin = "*", end = "$")
+  expect_equal(ret, "123456")
+
+})
