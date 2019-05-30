@@ -1276,11 +1276,19 @@ calc_feature_imp <- function(df,
                              with_boruta = FALSE,
                              boruta_max_runs = 20, # Maximal number of importance source runs.
                              boruta_p_value = 0.05, # Boruta recommends using the default 0.01 for P-value, but we are using 0.05 for consistency with other functions of ours.
-                             seed = 1
+                             seed = 1,
+                             test_rate = 0.0
                              ){
   if(!is.null(seed)){
     set.seed(seed)
   }
+
+  if(test_rate < 0 | 1 < test_rate){
+    stop("test_rate must be between 0 and 1")
+  } else if (test_rate == 1){
+    stop("test_rate must be less than 1")
+  }
+
   # this seems to be the new way of NSE column selection evaluation
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
   target_col <- dplyr::select_var(names(df), !! rlang::enquo(target))
@@ -1331,6 +1339,11 @@ calc_feature_imp <- function(df,
       if (smote && length(unique_val[!is.na(unique_val)]) == 2) {
         df <- df %>% exp_balance(clean_target_col, target_size = max_nrow, target_minority_perc = smote_target_minority_perc, max_synth_perc = smote_max_synth_perc, k = smote_k)
       }
+
+      # split training and test data
+      source_data <- df
+      test_index <- sample_df_index(source_data, rate = test_rate)
+      df <- safe_slice(source_data, test_index, remove = TRUE)
 
       # build formula for randomForest
       rhs <- paste0("`", c_cols, "`", collapse = " + ")
@@ -1429,6 +1442,7 @@ calc_feature_imp <- function(df,
       rf$y <- model.response(model_df)
       rf$df <- model_df
       rf
+      list(rf = rf, test_index = test_index, source_data = source_data)
     }, error = function(e){
       if(length(grouped_cols) > 0) {
         # ignore the error if
@@ -1443,7 +1457,31 @@ calc_feature_imp <- function(df,
     })
   }
 
-  do_on_each_group(clean_df, each_func, name = "model", with_unnest = FALSE)
+  model_and_data_col <- "model_and_data"
+  ret <- do_on_each_group(clean_df, each_func, name = model_and_data_col, with_unnest = FALSE)
+  if (length(grouped_cols) > 0) {
+    ret <- ret %>% tidyr::nest(-grouped_cols)
+  } else {
+    ret <- ret %>% tidyr::nest()
+  }
+
+  ret <- ret %>% dplyr::mutate(model = purrr::map(data, function(df){
+            df[[model_and_data_col]][[1]]$rf
+          })) %>%
+          dplyr::mutate(.test_index = purrr::map(data, function(df){
+            df[[model_and_data_col]][[1]]$test_index
+          })) %>%
+          dplyr::mutate(source.data = purrr::map(data, function(df){
+            data <- df[[model_and_data_col]][[1]]$source_data
+            if (length(grouped_cols) > 0 && !is.null(data)) {
+              data %>% dplyr::select(-grouped_cols)
+            } else {
+              data
+            }
+          })) %>%
+          dplyr::select(-data) %>%
+          dplyr::rowwise()
+  ret
 }
 
 #' TODO: not really for external use. hide it.
@@ -1766,11 +1804,19 @@ exp_rpart <- function(df,
                       smote_target_minority_perc = 40,
                       smote_max_synth_perc = 200,
                       smote_k = 5,
-                      seed = 1
+                      seed = 1,
+                      test_rate = 0.0
                       ) {
   if(!is.null(seed)){
     set.seed(seed)
   }
+
+  if(test_rate < 0 | 1 < test_rate){
+    stop("test_rate must be between 0 and 1")
+  } else if (test_rate == 1){
+    stop("test_rate must be less than 1")
+  }
+
   # this seems to be the new way of NSE column selection evaluation
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
   target_col <- dplyr::select_var(names(df), !! rlang::enquo(target))
@@ -1823,6 +1869,11 @@ exp_rpart <- function(df,
         stop("Categorical Target Variable must have 2 or more unique values.")
       }
 
+      # split training and test data
+      source_data <- df
+      test_index <- sample_df_index(source_data, rate = test_rate)
+      df <- safe_slice(source_data, test_index, remove = TRUE)
+
       rhs <- paste0("`", c_cols, "`", collapse = " + ")
       fml <- as.formula(paste0("`", clean_target_col, "`", " ~ ", rhs))
       model <- rpart::rpart(fml, df)
@@ -1835,7 +1886,8 @@ exp_rpart <- function(df,
       }
       model$terms_mapping <- names(name_map)
       names(model$terms_mapping) <- name_map
-      model
+
+      list(model = model, test_index = test_index, source_data = source_data)
     }, error = function(e){
       if(length(grouped_cols) > 0) {
         # ignore the error if
@@ -1850,7 +1902,31 @@ exp_rpart <- function(df,
     })
   }
 
-  ret <- do_on_each_group(clean_df, each_func, name = "model", with_unnest = FALSE)
+  model_and_data_col <- "model_and_data"
+  ret <- do_on_each_group(clean_df, each_func, name = model_and_data_col, with_unnest = FALSE)
+  if (length(grouped_cols) > 0) {
+    ret <- ret %>% tidyr::nest(-grouped_cols)
+  } else {
+    ret <- ret %>% tidyr::nest()
+  }
+
+  ret <- ret %>% dplyr::mutate(model = purrr::map(data, function(df){
+            df[[model_and_data_col]][[1]]$model
+          })) %>%
+          dplyr::mutate(.test_index = purrr::map(data, function(df){
+            df[[model_and_data_col]][[1]]$test_index
+          })) %>%
+          dplyr::mutate(source.data = purrr::map(data, function(df){
+            data <- df[[model_and_data_col]][[1]]$source_data
+            if (length(grouped_cols) > 0 && !is.null(data)) {
+              data %>% dplyr::select(-grouped_cols)
+            } else {
+              data
+            }
+          })) %>%
+          dplyr::select(-data) %>%
+          dplyr::rowwise()
+
   # add special class .model to pass column type validation at viz layer.
   # also add .model.rpart so that a step created by this function is viewable with Exploratory for debugging.
   class(ret$model) <- c("list", ".model", ".model.rpart")
