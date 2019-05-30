@@ -405,9 +405,9 @@ getMongoCollectionNames <- function(host = "", port = "", database = "", usernam
   con <- getDBConnection("mongodb", host, port, database, username, password, collection = collection, isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParams, timeout = timeout)
   # command to list collections.
   # con$command is our addition in our mongolite fork.
-  result <- con$command(command = '{"listCollections":1}')
+  result <- con$run(command = '{"listCollections":1}')
   # need to check existence of ok column of result dataframe first to avoid error in error check.
-  if (!("ok" %in% colnames(result)) || !result$ok) {
+  if (!("ok" %in% names(result)) || !result$ok) {
     clearDBConnection("mongodb", host, port, database, username, collection = collection, isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParams)
     stop("listCollections command failed");
   }
@@ -508,9 +508,9 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     if (!is.null(conn)){
       # command to ping to check connection validity.
       # con$command is our addition in our mongolite fork.
-      result <- conn$command(command = '{"ping":1}')
+      result <- conn$run(command = '{"ping":1}')
       # need to check existence of ok column of result dataframe first to avoid error in error check.
-      if (!("ok" %in% colnames(result)) || !result$ok) {
+      if (!("ok" %in% names(result)) || !result$ok) {
         rm(conn) # this disconnects connection
         conn <- NULL
         # fall through to getting new connection.
@@ -559,7 +559,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     }
   } else if (type == "postgres" || type == "redshift" || type == "vertica") {
     if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
-    if(!requireNamespace("RPostgres")){stop("package RPostgre must be installed.")}
+    if(!requireNamespace("RPostgres")){stop("package RPostgres must be installed.")}
     # use same key "postgres" for redshift and vertica too, since they use
     # queryPostgres() too, which uses the key "postgres"
     key <- paste("postgres", host, port, databaseName, username, sep = ":")
