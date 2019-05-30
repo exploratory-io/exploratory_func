@@ -767,9 +767,9 @@ augment.ranger <- function(x, data = NULL, ...) {
 
 
   augment.ranger.method <- switch(x$treetype,
-                                        "Classification" = ougment.ranger.classification,
-                                        "Probability estimation" = augment.ranger.classification,
-                                        "Regression" = augment.ranger.regression)
+                                  "Classification" = augment.ranger.classification,
+                                  "Probability estimation" = augment.ranger.classification,
+                                  "Regression" = augment.ranger.regression)
   augment.ranger.method(x, data, ...)
 
 }
