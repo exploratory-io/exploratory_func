@@ -1886,9 +1886,9 @@ bind_rows <- function(..., .id = NULL, first_id = '', ignore_column_data_type = 
   # since df1 does not have a name, the "id" column of the resulting data frame does not have the data frame name for rows from df1.
   # To workaround this issue, set a name to the first data frame with the value specified by fistLabel argument as a pre-process
   # then pass the updated list to dplyr::bind_rows.
+  x_updated <- list()
+  x <- dplyr:::flatten_bindable(rlang::dots_values(...))
   if(ignore_column_data_type | stringr::str_length(first_id) >0) {
-    x <- dplyr:::flatten_bindable(rlang::dots_values(...))
-    x_updated <- list()
     count <- 0;
     if(!is.null(names(x))) {
       for (name in names(x)) {
@@ -1901,6 +1901,9 @@ bind_rows <- function(..., .id = NULL, first_id = '', ignore_column_data_type = 
           }
         } else {
           # force character as column data types
+          if(name == "") {
+            name = count+1;
+          }
           if(ignore_column_data_type) {
             x_updated[[name]] <- dplyr::mutate_all(x[[name]], funs(as.character))
           } else {
@@ -1920,13 +1923,24 @@ bind_rows <- function(..., .id = NULL, first_id = '', ignore_column_data_type = 
       }
     }
     #re-evaluate column data types
-    if(ignore_column_data_type) {
-      readr::type_convert(dplyr::bind_rows(x_updated, .id = .id))
+    if(!is.null(.id)) {
+      new_id <- avoid_conflict(colnames(x_updated[[1]]), .id)
     } else {
-      dplyr::bind_rows(x_updated, .id = .id)
+      new_id  = .id
+    }
+    if(ignore_column_data_type) {
+      readr::type_convert(dplyr::bind_rows(x_updated, .id = new_id))
+    } else {
+      dplyr::bind_rows(x_updated, .id = new_id)
     }
   } else {
-    dplyr::bind_rows(..., .id = .id)
+    #re-evaluate column data types
+    if(!is.null(.id)) {
+      new_id <- avoid_conflict(colnames(x[[1]]), .id)
+    } else {
+      new_id <- .id
+    }
+    dplyr::bind_rows(..., .id = new_id)
   }
 }
 
