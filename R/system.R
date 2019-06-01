@@ -1944,3 +1944,51 @@ bind_rows <- function(..., .id = NULL, first_id = '', ignore_column_data_type = 
   }
 }
 
+#'Wrapper function for dplyr::union to support ignoring data type difference.
+#'@export
+union <- function(x, y, ignore_column_data_type = TRUE, ...){
+  if(ignore_column_data_type) {
+    x <- dplyr::mutate_all(x, funs(as.character))
+    y <- dplyr::mutate_all(y, funs(as.character))
+    readr::type_convert(dplyr::union(x, y, ...))
+  } else {
+    dplyr::union(x, y, ...)
+  }
+}
+
+#'Wrapper function for dplyr::union_all to support ignoring data type difference.
+#'@export
+union_all <- function(x, y, ignore_column_data_type = TRUE, ...){
+  if(ignore_column_data_type) {
+    x <- dplyr::mutate_all(x, funs(as.character))
+    y <- dplyr::mutate_all(y, funs(as.character))
+    readr::type_convert(dplyr::union_all(x, y, ...))
+  } else {
+    dplyr::union_all(x, y, ...)
+  }
+}
+
+#'Wrapper function for dplyr::intersect to support ignoring data type difference.
+#'@export
+intersect <- function(x, y, ignore_column_data_type = TRUE, ...){
+  if(ignore_column_data_type) {
+    x <- dplyr::mutate_all(x, funs(as.character))
+    y <- dplyr::mutate_all(y, funs(as.character))
+    readr::type_convert(dplyr::intersect(x, y, ...))
+  } else {
+    dplyr::intersect(x, y, ...)
+  }
+}
+
+#'Wrapper function for dplyr::setdiff to support ignoring data type difference.
+#'@export
+setdiff <- function(x, y, ignore_column_data_type = TRUE, ...){
+  if(ignore_column_data_type) {
+    x <- dplyr::mutate_all(x, funs(as.character))
+    y <- dplyr::mutate_all(y, funs(as.character))
+    readr::type_convert(dplyr::setdiff(x, y, ...))
+  } else {
+    dplyr::setdiff(x, y, ...)
+  }
+}
+

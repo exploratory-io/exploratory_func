@@ -196,7 +196,7 @@ test_that("bind_rows", {
   res <- mtcars %>% exploratory::bind_rows(list(acars = mtcars, bcars = mtcars), .id="dataf", first_id="firstMtcars")
   expect_equal(unique(res$dataf), c("firstMtcars", "acars", "bcars"))
   res2 <- mtcars %>% exploratory::bind_rows(mtcars, mtcars, .id="dataf")
-  expect_equal(unique(res2$dataf), c("1","2","3"))
+  expect_equal(unique(res2$dataf), c(1,2,3))
   # For data1, test1 column is factor data type
   data1 <- data.frame(person = c("A","B","C"),
                   test1 = as.factor(c(1,4,5)),
@@ -217,5 +217,84 @@ test_that("bind_rows", {
   expect_equal(unique(res3$person), c("A","B","C","D","E","F"))
 })
 
+test_that("union", {
+  library(dplyr)
+  # For data1, test1 column is factor data type
+  data1 <- data.frame(person = c("A","B","C"),
+                      test1 = as.factor(c(1,4,5)),
+                      test2 = c(14,25,10),
+                      test3 = c(12.5,16.0,4),
+                      test4 = c(16,23,21),
+                      test5 = as.factor(c(49,36,52)))
+  # for data2, test2 column is character data type
+  data2 <- data.frame(person = c("A","D","F"),
+                      test1 = c(1,7,2),
+                      test2 = c(14,25,10),
+                      test3 = c(12.5,12.0,19.5),
+                      test4 = as.factor(c(16,21,29)),
+                      test5 = as.factor(c(49,51,36)))
+  res <- exploratory::union(x = data1, y = data2)
+  expect_equal(nrow(res), 5)
+})
+
+test_that("union_all", {
+  library(dplyr)
+  # For data1, test1 column is factor data type
+  data1 <- data.frame(person = c("A","B","C"),
+                      test1 = as.factor(c(1,4,5)),
+                      test2 = c(14,25,10),
+                      test3 = c(12.5,16.0,4),
+                      test4 = c(16,23,21),
+                      test5 = as.factor(c(49,36,52)))
+  # for data2, test2 column is character data type
+  data2 <- data.frame(person = c("A","D","F"),
+                      test1 = c(1,7,2),
+                      test2 = c(14,25,10),
+                      test3 = c(12.5,12.0,19.5),
+                      test4 = as.factor(c(16,21,29)),
+                      test5 = as.factor(c(49,51,36)))
+  res <- exploratory::union_all(x = data1, y = data2)
+  expect_equal(nrow(res), 6)
+})
+
+test_that("intersect", {
+  library(dplyr)
+  # For data1, test1 column is factor data type
+  data1 <- data.frame(person = c("A","B","C"),
+                      test1 = as.factor(c(1,4,5)),
+                      test2 = c(14,25,10),
+                      test3 = c(12.5,16.0,4),
+                      test4 = c(16,23,21),
+                      test5 = as.factor(c(49,36,52)))
+  # for data2, test2 column is character data type
+  data2 <- data.frame(person = c("A","D","F"),
+                      test1 = c(1,7,2),
+                      test2 = c(14,25,10),
+                      test3 = c(12.5,12.0,19.5),
+                      test4 = as.factor(c(16,21,29)),
+                      test5 = as.factor(c(49,51,36)))
+  res <- exploratory::intersect(x = data1, y = data2)
+  expect_equal(nrow(res), 1)
+})
+
+test_that("setdiff", {
+  library(dplyr)
+  # For data1, test1 column is factor data type
+  data1 <- data.frame(person = c("A","B","C"),
+                      test1 = as.factor(c(1,4,5)),
+                      test2 = c(14,25,10),
+                      test3 = c(12.5,16.0,4),
+                      test4 = c(16,23,21),
+                      test5 = as.factor(c(49,36,52)))
+  # for data2, test2 column is character data type
+  data2 <- data.frame(person = c("A","D","F"),
+                      test1 = c(1,7,2),
+                      test2 = c(14,25,10),
+                      test3 = c(12.5,12.0,19.5),
+                      test4 = as.factor(c(16,21,29)),
+                      test5 = as.factor(c(49,51,36)))
+  res <- exploratory::setdiff(x = data1, y = data2)
+  expect_equal(nrow(res), 2)
+})
 
 
