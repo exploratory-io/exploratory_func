@@ -510,7 +510,7 @@ prediction_training_and_test <- function(df, prediction_type="default", threshol
     test_ret <- do_on_each_group(target_df, each_func, with_unnest = TRUE)
     test_ret <- test_ret %>% dplyr::mutate(is_test_data = TRUE) %>%
                   dplyr::select(-is_test_data, everything(), is_test_data)
-    ret <- ret %>% dplyr::bind_rows(test_ret)
+    ret <- ret %>% dplyr::bind_rows(test_ret) %>% dplyr::select(-is_test_data, everything(), is_test_data)
   }
 
   if (prediction_type == "conf_mat") {

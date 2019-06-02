@@ -485,7 +485,7 @@ augment.randomForest.classification <- function(x, data = NULL, newdata = NULL, 
 
     # These are from https://github.com/mdlincoln/broom/blob/e3cdf5f3363ab9514e5b61a56c6277cb0d9899fd/R/rf_tidiers.R
     # create index of eliminated rows (na_at) by na.action from model.
-    # since prediction output may have fewer rows than original data because of na.action, 
+    # since prediction output may have fewer rows than original data because of na.action,
     # we cannot augment the data just by binding columns.
     n_data <- nrow(data)
     if (is.null(x[["na.action"]])) {
@@ -642,15 +642,13 @@ augment.randomForest <- augment.randomForest.formula
 
 #' augment for randomForest(ranger) model
 #' @export
-augment.ranger <- function(x, data = NULL, ...) {
+augment.ranger <- function(x, data = NULL, newdata = NULL, ...) {
   # Extract data from model
   # This is from https://github.com/mdlincoln/broom/blob/e3cdf5f3363ab9514e5b61a56c6277cb0d9899fd/R/rf_tidiers.R
   if (is.null(data)) {
     if (is.null(x$call$data)) {
       list <- lapply(all.vars(x$call), as.name)
       data <- eval(as.call(list(quote(data.frame),list)), parent.frame())
-    } else {
-      #data <- eval(x$call$data, parent.frame())
     }
   }
 
@@ -658,7 +656,7 @@ augment.ranger <- function(x, data = NULL, ...) {
                                   "Classification" = augment.ranger.classification,
                                   "Probability estimation" = augment.ranger.classification,
                                   "Regression" = augment.ranger.regression)
-  augment.ranger.method(x, data, ...)
+  augment.ranger.method(x, data, newdata, ...)
 
 }
 
@@ -773,6 +771,56 @@ augment.ranger.regression <- function(x, data = NULL, newdata = NULL, ...){
   }
 }
 
+#' augment for rpart model
+#' @export
+augment.rpart <- function(x, data = NULL, newdata = NULL, ...) {
+  # Extract data from model
+  # This is from https://github.com/mdlincoln/broom/blob/e3cdf5f3363ab9514e5b61a56c6277cb0d9899fd/R/rf_tidiers.R
+  if (is.null(data)) {
+    if (is.null(x$call$data)) {
+      list <- lapply(all.vars(x$call), as.name)
+      data <- eval(as.call(list(quote(data.frame),list)), parent.frame())
+    }
+  }
+
+  augment.rpart.method <- switch(x$classification_type,
+                                  "binary" = augment.rpart.classification,
+                                  "multi" = augment.rpart.classification,
+                                  "regression" = augment.rpart.regression)
+  augment.rpart.method(x, data, newdata, ...)
+}
+
+augment.rpart.classification <- function(x, data = NULL, newdata = NULL, ...) {
+  y_name <- all.vars(x$terms)[1]
+  predictor_variables <- all.vars(x$terms)[-1]
+
+  if (!is.null(newdata)) {
+    predicted_value <- get_multiclass_predicted_value_from_probability_rpart(x, newdata)
+    predicted_value_col <- avoid_conflict(colnames(newdata), "predicted_value")
+    predicted_probability_col <- avoid_conflict(colnames(newdata), "predicted_probability")
+    newdata[predicted_value_col] <- predicted_value
+    newdata[predicted_probability_col] <- apply(predict(x, newdata), 1, max)
+    newdata %>% dplyr::rename(predicted_label = predicted_value_col) %>%
+                dplyr::select(-predicted_label, everything(), predicted_label)
+  } else if (!is.null(data)) {
+    # TODO: impolement calc of predict probability
+    y_value <- attributes(x)$ylevels[x$y]
+    predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
+    predicted_value <- x$predicted_class
+
+    data[[predicted_value_col]] <- ranger.add_narow(predicted_value, nrow(data), x$na.action)
+    data %>% dplyr::rename(predicted_label = predicted_value_col) %>%
+             dplyr::select(-predicted_label, everything(), predicted_label)
+
+  } else {
+    stop("data or newdata have to be indicated.")
+  }
+}
+
+augment.rpart.regression <- function(x, data = NULL, newdata = NULL, ...) {
+  # TODO: implement this method
+}
+
 #' In multiclass classification, add prediction probability to each class as a column to data
 #' @param data - data to predict multiclass
 #' @param x - Model object that is the return value of ranger::ranger
@@ -834,8 +882,8 @@ ranger.add_narow <- function(value, n_data, na_atrow){
     return_value[!na_at] <- value
     return_value
     if (is.factor(value)) {
-      return_value <- as.factor(return_value)
-      levels(return_value) <- levels(value)
+      return_value <- levels(value)[return_value]
+      return_value <- factor(return_value, levels=levels(value))
       return_value
     } else {
       return_value
@@ -901,11 +949,11 @@ rf_partial_dependence <- function(df, ...) { # TODO: write test for this.
 }
 
 ubSMOTE2 <- function(X,Y, max_synth_perc=200, target_minority_perc=40, target_size=NULL, k=5, ...) {
-  if(!is.factor(Y)) 
+  if(!is.factor(Y))
     stop("Y has to be a factor")
-  if(is.vector(X)) 
-    stop("X cannot be a vector")  
-  
+  if(is.vector(X))
+    stop("X cannot be a vector")
+
   data<-cbind(X,Y)
   id.1 <- which(Y == 1)
 
@@ -925,9 +973,9 @@ ubSMOTE2 <- function(X,Y, max_synth_perc=200, target_minority_perc=40, target_si
     else {
       synth_perc_ <- synth_perc
     }
-    newExs <- unbalanced::ubSmoteExs(data[id.1,], "Y", synth_perc_, k)   
+    newExs <- unbalanced::ubSmoteExs(data[id.1,], "Y", synth_perc_, k)
     row.is.na<-row.has.na(newExs)
-    
+
     if(any(row.is.na)) {
       newExs<-newExs[!row.is.na, ]
       colnames(newExs)<-colnames(data)
@@ -985,7 +1033,7 @@ ubSMOTE2 <- function(X,Y, max_synth_perc=200, target_minority_perc=40, target_si
       target_majority_size <- as.integer((nrow(newExs) + minority_size) / target_minority_perc * (100 - target_minority_perc))
       majority_data <- sample_majority(data, target_majority_size)
       minority_data <- data[id.1,]
-      
+
       # the final data set (the undersample + the rare cases + the smoted exs)
       newdataset <- dplyr::bind_rows(majority_data, minority_data, newExs)
     }
@@ -1054,7 +1102,7 @@ ubSMOTE2 <- function(X,Y, max_synth_perc=200, target_minority_perc=40, target_si
           target_majority_size <- as.integer((nrow(newExs) + minority_size) / target_minority_perc * (100 - target_minority_perc))
           majority_data <- sample_majority(data, target_majority_size)
           minority_data <- data[id.1,]
-          
+
           # the final data set (the undersample + the rare cases + the smoted exs)
           newdataset <- dplyr::bind_rows(majority_data, minority_data, newExs)
         }
@@ -1062,7 +1110,7 @@ ubSMOTE2 <- function(X,Y, max_synth_perc=200, target_minority_perc=40, target_si
     }
   }
   # Fill NA in synthesized with FALSE.
-  newdataset <- newdataset %>% mutate(synthesized = if_else(is.na(synthesized), FALSE, synthesized)) 
+  newdataset <- newdataset %>% mutate(synthesized = if_else(is.na(synthesized), FALSE, synthesized))
   #shuffle the order of instances
   newdataset<-newdataset[sample(1:NROW(newdataset)), ]
   newdataset
@@ -1122,7 +1170,7 @@ exp_balance <- function(df,
         df <- df %>% dplyr::mutate(!!rlang::sym(col):=forcats::fct_explicit_na(as.factor(!!rlang::sym(col))))
       }
       else if(is.factor(df[[col]])) {
-        # if already factor, just turn NAs into explicit levels. 
+        # if already factor, just turn NAs into explicit levels.
         if (is.ordered(df[[col]])) {
           # if ordered, make it not ordered, since ordered factor columns are filled with NAs by ubSMOTE().
           df <- df %>% dplyr::mutate(!!rlang::sym(col):=forcats::fct_explicit_na(factor(!!rlang::sym(col), ordered=FALSE)))
@@ -1187,7 +1235,7 @@ exp_balance <- function(df,
       df_balanced[[target_col]] <- as.logical(df_balanced[[target_col]]) # turn it back to logical.
     }
     if (was_target_character) {
-      df_balanced[[target_col]] <- as.character(df_balanced[[target_col]]) # turn it back to character 
+      df_balanced[[target_col]] <- as.character(df_balanced[[target_col]]) # turn it back to character
     }
     if (!is.null(orig_levels_order)) { # if target was factor, set original factor order. note this is different from orig_levels.
       df_balanced[[target_col]] <- forcats::fct_relevel(df_balanced[[target_col]], orig_levels_order)
@@ -1224,18 +1272,18 @@ get_classification_type <- function(v) {
   if (!is.numeric(v)) {
     if (!is.logical(v)) {
       if (length(unique(v)) == 2) {
-        classification_type <- "binary" 
+        classification_type <- "binary"
       }
       else {
-        classification_type <- "multi" 
+        classification_type <- "multi"
       }
     }
     else {
-      classification_type <- "binary" 
+      classification_type <- "binary"
     }
   }
   else {
-    classification_type <- "regression" 
+    classification_type <- "regression"
   }
 }
 
@@ -1270,7 +1318,7 @@ cleanup_df <- function(df, target_col, selected_cols, grouped_cols, target_n, pr
     if(all(is.na(df[[col]]))){
       # remove columns if they are all NA
       cols <- setdiff(cols, col)
-      df[[col]] <- NULL # drop the column so that SMOTE will not see it. 
+      df[[col]] <- NULL # drop the column so that SMOTE will not see it.
     }
   }
 
@@ -1438,7 +1486,7 @@ cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, nam
     unique_val <- unique(df[[col]])
     if (length(unique_val[!is.na(unique_val)]) <= 1) {
       c_cols <- setdiff(c_cols, col)
-      df[[col]] <- NULL # drop the column so that SMOTE will not see it. 
+      df[[col]] <- NULL # drop the column so that SMOTE will not see it.
     }
   }
 
@@ -1454,7 +1502,7 @@ cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, nam
 extract_importance_history_from_boruta <- function(x) {
   res <- tidyr::gather(as.data.frame(x$ImpHistory), "variable","importance")
   decisions <- data.frame(variable=names(x$finalDecision), decision=x$finalDecision)
-  res <- res %>% dplyr::left_join(decisions, by = "variable") 
+  res <- res %>% dplyr::left_join(decisions, by = "variable")
   res <- res %>% dplyr::filter(decision %in% c("Confirmed", "Tentative", "Rejected")) # Remove rows with NA, which are shadow variables
   res
 }
@@ -1485,7 +1533,7 @@ calc_feature_imp <- function(df,
                              smote_max_synth_perc = 200,
                              smote_k = 5,
                              importance_measure = "permutation", # "permutation" or "impurity".
-                             max_pd_vars = 12, # Number of most important variables to calculate partial dependences on. Default 12 fits well with either 3 or 4 columns of facets. 
+                             max_pd_vars = 12, # Number of most important variables to calculate partial dependences on. Default 12 fits well with either 3 or 4 columns of facets.
                              with_boruta = FALSE,
                              boruta_max_runs = 20, # Maximal number of importance source runs.
                              boruta_p_value = 0.05, # Boruta recommends using the default 0.01 for P-value, but we are using 0.05 for consistency with other functions of ours.
@@ -1731,7 +1779,7 @@ evaluate_classification <- function(actual, predicted, class, multi_class = TRUE
 
   if (multi_class) {
     data_size <- sum(actual == class)
-  
+
     ret <- data.frame(
       class,
       f_score,
@@ -1945,7 +1993,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
       }
       chart_type_map <- ifelse(chart_type_map, "line", "scatter")
       names(chart_type_map) <- colnames(x$df)
-      
+
       ret <- ret %>%  dplyr::mutate(chart_type = chart_type_map[x_name])
       ret <- ret %>% dplyr::mutate(x_name = x$terms_mapping[x_name]) # map variable names to original.
       ret
@@ -2165,9 +2213,13 @@ get_binary_predicted_value_from_probability_rpart <- function(x) {
   predicted
 }
 
-get_multiclass_predicted_value_from_probability_rpart <- function(x) {
+get_multiclass_predicted_value_from_probability_rpart <- function(x, data = NULL) {
   ylevels <- attr(x,"ylevels")
-  predicted_mat <- predict(x)
+  predicted_mat <- if (is.data.frame(data)) {
+    predict(x, data)
+  } else {
+   predict(x)
+  }
   # ties are broken randomly to be even.
   # TODO: move this to model building step so that there is no randomness in analytics viz preprocessor.
   predicted_idx <- max.col(predicted_mat, ties.method = "random")
