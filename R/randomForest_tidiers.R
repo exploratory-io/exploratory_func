@@ -485,7 +485,7 @@ augment.randomForest.classification <- function(x, data = NULL, newdata = NULL, 
 
     # These are from https://github.com/mdlincoln/broom/blob/e3cdf5f3363ab9514e5b61a56c6277cb0d9899fd/R/rf_tidiers.R
     # create index of eliminated rows (na_at) by na.action from model.
-    # since prediction output may have fewer rows than original data because of na.action, 
+    # since prediction output may have fewer rows than original data because of na.action,
     # we cannot augment the data just by binding columns.
     n_data <- nrow(data)
     if (is.null(x[["na.action"]])) {
@@ -640,6 +640,267 @@ augment.randomForest.unsupervised <- function(x, data, ...) {
 #' @export
 augment.randomForest <- augment.randomForest.formula
 
+#' augment for randomForest(ranger) model
+#' @export
+augment.ranger <- function(x, data = NULL, newdata = NULL, ...) {
+  # Extract data from model
+  # This is from https://github.com/mdlincoln/broom/blob/e3cdf5f3363ab9514e5b61a56c6277cb0d9899fd/R/rf_tidiers.R
+  if (is.null(data)) {
+    if (is.null(x$call$data)) {
+      list <- lapply(all.vars(x$call), as.name)
+      data <- eval(as.call(list(quote(data.frame),list)), parent.frame())
+    }
+  }
+
+  augment.ranger.method <- switch(x$treetype,
+                                  "Classification" = augment.ranger.classification,
+                                  "Probability estimation" = augment.ranger.classification,
+                                  "Regression" = augment.ranger.regression)
+  augment.ranger.method(x, data, newdata, ...)
+
+}
+
+#' augment for randomForest model
+#' @export
+augment.ranger.classification <- function(x, data = NULL, newdata = NULL, ...) {
+  y_name <- x$terms_mapping[all.vars(x$formula_terms)[[1]]]
+  y_name <- janitor::make_clean_names(y_name)
+  predictor_variables <- all.vars(x$formula_terms)[-1]
+  predictor_variables <- janitor::make_clean_names(x$terms_mapping[predictor_variables])
+
+  if(!is.null(newdata)){
+    # janitor::clean_names is called in randomForestClassify,
+    # so it should be called here too
+    cleaned_data <- janitor::clean_names(newdata)
+    y_value <- cleaned_data[[y_name]]
+
+    predicted_value_col <- avoid_conflict(colnames(newdata), "predicted_value")
+    predicted_probability_col <- avoid_conflict(colnames(newdata), "predicted_probability")
+
+    na_atrow <- ranger.find_na(predictor_variables, data = cleaned_data)
+
+    # ranger can't predict when the data have na row in predictor columns.
+    cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables) %>% na.omit()
+
+    colnames(cleaned_data) <- all.vars(x$formula_terms)[-1]
+    pred_res <- predict(x, cleaned_data, type = "se")
+    predicted_label_nona <- ranger.predict_value_from_prob(x$forest$levels,
+                                                           pred_res$predictions,
+                                                           y_value)
+    predicted_value <- ranger.add_narow(predicted_label_nona, nrow(newdata), na_atrow)
+
+    if(is.null(x$classification_type)){
+      # just append predicted labels
+      newdata[[predicted_value_col]] <- predicted_value
+      newdata
+    } else if (x$classification_type == "binary") {
+      newdata[[predicted_value_col]] <- predicted_value
+      predictions <- pred_res$predictions
+
+      # when the target level is a single, ncol(predictions) is 1.
+      predicted_prob <- ranger.add_narow(pred_res$predictions[, ncol(predictions)], nrow(newdata), na_atrow)
+      newdata[[predicted_probability_col]] <- predicted_prob
+      newdata
+    } else if (x$classification_type == "multi") {
+      # append predicted probability for each class, max and labels at max values
+      predicted_prob <- ranger.add_narow(apply(pred_res$predictions, 1 , max), nrow(newdata), na_atrow)
+      newdata <- ranger.set_multi_predicted_values(newdata, pred_res, predicted_value, na_atrow)
+      newdata[[predicted_probability_col]] <- predicted_prob
+      newdata
+    }
+    newdata <- newdata %>% dplyr::rename(predicted_label = predicted_value_col) %>%
+                  dplyr::select(-predicted_label, everything(), predicted_label)
+
+  } else if (!is.null(data)) {
+    # create clean name data frame because the model learned by those names
+    cleaned_data <- janitor::clean_names(data)
+    y_value <- cleaned_data[[y_name]]
+    predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
+    predicted_probability_col <- avoid_conflict(colnames(data), "predicted_probability")
+
+    predicted_label_nona <- ranger.predict_value_from_prob(x$forest$levels,
+                                                           x$predictions,
+                                                           y_value)
+    predicted_value <- ranger.add_narow(predicted_label_nona, nrow(data), x$na.action)
+
+    if(is.null(x$classification_type)){
+      # just append predicted label
+      data[[predicted_value_col]] <- predicted_value
+    } else if(!is.null(x$classification_type) && x$classification_type == "binary"){
+      # append predicted probability
+      predictions <- x$predictions
+      predicted_prob <- ranger.add_narow(x$predictions[, ncol(predictions)], nrow(data), x$na.action)
+      data[[predicted_value_col]] <- predicted_value
+      data[[predicted_probability_col]] <- predicted_prob
+    } else if (x$classification_type == "multi"){
+      predicted_prob <- ranger.add_narow(apply(x$predictions, 1 , max), nrow(data), x$na.action)
+      data <- ranger.set_multi_predicted_values(data, x, predicted_value, x$na.action)
+      data[[predicted_probability_col]] <- predicted_prob
+    }
+    data %>% dplyr::rename(predicted_label = predicted_value_col) %>%
+             dplyr::select(-predicted_label, everything(), predicted_label)
+
+  } else {
+    stop("data or newdata have to be indicated.")
+  }
+}
+
+#' @export
+augment.ranger.regression <- function(x, data = NULL, newdata = NULL, ...){
+  predicted_value_col <- avoid_conflict(colnames(newdata), "predicted_value")
+
+  if(!is.null(newdata)) {
+    # create clean name data frame because the model learned by those names
+    cleaned_data <- janitor::clean_names(newdata)
+
+    predictor_variables <- all.vars(x$formula_terms)[-1]
+    na_atrow <- ranger.find_na(predictor_variables, cleaned_data)
+
+    cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables) %>% na.omit()
+
+    predicted_val <- predict(x, cleaned_data)$predictions
+    newdata[[predicted_value_col]] <- ranger.add_narow(predicted_val, nrow(newdata), na_atrow)
+
+    newdata
+  } else if (!is.null(data)) {
+    predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
+
+    predicted <- ranger.add_narow(x$predictions, nrow(data), x$na.action)
+    data[[predicted_value_col]] <- predicted
+    data
+  }
+}
+
+#' augment for rpart model
+#' @export
+augment.rpart <- function(x, data = NULL, newdata = NULL, ...) {
+  # Extract data from model
+  # This is from https://github.com/mdlincoln/broom/blob/e3cdf5f3363ab9514e5b61a56c6277cb0d9899fd/R/rf_tidiers.R
+  if (is.null(data)) {
+    if (is.null(x$call$data)) {
+      list <- lapply(all.vars(x$call), as.name)
+      data <- eval(as.call(list(quote(data.frame),list)), parent.frame())
+    }
+  }
+
+  augment.rpart.method <- switch(x$classification_type,
+                                  "binary" = augment.rpart.classification,
+                                  "multi" = augment.rpart.classification,
+                                  "regression" = augment.rpart.regression)
+  augment.rpart.method(x, data, newdata, ...)
+}
+
+augment.rpart.classification <- function(x, data = NULL, newdata = NULL, ...) {
+  y_name <- all.vars(x$terms)[1]
+  predictor_variables <- all.vars(x$terms)[-1]
+
+  if (!is.null(newdata)) {
+    predicted_value <- get_multiclass_predicted_value_from_probability_rpart(x, newdata)
+    predicted_value_col <- avoid_conflict(colnames(newdata), "predicted_value")
+    predicted_probability_col <- avoid_conflict(colnames(newdata), "predicted_probability")
+    newdata[predicted_value_col] <- predicted_value
+    newdata[predicted_probability_col] <- apply(predict(x, newdata), 1, max)
+    newdata %>% dplyr::rename(predicted_label = predicted_value_col) %>%
+                dplyr::select(-predicted_label, everything(), predicted_label)
+  } else if (!is.null(data)) {
+    # TODO: impolement calc of predict probability
+    y_value <- attributes(x)$ylevels[x$y]
+    predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
+    predicted_value <- x$predicted_class
+
+    data[[predicted_value_col]] <- ranger.add_narow(predicted_value, nrow(data), x$na.action)
+    data %>% dplyr::rename(predicted_label = predicted_value_col) %>%
+             dplyr::select(-predicted_label, everything(), predicted_label)
+
+  } else {
+    stop("data or newdata have to be indicated.")
+  }
+}
+
+augment.rpart.regression <- function(x, data = NULL, newdata = NULL, ...) {
+  # TODO: implement this method
+}
+
+#' In multiclass classification, add prediction probability to each class as a column to data
+#' @param data - data to predict multiclass
+#' @param x - Model object that is the return value of ranger::ranger
+#' @param na_atrow - Numeric vector of which row of data has NA
+#' @param pred_prob_col - Column name suffix of predicted probability column for each class name
+#' @param pred_value_col - Column name for storing prediction class of multiclass classification
+ranger.set_multi_predicted_values <- function(data, x,
+                                              predicted_value,
+                                              na_atrow,
+                                              pred_plob_col="predicted_probability",
+                                              pred_value_col="predicted_value") {
+  ret <- x$predictions
+  for (i in 1:length(colnames(ret))) { # for each column
+    # this is basically bind_cols with na_at taken into account.
+    colname <- stringr::str_c(pred_plob_col, colnames(ret)[i], sep="_")
+    prob_data_bycol <- ranger.add_narow(ret[, i], nrow(data), na_atrow)
+    data[[colname]] <- prob_data_bycol
+  }
+  data[[pred_value_col]] <- predicted_value
+
+  data
+}
+
+#' returns the number of the row containing the NA value of data as a numeric vector
+#' @param variables - column name to use for prediction (determine if any of this column contains NA)
+#' @param data - data to predict
+#' @param na_index - Boolean vectors whether or not NA is included (Default: NULL)
+ranger.find_na <- function(variables, data, na_index = NULL){
+  na_atrow_index <- if (is.null(na_index)) {
+    ranger.find_na_index(variables, data)
+  } else {
+    na_index
+  }
+  na_atrow <- seq_len(nrow(data))[na_atrow_index]
+
+  return(na_atrow)
+}
+
+#' Returns TRUE / FALSE vectors whether each row contains the NA value in any of the column values specified in variables
+#' @param variables - column name to use for prediction (determine if any of this column contains NA)
+#' @param data - data to predict
+ranger.find_na_index <- function(variables, data) {
+  data %>% dplyr::select(variables) %>% is.na() %>% apply(1, any)
+}
+
+#' Returns NA value included in prediction result excluding NA
+#' @param value - prediction results without NA
+#' @param n_data - original data length
+#' @param na_atrow - row numbers containing the NA value of data
+ranger.add_narow <- function(value, n_data, na_atrow){
+  na_at <- if (!is.null(na_atrow)) {
+    seq_len(n_data) %in% as.integer(na_atrow)
+  } else {
+    NULL
+  }
+  return_value <- rep(NA, time = n_data)
+
+  if(length(na_at) > 0){
+    return_value[!na_at] <- value
+    return_value
+    if (is.factor(value)) {
+      return_value <- levels(value)[return_value]
+      return_value <- factor(return_value, levels=levels(value))
+      return_value
+    } else {
+      return_value
+    }
+  } else {
+    value
+  }
+}
+
+#' Return the highest probability label from the matrix of predicted probabilities
+#' @param levels_var - Factor level of label to predict
+#' @param pred - Matrix of prediction probabilities
+#' @param y_value - Actual value to be predicted
+ranger.predict_value_from_prob <- function(levels_var, pred, y_value) {
+  same_type(levels_var[apply(pred, 1, which.max)], y_value)
+}
+
 rename_groups <- function(n) {
   ifelse(grepl("^\\d", n), paste0("group_", n), n)
 }
@@ -688,11 +949,11 @@ rf_partial_dependence <- function(df, ...) { # TODO: write test for this.
 }
 
 ubSMOTE2 <- function(X,Y, max_synth_perc=200, target_minority_perc=40, target_size=NULL, k=5, ...) {
-  if(!is.factor(Y)) 
+  if(!is.factor(Y))
     stop("Y has to be a factor")
-  if(is.vector(X)) 
-    stop("X cannot be a vector")  
-  
+  if(is.vector(X))
+    stop("X cannot be a vector")
+
   data<-cbind(X,Y)
   id.1 <- which(Y == 1)
 
@@ -712,9 +973,9 @@ ubSMOTE2 <- function(X,Y, max_synth_perc=200, target_minority_perc=40, target_si
     else {
       synth_perc_ <- synth_perc
     }
-    newExs <- unbalanced::ubSmoteExs(data[id.1,], "Y", synth_perc_, k)   
+    newExs <- unbalanced::ubSmoteExs(data[id.1,], "Y", synth_perc_, k)
     row.is.na<-row.has.na(newExs)
-    
+
     if(any(row.is.na)) {
       newExs<-newExs[!row.is.na, ]
       colnames(newExs)<-colnames(data)
@@ -772,7 +1033,7 @@ ubSMOTE2 <- function(X,Y, max_synth_perc=200, target_minority_perc=40, target_si
       target_majority_size <- as.integer((nrow(newExs) + minority_size) / target_minority_perc * (100 - target_minority_perc))
       majority_data <- sample_majority(data, target_majority_size)
       minority_data <- data[id.1,]
-      
+
       # the final data set (the undersample + the rare cases + the smoted exs)
       newdataset <- dplyr::bind_rows(majority_data, minority_data, newExs)
     }
@@ -841,7 +1102,7 @@ ubSMOTE2 <- function(X,Y, max_synth_perc=200, target_minority_perc=40, target_si
           target_majority_size <- as.integer((nrow(newExs) + minority_size) / target_minority_perc * (100 - target_minority_perc))
           majority_data <- sample_majority(data, target_majority_size)
           minority_data <- data[id.1,]
-          
+
           # the final data set (the undersample + the rare cases + the smoted exs)
           newdataset <- dplyr::bind_rows(majority_data, minority_data, newExs)
         }
@@ -849,7 +1110,7 @@ ubSMOTE2 <- function(X,Y, max_synth_perc=200, target_minority_perc=40, target_si
     }
   }
   # Fill NA in synthesized with FALSE.
-  newdataset <- newdataset %>% mutate(synthesized = if_else(is.na(synthesized), FALSE, synthesized)) 
+  newdataset <- newdataset %>% mutate(synthesized = if_else(is.na(synthesized), FALSE, synthesized))
   #shuffle the order of instances
   newdataset<-newdataset[sample(1:NROW(newdataset)), ]
   newdataset
@@ -909,7 +1170,7 @@ exp_balance <- function(df,
         df <- df %>% dplyr::mutate(!!rlang::sym(col):=forcats::fct_explicit_na(as.factor(!!rlang::sym(col))))
       }
       else if(is.factor(df[[col]])) {
-        # if already factor, just turn NAs into explicit levels. 
+        # if already factor, just turn NAs into explicit levels.
         if (is.ordered(df[[col]])) {
           # if ordered, make it not ordered, since ordered factor columns are filled with NAs by ubSMOTE().
           df <- df %>% dplyr::mutate(!!rlang::sym(col):=forcats::fct_explicit_na(factor(!!rlang::sym(col), ordered=FALSE)))
@@ -974,7 +1235,7 @@ exp_balance <- function(df,
       df_balanced[[target_col]] <- as.logical(df_balanced[[target_col]]) # turn it back to logical.
     }
     if (was_target_character) {
-      df_balanced[[target_col]] <- as.character(df_balanced[[target_col]]) # turn it back to character 
+      df_balanced[[target_col]] <- as.character(df_balanced[[target_col]]) # turn it back to character
     }
     if (!is.null(orig_levels_order)) { # if target was factor, set original factor order. note this is different from orig_levels.
       df_balanced[[target_col]] <- forcats::fct_relevel(df_balanced[[target_col]], orig_levels_order)
@@ -1011,18 +1272,18 @@ get_classification_type <- function(v) {
   if (!is.numeric(v)) {
     if (!is.logical(v)) {
       if (length(unique(v)) == 2) {
-        classification_type <- "binary" 
+        classification_type <- "binary"
       }
       else {
-        classification_type <- "multi" 
+        classification_type <- "multi"
       }
     }
     else {
-      classification_type <- "binary" 
+      classification_type <- "binary"
     }
   }
   else {
-    classification_type <- "regression" 
+    classification_type <- "regression"
   }
 }
 
@@ -1057,7 +1318,7 @@ cleanup_df <- function(df, target_col, selected_cols, grouped_cols, target_n, pr
     if(all(is.na(df[[col]]))){
       # remove columns if they are all NA
       cols <- setdiff(cols, col)
-      df[[col]] <- NULL # drop the column so that SMOTE will not see it. 
+      df[[col]] <- NULL # drop the column so that SMOTE will not see it.
     }
   }
 
@@ -1225,7 +1486,7 @@ cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, nam
     unique_val <- unique(df[[col]])
     if (length(unique_val[!is.na(unique_val)]) <= 1) {
       c_cols <- setdiff(c_cols, col)
-      df[[col]] <- NULL # drop the column so that SMOTE will not see it. 
+      df[[col]] <- NULL # drop the column so that SMOTE will not see it.
     }
   }
 
@@ -1241,7 +1502,7 @@ cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, nam
 extract_importance_history_from_boruta <- function(x) {
   res <- tidyr::gather(as.data.frame(x$ImpHistory), "variable","importance")
   decisions <- data.frame(variable=names(x$finalDecision), decision=x$finalDecision)
-  res <- res %>% dplyr::left_join(decisions, by = "variable") 
+  res <- res %>% dplyr::left_join(decisions, by = "variable")
   res <- res %>% dplyr::filter(decision %in% c("Confirmed", "Tentative", "Rejected")) # Remove rows with NA, which are shadow variables
   res
 }
@@ -1272,15 +1533,23 @@ calc_feature_imp <- function(df,
                              smote_max_synth_perc = 200,
                              smote_k = 5,
                              importance_measure = "permutation", # "permutation" or "impurity".
-                             max_pd_vars = 12, # Number of most important variables to calculate partial dependences on. Default 12 fits well with either 3 or 4 columns of facets. 
+                             max_pd_vars = 12, # Number of most important variables to calculate partial dependences on. Default 12 fits well with either 3 or 4 columns of facets.
                              with_boruta = FALSE,
                              boruta_max_runs = 20, # Maximal number of importance source runs.
                              boruta_p_value = 0.05, # Boruta recommends using the default 0.01 for P-value, but we are using 0.05 for consistency with other functions of ours.
-                             seed = 1
+                             seed = 1,
+                             test_rate = 0.0
                              ){
   if(!is.null(seed)){
     set.seed(seed)
   }
+
+  if(test_rate < 0 | 1 < test_rate){
+    stop("test_rate must be between 0 and 1")
+  } else if (test_rate == 1){
+    stop("test_rate must be less than 1")
+  }
+
   # this seems to be the new way of NSE column selection evaluation
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
   target_col <- dplyr::select_var(names(df), !! rlang::enquo(target))
@@ -1332,6 +1601,12 @@ calc_feature_imp <- function(df,
         df <- df %>% exp_balance(clean_target_col, target_size = max_nrow, target_minority_perc = smote_target_minority_perc, max_synth_perc = smote_max_synth_perc, k = smote_k)
       }
 
+      # split training and test data
+      source_data <- df
+      test_index <- sample_df_index(source_data, rate = test_rate)
+      df <- safe_slice(source_data, test_index, remove = TRUE)
+      colnames(source_data) <- names(name_map)
+
       # build formula for randomForest
       rhs <- paste0("`", c_cols, "`", collapse = " + ")
       fml <- as.formula(paste(clean_target_col, " ~ ", rhs))
@@ -1357,8 +1632,9 @@ calc_feature_imp <- function(df,
         importance = ranger_importance_measure,
         num.trees = ntree,
         min.node.size = nodesize,
+        keep.inbag=TRUE,
         sample.fraction = sample.fraction,
-        probability = (classification_type == "binary") # build probability tree for AUC only for binary classification.
+        probability = (classification_type != "regression")
       )
       if (with_boruta) { # Run only either Boruta or ranger::importance.
         if (importance_measure == "impurity") {
@@ -1428,7 +1704,8 @@ calc_feature_imp <- function(df,
       names(rf$terms_mapping) <- name_map
       rf$y <- model.response(model_df)
       rf$df <- model_df
-      rf
+      rf$formula_terms <- terms(fml)
+      list(rf = rf, test_index = test_index, source_data = source_data)
     }, error = function(e){
       if(length(grouped_cols) > 0) {
         # ignore the error if
@@ -1443,7 +1720,31 @@ calc_feature_imp <- function(df,
     })
   }
 
-  do_on_each_group(clean_df, each_func, name = "model", with_unnest = FALSE)
+  model_and_data_col <- "model_and_data"
+  ret <- do_on_each_group(clean_df, each_func, name = model_and_data_col, with_unnest = FALSE)
+  if (length(grouped_cols) > 0) {
+    ret <- ret %>% tidyr::nest(-grouped_cols)
+  } else {
+    ret <- ret %>% tidyr::nest()
+  }
+
+  ret <- ret %>% dplyr::mutate(model = purrr::map(data, function(df){
+            df[[model_and_data_col]][[1]]$rf
+          })) %>%
+          dplyr::mutate(.test_index = purrr::map(data, function(df){
+            df[[model_and_data_col]][[1]]$test_index
+          })) %>%
+          dplyr::mutate(source.data = purrr::map(data, function(df){
+            data <- df[[model_and_data_col]][[1]]$source_data
+            if (length(grouped_cols) > 0 && !is.null(data)) {
+              data %>% dplyr::select(-grouped_cols)
+            } else {
+              data
+            }
+          })) %>%
+          dplyr::select(-data) %>%
+          dplyr::rowwise()
+  ret
 }
 
 #' TODO: not really for external use. hide it.
@@ -1478,7 +1779,7 @@ evaluate_classification <- function(actual, predicted, class, multi_class = TRUE
 
   if (multi_class) {
     data_size <- sum(actual == class)
-  
+
     ret <- data.frame(
       class,
       f_score,
@@ -1588,7 +1889,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
           ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = pretty.name)
         }
         else {
-          predicted <- x$predictions
+          predicted <- ranger.predict_value_from_prob(x$forest$levels, x$predictions, x$y)
           ret <- evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
         }
         ret
@@ -1601,7 +1902,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
         predicted <- get_binary_predicted_value_from_probability(x)
       }
       else {
-        predicted <- x$predictions
+        predicted <- ranger.predict_value_from_prob(x$forest$levels, x$predictions, x$y)
       }
 
       per_level <- function(class) {
@@ -1616,7 +1917,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
         predicted <- get_binary_predicted_value_from_probability(x)
       }
       else {
-        predicted <- x$predictions
+        predicted <- ranger.predict_value_from_prob(x$forest$levels, x$predictions, x$y)
       }
 
       ret <- data.frame(
@@ -1639,7 +1940,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
         predicted <- get_binary_predicted_value_from_probability(x)
       }
       else {
-        predicted <- x$predictions
+        predicted <- ranger.predict_value_from_prob(x$forest$levels, x$predictions, x$y)
       }
       ret <- data.frame(
         expected_value = x$y,
@@ -1692,7 +1993,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
       }
       chart_type_map <- ifelse(chart_type_map, "line", "scatter")
       names(chart_type_map) <- colnames(x$df)
-      
+
       ret <- ret %>%  dplyr::mutate(chart_type = chart_type_map[x_name])
       ret <- ret %>% dplyr::mutate(x_name = x$terms_mapping[x_name]) # map variable names to original.
       ret
@@ -1766,11 +2067,19 @@ exp_rpart <- function(df,
                       smote_target_minority_perc = 40,
                       smote_max_synth_perc = 200,
                       smote_k = 5,
-                      seed = 1
+                      seed = 1,
+                      test_rate = 0.0
                       ) {
   if(!is.null(seed)){
     set.seed(seed)
   }
+
+  if(test_rate < 0 | 1 < test_rate){
+    stop("test_rate must be between 0 and 1")
+  } else if (test_rate == 1){
+    stop("test_rate must be less than 1")
+  }
+
   # this seems to be the new way of NSE column selection evaluation
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
   target_col <- dplyr::select_var(names(df), !! rlang::enquo(target))
@@ -1823,6 +2132,11 @@ exp_rpart <- function(df,
         stop("Categorical Target Variable must have 2 or more unique values.")
       }
 
+      # split training and test data
+      source_data <- df
+      test_index <- sample_df_index(source_data, rate = test_rate)
+      df <- safe_slice(source_data, test_index, remove = TRUE)
+
       rhs <- paste0("`", c_cols, "`", collapse = " + ")
       fml <- as.formula(paste0("`", clean_target_col, "`", " ~ ", rhs))
       model <- rpart::rpart(fml, df)
@@ -1835,7 +2149,8 @@ exp_rpart <- function(df,
       }
       model$terms_mapping <- names(name_map)
       names(model$terms_mapping) <- name_map
-      model
+
+      list(model = model, test_index = test_index, source_data = source_data)
     }, error = function(e){
       if(length(grouped_cols) > 0) {
         # ignore the error if
@@ -1850,7 +2165,31 @@ exp_rpart <- function(df,
     })
   }
 
-  ret <- do_on_each_group(clean_df, each_func, name = "model", with_unnest = FALSE)
+  model_and_data_col <- "model_and_data"
+  ret <- do_on_each_group(clean_df, each_func, name = model_and_data_col, with_unnest = FALSE)
+  if (length(grouped_cols) > 0) {
+    ret <- ret %>% tidyr::nest(-grouped_cols)
+  } else {
+    ret <- ret %>% tidyr::nest()
+  }
+
+  ret <- ret %>% dplyr::mutate(model = purrr::map(data, function(df){
+            df[[model_and_data_col]][[1]]$model
+          })) %>%
+          dplyr::mutate(.test_index = purrr::map(data, function(df){
+            df[[model_and_data_col]][[1]]$test_index
+          })) %>%
+          dplyr::mutate(source.data = purrr::map(data, function(df){
+            data <- df[[model_and_data_col]][[1]]$source_data
+            if (length(grouped_cols) > 0 && !is.null(data)) {
+              data %>% dplyr::select(-grouped_cols)
+            } else {
+              data
+            }
+          })) %>%
+          dplyr::select(-data) %>%
+          dplyr::rowwise()
+
   # add special class .model to pass column type validation at viz layer.
   # also add .model.rpart so that a step created by this function is viewable with Exploratory for debugging.
   class(ret$model) <- c("list", ".model", ".model.rpart")
@@ -1874,9 +2213,13 @@ get_binary_predicted_value_from_probability_rpart <- function(x) {
   predicted
 }
 
-get_multiclass_predicted_value_from_probability_rpart <- function(x) {
+get_multiclass_predicted_value_from_probability_rpart <- function(x, data = NULL) {
   ylevels <- attr(x,"ylevels")
-  predicted_mat <- predict(x)
+  predicted_mat <- if (is.data.frame(data)) {
+    predict(x, data)
+  } else {
+   predict(x)
+  }
   # ties are broken randomly to be even.
   # TODO: move this to model building step so that there is no randomness in analytics viz preprocessor.
   predicted_idx <- max.col(predicted_mat, ties.method = "random")
