@@ -1344,7 +1344,7 @@ extract_from_numeric <- function(x, type = "asdisc") {
   ret
 }
 
-#' Calculate R-Squared
+#' Calculate R-Squared 
 #' @export
 r_squared <- function (actual, predicted) {
   # https://stats.stackexchange.com/questions/230556/calculate-r-square-in-r-for-two-vectors
