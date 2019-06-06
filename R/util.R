@@ -1484,7 +1484,6 @@ bind_rows <- function(..., .id = NULL, first_id = '', ignore_column_data_type = 
   # To workaround this issue, set a name to the first data frame with the value specified by fistLabel argument as a pre-process
   # then pass the updated list to dplyr::bind_rows.
   x_updated <- list()
-  x_updated_original <- list()
   x <- dplyr:::flatten_bindable(rlang::dots_values(...))
   if(ignore_column_data_type | stringr::str_length(first_id) >0) {
     count <- 0;
@@ -1497,7 +1496,6 @@ bind_rows <- function(..., .id = NULL, first_id = '', ignore_column_data_type = 
           } else {
             x_updated[[first_id]] <- x[[1]]
           }
-          x_updated_original[[first_id]] <- x[[1]]
         } else {
           # force character as column data types
           if(name == "") {
@@ -1508,7 +1506,6 @@ bind_rows <- function(..., .id = NULL, first_id = '', ignore_column_data_type = 
           } else {
             x_updated[[name]] <- x[[name]]
           }
-          x_updated_original[[name]] <- x[[name]]
         }
         count <- count + 1
       }
@@ -1520,7 +1517,6 @@ bind_rows <- function(..., .id = NULL, first_id = '', ignore_column_data_type = 
         } else {
           x_updated[[i]] <- x[[i]]
         }
-        x_updated_original[[i]] <- x[[i]]
       }
     }
     #re-evaluate column data types
@@ -1530,20 +1526,7 @@ bind_rows <- function(..., .id = NULL, first_id = '', ignore_column_data_type = 
       new_id  = .id
     }
     if(ignore_column_data_type) {
-      # try with original data types
-      tryCatch({
-          expr = dplyr::bind_rows(x_updated_original, .id = new_id)
-        },
-        error = function(e) {
-          # if it fails because of column data type mismatch,
-          # merge them with caracter column data type
-          # then bring back the data type by applying readr::type_convert
-          # after the merge.
-          if(stringr::str_detect(e$message, "can\'t be converted") | stringr::str_detect(e$message,"Incompatible type")) {
-            readr::type_convert(dplyr::bind_rows(x_updated, .id = new_id))
-          }
-        }
-      )
+      readr::type_convert(dplyr::bind_rows(x_updated, .id = new_id))
     } else {
       dplyr::bind_rows(x_updated, .id = new_id)
     }
@@ -1560,21 +1543,9 @@ bind_rows <- function(..., .id = NULL, first_id = '', ignore_column_data_type = 
 
 #'Wrapper function for dplyr's set operations to support ignoring data type difference.
 set_operation_with_force_caracter <- function(func, x, y, ...) {
-  tryCatch({
-    # try with original function
-    func(x, y, ...)
-  },error = function(e){
-    # if it fails because of data type mismtach
-    # try with character column data type then convert it back with readr::type_convert
-    # after the set operation.
-    if(stringr::str_detect(e$message, "can\'t be converted") | stringr::str_detect(e$message,"Incompatible type")) {
-      x <- dplyr::mutate_all(x, funs(as.character))
-      y <- dplyr::mutate_all(y, funs(as.character))
-      readr::type_convert(func(x, y, ...))
-    } else {
-      e
-    }
-  })
+  x <- dplyr::mutate_all(x, funs(as.character))
+  y <- dplyr::mutate_all(y, funs(as.character))
+  readr::type_convert(func(x, y, ...))
 }
 
 #'Wrapper function for dplyr::union to support ignoring data type difference.

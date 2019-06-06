@@ -5,7 +5,7 @@ test_that("bind_rows", {
   res <- mtcars %>% exploratory::bind_rows(list(acars = mtcars, bcars = mtcars), .id="dataf", first_id="firstMtcars")
   expect_equal(unique(res$dataf), c("firstMtcars", "acars", "bcars"))
   res2 <- mtcars %>% exploratory::bind_rows(mtcars, mtcars, .id="dataf")
-  expect_equal(unique(res2$dataf), c("1","2","3"))
+  expect_equal(unique(res2$dataf), c(1,2,3))
   # For data1, test1 column is factor data type
   data1 <- data.frame(person = c("A","B","C"),
                       test1 = as.factor(c(1,4,5)),
