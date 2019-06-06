@@ -428,6 +428,9 @@ parse_logical <- function(text, ...){
 #'Function to extract text inside the characters like bracket.
 #'@export
 str_extract_inside <- function(column, begin = "(", end = ")") {
+  # ref https://stackoverflow.com/questions/3926451/how-to-match-but-not-capture-part-of-a-regex
+  # Below logic creates a Regular Expression that uses lookbehind and lookahead to extract string
+  # between them.
   exp = stringr::str_c("(?<=\\", begin, ").*?(?=\\", end, ")")
   stringr::str_extract(column, exp)
 }
