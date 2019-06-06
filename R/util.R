@@ -1344,7 +1344,7 @@ extract_from_numeric <- function(x, type = "asdisc") {
   ret
 }
 
-#' Calculate R-Squared 
+#' Calculate R-Squared
 #' @export
 r_squared <- function (actual, predicted) {
   # https://stats.stackexchange.com/questions/230556/calculate-r-square-in-r-for-two-vectors
@@ -1473,26 +1473,6 @@ one_hot <- function(df, key) {
   df <- df %>% mutate(!!rlang::sym(tmp_value_col) := 1, !!rlang::sym(tmp_id_col) := seq(n()))
   # Spread the column into multiple columns with name <original column name>_<original value> and value of 1 or 0.
   df %>% tidyr::spread(!!rlang::enquo(key), !!rlang::sym(tmp_value_col), fill = 0, sep = "_") %>% select(-!!rlang::sym(tmp_id_col))
-}
-
-#' Temporary work-around for https://github.com/tidyverse/dplyr/issues/977
-#' It seems https://github.com/tidyverse/dplyr/pull/4205 has fixed it.
-#' Will remove this work-around once dplyr release with the above fix is out.
-#' @export
-n_distinct <- function(..., na.rm = FALSE) {
-  # Use length(unique()) since it is much faster under this issue.
-  if (length(rlang::quos(...)) == 1) {
-    if (!na.rm) {
-      length(unique(...))
-    }
-    else {
-      unique_v <- unique(...)
-      length(unique_v[!is.na(unique_v)])
-    }
-  }
-  else { # Fallback to regular dplyr::n_distinct. Solution with base function was as slow in this case.
-    dplyr::n_distinct(..., na.rm = na.rm)
-  }
 }
 
 
