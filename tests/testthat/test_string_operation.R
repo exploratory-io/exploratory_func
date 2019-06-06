@@ -340,4 +340,29 @@ test_that("str_extract_inside", {
   ret <- exploratory::str_extract_inside("abc*123456$ijk", begin = "*", end = "$")
   expect_equal(ret, "123456")
 
+  tryCatch({
+    ret <- exploratory::str_extract_inside("abc*123456$ijk", begin = "{{", end = "}")
+  }, error = function(e){
+    expect_equal(e$message, "The begin argument must be one character.")
+  })
+
+  tryCatch({
+    ret <- exploratory::str_extract_inside("abc*123456$ijk", begin = "n", end = "}")
+  }, error = function(e){
+    expect_equal(e$message, "The begin argument must be symbol such as (, {, [.")
+  })
+
+  tryCatch({
+    ret <- exploratory::str_extract_inside("abc*123456$ijk", begin = "{", end = "}}")
+  }, error = function(e){
+    expect_equal(e$message, "The end argument must be one character.")
+  })
+
+  tryCatch({
+    ret <- exploratory::str_extract_inside("abc*123456$ijk", begin = "{", end = "z")
+  }, error = function(e){
+    expect_equal(e$message, "The end argument must be symbol such as ), }, ].")
+  })
+
+
 })
