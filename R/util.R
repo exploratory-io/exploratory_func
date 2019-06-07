@@ -1542,7 +1542,7 @@ bind_rows <- function(..., .id = NULL, first_id = '', ignore_column_data_type = 
 }
 
 #'Wrapper function for dplyr's set operations to support ignoring data type difference.
-set_operation_with_force_caracter <- function(func, x, y, ...) {
+set_operation_with_force_character <- function(func, x, y, ...) {
   x <- dplyr::mutate_all(x, funs(as.character))
   y <- dplyr::mutate_all(y, funs(as.character))
   readr::type_convert(func(x, y, ...))
@@ -1554,7 +1554,7 @@ union <- function(x, y, ignore_column_data_type = TRUE, ...){
   if(!is.na(ignore_column_data_type) & class(ignore_column_data_type) ==  "logical" & ignore_column_data_type == FALSE)  {
     dplyr::union(x, y, ...)
   } else {
-    set_operation_with_force_caracter(dplyr::union, x, y, ...)
+    set_operation_with_force_character(dplyr::union, x, y, ...)
   }
 }
 
@@ -1564,7 +1564,7 @@ union_all <- function(x, y, ignore_column_data_type = TRUE, ...){
   if(!is.na(ignore_column_data_type) & class(ignore_column_data_type) ==  "logical" & ignore_column_data_type == FALSE)  {
     dplyr::union_all(x, y, ...)
   } else {
-    set_operation_with_force_caracter(dplyr::union_all, x, y, ...)
+    set_operation_with_force_character(dplyr::union_all, x, y, ...)
   }
 }
 
@@ -1574,7 +1574,7 @@ intersect <- function(x, y, ignore_column_data_type = TRUE, ...){
   if(!is.na(ignore_column_data_type) & class(ignore_column_data_type) ==  "logical" & ignore_column_data_type == FALSE)  {
     dplyr::intersect(x, y, ...)
   } else {
-    set_operation_with_force_caracter(dplyr::intersect, x, y, ...)
+    set_operation_with_force_character(dplyr::intersect, x, y, ...)
   }
 }
 
@@ -1584,7 +1584,7 @@ setdiff <- function(x, y, ignore_column_data_type = TRUE, ...){
   if(!is.na(ignore_column_data_type) & class(ignore_column_data_type) ==  "logical" & ignore_column_data_type == FALSE)  {
     dplyr::setdiff(x, y, ...)
   } else {
-    set_operation_with_force_caracter(dplyr::setdiff, x, y, ...)
+    set_operation_with_force_character(dplyr::setdiff, x, y, ...)
   }
 }
 
