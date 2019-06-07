@@ -1478,7 +1478,7 @@ one_hot <- function(df, key) {
 
 #'Wrapper function for dplyr::bind_rows to support named data frames when it's called inside dplyr chain.
 #'@export
-bind_rows <- function(..., .id = NULL, first_id = '', ignore_column_data_type = TRUE) {
+bind_rows <- function(..., .id = NULL, first_id = '', ignore_column_data_type = FALSE) {
   # If the dplyr::bind_rows is called within a dplyr chain like df1 %>% dplyr::bind_rows(list(df_2 = df2, df_3 = df3), .id="id"),
   # since df1 does not have a name, the "id" column of the resulting data frame does not have the data frame name for rows from df1.
   # To workaround this issue, set a name to the first data frame with the value specified by fistLabel argument as a pre-process
@@ -1559,7 +1559,7 @@ set_operation_with_force_character <- function(func, x, y, ...) {
 
 #'Wrapper function for dplyr::union to support ignoring data type difference.
 #'@export
-union <- function(x, y, ignore_column_data_type = TRUE, ...){
+union <- function(x, y, ignore_column_data_type = FALSE, ...){
   if(!is.na(ignore_column_data_type) & class(ignore_column_data_type) ==  "logical" & ignore_column_data_type == FALSE)  {
     dplyr::union(x, y, ...)
   } else {
@@ -1569,7 +1569,7 @@ union <- function(x, y, ignore_column_data_type = TRUE, ...){
 
 #'Wrapper function for dplyr::union_all to support ignoring data type difference.
 #'@export
-union_all <- function(x, y, ignore_column_data_type = TRUE, ...){
+union_all <- function(x, y, ignore_column_data_type = FALSE, ...){
   if(!is.na(ignore_column_data_type) & class(ignore_column_data_type) ==  "logical" & ignore_column_data_type == FALSE)  {
     dplyr::union_all(x, y, ...)
   } else {
@@ -1579,7 +1579,7 @@ union_all <- function(x, y, ignore_column_data_type = TRUE, ...){
 
 #'Wrapper function for dplyr::intersect to support ignoring data type difference.
 #'@export
-intersect <- function(x, y, ignore_column_data_type = TRUE, ...){
+intersect <- function(x, y, ignore_column_data_type = FALSE, ...){
   if(!is.na(ignore_column_data_type) & class(ignore_column_data_type) ==  "logical" & ignore_column_data_type == FALSE)  {
     dplyr::intersect(x, y, ...)
   } else {
@@ -1589,7 +1589,7 @@ intersect <- function(x, y, ignore_column_data_type = TRUE, ...){
 
 #'Wrapper function for dplyr::setdiff to support ignoring data type difference.
 #'@export
-setdiff <- function(x, y, ignore_column_data_type = TRUE, ...){
+setdiff <- function(x, y, ignore_column_data_type = FALSE, ...){
   if(!is.na(ignore_column_data_type) & class(ignore_column_data_type) ==  "logical" & ignore_column_data_type == FALSE)  {
     dplyr::setdiff(x, y, ...)
   } else {
