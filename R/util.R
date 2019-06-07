@@ -1515,7 +1515,7 @@ bind_rows <- function(..., .id = NULL, first_id = '', ignore_column_data_type = 
         }
         index <- index + 1
       }
-    } else { # for the case that list does not have key (data frame), use index number.
+    } else { # for the case that list does not have key (data frame name), use index number.
       for(i in 1:length(dataframes)) {
         # if ignore_column_data_type is set, force character as column data types
         if(ignore_column_data_type) {
