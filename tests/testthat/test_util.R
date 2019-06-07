@@ -42,7 +42,7 @@ test_that("union", {
                       test3 = c(12.5,12.0,19.5),
                       test4 = as.factor(c(16,21,29)),
                       test5 = as.factor(c(49,51,36)))
-  res <- exploratory::union(x = data1, y = data2)
+  res <- exploratory::union(x = data1, y = data2, ignore_column_data_type = TRUE)
   expect_equal(nrow(res), 5)
 })
 
@@ -62,7 +62,7 @@ test_that("union_all", {
                       test3 = c(12.5,12.0,19.5),
                       test4 = as.factor(c(16,21,29)),
                       test5 = as.factor(c(49,51,36)))
-  res <- exploratory::union_all(x = data1, y = data2)
+  res <- exploratory::union_all(x = data1, y = data2, ignore_column_data_type = TRUE)
   expect_equal(nrow(res), 6)
 })
 
@@ -82,7 +82,7 @@ test_that("intersect", {
                       test3 = c(12.5,12.0,19.5),
                       test4 = as.factor(c(16,21,29)),
                       test5 = as.factor(c(49,51,36)))
-  res <- exploratory::intersect(x = data1, y = data2)
+  res <- exploratory::intersect(x = data1, y = data2, ignore_column_data_type = TRUE)
   expect_equal(nrow(res), 1)
 })
 
@@ -102,7 +102,7 @@ test_that("setdiff", {
                       test3 = c(12.5,12.0,19.5),
                       test4 = as.factor(c(16,21,29)),
                       test5 = as.factor(c(49,51,36)))
-  res <- exploratory::setdiff(x = data1, y = data2)
+  res <- exploratory::setdiff(x = data1, y = data2, ignore_column_data_type = TRUE)
   expect_equal(nrow(res), 2)
 })
 
