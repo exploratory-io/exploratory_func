@@ -1483,57 +1483,66 @@ bind_rows <- function(..., .id = NULL, first_id = '', ignore_column_data_type = 
   # since df1 does not have a name, the "id" column of the resulting data frame does not have the data frame name for rows from df1.
   # To workaround this issue, set a name to the first data frame with the value specified by fistLabel argument as a pre-process
   # then pass the updated list to dplyr::bind_rows.
-  x_updated <- list()
-  x <- dplyr:::flatten_bindable(rlang::dots_values(...))
+  dataframes_updated <- list()
+  # with dplyr:::flatten_bindable API, create a list of data frames from arguments passed to bind_rows.
+  dataframes <- dplyr:::flatten_bindable(rlang::dots_values(...))
   if(ignore_column_data_type | stringr::str_length(first_id) >0) {
-    count <- 0;
-    if(!is.null(names(x))) {
-      for (name in names(x)) {
-        if(stringr::str_length(first_id) >0 & count == 0) {
+    index <- 1;
+    # for the case where a user passes a list that contains key (data frame name) and value (data frame) pair.
+    if(!is.null(names(dataframes))) {
+      # iterate data frames list by name as a key.
+      for (name in names(dataframes)) {
+        # for the first item, it's the data frame passed via %>% operator, so it does not have a key (data frame name) yet.
+        # so populate the key with the value passed by first_id argument.
+        if(stringr::str_length(first_id) > 0 & index == 1) {
           # if ignore_column_data_type is set, force character as column data types
           if(ignore_column_data_type) {
-            x_updated[[first_id]] <- dplyr::mutate_all(x[[1]], funs(as.character))
+            dataframes_updated[[first_id]] <- dplyr::mutate_all(dataframes[[1]], funs(as.character))
           } else {
-            x_updated[[first_id]] <- x[[1]]
+            dataframes_updated[[first_id]] <- dataframes[[1]]
           }
         } else {
-          # force character as column data types
+          # if the key (data frame name) is empty, use index instead.
           if(name == "") {
-            name = count+1;
+            name = index;
           }
+          # force character as column data types
           if(ignore_column_data_type) {
-            x_updated[[name]] <- dplyr::mutate_all(x[[name]], funs(as.character))
+            dataframes_updated[[name]] <- dplyr::mutate_all(dataframes[[name]], funs(as.character))
           } else {
-            x_updated[[name]] <- x[[name]]
+            dataframes_updated[[name]] <- dataframes[[name]]
           }
         }
-        count <- count + 1
+        index <- index + 1
       }
-    } else {
-      for(i in 1:length(x)) {
+    } else { # for the case that list does not have key (data frame), use index number.
+      for(i in 1:length(dataframes)) {
         # if ignore_column_data_type is set, force character as column data types
         if(ignore_column_data_type) {
-          x_updated[[i]] <- dplyr::mutate_all(x[[i]], funs(as.character))
+          dataframes_updated[[i]] <- dplyr::mutate_all(dataframes[[i]], funs(as.character))
         } else {
-          x_updated[[i]] <- x[[i]]
+          dataframes_updated[[i]] <- dataframes[[i]]
         }
       }
     }
-    #re-evaluate column data types
+    # create a name for the column that holds data frame name.
+    # and make sure to make the column name uniqe with avoid_conflict API.
     if(!is.null(.id)) {
-      new_id <- avoid_conflict(colnames(x_updated[[1]]), .id)
+      new_id <- avoid_conflict(colnames(dataframes_updated[[1]]), .id)
     } else {
       new_id  = .id
     }
+    #re-evaluate column data types
     if(ignore_column_data_type) {
-      readr::type_convert(dplyr::bind_rows(x_updated, .id = new_id))
+      readr::type_convert(dplyr::bind_rows(dataframes_updated, .id = new_id))
     } else {
-      dplyr::bind_rows(x_updated, .id = new_id)
+      dplyr::bind_rows(dataframes_updated, .id = new_id)
     }
   } else {
-    #re-evaluate column data types
+    # if .id argument is passed, create a name for the column that holds data frame name.
+    # and make sure to make the column name uniqe with avoid_conflict API.
     if(!is.null(.id)) {
-      new_id <- avoid_conflict(colnames(x[[1]]), .id)
+      new_id <- avoid_conflict(colnames(dataframes[[1]]), .id)
     } else {
       new_id <- .id
     }
