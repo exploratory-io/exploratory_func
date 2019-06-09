@@ -923,6 +923,113 @@ rf_evaluation_by_class <- function(data, ...) {
   broom::tidy(data, model, type = "evaluation_by_class", ...)
 }
 
+#' wrapper for tidy type importance
+#' @export
+rf_evaluation_training_and_test <- function(data, type = "evaluation", test_rate = 0.0, pretty.name = FALSE, ...) {
+  model <-  data %>% dplyr::filter(!is.null(model)) %>% `[[`(1, "model", 1)
+
+  if (!is.null(model) && model$classification_type != "regression") {
+    training_ret <- switch(type,
+                           evaluation = rf_evaluation(data, pretty.name = pretty.name, ...),
+                           evaluation_by_class = rf_evaluation_by_class(data, pretty.name = pretty.name, ...),
+                           conf_mat = data %>% broom::tidy(model, type = "conf_mat"))
+    if (nrow(training_ret) > 0) {
+      training_ret$is_test_data <- FALSE
+    }
+  } else {
+    training_ret <- data.frame()
+  }
+
+  ret <- training_ret
+
+  grouped_col <- colnames(data)[!colnames(data) %in% c("model", ".test_index", "source.data")]
+ 
+  if (test_rate > 0.0) {
+    each_func <- function(df) {
+      if (!is.data.frame(df)) {
+       df <- tribble(~model,   ~.test_index,   ~source.data,
+                   df$model, df$.test_index, df$source.data)
+      }
+      tryCatch({
+        model <- df$model[[1]]
+        test_ret <- prediction(df, data = "test")
+
+        actual_col <- model$terms_mapping[all.vars(model$formula_terms)[1]]
+        actual <- test_ret[[actual_col]]
+
+        if (is.numeric(actual)) {
+          stop("regression is not supported")
+        } else {
+          predicted <- test_ret$predicted_label
+
+          test_ret <- switch(type,
+                 evaluation = {
+                   evaluate_multi_(data.frame(predicted = predicted,
+                                                       actual = actual),
+                                   "predicted", "actual", pretty.name = pretty.name)
+                 },
+                 evaluation_by_class = {
+                   per_level <- function(klass) {
+                     ret <- evaluate_classification(actual, predicted, klass, pretty.name = pretty.name)
+                   }
+
+                   dplyr::bind_rows(lapply(levels(actual), per_level))
+                 },
+                 conf_mat = {
+                   ret <- data.frame(
+                     actual_value = actual,
+                     predicted_value = predicted
+                   ) %>%
+                     dplyr::filter(!is.na(predicted_value))
+             
+                   # get count if it's classification
+                   ret <- ret %>%
+                     dplyr::group_by(actual_value, predicted_value) %>%
+                     dplyr::summarize(count = n()) %>%
+                     dplyr::ungroup()
+             
+                   ret
+                 })
+        }
+      }, error = function(e) {
+        data.frame()
+      })
+    }
+
+    target_df <- if (length(grouped_col) > 0) {
+      data %>% dplyr::group_by_(paste0('`', grouped_col, '`'))
+    } else {
+      data 
+    }
+
+    test_ret <- do_on_each_group(target_df, each_func, with_unnest = TRUE)
+
+    if (nrow(test_ret) > 0) {
+      test_ret$is_test_data <- TRUE
+      ret <- ret %>% dplyr::bind_rows(test_ret)
+    }
+  }
+
+  if(nrow(ret) > 0) {
+    switch(type,
+           evaluation = {
+             ret %>% dplyr::arrange(is_test_data, .by_group = TRUE)
+           },
+           evaluation_by_class = {
+             if (pretty.name) {
+               ret %>% dplyr::arrange(Class, is_test_data, .by_group = TRUE)
+             } else {
+               ret %>% dplyr::arrange(class, is_test_data, .by_group = TRUE)
+             }
+           },
+           conf_mat = {
+             ret
+           })
+  } else {
+    ret
+  }
+}
+
 #' wrapper for tidy type partial dependence
 #' @export
 rf_partial_dependence <- function(df, ...) { # TODO: write test for this.
@@ -2149,6 +2256,7 @@ exp_rpart <- function(df,
       }
       model$terms_mapping <- names(name_map)
       names(model$terms_mapping) <- name_map
+      model$formula_terms <- terms(fml)
 
       list(model = model, test_index = test_index, source_data = source_data)
     }, error = function(e){

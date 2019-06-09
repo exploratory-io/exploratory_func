@@ -5,7 +5,7 @@ context("test rpart functions")
 if (!exists("flight")) {
   # To skip repeated data loading, run the following outside of the context of the test,
   # so that it stays even after the test.
-  flight <- exploratory::read_delim_file("https://www.dropbox.com/s/f47baw5f3v0xoll/airline_2013_10_tricky_v3.csv?dl=1", ",", quote = "\"", skip = 0 , col_names = TRUE , na = c("","NA") , locale=readr::locale(encoding = "UTF-8", decimal_mark = "."), trim_ws = FALSE , progress = FALSE) %>% exploratory::clean_data_frame()
+  flight <- exploratory::read_delim_file("~/.exploratory/airline_2013_10_tricky_v3.csv", ",", quote = "\"", skip = 0 , col_names = TRUE , na = c("","NA") , locale=readr::locale(encoding = "UTF-8", decimal_mark = "."), trim_ws = FALSE , progress = FALSE) %>% exploratory::clean_data_frame()
   flight <- flight %>% sample_n(5000)
 }
 
@@ -55,5 +55,9 @@ test_that("exp_rpart prediction", {
   ret <- model_df %>% prediction(.)
   test_ret <- model_df %>% prediction(., data = "test")
   ret_all <- prediction_training_and_test(model_df)
+})
+
+test_that("hoge", {
+  model_df <- flight %>% exp_rpart(`ORIGIN STATE ABR`,`DEP DELAY`, test_rate = 0.3)
 })
 
