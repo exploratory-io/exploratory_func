@@ -114,6 +114,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
     names(summarise_args) <- regressors
   }
 
+  # To filter NAs on regressor columns
   filter_args <- list() # default empty list
   if (!is.null(regressors)) {
     filter_args <- purrr::map(regressors, function(cname) {
