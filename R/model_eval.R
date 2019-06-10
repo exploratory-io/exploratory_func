@@ -324,7 +324,7 @@ evaluate_binary_training_and_test <- function(df, actual_val_col, threshold = "f
   if (test_rate > 0.0) {
     each_func <- function(df){
       if (!is.data.frame(df)) {
-        df <- tribble(~model,   ~.test_index,   ~source.data,
+        df <- tribble(~model, ~.test_index, ~source.data,
                       df$model, df$.test_index, df$source.data)
       }
 
@@ -351,7 +351,7 @@ evaluate_binary_training_and_test <- function(df, actual_val_col, threshold = "f
     }
 
     target_df <- if (length(grouped_col) > 0) {
-      df %>% dplyr::group_by_(paste0('`', grouped_col, '`'))
+      df %>% group_by(!!!rlang::syms(grouped_col))
     } else {
       df
     }

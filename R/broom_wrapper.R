@@ -148,9 +148,9 @@ add_prediction <- function(df, model_df, conf_int = 0.95, ...){
   # if type.predict argument is not indicated in this function
   # and models have $family$linkinv (basically, glm models have it),
   # both fitted link value column and response value column should appear in the result
-    with_response <- !("type.predict" %in% names(cll)) &&
-                       any(lapply(df$model, function(s) { "family" %in% names(s) })) &&
-                       any(lapply(df$model, function(s) { !is.null(s$family$linkinv) }))
+  with_response <- !("type.predict" %in% names(cll)) &&
+                   any(lapply(model_df$model, function(s) { "family" %in% names(s) })) &&
+                   any(lapply(model_df$model, function(s) { !is.null(s$family$linkinv) }))
 
   ret <- tryCatch({
     get_result(model_df, df, aug_args, with_response)
@@ -462,21 +462,23 @@ prediction_training_and_test <- function(df, prediction_type="default", threshol
 
   grouped_cols <- colnames(df)[!colnames(df) %in% c("model", ".test_index", "source.data", ".model_metadata")]
 
-  tra_ret <- switch(prediction_type,
+  train_ret <- switch(prediction_type,
                     default = prediction(df, ...),
                     binary = prediction_binary(df, threshold = threshold, ...),
                     conf_mat = prediction_binary(df, threshold = threshold, ...),
                     coxph = prediction_coxph(df, ...))
-  tra_ret <- tra_ret %>% dplyr::mutate(is_test_data = FALSE) %>%
+
+  # Change the is_test_data column to the last order
+  train_ret <- train_ret %>% dplyr::mutate(is_test_data = FALSE) %>%
                      dplyr::select(-is_test_data, everything(), is_test_data)
-  ret <- tra_ret
+  ret <- train_ret
 
   if (length(test_index) > 0) {
     target_df <- if (length(grouped_cols) > 0) {
       # like CAR RIER
       # To avoid errors when passing CAR RIER-like columns to group_by_ in Standard Evaluation,
       # enclose the column names in back quotes
-      df %>% dplyr::ungroup() %>% dplyr::group_by_(paste0('`', grouped_cols,'`'))
+      df %>% dplyr::ungroup() %>% dplyr::group_by(!!!rlang::syms(grouped_cols))
     } else {
       df
     }
@@ -494,8 +496,7 @@ prediction_training_and_test <- function(df, prediction_type="default", threshol
                            conf_mat = prediction_binary(df, data = "test", threshold = threshold, ...),
                            coxph = prediction_coxph(df, data = "test", ...))
 
-        # To prevent the group by column from being stored redundantly as follows:
-        #   klass, klass1
+        # Without this for example, column like klass1 is generated when klass is the group_by column.
         test_ret %>% dplyr::ungroup() %>% dplyr::select(-grouped_cols)
       }, error = function(e){
         # In the prediction type of function, if there is categorical data which was not at the time of learning at the time of test,
