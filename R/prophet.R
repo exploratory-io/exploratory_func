@@ -387,7 +387,10 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
     if (lubridate::is.Date(aggregated_data$ds)) {
       forecast$ds <- as.Date(forecast$ds)
     }
-    ret <- forecast %>% dplyr::full_join(aggregated_data, by = c("ds" = "ds"))
+    # Join original aggregated dataframe to forecast dataframe.
+    # Extra regressor columns will conflinct in names. We add _effect to the ones from forecast.
+    # TODO: Can we safely assume that all conflicts are from extra regressors?
+    ret <- forecast %>% dplyr::full_join(aggregated_data, by = c("ds" = "ds"), suffix = c("_effect", ""))
     # drop cap_scaled column, which is just scaled capacity, which does not seem informative.
     if ("cap_scaled" %in% colnames(ret)) {
       ret <- ret %>% dplyr::select(-cap_scaled)
