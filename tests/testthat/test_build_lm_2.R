@@ -95,7 +95,7 @@ test_that("Linear Regression with test rate", {
                                      `DERAY_TIME`,
                                      `Carrier Name`,
                                      model_type = "lm",
-                                     test_rate = 0.2)
+                                     test_rate = 0.1)
   expect_equal(colnames(ret), c("model", ".test_index", "source.data"))
   test_rownum <- length(ret$.test_index[[1]])
   training_rownum <- nrow(test_data) - test_rownum
@@ -121,7 +121,7 @@ test_that("Group Linear Regression with test_rate", {
            build_lm.fast(`DISTANCE`,
                         `ARR_TIME`,
                         model_type = "lm",
-                        test_rate = 0.2)
+                        test_rate = 0.1)
   expect_equal(colnames(ret), c("klass", "model", ".test_index", "source.data"))
   group_nrows <- group_data %>% summarize(n=n()) %>% `[[`("n")
   test_nrows <- sapply(ret$.test_index, length, simplify=TRUE)
@@ -153,7 +153,7 @@ test_that("GLM - Normal Destribution with test_rate", {
                                      `Carrier Name`,
                                      model_type = "glm",
                                      family = "gaussian",
-                                     test_rate = 0.2)
+                                     test_rate = 0.1)
   expect_equal(colnames(ret), c("model", ".test_index", "source.data"))
   test_rownum <- length(ret$.test_index[[1]])
   training_rownum <- nrow(test_data) - test_rownum
@@ -181,7 +181,7 @@ test_that("Group GLM - Normal Destribution with test_rate", {
                         `ARR_TIME`,
                         model_type = "glm",
                         family = "gaussian",
-                        test_rate = 0.2)
+                        test_rate = 0.1)
   expect_equal(colnames(ret), c("klass", "model", ".test_index", "source.data"))
   group_nrows <- group_data %>% summarize(n=n()) %>% `[[`("n")
   test_nrows <- sapply(ret$.test_index, length, simplify=TRUE)
@@ -213,7 +213,7 @@ test_that("GLM - Gamma Destribution with test_rate", {
                                      `Carrier Name`,
                                      model_type = "glm",
                                      family = "Gamma",
-                                     test_rate = 0.2)
+                                     test_rate = 0.1)
   expect_equal(colnames(ret), c("model", ".test_index", "source.data"))
   test_rownum <- length(ret$.test_index[[1]])
   training_rownum <- nrow(test_data) - test_rownum
@@ -241,7 +241,7 @@ test_that("Group GLM - Gamma Destribution with test_rate", {
                         `ARR_TIME`,
                         model_type = "glm",
                         family = "Gamma",
-                        test_rate = 0.2)
+                        test_rate = 0.1)
   expect_equal(colnames(ret), c("klass", "model", ".test_index", "source.data"))
   group_nrows <- group_data %>% summarize(n=n()) %>% `[[`("n")
   test_nrows <- sapply(ret$.test_index, length, simplify=TRUE)
@@ -273,7 +273,7 @@ test_that("GLM - Inverse Gaussian Destribution with test_rate", {
                                      `Carrier Name`,
                                      model_type = "glm",
                                      family = "inverse.gaussian",
-                                     test_rate = 0.2)
+                                     test_rate = 0.1)
   expect_equal(colnames(ret), c("model", ".test_index", "source.data"))
   test_rownum <- length(ret$.test_index[[1]])
   training_rownum <- nrow(test_data) - test_rownum
@@ -301,7 +301,7 @@ test_that("Group GLM - Inverse Gaussian Destribution with test_rate", {
                         `ARR_TIME`,
                         model_type = "glm",
                         family = "inverse.gaussian",
-                        test_rate = 0.2)
+                        test_rate = 0.1)
   expect_equal(colnames(ret), c("klass", "model", ".test_index", "source.data"))
   group_nrows <- group_data %>% summarize(n=n()) %>% `[[`("n")
   test_nrows <- sapply(ret$.test_index, length, simplify=TRUE)
@@ -333,7 +333,7 @@ test_that("GLM - poisson Destribution with test_rate", {
                                      `Carrier Name`,
                                      model_type = "glm",
                                      family = "poisson",
-                                     test_rate = 0.2)
+                                     test_rate = 0.1)
   expect_equal(colnames(ret), c("model", ".test_index", "source.data"))
   test_rownum <- length(ret$.test_index[[1]])
   training_rownum <- nrow(test_data) - test_rownum
@@ -361,7 +361,7 @@ test_that("Group GLM - Poisson Destribution with test_rate", {
                         `ARR_TIME`,
                         model_type = "glm",
                         family = "poisson",
-                        test_rate = 0.2)
+                        test_rate = 0.3)
   expect_equal(colnames(ret), c("klass", "model", ".test_index", "source.data"))
   group_nrows <- group_data %>% summarize(n=n()) %>% `[[`("n")
   test_nrows <- sapply(ret$.test_index, length, simplify=TRUE)
@@ -393,7 +393,7 @@ test_that("GLM - Negative Binomial Destribution with test_rate", {
                                      `Carrier Name`,
                                      model_type = "glm",
                                      family = "negativebinomial",
-                                     test_rate = 0.2)
+                                     test_rate = 0.1)
   expect_equal(colnames(ret), c("model", ".test_index", "source.data"))
   test_rownum <- length(ret$.test_index[[1]])
   training_rownum <- nrow(test_data) - test_rownum
@@ -421,7 +421,7 @@ test_that("Group GLM - Negative Binomial Destribution with test_rate", {
                         `ARR_TIME`,
                         model_type = "glm",
                         family = "negativebinomial",
-                        test_rate = 0.2)
+                        test_rate = 0.1)
   expect_equal(colnames(ret), c("klass", "model", ".test_index", "source.data"))
   group_nrows <- group_data %>% summarize(n=n()) %>% `[[`("n")
   test_nrows <- sapply(ret$.test_index, length, simplify=TRUE)
@@ -453,7 +453,7 @@ test_that("Logistic Regression with test_rate", {
                                      `Carrier Name`,
                                      family = "binomial",
                                      model_type = "glm",
-                                     test_rate = 0.2)
+                                     test_rate = 0.1)
   expect_equal(colnames(ret), c("model", ".test_index", "source.data"))
   test_rownum <- length(ret$.test_index[[1]])
   training_rownum <- nrow(test_data) - test_rownum
@@ -482,7 +482,7 @@ test_that("Group Logistic Regression with test_rate", {
                         model_type = "glm",
                         family = "binomial",
                         link = "logit",
-                        test_rate = 0.2)
+                        test_rate = 0.1)
   expect_equal(colnames(ret), c("klass", "model", ".test_index", "source.data"))
   group_nrows <- group_data %>% summarize(n=n()) %>% `[[`("n")
   test_nrows <- sapply(ret$.test_index, length, simplify=TRUE)

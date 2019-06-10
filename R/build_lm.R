@@ -517,7 +517,7 @@ build_lm.fast <- function(df,
         }
       }
       else {
-       # split training and test data
+        # split training and test data
         source_data <- df
         test_index <- sample_df_index(source_data, rate = test_rate)
         df <- safe_slice(source_data, test_index, remove = TRUE)
@@ -619,7 +619,7 @@ glance.lm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
 
 #' special version of glance.lm function to use with build_lm.fast.
 #' @export
-glance.glm_exploratory <- function(x, pretty.name = FALSE, threshold = 0.5, ...) { #TODO: add test
+glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification_threshold = 0.5, ...) { #TODO: add test
   ret <- broom:::glance.glm(x)
 
   # calculate model p-value since glm does not provide it as is.
@@ -647,10 +647,10 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, threshold = 0.5, ...)
   
   if (x$family$family %in% c('binomial', 'quasibinomial')) { # only for logistic regression.
     # Calculate F Score, Accuracy Rate, Misclassification Rate, Precision, Recall, Data Size
-    threshold_value <- if (is.numeric(threshold)) {
-      threshold
+    threshold_value <- if (is.numeric(binary_classification_threshold)) {
+      binary_classification_threshold
     } else {
-      get_optimized_score(x$y, x$fitted.value, threshold = threshold)$threshold
+      get_optimized_score(x$y, x$fitted.value, threshold = binary_classification_threshold)$threshold
     }
     predicted <- ifelse(x$fitted.value > threshold_value, 1, 0) #TODO make threshold adjustable
     ret2 <- evaluate_classification(x$y, predicted, 1, pretty.name = pretty.name)

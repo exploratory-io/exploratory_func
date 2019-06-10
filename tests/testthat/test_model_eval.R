@@ -336,7 +336,7 @@ test_that("Group evaluate binary classification model by training and test with 
                          model_type = "glm",
                          family = "binomial",
                          link = "logit",
-                         test_rate = 0.4)
+                         test_rate = 0.3)
   suppressWarnings({
     eret_fscore <- evaluate_binary_training_and_test(ret, "CANCELLED X", test_rate = 0.5, threshold = "f_score")
     eret_acc <- evaluate_binary_training_and_test(ret, "CANCELLED X", test_rate = 0.5, threshold = "accuracy_rate") 
