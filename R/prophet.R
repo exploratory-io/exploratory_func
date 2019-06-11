@@ -189,7 +189,8 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
       max_floored_date <- max(df[[time_col]])
       future_df <- future_df %>% dplyr::filter(UQ(rlang::sym(time_col)) > max_floored_date)
 
-      if(nrow(future_df) == 0) {
+      # No future external regressor data is provided. For test mode, this is fine, but when it is not, this is a problem.
+      if(nrow(future_df) == 0 && !test_mode) {
         # ignore the error if
         # it is caused by subset of
         # grouped data frame

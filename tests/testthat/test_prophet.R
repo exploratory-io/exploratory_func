@@ -159,7 +159,7 @@ test_that("do_prophet with regressor with holiday column with monthly data", {
   ret <- combined_data %>%
     do_prophet(timestamp, data, 10, time_unit = "month", regressors = c("regressor"), funs.aggregate.regressors = c(mean), holiday=`holi day`)
   # verify the last date with forecasted_value
-  expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2012-01-11")) 
+  expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2012-11-01")) 
   # verify the last date in the data is the end of regressor data
   expect_equal(ret$timestamp[[length(ret$timestamp)]], as.Date("2013-01-01"))
 })
