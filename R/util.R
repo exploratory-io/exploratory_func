@@ -1483,7 +1483,13 @@ extract_argument_names <- function(...) {
 
 #'Wrapper function for dplyr::bind_rows to support named data frames when it's called inside dplyr chain.
 #'@export
-bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_data_type = FALSE) {
+bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_data_type = FALSE, .id = NULL) {
+  # for compatiblity with dply::bind_rows
+  # if dplyr::bind_rows' .id argument is passed and id_column_name is NA
+  # use dplyr::bind_rows' .id argumetn value as id_column_name
+  if(!is.null(.id) && is.null(id_column_name)) {
+    id_column_name = .id
+  }
   # get a list of argument names to resolve data frame names passed to this bind_rows.
   # only exception is the current data frame which is passed via dplyr pipe operation (%>%).
   # it becomes period (.) instead of actual df name.

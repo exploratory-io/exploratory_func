@@ -30,6 +30,9 @@ test_that("bind_rows", {
   mtcars3 <- mtcars
   res4 <- mtcars1 %>% exploratory::bind_rows(mtcars2, mtcars3, current_df_name = "mtcars1", id_column_name = "ID")
   expect_equal(unique(res4$ID), c("mtcars1","mtcars2","mtcars3"))
+  # backward compatibility check
+  res5 <- mtcars1 %>% exploratory::bind_rows(mtcars2, mtcars3, .id = "ID")
+  expect_equal(unique(res5$ID), c("1","2","3"))
 })
 
 test_that("union", {
