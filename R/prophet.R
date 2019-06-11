@@ -180,6 +180,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
       df <- df[, !colnames(df) %in% grouped_col]
     }
 
+    aggregated_future_data <- NULL
     if (!is.null(regressors)) { # extra regressor case. separate the df into history and future based on the value is filled or not.
       # filter NAs on regressor columns
       df <- df %>% dplyr::filter(!!!filter_args)
