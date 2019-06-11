@@ -175,9 +175,7 @@ test_that("do_prophet with holiday column with hourly data", {
   ret <- combined_data %>%
     do_prophet(timestamp, data, 10, time_unit = "hour", holiday=holiday)
   # verify the last date with forecasted_value
-  expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2012-01-11")) 
-  # verify the last date in the data is the end of regressor data
-  expect_equal(ret$timestamp[[length(ret$timestamp)]], as.Date("2013-01-01"))
+  expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.POSIXct("2010-01-15 10:00:00 UTC")) 
 })
 
 test_that("do_prophet with extra regressor with cap/floor", {
