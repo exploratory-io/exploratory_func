@@ -403,7 +403,13 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
     # Join original aggregated dataframe to forecast dataframe.
     # Extra regressor columns will conflinct in names. We add _effect to the ones from forecast.
     # TODO: Can we safely assume that all conflicts are from extra regressors?
-    ret <- forecast %>% dplyr::full_join(aggregated_data, by = c("ds" = "ds"), suffix = c("_effect", ""))
+    # If there is future part of aggregated data, bind it too so that extra regressor values for future are also in the output.
+    if (!is.null(aggregated_future_data)) {
+      ret <- forecast %>% dplyr::full_join(dplyr::bind_rows(aggregated_data, aggregated_future_data), by = c("ds" = "ds"), suffix = c("_effect", ""))
+    }
+    else {
+      ret <- forecast %>% dplyr::full_join(aggregated_data, by = c("ds" = "ds"), suffix = c("_effect", ""))
+    }
     # drop cap_scaled column, which is just scaled capacity, which does not seem informative.
     if ("cap_scaled" %in% colnames(ret)) {
       ret <- ret %>% dplyr::select(-cap_scaled)
