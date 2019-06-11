@@ -146,8 +146,6 @@ test_that("do_prophet with holiday column", {
     do_prophet(timestamp, data, 10, time_unit = "day", holiday=`holi day`)
   # verify the last date with forecasted_value
   expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2012-01-11")) 
-  # verify the last date in the data is the end of regressor data
-  expect_equal(ret$timestamp[[length(ret$timestamp)]], as.Date("2013-01-01"))
 })
 
 test_that("do_prophet with regressor with holiday column with monthly data", {
