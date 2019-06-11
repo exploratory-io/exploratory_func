@@ -1488,7 +1488,6 @@ bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_da
   # only exception is the current data frame which is passed via dplyr pipe operation (%>%).
   # it becomes period (.) instead of actual df name.
   args <- extract_argument_names(...)
-  browser()
   # If the dplyr::bind_rows is called within a dplyr chain like df1 %>% dplyr::bind_rows(list(df_2 = df2, df_3 = df3), .id="id"),
   # since df1 does not have a name, the "id" column of the resulting data frame does not have the data frame name for rows from df1.
   # To workaround this issue, set a name to the first data frame with the value specified by fistLabel argument as a pre-process
@@ -1496,7 +1495,7 @@ bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_da
   dataframes_updated <- list()
   # with dplyr:::flatten_bindable API, create a list of data frames from arguments passed to bind_rows.
   dataframes <- dplyr:::flatten_bindable(rlang::dots_values(...))
-  if(force_data_type | stringr::str_length(current_df_name) >0) {
+  if(force_data_type || stringr::str_length(current_df_name) >0) {
     index <- 1;
     # for the case where a user passes a list that contains key (data frame name) and value (data frame) pair.
     if(!is.null(names(dataframes))) {
@@ -1504,7 +1503,7 @@ bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_da
       for (name in names(dataframes)) {
         # for the first item, it's the data frame passed via %>% operator, so it does not have a key (data frame name) yet.
         # so populate the key with the value passed by first_id argument.
-        if(stringr::str_length(current_df_name) > 0 & index == 1) {
+        if(stringr::str_length(current_df_name) > 0 && index == 1) {
           # if force_data_type is set, force character as column data types
           if(force_data_type) {
             dataframes_updated[[current_df_name]] <- dplyr::mutate_all(dataframes[[1]], funs(as.character))
@@ -1529,7 +1528,7 @@ bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_da
       for(i in 1:length(dataframes)) {
         # check if we can get each data frame name from the arguments
         df_name <- args[[i]]
-        if(is.na(df_name) | df_name == "") {
+        if(is.na(df_name) || df_name == "") {
           # if we cannot find data fram name, use index i instead.
           df_name = i
         }
@@ -1593,7 +1592,7 @@ set_operation_with_force_character <- function(func, x, y, ...) {
 #'Wrapper function for dplyr::union to support ignoring data type difference.
 #'@export
 union <- function(x, y, force_data_type = FALSE, ...){
-  if(!is.na(force_data_type) & class(force_data_type) ==  "logical" & force_data_type == FALSE)  {
+  if(!is.na(force_data_type) && class(force_data_type) ==  "logical" && force_data_type == FALSE)  {
     dplyr::union(x, y, ...)
   } else {
     set_operation_with_force_character(dplyr::union, x, y, ...)
@@ -1603,7 +1602,7 @@ union <- function(x, y, force_data_type = FALSE, ...){
 #'Wrapper function for dplyr::union_all to support ignoring data type difference.
 #'@export
 union_all <- function(x, y, force_data_type = FALSE, ...){
-  if(!is.na(force_data_type) & class(force_data_type) ==  "logical" & force_data_type == FALSE)  {
+  if(!is.na(force_data_type) && class(force_data_type) ==  "logical" && force_data_type == FALSE)  {
     dplyr::union_all(x, y, ...)
   } else {
     set_operation_with_force_character(dplyr::union_all, x, y, ...)
@@ -1613,7 +1612,7 @@ union_all <- function(x, y, force_data_type = FALSE, ...){
 #'Wrapper function for dplyr::intersect to support ignoring data type difference.
 #'@export
 intersect <- function(x, y, force_data_type = FALSE, ...){
-  if(!is.na(force_data_type) & class(force_data_type) ==  "logical" & force_data_type == FALSE)  {
+  if(!is.na(force_data_type) && class(force_data_type) ==  "logical" && force_data_type == FALSE)  {
     dplyr::intersect(x, y, ...)
   } else {
     set_operation_with_force_character(dplyr::intersect, x, y, ...)
@@ -1623,7 +1622,7 @@ intersect <- function(x, y, force_data_type = FALSE, ...){
 #'Wrapper function for dplyr::setdiff to support ignoring data type difference.
 #'@export
 setdiff <- function(x, y, force_data_type = FALSE, ...){
-  if(!is.na(force_data_type) & class(force_data_type) ==  "logical" & force_data_type == FALSE)  {
+  if(!is.na(force_data_type) && class(force_data_type) ==  "logical" && force_data_type == FALSE)  {
     dplyr::setdiff(x, y, ...)
   } else {
     set_operation_with_force_character(dplyr::setdiff, x, y, ...)
