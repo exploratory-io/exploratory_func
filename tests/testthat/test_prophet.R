@@ -114,9 +114,10 @@ test_that("do_prophet with extra regressor", {
   combined_data <- raw_data %>% full_join(regressor_data, by=c("timestamp"="timestamp"))
   ret <- combined_data %>%
     do_prophet(timestamp, data, 10, time_unit = "day", regressors = c("regressor"), funs.aggregate.regressors = c(mean))
-  # verify that the last forecasted_value is not NA
-  expect_true(!is.na(ret$forecasted_value[[length(ret$forecasted_value)]]))
-  expect_equal(ret$timestamp[[length(ret$timestamp)]], as.Date("2012-01-11"))
+  # verify the last date with forecasted_value
+  expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2012-01-11")) 
+  # verify the last date in the data is the end of regressor data
+  expect_equal(ret$timestamp[[length(ret$timestamp)]], as.Date("2013-01-01"))
 })
 
 test_that("do_prophet with extra regressor with holiday column", {
@@ -127,9 +128,10 @@ test_that("do_prophet with extra regressor with holiday column", {
   combined_data <- raw_data %>% full_join(regressor_data, by=c("timestamp"="timestamp"))
   ret <- combined_data %>%
     do_prophet(timestamp, data, 10, time_unit = "day", regressors = c("regressor"), funs.aggregate.regressors = c(mean), holiday=holiday)
-  # verify that the last forecasted_value is not NA
-  expect_true(!is.na(ret$forecasted_value[[length(ret$forecasted_value)]]))
-  expect_equal(ret$timestamp[[length(ret$timestamp)]], as.Date("2012-01-11"))
+  # verify the last date with forecasted_value
+  expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2012-01-11")) 
+  # verify the last date in the data is the end of regressor data
+  expect_equal(ret$timestamp[[length(ret$timestamp)]], as.Date("2013-01-01"))
 })
 
 test_that("do_prophet with holiday column", {
@@ -142,9 +144,8 @@ test_that("do_prophet with holiday column", {
   combined_data <- raw_data %>% full_join(regressor_data, by=c("timestamp"="timestamp"))
   ret <- combined_data %>%
     do_prophet(timestamp, data, 10, time_unit = "day", holiday=`holi day`)
-  # verify that the last forecasted_value is not NA
-  expect_true(!is.na(ret$forecasted_value[[length(ret$forecasted_value)]]))
-  expect_equal(ret$timestamp[[length(ret$timestamp)]], as.Date("2012-01-11"))
+  # verify the last date with forecasted_value
+  expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2012-01-11")) 
 })
 
 test_that("do_prophet with regressor with holiday column with monthly data", {
@@ -157,9 +158,10 @@ test_that("do_prophet with regressor with holiday column with monthly data", {
   combined_data <- raw_data %>% full_join(regressor_data, by=c("timestamp"="timestamp"))
   ret <- combined_data %>%
     do_prophet(timestamp, data, 10, time_unit = "month", regressors = c("regressor"), funs.aggregate.regressors = c(mean), holiday=`holi day`)
-  # verify that the last forecasted_value is not NA
-  expect_true(!is.na(ret$forecasted_value[[length(ret$forecasted_value)]]))
-  expect_equal(ret$timestamp[[length(ret$timestamp)]], as.Date("2012-11-01"))
+  # verify the last date with forecasted_value
+  expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2012-11-01")) 
+  # verify the last date in the data is the end of regressor data
+  expect_equal(ret$timestamp[[length(ret$timestamp)]], as.Date("2013-01-01"))
 })
 
 test_that("do_prophet with holiday column with hourly data", {
@@ -172,9 +174,10 @@ test_that("do_prophet with holiday column with hourly data", {
   combined_data <- raw_data %>% full_join(regressor_data, by=c("timestamp"="timestamp"))
   ret <- combined_data %>%
     do_prophet(timestamp, data, 10, time_unit = "hour", holiday=holiday)
-  # verify that the last forecasted_value is not NA
-  expect_true(!is.na(ret$forecasted_value[[length(ret$forecasted_value)]]))
-  expect_equal(ret$timestamp[[length(ret$timestamp)]], as.POSIXct("2010-01-15 10:00:00", tz="UTC"))
+  # verify the last date with forecasted_value
+  # Comparing between POSIXct is prone to false positive. 
+  # Comparing between characters is more stable with added bonus of printed evaluation result for easier debugging.
+  expect_equal(as.character(last((ret %>% filter(!is.na(forecasted_value)))$timestamp)), "2010-01-15 10:00:00")
 })
 
 test_that("do_prophet with extra regressor with cap/floor", {
@@ -185,9 +188,10 @@ test_that("do_prophet with extra regressor with cap/floor", {
   combined_data <- raw_data %>% full_join(regressor_data, by=c("timestamp"="timestamp"))
   ret <- combined_data %>%
     do_prophet(timestamp, data, 10, time_unit = "day", cap = 2, floor = -2, regressors = c("regressor"), funs.aggregate.regressors = c(mean))
-  # verify that the last forecasted_value is not NA
-  expect_true(!is.na(ret$forecasted_value[[length(ret$forecasted_value)]]))
-  expect_equal(ret$timestamp[[length(ret$timestamp)]], as.Date("2012-01-11"))
+  # verify the last date with forecasted_value
+  expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2012-01-11")) 
+  # verify the last date in the data is the end of regressor data
+  expect_equal(ret$timestamp[[length(ret$timestamp)]], as.Date("2013-01-01"))
 })
 
 test_that("do_prophet test mode with extra regressor", {
@@ -200,9 +204,11 @@ test_that("do_prophet test mode with extra regressor", {
   combined_data <- raw_data %>% full_join(regressor_data, by=c("timestamp"="timestamp"))
   ret <- combined_data %>%
     do_prophet(timestamp, data, 10, time_unit = "day", regressors = c("regressor"), funs.aggregate.regressors = c(mean), test_mode = TRUE)
-  # verify that the last forecasted_value is not NA
-  expect_true(!is.na(ret$forecasted_value[[length(ret$forecasted_value)]]))
-  expect_equal(ret$timestamp[[length(ret$timestamp)]], as.Date("2012-01-01"))
+  # verify the last date with forecasted_value
+  # Since it is test mode, end of original data is end of forecast.
+  expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2012-01-01"))
+  # verify the last date in the data is the end of regressor data
+  expect_equal(ret$timestamp[[length(ret$timestamp)]], as.Date("2013-01-01"))
 })
 
 

@@ -114,6 +114,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
     names(summarise_args) <- regressors
   }
 
+  # To filter NAs on regressor columns
   filter_args <- list() # default empty list
   if (!is.null(regressors)) {
     filter_args <- purrr::map(regressors, function(cname) {
@@ -179,6 +180,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
       df <- df[, !colnames(df) %in% grouped_col]
     }
 
+    aggregated_future_data <- NULL
     if (!is.null(regressors)) { # extra regressor case. separate the df into history and future based on the value is filled or not.
       # filter NAs on regressor columns
       df <- df %>% dplyr::filter(!!!filter_args)
@@ -186,6 +188,19 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
       df <- df %>% dplyr::filter(!is.na(UQ(rlang::sym(value_col)))) # keep the rows that has values. the ones that do not are for future regressors
       max_floored_date <- max(df[[time_col]])
       future_df <- future_df %>% dplyr::filter(UQ(rlang::sym(time_col)) > max_floored_date)
+
+      # No future external regressor data is provided. For test mode, this is fine, but when it is not, this is a problem.
+      if(nrow(future_df) == 0 && !test_mode) {
+        # ignore the error if
+        # it is caused by subset of
+        # grouped data frame
+        # to show result of
+        # data frames that succeed
+        if(is.null(grouped_col) || length(grouped_col) == 0) {
+          # Terminology is not consistent here, but we are calling extra regressor "external predictor" on the UI.
+          stop("External predictors require future data, or to be run in Test Mode.")
+        }
+      }
 
       # TODO: in test mode, this is not really necessary. optimize.
       aggregated_future_data <- future_df %>%
@@ -387,7 +402,16 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
     if (lubridate::is.Date(aggregated_data$ds)) {
       forecast$ds <- as.Date(forecast$ds)
     }
-    ret <- forecast %>% dplyr::full_join(aggregated_data, by = c("ds" = "ds"))
+    # Join original aggregated dataframe to forecast dataframe.
+    # Extra regressor columns will conflinct in names. We add _effect to the ones from forecast.
+    # TODO: Can we safely assume that all conflicts are from extra regressors?
+    # If there is future part of aggregated data, bind it too so that extra regressor values for future are also in the output.
+    if (!is.null(aggregated_future_data)) {
+      ret <- forecast %>% dplyr::full_join(dplyr::bind_rows(aggregated_data, aggregated_future_data), by = c("ds" = "ds"), suffix = c("_effect", ""))
+    }
+    else {
+      ret <- forecast %>% dplyr::full_join(aggregated_data, by = c("ds" = "ds"), suffix = c("_effect", ""))
+    }
     # drop cap_scaled column, which is just scaled capacity, which does not seem informative.
     if ("cap_scaled" %in% colnames(ret)) {
       ret <- ret %>% dplyr::select(-cap_scaled)
