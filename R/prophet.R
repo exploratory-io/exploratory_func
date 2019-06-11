@@ -198,7 +198,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
         # data frames that succeed
         if(is.null(grouped_col) || length(grouped_col) == 0) {
           # Terminology is not consistent here, but we are calling extra regressor "external predictor" on the UI.
-          stop("No future external predictor values to base forecast on is provided.")
+          stop("To make a forecast with external predictor, external predictor values for the future periods to forecast are required. To try forecast with external predictor without future data, use Test Mode.")
         }
       }
 
