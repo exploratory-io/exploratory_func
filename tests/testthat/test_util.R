@@ -2,9 +2,9 @@ context("check util functions")
 
 test_that("bind_rows", {
   library(dplyr)
-  res <- mtcars %>% exploratory::bind_rows(list(acars = mtcars, bcars = mtcars), .id="dataf", first_id="firstMtcars")
+  res <- mtcars %>% exploratory::bind_rows(list(acars = mtcars, bcars = mtcars), id_column_name="dataf", current_df_name="firstMtcars")
   expect_equal(unique(res$dataf), c("firstMtcars", "acars", "bcars"))
-  res2 <- mtcars %>% exploratory::bind_rows(mtcars, mtcars, .id="dataf", ignore_column_data_type = TRUE)
+  res2 <- mtcars %>% exploratory::bind_rows(mtcars, mtcars, id_column_name="dataf", force_data_type = TRUE)
   expect_equal(unique(res2$dataf), c(1,2,3))
   # For data1, test1 column is factor data type
   data1 <- data.frame(person = c("A","B","C"),
@@ -21,9 +21,15 @@ test_that("bind_rows", {
                       test4 = as.factor(c(15,21,29)),
                       test5 = as.factor(c(54,51,36)))
   # if this is dplyr::bind_rows, it fails because of factor vs character data type mismatch.
-  # but exploratory::bind_rows works if ignore_case argument is set as TRUE.
-  res3 <- exploratory::bind_rows(data1, data2, ignore_column_data_type = TRUE)
+  # but exploratory::bind_rows works if force_data_type is set as TRUE.
+  res3 <- exploratory::bind_rows(data1, data2, force_data_type = TRUE)
   expect_equal(unique(res3$person), c("A","B","C","D","E","F"))
+  # test data frames without dedicated names
+  mtcars1 <- mtcars
+  mtcars2 <- mtcars
+  mtcars3 <- mtcars
+  res4 <- mtcars1 %>% exploratory::bind_rows(mtcars2, mtcars3, current_df_name = "mtcars1", id_column_name = "ID")
+  expect_equal(unique(res4$ID), c("mtcars1","mtcars2","mtcars3"))
 })
 
 test_that("union", {
@@ -42,7 +48,7 @@ test_that("union", {
                       test3 = c(12.5,12.0,19.5),
                       test4 = as.factor(c(16,21,29)),
                       test5 = as.factor(c(49,51,36)))
-  res <- exploratory::union(x = data1, y = data2, ignore_column_data_type = TRUE)
+  res <- exploratory::union(x = data1, y = data2, force_data_type = TRUE)
   expect_equal(nrow(res), 5)
 })
 
@@ -62,7 +68,7 @@ test_that("union_all", {
                       test3 = c(12.5,12.0,19.5),
                       test4 = as.factor(c(16,21,29)),
                       test5 = as.factor(c(49,51,36)))
-  res <- exploratory::union_all(x = data1, y = data2, ignore_column_data_type = TRUE)
+  res <- exploratory::union_all(x = data1, y = data2, force_data_type = TRUE)
   expect_equal(nrow(res), 6)
 })
 
@@ -82,7 +88,7 @@ test_that("intersect", {
                       test3 = c(12.5,12.0,19.5),
                       test4 = as.factor(c(16,21,29)),
                       test5 = as.factor(c(49,51,36)))
-  res <- exploratory::intersect(x = data1, y = data2, ignore_column_data_type = TRUE)
+  res <- exploratory::intersect(x = data1, y = data2, force_data_type = TRUE)
   expect_equal(nrow(res), 1)
 })
 
@@ -102,7 +108,7 @@ test_that("setdiff", {
                       test3 = c(12.5,12.0,19.5),
                       test4 = as.factor(c(16,21,29)),
                       test5 = as.factor(c(49,51,36)))
-  res <- exploratory::setdiff(x = data1, y = data2, ignore_column_data_type = TRUE)
+  res <- exploratory::setdiff(x = data1, y = data2, force_data_type = TRUE)
   expect_equal(nrow(res), 2)
 })
 

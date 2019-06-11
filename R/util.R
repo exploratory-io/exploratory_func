@@ -1475,10 +1475,19 @@ one_hot <- function(df, key) {
   df %>% tidyr::spread(!!rlang::enquo(key), !!rlang::sym(tmp_value_col), fill = 0, sep = "_") %>% select(-!!rlang::sym(tmp_id_col))
 }
 
+# API to get a list of argument names
+extract_argument_names <- function(...) {
+  q <- rlang::quos(...)
+  purrr::map(q, function(x){rlang::quo_name(x)})
+}
 
 #'Wrapper function for dplyr::bind_rows to support named data frames when it's called inside dplyr chain.
 #'@export
-bind_rows <- function(..., .id = NULL, first_id = '', ignore_column_data_type = FALSE) {
+bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_data_type = FALSE) {
+  # get a list of argument names to resolve data frame names passed to this bind_rows.
+  # only exception is the current data frame which is passed via dplyr pipe operation (%>%).
+  # it becomes period (.) instead of actual df name.
+  args <- extract_argument_names(...)
   # If the dplyr::bind_rows is called within a dplyr chain like df1 %>% dplyr::bind_rows(list(df_2 = df2, df_3 = df3), .id="id"),
   # since df1 does not have a name, the "id" column of the resulting data frame does not have the data frame name for rows from df1.
   # To workaround this issue, set a name to the first data frame with the value specified by fistLabel argument as a pre-process
@@ -1486,7 +1495,7 @@ bind_rows <- function(..., .id = NULL, first_id = '', ignore_column_data_type = 
   dataframes_updated <- list()
   # with dplyr:::flatten_bindable API, create a list of data frames from arguments passed to bind_rows.
   dataframes <- dplyr:::flatten_bindable(rlang::dots_values(...))
-  if(ignore_column_data_type | stringr::str_length(first_id) >0) {
+  if(force_data_type || stringr::str_length(current_df_name) >0) {
     index <- 1;
     # for the case where a user passes a list that contains key (data frame name) and value (data frame) pair.
     if(!is.null(names(dataframes))) {
@@ -1494,12 +1503,12 @@ bind_rows <- function(..., .id = NULL, first_id = '', ignore_column_data_type = 
       for (name in names(dataframes)) {
         # for the first item, it's the data frame passed via %>% operator, so it does not have a key (data frame name) yet.
         # so populate the key with the value passed by first_id argument.
-        if(stringr::str_length(first_id) > 0 & index == 1) {
-          # if ignore_column_data_type is set, force character as column data types
-          if(ignore_column_data_type) {
-            dataframes_updated[[first_id]] <- dplyr::mutate_all(dataframes[[1]], funs(as.character))
+        if(stringr::str_length(current_df_name) > 0 && index == 1) {
+          # if force_data_type is set, force character as column data types
+          if(force_data_type) {
+            dataframes_updated[[current_df_name]] <- dplyr::mutate_all(dataframes[[1]], funs(as.character))
           } else {
-            dataframes_updated[[first_id]] <- dataframes[[1]]
+            dataframes_updated[[current_df_name]] <- dataframes[[1]]
           }
         } else {
           # if the key (data frame name) is empty, use index instead.
@@ -1507,7 +1516,7 @@ bind_rows <- function(..., .id = NULL, first_id = '', ignore_column_data_type = 
             name = index;
           }
           # force character as column data types
-          if(ignore_column_data_type) {
+          if(force_data_type) {
             dataframes_updated[[name]] <- dplyr::mutate_all(dataframes[[name]], funs(as.character))
           } else {
             dataframes_updated[[name]] <- dataframes[[name]]
@@ -1517,23 +1526,46 @@ bind_rows <- function(..., .id = NULL, first_id = '', ignore_column_data_type = 
       }
     } else { # for the case that list does not have key (data frame name), use index number.
       for(i in 1:length(dataframes)) {
-        # if ignore_column_data_type is set, force character as column data types
-        if(ignore_column_data_type) {
-          dataframes_updated[[i]] <- dplyr::mutate_all(dataframes[[i]], funs(as.character))
+        # check if we can get each data frame name from the arguments
+        df_name <- args[[i]]
+        if(is.na(df_name) || df_name == "") {
+          # if we cannot find data fram name, use index i instead.
+          df_name = i
+        }
+        # if force_data_type is set, force character as column data types
+        if(force_data_type) {
+          if(stringr::str_length(current_df_name) > 0) {
+            if(i == 1) {  # for the first item, use current_df_name
+              dataframes_updated[[current_df_name]] <- dplyr::mutate_all(dataframes[[i]], funs(as.character))
+            } else {
+              dataframes_updated[[df_name]] <- dplyr::mutate_all(dataframes[[i]], funs(as.character))
+            }
+          } else {
+            dataframes_updated[[i]] <- dplyr::mutate_all(dataframes[[i]], funs(as.character))
+          }
         } else {
-          dataframes_updated[[i]] <- dataframes[[i]]
+          # if we need to set data frame name to each row as a new column
+          if(stringr::str_length(current_df_name) > 0) {
+            if(i == 1) { # for the first item, use current_df_name
+              dataframes_updated[[current_df_name]] <- dataframes[[i]]
+            } else {
+              dataframes_updated[[df_name]] <- dataframes[[i]]
+            }
+          } else { # otherwise, keep using index
+            dataframes_updated[[i]] <- dataframes[[i]]
+          }
         }
       }
     }
     # create a name for the column that holds data frame name.
     # and make sure to make the column name uniqe with avoid_conflict API.
-    if(!is.null(.id)) {
-      new_id <- avoid_conflict(colnames(dataframes_updated[[1]]), .id)
+    if(!is.null(id_column_name)) {
+      new_id <- avoid_conflict(colnames(dataframes_updated[[1]]), id_column_name)
     } else {
-      new_id  = .id
+      new_id  = id_column_name
     }
     #re-evaluate column data types
-    if(ignore_column_data_type) {
+    if(force_data_type) {
       readr::type_convert(dplyr::bind_rows(dataframes_updated, .id = new_id))
     } else {
       dplyr::bind_rows(dataframes_updated, .id = new_id)
@@ -1541,10 +1573,10 @@ bind_rows <- function(..., .id = NULL, first_id = '', ignore_column_data_type = 
   } else {
     # if .id argument is passed, create a name for the column that holds data frame name.
     # and make sure to make the column name uniqe with avoid_conflict API.
-    if(!is.null(.id)) {
-      new_id <- avoid_conflict(colnames(dataframes[[1]]), .id)
+    if(!is.null(id_column_name)) {
+      new_id <- avoid_conflict(colnames(dataframes[[1]]), id_column_name)
     } else {
-      new_id <- .id
+      new_id <- id_column_name
     }
     dplyr::bind_rows(..., .id = new_id)
   }
@@ -1559,8 +1591,8 @@ set_operation_with_force_character <- function(func, x, y, ...) {
 
 #'Wrapper function for dplyr::union to support ignoring data type difference.
 #'@export
-union <- function(x, y, ignore_column_data_type = FALSE, ...){
-  if(!is.na(ignore_column_data_type) & class(ignore_column_data_type) ==  "logical" & ignore_column_data_type == FALSE)  {
+union <- function(x, y, force_data_type = FALSE, ...){
+  if(!is.na(force_data_type) && class(force_data_type) ==  "logical" && force_data_type == FALSE)  {
     dplyr::union(x, y, ...)
   } else {
     set_operation_with_force_character(dplyr::union, x, y, ...)
@@ -1569,8 +1601,8 @@ union <- function(x, y, ignore_column_data_type = FALSE, ...){
 
 #'Wrapper function for dplyr::union_all to support ignoring data type difference.
 #'@export
-union_all <- function(x, y, ignore_column_data_type = FALSE, ...){
-  if(!is.na(ignore_column_data_type) & class(ignore_column_data_type) ==  "logical" & ignore_column_data_type == FALSE)  {
+union_all <- function(x, y, force_data_type = FALSE, ...){
+  if(!is.na(force_data_type) && class(force_data_type) ==  "logical" && force_data_type == FALSE)  {
     dplyr::union_all(x, y, ...)
   } else {
     set_operation_with_force_character(dplyr::union_all, x, y, ...)
@@ -1579,8 +1611,8 @@ union_all <- function(x, y, ignore_column_data_type = FALSE, ...){
 
 #'Wrapper function for dplyr::intersect to support ignoring data type difference.
 #'@export
-intersect <- function(x, y, ignore_column_data_type = FALSE, ...){
-  if(!is.na(ignore_column_data_type) & class(ignore_column_data_type) ==  "logical" & ignore_column_data_type == FALSE)  {
+intersect <- function(x, y, force_data_type = FALSE, ...){
+  if(!is.na(force_data_type) && class(force_data_type) ==  "logical" && force_data_type == FALSE)  {
     dplyr::intersect(x, y, ...)
   } else {
     set_operation_with_force_character(dplyr::intersect, x, y, ...)
@@ -1589,8 +1621,8 @@ intersect <- function(x, y, ignore_column_data_type = FALSE, ...){
 
 #'Wrapper function for dplyr::setdiff to support ignoring data type difference.
 #'@export
-setdiff <- function(x, y, ignore_column_data_type = FALSE, ...){
-  if(!is.na(ignore_column_data_type) & class(ignore_column_data_type) ==  "logical" & ignore_column_data_type == FALSE)  {
+setdiff <- function(x, y, force_data_type = FALSE, ...){
+  if(!is.na(force_data_type) && class(force_data_type) ==  "logical" && force_data_type == FALSE)  {
     dplyr::setdiff(x, y, ...)
   } else {
     set_operation_with_force_character(dplyr::setdiff, x, y, ...)
