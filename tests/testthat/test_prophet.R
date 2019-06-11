@@ -175,7 +175,9 @@ test_that("do_prophet with holiday column with hourly data", {
   ret <- combined_data %>%
     do_prophet(timestamp, data, 10, time_unit = "hour", holiday=holiday)
   # verify the last date with forecasted_value
-  expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.POSIXct("2010-01-15 10:00:00 UTC")) 
+  # Comparing between POSIXct is prone to false positive. 
+  # Comparing between characters is more stable with added bonus of printed evaluation result for easier debugging.
+  expect_equal(as.character(last((ret %>% filter(!is.na(forecasted_value)))$timestamp)), "2010-01-15 10:00:00")
 })
 
 test_that("do_prophet with extra regressor with cap/floor", {
