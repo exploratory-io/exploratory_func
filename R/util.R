@@ -1530,13 +1530,13 @@ bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_da
         # check if we can get each data frame name from the arguments
         df_name <- args[[i]]
         if(is.na(df_name) | df_name == "") {
-          # if we cannot find it use index i.
+          # if we cannot find data fram name, use index i instead.
           df_name = i
         }
         # if force_data_type is set, force character as column data types
         if(force_data_type) {
           if(stringr::str_length(current_df_name) > 0) {
-            if(i == 1) {
+            if(i == 1) {  # for the first item, use current_df_name
               dataframes_updated[[current_df_name]] <- dplyr::mutate_all(dataframes[[i]], funs(as.character))
             } else {
               dataframes_updated[[df_name]] <- dplyr::mutate_all(dataframes[[i]], funs(as.character))
