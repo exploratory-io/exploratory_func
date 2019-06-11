@@ -1475,10 +1475,20 @@ one_hot <- function(df, key) {
   df %>% tidyr::spread(!!rlang::enquo(key), !!rlang::sym(tmp_value_col), fill = 0, sep = "_") %>% select(-!!rlang::sym(tmp_id_col))
 }
 
+# API to get a list of argument names
+extract_argument_names <- function(...) {
+  q <- rlang::quos(...)
+  purrr::map(q, function(x){rlang::quo_name(x)})
+}
 
 #'Wrapper function for dplyr::bind_rows to support named data frames when it's called inside dplyr chain.
 #'@export
 bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_data_type = FALSE) {
+  # get a list of argument names to resolve data frame names passed to this bind_rows.
+  # only exception is the current data frame which is passed via dplyr pipe operation (%>%).
+  # it becomes period (.) instead of actual df name.
+  args <- extract_argument_names(...)
+  browser()
   # If the dplyr::bind_rows is called within a dplyr chain like df1 %>% dplyr::bind_rows(list(df_2 = df2, df_3 = df3), .id="id"),
   # since df1 does not have a name, the "id" column of the resulting data frame does not have the data frame name for rows from df1.
   # To workaround this issue, set a name to the first data frame with the value specified by fistLabel argument as a pre-process
@@ -1517,11 +1527,34 @@ bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_da
       }
     } else { # for the case that list does not have key (data frame name), use index number.
       for(i in 1:length(dataframes)) {
+        # check if we can get each data frame name from the arguments
+        df_name <- args[[i]]
+        if(is.na(df_name) | df_name == "") {
+          # if we cannot find it use index i.
+          df_name = i
+        }
         # if force_data_type is set, force character as column data types
         if(force_data_type) {
-          dataframes_updated[[i]] <- dplyr::mutate_all(dataframes[[i]], funs(as.character))
+          if(stringr::str_length(current_df_name) > 0) {
+            if(i == 1) {
+              dataframes_updated[[current_df_name]] <- dplyr::mutate_all(dataframes[[i]], funs(as.character))
+            } else {
+              dataframes_updated[[df_name]] <- dplyr::mutate_all(dataframes[[i]], funs(as.character))
+            }
+          } else {
+            dataframes_updated[[i]] <- dplyr::mutate_all(dataframes[[i]], funs(as.character))
+          }
         } else {
-          dataframes_updated[[i]] <- dataframes[[i]]
+          # if we need to set data frame name to each row as a new column
+          if(stringr::str_length(current_df_name) > 0) {
+            if(i == 1) { # for the first item, use current_df_name
+              dataframes_updated[[current_df_name]] <- dataframes[[i]]
+            } else {
+              dataframes_updated[[df_name]] <- dataframes[[i]]
+            }
+          } else { # otherwise, keep using index
+            dataframes_updated[[i]] <- dataframes[[i]]
+          }
         }
       }
     }

@@ -24,6 +24,12 @@ test_that("bind_rows", {
   # but exploratory::bind_rows works if force_data_type is set as TRUE.
   res3 <- exploratory::bind_rows(data1, data2, force_data_type = TRUE)
   expect_equal(unique(res3$person), c("A","B","C","D","E","F"))
+  # test data frames without dedicated names
+  mtcars1 <- mtcars
+  mtcars2 <- mtcars
+  mtcars3 <- mtcars
+  res4 <- mtcars1 %>% exploratory::bind_rows(mtcars2, mtcars3, current_df_name = "mtcars1", id_column_name = "ID")
+  expect_equal(unique(res4$ID), c("mtcars1","mtcars2","mtcars3"))
 })
 
 test_that("union", {
