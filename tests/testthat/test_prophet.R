@@ -203,7 +203,8 @@ test_that("do_prophet test mode with extra regressor", {
   ret <- combined_data %>%
     do_prophet(timestamp, data, 10, time_unit = "day", regressors = c("regressor"), funs.aggregate.regressors = c(mean), test_mode = TRUE)
   # verify the last date with forecasted_value
-  expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2012-01-11")) 
+  # Since it is test mode, end of original data is end of forecast.
+  expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2012-01-01"))
   # verify the last date in the data is the end of regressor data
   expect_equal(ret$timestamp[[length(ret$timestamp)]], as.Date("2013-01-01"))
 })
