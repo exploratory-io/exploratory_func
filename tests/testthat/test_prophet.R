@@ -212,7 +212,7 @@ test_that("do_prophet test mode with extra regressor", {
   # verify the last date in the data is the end of regressor data
   expect_equal(ret$timestamp[[length(ret$timestamp)]], as.Date("2013-01-01"))
   # Unused regressor data should have NA value as is_test_data
-  expect_true(is.na(last((ret %>% filter(!is.na(forecasted_value)))$is_test_data)))
+  expect_true(is.na(last(ret$is_test_data)))
 })
 
 
