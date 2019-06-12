@@ -405,7 +405,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
 
     # Add is_test_data column before joining aggregated original data so that the end of forecast is correctly marked as test data.
     if (test_mode) {
-      ret <- forecast %>% dplyr::mutate(is_test_data = seq(1,n()) > n() - periods) # FALSE for training period, TRUE for test period.
+      ret <- forecast %>% dplyr::mutate(is_test_data = dplyr::row_number() > n() - periods) # FALSE for training period, TRUE for test period.
     }
     else {
       ret <- forecast
