@@ -178,6 +178,7 @@ randomForestMulti <- function(data, formula, na.action = na.omit, ...) {
   ret
 }
 
+# Common routine use for binary/multinomial classification and regression
 rangerCore <- function(data, formula, na.action = na.omit,
                        importance_mode = "permutation",
                        model_type = "regression", ...) {
@@ -190,7 +191,7 @@ rangerCore <- function(data, formula, na.action = na.omit,
   # randomForest must take clean names
   data <- janitor::clean_names(data)
   updated_colnames <- colnames(data)
-  # this will be used to get original colmn names later
+  # this will be used to get original column names later
   names(updated_colnames) <- original_colnames
   # get target col as clean name
   target_col <- colnames(data)[target_col_index]
@@ -215,7 +216,7 @@ rangerCore <- function(data, formula, na.action = na.omit,
   formula <- as.formula(paste0(target_col, " ~ ", paste0(newvars, collapse = " + ")))
 
   # ranger::ranger can't build model when there are NA values in data
-  # The ranger::raner will generate an error if it contains NA for both explanatory variables and target variables.
+  # The ranger::ranger will generate an error if it contains NA for both explanatory variables and target variables.
   # Therefore, it is necessary to exclude rows that have NA values in any of those columns.
   # Since it is necessary to save the information of the column excluded by NA and use it later,
   # the true/false value of which row has NA value once is judged.
@@ -2058,6 +2059,7 @@ glance.ranger.classification <- function(x, pretty.name, ...) {
   predicted <- ranger.predict_value_from_prob(x$forest$levels, x$predictions, x$y)
   levels(predicted) <- levels(actual)
 
+  # Composes data.frame of classification evaluation summary.
   multi_stat <- function(class) {
     datasize <- sum(actual == class)
 
@@ -2090,6 +2092,7 @@ glance.ranger.classification <- function(x, pretty.name, ...) {
     ret
   }
 
+  # Composes data.frame of binary classification evaluation summary.
   single_stat <- function(act, pred) {
     #       predicted
     #actual  FALSE TRUE
