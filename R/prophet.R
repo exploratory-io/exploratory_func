@@ -496,6 +496,9 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
         }
       }
     }
+    if (test_mode) { # Bring is_test_data column to the last
+      ret <- ret %>% dplyr::select(-is_test_data, is_test_data)
+    }
 
     # revive original column names (time_col, value_col)
     if (time_col != "ds") { # if time_col happens to be "ds", do not do this, since it will make the column name "ds.new".
