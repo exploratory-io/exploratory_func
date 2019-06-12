@@ -1,5 +1,120 @@
 context("check util functions")
 
+test_that("bind_rows", {
+  library(dplyr)
+  res <- mtcars %>% exploratory::bind_rows(list(acars = mtcars, bcars = mtcars), id_column_name="dataf", current_df_name="firstMtcars")
+  expect_equal(unique(res$dataf), c("firstMtcars", "acars", "bcars"))
+  res2 <- mtcars %>% exploratory::bind_rows(mtcars, mtcars, id_column_name="dataf", force_data_type = TRUE)
+  expect_equal(unique(res2$dataf), c(1,2,3))
+  # For data1, test1 column is factor data type
+  data1 <- data.frame(person = c("A","B","C"),
+                      test1 = as.factor(c(1,4,5)),
+                      test2 = c(14,25,10),
+                      test3 = c(12.5,16.0,4),
+                      test4 = c(16,23,21),
+                      test5 = as.factor(c(49,36,52)))
+  # for data2, test2 column is character data type
+  data2 <- data.frame(person = c("D","E","F"),
+                      test1 = c(8,7,2),
+                      test2 = c(14,25,10),
+                      test3 = c(6.5,12.0,19.5),
+                      test4 = as.factor(c(15,21,29)),
+                      test5 = as.factor(c(54,51,36)))
+  # if this is dplyr::bind_rows, it fails because of factor vs character data type mismatch.
+  # but exploratory::bind_rows works if force_data_type is set as TRUE.
+  res3 <- exploratory::bind_rows(data1, data2, force_data_type = TRUE)
+  expect_equal(unique(res3$person), c("A","B","C","D","E","F"))
+  # test data frames without dedicated names
+  mtcars1 <- mtcars
+  mtcars2 <- mtcars
+  mtcars3 <- mtcars
+  res4 <- mtcars1 %>% exploratory::bind_rows(mtcars2, mtcars3, current_df_name = "mtcars1", id_column_name = "ID")
+  expect_equal(unique(res4$ID), c("mtcars1","mtcars2","mtcars3"))
+  # backward compatibility check
+  res5 <- mtcars1 %>% exploratory::bind_rows(mtcars2, mtcars3, .id = "ID")
+  expect_equal(unique(res5$ID), c("1","2","3"))
+})
+
+test_that("union", {
+  library(dplyr)
+  # For data1, test1 column is factor data type
+  data1 <- data.frame(person = c("A","B","C"),
+                      test1 = as.factor(c(1,4,5)),
+                      test2 = c(14,25,10),
+                      test3 = c(12.5,16.0,4),
+                      test4 = c(16,23,21),
+                      test5 = as.factor(c(49,36,52)))
+  # for data2, test2 column is character data type
+  data2 <- data.frame(person = c("A","D","F"),
+                      test1 = c(1,7,2),
+                      test2 = c(14,25,10),
+                      test3 = c(12.5,12.0,19.5),
+                      test4 = as.factor(c(16,21,29)),
+                      test5 = as.factor(c(49,51,36)))
+  res <- exploratory::union(x = data1, y = data2, force_data_type = TRUE)
+  expect_equal(nrow(res), 5)
+})
+
+test_that("union_all", {
+  library(dplyr)
+  # For data1, test1 column is factor data type
+  data1 <- data.frame(person = c("A","B","C"),
+                      test1 = as.factor(c(1,4,5)),
+                      test2 = c(14,25,10),
+                      test3 = c(12.5,16.0,4),
+                      test4 = c(16,23,21),
+                      test5 = as.factor(c(49,36,52)))
+  # for data2, test2 column is character data type
+  data2 <- data.frame(person = c("A","D","F"),
+                      test1 = c(1,7,2),
+                      test2 = c(14,25,10),
+                      test3 = c(12.5,12.0,19.5),
+                      test4 = as.factor(c(16,21,29)),
+                      test5 = as.factor(c(49,51,36)))
+  res <- exploratory::union_all(x = data1, y = data2, force_data_type = TRUE)
+  expect_equal(nrow(res), 6)
+})
+
+test_that("intersect", {
+  library(dplyr)
+  # For data1, test1 column is factor data type
+  data1 <- data.frame(person = c("A","B","C"),
+                      test1 = as.factor(c(1,4,5)),
+                      test2 = c(14,25,10),
+                      test3 = c(12.5,16.0,4),
+                      test4 = c(16,23,21),
+                      test5 = as.factor(c(49,36,52)))
+  # for data2, test2 column is character data type
+  data2 <- data.frame(person = c("A","D","F"),
+                      test1 = c(1,7,2),
+                      test2 = c(14,25,10),
+                      test3 = c(12.5,12.0,19.5),
+                      test4 = as.factor(c(16,21,29)),
+                      test5 = as.factor(c(49,51,36)))
+  res <- exploratory::intersect(x = data1, y = data2, force_data_type = TRUE)
+  expect_equal(nrow(res), 1)
+})
+
+test_that("setdiff", {
+  library(dplyr)
+  # For data1, test1 column is factor data type
+  data1 <- data.frame(person = c("A","B","C"),
+                      test1 = as.factor(c(1,4,5)),
+                      test2 = c(14,25,10),
+                      test3 = c(12.5,16.0,4),
+                      test4 = c(16,23,21),
+                      test5 = as.factor(c(49,36,52)))
+  # for data2, test2 column is character data type
+  data2 <- data.frame(person = c("A","D","F"),
+                      test1 = c(1,7,2),
+                      test2 = c(14,25,10),
+                      test3 = c(12.5,12.0,19.5),
+                      test4 = as.factor(c(16,21,29)),
+                      test5 = as.factor(c(49,51,36)))
+  res <- exploratory::setdiff(x = data1, y = data2, force_data_type = TRUE)
+  expect_equal(nrow(res), 2)
+})
+
 test_that("test pivot with empty data frame", {
   df <- data.frame()
   expect_error({
@@ -604,7 +719,7 @@ test_that("test false_count", {
 
 test_that("test get_confint", {
   mean_vals <- c(0,1,NA)
-  sd_vals <- c(1,1,1) 
+  sd_vals <- c(1,1,1)
   ret <- get_confint(mean_vals, sd_vals, conf_int = 0.975)
   expect_equal(ret, c(1.959964, 2.959964, NA), tolerance=0.0001)
 })
@@ -631,7 +746,7 @@ test_that("test safe_slice", {
 })
 
 test_that("test sameple_rows", {
-  df <-data.frame(x=c(1,NA,3),y=c(2,3,NA)) 
+  df <-data.frame(x=c(1,NA,3),y=c(2,3,NA))
   df <-setNames(df,c("x 1", "col 2"))
   ret <- df %>% sample_rows(2)
   expect_equal(nrow(ret), 2)
@@ -683,15 +798,4 @@ test_that("one_hot", {
   df <- data.frame(x=c("A", "A", "B", "C"))
   res <- df %>% one_hot(x)
   expect_equal(res$x_A, c(1,1,0,0))
-})
-
-test_that("n_distinct", {
-  res <- n_distinct(c(1,2,2,3,3,NA))
-  expect_equal(res, 4)
-  res <- n_distinct(c(1,2,2,3,3,NA), na.rm = TRUE)
-  expect_equal(res, 3)
-  res <- n_distinct(c(1, 1, 2, 3, NA), c(2, 2, 3, 4, 5))
-  expect_equal(res, 4)
-  res <- n_distinct(c(1, 1, 2, 3, NA), c(2, 2, 3, 4, 5), na.rm = TRUE)
-  expect_equal(res, 3)
 })

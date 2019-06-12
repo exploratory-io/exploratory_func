@@ -74,7 +74,9 @@ test_that("test calc_feature_imp predicting multi-class", {
   conf_mat <- tidy(model_df, model, type = "conf_mat", pretty.name = TRUE)
   # ret <- model_df %>% rf_importance() # Skip this because Boruta is on.
   ret <- model_df %>% rf_partial_dependence()
-  expect_equal(as.character(ret$Group[1]), "0 cat 10") # Check that format of Group column is good for our Analytics View. 
+
+  # Check that format of Group column is good for our Analytics View.
+  expect_true(stringr::str_detect(as.character(ret$Group[1]), stringr::regex("[0-2] cat\\s10$|_25$")))
   ret <- model_df %>% rf_evaluation(pretty.name=TRUE) # TODO test that output is different from binary classification with TRUE/FALSE
   ret <- model_df %>% rf_evaluation_by_class(pretty.name=TRUE)
   ret <- model_df %>% tidy(model, type="boruta")
@@ -134,10 +136,10 @@ test_that("test calc_feature_imp predicting logical", {
                       num_1,
                       num_2, predictor_n = 6, with_boruta=TRUE)
 
-  conf_mat <- tidy(model_df, model, type = "conf_mat", pretty.name = TRUE)
+  conf_mat <- model_df %>% broom::tidy(model, type = "conf_mat", pretty.name = TRUE)
 
   # test get_binary_predicted_value_from_probability
-  model <- model_df$model[[1]]
+  model <- model_df %>% filter(!is.null(model)) %>% `[[`(1, "model", 1)
   predicted_values <- get_binary_predicted_value_from_probability(model)
   expect_equal(levels(predicted_values), c("TRUE","FALSE"))
 
@@ -194,7 +196,7 @@ test_that("test randomForest with multinomial classification", {
   model_ret <- build_model(test_data,
                            model_func = randomForestMulti,
                            formula = CARRIER ~ DISTANCE,
-                           test_rate = 0.3)
+                           test_rate = 0.2)
   coef_ret <- model_coef(model_ret)
   model_stats <- model_stats(model_ret, pretty.name = TRUE)
   pred_train_ret <- prediction(model_ret, data = "training")
@@ -318,7 +320,7 @@ test_that("test randomForest with multinomial classification", {
                            model_func = randomForestMulti,
                            formula = CARRIER ~ DISTANCE,
                            localImp = TRUE,
-                           test_rate = 0.3)
+                           test_rate = 0.2)
   coef_ret <- model_coef(model_ret)
   model_stats <- model_stats(model_ret, pretty.name = TRUE)
   pred_train_ret <- prediction(model_ret, data = "training")
@@ -340,7 +342,7 @@ test_that("test randomForest with multinomial classification", {
                            model_func = randomForestMulti,
                            formula = CARRIER ~ poly(DISTANCE, 3),
                            localImp = TRUE,
-                           test_rate = 0.3)
+                           test_rate = 0.2)
   coef_ret <- model_coef(model_ret)
   model_stats <- model_stats(model_ret, pretty.name = TRUE)
   pred_train_ret <- prediction(model_ret, data = "training")
