@@ -43,6 +43,14 @@ test_that("exp_rpart multiclass classification", {
   res <- model_df %>% tidy(model, type="conf_mat")
 })
 
+test_that("exp_rpart regression", {
+  model_df <- flight %>% exp_rpart(`DEP DELAY`, `delay ed`, `ARR DELAY`, test_rate = 0.3)
+  train_ret <- prediction(model_df)
+  expect_equal(colnames(train_ret), c("DEP DELAY", "ARR DELAY", "delay ed", "predicted_value"))
+  test_ret <- prediction(model_df, data = "test")
+  expect_equal(colnames(train_ret), c("DEP DELAY", "ARR DELAY", "delay ed", "predicted_value"))
+})
+
 test_that("exp_rpart throws error with classification with only one unique value", {
   expect_error({
     flight2 <- flight %>% filter(`ORIGIN STATE ABR` %in% c("CA"))
@@ -55,9 +63,5 @@ test_that("exp_rpart prediction", {
   ret <- model_df %>% prediction(.)
   test_ret <- model_df %>% prediction(., data = "test")
   ret_all <- prediction_training_and_test(model_df)
-})
-
-test_that("hoge", {
-  model_df <- flight %>% exp_rpart(`ORIGIN STATE ABR`,`DEP DELAY`, test_rate = 0.3)
 })
 
