@@ -1876,7 +1876,7 @@ calc_feature_imp <- function(df,
         min.node.size = nodesize,
         keep.inbag=TRUE,
         sample.fraction = sample.fraction,
-        probability = (classification_type != "regression")
+        probability = (classification_type %in% c("multi", "binary"))
       )
       if (with_boruta) { # Run only either Boruta or ranger::importance.
         if (importance_measure == "impurity") {
