@@ -140,7 +140,7 @@ test_that("test ranger with multinomial classification", {
     build_model(test_data,
       model_func = rangerMulti,
       formula = CARRIER ~ DISTANCE,
-      test_rate = 0.3)
+      test_rate = 0.2)
   })
   coef_ret <- model_coef(model_ret)
   expect_equal(colnames(coef_ret), c("variable", "importance"))
@@ -170,7 +170,7 @@ test_that("test ranger with multinomial classification", {
     build_model(test_data,
       model_func = rangerMulti,
       formula = CARRIER ~ .,
-      test_rate = 0.3)
+      test_rate = 0.2)
   })
   coef_ret <- model_coef(model_ret)
   expect_equal(colnames(coef_ret), c("variable", "importance"))
@@ -289,7 +289,7 @@ test_that("in the case of a unkown target variable of predictiton ranger with mu
       build_model(test_data,
         model_func = rangerMulti,
         formula = `CARRIER` ~ .,
-        test_rate = 0.3)
+        test_rate = 0.1)
   })
   test_data[1, "CARRIER"] <- "UNKOWN_CARRIER"
 
