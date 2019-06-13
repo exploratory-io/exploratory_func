@@ -221,8 +221,7 @@ rangerCore <- function(data, formula, na.action = na.omit,
   # Since it is necessary to save the information of the column excluded by NA and use it later,
   # the true/false value of which row has NA value once is judged.
   names(newvars) <- NULL
-  na_atrow_index <- ranger.find_na_index(c(target_col, newvars), data)
-  na_row_numbers <- ranger.find_na(c(target_col, newvars), data, na_atrow_index)
+  na_row_numbers <- ranger.find_na(c(target_col, newvars), data)
 
   # remove NA rows because ranger can't treat NA values.
   data <- data %>% dplyr::select(target_col, newvars) %>% filter_all(all_vars(!is.na(.)))
