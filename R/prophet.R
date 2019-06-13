@@ -402,15 +402,24 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
     if (lubridate::is.Date(aggregated_data$ds)) {
       forecast$ds <- as.Date(forecast$ds)
     }
+
+    # Add is_test_data column before joining aggregated original data so that the end of forecast is correctly marked as test data.
+    if (test_mode) {
+      ret <- forecast %>% dplyr::mutate(is_test_data = dplyr::row_number() > n() - periods) # FALSE for training period, TRUE for test period.
+    }
+    else {
+      ret <- forecast
+    }
+
     # Join original aggregated dataframe to forecast dataframe.
     # Extra regressor columns will conflinct in names. We add _effect to the ones from forecast.
     # TODO: Can we safely assume that all conflicts are from extra regressors?
     # If there is future part of aggregated data, bind it too so that extra regressor values for future are also in the output.
     if (!is.null(aggregated_future_data)) {
-      ret <- forecast %>% dplyr::full_join(dplyr::bind_rows(aggregated_data, aggregated_future_data), by = c("ds" = "ds"), suffix = c("_effect", ""))
+      ret <- ret %>% dplyr::full_join(dplyr::bind_rows(aggregated_data, aggregated_future_data), by = c("ds" = "ds"), suffix = c("_effect", ""))
     }
     else {
-      ret <- forecast %>% dplyr::full_join(aggregated_data, by = c("ds" = "ds"), suffix = c("_effect", ""))
+      ret <- ret %>% dplyr::full_join(aggregated_data, by = c("ds" = "ds"), suffix = c("_effect", ""))
     }
     # drop cap_scaled column, which is just scaled capacity, which does not seem informative.
     if ("cap_scaled" %in% colnames(ret)) {
@@ -428,10 +437,6 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
     else {
       # there is no changepoint.
       ret <- ret %>% dplyr::mutate(trend_change = NA_real_)
-    }
-
-    if (test_mode) {
-      ret <- ret %>% dplyr::mutate(is_test_data = seq(1,n()) > n() - periods) # FALSE for training period, TRUE for test period.
     }
 
     # adjust order of output columns
@@ -490,6 +495,9 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
                                        dplyr::everything())
         }
       }
+    }
+    if (test_mode) { # Bring is_test_data column to the last
+      ret <- ret %>% dplyr::select(-is_test_data, is_test_data)
     }
 
     # revive original column names (time_col, value_col)
