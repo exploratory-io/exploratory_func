@@ -49,4 +49,3 @@ test_that("exp_rpart throws error with classification with only one unique value
     model_df <- flight2 %>% exp_rpart(`ORIGIN STATE ABR`,`DEP DELAY`)
   }, "Categorical Target Variable must have 2 or more unique values.")
 })
-

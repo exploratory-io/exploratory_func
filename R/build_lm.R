@@ -172,6 +172,7 @@ build_lm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, gr
 #' @param relimp_conf_level - Confidence level for confidence interval of relative importance values. Default is 0.95.
 #' @param relimp_relative - When TRUE, relative importance values add up to 1. When FALSE they add up to R-Squared.
 #' @param seed - Random seed to control data sampling, SMOTE, and bootstrapping for confidence interval of relative importance.
+#' @param test_rate Ratio of test data
 #' @export
 build_lm.fast <- function(df,
                     target,
@@ -194,7 +195,8 @@ build_lm.fast <- function(df,
                     with_marginal_effects = FALSE,
                     with_marginal_effects_confint = FALSE,
                     variable_metric = NULL,
-                    seed = 1
+                    seed = 1,
+                    test_rate = 0.0
                     ){
   # TODO: add test
   # TODO: cleanup code only aplicable to randomForest. this func was started from copy of calc_feature_imp, and still adjusting for lm. 
@@ -213,6 +215,12 @@ build_lm.fast <- function(df,
 
   if (model_type  == "glm" && is.null(family)) {
     family = "binomial" # default for glm is logistic regression.
+  }
+
+  if(test_rate < 0 | 1 < test_rate){
+    stop("test_rate must be between 0 and 1")
+  } else if (test_rate == 1){
+    stop("test_rate must be less than 1")
   }
 
   # drop unrelated columns so that SMOTE later does not have to deal with them.
@@ -446,6 +454,11 @@ build_lm.fast <- function(df,
           }
         }
 
+        # split training and test data
+        source_data <- df
+        test_index <- sample_df_index(source_data, rate = test_rate)
+        df <- safe_slice(source_data, test_index, remove = TRUE)
+
         # when family is negativebinomial, use MASS::glm.nb
         if (is.null(link) && family != "negativebinomial") {
           rf <- stats::glm(fml, data = df, family = family) 
@@ -504,6 +517,11 @@ build_lm.fast <- function(df,
         }
       }
       else {
+        # split training and test data
+        source_data <- df
+        test_index <- sample_df_index(source_data, rate = test_rate)
+        df <- safe_slice(source_data, test_index, remove = TRUE)
+
         rf <- stats::lm(fml, data = df) 
         if (relimp) {
           tryCatch({
@@ -539,7 +557,8 @@ build_lm.fast <- function(df,
       else {
         class(rf) <- c("lm_exploratory", class(rf))
       }
-      rf
+      list(rf = rf, test_index = test_index, source_data = source_data)
+
     }, error = function(e){
       if(length(grouped_cols) > 0) {
         # ignore the error if
@@ -554,7 +573,29 @@ build_lm.fast <- function(df,
     })
   }
 
-  do_on_each_group(clean_df, each_func, name = "model", with_unnest = FALSE)
+  model_and_data_col <- "model_and_data"
+  ret <- do_on_each_group(clean_df, each_func, name = model_and_data_col, with_unnest = FALSE)
+  if (length(grouped_cols) > 0) {
+    ret <- ret %>% tidyr::nest(-grouped_cols)
+  } else {
+    ret <- ret %>% tidyr::nest()
+  }
+  ret %>% dplyr::mutate(model = purrr::map(data, function(df){
+            df[[model_and_data_col]][[1]]$rf
+          })) %>%
+          dplyr::mutate(.test_index = purrr::map(data, function(df){
+            df[[model_and_data_col]][[1]]$test_index
+          })) %>%
+          dplyr::mutate(source.data = purrr::map(data, function(df){
+            data <- df[[model_and_data_col]][[1]]$source_data
+            if (length(grouped_cols) > 0 && !is.null(data)) {
+              data %>% dplyr::select(-grouped_cols)
+            } else {
+              data
+            }
+          })) %>%
+          dplyr::select(-data) %>%
+          dplyr::rowwise()
 }
 
 #' special version of glance.lm function to use with build_lm.fast.
@@ -578,7 +619,7 @@ glance.lm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
 
 #' special version of glance.lm function to use with build_lm.fast.
 #' @export
-glance.glm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
+glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification_threshold = 0.5, ...) { #TODO: add test
   ret <- broom:::glance.glm(x)
 
   # calculate model p-value since glm does not provide it as is.
@@ -606,7 +647,12 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add tes
   
   if (x$family$family %in% c('binomial', 'quasibinomial')) { # only for logistic regression.
     # Calculate F Score, Accuracy Rate, Misclassification Rate, Precision, Recall, Data Size
-    predicted <- ifelse(x$fitted.value > 0.5, 1, 0) #TODO make threshold adjustable
+    threshold_value <- if (is.numeric(binary_classification_threshold)) {
+      binary_classification_threshold
+    } else {
+      get_optimized_score(x$y, x$fitted.value, threshold = binary_classification_threshold)$threshold
+    }
+    predicted <- ifelse(x$fitted.value > threshold_value, 1, 0) #TODO make threshold adjustable
     ret2 <- evaluate_classification(x$y, predicted, 1, pretty.name = pretty.name)
     ret2 <- ret2[, 2:6]
     ret <- ret %>% bind_cols(ret2)
@@ -657,6 +703,7 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add tes
         dplyr::select(`P Value`, `Log Likelihood`, `AIC`, `BIC`, `Deviance`, `Null Deviance`, `DF for Null Model`, everything())
     }
   }
+
   ret
 }
 

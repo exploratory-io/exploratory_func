@@ -148,7 +148,9 @@ add_prediction <- function(df, model_df, conf_int = 0.95, ...){
   # if type.predict argument is not indicated in this function
   # and models have $family$linkinv (basically, glm models have it),
   # both fitted link value column and response value column should appear in the result
-  with_response <- !("type.predict" %in% names(cll)) & !is.null(model_df[["model"]][[1]]$family) & !is.null(model_df[["model"]][[1]]$family$linkinv)
+  with_response <- !("type.predict" %in% names(cll)) &&
+                   any(lapply(model_df$model, function(s) { "family" %in% names(s) })) &&
+                   any(lapply(model_df$model, function(s) { !is.null(s$family$linkinv) }))
 
   ret <- tryCatch({
     get_result(model_df, df, aug_args, with_response)
@@ -313,7 +315,9 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
     # and models have $family$linkinv (basically, glm models have it),
     # both fitted link value column and response value column should appear in the result
 
-    with_response <- !("type.predict" %in% names(cll)) && "family" %in% names(df[["model"]][[1]]) && !is.null(df[["model"]][[1]]$family$linkinv)
+    with_response <- !("type.predict" %in% names(cll)) &&
+                       any(lapply(df$model, function(s) { "family" %in% names(s) })) &&
+                       any(lapply(df$model, function(s) { !is.null(s$family$linkinv) }))
 
     ret <- if(test){
       # augment by test data
@@ -448,6 +452,96 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
   colnames(ret)[colnames(ret) == ".std.resid"] <- avoid_conflict(colnames(ret), "standardised_residuals")
 
   dplyr::group_by(ret, !!!rlang::syms(grouping_cols))
+}
+
+#' prediction wrapper for both training and test data
+#' @param df Data frame to predict. This should have model column.
+#' @export
+prediction_training_and_test <- function(df, prediction_type="default", threshold = 0.5, ...) {
+  test_index <- df %>% dplyr::filter(!is.null(.test_index)) %>% `[[`(1, ".test_index", 1)
+
+  grouped_cols <- colnames(df)[!colnames(df) %in% c("model", ".test_index", "source.data", ".model_metadata")]
+
+  train_ret <- switch(prediction_type,
+                    default = prediction(df, ...),
+                    binary = prediction_binary(df, threshold = threshold, ...),
+                    conf_mat = prediction_binary(df, threshold = threshold, ...),
+                    coxph = prediction_coxph(df, ...))
+
+  # Change the is_test_data column to the last order
+  train_ret <- train_ret %>% dplyr::mutate(is_test_data = FALSE) %>%
+                     dplyr::select(-is_test_data, everything(), is_test_data)
+  ret <- train_ret
+
+  if (length(test_index) > 0) {
+    target_df <- if (length(grouped_cols) > 0) {
+      # like CAR RIER
+      # To avoid errors when passing CAR RIER-like columns to group_by_ in Standard Evaluation,
+      # enclose the column names in back quotes
+      df %>% dplyr::ungroup() %>% dplyr::group_by(!!!rlang::syms(grouped_cols))
+    } else {
+      df
+    }
+
+    each_func <- function(df){
+      tryCatch({
+        if (!is.data.frame(df)) {
+          df <- tribble(~model,   ~.test_index,   ~source.data,
+                        df$model, df$.test_index, df$source.data)
+        }
+
+        test_ret <- switch(prediction_type,
+                           default = prediction(df, data = "test", ...),
+                           binary = prediction_binary(df, data = "test", threshold = threshold, ...),
+                           conf_mat = prediction_binary(df, data = "test", threshold = threshold, ...),
+                           coxph = prediction_coxph(df, data = "test", ...))
+
+        # Without this for example, column like klass1 is generated when klass is the group_by column.
+        test_ret %>% dplyr::ungroup() %>% dplyr::select(-grouped_cols)
+      }, error = function(e){
+        # In the prediction type of function, if there is categorical data which was not at the time of learning at the time of test,
+        # delete the line. Also, if there is too little data prediction functions return the following error
+        #   no data found that can be predicted by the model
+        # When predicting by group by, certain categories may be reduced,
+        # but you may want to predict other categories, so catch errors and return empty data frames.
+        data.frame()
+      })
+    }
+
+    test_ret <- do_on_each_group(target_df, each_func, with_unnest = TRUE)
+    test_ret <- test_ret %>% dplyr::mutate(is_test_data = TRUE) %>%
+                  dplyr::select(-is_test_data, everything(), is_test_data)
+    ret <- ret %>% dplyr::bind_rows(test_ret) %>% dplyr::select(-is_test_data, everything(), is_test_data)
+  }
+
+  if (prediction_type == "conf_mat") {
+    model <- df %>% dplyr::filter(!is.null(model)) %>% `[[`(1, "model")
+    target_col <- all.vars(model$formula)[[1]]
+
+    each_mat_func <- function(df) {
+      actual_val <- df[[target_col]]
+      predicted <- df$predicted_label
+
+      df <- data.frame(
+        actual_value = actual_val,
+        predicted_value = predicted
+      ) %>%
+        dplyr::filter(!is.na(predicted_value))
+
+      # get count if it's classification
+      df <- df %>%
+        dplyr::group_by(actual_value, predicted_value) %>%
+        dplyr::summarize(count = n()) %>%
+        dplyr::ungroup()
+
+      df
+    }
+
+    target_df <- ret %>% group_by(is_test_data, add = TRUE)
+    do_on_each_group(target_df, each_mat_func, with_unnest = TRUE)
+  } else {
+    ret %>% dplyr::arrange(desc(is_test_data), .by_group = TRUE)
+  }
 }
 
 #' prediction wrapper to set predicted labels

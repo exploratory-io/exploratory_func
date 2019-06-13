@@ -356,3 +356,4 @@ test_that("test evaluate_classification", {
   ret <- evaluate_classification(actual, predicted, 1)
   expect_equal(class(ret), "data.frame")
 })
+

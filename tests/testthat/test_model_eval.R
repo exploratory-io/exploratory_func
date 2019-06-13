@@ -264,3 +264,89 @@ test_that("eval multi", {
   expect_equal(ret[["micro_f_score"]], 0)
 
 })
+
+test_data <- structure(
+    list(
+      `CANCELLED X` = c("N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "Y", "N", "Y", "N"),
+      `Carrier Name` = c("Delta Air Lines", "American Eagle", "American Airlines", "Southwest Airlines", "SkyWest Airlines", "Southwest Airlines", "Southwest Airlines", "Delta Air Lines", "Southwest Airlines", "Atlantic Southeast Airlines", "American Airlines", "Southwest Airlines", "US Airways", "US Airways", "Delta Air Lines", "Atlantic Southeast Airlines", NA, "Atlantic Southeast Airlines", "Delta Air Lines", "Delta Air Lines"),
+      CARRIER = factor(c("AA", "MQ", "AA", "DL", "MQ", "AA", "DL", "DL", "MQ", "AA", "AA", "WN", "US", "US", "DL", "EV", "9E", "EV", "DL", "DL")), # test with factor with NA
+      # testing filtering of Inf, -Inf, NA here.
+      DISTANCE = c(10, 12, 12, 187, 273, 1062, 583, 240, 1123, 851, 852, 862, 361, 507, 1020, 1092, 342, 489, 1184, 545),
+      ARR_TIME = c(10, 32, 321, 342, 123, 98, 10, 21, 80, 211, 121, 87, 821, 213, 213, 923, 121, 76, 34, 50),
+      DERAY_TIME = c(12, 42, 321, 31, 3, 43, 342, 764, 123, 43, 50, 12, 876, 12, 34, 45, 84, 25, 87, 352, 10)
+      ), row.names = c(NA, -20L),
+    class = c("tbl_df", "tbl", "data.frame"), .Names = c("CANCELLED X", "Carrier Name", "CARRIER", "DISTANCE", "ARR_TIME", "DERAY_TIME"))
+
+test_data$klass <- c(rep("A", 10), rep("B", 10))
+
+test_that("evaluate binary classification model by training and test", {
+  test_data[["CANCELLED X"]] <- test_data[["CANCELLED X"]] %>% as.factor() %>% as.numeric() -1
+  ret <- test_data %>% build_lm.fast(`CANCELLED X`,
+                                     `ARR_TIME`,
+                                     `DERAY_TIME`,
+                                     `Carrier Name`,
+                                     family = "binomial",
+                                     model_type = "glm",
+                                     test_rate = 0.5)
+  suppressWarnings({
+    eret <- evaluate_binary_training_and_test(ret, "CANCELLED X", test_rate = 0.5)
+    expect_cols <-  c("f_score", "accuracy_rate", "misclassification_rate", "precision", "recall", "auc",
+                      "positives", "negatives", "p.value", "logLik", "AIC", "BIC", "deviance",
+                      "null.deviance", "df.null", "df.residual", "Carrier.Name_base", "is_test_data")
+    expect_equal(colnames(eret), expect_cols)
+    eret <- evaluate_binary_training_and_test(ret, "CANCELLED X", test_rate = 0.5, pretty.name = TRUE)
+    expect_cols <- c("F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall", "AUC",
+                     "Data Size for TRUE", "Data Size for FALSE", "P Value", "Log Likelihood", "AIC", "BIC",
+                     "Deviance", "Null Deviance", "DF for Null Model", "Residual DF", "Base Level of Carrier.Name", "Test Data")
+
+    expect_equal(colnames(eret), expect_cols)
+  })
+})
+
+test_that("Group evaluate binary classification model by training and test", {
+  group_data <- test_data %>% group_by(klass)
+  ret <- group_data %>%
+           build_lm.fast(`CANCELLED X`,
+                         `ARR_TIME`,
+                         model_type = "glm",
+                         family = "binomial",
+                         link = "logit",
+                         test_rate = 0.5)
+  suppressWarnings({
+    eret <- evaluate_binary_training_and_test(ret, "CANCELLED X", test_rate = 0.5)
+    expect_cols <-  c("klass", "f_score", "accuracy_rate", "misclassification_rate", "precision", "recall", "auc",
+                      "positives", "negatives", "p.value", "logLik", "AIC", "BIC", "deviance",
+                      "null.deviance", "df.null", "df.residual", "is_test_data")
+    expect_equal(colnames(eret), expect_cols)
+    eret <- evaluate_binary_training_and_test(ret, "CANCELLED X", test_rate = 0.5, pretty.name = TRUE)
+    expect_cols <- c("klass", "F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall", "AUC",
+                     "Data Size for TRUE", "Data Size for FALSE", "P Value", "Log Likelihood", "AIC", "BIC",
+                     "Deviance", "Null Deviance", "DF for Null Model", "Residual DF", "Test Data")
+
+    expect_equal(colnames(eret), expect_cols)
+  })
+})
+
+test_that("Group evaluate binary classification model by training and test with threshold", {
+  ret <- test_data %>%
+           build_lm.fast(`CANCELLED X`,
+                         `DERAY_TIME`,
+                         `Carrier Name`,
+                         `ARR_TIME`,
+                         model_type = "glm",
+                         family = "binomial",
+                         link = "logit",
+                         test_rate = 0.3)
+  suppressWarnings({
+    eret_fscore <- evaluate_binary_training_and_test(ret, "CANCELLED X", test_rate = 0.5, threshold = "f_score")
+    eret_acc <- evaluate_binary_training_and_test(ret, "CANCELLED X", test_rate = 0.5, threshold = "accuracy_rate") 
+    eret_recall <- evaluate_binary_training_and_test(ret, "CANCELLED X", test_rate = 0.5, threshold = "recall")
+    eret_precision <- evaluate_binary_training_and_test(ret, "CANCELLED X", test_rate = 0.5, threshold = "precision")
+
+    expect_gte(eret_fscore$f_score[1], eret_acc$f_score[1])
+    expect_gte(eret_acc$accuracy_rate[1], eret_fscore$accuracy_rate[1])
+    expect_gte(eret_recall$recall[1], eret_precision$recall[1])
+    expect_gte(eret_precision$precision[1], eret_acc$precision[1])
+  })
+})
+
