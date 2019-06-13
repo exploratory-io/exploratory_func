@@ -495,8 +495,8 @@ prediction_binary <- function(df, threshold = 0.5, ...){
     }
   }
 
-  # if there is terms_mapping for randomForest, use the original column name
-  if ("randomForest" %in% class(first_model)) {
+  # if there is terms_mapping for randomForest or ranger, use the original column name
+  if ("randomForest" %in% class(first_model) || "ranger" %in% class(first_model)) {
     if (!is.na(first_model$terms_mapping) && !is.na(first_model$terms_mapping[[actual_col]])) {
       actual_col <- first_model$terms_mapping[[actual_col]]
     }
@@ -556,6 +556,7 @@ prediction_binary <- function(df, threshold = 0.5, ...){
   }
 
   ret[["predicted_label"]] <- label
+
   colnames(ret)[colnames(ret) == prob_col_name] <- "predicted_probability"
 
   ret
