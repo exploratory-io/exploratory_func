@@ -435,13 +435,23 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
                                  # Looks like an issue from broom. Working it around.
       ret <- ret %>% dplyr::mutate(estimate = estimate1 - estimate2)
     }
+
+    data_summary <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
+      dplyr::summarize(n_rows=length(!!rlang::sym(x$var1)))
+    n1 <- data_summary$n_rows[[1]]
+    n2 <- data_summary$n_rows[[2]]
+    # Estimate current power.
+    power <- pwr::pwr.t2n.test(n1 = n1, n2= n2, d = x$cohen_d, sig.level = x$sig.level, alternative = x$alternative)
+
     ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
+      dplyr::mutate(power=power$power) %>%
       dplyr::rename(`t Ratio`=statistic,
                     `P Value`=p.value,
                     `Degree of Freedom`=parameter,
                     Difference=estimate,
                     `Conf High`=conf.high,
-                    `Conf Low`=conf.low)
+                    `Conf Low`=conf.low,
+                    `Power`=power)
   }
   else if (type == "data_summary") { #TODO consolidate with code in tidy.anova_exploratory
     conf_threshold = 1 - (1 - conf_level)/2
