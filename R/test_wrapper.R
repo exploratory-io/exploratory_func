@@ -389,6 +389,9 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, d = 0.2, p
       model$var1 <- var1_col
       model$var2 <- var2_col
       model$data <- df
+      model$sig.level <- sig.level
+      model$cohen_d <- d # model$d seems to be already used.
+      model$power <- power
       model
     }, error = function(e){
       if(length(grouped_cols) > 0) {
