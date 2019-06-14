@@ -149,8 +149,9 @@ add_prediction <- function(df, model_df, conf_int = 0.95, ...){
   # and models have $family$linkinv (basically, glm models have it),
   # both fitted link value column and response value column should appear in the result
   with_response <- !("type.predict" %in% names(cll)) &&
-                   any(lapply(model_df$model, function(s) { "family" %in% names(s) })) &&
-                   any(lapply(model_df$model, function(s) { !is.null(s$family$linkinv) }))
+                   any(lapply(model_df$model, function(s) {
+                     "family" %in% names(s) && !is.null(s$family$linkinv)
+                   }))
 
   ret <- tryCatch({
     get_result(model_df, df, aug_args, with_response)
@@ -509,6 +510,8 @@ prediction_training_and_test <- function(df, prediction_type="default", threshol
     }
 
     test_ret <- do_on_each_group(target_df, each_func, with_unnest = TRUE)
+
+    # Change the is_test_data column to the last order
     test_ret <- test_ret %>% dplyr::mutate(is_test_data = TRUE) %>%
                   dplyr::select(-is_test_data, everything(), is_test_data)
     ret <- ret %>% dplyr::bind_rows(test_ret) %>% dplyr::select(-is_test_data, everything(), is_test_data)
