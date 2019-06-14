@@ -425,3 +425,33 @@ parse_logical <- function(text, ...){
   }
 }
 
+#'Function to extract text inside the characters like bracket.
+#'@export
+str_extract_inside <- function(column, begin = "(", end = ")") {
+  # Ref https://stackoverflow.com/questions/3926451/how-to-match-but-not-capture-part-of-a-regex
+  # Below logic creates a Regular Expression that uses lookbehind and lookahead to extract string
+  # between them.
+  # Also, regarding the "*?" (? after asterisk) in the regular expression, it's necessary to handle the case
+  # like below.
+  #> stringr::str_extract("aaa[xxx][ggg]","(?<=\\[).*(?=\\])")
+  #[1] "xxx][ggg"
+  #> stringr::str_extract("aaa[xxx][ggg]","(?<=\\[).*?(?=\\])")
+  #[1] "xxx"
+  # As you can see in the above example, with *? it can extract xxx but without it, it ends up with "xxx][ggg"
+  if(stringr::str_length(begin) > 1) {
+    stop("The begin argument must be one character.")
+  }
+  if(stringr::str_length(end) > 1) {
+    stop("The end argument must be one character.")
+  }
+  if(grepl("[A-Za-z]", begin)) {
+    stop("The begin argument must be symbol such as (, {, [.")
+  }
+  if(grepl("[A-Za-z]", end)) {
+    stop("The end argument must be symbol such as ), }, ].")
+  }
+  exp = stringr::str_c("(?<=\\", begin, ").*?(?=\\", end, ")")
+  stringr::str_extract(column, exp)
+}
+
+
