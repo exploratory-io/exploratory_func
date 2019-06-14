@@ -799,3 +799,12 @@ test_that("one_hot", {
   res <- df %>% one_hot(x)
   expect_equal(res$x_A, c(1,1,0,0))
 })
+
+test_that("Mode", {
+  # numeric column case
+  x <- c(1,2,2,3,NA,NA,NA)
+  res <- Mode(x)
+  expect_true(is.na(res))
+  res <- Mode(x, na.rm = TRUE)
+  expect_equal(res, 2)
+})
