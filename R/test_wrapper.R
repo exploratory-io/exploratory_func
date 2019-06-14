@@ -354,7 +354,9 @@ glance.chisq_exploratory <- function(x) {
 
 #' t-test wrapper for Analytics View
 #' @export
-exp_ttest <- function(df, var1, var2, func2 = NULL, ...) {
+#' @param conf.level - Level of confidence for confidence interval. Passed to t.test as part of ...
+#' @param sig.level - Significance level for power analysis.
+exp_ttest <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, d = 0.2, power = NULL, ...) {
   var1_col <- col_name(substitute(var1))
   var2_col <- col_name(substitute(var2))
   grouped_cols <- grouped_by(df)
