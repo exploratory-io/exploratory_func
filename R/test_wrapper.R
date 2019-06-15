@@ -472,13 +472,14 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
       power <- pwr::pwr.t2n.test(n1 = n1, n2= n2, d = x$cohens_d, sig.level = x$sig.level, alternative = x$alternative)
 
       ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
-        dplyr::mutate(power=power$power) %>%
+        dplyr::mutate(power=power$power, d=x$cohens_d) %>%
         dplyr::rename(`t Ratio`=statistic,
                       `P Value`=p.value,
                       `Degree of Freedom`=parameter,
                       Difference=estimate,
                       `Conf High`=conf.high,
                       `Conf Low`=conf.low,
+                      `Effect Size (Cohen's d)`=d,
                       `Power`=power)
     }
     else {
@@ -487,12 +488,15 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
       power <- pwr::pwr.t.test(d = x$cohens_d, sig.level = x$sig.level, power = x$power, alternative = x$alternative)
       ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
         dplyr::mutate(sample_size=power$n) %>%
+        dplyr::mutate(power=x$power, d=x$cohens_d) %>%
         dplyr::rename(`t Ratio`=statistic,
                       `P Value`=p.value,
                       `Degree of Freedom`=parameter,
                       Difference=estimate,
                       `Conf High`=conf.high,
                       `Conf Low`=conf.low,
+                      `Effect Size (Cohen's d)`=d,
+                      `Power`=power,
                       `Required Sample Size`=sample_size)
     }
   }
