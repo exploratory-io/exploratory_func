@@ -352,6 +352,18 @@ glance.chisq_exploratory <- function(x) {
   ret
 }
 
+# Calculate Cohen's d
+# Reference: https://stackoverflow.com/questions/15436702/estimate-cohens-d-for-effect-size
+calculate_cohens_d <- function(x, y) {
+  lx <- length(x) - 1
+  ly <- length(y) - 1
+  md  <- abs(mean(x) - mean(y)) # mean difference (numerator)
+  csd <- lx * var(x) + ly * var(y)
+  csd <- csd/(lx + ly)
+  csd <- sqrt(csd) # common sd computation
+  cd  <- md/csd # cohen's d
+}
+
 #' t-test wrapper for Analytics View
 #' @export
 #' @param conf.level - Level of confidence for confidence interval. Passed to t.test as part of ...
@@ -425,19 +437,6 @@ glance.ttest_exploratory <- function(x) {
   ret <- broom:::glance.htest(x) # for t-test. the returned content is same as tidy.
   ret
 }
-
-# Calculate Cohen's d
-# Reference: https://stackoverflow.com/questions/15436702/estimate-cohens-d-for-effect-size
-calculate_cohens_d <- function(x, y) {
-  lx <- length(x) - 1
-  ly <- length(y) - 1
-  md  <- abs(mean(x) - mean(y)) # mean difference (numerator)
-  csd <- lx * var(x) + ly * var(y)
-  csd <- csd/(lx + ly)
-  csd <- sqrt(csd) # common sd computation
-  cd  <- md/csd # cohen's d
-}
-
 
 #' @export
 tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
