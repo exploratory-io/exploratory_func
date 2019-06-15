@@ -403,6 +403,12 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, d = NULL, 
   formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
 
   ttest_each <- function(df) {
+    if (is.null(d)) {
+      cohens_d <- calculate_cohens_d(df[[var1_col]], df[[var2_col]])
+    }
+    else {
+      cohens_d <- d
+    }
     tryCatch({
       model <- t.test(formula, data = df, ...)
       class(model) <- c("ttest_exploratory", class(model))
@@ -410,7 +416,7 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, d = NULL, 
       model$var2 <- var2_col
       model$data <- df
       model$sig.level <- sig.level
-      model$cohen_d <- d # model$d seems to be already used.
+      model$cohens_d <- cohens_d # model$d seems to be already used for something.
       model$power <- power
       model
     }, error = function(e){
@@ -463,7 +469,7 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
     if (is.null(x$power)) {
       # If power is not specified in the arguments, estimate current power.
       # TODO: Consider paired and varEqual.
-      power <- pwr::pwr.t2n.test(n1 = n1, n2= n2, d = x$cohen_d, sig.level = x$sig.level, alternative = x$alternative)
+      power <- pwr::pwr.t2n.test(n1 = n1, n2= n2, d = x$cohens_d, sig.level = x$sig.level, alternative = x$alternative)
 
       ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
         dplyr::mutate(power=power$power) %>%
@@ -478,7 +484,7 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
     else {
       # If required power is specified in the arguments, estimate required sample size. 
       # TODO: Consider paired and varEqual.
-      power <- pwr::pwr.t.test(d = x$cohen_d, sig.level = x$sig.level, power = x$power, alternative = x$alternative)
+      power <- pwr::pwr.t.test(d = x$cohens_d, sig.level = x$sig.level, power = x$power, alternative = x$alternative)
       ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
         dplyr::mutate(sample_size=power$n) %>%
         dplyr::rename(`t Ratio`=statistic,
