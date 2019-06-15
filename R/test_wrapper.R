@@ -440,18 +440,35 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
       dplyr::summarize(n_rows=length(!!rlang::sym(x$var1)))
     n1 <- data_summary$n_rows[[1]]
     n2 <- data_summary$n_rows[[2]]
-    # Estimate current power.
-    power <- pwr::pwr.t2n.test(n1 = n1, n2= n2, d = x$cohen_d, sig.level = x$sig.level, alternative = x$alternative)
+    if (is.null(x$power)) {
+      # If power is not specified in the arguments, estimate current power.
+      # TODO: Consider paired and varEqual.
+      power <- pwr::pwr.t2n.test(n1 = n1, n2= n2, d = x$cohen_d, sig.level = x$sig.level, alternative = x$alternative)
 
-    ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
-      dplyr::mutate(power=power$power) %>%
-      dplyr::rename(`t Ratio`=statistic,
-                    `P Value`=p.value,
-                    `Degree of Freedom`=parameter,
-                    Difference=estimate,
-                    `Conf High`=conf.high,
-                    `Conf Low`=conf.low,
-                    `Power`=power)
+      ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
+        dplyr::mutate(power=power$power) %>%
+        dplyr::rename(`t Ratio`=statistic,
+                      `P Value`=p.value,
+                      `Degree of Freedom`=parameter,
+                      Difference=estimate,
+                      `Conf High`=conf.high,
+                      `Conf Low`=conf.low,
+                      `Power`=power)
+    }
+    else {
+      # If required power is specified in the arguments, estimate required sample size. 
+      # TODO: Consider paired and varEqual.
+      power <- pwr::pwr.t.test(d = x$cohen_d, sig.level = x$sig.level, power = x$power, alternative = x$alternative)
+      ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
+        dplyr::mutate(sample_size=power$n) %>%
+        dplyr::rename(`t Ratio`=statistic,
+                      `P Value`=p.value,
+                      `Degree of Freedom`=parameter,
+                      Difference=estimate,
+                      `Conf High`=conf.high,
+                      `Conf Low`=conf.low,
+                      `Required Sample Size`=sample_size)
+    }
   }
   else if (type == "data_summary") { #TODO consolidate with code in tidy.anova_exploratory
     conf_threshold = 1 - (1 - conf_level)/2
