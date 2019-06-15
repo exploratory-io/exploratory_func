@@ -354,11 +354,19 @@ glance.chisq_exploratory <- function(x) {
 
 # Calculate Cohen's d
 # Reference: https://stackoverflow.com/questions/15436702/estimate-cohens-d-for-effect-size
-calculate_cohens_d <- function(x, y) {
-  lx <- length(x) - 1
-  ly <- length(y) - 1
-  md  <- abs(mean(x) - mean(y)) # mean difference (numerator)
-  csd <- lx * var(x) + ly * var(y)
+calculate_cohens_d <- function(var1, var2) {
+  df <- data.frame(var1=var1, var2=var2)
+  summarized <- df %>% dplyr::group_by(var2) %>%
+    dplyr::summarize(n=n(), m=mean(var1), v=var(var1))
+    
+  lx <- summarized$n[[1]] - 1
+  ly <- summarized$n[[2]] - 1
+  mx <- summarized$m[[1]]
+  my <- summarized$m[[2]]
+  vx <- summarized$v[[1]]
+  vy <- summarized$v[[2]]
+  md  <- abs(mx - my) # mean difference (numerator)
+  csd <- lx * vx + ly * vy
   csd <- csd/(lx + ly)
   csd <- sqrt(csd) # common sd computation
   cd  <- md/csd # cohen's d
@@ -368,7 +376,7 @@ calculate_cohens_d <- function(x, y) {
 #' @export
 #' @param conf.level - Level of confidence for confidence interval. Passed to t.test as part of ...
 #' @param sig.level - Significance level for power analysis.
-exp_ttest <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, d = 0.2, power = NULL, ...) {
+exp_ttest <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, d = NULL, power = NULL, ...) {
   var1_col <- col_name(substitute(var1))
   var2_col <- col_name(substitute(var2))
   grouped_cols <- grouped_by(df)
