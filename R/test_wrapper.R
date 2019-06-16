@@ -553,6 +553,12 @@ exp_anova <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, f = NULL, 
   formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
 
   anova_each <- function(df) {
+    if (is.null(f)) {
+      #cohens_f <- calculate_cohens_f() #TODO
+    }
+    else {
+      cohens_f <- f
+    }
     tryCatch({
       model <- aov(formula, data = df, ...)
       class(model) <- c("anova_exploratory", class(model))
