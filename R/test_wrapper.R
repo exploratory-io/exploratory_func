@@ -193,9 +193,15 @@ do_chisq.test_ <- function(df,
     unnest_with_drop_(tmp_col)
 }
 
+# Calculate Cohen's w from Chi-Square value and total number of observations.
+# Reference: https://rdrr.io/github/markushuff/PsychHelperFunctions/src/R/cohens_w.R
+calculate_cohens_w <- function(chi_sq, N) {
+  sqrt(chi_sq/N)
+}
+
 #' Chi-Square test wrapper for Analytics View
 #' @export
-exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, fun.aggregate = sum, correct = FALSE, sig.level = 0.05, w = 0.1, power = NULL, ...) {
+exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, fun.aggregate = sum, correct = FALSE, sig.level = 0.05, w = NULL, power = NULL, ...) {
   # We are turning off Yates's correction by default because...
   # 1. It seems that it is commonly discussed that it is overly conservative and not necessary.
   #    https://en.wikipedia.org/wiki/Yates%27s_correction_for_continuity
@@ -247,13 +253,18 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
   pivotted_df <- pivot_(df, formula, value_col = value_col, fun.aggregate = fun.aggregate, fill = 0)
 
   chisq.test_each <- function(df) {
-    cohens_w <- w #TODO: calculate from data
     if (length(grouped_col) > 0) {
       df <- df %>% select(-!!rlang::sym(grouped_col))
     }
     df <- df %>% tibble::column_to_rownames(var=var1_col)
     x <- df %>% as.matrix()
     model <- chisq.test(x = x, correct = correct, ...)
+    if (is.null(w)) { # if effect size is not specified, calculate from actual data.
+      cohens_w <- calculate_cohens_w(model$statistic, sum(x))
+    }
+    else {
+      cohens_w <- w
+    }
     # add variable name info to the model
     model$var1 <- var1_col
     model$var2 <- var2_col
@@ -356,8 +367,14 @@ glance.chisq_exploratory <- function(x) {
     # If power is not specified in the arguments, estimate current power.
     # x$parameter is degree of freedom.
     N <- sum(x$observed) # Total number of observations (rows).
-    power_res <- pwr::pwr.chisq.test(df = x$parameter, N = N, w = x$cohens_w, sig.level = x$sig.level)
-    ret <- ret %>% dplyr::mutate(power=power_res$power, w=x$cohens_w)
+    if (!is.na(x$cohens_w)) { # It is possible that x$cohens_w is NA. Avoid calling pwr.chisq.test not to hit an error.
+      power_res <- pwr::pwr.chisq.test(df = x$parameter, N = N, w = x$cohens_w, sig.level = x$sig.level)
+      power_val <- power_res$power
+    }
+    else {
+      power_val <- NA_real_
+    }
+    ret <- ret %>% dplyr::mutate(power=power_val, w=x$cohens_w)
     ret <- ret %>% rename(`Chi-Square`=statistic,
                           `Degree of Freedom`=parameter,
                           `P Value`=p.value,
