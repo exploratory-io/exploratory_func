@@ -354,7 +354,15 @@ glance.chisq_exploratory <- function(x) {
   ret <- data.frame(statistic=x$statistic, parameter=x$parameter, p.value=x$p.value)
   if (is.null(x$power)) {
     # If power is not specified in the arguments, estimate current power.
-    ret <- ret %>% rename(`Chi-Square`=statistic, `Degree of Freedom`=parameter, `P Value`=p.value)
+    # x$parameter is degree of freedom.
+    N <- sum(x$observed) # Total number of observations (rows).
+    power_res <- pwr::pwr.chisq.test(df = x$parameter, N = N, w = x$cohens_w, sig.level = x$sig.level)
+    ret <- ret %>% dplyr::mutate(power=power_res$power, w=x$cohens_w)
+    ret <- ret %>% rename(`Chi-Square`=statistic,
+                          `Degree of Freedom`=parameter,
+                          `P Value`=p.value,
+                          `Effect Size (Cohen's w)`=w,
+                          `Power`=power)
   }
   else {
     ret <- ret %>% rename(`Chi-Square`=statistic, `Degree of Freedom`=parameter, `P Value`=p.value)
