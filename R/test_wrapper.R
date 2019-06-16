@@ -606,13 +606,26 @@ glance.anova_exploratory <- function(x) {
 tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
   if (type == "model") {
     ret <- broom:::tidy.aov(x)
-    ret <- ret %>% dplyr::select(term, statistic, p.value, df, sumsq, meansq) %>%
-      dplyr::rename(Term=term,
-                    `F Ratio`=statistic,
-                    `P Value`=p.value,
-                    `Degree of Freedom`=df,
-                    `Sum of Squares`=sumsq,
-                    `Mean Square`=meansq)
+    if (is.null(x$power)) {
+      # If power is not specified in the arguments, estimate current power.
+      ret <- ret %>% dplyr::select(term, statistic, p.value, df, sumsq, meansq) %>%
+        dplyr::rename(Term=term,
+                      `F Ratio`=statistic,
+                      `P Value`=p.value,
+                      `Degree of Freedom`=df,
+                      `Sum of Squares`=sumsq,
+                      `Mean Square`=meansq)
+    }
+    else {
+      # If required power is specified in the arguments, estimate required sample size. 
+      ret <- ret %>% dplyr::select(term, statistic, p.value, df, sumsq, meansq) %>%
+        dplyr::rename(Term=term,
+                      `F Ratio`=statistic,
+                      `P Value`=p.value,
+                      `Degree of Freedom`=df,
+                      `Sum of Squares`=sumsq,
+                      `Mean Square`=meansq)
+    }
   }
   else if (type == "data_summary") { #TODO consolidate with code in tidy.ttest_exploratory
     conf_threshold = 1 - (1 - conf_level)/2
