@@ -195,7 +195,7 @@ do_chisq.test_ <- function(df,
 
 #' Chi-Square test wrapper for Analytics View
 #' @export
-exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, fun.aggregate = sum, correct = FALSE, ...) {
+exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, fun.aggregate = sum, correct = FALSE, sig.level = 0.05, w = 0.1, power = NULL, ...) {
   # We are turning off Yates's correction by default because...
   # 1. It seems that it is commonly discussed that it is overly conservative and not necessary.
   #    https://en.wikipedia.org/wiki/Yates%27s_correction_for_continuity
@@ -247,6 +247,7 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
   pivotted_df <- pivot_(df, formula, value_col = value_col, fun.aggregate = fun.aggregate, fill = 0)
 
   chisq.test_each <- function(df) {
+    cohens_w <- w #TODO: calculate from data
     if (length(grouped_col) > 0) {
       df <- df %>% select(-!!rlang::sym(grouped_col))
     }
@@ -260,6 +261,9 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
     model$var2_class <- var2_class
     model$var1_levels <- var1_levels
     model$var2_levels <- var2_levels
+    model$sig.level <- sig.level
+    model$cohens_w <- cohens_w
+    model$power <- power
     class(model) <- c("chisq_exploratory", class(model))
     model
   }
