@@ -1,4 +1,10 @@
 context("test tidiers for ranger randomForest")
+if (!exists("flight")) {
+  # To skip repeated data loading, run the following outside of the context of the test,
+  # so that it stays even after the test.
+  flight <- exploratory::read_delim_file("https://www.dropbox.com/s/f47baw5f3v0xoll/airline_2013_10_tricky_v3.csv?dl=1", ",", quote = "\"", skip = 0 , col_names = TRUE , na = c("","NA") , locale=readr::locale(encoding = "UTF-8", decimal_mark = "."), trim_ws = FALSE , progress = FALSE) %>% exploratory::clean_data_frame()
+  flight <- flight %>% sample_n(5000)
+}
 
 test_data <- structure(
     list(
@@ -298,3 +304,14 @@ test_that("in the case of a unkown target variable of predictiton ranger with mu
  
 })
 
+test_that("calc imp negative test", {
+  model_df <- flight %>% dplyr::sample_n(4000) %>% calc_feature_imp(`ARR DELAY`, `YE AR`, `MON TH`, `DAY OF MONTH`, `FL DATE`, `TAIL NUM`, `FL NUM`, `ORI GIN`, `ORIGIN CITY NAME`, `ORIGIN STATE ABR`, `DE ST`, `DEST CITY NAME`, `DEST STATE ABR`, `DEP TIME`, `DEP DELAY`, `ARR TIME`, `CAN CELLED`, `CANCELLATION CODE`, `AIR TIME`, `DIS TANCE`, `WEATHER DELAY`, `delay ed`, `is UA`, `is delayed`, `end time`, `is UA or AA`, smote = FALSE)
+  res_importance <- model_df %>% rf_importance()
+  expect_equal(colnames(res_importance), c("variable", "importance"))
+  res_partial_dependence <- model_df %>% rf_partial_dependence() %>% rename(`X-Axis`=x_value, `ARR DELAY`=y_value)
+  expect_equal(colnames(res_partial_dependence), c("x_name", "X-Axis", "y_name", "ARR DELAY", "chart_type"))
+  res_evaluation <- model_df %>% rf_evaluation(pretty.name = TRUE)
+  expect_equal(colnames(res_evaluation), c("Root Mean Square Error", "R Squared"))
+  res_tidy <- model_df %>% tidy(model, type = "scatter") %>% rename(Actual=expected_value, Predicted=predicted_value) %>% mutate(`Perfect Fit`=Predicted)
+  expect_equal(colnames(res_tidy), c("Actual", "Predicted", "Perfect Fit"))
+})
