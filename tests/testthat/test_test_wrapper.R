@@ -296,8 +296,10 @@ test_that("test exp_ttest with group_by", {
 
 test_that("test exp_anova", {
   ret <- exp_anova(mtcars, mpg, am)
+  ret %>% tidy(model, type="model")
   ret %>% tidy(model, type="data_summary")
   ret <- exp_anova(mtcars, mpg, gear)
+  ret %>% tidy(model, type="model")
   ret %>% tidy(model, type="data_summary")
   ret
 })

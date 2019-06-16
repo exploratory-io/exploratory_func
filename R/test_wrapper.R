@@ -532,7 +532,7 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
 
 #' ANOVA wrapper for Analytics View
 #' @export
-exp_anova <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, f = NULL, power = NULL, ...) {
+exp_anova <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, f = 0.1, power = NULL, ...) {
   var1_col <- col_name(substitute(var1))
   var2_col <- col_name(substitute(var2))
   grouped_cols <- grouped_by(df)
@@ -606,15 +606,29 @@ glance.anova_exploratory <- function(x) {
 tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
   if (type == "model") {
     ret <- broom:::tidy.aov(x)
+
+    data_summary <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
+      dplyr::summarize(n_rows=length(!!rlang::sym(x$var1))) %>%
+      dplyr::summarize(min_n_rows=min(n_rows), k=n())
+    k <- data_summary$k
+    # Using minimum group sample size as the sample size for power calculation.
+    # Reference: https://www.theanalysisfactor.com/when-unequal-sample-sizes-are-and-are-not-a-problem-in-anova/
+    min_n_rows <- data_summary$min_n_rows
+
+    browser()
     if (is.null(x$power)) {
       # If power is not specified in the arguments, estimate current power.
+      power <- pwr::pwr.anova.test(k = k, n= min_n_rows, f = x$cohens_f, sig.level = x$sig.level)
       ret <- ret %>% dplyr::select(term, statistic, p.value, df, sumsq, meansq) %>%
+        dplyr::mutate(power=c(power$power, NA_real_), f=c(x$cohens_f, NA_real_)) %>%
         dplyr::rename(Term=term,
                       `F Ratio`=statistic,
                       `P Value`=p.value,
                       `Degree of Freedom`=df,
                       `Sum of Squares`=sumsq,
-                      `Mean Square`=meansq)
+                      `Mean Square`=meansq,
+                      `Effect Size (Cohen's f)`=f,
+                      `Power`=power)
     }
     else {
       # If required power is specified in the arguments, estimate required sample size. 
