@@ -1847,7 +1847,9 @@ calc_feature_imp <- function(df,
       source_data <- df
       test_index <- sample_df_index(source_data, rate = test_rate)
       df <- safe_slice(source_data, test_index, remove = TRUE)
-      colnames(source_data) <- names(name_map)
+
+      # Restore source_data column name to original column name
+      colnames(source_data) <- names(name_map[name_map %in% colnames(source_data)])
 
       # build formula for randomForest
       rhs <- paste0("`", c_cols, "`", collapse = " + ")
@@ -2185,8 +2187,11 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
       if (x$classification_type == "binary") {
         predicted <- get_binary_predicted_value_from_probability(x)
       }
-      else {
+      else if (x$classification_type == "mutli") {
         predicted <- ranger.predict_value_from_prob(x$forest$levels, x$predictions, x$y)
+      } else {
+        # classification type is regression
+        predicted <- x$predictions
       }
       ret <- data.frame(
         expected_value = x$y,
