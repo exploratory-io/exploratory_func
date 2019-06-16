@@ -469,10 +469,10 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
     if (is.null(x$power)) {
       # If power is not specified in the arguments, estimate current power.
       # TODO: Consider paired and varEqual.
-      power <- pwr::pwr.t2n.test(n1 = n1, n2= n2, d = x$cohens_d, sig.level = x$sig.level, alternative = x$alternative)
+      power_res <- pwr::pwr.t2n.test(n1 = n1, n2= n2, d = x$cohens_d, sig.level = x$sig.level, alternative = x$alternative)
 
       ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
-        dplyr::mutate(power=power$power, d=x$cohens_d) %>%
+        dplyr::mutate(power=power_res$power, d=x$cohens_d) %>%
         dplyr::rename(`t Ratio`=statistic,
                       `P Value`=p.value,
                       `Degree of Freedom`=parameter,
@@ -485,10 +485,10 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
     else {
       # If required power is specified in the arguments, estimate required sample size. 
       # TODO: Consider paired and varEqual.
-      power <- pwr::pwr.t.test(d = x$cohens_d, sig.level = x$sig.level, power = x$power, alternative = x$alternative)
+      power_res <- pwr::pwr.t.test(d = x$cohens_d, sig.level = x$sig.level, power = x$power, alternative = x$alternative)
       ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
-        dplyr::mutate(sample_size=power$n) %>%
         dplyr::mutate(power=x$power, d=x$cohens_d) %>%
+        dplyr::mutate(sample_size=power_res$n) %>%
         dplyr::rename(`t Ratio`=statistic,
                       `P Value`=p.value,
                       `Degree of Freedom`=parameter,
@@ -615,12 +615,11 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
     # Reference: https://www.theanalysisfactor.com/when-unequal-sample-sizes-are-and-are-not-a-problem-in-anova/
     min_n_rows <- data_summary$min_n_rows
 
-    browser()
     if (is.null(x$power)) {
       # If power is not specified in the arguments, estimate current power.
-      power <- pwr::pwr.anova.test(k = k, n= min_n_rows, f = x$cohens_f, sig.level = x$sig.level)
+      power_res <- pwr::pwr.anova.test(k = k, n= min_n_rows, f = x$cohens_f, sig.level = x$sig.level)
       ret <- ret %>% dplyr::select(term, statistic, p.value, df, sumsq, meansq) %>%
-        dplyr::mutate(power=c(power$power, NA_real_), f=c(x$cohens_f, NA_real_)) %>%
+        dplyr::mutate(power=c(power_res$power, NA_real_), f=c(x$cohens_f, NA_real_)) %>%
         dplyr::rename(Term=term,
                       `F Ratio`=statistic,
                       `P Value`=p.value,
@@ -632,13 +631,19 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
     }
     else {
       # If required power is specified in the arguments, estimate required sample size. 
+      power_res <- pwr::pwr.anova.test(k = k, f = x$cohens_f, sig.level = x$sig.level, power = x$power)
       ret <- ret %>% dplyr::select(term, statistic, p.value, df, sumsq, meansq) %>%
+        dplyr::mutate(power=c(x$power, NA_real_), f=c(x$cohens_f, NA_real_)) %>%
+        dplyr::mutate(sample_size=c(power_res$n, NA_real_)) %>%
         dplyr::rename(Term=term,
                       `F Ratio`=statistic,
                       `P Value`=p.value,
                       `Degree of Freedom`=df,
                       `Sum of Squares`=sumsq,
-                      `Mean Square`=meansq)
+                      `Mean Square`=meansq,
+                      `Effect Size (Cohen's f)`=f,
+                      `Power`=power,
+                      `Required Sample Size`=sample_size)
     }
   }
   else if (type == "data_summary") { #TODO consolidate with code in tidy.ttest_exploratory

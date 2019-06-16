@@ -304,6 +304,16 @@ test_that("test exp_anova", {
   ret
 })
 
+test_that("test exp_anova with required power", {
+  ret <- exp_anova(mtcars, mpg, am, power=0.8)
+  ret %>% tidy(model, type="model")
+  ret %>% tidy(model, type="data_summary")
+  ret <- exp_anova(mtcars, mpg, gear, power=0.8)
+  ret %>% tidy(model, type="model")
+  ret %>% tidy(model, type="data_summary")
+  ret
+})
+
 test_that("test exp_anova with grouping functions", {
   ret <- exp_anova(mtcars, mpg, disp, func2="asintby10")
   ret %>% tidy(model, type="data_summary")
