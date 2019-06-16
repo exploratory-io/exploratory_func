@@ -532,7 +532,7 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
 
 #' ANOVA wrapper for Analytics View
 #' @export
-exp_anova <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, f = 0.1, power = NULL, ...) {
+exp_anova <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, f = NULL, power = NULL, ...) {
   var1_col <- col_name(substitute(var1))
   var2_col <- col_name(substitute(var2))
   grouped_cols <- grouped_by(df)
@@ -553,20 +553,22 @@ exp_anova <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, f = 0.1, p
   formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
 
   anova_each <- function(df) {
-    if (is.null(f)) {
-      #cohens_f <- calculate_cohens_f() #TODO
-    }
-    else {
-      cohens_f <- f
-    }
     tryCatch({
       model <- aov(formula, data = df, ...)
+      if (is.null(f)) {
+        # calculate Cohen's f from actual data
+        cohens_f_res <- sjstats::cohens_f(model)
+        cohens_f_val <- cohens_f_res$cohens.f
+      }
+      else {
+        cohens_f_val <- f
+      }
       class(model) <- c("anova_exploratory", class(model))
       model$var1 <- var1_col
       model$var2 <- var2_col
       model$data <- df
       model$sig.level <- sig.level
-      model$cohens_f <- cohens_f
+      model$cohens_f <- cohens_f_val
       model$power <- power
       model
     }, error = function(e){
