@@ -532,7 +532,7 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
 
 #' ANOVA wrapper for Analytics View
 #' @export
-exp_anova <- function(df, var1, var2, func2 = NULL, ...) {
+exp_anova <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, f = NULL, power = NULL, ...) {
   var1_col <- col_name(substitute(var1))
   var2_col <- col_name(substitute(var2))
   grouped_cols <- grouped_by(df)
@@ -559,6 +559,9 @@ exp_anova <- function(df, var1, var2, func2 = NULL, ...) {
       model$var1 <- var1_col
       model$var2 <- var2_col
       model$data <- df
+      model$sig.level <- sig.level
+      model$cohens_f <- cohens_f
+      model$power <- power
       model
     }, error = function(e){
       if(length(grouped_cols) > 0) {
