@@ -365,7 +365,15 @@ glance.chisq_exploratory <- function(x) {
                           `Power`=power)
   }
   else {
-    ret <- ret %>% rename(`Chi-Square`=statistic, `Degree of Freedom`=parameter, `P Value`=p.value)
+    # If required power is specified in the arguments, estimate required sample size. 
+    power_res <- pwr::pwr.chisq.test(df = x$parameter, w = x$cohens_w, sig.level = x$sig.level, power = x$power)
+    ret <- ret %>% dplyr::mutate(power=x$power, w=x$cohens_w, sample_size=power_res$N)
+    ret <- ret %>% rename(`Chi-Square`=statistic,
+                          `Degree of Freedom`=parameter,
+                          `P Value`=p.value,
+                          `Effect Size (Cohen's w)`=w,
+                          `Power`=power,
+                          `Required Sample Size`=sample_size)
   }
   ret
 }

@@ -199,6 +199,14 @@ test_that("test exp_chisq", {
   ret
 })
 
+test_that("test exp_chisq with power", {
+  model_df <- exp_chisq(mtcars %>% mutate(gear=factor(gear)), gear, carb, power = 0.8) # factor order should be kept in the model
+  ret <- model_df %>% glance(model)
+  model_df <- exp_chisq(mtcars, gear, carb, value=cyl, power = 0.8)
+  ret <- model_df %>% glance(model)
+  ret
+})
+
 test_that("test exp_chisq with grouping functions", {
   ret <- exp_chisq(mtcars, disp, drat, func1="asintby10", func2="asint", value=mpg)
   ret
