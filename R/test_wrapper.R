@@ -380,22 +380,24 @@ glance.chisq_exploratory <- function(x) {
     else {
       power_val <- NA_real_
     }
-    ret <- ret %>% dplyr::mutate(power=power_val, w=x$cohens_w)
-    ret <- ret %>% rename(`Chi-Square`=statistic,
-                          `Degree of Freedom`=parameter,
-                          `P Value`=p.value,
-                          `Effect Size (Cohen's w)`=w,
-                          `Power`=power)
-  }
-  else {
-    # If required power is specified in the arguments, estimate required sample size. 
-    power_res <- pwr::pwr.chisq.test(df = x$parameter, w = x$cohens_w, sig.level = x$sig.level, power = x$power)
-    ret <- ret %>% dplyr::mutate(power=x$power, w=x$cohens_w, sample_size=power_res$N)
+    ret <- ret %>% dplyr::mutate(power=power_val, beta=1.0-power_val, w=x$cohens_w)
     ret <- ret %>% rename(`Chi-Square`=statistic,
                           `Degree of Freedom`=parameter,
                           `P Value`=p.value,
                           `Effect Size (Cohen's w)`=w,
                           `Power`=power,
+                          `Probability of Type 2 Error`=beta)
+  }
+  else {
+    # If required power is specified in the arguments, estimate required sample size. 
+    power_res <- pwr::pwr.chisq.test(df = x$parameter, w = x$cohens_w, sig.level = x$sig.level, power = x$power)
+    ret <- ret %>% dplyr::mutate(power=x$power, beta=1.0-x$power, w=x$cohens_w, sample_size=power_res$N)
+    ret <- ret %>% rename(`Chi-Square`=statistic,
+                          `Degree of Freedom`=parameter,
+                          `P Value`=p.value,
+                          `Effect Size (Cohen's w)`=w,
+                          `Power`=power,
+                          `Probability of Type 2 Error`=beta,
                           `Required Sample Size`=sample_size)
   }
   ret
@@ -527,7 +529,7 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
       power_res <- pwr::pwr.t2n.test(n1 = n1, n2= n2, d = x$cohens_d, sig.level = x$sig.level, alternative = x$alternative)
 
       ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
-        dplyr::mutate(power=power_res$power, d=x$cohens_d) %>%
+        dplyr::mutate(power=power_res$power, beta=1.0-power_res$power, d=x$cohens_d) %>%
         dplyr::rename(`t Ratio`=statistic,
                       `P Value`=p.value,
                       `Degree of Freedom`=parameter,
@@ -535,14 +537,15 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
                       `Conf High`=conf.high,
                       `Conf Low`=conf.low,
                       `Effect Size (Cohen's d)`=d,
-                      `Power`=power)
+                      `Power`=power,
+                      `Probability of Type 2 Error`=beta)
     }
     else {
       # If required power is specified in the arguments, estimate required sample size. 
       # TODO: Consider paired and varEqual.
       power_res <- pwr::pwr.t.test(d = x$cohens_d, sig.level = x$sig.level, power = x$power, alternative = x$alternative)
       ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
-        dplyr::mutate(power=x$power, d=x$cohens_d) %>%
+        dplyr::mutate(power=x$power, beta=1.0-x$power, d=x$cohens_d) %>%
         dplyr::mutate(sample_size=power_res$n) %>%
         dplyr::rename(`t Ratio`=statistic,
                       `P Value`=p.value,
@@ -552,6 +555,7 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
                       `Conf Low`=conf.low,
                       `Effect Size (Cohen's d)`=d,
                       `Power`=power,
+                      `Probability of Type 2 Error`=beta,
                       `Required Sample Size`=sample_size)
     }
   }
@@ -682,7 +686,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
       # If power is not specified in the arguments, estimate current power.
       power_res <- pwr::pwr.anova.test(k = k, n= min_n_rows, f = x$cohens_f, sig.level = x$sig.level)
       ret <- ret %>% dplyr::select(term, statistic, p.value, df, sumsq, meansq) %>%
-        dplyr::mutate(power=c(power_res$power, NA_real_), f=c(x$cohens_f, NA_real_)) %>%
+        dplyr::mutate(power=c(power_res$power, NA_real_), beta=c(1.0-power_res$power, NA_real_), f=c(x$cohens_f, NA_real_)) %>%
         dplyr::rename(Term=term,
                       `F Ratio`=statistic,
                       `P Value`=p.value,
@@ -690,13 +694,14 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
                       `Sum of Squares`=sumsq,
                       `Mean Square`=meansq,
                       `Effect Size (Cohen's f)`=f,
-                      `Power`=power)
+                      `Power`=power,
+                      `Probability of Type 2 Error`=beta)
     }
     else {
       # If required power is specified in the arguments, estimate required sample size. 
       power_res <- pwr::pwr.anova.test(k = k, f = x$cohens_f, sig.level = x$sig.level, power = x$power)
       ret <- ret %>% dplyr::select(term, statistic, p.value, df, sumsq, meansq) %>%
-        dplyr::mutate(power=c(x$power, NA_real_), f=c(x$cohens_f, NA_real_)) %>%
+        dplyr::mutate(power=c(x$power, NA_real_), beta=c(1.0-x$power, NA_real_), f=c(x$cohens_f, NA_real_)) %>%
         dplyr::mutate(sample_size=c(power_res$n, NA_real_)) %>%
         dplyr::rename(Term=term,
                       `F Ratio`=statistic,
@@ -706,6 +711,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
                       `Mean Square`=meansq,
                       `Effect Size (Cohen's f)`=f,
                       `Power`=power,
+                      `Probability of Type 2 Error`=beta,
                       `Required Sample Size`=sample_size)
     }
   }
