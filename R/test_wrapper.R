@@ -556,7 +556,7 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
                       `Effect Size (Cohen's d)`=d,
                       `Power`=power,
                       `Probability of Type 2 Error`=beta,
-                      `Required Sample Size`=sample_size)
+                      `Required Sample Size (Each Group)`=sample_size)
     }
   }
   else if (type == "data_summary") { #TODO consolidate with code in tidy.anova_exploratory
@@ -712,7 +712,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
                       `Effect Size (Cohen's f)`=f,
                       `Power`=power,
                       `Probability of Type 2 Error`=beta,
-                      `Required Sample Size`=sample_size)
+                      `Required Sample Size (Each Group)`=sample_size)
     }
   }
   else if (type == "data_summary") { #TODO consolidate with code in tidy.ttest_exploratory
