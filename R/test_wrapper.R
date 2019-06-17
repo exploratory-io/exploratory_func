@@ -201,7 +201,13 @@ calculate_cohens_w <- function(chi_sq, N) {
 
 #' Chi-Square test wrapper for Analytics View
 #' @export
-exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, fun.aggregate = sum, correct = FALSE, sig.level = 0.05, w = NULL, power = NULL, ...) {
+exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, fun.aggregate = sum, correct = FALSE, sig.level = 0.05, w = NULL, power = NULL, beta = NULL, ...) {
+  if (!is.null(power) && !is.null(beta) && (power + beta != 1.0)) {
+    stop("Specify only one of Power or Probability of Type 2 Error, or they must add up to 1.0.")
+  }
+  if (is.null(power) && !is.null(beta)) {
+    power <- 1.0 - beta
+  }
   # We are turning off Yates's correction by default because...
   # 1. It seems that it is commonly discussed that it is overly conservative and not necessary.
   #    https://en.wikipedia.org/wiki/Yates%27s_correction_for_continuity
@@ -419,7 +425,13 @@ calculate_cohens_d <- function(var1, var2) {
 #' @export
 #' @param conf.level - Level of confidence for confidence interval. Passed to t.test as part of ...
 #' @param sig.level - Significance level for power analysis.
-exp_ttest <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, d = NULL, power = NULL, ...) {
+exp_ttest <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, d = NULL, power = NULL, beta = NULL, ...) {
+  if (!is.null(power) && !is.null(beta) && (power + beta != 1.0)) {
+    stop("Specify only one of Power or Probability of Type 2 Error, or they must add up to 1.0.")
+  }
+  if (is.null(power) && !is.null(beta)) {
+    power <- 1.0 - beta
+  }
   var1_col <- col_name(substitute(var1))
   var2_col <- col_name(substitute(var2))
   grouped_cols <- grouped_by(df)
@@ -575,7 +587,13 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
 
 #' ANOVA wrapper for Analytics View
 #' @export
-exp_anova <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, f = NULL, power = NULL, ...) {
+exp_anova <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, f = NULL, power = NULL, beta = NULL, ...) {
+  if (!is.null(power) && !is.null(beta) && (power + beta != 1.0)) {
+    stop("Specify only one of Power or Probability of Type 2 Error, or they must add up to 1.0.")
+  }
+  if (is.null(power) && !is.null(beta)) {
+    power <- 1.0 - beta
+  }
   var1_col <- col_name(substitute(var1))
   var2_col <- col_name(substitute(var2))
   grouped_cols <- grouped_by(df)
