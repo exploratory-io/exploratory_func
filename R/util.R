@@ -1638,7 +1638,10 @@ setdiff <- function(x, y, force_data_type = FALSE, ...){
 # Wrapper function for dplyr::summarize
 # @export
 exp_summarize <- function(.data, grp_cols = c(), ...){
-  browser()
-  .data %>% dplyr::group_by(!!!rlang::syms(grp_cols)) %>% summarize(...)
+  if(length(grp_cols) == 0) {
+    .data %>% summarize(...)
+  } else {
+    .data %>% dplyr::group_by(!!!rlang::syms(grp_cols)) %>% summarize(...)
+  }
 }
 
