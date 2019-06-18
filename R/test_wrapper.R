@@ -404,6 +404,22 @@ glance.chisq_exploratory <- function(x) {
   ret
 }
 
+# Calculate common standard deviation.
+# This is written by removing unnecessary part from calculate_cohens_d.
+calculate_common_sd <- function(var1, var2) {
+  df <- data.frame(var1=var1, var2=var2)
+  summarized <- df %>% dplyr::group_by(var2) %>%
+    dplyr::summarize(n=n(), v=var(var1))
+    
+  lx <- summarized$n[[1]] - 1
+  ly <- summarized$n[[2]] - 1
+  vx <- summarized$v[[1]]
+  vy <- summarized$v[[2]]
+  csd <- lx * vx + ly * vy
+  csd <- csd/(lx + ly)
+  csd <- sqrt(csd) # common sd computation
+}
+
 # Calculate Cohen's d
 # Reference: https://stackoverflow.com/questions/15436702/estimate-cohens-d-for-effect-size
 calculate_cohens_d <- function(var1, var2) {
