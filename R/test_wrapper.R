@@ -369,10 +369,10 @@ tidy.chisq_exploratory <- function(x, type = "observed") {
 glance.chisq_exploratory <- function(x) {
   # ret <- x %>% broom:::glance.htest() # for some reason this does not work. just do it like following.
   ret <- data.frame(statistic=x$statistic, parameter=x$parameter, p.value=x$p.value)
+  N <- sum(x$observed) # Total number of observations (rows).
   if (is.null(x$power)) {
     # If power is not specified in the arguments, estimate current power.
     # x$parameter is degree of freedom.
-    N <- sum(x$observed) # Total number of observations (rows).
     if (!is.na(x$cohens_w)) { # It is possible that x$cohens_w is NA. Avoid calling pwr.chisq.test not to hit an error.
       power_res <- pwr::pwr.chisq.test(df = x$parameter, N = N, w = x$cohens_w, sig.level = x$sig.level)
       power_val <- power_res$power
@@ -391,14 +391,15 @@ glance.chisq_exploratory <- function(x) {
   else {
     # If required power is specified in the arguments, estimate required sample size. 
     power_res <- pwr::pwr.chisq.test(df = x$parameter, w = x$cohens_w, sig.level = x$sig.level, power = x$power)
-    ret <- ret %>% dplyr::mutate(power=x$power, beta=1.0-x$power, w=x$cohens_w, sample_size=power_res$N)
+    ret <- ret %>% dplyr::mutate(power=x$power, beta=1.0-x$power, w=x$cohens_w, current_sample_size=N, required_sample_size=power_res$N)
     ret <- ret %>% rename(`Chi-Square`=statistic,
                           `Degree of Freedom`=parameter,
                           `P Value`=p.value,
                           `Effect Size (Cohen's w)`=w,
                           `Power`=power,
                           `Probability of Type 2 Error`=beta,
-                          `Required Sample Size`=sample_size)
+                          `Current Sample Size`=current_sample_size,
+                          `Required Sample Size`=required_sample_size)
   }
   ret
 }
@@ -566,7 +567,7 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
       power_res <- pwr::pwr.t.test(d = x$cohens_d, sig.level = x$sig.level, power = x$power, alternative = x$alternative)
       ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
         dplyr::mutate(power=x$power, beta=1.0-x$power, d=x$cohens_d) %>%
-        dplyr::mutate(sample_size=power_res$n) %>%
+        dplyr::mutate(current_sample_size=min(n1,n2), required_sample_size=power_res$n) %>%
         dplyr::rename(`t Ratio`=statistic,
                       `P Value`=p.value,
                       `Degree of Freedom`=parameter,
@@ -576,7 +577,8 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
                       `Effect Size (Cohen's d)`=d,
                       `Power`=power,
                       `Probability of Type 2 Error`=beta,
-                      `Required Sample Size (Each Group)`=sample_size)
+                      `Current Sample Size (Each Group)`=current_sample_size,
+                      `Required Sample Size (Each Group)`=required_sample_size)
     }
   }
   else if (type == "data_summary") { #TODO consolidate with code in tidy.anova_exploratory
@@ -721,7 +723,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
       power_res <- pwr::pwr.anova.test(k = k, f = x$cohens_f, sig.level = x$sig.level, power = x$power)
       ret <- ret %>% dplyr::select(term, statistic, p.value, df, sumsq, meansq) %>%
         dplyr::mutate(power=c(x$power, NA_real_), beta=c(1.0-x$power, NA_real_), f=c(x$cohens_f, NA_real_)) %>%
-        dplyr::mutate(sample_size=c(power_res$n, NA_real_)) %>%
+        dplyr::mutate(current_sample_size=min_n_rows, required_sample_size=c(power_res$n, NA_real_)) %>%
         dplyr::rename(Term=term,
                       `F Ratio`=statistic,
                       `P Value`=p.value,
@@ -731,7 +733,8 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
                       `Effect Size (Cohen's f)`=f,
                       `Power`=power,
                       `Probability of Type 2 Error`=beta,
-                      `Required Sample Size (Each Group)`=sample_size)
+                      `Current Sample Size (Each Group)`=current_sample_size,
+                      `Required Sample Size (Each Group)`=required_sample_size)
     }
   }
   else if (type == "data_summary") { #TODO consolidate with code in tidy.ttest_exploratory
