@@ -428,6 +428,9 @@ calculate_cohens_d <- function(var1, var2) {
 # SSb, SSt, eta squared definition: https://learningstatisticswithr.com/lsr-0.6.pdf
 # Cohen's f definition: https://en.wikipedia.org/wiki/Effect_size
 # Compared results with sjstats::cohens_f(), and powerAnalysis::ES.anova.oneway()
+# Did not use sjstats::cohens_f() to avoid requiring entire sjstats and its dependencies.
+# Did not use powerAnalysis::ES.anova.oneway() because it only works for the case all categories
+# have same number of observations.
 calculate_cohens_f <- function(var1, var2) {
   m <- mean(var1, na.rm = TRUE)
   df <- data.frame(var1=var1, var2=var2)
@@ -639,8 +642,7 @@ exp_anova <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, f = NULL, 
       model <- aov(formula, data = df, ...)
       if (is.null(f)) {
         # calculate Cohen's f from actual data
-        cohens_f_res <- sjstats::cohens_f(model)
-        cohens_f_val <- cohens_f_res$cohens.f
+        cohens_f_val <- calculate_cohens_f(df[[var1_col]], df[[var2_col]])
       }
       else {
         cohens_f_val <- f
