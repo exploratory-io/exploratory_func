@@ -394,8 +394,8 @@ glance.chisq_exploratory <- function(x) {
                           `Degree of Freedom`=parameter,
                           `P Value`=p.value,
                           `Effect Size (Cohen's w)`=w,
-                          `Required Power`=power,
-                          `Required Probability of Type 2 Error`=beta,
+                          `Target Power`=power,
+                          `Target Probability of Type 2 Error`=beta,
                           `Current Sample Size`=current_sample_size,
                           `Required Sample Size`=required_sample_size)
   }
@@ -557,8 +557,8 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
                       `Conf High`=conf.high,
                       `Conf Low`=conf.low,
                       `Effect Size (Cohen's d)`=d,
-                      `Required Power`=power,
-                      `Required Probability of Type 2 Error`=beta,
+                      `Target Power`=power,
+                      `Target Probability of Type 2 Error`=beta,
                       `Current Sample Size (Each Group)`=current_sample_size,
                       `Required Sample Size (Each Group)`=required_sample_size)
     }
@@ -713,8 +713,8 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
                       `Sum of Squares`=sumsq,
                       `Mean Square`=meansq,
                       `Effect Size (Cohen's f)`=f,
-                      `Required Power`=power,
-                      `Required Probability of Type 2 Error`=beta,
+                      `Target Power`=power,
+                      `Target Probability of Type 2 Error`=beta,
                       `Current Sample Size (Each Group)`=current_sample_size,
                       `Required Sample Size (Each Group)`=required_sample_size)
     }
