@@ -497,23 +497,27 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, d = NULL, 
   formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
 
   ttest_each <- function(df) {
+    # Calculate Cohen's d from data.
+    cohens_d <- calculate_cohens_d(df[[var1_col]], df[[var2_col]])
+    # Get size of Cohen's d to detect for power analysis.
+    # If neither d nor diff_to_detect is specified, use the one calculated from data.
     if (is.null(d)) {
       if (is.null(diff_to_detect)) {
         # If neither d nor diff_to_detect is specified, calculate Cohen's d from data.
-        cohens_d <- calculate_cohens_d(df[[var1_col]], df[[var2_col]])
+        cohens_d_to_detect <- cohens_d
       }
       else { # diff_to_detect is specified.
         if (is.null(common_sd)) {
           # If common SD is not specified, estimate from data, and use it to calculate Cohen's d
-          cohens_d <- diff_to_detect/calculate_common_sd(df[[var1_col]], df[[var2_col]])
+          cohens_d_to_detect <- diff_to_detect/calculate_common_sd(df[[var1_col]], df[[var2_col]])
         }
         else {
-          cohens_d <- diff_to_detect/common_sd
+          cohens_d_to_detect <- diff_to_detect/common_sd
         }
       }
     }
     else {
-      cohens_d <- d
+      cohens_d_to_detect <- d
     }
     tryCatch({
       model <- t.test(formula, data = df, ...)
@@ -523,6 +527,7 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, d = NULL, 
       model$data <- df
       model$sig.level <- sig.level
       model$cohens_d <- cohens_d # model$d seems to be already used for something.
+      model$cohens_d_to_detect <- cohens_d_to_detect
       model$power <- power
       model
     }, error = function(e){
@@ -575,7 +580,7 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
     if (is.null(x$power)) {
       # If power is not specified in the arguments, estimate current power.
       # TODO: Consider paired and varEqual.
-      power_res <- pwr::pwr.t2n.test(n1 = n1, n2= n2, d = x$cohens_d, sig.level = x$sig.level, alternative = x$alternative)
+      power_res <- pwr::pwr.t2n.test(n1 = n1, n2= n2, d = x$cohens_d_to_detect, sig.level = x$sig.level, alternative = x$alternative)
 
       ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
         dplyr::mutate(power=power_res$power, beta=1.0-power_res$power, d=x$cohens_d) %>%
@@ -592,7 +597,7 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
     else {
       # If required power is specified in the arguments, estimate required sample size. 
       # TODO: Consider paired and varEqual.
-      power_res <- pwr::pwr.t.test(d = x$cohens_d, sig.level = x$sig.level, power = x$power, alternative = x$alternative)
+      power_res <- pwr::pwr.t.test(d = x$cohens_d_to_detect, sig.level = x$sig.level, power = x$power, alternative = x$alternative)
       ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
         dplyr::mutate(power=x$power, beta=1.0-x$power, d=x$cohens_d) %>%
         dplyr::mutate(current_sample_size=min(n1,n2), required_sample_size=power_res$n) %>%
