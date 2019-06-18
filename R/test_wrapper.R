@@ -423,6 +423,23 @@ calculate_cohens_d <- function(var1, var2) {
   cd  <- md/csd # cohen's d
 }
 
+# Calculate Cohen's f
+# References:
+# SSb, SSt, eta squared definition: https://learningstatisticswithr.com/lsr-0.6.pdf
+# Cohen's f definition: https://en.wikipedia.org/wiki/Effect_size
+# Compared results with sjstats::cohens_f(), and powerAnalysis::ES.anova.oneway()
+calculate_cohens_f <- function(var1, var2) {
+  m <- mean(var1, na.rm = TRUE)
+  df <- data.frame(var1=var1, var2=var2)
+  summarized <- df %>% dplyr::group_by(var2) %>%
+    dplyr::mutate(diff_between = mean(var1) - m, diff_total = var1 - m) %>% dplyr::ungroup() %>%
+    dplyr::summarize(ssb=sum(diff_between^2), sst=sum(diff_total^2))
+  ssb <- summarized$ssb # Sum of squares between groups
+  sst <- summarized$sst # Total sum of squares
+  f <- sqrt(ssb/(sst - ssb))
+  f
+}
+
 #' t-test wrapper for Analytics View
 #' @export
 #' @param conf.level - Level of confidence for confidence interval. Passed to t.test as part of ...
