@@ -1269,22 +1269,43 @@ extract_from_date <- function(x, type = "fltoyear") {
     fltoyear = {
       ret <- lubridate::floor_date(x, unit="year")
     },
+    rtoyear = {
+      ret <- lubridate::floor_date(x, unit="year")
+    },
     fltohalfyear = {
+      ret <- lubridate::floor_date(x, unit="halfyear")
+    },
+    rtohalfyear = {
       ret <- lubridate::floor_date(x, unit="halfyear")
     },
     fltoquarter = {
       ret <- lubridate::floor_date(x, unit="quarter")
     },
+    rtoq = {
+      ret <- lubridate::floor_date(x, unit="quarter")
+    },
     fltobimonth = {
+      ret <- lubridate::floor_date(x, unit="bimonth")
+    },
+    rtobimon = {
       ret <- lubridate::floor_date(x, unit="bimonth")
     },
     fltomonth = {
       ret <- lubridate::floor_date(x, unit="month")
     },
+    rtomon = {
+      ret <- lubridate::floor_date(x, unit="month")
+    },
     fltoweek = {
       ret <- lubridate::floor_date(x, unit="week")
     },
+    rtoweek = {
+      ret <- lubridate::floor_date(x, unit="week")
+    },
     fltoday = {
+      ret <- lubridate::floor_date(x, unit="day")
+    },
+    rtoday = {
       ret <- lubridate::floor_date(x, unit="day")
     },
     year = {
@@ -1299,11 +1320,26 @@ extract_from_date <- function(x, type = "fltoyear") {
     bimonth = {
       ret <- (lubridate::month(x)+1) %/% 2
     },
+    bimon = {
+      ret <- (lubridate::month(x)+1) %/% 2
+    },
     month = {
+      ret <- lubridate::month(x)
+    },
+    mon = {
       ret <- lubridate::month(x)
     },
     monthname = {
       ret <- lubridate::month(x, label=TRUE)
+    },
+    monname = {
+      ret <- lubridate::month(x, label=TRUE)
+    },
+    monthnamelong = {
+      ret <- lubridate::month(x, label=TRUE, abbr=FALSE)
+    },
+    monnamelong = {
+      ret <- lubridate::month(x, label=TRUE, abbr=FALSE)
     },
     week = {
       ret <- lubridate::week(x)
@@ -1311,8 +1347,20 @@ extract_from_date <- function(x, type = "fltoyear") {
     day = {
       ret <- lubridate::day(x)
     },
+    dayofyear = {
+      ret <- lubridate::yday(x)
+    },
+    dayofquarter = {
+      ret <- lubridate::qday(x)
+    },
+    dayofweek = {
+      ret <- lubridate::wday(x)
+    },
     wday = {
       ret <- lubridate::wday(x, label=TRUE)
+    },
+    wdaylong = {
+      ret <- lubridate::wday(x, label=TRUE, abbr=FALSE)
     },
     hour = {
       ret <- lubridate::hour(x)
@@ -1637,11 +1685,69 @@ setdiff <- function(x, y, force_data_type = FALSE, ...){
 
 # Wrapper function for dplyr::summarize
 # @export
-exp_summarize <- function(.data, grp_cols = c(), ...){
+exp_summarize <- function(.data, grp_cols = c(), grp_aggregations = c(), ...){
+  library(dplyr)
   if(length(grp_cols) == 0) {
     .data %>% summarize(...)
   } else {
-    .data %>% dplyr::group_by(!!!rlang::syms(grp_cols)) %>% summarize(...)
+    groupby_args <- list() # default empty list
+    name_list <- list()
+    name_index = 1
+    if (!is.null(grp_cols) && !is.null(grp_aggregations)) {
+      groupby_args <- purrr::map2(grp_aggregations, grp_cols, function(func, cname) {
+        if(is.na(func) || length(func)==0 || func == "none"){
+          rlang::quo((UQ(rlang::sym(cname))))
+        } else if (func %in% c("fltoyear","rtoyear",
+            "fltohalfyear",
+            "rtohalfyear",
+            "fltoquarter",
+            "rtoq",
+            "fltobimonth",
+            "rtobimon",
+            "fltomonth",
+            "rtomon",
+            "fltoweek",
+            "rtoweek",
+            "fltoday",
+            "rtoday",
+            "year",
+            "halfyear",
+            "quarter",
+            "bimonth",
+            "bimon",
+            "month",
+            "mon",
+            "monthname",
+            "monname",
+            "monthnamelong",
+            "monnamelong",
+            "week",
+            "dayofyear",
+            "dayofquarter",
+            "dayofweek",
+            "day",
+            "wday",
+            "wdaylong",
+            "hour",
+            "minute",
+            "second")) {
+          rlang::quo(extract_from_date(UQ(rlang::sym(cname)), type = UQ(func)))
+        } else {
+          rlang::quo(UQ(func)(UQ(rlang::sym(cname))))
+        }
+      })
+      name_list <- purrr::map2(grp_aggregations, grp_cols, function(func, cname) {
+        if(is.na(func) || length(func)==0 || func == "none"){
+          cname
+        } else {
+          stringr::str_c(cname, func, sep = "_")
+        }
+      })
+      names(groupby_args) <- name_list
+      .data %>% dplyr::group_by(!!!groupby_args) %>% summarize(...)
+    } else {
+      .data %>% dplyr::group_by(!!!rlang::sym(grp_cols)) %>% summarize(...)
+    }
   }
 }
 
