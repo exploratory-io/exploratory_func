@@ -448,7 +448,7 @@ calculate_cohens_f <- function(var1, var2) {
 #' @export
 #' @param conf.level - Level of confidence for confidence interval. Passed to t.test as part of ...
 #' @param sig.level - Significance level for power analysis.
-exp_ttest <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, d = NULL, power = NULL, beta = NULL, ...) {
+exp_ttest <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, d = NULL, common_sd = NULL, diff_to_detect = NULL, power = NULL, beta = NULL, ...) {
   if (!is.null(power) && !is.null(beta) && (power + beta != 1.0)) {
     stop("Specify only one of Power or Probability of Type 2 Error, or they must add up to 1.0.")
   }
@@ -482,7 +482,19 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, d = NULL, 
 
   ttest_each <- function(df) {
     if (is.null(d)) {
-      cohens_d <- calculate_cohens_d(df[[var1_col]], df[[var2_col]])
+      if (is.null(diff_to_detect)) {
+        # If neither d nor diff_to_detect is specified, calculate Cohen's d from data.
+        cohens_d <- calculate_cohens_d(df[[var1_col]], df[[var2_col]])
+      }
+      else { # diff_to_detect is specified.
+        if (!is.null(common_sd)) {
+          # If common SD is not specified, estimate from data, and use it to calculate Cohen's d
+          cohens_d <- diff_to_detect/calculate_common_sd(df[[var1_col]], df[[var2_col]])
+        }
+        else {
+          cohens_d <- diff_to_detect/common_sd
+        }
+      }
     }
     else {
       cohens_d <- d
