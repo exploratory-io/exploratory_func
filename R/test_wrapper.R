@@ -675,19 +675,19 @@ exp_anova <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, f = NULL, 
   anova_each <- function(df) {
     tryCatch({
       model <- aov(formula, data = df, ...)
+      # calculate Cohen's f from actual data
+      model$cohens_f <- calculate_cohens_f(df[[var1_col]], df[[var2_col]])
       if (is.null(f)) {
-        # calculate Cohen's f from actual data
-        cohens_f_val <- calculate_cohens_f(df[[var1_col]], df[[var2_col]])
+        model$cohens_f_to_detect <- model$cohens_f
       }
       else {
-        cohens_f_val <- f
+        model$cohens_f_to_detect <- f
       }
       class(model) <- c("anova_exploratory", class(model))
       model$var1 <- var1_col
       model$var2 <- var2_col
       model$data <- df
       model$sig.level <- sig.level
-      model$cohens_f <- cohens_f_val
       model$power <- power
       model
     }, error = function(e){
@@ -738,7 +738,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
 
     if (is.null(x$power)) {
       # If power is not specified in the arguments, estimate current power.
-      power_res <- pwr::pwr.anova.test(k = k, n= min_n_rows, f = x$cohens_f, sig.level = x$sig.level)
+      power_res <- pwr::pwr.anova.test(k = k, n= min_n_rows, f = x$cohens_f_to_detect, sig.level = x$sig.level)
       ret <- ret %>% dplyr::select(term, statistic, p.value, df, sumsq, meansq) %>%
         dplyr::mutate(power=c(power_res$power, NA_real_), beta=c(1.0-power_res$power, NA_real_), f=c(x$cohens_f, NA_real_)) %>%
         dplyr::rename(Term=term,
@@ -753,7 +753,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
     }
     else {
       # If required power is specified in the arguments, estimate required sample size. 
-      power_res <- pwr::pwr.anova.test(k = k, f = x$cohens_f, sig.level = x$sig.level, power = x$power)
+      power_res <- pwr::pwr.anova.test(k = k, f = x$cohens_f_to_detect, sig.level = x$sig.level, power = x$power)
       ret <- ret %>% dplyr::select(term, statistic, p.value, df, sumsq, meansq) %>%
         dplyr::mutate(power=c(x$power, NA_real_), beta=c(1.0-x$power, NA_real_), f=c(x$cohens_f, NA_real_)) %>%
         dplyr::mutate(current_sample_size=min_n_rows, required_sample_size=c(power_res$n, NA_real_)) %>%
