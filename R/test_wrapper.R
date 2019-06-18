@@ -372,6 +372,7 @@ glance.chisq_exploratory <- function(x) {
     # If power is not specified in the arguments, estimate current power.
     # x$parameter is degree of freedom.
     if (!is.na(x$cohens_w_to_detect)) { # It is possible that x$cohens_w_to_detect is NA. Avoid calling pwr.chisq.test not to hit an error.
+      # pwr functions returns value for the missing arg, which in this case is power.
       power_res <- pwr::pwr.chisq.test(df = x$parameter, N = N, w = x$cohens_w_to_detect, sig.level = x$sig.level)
       power_val <- power_res$power
     }
@@ -388,6 +389,7 @@ glance.chisq_exploratory <- function(x) {
   }
   else {
     # If required power is specified in the arguments, estimate required sample size. 
+    # pwr functions returns value for the missing arg, which in this case is sample size (N). 
     power_res <- pwr::pwr.chisq.test(df = x$parameter, w = x$cohens_w_to_detect, sig.level = x$sig.level, power = x$power)
     ret <- ret %>% dplyr::mutate(w=x$cohens_w, power=x$power, beta=1.0-x$power, current_sample_size=N, required_sample_size=power_res$N)
     ret <- ret %>% rename(`Chi-Square`=statistic,
@@ -516,6 +518,7 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
       ret <- ret %>% dplyr::mutate(estimate = estimate1 - estimate2)
     }
 
+    # Get sample sizes for the 2 groups (n1, n2).
     data_summary <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
       dplyr::summarize(n_rows=length(!!rlang::sym(x$var1)))
     n1 <- data_summary$n_rows[[1]]
@@ -677,6 +680,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
   if (type == "model") {
     ret <- broom:::tidy.aov(x)
 
+    # Get number of groups (k) , and the minimum sample size amoung those groups (min_n_rows).
     data_summary <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
       dplyr::summarize(n_rows=length(!!rlang::sym(x$var1))) %>%
       dplyr::summarize(min_n_rows=min(n_rows), k=n())

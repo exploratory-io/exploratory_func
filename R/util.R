@@ -1641,7 +1641,7 @@ setdiff <- function(x, y, force_data_type = FALSE, ...){
 calculate_common_sd <- function(var1, var2) {
   df <- data.frame(var1=var1, var2=var2)
   summarized <- df %>% dplyr::group_by(var2) %>%
-    dplyr::summarize(n=n(), v=var(var1))
+    dplyr::summarize(n=n(), v=var(var1, na.rm=TRUE))
     
   lx <- summarized$n[[1]] - 1
   ly <- summarized$n[[2]] - 1
@@ -1658,7 +1658,7 @@ calculate_common_sd <- function(var1, var2) {
 calculate_cohens_d <- function(var1, var2) {
   df <- data.frame(var1=var1, var2=var2)
   summarized <- df %>% dplyr::group_by(var2) %>%
-    dplyr::summarize(n=n(), m=mean(var1), v=var(var1))
+    dplyr::summarize(n=n(), m=mean(var1, na.rm=TRUE), v=var(var1, na.rm=TRUE))
     
   lx <- summarized$n[[1]] - 1
   ly <- summarized$n[[2]] - 1
