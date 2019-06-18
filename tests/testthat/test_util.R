@@ -808,6 +808,13 @@ test_that("get_mode", {
   res <- get_mode(x, na.rm = TRUE)
   expect_equal(res, 2)
 
+  # logical column case
+  x <- c(F,T,T,NA,NA,NA)
+  res <- get_mode(x)
+  expect_true(is.na(res))
+  res <- get_mode(x, na.rm = TRUE)
+  expect_equal(res, T)
+
   # character column case
   x <- c("A","B","B","C",NA,NA,NA)
   res <- get_mode(x)
