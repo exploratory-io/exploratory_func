@@ -503,7 +503,7 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, d = NULL, 
         cohens_d <- calculate_cohens_d(df[[var1_col]], df[[var2_col]])
       }
       else { # diff_to_detect is specified.
-        if (!is.null(common_sd)) {
+        if (is.null(common_sd)) {
           # If common SD is not specified, estimate from data, and use it to calculate Cohen's d
           cohens_d <- diff_to_detect/calculate_common_sd(df[[var1_col]], df[[var2_col]])
         }

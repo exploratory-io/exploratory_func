@@ -285,6 +285,15 @@ test_that("test exp_ttest with power", {
   ret
 })
 
+test_that("test exp_ttest with diff_to_detect", {
+  mtcars2 <- mtcars
+  mtcars2$am[[1]] <- NA # test NA filtering
+  ret <- exp_ttest(mtcars2, mpg, am, diff_to_detect = 0.5, power = 0.8)
+  ret %>% tidy(model, type="model")
+  ret %>% tidy(model, type="data_summary")
+  ret
+})
+
 
 test_that("test exp_ttest with asint grouping", {
   mtcars2 <- mtcars
