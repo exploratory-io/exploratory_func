@@ -265,11 +265,14 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
     df <- df %>% tibble::column_to_rownames(var=var1_col)
     x <- df %>% as.matrix()
     model <- chisq.test(x = x, correct = correct, ...)
-    if (is.null(w)) { # if effect size is not specified, calculate from actual data.
-      cohens_w <- calculate_cohens_w(model$statistic, sum(x))
+    # Calculate Cohen's w from actual data.
+    cohens_w <- calculate_cohens_w(model$statistic, sum(x))
+    if (is.null(w)) {
+      # If w is not specified, use the one calculated from data.
+      cohens_w_to_detect <- cohens_w
     }
     else {
-      cohens_w <- w
+      cohens_w_to_detect <- w
     }
     # add variable name info to the model
     model$var1 <- var1_col
@@ -280,6 +283,7 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
     model$var2_levels <- var2_levels
     model$sig.level <- sig.level
     model$cohens_w <- cohens_w
+    model$cohens_w_to_detect <- cohens_w_to_detect
     model$power <- power
     class(model) <- c("chisq_exploratory", class(model))
     model
@@ -373,8 +377,8 @@ glance.chisq_exploratory <- function(x) {
   if (is.null(x$power)) {
     # If power is not specified in the arguments, estimate current power.
     # x$parameter is degree of freedom.
-    if (!is.na(x$cohens_w)) { # It is possible that x$cohens_w is NA. Avoid calling pwr.chisq.test not to hit an error.
-      power_res <- pwr::pwr.chisq.test(df = x$parameter, N = N, w = x$cohens_w, sig.level = x$sig.level)
+    if (!is.na(x$cohens_w_to_detect)) { # It is possible that x$cohens_w_to_detect is NA. Avoid calling pwr.chisq.test not to hit an error.
+      power_res <- pwr::pwr.chisq.test(df = x$parameter, N = N, w = x$cohens_w_to_detect, sig.level = x$sig.level)
       power_val <- power_res$power
     }
     else {
@@ -390,7 +394,7 @@ glance.chisq_exploratory <- function(x) {
   }
   else {
     # If required power is specified in the arguments, estimate required sample size. 
-    power_res <- pwr::pwr.chisq.test(df = x$parameter, w = x$cohens_w, sig.level = x$sig.level, power = x$power)
+    power_res <- pwr::pwr.chisq.test(df = x$parameter, w = x$cohens_w_to_detect, sig.level = x$sig.level, power = x$power)
     ret <- ret %>% dplyr::mutate(power=x$power, beta=1.0-x$power, w=x$cohens_w, current_sample_size=N, required_sample_size=power_res$N)
     ret <- ret %>% rename(`Chi-Square`=statistic,
                           `Degree of Freedom`=parameter,
