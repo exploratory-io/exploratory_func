@@ -523,7 +523,13 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
     if (is.null(x$power)) {
       # If power is not specified in the arguments, estimate current power.
       # TODO: Consider paired and varEqual.
-      power_res <- pwr::pwr.t2n.test(n1 = n1, n2= n2, d = x$cohens_d_to_detect, sig.level = x$sig.level, alternative = x$alternative)
+      if (x$method == "Paired t-test") {
+        # If paired, we should be able to assume n1 == n2.
+        power_res <- pwr::pwr.t.test(n = n1, d = x$cohens_d_to_detect, sig.level = x$sig.level, type = "two.sample", alternative = x$alternative)
+      }
+      else {
+        power_res <- pwr::pwr.t2n.test(n1 = n1, n2= n2, d = x$cohens_d_to_detect, sig.level = x$sig.level, alternative = x$alternative)
+      }
 
       ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
         dplyr::mutate(d=x$cohens_d, power=power_res$power, beta=1.0-power_res$power) %>%
