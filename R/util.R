@@ -1638,7 +1638,7 @@ setdiff <- function(x, y, force_data_type = FALSE, ...){
 #'Calculates mode. Function name is capitalized to avoid conflict with base::mode(), which does something other than calculating mode.
 # Reference: https://stackoverflow.com/questions/2547402/is-there-a-built-in-function-for-finding-the-mode
 #'@export
-Mode <- function(x, na.rm = FALSE) {
+get_mode <- function(x, na.rm = FALSE) {
   if(na.rm){
     x = x[!is.na(x)]
   }
