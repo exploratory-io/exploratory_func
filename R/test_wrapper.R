@@ -522,7 +522,7 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
     n2 <- data_summary$n_rows[[2]]
     if (is.null(x$power)) {
       # If power is not specified in the arguments, estimate current power.
-      # TODO: Consider paired and varEqual.
+      # TODO: pwr functions does not seem to have argument for equal variance. Is it ok? 
       if (x$method == "Paired t-test") {
         # If paired, we should be able to assume n1 == n2.
         power_res <- pwr::pwr.t.test(n = n1, d = x$cohens_d_to_detect, sig.level = x$sig.level, type = "two.sample", alternative = x$alternative)
@@ -545,7 +545,7 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
     }
     else {
       # If required power is specified in the arguments, estimate required sample size. 
-      # TODO: Consider paired and varEqual.
+      # TODO: pwr functions does not seem to have argument for equal variance. Is it ok? 
       power_res <- pwr::pwr.t.test(d = x$cohens_d_to_detect, sig.level = x$sig.level, power = x$power, alternative = x$alternative)
       ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
         dplyr::mutate(d=x$cohens_d, power=x$power, beta=1.0-x$power) %>%
