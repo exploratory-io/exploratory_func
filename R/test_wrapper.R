@@ -368,15 +368,22 @@ glance.chisq_exploratory <- function(x) {
   # ret <- x %>% broom:::glance.htest() # for some reason this does not work. just do it like following.
   ret <- data.frame(statistic=x$statistic, parameter=x$parameter, p.value=x$p.value)
   N <- sum(x$observed) # Total number of observations (rows).
+  note <- NULL
   if (is.null(x$power)) {
     # If power is not specified in the arguments, estimate current power.
     # x$parameter is degree of freedom.
     if (!is.na(x$cohens_w_to_detect)) { # It is possible that x$cohens_w_to_detect is NA. Avoid calling pwr.chisq.test not to hit an error.
       # pwr functions returns value for the missing arg, which in this case is power.
-      power_res <- pwr::pwr.chisq.test(df = x$parameter, N = N, w = x$cohens_w_to_detect, sig.level = x$sig.level)
-      power_val <- power_res$power
+      tryCatch({ # pwr function can return error from equation resolver. Catch it rather than stopping the whole thing.
+        power_res <- pwr::pwr.chisq.test(df = x$parameter, N = N, w = x$cohens_w_to_detect, sig.level = x$sig.level)
+        power_val <- power_res$power
+      }, error = function(e) {
+        note <- e$message
+        power_val <- NA_real_
+      })
     }
     else {
+      note <- "Could not calculate Cohhen's w." 
       power_val <- NA_real_
     }
     ret <- ret %>% dplyr::mutate(w=x$cohens_w, power=power_val, beta=1.0-power_val)
@@ -390,8 +397,14 @@ glance.chisq_exploratory <- function(x) {
   else {
     # If required power is specified in the arguments, estimate required sample size. 
     # pwr functions returns value for the missing arg, which in this case is sample size (N). 
-    power_res <- pwr::pwr.chisq.test(df = x$parameter, w = x$cohens_w_to_detect, sig.level = x$sig.level, power = x$power)
-    ret <- ret %>% dplyr::mutate(w=x$cohens_w, power=x$power, beta=1.0-x$power, current_sample_size=N, required_sample_size=power_res$N)
+    tryCatch({ # pwr function can return error from equation resolver. Catch it rather than stopping the whole thing.
+      power_res <- pwr::pwr.chisq.test(df = x$parameter, w = x$cohens_w_to_detect, sig.level = x$sig.level, power = x$power)
+      required_sample_size <- power_res$N
+    }, error = function(e) {
+      note <- e$message
+      required_sample_size <- NA_real_
+    })
+    ret <- ret %>% dplyr::mutate(w=x$cohens_w, power=x$power, beta=1.0-x$power, current_sample_size=N, required_sample_size=required_sample_size)
     ret <- ret %>% rename(`Chi-Square`=statistic,
                           `Degree of Freedom`=parameter,
                           `P Value`=p.value,
@@ -400,6 +413,9 @@ glance.chisq_exploratory <- function(x) {
                           `Target Probability of Type 2 Error`=beta,
                           `Current Sample Size`=current_sample_size,
                           `Required Sample Size`=required_sample_size)
+  }
+  if (!is.null(note)) { # Add Note column, if there was an error from pwr function.
+    ret <- ret %>% dplyr::mutate(Note=note)
   }
   ret
 }
