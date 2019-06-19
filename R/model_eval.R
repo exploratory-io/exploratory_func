@@ -314,14 +314,14 @@ evaluate_multi_ <- function(df, pred_label_col, actual_val_col, pretty.name = FA
 }
 
 #' @export
-evaluate_binary_training_and_test <- function(df, actual_val_col, threshold = "f_score", pretty.name = FALSE, test_rate = 0.0){
+evaluate_binary_training_and_test <- function(df, actual_val_col, threshold = "f_score", pretty.name = FALSE){
   training_ret <- df %>% broom::glance(model, threshold = threshold)
   training_ret$is_test_data <- FALSE
   ret <- training_ret
 
   grouped_col <- colnames(df)[!colnames(df) %in% c("model", ".test_index", "source.data")]
 
-  if (test_rate > 0.0) {
+  if (purrr::some(df$.test_index, function(x){length(x)!=0})) { # Consider it test mode if any of the element of .test_index column has non-zero length.
     each_func <- function(df){
       if (!is.data.frame(df)) {
         df <- tribble(~model, ~.test_index, ~source.data,
