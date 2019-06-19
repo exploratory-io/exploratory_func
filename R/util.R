@@ -1263,6 +1263,25 @@ do_on_each_group_2 <- function(df, func1, func2, params1 = quote(list()), params
 }
 
 #' @export
+categorize_numeric <- function(x, type = "asnum") {
+  ret <- NULL
+  switch(type,
+     asnum = {
+       ret <- as.numeric(x)
+     },
+     asint = {
+       ret <- as.integer(x)
+     },
+     asintby10 = {
+       ret <- floor(x/10)*10
+     },
+     aschar = {
+       ret <- as.character(x)
+     })
+  ret
+}
+
+#' @export
 extract_from_date <- function(x, type = "fltoyear") {
   ret <- NULL
   switch(type,
@@ -1683,7 +1702,7 @@ setdiff <- function(x, y, force_data_type = FALSE, ...){
   }
 }
 
-# Wrapper function for dplyr::summarize
+# Wrapper function that takes care of dplyr::group_by and dplyr::summarize as a single step.
 # @export
 exp_summarize <- function(.data, grp_cols = c(), grp_aggregations = c(), ...){
   library(dplyr)
@@ -1731,7 +1750,11 @@ exp_summarize <- function(.data, grp_cols = c(), grp_aggregations = c(), ...){
             "hour",
             "minute",
             "second")) {
+          # For date column, call extract_from_date
           rlang::quo(extract_from_date(UQ(rlang::sym(cname)), type = UQ(func)))
+        } else if (func %in% c("asnum","asint","asintby10","aschar")) {
+          # For numeric column, call categorize_numeric
+          rlang::quo(categorize_numeric(UQ(rlang::sym(cname)), type = UQ(func)))
         } else {
           rlang::quo(UQ(func)(UQ(rlang::sym(cname))))
         }
