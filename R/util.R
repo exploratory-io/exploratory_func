@@ -1704,7 +1704,7 @@ setdiff <- function(x, y, force_data_type = FALSE, ...){
 
 # Wrapper function that takes care of dplyr::group_by and dplyr::summarize as a single step.
 # @export
-exp_summarize <- function(.data, grp_cols = c(), grp_aggregations = c(), ...){
+exp_summarize <- function(.data, grp_cols = NULL, grp_aggregations = NULL, ...){
   library(dplyr)
   if(length(grp_cols) == 0) {
     .data %>% summarize(...)
@@ -1769,7 +1769,11 @@ exp_summarize <- function(.data, grp_cols = c(), grp_aggregations = c(), ...){
       names(groupby_args) <- name_list
       .data %>% dplyr::group_by(!!!groupby_args) %>% summarize(...)
     } else {
-      .data %>% dplyr::group_by(!!!rlang::sym(grp_cols)) %>% summarize(...)
+      if(!is.null(grp_cols)) {
+        .data %>% dplyr::group_by(!!!rlang::sym(grp_cols)) %>% summarize(...)
+      } else {
+        .data %>% summarize(...)
+      }
     }
   }
 }
