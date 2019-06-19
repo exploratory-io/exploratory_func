@@ -527,8 +527,8 @@ glance.ttest_exploratory <- function(x) {
 #' @export
 tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
   if (type == "model") {
+    note <- NULL
     ret <- broom:::tidy.htest(x)
-
     if (is.null(ret$estimate)) { # estimate is empty when var.equal = TRUE.
                                  # Looks like an issue from broom. Working it around.
       ret <- ret %>% dplyr::mutate(estimate = estimate1 - estimate2)
@@ -542,16 +542,22 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
     if (is.null(x$power)) {
       # If power is not specified in the arguments, estimate current power.
       # TODO: pwr functions does not seem to have argument for equal variance. Is it ok? 
-      if (x$method == "Paired t-test") {
-        # If paired, we should be able to assume n1 == n2.
-        power_res <- pwr::pwr.t.test(n = n1, d = x$cohens_d_to_detect, sig.level = x$sig.level, type = "two.sample", alternative = x$alternative)
-      }
-      else {
-        power_res <- pwr::pwr.t2n.test(n1 = n1, n2= n2, d = x$cohens_d_to_detect, sig.level = x$sig.level, alternative = x$alternative)
-      }
+      tryCatch({ # pwr function can return error from equation resolver. Catch it rather than stopping the whole thing.
+        if (x$method == "Paired t-test") {
+          # If paired, we should be able to assume n1 == n2.
+          power_res <- pwr::pwr.t.test(n = n1, d = x$cohens_d_to_detect, sig.level = x$sig.level, type = "two.sample", alternative = x$alternative)
+        }
+        else {
+          power_res <- pwr::pwr.t2n.test(n1 = n1, n2= n2, d = x$cohens_d_to_detect, sig.level = x$sig.level, alternative = x$alternative)
+        }
+        power_val <- power_res$power
+      }, error = function(e) {
+        note <- e$message
+        power_val <- NA_real_
+      })
 
       ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
-        dplyr::mutate(d=x$cohens_d, power=power_res$power, beta=1.0-power_res$power) %>%
+        dplyr::mutate(d=x$cohens_d, power=power_val, beta=1.0-power_val) %>%
         dplyr::rename(`t Ratio`=statistic,
                       `P Value`=p.value,
                       `Degree of Freedom`=parameter,
@@ -565,10 +571,16 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
     else {
       # If required power is specified in the arguments, estimate required sample size. 
       # TODO: pwr functions does not seem to have argument for equal variance. Is it ok? 
-      power_res <- pwr::pwr.t.test(d = x$cohens_d_to_detect, sig.level = x$sig.level, power = x$power, alternative = x$alternative)
+      tryCatch({ # pwr function can return error from equation resolver. Catch it rather than stopping the whole thing.
+        power_res <- pwr::pwr.t.test(d = x$cohens_d_to_detect, sig.level = x$sig.level, power = x$power, alternative = x$alternative)
+        required_sample_size <- power_res$n
+      }, error = function(e) {
+        note <- e$message
+        required_sample_size <- NA_real_
+      })
       ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
         dplyr::mutate(d=x$cohens_d, power=x$power, beta=1.0-x$power) %>%
-        dplyr::mutate(current_sample_size=min(n1,n2), required_sample_size=power_res$n) %>%
+        dplyr::mutate(current_sample_size=min(n1,n2), required_sample_size=required_sample_size) %>%
         dplyr::rename(`t Ratio`=statistic,
                       `P Value`=p.value,
                       `Degree of Freedom`=parameter,
@@ -580,6 +592,9 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
                       `Target Probability of Type 2 Error`=beta,
                       `Current Sample Size (Each Group)`=current_sample_size,
                       `Required Sample Size (Each Group)`=required_sample_size)
+    }
+    if (!is.null(note)) { # Add Note column, if there was an error from pwr function.
+      ret <- ret %>% dplyr::mutate(Note=note)
     }
   }
   else if (type == "data_summary") { #TODO consolidate with code in tidy.anova_exploratory
