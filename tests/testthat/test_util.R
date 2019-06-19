@@ -799,3 +799,11 @@ test_that("one_hot", {
   res <- df %>% one_hot(x)
   expect_equal(res$x_A, c(1,1,0,0))
 })
+
+test_that("summarize_group", {
+ df <- mtcars %>% exploratory::summarize_group(grp_cols = c("cyl", "mpg"), grp_aggregations = c("none", "mean"), count = n())
+ expect_equal(nrow(df),3)
+ df2 <- mtcars %>% exploratory::summarize_group(grp_cols = NULL, grp_aggregations = NULL, count = n())
+ expect_equal(nrow(df2),1)
+})
+
