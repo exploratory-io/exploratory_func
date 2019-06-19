@@ -487,7 +487,7 @@ prediction_training_and_test <- function(df, prediction_type="default", threshol
     each_func <- function(df){
       tryCatch({
         if (!is.data.frame(df)) {
-          df <- tribble(~model,   ~.test_index,   ~source.data,
+          df <- tibble::tribble(~model,   ~.test_index,   ~source.data,
                         df$model, df$.test_index, df$source.data)
         }
 
