@@ -709,8 +709,8 @@ glance.anova_exploratory <- function(x) {
 #' @export
 tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
   if (type == "model") {
+    note <- NULL
     ret <- broom:::tidy.aov(x)
-
     # Get number of groups (k) , and the minimum sample size amoung those groups (min_n_rows).
     data_summary <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
       dplyr::summarize(n_rows=length(!!rlang::sym(x$var1))) %>%
@@ -722,9 +722,15 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
 
     if (is.null(x$power)) {
       # If power is not specified in the arguments, estimate current power.
-      power_res <- pwr::pwr.anova.test(k = k, n= min_n_rows, f = x$cohens_f_to_detect, sig.level = x$sig.level)
+      tryCatch({ # pwr function can return error from equation resolver. Catch it rather than stopping the whole thing.
+        power_res <- pwr::pwr.anova.test(k = k, n= min_n_rows, f = x$cohens_f_to_detect, sig.level = x$sig.level)
+        power_val <- power_res$power
+      }, error = function(e) {
+        note <- e$message
+        power_val <- NA_real_
+      })
       ret <- ret %>% dplyr::select(term, statistic, p.value, df, sumsq, meansq) %>%
-        dplyr::mutate(f=c(x$cohens_f, NA_real_), power=c(power_res$power, NA_real_), beta=c(1.0-power_res$power, NA_real_)) %>%
+        dplyr::mutate(f=c(x$cohens_f, NA_real_), power=c(power_val, NA_real_), beta=c(1.0-power_val, NA_real_)) %>%
         dplyr::rename(Term=term,
                       `F Ratio`=statistic,
                       `P Value`=p.value,
@@ -737,10 +743,16 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
     }
     else {
       # If required power is specified in the arguments, estimate required sample size. 
-      power_res <- pwr::pwr.anova.test(k = k, f = x$cohens_f_to_detect, sig.level = x$sig.level, power = x$power)
+      tryCatch({ # pwr function can return error from equation resolver. Catch it rather than stopping the whole thing.
+        power_res <- pwr::pwr.anova.test(k = k, f = x$cohens_f_to_detect, sig.level = x$sig.level, power = x$power)
+        required_sample_size <- power_res$n
+      }, error = function(e) {
+        note <- e$message
+        required_sample_size <- NA_real_
+      })
       ret <- ret %>% dplyr::select(term, statistic, p.value, df, sumsq, meansq) %>%
         dplyr::mutate(f=c(x$cohens_f, NA_real_), power=c(x$power, NA_real_), beta=c(1.0-x$power, NA_real_)) %>%
-        dplyr::mutate(current_sample_size=min_n_rows, required_sample_size=c(power_res$n, NA_real_)) %>%
+        dplyr::mutate(current_sample_size=min_n_rows, required_sample_size=c(required_sample_size, NA_real_)) %>%
         dplyr::rename(Term=term,
                       `F Ratio`=statistic,
                       `P Value`=p.value,
@@ -752,6 +764,9 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
                       `Target Probability of Type 2 Error`=beta,
                       `Current Sample Size (Each Group)`=current_sample_size,
                       `Required Sample Size (Each Group)`=required_sample_size)
+    }
+    if (!is.null(note)) { # Add Note column, if there was an error from pwr function.
+      ret <- ret %>% dplyr::mutate(Note=note)
     }
   }
   else if (type == "data_summary") { #TODO consolidate with code in tidy.ttest_exploratory
