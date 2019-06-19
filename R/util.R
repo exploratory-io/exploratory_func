@@ -1686,8 +1686,8 @@ calculate_cohens_f <- function(var1, var2) {
   m <- mean(var1, na.rm = TRUE)
   df <- data.frame(var1=var1, var2=var2)
   summarized <- df %>% dplyr::group_by(var2) %>%
-    dplyr::mutate(diff_between = mean(var1) - m, diff_total = var1 - m) %>% dplyr::ungroup() %>%
-    dplyr::summarize(ssb=sum(diff_between^2), sst=sum(diff_total^2))
+    dplyr::mutate(diff_between = mean(var1, na.rm=TRUE) - m, diff_total = var1 - m) %>% dplyr::ungroup() %>%
+    dplyr::summarize(ssb=sum(diff_between^2, na.rm=TRUE), sst=sum(diff_total^2, na.rm=TRUE))
   ssb <- summarized$ssb # Sum of squares between groups
   sst <- summarized$sst # Total sum of squares
   f <- sqrt(ssb/(sst - ssb))
