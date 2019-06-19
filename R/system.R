@@ -1316,8 +1316,8 @@ scrape_html_table <- function(url, index, heading, encoding = NULL) {
 #' function to convert labelled class to factor
 #' @export
 handleLabelledColumns = function(df){
-  # check if column class is labelled, haven_labelled, etc
-  # this causes and
+  # check if column class is labelled or haven_labelled, and conver them to factor.
+  # If labelled or haven_labelled are not converted to factor, appling jsonlite::toJSON to the data frame fails.
   is_labelled <- which(lapply(df, class) %in% c("labelled", "haven_labelled"))
   df[is_labelled] <- lapply(df[is_labelled], haven::as_factor)
   df
