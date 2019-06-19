@@ -1313,12 +1313,12 @@ scrape_html_table <- function(url, index, heading, encoding = NULL) {
 }
 
 
-#' function to convert labelled class to factoror
-#' see https://github.com/exploratory-io/tam/issues/1481
+#' function to convert labelled class to factor
 #' @export
 handleLabelledColumns = function(df){
   # check if column class is labelled, haven_labelled, etc
-  is_labelled <- which(stringr::str_detect(lapply(df, class), "labelled"))
+  # this causes and
+  is_labelled <- which(lapply(df, class) %in% c("labelled", "haven_labelled"))
   df[is_labelled] <- lapply(df[is_labelled], haven::as_factor)
   df
 }
