@@ -366,7 +366,7 @@ evaluate_binary_training_and_test <- function(df, actual_val_col, threshold = "f
                                deviance, null.deviance, df.null, df.residual, everything())
 
   if (length(grouped_col) > 0) {
-    ret <- ret %>% dplyr::select(grouped_col, everything())
+    ret <- ret %>% dplyr::select(!!!rlang::syms(grouped_col), is_test_data, everything())
   }
 
   if (pretty.name){
