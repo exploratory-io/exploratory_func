@@ -15,6 +15,12 @@ test_data <- structure(
       FNUMBER= c(21, NA, 6, 87, 23, 12, 3, 0, 13, 1, 85, 82, 31, 57, 20, 12, 42, 49, NA, 45)), row.names = c(NA, -20L),
     class = c("tbl_df", "tbl", "data.frame"), .Names = c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE", "FNUMBER"))
 
+test_that("evaluate training and test prediction by calc_feature_imp", {
+  model_df <- flight %>% dplyr::sample_n(4000) %>% calc_feature_imp(`ARR DELAY`, `YE AR`, `MON TH`, `DAY OF MONTH`, `FL DATE`, `TAIL NUM`, `FL NUM`, `ORI GIN`, `ORIGIN CITY NAME`, `ORIGIN STATE ABR`, `DE ST`, `DEST CITY NAME`, `DEST STATE ABR`, `DEP TIME`, `DEP DELAY`, `ARR TIME`, `CAN CELLED`, `CANCELLATION CODE`, `AIR TIME`, `DIS TANCE`, `WEATHER DELAY`, `delay ed`, `is UA`, `is delayed`, `end time`, `is UA or AA`, smote = FALSE, test_rate=0.3)
+  res <- model_df %>% rf_evaluation_training_and_test(pretty.name = TRUE, test_rate = 0.3)
+  res # TODO: Add test expectation.
+})
+
 test_that("test ranger with regression", {
   model_ret <- build_model(test_data,
                            model_func = rangerReg,
@@ -315,3 +321,4 @@ test_that("calc imp negative test", {
   res_tidy <- model_df %>% tidy(model, type = "scatter") %>% rename(Actual=expected_value, Predicted=predicted_value) %>% mutate(`Perfect Fit`=Predicted)
   expect_equal(colnames(res_tidy), c("Actual", "Predicted", "Perfect Fit"))
 })
+
