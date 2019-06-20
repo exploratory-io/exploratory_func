@@ -368,6 +368,9 @@ evaluate_binary_training_and_test <- function(df, actual_val_col, threshold = "f
   if (length(grouped_col) > 0) {
     ret <- ret %>% dplyr::select(!!!rlang::syms(grouped_col), is_test_data, everything())
   }
+  else {
+    ret <- ret %>% dplyr::select(is_test_data, everything())
+  }
 
   if (pretty.name){
     colnames(ret)[colnames(ret) == "f_score"] <- "F Score"
