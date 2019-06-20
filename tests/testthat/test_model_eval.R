@@ -289,12 +289,12 @@ test_that("evaluate binary classification model by training and test", {
                                      model_type = "glm",
                                      test_rate = 0.5)
   suppressWarnings({
-    eret <- evaluate_binary_training_and_test(ret, "CANCELLED X", test_rate = 0.5)
+    eret <- evaluate_binary_training_and_test(ret, "CANCELLED X")
     expect_cols <-  c("f_score", "accuracy_rate", "misclassification_rate", "precision", "recall", "auc",
                       "positives", "negatives", "p.value", "logLik", "AIC", "BIC", "deviance",
                       "null.deviance", "df.null", "df.residual", "Carrier.Name_base", "is_test_data")
     expect_equal(colnames(eret), expect_cols)
-    eret <- evaluate_binary_training_and_test(ret, "CANCELLED X", test_rate = 0.5, pretty.name = TRUE)
+    eret <- evaluate_binary_training_and_test(ret, "CANCELLED X", pretty.name = TRUE)
     expect_cols <- c("F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall", "AUC",
                      "Data Size for TRUE", "Data Size for FALSE", "P Value", "Log Likelihood", "AIC", "BIC",
                      "Deviance", "Null Deviance", "DF for Null Model", "Residual DF", "Base Level of Carrier.Name", "Test Data")
@@ -313,12 +313,12 @@ test_that("Group evaluate binary classification model by training and test", {
                          link = "logit",
                          test_rate = 0.5)
   suppressWarnings({
-    eret <- evaluate_binary_training_and_test(ret, "CANCELLED X", test_rate = 0.5)
+    eret <- evaluate_binary_training_and_test(ret, "CANCELLED X")
     expect_cols <-  c("klass", "f_score", "accuracy_rate", "misclassification_rate", "precision", "recall", "auc",
                       "positives", "negatives", "p.value", "logLik", "AIC", "BIC", "deviance",
                       "null.deviance", "df.null", "df.residual", "is_test_data")
     expect_equal(colnames(eret), expect_cols)
-    eret <- evaluate_binary_training_and_test(ret, "CANCELLED X", test_rate = 0.5, pretty.name = TRUE)
+    eret <- evaluate_binary_training_and_test(ret, "CANCELLED X", pretty.name = TRUE)
     expect_cols <- c("klass", "F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall", "AUC",
                      "Data Size for TRUE", "Data Size for FALSE", "P Value", "Log Likelihood", "AIC", "BIC",
                      "Deviance", "Null Deviance", "DF for Null Model", "Residual DF", "Test Data")
@@ -338,10 +338,10 @@ test_that("Group evaluate binary classification model by training and test with 
                          link = "logit",
                          test_rate = 0.3)
   suppressWarnings({
-    eret_fscore <- evaluate_binary_training_and_test(ret, "CANCELLED X", test_rate = 0.5, threshold = "f_score")
-    eret_acc <- evaluate_binary_training_and_test(ret, "CANCELLED X", test_rate = 0.5, threshold = "accuracy_rate") 
-    eret_recall <- evaluate_binary_training_and_test(ret, "CANCELLED X", test_rate = 0.5, threshold = "recall")
-    eret_precision <- evaluate_binary_training_and_test(ret, "CANCELLED X", test_rate = 0.5, threshold = "precision")
+    eret_fscore <- evaluate_binary_training_and_test(ret, "CANCELLED X", threshold = "f_score")
+    eret_acc <- evaluate_binary_training_and_test(ret, "CANCELLED X", threshold = "accuracy_rate") 
+    eret_recall <- evaluate_binary_training_and_test(ret, "CANCELLED X", threshold = "recall")
+    eret_precision <- evaluate_binary_training_and_test(ret, "CANCELLED X", threshold = "precision")
 
     expect_gte(eret_fscore$f_score[1], eret_acc$f_score[1])
     expect_gte(eret_acc$accuracy_rate[1], eret_fscore$accuracy_rate[1])
