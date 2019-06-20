@@ -199,6 +199,14 @@ test_that("test exp_chisq", {
   ret
 })
 
+test_that("test exp_chisq with power", {
+  model_df <- exp_chisq(mtcars %>% mutate(gear=factor(gear)), gear, carb, power = 0.8) # factor order should be kept in the model
+  ret <- model_df %>% glance(model)
+  model_df <- exp_chisq(mtcars, gear, carb, value=cyl, power = 0.8)
+  ret <- model_df %>% glance(model)
+  ret
+})
+
 test_that("test exp_chisq with grouping functions", {
   ret <- exp_chisq(mtcars, disp, drat, func1="asintby10", func2="asint", value=mpg)
   ret
@@ -260,9 +268,46 @@ test_that("test exp_ttest with alternative = greater", {
 })
 
 test_that("test exp_ttest with paired = TRUE", {
+  # Make sample size equal between groups for paired t-test.
+  mtcars2 <- mtcars %>% group_by(am) %>% sample_n(6) %>% ungroup()
+  ret <- exp_ttest(mtcars2, mpg, am, paired = TRUE)
+  ret %>% tidy(model, type="model")
+  ret %>% tidy(model, type="data_summary")
+  ret
+})
+
+test_that("test exp_ttest with power", {
   mtcars2 <- mtcars
   mtcars2$am[[1]] <- NA # test NA filtering
-  ret <- exp_ttest(mtcars2, mpg, am, paired = FALSE)
+  ret <- exp_ttest(mtcars2, mpg, am, power = 0.8)
+  ret %>% tidy(model, type="model")
+  ret %>% tidy(model, type="data_summary")
+  ret
+})
+
+test_that("test exp_ttest with power with paired = TRUE", {
+  # Make sample size equal between groups for paired t-test.
+  mtcars2 <- mtcars %>% group_by(am) %>% sample_n(6) %>% ungroup()
+  ret <- exp_ttest(mtcars2, mpg, am, paired = TRUE, power = 0.8)
+  ret %>% tidy(model, type="model")
+  ret %>% tidy(model, type="data_summary")
+  ret
+})
+
+
+test_that("test exp_ttest with diff_to_detect", {
+  mtcars2 <- mtcars
+  mtcars2$am[[1]] <- NA # test NA filtering
+  ret <- exp_ttest(mtcars2, mpg, am, diff_to_detect = 0.5, power = 0.8)
+  ret %>% tidy(model, type="model")
+  ret %>% tidy(model, type="data_summary")
+  ret
+})
+
+test_that("test exp_ttest with diff_to_detect and common_sd", {
+  mtcars2 <- mtcars
+  mtcars2$am[[1]] <- NA # test NA filtering
+  ret <- exp_ttest(mtcars2, mpg, am, diff_to_detect = 0.5, common_sd = 1.5, power = 0.8)
   ret %>% tidy(model, type="model")
   ret %>% tidy(model, type="data_summary")
   ret
@@ -287,8 +332,20 @@ test_that("test exp_ttest with group_by", {
 
 test_that("test exp_anova", {
   ret <- exp_anova(mtcars, mpg, am)
+  ret %>% tidy(model, type="model")
   ret %>% tidy(model, type="data_summary")
   ret <- exp_anova(mtcars, mpg, gear)
+  ret %>% tidy(model, type="model")
+  ret %>% tidy(model, type="data_summary")
+  ret
+})
+
+test_that("test exp_anova with required power", {
+  ret <- exp_anova(mtcars, mpg, am, power=0.8)
+  ret %>% tidy(model, type="model")
+  ret %>% tidy(model, type="data_summary")
+  ret <- exp_anova(mtcars, mpg, gear, power=0.8)
+  ret %>% tidy(model, type="model")
   ret %>% tidy(model, type="data_summary")
   ret
 })

@@ -1702,6 +1702,82 @@ setdiff <- function(x, y, force_data_type = FALSE, ...){
   }
 }
 
+# This is written by removing unnecessary part from calculate_cohens_d.
+#'Calculate common standard deviation.
+#'@export
+calculate_common_sd <- function(var1, var2) {
+  df <- data.frame(var1=var1, var2=var2)
+  summarized <- df %>% dplyr::group_by(var2) %>%
+    dplyr::summarize(n=n(), v=var(var1, na.rm=TRUE))
+    
+  lx <- summarized$n[[1]] - 1
+  ly <- summarized$n[[2]] - 1
+  vx <- summarized$v[[1]]
+  vy <- summarized$v[[2]]
+  csd <- lx * vx + ly * vy
+  csd <- csd/(lx + ly)
+  csd <- sqrt(csd) # common sd computation
+}
+
+# Reference: https://stackoverflow.com/questions/15436702/estimate-cohens-d-for-effect-size
+#'Calculate Cohen's d
+#'@export
+calculate_cohens_d <- function(var1, var2) {
+  df <- data.frame(var1=var1, var2=var2)
+  summarized <- df %>% dplyr::group_by(var2) %>%
+    dplyr::summarize(n=n(), m=mean(var1, na.rm=TRUE), v=var(var1, na.rm=TRUE))
+    
+  lx <- summarized$n[[1]] - 1
+  ly <- summarized$n[[2]] - 1
+  mx <- summarized$m[[1]]
+  my <- summarized$m[[2]]
+  vx <- summarized$v[[1]]
+  vy <- summarized$v[[2]]
+  md  <- abs(mx - my) # mean difference (numerator)
+  csd <- lx * vx + ly * vy
+  csd <- csd/(lx + ly)
+  csd <- sqrt(csd) # common sd computation
+  cd  <- md/csd # cohen's d
+}
+
+# References:
+# SSb, SSt, eta squared definition: https://learningstatisticswithr.com/lsr-0.6.pdf
+# Cohen's f definition: https://en.wikipedia.org/wiki/Effect_size
+# Compared results with sjstats::cohens_f(), and powerAnalysis::ES.anova.oneway()
+# Did not use sjstats::cohens_f() to avoid requiring entire sjstats and its dependencies.
+# Did not use powerAnalysis::ES.anova.oneway() because it only works for the case all categories
+# have same number of observations.
+#'Calculate Cohen's f
+#'@export
+calculate_cohens_f <- function(var1, var2) {
+  m <- mean(var1, na.rm = TRUE)
+  df <- data.frame(var1=var1, var2=var2)
+  summarized <- df %>% dplyr::group_by(var2) %>%
+    dplyr::mutate(diff_between = mean(var1, na.rm=TRUE) - m, diff_total = var1 - m) %>% dplyr::ungroup() %>%
+    dplyr::summarize(ssb=sum(diff_between^2, na.rm=TRUE), sst=sum(diff_total^2, na.rm=TRUE))
+  ssb <- summarized$ssb # Sum of squares between groups
+  sst <- summarized$sst # Total sum of squares
+  f <- sqrt(ssb/(sst - ssb))
+  f
+}
+
+# Reference: https://rdrr.io/github/markushuff/PsychHelperFunctions/src/R/cohens_w.R
+#'Calculate Cohen's w from Chi-Square value and total number of observations.
+#'@export
+calculate_cohens_w <- function(chi_sq, N) {
+  sqrt(chi_sq/N)
+}
+
+#'Calculates mode. Function name is capitalized to avoid conflict with base::mode(), which does something other than calculating mode.
+# Reference: https://stackoverflow.com/questions/2547402/is-there-a-built-in-function-for-finding-the-mode
+#'@export
+get_mode <- function(x, na.rm = FALSE) {
+  if(na.rm){
+    x = x[!is.na(x)]
+  }
+  ux <- unique(x)
+  return(ux[which.max(tabulate(match(x, ux)))])
+}
 # Wrapper function that takes care of dplyr::group_by and dplyr::summarize as a single step.
 # @export
 summarize_group <- function(.data, grp_cols = NULL, grp_aggregations = NULL, ...){

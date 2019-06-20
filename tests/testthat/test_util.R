@@ -800,6 +800,43 @@ test_that("one_hot", {
   expect_equal(res$x_A, c(1,1,0,0))
 })
 
+test_that("get_mode", {
+  # numeric column case
+  x <- c(1,2,2,3,NA,NA,NA)
+  res <- get_mode(x)
+  expect_true(is.na(res))
+  res <- get_mode(x, na.rm = TRUE)
+  expect_equal(res, 2)
+
+  # logical column case
+  x <- c(F,T,T,NA,NA,NA)
+  res <- get_mode(x)
+  expect_true(is.na(res))
+  res <- get_mode(x, na.rm = TRUE)
+  expect_equal(res, T)
+
+  # character column case
+  x <- c("A","B","B","C",NA,NA,NA)
+  res <- get_mode(x)
+  expect_true(is.na(res))
+  res <- get_mode(x, na.rm = TRUE)
+  expect_equal(res, "B")
+
+  # factor column case
+  x <- factor(c("A","B","B","C",NA,NA,NA))
+  res <- get_mode(x)
+  expect_true(is.na(res))
+  res <- get_mode(x, na.rm = TRUE)
+  expect_equal(as.character(res), "B")
+
+  # Date column case
+  x <-c(as.Date(c("2019-01-01","2019-01-02","2019-01-02","2019-01-03")),NA,NA,NA)
+  res <- get_mode(x)
+  expect_true(is.na(res))
+  res <- get_mode(x, na.rm = TRUE)
+  expect_equal(as.character(res), "2019-01-02")
+})
+
 test_that("summarize_group", {
  df <- mtcars %>% exploratory::summarize_group(grp_cols = c("cyl", "mpg"), grp_aggregations = c("none", "mean"), count = n())
  expect_equal(nrow(df),3)
