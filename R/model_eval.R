@@ -316,12 +316,12 @@ evaluate_multi_ <- function(df, pred_label_col, actual_val_col, pretty.name = FA
 #' @export
 evaluate_binary_training_and_test <- function(df, actual_val_col, threshold = "f_score", pretty.name = FALSE){
   training_ret <- df %>% broom::glance(model, threshold = threshold)
-  training_ret$is_test_data <- FALSE
   ret <- training_ret
 
   grouped_col <- colnames(df)[!colnames(df) %in% c("model", ".test_index", "source.data")]
 
   if (purrr::some(df$.test_index, function(x){length(x)!=0})) { # Consider it test mode if any of the element of .test_index column has non-zero length.
+    ret$is_test_data <- FALSE # Set is_test_data FALSE for training data. Add is_test_data column only when there are test data too.
     each_func <- function(df){
       if (!is.data.frame(df)) {
         df <- tribble(~model, ~.test_index, ~source.data,
@@ -365,11 +365,19 @@ evaluate_binary_training_and_test <- function(df, actual_val_col, threshold = "f
                                recall, auc, positives, negatives, p.value, logLik, AIC, BIC,
                                deviance, null.deviance, df.null, df.residual, everything())
 
-  if (length(grouped_col) > 0) {
-    ret <- ret %>% dplyr::select(!!!rlang::syms(grouped_col), is_test_data, everything())
+  # Reorder columns. Bring group_by column first, and then is_test_data column, if it exists.
+  if (!is.null(ret$is_test_data)) {
+    if (length(grouped_col) > 0) {
+      ret <- ret %>% dplyr::select(!!!rlang::syms(grouped_col), is_test_data, everything())
+    }
+    else {
+      ret <- ret %>% dplyr::select(is_test_data, everything())
+    }
   }
   else {
-    ret <- ret %>% dplyr::select(is_test_data, everything())
+    if (length(grouped_col) > 0) {
+      ret <- ret %>% dplyr::select(!!!rlang::syms(grouped_col), everything())
+    }
   }
 
   if (pretty.name){
