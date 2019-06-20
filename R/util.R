@@ -1263,6 +1263,8 @@ do_on_each_group_2 <- function(df, func1, func2, params1 = quote(list()), params
 }
 
 #' @export
+#' Utility function that categorizes numeric column based on the type argument.
+#' For example, if type argument is aschar, the column value is categorized as character.
 categorize_numeric <- function(x, type = "asnum") {
   ret <- NULL
   switch(type,
@@ -1709,7 +1711,7 @@ calculate_common_sd <- function(var1, var2) {
   df <- data.frame(var1=var1, var2=var2)
   summarized <- df %>% dplyr::group_by(var2) %>%
     dplyr::summarize(n=n(), v=var(var1, na.rm=TRUE))
-    
+
   lx <- summarized$n[[1]] - 1
   ly <- summarized$n[[2]] - 1
   vx <- summarized$v[[1]]
@@ -1726,7 +1728,7 @@ calculate_cohens_d <- function(var1, var2) {
   df <- data.frame(var1=var1, var2=var2)
   summarized <- df %>% dplyr::group_by(var2) %>%
     dplyr::summarize(n=n(), m=mean(var1, na.rm=TRUE), v=var(var1, na.rm=TRUE))
-    
+
   lx <- summarized$n[[1]] - 1
   ly <- summarized$n[[2]] - 1
   mx <- summarized$m[[1]]
@@ -1788,6 +1790,8 @@ summarize_group <- function(.data, grp_cols = NULL, grp_aggregations = NULL, ...
     groupby_args <- list() # default empty list
     name_list <- list()
     name_index = 1
+    # If group by columns and associated aggregation funcionts are provided,
+    # quote the columns/functions with rlang::quo so that dplyr can understand them.
     if (!is.null(grp_cols) && !is.null(grp_aggregations)) {
       groupby_args <- purrr::map2(grp_aggregations, grp_cols, function(func, cname) {
         if(is.na(func) || length(func)==0 || func == "none"){
@@ -1835,6 +1839,7 @@ summarize_group <- function(.data, grp_cols = NULL, grp_aggregations = NULL, ...
           rlang::quo(UQ(func)(UQ(rlang::sym(cname))))
         }
       })
+      # create a name list
       name_list <- purrr::map2(grp_aggregations, grp_cols, function(func, cname) {
         if(is.na(func) || length(func)==0 || func == "none"){
           cname
