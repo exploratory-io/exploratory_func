@@ -342,16 +342,6 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
       }
       data_to_augment <- df %>%
         dplyr::ungroup() %>%
-        dplyr::mutate(source.data = purrr::map2(source.data, model, function(df, model){
-          # if there is terms_mapping for randomForest or ranger, use the normalized column name used for learning.
-          # TODO: Do we need to do the same for training data case??
-          if (("randomForest" %in% class(model) || "ranger" %in% class(model)) && !is.null(model$terms_mapping)) {
-            rev_map <- names(model$terms_mapping)
-            names(rev_map) <- model$terms_mapping
-            colnames(df) <- dplyr::coalesce(rev_map[colnames(df)], colnames(df))
-          }
-          df
-        })) %>%
         dplyr::mutate(source.data = purrr::map2(source.data, .test_index, function(df, index){
           # keep data only in test_index
           safe_slice(df, index)
@@ -393,16 +383,6 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
       })
 
       augmented <- augmented %>% dplyr::ungroup()
-
-      augmented <- augmented %>% 
-        dplyr::mutate(source.data = purrr::map2(source.data, model, function(df, model){
-          # if there is terms_mapping for randomForest or ranger, we used the normalized column name used for learning.
-          # Revert it to the original column names.
-          if (("randomForest" %in% class(model) || "ranger" %in% class(model)) && !is.null(model$terms_mapping)) {
-            colnames(df) <- dplyr::coalesce(model$terms_mapping[colnames(df)], colnames(df))
-          }
-          df
-        }))
 
       if (with_response){
         augmented <- augmented %>%
