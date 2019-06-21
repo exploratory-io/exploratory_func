@@ -1071,7 +1071,7 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", test_rate
   model <-  data %>% dplyr::filter(!is.null(model)) %>% `[[`(1, "model", 1)
 
   # Get evaluation for training part. Just passing down to rf_evaluation does it, since it is done off of data embeded in the model.
-  if (!is.null(model) && model$classification_type != "regression") {
+  if (!is.null(model)) {
     training_ret <- switch(type,
                            evaluation = rf_evaluation(data, pretty.name = pretty.name, ...),
                            evaluation_by_class = rf_evaluation_by_class(data, pretty.name = pretty.name, ...),
