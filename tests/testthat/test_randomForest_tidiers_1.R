@@ -377,6 +377,7 @@ test_that("calc_feature_map(regression) evaluate training and test", {
   ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class", test_rate = 0.3)
 
   ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat", test_rate = 0.3)
+  ret <- model_df %>% prediction_training_and_test()
 })
 
 test_that("calc_feature_map(binary) evaluate training and test", {
@@ -387,6 +388,7 @@ test_that("calc_feature_map(binary) evaluate training and test", {
   ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class", test_rate = 0.3)
 
   ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat", test_rate = 0.3)
+  ret <- model_df %>% prediction_training_and_test()
 })
 
 test_that("calc_feature_map(multi) evaluate training and test", {
@@ -396,5 +398,6 @@ test_that("calc_feature_map(multi) evaluate training and test", {
   ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class", test_rate = 0.3)
 
   ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat", test_rate = 0.3)
+  ret <- model_df %>% prediction_training_and_test()
 })
 
