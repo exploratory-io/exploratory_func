@@ -463,6 +463,8 @@ prediction_training_and_test <- function(df, prediction_type="default", threshol
 
   grouped_cols <- colnames(df)[!colnames(df) %in% c("model", ".test_index", "source.data", ".model_metadata")]
 
+  # Note that for ranger/rpart, even for binary prediction case, we are using "default" prediction(),
+  # and predicted_label column is set by augment.ranger.classification, which is called internally.
   train_ret <- switch(prediction_type,
                     default = prediction(df, ...),
                     binary = prediction_binary(df, threshold = threshold, ...),
