@@ -1067,8 +1067,9 @@ rf_evaluation_by_class <- function(data, ...) {
 
 #' wrapper for tidy type evaluation
 #' @export
-rf_evaluation_training_and_test <- function(data, type = "evaluation", test_rate = 0.0, pretty.name = FALSE, ...) {
+rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.name = FALSE, ...) {
   model <-  data %>% dplyr::filter(!is.null(model)) %>% `[[`(1, "model", 1)
+  test_index <- data %>% dplyr::filter(!is.null(.test_index)) %>% `[[`(1, ".test_index", 1)
 
   # Get evaluation for training part. Just passing down to rf_evaluation does it, since it is done off of data embeded in the model.
   if (!is.null(model)) {
@@ -1088,7 +1089,7 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", test_rate
   grouped_col <- colnames(data)[!colnames(data) %in% c("model", ".test_index", "source.data")]
 
   # Execute evaluation if there is test data
-  if (test_rate > 0.0) {
+  if (length(test_index) > 0) {
     each_func <- function(df) {
       if (!is.data.frame(df)) {
         df <- tribble(~model,   ~.test_index,   ~source.data,
