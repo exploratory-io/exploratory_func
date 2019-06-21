@@ -1,8 +1,7 @@
 # how to run this test:
-# devtools::test(filter="rpart_3_group")
-# This is same test as test_rpart_2.R with group_by.
+# devtools::test(filter="randomForest_tidiers")
 
-context("test tidiers for randomForest 3")
+context("test rpart prediction with training/test data")
 
 testdata_dir <- "~/.exploratory/"
 testdata_filename <- "airline_2013_10_tricky_v3.csv" 
@@ -20,9 +19,7 @@ if (!exists("flight_downloaded")) {
 } else {
   flight <- flight_downloaded
 }
-
-# Add group_by. Cases without group_by is covered in test_randomForest_tidiers_3.R.
-flight <- flight %>% sample_n(5000) %>% group_by(`CAR RIER`)
+flight <- flight %>% sample_n(5000)
 
 
 test_that("calc_feature_map(regression) evaluate training and test", {
@@ -31,9 +28,9 @@ test_that("calc_feature_map(regression) evaluate training and test", {
 
   ret <- model_df %>% prediction_training_and_test()
   test_ret <- ret %>% filter(is_test_data==TRUE)
-  # expect_equal(nrow(test_ret), 1500) # Fails for now
+  expect_equal(nrow(test_ret), 1500)
   train_ret <- ret %>% filter(is_test_data==FALSE)
-  # expect_equal(nrow(train_ret), 3500) # Fails for now
+  expect_equal(nrow(train_ret), 3500)
 
   # Training only case
   model_df <- flight %>%
@@ -44,16 +41,14 @@ test_that("calc_feature_map(regression) evaluate training and test", {
 })
 
 test_that("calc_feature_map(binary) evaluate training and test", {
-  model_df <- flight %>%
-                # filter(`CAR RIER` %in% c("VA","AA")) %>%
-                dplyr::mutate(is_delayed = as.factor(`is delayed`)) %>%
+  model_df <- flight %>% dplyr::mutate(is_delayed = as.factor(`is delayed`)) %>%
                 exp_rpart(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0.3)
 
   ret <- model_df %>% prediction_training_and_test()
   test_ret <- ret %>% filter(is_test_data==TRUE)
-  # expect_equal(nrow(test_ret), 1500) # Fails for now
+  expect_equal(nrow(test_ret), 1500)
   train_ret <- ret %>% filter(is_test_data==FALSE)
-  # expect_equal(nrow(train_ret), 3500) # Fails for now
+  expect_equal(nrow(train_ret), 3500)
 
   # Training only case
   model_df <- flight %>% dplyr::mutate(is_delayed = as.factor(`is delayed`)) %>%
@@ -69,9 +64,9 @@ test_that("calc_feature_map(multi) evaluate training and test", {
 
   ret <- model_df %>% prediction_training_and_test()
   test_ret <- ret %>% filter(is_test_data==TRUE)
-  # expect_equal(nrow(test_ret), 1500) # Fails for now
+  expect_equal(nrow(test_ret), 1500)
   train_ret <- ret %>% filter(is_test_data==FALSE)
-  # expect_equal(nrow(train_ret), 3500) # Fails for now
+  expect_equal(nrow(train_ret), 3500)
 
   # Training only case
   model_df <- flight %>%

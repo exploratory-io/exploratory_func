@@ -35,6 +35,12 @@ test_that("calc_feature_map(regression) evaluate training and test", {
   expect_equal(nrow(test_ret), 1500)
   train_ret <- ret %>% filter(is_test_data==FALSE)
   expect_equal(nrow(train_ret), 3500)
+
+  model_df <- flight %>%
+                calc_feature_imp(`FL NUM`, `DIS TANCE`, `DEP TIME`, test_rate = 0)
+  ret <- model_df %>% prediction_training_and_test()
+  train_ret <- ret %>% filter(is_test_data==FALSE)
+  expect_equal(nrow(train_ret), 5000)
 })
 
 test_that("calc_feature_map(binary) evaluate training and test", {
@@ -50,6 +56,12 @@ test_that("calc_feature_map(binary) evaluate training and test", {
   expect_equal(nrow(test_ret), 1500)
   train_ret <- ret %>% filter(is_test_data==FALSE)
   expect_equal(nrow(train_ret), 3500)
+
+  model_df <- flight %>% dplyr::mutate(is_delayed = as.factor(`is delayed`)) %>%
+                calc_feature_imp(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0)
+  ret <- model_df %>% prediction_training_and_test()
+  train_ret <- ret %>% filter(is_test_data==FALSE)
+  expect_equal(nrow(train_ret), 5000)
 })
 
 test_that("calc_feature_map(multi) evaluate training and test", {
@@ -65,5 +77,11 @@ test_that("calc_feature_map(multi) evaluate training and test", {
   expect_equal(nrow(test_ret), 1500)
   train_ret <- ret %>% filter(is_test_data==FALSE)
   expect_equal(nrow(train_ret), 3500)
+
+  model_df <- flight %>%
+                calc_feature_imp(`ORI GIN`, `DIS TANCE`, `DEP TIME`, test_rate = 0)
+  ret <- model_df %>% prediction_training_and_test()
+  train_ret <- ret %>% filter(is_test_data==FALSE)
+  expect_equal(nrow(train_ret), 5000)
 })
 
