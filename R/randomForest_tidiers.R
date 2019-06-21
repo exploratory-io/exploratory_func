@@ -792,8 +792,12 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, ...) {
     # ranger can't predict when the data have na row in predictor columns.
     cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables) %>% na.omit()
 
+    # Rename columns to the normalized ones used while learning.
     colnames(cleaned_data) <- all.vars(x$formula_terms)[-1]
+
+    # Run prediction.
     pred_res <- predict(x, cleaned_data)
+
     # Inserting once removed NA rows
     predicted_label_nona <- ranger.predict_value_from_prob(x$forest$levels,
                                                            pred_res$predictions,
@@ -859,17 +863,23 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, ...) {
 #' @export
 augment.ranger.regression <- function(x, data = NULL, newdata = NULL, ...){
   predicted_value_col <- avoid_conflict(colnames(newdata), "predicted_value")
+  predictor_variables <- all.vars(x$formula_terms)[-1]
+  predictor_variables <- janitor::make_clean_names(x$terms_mapping[predictor_variables])
 
   if(!is.null(newdata)) {
     # create clean name data frame because the model learned by those names
     cleaned_data <- janitor::clean_names(newdata)
 
-    predictor_variables <- all.vars(x$formula_terms)[-1]
     na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
 
     cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables) %>% na.omit()
 
+    # Rename columns to the normalized ones used while learning.
+    colnames(cleaned_data) <- all.vars(x$formula_terms)[-1]
+
+    # Run prediction.
     predicted_val <- predict(x, cleaned_data)$predictions
+
     # Inserting once removed NA rows
     newdata[[predicted_value_col]] <- ranger.add_narow(predicted_val, nrow(newdata), na_row_numbers)
 
