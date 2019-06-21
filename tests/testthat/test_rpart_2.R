@@ -32,12 +32,18 @@ test_that("calc_feature_map(regression) evaluate training and test", {
   train_ret <- ret %>% filter(is_test_data==FALSE)
   expect_equal(nrow(train_ret), 3500)
 
+  ret <- rf_evaluation_training_and_test(model_df, test_rate = 0.3)
+  expect_equal(nrow(ret), 2) # 2 for train and test
+
   # Training only case
   model_df <- flight %>%
                 exp_rpart(`FL NUM`, `DIS TANCE`, `DEP TIME`, test_rate = 0)
   ret <- model_df %>% prediction_training_and_test()
   train_ret <- ret %>% filter(is_test_data==FALSE)
   expect_equal(nrow(train_ret), 5000)
+
+  ret <- rf_evaluation_training_and_test(model_df, test_rate = 0)
+  expect_equal(nrow(ret), 1) # 1 for train
 })
 
 test_that("calc_feature_map(binary) evaluate training and test", {
@@ -50,12 +56,18 @@ test_that("calc_feature_map(binary) evaluate training and test", {
   train_ret <- ret %>% filter(is_test_data==FALSE)
   expect_equal(nrow(train_ret), 3500)
 
+  ret <- rf_evaluation_training_and_test(model_df, test_rate = 0.3)
+  expect_equal(nrow(ret), 2) # 2 for train and test
+
   # Training only case
   model_df <- flight %>% dplyr::mutate(is_delayed = as.factor(`is delayed`)) %>%
                 exp_rpart(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0)
   ret <- model_df %>% prediction_training_and_test()
   train_ret <- ret %>% filter(is_test_data==FALSE)
   expect_equal(nrow(train_ret), 5000)
+
+  ret <- rf_evaluation_training_and_test(model_df, test_rate = 0)
+  expect_equal(nrow(ret), 1) # 1 for train
 })
 
 test_that("calc_feature_map(multi) evaluate training and test", {
@@ -68,11 +80,17 @@ test_that("calc_feature_map(multi) evaluate training and test", {
   train_ret <- ret %>% filter(is_test_data==FALSE)
   expect_equal(nrow(train_ret), 3500)
 
+  ret <- rf_evaluation_training_and_test(model_df, test_rate = 0.3)
+  expect_equal(nrow(ret), 2) # 2 for train and test
+
   # Training only case
   model_df <- flight %>%
                 exp_rpart(`ORI GIN`, `DIS TANCE`, `DEP TIME`, test_rate = 0)
   ret <- model_df %>% prediction_training_and_test()
   train_ret <- ret %>% filter(is_test_data==FALSE)
   expect_equal(nrow(train_ret), 5000)
+
+  ret <- rf_evaluation_training_and_test(model_df, test_rate = 0)
+  expect_equal(nrow(ret), 1) # 1 for train
 })
 
