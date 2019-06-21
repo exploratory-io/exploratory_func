@@ -912,6 +912,7 @@ augment.rpart <- function(x, data = NULL, newdata = NULL, ...) {
 }
 
 augment.rpart.classification <- function(x, data = NULL, newdata = NULL, ...) {
+  # For rpart, terms_mapping is turned off in exp_rpart, so that we can display original column names in tree image.
   y_name <- all.vars(x$terms)[1]
   predictor_variables <- all.vars(x$terms)[-1]
 
@@ -942,6 +943,7 @@ augment.rpart.classification <- function(x, data = NULL, newdata = NULL, ...) {
 }
 
 augment.rpart.regression <- function(x, data = NULL, newdata = NULL, ...) {
+  # For rpart, terms_mapping is turned off in exp_rpart, so that we can display original column names in tree image.
   predicted_value_col <- avoid_conflict(colnames(newdata), "predicted_value")
 
   if(!is.null(newdata)) {
