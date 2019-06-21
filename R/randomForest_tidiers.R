@@ -1102,7 +1102,24 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", test_rate
         actual <- test_ret[[actual_col]]
 
         if (is.numeric(actual)) {
-          stop("regression is not supported")
+          predicted <- test_ret$predicted_value
+          root_mean_square_error <- rmse(actual, predicted)
+          rsq <- r_squared(actual, predicted)
+          ret <- data.frame(
+                            root_mean_square_error = root_mean_square_error,
+                            r_squared = rsq
+                            )
+
+          if(pretty.name){
+            map = list(
+                       `Root Mean Square Error` = as.symbol("root_mean_square_error"),
+                       `R Squared` = as.symbol("r_squared")
+                       )
+            ret <- ret %>%
+            dplyr::rename(!!!map)
+          }
+
+          ret
         } else {
           predicted <- test_ret$predicted_label
 
