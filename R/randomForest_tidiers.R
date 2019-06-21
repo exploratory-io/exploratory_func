@@ -774,14 +774,12 @@ augment.ranger <- function(x, data = NULL, newdata = NULL, ...) {
 #' @export
 augment.ranger.classification <- function(x, data = NULL, newdata = NULL, ...) {
   y_name <- x$terms_mapping[all.vars(x$formula_terms)[[1]]]
-  y_name <- janitor::make_clean_names(y_name)
   predictor_variables <- all.vars(x$formula_terms)[-1]
-  predictor_variables <- janitor::make_clean_names(x$terms_mapping[predictor_variables])
+  predictor_variables <- x$terms_mapping[predictor_variables]
 
   if(!is.null(newdata)){
-    # janitor::clean_names is called in randomForestClassify,
-    # so it should be called here too
-    cleaned_data <- janitor::clean_names(newdata)
+    # create clean name data frame because the model learned by those names
+    cleaned_data <- newdata
     y_value <- cleaned_data[[y_name]]
 
     predicted_value_col <- avoid_conflict(colnames(newdata), "predicted_value")
@@ -830,7 +828,7 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, ...) {
 
   } else if (!is.null(data)) {
     # create clean name data frame because the model learned by those names
-    cleaned_data <- janitor::clean_names(data)
+    cleaned_data <- data
     y_value <- cleaned_data[[y_name]]
     predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
     predicted_probability_col <- avoid_conflict(colnames(data), "predicted_probability")
@@ -864,11 +862,11 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, ...) {
 augment.ranger.regression <- function(x, data = NULL, newdata = NULL, ...){
   predicted_value_col <- avoid_conflict(colnames(newdata), "predicted_value")
   predictor_variables <- all.vars(x$formula_terms)[-1]
-  predictor_variables <- janitor::make_clean_names(x$terms_mapping[predictor_variables])
+  predictor_variables <- x$terms_mapping[predictor_variables]
 
   if(!is.null(newdata)) {
     # create clean name data frame because the model learned by those names
-    cleaned_data <- janitor::clean_names(newdata)
+    cleaned_data <- newdata
 
     na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
 
