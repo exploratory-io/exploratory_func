@@ -1848,10 +1848,10 @@ summarize_group <- function(.data, grp_cols = NULL, grp_aggregations = NULL, ...
         }
       })
       names(groupby_args) <- name_list
-      .data %>% dplyr::group_by(!!!groupby_args, add = TRUE) %>% summarize(...)
+      .data %>% dplyr::group_by(!!!groupby_args) %>% summarize(...)
     } else {
       if(!is.null(grp_cols)) {
-        .data %>% dplyr::group_by(!!!rlang::sym(grp_cols), add = TRUE) %>% summarize(...)
+        .data %>% dplyr::group_by(!!!rlang::sym(grp_cols)) %>% summarize(...)
       } else {
         .data %>% summarize(...)
       }
