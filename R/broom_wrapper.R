@@ -293,7 +293,7 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
   grouping_cols <- df_cnames[!df_cnames %in% c("source.data", ".test_index", "model", ".model_metadata")]
 
 
-  if (!data %in% c("test", "training", "newdata")) {
+  if (!data %in% c("test", "training", "newdata", "training_and_test")) {
     stop('data argument must be "test", "training" or "newdata"')
   }
 
@@ -425,6 +425,53 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
         unnest_with_drop(source.data)
 
     } else if (data == "training_and_test") {
+      # Augment data that includes bot training part and test part of data with predictions embedded in the model.
+      # This is for Analytics View on Test Mode.
+
+      # Use formula to support expanded aug_args (especially for type.predict for logistic regression)
+      # because ... can't be passed to a function inside mutate directly.
+      # If test is FALSE, this uses data as an argument and if not, uses newdata as an argument.
+      browser()
+      aug_fml_train <- if(aug_args == ""){
+        as.formula("~list(broom::augment(model, data = source.data))")
+      } else {
+        as.formula(paste0("~list(broom::augment(model, data = source.data, ", aug_args, "))"))
+      }
+      aug_fml_test <- if(aug_args == ""){
+        as.formula("~list(broom::augment(model, data = source.data.test, data_type = 'test'))")
+      } else {
+        as.formula(paste0("~list(broom::augment(model, data = source.data.test, data_type = 'test', ", aug_args, "))"))
+      }
+      augmented <- df %>%
+        dplyr::ungroup() %>%
+        dplyr::mutate(source.data = purrr::map2(source.data, .test_index, function(df, index){
+          # Remove data in test_index for training data
+          safe_slice(df, index, remove = TRUE)
+        }), source.data.test = purrr::map2(source.data, .test_index, function(df, index){
+          # Keep data in test_index for test data
+          safe_slice(df, index, remove = FALSE)
+        })) %>%
+        dplyr::select(-.test_index) %>%
+        dplyr::rowwise() %>%
+        # evaluate the formula of augment and "data" column will have it
+        dplyr::mutate_(.dots = list(source.data = aug_fml_train, source.data.test = aug_fml_test))
+      augmented <- augmented %>%
+        dplyr::ungroup() %>% # ungroup is necessary here to get expected df1, df2 value in the next line.
+        dplyr::mutate(source.data = purrr::map2(source.data, source.data.test, function(df1, df2){
+          dplyr::bind_rows(df1, df2)
+        })) %>%
+        dplyr::select(-source.data.test) %>%
+        dplyr::ungroup()
+
+      if (with_response){
+        augmented <- augmented %>%
+          dplyr::mutate(source.data = purrr::map2(source.data, model, add_response))
+      }
+
+      augmented %>%
+        dplyr::select(-model) %>%
+        unnest_with_drop(source.data)
+
     }
   }
 
