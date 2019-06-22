@@ -858,8 +858,9 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, ...) {
   }
 }
 
+#' @param data_type - "training" or "test", Which type of prediction result included inside the model to augment the data.
 #' @export
-augment.ranger.regression <- function(x, data = NULL, newdata = NULL, ...){
+augment.ranger.regression <- function(x, data = NULL, newdata = NULL, data_type = "training", ...){
   predicted_value_col <- avoid_conflict(colnames(newdata), "predicted_value")
   predictor_variables <- all.vars(x$formula_terms)[-1]
   predictor_variables <- x$terms_mapping[predictor_variables]
@@ -883,12 +884,21 @@ augment.ranger.regression <- function(x, data = NULL, newdata = NULL, ...){
 
     newdata
   } else if (!is.null(data)) {
-    predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
-
-    # Inserting once removed NA rows
-    predicted <- ranger.add_narow(x$predictions, nrow(data), x$na.action)
-    data[[predicted_value_col]] <- predicted
-    data
+    switch(data_type,
+      training = {
+        predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
+        # Inserting once removed NA rows
+        predicted <- ranger.add_narow(x$predictions, nrow(data), x$na.action)
+        data[[predicted_value_col]] <- predicted
+        data
+      },
+      test = {
+        predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
+        # Inserting once removed NA rows
+        predicted <- ranger.add_narow(x$prediction_test$predictions, nrow(data), x$prediction_test$na.action)
+        data[[predicted_value_col]] <- predicted
+        data
+      })
   }
 }
 
