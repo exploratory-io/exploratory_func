@@ -431,7 +431,6 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
       # Use formula to support expanded aug_args (especially for type.predict for logistic regression)
       # because ... can't be passed to a function inside mutate directly.
       # If test is FALSE, this uses data as an argument and if not, uses newdata as an argument.
-      browser()
       aug_fml_train <- if(aug_args == ""){
         as.formula("~list(broom::augment(model, data = source.data))")
       } else {
@@ -458,6 +457,8 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
       augmented <- augmented %>%
         dplyr::ungroup() %>% # ungroup is necessary here to get expected df1, df2 value in the next line.
         dplyr::mutate(source.data = purrr::map2(source.data, source.data.test, function(df1, df2){
+          df1 <- df1 %>% dplyr::mutate(is_test_data=FALSE)
+          df2 <- df2 %>% dplyr::mutate(is_test_data=TRUE)
           dplyr::bind_rows(df1, df2)
         })) %>%
         dplyr::select(-source.data.test) %>%
