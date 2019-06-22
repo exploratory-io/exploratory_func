@@ -892,7 +892,7 @@ evaluate_lm_training_and_test <- function(df, pretty.name = FALSE){
                           r.squared = rsq
                           )
         if(pretty.name) {
-          ret <- ret %>% dplyr::rename(`R Squared`=r.squared, `RMSE`=sigma)
+          test_ret <- test_ret %>% dplyr::rename(`R Squared`=r.squared, `RMSE`=sigma)
         }
         test_ret$is_test_data <- TRUE
         test_ret

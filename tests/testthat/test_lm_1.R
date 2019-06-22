@@ -26,7 +26,7 @@ test_that("calc_feature_map(regression) evaluate training and test", {
   model_df <- flight %>%
                 build_lm.fast(`FL NUM`, `DIS TANCE`, `DEP TIME`, test_rate = 0.3)
 
-  ret <- model_df %>% evaluate_lm_training_and_test()
+  ret <- model_df %>% evaluate_lm_training_and_test(pretty.name=TRUE)
   expect_equal(nrow(ret), 2) # 2 for train and test
   ret
 })
