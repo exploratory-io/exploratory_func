@@ -307,7 +307,6 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
     }
     add_prediction(data_frame, df, conf_int = conf_int, ...)
   } else {
-    test <- data == "test"
     # parsing arguments of prediction and getting optional arguemnt for augment in ...
     cll <- match.call()
     aug_args <- expand_args(cll, exclude = c("df", "data", "data_frame", "conf_int"))
@@ -320,7 +319,7 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
                        any(lapply(df$model, function(s) { "family" %in% names(s) })) &&
                        any(lapply(df$model, function(s) { !is.null(s$family$linkinv) }))
 
-    ret <- if(test){
+    ret <- if(data == "test"){
       # augment by test data
 
       # check if there is test data
@@ -393,7 +392,7 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
         dplyr::select(-model) %>%
         unnest_with_drop(source.data)
 
-    } else {
+    } else if (data == "training") {
       # augment by training data
 
       # Use formula to support expanded aug_args (especially for type.predict for logistic regression)
@@ -424,6 +423,8 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
       augmented %>%
         dplyr::select(-model) %>%
         unnest_with_drop(source.data)
+
+    } else if (data == "training_and_test") {
     }
   }
 
