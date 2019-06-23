@@ -4,7 +4,7 @@
 context("test rpart prediction with training/test data")
 
 testdata_dir <- "~/.exploratory/"
-testdata_filename <- "airline_2013_10_tricky_v3.csv" 
+testdata_filename <- "airline_2013_10_tricky_v3_5k.csv" 
 testdata_file_path <- paste0(testdata_dir, testdata_filename)
 
 filepath <- if (!testdata_filename %in% list.files(testdata_dir)) {
@@ -21,7 +21,7 @@ filepath <- if (!testdata_filename %in% list.files(testdata_dir)) {
 }
 
 
-test_that("calc_feature_map(regression) evaluate training and test", {
+test_that("exp_rpart(regression) evaluate training and test", {
   model_df <- flight %>%
                 exp_rpart(`FL NUM`, `DIS TANCE`, `DEP TIME`, test_rate = 0.3)
 
@@ -37,7 +37,7 @@ test_that("calc_feature_map(regression) evaluate training and test", {
   # Training only case
   model_df <- flight %>%
                 exp_rpart(`FL NUM`, `DIS TANCE`, `DEP TIME`, test_rate = 0)
-  ret <- model_df %>% prediction_training_and_test()
+  ret <- model_df %>% prediction(data="training_and_test")
   train_ret <- ret %>% filter(is_test_data==FALSE)
   expect_equal(nrow(train_ret), 5000)
 
@@ -45,11 +45,11 @@ test_that("calc_feature_map(regression) evaluate training and test", {
   expect_equal(nrow(ret), 1) # 1 for train
 })
 
-test_that("calc_feature_map(binary) evaluate training and test", {
+test_that("exp_rpart(binary) evaluate training and test", {
   model_df <- flight %>% dplyr::mutate(is_delayed = as.factor(`is delayed`)) %>%
                 exp_rpart(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0.3)
 
-  ret <- model_df %>% prediction_training_and_test()
+  ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
   expect_equal(nrow(test_ret), 1500)
   train_ret <- ret %>% filter(is_test_data==FALSE)
@@ -61,7 +61,7 @@ test_that("calc_feature_map(binary) evaluate training and test", {
   # Training only case
   model_df <- flight %>% dplyr::mutate(is_delayed = as.factor(`is delayed`)) %>%
                 exp_rpart(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0)
-  ret <- model_df %>% prediction_training_and_test()
+  ret <- model_df %>% prediction(data="training_and_test")
   train_ret <- ret %>% filter(is_test_data==FALSE)
   expect_equal(nrow(train_ret), 5000)
 
@@ -69,11 +69,11 @@ test_that("calc_feature_map(binary) evaluate training and test", {
   expect_equal(nrow(ret), 1) # 1 for train
 })
 
-test_that("calc_feature_map(multi) evaluate training and test", {
+test_that("exp_rpart(multi) evaluate training and test", {
   model_df <- flight %>%
                 exp_rpart(`ORI GIN`, `DIS TANCE`, `DEP TIME`, test_rate = 0.3)
 
-  ret <- model_df %>% prediction_training_and_test()
+  ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
   expect_equal(nrow(test_ret), 1500)
   train_ret <- ret %>% filter(is_test_data==FALSE)
@@ -85,7 +85,7 @@ test_that("calc_feature_map(multi) evaluate training and test", {
   # Training only case
   model_df <- flight %>%
                 exp_rpart(`ORI GIN`, `DIS TANCE`, `DEP TIME`, test_rate = 0)
-  ret <- model_df %>% prediction_training_and_test()
+  ret <- model_df %>% prediction(data="training_and_test")
   train_ret <- ret %>% filter(is_test_data==FALSE)
   expect_equal(nrow(train_ret), 5000)
 

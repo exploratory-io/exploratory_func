@@ -921,7 +921,7 @@ augment.rpart <- function(x, data = NULL, newdata = NULL, ...) {
   augment.rpart.method(x, data, newdata, ...)
 }
 
-augment.rpart.classification <- function(x, data = NULL, newdata = NULL, ...) {
+augment.rpart.classification <- function(x, data = NULL, newdata = NULL, data_type = "training", ...) {
   # For rpart, terms_mapping is turned off in exp_rpart, so that we can display original column names in tree image.
   y_name <- all.vars(x$terms)[1]
   predictor_variables <- all.vars(x$terms)[-1]
@@ -938,12 +938,19 @@ augment.rpart.classification <- function(x, data = NULL, newdata = NULL, ...) {
     y_value <- attributes(x)$ylevels[x$y]
     predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
     predicted_probability_col <- avoid_conflict(colnames(data), "predicted_probability")
-    predicted_value <- x$predicted_class
-    predicted_probability <- apply(predict(x, data, type="prob"), 1, max)
+    switch(data_type,
+      training = {
+        predicted_value <- x$predicted_class
+        predicted_probability <- apply(predict(x, data, type="prob"), 1, max)
+      },
+      test = {
+        predicted_value <- x$predicted_class_test
+        predicted_probability <- apply(predict(x, data, type="prob"), 1, max)
+      })
 
     # Inserting once removed NA rows
-    data[[predicted_value_col]] <- ranger.add_narow(predicted_value, nrow(data), x$na.action)
-    data[[predicted_probability_col]] <- ranger.add_narow(predicted_probability, nrow(data), x$na.action)
+    data[[predicted_value_col]] <- predicted_value
+    data[[predicted_probability_col]] <- predicted_probability
     data %>% dplyr::rename(predicted_label = predicted_value_col) %>%
              dplyr::select(-predicted_label, everything(), predicted_label)
 
@@ -2544,8 +2551,16 @@ exp_rpart <- function(df,
       model$formula_terms <- terms(fml)
 
       if (test_rate > 0) {
-        prediction_test <- predict(model, df_test)
+        if (classification_type != "multi") {
+          prediction_test <- predict(model, df_test)
+        }
+        else {
+          prediction_test <- apply(predict(model, df_test, type="prob"), 1, max)
+        }
         model$prediction_test <- prediction_test
+        if (classification_type %in% c("binary", "multi")) {
+          model$predicted_class_test <- get_predicted_class_rpart(model, data_type = "test")
+        }
       }
 
       list(model = model, test_index = test_index, source_data = source_data)
@@ -2602,26 +2617,41 @@ exp_rpart <- function(df,
 # with binary probability prediction model from ranger, take the level with bigger probability as the predicted value.
 #' @export
 # not really an external function but exposing for test. TODO: find better way.
-get_binary_predicted_value_from_probability_rpart <- function(x) {
+get_binary_predicted_value_from_probability_rpart <- function(x, data_type = "training") {
   if (class(x$y) == "logical") {
     # predict(x) is numeric vector of probability of being TRUE.
     ylevels <- c("TRUE", "FALSE")
-    predicted <- factor(predict(x) > 0.5, levels=ylevels)
+    if (data_type == "training") {
+      predicted <- factor(predict(x) > 0.5, levels=ylevels)
+    }
+    else {
+      predicted <- factor(x$prediction_test > 0.5, levels=ylevels)
+    }
   }
   else {
     # predict(x) is 2-diminsional matrix with 2 columns for the 2 categories. values in the matrix is the probabilities.
     ylevels <- attr(x,"ylevels")
-    predicted <- factor(ylevels[apply(predict(x), 1, function(x){if(x[1]>x[2]) 1 else 2})], levels=ylevels)
+    if (data_type == "training") {
+      predicted <- factor(ylevels[apply(predict(x), 1, function(x){if(x[1]>x[2]) 1 else 2})], levels=ylevels)
+    }
+    else {
+      predicted <- factor(ylevels[apply(x$prediction_test, 1, function(x){if(x[1]>x[2]) 1 else 2})], levels=ylevels)
+    }
   }
   predicted
 }
 
-get_multiclass_predicted_value_from_probability_rpart <- function(x, data = NULL) {
+get_multiclass_predicted_value_from_probability_rpart <- function(x, data = NULL, data_type = 'training') {
   ylevels <- attr(x,"ylevels")
   predicted_mat <- if (is.data.frame(data)) {
     predict(x, data)
   } else {
-    predict(x)
+    if (data_type == 'training') {
+      predict(x)
+    }
+    else {
+      x$prediction_test
+    }
   }
   # ties are broken randomly to be even.
   # TODO: move this to model building step so that there is no randomness in analytics viz preprocessor.
@@ -2666,12 +2696,12 @@ get_class_levels_rpart <- function(x) {
   ylevels
 }
 
-get_predicted_class_rpart <- function(x) {
+get_predicted_class_rpart <- function(x, data_type = "training") {
   if (x$classification_type == "binary") {
-    predicted <- get_binary_predicted_value_from_probability_rpart(x)
+    predicted <- get_binary_predicted_value_from_probability_rpart(x, data_type = data_type)
   }
   else {
-    predicted <- get_multiclass_predicted_value_from_probability_rpart(x)
+    predicted <- get_multiclass_predicted_value_from_probability_rpart(x, data_type = data_type)
   }
   predicted
 }
