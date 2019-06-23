@@ -819,7 +819,7 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
       # append predicted probability for each class, max and labels at max values
       # Inserting once removed NA rows
       predicted_prob <- ranger.add_narow(apply(pred_res$predictions, 1 , max), nrow(newdata), na_row_numbers)
-      newdata <- ranger.set_multi_predicted_values(newdata, pred_res, predicted_value, na_row_numbers)
+      newdata <- ranger.set_multi_predicted_values(newdata, pred_res$predictions, predicted_value, na_row_numbers)
       newdata[[predicted_probability_col]] <- predicted_prob
       newdata
     }
@@ -865,9 +865,12 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
         training = {
           # Inserting once removed NA rows
           predicted_prob <- ranger.add_narow(apply(x$predictions, 1 , max), nrow(data), x$na.action)
-          data <- ranger.set_multi_predicted_values(data, x, predicted_value, x$na.action)
+          data <- ranger.set_multi_predicted_values(data, x$predictions, predicted_value, x$na.action)
         },
         test = {
+          # Inserting once removed NA rows
+          predicted_prob <- ranger.add_narow(apply(x$prediction_test$predictions, 1 , max), nrow(data), x$prediction_test$na.action)
+          data <- ranger.set_multi_predicted_values(data, x$prediction_test$predictions, predicted_value, x$prediction_test$na.action)
         })
       data[[predicted_probability_col]] <- predicted_prob
     }
@@ -1014,12 +1017,12 @@ augment.rpart.regression <- function(x, data = NULL, newdata = NULL, data_type =
 #' @param na_row_numbers - Numeric vector of which row of data has NA
 #' @param pred_prob_col - Column name suffix of predicted probability column for each class name
 #' @param pred_value_col - Column name for storing prediction class of multiclass classification
-ranger.set_multi_predicted_values <- function(data, x,
+ranger.set_multi_predicted_values <- function(data, predictions,
                                               predicted_value,
                                               na_row_numbers,
                                               pred_plob_col="predicted_probability",
                                               pred_value_col="predicted_value") {
-  ret <- x$predictions
+  ret <- predictions
   for (i in 1:length(colnames(ret))) { # for each column
     # this is basically bind_cols with na_at taken into account.
     colname <- stringr::str_c(pred_plob_col, colnames(ret)[i], sep="_")
