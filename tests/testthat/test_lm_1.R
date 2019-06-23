@@ -21,11 +21,25 @@ if (!testdata_filename %in% list.files(testdata_dir)) {
 }
 
 
-test_that("calc_feature_map(regression) evaluate training and test", {
+if(F){
+test_that("build_lm.fast (linear regression) evaluate training and test", {
   model_df <- flight %>%
                 build_lm.fast(`FL NUM`, `DIS TANCE`, `DEP TIME`, test_rate = 0.3)
 
   ret <- model_df %>% prediction(data="training_and_test")
+  #ret <- model_df %>% evaluate_lm_training_and_test(pretty.name=TRUE)
+  #expect_equal(nrow(ret), 2) # 2 for train and test
+  #ret
+})
+}
+
+test_that("build_lm.fast (logistic regression) evaluate training and test", {
+  browser()
+  model_df <- flight %>%
+                build_lm.fast(`is delayed`, `DIS TANCE`, `DEP TIME`, model_type = "glm", test_rate = 0.3)
+
+  ret <- model_df %>% prediction(data="training_and_test")
+  browser()
   #ret <- model_df %>% evaluate_lm_training_and_test(pretty.name=TRUE)
   #expect_equal(nrow(ret), 2) # 2 for train and test
   #ret

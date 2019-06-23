@@ -456,7 +456,6 @@ build_lm.fast <- function(df,
         }
 
         # split training and test data
-        browser()
         source_data <- df
         test_index <- sample_df_index(source_data, rate = test_rate)
         df <- safe_slice(source_data, test_index, remove = TRUE)
@@ -523,7 +522,6 @@ build_lm.fast <- function(df,
       }
       else {
         # split training and test data
-        browser()
         source_data <- df
         test_index <- sample_df_index(source_data, rate = test_rate)
         df <- safe_slice(source_data, test_index, remove = TRUE)
@@ -885,12 +883,15 @@ augment.lm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "
 
 #' @export
 augment.glm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "training", ...) {
-  if(!is.null(newdata)) { # Call broom:::augment.glm as is
-    broom:::augment.glm(x, data = data, newdata = newdata, ...)
+  if(!is.null(newdata)) {
+    # Calling broom:::augment.glm fails with 'NextMethod' called from an anonymous function
+    # It seems augment.glm is only calling NextMethod, which is falling back to broom:::augment.lm.
+    # So, we are just directly calling augment.lm here.
+    broom:::augment.lm(x, data = data, newdata = newdata, ...)
   } else if (!is.null(data)) {
     switch(data_type,
-      training = { # Call broom:::augment.glm as is
-        broom:::augment.glm(x, data = data, newdata = newdata, ...)
+      training = { # Call broom:::augment.lm as is
+        broom:::augment.lm(x, data = data, newdata = newdata, ...)
       },
       test = {
         # Augment data with already predicted result in the model.
@@ -919,7 +920,6 @@ evaluate_lm_training_and_test <- function(df, pretty.name = FALSE){
   if (purrr::some(df$.test_index, function(x){length(x)!=0})) { # Consider it test mode if any of the element of .test_index column has non-zero length.
     ret$is_test_data <- FALSE # Set is_test_data FALSE for training data. Add is_test_data column only when there are test data too.
     each_func <- function(df){
-      browser()
       if (!is.data.frame(df)) {
         df <- tribble(~model, ~.test_index, ~source.data,
                       df$model, df$.test_index, df$source.data)
