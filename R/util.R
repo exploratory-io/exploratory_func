@@ -1291,7 +1291,7 @@ extract_from_date <- function(x, type = "fltoyear") {
       ret <- lubridate::floor_date(x, unit="year")
     },
     # This key is a synonym for fltoyear and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
-    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this funciton.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this function.
     rtoyear = {
       ret <- lubridate::floor_date(x, unit="year")
     },
@@ -1299,7 +1299,7 @@ extract_from_date <- function(x, type = "fltoyear") {
       ret <- lubridate::floor_date(x, unit="halfyear")
     },
     # This key is a synonym for fltohalfyear and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
-    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this funciton.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this function.
     rtohalfyear = {
       ret <- lubridate::floor_date(x, unit="halfyear")
     },
@@ -1307,7 +1307,7 @@ extract_from_date <- function(x, type = "fltoyear") {
       ret <- lubridate::floor_date(x, unit="quarter")
     },
     # This key is a synonym for fltoquarter and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
-    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this funciton.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this function.
     rtoq = {
       ret <- lubridate::floor_date(x, unit="quarter")
     },
@@ -1315,7 +1315,7 @@ extract_from_date <- function(x, type = "fltoyear") {
       ret <- lubridate::floor_date(x, unit="bimonth")
     },
     # This key is a synonym for fltobimonth and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
-    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this funciton.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this function.
     rtobimon = {
       ret <- lubridate::floor_date(x, unit="bimonth")
     },
@@ -1323,7 +1323,7 @@ extract_from_date <- function(x, type = "fltoyear") {
       ret <- lubridate::floor_date(x, unit="month")
     },
     # This key is a synonym for fltomonth and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
-    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this funciton.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this function.
     rtomon = {
       ret <- lubridate::floor_date(x, unit="month")
     },
@@ -1331,7 +1331,7 @@ extract_from_date <- function(x, type = "fltoyear") {
       ret <- lubridate::floor_date(x, unit="week")
     },
     # This key is a synonym for fltoweek and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
-    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this funciton.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this function.
     rtoweek = {
       ret <- lubridate::floor_date(x, unit="week")
     },
@@ -1339,7 +1339,7 @@ extract_from_date <- function(x, type = "fltoyear") {
       ret <- lubridate::floor_date(x, unit="day")
     },
     # This key is a synonym for fltoday and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
-    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this funciton.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this function.
     rtoday = {
       ret <- lubridate::floor_date(x, unit="day")
     },
@@ -1356,7 +1356,7 @@ extract_from_date <- function(x, type = "fltoyear") {
       ret <- (lubridate::month(x)+1) %/% 2
     },
     # This key is a synonym for bimonth and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
-    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this funciton.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this function.
     bimon = {
       ret <- (lubridate::month(x)+1) %/% 2
     },
@@ -1364,7 +1364,7 @@ extract_from_date <- function(x, type = "fltoyear") {
       ret <- lubridate::month(x)
     },
     # This key is a synonym for month and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
-    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this funciton.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this function.
     mon = {
       ret <- lubridate::month(x)
     },
@@ -1372,7 +1372,7 @@ extract_from_date <- function(x, type = "fltoyear") {
       ret <- lubridate::month(x, label=TRUE)
     },
     # This key is a synonym for monthname and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
-    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this funciton.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this function.
     monname = {
       ret <- lubridate::month(x, label=TRUE)
     },
@@ -1380,7 +1380,7 @@ extract_from_date <- function(x, type = "fltoyear") {
       ret <- lubridate::month(x, label=TRUE, abbr=FALSE)
     },
     # This key is a synonym for monthnamelong and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
-    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this funciton.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this function.
     monnamelong = {
       ret <- lubridate::month(x, label=TRUE, abbr=FALSE)
     },
