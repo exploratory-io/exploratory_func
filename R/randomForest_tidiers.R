@@ -1100,20 +1100,15 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
 
   # Execute evaluation if there is test data
   if (length(test_index) > 0) {
-    each_func <- function(df) {
-      if (!is.data.frame(df)) {
-        df <- tribble(~model,   ~.test_index,   ~source.data,
-                      df$model, df$.test_index, df$source.data)
-      }
-      tryCatch({
-        model <- df$model[[1]]
-        test_ret <- prediction(df, data = "test")
+    predicted <- data %>% prediction(data = "test")
 
+    each_func <- function(df) {
+      tryCatch({
         actual_col <- model$terms_mapping[all.vars(model$formula_terms)[1]]
-        actual <- test_ret[[actual_col]]
+        actual <- df[[actual_col]]
 
         if (is.numeric(actual)) {
-          predicted <- test_ret$predicted_value
+          predicted <- df$predicted_value
           root_mean_square_error <- rmse(actual, predicted)
           rsq <- r_squared(actual, predicted)
           ret <- data.frame(
@@ -1132,7 +1127,7 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
 
           ret
         } else {
-          predicted <- test_ret$predicted_label
+          predicted <- df$predicted_label
 
           test_ret <- switch(type,
                  evaluation = {
@@ -1168,13 +1163,11 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
       })
     }
 
-    target_df <- if (length(grouped_col) > 0) {
-      data %>% dplyr::group_by_(paste0('`', grouped_col, '`'))
-    } else {
-      data
+    if (length(grouped_col) > 0) {
+      predicted <- predicted %>% dplyr::group_by_(paste0('`', grouped_col, '`'))
     }
 
-    test_ret <- do_on_each_group(target_df, each_func, with_unnest = TRUE)
+    test_ret <- do_on_each_group(predicted, each_func, with_unnest = TRUE)
 
     if (nrow(test_ret) > 0) {
       test_ret$is_test_data <- TRUE
