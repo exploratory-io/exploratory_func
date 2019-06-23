@@ -937,7 +937,7 @@ augment.rpart.classification <- function(x, data = NULL, newdata = NULL, ...) {
   } else if (!is.null(data)) {
     y_value <- attributes(x)$ylevels[x$y]
     predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
-    predicted_probability_col <- avoid_conflict(colnames(newdata), "predicted_probability")
+    predicted_probability_col <- avoid_conflict(colnames(data), "predicted_probability")
     predicted_value <- x$predicted_class
     predicted_probability <- apply(predict(x, data, type="prob"), 1, max)
 
