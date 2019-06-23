@@ -455,9 +455,13 @@ build_lm.fast <- function(df,
         }
 
         # split training and test data
+        browser()
         source_data <- df
         test_index <- sample_df_index(source_data, rate = test_rate)
         df <- safe_slice(source_data, test_index, remove = TRUE)
+        if (test_rate > 0) {
+          df_test <- safe_slice(source_data, test_index, remove = FALSE)
+        }
 
         # when family is negativebinomial, use MASS::glm.nb
         if (is.null(link) && family != "negativebinomial") {
@@ -518,9 +522,13 @@ build_lm.fast <- function(df,
       }
       else {
         # split training and test data
+        browser()
         source_data <- df
         test_index <- sample_df_index(source_data, rate = test_rate)
         df <- safe_slice(source_data, test_index, remove = TRUE)
+        if (test_rate > 0) {
+          df_test <- safe_slice(source_data, test_index, remove = FALSE)
+        }
 
         rf <- stats::lm(fml, data = df) 
         if (relimp) {
