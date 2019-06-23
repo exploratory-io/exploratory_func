@@ -833,10 +833,19 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
     predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
     predicted_probability_col <- avoid_conflict(colnames(data), "predicted_probability")
 
-    predicted_label_nona <- ranger.predict_value_from_prob(x$forest$levels,
-                                                           x$predictions,
-                                                           y_value)
-    predicted_value <- ranger.add_narow(predicted_label_nona, nrow(data), x$na.action)
+    switch(data_type,
+      training = {
+        predicted_label_nona <- ranger.predict_value_from_prob(x$forest$levels,
+                                                               x$predictions,
+                                                               y_value)
+        predicted_value <- ranger.add_narow(predicted_label_nona, nrow(data), x$na.action)
+      },
+      test = {
+        predicted_label_nona <- ranger.predict_value_from_prob(x$forest$levels,
+                                                               x$prediction_test$predictions,
+                                                               y_value)
+        predicted_value <- ranger.add_narow(predicted_label_nona, nrow(data), x$prediction_test$na.action)
+      })
 
     if(!is.null(x$classification_type) && x$classification_type == "binary"){
       switch(data_type,
@@ -846,6 +855,8 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
           predicted_prob <- ranger.add_narow(x$predictions[, ncol(predictions)], nrow(data), x$na.action)
         },
         test = {
+          predictions <- x$prediction_test$predictions
+          predicted_prob <- ranger.add_narow(x$prediction_test$predictions[, ncol(predictions)], nrow(data), x$prediction_test$na.action)
         })
       data[[predicted_value_col]] <- predicted_value
       data[[predicted_probability_col]] <- predicted_prob
