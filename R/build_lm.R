@@ -310,6 +310,7 @@ build_lm.fast <- function(df,
 
   each_func <- function(df) {
     tryCatch({
+      df_test <- NULL # declare variable for test data
       df <- df %>%
         # dplyr::filter(!is.na(!!target_col))  TODO: this was not filtering, and replaced it with the next line. check other similar places.
         # for numeric cols, filter NA rows, because lm will anyway do this internally, and errors out
@@ -544,6 +545,10 @@ build_lm.fast <- function(df,
             # This can fail when columns are not linearly independent. Keep going. TODO: Show error in summary table.
           })
         }
+      }
+
+      if (test_rate > 0) {
+        model$prediction_test <- predict(model, df_test)
       }
       # these attributes are used in tidy of randomForest TODO: is this good for lm too?
       model$terms_mapping <- names(name_map)
@@ -858,6 +863,12 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
       ret
     }
   )
+}
+
+#' @export
+augment.lm_exploratory <- function(x, pretty.name = FALSE, ...) {
+  browser()
+  broom:::augment.lm(x, ...)
 }
 
 # For some reason, find_data called from inside margins::marginal_effects() fails in Exploratory.
