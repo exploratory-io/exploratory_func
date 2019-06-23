@@ -1794,7 +1794,7 @@ summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...){
     groupby_args <- list() # default empty list
     name_list <- list()
     name_index = 1
-    # If group_by columns and associated aggregation funcionts are provided,
+    # If group_by columns and associated categorizing functionts are provided,
     # quote the columns/functions with rlang::quo so that dplyr can understand them.
     if (!is.null(group_cols) && !is.null(group_funs)) {
       groupby_args <- purrr::map2(group_funs, group_cols, function(func, cname) {
