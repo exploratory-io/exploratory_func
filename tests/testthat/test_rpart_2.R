@@ -20,7 +20,6 @@ filepath <- if (!testdata_filename %in% list.files(testdata_dir)) {
   write.csv(flight, testdata_file_path) # save sampled-down data for performance.
 }
 
-
 test_that("exp_rpart(regression) evaluate training and test", {
   model_df <- flight %>%
                 exp_rpart(`FL NUM`, `DIS TANCE`, `DEP TIME`, test_rate = 0.3)
@@ -46,24 +45,30 @@ test_that("exp_rpart(regression) evaluate training and test", {
 })
 
 test_that("exp_rpart(binary) evaluate training and test", {
-  model_df <- flight %>% dplyr::mutate(is_delayed = as.factor(`is delayed`)) %>%
+  # TODO: It becomes binary prediction only with binary factor without NA
+  # TODO: Predicted values are numeric rather than factor
+  model_df <- flight %>% filter(!is.na(`is delayed`)) %>%
+                dplyr::mutate(is_delayed = as.factor(`is delayed`)) %>%
                 exp_rpart(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0.3)
 
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
-  expect_equal(nrow(test_ret), 1500)
+  expect_equal(nrow(test_ret), 1488)
   train_ret <- ret %>% filter(is_test_data==FALSE)
-  expect_equal(nrow(train_ret), 3500)
+  expect_equal(nrow(train_ret), 3472)
 
   ret <- rf_evaluation_training_and_test(model_df)
   expect_equal(nrow(ret), 2) # 2 for train and test
 
   # Training only case
-  model_df <- flight %>% dplyr::mutate(is_delayed = as.factor(`is delayed`)) %>%
+  # TODO: It becomes binary prediction only with binary factor without NA
+  # TODO: Predicted values are numeric rather than factor
+  model_df <- flight %>% filter(!is.na(`is delayed`)) %>%
+                dplyr::mutate(is_delayed = as.factor(`is delayed`)) %>%
                 exp_rpart(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0)
   ret <- model_df %>% prediction(data="training_and_test")
   train_ret <- ret %>% filter(is_test_data==FALSE)
-  expect_equal(nrow(train_ret), 5000)
+  expect_equal(nrow(train_ret), 4960)
 
   ret <- rf_evaluation_training_and_test(model_df)
   expect_equal(nrow(ret), 1) # 1 for train
