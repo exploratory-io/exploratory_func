@@ -1290,43 +1290,57 @@ extract_from_date <- function(x, type = "fltoyear") {
     fltoyear = {
       ret <- lubridate::floor_date(x, unit="year")
     },
-    rtoyear = {# This key is required by Exploratory Desktop for Summarize Group Dialog.
+    # This key is a synonym for fltoyear and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this funciton.
+    rtoyear = {
       ret <- lubridate::floor_date(x, unit="year")
     },
     fltohalfyear = {
       ret <- lubridate::floor_date(x, unit="halfyear")
     },
-    rtohalfyear = {# This key is required by Exploratory Desktop for Summarize Group Dialog.
+    # This key is a synonym for fltohalfyear and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this funciton.
+    rtohalfyear = {
       ret <- lubridate::floor_date(x, unit="halfyear")
     },
     fltoquarter = {
       ret <- lubridate::floor_date(x, unit="quarter")
     },
-    rtoq = {# This key is required by Exploratory Desktop for Summarize Group Dialog.
+    # This key is a synonym for fltoquarter and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this funciton.
+    rtoq = {
       ret <- lubridate::floor_date(x, unit="quarter")
     },
     fltobimonth = {
       ret <- lubridate::floor_date(x, unit="bimonth")
     },
-    rtobimon = {# This key is required by Exploratory Desktop for Summarize Group Dialog.
+    # This key is a synonym for fltobimonth and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this funciton.
+    rtobimon = {
       ret <- lubridate::floor_date(x, unit="bimonth")
     },
     fltomonth = {
       ret <- lubridate::floor_date(x, unit="month")
     },
-    rtomon = {# This key is required by Exploratory Desktop for Summarize Group Dialog.
+    # This key is a synonym for fltomonth and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this funciton.
+    rtomon = {
       ret <- lubridate::floor_date(x, unit="month")
     },
     fltoweek = {
       ret <- lubridate::floor_date(x, unit="week")
     },
-    rtoweek = {# This key is required by Exploratory Desktop for Summarize Group Dialog.
+    # This key is a synonym for fltoweek and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this funciton.
+    rtoweek = {
       ret <- lubridate::floor_date(x, unit="week")
     },
     fltoday = {
       ret <- lubridate::floor_date(x, unit="day")
     },
-    rtoday = {# This key is required by Exploratory Desktop for Summarize Group Dialog.
+    # This key is a synonym for fltoday and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this funciton.
+    rtoday = {
       ret <- lubridate::floor_date(x, unit="day")
     },
     year = {
@@ -1341,25 +1355,33 @@ extract_from_date <- function(x, type = "fltoyear") {
     bimonth = {
       ret <- (lubridate::month(x)+1) %/% 2
     },
-    bimon = {# This key is required by Exploratory Desktop for Summarize Group Dialog.
+    # This key is a synonym for bimonth and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this funciton.
+    bimon = {
       ret <- (lubridate::month(x)+1) %/% 2
     },
     month = {
       ret <- lubridate::month(x)
     },
-    mon = {# This key is required by Exploratory Desktop for Summarize Group Dialog.
+    # This key is a synonym for month and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this funciton.
+    mon = {
       ret <- lubridate::month(x)
     },
     monthname = {
       ret <- lubridate::month(x, label=TRUE)
     },
-    monname = {# This key is required by Exploratory Desktop for Summarize Group Dialog.
+    # This key is a synonym for monthname and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this funciton.
+    monname = {
       ret <- lubridate::month(x, label=TRUE)
     },
-    monthnamelong = {# This key is required by Exploratory Desktop for Summarize Group Dialog.
+    monthnamelong = {
       ret <- lubridate::month(x, label=TRUE, abbr=FALSE)
     },
-    monnamelong = {# This key is required by Exploratory Desktop for Summarize Group Dialog.
+    # This key is a synonym for monthnamelong and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this funciton.
+    monnamelong = {
       ret <- lubridate::month(x, label=TRUE, abbr=FALSE)
     },
     week = {
@@ -1368,19 +1390,23 @@ extract_from_date <- function(x, type = "fltoyear") {
     day = {
       ret <- lubridate::day(x)
     },
-    dayofyear = {# This key is required by Exploratory Desktop for Summarize Group Dialog.
+    # This key is required by Exploratory Desktop for Summarize Group Dialog
+    dayofyear = {
       ret <- lubridate::yday(x)
     },
-    dayofquarter = {# This key is required by Exploratory Desktop for Summarize Group Dialog.
+    # This key is required by Exploratory Desktop for Summarize Group Dialog.
+    dayofquarter = {
       ret <- lubridate::qday(x)
     },
-    dayofweek = {# This key is required by Exploratory Desktop for Summarize Group Dialog.
+    # This key is required by Exploratory Desktop for Summarize Group Dialog.
+    dayofweek = {
       ret <- lubridate::wday(x)
     },
     wday = {
       ret <- lubridate::wday(x, label=TRUE)
     },
-    wdaylong = {# This key is required by Exploratory Desktop for Summarize Group Dialog.
+    # This key is required by Exploratory Desktop for Summarize Group Dialog.
+    wdaylong = {
       ret <- lubridate::wday(x, label=TRUE, abbr=FALSE)
     },
     hour = {
