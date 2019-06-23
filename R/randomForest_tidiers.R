@@ -923,7 +923,6 @@ augment.rpart <- function(x, data = NULL, newdata = NULL, ...) {
 
 augment.rpart.classification <- function(x, data = NULL, newdata = NULL, data_type = "training", ...) {
   # For rpart, terms_mapping is turned off in exp_rpart, so that we can display original column names in tree image.
-  y_name <- all.vars(x$terms)[1]
   predictor_variables <- all.vars(x$terms)[-1]
 
   if (!is.null(newdata)) {
