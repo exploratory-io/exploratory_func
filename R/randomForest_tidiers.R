@@ -948,11 +948,13 @@ augment.rpart.classification <- function(x, data = NULL, newdata = NULL, data_ty
         predicted_probability <- apply(predict(x, data, type="prob"), 1, max)
       })
 
-    # Inserting once removed NA rows
     data[[predicted_value_col]] <- predicted_value
     data[[predicted_probability_col]] <- predicted_probability
-    data %>% dplyr::rename(predicted_label = predicted_value_col) %>%
+    if (!is.null(data[[predicted_value_col]])) { # Avoid error in case data_type is 'test' and there is no test data.
+      data <- data %>% dplyr::rename(predicted_label = predicted_value_col) %>%
              dplyr::select(-predicted_label, everything(), predicted_label)
+    }
+    data
 
   } else {
     stop("data or newdata have to be indicated.")
