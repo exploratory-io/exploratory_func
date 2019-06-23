@@ -867,7 +867,6 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
 
 #' @export
 augment.lm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "training", ...) {
-  browser()
   if(!is.null(newdata)) { # Call broom:::augment.lm as is
     broom:::augment.lm(x, data = data, newdata = newdata, ...)
   } else if (!is.null(data)) {
@@ -877,6 +876,25 @@ augment.lm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "
       },
       test = {
         # Augment data with already predicted result in the model.
+        predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
+        data[[predicted_value_col]] <- x$prediction_test
+        data
+      })
+  }
+}
+
+#' @export
+augment.glm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "training", ...) {
+  if(!is.null(newdata)) { # Call broom:::augment.glm as is
+    broom:::augment.glm(x, data = data, newdata = newdata, ...)
+  } else if (!is.null(data)) {
+    switch(data_type,
+      training = { # Call broom:::augment.glm as is
+        broom:::augment.glm(x, data = data, newdata = newdata, ...)
+      },
+      test = {
+        # Augment data with already predicted result in the model.
+        # TODO: Add probability and label.
         predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
         data[[predicted_value_col]] <- x$prediction_test
         data
