@@ -12,21 +12,20 @@ filepath <- if (!testdata_filename %in% list.files(testdata_dir)) {
 } else {
   testdata_file_path
 }
-if (!exists("flight_downloaded")) {
-  flight_downloaded <- exploratory::read_delim_file(filepath, ",", quote = "\"", skip = 0 , col_names = TRUE , na = c("","NA") , locale=readr::locale(encoding = "UTF-8", decimal_mark = "."), trim_ws = FALSE , progress = FALSE) %>% exploratory::clean_data_frame()
-  write.csv(flight_downloaded, testdata_file_path)
-  flight <- flight_downloaded
-} else {
-  flight <- flight_downloaded
+
+flight <- exploratory::read_delim_file(filepath, ",", quote = "\"", skip = 0 , col_names = TRUE , na = c("","NA") , locale=readr::locale(encoding = "UTF-8", decimal_mark = "."), trim_ws = FALSE , progress = FALSE) %>% exploratory::clean_data_frame()
+
+filepath <- if (!testdata_filename %in% list.files(testdata_dir)) {
+  flight <- flight %>% sample_n(5000)
+  write.csv(flight, testdata_file_path) # save sampled-down data for performance.
 }
-flight <- flight %>% sample_n(5000)
 
 
 test_that("calc_feature_map(regression) evaluate training and test", {
   model_df <- flight %>%
                 exp_rpart(`FL NUM`, `DIS TANCE`, `DEP TIME`, test_rate = 0.3)
 
-  ret <- model_df %>% prediction_training_and_test()
+  ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
   expect_equal(nrow(test_ret), 1500)
   train_ret <- ret %>% filter(is_test_data==FALSE)
