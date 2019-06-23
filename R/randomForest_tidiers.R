@@ -827,6 +827,11 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
                   dplyr::select(-predicted_label, everything(), predicted_label)
 
   } else if (!is.null(data)) {
+    if (nrow(data) == 0) {
+      # Handle the case where, for example, test_rate is 0 here,
+      # rather than trying to make it pass through following code, which can be complex.
+      return (data)
+    }
     # create clean name data frame because the model learned by those names
     cleaned_data <- data
     y_value <- cleaned_data[[y_name]]

@@ -21,7 +21,7 @@ filepath <- if (!testdata_filename %in% list.files(testdata_dir)) {
 }
 
 
-if(F){
+if(T){
 test_that("calc_feature_map(regression) evaluate training and test", {
   model_df <- flight %>%
                 calc_feature_imp(`FL NUM`, `DIS TANCE`, `DEP TIME`, test_rate = 0.3)
@@ -58,6 +58,7 @@ test_that("calc_feature_map(binary) evaluate training and test", {
   #ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class", test_rate = 0.3)
   #ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat", test_rate = 0.3)
 
+if(T){
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
   expect_equal(nrow(test_ret), 1500)
@@ -66,7 +67,9 @@ test_that("calc_feature_map(binary) evaluate training and test", {
 
   #ret <- rf_evaluation_training_and_test(model_df)
   #expect_equal(nrow(ret), 2) # 2 for train and test
+}
 
+if(T){
   model_df <- flight %>% dplyr::mutate(is_delayed = as.factor(`is delayed`)) %>%
                 calc_feature_imp(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0)
   ret <- model_df %>% prediction(data="training_and_test")
@@ -75,9 +78,10 @@ test_that("calc_feature_map(binary) evaluate training and test", {
 
   #ret <- rf_evaluation_training_and_test(model_df)
   #expect_equal(nrow(ret), 1) # 1 for train
+}
 })
 
-if(F){
+if(T){
 test_that("calc_feature_map(multi) evaluate training and test", {
   model_df <- flight %>%
                 calc_feature_imp(`ORI GIN`, `DIS TANCE`, `DEP TIME`, test_rate = 0.3)
