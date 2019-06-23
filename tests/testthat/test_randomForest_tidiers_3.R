@@ -30,7 +30,7 @@ test_that("calc_feature_map(regression) evaluate training and test", {
   #ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat", test_rate = 0.3)
 
   ret <- model_df %>% prediction(data="training_and_test")
-  ret <- model_df %>% prediction_training_and_test()
+  #ret <- model_df %>% prediction_training_and_test() # Might deprecate this in favor of prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
   expect_equal(nrow(test_ret), 1500)
   train_ret <- ret %>% filter(is_test_data==FALSE)

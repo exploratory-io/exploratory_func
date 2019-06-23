@@ -322,7 +322,6 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
     ret <- if(data == "test"){
       if (!is.null(df$model[[1]]$prediction_test)) { # Check if model already has test prediction result.
                                                      # This is typically the case for Analytics Views.
-        browser()
         # Augment test part of data with prediction embedded in the model.
         # This is typically for Summary tab of Analytics View on Test Mode.
 
