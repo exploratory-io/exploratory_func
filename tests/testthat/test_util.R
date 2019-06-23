@@ -838,9 +838,9 @@ test_that("get_mode", {
 })
 
 test_that("summarize_group", {
- df <- mtcars %>% exploratory::summarize_group(grp_cols = c("cyl", "mpg"), grp_aggregations = c("none", "mean"), count = n())
+ df <- mtcars %>% exploratory::summarize_group(group_cols = c("cyl", "mpg"), group_funs = c("none", "mean"), count = n())
  expect_equal(nrow(df),3)
- df2 <- mtcars %>% exploratory::summarize_group(grp_cols = NULL, grp_aggregations = NULL, count = n())
+ df2 <- mtcars %>% exploratory::summarize_group(group_cols = NULL, group_funs = NULL, count = n())
  expect_equal(nrow(df2),1)
 })
 

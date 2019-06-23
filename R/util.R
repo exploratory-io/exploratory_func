@@ -1290,7 +1290,7 @@ extract_from_date <- function(x, type = "fltoyear") {
     fltoyear = {
       ret <- lubridate::floor_date(x, unit="year")
     },
-    rtoyear = {
+    rtoyear = {# This key is required by Exploratory Desktop for Summarize Group Dialog.
       ret <- lubridate::floor_date(x, unit="year")
     },
     fltohalfyear = {
@@ -1781,19 +1781,23 @@ get_mode <- function(x, na.rm = FALSE) {
   return(ux[which.max(tabulate(match(x, ux)))])
 }
 # Wrapper function that takes care of dplyr::group_by and dplyr::summarize as a single step.
-# @export
-summarize_group <- function(.data, grp_cols = NULL, grp_aggregations = NULL, ...){
+#' @param .data - data frame
+#' @param group_cols - Columns to group_by
+#' @param group_funs - Functions to apply to group_by columns
+#' @param ... - Name-value pairs of summary functions. The name will be the name of the variable in the result. The value should be an expression that returns a single value like min(x), n(), or sum(is.na(y)).
+#' @export
+summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...){
   library(dplyr)
-  if(length(grp_cols) == 0) {
+  if(length(group_cols) == 0) {
     .data %>% summarize(...)
   } else {
     groupby_args <- list() # default empty list
     name_list <- list()
     name_index = 1
-    # If group by columns and associated aggregation funcionts are provided,
+    # If group_by columns and associated aggregation funcionts are provided,
     # quote the columns/functions with rlang::quo so that dplyr can understand them.
-    if (!is.null(grp_cols) && !is.null(grp_aggregations)) {
-      groupby_args <- purrr::map2(grp_aggregations, grp_cols, function(func, cname) {
+    if (!is.null(group_cols) && !is.null(group_funs)) {
+      groupby_args <- purrr::map2(group_funs, group_cols, function(func, cname) {
         if(is.na(func) || length(func)==0 || func == "none"){
           rlang::quo((UQ(rlang::sym(cname))))
         } else if (func %in% c("fltoyear","rtoyear",
@@ -1835,12 +1839,12 @@ summarize_group <- function(.data, grp_cols = NULL, grp_aggregations = NULL, ...
         } else if (func %in% c("asnum","asint","asintby10","aschar")) {
           # For numeric column, call categorize_numeric
           rlang::quo(categorize_numeric(UQ(rlang::sym(cname)), type = UQ(func)))
-        } else {
+        } else { # For non-numeric and non-date related function case.
           rlang::quo(UQ(func)(UQ(rlang::sym(cname))))
         }
       })
       # create a name list
-      name_list <- purrr::map2(grp_aggregations, grp_cols, function(func, cname) {
+      name_list <- purrr::map2(group_funs, group_cols, function(func, cname) {
         if(is.na(func) || length(func)==0 || func == "none"){
           cname
         } else {
@@ -1850,9 +1854,9 @@ summarize_group <- function(.data, grp_cols = NULL, grp_aggregations = NULL, ...
       names(groupby_args) <- name_list
       .data %>% dplyr::group_by(!!!groupby_args) %>% summarize(...)
     } else {
-      if(!is.null(grp_cols)) {
-        .data %>% dplyr::group_by(!!!rlang::sym(grp_cols)) %>% summarize(...)
-      } else {
+      if(!is.null(group_cols)) { # In case only group_by columns are provied, group_by with the columns
+        .data %>% dplyr::group_by(!!!rlang::sym(group_cols)) %>% summarize(...)
+      } else { # In case no group_by columns are provided,skip group_by
         .data %>% summarize(...)
       }
     }
