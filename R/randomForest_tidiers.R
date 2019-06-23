@@ -952,7 +952,7 @@ augment.rpart.classification <- function(x, data = NULL, newdata = NULL, ...) {
   }
 }
 
-augment.rpart.regression <- function(x, data = NULL, newdata = NULL, ...) {
+augment.rpart.regression <- function(x, data = NULL, newdata = NULL, data_type = "training", ...) {
   # For rpart, terms_mapping is turned off in exp_rpart, so that we can display original column names in tree image.
   predicted_value_col <- avoid_conflict(colnames(newdata), "predicted_value")
 
@@ -963,11 +963,19 @@ augment.rpart.regression <- function(x, data = NULL, newdata = NULL, ...) {
 
     newdata
   } else if (!is.null(data)) {
-    predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
+    switch(data_type,
+      training = {
+        predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
+        predicted <- predict(x, data) # Do we need to call predict()? Isn't predicted result in the model?
+        data[[predicted_value_col]] <- predicted
+        data
+      },
+      test = {
+        predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
+        data[[predicted_value_col]] <- x$prediction_test
+        data
+      })
 
-    predicted <- predict(x, data)
-    data[[predicted_value_col]] <- predicted
-    data
   }
 }
 
@@ -2517,6 +2525,9 @@ exp_rpart <- function(df,
       source_data <- df
       test_index <- sample_df_index(source_data, rate = test_rate)
       df <- safe_slice(source_data, test_index, remove = TRUE)
+      if (test_rate > 0) {
+        df_test <- safe_slice(source_data, test_index, remove = FALSE)
+      }
 
       rhs <- paste0("`", c_cols, "`", collapse = " + ")
       fml <- as.formula(paste0("`", clean_target_col, "`", " ~ ", rhs))
@@ -2531,6 +2542,11 @@ exp_rpart <- function(df,
       model$terms_mapping <- names(name_map)
       names(model$terms_mapping) <- name_map
       model$formula_terms <- terms(fml)
+
+      if (test_rate > 0) {
+        prediction_test <- predict(model, df_test)
+        model$prediction_test <- prediction_test
+      }
 
       list(model = model, test_index = test_index, source_data = source_data)
     }, error = function(e){
