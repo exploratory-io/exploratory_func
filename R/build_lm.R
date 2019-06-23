@@ -465,7 +465,7 @@ build_lm.fast <- function(df,
 
         # when family is negativebinomial, use MASS::glm.nb
         if (is.null(link) && family != "negativebinomial") {
-          rf <- stats::glm(fml, data = df, family = family) 
+          model <- stats::glm(fml, data = df, family = family) 
         }
         else {
           if (family == "gaussian") {
@@ -511,12 +511,12 @@ build_lm.fast <- function(df,
             # For example, if you execute like MASS::glm.nb(fmt, data = df, link = link), the following error will occur
             # link "link" not available for poisson family; available links are 'log', 'identity', 'sqrt'
             # Therefore, we used eval to pass the string (log etc.) specified in the argument to link as it is.
-            rf <- eval(parse(text=paste0("MASS::glm.nb(fml, data=df, link=", link, ")")))
+            model <- eval(parse(text=paste0("MASS::glm.nb(fml, data=df, link=", link, ")")))
 
             # A model by MASS::glm.nb has not a formula attribute.
-            rf$formula <- fml
+            model$formula <- fml
           } else {
-            rf <- stats::glm(fml, data = df, family = family_arg)
+            model <- stats::glm(fml, data = df, family = family_arg)
           }
         }
       }
@@ -530,11 +530,11 @@ build_lm.fast <- function(df,
           df_test <- safe_slice(source_data, test_index, remove = FALSE)
         }
 
-        rf <- stats::lm(fml, data = df) 
+        model <- stats::lm(fml, data = df) 
         if (relimp) {
           tryCatch({
             # Calculate relative importance.
-            rf$relative_importance <- relaimpo::booteval.relimp(relaimpo::boot.relimp(rf, type = relimp_type,
+            model$relative_importance <- relaimpo::booteval.relimp(relaimpo::boot.relimp(model, type = relimp_type,
                                                                                       b = relimp_bootstrap_runs,
                                                                                       rela = relimp_relative,
                                                                                       rank = FALSE,
@@ -546,26 +546,26 @@ build_lm.fast <- function(df,
         }
       }
       # these attributes are used in tidy of randomForest TODO: is this good for lm too?
-      rf$terms_mapping <- names(name_map)
-      names(rf$terms_mapping) <- name_map
-      rf$orig_levels <- orig_levels
+      model$terms_mapping <- names(name_map)
+      names(model$terms_mapping) <- name_map
+      model$orig_levels <- orig_levels
 
       # add special lm_exploratory class for adding extra info at glance().
       if (model_type == "glm") {
-        class(rf) <- c("glm_exploratory", class(rf))
+        class(model) <- c("glm_exploratory", class(model))
         if (with_marginal_effects) { # For now, we have tested marginal_effects for logistic regression only. It seems to fail for probit for example.
           if (smote) {
-            rf$marginal_effects <- calc_average_marginal_effects(rf, data=df_before_smote, with_confint=with_marginal_effects_confint) # This has to be done after glm_exploratory class name is set.
+            model$marginal_effects <- calc_average_marginal_effects(model, data=df_before_smote, with_confint=with_marginal_effects_confint) # This has to be done after glm_exploratory class name is set.
           }
           else {
-            rf$marginal_effects <- calc_average_marginal_effects(rf, with_confint=with_marginal_effects_confint) # This has to be done after glm_exploratory class name is set.
+            model$marginal_effects <- calc_average_marginal_effects(model, with_confint=with_marginal_effects_confint) # This has to be done after glm_exploratory class name is set.
           }
         }
       }
       else {
-        class(rf) <- c("lm_exploratory", class(rf))
+        class(model) <- c("lm_exploratory", class(model))
       }
-      list(rf = rf, test_index = test_index, source_data = source_data)
+      list(model = model, test_index = test_index, source_data = source_data)
 
     }, error = function(e){
       if(length(grouped_cols) > 0) {
@@ -589,7 +589,7 @@ build_lm.fast <- function(df,
     ret <- ret %>% tidyr::nest()
   }
   ret %>% dplyr::mutate(model = purrr::map(data, function(df){
-            df[[model_and_data_col]][[1]]$rf
+            df[[model_and_data_col]][[1]]$model
           })) %>%
           dplyr::mutate(.test_index = purrr::map(data, function(df){
             df[[model_and_data_col]][[1]]$test_index
