@@ -866,9 +866,22 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
 }
 
 #' @export
-augment.lm_exploratory <- function(x, pretty.name = FALSE, ...) {
+augment.lm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "training", ...) {
   browser()
-  broom:::augment.lm(x, ...)
+  if(!is.null(newdata)) { # Call broom:::augment.lm as is
+    broom:::augment.lm(x, data = data, newdata = newdata, ...)
+  } else if (!is.null(data)) {
+    switch(data_type,
+      training = { # Call broom:::augment.lm as is
+        broom:::augment.lm(x, data = data, newdata = newdata, ...)
+      },
+      test = {
+        # Augment data with already predicted result in the model.
+        predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
+        data[[predicted_value_col]] <- x$prediction_test
+        data
+      })
+  }
 }
 
 # For some reason, find_data called from inside margins::marginal_effects() fails in Exploratory.
