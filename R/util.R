@@ -1296,37 +1296,37 @@ extract_from_date <- function(x, type = "fltoyear") {
     fltohalfyear = {
       ret <- lubridate::floor_date(x, unit="halfyear")
     },
-    rtohalfyear = {
+    rtohalfyear = {# This key is required by Exploratory Desktop for Summarize Group Dialog.
       ret <- lubridate::floor_date(x, unit="halfyear")
     },
     fltoquarter = {
       ret <- lubridate::floor_date(x, unit="quarter")
     },
-    rtoq = {
+    rtoq = {# This key is required by Exploratory Desktop for Summarize Group Dialog.
       ret <- lubridate::floor_date(x, unit="quarter")
     },
     fltobimonth = {
       ret <- lubridate::floor_date(x, unit="bimonth")
     },
-    rtobimon = {
+    rtobimon = {# This key is required by Exploratory Desktop for Summarize Group Dialog.
       ret <- lubridate::floor_date(x, unit="bimonth")
     },
     fltomonth = {
       ret <- lubridate::floor_date(x, unit="month")
     },
-    rtomon = {
+    rtomon = {# This key is required by Exploratory Desktop for Summarize Group Dialog.
       ret <- lubridate::floor_date(x, unit="month")
     },
     fltoweek = {
       ret <- lubridate::floor_date(x, unit="week")
     },
-    rtoweek = {
+    rtoweek = {# This key is required by Exploratory Desktop for Summarize Group Dialog.
       ret <- lubridate::floor_date(x, unit="week")
     },
     fltoday = {
       ret <- lubridate::floor_date(x, unit="day")
     },
-    rtoday = {
+    rtoday = {# This key is required by Exploratory Desktop for Summarize Group Dialog.
       ret <- lubridate::floor_date(x, unit="day")
     },
     year = {
@@ -1341,25 +1341,25 @@ extract_from_date <- function(x, type = "fltoyear") {
     bimonth = {
       ret <- (lubridate::month(x)+1) %/% 2
     },
-    bimon = {
+    bimon = {# This key is required by Exploratory Desktop for Summarize Group Dialog.
       ret <- (lubridate::month(x)+1) %/% 2
     },
     month = {
       ret <- lubridate::month(x)
     },
-    mon = {
+    mon = {# This key is required by Exploratory Desktop for Summarize Group Dialog.
       ret <- lubridate::month(x)
     },
     monthname = {
       ret <- lubridate::month(x, label=TRUE)
     },
-    monname = {
+    monname = {# This key is required by Exploratory Desktop for Summarize Group Dialog.
       ret <- lubridate::month(x, label=TRUE)
     },
-    monthnamelong = {
+    monthnamelong = {# This key is required by Exploratory Desktop for Summarize Group Dialog.
       ret <- lubridate::month(x, label=TRUE, abbr=FALSE)
     },
-    monnamelong = {
+    monnamelong = {# This key is required by Exploratory Desktop for Summarize Group Dialog.
       ret <- lubridate::month(x, label=TRUE, abbr=FALSE)
     },
     week = {
@@ -1368,19 +1368,19 @@ extract_from_date <- function(x, type = "fltoyear") {
     day = {
       ret <- lubridate::day(x)
     },
-    dayofyear = {
+    dayofyear = {# This key is required by Exploratory Desktop for Summarize Group Dialog.
       ret <- lubridate::yday(x)
     },
-    dayofquarter = {
+    dayofquarter = {# This key is required by Exploratory Desktop for Summarize Group Dialog.
       ret <- lubridate::qday(x)
     },
-    dayofweek = {
+    dayofweek = {# This key is required by Exploratory Desktop for Summarize Group Dialog.
       ret <- lubridate::wday(x)
     },
     wday = {
       ret <- lubridate::wday(x, label=TRUE)
     },
-    wdaylong = {
+    wdaylong = {# This key is required by Exploratory Desktop for Summarize Group Dialog.
       ret <- lubridate::wday(x, label=TRUE, abbr=FALSE)
     },
     hour = {
