@@ -772,7 +772,7 @@ augment.ranger <- function(x, data = NULL, newdata = NULL, ...) {
 
 #' augment for randomForest model
 #' @export
-augment.ranger.classification <- function(x, data = NULL, newdata = NULL, ...) {
+augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_type = "training", ...) {
   y_name <- x$terms_mapping[all.vars(x$formula_terms)[[1]]]
   predictor_variables <- all.vars(x$formula_terms)[-1]
   predictor_variables <- x$terms_mapping[predictor_variables]
@@ -839,15 +839,25 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, ...) {
     predicted_value <- ranger.add_narow(predicted_label_nona, nrow(data), x$na.action)
 
     if(!is.null(x$classification_type) && x$classification_type == "binary"){
-      # append predicted probability
-      predictions <- x$predictions
-      predicted_prob <- ranger.add_narow(x$predictions[, ncol(predictions)], nrow(data), x$na.action)
+      switch(data_type,
+        training = {
+          # append predicted probability
+          predictions <- x$predictions
+          predicted_prob <- ranger.add_narow(x$predictions[, ncol(predictions)], nrow(data), x$na.action)
+        },
+        test = {
+        })
       data[[predicted_value_col]] <- predicted_value
       data[[predicted_probability_col]] <- predicted_prob
     } else if (x$classification_type == "multi"){
-      # Inserting once removed NA rows
-      predicted_prob <- ranger.add_narow(apply(x$predictions, 1 , max), nrow(data), x$na.action)
-      data <- ranger.set_multi_predicted_values(data, x, predicted_value, x$na.action)
+      switch(data_type,
+        training = {
+          # Inserting once removed NA rows
+          predicted_prob <- ranger.add_narow(apply(x$predictions, 1 , max), nrow(data), x$na.action)
+          data <- ranger.set_multi_predicted_values(data, x, predicted_value, x$na.action)
+        },
+        test = {
+        })
       data[[predicted_probability_col]] <- predicted_prob
     }
     data %>% dplyr::rename(predicted_label = predicted_value_col) %>%
