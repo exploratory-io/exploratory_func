@@ -2126,7 +2126,7 @@ evaluate_classification <- function(actual, predicted, class, multi_class = TRUE
   }
 
   if (multi_class) {
-    data_size <- sum(actual == class)
+    data_size <- sum(actual == class, na.rm = TRUE)
 
     ret <- data.frame(
       class,
