@@ -47,10 +47,10 @@ test_that("exp_rpart(regression) evaluate training and test", {
 test_that("exp_rpart(binary) evaluate training and test", {
   # TODO: It becomes binary prediction only with binary factor without NA
   # TODO: Predicted values are numeric rather than factor
-  model_df <- flight %>% filter(!is.na(`is delayed`)) %>%
-                dplyr::mutate(is_delayed = as.factor(`is delayed`)) %>%
+  model_df <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`)) %>%
                 exp_rpart(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0.3)
 
+  # TODO: Error: replacement has 3473 rows, data has 3500
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
   expect_equal(nrow(test_ret), 1488)
@@ -63,8 +63,7 @@ test_that("exp_rpart(binary) evaluate training and test", {
   # Training only case
   # TODO: It becomes binary prediction only with binary factor without NA
   # TODO: Predicted values are numeric rather than factor
-  model_df <- flight %>% filter(!is.na(`is delayed`)) %>%
-                dplyr::mutate(is_delayed = as.factor(`is delayed`)) %>%
+  model_df <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`)) %>%
                 exp_rpart(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0)
   ret <- model_df %>% prediction(data="training_and_test")
   train_ret <- ret %>% filter(is_test_data==FALSE)
