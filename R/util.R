@@ -604,10 +604,12 @@ safe_slice <- function(data, index, remove = FALSE){
 add_response <- function(data, model, response_label = "predicted_response"){
   # fitted values are converted to response values through inverse link function
   # for example, inverse of logit function is used for logistic regression
-  data[[response_label]] <- if (nrow(data) == 0) {
-    numeric(0)
-  } else {
-    model$family$linkinv(data[[".fitted"]])
+  if (!is.null(data$.fitted)) {
+    data[[response_label]] <- if (nrow(data) == 0) {
+      numeric(0)
+    } else {
+      model$family$linkinv(data[[".fitted"]])
+    }
   }
   data
 }
