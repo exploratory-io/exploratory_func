@@ -20,7 +20,6 @@ if (!testdata_filename %in% list.files(testdata_dir)) {
   write.csv(flight, testdata_file_path) # save sampled-down data for performance.
 }
 
-
 test_that("calc_feature_map(regression) evaluate training and test", {
   model_df <- flight %>%
                 calc_feature_imp(`FL NUM`, `DIS TANCE`, `DEP TIME`, test_rate = 0.3)
@@ -45,7 +44,9 @@ test_that("calc_feature_map(regression) evaluate training and test", {
 })
 
 test_that("calc_feature_map(binary) evaluate training and test", {
-  model_df <- flight %>% dplyr::mutate(is_delayed = as.factor(`is delayed`)) %>%
+  # `is delayed` is not logical for some reason.
+  # To test binary prediction, need to cast it into logical.
+  model_df <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`)) %>%
                 calc_feature_imp(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0.3)
 
   ret <- model_df %>% prediction(data="training_and_test")
@@ -60,7 +61,7 @@ test_that("calc_feature_map(binary) evaluate training and test", {
   ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class")
   ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
 
-  model_df <- flight %>% dplyr::mutate(is_delayed = as.factor(`is delayed`)) %>%
+  model_df <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`)) %>%
                 calc_feature_imp(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0)
   ret <- model_df %>% prediction(data="training_and_test")
   train_ret <- ret %>% filter(is_test_data==FALSE)
@@ -68,6 +69,9 @@ test_that("calc_feature_map(binary) evaluate training and test", {
 
   ret <- rf_evaluation_training_and_test(model_df)
   expect_equal(nrow(ret), 1) # 1 for train
+
+  ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class")
+  ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
 })
 
 test_that("calc_feature_map(multi) evaluate training and test", {
