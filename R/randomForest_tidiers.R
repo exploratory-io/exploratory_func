@@ -1132,8 +1132,8 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
                            evaluation = rf_evaluation(data, pretty.name = pretty.name, ...),
                            evaluation_by_class = rf_evaluation_by_class(data, pretty.name = pretty.name, ...),
                            conf_mat = data %>% broom::tidy(model, type = "conf_mat"))
-    if (nrow(training_ret) > 0) {
-      training_ret$is_test_data <- FALSE
+    if (length(test_index) > 0 && nrow(training_ret) > 0) {
+        training_ret$is_test_data <- FALSE
     }
   } else {
     training_ret <- data.frame()
@@ -1228,26 +1228,33 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
     }
   }
 
+
   # Sort data by class and is_test_data if there is more than one row of evaluation results for
   # both training data and test data or training data
-  if(nrow(ret) > 0) {
-    switch(type,
-           evaluation = {
-             ret %>% dplyr::arrange(is_test_data, .by_group = TRUE)
-           },
-           evaluation_by_class = {
-             if (pretty.name) {
-               ret %>% dplyr::arrange(Class, is_test_data, .by_group = TRUE)
-             } else {
-               ret %>% dplyr::arrange(class, is_test_data, .by_group = TRUE)
-             }
-           },
-           conf_mat = {
-             ret
-           })
-  } else {
-    ret
+  if (!is.null(ret$is_test_data) && nrow(ret) > 0) {
+    ret <- switch(type,
+             evaluation = {
+               ret %>% dplyr::arrange(is_test_data, .by_group = TRUE)
+             },
+             evaluation_by_class = {
+               if (pretty.name) {
+                 ret %>% dplyr::arrange(Class, is_test_data, .by_group = TRUE)
+               } else {
+                 ret %>% dplyr::arrange(class, is_test_data, .by_group = TRUE)
+               }
+             },
+             conf_mat = {
+               ret
+             })
   }
+
+  # Prettify is_test_data column. Do this after the above arrange calls, since it looks at is_test_data column.
+  if (!is.null(ret$is_test_data) && pretty.name) {
+    ret <- ret %>% dplyr::select(is_test_data, everything()) %>%
+      dplyr::mutate(is_test_data = dplyr::if_else(is_test_data, "Test", "Training")) %>%
+      dplyr::rename(`Data Type` = is_test_data)
+  }
+  ret
 }
 
 #' wrapper for tidy type partial dependence

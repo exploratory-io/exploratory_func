@@ -30,7 +30,7 @@ test_that("calc_feature_map(regression) evaluate training and test", {
   train_ret <- ret %>% filter(is_test_data==FALSE)
   expect_equal(nrow(train_ret), 3500)
 
-  ret <- rf_evaluation_training_and_test(model_df)
+  ret <- rf_evaluation_training_and_test(model_df, pretty.name = TRUE)
   expect_equal(nrow(ret), 2) # 2 for train and test
 
   model_df <- flight %>%
