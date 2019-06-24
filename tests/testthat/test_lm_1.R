@@ -48,4 +48,29 @@ test_that("build_lm.fast (logistic regression) evaluate training and test", {
   expect_equal(nrow(ret), 2) # 2 for train and test
 })
 
+test_that("build_lm.fast (gaussian regression) evaluate training and test", {
+  model_df <- flight %>%
+                build_lm.fast(`FL NUM`, `DIS TANCE`, `DEP TIME`, model_type = "glm", family = "gaussian", test_rate = 0.3)
+
+  ret <- model_df %>% prediction(data="training_and_test")
+  test_ret <- ret %>% filter(is_test_data==TRUE)
+  expect_equal(nrow(test_ret), 1464)
+  train_ret <- ret %>% filter(is_test_data==FALSE)
+  expect_equal(nrow(train_ret), 3418)
+  ret <- model_df %>% evaluate_lm_training_and_test(pretty.name=TRUE)
+  expect_equal(nrow(ret), 2) # 2 for train and test
+})
+
+test_that("build_lm.fast (binomial regression) evaluate training and test", {
+  model_df <- flight %>%
+                build_lm.fast(`is delayed`, `DIS TANCE`, `DEP TIME`, model_type = "glm", family = "binomial", test_rate = 0.3)
+
+  ret <- model_df %>% prediction_binary(data="training_and_test", threshold = 0.5)
+  test_ret <- ret %>% filter(is_test_data==TRUE)
+  expect_equal(nrow(test_ret), 1470)
+  train_ret <- ret %>% filter(is_test_data==FALSE)
+  expect_equal(nrow(train_ret), 3433)
+  ret <- model_df %>% evaluate_binary_training_and_test("is delayed", pretty.name=TRUE)
+  expect_equal(nrow(ret), 2) # 2 for train and test
+})
 
