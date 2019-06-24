@@ -322,7 +322,7 @@ evaluate_binary_training_and_test <- function(df, actual_val_col, threshold = "f
 
   if (purrr::some(df$.test_index, function(x){length(x)!=0})) { # Consider it test mode if any of the element of .test_index column has non-zero length.
     ret$is_test_data <- FALSE # Set is_test_data FALSE for training data. Add is_test_data column only when there are test data too.
-    each_func <- function(df){
+    each_func <- function(df) {
       if (!is.data.frame(df)) {
         df <- tribble(~model, ~.test_index, ~source.data,
                       df$model, df$.test_index, df$source.data)

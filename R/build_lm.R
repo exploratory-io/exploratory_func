@@ -546,7 +546,8 @@ build_lm.fast <- function(df,
       }
 
       if (test_rate > 0) {
-        model$prediction_test <- predict(model, df_test)
+        # Note: Do not pass df_test like data=df_test. This for some reason ends up predict returning training data prediction.
+        model$prediction_test <- predict(model, df_test, se.fit = TRUE)
       }
       # these attributes are used in tidy of randomForest TODO: is this good for lm too?
       model$terms_mapping <- names(name_map)
@@ -874,8 +875,8 @@ augment.lm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "
       },
       test = {
         # Augment data with already predicted result in the model.
-        predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
-        data[[predicted_value_col]] <- x$prediction_test
+        data$.fitted <- x$prediction_test$fit
+        data$.se.fit <- x$prediction_test$se.fit
         data
       })
   }
@@ -895,9 +896,8 @@ augment.glm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = 
       },
       test = {
         # Augment data with already predicted result in the model.
-        # TODO: Add probability and label.
-        predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
-        data[[predicted_value_col]] <- x$prediction_test
+        data$.fitted <- x$prediction_test$fit
+        data$.se.fit <- x$prediction_test$se.fit
         data
       })
   }
