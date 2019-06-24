@@ -968,12 +968,13 @@ augment.rpart.classification <- function(x, data = NULL, newdata = NULL, data_ty
     predicted_probability_col <- avoid_conflict(colnames(data), "predicted_probability")
     switch(data_type,
       training = {
-        predicted_value <- x$predicted_class
+        predicted_value_nona <- x$predicted_class
+        predicted_value <- ranger.add_narow(predicted_value_nona, nrow(data), x$na.action)
         predicted_probability <- apply(predict(x, data, type="prob"), 1, max)
       },
       test = {
         predicted_value <- x$predicted_class_test
-        predicted_probability <- apply(predict(x, data, type="prob"), 1, max)
+        predicted_probability <- apply(predict(x, data, type="prob"), 1, max) # TODO: Use pre-calculated value like predicted_value.
       })
 
     data[[predicted_value_col]] <- predicted_value
