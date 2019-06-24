@@ -1152,13 +1152,9 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
       tryCatch({
         actual_col <- model$terms_mapping[all.vars(model$formula_terms)[1]]
         actual <- df[[actual_col]]
-        predicted <- df$predicted_label
 
         test_ret <- switch(type,
           evaluation = {
-            #evaluate_multi_(data.frame(predicted = predicted,
-            #                                    actual = actual),
-            #                "predicted", "actual", pretty.name = pretty.name)
             if (is.numeric(actual)) {
               predicted <- df$predicted_value
               root_mean_square_error <- rmse(actual, predicted)
@@ -1180,39 +1176,39 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
               ret
             } else {
               if (model$classification_type == "binary") {
-                predicted <- get_binary_predicted_value_from_probability(x)
-                predicted_probability <- x$predictions[,1]
+                predicted <- df$predicted_label
+                predicted_probability <- df$predicted_probability
                 ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = pretty.name)
               }
               else {
-                predicted <- ranger.predict_value_from_prob(x$forest$levels, x$predictions, x$y)
-                ret <- evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
+                predicted <- df$predicted_label
+                ret <- evaluate_multi_(data.frame(predicted = predicted, actual = actual),
+                                       "predicted", "actual", pretty.name = pretty.name)
               }
               ret
-            },
-            evaluation_by_class = {
-              per_level <- function(klass) {
-                ret <- evaluate_classification(actual, predicted, klass, pretty.name = pretty.name)
-              }
+            }
+          },
+          evaluation_by_class = {
+            per_level <- function(klass) {
+              ret <- evaluate_classification(actual, predicted, klass, pretty.name = pretty.name)
+            }
 
-              dplyr::bind_rows(lapply(levels(actual), per_level))
-            },
-            conf_mat = {
-              ret <- data.frame(
-                                actual_value = actual,
-                                predicted_value = predicted
-                                ) %>%
-              dplyr::filter(!is.na(predicted_value))
+            dplyr::bind_rows(lapply(levels(actual), per_level))
+          },
+          conf_mat = {
+            ret <- data.frame(
+                              actual_value = actual,
+                              predicted_value = predicted
+                              ) %>%
+            dplyr::filter(!is.na(predicted_value))
 
-              # get count if it's classification
-              ret <- ret %>%
-              dplyr::group_by(actual_value, predicted_value) %>%
-              dplyr::summarize(count = n()) %>%
-              dplyr::ungroup()
-
-              ret
-            })
-          }
+            # get count if it's classification
+            ret <- ret %>%
+            dplyr::group_by(actual_value, predicted_value) %>%
+            dplyr::summarize(count = n()) %>%
+            dplyr::ungroup()
+            ret
+          })
       }, error = function(e) {
         data.frame()
       })
