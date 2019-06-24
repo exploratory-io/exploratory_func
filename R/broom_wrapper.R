@@ -452,6 +452,7 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
         dplyr::mutate_(.dots = list(source.data = aug_fml)) %>%
         dplyr::ungroup()
 
+      browser()
       if (with_response){
         augmented <- augmented %>%
           dplyr::mutate(source.data = purrr::map2(source.data, model, add_response))
@@ -551,59 +552,12 @@ prediction_training_and_test <- function(df, prediction_type="default", threshol
 
   # Note that for ranger/rpart, even for binary prediction case, we are using "default" prediction(),
   # and predicted_label column is set by augment.ranger.classification, which is called internally.
-  train_ret <- switch(prediction_type,
-                    default = prediction(df, ...),
-                    binary = prediction_binary(df, threshold = threshold, ...),
-                    conf_mat = prediction_binary(df, threshold = threshold, ...),
-                    coxph = prediction_coxph(df, ...))
+  ret <- switch(prediction_type,
+                    default = prediction(df, data='training_and_test', ...),
+                    binary = prediction_binary(df,  data='training_and_test', threshold = threshold, ...),
+                    conf_mat = prediction_binary(df, data='training_and_test', threshold = threshold, ...),
+                    coxph = prediction_coxph(df, data='training_and_test', ...))
 
-  # Change the is_test_data column to the last order
-  train_ret <- train_ret %>% dplyr::mutate(is_test_data = FALSE) %>%
-                     dplyr::select(-is_test_data, everything(), is_test_data)
-  ret <- train_ret
-
-  if (length(test_index) > 0) {
-    target_df <- if (length(grouped_cols) > 0) {
-      # like CAR RIER
-      # To avoid errors when passing CAR RIER-like columns to group_by_ in Standard Evaluation,
-      # enclose the column names in back quotes
-      df %>% dplyr::ungroup() %>% dplyr::group_by(!!!rlang::syms(grouped_cols))
-    } else {
-      df
-    }
-
-    each_func <- function(df){
-      tryCatch({
-        if (!is.data.frame(df)) {
-          df <- tibble::tribble(~model,   ~.test_index,   ~source.data,
-                        df$model, df$.test_index, df$source.data)
-        }
-
-        test_ret <- switch(prediction_type,
-                           default = prediction(df, data = "test", ...),
-                           binary = prediction_binary(df, data = "test", threshold = threshold, ...),
-                           conf_mat = prediction_binary(df, data = "test", threshold = threshold, ...),
-                           coxph = prediction_coxph(df, data = "test", ...))
-
-        # Without this for example, column like klass1 is generated when klass is the group_by column.
-        test_ret %>% dplyr::ungroup() %>% dplyr::select(-grouped_cols)
-      }, error = function(e){
-        # In the prediction type of function, if there is categorical data which was not at the time of learning at the time of test,
-        # delete the line. Also, if there is too little data prediction functions return the following error
-        #   no data found that can be predicted by the model
-        # When predicting by group by, certain categories may be reduced,
-        # but you may want to predict other categories, so catch errors and return empty data frames.
-        data.frame()
-      })
-    }
-
-    test_ret <- do_on_each_group(target_df, each_func, with_unnest = TRUE)
-
-    # Change the is_test_data column to the last order
-    test_ret <- test_ret %>% dplyr::mutate(is_test_data = TRUE) %>%
-                  dplyr::select(-is_test_data, everything(), is_test_data)
-    ret <- ret %>% dplyr::bind_rows(test_ret) %>% dplyr::select(-is_test_data, everything(), is_test_data)
-  }
 
   if (prediction_type == "conf_mat") {
     model <- df %>% dplyr::filter(!is.null(model)) %>% `[[`(1, "model")
