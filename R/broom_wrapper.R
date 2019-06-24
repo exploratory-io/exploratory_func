@@ -589,7 +589,8 @@ prediction_training_and_test <- function(df, prediction_type="default", threshol
   }
 }
 
-#' prediction wrapper to set predicted labels
+#' Wrapper around prediction() to set predicted_probability and predicted_label with optimized threshold.
+#' Currently, this is really for logistic regression and GLM, since for ranger and rpart, prediction() already returns predicted_probability and predicted_label.
 #' @param df Data frame to predict. This should have model column.
 #' @param threshold Threshold value for predicted probability or what to optimize. It can be "f_score", "accuracy", "precision", "sensitivity" or "specificity" to optimize.
 #' @export
