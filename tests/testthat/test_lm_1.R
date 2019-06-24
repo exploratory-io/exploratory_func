@@ -16,33 +16,36 @@ filepath <- if (!testdata_filename %in% list.files(testdata_dir)) {
 flight <- exploratory::read_delim_file(filepath, ",", quote = "\"", skip = 0 , col_names = TRUE , na = c("","NA") , locale=readr::locale(encoding = "UTF-8", decimal_mark = "."), trim_ws = FALSE , progress = FALSE) %>% exploratory::clean_data_frame()
 
 if (!testdata_filename %in% list.files(testdata_dir)) {
+  set.seed(1)
   flight <- flight %>% sample_n(5000)
   write.csv(flight, testdata_file_path) # save sampled-down data for performance.
 }
 
 
-if(F){
 test_that("build_lm.fast (linear regression) evaluate training and test", {
   model_df <- flight %>%
                 build_lm.fast(`FL NUM`, `DIS TANCE`, `DEP TIME`, test_rate = 0.3)
 
   ret <- model_df %>% prediction(data="training_and_test")
-  #ret <- model_df %>% evaluate_lm_training_and_test(pretty.name=TRUE)
-  #expect_equal(nrow(ret), 2) # 2 for train and test
-  #ret
+  test_ret <- ret %>% filter(is_test_data==TRUE)
+  expect_equal(nrow(test_ret), 1464)
+  train_ret <- ret %>% filter(is_test_data==FALSE)
+  expect_equal(nrow(train_ret), 3418)
+  ret <- model_df %>% evaluate_lm_training_and_test(pretty.name=TRUE)
+  expect_equal(nrow(ret), 2) # 2 for train and test
 })
-}
 
 test_that("build_lm.fast (logistic regression) evaluate training and test", {
-  browser()
   model_df <- flight %>%
                 build_lm.fast(`is delayed`, `DIS TANCE`, `DEP TIME`, model_type = "glm", test_rate = 0.3)
 
-  ret <- model_df %>% prediction(data="training_and_test")
-  browser()
-  #ret <- model_df %>% evaluate_lm_training_and_test(pretty.name=TRUE)
-  #expect_equal(nrow(ret), 2) # 2 for train and test
-  #ret
+  ret <- model_df %>% prediction_binary(data="training_and_test", threshold = 0.5)
+  test_ret <- ret %>% filter(is_test_data==TRUE)
+  expect_equal(nrow(test_ret), 1470)
+  train_ret <- ret %>% filter(is_test_data==FALSE)
+  expect_equal(nrow(train_ret), 3433)
+  ret <- model_df %>% evaluate_binary_training_and_test("is delayed", pretty.name=TRUE)
+  expect_equal(nrow(ret), 2) # 2 for train and test
 })
 
 
