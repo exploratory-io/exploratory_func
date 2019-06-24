@@ -395,7 +395,6 @@ evaluate_binary_training_and_test <- function(df, actual_val_col, threshold = "f
     colnames(ret)[colnames(ret) == "null.deviance"] <- "Null Deviance"
     colnames(ret)[colnames(ret) == "df.null"] <- "DF for Null Model"
     colnames(ret)[colnames(ret) == "df.residual"] <- "Residual DF"
-    colnames(ret)[colnames(ret) == "is_test_data"] <- "Test Data"
 
     base_cols <- colnames(ret)[stringr::str_detect(colnames(ret) , "_base$")]
     if (length(base_cols) > 0) {
@@ -409,6 +408,12 @@ evaluate_binary_training_and_test <- function(df, actual_val_col, threshold = "f
     ret <- ret %>% dplyr::arrange_(paste0("`", grouped_col, "`"))
   }
 
+  # Prettify is_test_data column.
+  if (!is.null(ret$is_test_data) && pretty.name) {
+    ret <- ret %>% dplyr::select(is_test_data, everything()) %>%
+      dplyr::mutate(is_test_data = dplyr::if_else(is_test_data, "Test", "Training")) %>%
+      dplyr::rename(`Data Type` = is_test_data)
+  }
   ret
 }
 

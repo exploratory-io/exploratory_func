@@ -46,9 +46,7 @@ test_that("build_lm.fast (logistic regression) evaluate training and test", {
   expect_equal(nrow(train_ret), 3433)
   ret <- model_df %>% evaluate_binary_training_and_test("is delayed", pretty.name=TRUE)
   expect_equal(nrow(ret), 2) # 2 for train and test
-  browser()
   ret <- model_df %>% prediction_training_and_test(prediction_type = 'conf_mat', threshold = 0.5)
-  browser()
 })
 
 test_that("build_lm.fast (gaussian regression) evaluate training and test", {
@@ -75,8 +73,6 @@ test_that("build_lm.fast (binomial regression) evaluate training and test", {
   expect_equal(nrow(train_ret), 3433)
   ret <- model_df %>% evaluate_binary_training_and_test("is delayed", pretty.name=TRUE)
   expect_equal(nrow(ret), 2) # 2 for train and test
-  browser()
   ret <- model_df %>% prediction_training_and_test(prediction_type = 'conf_mat', threshold = 0.5)
-  browser()
 })
 

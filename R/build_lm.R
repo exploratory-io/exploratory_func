@@ -980,5 +980,12 @@ evaluate_lm_training_and_test <- function(df, pretty.name = FALSE){
     ret <- ret %>% dplyr::arrange_(paste0("`", grouped_col, "`"))
   }
 
+  # Prettify is_test_data column. Do this after the above select calls, since it looks at is_test_data column.
+  if (!is.null(ret$is_test_data) && pretty.name) {
+    ret <- ret %>% dplyr::select(is_test_data, everything()) %>%
+      dplyr::mutate(is_test_data = dplyr::if_else(is_test_data, "Test", "Training")) %>%
+      dplyr::rename(`Data Type` = is_test_data)
+  }
+
   ret
 }
