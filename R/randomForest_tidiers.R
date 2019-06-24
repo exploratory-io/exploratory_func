@@ -1145,6 +1145,7 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
 
   # Execute evaluation if there is test data
   if (length(test_index) > 0) {
+    # Extract test prediction result embedded in the model.
     predicted <- data %>% prediction(data = "test")
 
     each_func <- function(df) {
