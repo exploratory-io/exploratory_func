@@ -1144,6 +1144,8 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
   grouped_col <- colnames(data)[!colnames(data) %in% c("model", ".test_index", "source.data")]
 
   # Execute evaluation if there is test data
+  # TODO: This part of the code needs to be kept in sync with broom::tidy with type evaluation/evaluation_by_class.
+  # Would it be possible to consolidate those code?
   if (length(test_index) > 0) {
     # Extract test prediction result embedded in the model.
     predicted <- data %>% prediction(data = "test")
