@@ -1960,10 +1960,14 @@ calc_feature_imp <- function(df,
         na_row_numbers_test <- ranger.find_na(c_cols, data = df_test)
         names(c_cols) <- NULL # Clearing names in vector is necessary to make the following select work.
         df_test_clean <- df_test %>% dplyr::select(!!!rlang::syms(c_cols)) %>% na.omit()
+        unknown_category_rows_index_vector <- get_unknown_category_rows_index_vector(df_test_clean, df %>% dplyr::select(!!!rlang::syms(c_cols)))
+        df_test_clean <- df_test_clean[!unknown_category_rows_index_vector, , drop = FALSE] # 2nd arg must be empty.
+        unknown_category_rows_index <- get_row_numbers_from_index_vector(unknown_category_rows_index_vector)
         prediction_test <- predict(rf, df_test_clean)
         # TODO: Following current convention for the name na.action to keep na row index, but we might want to rethink.
         # We do not keep this for training since na.roughfix should fill values and not delete rows.
         prediction_test$na.action = na_row_numbers_test
+        prediction_test$unknown_category_rows_index = unknown_category_rows_index
         rf$prediction_test <- prediction_test
       }
 
