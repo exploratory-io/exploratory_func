@@ -375,8 +375,11 @@ test_that("str_extract_inside", {
     expect_equal(ret, c(TRUE, FALSE, FALSE, TRUE, TRUE, TRUE, TRUE, FALSE, TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, NA))
     ret <- exploratory::str_logical(c("Sign Up", "Not Sign Up", "Not Sign Up", "sign Up", "sign up", "SIGN UP", "Sign UP", "Not Sign Up", "Sign Up", "Sign Up", "Sign Up", "Sign Up","Sign Up", "Not Sign Up", NA), true_value = "Sign Up")
     expect_equal(ret, c(TRUE, FALSE, FALSE, TRUE, TRUE, TRUE, TRUE, FALSE, TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, NA))
-    ret <- exploratory::str_logical(c("aa", "ddd", "cc", "ee", "11", "00", "122", "00", "dd", "88", "aa", "","", NA, NA))
-    expect_equal(ret, c(NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA))
+    ret <- exploratory::str_logical(c("yes", "ddd", "cc", "ee", "1", "0", 1, 0, "true", "false", "aa", "","", NA, NA))
+    expect_equal(ret, c(TRUE, NA, NA, NA, TRUE, FALSE, TRUE, FALSE, TRUE, FALSE, NA, NA, NA, NA, NA))
+    ret <- exploratory::str_logical(c("yes", "ddd", "cc", "ee", "1", "0", 1, 0, "true", "false", "YES", "","", NA, NA), true_value = "yes")
+    expect_equal(ret, c(TRUE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, FALSE, FALSE, NA, NA))
+
   })
 
 

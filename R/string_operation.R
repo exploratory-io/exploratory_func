@@ -461,22 +461,11 @@ str_logical <- function(column, true_value = NULL) {
    if(!is.null(true_value)) {
      stringr::str_to_lower(column) == stringr::str_to_lower(true_value)
    } else { # default handling.
-     unique_values <- unique(stringr::str_to_lower(column))
-     # if the column holds "true"/"false" or "TRUE"/"FALSE", use parse_logical
-     if(all(lapply(unique_values, function(x){x %in% c("true","false", NA)}) == TRUE)) {
-       parse_logical(stringr::str_to_lower(column))
-     } else if (all(lapply(unique_values, function(x){x %in% c("yes","no", NA)}) == TRUE)){
-       # if the column holds "yes"/"no" or "YES"/"NO", assume yes or YES as TRUE
-       stringr::str_to_lower(column) == "yes"
-     } else if (all(lapply(unique_values, function(x){x %in% c("1","0", NA)}) == TRUE)) {
-       # if the column holds "1"/"0", assume yes or YES as TRUE
-       stringr::str_to_lower(column) == "1"
-     } else if (all(lapply(unique_values, function(x){x %in% c(1,0, NA)}) == TRUE)) {
-       # if the column holds 1 and 0, assume 1 as TRUE
-       column == 1
-     } else { # all the other case, return NA
-       unlist(lapply(column, function(x){NA}))
-     }
+      # if value is either "true", "yes", "1", or 1, return TRUE
+      target <- stringr::str_to_lower(column)
+      dplyr::case_when(target %in% c("true", "yes", "1", 1) ~ TRUE,
+                       target %in% c("false", "no", "0", 0) ~ FALSE,
+                       TRUE ~ as.logical(NA))
    }
 }
 
