@@ -880,7 +880,7 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
           predicted_prob_nona <- apply(x$prediction_test$predictions, 1 , max)
           predicted_prob_nona <- restore_na(predicted_prob_nona, x$prediction_test$unknown_category_rows_index)
           predicted_prob <- restore_na(predicted_prob_nona, x$prediction_test$na.action)
-          data <- ranger.set_multi_predicted_values(data, x$prediction_test$predictions, predicted_value, x$prediction_test$na.action)
+          data <- ranger.set_multi_predicted_values(data, x$prediction_test$predictions, predicted_value, x$prediction_test$na.action, x$prediction_test$unknown_category_rows_index)
         })
       data[[predicted_probability_col]] <- predicted_prob
     }
@@ -1039,7 +1039,7 @@ augment.rpart.regression <- function(x, data = NULL, newdata = NULL, data_type =
 ranger.set_multi_predicted_values <- function(data, predictions,
                                               predicted_value,
                                               na_row_numbers,
-                                              unknown_category_row_numbers,
+                                              unknown_category_row_numbers=NULL,
                                               pred_plob_col="predicted_probability",
                                               pred_value_col="predicted_value") {
   ret <- predictions
@@ -1048,8 +1048,8 @@ ranger.set_multi_predicted_values <- function(data, predictions,
     colname <- stringr::str_c(pred_plob_col, colnames(ret)[i], sep="_")
 
     # Inserting once removed NA rows
-    prob_data_bycol_nona <- ret[, i, drop = FALSE]
-    if (!is.na(unknown_category_row_numbers)) {
+    prob_data_bycol_nona <- ret[, i] # Do not add drop=FALSE since we want vector here.
+    if (!is.null(unknown_category_row_numbers)) {
       prob_data_bycol_nona <- restore_na(prob_data_bycol_nona, unknown_category_row_numbers)
     }
     prob_data_bycol <- restore_na(prob_data_bycol_nona, na_row_numbers)
