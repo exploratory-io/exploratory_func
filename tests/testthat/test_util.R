@@ -846,3 +846,11 @@ test_that("get_unknown_category_rows_index", {
   unknown_index <- get_row_numbers_from_index_vector(unknown_vector)
   expect_equal(unknown_index,c(2,3))
 })
+
+test_that("summarize_group", {
+ df <- mtcars %>% exploratory::summarize_group(group_cols = c("cyl", "mpg"), group_funs = c("none", "mean"), count = n())
+ expect_equal(nrow(df),3)
+ df2 <- mtcars %>% exploratory::summarize_group(group_cols = NULL, group_funs = NULL, count = n())
+ expect_equal(nrow(df2),1)
+})
+

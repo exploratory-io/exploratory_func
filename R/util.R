@@ -1265,28 +1265,84 @@ do_on_each_group_2 <- function(df, func1, func2, params1 = quote(list()), params
 }
 
 #' @export
+#' Utility function that categorizes numeric column based on the type argument.
+#' For example, if type argument is aschar, the column value is categorized as character.
+categorize_numeric <- function(x, type = "asnum") {
+  ret <- NULL
+  switch(type,
+     asnum = {
+       ret <- as.numeric(x)
+     },
+     asint = {
+       ret <- as.integer(x)
+     },
+     asintby10 = {
+       ret <- floor(x/10)*10
+     },
+     aschar = {
+       ret <- as.character(x)
+     })
+  ret
+}
+
+#' @export
 extract_from_date <- function(x, type = "fltoyear") {
   ret <- NULL
   switch(type,
     fltoyear = {
       ret <- lubridate::floor_date(x, unit="year")
     },
+    # This key is a synonym for fltoyear and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this function.
+    rtoyear = {
+      ret <- lubridate::floor_date(x, unit="year")
+    },
     fltohalfyear = {
+      ret <- lubridate::floor_date(x, unit="halfyear")
+    },
+    # This key is a synonym for fltohalfyear and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this function.
+    rtohalfyear = {
       ret <- lubridate::floor_date(x, unit="halfyear")
     },
     fltoquarter = {
       ret <- lubridate::floor_date(x, unit="quarter")
     },
+    # This key is a synonym for fltoquarter and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this function.
+    rtoq = {
+      ret <- lubridate::floor_date(x, unit="quarter")
+    },
     fltobimonth = {
+      ret <- lubridate::floor_date(x, unit="bimonth")
+    },
+    # This key is a synonym for fltobimonth and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this function.
+    rtobimon = {
       ret <- lubridate::floor_date(x, unit="bimonth")
     },
     fltomonth = {
       ret <- lubridate::floor_date(x, unit="month")
     },
+    # This key is a synonym for fltomonth and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this function.
+    rtomon = {
+      ret <- lubridate::floor_date(x, unit="month")
+    },
     fltoweek = {
       ret <- lubridate::floor_date(x, unit="week")
     },
+    # This key is a synonym for fltoweek and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this function.
+    rtoweek = {
+      ret <- lubridate::floor_date(x, unit="week")
+    },
     fltoday = {
+      ret <- lubridate::floor_date(x, unit="day")
+    },
+    # This key is a synonym for fltoday and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this function.
+    rtoday = {
       ret <- lubridate::floor_date(x, unit="day")
     },
     year = {
@@ -1301,11 +1357,34 @@ extract_from_date <- function(x, type = "fltoyear") {
     bimonth = {
       ret <- (lubridate::month(x)+1) %/% 2
     },
+    # This key is a synonym for bimonth and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this function.
+    bimon = {
+      ret <- (lubridate::month(x)+1) %/% 2
+    },
     month = {
+      ret <- lubridate::month(x)
+    },
+    # This key is a synonym for month and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this function.
+    mon = {
       ret <- lubridate::month(x)
     },
     monthname = {
       ret <- lubridate::month(x, label=TRUE)
+    },
+    # This key is a synonym for monthname and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this function.
+    monname = {
+      ret <- lubridate::month(x, label=TRUE)
+    },
+    monthnamelong = {
+      ret <- lubridate::month(x, label=TRUE, abbr=FALSE)
+    },
+    # This key is a synonym for monthnamelong and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this function.
+    monnamelong = {
+      ret <- lubridate::month(x, label=TRUE, abbr=FALSE)
     },
     week = {
       ret <- lubridate::week(x)
@@ -1313,8 +1392,24 @@ extract_from_date <- function(x, type = "fltoyear") {
     day = {
       ret <- lubridate::day(x)
     },
+    # This key is required by Exploratory Desktop for Summarize Group Dialog
+    dayofyear = {
+      ret <- lubridate::yday(x)
+    },
+    # This key is required by Exploratory Desktop for Summarize Group Dialog.
+    dayofquarter = {
+      ret <- lubridate::qday(x)
+    },
+    # This key is required by Exploratory Desktop for Summarize Group Dialog.
+    dayofweek = {
+      ret <- lubridate::wday(x)
+    },
     wday = {
       ret <- lubridate::wday(x, label=TRUE)
+    },
+    # This key is required by Exploratory Desktop for Summarize Group Dialog.
+    wdaylong = {
+      ret <- lubridate::wday(x, label=TRUE, abbr=FALSE)
     },
     hour = {
       ret <- lubridate::hour(x)
@@ -1637,6 +1732,72 @@ setdiff <- function(x, y, force_data_type = FALSE, ...){
   }
 }
 
+# This is written by removing unnecessary part from calculate_cohens_d.
+#'Calculate common standard deviation.
+#'@export
+calculate_common_sd <- function(var1, var2) {
+  df <- data.frame(var1=var1, var2=var2)
+  summarized <- df %>% dplyr::group_by(var2) %>%
+    dplyr::summarize(n=n(), v=var(var1, na.rm=TRUE))
+
+  lx <- summarized$n[[1]] - 1
+  ly <- summarized$n[[2]] - 1
+  vx <- summarized$v[[1]]
+  vy <- summarized$v[[2]]
+  csd <- lx * vx + ly * vy
+  csd <- csd/(lx + ly)
+  csd <- sqrt(csd) # common sd computation
+}
+
+# Reference: https://stackoverflow.com/questions/15436702/estimate-cohens-d-for-effect-size
+#'Calculate Cohen's d
+#'@export
+calculate_cohens_d <- function(var1, var2) {
+  df <- data.frame(var1=var1, var2=var2)
+  summarized <- df %>% dplyr::group_by(var2) %>%
+    dplyr::summarize(n=n(), m=mean(var1, na.rm=TRUE), v=var(var1, na.rm=TRUE))
+
+  lx <- summarized$n[[1]] - 1
+  ly <- summarized$n[[2]] - 1
+  mx <- summarized$m[[1]]
+  my <- summarized$m[[2]]
+  vx <- summarized$v[[1]]
+  vy <- summarized$v[[2]]
+  md  <- abs(mx - my) # mean difference (numerator)
+  csd <- lx * vx + ly * vy
+  csd <- csd/(lx + ly)
+  csd <- sqrt(csd) # common sd computation
+  cd  <- md/csd # cohen's d
+}
+
+# References:
+# SSb, SSt, eta squared definition: https://learningstatisticswithr.com/lsr-0.6.pdf
+# Cohen's f definition: https://en.wikipedia.org/wiki/Effect_size
+# Compared results with sjstats::cohens_f(), and powerAnalysis::ES.anova.oneway()
+# Did not use sjstats::cohens_f() to avoid requiring entire sjstats and its dependencies.
+# Did not use powerAnalysis::ES.anova.oneway() because it only works for the case all categories
+# have same number of observations.
+#'Calculate Cohen's f
+#'@export
+calculate_cohens_f <- function(var1, var2) {
+  m <- mean(var1, na.rm = TRUE)
+  df <- data.frame(var1=var1, var2=var2)
+  summarized <- df %>% dplyr::group_by(var2) %>%
+    dplyr::mutate(diff_between = mean(var1, na.rm=TRUE) - m, diff_total = var1 - m) %>% dplyr::ungroup() %>%
+    dplyr::summarize(ssb=sum(diff_between^2, na.rm=TRUE), sst=sum(diff_total^2, na.rm=TRUE))
+  ssb <- summarized$ssb # Sum of squares between groups
+  sst <- summarized$sst # Total sum of squares
+  f <- sqrt(ssb/(sst - ssb))
+  f
+}
+
+# Reference: https://rdrr.io/github/markushuff/PsychHelperFunctions/src/R/cohens_w.R
+#'Calculate Cohen's w from Chi-Square value and total number of observations.
+#'@export
+calculate_cohens_w <- function(chi_sq, N) {
+  sqrt(chi_sq/N)
+}
+
 #'Calculates mode. Function name is capitalized to avoid conflict with base::mode(), which does something other than calculating mode.
 # Reference: https://stackoverflow.com/questions/2547402/is-there-a-built-in-function-for-finding-the-mode
 #'@export
@@ -1704,6 +1865,89 @@ restore_na <- function(value, na_row_numbers){
     }
   } else {
     value
+  }
+}
+
+# Wrapper function that takes care of dplyr::group_by and dplyr::summarize as a single step.
+#' @param .data - data frame
+#' @param group_cols - Columns to group_by
+#' @param group_funs - Functions to apply to group_by columns
+#' @param ... - Name-value pairs of summary functions. The name will be the name of the variable in the result. The value should be an expression that returns a single value like min(x), n(), or sum(is.na(y)).
+#' @export
+summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...){
+  library(dplyr)
+  if(length(group_cols) == 0) {
+    .data %>% summarize(...)
+  } else {
+    groupby_args <- list() # default empty list
+    name_list <- list()
+    name_index = 1
+    # If group_by columns and associated categorizing functionts are provided,
+    # quote the columns/functions with rlang::quo so that dplyr can understand them.
+    if (!is.null(group_cols) && !is.null(group_funs)) {
+      groupby_args <- purrr::map2(group_funs, group_cols, function(func, cname) {
+        if(is.na(func) || length(func)==0 || func == "none"){
+          rlang::quo((UQ(rlang::sym(cname))))
+        } else if (func %in% c("fltoyear","rtoyear",
+            "fltohalfyear",
+            "rtohalfyear",
+            "fltoquarter",
+            "rtoq",
+            "fltobimonth",
+            "rtobimon",
+            "fltomonth",
+            "rtomon",
+            "fltoweek",
+            "rtoweek",
+            "fltoday",
+            "rtoday",
+            "year",
+            "halfyear",
+            "quarter",
+            "bimonth",
+            "bimon",
+            "month",
+            "mon",
+            "monthname",
+            "monname",
+            "monthnamelong",
+            "monnamelong",
+            "week",
+            "dayofyear",
+            "dayofquarter",
+            "dayofweek",
+            "day",
+            "wday",
+            "wdaylong",
+            "hour",
+            "minute",
+            "second")) {
+          # For date column, call extract_from_date
+          rlang::quo(extract_from_date(UQ(rlang::sym(cname)), type = UQ(func)))
+        } else if (func %in% c("asnum","asint","asintby10","aschar")) {
+          # For numeric column, call categorize_numeric
+          rlang::quo(categorize_numeric(UQ(rlang::sym(cname)), type = UQ(func)))
+        } else { # For non-numeric and non-date related function case.
+          rlang::quo(UQ(func)(UQ(rlang::sym(cname))))
+        }
+      })
+      # create a name list
+      name_list <- purrr::map2(group_funs, group_cols, function(func, cname) {
+        if(is.na(func) || length(func)==0 || func == "none"){
+          cname
+        } else {
+          stringr::str_c(cname, func, sep = "_")
+        }
+      })
+      names(groupby_args) <- name_list
+      .data %>% dplyr::group_by(!!!groupby_args) %>% summarize(...)
+    } else {
+      if(!is.null(group_cols)) { # In case only group_by columns are provied, group_by with the columns
+        .data %>% dplyr::group_by(!!!rlang::sym(group_cols)) %>% summarize(...)
+      } else { # In case no group_by columns are provided,skip group_by
+        .data %>% summarize(...)
+      }
+    }
   }
 }
 

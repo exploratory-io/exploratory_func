@@ -195,7 +195,13 @@ do_chisq.test_ <- function(df,
 
 #' Chi-Square test wrapper for Analytics View
 #' @export
-exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, fun.aggregate = sum, correct = FALSE, ...) {
+exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, fun.aggregate = sum, correct = FALSE, sig.level = 0.05, w = NULL, power = NULL, beta = NULL, ...) {
+  if (!is.null(power) && !is.null(beta) && (power + beta != 1.0)) {
+    stop("Specify only one of Power or Probability of Type 2 Error, or they must add up to 1.0.")
+  }
+  if (is.null(power) && !is.null(beta)) {
+    power <- 1.0 - beta
+  }
   # We are turning off Yates's correction by default because...
   # 1. It seems that it is commonly discussed that it is overly conservative and not necessary.
   #    https://en.wikipedia.org/wiki/Yates%27s_correction_for_continuity
@@ -253,6 +259,15 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
     df <- df %>% tibble::column_to_rownames(var=var1_col)
     x <- df %>% as.matrix()
     model <- chisq.test(x = x, correct = correct, ...)
+    # Calculate Cohen's w from actual data.
+    cohens_w <- calculate_cohens_w(model$statistic, sum(x))
+    if (is.null(w)) {
+      # If w is not specified, use the one calculated from data.
+      cohens_w_to_detect <- cohens_w
+    }
+    else {
+      cohens_w_to_detect <- w
+    }
     # add variable name info to the model
     model$var1 <- var1_col
     model$var2 <- var2_col
@@ -260,6 +275,10 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
     model$var2_class <- var2_class
     model$var1_levels <- var1_levels
     model$var2_levels <- var2_levels
+    model$sig.level <- sig.level
+    model$cohens_w <- cohens_w
+    model$cohens_w_to_detect <- cohens_w_to_detect
+    model$power <- power
     class(model) <- c("chisq_exploratory", class(model))
     model
   }
@@ -348,13 +367,71 @@ tidy.chisq_exploratory <- function(x, type = "observed") {
 glance.chisq_exploratory <- function(x) {
   # ret <- x %>% broom:::glance.htest() # for some reason this does not work. just do it like following.
   ret <- data.frame(statistic=x$statistic, parameter=x$parameter, p.value=x$p.value)
-  ret <- ret %>% rename(`Chi-Square`=statistic, `Degree of Freedom`=parameter, `P Value`=p.value)
+  N <- sum(x$observed) # Total number of observations (rows).
+  note <- NULL
+  if (is.null(x$power)) {
+    # If power is not specified in the arguments, estimate current power.
+    # x$parameter is degree of freedom.
+    if (!is.na(x$cohens_w_to_detect)) { # It is possible that x$cohens_w_to_detect is NA. Avoid calling pwr.chisq.test not to hit an error.
+      # pwr functions returns value for the missing arg, which in this case is power.
+      tryCatch({ # pwr function can return error from equation resolver. Catch it rather than stopping the whole thing.
+        power_res <- pwr::pwr.chisq.test(df = x$parameter, N = N, w = x$cohens_w_to_detect, sig.level = x$sig.level)
+        power_val <- power_res$power
+      }, error = function(e) {
+        note <- e$message
+        power_val <- NA_real_
+      })
+    }
+    else {
+      note <- "Could not calculate Cohhen's w." 
+      power_val <- NA_real_
+    }
+    ret <- ret %>% dplyr::mutate(w=x$cohens_w, power=power_val, beta=1.0-power_val)
+    ret <- ret %>% rename(`Chi-Square`=statistic,
+                          `Degree of Freedom`=parameter,
+                          `P Value`=p.value,
+                          `Effect Size (Cohen's w)`=w,
+                          `Power`=power,
+                          `Probability of Type 2 Error`=beta)
+  }
+  else {
+    # If required power is specified in the arguments, estimate required sample size. 
+    # pwr functions returns value for the missing arg, which in this case is sample size (N). 
+    tryCatch({ # pwr function can return error from equation resolver. Catch it rather than stopping the whole thing.
+      power_res <- pwr::pwr.chisq.test(df = x$parameter, w = x$cohens_w_to_detect, sig.level = x$sig.level, power = x$power)
+      required_sample_size <- power_res$N
+    }, error = function(e) {
+      note <- e$message
+      required_sample_size <- NA_real_
+    })
+    ret <- ret %>% dplyr::mutate(w=x$cohens_w, power=x$power, beta=1.0-x$power, current_sample_size=N, required_sample_size=required_sample_size)
+    ret <- ret %>% rename(`Chi-Square`=statistic,
+                          `Degree of Freedom`=parameter,
+                          `P Value`=p.value,
+                          `Effect Size (Cohen's w)`=w,
+                          `Target Power`=power,
+                          `Target Probability of Type 2 Error`=beta,
+                          `Current Sample Size`=current_sample_size,
+                          `Required Sample Size`=required_sample_size)
+  }
+  if (!is.null(note)) { # Add Note column, if there was an error from pwr function.
+    ret <- ret %>% dplyr::mutate(Note=note)
+  }
   ret
 }
 
+
 #' t-test wrapper for Analytics View
 #' @export
-exp_ttest <- function(df, var1, var2, func2 = NULL, ...) {
+#' @param conf.level - Level of confidence for confidence interval. Passed to t.test as part of ...
+#' @param sig.level - Significance level for power analysis.
+exp_ttest <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, d = NULL, common_sd = NULL, diff_to_detect = NULL, power = NULL, beta = NULL, ...) {
+  if (!is.null(power) && !is.null(beta) && (power + beta != 1.0)) {
+    stop("Specify only one of Power or Probability of Type 2 Error, or they must add up to 1.0.")
+  }
+  if (is.null(power) && !is.null(beta)) {
+    power <- 1.0 - beta
+  }
   var1_col <- col_name(substitute(var1))
   var2_col <- col_name(substitute(var2))
   grouped_cols <- grouped_by(df)
@@ -381,12 +458,38 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, ...) {
   formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
 
   ttest_each <- function(df) {
+    # Calculate Cohen's d from data.
+    cohens_d <- calculate_cohens_d(df[[var1_col]], df[[var2_col]])
+    # Get size of Cohen's d to detect for power analysis.
+    # If neither d nor diff_to_detect is specified, use the one calculated from data.
+    if (is.null(d)) {
+      if (is.null(diff_to_detect)) {
+        # If neither d nor diff_to_detect is specified, calculate Cohen's d from data.
+        cohens_d_to_detect <- cohens_d
+      }
+      else { # diff_to_detect is specified.
+        if (is.null(common_sd)) {
+          # If common SD is not specified, estimate from data, and use it to calculate Cohen's d
+          cohens_d_to_detect <- diff_to_detect/calculate_common_sd(df[[var1_col]], df[[var2_col]])
+        }
+        else {
+          cohens_d_to_detect <- diff_to_detect/common_sd
+        }
+      }
+    }
+    else {
+      cohens_d_to_detect <- d
+    }
     tryCatch({
       model <- t.test(formula, data = df, ...)
       class(model) <- c("ttest_exploratory", class(model))
       model$var1 <- var1_col
       model$var2 <- var2_col
       model$data <- df
+      model$sig.level <- sig.level
+      model$cohens_d <- cohens_d # model$d seems to be already used for something.
+      model$cohens_d_to_detect <- cohens_d_to_detect
+      model$power <- power
       model
     }, error = function(e){
       if(length(grouped_cols) > 0) {
@@ -424,19 +527,75 @@ glance.ttest_exploratory <- function(x) {
 #' @export
 tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
   if (type == "model") {
+    note <- NULL
     ret <- broom:::tidy.htest(x)
-
     if (is.null(ret$estimate)) { # estimate is empty when var.equal = TRUE.
                                  # Looks like an issue from broom. Working it around.
       ret <- ret %>% dplyr::mutate(estimate = estimate1 - estimate2)
     }
-    ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
-      dplyr::rename(`t Ratio`=statistic,
-                    `P Value`=p.value,
-                    `Degree of Freedom`=parameter,
-                    Difference=estimate,
-                    `Conf High`=conf.high,
-                    `Conf Low`=conf.low)
+
+    # Get sample sizes for the 2 groups (n1, n2).
+    data_summary <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
+      dplyr::summarize(n_rows=length(!!rlang::sym(x$var1)))
+    n1 <- data_summary$n_rows[[1]]
+    n2 <- data_summary$n_rows[[2]]
+    if (is.null(x$power)) {
+      # If power is not specified in the arguments, estimate current power.
+      # TODO: pwr functions does not seem to have argument for equal variance. Is it ok? 
+      tryCatch({ # pwr function can return error from equation resolver. Catch it rather than stopping the whole thing.
+        if (x$method == "Paired t-test") {
+          # If paired, we should be able to assume n1 == n2.
+          power_res <- pwr::pwr.t.test(n = n1, d = x$cohens_d_to_detect, sig.level = x$sig.level, type = "two.sample", alternative = x$alternative)
+        }
+        else {
+          power_res <- pwr::pwr.t2n.test(n1 = n1, n2= n2, d = x$cohens_d_to_detect, sig.level = x$sig.level, alternative = x$alternative)
+        }
+        power_val <- power_res$power
+      }, error = function(e) {
+        note <- e$message
+        power_val <- NA_real_
+      })
+
+      ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
+        dplyr::mutate(d=x$cohens_d, power=power_val, beta=1.0-power_val) %>%
+        dplyr::rename(`t Ratio`=statistic,
+                      `P Value`=p.value,
+                      `Degree of Freedom`=parameter,
+                      Difference=estimate,
+                      `Conf High`=conf.high,
+                      `Conf Low`=conf.low,
+                      `Effect Size (Cohen's d)`=d,
+                      `Power`=power,
+                      `Probability of Type 2 Error`=beta)
+    }
+    else {
+      # If required power is specified in the arguments, estimate required sample size. 
+      # TODO: pwr functions does not seem to have argument for equal variance. Is it ok? 
+      tryCatch({ # pwr function can return error from equation resolver. Catch it rather than stopping the whole thing.
+        power_res <- pwr::pwr.t.test(d = x$cohens_d_to_detect, sig.level = x$sig.level, power = x$power, alternative = x$alternative)
+        required_sample_size <- power_res$n
+      }, error = function(e) {
+        note <- e$message
+        required_sample_size <- NA_real_
+      })
+      ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
+        dplyr::mutate(d=x$cohens_d, power=x$power, beta=1.0-x$power) %>%
+        dplyr::mutate(current_sample_size=min(n1,n2), required_sample_size=required_sample_size) %>%
+        dplyr::rename(`t Ratio`=statistic,
+                      `P Value`=p.value,
+                      `Degree of Freedom`=parameter,
+                      Difference=estimate,
+                      `Conf High`=conf.high,
+                      `Conf Low`=conf.low,
+                      `Effect Size (Cohen's d)`=d,
+                      `Target Power`=power,
+                      `Target Probability of Type 2 Error`=beta,
+                      `Current Sample Size (Each Group)`=current_sample_size,
+                      `Required Sample Size (Each Group)`=required_sample_size)
+    }
+    if (!is.null(note)) { # Add Note column, if there was an error from pwr function.
+      ret <- ret %>% dplyr::mutate(Note=note)
+    }
   }
   else if (type == "data_summary") { #TODO consolidate with code in tidy.anova_exploratory
     conf_threshold = 1 - (1 - conf_level)/2
@@ -470,7 +629,13 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
 
 #' ANOVA wrapper for Analytics View
 #' @export
-exp_anova <- function(df, var1, var2, func2 = NULL, ...) {
+exp_anova <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, f = NULL, power = NULL, beta = NULL, ...) {
+  if (!is.null(power) && !is.null(beta) && (power + beta != 1.0)) {
+    stop("Specify only one of Power or Probability of Type 2 Error, or they must add up to 1.0.")
+  }
+  if (is.null(power) && !is.null(beta)) {
+    power <- 1.0 - beta
+  }
   var1_col <- col_name(substitute(var1))
   var2_col <- col_name(substitute(var2))
   grouped_cols <- grouped_by(df)
@@ -493,10 +658,20 @@ exp_anova <- function(df, var1, var2, func2 = NULL, ...) {
   anova_each <- function(df) {
     tryCatch({
       model <- aov(formula, data = df, ...)
+      # calculate Cohen's f from actual data
+      model$cohens_f <- calculate_cohens_f(df[[var1_col]], df[[var2_col]])
+      if (is.null(f)) {
+        model$cohens_f_to_detect <- model$cohens_f
+      }
+      else {
+        model$cohens_f_to_detect <- f
+      }
       class(model) <- c("anova_exploratory", class(model))
       model$var1 <- var1_col
       model$var2 <- var2_col
       model$data <- df
+      model$sig.level <- sig.level
+      model$power <- power
       model
     }, error = function(e){
       if(length(grouped_cols) > 0) {
@@ -534,14 +709,65 @@ glance.anova_exploratory <- function(x) {
 #' @export
 tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
   if (type == "model") {
+    note <- NULL
     ret <- broom:::tidy.aov(x)
-    ret <- ret %>% dplyr::select(term, statistic, p.value, df, sumsq, meansq) %>%
-      dplyr::rename(Term=term,
-                    `F Ratio`=statistic,
-                    `P Value`=p.value,
-                    `Degree of Freedom`=df,
-                    `Sum of Squares`=sumsq,
-                    `Mean Square`=meansq)
+    # Get number of groups (k) , and the minimum sample size amoung those groups (min_n_rows).
+    data_summary <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
+      dplyr::summarize(n_rows=length(!!rlang::sym(x$var1))) %>%
+      dplyr::summarize(min_n_rows=min(n_rows), k=n())
+    k <- data_summary$k
+    # Using minimum group sample size as the sample size for power calculation.
+    # Reference: https://www.theanalysisfactor.com/when-unequal-sample-sizes-are-and-are-not-a-problem-in-anova/
+    min_n_rows <- data_summary$min_n_rows
+
+    if (is.null(x$power)) {
+      # If power is not specified in the arguments, estimate current power.
+      tryCatch({ # pwr function can return error from equation resolver. Catch it rather than stopping the whole thing.
+        power_res <- pwr::pwr.anova.test(k = k, n= min_n_rows, f = x$cohens_f_to_detect, sig.level = x$sig.level)
+        power_val <- power_res$power
+      }, error = function(e) {
+        note <- e$message
+        power_val <- NA_real_
+      })
+      ret <- ret %>% dplyr::select(term, statistic, p.value, df, sumsq, meansq) %>%
+        dplyr::mutate(f=c(x$cohens_f, NA_real_), power=c(power_val, NA_real_), beta=c(1.0-power_val, NA_real_)) %>%
+        dplyr::rename(Term=term,
+                      `F Ratio`=statistic,
+                      `P Value`=p.value,
+                      `Degree of Freedom`=df,
+                      `Sum of Squares`=sumsq,
+                      `Mean Square`=meansq,
+                      `Effect Size (Cohen's f)`=f,
+                      `Power`=power,
+                      `Probability of Type 2 Error`=beta)
+    }
+    else {
+      # If required power is specified in the arguments, estimate required sample size. 
+      tryCatch({ # pwr function can return error from equation resolver. Catch it rather than stopping the whole thing.
+        power_res <- pwr::pwr.anova.test(k = k, f = x$cohens_f_to_detect, sig.level = x$sig.level, power = x$power)
+        required_sample_size <- power_res$n
+      }, error = function(e) {
+        note <- e$message
+        required_sample_size <- NA_real_
+      })
+      ret <- ret %>% dplyr::select(term, statistic, p.value, df, sumsq, meansq) %>%
+        dplyr::mutate(f=c(x$cohens_f, NA_real_), power=c(x$power, NA_real_), beta=c(1.0-x$power, NA_real_)) %>%
+        dplyr::mutate(current_sample_size=min_n_rows, required_sample_size=c(required_sample_size, NA_real_)) %>%
+        dplyr::rename(Term=term,
+                      `F Ratio`=statistic,
+                      `P Value`=p.value,
+                      `Degree of Freedom`=df,
+                      `Sum of Squares`=sumsq,
+                      `Mean Square`=meansq,
+                      `Effect Size (Cohen's f)`=f,
+                      `Target Power`=power,
+                      `Target Probability of Type 2 Error`=beta,
+                      `Current Sample Size (Each Group)`=current_sample_size,
+                      `Required Sample Size (Each Group)`=required_sample_size)
+    }
+    if (!is.null(note)) { # Add Note column, if there was an error from pwr function.
+      ret <- ret %>% dplyr::mutate(Note=note)
+    }
   }
   else if (type == "data_summary") { #TODO consolidate with code in tidy.ttest_exploratory
     conf_threshold = 1 - (1 - conf_level)/2
