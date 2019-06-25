@@ -408,9 +408,9 @@ evaluate_binary_training_and_test <- function(df, actual_val_col, threshold = "f
     ret <- ret %>% dplyr::arrange_(paste0("`", grouped_col, "`"))
   }
 
-  # Prettify is_test_data column.
+  # Prettify is_test_data column. Note that column order is already taken care of.
   if (!is.null(ret$is_test_data) && pretty.name) {
-    ret <- ret %>% dplyr::select(is_test_data, everything()) %>%
+    ret <- ret %>%
       dplyr::mutate(is_test_data = dplyr::if_else(is_test_data, "Test", "Training")) %>%
       dplyr::rename(`Data Type` = is_test_data)
   }
