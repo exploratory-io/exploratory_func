@@ -804,15 +804,14 @@ pivot <- function(df, formula, value = NULL, ...) {
 #' @param fun.aggregate Function to aggregate duplicated columns
 #' @param fill Value to be filled for missing values
 #' @param na.rm If na should be removed from values
-#' @param sep Column name separater character
 #' @export
-pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = NULL, na.rm = TRUE, sep="_") {
+pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = NULL, na.rm = TRUE) {
   validate_empty_data(df)
 
   # create a column name for row names
-  # column names in lhs are collapsed by sep argument. Default is "_"
+  # column names in lhs are collapsed by "_"
   rows <- all.vars(lazyeval::f_lhs(formula))
-  cname <- paste0(rows, collapse = sep)
+  cname <- paste0(rows, collapse = "_")
 
   vars <- all.vars(formula)
 
