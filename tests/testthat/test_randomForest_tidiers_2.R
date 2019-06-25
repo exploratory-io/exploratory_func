@@ -252,7 +252,7 @@ test_that("ranger.set_multi_predicted_values", {
                                                          m_m$predictions,
                                                          df[["z"]])
   na_at <- ranger.find_na(c("x", "y"), df) 
-  predicted_value <- restore_na(predicted_value_nona, nrow(df), na_at)
+  predicted_value <- restore_na(predicted_value_nona, na_at)
   ret <- ranger.set_multi_predicted_values(df, m_m$predictions, predicted_value, na_at)
   expected_colnames <-  c("x", "y", "z",
                           "predicted_probability_A", "predicted_probability_D", "predicted_probability_E",

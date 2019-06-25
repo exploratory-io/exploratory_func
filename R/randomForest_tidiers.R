@@ -800,7 +800,7 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
     predicted_label_nona <- ranger.predict_value_from_prob(x$forest$levels,
                                                            pred_res$predictions,
                                                            y_value)
-    predicted_value <- restore_na(predicted_label_nona, nrow(newdata), na_row_numbers)
+    predicted_value <- restore_na(predicted_label_nona, na_row_numbers)
 
     if(is.null(x$classification_type)){
       # just append predicted labels
@@ -812,13 +812,13 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
 
       # when the target level is a single, ncol(predictions) is 1.
       # Inserting once removed NA rows
-      predicted_prob <- restore_na(pred_res$predictions[, ncol(predictions)], nrow(newdata), na_row_numbers)
+      predicted_prob <- restore_na(pred_res$predictions[, ncol(predictions)], na_row_numbers)
       newdata[[predicted_probability_col]] <- predicted_prob
       newdata
     } else if (x$classification_type == "multi") {
       # append predicted probability for each class, max and labels at max values
       # Inserting once removed NA rows
-      predicted_prob <- restore_na(apply(pred_res$predictions, 1 , max), nrow(newdata), na_row_numbers)
+      predicted_prob <- restore_na(apply(pred_res$predictions, 1 , max), na_row_numbers)
       newdata <- ranger.set_multi_predicted_values(newdata, pred_res$predictions, predicted_value, na_row_numbers)
       newdata[[predicted_probability_col]] <- predicted_prob
       newdata
@@ -843,13 +843,13 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
         predicted_label_nona <- ranger.predict_value_from_prob(x$forest$levels,
                                                                x$predictions,
                                                                y_value)
-        predicted_value <- restore_na(predicted_label_nona, nrow(data), x$na.action)
+        predicted_value <- restore_na(predicted_label_nona, x$na.action)
       },
       test = {
         predicted_label_nona <- ranger.predict_value_from_prob(x$forest$levels,
                                                                x$prediction_test$predictions,
                                                                y_value)
-        predicted_value <- restore_na(predicted_label_nona, nrow(data), x$prediction_test$na.action)
+        predicted_value <- restore_na(predicted_label_nona, x$prediction_test$na.action)
       })
 
     if(!is.null(x$classification_type) && x$classification_type == "binary"){
@@ -857,11 +857,11 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
         training = {
           # append predicted probability
           predictions <- x$predictions
-          predicted_prob <- restore_na(x$predictions[, ncol(predictions)], nrow(data), x$na.action)
+          predicted_prob <- restore_na(x$predictions[, ncol(predictions)], x$na.action)
         },
         test = {
           predictions <- x$prediction_test$predictions
-          predicted_prob <- restore_na(x$prediction_test$predictions[, ncol(predictions)], nrow(data), x$prediction_test$na.action)
+          predicted_prob <- restore_na(x$prediction_test$predictions[, ncol(predictions)], x$prediction_test$na.action)
         })
       data[[predicted_value_col]] <- predicted_value
       data[[predicted_probability_col]] <- predicted_prob
@@ -869,12 +869,12 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
       switch(data_type,
         training = {
           # Inserting once removed NA rows
-          predicted_prob <- restore_na(apply(x$predictions, 1 , max), nrow(data), x$na.action)
+          predicted_prob <- restore_na(apply(x$predictions, 1 , max), x$na.action)
           data <- ranger.set_multi_predicted_values(data, x$predictions, predicted_value, x$na.action)
         },
         test = {
           # Inserting once removed NA rows
-          predicted_prob <- restore_na(apply(x$prediction_test$predictions, 1 , max), nrow(data), x$prediction_test$na.action)
+          predicted_prob <- restore_na(apply(x$prediction_test$predictions, 1 , max), x$prediction_test$na.action)
           data <- ranger.set_multi_predicted_values(data, x$prediction_test$predictions, predicted_value, x$prediction_test$na.action)
         })
       data[[predicted_probability_col]] <- predicted_prob
@@ -909,7 +909,7 @@ augment.ranger.regression <- function(x, data = NULL, newdata = NULL, data_type 
     predicted_val <- predict(x, cleaned_data)$predictions
 
     # Inserting once removed NA rows
-    newdata[[predicted_value_col]] <- restore_na(predicted_val, nrow(newdata), na_row_numbers)
+    newdata[[predicted_value_col]] <- restore_na(predicted_val, na_row_numbers)
 
     newdata
   } else if (!is.null(data)) {
@@ -917,14 +917,14 @@ augment.ranger.regression <- function(x, data = NULL, newdata = NULL, data_type 
       training = {
         predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
         # Inserting once removed NA rows
-        predicted <- restore_na(x$predictions, nrow(data), x$na.action)
+        predicted <- restore_na(x$predictions, x$na.action)
         data[[predicted_value_col]] <- predicted
         data
       },
       test = {
         predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
         # Inserting once removed NA rows
-        predicted <- restore_na(x$prediction_test$predictions, nrow(data), x$prediction_test$na.action)
+        predicted <- restore_na(x$prediction_test$predictions, x$prediction_test$na.action)
         data[[predicted_value_col]] <- predicted
         data
       })
@@ -974,9 +974,9 @@ augment.rpart.classification <- function(x, data = NULL, newdata = NULL, data_ty
     switch(data_type,
       training = {
         predicted_value_nona <- x$predicted_class
-        predicted_value <- restore_na(predicted_value_nona, nrow(data), x$na.action)
+        predicted_value <- restore_na(predicted_value_nona, x$na.action)
         predicted_probability_nona <- get_predicted_probability_rpart(x)
-        predicted_probability <- restore_na(predicted_probability_nona, nrow(data), x$na.action)
+        predicted_probability <- restore_na(predicted_probability_nona, x$na.action)
       },
       test = {
         predicted_value <- x$predicted_class_test
@@ -1040,7 +1040,7 @@ ranger.set_multi_predicted_values <- function(data, predictions,
     colname <- stringr::str_c(pred_plob_col, colnames(ret)[i], sep="_")
 
     # Inserting once removed NA rows
-    prob_data_bycol <- restore_na(ret[, i], nrow(data), na_row_numbers)
+    prob_data_bycol <- restore_na(ret[, i], na_row_numbers)
     data[[colname]] <- prob_data_bycol
   }
   data[[pred_value_col]] <- predicted_value
