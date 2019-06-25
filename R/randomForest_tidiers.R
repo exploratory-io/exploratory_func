@@ -981,16 +981,17 @@ augment.rpart.classification <- function(x, data = NULL, newdata = NULL, data_ty
     switch(data_type,
       training = {
         predicted_value_nona <- x$predicted_class
-        predicted_value <- restore_na(predicted_value_nona, x$na.action) # TODO: Is this really needed? It seems rpart is returning result with NA rows included.
+        # TODO: This restore_na seems to be needed here, but it seems rpart is returning result with NA rows included for regression case. Whhat is making the difference?
+        predicted_value <- restore_na(predicted_value_nona, x$na.action)
         predicted_probability_nona <- get_predicted_probability_rpart(x)
         predicted_probability <- restore_na(predicted_probability_nona, x$na.action)
       },
       test = {
         predicted_value_nona <- x$predicted_class_test
-        predicted_value_nona <- restore_na(predicted_value_nona, x$unknown_category_rows_index_test) # TODO: Is this really needed? It seems rpart is returning result with NA rows included.
+        predicted_value_nona <- restore_na(predicted_value_nona, x$unknown_category_rows_index_test)
         predicted_value <- restore_na(predicted_value_nona, x$na_row_numbers_test)
         predicted_probability_nona <- get_predicted_probability_rpart(x, data_type = "test")
-        predicted_probability_nona <- restore_na(predicted_probability_nona, x$unknown_category_rows_index_test) # TODO: Is this really needed? It seems rpart is returning result with NA rows included.
+        predicted_probability_nona <- restore_na(predicted_probability_nona, x$unknown_category_rows_index_test)
         predicted_probability <- restore_na(predicted_probability_nona, x$na_row_numbers_test)
       })
 
