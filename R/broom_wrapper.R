@@ -547,6 +547,8 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
 }
 
 #' prediction wrapper for both training and test data
+#' There are not much reason to call this function any more, since you can call prediction(data='training_and_test')
+#' directly. Only remaining case we need to call this is for confusion matrix.
 #' @param df Data frame to predict. This should have model column.
 #' @export
 prediction_training_and_test <- function(df, prediction_type="default", threshold = 0.5, ...) {
