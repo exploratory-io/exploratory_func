@@ -1683,7 +1683,8 @@ get_row_numbers_from_index_vector <- function(index_vector)  {
 #' @param value - prediction results without NA
 #' @param n_data - original data length
 #' @param na_row_numbers - row numbers containing the NA value of data
-restore_na <- function(value, n_data, na_row_numbers){
+restore_na <- function(value, na_row_numbers){
+  n_data <- length(value) + length(na_row_numbers)
   na_at <- if (!is.null(na_row_numbers)) {
     seq_len(n_data) %in% as.integer(na_row_numbers)
   } else {
