@@ -53,9 +53,9 @@ test_that("exp_rpart(binary) evaluate training and test", {
   # TODO: Error: replacement has 3473 rows, data has 3500
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
-  expect_equal(nrow(test_ret), 1488)
+  expect_equal(nrow(test_ret), 1500)
   train_ret <- ret %>% filter(is_test_data==FALSE)
-  expect_equal(nrow(train_ret), 3472)
+  expect_equal(nrow(train_ret), 3500)
 
   ret <- rf_evaluation_training_and_test(model_df)
   expect_equal(nrow(ret), 2) # 2 for train and test
@@ -67,7 +67,7 @@ test_that("exp_rpart(binary) evaluate training and test", {
                 exp_rpart(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0)
   ret <- model_df %>% prediction(data="training_and_test")
   train_ret <- ret %>% filter(is_test_data==FALSE)
-  expect_equal(nrow(train_ret), 4960)
+  expect_equal(nrow(train_ret), 5000)
 
   ret <- rf_evaluation_training_and_test(model_df)
   expect_equal(nrow(ret), 1) # 1 for train
