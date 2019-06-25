@@ -882,8 +882,8 @@ augment.lm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "
       },
       test = {
         # Augment data with already predicted result in the model.
-        data$.fitted <- x$prediction_test$fit
-        data$.se.fit <- x$prediction_test$se.fit
+        data$.fitted <- restore_na(x$prediction_test$fit, nrow(data), x$prediction_test$unknown_category_rows_index)
+        data$.se.fit <- restore_na(x$prediction_test$se.fit, nrow(data), x$prediction_test$unknown_category_rows_index)
         data
       })
   }
@@ -906,8 +906,8 @@ augment.glm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = 
       },
       test = {
         # Augment data with already predicted result in the model.
-        data$.fitted <- x$prediction_test$fit
-        data$.se.fit <- x$prediction_test$se.fit
+        data$.fitted <- restore_na(x$prediction_test$fit, nrow(data), x$prediction_test$unknown_category_rows_index)
+        data$.se.fit <- restore_na(x$prediction_test$se.fit, nrow(data), x$prediction_test$unknown_category_rows_index)
         data
       })
   }
