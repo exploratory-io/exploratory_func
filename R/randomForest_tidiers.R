@@ -2592,7 +2592,17 @@ exp_rpart <- function(df,
       model$formula_terms <- terms(fml)
 
       if (test_rate > 0) {
+        # Handle NA rows for test. For training, rpart seems to automatically handle it, and row numbers of
+        # removed rows are stored in model$na.action.
+        na_row_numbers_test <- ranger.find_na(c_cols, data = df_test)
+        names(c_cols) <- NULL # Clearing names in vector is necessary to make the following select work.
+        df_test_clean <- df_test %>% dplyr::select(!!!rlang::syms(c_cols)) %>% na.omit()
+        unknown_category_rows_index_vector <- get_unknown_category_rows_index_vector(df_test_clean, df %>% dplyr::select(!!!rlang::syms(c_cols)))
+        df_test_clean <- df_test_clean[!unknown_category_rows_index_vector, , drop = FALSE] # 2nd arg must be empty.
+        unknown_category_rows_index <- get_row_numbers_from_index_vector(unknown_category_rows_index_vector)
         model$prediction_test <- predict(model, df_test)
+        model$na_row_numbers_test <- na_row_numbers_test
+        model$unknown_category_rows_index_test <- unknown_category_rows_index
         if (classification_type %in% c("binary", "multi")) {
           model$predicted_class_test <- get_predicted_class_rpart(model, data_type = "test")
         }
