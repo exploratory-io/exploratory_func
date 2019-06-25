@@ -454,4 +454,30 @@ str_extract_inside <- function(column, begin = "(", end = ")") {
   stringr::str_extract(column, exp)
 }
 
+#'Function to extract text inside the characters like bracket.
+#'@export
+str_logical <- function(column, true_value = NULL) {
+   # if true_value are expliclity provided, honor them.
+   if(!is.null(true_value)) {
+     stringr::str_to_lower(column) == stringr::str_to_lower(true_value)
+   } else { # default handling.
+     unique_values <- unique(stringr::str_to_lower(column))
+     # if the column holds "true"/"false" or "TRUE"/"FALSE", use parse_logical
+     if(all(lapply(unique_values, function(x){x %in% c("true","false", NA)}) == TRUE)) {
+       parse_logical(stringr::str_to_lower(column))
+     } else if (all(lapply(unique_values, function(x){x %in% c("yes","no", NA)}) == TRUE)){
+       # if the column holds "yes"/"no" or "YES"/"NO", assume yes or YES as TRUE
+       stringr::str_to_lower(column) == "yes"
+     } else if (all(lapply(unique_values, function(x){x %in% c("1","0", NA)}) == TRUE)) {
+       # if the column holds "1"/"0", assume yes or YES as TRUE
+       stringr::str_to_lower(column) == "1"
+     } else if (all(lapply(unique_values, function(x){x %in% c(1,0, NA)}) == TRUE)) {
+       # if the column holds 1 and 0, assume 1 as TRUE
+       column == 1
+     } else { # all the other case, return NA
+       unlist(lapply(column, function(x){NA}))
+     }
+   }
+}
+
 
