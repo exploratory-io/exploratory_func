@@ -836,3 +836,12 @@ test_that("get_mode", {
   res <- get_mode(x, na.rm = TRUE)
   expect_equal(as.character(res), "2019-01-02")
 })
+
+test_that("get_unknown_category_rows_index", {
+  train_df <- data.frame(x=c('a','b','c'),
+                         y=c('a','b','c'))
+  test_df <- data.frame(x=c('a','c','d'),
+                        y=c('b','e','c'))
+  unknown_index <- get_unknown_category_rows_index(test_df, train_df)
+  expect_equal(unknown_index,c(2,3))
+})

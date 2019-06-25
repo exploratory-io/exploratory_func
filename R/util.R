@@ -1647,3 +1647,36 @@ get_mode <- function(x, na.rm = FALSE) {
   ux <- unique(x)
   return(ux[which.max(tabulate(match(x, ux)))])
 }
+
+get_unknown_category_rows_index_vector <- function(df, training_df) {
+  # list of unique values of each column of training_df.
+  uniq_index <- purrr::map(training_df, function(x){
+    if(is.character(x) || is.factor(x) || is.logical(x)) {
+      unique(x)
+    }
+    else {
+      NULL
+    }
+  })
+
+  # list of vectors each of which is logical vector indicating location of unknown values.
+  # TRUE means unknown value at the row position.
+  unknown_indexes <- purrr::map2(uniq_index, seq(length(uniq_index)), function(unique_values, col_index) {
+    if (is.null(unique_values)) {
+      FALSE
+    }
+    else {
+      df[[col_index]] %nin% unique_values
+    }
+  })
+
+  # Combine unknown_indexes into one logical vector that indicates location of rows with unknown values.
+  ret <- purrr::reduce(unknown_indexes,function(x,y){x|y})
+  ret
+}
+
+get_unknown_category_rows_index <- function(df, training_df) {
+  unknown_index_vector <- get_unknown_category_rows_index_vector(df, training_df)
+  seq(nrow(df))[unknown_index_vector]
+}
+
