@@ -462,7 +462,7 @@ build_lm.fast <- function(df,
         if (test_rate > 0) {
           df_test <- safe_slice(source_data, test_index, remove = FALSE)
           unknown_category_rows_index_vector <- get_unknown_category_rows_index_vector(df_test, df)
-          df_test <- df_test[!unknown_category_rows_index_vector, drop=FALSE]
+          df_test <- df_test[!unknown_category_rows_index_vector, , drop = FALSE] # 2nd arg must be empty.
           unknown_category_rows_index <- get_row_numbers_from_index_vector(unknown_category_rows_index_vector)
         }
 
@@ -531,7 +531,7 @@ build_lm.fast <- function(df,
         if (test_rate > 0) {
           df_test <- safe_slice(source_data, test_index, remove = FALSE)
           unknown_category_rows_index_vector <- get_unknown_category_rows_index_vector(df_test, df)
-          df_test <- df_test[!unknown_category_rows_index_vector,]
+          df_test <- df_test[!unknown_category_rows_index_vector, , drop = FALSE] # 2nd arg must be empty.
           unknown_category_rows_index <- get_row_numbers_from_index_vector(unknown_category_rows_index_vector)
         }
 
