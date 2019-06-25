@@ -506,9 +506,14 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
           dplyr::mutate(source.data = purrr::map2(source.data, model, add_response))
       }
 
-      augmented %>%
+      augmented <- augmented %>%
         dplyr::select(-model) %>%
         unnest_with_drop(source.data)
+
+      # Since is_test_data can go to strange position if there are columns that exists only in certain groups,
+      # move it to the last explicitly.
+      augmented <- augmented %>% select(-is_test_data, everything(), is_test_data)
+      augmented
 
     }
   }
