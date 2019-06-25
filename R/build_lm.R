@@ -880,6 +880,9 @@ augment.lm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "
         data
       })
   }
+  else {
+    broom:::augment.lm(x, ...)
+  }
 }
 
 #' @export
@@ -900,6 +903,9 @@ augment.glm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = 
         data$.se.fit <- x$prediction_test$se.fit
         data
       })
+  }
+  else {
+    broom:::augment.lm(x, ...)
   }
 }
 
