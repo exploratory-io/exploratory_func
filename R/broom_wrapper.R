@@ -452,7 +452,6 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
         dplyr::mutate_(.dots = list(source.data = aug_fml)) %>%
         dplyr::ungroup()
 
-      browser()
       if (with_response){
         augmented <- augmented %>%
           dplyr::mutate(source.data = purrr::map2(source.data, model, add_response))

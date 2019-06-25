@@ -963,6 +963,11 @@ augment.rpart.classification <- function(x, data = NULL, newdata = NULL, data_ty
     newdata %>% dplyr::rename(predicted_label = predicted_value_col) %>%
                 dplyr::select(-predicted_label, everything(), predicted_label)
   } else if (!is.null(data)) {
+    if (nrow(data) == 0) {
+      # Handle the case where, for example, test_rate is 0 here,
+      # rather than trying to make it pass through following code, which can be complex.
+      return (data)
+    }
     y_value <- attributes(x)$ylevels[x$y]
     predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
     predicted_probability_col <- avoid_conflict(colnames(data), "predicted_probability")
@@ -970,11 +975,12 @@ augment.rpart.classification <- function(x, data = NULL, newdata = NULL, data_ty
       training = {
         predicted_value_nona <- x$predicted_class
         predicted_value <- ranger.add_narow(predicted_value_nona, nrow(data), x$na.action)
-        predicted_probability <- apply(predict(x, data, type="prob"), 1, max)
+        predicted_probability_nona <- get_predicted_probability_rpart(x)
+        predicted_probability <- ranger.add_narow(predicted_probability_nona, nrow(data), x$na.action)
       },
       test = {
         predicted_value <- x$predicted_class_test
-        predicted_probability <- apply(predict(x, data, type="prob"), 1, max) # TODO: Use pre-calculated value like predicted_value.
+        predicted_probability <- get_predicted_probability_rpart(x, data_type = "test")
       })
 
     data[[predicted_value_col]] <- predicted_value
@@ -2597,13 +2603,7 @@ exp_rpart <- function(df,
       model$formula_terms <- terms(fml)
 
       if (test_rate > 0) {
-        if (classification_type != "multi") {
-          prediction_test <- predict(model, df_test)
-        }
-        else {
-          prediction_test <- apply(predict(model, df_test, type="prob"), 1, max)
-        }
-        model$prediction_test <- prediction_test
+        model$prediction_test <- predict(model, df_test)
         if (classification_type %in% c("binary", "multi")) {
           model$predicted_class_test <- get_predicted_class_rpart(model, data_type = "test")
         }
@@ -2687,6 +2687,29 @@ get_binary_predicted_value_from_probability_rpart <- function(x, data_type = "tr
   predicted
 }
 
+get_binary_predicted_probability_rpart <- function(x, data_type = "training") {
+  if (class(x$y) == "logical") {
+    # predict(x) is numeric vector of probability of being TRUE.
+    if (data_type == "training") {
+      predicted <- predict(x)
+    }
+    else {
+      predicted <- x$prediction_test
+    }
+  }
+  else {
+    # predict(x) is 2-diminsional matrix with 2 columns for the 2 categories. values in the matrix is the probabilities.
+    # Return the probability for the value for the 1st column.
+    if (data_type == "training") {
+      predicted <- predict(x)[,1]
+    }
+    else {
+      predicted <- x$prediction_test[,1]
+    }
+  }
+  predicted
+}
+
 get_multiclass_predicted_value_from_probability_rpart <- function(x, data = NULL, data_type = 'training') {
   ylevels <- attr(x,"ylevels")
   predicted_mat <- if (is.data.frame(data)) {
@@ -2703,6 +2726,24 @@ get_multiclass_predicted_value_from_probability_rpart <- function(x, data = NULL
   # TODO: move this to model building step so that there is no randomness in analytics viz preprocessor.
   predicted_idx <- max.col(predicted_mat, ties.method = "random")
   predicted <- factor(ylevels[predicted_idx], levels=ylevels)
+  predicted
+}
+
+get_multiclass_predicted_probability_rpart <- function(x, data = NULL, data_type = 'training') {
+  ylevels <- attr(x,"ylevels")
+  predicted_mat <- if (is.data.frame(data)) {
+    predict(x, data)
+  } else {
+    if (data_type == 'training') {
+      predict(x)
+    }
+    else {
+      x$prediction_test
+    }
+  }
+  # ties are broken randomly to be even.
+  # TODO: move this to model building step so that there is no randomness in analytics viz preprocessor.
+  predicted <- apply(predicted_mat, 1, max) # TODO: Looks this is for multiclass. Does this cover binary case too??
   predicted
 }
 
@@ -2748,6 +2789,16 @@ get_predicted_class_rpart <- function(x, data_type = "training") {
   }
   else {
     predicted <- get_multiclass_predicted_value_from_probability_rpart(x, data_type = data_type)
+  }
+  predicted
+}
+
+get_predicted_probability_rpart <- function(x, data_type = "training") {
+  if (x$classification_type == "binary") {
+    predicted <- get_binary_predicted_probability_rpart(x, data_type = data_type)
+  }
+  else {
+    predicted <- get_multiclass_predicted_probability_rpart(x, data_type = data_type)
   }
   predicted
 }
