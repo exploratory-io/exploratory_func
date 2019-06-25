@@ -1,7 +1,7 @@
 # how to run this test:
-# devtools::test(filter="randomForest_tidiers")
+# devtools::test(filter="lm_1")
 
-context("test rpart prediction with training/test data")
+context("test lm/glm prediction with training/test data")
 
 testdata_dir <- "~/.exploratory/"
 testdata_filename <- "airline_2013_10_tricky_v3_5k.csv" 

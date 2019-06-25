@@ -1,7 +1,7 @@
 # how to run this test:
-# devtools::test(filter="randomForest_tidiers")
+# devtools::test(filter="randomForest_tidiers_3")
 
-context("test tidiers for randomForest 3")
+context("test tidiers for randomForest 3 (training and test data)")
 
 testdata_dir <- "~/.exploratory/"
 testdata_filename <- "airline_2013_10_tricky_v3_5k.csv" 

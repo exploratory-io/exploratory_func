@@ -1,8 +1,8 @@
 # how to run this test:
-# devtools::test(filter="rpart_3_group")
+# devtools::test(filter="rpart_3")
 # This is same test as test_rpart_2.R with group_by.
 
-context("test tidiers for randomForest 3")
+context("test tidiers for rpart. (trainig/test with group_by)")
 
 testdata_dir <- "~/.exploratory/"
 testdata_filename <- "airline_2013_10_tricky_v3.csv" 

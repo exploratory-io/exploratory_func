@@ -1,5 +1,5 @@
 # how to run this test:
-# devtools::test(filter="randomForest_tidiers")
+# devtools::test(filter="rpart_2")
 
 context("test rpart prediction with training/test data")
 
