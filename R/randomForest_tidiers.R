@@ -981,13 +981,17 @@ augment.rpart.classification <- function(x, data = NULL, newdata = NULL, data_ty
     switch(data_type,
       training = {
         predicted_value_nona <- x$predicted_class
-        predicted_value <- restore_na(predicted_value_nona, x$na.action)
+        predicted_value <- restore_na(predicted_value_nona, x$na.action) # TODO: Is this really needed? It seems rpart is returning result with NA rows included.
         predicted_probability_nona <- get_predicted_probability_rpart(x)
         predicted_probability <- restore_na(predicted_probability_nona, x$na.action)
       },
       test = {
-        predicted_value <- x$predicted_class_test
-        predicted_probability <- get_predicted_probability_rpart(x, data_type = "test")
+        predicted_value_nona <- x$predicted_class_test
+        predicted_value_nona <- restore_na(predicted_value_nona, x$unknown_category_rows_index_test) # TODO: Is this really needed? It seems rpart is returning result with NA rows included.
+        predicted_value <- restore_na(predicted_value_nona, x$na_row_numbers_test)
+        predicted_probability_nona <- get_predicted_probability_rpart(x, data_type = "test")
+        predicted_probability_nona <- restore_na(predicted_probability_nona, x$unknown_category_rows_index_test) # TODO: Is this really needed? It seems rpart is returning result with NA rows included.
+        predicted_probability <- restore_na(predicted_probability_nona, x$na_row_numbers_test)
       })
 
     data[[predicted_value_col]] <- predicted_value
@@ -1023,7 +1027,11 @@ augment.rpart.regression <- function(x, data = NULL, newdata = NULL, data_type =
       },
       test = {
         predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
-        data[[predicted_value_col]] <- x$prediction_test
+        # Inserting once removed NA rows
+        predicted_nona <- x$prediction_test
+        predicted_nona <- restore_na(predicted_nona, x$unknown_category_rows_index_test)
+        predicted <- restore_na(predicted_nona, x$na_row_numbers_test)
+        data[[predicted_value_col]] <- predicted
         data
       })
 
@@ -2600,7 +2608,7 @@ exp_rpart <- function(df,
         unknown_category_rows_index_vector <- get_unknown_category_rows_index_vector(df_test_clean, df %>% dplyr::select(!!!rlang::syms(c_cols)))
         df_test_clean <- df_test_clean[!unknown_category_rows_index_vector, , drop = FALSE] # 2nd arg must be empty.
         unknown_category_rows_index <- get_row_numbers_from_index_vector(unknown_category_rows_index_vector)
-        model$prediction_test <- predict(model, df_test)
+        model$prediction_test <- predict(model, df_test_clean)
         model$na_row_numbers_test <- na_row_numbers_test
         model$unknown_category_rows_index_test <- unknown_category_rows_index
         if (classification_type %in% c("binary", "multi")) {
