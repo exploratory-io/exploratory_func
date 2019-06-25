@@ -1039,6 +1039,7 @@ augment.rpart.regression <- function(x, data = NULL, newdata = NULL, data_type =
 ranger.set_multi_predicted_values <- function(data, predictions,
                                               predicted_value,
                                               na_row_numbers,
+                                              unknown_category_row_numbers,
                                               pred_plob_col="predicted_probability",
                                               pred_value_col="predicted_value") {
   ret <- predictions
@@ -1047,7 +1048,11 @@ ranger.set_multi_predicted_values <- function(data, predictions,
     colname <- stringr::str_c(pred_plob_col, colnames(ret)[i], sep="_")
 
     # Inserting once removed NA rows
-    prob_data_bycol <- restore_na(ret[, i], na_row_numbers)
+    prob_data_bycol_nona <- ret[, i, drop = FALSE]
+    if (!is.na(unknown_category_row_numbers)) {
+      prob_data_bycol_nona <- restore_na(prob_data_bycol_nona, unknown_category_row_numbers)
+    }
+    prob_data_bycol <- restore_na(prob_data_bycol_nona, na_row_numbers)
     data[[colname]] <- prob_data_bycol
   }
   data[[pred_value_col]] <- predicted_value
