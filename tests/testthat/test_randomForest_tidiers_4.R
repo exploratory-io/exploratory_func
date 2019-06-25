@@ -5,7 +5,7 @@
 context("test tidiers for randomForest 3")
 
 testdata_dir <- "~/.exploratory/"
-testdata_filename <- "airline_2013_10_tricky_v3.csv" 
+testdata_filename <- "airline_2013_10_tricky_v3_5k.csv" 
 testdata_file_path <- paste0(testdata_dir, testdata_filename)
 
 filepath <- if (!testdata_filename %in% list.files(testdata_dir)) {
@@ -13,16 +13,16 @@ filepath <- if (!testdata_filename %in% list.files(testdata_dir)) {
 } else {
   testdata_file_path
 }
-if (!exists("flight_downloaded")) {
-  flight_downloaded <- exploratory::read_delim_file(filepath, ",", quote = "\"", skip = 0 , col_names = TRUE , na = c("","NA") , locale=readr::locale(encoding = "UTF-8", decimal_mark = "."), trim_ws = FALSE , progress = FALSE) %>% exploratory::clean_data_frame()
-  write.csv(flight_downloaded, testdata_file_path)
-  flight <- flight_downloaded
-} else {
-  flight <- flight_downloaded
+
+flight <- exploratory::read_delim_file(filepath, ",", quote = "\"", skip = 0 , col_names = TRUE , na = c("","NA") , locale=readr::locale(encoding = "UTF-8", decimal_mark = "."), trim_ws = FALSE , progress = FALSE) %>% exploratory::clean_data_frame()
+
+filepath <- if (!testdata_filename %in% list.files(testdata_dir)) {
+  flight <- flight %>% sample_n(5000)
+  write.csv(flight, testdata_file_path) # save sampled-down data for performance.
 }
 
 # Add group_by. Cases without group_by is covered in test_randomForest_tidiers_3.R.
-flight <- flight %>% sample_n(5000) %>% group_by(`CAR RIER`)
+flight <- flight %>% group_by(`CAR RIER`)
 
 
 test_that("calc_feature_map(regression) evaluate training and test", {
