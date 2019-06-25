@@ -461,6 +461,8 @@ build_lm.fast <- function(df,
         df <- safe_slice(source_data, test_index, remove = TRUE)
         if (test_rate > 0) {
           df_test <- safe_slice(source_data, test_index, remove = FALSE)
+          unknown_category_rows_index_vector <- get_unknown_category_rows_index_vector(df_test, df)
+          df_test <- df_test[!unknown_category_rows_index_vector, drop=FALSE]
         }
 
         # when family is negativebinomial, use MASS::glm.nb
@@ -527,6 +529,8 @@ build_lm.fast <- function(df,
         df <- safe_slice(source_data, test_index, remove = TRUE)
         if (test_rate > 0) {
           df_test <- safe_slice(source_data, test_index, remove = FALSE)
+          unknown_category_rows_index_vector <- get_unknown_category_rows_index_vector(df_test, df)
+          df_test <- df_test[!unknown_category_rows_index_vector,]
         }
 
         model <- stats::lm(fml, data = df) 

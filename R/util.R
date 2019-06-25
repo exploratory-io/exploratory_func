@@ -1675,8 +1675,34 @@ get_unknown_category_rows_index_vector <- function(df, training_df) {
   ret
 }
 
-get_unknown_category_rows_index <- function(df, training_df) {
-  unknown_index_vector <- get_unknown_category_rows_index_vector(df, training_df)
-  seq(nrow(df))[unknown_index_vector]
+get_row_numbers_from_index_vector <- function(index_vector)  {
+  seq(length(index_vector))[index_vector]
+}
+
+#' Returns NA value included in prediction result excluding NA
+#' @param value - prediction results without NA
+#' @param n_data - original data length
+#' @param na_row_numbers - row numbers containing the NA value of data
+restore_na <- function(value, n_data, na_row_numbers){
+  na_at <- if (!is.null(na_row_numbers)) {
+    seq_len(n_data) %in% as.integer(na_row_numbers)
+  } else {
+    NULL
+  }
+  return_value <- rep(NA, time = n_data)
+
+  if(length(na_at) > 0){
+    return_value[!na_at] <- value
+    return_value
+    if (is.factor(value)) {
+      return_value <- levels(value)[return_value]
+      return_value <- factor(return_value, levels=levels(value))
+      return_value
+    } else {
+      return_value
+    }
+  } else {
+    value
+  }
 }
 

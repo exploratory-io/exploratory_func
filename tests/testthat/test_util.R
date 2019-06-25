@@ -842,6 +842,7 @@ test_that("get_unknown_category_rows_index", {
                          y=c('a','b','c'))
   test_df <- data.frame(x=c('a','c','d'),
                         y=c('b','e','c'))
-  unknown_index <- get_unknown_category_rows_index(test_df, train_df)
+  unknown_vector <- get_unknown_category_rows_index_vector(test_df, train_df)
+  unknown_index <- get_row_numbers_from_index_vector(unknown_vector)
   expect_equal(unknown_index,c(2,3))
 })
