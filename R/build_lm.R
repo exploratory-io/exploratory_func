@@ -463,6 +463,7 @@ build_lm.fast <- function(df,
           df_test <- safe_slice(source_data, test_index, remove = FALSE)
           unknown_category_rows_index_vector <- get_unknown_category_rows_index_vector(df_test, df)
           df_test <- df_test[!unknown_category_rows_index_vector, drop=FALSE]
+          unknown_category_rows_index <- get_row_numbers_from_index_vector(unknown_category_rows_index_vector)
         }
 
         # when family is negativebinomial, use MASS::glm.nb
@@ -531,6 +532,7 @@ build_lm.fast <- function(df,
           df_test <- safe_slice(source_data, test_index, remove = FALSE)
           unknown_category_rows_index_vector <- get_unknown_category_rows_index_vector(df_test, df)
           df_test <- df_test[!unknown_category_rows_index_vector,]
+          unknown_category_rows_index <- get_row_numbers_from_index_vector(unknown_category_rows_index_vector)
         }
 
         model <- stats::lm(fml, data = df) 
@@ -552,6 +554,7 @@ build_lm.fast <- function(df,
       if (test_rate > 0) {
         # Note: Do not pass df_test like data=df_test. This for some reason ends up predict returning training data prediction.
         model$prediction_test <- predict(model, df_test, se.fit = TRUE)
+        model$prediction_test$unknown_category_rows_index <- unknown_category_rows_index
       }
       # these attributes are used in tidy of randomForest TODO: is this good for lm too?
       model$terms_mapping <- names(name_map)
