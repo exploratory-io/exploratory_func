@@ -454,7 +454,9 @@ str_extract_inside <- function(column, begin = "(", end = ")") {
   stringr::str_extract(column, exp)
 }
 
-#'Function to extract text inside the characters like bracket.
+#'Function to extract logical value from the specified column.
+#'If true_value is provided, use it to decide TRUE or FALSE.
+#'If true_value is not provided, "true", "yes", "1", and 1 are treated as TRUE.
 #'@export
 str_logical <- function(column, true_value = NULL) {
    # if true_value is explicitly provided, honor them.
