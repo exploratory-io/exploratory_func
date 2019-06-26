@@ -1149,7 +1149,7 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
   # Would it be possible to consolidate those code?
   if (length(test_index) > 0) {
     # Extract test prediction result embedded in the model.
-    predicted <- data %>% prediction(data = "test")
+    predicted <- data %>% prediction(data = "test", ...)
 
     each_func <- function(df) {
       tryCatch({
@@ -2179,7 +2179,7 @@ evaluate_classification <- function(actual, predicted, class, multi_class = TRUE
 # with binary probability prediction model from ranger, take the level with bigger probability as the predicted value.
 #' @export
 # not really an external function but exposing for test. TODO: find better way.
-get_binary_predicted_value_from_probability <- function(x) {
+get_binary_predicted_value_from_probability <- function(x, threshold = 0.5) {
   # x$predictions is 2-diminsional matrix with 2 columns for the 2 categories. values in the matrix is the probabilities.
   # TODO: thought x$predictions was 3 dimensinal array with tree dimension from the doc and independently running ranger,
   # but looks like it is already averaged? look into it.
@@ -2188,7 +2188,7 @@ get_binary_predicted_value_from_probability <- function(x) {
       1
     }
     else {
-      if(x[1]>x[2]) 1 else 2
+      if(x[1]>threshold) 1 else 2
     }
   })], levels=x$forest$levels)
   predicted
@@ -2221,7 +2221,7 @@ evaluate_binary_classification <- function(actual, predicted, predicted_probabil
 
 #' @export
 #' @param type "importance", "evaluation" or "conf_mat". Feature importance, evaluated scores or confusion matrix of training data.
-tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
+tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, binary_classification_threshold = 0.5, ...) {
   switch(
     type,
     importance = {
@@ -2244,7 +2244,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
         glance(x, pretty.name = pretty.name, ...)
       } else {
         if (x$classification_type == "binary") {
-          predicted <- get_binary_predicted_value_from_probability(x)
+          predicted <- get_binary_predicted_value_from_probability(x, threshold = binary_classification_threshold)
           predicted_probability <- x$predictions[,1]
           ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = pretty.name)
         }
@@ -2259,7 +2259,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
       # get evaluation scores from training data
       actual <- x$y
       if (x$classification_type == "binary") {
-        predicted <- get_binary_predicted_value_from_probability(x)
+        predicted <- get_binary_predicted_value_from_probability(x, threshold = binary_classification_threshold)
       }
       else {
         predicted <- ranger.predict_value_from_prob(x$forest$levels, x$predictions, x$y)
@@ -2274,7 +2274,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
     conf_mat = {
       # return confusion matrix
       if (x$classification_type == "binary") {
-        predicted <- get_binary_predicted_value_from_probability(x)
+        predicted <- get_binary_predicted_value_from_probability(x, threshold = binary_classification_threshold)
       }
       else {
         predicted <- ranger.predict_value_from_prob(x$forest$levels, x$predictions, x$y)
@@ -2297,7 +2297,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, ...) {
     scatter = {
       # return actual and predicted value pairs
       if (x$classification_type == "binary") {
-        predicted <- get_binary_predicted_value_from_probability(x)
+        predicted <- get_binary_predicted_value_from_probability(x, threshold = binary_classification_threshold)
       }
       else if (x$classification_type == "mutli") {
         predicted <- ranger.predict_value_from_prob(x$forest$levels, x$predictions, x$y)
