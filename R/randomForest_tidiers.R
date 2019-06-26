@@ -772,10 +772,15 @@ augment.ranger <- function(x, data = NULL, newdata = NULL, ...) {
 
 #' augment for randomForest model
 #' @export
-augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_type = "training", ...) {
+augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_type = "training", binary_classification_threshold = 0.5, ...) {
   y_name <- x$terms_mapping[all.vars(x$formula_terms)[[1]]]
   predictor_variables <- all.vars(x$formula_terms)[-1]
   predictor_variables <- x$terms_mapping[predictor_variables]
+
+  threshold <- NULL
+  if (x$classification_type == "binary") {
+    threshold <- binary_classification_threshold
+  }
 
   if(!is.null(newdata)){
     # create clean name data frame because the model learned by those names
@@ -796,10 +801,10 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
     # Run prediction.
     pred_res <- predict(x, cleaned_data)
 
-    # Inserting once removed NA rows
     predicted_label_nona <- ranger.predict_value_from_prob(x$forest$levels,
                                                            pred_res$predictions,
-                                                           y_value)
+                                                           y_value, threshold = threshold)
+    # Inserting once removed NA rows
     predicted_value <- restore_na(predicted_label_nona, na_row_numbers)
 
     if(is.null(x$classification_type)){
@@ -842,13 +847,13 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
       training = {
         predicted_label_nona <- ranger.predict_value_from_prob(x$forest$levels,
                                                                x$predictions,
-                                                               y_value)
+                                                               y_value, threshold = threshold)
         predicted_value <- restore_na(predicted_label_nona, x$na.action)
       },
       test = {
         predicted_label_nona <- ranger.predict_value_from_prob(x$forest$levels,
                                                                x$prediction_test$predictions,
-                                                               y_value)
+                                                               y_value, threshold = threshold)
         predicted_label_nona <- restore_na(predicted_label_nona, x$prediction_test$unknown_category_rows_index)
         predicted_value <- restore_na(predicted_label_nona, x$prediction_test$na.action)
       })
