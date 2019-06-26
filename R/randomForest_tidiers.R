@@ -1151,7 +1151,7 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
     training_ret <- switch(type,
                            evaluation = rf_evaluation(data, pretty.name = pretty.name, ...),
                            evaluation_by_class = rf_evaluation_by_class(data, pretty.name = pretty.name, ...),
-                           conf_mat = data %>% broom::tidy(model, type = "conf_mat"))
+                           conf_mat = data %>% broom::tidy(model, type = "conf_mat", ...))
     if (length(test_index) > 0 && nrow(training_ret) > 0) {
         training_ret$is_test_data <- FALSE
     }
