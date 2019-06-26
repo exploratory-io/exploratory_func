@@ -457,12 +457,12 @@ str_extract_inside <- function(column, begin = "(", end = ")") {
 #'Function to extract text inside the characters like bracket.
 #'@export
 str_logical <- function(column, true_value = NULL) {
-   # if true_value are expliclity provided, honor them.
+   # if true_value are explicitly provided, honor them.
    if(!is.null(true_value)) {
-     stringr::str_to_lower(column) == stringr::str_to_lower(true_value)
+     stringr::str_to_lower(stringr::str_trim(column)) == stringr::str_to_lower(true_value)
    } else { # default handling.
       # if value is either "true", "yes", "1", or 1, return TRUE
-      target <- stringr::str_to_lower(column)
+      target <- stringr::str_to_lower(stringr::str_trim(column))
       dplyr::case_when(target %in% c("true", "yes", "1", 1) ~ TRUE,
                        target %in% c("false", "no", "0", 0) ~ FALSE,
                        TRUE ~ as.logical(NA))
