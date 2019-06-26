@@ -1,9 +1,20 @@
 context("test tidiers for ranger randomForest")
-if (!exists("flight")) {
-  # To skip repeated data loading, run the following outside of the context of the test,
-  # so that it stays even after the test.
-  flight <- exploratory::read_delim_file("https://www.dropbox.com/s/f47baw5f3v0xoll/airline_2013_10_tricky_v3.csv?dl=1", ",", quote = "\"", skip = 0 , col_names = TRUE , na = c("","NA") , locale=readr::locale(encoding = "UTF-8", decimal_mark = "."), trim_ws = FALSE , progress = FALSE) %>% exploratory::clean_data_frame()
+
+testdata_dir <- "~/.exploratory/"
+testdata_filename <- "airline_2013_10_tricky_v3_5k.csv" 
+testdata_file_path <- paste0(testdata_dir, testdata_filename)
+
+filepath <- if (!testdata_filename %in% list.files(testdata_dir)) {
+  "https://www.dropbox.com/s/f47baw5f3v0xoll/airline_2013_10_tricky_v3.csv?dl=1"
+} else {
+  testdata_file_path
+}
+
+flight <- exploratory::read_delim_file(filepath, ",", quote = "\"", skip = 0 , col_names = TRUE , na = c("","NA") , locale=readr::locale(encoding = "UTF-8", decimal_mark = "."), trim_ws = FALSE , progress = FALSE) %>% exploratory::clean_data_frame()
+
+filepath <- if (!testdata_filename %in% list.files(testdata_dir)) {
   flight <- flight %>% sample_n(5000)
+  write.csv(flight, testdata_file_path) # save sampled-down data for performance.
 }
 
 test_data <- structure(
@@ -271,7 +282,7 @@ test_that("in the case of a single target variable single_value ranger with bina
   test_data[1, "IS_TRUE"] <- FALSE
 
   pred_train_ret <- suppressWarnings(prediction(model_ret, data = "newdata", data_frame = test_data))
-  expect_equal(pred_train_ret[1, "predicted_label"]$predicted_label, NA)
+  expect_true(is.na(pred_train_ret[1, "predicted_label"]$predicted_label))
  
 })
 
