@@ -2528,6 +2528,7 @@ exp_rpart <- function(df,
                       max_nrow = 50000, # down from 200000 when we added partial dependence
                       target_n = 20,
                       predictor_n = 12, # so that at least months can fit in it.
+                      binary_classification_threshold = 0.5,
                       smote = FALSE,
                       smote_target_minority_perc = 40,
                       smote_max_synth_perc = 200,
@@ -2613,7 +2614,8 @@ exp_rpart <- function(df,
         # we need to call this here rather than in tidy(),
         # since there is randomness involved in breaking tie
         # of multiclass classification.
-        model$predicted_class <- get_predicted_class_rpart(model)
+        model$predicted_class <- get_predicted_class_rpart(model,
+                                                           binary_classification_threshold = binary_classification_threshold)
       }
       model$terms_mapping <- names(name_map)
       names(model$terms_mapping) <- name_map
@@ -2632,7 +2634,8 @@ exp_rpart <- function(df,
         model$na_row_numbers_test <- na_row_numbers_test
         model$unknown_category_rows_index_test <- unknown_category_rows_index
         if (classification_type %in% c("binary", "multi")) {
-          model$predicted_class_test <- get_predicted_class_rpart(model, data_type = "test")
+          model$predicted_class_test <- get_predicted_class_rpart(model, data_type = "test",
+                                                                  binary_classification_threshold = binary_classification_threshold)
         }
       }
 
