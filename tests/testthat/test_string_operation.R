@@ -379,7 +379,8 @@ test_that("str_extract_inside", {
     expect_equal(ret, c(TRUE, NA, NA, NA, TRUE, FALSE, TRUE, FALSE, TRUE, FALSE, NA, NA, NA, NA, NA))
     ret <- exploratory::str_logical(c("yes", "ddd", "cc", "ee", "1", "0", 1, 0, "true", "false", "YES", "","", NA, NA), true_value = "yes")
     expect_equal(ret, c(TRUE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, FALSE, FALSE, NA, NA))
-
+    ret <- exploratory::str_logical(c(NA, NA, NA, NA, NA, NA, NA, NA))
+    expect_equal(ret, c(NA, NA, NA, NA, NA, NA, NA, NA))
   })
 
 
