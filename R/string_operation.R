@@ -454,4 +454,21 @@ str_extract_inside <- function(column, begin = "(", end = ")") {
   stringr::str_extract(column, exp)
 }
 
+#'Function to extract logical value from the specified column.
+#'If true_value is provided, use it to decide TRUE or FALSE.
+#'If true_value is not provided, "true", "yes", "1", and 1 are treated as TRUE.
+#'@export
+str_logical <- function(column, true_value = NULL) {
+   # if true_value is explicitly provided, honor it
+   if(!is.null(true_value)) {
+     stringr::str_to_lower(stringr::str_trim(column)) == stringr::str_to_lower(true_value)
+   } else { # default handling.
+      # if value is either "true", "yes", "1", or 1, return TRUE
+      target <- stringr::str_to_lower(stringr::str_trim(column))
+      ifelse (target %in% c("true", "yes", "1", 1),
+              TRUE,
+              ifelse(target %in%  c("false", "no", "0", 0), FALSE, NA))
+   }
+}
+
 

@@ -364,5 +364,24 @@ test_that("str_extract_inside", {
     expect_equal(e$message, "The end argument must be symbol such as ), }, ].")
   })
 
+  test_that("str_logical", {
+    ret <- exploratory::str_logical(c("yes", "yEs", "yeS", " YEs", "YeS ", "yES", "YES","no", "No", "nO", "NO ", NA))
+    expect_equal(ret, c(TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, FALSE, NA))
+    ret <- exploratory::str_logical(c("true", "tRue", "trUe", "truE", "TRue", "TrUe", "TruE", "TRUe", "TRuE", "TrUE", "tRUE", "TRUE","false", "FALSE", NA))
+    expect_equal(ret, c(TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, FALSE, NA))
+    ret <- exploratory::str_logical(c("1", "0", "0", "1", "1", "1", "1", "0", "1", "1", "1", "1","1", "0", NA))
+    expect_equal(ret, c(TRUE, FALSE, FALSE, TRUE, TRUE, TRUE, TRUE, FALSE, TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, NA))
+    ret <- exploratory::str_logical(c(1, 0, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1,1, 0, NA))
+    expect_equal(ret, c(TRUE, FALSE, FALSE, TRUE, TRUE, TRUE, TRUE, FALSE, TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, NA))
+    ret <- exploratory::str_logical(c("Sign Up", "Not Sign Up", "Not Sign Up", "sign Up", "sign up", "SIGN UP", "Sign UP", "Not Sign Up", "Sign Up", "Sign Up", "Sign Up", "Sign Up","Sign Up", "Not Sign Up", NA), true_value = "Sign Up")
+    expect_equal(ret, c(TRUE, FALSE, FALSE, TRUE, TRUE, TRUE, TRUE, FALSE, TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, NA))
+    ret <- exploratory::str_logical(c("yes", "ddd", "cc", "ee", "1", "0", 1, 0, "true", "false", "aa", "","", NA, NA))
+    expect_equal(ret, c(TRUE, NA, NA, NA, TRUE, FALSE, TRUE, FALSE, TRUE, FALSE, NA, NA, NA, NA, NA))
+    ret <- exploratory::str_logical(c("yes", "ddd", "cc", "ee", "1", "0", 1, 0, "true", "false", "YES", "","", NA, NA), true_value = "yes")
+    expect_equal(ret, c(TRUE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, FALSE, FALSE, NA, NA))
+    ret <- exploratory::str_logical(c(NA, NA, NA, NA, NA, NA, NA, NA))
+    expect_equal(ret, c(NA, NA, NA, NA, NA, NA, NA, NA))
+  })
+
 
 })
