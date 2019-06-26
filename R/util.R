@@ -336,7 +336,7 @@ same_type <- function(vector, original){
     as.integer(vector)
   } else if(inherits(original, "Date")) {
     # when original data is Date.
-    # if the column is wrapped with lubridate funciton, it's possible that data is converted to numeric like year
+    # if the column is wrapped with lubridate function, it's possible that data is converted to numeric like year
     # and character like month name. For these cases, it fails with "character string is not in a standard unambiguous format" error
     # so fallback to original value.
     tryCatch({as.Date(vector, tz = lubridate::tz(original))},
@@ -346,7 +346,7 @@ same_type <- function(vector, original){
     )
   } else if(inherits(original, "POSIXct")){
     # when original data is POSIXct
-    # if the column is wrapped with lubridate funciton, it's possible that data is converted to numeric like year
+    # if the column is wrapped with lubridate function, it's possible that data is converted to numeric like year
     # and character like month name. For these cases, it fails with "character string is not in a standard unambiguous format" error
     # so fallback to original value.
     tryCatch({ as.POSIXct(vector, tz = lubridate::tz(original))},
