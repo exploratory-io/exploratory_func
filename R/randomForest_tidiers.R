@@ -1095,8 +1095,22 @@ ranger.find_na_index <- function(variables, data) {
 #' @param levels_var - Factor level of label to predict
 #' @param pred - Matrix of prediction probabilities
 #' @param y_value - Actual value to be predicted
-ranger.predict_value_from_prob <- function(levels_var, pred, y_value) {
-  same_type(levels_var[apply(pred, 1, which.max)], y_value)
+ranger.predict_value_from_prob <- function(levels_var, pred, y_value, threshold = NULL) {
+  # We assume threshold is given only for binary case.
+  if (is.null(threshold)) { # multiclass case
+    same_type(levels_var[apply(pred, 1, which.max)], y_value)
+  }
+  else { # binary case
+    predicted <- factor(levels_var[apply(pred, 1, function(x){
+      if(is.na(x[2])){ # take care of the case where x$predictions has only 1 column. possible when there are only one value in training data.
+        1
+      }
+      else {
+        if(x[1]>threshold) 1 else 2
+      }
+    })], levels=levels_var)
+    predicted
+  }
 }
 
 rename_groups <- function(n) {
