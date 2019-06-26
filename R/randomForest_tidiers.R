@@ -2810,9 +2810,9 @@ get_class_levels_rpart <- function(x) {
   ylevels
 }
 
-get_predicted_class_rpart <- function(x, data_type = "training") {
+get_predicted_class_rpart <- function(x, data_type = "training", binary_classification_threshold = 0.5) {
   if (x$classification_type == "binary") {
-    predicted <- get_binary_predicted_value_from_probability_rpart(x, data_type = data_type)
+    predicted <- get_binary_predicted_value_from_probability_rpart(x, data_type = data_type, threshold = binary_classification_threshold)
   }
   else {
     predicted <- get_multiclass_predicted_value_from_probability_rpart(x, data_type = data_type)
