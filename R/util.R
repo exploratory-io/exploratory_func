@@ -335,11 +335,25 @@ same_type <- function(vector, original){
   } else if(is.integer(original)){
     as.integer(vector)
   } else if(inherits(original, "Date")) {
-    # when original data is Date
-    as.Date(vector, tz = lubridate::tz(original))
+    # when original data is Date.
+    # if the column is wrapped with lubridate funciton, it's possible that data is converted to numeric like year
+    # and character like month name. For these cases, it fails with "character string is not in a standard unambiguous format" error
+    # so fallback to original value.
+    tryCatch({as.Date(vector, tz = lubridate::tz(original))},
+              error = function(e){
+                vector
+              }
+    )
   } else if(inherits(original, "POSIXct")){
     # when original data is POSIXct
-    as.POSIXct(vector, tz = lubridate::tz(original))
+    # if the column is wrapped with lubridate funciton, it's possible that data is converted to numeric like year
+    # and character like month name. For these cases, it fails with "character string is not in a standard unambiguous format" error
+    # so fallback to original value.
+    tryCatch({ as.POSIXct(vector, tz = lubridate::tz(original))},
+             error = function(e) {
+               vector
+             }
+    )
   } else if (is.numeric(original)){
     as.numeric(vector)
   } else if(is.character(original)) {
@@ -1183,6 +1197,20 @@ non_na_pct <- function(x){
 #' @export
 na_ratio <- function(x){
   sum(is.na(x)) / length(x)
+}
+
+#' Ratio of TRUE in a vector
+#' @param x vector
+#' @export
+true_ratio <- function(x){
+  sum(x, na.rm =!all(is.na(x))) / length(x)
+}
+
+#' Ratio of FALSE in a vector
+#' @param x vector
+#' @export
+false_ratio <- function(x){
+  sum(!x, na.rm =!all(is.na(x))) / length(x)
 }
 
 #' Ratio of Non NA in a vector
