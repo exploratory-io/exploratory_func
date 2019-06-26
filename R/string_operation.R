@@ -465,9 +465,9 @@ str_logical <- function(column, true_value = NULL) {
    } else { # default handling.
       # if value is either "true", "yes", "1", or 1, return TRUE
       target <- stringr::str_to_lower(stringr::str_trim(column))
-      dplyr::case_when(target %in% c("true", "yes", "1", 1) ~ TRUE,
-                       target %in% c("false", "no", "0", 0) ~ FALSE,
-                       TRUE ~ as.logical(NA))
+      ifelse (target %in% c("true", "yes", "1", 1),
+              TRUE,
+              ifelse(target %in%  c("false", "no", "0", 0), FALSE, NA))
    }
 }
 
