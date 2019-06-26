@@ -1199,6 +1199,20 @@ na_ratio <- function(x){
   sum(is.na(x)) / length(x)
 }
 
+#' Ratio of TRUE in a vector
+#' @param x vector
+#' @export
+true_ratio <- function(x){
+  sum(x, na.rm =!all(is.na(x))) / length(x)
+}
+
+#' Ratio of FALSE in a vector
+#' @param x vector
+#' @export
+false_ratio <- function(x){
+  sum(!x, na.rm =!all(is.na(x))) / length(x)
+}
+
 #' Ratio of Non NA in a vector
 #' @param x vector
 #' @export
