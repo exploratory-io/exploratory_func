@@ -457,7 +457,7 @@ str_extract_inside <- function(column, begin = "(", end = ")") {
 #'Function to extract text inside the characters like bracket.
 #'@export
 str_logical <- function(column, true_value = NULL) {
-   # if true_value are explicitly provided, honor them.
+   # if true_value is explicitly provided, honor them.
    if(!is.null(true_value)) {
      stringr::str_to_lower(stringr::str_trim(column)) == stringr::str_to_lower(true_value)
    } else { # default handling.
