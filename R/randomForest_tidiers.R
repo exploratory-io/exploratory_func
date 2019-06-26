@@ -2690,25 +2690,25 @@ exp_rpart <- function(df,
 # with binary probability prediction model from ranger, take the level with bigger probability as the predicted value.
 #' @export
 # not really an external function but exposing for test. TODO: find better way.
-get_binary_predicted_value_from_probability_rpart <- function(x, data_type = "training") {
+get_binary_predicted_value_from_probability_rpart <- function(x, data_type = "training", threshold = 0.5) {
   if (class(x$y) == "logical") {
     # predict(x) is numeric vector of probability of being TRUE.
     ylevels <- c("TRUE", "FALSE")
     if (data_type == "training") {
-      predicted <- factor(predict(x) > 0.5, levels=ylevels)
+      predicted <- factor(predict(x) > threshold, levels=ylevels)
     }
     else {
-      predicted <- factor(x$prediction_test > 0.5, levels=ylevels)
+      predicted <- factor(x$prediction_test > threshold, levels=ylevels)
     }
   }
   else {
     # predict(x) is 2-diminsional matrix with 2 columns for the 2 categories. values in the matrix is the probabilities.
     ylevels <- attr(x,"ylevels")
     if (data_type == "training") {
-      predicted <- factor(ylevels[apply(predict(x), 1, function(x){if(x[1]>x[2]) 1 else 2})], levels=ylevels)
+      predicted <- factor(ylevels[apply(predict(x), 1, function(x){if(x[1] > threshold) 1 else 2})], levels=ylevels)
     }
     else {
-      predicted <- factor(ylevels[apply(x$prediction_test, 1, function(x){if(x[1]>x[2]) 1 else 2})], levels=ylevels)
+      predicted <- factor(ylevels[apply(x$prediction_test, 1, function(x){if(x[1] > threshold) 1 else 2})], levels=ylevels)
     }
   }
   predicted
