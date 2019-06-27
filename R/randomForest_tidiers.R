@@ -993,6 +993,7 @@ augment.rpart.classification <- function(x, data = NULL, newdata = NULL, data_ty
         predicted_value_nona <- x$predicted_class
         # TODO: This restore_na seems to be needed here, but it seems rpart is returning result with NA rows included for regression case. Whhat is making the difference?
         predicted_value <- restore_na(predicted_value_nona, x$na.action)
+        # binary case and multiclass case are both handled inside this func.
         predicted_probability_nona <- get_predicted_probability_rpart(x)
         predicted_probability <- restore_na(predicted_probability_nona, x$na.action)
       },
@@ -1000,6 +1001,7 @@ augment.rpart.classification <- function(x, data = NULL, newdata = NULL, data_ty
         predicted_value_nona <- x$predicted_class_test
         predicted_value_nona <- restore_na(predicted_value_nona, x$unknown_category_rows_index_test)
         predicted_value <- restore_na(predicted_value_nona, x$na_row_numbers_test)
+        # binary case and multiclass case are both handled inside this func.
         predicted_probability_nona <- get_predicted_probability_rpart(x, data_type = "test")
         predicted_probability_nona <- restore_na(predicted_probability_nona, x$unknown_category_rows_index_test)
         predicted_probability <- restore_na(predicted_probability_nona, x$na_row_numbers_test)
@@ -2781,7 +2783,7 @@ get_multiclass_predicted_probability_rpart <- function(x, data = NULL, data_type
   }
   # ties are broken randomly to be even.
   # TODO: move this to model building step so that there is no randomness in analytics viz preprocessor.
-  predicted <- apply(predicted_mat, 1, max) # TODO: Looks this is for multiclass. Does this cover binary case too??
+  predicted <- apply(predicted_mat, 1, max)
   predicted
 }
 
