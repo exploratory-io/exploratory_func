@@ -460,7 +460,11 @@ build_lm.fast <- function(df,
         test_index <- sample_df_index(source_data, rate = test_rate)
         df <- safe_slice(source_data, test_index, remove = TRUE)
         if (test_rate > 0) {
+          # Test mode. Make prediction with test data here, rather than repeating it in Analytics View preprocessors.
           df_test <- safe_slice(source_data, test_index, remove = FALSE)
+          # Remove rows with categorical values which does not appear in training data and unknown to the model.
+          # Record where it was in unknown_category_rows_index, and keep it with model, so that prediction that
+          # matches with original data can be generated later.
           unknown_category_rows_index_vector <- get_unknown_category_rows_index_vector(df_test, df)
           df_test <- df_test[!unknown_category_rows_index_vector, , drop = FALSE] # 2nd arg must be empty.
           unknown_category_rows_index <- get_row_numbers_from_index_vector(unknown_category_rows_index_vector)
@@ -925,14 +929,18 @@ find_data.glm_exploratory <- function(model, env = parent.frame(), ...) {
   model$data
 }
 
+# Generates Summary table for Analytics View. It can handle Test Mode.
 # This is written for linear regression analytics view and GLM analytics views that makes numeric prediction.
 evaluate_lm_training_and_test <- function(df, pretty.name = FALSE){
+  # Get the summary row for traninng data. Info is retrieved from model by glance()
   training_ret <- df %>% broom::glance(model, pretty.name = pretty.name)
   ret <- training_ret
 
   grouped_col <- colnames(df)[!colnames(df) %in% c("model", ".test_index", "source.data")]
 
-  if (purrr::some(df$.test_index, function(x){length(x)!=0})) { # Consider it test mode if any of the element of .test_index column has non-zero length.
+  # Consider it test mode if any of the element of .test_index column has non-zero length, and generate summary row for test data.
+  # Unlike training data, this involves calculating metrics by ourselves from test prediction result.
+  if (purrr::some(df$.test_index, function(x){length(x)!=0})) {
     ret$is_test_data <- FALSE # Set is_test_data FALSE for training data. Add is_test_data column only when there are test data too.
     each_func <- function(df){
       if (!is.data.frame(df)) {
@@ -992,7 +1000,7 @@ evaluate_lm_training_and_test <- function(df, pretty.name = FALSE){
   }
 
   if (length(grouped_col) > 0){
-    ret <- ret %>% dplyr::arrange_(paste0("`", grouped_col, "`"))
+    ret <- ret %>% dplyr::arrange(!!!rlang::syms(grouped_col))
   }
 
   # Prettify is_test_data column. Do this after the above select calls, since it looks at is_test_data column.

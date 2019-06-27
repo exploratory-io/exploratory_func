@@ -1809,6 +1809,9 @@ get_mode <- function(x, na.rm = FALSE) {
   return(ux[which.max(tabulate(match(x, ux)))])
 }
 
+# Returns logical vector that indicates the position of rows in df that has categorical values
+# that does not appear in training_df. TRUE means such a row with unknown categorical value.
+# Used to remove such rows from test/new data before predicting with the model, to avoid error.
 get_unknown_category_rows_index_vector <- function(df, training_df) {
   # list of unique values of each column of training_df.
   uniq_index <- purrr::map(training_df, function(x){
@@ -1836,6 +1839,8 @@ get_unknown_category_rows_index_vector <- function(df, training_df) {
   ret
 }
 
+# Converts logical vector such as the output from get_unknown_category_rows_index_vector into 
+# vector of index integer of TRUE rows.
 get_row_numbers_from_index_vector <- function(index_vector)  {
   seq(length(index_vector))[index_vector]
 }

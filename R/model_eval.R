@@ -313,6 +313,7 @@ evaluate_multi_ <- function(df, pred_label_col, actual_val_col, pretty.name = FA
   ret
 }
 
+# Generates Analytics View Summary Table for logistic/binomial regression. Handles Test Mode.
 #' @export
 evaluate_binary_training_and_test <- function(df, actual_val_col, threshold = "f_score", pretty.name = FALSE){
   training_ret <- df %>% broom::glance(model, threshold = threshold)
@@ -320,7 +321,8 @@ evaluate_binary_training_and_test <- function(df, actual_val_col, threshold = "f
 
   grouped_col <- colnames(df)[!colnames(df) %in% c("model", ".test_index", "source.data")]
 
-  if (purrr::some(df$.test_index, function(x){length(x)!=0})) { # Consider it test mode if any of the element of .test_index column has non-zero length.
+  # Consider it test mode if any of the element of .test_index column has non-zero length, and work on generating Summary row for prediction on test data.
+  if (purrr::some(df$.test_index, function(x){length(x)!=0})) {
     ret$is_test_data <- FALSE # Set is_test_data FALSE for training data. Add is_test_data column only when there are test data too.
     each_func <- function(df) {
       if (!is.data.frame(df)) {

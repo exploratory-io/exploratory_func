@@ -294,6 +294,7 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
 
 
   if (!data %in% c("test", "training", "newdata", "training_and_test")) {
+    # Not mentioning training_and_test since it is used only by Analytics View.
     stop('data argument must be "test", "training" or "newdata"')
   }
 

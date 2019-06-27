@@ -845,6 +845,8 @@ test_that("get_unknown_category_rows_index", {
   unknown_vector <- get_unknown_category_rows_index_vector(test_df, train_df)
   unknown_index <- get_row_numbers_from_index_vector(unknown_vector)
   expect_equal(unknown_index,c(2,3))
+  restored <- restore_na(c('a','b','c'), c(2,4))
+  expect_equal(restored ,c('a',NA,'b',NA,'c'))
 })
 
 test_that("summarize_group", {

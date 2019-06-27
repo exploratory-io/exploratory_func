@@ -773,7 +773,10 @@ augment.ranger <- function(x, data = NULL, newdata = NULL, ...) {
 #' augment for randomForest model
 #' @export
 augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_type = "training", binary_classification_threshold = 0.5, ...) {
+  # Get name of original target columns by reverse-mapping the name in formula.
   y_name <- x$terms_mapping[all.vars(x$formula_terms)[[1]]]
+
+  # Get names of original predictor columns by reverse-mapping the names in formula.
   predictor_variables <- all.vars(x$formula_terms)[-1]
   predictor_variables <- x$terms_mapping[predictor_variables]
 
@@ -854,6 +857,8 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
         predicted_label_nona <- ranger.predict_value_from_prob(x$forest$levels,
                                                                x$prediction_test$predictions,
                                                                y_value, threshold = threshold)
+        # Restore NAs for removed rows that had unknown categorical predictor values.
+        # Note that this is necessary only for test data, and not for training data.
         predicted_label_nona <- restore_na(predicted_label_nona, x$prediction_test$unknown_category_rows_index)
         predicted_value <- restore_na(predicted_label_nona, x$prediction_test$na.action)
       })
@@ -1140,6 +1145,7 @@ rf_evaluation_by_class <- function(data, ...) {
   broom::tidy(data, model, type = "evaluation_by_class", ...)
 }
 
+# Generates Analytics View Summary table for ranger and rpart.
 #' wrapper for tidy type evaluation
 #' @export
 rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.name = FALSE, ...) {
@@ -1153,7 +1159,7 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
                            evaluation_by_class = rf_evaluation_by_class(data, pretty.name = pretty.name, ...),
                            conf_mat = data %>% broom::tidy(model, type = "conf_mat", ...))
     if (length(test_index) > 0 && nrow(training_ret) > 0) {
-        training_ret$is_test_data <- FALSE
+      training_ret$is_test_data <- FALSE
     }
   } else {
     training_ret <- data.frame()
