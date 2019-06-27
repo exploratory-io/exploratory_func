@@ -1199,8 +1199,9 @@ executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 1
     dataSet = dataSetTable[[1]][1]
     table = dataSetTable[[1]][2]
     bqtable <- NULL
-    query <- convertUserInputToUtf8(query)
     # submit a query to get a result (for refresh data frame case)
+    # convertUserInputToUtf8 API call for query is taken care of by exploratory::submitGoogleBigQueryJob
+    # so just pass query as is.
     result <- exploratory::submitGoogleBigQueryJob(project = bucketProjectId, sqlquery = query, tokenFieldId =  tokenFileId, useStandardSQL = useStandardSQL);
     # extranct result from Google BigQuery to Google Cloud Storage and import
     df <- getDataFromGoogleBigQueryTableViaCloudStorage(bucketProjectId, dataSet, table, bucket, folder, tokenFileId)
@@ -1213,6 +1214,8 @@ executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 1
     if(!isStandardSQL && useStandardSQL) { # honor value provided by parameter
       isStandardSQL = TRUE;
     }
+    # make sure to convert query to UTF8
+    query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
     query <- glue_exploratory(query, .transformer=bigquery_glue_transformer, .envir = parent.frame())
     tb <- bigrquery::bq_project_query(x = project, query = query, quiet = TRUE, use_legacy_sql = !isStandardSQL)
