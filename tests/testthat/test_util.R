@@ -688,7 +688,7 @@ test_that("test extract_from_date", {
 
 test_that("test extract_from_date", {
   data <- as.Date(c("2019-06-16", "2019-06-08", "2019-06-26", NA, NA))
-  ret <- extract_from_date(data, type="daytype")
+  ret <- extract_from_date(data, type="wdaytype")
   expect_equal(ret, c("Weekend","Weekend", "Weekday", NA, NA))
 })
 
