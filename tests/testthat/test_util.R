@@ -847,6 +847,8 @@ test_that("get_unknown_category_rows_index", {
   expect_equal(unknown_index,c(2,3))
   restored <- restore_na(c('a','b','c'), c(2,4))
   expect_equal(restored ,c('a',NA,'b',NA,'c'))
+  restored <- restore_na(c('a','b','c'), c(1,3,5,7))
+  expect_equal(restored ,c(NA,'a',NA,'b',NA,'c',NA))
 })
 
 test_that("summarize_group", {
