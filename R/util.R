@@ -1439,6 +1439,11 @@ extract_from_date <- function(x, type = "fltoyear") {
     wdaylong = {
       ret <- lubridate::wday(x, label=TRUE, abbr=FALSE)
     },
+    wdaytype = {
+      ret <- dplyr::if_else(is.na(x), NA_character_,
+                              #if it's 1: Sun or 7: Sat, assume it's Weekend.
+                              dplyr::if_else(lubridate::wday(x, label = F, week_start = "7") %in% c(1,7),  'Weekend', "Weekday"))
+    },
     hour = {
       ret <- lubridate::hour(x)
     },
