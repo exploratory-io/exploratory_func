@@ -435,7 +435,6 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
 
       # Use formula to support expanded aug_args (especially for type.predict for logistic regression)
       # because ... can't be passed to a function inside mutate directly.
-      # If test is FALSE, this uses data as an argument and if not, uses newdata as an argument.
       aug_fml <- if(aug_args == ""){
         as.formula("~list(broom::augment(model, data = source.data))")
       } else {
@@ -463,7 +462,7 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
         unnest_with_drop(source.data)
 
     } else if (data == "training_and_test") {
-      # Augment data that includes bot training part and test part of data with predictions embedded in the model.
+      # Augment data that includes both training part and test part of data with predictions embedded in the model.
       # This is for Analytics View on Test Mode.
 
       # Use formula to support expanded aug_args (especially for type.predict for logistic regression)
@@ -562,7 +561,8 @@ prediction_training_and_test <- function(df, prediction_type="default", threshol
   ret <- switch(prediction_type,
                     default = prediction(df, data='training_and_test', ...),
                     binary = prediction_binary(df,  data='training_and_test', threshold = threshold, ...),
-                    conf_mat = prediction_binary(df, data='training_and_test', threshold = threshold, ...),
+                    conf_mat = prediction_binary(df, data='training_and_test', threshold = threshold, ...), # Same as 'binary'. Aggregation for
+                                                                                                            # confusion matrix is done later in this function.
                     coxph = prediction_coxph(df, data='training_and_test', ...))
 
 

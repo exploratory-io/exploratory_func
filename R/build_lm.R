@@ -974,13 +974,7 @@ evaluate_lm_training_and_test <- function(df, pretty.name = FALSE){
       })
     }
 
-    target_df <- if (length(grouped_col) > 0) {
-      df %>% group_by(!!!rlang::syms(grouped_col))
-    } else {
-      df
-    }
-
-    test_ret <- do_on_each_group(target_df, each_func, with_unnest = TRUE)
+    test_ret <- do_on_each_group(df, each_func, with_unnest = TRUE)
     ret <- ret %>% dplyr::bind_rows(test_ret)
   }
 
