@@ -1034,7 +1034,7 @@ augment.rpart.regression <- function(x, data = NULL, newdata = NULL, data_type =
     switch(data_type,
       training = {
         predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
-        predicted <- predict(x, data) # Do we need to call predict()? Isn't predicted result in the model?
+        predicted <- restore_na(predict(x), x$na.action)
         data[[predicted_value_col]] <- predicted
         data
       },
