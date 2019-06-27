@@ -991,7 +991,6 @@ augment.rpart.classification <- function(x, data = NULL, newdata = NULL, data_ty
     switch(data_type,
       training = {
         predicted_value_nona <- x$predicted_class
-        # TODO: This restore_na seems to be needed here, but it seems rpart is returning result with NA rows included for regression case. Whhat is making the difference?
         predicted_value <- restore_na(predicted_value_nona, x$na.action)
         # binary case and multiclass case are both handled inside this func.
         predicted_probability_nona <- get_predicted_probability_rpart(x)
