@@ -2704,7 +2704,7 @@ exp_rpart <- function(df,
 #' @export
 # not really an external function but exposing for test. TODO: find better way.
 get_binary_predicted_value_from_probability_rpart <- function(x, data_type = "training", threshold = 0.5) {
-  if (class(x$y) == "logical") {
+  if (class(x$y) == "logical") { # Note that this part is *not* used for rpart Analytics View since we convert logical to factor in exp_rpart().
     # predict(x) is numeric vector of probability of being TRUE.
     ylevels <- c("TRUE", "FALSE")
     if (data_type == "training") {
@@ -2717,6 +2717,14 @@ get_binary_predicted_value_from_probability_rpart <- function(x, data_type = "tr
   else {
     # predict(x) is 2-diminsional matrix with 2 columns for the 2 categories. values in the matrix is the probabilities.
     ylevels <- attr(x,"ylevels")
+
+    # We convert logical to factor with level of "FALSE", "TRUE". We had to keep this order not to mess up tree image for rpart.
+    # Since the threshold given here is meant to be the probability of being true, it needs to be reverted to work with the rest
+    # of the code here.
+    if (ylevels[[1]] == "FALSE" && ylevels[[2]] == "TRUE") {
+      threshold <- 1 - threshold
+    }
+
     if (data_type == "training") {
       predicted <- factor(ylevels[apply(predict(x), 1, function(x){if(x[1] > threshold) 1 else 2})], levels=ylevels)
     }
@@ -2740,11 +2748,21 @@ get_binary_predicted_probability_rpart <- function(x, data_type = "training") {
   else {
     # predict(x) is 2-diminsional matrix with 2 columns for the 2 categories. values in the matrix is the probabilities.
     # Return the probability for the value for the 1st column.
+    true_index <- 1
+
+    # We convert logical to factor with level of "FALSE", "TRUE". We had to keep this order not to mess up tree image for rpart.
+    # In this case, we need to return the probability of being TRUE, which is the 2nd column.
+
+    ylevels <- attr(x,"ylevels")
+    if (ylevels[[1]] == "FALSE" && ylevels[[2]] == "TRUE") {
+      true_index <- 2
+    }
+
     if (data_type == "training") {
-      predicted <- predict(x)[,1]
+      predicted <- predict(x)[,true_index]
     }
     else {
-      predicted <- x$prediction_test[,1]
+      predicted <- x$prediction_test[,true_index]
     }
   }
   predicted
