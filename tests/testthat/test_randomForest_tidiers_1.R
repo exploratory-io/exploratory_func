@@ -4,7 +4,7 @@
 context("test tidiers for randomForest")
 
 testdata_dir <- "~/.exploratory/"
-testdata_filename <- "airline_2013_10_tricky_v3.csv" 
+testdata_filename <- "airline_2013_10_tricky_v3_5k.csv" 
 testdata_file_path <- paste0(testdata_dir, testdata_filename)
 
 filepath <- if (!testdata_filename %in% list.files(testdata_dir)) {
@@ -12,9 +12,13 @@ filepath <- if (!testdata_filename %in% list.files(testdata_dir)) {
 } else {
   testdata_file_path
 }
+
 flight <- exploratory::read_delim_file(filepath, ",", quote = "\"", skip = 0 , col_names = TRUE , na = c("","NA") , locale=readr::locale(encoding = "UTF-8", decimal_mark = "."), trim_ws = FALSE , progress = FALSE) %>% exploratory::clean_data_frame()
-write.csv(flight, testdata_file_path)
-flight <- flight %>% sample_n(5000)
+
+filepath <- if (!testdata_filename %in% list.files(testdata_dir)) {
+  flight <- flight %>% sample_n(5000)
+  write.csv(flight, testdata_file_path) # save sampled-down data for performance.
+}
 
 test_that("test exp_balance with character", {
   sample_data <- data.frame(
@@ -373,10 +377,8 @@ test_that("calc_feature_map(regression) evaluate training and test", {
   model_df <- flight %>%
               dplyr::group_by(`CAR RIER`) %>%
                 calc_feature_imp(`FL NUM`, `DIS TANCE`, `DEP TIME`, test_rate = 0.3)
-  ret <- rf_evaluation_training_and_test(model_df, test_rate = 0.3)
-  ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class", test_rate = 0.3)
-
-  ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat", test_rate = 0.3)
+  ret <- rf_evaluation_training_and_test(model_df)
+  ret <- model_df %>% prediction_training_and_test()
 })
 
 test_that("calc_feature_map(binary) evaluate training and test", {
@@ -387,6 +389,7 @@ test_that("calc_feature_map(binary) evaluate training and test", {
   ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class", test_rate = 0.3)
 
   ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat", test_rate = 0.3)
+  ret <- model_df %>% prediction_training_and_test()
 })
 
 test_that("calc_feature_map(multi) evaluate training and test", {
@@ -396,5 +399,6 @@ test_that("calc_feature_map(multi) evaluate training and test", {
   ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class", test_rate = 0.3)
 
   ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat", test_rate = 0.3)
+  ret <- model_df %>% prediction_training_and_test()
 })
 

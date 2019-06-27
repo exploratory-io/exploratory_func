@@ -313,16 +313,18 @@ evaluate_multi_ <- function(df, pred_label_col, actual_val_col, pretty.name = FA
   ret
 }
 
+# Generates Analytics View Summary Table for logistic/binomial regression. Handles Test Mode.
 #' @export
-evaluate_binary_training_and_test <- function(df, actual_val_col, threshold = "f_score", pretty.name = FALSE, test_rate = 0.0){
+evaluate_binary_training_and_test <- function(df, actual_val_col, threshold = "f_score", pretty.name = FALSE){
   training_ret <- df %>% broom::glance(model, threshold = threshold)
-  training_ret$is_test_data <- FALSE
   ret <- training_ret
 
   grouped_col <- colnames(df)[!colnames(df) %in% c("model", ".test_index", "source.data")]
 
-  if (test_rate > 0.0) {
-    each_func <- function(df){
+  # Consider it test mode if any of the element of .test_index column has non-zero length, and work on generating Summary row for prediction on test data.
+  if (purrr::some(df$.test_index, function(x){length(x)!=0})) {
+    ret$is_test_data <- FALSE # Set is_test_data FALSE for training data. Add is_test_data column only when there are test data too.
+    each_func <- function(df) {
       if (!is.data.frame(df)) {
         df <- tribble(~model, ~.test_index, ~source.data,
                       df$model, df$.test_index, df$source.data)
@@ -365,8 +367,19 @@ evaluate_binary_training_and_test <- function(df, actual_val_col, threshold = "f
                                recall, auc, positives, negatives, p.value, logLik, AIC, BIC,
                                deviance, null.deviance, df.null, df.residual, everything())
 
-  if (length(grouped_col) > 0) {
-    ret <- ret %>% dplyr::select(grouped_col, everything())
+  # Reorder columns. Bring group_by column first, and then is_test_data column, if it exists.
+  if (!is.null(ret$is_test_data)) {
+    if (length(grouped_col) > 0) {
+      ret <- ret %>% dplyr::select(!!!rlang::syms(grouped_col), is_test_data, everything())
+    }
+    else {
+      ret <- ret %>% dplyr::select(is_test_data, everything())
+    }
+  }
+  else {
+    if (length(grouped_col) > 0) {
+      ret <- ret %>% dplyr::select(!!!rlang::syms(grouped_col), everything())
+    }
   }
 
   if (pretty.name){
@@ -384,7 +397,6 @@ evaluate_binary_training_and_test <- function(df, actual_val_col, threshold = "f
     colnames(ret)[colnames(ret) == "null.deviance"] <- "Null Deviance"
     colnames(ret)[colnames(ret) == "df.null"] <- "DF for Null Model"
     colnames(ret)[colnames(ret) == "df.residual"] <- "Residual DF"
-    colnames(ret)[colnames(ret) == "is_test_data"] <- "Test Data"
 
     base_cols <- colnames(ret)[stringr::str_detect(colnames(ret) , "_base$")]
     if (length(base_cols) > 0) {
@@ -398,6 +410,13 @@ evaluate_binary_training_and_test <- function(df, actual_val_col, threshold = "f
     ret <- ret %>% dplyr::arrange_(paste0("`", grouped_col, "`"))
   }
 
+  # Prettify is_test_data column. Note that column order is already taken care of.
+  if (!is.null(ret$is_test_data) && pretty.name) {
+    ret <- ret %>%
+      dplyr::mutate(is_test_data = dplyr::if_else(is_test_data, "Test", "Training")) %>%
+      dplyr::rename(`Data Type` = is_test_data)
+  }
   ret
 }
+
 

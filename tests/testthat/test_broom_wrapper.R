@@ -521,7 +521,7 @@ test_that("test data frame prediction by xgboost with group", {
   expect_equal(prediction_ret3$predicted_value[!is.na(prediction_ret3$predicted_value)], prediction_ret2$predicted_value[!is.na(prediction_ret2$predicted_value)])
 })
 
-test_that("test prediction_training_and_test by glm", {
+test_that("test prediction(data='training_and_test') by glm", {
   test_data <- structure(
       list(
         `CANCELLED X` = c("N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "Y", "N", "Y", "N"),
@@ -541,7 +541,7 @@ test_that("test prediction_training_and_test by glm", {
                                      `Carrier Name`,
                                      model_type = "lm",
                                      test_rate = 0.2)
-  ret <- model_ret %>% prediction_training_and_test(.)
+  ret <- model_ret %>% prediction(data='training_and_test')
   expected_cols <- c("Carrier.Name", "DISTANCE", "ARR_TIME",
                      "DERAY_TIME", "predicted_value", "standard_error",
                      "conf_low", "conf_high", "residuals", "hat",
@@ -555,7 +555,7 @@ test_that("test prediction_training_and_test by glm", {
                                    `Carrier Name`,
                                    model_type = "lm",
                                    test_rate = 0.2)
-  grp_ret <- grp_model_ret %>% prediction_training_and_test(.)
+  grp_ret <- grp_model_ret %>% prediction(data='training_and_test')
   expected_cols <- c("klass", "Carrier.Name", "DISTANCE",
                      "ARR_TIME", "DERAY_TIME", "predicted_value",
                      "standard_error", "conf_low", "conf_high", "residuals",
@@ -602,4 +602,3 @@ test_that("test prediction_training_and_test by glm", {
   expected_cols <- c("klass", "is_test_data","actual_value","predicted_value","count")
   expect_equal(colnames(grp_ret), expected_cols)
 })
-

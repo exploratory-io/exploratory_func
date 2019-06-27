@@ -293,7 +293,8 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
   grouping_cols <- df_cnames[!df_cnames %in% c("source.data", ".test_index", "model", ".model_metadata")]
 
 
-  if (!data %in% c("test", "training", "newdata")) {
+  if (!data %in% c("test", "training", "newdata", "training_and_test")) {
+    # Not mentioning training_and_test since it is used only by Analytics View.
     stop('data argument must be "test", "training" or "newdata"')
   }
 
@@ -307,7 +308,6 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
     }
     add_prediction(data_frame, df, conf_int = conf_int, ...)
   } else {
-    test <- data == "test"
     # parsing arguments of prediction and getting optional arguemnt for augment in ...
     cll <- match.call()
     aug_args <- expand_args(cll, exclude = c("df", "data", "data_frame", "conf_int"))
@@ -320,85 +320,121 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
                        any(lapply(df$model, function(s) { "family" %in% names(s) })) &&
                        any(lapply(df$model, function(s) { !is.null(s$family$linkinv) }))
 
-    ret <- if(test){
-      # augment by test data
+    ret <- if(data == "test"){
+      if (!is.null(df$model[[1]]$prediction_test)) { # Check if model already has test prediction result.
+                                                     # This is typically the case for Analytics Views.
+        # Augment test part of data with prediction embedded in the model.
+        # This is typically for Summary tab of Analytics View on Test Mode.
 
-      # check if there is test data
-      test_sizes <- vapply(df[[".test_index"]], function(test){
-        length(test)
-      }, FUN.VALUE = 0)
-
-      if(all(test_sizes==0)){
-        stop("no test data found")
-      }
-
-      # Use formula to support expanded aug_args (especially for type.predict for logistic regression)
-      # because ... can't be passed to a function inside mutate directly.
-      # If test is TRUE, this uses newdata as an argument and if not, uses data as an argument.
-      aug_fml <- if(aug_args == ""){
-        as.formula("~list(broom::augment(model, newdata = source.data))")
-      } else {
-        as.formula(paste0("~list(broom::augment(model, newdata = source.data, ", aug_args, "))"))
-      }
-      data_to_augment <- df %>%
-        dplyr::ungroup() %>%
-        dplyr::mutate(source.data = purrr::map2(source.data, .test_index, function(df, index){
-          # keep data only in test_index
-          safe_slice(df, index)
-        })) %>%
-        dplyr::select(-.test_index)
-
-      if(".model_metadata" %in% colnames(data_to_augment)){
-        data_to_augment <- data_to_augment %>% dplyr::select(-`.model_metadata`)
-      }
-
-      augmented <- tryCatch({
-        data_to_augment %>%
-          dplyr::rowwise() %>%
-          # evaluate the formula of augment and "source.data" column will have it
-          dplyr::mutate_(.dots = list(source.data = aug_fml))
-      }, error = function(e){
-        if (grepl("arguments imply differing number of rows: ", e$message)) {
-          data_to_augment %>%
-            dplyr::mutate(source.data = purrr::map2(source.data, model, function(df, model){
-              # remove rows that have categories that aren't in training data
-              # otherwise, broom::augment causes an error
-              filtered_data <- df
-              for (cname in colnames(model$model)) {
-                filtered_data <- filtered_data[filtered_data[[cname]] %in% model$model[[cname]], ]
-              }
-
-              if(nrow(filtered_data) == 0){
-                stop("no data found that can be predicted by the model")
-              }
-
-              filtered_data
-            })) %>%
-            dplyr::rowwise() %>%
-            # evaluate the formula of augment and "data" column will have it
-            dplyr::mutate_(.dots = list(source.data = aug_fml))
+        # Use formula to support expanded aug_args (especially for type.predict for logistic regression)
+        # because ... can't be passed to a function inside mutate directly.
+        # If test is FALSE, this uses data as an argument and if not, uses newdata as an argument.
+        aug_fml_test <- if(aug_args == ""){
+          as.formula("~list(broom::augment(model, data = source.data, data_type = 'test'))")
         } else {
-          stop(e$message)
+          as.formula(paste0("~list(broom::augment(model, data = source.data, data_type = 'test', ", aug_args, "))"))
         }
-      })
-
-      augmented <- augmented %>% dplyr::ungroup()
-
-      if (with_response){
+        augmented <- df %>%
+          dplyr::ungroup() %>%
+          dplyr::mutate(source.data = purrr::map2(source.data, .test_index, function(df, index){
+            # Keep data in test_index for test data
+            safe_slice(df, index, remove = FALSE)
+          })) %>%
+          dplyr::select(-.test_index) %>%
+          dplyr::rowwise() %>%
+          # evaluate the formula of augment and "data" column will have it
+          dplyr::mutate_(.dots = list(source.data = aug_fml_test))
         augmented <- augmented %>%
-          dplyr::mutate(source.data = purrr::map2(source.data, model, add_response))
+          dplyr::ungroup()
+
+        if (with_response){
+          augmented <- augmented %>%
+            dplyr::mutate(source.data = purrr::map2(source.data, model, add_response))
+        }
+
+        augmented %>%
+          dplyr::select(-model) %>%
+          unnest_with_drop(source.data)
+      }
+      else { # test prediction result is not in the model. Need to predict from test data.
+        # augment by test data
+
+        # check if there is test data
+        test_sizes <- vapply(df[[".test_index"]], function(test){
+          length(test)
+        }, FUN.VALUE = 0)
+
+        if(all(test_sizes==0)){
+          stop("no test data found")
+        }
+
+        # Use formula to support expanded aug_args (especially for type.predict for logistic regression)
+        # because ... can't be passed to a function inside mutate directly.
+        # If test is TRUE, this uses newdata as an argument and if not, uses data as an argument.
+        aug_fml <- if(aug_args == ""){
+          as.formula("~list(broom::augment(model, newdata = source.data))")
+        } else {
+          as.formula(paste0("~list(broom::augment(model, newdata = source.data, ", aug_args, "))"))
+        }
+        data_to_augment <- df %>%
+          dplyr::ungroup() %>%
+          dplyr::mutate(source.data = purrr::map2(source.data, .test_index, function(df, index){
+            # keep data only in test_index
+            safe_slice(df, index)
+          })) %>%
+          dplyr::select(-.test_index)
+
+        if(".model_metadata" %in% colnames(data_to_augment)){
+          data_to_augment <- data_to_augment %>% dplyr::select(-`.model_metadata`)
+        }
+
+        augmented <- tryCatch({
+          data_to_augment %>%
+            dplyr::rowwise() %>%
+            # evaluate the formula of augment and "source.data" column will have it
+            dplyr::mutate_(.dots = list(source.data = aug_fml))
+        }, error = function(e){
+          if (grepl("arguments imply differing number of rows: ", e$message)) {
+            data_to_augment %>%
+              dplyr::mutate(source.data = purrr::map2(source.data, model, function(df, model){
+                # remove rows that have categories that aren't in training data
+                # otherwise, broom::augment causes an error
+                filtered_data <- df
+                for (cname in colnames(model$model)) {
+                  filtered_data <- filtered_data[filtered_data[[cname]] %in% model$model[[cname]], ]
+                }
+
+                if(nrow(filtered_data) == 0){
+                  stop("no data found that can be predicted by the model")
+                }
+
+                filtered_data
+              })) %>%
+              dplyr::rowwise() %>%
+              # evaluate the formula of augment and "data" column will have it
+              dplyr::mutate_(.dots = list(source.data = aug_fml))
+          } else {
+            stop(e$message)
+          }
+        })
+
+        augmented <- augmented %>% dplyr::ungroup()
+
+        if (with_response){
+          augmented <- augmented %>%
+            dplyr::mutate(source.data = purrr::map2(source.data, model, add_response))
+        }
+
+        ret <- augmented %>%
+          dplyr::select(-model) %>%
+          unnest_with_drop(source.data)
       }
 
-      ret <- augmented %>%
-        dplyr::select(-model) %>%
-        unnest_with_drop(source.data)
-
-    } else {
+    } else if (data == "training") {
       # augment by training data
 
       # Use formula to support expanded aug_args (especially for type.predict for logistic regression)
       # because ... can't be passed to a function inside mutate directly.
-      # If test is FALSE, this uses data as an argument and if not, uses newdata as an argument.
       aug_fml <- if(aug_args == ""){
         as.formula("~list(broom::augment(model, data = source.data))")
       } else {
@@ -424,6 +460,61 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
       augmented %>%
         dplyr::select(-model) %>%
         unnest_with_drop(source.data)
+
+    } else if (data == "training_and_test") {
+      # Augment data that includes both training part and test part of data with predictions embedded in the model.
+      # This is for Analytics View on Test Mode.
+
+      # Use formula to support expanded aug_args (especially for type.predict for logistic regression)
+      # because ... can't be passed to a function inside mutate directly.
+      # If test is FALSE, this uses data as an argument and if not, uses newdata as an argument.
+      aug_fml_train <- if(aug_args == ""){
+        as.formula("~list(broom::augment(model, data = source.data))")
+      } else {
+        as.formula(paste0("~list(broom::augment(model, data = source.data, ", aug_args, "))"))
+      }
+      aug_fml_test <- if(aug_args == ""){
+        as.formula("~list(broom::augment(model, data = source.data.test, data_type = 'test'))")
+      } else {
+        as.formula(paste0("~list(broom::augment(model, data = source.data.test, data_type = 'test', ", aug_args, "))"))
+      }
+      augmented <- df %>%
+        dplyr::ungroup() %>%
+        dplyr::mutate(source.data = purrr::map2(source.data, .test_index, function(df, index){
+          # Remove data in test_index for training data
+          safe_slice(df, index, remove = TRUE)
+        }), source.data.test = purrr::map2(source.data, .test_index, function(df, index){
+          # Keep data in test_index for test data
+          safe_slice(df, index, remove = FALSE)
+        })) %>%
+        dplyr::select(-.test_index) %>%
+        dplyr::rowwise() %>%
+        # evaluate the formula of augment and "data" column will have it
+        dplyr::mutate_(.dots = list(source.data = aug_fml_train, source.data.test = aug_fml_test))
+      augmented <- augmented %>%
+        dplyr::ungroup() %>% # ungroup is necessary here to get expected df1, df2 value in the next line.
+        dplyr::mutate(source.data = purrr::map2(source.data, source.data.test, function(df1, df2){
+          df1 <- df1 %>% dplyr::mutate(is_test_data=FALSE)
+          df2 <- df2 %>% dplyr::mutate(is_test_data=TRUE)
+          dplyr::bind_rows(df1, df2)
+        })) %>%
+        dplyr::select(-source.data.test) %>%
+        dplyr::ungroup()
+
+      if (with_response){
+        augmented <- augmented %>%
+          dplyr::mutate(source.data = purrr::map2(source.data, model, add_response))
+      }
+
+      augmented <- augmented %>%
+        dplyr::select(-model) %>%
+        unnest_with_drop(source.data)
+
+      # Since is_test_data can go to strange position if there are columns that exists only in certain groups,
+      # move it to the last explicitly.
+      augmented <- augmented %>% select(-is_test_data, everything(), is_test_data)
+      augmented
+
     }
   }
 
@@ -456,6 +547,8 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
 }
 
 #' prediction wrapper for both training and test data
+#' There are not much reason to call this function any more, since you can call prediction(data='training_and_test')
+#' directly. Only remaining case we need to call this is for confusion matrix.
 #' @param df Data frame to predict. This should have model column.
 #' @export
 prediction_training_and_test <- function(df, prediction_type="default", threshold = 0.5, ...) {
@@ -463,59 +556,15 @@ prediction_training_and_test <- function(df, prediction_type="default", threshol
 
   grouped_cols <- colnames(df)[!colnames(df) %in% c("model", ".test_index", "source.data", ".model_metadata")]
 
-  train_ret <- switch(prediction_type,
-                    default = prediction(df, ...),
-                    binary = prediction_binary(df, threshold = threshold, ...),
-                    conf_mat = prediction_binary(df, threshold = threshold, ...),
-                    coxph = prediction_coxph(df, ...))
+  # Note that for ranger/rpart, even for binary prediction case, we are using "default" prediction(),
+  # and predicted_label column is set by augment.ranger.classification, which is called internally.
+  ret <- switch(prediction_type,
+                    default = prediction(df, data='training_and_test', ...),
+                    binary = prediction_binary(df,  data='training_and_test', threshold = threshold, ...),
+                    conf_mat = prediction_binary(df, data='training_and_test', threshold = threshold, ...), # Same as 'binary'. Aggregation for
+                                                                                                            # confusion matrix is done later in this function.
+                    coxph = prediction_coxph(df, data='training_and_test', ...))
 
-  # Change the is_test_data column to the last order
-  train_ret <- train_ret %>% dplyr::mutate(is_test_data = FALSE) %>%
-                     dplyr::select(-is_test_data, everything(), is_test_data)
-  ret <- train_ret
-
-  if (length(test_index) > 0) {
-    target_df <- if (length(grouped_cols) > 0) {
-      # like CAR RIER
-      # To avoid errors when passing CAR RIER-like columns to group_by_ in Standard Evaluation,
-      # enclose the column names in back quotes
-      df %>% dplyr::ungroup() %>% dplyr::group_by(!!!rlang::syms(grouped_cols))
-    } else {
-      df
-    }
-
-    each_func <- function(df){
-      tryCatch({
-        if (!is.data.frame(df)) {
-          df <- tribble(~model,   ~.test_index,   ~source.data,
-                        df$model, df$.test_index, df$source.data)
-        }
-
-        test_ret <- switch(prediction_type,
-                           default = prediction(df, data = "test", ...),
-                           binary = prediction_binary(df, data = "test", threshold = threshold, ...),
-                           conf_mat = prediction_binary(df, data = "test", threshold = threshold, ...),
-                           coxph = prediction_coxph(df, data = "test", ...))
-
-        # Without this for example, column like klass1 is generated when klass is the group_by column.
-        test_ret %>% dplyr::ungroup() %>% dplyr::select(-grouped_cols)
-      }, error = function(e){
-        # In the prediction type of function, if there is categorical data which was not at the time of learning at the time of test,
-        # delete the line. Also, if there is too little data prediction functions return the following error
-        #   no data found that can be predicted by the model
-        # When predicting by group by, certain categories may be reduced,
-        # but you may want to predict other categories, so catch errors and return empty data frames.
-        data.frame()
-      })
-    }
-
-    test_ret <- do_on_each_group(target_df, each_func, with_unnest = TRUE)
-
-    # Change the is_test_data column to the last order
-    test_ret <- test_ret %>% dplyr::mutate(is_test_data = TRUE) %>%
-                  dplyr::select(-is_test_data, everything(), is_test_data)
-    ret <- ret %>% dplyr::bind_rows(test_ret) %>% dplyr::select(-is_test_data, everything(), is_test_data)
-  }
 
   if (prediction_type == "conf_mat") {
     model <- df %>% dplyr::filter(!is.null(model)) %>% `[[`(1, "model")
@@ -547,7 +596,8 @@ prediction_training_and_test <- function(df, prediction_type="default", threshol
   }
 }
 
-#' prediction wrapper to set predicted labels
+#' Wrapper around prediction() to set predicted_probability and predicted_label with optimized threshold.
+#' Currently, this is really for logistic regression and GLM, since for ranger and rpart, prediction() already returns predicted_probability and predicted_label.
 #' @param df Data frame to predict. This should have model column.
 #' @param threshold Threshold value for predicted probability or what to optimize. It can be "f_score", "accuracy", "precision", "sensitivity" or "specificity" to optimize.
 #' @export

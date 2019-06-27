@@ -837,6 +837,20 @@ test_that("get_mode", {
   expect_equal(as.character(res), "2019-01-02")
 })
 
+test_that("get_unknown_category_rows_index", {
+  train_df <- data.frame(x=c('a','b','c'),
+                         y=c('a','b','c'))
+  test_df <- data.frame(x=c('a','c','d'),
+                        y=c('b','e','c'))
+  unknown_vector <- get_unknown_category_rows_index_vector(test_df, train_df)
+  unknown_index <- get_row_numbers_from_index_vector(unknown_vector)
+  expect_equal(unknown_index,c(2,3))
+  restored <- restore_na(c('a','b','c'), c(2,4))
+  expect_equal(restored ,c('a',NA,'b',NA,'c'))
+  restored <- restore_na(c('a','b','c'), c(1,3,5,7))
+  expect_equal(restored ,c(NA,'a',NA,'b',NA,'c',NA))
+})
+
 test_that("summarize_group", {
  df <- mtcars %>% exploratory::summarize_group(group_cols = c("cyl", "mpg"), group_funs = c("none", "mean"), count = n())
  expect_equal(nrow(df),3)

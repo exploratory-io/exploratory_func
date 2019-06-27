@@ -618,10 +618,12 @@ safe_slice <- function(data, index, remove = FALSE){
 add_response <- function(data, model, response_label = "predicted_response"){
   # fitted values are converted to response values through inverse link function
   # for example, inverse of logit function is used for logistic regression
-  data[[response_label]] <- if (nrow(data) == 0) {
-    numeric(0)
-  } else {
-    model$family$linkinv(data[[".fitted"]])
+  if (!is.null(data$.fitted)) {
+    data[[response_label]] <- if (nrow(data) == 0) {
+      numeric(0)
+    } else {
+      model$family$linkinv(data[[".fitted"]])
+    }
   }
   data
 }
@@ -1834,6 +1836,71 @@ get_mode <- function(x, na.rm = FALSE) {
   ux <- unique(x)
   return(ux[which.max(tabulate(match(x, ux)))])
 }
+
+# Returns logical vector that indicates the position of rows in df that has categorical values
+# that does not appear in training_df. TRUE means such a row with unknown categorical value.
+# Used to remove such rows from test/new data before predicting with the model, to avoid error.
+get_unknown_category_rows_index_vector <- function(df, training_df) {
+  # list of unique values of each column of training_df.
+  uniq_index <- purrr::map(training_df, function(x){
+    if(is.character(x) || is.factor(x) || is.logical(x)) {
+      unique(x)
+    }
+    else {
+      NULL
+    }
+  })
+
+  # list of vectors each of which is logical vector indicating location of unknown values.
+  # TRUE means unknown value at the row position.
+  unknown_indexes <- purrr::map2(uniq_index, seq(length(uniq_index)), function(unique_values, col_index) {
+    if (is.null(unique_values)) {
+      FALSE
+    }
+    else {
+      df[[col_index]] %nin% unique_values
+    }
+  })
+
+  # Combine unknown_indexes into one logical vector that indicates location of rows with unknown values.
+  ret <- purrr::reduce(unknown_indexes,function(x,y){x|y})
+  ret
+}
+
+# Converts logical vector such as the output from get_unknown_category_rows_index_vector into 
+# vector of index integer of TRUE rows.
+get_row_numbers_from_index_vector <- function(index_vector)  {
+  seq(length(index_vector))[index_vector]
+}
+
+#' Returns NA value included in prediction result excluding NA
+#' @param value - prediction results without NA
+#' @param n_data - original data length
+#' @param na_row_numbers - row numbers containing the NA value of data
+restore_na <- function(value, na_row_numbers){
+  n_data <- length(value) + length(na_row_numbers)
+  na_at <- if (!is.null(na_row_numbers)) {
+    seq_len(n_data) %in% as.integer(na_row_numbers)
+  } else {
+    NULL
+  }
+  return_value <- rep(NA, time = n_data)
+
+  if(length(na_at) > 0){
+    return_value[!na_at] <- value
+    return_value
+    if (is.factor(value)) {
+      return_value <- levels(value)[return_value]
+      return_value <- factor(return_value, levels=levels(value))
+      return_value
+    } else {
+      return_value
+    }
+  } else {
+    value
+  }
+}
+
 # Wrapper function that takes care of dplyr::group_by and dplyr::summarize as a single step.
 #' @param .data - data frame
 #' @param group_cols - Columns to group_by

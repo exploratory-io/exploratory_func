@@ -310,6 +310,7 @@ build_lm.fast <- function(df,
 
   each_func <- function(df) {
     tryCatch({
+      df_test <- NULL # declare variable for test data
       df <- df %>%
         # dplyr::filter(!is.na(!!target_col))  TODO: this was not filtering, and replaced it with the next line. check other similar places.
         # for numeric cols, filter NA rows, because lm will anyway do this internally, and errors out
@@ -458,10 +459,20 @@ build_lm.fast <- function(df,
         source_data <- df
         test_index <- sample_df_index(source_data, rate = test_rate)
         df <- safe_slice(source_data, test_index, remove = TRUE)
+        if (test_rate > 0) {
+          # Test mode. Make prediction with test data here, rather than repeating it in Analytics View preprocessors.
+          df_test <- safe_slice(source_data, test_index, remove = FALSE)
+          # Remove rows with categorical values which does not appear in training data and unknown to the model.
+          # Record where it was in unknown_category_rows_index, and keep it with model, so that prediction that
+          # matches with original data can be generated later.
+          unknown_category_rows_index_vector <- get_unknown_category_rows_index_vector(df_test, df)
+          df_test <- df_test[!unknown_category_rows_index_vector, , drop = FALSE] # 2nd arg must be empty.
+          unknown_category_rows_index <- get_row_numbers_from_index_vector(unknown_category_rows_index_vector)
+        }
 
         # when family is negativebinomial, use MASS::glm.nb
         if (is.null(link) && family != "negativebinomial") {
-          rf <- stats::glm(fml, data = df, family = family) 
+          model <- stats::glm(fml, data = df, family = family) 
         }
         else {
           if (family == "gaussian") {
@@ -507,12 +518,12 @@ build_lm.fast <- function(df,
             # For example, if you execute like MASS::glm.nb(fmt, data = df, link = link), the following error will occur
             # link "link" not available for poisson family; available links are 'log', 'identity', 'sqrt'
             # Therefore, we used eval to pass the string (log etc.) specified in the argument to link as it is.
-            rf <- eval(parse(text=paste0("MASS::glm.nb(fml, data=df, link=", link, ")")))
+            model <- eval(parse(text=paste0("MASS::glm.nb(fml, data=df, link=", link, ")")))
 
             # A model by MASS::glm.nb has not a formula attribute.
-            rf$formula <- fml
+            model$formula <- fml
           } else {
-            rf <- stats::glm(fml, data = df, family = family_arg)
+            model <- stats::glm(fml, data = df, family = family_arg)
           }
         }
       }
@@ -521,12 +532,18 @@ build_lm.fast <- function(df,
         source_data <- df
         test_index <- sample_df_index(source_data, rate = test_rate)
         df <- safe_slice(source_data, test_index, remove = TRUE)
+        if (test_rate > 0) {
+          df_test <- safe_slice(source_data, test_index, remove = FALSE)
+          unknown_category_rows_index_vector <- get_unknown_category_rows_index_vector(df_test, df)
+          df_test <- df_test[!unknown_category_rows_index_vector, , drop = FALSE] # 2nd arg must be empty.
+          unknown_category_rows_index <- get_row_numbers_from_index_vector(unknown_category_rows_index_vector)
+        }
 
-        rf <- stats::lm(fml, data = df) 
+        model <- stats::lm(fml, data = df) 
         if (relimp) {
           tryCatch({
             # Calculate relative importance.
-            rf$relative_importance <- relaimpo::booteval.relimp(relaimpo::boot.relimp(rf, type = relimp_type,
+            model$relative_importance <- relaimpo::booteval.relimp(relaimpo::boot.relimp(model, type = relimp_type,
                                                                                       b = relimp_bootstrap_runs,
                                                                                       rela = relimp_relative,
                                                                                       rank = FALSE,
@@ -537,27 +554,33 @@ build_lm.fast <- function(df,
           })
         }
       }
+
+      if (test_rate > 0) {
+        # Note: Do not pass df_test like data=df_test. This for some reason ends up predict returning training data prediction.
+        model$prediction_test <- predict(model, df_test, se.fit = TRUE)
+        model$prediction_test$unknown_category_rows_index <- unknown_category_rows_index
+      }
       # these attributes are used in tidy of randomForest TODO: is this good for lm too?
-      rf$terms_mapping <- names(name_map)
-      names(rf$terms_mapping) <- name_map
-      rf$orig_levels <- orig_levels
+      model$terms_mapping <- names(name_map)
+      names(model$terms_mapping) <- name_map
+      model$orig_levels <- orig_levels
 
       # add special lm_exploratory class for adding extra info at glance().
       if (model_type == "glm") {
-        class(rf) <- c("glm_exploratory", class(rf))
+        class(model) <- c("glm_exploratory", class(model))
         if (with_marginal_effects) { # For now, we have tested marginal_effects for logistic regression only. It seems to fail for probit for example.
           if (smote) {
-            rf$marginal_effects <- calc_average_marginal_effects(rf, data=df_before_smote, with_confint=with_marginal_effects_confint) # This has to be done after glm_exploratory class name is set.
+            model$marginal_effects <- calc_average_marginal_effects(model, data=df_before_smote, with_confint=with_marginal_effects_confint) # This has to be done after glm_exploratory class name is set.
           }
           else {
-            rf$marginal_effects <- calc_average_marginal_effects(rf, with_confint=with_marginal_effects_confint) # This has to be done after glm_exploratory class name is set.
+            model$marginal_effects <- calc_average_marginal_effects(model, with_confint=with_marginal_effects_confint) # This has to be done after glm_exploratory class name is set.
           }
         }
       }
       else {
-        class(rf) <- c("lm_exploratory", class(rf))
+        class(model) <- c("lm_exploratory", class(model))
       }
-      list(rf = rf, test_index = test_index, source_data = source_data)
+      list(model = model, test_index = test_index, source_data = source_data)
 
     }, error = function(e){
       if(length(grouped_cols) > 0) {
@@ -581,7 +604,7 @@ build_lm.fast <- function(df,
     ret <- ret %>% tidyr::nest()
   }
   ret %>% dplyr::mutate(model = purrr::map(data, function(df){
-            df[[model_and_data_col]][[1]]$rf
+            df[[model_and_data_col]][[1]]$model
           })) %>%
           dplyr::mutate(.test_index = purrr::map(data, function(df){
             df[[model_and_data_col]][[1]]$test_index
@@ -852,9 +875,134 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
   )
 }
 
+#' @export
+augment.lm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "training", ...) {
+  if(!is.null(newdata)) { # Call broom:::augment.lm as is
+    broom:::augment.lm(x, data = data, newdata = newdata, ...)
+  } else if (!is.null(data)) {
+    switch(data_type,
+      training = { # Call broom:::augment.lm as is
+        broom:::augment.lm(x, data = data, newdata = newdata, ...)
+      },
+      test = {
+        # Minic broom:::augment.lm behavior of replacing spaces in column names. Without this, after bind_row in prediction(), such columns will end up in 2 separate columns.
+        names(data) <- stringr::str_replace_all(names(data), ' ', '.')
+        # Augment data with already predicted result in the model.
+        data$.fitted <- restore_na(x$prediction_test$fit, x$prediction_test$unknown_category_rows_index)
+        data$.se.fit <- restore_na(x$prediction_test$se.fit, x$prediction_test$unknown_category_rows_index)
+        data
+      })
+  }
+  else {
+    broom:::augment.lm(x, ...)
+  }
+}
+
+#' @export
+augment.glm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "training", ...) {
+  if(!is.null(newdata)) {
+    # Calling broom:::augment.glm fails with 'NextMethod' called from an anonymous function
+    # It seems augment.glm is only calling NextMethod, which is falling back to broom:::augment.lm.
+    # So, we are just directly calling augment.lm here.
+    broom:::augment.lm(x, data = data, newdata = newdata, ...)
+  } else if (!is.null(data)) {
+    switch(data_type,
+      training = { # Call broom:::augment.lm as is
+        broom:::augment.lm(x, data = data, newdata = newdata, ...)
+      },
+      test = {
+        # Augment data with already predicted result in the model.
+        data$.fitted <- restore_na(x$prediction_test$fit, x$prediction_test$unknown_category_rows_index)
+        data$.se.fit <- restore_na(x$prediction_test$se.fit, x$prediction_test$unknown_category_rows_index)
+        data
+      })
+  }
+  else {
+    broom:::augment.lm(x, ...)
+  }
+}
+
 # For some reason, find_data called from inside margins::marginal_effects() fails in Exploratory.
 # Explicitly declaring find_data for our glm_exploratory class works it around.
 #' @export
 find_data.glm_exploratory <- function(model, env = parent.frame(), ...) {
   model$data
+}
+
+# Generates Summary table for Analytics View. It can handle Test Mode.
+# This is written for linear regression analytics view and GLM analytics views that makes numeric prediction.
+evaluate_lm_training_and_test <- function(df, pretty.name = FALSE){
+  # Get the summary row for traninng data. Info is retrieved from model by glance()
+  training_ret <- df %>% broom::glance(model, pretty.name = pretty.name)
+  ret <- training_ret
+
+  grouped_col <- colnames(df)[!colnames(df) %in% c("model", ".test_index", "source.data")]
+
+  # Consider it test mode if any of the element of .test_index column has non-zero length, and generate summary row for test data.
+  # Unlike training data, this involves calculating metrics by ourselves from test prediction result.
+  if (purrr::some(df$.test_index, function(x){length(x)!=0})) {
+    ret$is_test_data <- FALSE # Set is_test_data FALSE for training data. Add is_test_data column only when there are test data too.
+    each_func <- function(df){
+      if (!is.data.frame(df)) {
+        df <- tribble(~model, ~.test_index, ~source.data,
+                      df$model, df$.test_index, df$source.data)
+      }
+
+      tryCatch({
+        test_pred_ret <- prediction(df, data = "test")
+        ## get Model Object
+        m <- df %>% filter(!is.null(model)) %>% `[[`(1, "model", 1)
+        actual_val_col <- all.vars(df$model[[1]]$terms)[[1]]
+        # Emulate the way lm replaces the column names in the output.
+        actual_val_col <- stringr::str_replace_all(actual_val_col, ' ', '.')
+
+        actual <- test_pred_ret[[actual_val_col]]
+        predicted <- test_pred_ret$predicted_value
+        root_mean_square_error <- rmse(actual, predicted)
+        rsq <- r_squared(actual, predicted)
+        test_ret <- data.frame(
+                          sigma = root_mean_square_error,
+                          r.squared = rsq
+                          )
+        if(pretty.name) {
+          test_ret <- test_ret %>% dplyr::rename(`R Squared`=r.squared, `RMSE`=sigma)
+        }
+        test_ret$is_test_data <- TRUE
+        test_ret
+      }, error = function(e){
+        data.frame()
+      })
+    }
+
+    test_ret <- do_on_each_group(df, each_func, with_unnest = TRUE)
+    ret <- ret %>% dplyr::bind_rows(test_ret)
+  }
+
+  # Reorder columns. Bring group_by column first, and then is_test_data column, if it exists.
+  if (!is.null(ret$is_test_data)) {
+    if (length(grouped_col) > 0) {
+      ret <- ret %>% dplyr::select(!!!rlang::syms(grouped_col), is_test_data, everything())
+    }
+    else {
+      ret <- ret %>% dplyr::select(is_test_data, everything())
+    }
+  }
+  else {
+    if (length(grouped_col) > 0) {
+      ret <- ret %>% dplyr::select(!!!rlang::syms(grouped_col), everything())
+    }
+  }
+
+  if (length(grouped_col) > 0){
+    ret <- ret %>% dplyr::arrange(!!!rlang::syms(grouped_col))
+  }
+
+  # Prettify is_test_data column. Do this after the above select calls, since it looks at is_test_data column.
+  if (!is.null(ret$is_test_data) && pretty.name) {
+    ret <- ret %>% dplyr::select(is_test_data, everything()) %>%
+      dplyr::mutate(is_test_data = dplyr::if_else(is_test_data, "Test", "Training")) %>%
+      dplyr::rename(`Data Type` = is_test_data)
+  }
+
+  ret
 }
