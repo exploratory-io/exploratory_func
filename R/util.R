@@ -1439,9 +1439,6 @@ extract_from_date <- function(x, type = "fltoyear") {
     wdaylong = {
       ret <- lubridate::wday(x, label=TRUE, abbr=FALSE)
     },
-    wdaytype = {
-      ret <- weekend(x)
-    },
     hour = {
       ret <- lubridate::hour(x)
     },
@@ -1965,7 +1962,6 @@ summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...){
             "day",
             "wday",
             "wdaylong",
-            "wdaytype",
             "hour",
             "minute",
             "second")) {
