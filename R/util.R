@@ -1872,7 +1872,7 @@ get_unknown_category_rows_index_vector <- function(df, training_df) {
   ret
 }
 
-# Converts logical vector such as the output from get_unknown_category_rows_index_vector into 
+# Converts logical vector such as the output from get_unknown_category_rows_index_vector into
 # vector of index integer of TRUE rows.
 get_row_numbers_from_index_vector <- function(index_vector)  {
   seq(length(index_vector))[index_vector]
@@ -1957,6 +1957,7 @@ summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...){
             "day",
             "wday",
             "wdaylong",
+            "wdaytype",
             "hour",
             "minute",
             "second")) {
