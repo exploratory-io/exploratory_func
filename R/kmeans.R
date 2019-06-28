@@ -56,6 +56,7 @@ exp_kmeans <- function(df, ...,
                                                    nstart = nstart,
                                                    algorithm = algorithm,
                                                    trace = trace,
+                                                   normalize_data = FALSE, # Do not normalize further, since we normalized in do_prcomp.
                                                    keep.source=FALSE,
                                                    augment=FALSE,
                                                    seed=NULL) # Seed is already done in do_prcomp. Skip it.
