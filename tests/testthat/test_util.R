@@ -686,10 +686,10 @@ test_that("test extract_from_date", {
   expect_equal(ret, as.Date(c("2018-01-01","2018-01-01",NA,NA)))
 })
 
-test_that("test extract_from_date", {
+test_that("test weekend", {
   data <- as.Date(c("2019-06-16", "2019-06-08", "2019-06-26", NA, NA))
-  ret <- extract_from_date(data, type="wdaytype")
-  expect_equal(ret, c("Weekend","Weekend", "Weekday", NA, NA))
+  ret <- weekend(data)
+  expect_equal(ret, as.factor(c("Weekend","Weekend", "Weekday", NA, NA)))
 })
 
 test_that("test %in_or_all%", {
