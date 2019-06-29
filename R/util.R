@@ -1439,6 +1439,10 @@ extract_from_date <- function(x, type = "fltoyear") {
     wdaylong = {
       ret <- lubridate::wday(x, label=TRUE, abbr=FALSE)
     },
+    # This key is required by Exploratory Desktop for Chart, Analytics, and Data Wrangling.
+    weekend = {
+      ret <- weekend(x)
+    },
     hour = {
       ret <- lubridate::hour(x)
     },
@@ -1962,6 +1966,7 @@ summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...){
             "day",
             "wday",
             "wdaylong",
+            "weekend",
             "hour",
             "minute",
             "second")) {
