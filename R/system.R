@@ -1882,3 +1882,4 @@ read_raw_lines <- function(file, locale = readr::default_locale(), na = characte
   # use line as column name
   df <- data.frame(line = line, stringsAsFactors = FALSE)
 }
+
