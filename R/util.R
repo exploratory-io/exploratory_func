@@ -1439,10 +1439,9 @@ extract_from_date <- function(x, type = "fltoyear") {
     wdaylong = {
       ret <- lubridate::wday(x, label=TRUE, abbr=FALSE)
     },
-    wdaytype = {
-      ret <- dplyr::if_else(is.na(x), NA_character_,
-                              #if it's 1: Sun or 7: Sat, assume it's Weekend.
-                              dplyr::if_else(lubridate::wday(x, label = F, week_start = "7") %in% c(1,7),  'Weekend', "Weekday"))
+    # This key is required by Exploratory Desktop for Chart, Analytics, and Data Wrangling.
+    weekend = {
+      ret <- weekend(x)
     },
     hour = {
       ret <- lubridate::hour(x)
@@ -1454,6 +1453,16 @@ extract_from_date <- function(x, type = "fltoyear") {
       ret <- lubridate::second(x)
     })
   ret
+}
+
+#' @export
+#' It returns Weekend if the provided date is weekend and Weekday if the provided date is weekday.
+#' @param x - Date (or POSIXct)
+weekend <- function(x){
+  ret <- dplyr::if_else(is.na(x), NA_character_,
+                        #if it's 1: Sun or 7: Sat, assume it's Weekend.
+                        dplyr::if_else(lubridate::wday(x, label = F, week_start = "7") %in% c(1,7),  "Weekend", "Weekday"))
+  factor(ret, levels = c("Weekday", "Weekend"))
 }
 
 #' @export
@@ -1872,7 +1881,7 @@ get_unknown_category_rows_index_vector <- function(df, training_df) {
   ret
 }
 
-# Converts logical vector such as the output from get_unknown_category_rows_index_vector into 
+# Converts logical vector such as the output from get_unknown_category_rows_index_vector into
 # vector of index integer of TRUE rows.
 get_row_numbers_from_index_vector <- function(index_vector)  {
   seq(length(index_vector))[index_vector]
@@ -1957,6 +1966,7 @@ summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...){
             "day",
             "wday",
             "wdaylong",
+            "weekend",
             "hour",
             "minute",
             "second")) {
