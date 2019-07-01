@@ -629,7 +629,8 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
 
 #' Wilcoxon signed-rank test wrapper for Analytics View
 #' @export
-#' @param conf.level - Level of confidence for confidence interval. Passed to t.test as part of ...
+#' @param conf.int - Whether to calculate estimate and confidence interval. Default FALSE. Passed to wilcox.test as part of ...
+#' @param conf.level - Level of confidence for confidence interval. Passed to wilcox.test as part of ...
 exp_wilcox <- function(df, var1, var2, func2 = NULL, ...) {
   var1_col <- col_name(substitute(var1))
   var2_col <- col_name(substitute(var2))
@@ -658,7 +659,7 @@ exp_wilcox <- function(df, var1, var2, func2 = NULL, ...) {
 
   each_func <- function(df) {
     tryCatch({
-      model <- wilcox.test(formula, data = df, conf.int = TRUE, ...)
+      model <- wilcox.test(formula, data = df, ...)
       class(model) <- c("wilcox_exploratory", class(model))
       model$var1 <- var1_col
       model$var2 <- var2_col
@@ -697,7 +698,12 @@ tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
   if (type == "model") {
     note <- NULL
     ret <- broom:::tidy.htest(x)
-    ret <- ret %>% dplyr::select(statistic, p.value, estimate, conf.high, conf.low, method)
+    if (!is.null(x$estimate)) { # Result is with estimate and confidence interval
+      ret <- ret %>% dplyr::select(statistic, p.value, estimate, conf.high, conf.low, method)
+    }
+    else {
+      ret <- ret %>% dplyr::select(statistic, p.value, method)
+    }
 
     if (stringr::str_detect(ret$method[[1]], "signed rank test")) {
       ret <- ret %>% dplyr::rename(`W Statistic`=statistic)
@@ -706,11 +712,17 @@ tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
       ret <- ret %>% dplyr::rename(`U Statistic`=statistic)
     }
 
-    ret <- ret %>% dplyr::rename(`P Value`=p.value,
-                    Difference=estimate,
-                    `Conf High`=conf.high,
-                    `Conf Low`=conf.low,
-                    `Method`=method)
+    if (!is.null(x$estimate)) { # Result is with estimate and confidence interval
+      ret <- ret %>% dplyr::rename(`P Value`=p.value,
+                     Difference=estimate,
+                     `Conf High`=conf.high,
+                     `Conf Low`=conf.low,
+                     `Method`=method)
+    }
+    else {
+      ret <- ret %>% dplyr::rename(`P Value`=p.value,
+                     `Method`=method)
+    }
 
     if (!is.null(note)) { # Add Note column, if there was an error from pwr function.
       ret <- ret %>% dplyr::mutate(Note=note)
