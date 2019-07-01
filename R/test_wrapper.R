@@ -697,13 +697,21 @@ tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
   if (type == "model") {
     note <- NULL
     ret <- broom:::tidy.htest(x)
-    ret <- ret %>% dplyr::select(statistic, p.value, estimate, conf.high, conf.low, method) %>%
-      dplyr::rename(`U Statistic`=statistic,
-                    `P Value`=p.value,
+    ret <- ret %>% dplyr::select(statistic, p.value, estimate, conf.high, conf.low, method)
+
+    if (stringr::str_detect(ret$method[[1]], "signed rank test")) {
+      ret <- ret %>% dplyr::rename(`W Statistic`=statistic)
+    }
+    else if (stringr::str_detect(ret$method[[1]], "rank sum test")) {
+      ret <- ret %>% dplyr::rename(`U Statistic`=statistic)
+    }
+
+    ret <- ret %>% dplyr::rename(`P Value`=p.value,
                     Difference=estimate,
                     `Conf High`=conf.high,
                     `Conf Low`=conf.low,
                     `Method`=method)
+
     if (!is.null(note)) { # Add Note column, if there was an error from pwr function.
       ret <- ret %>% dplyr::mutate(Note=note)
     }
