@@ -694,7 +694,6 @@ exp_wilcox <- function(df, var1, var2, func2 = NULL, ...) {
 
 #' @export
 tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
-  browser()
   if (type == "model") {
     note <- NULL
     ret <- broom:::tidy.htest(x)
