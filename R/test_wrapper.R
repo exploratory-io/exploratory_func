@@ -627,6 +627,70 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
   ret
 }
 
+#' Wilcoxon signed-rank test wrapper for Analytics View
+#' @export
+#' @param conf.level - Level of confidence for confidence interval. Passed to t.test as part of ...
+exp_wilcox <- function(df, var1, var2, func2 = NULL, ...) {
+  var1_col <- col_name(substitute(var1))
+  var2_col <- col_name(substitute(var2))
+  grouped_cols <- grouped_by(df)
+
+  if (!is.null(func2)) {
+    if (lubridate::is.Date(df[[var2_col]]) || lubridate::is.POSIXct(df[[var2_col]])) {
+      df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_date(!!rlang::sym(var2_col), type=func2))
+    }
+    else if (is.numeric(df[[var2_col]])) {
+      df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_numeric(!!rlang::sym(var2_col), type=func2))
+    }
+  }
+  
+  n_distinct_res <- n_distinct(df[[var2_col]]) # save n_distinct result to avoid repeating the relatively expensive call.
+  if (n_distinct_res != 2) {
+    if (n_distinct_res == 3 && any(is.na(df[[var2_col]]))) { # automatically filter NA to make number of category 2, if it is the 3rd category.
+      df <- df %>% dplyr::filter(!is.na(!!rlang::sym(var2_col)))
+    }
+    else {
+      stop(paste0("Variable Column (", var2_col, ") has to have 2 kinds of values."))
+    }
+  }
+
+  formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
+
+  each_func <- function(df) {
+    tryCatch({
+      model <- wilcox.test(formula, data = df, ...)
+      class(model) <- c("wilcox_exploratory", class(model))
+      model$var1 <- var1_col
+      model$var2 <- var2_col
+      model$data <- df
+      model
+    }, error = function(e){
+      if(length(grouped_cols) > 0) {
+        # Ignore the error if
+        # it is caused by subset of
+        # grouped data frame
+        # to show result of
+        # data frames that succeed.
+        # For example, error can happen if one of the groups does not have both values (e.g. both TRUE and FALSE) of var2.
+        NULL
+      } else {
+        stop(e)
+      }
+    })
+  }
+
+  # Calculation is executed in each group.
+  # Storing the result in this tmp_col and
+  # unnesting the result.
+  # If the original data frame is grouped by "tmp",
+  # overwriting it should be avoided,
+  # so avoid_conflict is used here.
+  tmp_col <- avoid_conflict(colnames(df), "model")
+  ret <- df %>%
+    dplyr::do_(.dots = setNames(list(~each_func(.)), tmp_col))
+  ret
+}
+
 #' ANOVA wrapper for Analytics View
 #' @export
 exp_anova <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, f = NULL, power = NULL, beta = NULL, ...) {
