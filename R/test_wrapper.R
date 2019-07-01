@@ -658,7 +658,7 @@ exp_wilcox <- function(df, var1, var2, func2 = NULL, ...) {
 
   each_func <- function(df) {
     tryCatch({
-      model <- wilcox.test(formula, data = df, ...)
+      model <- wilcox.test(formula, data = df, conf.int = TRUE, ...)
       class(model) <- c("wilcox_exploratory", class(model))
       model$var1 <- var1_col
       model$var2 <- var2_col
@@ -697,10 +697,12 @@ tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
   if (type == "model") {
     note <- NULL
     ret <- broom:::tidy.htest(x)
-
-    ret <- ret %>% dplyr::select(statistic, p.value, method) %>%
+    ret <- ret %>% dplyr::select(statistic, p.value, estimate, conf.high, conf.low, method) %>%
       dplyr::rename(`U Statistic`=statistic,
                     `P Value`=p.value,
+                    Difference=estimate,
+                    `Conf High`=conf.high,
+                    `Conf Low`=conf.low,
                     `Method`=method)
     if (!is.null(note)) { # Add Note column, if there was an error from pwr function.
       ret <- ret %>% dplyr::mutate(Note=note)
