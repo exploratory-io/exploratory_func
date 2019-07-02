@@ -929,6 +929,104 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
   ret
 }
 
+#' Kruskal-Wallis wrapper for Analytics View
+#' @export
+exp_kruskal <- function(df, var1, var2, func2 = NULL, ...) {
+  var1_col <- col_name(substitute(var1))
+  var2_col <- col_name(substitute(var2))
+  grouped_cols <- grouped_by(df)
+
+  if (!is.null(func2)) {
+    if (lubridate::is.Date(df[[var2_col]]) || lubridate::is.POSIXct(df[[var2_col]])) {
+      df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_date(!!rlang::sym(var2_col), type=func2))
+    }
+    else if (is.numeric(df[[var2_col]])) {
+      df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_numeric(!!rlang::sym(var2_col), type=func2))
+    }
+  }
+  
+  if (n_distinct(df[[var2_col]]) < 2) {
+    stop(paste0("Variable Column (", var2_col, ") has to have 2 or more kinds of values."))
+  }
+
+  formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
+
+  each_func <- function(df) {
+    tryCatch({
+      model <- kruskal.test(formula, data = df, ...)
+      class(model) <- c("kruskal_exploratory", class(model))
+      model$var1 <- var1_col
+      model$var2 <- var2_col
+      model$data <- df
+      model
+    }, error = function(e){
+      if(length(grouped_cols) > 0) {
+        # Ignore the error if
+        # it is caused by subset of
+        # grouped data frame
+        # to show result of
+        # data frames that succeed.
+        # For example, error can happen if one of the groups has only one unique value in its set of var2.
+        NULL
+      } else {
+        stop(e)
+      }
+    })
+  }
+
+  # Calculation is executed in each group.
+  # Storing the result in this tmp_col and
+  # unnesting the result.
+  # If the original data frame is grouped by "tmp",
+  # overwriting it should be avoided,
+  # so avoid_conflict is used here.
+  tmp_col <- avoid_conflict(colnames(df), "model")
+  ret <- df %>%
+    dplyr::do_(.dots = setNames(list(~each_func(.)), tmp_col))
+  ret
+}
+
+tidy.kruskal_exploratory <- function(x, type="model", conf_level=0.95) {
+  if (type == "model") {
+    note <- NULL
+    ret <- broom:::tidy.htest(x)
+    ret <- ret %>% dplyr::select(statistic, p.value, method)
+    ret <- ret %>% dplyr::rename(`H Statistic` = statistic,
+                                 `P Value`=p.value,
+                                 `Method`=method)
+    if (!is.null(note)) { # Add Note column, if there was an error from pwr function.
+      ret <- ret %>% dplyr::mutate(Note=note)
+    }
+  }
+  else if (type == "data_summary") { #TODO consolidate with code in tidy.ttest_exploratory
+    conf_threshold = 1 - (1 - conf_level)/2
+    ret <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
+      dplyr::summarize(`Number of Rows`=length(!!rlang::sym(x$var1)),
+                       Mean=mean(!!rlang::sym(x$var1), na.rm=TRUE),
+                       `Std Deviation`=sd(!!rlang::sym(x$var1), na.rm=TRUE),
+                       # std error definition: https://www.rdocumentation.org/packages/plotrix/versions/3.7/topics/std.error
+                       `Std Error of Mean`=sd(!!rlang::sym(x$var1), na.rm=TRUE)/sqrt(sum(!is.na(!!rlang::sym(x$var1)))),
+                       # Note: Use qt (t distribution) instead of qnorm (normal distribution) here.
+                       # For more detail take a look at 10.5.1 A slight mistake in the formula of "Learning Statistics with R" 
+                       `Conf High` = Mean + `Std Error of Mean` * qt(p=conf_threshold, df=`Number of Rows`-1),
+                       `Conf Low` = Mean - `Std Error of Mean` * qt(p=conf_threshold, df=`Number of Rows`-1),
+                       `Minimum`=min(!!rlang::sym(x$var1), na.rm=TRUE),
+                       `Maximum`=max(!!rlang::sym(x$var1), na.rm=TRUE)) %>%
+      dplyr::select(!!rlang::sym(x$var2),
+                    `Number of Rows`,
+                    Mean,
+                    `Conf Low`,
+                    `Conf High`,
+                    `Std Error of Mean`,
+                    `Std Deviation`,
+                    `Minimum`,
+                    `Maximum`)
+  }
+  else { # type == "data"
+    ret <- x$data
+  }
+  ret
+}
 
 # qqline function that does not draw line and instead return intercept and slope
 qqline_data <- function (y, datax = FALSE, distribution = qnorm, probs = c(0.25, 0.75), qtype = 7, ...) 
