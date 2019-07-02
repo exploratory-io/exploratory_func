@@ -493,11 +493,7 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, d = NULL, 
       model
     }, error = function(e){
       if(length(grouped_cols) > 0) {
-        # Ignore the error if
-        # it is caused by subset of
-        # grouped data frame
-        # to show result of
-        # data frames that succeed.
+        # Ignore the error if it is caused by subset of grouped data frame to show result of data frames that succeed.
         # For example, error can happen if one of the groups does not have both values (e.g. both TRUE and FALSE) of var2.
         NULL
       } else {
@@ -667,11 +663,7 @@ exp_wilcox <- function(df, var1, var2, func2 = NULL, ...) {
       model
     }, error = function(e){
       if(length(grouped_cols) > 0) {
-        # Ignore the error if
-        # it is caused by subset of
-        # grouped data frame
-        # to show result of
-        # data frames that succeed.
+        # Ignore the error if it is caused by subset of grouped data frame to show result of data frames that succeed.
         # For example, error can happen if one of the groups does not have both values (e.g. both TRUE and FALSE) of var2.
         NULL
       } else {
@@ -704,6 +696,7 @@ tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
       ret <- ret %>% dplyr::select(statistic, p.value, method)
     }
 
+    # Switch the name of statistic based on the type of performed test.
     if (stringr::str_detect(ret$method[[1]], "signed rank test")) {
       ret <- ret %>% dplyr::rename(`W Statistic`=statistic)
     }
@@ -723,7 +716,7 @@ tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
                      `Method`=method)
     }
 
-    if (!is.null(note)) { # Add Note column, if there was an error from pwr function.
+    if (!is.null(note)) { # Code to add Note column if there was an error. Not used for this particular function yet.
       ret <- ret %>% dplyr::mutate(Note=!!note)
     }
   }
@@ -805,11 +798,7 @@ exp_anova <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, f = NULL, 
       model
     }, error = function(e){
       if(length(grouped_cols) > 0) {
-        # Ignore the error if
-        # it is caused by subset of
-        # grouped data frame
-        # to show result of
-        # data frames that succeed.
+        # Ignore the error if it is caused by subset of grouped data frame to show result of data frames that succeed.
         # For example, error can happen if one of the groups has only one unique value in its set of var2.
         NULL
       } else {
@@ -961,11 +950,7 @@ exp_kruskal <- function(df, var1, var2, func2 = NULL, ...) {
       model
     }, error = function(e){
       if(length(grouped_cols) > 0) {
-        # Ignore the error if
-        # it is caused by subset of
-        # grouped data frame
-        # to show result of
-        # data frames that succeed.
+        # Ignore the error if it is caused by subset of grouped data frame to show result of data frames that succeed.
         # For example, error can happen if one of the groups has only one unique value in its set of var2.
         NULL
       } else {
