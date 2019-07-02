@@ -214,18 +214,18 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
 
   if (!is.null(func1)) {
     if (lubridate::is.Date(df[[var1_col]]) || lubridate::is.POSIXct(df[[var1_col]])) {
-      df <- df %>% dplyr::mutate(!!rlang::sym(var1_col) := extract_from_date(!!rlang::sym(var1_col), type=func1))
+      df <- df %>% dplyr::mutate(!!rlang::sym(var1_col) := extract_from_date(!!rlang::sym(var1_col), type=!!func1))
     }
     else if (is.numeric(df[[var1_col]])) {
-      df <- df %>% dplyr::mutate(!!rlang::sym(var1_col) := extract_from_numeric(!!rlang::sym(var1_col), type=func1))
+      df <- df %>% dplyr::mutate(!!rlang::sym(var1_col) := extract_from_numeric(!!rlang::sym(var1_col), type=!!func1))
     }
   }
   if (!is.null(func2)) {
     if (lubridate::is.Date(df[[var2_col]]) || lubridate::is.POSIXct(df[[var2_col]])) {
-      df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_date(!!rlang::sym(var2_col), type=func2))
+      df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_date(!!rlang::sym(var2_col), type=!!func2))
     }
     else if (is.numeric(df[[var2_col]])) {
-      df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_numeric(!!rlang::sym(var2_col), type=func2))
+      df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_numeric(!!rlang::sym(var2_col), type=!!func2))
     }
   }
   
@@ -330,7 +330,7 @@ tidy.chisq_exploratory <- function(x, type = "observed") {
       ret <- ret %>% mutate(contrib = 0) # avoid division by 0
     }
     else {
-      ret <- ret %>% mutate(contrib = 100*residual^2/x$statistic) # add percent contribution too.
+      ret <- ret %>% mutate(contrib = 100*residual^2/(!!(x$statistic))) # add percent contribution too.
     }
 
     if (!is.null(x$var1_levels)) {
@@ -386,7 +386,7 @@ glance.chisq_exploratory <- function(x) {
       note <- "Could not calculate Cohhen's w." 
       power_val <- NA_real_
     }
-    ret <- ret %>% dplyr::mutate(w=x$cohens_w, power=power_val, beta=1.0-power_val)
+    ret <- ret %>% dplyr::mutate(w=!!(x$cohens_w), power=!!power_val, beta=1.0-!!power_val)
     ret <- ret %>% rename(`Chi-Square`=statistic,
                           `Degree of Freedom`=parameter,
                           `P Value`=p.value,
@@ -404,7 +404,7 @@ glance.chisq_exploratory <- function(x) {
       note <- e$message
       required_sample_size <- NA_real_
     })
-    ret <- ret %>% dplyr::mutate(w=x$cohens_w, power=x$power, beta=1.0-x$power, current_sample_size=N, required_sample_size=required_sample_size)
+    ret <- ret %>% dplyr::mutate(w=!!(x$cohens_w), power=!!(x$power), beta=1.0-!!(x$power), current_sample_size=!!N, required_sample_size=!!required_sample_size)
     ret <- ret %>% rename(`Chi-Square`=statistic,
                           `Degree of Freedom`=parameter,
                           `P Value`=p.value,
@@ -415,7 +415,7 @@ glance.chisq_exploratory <- function(x) {
                           `Required Sample Size`=required_sample_size)
   }
   if (!is.null(note)) { # Add Note column, if there was an error from pwr function.
-    ret <- ret %>% dplyr::mutate(Note=note)
+    ret <- ret %>% dplyr::mutate(Note=!!note)
   }
   ret
 }
@@ -438,10 +438,10 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, d = NULL, 
 
   if (!is.null(func2)) {
     if (lubridate::is.Date(df[[var2_col]]) || lubridate::is.POSIXct(df[[var2_col]])) {
-      df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_date(!!rlang::sym(var2_col), type=func2))
+      df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_date(!!rlang::sym(var2_col), type=!!func2))
     }
     else if (is.numeric(df[[var2_col]])) {
-      df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_numeric(!!rlang::sym(var2_col), type=func2))
+      df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_numeric(!!rlang::sym(var2_col), type=!!func2))
     }
   }
   
@@ -557,7 +557,7 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
       })
 
       ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
-        dplyr::mutate(d=x$cohens_d, power=power_val, beta=1.0-power_val) %>%
+        dplyr::mutate(d=!!(x$cohens_d), power=!!power_val, beta=1.0-!!power_val) %>%
         dplyr::rename(`t Ratio`=statistic,
                       `P Value`=p.value,
                       `Degree of Freedom`=parameter,
@@ -579,8 +579,8 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
         required_sample_size <- NA_real_
       })
       ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
-        dplyr::mutate(d=x$cohens_d, power=x$power, beta=1.0-x$power) %>%
-        dplyr::mutate(current_sample_size=min(n1,n2), required_sample_size=required_sample_size) %>%
+        dplyr::mutate(d=!!(x$cohens_d), power=!!(x$power), beta=1.0-!!(x$power)) %>%
+        dplyr::mutate(current_sample_size=min(!!n1,!!n2), required_sample_size=required_sample_size) %>%
         dplyr::rename(`t Ratio`=statistic,
                       `P Value`=p.value,
                       `Degree of Freedom`=parameter,
@@ -594,7 +594,7 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
                       `Required Sample Size (Each Group)`=required_sample_size)
     }
     if (!is.null(note)) { # Add Note column, if there was an error from pwr function.
-      ret <- ret %>% dplyr::mutate(Note=note)
+      ret <- ret %>% dplyr::mutate(Note=!!note)
     }
   }
   else if (type == "data_summary") { #TODO consolidate with code in tidy.anova_exploratory
@@ -772,10 +772,10 @@ exp_anova <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, f = NULL, 
 
   if (!is.null(func2)) {
     if (lubridate::is.Date(df[[var2_col]]) || lubridate::is.POSIXct(df[[var2_col]])) {
-      df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_date(!!rlang::sym(var2_col), type=func2))
+      df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_date(!!rlang::sym(var2_col), type=!!func2))
     }
     else if (is.numeric(df[[var2_col]])) {
-      df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_numeric(!!rlang::sym(var2_col), type=func2))
+      df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_numeric(!!rlang::sym(var2_col), type=!!func2))
     }
   }
   
@@ -860,7 +860,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
         power_val <- NA_real_
       })
       ret <- ret %>% dplyr::select(term, statistic, p.value, df, sumsq, meansq) %>%
-        dplyr::mutate(f=c(x$cohens_f, NA_real_), power=c(power_val, NA_real_), beta=c(1.0-power_val, NA_real_)) %>%
+        dplyr::mutate(f=c(!!(x$cohens_f), NA_real_), power=c(!!power_val, NA_real_), beta=c(1.0-!!power_val, NA_real_)) %>%
         dplyr::rename(Term=term,
                       `F Ratio`=statistic,
                       `P Value`=p.value,
@@ -881,8 +881,8 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
         required_sample_size <- NA_real_
       })
       ret <- ret %>% dplyr::select(term, statistic, p.value, df, sumsq, meansq) %>%
-        dplyr::mutate(f=c(x$cohens_f, NA_real_), power=c(x$power, NA_real_), beta=c(1.0-x$power, NA_real_)) %>%
-        dplyr::mutate(current_sample_size=min_n_rows, required_sample_size=c(required_sample_size, NA_real_)) %>%
+        dplyr::mutate(f=c(!!(x$cohens_f), NA_real_), power=c(!!(x$power), NA_real_), beta=c(1.0-!!(x$power), NA_real_)) %>%
+        dplyr::mutate(current_sample_size=!!min_n_rows, required_sample_size=c(!!required_sample_size, NA_real_)) %>%
         dplyr::rename(Term=term,
                       `F Ratio`=statistic,
                       `P Value`=p.value,
@@ -896,7 +896,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
                       `Required Sample Size (Each Group)`=required_sample_size)
     }
     if (!is.null(note)) { # Add Note column, if there was an error from pwr function.
-      ret <- ret %>% dplyr::mutate(Note=note)
+      ret <- ret %>% dplyr::mutate(Note=!!note)
     }
   }
   else if (type == "data_summary") { #TODO consolidate with code in tidy.ttest_exploratory
@@ -1101,7 +1101,7 @@ exp_normality<- function(df, ...,
           sample_size <- length(col_to_test)
         }
         res <- shapiro.test(col_to_test) %>% tidy() %>%
-          dplyr::mutate(col=col, sample_size=sample_size) %>%
+          dplyr::mutate(col=!!col, sample_size=!!sample_size) %>%
           dplyr::select(col, everything())
         df.model <- dplyr::bind_rows(df.model, res)
       }
@@ -1140,7 +1140,7 @@ tidy.shapiro_exploratory <- function(x, type = "model", signif_level=0.05) {
 
     # table with TRUE/FALSE result on normality of each column.
     normal_df <- x$model_summary %>%
-      dplyr::mutate(normal = p.value > signif_level) %>%
+      dplyr::mutate(normal = p.value > !!signif_level) %>%
       dplyr::select(col, normal)
 
     ret <- dplyr::bind_rows(sampled_qq_df, x$qqline)
@@ -1150,7 +1150,7 @@ tidy.shapiro_exploratory <- function(x, type = "model", signif_level=0.05) {
   }
   else {
     ret <- x$model_summary
-    ret <- ret %>% dplyr::mutate(normal = p.value > signif_level)
+    ret <- ret %>% dplyr::mutate(normal = p.value > !!signif_level)
     ret <- ret %>% dplyr::select(-method)
     ret <- ret %>% dplyr::rename(`Column`=col, `Statistic`=statistic, `P Value`=p.value, `Normal Distribution`=normal, `Sample Size`=sample_size)
     ret
