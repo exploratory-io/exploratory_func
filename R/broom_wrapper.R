@@ -616,12 +616,12 @@ prediction_binary <- function(df, threshold = 0.5, ...){
       if (!is.null(first_model$family$linkinv)) {
         if (any(colnames(ret) %in% "conf_low")) {
           conf_low_vec <- first_model$family$linkinv(ret[["conf_low"]])
-          ret[["conf_low"]] <- NULL
+          ret[["conf_low"]] <- NULL # Remove column once to move it to the last.
           ret[["conf_low"]] <- conf_low_vec
         }
         if (any(colnames(ret) %in% "conf_high")) {
           conf_high_vec <- first_model$family$linkinv(ret[["conf_high"]])
-          ret[["conf_high"]] <- NULL
+          ret[["conf_high"]] <- NULL # Remove column once to move it to the last.
           ret[["conf_high"]] <- conf_high_vec
         }
       }
@@ -706,6 +706,10 @@ prediction_binary <- function(df, threshold = 0.5, ...){
 
   colnames(ret)[colnames(ret) == prob_col_name] <- "predicted_probability"
 
+  # Move is_test_data to the last again, since new columns were added to the last in this function.
+  if (!is.null(ret$is_test_data)) {
+    ret <- ret %>% select(-is_test_data, everything(), is_test_data)
+  }
   ret
 }
 
