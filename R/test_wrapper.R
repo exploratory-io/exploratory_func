@@ -214,18 +214,18 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
 
   if (!is.null(func1)) {
     if (lubridate::is.Date(df[[var1_col]]) || lubridate::is.POSIXct(df[[var1_col]])) {
-      df <- df %>% dplyr::mutate(!!rlang::sym(var1_col) := extract_from_date(!!rlang::sym(var1_col), type=func1))
+      df <- df %>% dplyr::mutate(!!rlang::sym(var1_col) := extract_from_date(!!rlang::sym(var1_col), type=!!func1))
     }
     else if (is.numeric(df[[var1_col]])) {
-      df <- df %>% dplyr::mutate(!!rlang::sym(var1_col) := extract_from_numeric(!!rlang::sym(var1_col), type=func1))
+      df <- df %>% dplyr::mutate(!!rlang::sym(var1_col) := extract_from_numeric(!!rlang::sym(var1_col), type=!!func1))
     }
   }
   if (!is.null(func2)) {
     if (lubridate::is.Date(df[[var2_col]]) || lubridate::is.POSIXct(df[[var2_col]])) {
-      df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_date(!!rlang::sym(var2_col), type=func2))
+      df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_date(!!rlang::sym(var2_col), type=!!func2))
     }
     else if (is.numeric(df[[var2_col]])) {
-      df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_numeric(!!rlang::sym(var2_col), type=func2))
+      df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_numeric(!!rlang::sym(var2_col), type=!!func2))
     }
   }
   
@@ -330,7 +330,7 @@ tidy.chisq_exploratory <- function(x, type = "observed") {
       ret <- ret %>% mutate(contrib = 0) # avoid division by 0
     }
     else {
-      ret <- ret %>% mutate(contrib = 100*residual^2/x$statistic) # add percent contribution too.
+      ret <- ret %>% mutate(contrib = 100*residual^2/(!!(x$statistic))) # add percent contribution too.
     }
 
     if (!is.null(x$var1_levels)) {
@@ -386,7 +386,7 @@ glance.chisq_exploratory <- function(x) {
       note <- "Could not calculate Cohhen's w." 
       power_val <- NA_real_
     }
-    ret <- ret %>% dplyr::mutate(w=x$cohens_w, power=power_val, beta=1.0-power_val)
+    ret <- ret %>% dplyr::mutate(w=!!(x$cohens_w), power=!!power_val, beta=1.0-!!power_val)
     ret <- ret %>% rename(`Chi-Square`=statistic,
                           `Degree of Freedom`=parameter,
                           `P Value`=p.value,
@@ -404,7 +404,7 @@ glance.chisq_exploratory <- function(x) {
       note <- e$message
       required_sample_size <- NA_real_
     })
-    ret <- ret %>% dplyr::mutate(w=x$cohens_w, power=x$power, beta=1.0-x$power, current_sample_size=N, required_sample_size=required_sample_size)
+    ret <- ret %>% dplyr::mutate(w=!!(x$cohens_w), power=!!(x$power), beta=1.0-!!(x$power), current_sample_size=!!N, required_sample_size=!!required_sample_size)
     ret <- ret %>% rename(`Chi-Square`=statistic,
                           `Degree of Freedom`=parameter,
                           `P Value`=p.value,
@@ -415,7 +415,7 @@ glance.chisq_exploratory <- function(x) {
                           `Required Sample Size`=required_sample_size)
   }
   if (!is.null(note)) { # Add Note column, if there was an error from pwr function.
-    ret <- ret %>% dplyr::mutate(Note=note)
+    ret <- ret %>% dplyr::mutate(Note=!!note)
   }
   ret
 }
@@ -438,10 +438,10 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, d = NULL, 
 
   if (!is.null(func2)) {
     if (lubridate::is.Date(df[[var2_col]]) || lubridate::is.POSIXct(df[[var2_col]])) {
-      df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_date(!!rlang::sym(var2_col), type=func2))
+      df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_date(!!rlang::sym(var2_col), type=!!func2))
     }
     else if (is.numeric(df[[var2_col]])) {
-      df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_numeric(!!rlang::sym(var2_col), type=func2))
+      df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_numeric(!!rlang::sym(var2_col), type=!!func2))
     }
   }
   
@@ -493,11 +493,7 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, d = NULL, 
       model
     }, error = function(e){
       if(length(grouped_cols) > 0) {
-        # Ignore the error if
-        # it is caused by subset of
-        # grouped data frame
-        # to show result of
-        # data frames that succeed.
+        # Ignore the error if it is caused by subset of grouped data frame to show result of data frames that succeed.
         # For example, error can happen if one of the groups does not have both values (e.g. both TRUE and FALSE) of var2.
         NULL
       } else {
@@ -557,7 +553,7 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
       })
 
       ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
-        dplyr::mutate(d=x$cohens_d, power=power_val, beta=1.0-power_val) %>%
+        dplyr::mutate(d=!!(x$cohens_d), power=!!power_val, beta=1.0-!!power_val) %>%
         dplyr::rename(`t Ratio`=statistic,
                       `P Value`=p.value,
                       `Degree of Freedom`=parameter,
@@ -579,8 +575,8 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
         required_sample_size <- NA_real_
       })
       ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
-        dplyr::mutate(d=x$cohens_d, power=x$power, beta=1.0-x$power) %>%
-        dplyr::mutate(current_sample_size=min(n1,n2), required_sample_size=required_sample_size) %>%
+        dplyr::mutate(d=!!(x$cohens_d), power=!!(x$power), beta=1.0-!!(x$power)) %>%
+        dplyr::mutate(current_sample_size=min(!!n1,!!n2), required_sample_size=required_sample_size) %>%
         dplyr::rename(`t Ratio`=statistic,
                       `P Value`=p.value,
                       `Degree of Freedom`=parameter,
@@ -594,7 +590,134 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
                       `Required Sample Size (Each Group)`=required_sample_size)
     }
     if (!is.null(note)) { # Add Note column, if there was an error from pwr function.
-      ret <- ret %>% dplyr::mutate(Note=note)
+      ret <- ret %>% dplyr::mutate(Note=!!note)
+    }
+  }
+  else if (type == "data_summary") { #TODO consolidate with code in tidy.anova_exploratory
+    conf_threshold = 1 - (1 - conf_level)/2
+    ret <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
+      dplyr::summarize(`Number of Rows`=length(!!rlang::sym(x$var1)),
+                       Mean=mean(!!rlang::sym(x$var1), na.rm=TRUE),
+                       `Std Deviation`=sd(!!rlang::sym(x$var1), na.rm=TRUE),
+                       # std error definition: https://www.rdocumentation.org/packages/plotrix/versions/3.7/topics/std.error
+                       `Std Error of Mean`=sd(!!rlang::sym(x$var1), na.rm=TRUE)/sqrt(sum(!is.na(!!rlang::sym(x$var1)))),
+                       # Note: Use qt (t distribution) instead of qnorm (normal distribution) here.
+                       # For more detail take a look at 10.5.1 A slight mistake in the formula of "Learning Statistics with R" 
+                       `Conf High` = Mean + `Std Error of Mean` * qt(p=!!conf_threshold, df=`Number of Rows`-1),
+                       `Conf Low` = Mean - `Std Error of Mean` * qt(p=!!conf_threshold, df=`Number of Rows`-1),
+                       `Minimum`=min(!!rlang::sym(x$var1), na.rm=TRUE),
+                       `Maximum`=max(!!rlang::sym(x$var1), na.rm=TRUE)) %>%
+      dplyr::select(!!rlang::sym(x$var2),
+                    `Number of Rows`,
+                    Mean,
+                    `Conf Low`,
+                    `Conf High`,
+                    `Std Error of Mean`,
+                    `Std Deviation`,
+                    `Minimum`,
+                    `Maximum`)
+  }
+  else { # type == "data"
+    ret <- x$data
+  }
+  ret
+}
+
+#' Wrapper for Wilcoxon rank sum test and signed-rank test for Analytics View
+#' @export
+#' @param conf.int - Whether to calculate estimate and confidence interval. Default FALSE. Passed to wilcox.test as part of ...
+#' @param conf.level - Level of confidence for confidence interval. Passed to wilcox.test as part of ...
+exp_wilcox <- function(df, var1, var2, func2 = NULL, ...) {
+  var1_col <- col_name(substitute(var1))
+  var2_col <- col_name(substitute(var2))
+  grouped_cols <- grouped_by(df)
+
+  if (!is.null(func2)) {
+    if (lubridate::is.Date(df[[var2_col]]) || lubridate::is.POSIXct(df[[var2_col]])) {
+      df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_date(!!rlang::sym(var2_col), type=!!func2))
+    }
+    else if (is.numeric(df[[var2_col]])) {
+      df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_numeric(!!rlang::sym(var2_col), type=!!func2))
+    }
+  }
+  
+  n_distinct_res <- n_distinct(df[[var2_col]]) # save n_distinct result to avoid repeating the relatively expensive call.
+  if (n_distinct_res != 2) {
+    if (n_distinct_res == 3 && any(is.na(df[[var2_col]]))) { # automatically filter NA to make number of category 2, if it is the 3rd category.
+      df <- df %>% dplyr::filter(!is.na(!!rlang::sym(var2_col)))
+    }
+    else {
+      stop(paste0("Variable Column (", var2_col, ") has to have 2 kinds of values."))
+    }
+  }
+
+  formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
+
+  each_func <- function(df) {
+    tryCatch({
+      model <- wilcox.test(formula, data = df, ...)
+      class(model) <- c("wilcox_exploratory", class(model))
+      model$var1 <- var1_col
+      model$var2 <- var2_col
+      model$data <- df
+      model
+    }, error = function(e){
+      if(length(grouped_cols) > 0) {
+        # Ignore the error if it is caused by subset of grouped data frame to show result of data frames that succeed.
+        # For example, error can happen if one of the groups does not have both values (e.g. both TRUE and FALSE) of var2.
+        NULL
+      } else {
+        stop(e)
+      }
+    })
+  }
+
+  # Calculation is executed in each group.
+  # Storing the result in this tmp_col and
+  # unnesting the result.
+  # If the original data frame is grouped by "tmp",
+  # overwriting it should be avoided,
+  # so avoid_conflict is used here.
+  tmp_col <- avoid_conflict(colnames(df), "model")
+  ret <- df %>%
+    dplyr::do_(.dots = setNames(list(~each_func(.)), tmp_col))
+  ret
+}
+
+#' @export
+tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
+  if (type == "model") {
+    note <- NULL
+    ret <- broom:::tidy.htest(x)
+    if (!is.null(x$estimate)) { # Result is with estimate and confidence interval
+      ret <- ret %>% dplyr::select(statistic, p.value, estimate, conf.high, conf.low, method)
+    }
+    else {
+      ret <- ret %>% dplyr::select(statistic, p.value, method)
+    }
+
+    # Switch the name of statistic based on the type of performed test.
+    if (stringr::str_detect(ret$method[[1]], "signed rank test")) {
+      ret <- ret %>% dplyr::rename(`W Statistic`=statistic)
+    }
+    else if (stringr::str_detect(ret$method[[1]], "rank sum test")) {
+      ret <- ret %>% dplyr::rename(`U Statistic`=statistic)
+    }
+
+    if (!is.null(x$estimate)) { # Result is with estimate and confidence interval
+      ret <- ret %>% dplyr::rename(`P Value`=p.value,
+                     Difference=estimate,
+                     `Conf High`=conf.high,
+                     `Conf Low`=conf.low,
+                     `Method`=method)
+    }
+    else {
+      ret <- ret %>% dplyr::rename(`P Value`=p.value,
+                     `Method`=method)
+    }
+
+    if (!is.null(note)) { # Code to add Note column if there was an error. Not used for this particular function yet.
+      ret <- ret %>% dplyr::mutate(Note=!!note)
     }
   }
   else if (type == "data_summary") { #TODO consolidate with code in tidy.anova_exploratory
@@ -642,10 +765,10 @@ exp_anova <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, f = NULL, 
 
   if (!is.null(func2)) {
     if (lubridate::is.Date(df[[var2_col]]) || lubridate::is.POSIXct(df[[var2_col]])) {
-      df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_date(!!rlang::sym(var2_col), type=func2))
+      df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_date(!!rlang::sym(var2_col), type=!!func2))
     }
     else if (is.numeric(df[[var2_col]])) {
-      df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_numeric(!!rlang::sym(var2_col), type=func2))
+      df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_numeric(!!rlang::sym(var2_col), type=!!func2))
     }
   }
   
@@ -675,11 +798,7 @@ exp_anova <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, f = NULL, 
       model
     }, error = function(e){
       if(length(grouped_cols) > 0) {
-        # Ignore the error if
-        # it is caused by subset of
-        # grouped data frame
-        # to show result of
-        # data frames that succeed.
+        # Ignore the error if it is caused by subset of grouped data frame to show result of data frames that succeed.
         # For example, error can happen if one of the groups has only one unique value in its set of var2.
         NULL
       } else {
@@ -730,7 +849,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
         power_val <- NA_real_
       })
       ret <- ret %>% dplyr::select(term, statistic, p.value, df, sumsq, meansq) %>%
-        dplyr::mutate(f=c(x$cohens_f, NA_real_), power=c(power_val, NA_real_), beta=c(1.0-power_val, NA_real_)) %>%
+        dplyr::mutate(f=c(!!(x$cohens_f), NA_real_), power=c(!!power_val, NA_real_), beta=c(1.0-!!power_val, NA_real_)) %>%
         dplyr::rename(Term=term,
                       `F Ratio`=statistic,
                       `P Value`=p.value,
@@ -751,8 +870,8 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
         required_sample_size <- NA_real_
       })
       ret <- ret %>% dplyr::select(term, statistic, p.value, df, sumsq, meansq) %>%
-        dplyr::mutate(f=c(x$cohens_f, NA_real_), power=c(x$power, NA_real_), beta=c(1.0-x$power, NA_real_)) %>%
-        dplyr::mutate(current_sample_size=min_n_rows, required_sample_size=c(required_sample_size, NA_real_)) %>%
+        dplyr::mutate(f=c(!!(x$cohens_f), NA_real_), power=c(!!(x$power), NA_real_), beta=c(1.0-!!(x$power), NA_real_)) %>%
+        dplyr::mutate(current_sample_size=!!min_n_rows, required_sample_size=c(!!required_sample_size, NA_real_)) %>%
         dplyr::rename(Term=term,
                       `F Ratio`=statistic,
                       `P Value`=p.value,
@@ -766,7 +885,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
                       `Required Sample Size (Each Group)`=required_sample_size)
     }
     if (!is.null(note)) { # Add Note column, if there was an error from pwr function.
-      ret <- ret %>% dplyr::mutate(Note=note)
+      ret <- ret %>% dplyr::mutate(Note=!!note)
     }
   }
   else if (type == "data_summary") { #TODO consolidate with code in tidy.ttest_exploratory
@@ -779,8 +898,8 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
                        `Std Error of Mean`=sd(!!rlang::sym(x$var1), na.rm=TRUE)/sqrt(sum(!is.na(!!rlang::sym(x$var1)))),
                        # Note: Use qt (t distribution) instead of qnorm (normal distribution) here.
                        # For more detail take a look at 10.5.1 A slight mistake in the formula of "Learning Statistics with R" 
-                       `Conf High` = Mean + `Std Error of Mean` * qt(p=conf_threshold, df=`Number of Rows`-1),
-                       `Conf Low` = Mean - `Std Error of Mean` * qt(p=conf_threshold, df=`Number of Rows`-1),
+                       `Conf High` = Mean + `Std Error of Mean` * qt(p=!!conf_threshold, df=`Number of Rows`-1),
+                       `Conf Low` = Mean - `Std Error of Mean` * qt(p=!!conf_threshold, df=`Number of Rows`-1),
                        `Minimum`=min(!!rlang::sym(x$var1), na.rm=TRUE),
                        `Maximum`=max(!!rlang::sym(x$var1), na.rm=TRUE)) %>%
       dplyr::select(!!rlang::sym(x$var2),
@@ -799,6 +918,100 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
   ret
 }
 
+#' Kruskal-Wallis wrapper for Analytics View
+#' @export
+exp_kruskal <- function(df, var1, var2, func2 = NULL, ...) {
+  var1_col <- col_name(substitute(var1))
+  var2_col <- col_name(substitute(var2))
+  grouped_cols <- grouped_by(df)
+
+  if (!is.null(func2)) {
+    if (lubridate::is.Date(df[[var2_col]]) || lubridate::is.POSIXct(df[[var2_col]])) {
+      df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_date(!!rlang::sym(var2_col), type=!!func2))
+    }
+    else if (is.numeric(df[[var2_col]])) {
+      df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_numeric(!!rlang::sym(var2_col), type=!!func2))
+    }
+  }
+  
+  if (n_distinct(df[[var2_col]]) < 2) {
+    stop(paste0("Variable Column (", var2_col, ") has to have 2 or more kinds of values."))
+  }
+
+  formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
+
+  each_func <- function(df) {
+    tryCatch({
+      model <- kruskal.test(formula, data = df, ...)
+      class(model) <- c("kruskal_exploratory", class(model))
+      model$var1 <- var1_col
+      model$var2 <- var2_col
+      model$data <- df
+      model
+    }, error = function(e){
+      if(length(grouped_cols) > 0) {
+        # Ignore the error if it is caused by subset of grouped data frame to show result of data frames that succeed.
+        # For example, error can happen if one of the groups has only one unique value in its set of var2.
+        NULL
+      } else {
+        stop(e)
+      }
+    })
+  }
+
+  # Calculation is executed in each group.
+  # Storing the result in this tmp_col and
+  # unnesting the result.
+  # If the original data frame is grouped by "tmp",
+  # overwriting it should be avoided,
+  # so avoid_conflict is used here.
+  tmp_col <- avoid_conflict(colnames(df), "model")
+  ret <- df %>%
+    dplyr::do_(.dots = setNames(list(~each_func(.)), tmp_col))
+  ret
+}
+
+tidy.kruskal_exploratory <- function(x, type="model", conf_level=0.95) {
+  if (type == "model") {
+    note <- NULL
+    ret <- broom:::tidy.htest(x)
+    ret <- ret %>% dplyr::select(statistic, p.value, method)
+    ret <- ret %>% dplyr::rename(`H Statistic` = statistic,
+                                 `P Value`=p.value,
+                                 `Method`=method)
+    if (!is.null(note)) { # Add Note column, if there was an error from pwr function.
+      ret <- ret %>% dplyr::mutate(Note=!!note)
+    }
+  }
+  else if (type == "data_summary") { #TODO consolidate with code in tidy.ttest_exploratory
+    conf_threshold = 1 - (1 - conf_level)/2
+    ret <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
+      dplyr::summarize(`Number of Rows`=length(!!rlang::sym(x$var1)),
+                       Mean=mean(!!rlang::sym(x$var1), na.rm=TRUE),
+                       `Std Deviation`=sd(!!rlang::sym(x$var1), na.rm=TRUE),
+                       # std error definition: https://www.rdocumentation.org/packages/plotrix/versions/3.7/topics/std.error
+                       `Std Error of Mean`=sd(!!rlang::sym(x$var1), na.rm=TRUE)/sqrt(sum(!is.na(!!rlang::sym(x$var1)))),
+                       # Note: Use qt (t distribution) instead of qnorm (normal distribution) here.
+                       # For more detail take a look at 10.5.1 A slight mistake in the formula of "Learning Statistics with R" 
+                       `Conf High` = Mean + `Std Error of Mean` * qt(p=!!conf_threshold, df=`Number of Rows`-1),
+                       `Conf Low` = Mean - `Std Error of Mean` * qt(p=!!conf_threshold, df=`Number of Rows`-1),
+                       `Minimum`=min(!!rlang::sym(x$var1), na.rm=TRUE),
+                       `Maximum`=max(!!rlang::sym(x$var1), na.rm=TRUE)) %>%
+      dplyr::select(!!rlang::sym(x$var2),
+                    `Number of Rows`,
+                    Mean,
+                    `Conf Low`,
+                    `Conf High`,
+                    `Std Error of Mean`,
+                    `Std Deviation`,
+                    `Minimum`,
+                    `Maximum`)
+  }
+  else { # type == "data"
+    ret <- x$data
+  }
+  ret
+}
 
 # qqline function that does not draw line and instead return intercept and slope
 qqline_data <- function (y, datax = FALSE, distribution = qnorm, probs = c(0.25, 0.75), qtype = 7, ...) 
@@ -873,7 +1086,7 @@ exp_normality<- function(df, ...,
           sample_size <- length(col_to_test)
         }
         res <- shapiro.test(col_to_test) %>% tidy() %>%
-          dplyr::mutate(col=col, sample_size=sample_size) %>%
+          dplyr::mutate(col=!!col, sample_size=!!sample_size) %>%
           dplyr::select(col, everything())
         df.model <- dplyr::bind_rows(df.model, res)
       }
@@ -912,7 +1125,7 @@ tidy.shapiro_exploratory <- function(x, type = "model", signif_level=0.05) {
 
     # table with TRUE/FALSE result on normality of each column.
     normal_df <- x$model_summary %>%
-      dplyr::mutate(normal = p.value > signif_level) %>%
+      dplyr::mutate(normal = p.value > !!signif_level) %>%
       dplyr::select(col, normal)
 
     ret <- dplyr::bind_rows(sampled_qq_df, x$qqline)
@@ -922,7 +1135,7 @@ tidy.shapiro_exploratory <- function(x, type = "model", signif_level=0.05) {
   }
   else {
     ret <- x$model_summary
-    ret <- ret %>% dplyr::mutate(normal = p.value > signif_level)
+    ret <- ret %>% dplyr::mutate(normal = p.value > !!signif_level)
     ret <- ret %>% dplyr::select(-method)
     ret <- ret %>% dplyr::rename(`Column`=col, `Statistic`=statistic, `P Value`=p.value, `Normal Distribution`=normal, `Sample Size`=sample_size)
     ret

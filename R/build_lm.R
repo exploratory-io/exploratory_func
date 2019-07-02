@@ -652,19 +652,19 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
   x0 <- glm(f0, x$model, family = x$family) # build null model. Use x$model rather than x$data since x$model seems to be the data after glm handled missingness.
   pvalue <- with(anova(x0,x),pchisq(Deviance,Df,lower.tail=FALSE)[2]) 
   if(pretty.name) {
-    ret <- ret %>% dplyr::mutate(`P Value`=pvalue)
+    ret <- ret %>% dplyr::mutate(`P Value`=!!pvalue)
   }
   else {
-    ret <- ret %>% dplyr::mutate(p.value=pvalue)
+    ret <- ret %>% dplyr::mutate(p.value=!!pvalue)
   }
 
   # For GLM (Negative Binomial)
   if("negbin" %in% class(x)) {
     if(pretty.name) {
-      ret <- ret %>% dplyr::mutate(`Theta`=x$theta, `SE Theta`=x$SE.theta)
+      ret <- ret %>% dplyr::mutate(`Theta`=!!(x$theta), `SE Theta`=!!(x$SE.theta))
     }
     else {
-      ret <- ret %>% dplyr::mutate(theta=x$theta, SE.theta=x$SE.theta)
+      ret <- ret %>% dplyr::mutate(theta=!!(x$theta), SE.theta=!!(x$SE.theta))
     }
   }
   
