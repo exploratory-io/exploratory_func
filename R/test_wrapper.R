@@ -627,7 +627,7 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
   ret
 }
 
-#' Wilcoxon signed-rank test wrapper for Analytics View
+#' Wrapper for Wilcoxon rank sum test and signed-rank test for Analytics View
 #' @export
 #' @param conf.int - Whether to calculate estimate and confidence interval. Default FALSE. Passed to wilcox.test as part of ...
 #' @param conf.level - Level of confidence for confidence interval. Passed to wilcox.test as part of ...
