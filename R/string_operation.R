@@ -467,9 +467,9 @@ str_logical <- function(column, true_value = NULL) {
    } else { # default handling.
       # if value is either "true", "yes", "1", or 1, return TRUE
       target <- stringr::str_to_lower(stringr::str_trim(column))
-      ifelse (target %in% c("true", "yes", "1", 1),
+      ifelse (target %in% c("true", "yes", "1"),
               TRUE,
-              ifelse(target %in%  c("false", "no", "0", 0), FALSE, NA))
+              ifelse(target %in%  c("false", "no", "0"), FALSE, NA))
    }
 }
 
