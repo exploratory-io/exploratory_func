@@ -462,6 +462,8 @@ str_logical <- function(column, true_value = NULL) {
    # if true_value is explicitly provided, honor it
    if(!is.null(true_value)) {
      stringr::str_to_lower(stringr::str_trim(column)) == stringr::str_to_lower(true_value)
+   } else if (is.numeric(column)) { # for numeric columns (integer, double, numeric, etc), use as.logical
+     as.logical(column)
    } else { # default handling.
       # if value is either "true", "yes", "1", or 1, return TRUE
       target <- stringr::str_to_lower(stringr::str_trim(column))
