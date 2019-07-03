@@ -1822,9 +1822,14 @@ cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, nam
       # we need to convert logical to factor too since na.roughfix only works for numeric or factor.
       df[[col]] <- forcats::fct_explicit_na(forcats::fct_lump(as.factor(df[[col]]), n=predictor_n, ties.method="first"))
     } else {
-      # filter Inf/-Inf to avoid following error from ranger.
+      # Filter Inf/-Inf to avoid following error from ranger.
       # Error in seq.default(min(x, na.rm = TRUE), max(x, na.rm = TRUE), length.out = length.out) : 'from' must be a finite number
-      df <- df %>% dplyr::filter(!is.infinite(.[[col]]))
+      # Also, filter NAs for numeric columns to avoid instability from rpart. It seems that the resulting tree from rpart sometimes becomes
+      # simplistic (e.g. only one split in the tree), especially in Exploratory for some reason, if we let rpart handle the handling of NAs,
+      # even though it is supposed to just filter out rows with NAs, which is same as what we are doing here.
+      # TODO: In exp_rpart and calc_feature_imp, we have logic to remember and restore NA rows, but they are probably not made use of
+      # if we filter NA rows here.
+      df <- df %>% dplyr::filter(!is.infinite(.[[col]]) & !is.na(.[[col]]))
     }
   }
 
