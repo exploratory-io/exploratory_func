@@ -1194,10 +1194,16 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
               predicted <- test_pred_ret$predicted_value
               root_mean_square_error <- rmse(actual, predicted)
 
-              ranger_model <- df$model[[1]]
+              model_object <- df$model[[1]]
 
               # null_model_mean is mean of training data.
-              null_model_mean <- mean(ranger_model$df[[names(ranger_model$terms)[[1]]]], na.rm=TRUE)
+              if ("rpart" %in% class(model_object)) { # rpart case
+                null_model_mean <- mean(model_object$y, na.rm=TRUE)
+              }
+              else { # ranger case
+                null_model_mean <- mean(model_object$df[[names(model_object$terms)[[1]]]], na.rm=TRUE)
+              }
+
               rsq <- r_squared(actual, predicted, null_model_mean)
               ret <- data.frame(
                                 root_mean_square_error = root_mean_square_error,
