@@ -1182,16 +1182,16 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
       }
 
       # Extract test prediction result embedded in the model.
-      df <- df %>% prediction(data = "test", ...)
+      test_pred_ret <- df %>% prediction(data = "test", ...)
 
       tryCatch({
         actual_col <- model$terms_mapping[all.vars(model$formula_terms)[1]]
-        actual <- df[[actual_col]]
+        actual <- test_pred_ret[[actual_col]]
 
         test_ret <- switch(type,
           evaluation = {
             if (is.numeric(actual)) {
-              predicted <- df$predicted_value
+              predicted <- test_pred_ret$predicted_value
               root_mean_square_error <- rmse(actual, predicted)
               rsq <- r_squared(actual, predicted)
               ret <- data.frame(
@@ -1211,12 +1211,12 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
               ret
             } else {
               if (model$classification_type == "binary") {
-                predicted <- df$predicted_label
-                predicted_probability <- df$predicted_probability
+                predicted <- test_pred_ret$predicted_label
+                predicted_probability <- test_pred_ret$predicted_probability
                 ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = pretty.name)
               }
               else {
-                predicted <- df$predicted_label
+                predicted <- test_pred_ret$predicted_label
                 ret <- evaluate_multi_(data.frame(predicted = predicted, actual = actual),
                                        "predicted", "actual", pretty.name = pretty.name)
               }
@@ -1224,7 +1224,7 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
             }
           },
           evaluation_by_class = {
-            predicted <- df$predicted_label
+            predicted <- test_pred_ret$predicted_label
             per_level <- function(klass) {
               ret <- evaluate_classification(actual, predicted, klass, pretty.name = pretty.name)
             }
@@ -1232,7 +1232,7 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
             dplyr::bind_rows(lapply(levels(actual), per_level))
           },
           conf_mat = {
-            predicted <- df$predicted_label
+            predicted <- test_pred_ret$predicted_label
             ret <- data.frame(
                               actual_value = actual,
                               predicted_value = predicted
