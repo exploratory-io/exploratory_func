@@ -1193,7 +1193,9 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
             if (is.numeric(actual)) {
               predicted <- test_pred_ret$predicted_value
               root_mean_square_error <- rmse(actual, predicted)
-              rsq <- r_squared(actual, predicted)
+
+              null_model_mean <- mean(df$model[[1]]$df[[names(df$model[[1]]$terms)[[1]]]], na.rm=TRUE)
+              rsq <- r_squared(actual, predicted, null_model_mean)
               ret <- data.frame(
                                 root_mean_square_error = root_mean_square_error,
                                 r_squared = rsq
