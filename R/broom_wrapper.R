@@ -468,10 +468,10 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
       # Use formula to support expanded aug_args (especially for type.predict for logistic regression)
       # because ... can't be passed to a function inside mutate directly.
       # If test is FALSE, this uses data as an argument and if not, uses newdata as an argument.
-      aug_fml_train <- if(aug_args == ""){
-        as.formula("~list(broom::augment(model, data = source.data))")
+      aug_fml_training <- if(aug_args == ""){
+        as.formula("~list(broom::augment(model, data = source.data.training))")
       } else {
-        as.formula(paste0("~list(broom::augment(model, data = source.data, ", aug_args, "))"))
+        as.formula(paste0("~list(broom::augment(model, data = source.data.training, ", aug_args, "))"))
       }
       aug_fml_test <- if(aug_args == ""){
         as.formula("~list(broom::augment(model, data = source.data.test, data_type = 'test'))")
@@ -480,7 +480,7 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
       }
       augmented <- df %>%
         dplyr::ungroup() %>%
-        dplyr::mutate(source.data = purrr::map2(source.data, .test_index, function(df, index){
+        dplyr::mutate(source.data.training = purrr::map2(source.data, .test_index, function(df, index){
           # Remove data in test_index for training data
           safe_slice(df, index, remove = TRUE)
         }), source.data.test = purrr::map2(source.data, .test_index, function(df, index){
@@ -490,15 +490,15 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
         dplyr::select(-.test_index) %>%
         dplyr::rowwise() %>%
         # evaluate the formula of augment and "data" column will have it
-        dplyr::mutate_(.dots = list(source.data = aug_fml_train, source.data.test = aug_fml_test))
+        dplyr::mutate_(.dots = list(source.data.training = aug_fml_training, source.data.test = aug_fml_test))
       augmented <- augmented %>%
         dplyr::ungroup() %>% # ungroup is necessary here to get expected df1, df2 value in the next line.
-        dplyr::mutate(source.data = purrr::map2(source.data, source.data.test, function(df1, df2){
+        dplyr::mutate(source.data = purrr::map2(source.data.training, source.data.test, function(df1, df2){
           df1 <- df1 %>% dplyr::mutate(is_test_data=FALSE)
           df2 <- df2 %>% dplyr::mutate(is_test_data=TRUE)
           dplyr::bind_rows(df1, df2)
         })) %>%
-        dplyr::select(-source.data.test) %>%
+        dplyr::select(-source.data.training, -source.data.test) %>%
         dplyr::ungroup()
 
       if (with_response){
