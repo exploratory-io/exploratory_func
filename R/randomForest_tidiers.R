@@ -1174,10 +1174,16 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
   # TODO: This part of the code needs to be kept in sync with broom::tidy with type evaluation/evaluation_by_class.
   # Would it be possible to consolidate those code?
   if (length(test_index) > 0) {
-    # Extract test prediction result embedded in the model.
-    predicted <- data %>% prediction(data = "test", ...)
 
     each_func <- function(df) {
+      if (!is.data.frame(df)) {
+        df <- tribble(~model, ~.test_index, ~source.data,
+                      df$model, df$.test_index, df$source.data)
+      }
+
+      # Extract test prediction result embedded in the model.
+      df <- df %>% prediction(data = "test", ...)
+
       tryCatch({
         actual_col <- model$terms_mapping[all.vars(model$formula_terms)[1]]
         actual <- df[[actual_col]]
@@ -1244,12 +1250,7 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
         data.frame()
       })
     }
-
-    if (length(grouped_col) > 0) {
-      predicted <- predicted %>% dplyr::group_by_(paste0('`', grouped_col, '`'))
-    }
-
-    test_ret <- do_on_each_group(predicted, each_func, with_unnest = TRUE)
+    test_ret <- do_on_each_group(data, each_func, with_unnest = TRUE)
 
     if (nrow(test_ret) > 0) {
       test_ret$is_test_data <- TRUE
