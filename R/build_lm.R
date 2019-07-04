@@ -974,12 +974,20 @@ evaluate_lm_training_and_test <- function(df, pretty.name = FALSE){
         null_model_mean <- mean(df$model[[1]]$model[[actual_val_col]], na.rm=TRUE)
 
         rsq <- r_squared(actual, predicted, null_model_mean)
+
+        # Calculate Adjusted R Sauared
+        # https://en.wikipedia.org/wiki/Coefficient_of_determination
+        n_observations <- nrow(df$model[[1]]$model)
+        df_residual <- df$model[[1]]$df.residual
+        adj_rsq <- 1 - (1 - rsq) * (n_observations - 1) / df_residual
+
         test_ret <- data.frame(
-                          sigma = root_mean_square_error,
-                          r.squared = rsq
+                          r.squared = rsq,
+                          adj.r.squared = adj_rsq,
+                          rmse = root_mean_square_error
                           )
         if(pretty.name) {
-          test_ret <- test_ret %>% dplyr::rename(`R Squared`=r.squared, `RMSE`=sigma)
+          test_ret <- test_ret %>% dplyr::rename(`R Squared`=r.squared, `Adj R Squared`=adj.r.squared, `RMSE`=rmse)
         }
         test_ret$is_test_data <- TRUE
         test_ret
