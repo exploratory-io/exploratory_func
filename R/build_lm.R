@@ -954,12 +954,17 @@ evaluate_lm_training_and_test <- function(df, pretty.name = FALSE){
         m <- df %>% filter(!is.null(model)) %>% `[[`(1, "model", 1)
         actual_val_col <- all.vars(df$model[[1]]$terms)[[1]]
         # Emulate the way lm replaces the column names in the output.
-        actual_val_col <- stringr::str_replace_all(actual_val_col, ' ', '.')
+        actual_val_col_clean <- stringr::str_replace_all(actual_val_col, ' ', '.')
 
-        actual <- test_pred_ret[[actual_val_col]]
+        actual <- test_pred_ret[[actual_val_col_clean]]
         predicted <- test_pred_ret$predicted_value
         root_mean_square_error <- rmse(actual, predicted)
-        rsq <- r_squared(actual, predicted)
+
+        # To calculate R Squared for test data, use same null model basis as training,
+        # so that the results are comparable.
+        null_model_mean <- mean(df$model[[1]]$model[[actual_val_col]], na.rm=TRUE)
+
+        rsq <- r_squared(actual, predicted, null_model_mean)
         test_ret <- data.frame(
                           sigma = root_mean_square_error,
                           r.squared = rsq
