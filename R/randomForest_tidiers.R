@@ -1748,7 +1748,7 @@ cleanup_df <- function(df, target_col, selected_cols, grouped_cols, target_n, pr
   ret
 }
 
-cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, name_map, predictor_n, revert_logical_levels=TRUE) {
+cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, name_map, predictor_n, revert_logical_levels=TRUE, filter_numeric_na=FALSE) {
   if (is.factor(df[[clean_target_col]])) { # to avoid error in edarf::partial_dependence(), remove levels that is not used in this group.
     df[[clean_target_col]] <- forcats::fct_drop(df[[clean_target_col]])
   }
@@ -1836,12 +1836,17 @@ cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, nam
     } else {
       # Filter Inf/-Inf to avoid following error from ranger.
       # Error in seq.default(min(x, na.rm = TRUE), max(x, na.rm = TRUE), length.out = length.out) : 'from' must be a finite number
-      # Also, filter NAs for numeric columns to avoid instability from rpart. It seems that the resulting tree from rpart sometimes becomes
-      # simplistic (e.g. only one split in the tree), especially in Exploratory for some reason, if we let rpart handle the handling of NAs,
-      # even though it is supposed to just filter out rows with NAs, which is same as what we are doing here.
       # TODO: In exp_rpart and calc_feature_imp, we have logic to remember and restore NA rows, but they are probably not made use of
       # if we filter NA rows here.
-      df <- df %>% dplyr::filter(!is.infinite(.[[col]]) & !is.na(.[[col]]))
+      if (filter_numeric_na) {
+        # Also, filter NAs for numeric columns to avoid instability from rpart. It seems that the resulting tree from rpart sometimes becomes
+        # simplistic (e.g. only one split in the tree), especially in Exploratory for some reason, if we let rpart handle the handling of NAs,
+        # even though it is supposed to just filter out rows with NAs, which is same as what we are doing here.
+        df <- df %>% dplyr::filter(!is.infinite(.[[col]]) & !is.na(.[[col]]))
+      }
+      else {
+        df <- df %>% dplyr::filter(!is.infinite(.[[col]]))
+      }
     }
   }
 
@@ -2602,7 +2607,7 @@ exp_rpart <- function(df,
       # especially multiclass classification seems to take forever when number of unique values of predictors are many.
       # fct_lump is essential here.
       # http://grokbase.com/t/r/r-help/051sayg38p/r-multi-class-classification-using-rpart
-      clean_df_ret <- cleanup_df_per_group(df, clean_target_col, sample_size, clean_cols, name_map, predictor_n, revert_logical_levels=FALSE)
+      clean_df_ret <- cleanup_df_per_group(df, clean_target_col, sample_size, clean_cols, name_map, predictor_n, revert_logical_levels=FALSE, filter_numeric_na=TRUE)
       if (is.null(clean_df_ret)) {
         return(NULL) # skip this group
       }
