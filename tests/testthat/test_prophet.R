@@ -148,6 +148,19 @@ test_that("do_prophet with holiday column", {
   expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2012-01-11")) 
 })
 
+test_that("do_prophet with logical holiday column", {
+  ts <- seq.Date(as.Date("2010-01-01"), as.Date("2012-01-01"), by="day")
+  raw_data <- data.frame(timestamp=ts, data=runif(length(ts)))
+  ts2 <- seq.Date(as.Date("2010-01-01"), as.Date("2013-01-01"), by="day")
+  regressor_data <- data.frame(timestamp=ts2, regressor=runif(length(ts2)), holiday=(runif(length(ts2)) > 0.90)) %>%
+    rename(`holi day`=holiday)
+  combined_data <- raw_data %>% full_join(regressor_data, by=c("timestamp"="timestamp"))
+  ret <- combined_data %>%
+    do_prophet(timestamp, data, 10, time_unit = "day", holiday=`holi day`)
+  # verify the last date with forecasted_value
+  expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2012-01-11")) 
+})
+
 test_that("do_prophet with regressor with holiday column with monthly data", {
   ts <- seq.Date(as.Date("2010-01-01"), as.Date("2012-01-01"), by="month")
   raw_data <- data.frame(timestamp=ts, data=runif(length(ts)))
