@@ -170,8 +170,9 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
         dplyr::summarise(holiday = first(holiday[!is.na(holiday)])) %>% # take first non-NA value for aggregation.
         dplyr::filter(!is.na(holiday))
       # If holiday column is logical, create holiday df with only TRUE rows, with single value "Holiday".
-      if (is.logical(holidays_df$holiday)) {
-        holidays_df <- holidays_df %>% dplyr::filter(holiday) %>% dplyr::mutate(holiday = "Holiday")
+      # If it is numeric, first convert to logical (0:FALSE, Others:TRUE), then do the above.
+      if (is.logical(holidays_df$holiday) || is.numeric(holidays_df$holiday)) {
+        holidays_df <- holidays_df %>% dplyr::mutate(holiday = as.logical(holiday)) %>% dplyr::filter(holiday) %>% dplyr::mutate(holiday = "Holiday")
       }
       # Passing empty dataframe causes prophet error: "Column `ds` is of unsupported type NULL". Set it back to NULL if empty.
       if (nrow(holidays_df) == 0) {
