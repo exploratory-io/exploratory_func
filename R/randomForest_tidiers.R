@@ -1180,6 +1180,9 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
         df <- tribble(~model, ~.test_index, ~source.data,
                       df$model, df$.test_index, df$source.data)
       }
+      if (is.null(df$model[[1]])) { # model is NULL. Skip this group.
+        return(data.frame())
+      }
 
       # Extract test prediction result embedded in the model.
       test_pred_ret <- df %>% prediction(data = "test", ...)
