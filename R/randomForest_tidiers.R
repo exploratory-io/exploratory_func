@@ -1264,6 +1264,12 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
         data.frame()
       })
     }
+
+    # data is already grouped rowwise, but to get group column value on the output, we need to group it explicitly with the group column.
+    if (length(grouped_col) > 0) {
+      data <- data %>% group_by(!!!rlang::syms(grouped_col))
+    }
+
     test_ret <- do_on_each_group(data, each_func, with_unnest = TRUE)
 
     if (nrow(test_ret) > 0) {

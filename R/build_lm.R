@@ -996,6 +996,11 @@ evaluate_lm_training_and_test <- function(df, pretty.name = FALSE){
       })
     }
 
+    # df is already grouped rowwise, but to get group column value on the output, we need to group it explicitly with the group column.
+    if (length(grouped_col) > 0) {
+      df <- df %>% dplyr::group_by(!!!rlang::syms(grouped_col))
+    }
+
     test_ret <- do_on_each_group(df, each_func, with_unnest = TRUE)
     ret <- ret %>% dplyr::bind_rows(test_ret)
   }
