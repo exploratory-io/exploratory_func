@@ -1204,7 +1204,7 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
                 null_model_mean <- mean(model_object$y, na.rm=TRUE)
               }
               else { # ranger case
-                null_model_mean <- mean(model_object$df[[names(model_object$terms)[[1]]]], na.rm=TRUE)
+                null_model_mean <- mean(model_object$df[[all.vars(model_object$formula_terms)[[1]]]], na.rm=TRUE)
               }
 
               rsq <- r_squared(actual, predicted, null_model_mean)
