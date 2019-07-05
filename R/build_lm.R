@@ -634,8 +634,17 @@ glance.lm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
       ret[paste0(var, "_base")] <- x$xlevels[[var]][[1]]
     }
   }
+  # Adjust the subtle difference between sigma (Residual Standard Error) and RMSE.
+  # In RMSE, division is done by observation size, while it is by residual degree of freedom in sigma.
+  # https://www.rdocumentation.org/packages/sjstats/versions/0.17.4/topics/cv
+  # https://stat.ethz.ch/pipermail/r-help/2012-April/308935.html
+  rmse_val <- sqrt(ret$sigma^2 * x$df.residual / nrow(x$model))
+  ret <- ret %>% dplyr::mutate(rmse=!!rmse_val)
+  # Drop sigma in favor of rmse.
+  ret <- ret %>% dplyr::select(r.squared, adj.r.squared, rmse, everything(), -sigma)
+
   if(pretty.name) {
-    ret <- ret %>% dplyr::rename(`R Squared`=r.squared, `Adj R Squared`=adj.r.squared, `RMSE`=sigma, `F Ratio`=statistic, `P Value`=p.value, `Degree of Freedom`=df, `Log Likelihood`=logLik, Deviance=deviance, `Residual DF`=df.residual)
+    ret <- ret %>% dplyr::rename(`R Squared`=r.squared, `Adj R Squared`=adj.r.squared, `RMSE`=rmse, `F Ratio`=statistic, `P Value`=p.value, `Degree of Freedom`=df, `Log Likelihood`=logLik, Deviance=deviance, `Residual DF`=df.residual)
   }
   ret
 }
@@ -943,9 +952,11 @@ evaluate_lm_training_and_test <- function(df, pretty.name = FALSE){
   if (purrr::some(df$.test_index, function(x){length(x)!=0})) {
     ret$is_test_data <- FALSE # Set is_test_data FALSE for training data. Add is_test_data column only when there are test data too.
     each_func <- function(df){
+      # With the way this is called, df becomes list rather than data.frame.
+      # Make it data.frame again so that prediction() can be applied on it.
       if (!is.data.frame(df)) {
-        df <- tribble(~model, ~.test_index, ~source.data,
-                      df$model, df$.test_index, df$source.data)
+        df <- tibble::tribble(~model, ~.test_index, ~source.data,
+                              df$model, df$.test_index, df$source.data)
       }
 
       tryCatch({
@@ -954,24 +965,42 @@ evaluate_lm_training_and_test <- function(df, pretty.name = FALSE){
         m <- df %>% filter(!is.null(model)) %>% `[[`(1, "model", 1)
         actual_val_col <- all.vars(df$model[[1]]$terms)[[1]]
         # Emulate the way lm replaces the column names in the output.
-        actual_val_col <- stringr::str_replace_all(actual_val_col, ' ', '.')
+        actual_val_col_clean <- stringr::str_replace_all(actual_val_col, ' ', '.')
 
-        actual <- test_pred_ret[[actual_val_col]]
+        actual <- test_pred_ret[[actual_val_col_clean]]
         predicted <- test_pred_ret$predicted_value
         root_mean_square_error <- rmse(actual, predicted)
-        rsq <- r_squared(actual, predicted)
+
+        # To calculate R Squared for test data, use same null model basis as training,
+        # so that the results are comparable.
+        null_model_mean <- mean(df$model[[1]]$model[[actual_val_col]], na.rm=TRUE)
+
+        rsq <- r_squared(actual, predicted, null_model_mean)
+
+        # Calculate Adjusted R Sauared
+        # https://en.wikipedia.org/wiki/Coefficient_of_determination
+        n_observations <- nrow(df$model[[1]]$model)
+        df_residual <- df$model[[1]]$df.residual
+        adj_rsq <- 1 - (1 - rsq) * (n_observations - 1) / df_residual
+
         test_ret <- data.frame(
-                          sigma = root_mean_square_error,
-                          r.squared = rsq
+                          r.squared = rsq,
+                          adj.r.squared = adj_rsq,
+                          rmse = root_mean_square_error
                           )
         if(pretty.name) {
-          test_ret <- test_ret %>% dplyr::rename(`R Squared`=r.squared, `RMSE`=sigma)
+          test_ret <- test_ret %>% dplyr::rename(`R Squared`=r.squared, `Adj R Squared`=adj.r.squared, `RMSE`=rmse)
         }
         test_ret$is_test_data <- TRUE
         test_ret
       }, error = function(e){
         data.frame()
       })
+    }
+
+    # df is already grouped rowwise, but to get group column value on the output, we need to group it explicitly with the group column.
+    if (length(grouped_col) > 0) {
+      df <- df %>% dplyr::group_by(!!!rlang::syms(grouped_col))
     }
 
     test_ret <- do_on_each_group(df, each_func, with_unnest = TRUE)

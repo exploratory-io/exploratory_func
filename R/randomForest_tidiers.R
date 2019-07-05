@@ -1174,20 +1174,42 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
   # TODO: This part of the code needs to be kept in sync with broom::tidy with type evaluation/evaluation_by_class.
   # Would it be possible to consolidate those code?
   if (length(test_index) > 0) {
-    # Extract test prediction result embedded in the model.
-    predicted <- data %>% prediction(data = "test", ...)
 
     each_func <- function(df) {
+      # With the way this is called, df becomes list rather than data.frame.
+      # Make it data.frame again so that prediction() can be applied on it.
+      if (!is.data.frame(df)) {
+        df <- tibble::tribble(~model, ~.test_index, ~source.data,
+                              df$model, df$.test_index, df$source.data)
+      }
+      if (is.null(df$model[[1]])) { # model is NULL. Skip this group.
+        return(data.frame())
+      }
+
+      # Extract test prediction result embedded in the model.
+      test_pred_ret <- df %>% prediction(data = "test", ...)
+
       tryCatch({
         actual_col <- model$terms_mapping[all.vars(model$formula_terms)[1]]
-        actual <- df[[actual_col]]
+        actual <- test_pred_ret[[actual_col]]
 
         test_ret <- switch(type,
           evaluation = {
             if (is.numeric(actual)) {
-              predicted <- df$predicted_value
+              predicted <- test_pred_ret$predicted_value
               root_mean_square_error <- rmse(actual, predicted)
-              rsq <- r_squared(actual, predicted)
+
+              model_object <- df$model[[1]]
+
+              # null_model_mean is mean of training data.
+              if ("rpart" %in% class(model_object)) { # rpart case
+                null_model_mean <- mean(model_object$y, na.rm=TRUE)
+              }
+              else { # ranger case
+                null_model_mean <- mean(model_object$df[[all.vars(model_object$formula_terms)[[1]]]], na.rm=TRUE)
+              }
+
+              rsq <- r_squared(actual, predicted, null_model_mean)
               ret <- data.frame(
                                 root_mean_square_error = root_mean_square_error,
                                 r_squared = rsq
@@ -1205,12 +1227,12 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
               ret
             } else {
               if (model$classification_type == "binary") {
-                predicted <- df$predicted_label
-                predicted_probability <- df$predicted_probability
+                predicted <- test_pred_ret$predicted_label
+                predicted_probability <- test_pred_ret$predicted_probability
                 ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = pretty.name)
               }
               else {
-                predicted <- df$predicted_label
+                predicted <- test_pred_ret$predicted_label
                 ret <- evaluate_multi_(data.frame(predicted = predicted, actual = actual),
                                        "predicted", "actual", pretty.name = pretty.name)
               }
@@ -1218,7 +1240,7 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
             }
           },
           evaluation_by_class = {
-            predicted <- df$predicted_label
+            predicted <- test_pred_ret$predicted_label
             per_level <- function(klass) {
               ret <- evaluate_classification(actual, predicted, klass, pretty.name = pretty.name)
             }
@@ -1226,7 +1248,7 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
             dplyr::bind_rows(lapply(levels(actual), per_level))
           },
           conf_mat = {
-            predicted <- df$predicted_label
+            predicted <- test_pred_ret$predicted_label
             ret <- data.frame(
                               actual_value = actual,
                               predicted_value = predicted
@@ -1245,11 +1267,12 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
       })
     }
 
+    # data is already grouped rowwise, but to get group column value on the output, we need to group it explicitly with the group column.
     if (length(grouped_col) > 0) {
-      predicted <- predicted %>% dplyr::group_by_(paste0('`', grouped_col, '`'))
+      data <- data %>% group_by(!!!rlang::syms(grouped_col))
     }
 
-    test_ret <- do_on_each_group(predicted, each_func, with_unnest = TRUE)
+    test_ret <- do_on_each_group(data, each_func, with_unnest = TRUE)
 
     if (nrow(test_ret) > 0) {
       test_ret$is_test_data <- TRUE
@@ -1736,7 +1759,7 @@ cleanup_df <- function(df, target_col, selected_cols, grouped_cols, target_n, pr
   ret
 }
 
-cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, name_map, predictor_n, revert_logical_levels=TRUE) {
+cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, name_map, predictor_n, revert_logical_levels=TRUE, filter_numeric_na=FALSE) {
   if (is.factor(df[[clean_target_col]])) { # to avoid error in edarf::partial_dependence(), remove levels that is not used in this group.
     df[[clean_target_col]] <- forcats::fct_drop(df[[clean_target_col]])
   }
@@ -1822,9 +1845,19 @@ cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, nam
       # we need to convert logical to factor too since na.roughfix only works for numeric or factor.
       df[[col]] <- forcats::fct_explicit_na(forcats::fct_lump(as.factor(df[[col]]), n=predictor_n, ties.method="first"))
     } else {
-      # filter Inf/-Inf to avoid following error from ranger.
+      # Filter Inf/-Inf to avoid following error from ranger.
       # Error in seq.default(min(x, na.rm = TRUE), max(x, na.rm = TRUE), length.out = length.out) : 'from' must be a finite number
-      df <- df %>% dplyr::filter(!is.infinite(.[[col]]))
+      # TODO: In exp_rpart and calc_feature_imp, we have logic to remember and restore NA rows, but they are probably not made use of
+      # if we filter NA rows here.
+      if (filter_numeric_na) {
+        # Also, filter NAs for numeric columns to avoid instability from rpart. It seems that the resulting tree from rpart sometimes becomes
+        # simplistic (e.g. only one split in the tree), especially in Exploratory for some reason, if we let rpart handle the handling of NAs,
+        # even though it is supposed to just filter out rows with NAs, which is same as what we are doing here.
+        df <- df %>% dplyr::filter(!is.infinite(.[[col]]) & !is.na(.[[col]]))
+      }
+      else {
+        df <- df %>% dplyr::filter(!is.infinite(.[[col]]))
+      }
     }
   }
 
@@ -2585,7 +2618,7 @@ exp_rpart <- function(df,
       # especially multiclass classification seems to take forever when number of unique values of predictors are many.
       # fct_lump is essential here.
       # http://grokbase.com/t/r/r-help/051sayg38p/r-multi-class-classification-using-rpart
-      clean_df_ret <- cleanup_df_per_group(df, clean_target_col, sample_size, clean_cols, name_map, predictor_n, revert_logical_levels=FALSE)
+      clean_df_ret <- cleanup_df_per_group(df, clean_target_col, sample_size, clean_cols, name_map, predictor_n, revert_logical_levels=FALSE, filter_numeric_na=TRUE)
       if (is.null(clean_df_ret)) {
         return(NULL) # skip this group
       }
