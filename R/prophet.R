@@ -323,7 +323,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
       
       training_data <- filled_aggregated_data
       if (periods > nrow(training_data)) {
-        stop("Time period for test data is longer than entire data.")
+        stop("The time period set for the Test period is longer than the entire data.")
       }
       training_data <- training_data %>% head(-periods)
 

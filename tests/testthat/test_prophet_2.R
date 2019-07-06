@@ -55,5 +55,5 @@ test_that("do_prophet with test mode with a period that is too long.", {
   expect_error({
     ret <- raw_data %>%
       do_prophet(timestamp, y, 500, time_unit = "day", test_mode = TRUE)
-  }, "Time period for test data is longer than entire data.")
+  }, "The time period set for the Test period is longer than the entire data.")
 })
