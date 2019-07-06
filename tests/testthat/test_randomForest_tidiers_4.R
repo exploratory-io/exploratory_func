@@ -67,6 +67,30 @@ test_that("calc_feature_map(binary) evaluate training and test", {
   # expect_equal(nrow(train_ret), 5000) # Fails for now
 })
 
+test_that("calc_feature_map(binary) evaluate training and test with SMOTE", {
+  model_df <- flight %>%
+                # filter(`CAR RIER` %in% c("VA","AA")) %>%
+                dplyr::mutate(is_delayed = as.factor(`is delayed`)) %>%
+                calc_feature_imp(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0.3, smote = TRUE)
+  ret <- rf_evaluation_training_and_test(model_df, test_rate = 0.3)
+  ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class", test_rate = 0.3)
+  ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat", test_rate = 0.3)
+
+  ret <- model_df %>% prediction_training_and_test()
+  test_ret <- ret %>% filter(is_test_data==TRUE)
+  # expect_equal(nrow(test_ret), 1500) # Fails for now
+  train_ret <- ret %>% filter(is_test_data==FALSE)
+  # expect_equal(nrow(train_ret), 3500) # Fails for now
+
+  model_df <- flight %>%
+                # filter(`CAR RIER` %in% c("VA","AA")) %>%
+                dplyr::mutate(is_delayed = as.factor(`is delayed`)) %>%
+                calc_feature_imp(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0, smote = TRUE)
+  ret <- model_df %>% prediction_training_and_test()
+  train_ret <- ret %>% filter(is_test_data==FALSE)
+  # expect_equal(nrow(train_ret), 5000) # Fails for now
+})
+
 test_that("calc_feature_map(multi) evaluate training and test", {
   model_df <- flight %>%
                 calc_feature_imp(`ORI GIN`, `DIS TANCE`, `DEP TIME`, test_rate = 0.3)
