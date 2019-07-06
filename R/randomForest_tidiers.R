@@ -1995,6 +1995,7 @@ calc_feature_imp <- function(df,
       unique_val <- unique(df[[clean_target_col]])
       if (smote && length(unique_val[!is.na(unique_val)]) == 2) {
         df <- df %>% exp_balance(clean_target_col, target_size = max_nrow, target_minority_perc = smote_target_minority_perc, max_synth_perc = smote_max_synth_perc, k = smote_k)
+        df <- df %>% dplyr::select(-synthesized) # Remove synthesized column added by exp_balance(). TODO: Handle it better. We might want to show it in resulting data.
       }
 
       # split training and test data
@@ -2630,6 +2631,7 @@ exp_rpart <- function(df,
       unique_val <- unique(df[[clean_target_col]])
       if (smote && length(unique_val[!is.na(unique_val)]) == 2) {
         df <- df %>% exp_balance(clean_target_col, target_size = max_nrow, target_minority_perc = smote_target_minority_perc, max_synth_perc = smote_max_synth_perc, k = smote_k)
+        df <- df %>% dplyr::select(-synthesized) # Remove synthesized column added by exp_balance(). TODO: Handle it better. We might want to show it in resulting data.
       }
       # if target is categorical (not numeric) and only 1 unique value (or all NA), throw error.
       if ("numeric" %nin% class(clean_target_col) &&
@@ -3072,6 +3074,7 @@ exp_boruta <- function(df,
       unique_val <- unique(df[[clean_target_col]])
       if (smote && length(unique_val[!is.na(unique_val)]) == 2) {
         df <- df %>% exp_balance(clean_target_col, target_size = max_nrow, target_minority_perc = smote_target_minority_perc, max_synth_perc = smote_max_synth_perc, k = smote_k)
+        df <- df %>% dplyr::select(-synthesized) # Remove synthesized column added by exp_balance(). TODO: Handle it better. We might want to show it in resulting data.
       }
 
       # build formula for randomForest

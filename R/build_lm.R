@@ -437,6 +437,7 @@ build_lm.fast <- function(df,
             df_before_smote <- df
           }
           df <- df %>% exp_balance(clean_target_col, target_size = max_nrow, target_minority_perc = smote_target_minority_perc, max_synth_perc = smote_max_synth_perc, k = smote_k)
+          df <- df %>% dplyr::select(-synthesized) # Remove synthesized column added by exp_balance(). TODO: Handle it better. We might want to show it in resulting data.
           for(col in names(df)){
             if(is.factor(df[[col]])) {
               # margins::marginal_effects() fails if unused factor level exists. Drop them to avoid it.
