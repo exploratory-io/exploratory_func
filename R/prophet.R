@@ -322,6 +322,9 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
       filled_aggregated_data <- dplyr::full_join(ts_df, aggregated_data, by = c("ds" = "ds"))
       
       training_data <- filled_aggregated_data
+      if (periods > nrow(training_data)) {
+        stop("Time period for test data is longer than entire data.")
+      }
       training_data <- training_data %>% head(-periods)
 
       # we got correct set of training data by filling missing date/time,
