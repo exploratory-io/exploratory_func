@@ -1932,6 +1932,8 @@ summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...){
   if(length(group_cols) == 0) {
     .data %>% summarize(...)
   } else {
+    # if group_cols argument is passed, make sure to ungroup so that it won't thrown an error
+    # when group_cols conflict with group columns in previous steps.
     .data <- .data %>% dplyr::ungroup()
     groupby_args <- list() # default empty list
     name_list <- list()
