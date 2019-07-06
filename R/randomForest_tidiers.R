@@ -2007,7 +2007,9 @@ calc_feature_imp <- function(df,
       }
 
       # Restore source_data column name to original column name
-      colnames(source_data) <- names(name_map[name_map %in% colnames(source_data)])
+      rev_name_map <- names(name_map)
+      names(rev_name_map) <- name_map
+      colnames(source_data) <- rev_name_map[colnames(source_data)]
 
       # build formula for randomForest
       rhs <- paste0("`", c_cols, "`", collapse = " + ")
