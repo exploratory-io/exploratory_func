@@ -50,6 +50,7 @@ do_prophet <- function(df, time, value = NULL, periods = 10, holiday = NULL, ...
 do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit = "day", include_history = TRUE, test_mode = FALSE,
                         fun.aggregate = sum, na_fill_type = NULL, na_fill_value = 0,
                         cap = NULL, floor = NULL, growth = NULL, weekly.seasonality = TRUE, yearly.seasonality = TRUE,
+                        daily.seasonality = "auto",
                         holiday_col = NULL, holidays = NULL,
                         regressors = NULL, funs.aggregate.regressors = NULL, ...){
   validate_empty_data(df)
@@ -169,6 +170,11 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
         dplyr::group_by(ds) %>%
         dplyr::summarise(holiday = first(holiday[!is.na(holiday)])) %>% # take first non-NA value for aggregation.
         dplyr::filter(!is.na(holiday))
+      # If holiday column is logical, create holiday df with only TRUE rows, with single value "Holiday".
+      # If it is numeric, first convert to logical (0:FALSE, Others:TRUE), then do the above.
+      if (is.logical(holidays_df$holiday) || is.numeric(holidays_df$holiday)) {
+        holidays_df <- holidays_df %>% dplyr::mutate(holiday = as.logical(holiday)) %>% dplyr::filter(holiday) %>% dplyr::mutate(holiday = "Holiday")
+      }
       # Passing empty dataframe causes prophet error: "Column `ds` is of unsupported type NULL". Set it back to NULL if empty.
       if (nrow(holidays_df) == 0) {
         holidays_df <- NULL
@@ -272,6 +278,10 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
 
     if (time_unit %in% c("week", "month", "quarter", "year")) { # if time_unit is larger than day (the next level is week), having weekly.seasonality does not make sense.
       weekly.seasonality <- FALSE
+      daily.seasonality <- FALSE
+    }
+    else if (time_unit %in% c("day")) { # if time_unit is larger than hour (the next level is day), having daily.seasonality does not make sense.
+      daily.seasonality <- FALSE
     }
     # disabling this logic for now, since setting yearly.seasonality FALSE disables weekly.seasonality too.
     # if (time_unit == "year") { # if time_unit is year (the largest unit), having yearly.seasonality does not make sense.
@@ -335,7 +345,8 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
         growth <- "linear"
         # if future data frame is without cap, use it just as a future data frame.
       }
-      m <- prophet::prophet(training_data, fit = FALSE, growth = growth, weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
+      m <- prophet::prophet(training_data, fit = FALSE, growth = growth,
+                            daily.seasonality = daily.seasonality, weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
       # add regressors to the model.
       if (!is.null(regressors)) {
         for (regressor in regressors) {
@@ -358,7 +369,8 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
       else {
         growth <- "linear"
       }
-      m <- prophet::prophet(training_data, fit = FALSE, growth = growth, weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
+      m <- prophet::prophet(training_data, fit = FALSE, growth = growth,
+                            daily.seasonality = daily.seasonality, weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
       if (!is.null(regressors)) {
         for (regressor in regressors) {
           m <- add_regressor(m, regressor)
