@@ -48,3 +48,12 @@ test_that("do_prophet with changepoint.range specified.", {
   # Check that last change point is close to the end of data.
   expect_true((ret %>% filter(!is.na(trend_change)) %>% filter(row_number()==n()))$timestamp > as.Date("2010-12-01"))
 })
+
+test_that("do_prophet with test mode with a period that is too long.", {
+  ts <- lubridate::with_tz(as.POSIXct(seq.Date(as.Date("2010-01-01"), as.Date("2010-12-31"), by="day")), tz="America/Los_Angeles")
+  raw_data <- data.frame(timestamp=ts, y=runif(length(ts)))
+  expect_error({
+    ret <- raw_data %>%
+      do_prophet(timestamp, y, 500, time_unit = "day", test_mode = TRUE)
+  }, "The time period set for the Test period is longer than the entire data.")
+})
