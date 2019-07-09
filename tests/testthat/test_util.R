@@ -858,8 +858,8 @@ test_that("get_unknown_category_rows_index", {
 })
 
 test_that("summarize_group", {
- df <- mtcars %>% exploratory::summarize_group(group_cols = c("cyl", "mpg"), group_funs = c("none", "mean"), count = n())
- expect_equal(nrow(df),3)
+ df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl", mpg_int10="mpg"), group_funs = c("none", "asintby10"), count = n())
+ expect_equal(nrow(df),5)
  df2 <- mtcars %>% exploratory::summarize_group(group_cols = NULL, group_funs = NULL, count = n())
  expect_equal(nrow(df2),1)
 })
