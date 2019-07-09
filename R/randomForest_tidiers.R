@@ -1986,7 +1986,8 @@ calc_feature_imp <- function(df,
       # Training actually works without filtering numeric NA, but predict on ranger fails with NAs.
       # To keep distribution of training data and test data on par with each other, we are filtering them from training data too.
       # https://github.com/imbs-hl/ranger/pull/109
-      clean_df_ret <- cleanup_df_per_group(df, clean_target_col, sample_size, clean_cols, name_map, predictor_n, filter_numeric_na=TRUE)
+      filter_numeric_na = test_rate > 0
+      clean_df_ret <- cleanup_df_per_group(df, clean_target_col, sample_size, clean_cols, name_map, predictor_n, filter_numeric_na=filter_numeric_na)
       if (is.null(clean_df_ret)) {
         return(NULL) # skip this group
       }
