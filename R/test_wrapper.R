@@ -786,7 +786,9 @@ exp_anova <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, f = NULL, 
 
   anova_each <- function(df) {
     if(length(grouped_cols) > 0) {
-      n_distinct_res_each <- n_distinct(df[[var2_col]]) # check n_distinct again within group.
+      # Check n_distinct again within group.
+      # Group with NA and another category does not seem to work well with aov. Eliminating such case too. TODO: We could replace NA with an explicit level.
+      n_distinct_res_each <- n_distinct(df[[var2_col]], na.rm=TRUE)
       if (n_distinct_res_each < 2) {
         return(NULL)
       }
