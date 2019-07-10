@@ -645,6 +645,8 @@ glance.lm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
   # Drop sigma in favor of rmse.
   ret <- ret %>% dplyr::select(r.squared, adj.r.squared, rmse, everything(), -sigma)
 
+  # We are checking if it is of error class, since in build_lm.fast, if calculation of relative importance fails, we set the returned error
+  # so that we can report the error in Summary table (return from tidy()).
   if (!is.null(x$relative_importance) && "error" %in% class(x$relative_importance)) {
     note <- x$relative_importance$message
     if (note == "covg must be \n a positive definite covariance matrix \n or a data matrix / data frame with linearly independent columns.") {
