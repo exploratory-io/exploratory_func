@@ -458,6 +458,12 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, d = NULL, 
   formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
 
   ttest_each <- function(df) {
+    if(length(grouped_cols) > 0) {
+      n_distinct_res_each <- n_distinct(df[[var2_col]]) # check n_distinct again within group.
+      if (n_distinct_res_each != 2) {
+        return(NULL)
+      }
+    }
     # Calculate Cohen's d from data.
     cohens_d <- calculate_cohens_d(df[[var1_col]], df[[var2_col]])
     # Get size of Cohen's d to detect for power analysis.
