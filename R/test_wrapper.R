@@ -785,6 +785,12 @@ exp_anova <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, f = NULL, 
   formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
 
   anova_each <- function(df) {
+    if(length(grouped_cols) > 0) {
+      n_distinct_res_each <- n_distinct(df[[var2_col]]) # check n_distinct again within group.
+      if (n_distinct_res_each < 2) {
+        return(NULL)
+      }
+    }
     tryCatch({
       model <- aov(formula, data = df, ...)
       # calculate Cohen's f from actual data
