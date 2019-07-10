@@ -44,7 +44,9 @@ is_digit <- function(word){
 #' @export
 is_alphabet <- function(word){
   loadNamespace("stringr")
-  stringr::str_detect(word, "^[[:alpha:]]+$")
+  # To treat non-ascii characters as FALSE, use [a-zA-Z]
+  # instead of [:alpha:]
+  stringr::str_detect(word, "^[a-zA-Z]+$")
 }
 
 #' Get vector of stopwords
