@@ -551,7 +551,7 @@ build_lm.fast <- function(df,
                                                                                       diff = FALSE),
                                                                 bty = relimp_bootstrap_type, level = relimp_conf_level)
           }, error = function(e){
-            # This can fail when columns are not linearly independent. Record error and keep going. TODO: Show error in summary table.
+            # This can fail when columns are not linearly independent. Record error and keep going.
             model$relative_importance <<- e
           })
         }
