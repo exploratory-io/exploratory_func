@@ -654,7 +654,9 @@ glance.lm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
   }
 
   if(pretty.name) {
-    ret <- ret %>% dplyr::rename(`R Squared`=r.squared, `Adj R Squared`=adj.r.squared, `RMSE`=rmse, `F Ratio`=statistic, `P Value`=p.value, `Degree of Freedom`=df, `Log Likelihood`=logLik, Deviance=deviance, `Residual DF`=df.residual, Note=note)
+    ret <- ret %>% dplyr::rename(`R Squared`=r.squared, `Adj R Squared`=adj.r.squared, `RMSE`=rmse, `F Ratio`=statistic, `P Value`=p.value, `Degree of Freedom`=df, `Log Likelihood`=logLik, Deviance=deviance, `Residual DF`=df.residual)
+    # Note column might not exist. Rename if it is there.
+    colnames(ret)[colnames(ret) == "note"] <- "Note"
   }
   ret
 }
