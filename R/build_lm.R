@@ -552,7 +552,7 @@ build_lm.fast <- function(df,
                                                                 bty = relimp_bootstrap_type, level = relimp_conf_level)
           }, error = function(e){
             # This can fail when columns are not linearly independent. Record error and keep going. TODO: Show error in summary table.
-            model$relative_importance <- e
+            model$relative_importance <<- e
           })
         }
       }
@@ -645,8 +645,16 @@ glance.lm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
   # Drop sigma in favor of rmse.
   ret <- ret %>% dplyr::select(r.squared, adj.r.squared, rmse, everything(), -sigma)
 
+  if (!is.null(x$relative_importance) && "error" %in% class(x$relative_importance)) {
+    note <- x$relative_importance$message
+    if (note == "covg must be \n a positive definite covariance matrix \n or a data matrix / data frame with linearly independent columns.") {
+      note <- "Calculation of variable importance failed most likely due to perfect multicollinearity."
+    }
+    ret <- ret %>% dplyr::mutate(note=note)
+  }
+
   if(pretty.name) {
-    ret <- ret %>% dplyr::rename(`R Squared`=r.squared, `Adj R Squared`=adj.r.squared, `RMSE`=rmse, `F Ratio`=statistic, `P Value`=p.value, `Degree of Freedom`=df, `Log Likelihood`=logLik, Deviance=deviance, `Residual DF`=df.residual)
+    ret <- ret %>% dplyr::rename(`R Squared`=r.squared, `Adj R Squared`=adj.r.squared, `RMSE`=rmse, `F Ratio`=statistic, `P Value`=p.value, `Degree of Freedom`=df, `Log Likelihood`=logLik, Deviance=deviance, `Residual DF`=df.residual, Note=note)
   }
   ret
 }
@@ -783,7 +791,7 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
       ret
     },
     relative_importance = {
-      if (!is.null(x$relative_importance)) {
+      if (!is.null(x$relative_importance) && "error" %nin% class(x$relative_importance)) {
         # Add columns for relative importance. NA for the first row is for the row for intercept.
         term <- x$relative_importance$namen[2:length(x$relative_importance$namen)] # Skip first element, which is the target variable name.
         importance <- attr(x$relative_importance, x$relative_importance$type)
