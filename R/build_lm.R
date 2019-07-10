@@ -795,6 +795,8 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
       ret
     },
     relative_importance = {
+      # We are checking if it is of error class, since in build_lm.fast, if calculation of relative importance fails, we set the returned error
+      # so that we can report the error in Summary table (return from tidy()).
       if (!is.null(x$relative_importance) && "error" %nin% class(x$relative_importance)) {
         # Add columns for relative importance. NA for the first row is for the row for intercept.
         term <- x$relative_importance$namen[2:length(x$relative_importance$namen)] # Skip first element, which is the target variable name.
