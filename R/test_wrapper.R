@@ -378,8 +378,8 @@ glance.chisq_exploratory <- function(x) {
         power_res <- pwr::pwr.chisq.test(df = x$parameter, N = N, w = x$cohens_w_to_detect, sig.level = x$sig.level)
         power_val <- power_res$power
       }, error = function(e) {
-        note <- e$message
-        power_val <- NA_real_
+        note <<- e$message
+        power_val <<- NA_real_
       })
     }
     else {
@@ -401,8 +401,8 @@ glance.chisq_exploratory <- function(x) {
       power_res <- pwr::pwr.chisq.test(df = x$parameter, w = x$cohens_w_to_detect, sig.level = x$sig.level, power = x$power)
       required_sample_size <- power_res$N
     }, error = function(e) {
-      note <- e$message
-      required_sample_size <- NA_real_
+      note <<- e$message
+      required_sample_size <<- NA_real_
     })
     ret <- ret %>% dplyr::mutate(w=!!(x$cohens_w), power=!!(x$power), beta=1.0-!!(x$power), current_sample_size=!!N, required_sample_size=!!required_sample_size)
     ret <- ret %>% rename(`Chi-Square`=statistic,
@@ -555,7 +555,7 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
         power_val <- power_res$power
       }, error = function(e) {
         note <- e$message
-        power_val <- NA_real_
+        power_val <<- NA_real_
       })
 
       ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
@@ -577,8 +577,8 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
         power_res <- pwr::pwr.t.test(d = x$cohens_d_to_detect, sig.level = x$sig.level, power = x$power, alternative = x$alternative)
         required_sample_size <- power_res$n
       }, error = function(e) {
-        note <- e$message
-        required_sample_size <- NA_real_
+        note <<- e$message
+        required_sample_size <<- NA_real_
       })
       ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
         dplyr::mutate(d=!!(x$cohens_d), power=!!(x$power), beta=1.0-!!(x$power)) %>%
@@ -859,8 +859,8 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
         power_res <- pwr::pwr.anova.test(k = k, n= min_n_rows, f = x$cohens_f_to_detect, sig.level = x$sig.level)
         power_val <- power_res$power
       }, error = function(e) {
-        note <- e$message
-        power_val <- NA_real_
+        note <<- e$message
+        power_val <<- NA_real_
       })
       ret <- ret %>% dplyr::select(term, statistic, p.value, df, sumsq, meansq) %>%
         dplyr::mutate(f=c(!!(x$cohens_f), NA_real_), power=c(!!power_val, NA_real_), beta=c(1.0-!!power_val, NA_real_)) %>%
@@ -880,8 +880,8 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
         power_res <- pwr::pwr.anova.test(k = k, f = x$cohens_f_to_detect, sig.level = x$sig.level, power = x$power)
         required_sample_size <- power_res$n
       }, error = function(e) {
-        note <- e$message
-        required_sample_size <- NA_real_
+        note <<- e$message
+        required_sample_size <<- NA_real_
       })
       ret <- ret %>% dplyr::select(term, statistic, p.value, df, sumsq, meansq) %>%
         dplyr::mutate(f=c(!!(x$cohens_f), NA_real_), power=c(!!(x$power), NA_real_), beta=c(1.0-!!(x$power), NA_real_)) %>%
