@@ -316,7 +316,7 @@ evaluate_multi_ <- function(df, pred_label_col, actual_val_col, pretty.name = FA
 # Generates Analytics View Summary Table for logistic/binomial regression. Handles Test Mode.
 #' @export
 evaluate_binary_training_and_test <- function(df, actual_val_col, threshold = "f_score", pretty.name = FALSE){
-  training_ret <- df %>% broom::glance(model, threshold = threshold)
+  training_ret <- df %>% broom::glance(model, binary_classification_threshold = threshold)
   ret <- training_ret
 
   grouped_col <- colnames(df)[!colnames(df) %in% c("model", ".test_index", "source.data")]
