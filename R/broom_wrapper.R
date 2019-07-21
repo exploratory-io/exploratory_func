@@ -679,9 +679,20 @@ prediction_binary <- function(df, threshold = 0.5, ...){
   } else if (is.numeric(actual_val)) {
     as.numeric(predicted)
   } else if (is.factor(actual_val)){
-    # create a factor vector with the same levels as actual_val
-    # predicted is logical, so should +1 to make it index
-    factor(levels(actual_val)[as.numeric(predicted) + 1], levels(actual_val))
+    if ("ranger" %in% class(first_model) || "rpart" %in% class(first_model)) {
+      # For binary prediction of ranger/rpart used from Analytics View, we use prediction() rather than this prediction_binary().
+      # Only case where it comes here is via Analytics Step. Maybe even for that, we should start calling prediction() to
+      # use common code as much as possible, but for now Analytics Step of ranger keeps using prediction_binary() for the
+      # ability to overwrite classification threshold, and optimized classification threshold. TODO: Clean up this situation.
+      # And, when it is ranger, (there is no rpart Analytics Step, but added if statement just for completeness.)
+      # we consider the first level to be "TRUE". This is different from logistic regression.
+      factor(levels(actual_val)[2 - as.numeric(predicted)], levels(actual_val))
+    }
+    else {
+      # create a factor vector with the same levels as actual_val
+      # predicted is logical, so should +1 to make it index
+      factor(levels(actual_val)[as.numeric(predicted) + 1], levels(actual_val))
+    }
   } else if (is.character(actual_val)) {
     # modify actual_val to factor with levels used in training data
     if(!is.null(first_model$model) && !is.null(first_model$model[[actual_col]])){
