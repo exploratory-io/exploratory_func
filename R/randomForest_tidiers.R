@@ -197,7 +197,15 @@ rangerCore <- function(data, formula, na.action = na.omit,
   target_col <- colnames(data)[target_col_index]
 
   if(model_type %in% c("classification_binary", "classification_multi")){
-    data[[target_col]] <- as.factor(data[[target_col]])
+    if (is.logical(data[[target_col]])) {
+      # Convert logical to factor to make it work with ranger.
+      # For ranger, we consider the first level to be TRUE. So set levels that way.
+      # Keep this logic consistent with get_binary_predicted_value_from_probability and augment.ranger.classification
+      data[[target_col]] <- factor(data[[target_col]], levels=c("TRUE","FALSE"))
+    }
+    else {
+      data[[target_col]] <- as.factor(data[[target_col]])
+    }
   }
 
   if(!is.logical(original_val) &&
