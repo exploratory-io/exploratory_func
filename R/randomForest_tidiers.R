@@ -197,7 +197,15 @@ rangerCore <- function(data, formula, na.action = na.omit,
   target_col <- colnames(data)[target_col_index]
 
   if(model_type %in% c("classification_binary", "classification_multi")){
-    data[[target_col]] <- as.factor(data[[target_col]])
+    if (is.logical(data[[target_col]])) {
+      # Convert logical to factor to make it work with ranger.
+      # For ranger, we consider the first level to be TRUE. So set levels that way.
+      # Keep this logic consistent with get_binary_predicted_value_from_probability and augment.ranger.classification
+      data[[target_col]] <- factor(data[[target_col]], levels=c("TRUE","FALSE"))
+    }
+    else {
+      data[[target_col]] <- as.factor(data[[target_col]])
+    }
   }
 
   if(!is.logical(original_val) &&
@@ -818,9 +826,13 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
       newdata[[predicted_value_col]] <- predicted_value
       predictions <- pred_res$predictions
 
-      # when the target level is a single, ncol(predictions) is 1.
+      # With ranger, 1st category always is the one to be considered "TRUE",
+      # and the probability for it is the probability for the binary classification.
+      # (For logistic regression, it is different, but here for ranger for now, for simplicity, we choose this behavior.)
+      # Keep this logic consistent with get_binary_predicted_value_from_probability
+      predicted_prob <- pred_res$predictions[, 1]
       # Inserting once removed NA rows
-      predicted_prob <- restore_na(pred_res$predictions[, ncol(predictions)], na_row_numbers)
+      predicted_prob <- restore_na(predicted_prob, na_row_numbers)
       newdata[[predicted_probability_col]] <- predicted_prob
       newdata
     } else if (x$classification_type == "multi") {
@@ -868,11 +880,17 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
         training = {
           # append predicted probability
           predictions <- x$predictions
-          predicted_prob <- restore_na(x$predictions[, ncol(predictions)], x$na.action)
+          # With ranger, 1st category always is the one to be considered "TRUE",
+          # and the probability for it is the probability for the binary classification.
+          # Keep this logic consistent with get_binary_predicted_value_from_probability
+          predicted_prob <- restore_na(x$predictions[, 1], x$na.action)
         },
         test = {
           predictions <- x$prediction_test$predictions
-          predicted_prob_nona <- x$prediction_test$predictions[, ncol(predictions)]
+          # With ranger, 1st category always is the one to be considered "TRUE",
+          # and the probability for it is the probability for the binary classification.
+          # Keep this logic consistent with get_binary_predicted_value_from_probability
+          predicted_prob_nona <- x$prediction_test$predictions[, 1]
           predicted_prob_nona <- restore_na(predicted_prob_nona, x$prediction_test$unknown_category_rows_index)
           predicted_prob <- restore_na(predicted_prob_nona, x$prediction_test$na.action)
         })
@@ -2266,7 +2284,14 @@ get_binary_predicted_value_from_probability <- function(x, threshold = 0.5) {
 # not really an external function but exposing for sharing with rpart.R TODO: find better way.
 evaluate_binary_classification <- function(actual, predicted, predicted_probability, pretty.name = FALSE) {
   # calculate AUC from ROC
-  roc_df <- data.frame(actual = (as.integer(actual)==1), predicted_probability = predicted_probability)
+  if (is.factor(actual) && "TRUE" %in% levels(actual)) { # target was logical and converted to factor.
+    # For rpart, level for "TRUE" is 2, and that does not work with the logic in else clause.
+    actual_for_roc <- actual == "TRUE"
+  }
+  else {
+    actual_for_roc <- as.integer(actual)==1
+  }
+  roc_df <- data.frame(actual = actual_for_roc, predicted_probability = predicted_probability)
   roc <- roc_df %>% do_roc_(actual_val_col = "actual", pred_prob_col = "predicted_probability")
   # use numeric index so that it won't be disturbed by name change
   # 2 should be false positive rate (x axis) and 1 should be true positive rate (yaxis)
@@ -2932,6 +2957,11 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
         if (x$classification_type == "binary") {
           if (class(x$y) == "logical") {
             predicted_probability <- predict(x)
+          }
+          else if (is.factor(actual) && "TRUE" %in% levels(actual)) {
+            # For rpart, we convert logical to facter with levels of "FALSE", "TRUE" in this order.
+            # In this case, probability for TRUE is on the 2nd column.
+            predicted_probability <- predict(x)[,2]
           }
           else {
             predicted_probability <- predict(x)[,1]
