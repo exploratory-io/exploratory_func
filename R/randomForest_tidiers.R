@@ -2284,7 +2284,14 @@ get_binary_predicted_value_from_probability <- function(x, threshold = 0.5) {
 # not really an external function but exposing for sharing with rpart.R TODO: find better way.
 evaluate_binary_classification <- function(actual, predicted, predicted_probability, pretty.name = FALSE) {
   # calculate AUC from ROC
-  roc_df <- data.frame(actual = (as.integer(actual)==1), predicted_probability = predicted_probability)
+  if (is.factor(actual) && "TRUE" %in% levels(actual)) { # target was logical and converted to factor.
+    # For rpart, level for "TRUE" is 2, and that does not work with the logic in else clause.
+    actual_for_roc <- actual == "TRUE"
+  }
+  else {
+    actual_for_roc <- as.integer(actual)==1
+  }
+  roc_df <- data.frame(actual = actual_for_roc, predicted_probability = predicted_probability)
   roc <- roc_df %>% do_roc_(actual_val_col = "actual", pred_prob_col = "predicted_probability")
   # use numeric index so that it won't be disturbed by name change
   # 2 should be false positive rate (x axis) and 1 should be true positive rate (yaxis)
@@ -2950,6 +2957,11 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
         if (x$classification_type == "binary") {
           if (class(x$y) == "logical") {
             predicted_probability <- predict(x)
+          }
+          else if (is.factor(actual) && "TRUE" %in% levels(actual)) {
+            # For rpart, we convert logical to facter with levels of "FALSE", "TRUE" in this order.
+            # In this case, probability for TRUE is on the 2nd column.
+            predicted_probability <- predict(x)[,2]
           }
           else {
             predicted_probability <- predict(x)[,1]
