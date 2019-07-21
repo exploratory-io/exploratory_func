@@ -818,9 +818,13 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
       newdata[[predicted_value_col]] <- predicted_value
       predictions <- pred_res$predictions
 
-      # when the target level is a single, ncol(predictions) is 1.
+      # With ranger, 1st category always is the one to be considered "TRUE",
+      # and the probability for it is the probability for the binary classification.
+      # (For logistic regression, it is different, but here for ranger for now, for simplicity, we choose this behavior.)
+      # Keep this logic consistent with get_binary_predicted_value_from_probability
+      predicted_prob <- pred_res$predictions[, 1]
       # Inserting once removed NA rows
-      predicted_prob <- restore_na(pred_res$predictions[, ncol(predictions)], na_row_numbers)
+      predicted_prob <- restore_na(predicted_prob, na_row_numbers)
       newdata[[predicted_probability_col]] <- predicted_prob
       newdata
     } else if (x$classification_type == "multi") {
@@ -868,11 +872,17 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
         training = {
           # append predicted probability
           predictions <- x$predictions
-          predicted_prob <- restore_na(x$predictions[, ncol(predictions)], x$na.action)
+          # With ranger, 1st category always is the one to be considered "TRUE",
+          # and the probability for it is the probability for the binary classification.
+          # Keep this logic consistent with get_binary_predicted_value_from_probability
+          predicted_prob <- restore_na(x$predictions[, 1], x$na.action)
         },
         test = {
           predictions <- x$prediction_test$predictions
-          predicted_prob_nona <- x$prediction_test$predictions[, ncol(predictions)]
+          # With ranger, 1st category always is the one to be considered "TRUE",
+          # and the probability for it is the probability for the binary classification.
+          # Keep this logic consistent with get_binary_predicted_value_from_probability
+          predicted_prob_nona <- x$prediction_test$predictions[, 1]
           predicted_prob_nona <- restore_na(predicted_prob_nona, x$prediction_test$unknown_category_rows_index)
           predicted_prob <- restore_na(predicted_prob_nona, x$prediction_test$na.action)
         })
