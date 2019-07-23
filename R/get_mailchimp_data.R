@@ -250,7 +250,7 @@ export_members <- function(id, dc, apikey, date_since){
     body = list(
       apikey = apikey,
       id = id,
-      since = date_since
+      since = as.character(date_since)
     )
   )
   text <- httr::content(res, as = "text")
@@ -304,7 +304,7 @@ export_activity <- function(id, dc, apikey, date_since, include_empty){
       apikey = apikey,
       id = id,
       include_empty = include_empty,
-      since = date_since
+      since = as.character(date_since)
     )
   )
   text <- httr::content(res, as = "text")
