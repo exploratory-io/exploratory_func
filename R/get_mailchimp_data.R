@@ -245,12 +245,13 @@ access_api <- function(query, dc, apikey, endpoint){
 #' @param date_since From when members data should be returned
 export_members <- function(id, dc, apikey, date_since){
   url <- paste0("https://", dc, ".api.mailchimp.com/export/1.0/list/", sep = "")
+  # For "since" parameter, it needs to be character instead of Date.
   res <- httr::POST(
     url,
     body = list(
       apikey = apikey,
       id = id,
-      since = date_since
+      since = as.character(date_since)
     )
   )
   text <- httr::content(res, as = "text")
@@ -298,13 +299,14 @@ export_members <- function(id, dc, apikey, date_since){
 #' @param include_empty  If set to TRUE, a record for every email address sent to will be returned even if there is no activity data
 export_activity <- function(id, dc, apikey, date_since, include_empty){
   url <- paste0("https://", dc, ".api.mailchimp.com/export/1.0/campaignSubscriberActivity/", sep = "")
+  # For "since" parameter, it needs to be character instead of Date.
   res <- httr::POST(
     url,
     body = list(
       apikey = apikey,
       id = id,
       include_empty = include_empty,
-      since = date_since
+      since = as.character(date_since)
     )
   )
   text <- httr::content(res, as = "text")
