@@ -2137,7 +2137,8 @@ calc_feature_imp <- function(df,
       imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
       imp_vars <- as.character(imp_vars) # for some reason imp_vars is converted to factor at this point. turn it back to character.
       rf$imp_vars <- imp_vars
-      rf$partial_dependence <- edarf::partial_dependence(rf, vars=imp_vars, data=model_df, n=c(20,20))
+      # Second element of n argument needs to be less than or equal to sample size, to avoid error.
+      rf$partial_dependence <- edarf::partial_dependence(rf, vars=imp_vars, data=model_df, n=c(20, min(rf$num.samples, 20)))
 
       # these attributes are used in tidy of randomForest
       rf$classification_type <- classification_type
