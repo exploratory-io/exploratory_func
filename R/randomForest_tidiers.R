@@ -179,6 +179,7 @@ randomForestMulti <- function(data, formula, na.action = na.omit, ...) {
 }
 
 # Common routine use for binary/multinomial classification and regression
+# TODO: Make it a common routine and use it from calc_feature_imp too.
 rangerCore <- function(data, formula, na.action = na.omit,
                        importance_mode = "permutation",
                        model_type = "regression", ...) {
@@ -247,6 +248,10 @@ rangerCore <- function(data, formula, na.action = na.omit,
     stop(e)
   })
 
+  # prediction result in the ranger model (ret$predictions) is for some reason different from and worse than
+  # the prediction separately done with the same training data.
+  # Make prediction with training data here and keep it, so that we can use this separate prediction for prediction, evaluation, etc.
+  ret$prediction_training <- predict(ret, data)
   # this attribute will be used to get back original column names
   terms_mapping <- original_colnames
   names(terms_mapping) <- updated_colnames
@@ -883,14 +888,14 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
           # With ranger, 1st category always is the one to be considered "TRUE",
           # and the probability for it is the probability for the binary classification.
           # Keep this logic consistent with get_binary_predicted_value_from_probability
-          predicted_prob <- restore_na(x$predictions[, 1], x$na.action)
+          predicted_prob <- restore_na(predictions[, 1], x$na.action)
         },
         test = {
           predictions <- x$prediction_test$predictions
           # With ranger, 1st category always is the one to be considered "TRUE",
           # and the probability for it is the probability for the binary classification.
           # Keep this logic consistent with get_binary_predicted_value_from_probability
-          predicted_prob_nona <- x$prediction_test$predictions[, 1]
+          predicted_prob_nona <- predictions[, 1]
           predicted_prob_nona <- restore_na(predicted_prob_nona, x$prediction_test$unknown_category_rows_index)
           predicted_prob <- restore_na(predicted_prob_nona, x$prediction_test$na.action)
         })
@@ -1131,7 +1136,7 @@ ranger.predict_value_from_prob <- function(levels_var, pred, y_value, threshold 
   }
   else { # binary case
     predicted <- factor(levels_var[apply(pred, 1, function(x){
-      if(is.na(x[2])){ # take care of the case where x$predictions has only 1 column. possible when there are only one value in training data.
+      if(is.na(x[2])){ # take care of the case where pred has only 1 column. possible when there are only one value in training data.
         1
       }
       else {
@@ -2062,6 +2067,9 @@ calc_feature_imp <- function(df,
         sample.fraction = sample.fraction,
         probability = (classification_type %in% c("multi", "binary"))
       )
+      # prediction result in the ranger model (ret$predictions) is for some reason different from and worse than
+      # the prediction separately done with the same training data.
+      # Make prediction with training data here and keep it, so that we can use this separate prediction for prediction, evaluation, etc.
       rf$prediction_training <- predict(rf, model_df)
 
       if (test_rate > 0) {
@@ -2271,7 +2279,7 @@ get_binary_predicted_value_from_probability <- function(x, threshold = 0.5) {
   # x$predictions is 2-diminsional matrix with 2 columns for the 2 categories. values in the matrix is the probabilities.
   # TODO: thought x$predictions was 3 dimensinal array with tree dimension from the doc and independently running ranger,
   # but looks like it is already averaged? look into it.
-  predicted <- factor(x$forest$levels[apply(x$predictions, 1, function(x){
+  predicted <- factor(x$forest$levels[apply(x$prediction_training$predictions, 1, function(x){
     if(is.na(x[2])){ # take care of the case where x$predictions has only 1 column. possible when there are only one value in training data.
       1
     }
@@ -2340,11 +2348,11 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, binary_clas
       } else {
         if (x$classification_type == "binary") {
           predicted <- get_binary_predicted_value_from_probability(x, threshold = binary_classification_threshold)
-          predicted_probability <- x$predictions[,1]
+          predicted_probability <- x$prediction_training$predictions[,1]
           ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = pretty.name)
         }
         else {
-          predicted <- ranger.predict_value_from_prob(x$forest$levels, x$predictions, x$y)
+          predicted <- ranger.predict_value_from_prob(x$forest$levels, x$prediction_training$predictions, x$y)
           ret <- evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
         }
         ret
@@ -2357,7 +2365,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, binary_clas
         predicted <- get_binary_predicted_value_from_probability(x, threshold = binary_classification_threshold)
       }
       else {
-        predicted <- ranger.predict_value_from_prob(x$forest$levels, x$predictions, x$y)
+        predicted <- ranger.predict_value_from_prob(x$forest$levels, x$prediction_training$predictions, x$y)
       }
 
       per_level <- function(class) {
@@ -2372,7 +2380,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, binary_clas
         predicted <- get_binary_predicted_value_from_probability(x, threshold = binary_classification_threshold)
       }
       else {
-        predicted <- ranger.predict_value_from_prob(x$forest$levels, x$predictions, x$y)
+        predicted <- ranger.predict_value_from_prob(x$forest$levels, x$prediction_training$predictions, x$y)
       }
 
       ret <- data.frame(
@@ -2395,10 +2403,10 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, binary_clas
         predicted <- get_binary_predicted_value_from_probability(x, threshold = binary_classification_threshold)
       }
       else if (x$classification_type == "mutli") {
-        predicted <- ranger.predict_value_from_prob(x$forest$levels, x$predictions, x$y)
+        predicted <- ranger.predict_value_from_prob(x$forest$levels, x$prediction_training$predictions, x$y)
       } else {
         # classification type is regression
-        predicted <- x$predictions
+        predicted <- x$prediction_training$predictions
       }
       ret <- data.frame(
         expected_value = x$y,
@@ -2509,7 +2517,7 @@ glance.ranger.regression <- function(x, pretty.name, ...) {
 glance.ranger.classification <- function(x, pretty.name, ...) {
   # Both actual and predicted have no NA values.
   actual <- x$y
-  predicted <- ranger.predict_value_from_prob(x$forest$levels, x$predictions, x$y)
+  predicted <- ranger.predict_value_from_prob(x$forest$levels, x$prediction_training$predictions, x$y)
   levels(predicted) <- levels(actual)
 
   # Composes data.frame of classification evaluation summary.
