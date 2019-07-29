@@ -861,7 +861,7 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
     switch(data_type,
       training = {
         predicted_label_nona <- ranger.predict_value_from_prob(x$forest$levels,
-                                                               x$predictions,
+                                                               x$prediction_training$predictions,
                                                                y_value, threshold = threshold)
         predicted_value <- restore_na(predicted_label_nona, x$na.action)
       },
@@ -879,7 +879,7 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
       switch(data_type,
         training = {
           # append predicted probability
-          predictions <- x$predictions
+          predictions <- x$prediction_training$predictions
           # With ranger, 1st category always is the one to be considered "TRUE",
           # and the probability for it is the probability for the binary classification.
           # Keep this logic consistent with get_binary_predicted_value_from_probability
@@ -900,8 +900,8 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
       switch(data_type,
         training = {
           # Inserting once removed NA rows
-          predicted_prob <- restore_na(apply(x$predictions, 1 , max), x$na.action)
-          data <- ranger.set_multi_predicted_values(data, x$predictions, predicted_value, x$na.action)
+          predicted_prob <- restore_na(apply(x$prediction_training$predictions, 1 , max), x$na.action)
+          data <- ranger.set_multi_predicted_values(data, x$prediction_training$predictions, predicted_value, x$na.action)
         },
         test = {
           # Inserting once removed NA rows
