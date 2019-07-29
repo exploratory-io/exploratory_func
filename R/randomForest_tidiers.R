@@ -2491,7 +2491,7 @@ glance.ranger <- function(x, pretty.name = FALSE, ...) {
 #' @export
 glance.ranger.regression <- function(x, pretty.name, ...) {
   predicted <- x$prediction_training$predictions
-  actual <- x$df[[all.vars(x$formula_terms)[1]]]
+  actual <- x$y
   root_mean_square_error <- rmse(predicted, actual)
   rsq <- r_squared(actual, predicted)
   ret <- data.frame(
