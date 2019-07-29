@@ -950,7 +950,7 @@ augment.ranger.regression <- function(x, data = NULL, newdata = NULL, data_type 
       training = {
         predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
         # Inserting once removed NA rows
-        predicted <- restore_na(x$predictions, x$na.action)
+        predicted <- restore_na(x$prediction_training$predictions, x$na.action)
         data[[predicted_value_col]] <- predicted
         data
       },
@@ -2062,6 +2062,7 @@ calc_feature_imp <- function(df,
         sample.fraction = sample.fraction,
         probability = (classification_type %in% c("multi", "binary"))
       )
+      rf$prediction_training <- predict(rf, model_df)
 
       if (test_rate > 0) {
         na_row_numbers_test <- ranger.find_na(c_cols, data = df_test)
@@ -2481,9 +2482,15 @@ glance.ranger <- function(x, pretty.name = FALSE, ...) {
 
 #' @export
 glance.ranger.regression <- function(x, pretty.name, ...) {
+  predicted <- x$prediction_training$predictions
+  actual <- x$df[[all.vars(x$formula_terms)[1]]]
+  root_mean_square_error <- rmse(predicted, actual)
+  rsq <- r_squared(actual, predicted)
   ret <- data.frame(
-    root_mean_square_error = sqrt(x$prediction.error),
-    r_squared = x$r.squared
+    # root_mean_square_error = sqrt(x$prediction.error),
+    # r_squared = x$r.squared
+    root_mean_square_error = root_mean_square_error,
+    r_squared = rsq
   )
 
   if(pretty.name){
