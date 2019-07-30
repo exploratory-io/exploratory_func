@@ -510,9 +510,9 @@ glance.randomForest.classification <- function(x, pretty.name = FALSE,  ...) {
     )
 
     names(ret) <- if(pretty.name){
-      paste(class, c("F Score", "Precision", "Misclassification Rate", "Recall", "Accuracy"), sep = " ")
+      paste(class, c("F Score", "Accuracy", "Misclassification Rate", "Precision", "Recall"), sep = " ")
     } else {
-      paste(class, c("f_score", "precision", "misclassification_rate", "recall", "accuracy"), sep = "_")
+      paste(class, c("f_score", "accuracy", "misclassification_rate", "precision", "recall"), sep = "_")
     }
     ret
   }
@@ -2570,7 +2570,7 @@ glance.ranger.classification <- function(x, pretty.name, ...) {
     accuracy <- (tp + tn) / (tp + tn + fp + fn)
     f_score <- 2 * ((precision * recall) / (precision + recall))
 
-    ret <- data.frame(f_score, precision, 1 - precision, recall, accuracy)
+    ret <- data.frame(f_score, accuracy, 1 - accuracy, precision, recall)
     names(ret) <- if (pretty.name) {
       c("F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall")
     } else {
