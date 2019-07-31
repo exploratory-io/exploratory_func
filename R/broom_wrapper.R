@@ -706,8 +706,10 @@ prediction_binary <- function(df, threshold = 0.5, ...){
     }
   } else if (is.character(actual_val)) {
     if ("ranger" %in% class(first_model)) {
+      # In case of ranger, TRUE corresponds to 1st factor level.
       if_else(predicted, levels(first_model$y)[[1]], levels(first_model$y)[[2]])
       lev <- levels(first_model$y)
+      # TRUE turns into 1 by as.numeric, which makes the index of lev 1. (2-1). FALSE makes the index 2.
       factor(lev[2 - as.numeric(predicted)], lev)
     }
     else if(!is.null(first_model$model) && !is.null(first_model$model[[actual_col]])){
