@@ -1218,11 +1218,10 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
 
         test_ret <- switch(type,
           evaluation = {
+            model_object <- df$model[[1]]
             if (is.numeric(actual)) {
               predicted <- test_pred_ret$predicted_value
               root_mean_square_error <- rmse(actual, predicted)
-
-              model_object <- df$model[[1]]
 
               # null_model_mean is mean of training data.
               if ("rpart" %in% class(model_object)) { # rpart case
@@ -1252,7 +1251,8 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
               if (model$classification_type == "binary") {
                 predicted <- test_pred_ret$predicted_label
                 predicted_probability <- test_pred_ret$predicted_probability
-                ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = pretty.name)
+                is_rpart <- "rpart" %in% class(model_object)
+                ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = pretty.name, is_rpart = is_rpart)
               }
               else {
                 predicted <- test_pred_ret$predicted_label
@@ -2292,10 +2292,11 @@ get_binary_predicted_value_from_probability <- function(x, threshold = 0.5) {
 
 #' @export
 # not really an external function but exposing for sharing with rpart.R TODO: find better way.
-evaluate_binary_classification <- function(actual, predicted, predicted_probability, pretty.name = FALSE) {
+evaluate_binary_classification <- function(actual, predicted, predicted_probability, pretty.name = FALSE, is_rpart = FALSE) {
   # calculate AUC from ROC
-  if (is.factor(actual) && "TRUE" %in% levels(actual)) { # target was logical and converted to factor.
+  if (is_rpart && is.factor(actual) && "TRUE" %in% levels(actual)) { # target was logical and converted to factor.
     # For rpart, level for "TRUE" is 2, and that does not work with the logic in else clause.
+    # For ranger, even if level for label "TRUE" is 2, we treat level 1 as TRUE, for simplicity for now, which can be handled by the else clause.
     actual_for_roc <- actual == "TRUE"
   }
   else {
@@ -2308,7 +2309,15 @@ evaluate_binary_classification <- function(actual, predicted, predicted_probabil
   # calculate the area under the plots
   auc <- sum((roc[[2]] - dplyr::lag(roc[[2]])) * roc[[1]], na.rm = TRUE)
   if (is.factor(actual) && "TRUE" %in% levels(actual)) { # target was logical and converted to factor.
-    ret <- evaluate_classification(actual, predicted, "TRUE", multi_class = FALSE, pretty.name = pretty.name)
+    if (is_rpart) {
+      # For rpart, level for "TRUE" is 2, and that does not work with the logic in else clause.
+      true_class <- "TRUE"
+    }
+    else {
+      # For ranger, even if level for label "TRUE" is 2, we always treat level 1 as TRUE, for simplicity for now.
+      true_class <- levels(actual)[[1]]
+    }
+    ret <- evaluate_classification(actual, predicted, true_class, multi_class = FALSE, pretty.name = pretty.name)
   }
   else {
     ret <- evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
@@ -2982,7 +2991,7 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
           else {
             predicted_probability <- predict(x)[,1]
           }
-          ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = pretty.name)
+          ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = pretty.name, is_rpart = TRUE)
         }
         else {
           # multiclass case
