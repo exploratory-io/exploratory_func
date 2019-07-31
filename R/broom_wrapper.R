@@ -650,7 +650,18 @@ prediction_binary <- function(df, threshold = 0.5, ...){
   }
 
   actual_val <- ret[[actual_col]]
-  actual_logical <- as.logical(as.numeric(actual_val))
+  actual_logical <- if ((is.character(actual_val) || is.factor(actual_val)) && "ranger" %in% class(first_model)) {
+    # For binary prediction of ranger/rpart used from Analytics View, we use prediction() rather than this prediction_binary().
+    # Only case where it comes here is via Analytics Step. Maybe even for that, we should start calling prediction() to
+    # use common code as much as possible, but for now Analytics Step of ranger keeps using prediction_binary() for the
+    # ability to overwrite classification threshold, and optimized classification threshold. TODO: Clean up this situation.
+    # And, when it is ranger, (there is no rpart Analytics Step.)
+    # we consider the first level to be "TRUE". This is different from logistic regression.
+    actual_val == levels(first_model$y)[[1]]
+  }
+  else {
+    as.logical(as.numeric(actual_val)) # From the code before adding this if clause, but can't be sure if this covers rest of the cases well. TODO: look into it.
+  }
 
   prob_col_name <- if ("predicted_response" %in% colnames(ret)) {
     "predicted_response"
@@ -694,8 +705,13 @@ prediction_binary <- function(df, threshold = 0.5, ...){
       factor(levels(actual_val)[as.numeric(predicted) + 1], levels(actual_val))
     }
   } else if (is.character(actual_val)) {
-    # modify actual_val to factor with levels used in training data
-    if(!is.null(first_model$model) && !is.null(first_model$model[[actual_col]])){
+    if ("ranger" %in% class(first_model)) {
+      if_else(predicted, levels(first_model$y)[[1]], levels(first_model$y)[[2]])
+      lev <- levels(first_model$y)
+      factor(lev[2 - as.numeric(predicted)], lev)
+    }
+    else if(!is.null(first_model$model) && !is.null(first_model$model[[actual_col]])){
+      # modify actual_val to factor with levels used in training data
       lev <- first_model$model[[actual_col]] %>% levels()
       factor(lev[as.numeric(predicted) + 1], lev)
     } else {
