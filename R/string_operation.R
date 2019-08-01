@@ -79,6 +79,7 @@ get_stopwords <- function(lang = "english", include = c(), exclude = c()){
     "english_snowball",
     "english_onix",
     "english_smart",
+    "english",
     "japanese")){
     # these data are created from data-raw/create_internal_data.R
     get(paste0("stopwords_", lang))
