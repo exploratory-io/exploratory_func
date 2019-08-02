@@ -26,8 +26,8 @@
 #' @param exclude Values that should be excluded from stopwords
 #' @return Logical vector if the token is in stop words or not.
 #' @export
-is_stopword <- function(token, lang = "english", include = c(), exclude = c()){
-  token %in% get_stopwords(lang, include = include, exclude = exclude)
+is_stopword <- function(token, lang = "english", include = c(), exclude = c(), ...){
+  token %in% get_stopwords(lang, include = include, exclude = exclude, ...)
 }
 
 #' Check if the word is digits.
