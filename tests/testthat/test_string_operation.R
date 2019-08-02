@@ -47,10 +47,16 @@ test_that("is_alphabet", {
   expect_equal(result, c(T, F, F, F, F))
 })
 
-test_that("test get_stop_words", {
+test_that("test get_stopwords", {
   result <- get_stopwords()
   expect_true(any(result == "a"))
+  expect_true(any(result == "amp"))
+  expect_true(any(result == "http"))
+  expect_true(any(result == "https"))
+  expect_true(any(result == "t.co"))
 })
+
+
 
 test_that("test word_to_sentiment", {
   result <- word_to_sentiment("good")
