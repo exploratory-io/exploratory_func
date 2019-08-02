@@ -71,15 +71,15 @@ is_alphabet <- function(word){
 #' "swedish"
 #' @param include Values that should be included as stop words
 #' @param exclude Values that should be excluded from stop words
+#' @param is_twitter flag that tells if you want to get twitter related stopwords such as http and https.
 #' @return vector of stop words.
 #' @export
-get_stopwords <- function(lang = "english", include = c(), exclude = c()){
+get_stopwords <- function(lang = "english", include = c(), exclude = c(), is_twitter = TRUE){
   lang <- tolower(lang)
   stopwords <- if (lang %in% c(
     "english_snowball",
     "english_onix",
     "english_smart",
-    "english",
     "japanese")){
     # these data are created from data-raw/create_internal_data.R
     get(paste0("stopwords_", lang))
@@ -87,7 +87,10 @@ get_stopwords <- function(lang = "english", include = c(), exclude = c()){
     loadNamespace("tm")
     tm::stopwords(kind = lang)
   }
-
+  # if is_twitter argument is true, append exploratory_stopwords which contains stopwords for twitter
+  if(is_twitter) {
+    stopwords <- append(stopwords, exploratory_stopwords)
+  }
   ret <- c(stopwords[!stopwords %in% exclude], include)
   ret
 }

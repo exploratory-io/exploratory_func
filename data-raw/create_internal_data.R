@@ -20,7 +20,6 @@ names(sentiment_AFINN) <- sentiment_AFINN_df[["word"]]
 
 exploratory_stopwords <- c("http", "https", "t.co", "amp")
 default_stopwords = c(tm::stopwords("english"), exploratory_stopwords)
-stopwords_english <- default_stopwords
 res <- httr::GET("http://svn.sourceforge.jp/svnroot/slothlib/CSharp/Version1/SlothLib/NLP/Filter/StopWord/word/Japanese.txt")
 stopwords_japanese <- httr::content(res) %>% stringr::str_split("\r\n")
 # ja_stopwrods is a list whose length is 1
@@ -40,7 +39,6 @@ devtools::use_data(
   default_stopwords,
   exploratory_stopwords,
   stopwords_japanese,
-  stopwords_english,
   stopwords_english_smart,
   stopwords_english_onix,
   stopwords_english_snowball,
