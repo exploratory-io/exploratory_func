@@ -1994,10 +1994,12 @@ summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...){
         name_list <- group_cols
       }
       names(groupby_args) <- name_list
-      .data %>% dplyr::group_by(!!!groupby_args) %>% summarize(...)
+      # make sure to ungroup result
+      .data %>% dplyr::group_by(!!!groupby_args) %>% summarize(...) %>% dplyr::ungroup()
     } else {
       if(!is.null(group_cols)) { # In case only group_by columns are provied, group_by with the columns
-        .data %>% dplyr::group_by(!!!rlang::sym(group_cols)) %>% summarize(...)
+        # make sure to ungroup result
+        .data %>% dplyr::group_by(!!!rlang::sym(group_cols)) %>% summarize(...) %>% dplyr::ungroup()
       } else { # In case no group_by columns are provided,skip group_by
         .data %>% summarize(...)
       }
