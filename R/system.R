@@ -1262,8 +1262,9 @@ getGoogleBigQueryTables <- function(project, dataset, tokenFileId=""){
     # If we pass large value to max_results (via page_size argument) like 1,000,000, Google BigQuery gives
     # Error: Invalid value at 'max_results.value' (TYPE_UINT32), "1e+06" [badRequest]
     # so set 10,000 as the default value.
-    dataset <- bigrquery::bq_dataset(project = project, dataset = dataset)
-    tables <- bigrquery::bq_dataset_tables(dataset, page_size = 10000);
+    # Below is just getting a list of table names and not the actual table data.
+    bqdataset <- bigrquery::bq_dataset(project = project, dataset = dataset)
+    tables <- bigrquery::bq_dataset_tables(bqdataset, page_size = 10000);
     lapply(tables, function(x){x$table})
   }, error = function(err){
     c("")
