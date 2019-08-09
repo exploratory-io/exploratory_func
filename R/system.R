@@ -1096,9 +1096,9 @@ extractDataFromGoogleBigQueryToCloudStorage <- function(project, dataset, table,
   token <- getGoogleTokenForBigQuery(tokenFileId)
   bigrquery::set_access_cred(token)
   # call forked bigrquery for submitting extract job
-  job <- bigrquery::insert_extract_job(project, dataset, table, destinationUri,
-                                print_header=TRUE, field_delimiter=",", destination_format="CSV", compression="GZIP")
-  job <- bigrquery::wait_for(job)
+  table <- bigrquery::bq_table(project, dataset, table = table)
+  job <- bigrquery::bq_perform_extract(x = table, destination_uris = destinationUri, print_header = TRUE, destination_format = "CSV", compression = "GZIP")
+  job <- bigrquery::bq_job_wait(job)
   job
 }
 
@@ -1167,8 +1167,6 @@ getDataFromGoogleBigQueryTableViaCloudStorage <- function(bucketProjectId, dataS
   # submit a job to extract query result to cloud storage
   uri = stringr::str_c('gs://', bucket, "/", folder, "/", "exploratory_temp*.gz")
   job <- exploratory::extractDataFromGoogleBigQueryToCloudStorage(project = bucketProjectId, dataset = dataSet, table = table, uri,tokenFileId);
-  # wait for extract to be done
-  job <- bigrquery::wait_for(job)
   # download tgzip file to client
   df <- exploratory::downloadDataFromGoogleCloudStorage(bucket = bucket, folder=folder, download_dir = tempdir(), tokenFileId = tokenFileId)
 }
@@ -1231,7 +1229,8 @@ getGoogleBigQueryProjects <- function(tokenFileId=""){
   tryCatch({
     token <- getGoogleTokenForBigQuery(tokenFileId);
     bigrquery::set_access_cred(token)
-    projects <- bigrquery::list_projects();
+    projects <- bigrquery::bq_projects(page_size = 100, max_pages = Inf, warn = TRUE)
+    projects
   }, error = function(err){
     c("")
   })
@@ -1244,7 +1243,8 @@ getGoogleBigQueryDataSets <- function(project, tokenFileId=""){
   tryCatch({
     token <- getGoogleTokenForBigQuery(tokenFileId);
     bigrquery::set_access_cred(token)
-    resultdatasets <- bigrquery::list_datasets(project);
+    resultdatasets <- bigrquery::bq_project_datasets(project);
+    lapply(resultdatasets, function(x){x$dataset})
   }, error = function(err){
      c("")
   })
@@ -1262,7 +1262,9 @@ getGoogleBigQueryTables <- function(project, dataset, tokenFileId=""){
     # If we pass large value to max_results (via page_size argument) like 1,000,000, Google BigQuery gives
     # Error: Invalid value at 'max_results.value' (TYPE_UINT32), "1e+06" [badRequest]
     # so set 10,000 as the default value.
-    tables <- bigrquery::list_tables(project, dataset, page_size=10000);
+    dataset <- bigrquery::bq_dataset(project = project, dataset = dataset)
+    tables <- bigrquery::bq_dataset_tables(dataset, page_size = 10000);
+    lapply(tables, function(x){x$table})
   }, error = function(err){
     c("")
   })
@@ -1274,7 +1276,8 @@ getGoogleBigQueryTable <- function(project, dataset, table, tokenFileId=""){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   token <- getGoogleTokenForBigQuery(tokenFileId);
   bigrquery::set_access_cred(token)
-  table <- bigrquery::get_table(project, dataset, table);
+  table <- bigrquery::bq_table(project = project, dataset = dataset, table = table)
+  table <- bigrquery::bq_table_meta(table);
 }
 
 #' API to get tables for current project, data set
