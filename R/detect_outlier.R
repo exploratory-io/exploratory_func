@@ -2,10 +2,11 @@
 #' ref: https://www.r-bloggers.com/outlier-detection-and-treatment-with-r/
 #' @export
 detect_outlier <- function (vec, type = "iqr", threshold = NULL) {
-  ret <- factor(rep("normal", length(vec)),
+  
+  # Fill the data with "normal". Leave NAs as NAs.
+  ret <- factor(if_else(is.na(vec), as.character(NA), "normal"),
                 levels = c("lower", "normal", "upper"),
                 ordered=TRUE)
-
   type <- tolower(type)
 
   switch(type, iqr = {
