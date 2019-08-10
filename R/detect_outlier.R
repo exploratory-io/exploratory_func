@@ -3,7 +3,7 @@
 #' @export
 detect_outlier <- function (vec, type = "iqr", threshold = NULL) {
   
-  # Fill the data with "normal". Leave NAs as is.
+  # Fill the data with "normal". Leave NAs as NAs.
   ret <- factor(if_else(is.na(vec), as.character(NA), "normal"),
                 levels = c("lower", "normal", "upper"),
                 ordered=TRUE)
