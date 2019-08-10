@@ -542,7 +542,7 @@ build_lm.fast <- function(df,
         }
 
         model <- stats::lm(fml, data = df) 
-        if (relimp) {
+        if (relimp && length(c_cols) > 1) { # relimp seems to work only when there are multiple predictors, which makes sense since it is "relative".
           tryCatch({
             # Calculate relative importance.
             model$relative_importance <- relaimpo::booteval.relimp(relaimpo::boot.relimp(model, type = relimp_type,
