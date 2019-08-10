@@ -329,10 +329,11 @@ build_lm.fast <- function(df,
       # to be done before factor level adjustments. Because of that, the for statement below has to
       # be separate from the for statement after that, and done first.
       for(col in clean_cols){
-        if(is.numeric(df[[col]])) {
-          # for numeric cols, filter NA rows, because lm will anyway do this internally, and errors out
+        if(is.numeric(df[[col]]) || lubridate::is.Date(df[[col]]) || lubridate::is.POSIXct(df[[col]])) {
+          # For numeric cols, filter NA rows, because lm will anyway do this internally, and errors out
           # if the remaining rows are with single value in any predictor column.
-          # filter Inf/-Inf too to avoid error at lm.
+          # Filter Inf/-Inf too to avoid error at lm.
+          # Do the same for Date/POSIXct, because we will create numeric columns from them.
           df <- df %>% dplyr::filter(!is.na(df[[col]]) & !is.infinite(df[[col]]))
         }
       }
@@ -541,7 +542,7 @@ build_lm.fast <- function(df,
         }
 
         model <- stats::lm(fml, data = df) 
-        if (relimp) {
+        if (relimp && length(c_cols) > 1) { # relimp seems to work only when there are multiple predictors, which makes sense since it is "relative".
           tryCatch({
             # Calculate relative importance.
             model$relative_importance <- relaimpo::booteval.relimp(relaimpo::boot.relimp(model, type = relimp_type,
