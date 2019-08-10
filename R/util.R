@@ -1988,19 +1988,18 @@ summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...){
           rlang::quo(UQ(func)(UQ(rlang::sym(cname))))
         }
       })
-      # create a name list
-      name_list <- purrr::map2(group_funs, group_cols, function(func, cname) {
-        if(is.na(func) || length(func)==0 || func == "none"){
-          cname
-        } else {
-          stringr::str_c(cname, func, sep = "_")
-        }
-      })
+      # Set names of group_by columns in the output.
+      name_list <- names(group_cols) # If names are specified in group_cols, use them for output.
+      if (is.null(name_list)) { # If name is not specified, use original column names.
+        name_list <- group_cols
+      }
       names(groupby_args) <- name_list
-      .data %>% dplyr::group_by(!!!groupby_args) %>% summarize(...)
+      # make sure to ungroup result
+      .data %>% dplyr::group_by(!!!groupby_args) %>% summarize(...) %>% dplyr::ungroup()
     } else {
       if(!is.null(group_cols)) { # In case only group_by columns are provied, group_by with the columns
-        .data %>% dplyr::group_by(!!!rlang::sym(group_cols)) %>% summarize(...)
+        # make sure to ungroup result
+        .data %>% dplyr::group_by(!!!rlang::sym(group_cols)) %>% summarize(...) %>% dplyr::ungroup()
       } else { # In case no group_by columns are provided,skip group_by
         .data %>% summarize(...)
       }

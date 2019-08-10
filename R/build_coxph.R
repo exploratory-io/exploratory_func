@@ -288,6 +288,13 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add tes
   )
   base_level_table <- xlevels_to_base_level_table(x$xlevels)
   ret <- ret %>% dplyr::left_join(base_level_table, by="term")
+
+  # Rows with NA estimates are due to perfect multicollinearity. Explain it in Note column.
+  # https://www.rdocumentation.org/packages/survival/versions/2.44-1.1/topics/coxph - Take a look at explanation for singular.ok.
+  if (any(is.na(ret$estimate))) {
+    ret <- ret %>% dplyr::mutate(note=if_else(is.na(estimate), "Dropped most likely due to perfect multicollinearity.", NA_character_))
+  }
+
   if (pretty.name){
     colnames(ret)[colnames(ret) == "term"] <- "Term"
     colnames(ret)[colnames(ret) == "statistic"] <- "t Ratio"
@@ -298,6 +305,7 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add tes
     colnames(ret)[colnames(ret) == "conf.high"] <- "Conf High"
     colnames(ret)[colnames(ret) == "hazard_ratio"] <- "Hazard Ratio"
     colnames(ret)[colnames(ret) == "base.level"] <- "Base Level"
+    colnames(ret)[colnames(ret) == "note"] <- "Note"
   } else {
     colnames(ret)[colnames(ret) == "statistic"] <- "t_ratio"
     colnames(ret)[colnames(ret) == "p.value"] <- "p_value"

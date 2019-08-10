@@ -44,7 +44,8 @@ test_that("build_lm.fast (logistic regression) evaluate training and test", {
   # expect_equal(nrow(test_ret), 1480) # Not very stable for some reason. Will revisit
   train_ret <- ret %>% filter(is_test_data==FALSE)
   # expect_equal(nrow(train_ret), 3454) # Not very stable for some reason. Will revisit
-  ret <- model_df %>% evaluate_binary_training_and_test("is delayed", pretty.name=TRUE)
+  ret <- model_df %>% evaluate_binary_training_and_test("is delayed", pretty.name=TRUE, threshold=0.1)
+  expect_gt(ret$Recall[[1]], 0.8) # Expect Recall to be ok since threshold is as low as 0.1.
   expect_equal(nrow(ret), 2) # 2 for train and test
   ret <- model_df %>% prediction_training_and_test(prediction_type = 'conf_mat', threshold = 0.5)
 })

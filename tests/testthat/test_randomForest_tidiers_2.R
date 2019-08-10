@@ -67,10 +67,9 @@ test_that("test ranger with binary regression all predictor variables", {
   expect_equal(colnames(pred_test_newdata_ret), expected_colnames)
 })
 
-test_that("test ranger with binary classification", {
-  test_data[["IS AA"]] <- test_data$CARRIER == "AA" # test target column name with space
+test_that("test ranger with binary classification with logical column", {
+  test_data[["IS AA"]] <- factor(test_data$CARRIER == "AA") # test target column name with space
   test_data[1, "IS AA"] <- NA
-  test_data[["IS AA"]]
   model_ret <- suppressWarnings({
       build_model(test_data,
         model_func = rangerBinary,
@@ -85,6 +84,54 @@ test_that("test ranger with binary classification", {
                        "Precision", "Recall")
   expect_equal(colnames(model_stats), expect_colnames)
 
+  pred_train_ret <- suppressWarnings(
+    prediction_binary(model_ret, data = "training", threshold = 0.6)
+  )
+  pred_train_ret <- suppressWarnings(
+    prediction_binary(model_ret, data = "training", threshold = "f_score")
+  )
+  expect_colnames <- c("CANCELLED", "Carrier Name", "CARRIER",
+                       "DISTANCE", "FNUMBER", "IS AA", "predicted_probability", "predicted_label")
+  expect_equal(colnames(pred_train_ret), expect_colnames)
+
+  pred_train_ret2 <- suppressWarnings(
+    prediction(model_ret, data = "training", threshold = "f_score")
+  )
+  expect_equal(colnames(pred_train_ret2), expect_colnames)
+
+  pred_test_ret <- suppressWarnings(prediction_binary(model_ret, data = "test"))
+  expect_equal(colnames(pred_test_ret), expect_colnames)
+
+  pred_test_ret2 <- suppressWarnings(prediction(model_ret, data = "test"))
+  expect_equal(colnames(pred_test_ret2), expect_colnames)
+
+  pred_test_newdata_ret <- suppressWarnings(prediction_binary(model_ret, data = "newdata", data_frame = test_data))
+  expect_equal(colnames(pred_test_newdata_ret), expect_colnames)
+
+  pred_test_newdata_ret2 <- suppressWarnings(prediction_binary(model_ret, data = "newdata", data_frame = test_data))
+  expect_equal(colnames(pred_test_newdata_ret2), expect_colnames)
+})
+
+test_that("test ranger with binary classification with factor", {
+  test_data[["IS AA"]] <- if_else(test_data$CARRIER == "AA", "AA", "Not AA") # test target column name with space
+  test_data[1, "IS AA"] <- NA
+  model_ret <- suppressWarnings({
+      build_model(test_data,
+        model_func = rangerBinary,
+        formula = `IS AA` ~ DISTANCE,
+        test_rate = 0.3)
+  })
+  coef_ret <- model_coef(model_ret)
+  expect_equal(colnames(coef_ret), c("variable", "importance"))
+
+  model_stats <- suppressWarnings(model_stats(model_ret, pretty.name = TRUE))
+  expect_colnames <- c("F Score", "Accuracy Rate", "Misclassification Rate",
+                       "Precision", "Recall")
+  expect_equal(colnames(model_stats), expect_colnames)
+
+  pred_train_ret <- suppressWarnings(
+    prediction_binary(model_ret, data = "training", threshold = 0.6)
+  )
   pred_train_ret <- suppressWarnings(
     prediction_binary(model_ret, data = "training", threshold = "f_score")
   )

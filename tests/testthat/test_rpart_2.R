@@ -46,7 +46,7 @@ test_that("exp_rpart(regression) evaluate training and test", {
 
 test_that("exp_rpart(binary) evaluate training and test", {
   model_df <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`)) %>%
-                exp_rpart(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0.3)
+                exp_rpart(is_delayed, `DIS TANCE`, `DEP DELAY`, test_rate = 0.3, binary_classification_threshold=0.5)
 
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
@@ -54,7 +54,7 @@ test_that("exp_rpart(binary) evaluate training and test", {
   train_ret <- ret %>% filter(is_test_data==FALSE)
   # expect_equal(nrow(train_ret), 3461) # Not very stable for some reason. Will revisit.
 
-  ret <- rf_evaluation_training_and_test(model_df)
+  ret <- model_df %>% rf_evaluation_training_and_test()
   expect_equal(nrow(ret), 2) # 2 for train and test
 
   # Training only case
