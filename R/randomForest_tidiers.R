@@ -2133,7 +2133,7 @@ calc_feature_imp <- function(df,
         ) %>% dplyr::arrange(-importance)
         imp_vars <- imp_df$variable
         if (is.null(max_pd_vars)) {
-          max_pd_vars <- 12, # Number of most important variables to calculate partial dependences on. Default 12 fits well with either 3 or 4 columns of facets.
+          max_pd_vars <- 12 # Number of most important variables to calculate partial dependences on. Default 12 fits well with either 3 or 4 columns of facets.
         }
         imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
         # code to separate numeric and categorical. keeping it for now for possibility of design change
