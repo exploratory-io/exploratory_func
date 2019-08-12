@@ -8,8 +8,14 @@ test_that("Random Forest: Group with fewer samples should not be skipped in the 
     exploratory::clean_data_frame() %>%
     filter(ChurnedWithinYear != "Unknown") %>%
     mutate(ChurnedWithinYear = str_logical(ChurnedWithinYear))
+
   model_df <- df %>% dplyr::group_by(`Store`) %>% calc_feature_imp(`ChurnedWithinYear`, `Region`, `Gender`, `Age`, `JobField`, `MaritalStatus`, `ContactType`, `MemberCard`, `MonthlySpending`, `BeerTastingClass`, `CookingClass`, `FlowerArrangementClass`, `PaperCraftClass`, `WineClass`, `DistanceFromStore`, `NumberOfStoresVisited`, `StoreVisitsPerMonth`, `NewsLetterOpened`, `WebSiteEngagement`, `SurveyOverallRating`, `FacebookPageLikes`, `EnvironmentCareness`, smote = TRUE, importance_measure = "permutation", with_boruta = TRUE)
   res <- model_df %>% rf_evaluation_training_and_test()
   expect_equal(nrow(res), 9) # There used to be an issue that Store with fewer samples (after SMOTE) was skipped in the result due to edarf error. #14070
-  res <- model_df %>% rf_partial_dependence() # Just make sure edarf works without error handling Stores with no significant variable well.
+  res <- model_df %>% rf_partial_dependence() # Just make sure edarf works without error, handling Stores with no significant variable well.
+
+  # Test edarf with no group_by to handle the case where there is no significant variagle.
+  model_df <- df %>% dplyr::filter(`Store` == "Napa") %>% calc_feature_imp(`ChurnedWithinYear`, `Region`, `Gender`, `Age`, `JobField`, `MaritalStatus`, `ContactType`, `MemberCard`, `MonthlySpending`, `BeerTastingClass`, `CookingClass`, `FlowerArrangementClass`, `PaperCraftClass`, `WineClass`, `DistanceFromStore`, `NumberOfStoresVisited`, `StoreVisitsPerMonth`, `NewsLetterOpened`, `WebSiteEngagement`, `SurveyOverallRating`, `FacebookPageLikes`, `EnvironmentCareness`, smote = TRUE, importance_measure = "permutation", with_boruta = TRUE)
+  res <- model_df %>% rf_evaluation_training_and_test()
+  res <- model_df %>% rf_partial_dependence() # Just make sure edarf works without error, handling no significant variable case well.
 })

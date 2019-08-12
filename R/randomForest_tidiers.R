@@ -1336,6 +1336,9 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
 #' @export
 rf_partial_dependence <- function(df, ...) { # TODO: write test for this.
   res <- df %>% broom::tidy(model, type="partial_dependence", ...)
+  if (nrow(res) == 0) {
+    return(data.frame()) # Skip the rest of processing by returning empty data.frame.
+  }
   grouped_col <- grouped_by(res) # When called from analytics view, this should be a single column or empty.
                                  # grouped_by has to be on res rather than on df since dplyr::group_vars
                                  # does not work on rowwise-grouped data frame.
