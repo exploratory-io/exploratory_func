@@ -2159,7 +2159,12 @@ calc_feature_imp <- function(df,
       imp_vars <- as.character(imp_vars) # for some reason imp_vars is converted to factor at this point. turn it back to character.
       rf$imp_vars <- imp_vars
       # Second element of n argument needs to be less than or equal to sample size, to avoid error.
-      rf$partial_dependence <- edarf::partial_dependence(rf, vars=imp_vars, data=model_df, n=c(20, min(rf$num.samples, 20)))
+      if (length(imp_vars) > 0) {
+        rf$partial_dependence <- edarf::partial_dependence(rf, vars=imp_vars, data=model_df, n=c(20, min(rf$num.samples, 20)))
+      }
+      else {
+        rf$partial_dependence <- NULL
+      }
 
       # these attributes are used in tidy of randomForest
       rf$classification_type <- classification_type
@@ -2438,6 +2443,9 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, binary_clas
       ret
     },
     partial_dependence = {
+      if (is.null(x$partial_dependence)) {
+        return(data.frame()) # Skip by returning empty data.frame.
+      }
       # return partial dependence
       ret <- x$partial_dependence
       var_cols <- colnames(ret)
