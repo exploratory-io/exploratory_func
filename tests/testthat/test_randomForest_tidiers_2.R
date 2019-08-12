@@ -362,7 +362,7 @@ test_that("in the case of a unkown target variable of predictiton ranger with mu
  
 })
 
-test_that("calc imp negative test", {
+test_that("calc imp negative test", { #TODO: What was this case for?
   model_df <- flight %>% dplyr::sample_n(4000) %>% calc_feature_imp(`ARR DELAY`, `YE AR`, `MON TH`, `DAY OF MONTH`, `FL DATE`, `TAIL NUM`, `FL NUM`, `ORI GIN`, `ORIGIN CITY NAME`, `ORIGIN STATE ABR`, `DE ST`, `DEST CITY NAME`, `DEST STATE ABR`, `DEP TIME`, `DEP DELAY`, `ARR TIME`, `CAN CELLED`, `CANCELLATION CODE`, `AIR TIME`, `DIS TANCE`, `WEATHER DELAY`, `delay ed`, `is UA`, `is delayed`, `end time`, `is UA or AA`, smote = FALSE)
   res_importance <- model_df %>% rf_importance()
   expect_equal(colnames(res_importance), c("variable", "importance"))
@@ -372,4 +372,12 @@ test_that("calc imp negative test", {
   expect_equal(colnames(res_evaluation), c("Root Mean Square Error", "R Squared"))
   res_tidy <- model_df %>% tidy(model, type = "scatter") %>% rename(Actual=expected_value, Predicted=predicted_value) %>% mutate(`Perfect Fit`=Predicted)
   expect_equal(colnames(res_tidy), c("Actual", "Predicted", "Perfect Fit"))
+})
+
+test_that("calc imp - variables for edarf should correspond to variables decided to be Confirmed or Tentative by Boruta", {
+  model_df <- flight %>% dplyr::sample_n(4000) %>% calc_feature_imp(`ARR DELAY`, `YE AR`, `MON TH`, `DAY OF MONTH`, `FL DATE`, `TAIL NUM`, `FL NUM`, `ORI GIN`, `ORIGIN CITY NAME`, `ORIGIN STATE ABR`, `DE ST`, `DEST CITY NAME`, `DEST STATE ABR`, `DEP TIME`, `DEP DELAY`, `ARR TIME`, `CAN CELLED`, `CANCELLATION CODE`, `AIR TIME`, `DIS TANCE`, `WEATHER DELAY`, `delay ed`, `is UA`, `is delayed`, `end time`, `is UA or AA`,
+                                                                    smote = FALSE, with_boruta = TRUE)
+
+  res_partial_dependence <- model_df %>% rf_partial_dependence()
+  expect_equal(n_distinct((model_df %>% tidy(model, type='boruta') %>% filter(decision != "Rejected"))$variable), n_distinct(res_partial_dependence$x_name))
 })

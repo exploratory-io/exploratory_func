@@ -1336,6 +1336,9 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
 #' @export
 rf_partial_dependence <- function(df, ...) { # TODO: write test for this.
   res <- df %>% broom::tidy(model, type="partial_dependence", ...)
+  if (nrow(res) == 0) {
+    return(data.frame()) # Skip the rest of processing by returning empty data.frame.
+  }
   grouped_col <- grouped_by(res) # When called from analytics view, this should be a single column or empty.
                                  # grouped_by has to be on res rather than on df since dplyr::group_vars
                                  # does not work on rowwise-grouped data frame.
@@ -1926,10 +1929,11 @@ extract_importance_history_from_boruta <- function(x) {
   res
 }
 
-# Extract vector of column names in the order of importance.
+# Extract vector of column names in the order of importance, except for rejected ones.
 # Used to determine variables to run partial dependency on.
 extract_important_variables_from_boruta <- function(x) {
   res <- extract_importance_history_from_boruta(x)
+  res <- res %>% dplyr::filter(decision != "Rejected")
   res <- res %>% dplyr::group_by(variable) %>% dplyr::summarize(importance = median(importance, na.rm = TRUE))
   res <- res %>% dplyr::arrange(desc(importance))
   res$variable
@@ -1952,7 +1956,10 @@ calc_feature_imp <- function(df,
                              smote_max_synth_perc = 200,
                              smote_k = 5,
                              importance_measure = "permutation", # "permutation" or "impurity".
-                             max_pd_vars = 12, # Number of most important variables to calculate partial dependences on. Default 12 fits well with either 3 or 4 columns of facets.
+                             max_pd_vars = NULL,
+                             # Number of most important variables to calculate partial dependences on. 
+                             # By default, when Boruta is on, all Confirmed/Tentative variables.
+                             # 12 when Boruta is off.
                              with_boruta = FALSE,
                              boruta_max_runs = 20, # Maximal number of importance source runs.
                              boruta_p_value = 0.05, # Boruta recommends using the default 0.01 for P-value, but we are using 0.05 for consistency with other functions of ours.
@@ -2113,7 +2120,12 @@ calc_feature_imp <- function(df,
         rf$boruta$terms_mapping <- names(name_map)
         names(rf$boruta$terms_mapping) <- name_map
         class(rf$boruta) <- c("Boruta_exploratory", class(rf$boruta))
+        # Show all variables with Confirmed or Tentative decision.
         imp_vars <- extract_important_variables_from_boruta(rf$boruta)
+        # max_pd_vars is not applied by default with Boruta.
+        if (!is.null(max_pd_vars)) {
+          imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
+        }
       }
       else {
         # return partial dependence
@@ -2123,6 +2135,10 @@ calc_feature_imp <- function(df,
           importance = imp
         ) %>% dplyr::arrange(-importance)
         imp_vars <- imp_df$variable
+        if (is.null(max_pd_vars)) {
+          max_pd_vars <- 12 # Number of most important variables to calculate partial dependences on. Default 12 fits well with either 3 or 4 columns of facets.
+        }
+        imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
         # code to separate numeric and categorical. keeping it for now for possibility of design change
         # imp_vars_tmp <- imp_df$variable
         # imp_vars <- character(0)
@@ -2143,11 +2159,15 @@ calc_feature_imp <- function(df,
         #   }
         # }
       }
-      imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
       imp_vars <- as.character(imp_vars) # for some reason imp_vars is converted to factor at this point. turn it back to character.
       rf$imp_vars <- imp_vars
       # Second element of n argument needs to be less than or equal to sample size, to avoid error.
-      rf$partial_dependence <- edarf::partial_dependence(rf, vars=imp_vars, data=model_df, n=c(20, min(rf$num.samples, 20)))
+      if (length(imp_vars) > 0) {
+        rf$partial_dependence <- edarf::partial_dependence(rf, vars=imp_vars, data=model_df, n=c(20, min(rf$num.samples, 20)))
+      }
+      else {
+        rf$partial_dependence <- NULL
+      }
 
       # these attributes are used in tidy of randomForest
       rf$classification_type <- classification_type
@@ -2426,6 +2446,9 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, binary_clas
       ret
     },
     partial_dependence = {
+      if (is.null(x$partial_dependence)) {
+        return(data.frame()) # Skip by returning empty data.frame.
+      }
       # return partial dependence
       ret <- x$partial_dependence
       var_cols <- colnames(ret)
