@@ -1953,7 +1953,10 @@ calc_feature_imp <- function(df,
                              smote_max_synth_perc = 200,
                              smote_k = 5,
                              importance_measure = "permutation", # "permutation" or "impurity".
-                             max_pd_vars = 12, # Number of most important variables to calculate partial dependences on. Default 12 fits well with either 3 or 4 columns of facets.
+                             max_pd_vars = NULL,
+                             # Number of most important variables to calculate partial dependences on. 
+                             # By default, when Boruta is on, all Confirmed/Tentative variables.
+                             # 12 when Boruta is off.
                              with_boruta = FALSE,
                              boruta_max_runs = 20, # Maximal number of importance source runs.
                              boruta_p_value = 0.05, # Boruta recommends using the default 0.01 for P-value, but we are using 0.05 for consistency with other functions of ours.
@@ -2115,8 +2118,11 @@ calc_feature_imp <- function(df,
         names(rf$boruta$terms_mapping) <- name_map
         class(rf$boruta) <- c("Boruta_exploratory", class(rf$boruta))
         # Show all variables with Confirmed or Tentative decision.
-        # max_pd_vars is ignored with Boruta for now.
         imp_vars <- extract_important_variables_from_boruta(rf$boruta)
+        # max_pd_vars is not applied by default with Boruta.
+        if (!is.null(max_pd_vars)) {
+          imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
+        }
       }
       else {
         # return partial dependence
@@ -2126,6 +2132,9 @@ calc_feature_imp <- function(df,
           importance = imp
         ) %>% dplyr::arrange(-importance)
         imp_vars <- imp_df$variable
+        if (is.null(max_pd_vars)) {
+          max_pd_vars <- 12, # Number of most important variables to calculate partial dependences on. Default 12 fits well with either 3 or 4 columns of facets.
+        }
         imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
         # code to separate numeric and categorical. keeping it for now for possibility of design change
         # imp_vars_tmp <- imp_df$variable
