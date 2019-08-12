@@ -94,10 +94,6 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
     }
   }
 
-  if(!is.null(regressors) && is.null(value_col)){
-      stop("Value column must be specified to make forecast with extra regressors.")
-  }
-
   if(!is.null(holiday_col) && is.null(value_col)){
       stop("Value column must be specified to make forecast with Holiday column.")
   }
@@ -191,7 +187,13 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
       # filter NAs on regressor columns
       df <- df %>% dplyr::filter(!!!filter_args)
       future_df <- df # keep all rows before df is filtered out.
-      df <- df %>% dplyr::filter(!is.na(UQ(rlang::sym(value_col)))) # keep the rows that has values. the ones that do not are for future regressors
+      if (!is.null(value_col)) {
+        df <- df %>% dplyr::filter(!is.na(UQ(rlang::sym(value_col)))) # keep the rows that has values. the ones that do not are for future regressors
+      }
+      else {
+        #TODO: handle units other than days.
+        df <- df %>% dplyr::filter(!!rlang::sym(time_col) <= (max(!!rlang::sym(time_col)) - lubridate::days(!!periods)))
+      }
       max_floored_date <- max(df[[time_col]])
       future_df <- future_df %>% dplyr::filter(UQ(rlang::sym(time_col)) > max_floored_date)
 
@@ -252,11 +254,15 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
         dplyr::group_by(ds) %>%
         dplyr::summarise(y = fun.aggregate(value), !!!summarise_args)
     } else { # in this case we do not support extra regressors since there is no way to detect bounndary between history and future
-      data.frame(
-        ds = df[[time_col]]
-      ) %>%
+      browser()
+      # TODO: case with cap.
+      df %>%
+        dplyr::transmute(
+          ds = UQ(rlang::sym(time_col)),
+          !!!rlang::syms(regressors) # this should be able to handle regressor=NULL case fine.
+        ) %>%
         dplyr::group_by(ds) %>%
-        dplyr::summarise(y = n())
+        dplyr::summarise(y = n(), !!!summarise_args)
     }
 
     # TODO: Check if this would not have daylight saving days issue we had with anomaly detection.
@@ -379,6 +385,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
           m <- add_regressor(m, regressor)
         }
       }
+      browser()
       m <- fit.prophet(m, training_data)
       if (time_unit == "hour") {
         time_unit_for_future_dataframe = 3600
