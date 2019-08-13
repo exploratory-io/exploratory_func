@@ -67,6 +67,20 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
                         regressors = NULL, funs.aggregate.regressors = NULL, regressors_na_fill_type = NULL, regressors_na_fill_value = 0, ...){
   validate_empty_data(df)
 
+  # Pseudo code of preprocessing:
+  # ----
+  # floor_date
+  # if (!is.null(regressors)) {
+  #   separate df into history and future
+  #   aggregate future df
+  # }
+  # aggregate history df
+  # if (test_mode) {
+  #   separate history df into training df and test df based on periods
+  # } else {
+  #   training df is history df as is
+  # }
+
   # we are making default for weekly/yearly.seasonality TRUE since 'auto' does not behave well.
   # it seems that there are cases that weekly.seasonality is turned off as a side-effect of yearly.seasonality turned off.
   # if that happens, since no seasonality is on, prophet forecast result becomes just a linear trend line,
@@ -115,6 +129,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
     stop("cap must be greater than floor.")
   }
 
+  # Compose arguments to pass to dplyr::summarise.
   summarise_args <- list() # default empty list
   if (!is.null(regressors) && !is.null(funs.aggregate.regressors)) {
     summarise_args <- purrr::map2(funs.aggregate.regressors, regressors, function(func, cname) {
