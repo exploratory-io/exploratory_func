@@ -213,7 +213,9 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
           time_unit_func <- base::months
         }
         else if (time_unit == "quarter") {
-          time_unit_func <- function(x) {lubridate::months(3 * x)}
+          time_unit_func <- function(x) {
+            base::months(3 * x)
+          }
         }
         else { # assuming it is year.
           time_unit_func <- lubridate::years
