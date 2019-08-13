@@ -256,6 +256,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
 
 
     # note that prophet only takes columns with predetermined names like ds, y, cap, as input
+    browser()
     aggregated_data <- if (!is.null(value_col) && ("cap" %in% colnames(df))) {
       # preserve cap column if it is there, so that cap argument as future data frame works.
       # apply same aggregation as value to cap.
