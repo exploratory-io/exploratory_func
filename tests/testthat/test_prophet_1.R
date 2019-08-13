@@ -122,6 +122,7 @@ test_that("do_prophet with extra regressor", {
 })
 }
 
+if(F){
 test_that("do_prophet with extra regressor without target column (Number of Rows)", {
   ts <- seq.Date(as.Date("2010-01-01"), as.Date("2012-01-01"), by="day")
   raw_data <- data.frame(timestamp=ts, count=round(runif(length(ts))/0.1))
@@ -138,6 +139,28 @@ test_that("do_prophet with extra regressor without target column (Number of Rows
   expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2012-01-11")) 
   # verify the last date in the data
   expect_equal(ret$timestamp[[length(ret$timestamp)]], as.Date("2012-01-11"))
+})
+}
+
+test_that("do_prophet with extra regressor without target column (Number of Rows) with test mode", {
+  ts <- seq.Date(as.Date("2010-01-01"), as.Date("2012-01-11"), by="day")
+  raw_data <- data.frame(timestamp=ts, count=round(runif(length(ts))/0.1))
+  ts2 <- seq.Date(as.Date("2010-01-01"), as.Date("2012-01-11"), by="day")
+  regressor_data <- data.frame(timestamp=ts2, regressor=runif(length(ts2)))
+  combined_data <- raw_data %>% full_join(regressor_data, by=c("timestamp"="timestamp"))
+  combined_data <- combined_data %>% mutate(count=if_else(is.na(count),1,count))
+  uncounted_data <- combined_data %>% tidyr::uncount(count)
+  browser()
+  ret <- uncounted_data %>%
+    do_prophet(timestamp, NULL, 10, time_unit = "day", regressors = c("regressor"), funs.aggregate.regressors = c(mean), test_mode = TRUE)
+  browser()
+  # verify the last date with forecasted_value
+  expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2012-01-11")) 
+  # verify the end of training data.
+  expect_equal(last((ret %>% filter(!is_test_data))$timestamp), as.Date("2012-01-01")) 
+  # verify the last date in the data
+  expect_equal(ret$timestamp[[length(ret$timestamp)]], as.Date("2012-01-11"))
+  browser()
 })
 
 if(F) {
