@@ -129,21 +129,28 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
     stop("cap must be greater than floor.")
   }
 
-  # Compose arguments to pass to dplyr::summarise.
-  summarise_args <- list() # default empty list
-  if (!is.null(regressors) && !is.null(funs.aggregate.regressors)) {
-    summarise_args <- purrr::map2(funs.aggregate.regressors, regressors, function(func, cname) {
-      quo(UQ(func)(UQ(rlang::sym(cname))))
-    })
-    names(summarise_args) <- regressors
-  }
-
   # To filter NAs on regressor columns
   filter_args <- list() # default empty list
   if (!is.null(regressors)) {
     filter_args <- purrr::map(regressors, function(cname) {
       quo(!is.na(UQ(rlang::sym(cname))))
     })
+    names(filter_args) <- NULL
+  }
+
+  # Compose arguments to pass to dplyr::summarise.
+  summarise_args <- list() # default empty list
+  if (!is.null(regressors) && !is.null(funs.aggregate.regressors)) {
+    summarise_args <- purrr::map2(funs.aggregate.regressors, regressors, function(func, cname) {
+      quo(UQ(func)(UQ(rlang::sym(cname))))
+    })
+    if (!is.null(names(regressors))) {
+      regressor_output_cols <- names(regressors)
+    }
+    else {
+      regressor_output_cols <- regressors
+    }
+    names(summarise_args) <- regressor_output_cols
   }
 
   # remove rows with NA time
@@ -269,7 +276,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
       aggregated_future_data <- future_df %>%
         dplyr::transmute(
           ds = UQ(rlang::sym(time_col)),
-          !!!rlang::syms(regressors)
+          !!!rlang::syms(unname(regressors)) # unname is necessary to avoid error when regressors is named vector.
         ) %>%
         dplyr::group_by(ds) %>%
         dplyr::summarise(!!!summarise_args)
@@ -291,7 +298,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
           ds = UQ(rlang::sym(time_col)),
           value = UQ(rlang::sym(value_col)),
           cap_col = cap,
-          !!!rlang::syms(regressors) # this should be able to handle regressor=NULL case fine.
+          !!!rlang::syms(unname(regressors)) # this should be able to handle regressor=NULL case fine.
         ) %>%
         # remove NA so that we do not pass data with NA, NaN, or 0 to prophet, which we are not very sure what would happen.
         # we saw a case where rstan crashes with the last row with 0 y value.
@@ -303,7 +310,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
         dplyr::transmute(
           ds = UQ(rlang::sym(time_col)),
           value = UQ(rlang::sym(value_col)),
-          !!!rlang::syms(regressors) # this should be able to handle regressor=NULL case fine.
+          !!!rlang::syms(unname(regressors)) # this should be able to handle regressor=NULL case fine.
         ) %>%
         dplyr::filter(!is.na(value)) %>% # remove NA so that we do not pass data with NA, NaN, or 0 to prophet
         dplyr::group_by(ds) %>%
@@ -313,7 +320,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
       df %>%
         dplyr::transmute(
           ds = UQ(rlang::sym(time_col)),
-          !!!rlang::syms(regressors) # this should be able to handle regressor=NULL case fine.
+          !!!rlang::syms(unname(regressors)) # this should be able to handle regressor=NULL case fine.
         ) %>%
         dplyr::group_by(ds) %>%
         dplyr::summarise(y = n(), !!!summarise_args)
@@ -333,7 +340,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
       }
       # fill NAs in y with zoo
       aggregated_data <- aggregated_data %>% dplyr::mutate(y = fill_ts_na(y, ds, type = na_fill_type, val = na_fill_value))
-      for (regressor_col in regressors) {
+      for (regressor_col in regressor_output_cols) {
         aggregated_data <- aggregated_data %>% dplyr::mutate(!!sym(regressor_col) := fill_ts_na(!!sym(regressor_col), ds, type = !!regressors_na_fill_type, val = !!regressors_na_fill_value))
       }
     }
@@ -405,8 +412,8 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
       m <- prophet::prophet(training_data, fit = FALSE, growth = growth,
                             daily.seasonality = daily.seasonality, weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
       # add regressors to the model.
-      if (!is.null(regressors)) {
-        for (regressor in regressors) {
+      if (!is.null(regressor_output_cols)) {
+        for (regressor in regressor_output_cols) {
           m <- add_regressor(m, regressor)
         }
       }
@@ -428,8 +435,8 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
       }
       m <- prophet::prophet(training_data, fit = FALSE, growth = growth,
                             daily.seasonality = daily.seasonality, weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
-      if (!is.null(regressors)) {
-        for (regressor in regressors) {
+      if (!is.null(regressor_output_cols)) {
+        for (regressor in regressor_output_cols) {
           m <- add_regressor(m, regressor)
         }
       }
@@ -447,7 +454,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
         time_unit_for_future_dataframe = time_unit
       }
       future <- prophet::make_future_dataframe(m, periods = periods, freq = time_unit_for_future_dataframe, include_history = include_history) #includes past dates
-      if (!is.null(regressors)) {
+      if (!is.null(regressor_output_cols)) {
         regressor_data <- aggregated_data %>%
           dplyr::select(-y) %>%
           dplyr::bind_rows(aggregated_future_data)
