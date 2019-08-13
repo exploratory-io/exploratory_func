@@ -608,8 +608,9 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
         # it is caused by subset of
         # grouped data frame
         # to show result of
-        # data frames that succeed
-        data.frame()
+        # data frames that succeed.
+        # For debugging purpose, return one row with error message in note column.
+        data.frame(note = e$message)
       } else {
         stop(e)
       }
