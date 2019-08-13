@@ -34,7 +34,6 @@ exp_kmeans <- function(df, ...,
                        algorithm = "Hartigan-Wong",
                        trace = FALSE,
                        normalize_data = TRUE,
-                       n_pcs = NULL,
                        max_nrow = NULL,
                        seed = 1,
                        elbow_method_mode=FALSE,
@@ -47,9 +46,6 @@ exp_kmeans <- function(df, ...,
   if (!elbow_method_mode) {
     ret <- ret %>% dplyr::mutate(model = purrr::map(model, function(x) {
       kmeans_df <- as.data.frame(x$x)
-      if (!is.null(n_pcs)) {
-        kmeans_df <- kmeans_df %>% dplyr::select(1:n_pcs) # keep only n_pcs principal components
-      }
       kmeans_model <- kmeans_df %>% build_kmeans.cols(everything(),
                                                    centers=centers,
                                                    iter.max = iter.max,
