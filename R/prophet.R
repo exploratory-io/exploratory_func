@@ -158,6 +158,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
   df <- df[!is.na(df[[time_col]]), ]
 
   do_prophet_each <- function(df){
+    tryCatch({
     # filter the part of external holidays df for this group.
     holidays_df <- NULL
     if (!is.null(holidays)) {
@@ -601,6 +602,18 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
     colnames(ret)[colnames(ret) == "cap.x"] <- avoid_conflict(colnames(ret), "cap_forecast")
     colnames(ret)[colnames(ret) == "cap.y"] <- avoid_conflict(colnames(ret), "cap_model")
     ret
+    }, error = function(e){
+      if(length(grouped_col) > 0) {
+        # ignore the error if
+        # it is caused by subset of
+        # grouped data frame
+        # to show result of
+        # data frames that succeed
+        data.frame()
+      } else {
+        stop(e)
+      }
+    })
   }
 
   # Calculation is executed in each group.
