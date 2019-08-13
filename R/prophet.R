@@ -256,8 +256,8 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
         dplyr::filter(!is.na(value)) %>% # remove NA so that we do not pass data with NA, NaN, or 0 to prophet
         dplyr::group_by(ds) %>%
         dplyr::summarise(y = fun.aggregate(value), !!!summarise_args)
-    } else { # in this case we do not support extra regressors since there is no way to detect bounndary between history and future
-      # TODO: case with cap.
+    } else { # value_col is not specified. The forecast is about number of rows.
+      # Note: We ignore cap column in this case for now.
       df %>%
         dplyr::transmute(
           ds = UQ(rlang::sym(time_col)),
