@@ -140,6 +140,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
 
   # Compose arguments to pass to dplyr::summarise.
   summarise_args <- list() # default empty list
+  regressor_output_cols <- NULL # Just declaring variable
   if (!is.null(regressors) && !is.null(funs.aggregate.regressors)) {
     summarise_args <- purrr::map2(funs.aggregate.regressors, regressors, function(func, cname) {
       quo(UQ(func)(UQ(rlang::sym(cname))))
