@@ -9,7 +9,7 @@ test_that("do_prophet with extra regressor without target column (Number of Rows
   combined_data <- combined_data %>% mutate(count=if_else(is.na(count),1,count))
   uncounted_data <- combined_data %>% tidyr::uncount(count)
   ret <- uncounted_data %>%
-    do_prophet(timestamp, NULL, 10, time_unit = "day", regressors = c("regressor"), funs.aggregate.regressors = c(mean), na_fill_type="value", na_fill_value=0, regressors_na_fill_type="value", regressors_na_fill_value=0)
+    do_prophet(timestamp, NULL, 10, time_unit = "day", regressors = c(regressor_mean="regressor"), funs.aggregate.regressors = c(mean), na_fill_type="value", na_fill_value=0, regressors_na_fill_type="value", regressors_na_fill_value=0)
   # verify the last date with forecasted_value
   expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2012-01-11")) 
   # verify the last date in the data
@@ -113,4 +113,3 @@ test_that("do_prophet with extra regressor without target column (Number of Rows
   # verify the last date in the data
   expect_equal(lubridate::with_tz(ret$timestamp[[length(ret$timestamp)]], tz="America/Los_Angeles"), lubridate::with_tz(as.POSIXct("2010-01-01 00:00:53"), tz="America/Los_Angeles"))
 })
-
