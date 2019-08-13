@@ -294,13 +294,22 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
 
     # TODO: Check if this would not have daylight saving days issue we had with anomaly detection.
     if (!is.null(na_fill_type)) {
+      if (time_unit == "minute") { # TODO: Unify similar code.
+        time_unit_for_seq <- "min"
+      }
+      else if (time_unit == "second") {
+        time_unit_for_seq <- "sec"
+      }
+      else {
+        time_unit_for_seq <- time_unit
+      }
       # complete the date time with NA
       aggregated_data <- if(inherits(aggregated_data$ds, "Date")){
         aggregated_data %>%
-          tidyr::complete(ds = seq.Date(min(ds), max(ds), by = time_unit))
+          tidyr::complete(ds = seq.Date(min(ds), max(ds), by = time_unit_for_seq))
       } else if(inherits(aggregated_data$ds, "POSIXct")) {
         aggregated_data %>%
-          tidyr::complete(ds = seq.POSIXt(min(ds), max(ds), by = time_unit))
+          tidyr::complete(ds = seq.POSIXt(min(ds), max(ds), by = time_unit_for_seq))
       } else {
         stop("time must be Date or POSIXct.")
       }
