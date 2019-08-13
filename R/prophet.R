@@ -1,5 +1,17 @@
 # Wrapper functions around prophet.
 
+to_time_unit_for_seq <- function(time_unit) {
+  if (time_unit == "minute") {
+    "min"
+  }
+  else if (time_unit == "second") {
+    "sec"
+  }
+  else {
+    time_unit
+  }
+}
+
 #' NSE version of do_prophet_
 #' @export
 do_prophet <- function(df, time, value = NULL, periods = 10, holiday = NULL, ...){
@@ -294,22 +306,13 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
 
     # TODO: Check if this would not have daylight saving days issue we had with anomaly detection.
     if (!is.null(na_fill_type)) {
-      if (time_unit == "minute") { # TODO: Unify similar code.
-        time_unit_for_seq <- "min"
-      }
-      else if (time_unit == "second") {
-        time_unit_for_seq <- "sec"
-      }
-      else {
-        time_unit_for_seq <- time_unit
-      }
       # complete the date time with NA
       aggregated_data <- if(inherits(aggregated_data$ds, "Date")){
         aggregated_data %>%
-          tidyr::complete(ds = seq.Date(min(ds), max(ds), by = time_unit_for_seq))
+          tidyr::complete(ds = seq.Date(min(ds), max(ds), by = to_time_unit_for_seq(time_unit)))
       } else if(inherits(aggregated_data$ds, "POSIXct")) {
         aggregated_data %>%
-          tidyr::complete(ds = seq.POSIXt(min(ds), max(ds), by = time_unit_for_seq))
+          tidyr::complete(ds = seq.POSIXt(min(ds), max(ds), by = to_time_unit_for_seq(time_unit)))
       } else {
         stop("time must be Date or POSIXct.")
       }
@@ -337,24 +340,15 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
       # This is necessary to make forecast period correspond with test period in test mode when there is missing date/time in original aggregated_data$ds.
       # Note that this is only for the purpose of correctly determine where to start test period, and we remove those filled data once that purpose is met.
 
-      if (time_unit == "minute") {
-        time_unit_for_seq <- "min"
-      }
-      else if (time_unit == "second") {
-        time_unit_for_seq <- "sec"
-      }
-      else {
-        time_unit_for_seq <- time_unit
-      }
       # Create periodical sequence of time to fill missing date/time
       if (time_unit %in% c("hour", "minute", "second")) { # Use seq.POSIXt for unit smaller than day.
-        ts <- seq.POSIXt(as.POSIXct(min(aggregated_data$ds)), as.POSIXct(max(aggregated_data$ds)), by=time_unit_for_seq)
+        ts <- seq.POSIXt(as.POSIXct(min(aggregated_data$ds)), as.POSIXct(max(aggregated_data$ds)), by=to_time_unit_for_seq(time_unit))
         if (lubridate::is.Date(aggregated_data$ds)) {
           ts <- as.Date(ts)
         }
       }
       else { # Use seq.Date for unit of day or larger. Using seq.POSIXct for month does not always give first day of month.
-        ts <- seq.Date(as.Date(min(aggregated_data$ds)), as.Date(max(aggregated_data$ds)), by=time_unit_for_seq)
+        ts <- seq.Date(as.Date(min(aggregated_data$ds)), as.Date(max(aggregated_data$ds)), by=to_time_unit_for_seq(time_unit))
         if (!lubridate::is.Date(aggregated_data$ds)) {
           ts <- as.POSIXct(ts)
         }
