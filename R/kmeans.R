@@ -40,6 +40,7 @@ exp_kmeans <- function(df, ...,
                        max_centers = 10
                        ) {
 
+  df <- df %>% sample_rows(max_nrow)
   kmeans_model_df <- df %>% build_kmeans.cols(...,
                                               centers=centers,
                                               iter.max = iter.max,
@@ -52,7 +53,7 @@ exp_kmeans <- function(df, ...,
                                               seed=seed) # Seed is already done in do_prcomp. Skip it.
 
   # Set seed just once.
-  ret <- do_prcomp(df, normalize_data = normalize_data, max_nrow = max_nrow, seed = NULL, ...)
+  ret <- do_prcomp(df, normalize_data = normalize_data, seed = NULL, ...)
 
   if (!elbow_method_mode) {
     ret <- ret %>% dplyr::mutate(model = purrr::map2(model, !!kmeans_model_df$model, function(x, y) {
