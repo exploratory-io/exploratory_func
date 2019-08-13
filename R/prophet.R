@@ -52,7 +52,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
                         cap = NULL, floor = NULL, growth = NULL, weekly.seasonality = TRUE, yearly.seasonality = TRUE,
                         daily.seasonality = "auto",
                         holiday_col = NULL, holidays = NULL,
-                        regressors = NULL, funs.aggregate.regressors = NULL, ...){
+                        regressors = NULL, funs.aggregate.regressors = NULL, regressors_na_fill_type = NULL, regressors_na_fill_value = 0, ...){
   validate_empty_data(df)
 
   # we are making default for weekly/yearly.seasonality TRUE since 'auto' does not behave well.
