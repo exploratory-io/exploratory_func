@@ -40,19 +40,24 @@ exp_kmeans <- function(df, ...,
                        max_centers = 10
                        ) {
 
-  df <- df %>% sample_rows(max_nrow)
-  kmeans_model_df <- df %>% build_kmeans.cols(...,
-                                              centers=centers,
-                                              iter.max = iter.max,
-                                              nstart = nstart,
-                                              algorithm = algorithm,
-                                              trace = trace,
-                                              normalize_data = normalize_data,
-                                              keep.source=FALSE,
-                                              augment=FALSE,
-                                              seed=seed) # Seed is already done in do_prcomp. Skip it.
-
   # Set seed just once.
+  if(!is.null(seed)) { # Set seed before starting to call sample_n.
+    set.seed(seed)
+  }
+  df <- df %>% sample_rows(max_nrow)
+  if (!elbow_method_mode) {
+    kmeans_model_df <- df %>% build_kmeans.cols(...,
+                                                centers=centers,
+                                                iter.max = iter.max,
+                                                nstart = nstart,
+                                                algorithm = algorithm,
+                                                trace = trace,
+                                                normalize_data = normalize_data,
+                                                keep.source=FALSE,
+                                                augment=FALSE,
+                                                seed=NULL) # Seed is already done. Skip it.
+  }
+
   ret <- do_prcomp(df, normalize_data = normalize_data, seed = NULL, ...)
 
   if (!elbow_method_mode) {
