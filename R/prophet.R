@@ -183,7 +183,8 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
     }
 
     aggregated_future_data <- NULL
-    if (!is.null(regressors)) { # extra regressor case. separate the df into history and future based on the value is filled or not.
+    # extra regressor case. separate the df into history and future based on the value is filled or not.
+    if (!is.null(regressors)) {
       # filter NAs on regressor columns
       df <- df %>% dplyr::filter(!!!filter_args)
       future_df <- df # keep all rows before df is filtered out.
@@ -254,7 +255,6 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
         dplyr::group_by(ds) %>%
         dplyr::summarise(y = fun.aggregate(value), !!!summarise_args)
     } else { # in this case we do not support extra regressors since there is no way to detect bounndary between history and future
-      browser()
       # TODO: case with cap.
       df %>%
         dplyr::transmute(
@@ -385,7 +385,6 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
           m <- add_regressor(m, regressor)
         }
       }
-      browser()
       m <- fit.prophet(m, training_data)
       if (time_unit == "hour") {
         time_unit_for_future_dataframe = 3600
