@@ -40,23 +40,23 @@ exp_kmeans <- function(df, ...,
                        max_centers = 10
                        ) {
 
-  # Set seed just once inside do_prcomp where we call sample_n().
-  ret <- do_prcomp(df, normalize_data = normalize_data, max_nrow = max_nrow, seed = seed, ...)
+  kmeans_model_df <- df %>% build_kmeans.cols(...,
+                                              centers=centers,
+                                              iter.max = iter.max,
+                                              nstart = nstart,
+                                              algorithm = algorithm,
+                                              trace = trace,
+                                              normalize_data = normalize_data,
+                                              keep.source=FALSE,
+                                              augment=FALSE,
+                                              seed=seed) # Seed is already done in do_prcomp. Skip it.
+
+  # Set seed just once.
+  ret <- do_prcomp(df, normalize_data = normalize_data, max_nrow = max_nrow, seed = NULL, ...)
 
   if (!elbow_method_mode) {
-    ret <- ret %>% dplyr::mutate(model = purrr::map(model, function(x) {
-      kmeans_df <- as.data.frame(x$x)
-      kmeans_model <- kmeans_df %>% build_kmeans.cols(everything(),
-                                                   centers=centers,
-                                                   iter.max = iter.max,
-                                                   nstart = nstart,
-                                                   algorithm = algorithm,
-                                                   trace = trace,
-                                                   normalize_data = FALSE, # Do not normalize further, since we normalized in do_prcomp.
-                                                   keep.source=FALSE,
-                                                   augment=FALSE,
-                                                   seed=NULL) # Seed is already done in do_prcomp. Skip it.
-      x$kmeans <- kmeans_model$model[[1]]
+    ret <- ret %>% dplyr::mutate(model = purrr::map2(model, !!kmeans_model_df$model, function(x, y) {
+      x$kmeans <- y # Might need to be more careful on guaranetting x and y are from same group, but we are not supporting group_by on UI at this point.
       x
     }))
   }
