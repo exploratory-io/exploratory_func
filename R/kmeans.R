@@ -58,6 +58,7 @@ exp_kmeans <- function(df, ...,
                                                 seed=NULL) # Seed is already done. Skip it.
   }
 
+  # TODO: Running PCA is not necessary for elbow method case.
   ret <- do_prcomp(df, normalize_data = normalize_data, seed = NULL, ...)
 
   if (!elbow_method_mode) {
