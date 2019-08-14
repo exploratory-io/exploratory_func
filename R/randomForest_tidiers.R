@@ -1964,7 +1964,8 @@ calc_feature_imp <- function(df,
                              boruta_max_runs = 20, # Maximal number of importance source runs.
                              boruta_p_value = 0.05, # Boruta recommends using the default 0.01 for P-value, but we are using 0.05 for consistency with other functions of ours.
                              seed = 1,
-                             test_rate = 0.0
+                             test_rate = 0.0,
+                             test_split_type = "random" # "random" or "ordered"
                              ){
   if(!is.null(seed)){
     set.seed(seed)
@@ -2034,7 +2035,7 @@ calc_feature_imp <- function(df,
 
       # split training and test data
       source_data <- df
-      test_index <- sample_df_index(source_data, rate = test_rate)
+      test_index <- sample_df_index(source_data, rate = test_rate, ordered = (test_split_type == "ordered"))
       df <- safe_slice(source_data, test_index, remove = TRUE)
       if (test_rate > 0) {
         df_test <- safe_slice(source_data, test_index, remove = FALSE)
@@ -2656,11 +2657,12 @@ exp_rpart <- function(df,
                       smote_max_synth_perc = 200,
                       smote_k = 5,
                       seed = 1,
-                      test_rate = 0.0,
                       minsplit = 20, # The minimum number of observations that must exist in a node in order for a split to be attempted. Passed down to rpart()
                       minbucket = round(minsplit/3), # The minimum number of observations in any terminal node. Passed down to rpart()
                       cp = 0.01, # Complexity parameter. Any split that does not decrease the overall lack of fit by a factor of cp is not attempted. Passed down to rpart()
-                      maxdepth = 30 # Set the maximum depth of any node of the final tree, with the root node counted as depth 0. Passed down to rpart()
+                      maxdepth = 30, # Set the maximum depth of any node of the final tree, with the root node counted as depth 0. Passed down to rpart()
+                      test_rate = 0.0,
+                      test_split_type = "random" # "random" or "ordered"
                       ) {
   if(!is.null(seed)){
     set.seed(seed)
@@ -2727,7 +2729,7 @@ exp_rpart <- function(df,
 
       # split training and test data
       source_data <- df
-      test_index <- sample_df_index(source_data, rate = test_rate)
+      test_index <- sample_df_index(source_data, rate = test_rate, ordered = (test_split_type == "ordered"))
       df <- safe_slice(source_data, test_index, remove = TRUE)
       if (test_rate > 0) {
         df_test <- safe_slice(source_data, test_index, remove = FALSE)
