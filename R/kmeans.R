@@ -34,33 +34,36 @@ exp_kmeans <- function(df, ...,
                        algorithm = "Hartigan-Wong",
                        trace = FALSE,
                        normalize_data = TRUE,
-                       n_pcs = NULL,
                        max_nrow = NULL,
                        seed = 1,
                        elbow_method_mode=FALSE,
                        max_centers = 10
                        ) {
 
-  # Set seed just once inside do_prcomp where we call sample_n().
-  ret <- do_prcomp(df, normalize_data = normalize_data, max_nrow = max_nrow, seed = seed, ...)
+  # Set seed just once.
+  if(!is.null(seed)) { # Set seed before starting to call sample_n.
+    set.seed(seed)
+  }
+  df <- df %>% sample_rows(max_nrow)
+  if (!elbow_method_mode) {
+    kmeans_model_df <- df %>% build_kmeans.cols(...,
+                                                centers=centers,
+                                                iter.max = iter.max,
+                                                nstart = nstart,
+                                                algorithm = algorithm,
+                                                trace = trace,
+                                                normalize_data = normalize_data,
+                                                keep.source=FALSE,
+                                                augment=FALSE,
+                                                seed=NULL) # Seed is already done. Skip it.
+  }
+
+  # TODO: Running PCA is not necessary for elbow method case.
+  ret <- do_prcomp(df, normalize_data = normalize_data, seed = NULL, ...)
 
   if (!elbow_method_mode) {
-    ret <- ret %>% dplyr::mutate(model = purrr::map(model, function(x) {
-      kmeans_df <- as.data.frame(x$x)
-      if (!is.null(n_pcs)) {
-        kmeans_df <- kmeans_df %>% dplyr::select(1:n_pcs) # keep only n_pcs principal components
-      }
-      kmeans_model <- kmeans_df %>% build_kmeans.cols(everything(),
-                                                   centers=centers,
-                                                   iter.max = iter.max,
-                                                   nstart = nstart,
-                                                   algorithm = algorithm,
-                                                   trace = trace,
-                                                   normalize_data = FALSE, # Do not normalize further, since we normalized in do_prcomp.
-                                                   keep.source=FALSE,
-                                                   augment=FALSE,
-                                                   seed=NULL) # Seed is already done in do_prcomp. Skip it.
-      x$kmeans <- kmeans_model$model[[1]]
+    ret <- ret %>% dplyr::mutate(model = purrr::map2(model, !!kmeans_model_df$model, function(x, y) {
+      x$kmeans <- y # Might need to be more careful on guaranteeing x and y are from same group, but we are not supporting group_by on UI at this point.
       x
     }))
   }
