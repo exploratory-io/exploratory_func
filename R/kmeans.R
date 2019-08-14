@@ -63,7 +63,7 @@ exp_kmeans <- function(df, ...,
 
   if (!elbow_method_mode) {
     ret <- ret %>% dplyr::mutate(model = purrr::map2(model, !!kmeans_model_df$model, function(x, y) {
-      x$kmeans <- y # Might need to be more careful on guaranetting x and y are from same group, but we are not supporting group_by on UI at this point.
+      x$kmeans <- y # Might need to be more careful on guaranteeing x and y are from same group, but we are not supporting group_by on UI at this point.
       x
     }))
   }
