@@ -196,7 +196,8 @@ build_lm.fast <- function(df,
                     with_marginal_effects_confint = FALSE,
                     variable_metric = NULL,
                     seed = 1,
-                    test_rate = 0.0
+                    test_rate = 0.0,
+                    test_split_type = "random" # "random" or "ordered"
                     ){
   # TODO: add test
   # TODO: cleanup code only aplicable to randomForest. this func was started from copy of calc_feature_imp, and still adjusting for lm. 
@@ -459,7 +460,7 @@ build_lm.fast <- function(df,
 
         # split training and test data
         source_data <- df
-        test_index <- sample_df_index(source_data, rate = test_rate)
+        test_index <- sample_df_index(source_data, rate = test_rate, ordered = (test_split_type == "ordered"))
         df <- safe_slice(source_data, test_index, remove = TRUE)
         if (test_rate > 0) {
           # Test mode. Make prediction with test data here, rather than repeating it in Analytics View preprocessors.
@@ -532,7 +533,7 @@ build_lm.fast <- function(df,
       else {
         # split training and test data
         source_data <- df
-        test_index <- sample_df_index(source_data, rate = test_rate)
+        test_index <- sample_df_index(source_data, rate = test_rate, ordered = (test_split_type == "ordered"))
         df <- safe_slice(source_data, test_index, remove = TRUE)
         if (test_rate > 0) {
           df_test <- safe_slice(source_data, test_index, remove = FALSE)
