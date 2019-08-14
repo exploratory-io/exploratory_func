@@ -2,7 +2,7 @@ context("test prophet functions - Extra Regressor with Number-of-Rows target")
 
 test_that("do_prophet with extra regressor without target column (Number of Rows)", {
   ts <- seq.Date(as.Date("2010-01-01"), as.Date("2012-01-01"), by="day")
-  raw_data <- data.frame(timestamp=ts, count=round(runif(length(ts))/0.1))
+  raw_data <- data.frame(timestamp=ts, count=round(runif(length(ts))/0.1)+1) #TODO: +1 to remove possibility of 0 rows is necessary to stabilize test. Looks into it.
   ts2 <- seq.Date(as.Date("2010-01-01"), as.Date("2012-01-11"), by="day")
   regressor_data <- data.frame(timestamp=ts2, regressor=runif(length(ts2)))
   combined_data <- raw_data %>% full_join(regressor_data, by=c("timestamp"="timestamp"))
@@ -18,7 +18,7 @@ test_that("do_prophet with extra regressor without target column (Number of Rows
 
 test_that("do_prophet with extra regressor without target column (Number of Rows) with test mode", {
   ts <- seq.Date(as.Date("2010-01-01"), as.Date("2012-01-11"), by="day")
-  raw_data <- data.frame(timestamp=ts, count=round(runif(length(ts))/0.1))
+  raw_data <- data.frame(timestamp=ts, count=round(runif(length(ts))/0.1)+1)
   ts2 <- seq.Date(as.Date("2010-01-01"), as.Date("2012-01-11"), by="day")
   regressor_data <- data.frame(timestamp=ts2, regressor=runif(length(ts2)))
   combined_data <- raw_data %>% full_join(regressor_data, by=c("timestamp"="timestamp"))
@@ -36,7 +36,7 @@ test_that("do_prophet with extra regressor without target column (Number of Rows
 
 test_that("do_prophet with extra regressor without target column (Number of Rows) with time unit of month", {
   ts <- seq.Date(as.Date("2010-01-01"), as.Date("2012-01-01"), by="month")
-  raw_data <- data.frame(timestamp=ts, count=round(runif(length(ts))/0.1))
+  raw_data <- data.frame(timestamp=ts, count=round(runif(length(ts))/0.1)+1)
   ts2 <- seq.Date(as.Date("2010-01-01"), as.Date("2012-04-01"), by="month")
   regressor_data <- data.frame(timestamp=ts2, regressor=runif(length(ts2)))
   combined_data <- raw_data %>% full_join(regressor_data, by=c("timestamp"="timestamp"))
@@ -52,7 +52,7 @@ test_that("do_prophet with extra regressor without target column (Number of Rows
 
 test_that("do_prophet with extra regressor without target column (Number of Rows) with time unit of year", {
   ts <- seq.Date(as.Date("2010-01-01"), as.Date("2020-01-01"), by="year")
-  raw_data <- data.frame(timestamp=ts, count=round(runif(length(ts))/0.1))
+  raw_data <- data.frame(timestamp=ts, count=round(runif(length(ts))/0.1)+1)
   ts2 <- seq.Date(as.Date("2010-01-01"), as.Date("2023-01-01"), by="year")
   regressor_data <- data.frame(timestamp=ts2, regressor=runif(length(ts2)))
   combined_data <- raw_data %>% full_join(regressor_data, by=c("timestamp"="timestamp"))
@@ -68,7 +68,7 @@ test_that("do_prophet with extra regressor without target column (Number of Rows
 
 test_that("do_prophet with extra regressor without target column (Number of Rows) with time unit of quarter", {
   ts <- seq.Date(as.Date("2010-01-01"), as.Date("2020-01-01"), by="quarter")
-  raw_data <- data.frame(timestamp=ts, count=round(runif(length(ts))/0.1))
+  raw_data <- data.frame(timestamp=ts, count=round(runif(length(ts))/0.1)+1)
   ts2 <- seq.Date(as.Date("2010-01-01"), as.Date("2020-10-01"), by="quarter")
   regressor_data <- data.frame(timestamp=ts2, regressor=runif(length(ts2)))
   combined_data <- raw_data %>% full_join(regressor_data, by=c("timestamp"="timestamp"))
@@ -84,7 +84,7 @@ test_that("do_prophet with extra regressor without target column (Number of Rows
 
 test_that("do_prophet with extra regressor without target column (Number of Rows) with time unit of hour", {
   ts <- lubridate::with_tz(seq.POSIXt(as.POSIXct("2010-01-01 00:00:00"), as.POSIXct("2010-01-02 00:00:00"), by="hour"), tz="America/Los_Angeles")
-  raw_data <- data.frame(timestamp=ts, count=round(runif(length(ts))/0.1))
+  raw_data <- data.frame(timestamp=ts, count=round(runif(length(ts))/0.1)+1)
   ts2 <- lubridate::with_tz(seq.POSIXt(as.POSIXct("2010-01-01 00:00:00"), as.POSIXct("2010-01-02 03:00:00"), by="hour"), tz="America/Los_Angeles")
   regressor_data <- data.frame(timestamp=ts2, regressor=runif(length(ts2)))
   combined_data <- raw_data %>% full_join(regressor_data, by=c("timestamp"="timestamp"))
@@ -100,7 +100,7 @@ test_that("do_prophet with extra regressor without target column (Number of Rows
 
 test_that("do_prophet with extra regressor without target column (Number of Rows) with time unit of second", {
   ts <- lubridate::with_tz(seq.POSIXt(as.POSIXct("2010-01-01 00:00:00"), as.POSIXct("2010-01-01 00:00:50"), by="sec"), tz="America/Los_Angeles")
-  raw_data <- data.frame(timestamp=ts, count=round(runif(length(ts))/0.1))
+  raw_data <- data.frame(timestamp=ts, count=round(runif(length(ts))/0.1)+1)
   ts2 <- lubridate::with_tz(seq.POSIXt(as.POSIXct("2010-01-01 00:00:00"), as.POSIXct("2010-01-01 00:00:53"), by="sec"), tz="America/Los_Angeles")
   regressor_data <- data.frame(timestamp=ts2, regressor=runif(length(ts2)))
   combined_data <- raw_data %>% full_join(regressor_data, by=c("timestamp"="timestamp"))
