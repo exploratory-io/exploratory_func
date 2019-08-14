@@ -14,7 +14,8 @@ test_that("binary prediction with character target column", {
   # otherwise, the number of rows of the result of prediction becomes 0
   test_data <- dplyr::bind_rows(test_data, test_data)
 
-  model_data <- build_lm.fast(test_data, `CANCELLED X`, `Carrier Name`, CARRIER, DISTANCE, model_type = "glm", smote=FALSE, with_marginal_effects=TRUE, with_marginal_effects_confint=TRUE)
+  model_data <- build_lm.fast(test_data, `CANCELLED X`, `Carrier Name`, CARRIER, DISTANCE,
+                              model_type = "glm", smote=FALSE, with_marginal_effects=TRUE, with_marginal_effects_confint=TRUE)
   ret <- model_data %>% broom::glance(model, pretty.name=TRUE)
   expect_equal(ret$`Data Size for Y`, 4) # This ends up to be 4 after doubling
   expect_equal(ret$`Data Size for N`, 30) # This ends up to be 30 after doubling and removing NA rows.
@@ -95,7 +96,8 @@ test_that("Linear Regression with test rate", {
                                      `DERAY_TIME`,
                                      `Carrier Name`,
                                      model_type = "lm",
-                                     test_rate = 0.1)
+                                     test_rate = 0.1,
+                                     test_split_type = "ordered") # testing ordered split too.
   expect_equal(colnames(ret), c("model", ".test_index", "source.data"))
   test_rownum <- length(ret$.test_index[[1]])
   training_rownum <- nrow(test_data) - test_rownum

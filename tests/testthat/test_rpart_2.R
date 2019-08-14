@@ -22,7 +22,9 @@ filepath <- if (!testdata_filename %in% list.files(testdata_dir)) {
 
 test_that("exp_rpart(regression) evaluate training and test", {
   model_df <- flight %>%
-                exp_rpart(`FL NUM`, `DIS TANCE`, `DEP TIME`, test_rate = 0.3)
+                exp_rpart(`FL NUM`, `DIS TANCE`, `DEP TIME`,
+                          test_rate = 0.3,
+                          test_split_type = "ordered") # testing ordered split too.
 
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
