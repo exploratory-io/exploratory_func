@@ -1,5 +1,8 @@
 # Wrapper functions around prophet.
 
+# Our time_unit argument is based on floor_date, but we also need to
+# pass down the same info to seq.Date/seq.POSIXct, and to do so,
+# some values needs to be converted.
 to_time_unit_for_seq <- function(time_unit) {
   if (time_unit == "minute") {
     "min"
@@ -256,6 +259,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
           else { # assuming it is year.
             time_unit_func <- lubridate::years
           }
+          # Keep the rows older than the history/future boundary, as the history data.
           df <- df %>% dplyr::filter(!!rlang::sym(time_col) <= (max(!!rlang::sym(time_col)) - time_unit_func(!!periods)))
         }
         max_floored_date <- max(df[[time_col]])
@@ -276,7 +280,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
   
         # TODO: in test mode, this is not really necessary. optimize.
         aggregated_future_data <- future_df %>%
-          dplyr::transmute(
+          dplyr::transmute( # Keep only time column and regressor columns in future data frame.
             ds = UQ(rlang::sym(time_col)),
             !!!rlang::syms(unname(regressors)) # unname is necessary to avoid error when regressors is named vector.
           ) %>%
@@ -328,6 +332,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
           dplyr::summarise(y = n(), !!!summarise_args)
       }
   
+      # Fill time column and/or regressor columns as specified by arguments.
       # TODO: Check if this would not have daylight saving days issue we had with anomaly detection.
       if (!is.null(na_fill_type) || !is.null(regressors_na_fill_type)) {
         # complete the date time with NA
