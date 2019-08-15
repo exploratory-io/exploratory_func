@@ -751,6 +751,14 @@ test_that("test safe_slice", {
   expect_equal(ret2, matrix(c(NA,3,5,6,8,NA),2,3))
 })
 
+test_that("test sameple_df_index", {
+  df <-data.frame(x=1:99,y=1:99)
+  test_index <- sample_df_index(df, 0.3, seed=1)
+  expect_equal(length(test_index), 29)
+  test_index <- sample_df_index(df, 0.3, ordered=TRUE)
+  expect_equal(length(test_index), 30)
+})
+
 test_that("test sameple_rows", {
   df <-data.frame(x=c(1,NA,3),y=c(2,3,NA))
   df <-setNames(df,c("x 1", "col 2"))

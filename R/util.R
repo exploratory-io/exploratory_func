@@ -574,11 +574,17 @@ expand_args <- function(call, exclude = c()){
 
 #' get sampled indice from data frame
 #' @export
-sample_df_index <- function(df, rate, seed = NULL){
-  if(!is.null(seed)){
-    set.seed(seed)
+sample_df_index <- function(df, rate, seed = NULL, ordered = FALSE){
+  if (!ordered) {
+    if(!is.null(seed)){
+      set.seed(seed)
+    }
+    sample(seq(nrow(df)), nrow(df) * rate)
   }
-  sample(seq(nrow(df)), nrow(df) * rate)
+  else {
+    # Return indexes above threshold determined by rate.
+    ceiling(nrow(df)*(1-rate)):nrow(df)
+  }
 }
 
 #' slice of 2 dimensional data that can handle empty vector

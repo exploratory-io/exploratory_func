@@ -22,7 +22,9 @@ if (!testdata_filename %in% list.files(testdata_dir)) {
 
 test_that("calc_feature_map(regression) evaluate training and test", {
   model_df <- flight %>%
-                calc_feature_imp(`ARR DELAY`, `CAR RIER`, `ORI GIN`, `DEP DELAY`, `AIR TIME`, test_rate = 0.3)
+                calc_feature_imp(`ARR DELAY`, `CAR RIER`, `ORI GIN`, `DEP DELAY`, `AIR TIME`,
+                                 test_rate = 0.3,
+                                 test_split_type = "ordered") # testing ordered split too.
 
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
