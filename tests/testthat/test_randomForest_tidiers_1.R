@@ -79,6 +79,30 @@ test_that("test calc_feature_imp predicting multi-class", {
     # creating those columns in data.frame replaces spaces with .
     rename(`Tar get` = "target", `cat 10` = cat_10, `num 1` = num_1)
 
+
+  # target is character
+  # this case is to test rf_partial_dependence() output.
+  model_df <- test_data %>%
+    dplyr::group_by(Group) %>%
+    calc_feature_imp(`Tar get`,
+                     `cat 10`,
+                     cat_25,
+                      `num 1`,
+                      num_2,
+                      with_boruta=FALSE, max_pd_vars=3, # with_boruta must be FALSE, in this case to test rf_partial_dependence,
+                                                        # because, with boruta, there will be no significant variable,
+                                                        # and no partial dependence data will be returned.
+                      test_rate = 0.3)
+  
+  ret <- model_df %>% prediction(data="training_and_test")
+  conf_mat <- tidy(model_df, model, type = "conf_mat", pretty.name = TRUE) # Old pre-5.3 way. For backward compatibility on the server.
+  conf_mat <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
+  # ret <- model_df %>% rf_importance() # Skip this because Boruta is on.
+  ret <- model_df %>% rf_partial_dependence()
+  # Check that format of Group column is good for our Analytics View.
+  expect_true(stringr::str_detect(as.character(ret$Group[1]), stringr::regex("[0-2] cat\\s10$|_25$")))
+
+
   # target is character
   model_df <- test_data %>%
     dplyr::group_by(Group) %>%
@@ -86,14 +110,17 @@ test_that("test calc_feature_imp predicting multi-class", {
                      `cat 10`,
                      cat_25,
                       `num 1`,
-                      num_2, with_boruta=TRUE, test_rate = 0.3)
+                      num_2,
+                      with_boruta=TRUE, max_pd_vars=3,
+                      test_rate = 0.3)
   
-  ret <- model_df %>% prediction_training_and_test(.)
-  conf_mat <- tidy(model_df, model, type = "conf_mat", pretty.name = TRUE)
+  ret <- model_df %>% prediction(data="training_and_test")
+  conf_mat <- tidy(model_df, model, type = "conf_mat", pretty.name = TRUE) # Old pre-5.3 way. For backward compatibility on the server.
+  conf_mat <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
   # ret <- model_df %>% rf_importance() # Skip this because Boruta is on.
   ret <- model_df %>% rf_partial_dependence()
   # Check that format of Group column is good for our Analytics View.
-  expect_true(stringr::str_detect(as.character(ret$Group[1]), stringr::regex("[0-2] cat\\s10$|_25$")))
+  # expect_true(stringr::str_detect(as.character(ret$Group[1]), stringr::regex("[0-2] cat\\s10$|_25$"))) # This does not work since there is no significant variables.
   ret <- model_df %>% rf_evaluation(pretty.name=TRUE) # TODO test that output is different from binary classification with TRUE/FALSE
   ret <- model_df %>% rf_evaluation_by_class(pretty.name=TRUE)
   ret <- model_df %>% tidy(model, type="boruta")
@@ -132,6 +159,7 @@ test_that("test calc_feature_imp predicting multi-class", {
   ret <- model_df %>% rf_evaluation_by_class(pretty.name=TRUE)
   ret <- model_df %>% tidy(model, type="boruta")
 })
+
 
 test_that("test calc_feature_imp predicting logical", {
   set.seed(0)
@@ -401,4 +429,3 @@ test_that("calc_feature_map(multi) evaluate training and test", {
   ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat", test_rate = 0.3)
   ret <- model_df %>% prediction_training_and_test()
 })
-
