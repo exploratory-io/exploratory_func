@@ -2013,3 +2013,12 @@ summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...){
   }
 }
 
+#' calc_feature_imp (Random Forest) or exp_rpart (Decision Tree) converts logical columns into factor
+#' with level of "TRUE" and "FALSE". This function reverts such columns back to logical.
+#' @export
+revert_factor_cols_to_logical <- function(df) {
+  dplyr::mutate_if(df, function(col) {
+    is.factor(col) && length(levels(col)) == 2 && (all(levels(col) == c("TRUE", "FALSE")) || all(levels(col) == c("FALSE", "TRUE")))
+  }, as.logical)
+}
+
