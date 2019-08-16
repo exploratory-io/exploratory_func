@@ -2129,7 +2129,7 @@ calc_feature_imp <- function(df,
         # Show all variables with Confirmed or Tentative decision.
         imp_vars <- extract_important_variables_from_boruta(rf$boruta)
         # max_pd_vars is not applied by default with Boruta.
-        if (!is.null(max_pd_vars)) {
+        if (!is.null(max_pd_vars) && length(imp_vars) > 0) {
           imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
         }
       }
