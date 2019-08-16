@@ -2007,6 +2007,7 @@ summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...){
   }
 }
 
+#' @export
 revert_factor_cols_to_logical <- function(x) {
   dplyr::mutate_if(x, function(col) {
     is.factor(col) && length(levels(col)) == 2 && (all(levels(col) == c("TRUE", "FALSE")) || all(levels(col) == c("FALSE", "TRUE")))
