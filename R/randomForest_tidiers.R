@@ -1173,8 +1173,13 @@ rf_evaluation_by_class <- function(data, ...) {
 #' wrapper for tidy type evaluation
 #' @export
 rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.name = FALSE, ...) {
-  model <-  data %>% dplyr::filter(!is.null(model)) %>% `[[`(1, "model", 1)
-  test_index <- data %>% dplyr::filter(!is.null(.test_index)) %>% `[[`(1, ".test_index", 1)
+  filtered <- data %>% dplyr::filter(!is.null(model))
+  if (nrow(filtered) == 0) { # No valid models were returned.
+    return(data.frame())
+  }
+
+  model <-  filtered %>% `[[`(1, "model", 1)
+  test_index <- filtered %>% `[[`(1, ".test_index", 1)
 
   # Get evaluation for training part. Just passing down to rf_evaluation does it, since it is done off of data embeded in the model.
   if (!is.null(model)) {
