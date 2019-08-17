@@ -644,9 +644,9 @@ glance.lm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
   # https://stat.ethz.ch/pipermail/r-help/2012-April/308935.html
   rmse_val <- sqrt(ret$sigma^2 * x$df.residual / nrow(x$model))
   sample_size <- nrow(x$model)
-  ret <- ret %>% dplyr::mutate(rmse=!!rmse_val, sample_size=!!sample_size)
+  ret <- ret %>% dplyr::mutate(rmse=!!rmse_val, size=!!sample_size)
   # Drop sigma in favor of rmse.
-  ret <- ret %>% dplyr::select(r.squared, adj.r.squared, rmse, everything(), -sigma)
+  ret <- ret %>% dplyr::select(r.squared, adj.r.squared, rmse, statistic, p.value, size, everything(), -sigma)
 
   # We are checking if it is of error class, since in build_lm.fast, if calculation of relative importance fails, we set the returned error
   # so that we can report the error in Summary table (return from tidy()).
@@ -659,7 +659,7 @@ glance.lm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
   }
 
   if(pretty.name) {
-    ret <- ret %>% dplyr::rename(`R Squared`=r.squared, `Adj R Squared`=adj.r.squared, `RMSE`=rmse, `F Ratio`=statistic, `P Value`=p.value, `Degree of Freedom`=df, `Log Likelihood`=logLik, Deviance=deviance, `Residual DF`=df.residual, `Sample Size`=sample_size)
+    ret <- ret %>% dplyr::rename(`R Squared`=r.squared, `Adj R Squared`=adj.r.squared, `RMSE`=rmse, `F Ratio`=statistic, `P Value`=p.value, `Degree of Freedom`=df, `Log Likelihood`=logLik, Deviance=deviance, `Residual DF`=df.residual, `Size`=size)
     # Note column might not exist. Rename if it is there.
     colnames(ret)[colnames(ret) == "note"] <- "Note"
   }
