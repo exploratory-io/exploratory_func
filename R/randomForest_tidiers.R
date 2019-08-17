@@ -2227,7 +2227,7 @@ calc_feature_imp <- function(df,
 #' TODO: not really for external use. hide it.
 #' TODO: use this other places doing similar thing.
 #' @export
-#' @param multi_class - TRUE when we need class and data_size, which we show for multiclass classification case.
+#' @param multi_class - TRUE when we need class and size, which we show for multiclass classification case.
 evaluate_classification <- function(actual, predicted, class, multi_class = TRUE, pretty.name = FALSE) { #TODO user better name for class not to confuse with class()
   tp <- sum(actual == class & predicted == class, na.rm = TRUE)
   tn <- sum(actual != class & predicted != class, na.rm = TRUE)
@@ -2255,7 +2255,7 @@ evaluate_classification <- function(actual, predicted, class, multi_class = TRUE
   }
 
   if (multi_class) {
-    data_size <- sum(actual == class, na.rm = TRUE)
+    size <- sum(actual == class, na.rm = TRUE)
 
     ret <- data.frame(
       class,
@@ -2264,10 +2264,10 @@ evaluate_classification <- function(actual, predicted, class, multi_class = TRUE
       1- accuracy,
       precision,
       recall,
-      data_size
+      size
     )
   }
-  else { # class, data_size is not necessary when it is binary classification with TRUE/FALSE
+  else { # class, size is not necessary when it is binary classification with TRUE/FALSE
     ret <- data.frame(
       f_score,
       accuracy,
@@ -2279,13 +2279,13 @@ evaluate_classification <- function(actual, predicted, class, multi_class = TRUE
 
   names(ret) <- if(pretty.name){
     if (multi_class) {
-      c("Class", "F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall", "Data Size")
+      c("Class", "F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall", "Size")
     } else {
       c("F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall")
     }
   } else {
     if (multi_class) {
-      c("class", "f_score", "accuracy_rate", "misclassification_rate", "precision", "recall", "data_size")
+      c("class", "f_score", "accuracy_rate", "misclassification_rate", "precision", "recall", "size")
     } else {
       c("f_score", "accuracy_rate", "misclassification_rate", "precision", "recall")
     }
@@ -2579,9 +2579,9 @@ glance.ranger.classification <- function(x, pretty.name, ...) {
     )
 
     names(ret) <- if(pretty.name){
-      c("Class", "F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall", "Data Size")
+      c("Class", "F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall", "Size")
     } else {
-      c("class", "f_score", "accuracy_rate", "misclassification_rate", "precision", "recall", "data_size")
+      c("class", "f_score", "accuracy_rate", "misclassification_rate", "precision", "recall", "size")
     }
     ret
   }
