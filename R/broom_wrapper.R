@@ -614,8 +614,6 @@ prediction_binary <- function(df, threshold = 0.5, ...){
   }
   first_model <- filtered %>% `[[`(1, "model")
 
-  #first_model <- df[["model"]][[1]]
-
   # converting conf_low and conf_high from regression values
   # to probability values
   if(any(class(first_model) %in% "glm")){
