@@ -695,7 +695,7 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
   }
   
   if (x$family$family %in% c('binomial', 'quasibinomial')) { # only for logistic regression.
-    # Calculate F Score, Accuracy Rate, Misclassification Rate, Precision, Recall, Data Size
+    # Calculate F Score, Accuracy Rate, Misclassification Rate, Precision, Recall, Size
     threshold_value <- if (is.numeric(binary_classification_threshold)) {
       binary_classification_threshold
     } else {
@@ -744,8 +744,8 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
         pos_label <- "TRUE"
         neg_label <- "FALSE"
       }
-      colnames(ret)[colnames(ret) == "positives"] <- paste0("Data Size for ", pos_label)
-      colnames(ret)[colnames(ret) == "negatives"] <- paste0("Data Size for ", neg_label)
+      colnames(ret)[colnames(ret) == "positives"] <- paste0("Size for ", pos_label)
+      colnames(ret)[colnames(ret) == "negatives"] <- paste0("Size for ", neg_label)
     }
     else { # for other numeric regressions.
       ret <- ret %>% dplyr::rename(`Null Deviance`=null.deviance, `DF for Null Model`=df.null, `Log Likelihood`=logLik, Deviance=deviance, `Residual DF`=df.residual) %>%
