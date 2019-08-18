@@ -753,7 +753,6 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
     }
   }
 
-  browser()
   ret
 }
 
