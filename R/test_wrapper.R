@@ -386,13 +386,14 @@ glance.chisq_exploratory <- function(x) {
       note <- "Could not calculate Cohhen's w." 
       power_val <- NA_real_
     }
-    ret <- ret %>% dplyr::mutate(w=!!(x$cohens_w), power=!!power_val, beta=1.0-!!power_val)
+    ret <- ret %>% dplyr::mutate(w=!!(x$cohens_w), power=!!power_val, beta=1.0-!!power_val, sample_size=!!N)
     ret <- ret %>% rename(`Chi-Square`=statistic,
                           `Degree of Freedom`=parameter,
                           `P Value`=p.value,
                           `Effect Size (Cohen's w)`=w,
                           `Power`=power,
-                          `Probability of Type 2 Error`=beta)
+                          `Probability of Type 2 Error`=beta,
+                          `Sample Size`=sample_size)
   }
   else {
     # If required power is specified in the arguments, estimate required sample size. 
