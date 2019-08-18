@@ -2518,7 +2518,11 @@ glance.ranger <- function(x, pretty.name = FALSE, ...) {
                                         "Classification" = glance.ranger.classification,
                                         "Probability estimation" = glance.ranger.classification,
                                         "Regression" = glance.ranger.regression)
-  glance.ranger.method(x, pretty.name = pretty.name, ...)
+  ret <- glance.ranger.method(x, pretty.name = pretty.name, ...)
+  ret <- ret %>% dplyr::mutate(size = !!length(x$y))
+  if(pretty.name){
+    ret <- ret %>% dplyr::rename(Size = size)
+  }
 }
 
 #' @export
@@ -2629,13 +2633,15 @@ glance.rpart <- function(x, pretty.name = FALSE, ...) {
   r_squared_val <- r_squared(actual, predicted)
   ret <- data.frame(
     root_mean_square_error = rmse_val,
-    r_squared = r_squared_val
+    r_squared = r_squared_val,
+    size = length(x$y)
   )
 
   if(pretty.name){
     map = list(
       `Root Mean Square Error` = as.symbol("root_mean_square_error"),
-      `R Squared` = as.symbol("r_squared")
+      `R Squared` = as.symbol("r_squared"),
+      `Size` = as.symbol("size")
     )
     ret <- ret %>%
       dplyr::rename(!!!map)
