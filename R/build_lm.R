@@ -678,10 +678,10 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
   x0 <- glm(f0, x$model, family = x$family) # build null model. Use x$model rather than x$data since x$model seems to be the data after glm handled missingness.
   pvalue <- with(anova(x0,x),pchisq(Deviance,Df,lower.tail=FALSE)[2]) 
   if(pretty.name) {
-    ret <- ret %>% dplyr::mutate(`P Value`=!!pvalue)
+    ret <- ret %>% dplyr::mutate(`P Value`=!!pvalue, `Size`=!!length(x$y))
   }
   else {
-    ret <- ret %>% dplyr::mutate(p.value=!!pvalue)
+    ret <- ret %>% dplyr::mutate(p.value=!!pvalue, size=!!length(x$y))
   }
 
   # For GLM (Negative Binomial)
@@ -731,7 +731,7 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
   if(pretty.name) {
     if (x$family$family %in% c('binomial', 'quasibinomial')) { # for binomial regressions.
       ret <- ret %>% dplyr::rename(`Null Deviance`=null.deviance, `DF for Null Model`=df.null, `Log Likelihood`=logLik, Deviance=deviance, `Residual DF`=df.residual, `AUC`=auc) %>%
-        dplyr::select(`F Score`, `Accuracy Rate`, `Misclassification Rate`, `Precision`, `Recall`, `AUC`, positives, negatives, `P Value`, `Log Likelihood`, `AIC`, `BIC`, `Deviance`, `Null Deviance`, `DF for Null Model`, everything())
+        dplyr::select(`F Score`, `Accuracy Rate`, `Misclassification Rate`, `Precision`, `Recall`, `AUC`,`P Value`, Size, positives, negatives,  `Log Likelihood`, `AIC`, `BIC`, `Deviance`, `Null Deviance`, `DF for Null Model`, everything())
       if (!is.null(x$orig_levels)) { 
         pos_label <- x$orig_levels[2]
         neg_label <- x$orig_levels[1]
@@ -749,10 +749,11 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
     }
     else { # for other numeric regressions.
       ret <- ret %>% dplyr::rename(`Null Deviance`=null.deviance, `DF for Null Model`=df.null, `Log Likelihood`=logLik, Deviance=deviance, `Residual DF`=df.residual) %>%
-        dplyr::select(`P Value`, `Log Likelihood`, `AIC`, `BIC`, `Deviance`, `Null Deviance`, `DF for Null Model`, everything())
+        dplyr::select(`P Value`, Size, `Log Likelihood`, `AIC`, `BIC`, `Deviance`, `Null Deviance`, `DF for Null Model`, everything())
     }
   }
 
+  browser()
   ret
 }
 
