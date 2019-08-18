@@ -644,9 +644,9 @@ glance.lm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
   # https://stat.ethz.ch/pipermail/r-help/2012-April/308935.html
   rmse_val <- sqrt(ret$sigma^2 * x$df.residual / nrow(x$model))
   sample_size <- nrow(x$model)
-  ret <- ret %>% dplyr::mutate(rmse=!!rmse_val, size=!!sample_size)
+  ret <- ret %>% dplyr::mutate(rmse=!!rmse_val, n=!!sample_size)
   # Drop sigma in favor of rmse.
-  ret <- ret %>% dplyr::select(r.squared, adj.r.squared, rmse, statistic, p.value, size, everything(), -sigma)
+  ret <- ret %>% dplyr::select(r.squared, adj.r.squared, rmse, statistic, p.value, n, everything(), -sigma)
 
   # We are checking if it is of error class, since in build_lm.fast, if calculation of relative importance fails, we set the returned error
   # so that we can report the error in Summary table (return from tidy()).
@@ -659,7 +659,7 @@ glance.lm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
   }
 
   if(pretty.name) {
-    ret <- ret %>% dplyr::rename(`R Squared`=r.squared, `Adj R Squared`=adj.r.squared, `RMSE`=rmse, `F Ratio`=statistic, `P Value`=p.value, `Degree of Freedom`=df, `Log Likelihood`=logLik, Deviance=deviance, `Residual DF`=df.residual, `Size`=size)
+    ret <- ret %>% dplyr::rename(`R Squared`=r.squared, `Adj R Squared`=adj.r.squared, `RMSE`=rmse, `F Ratio`=statistic, `P Value`=p.value, `Degree of Freedom`=df, `Log Likelihood`=logLik, Deviance=deviance, `Residual DF`=df.residual, `Number of Rows`=n)
     # Note column might not exist. Rename if it is there.
     colnames(ret)[colnames(ret) == "note"] <- "Note"
   }
@@ -678,10 +678,10 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
   x0 <- glm(f0, x$model, family = x$family) # build null model. Use x$model rather than x$data since x$model seems to be the data after glm handled missingness.
   pvalue <- with(anova(x0,x),pchisq(Deviance,Df,lower.tail=FALSE)[2]) 
   if(pretty.name) {
-    ret <- ret %>% dplyr::mutate(`P Value`=!!pvalue, `Size`=!!length(x$y))
+    ret <- ret %>% dplyr::mutate(`P Value`=!!pvalue, `Number of Rows`=!!length(x$y))
   }
   else {
-    ret <- ret %>% dplyr::mutate(p.value=!!pvalue, size=!!length(x$y))
+    ret <- ret %>% dplyr::mutate(p.value=!!pvalue, n=!!length(x$y))
   }
 
   # For GLM (Negative Binomial)
@@ -695,7 +695,7 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
   }
   
   if (x$family$family %in% c('binomial', 'quasibinomial')) { # only for logistic regression.
-    # Calculate F Score, Accuracy Rate, Misclassification Rate, Precision, Recall, Size
+    # Calculate F Score, Accuracy Rate, Misclassification Rate, Precision, Recall, Number of Rows 
     threshold_value <- if (is.numeric(binary_classification_threshold)) {
       binary_classification_threshold
     } else {
@@ -731,7 +731,7 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
   if(pretty.name) {
     if (x$family$family %in% c('binomial', 'quasibinomial')) { # for binomial regressions.
       ret <- ret %>% dplyr::rename(`Null Deviance`=null.deviance, `DF for Null Model`=df.null, `Log Likelihood`=logLik, Deviance=deviance, `Residual DF`=df.residual, `AUC`=auc) %>%
-        dplyr::select(`F Score`, `Accuracy Rate`, `Misclassification Rate`, `Precision`, `Recall`, `AUC`,`P Value`, Size, positives, negatives,  `Log Likelihood`, `AIC`, `BIC`, `Deviance`, `Null Deviance`, `DF for Null Model`, everything())
+        dplyr::select(`F Score`, `Accuracy Rate`, `Misclassification Rate`, `Precision`, `Recall`, `AUC`,`P Value`, `Number of Rows`, positives, negatives,  `Log Likelihood`, `AIC`, `BIC`, `Deviance`, `Null Deviance`, `DF for Null Model`, everything())
       if (!is.null(x$orig_levels)) { 
         pos_label <- x$orig_levels[2]
         neg_label <- x$orig_levels[1]
@@ -744,12 +744,12 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
         pos_label <- "TRUE"
         neg_label <- "FALSE"
       }
-      colnames(ret)[colnames(ret) == "positives"] <- paste0("Size for ", pos_label)
-      colnames(ret)[colnames(ret) == "negatives"] <- paste0("Size for ", neg_label)
+      colnames(ret)[colnames(ret) == "positives"] <- paste0("Number of Rows for ", pos_label)
+      colnames(ret)[colnames(ret) == "negatives"] <- paste0("Number of Rows for ", neg_label)
     }
     else { # for other numeric regressions.
       ret <- ret %>% dplyr::rename(`Null Deviance`=null.deviance, `DF for Null Model`=df.null, `Log Likelihood`=logLik, Deviance=deviance, `Residual DF`=df.residual) %>%
-        dplyr::select(`P Value`, Size, `Log Likelihood`, `AIC`, `BIC`, `Deviance`, `Null Deviance`, `DF for Null Model`, everything())
+        dplyr::select(`P Value`, `Number of Rows`, `Log Likelihood`, `AIC`, `BIC`, `Deviance`, `Null Deviance`, `DF for Null Model`, everything())
     }
   }
 
