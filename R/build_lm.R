@@ -989,6 +989,7 @@ evaluate_lm_training_and_test <- function(df, pretty.name = FALSE){
         actual <- test_pred_ret[[actual_val_col_clean]]
         predicted <- test_pred_ret$predicted_value
         root_mean_square_error <- rmse(actual, predicted)
+        test_n <- sum(!is.na(predicted)) # Sample size for test.
 
         # To calculate R Squared for test data, use same null model basis as training,
         # so that the results are comparable.
@@ -1005,10 +1006,11 @@ evaluate_lm_training_and_test <- function(df, pretty.name = FALSE){
         test_ret <- data.frame(
                           r.squared = rsq,
                           adj.r.squared = adj_rsq,
-                          rmse = root_mean_square_error
+                          rmse = root_mean_square_error,
+                          n = test_n
                           )
         if(pretty.name) {
-          test_ret <- test_ret %>% dplyr::rename(`R Squared`=r.squared, `Adj R Squared`=adj.r.squared, `RMSE`=rmse)
+          test_ret <- test_ret %>% dplyr::rename(`R Squared`=r.squared, `Adj R Squared`=adj.r.squared, `RMSE`=rmse, `Number of Rows`=n)
         }
         test_ret$is_test_data <- TRUE
         test_ret
