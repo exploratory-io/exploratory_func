@@ -2352,8 +2352,8 @@ evaluate_binary_classification <- function(actual, predicted, predicted_probabil
   else {
     ret <- ret %>% mutate(auc = auc)
   }
-  test_n <- sum(!is.na(predicted)) # Sample size for test.
-  ret <- ret %>% dplyr::mutate(n = !!test_n)
+  sample_n <- sum(!is.na(predicted)) # Sample size for test.
+  ret <- ret %>% dplyr::mutate(n = !!sample_n)
   if(pretty.name){
     ret <- ret %>% dplyr::rename(`Number of Rows` = n)
   }
