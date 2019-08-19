@@ -17,8 +17,9 @@ test_that("binary prediction with character target column", {
   model_data <- build_lm.fast(test_data, `CANCELLED X`, `Carrier Name`, CARRIER, DISTANCE,
                               model_type = "glm", smote=FALSE, with_marginal_effects=TRUE, with_marginal_effects_confint=TRUE)
   ret <- model_data %>% broom::glance(model, pretty.name=TRUE)
-  expect_equal(ret$`Data Size for Y`, 4) # This ends up to be 4 after doubling
-  expect_equal(ret$`Data Size for N`, 30) # This ends up to be 30 after doubling and removing NA rows.
+  expect_equal(ret$`Number of Rows`, 34)
+  expect_equal(ret$`Number of Rows for Y`, 4) # This ends up to be 4 after doubling
+  expect_equal(ret$`Number of Rows for N`, 30) # This ends up to be 30 after doubling and removing NA rows.
   ret <- model_data %>% broom::tidy(model)
   ret <- model_data %>% broom::augment(model)
 
@@ -41,8 +42,9 @@ test_that("binary prediction with factor target column", {
 
   model_data <- build_lm.fast(test_data, `CANCELLED X`, `Carrier Name`, CARRIER, DISTANCE, model_type = "glm", smote=FALSE, with_marginal_effects=TRUE, with_marginal_effects_confint=FALSE)
   ret <- model_data %>% broom::glance(model, pretty.name=TRUE)
-  expect_equal(ret$`Data Size for Y`, 4) # This ends up to be 4 after doubling
-  expect_equal(ret$`Data Size for N`, 30) # This ends up to be 30 after doubling and removing NA rows.
+  expect_equal(ret$`Number of Rows`, 34)
+  expect_equal(ret$`Number of Rows for Y`, 4) # This ends up to be 4 after doubling
+  expect_equal(ret$`Number of Rows for N`, 30) # This ends up to be 30 after doubling and removing NA rows.
   ret <- model_data %>% broom::tidy(model)
   ret <- model_data %>% broom::augment(model)
 
@@ -114,6 +116,9 @@ test_that("Linear Regression with test rate", {
     expect_equal(colnames(pred_training), expected_cols)
     expected_cols <- c("Carrier.Name", "DISTANCE", "ARR_TIME", "DERAY_TIME", "predicted_value", "standard_error", "conf_low", "conf_high")
     expect_equal(colnames(pred_test), expected_cols)
+
+    res <- ret %>% broom::glance(model, pretty.name=TRUE)
+    expect_equal(res$`Number of Rows`, 17)
    })
 })
 
@@ -145,6 +150,8 @@ test_that("Group Linear Regression with test_rate", {
     expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "predicted_value",
                        "standard_error", "conf_low", "conf_high")
     expect_equal(colnames(pred_test), expected_cols)
+
+    res <- ret %>% broom::glance(model, pretty.name=TRUE)
    })
 })
 
@@ -173,6 +180,8 @@ test_that("GLM - Normal Destribution with test_rate", {
     expected_cols <- c("Carrier.Name", "DISTANCE", "ARR_TIME", "DERAY_TIME", "predicted_value", "standard_error",
                        "conf_low", "conf_high", "predicted_response")
     expect_equal(colnames(pred_test), expected_cols)
+
+    res <- ret %>% broom::glance(model, pretty.name=TRUE)
    })
 })
 
@@ -205,6 +214,8 @@ test_that("Group GLM - Normal Destribution with test_rate", {
     expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "predicted_value",
                        "standard_error", "conf_low", "conf_high", "predicted_response")
     expect_equal(colnames(pred_test), expected_cols)
+
+    res <- ret %>% broom::glance(model, pretty.name=TRUE)
    })
 })
 
@@ -233,6 +244,8 @@ test_that("GLM - Gamma Destribution with test_rate", {
     expected_cols <- c("Carrier.Name", "DISTANCE", "ARR_TIME", "DERAY_TIME", "predicted_value", "standard_error",
                        "conf_low", "conf_high", "predicted_response")
     expect_equal(colnames(pred_test), expected_cols)
+
+    res <- ret %>% broom::glance(model, pretty.name=TRUE)
    })
 })
 
@@ -265,6 +278,8 @@ test_that("Group GLM - Gamma Destribution with test_rate", {
     expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "predicted_value",
                        "standard_error", "conf_low", "conf_high", "predicted_response")
     expect_equal(colnames(pred_test), expected_cols)
+
+    res <- ret %>% broom::glance(model, pretty.name=TRUE)
    })
 })
 
@@ -293,6 +308,8 @@ test_that("GLM - Inverse Gaussian Destribution with test_rate", {
     expected_cols <- c("Carrier.Name", "DISTANCE", "ARR_TIME", "DERAY_TIME", "predicted_value", "standard_error",
                        "conf_low", "conf_high", "predicted_response")
     expect_equal(colnames(pred_test), expected_cols)
+
+    res <- ret %>% broom::glance(model, pretty.name=TRUE)
    })
 })
 
@@ -325,6 +342,8 @@ test_that("Group GLM - Inverse Gaussian Destribution with test_rate", {
     expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "predicted_value",
                        "standard_error", "conf_low", "conf_high", "predicted_response")
     expect_equal(colnames(pred_test), expected_cols)
+
+    res <- ret %>% broom::glance(model, pretty.name=TRUE)
    })
 })
 
@@ -353,6 +372,8 @@ test_that("GLM - poisson Destribution with test_rate", {
     expected_cols <- c("Carrier.Name", "DISTANCE", "ARR_TIME", "DERAY_TIME", "predicted_value", "standard_error",
                        "conf_low", "conf_high", "predicted_response")
     expect_equal(colnames(pred_test), expected_cols)
+
+    res <- ret %>% broom::glance(model, pretty.name=TRUE)
    })
 })
 
@@ -385,6 +406,8 @@ test_that("Group GLM - Poisson Destribution with test_rate", {
     expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "predicted_value",
                        "standard_error", "conf_low", "conf_high", "predicted_response")
     expect_equal(colnames(pred_test), expected_cols)
+
+    res <- ret %>% broom::glance(model, pretty.name=TRUE)
    })
 })
 
@@ -413,6 +436,8 @@ test_that("GLM - Negative Binomial Destribution with test_rate", {
     expected_cols <- c("Carrier.Name", "DISTANCE", "ARR_TIME", "DERAY_TIME", "predicted_value", "standard_error",
                        "conf_low", "conf_high", "predicted_response")
     expect_equal(colnames(pred_test), expected_cols)
+
+    res <- ret %>% broom::glance(model, pretty.name=TRUE)
    })
 })
 
@@ -445,6 +470,8 @@ test_that("Group GLM - Negative Binomial Destribution with test_rate", {
     expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "predicted_value",
                        "standard_error", "conf_low", "conf_high", "predicted_response")
     expect_equal(colnames(pred_test), expected_cols)
+
+    res <- ret %>% broom::glance(model, pretty.name=TRUE)
    })
 })
 
@@ -473,6 +500,8 @@ test_that("Logistic Regression with test_rate", {
     expected_cols <- c("CANCELLED.X", "Carrier.Name", "ARR_TIME", "DERAY_TIME", "predicted_value", "standard_error",
                        "conf_low", "conf_high", "predicted_response")
     expect_equal(colnames(pred_test), expected_cols)
+
+    res <- ret %>% broom::glance(model, pretty.name=TRUE)
    })
 })
 
@@ -506,6 +535,8 @@ test_that("Group Logistic Regression with test_rate", {
     expected_cols <- c("klass", "CANCELLED.X", "ARR_TIME", "predicted_value",
                        "standard_error", "conf_low", "conf_high", "predicted_response")
     expect_equal(colnames(pred_test), expected_cols)
+
+    res <- ret %>% broom::glance(model, pretty.name=TRUE)
    })
 })
 

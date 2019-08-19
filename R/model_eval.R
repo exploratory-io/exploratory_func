@@ -280,12 +280,14 @@ evaluate_multi_ <- function(df, pred_label_col, actual_val_col, pretty.name = FA
 
     # this is to change column name
     accuracy_rate <- accuracy
+    n <- sum(!is.na(pred_values)) # Sample size for test.
 
     data.frame(
       micro_f_score,
       macro_f_score,
       accuracy_rate,
-      misclassification_rate
+      misclassification_rate,
+      n
     )
   }
 
@@ -308,6 +310,7 @@ evaluate_multi_ <- function(df, pred_label_col, actual_val_col, pretty.name = FA
     colnames(ret)[colnames(ret) == "macro_f_score"] <- "Macro-Averaged F Score"
     colnames(ret)[colnames(ret) == "accuracy_rate"] <- "Accuracy Rate"
     colnames(ret)[colnames(ret) == "misclassification_rate"] <- "Misclassification Rate"
+    colnames(ret)[colnames(ret) == "n"] <- "Number of Rows"
   }
 
   ret
@@ -340,11 +343,12 @@ evaluate_binary_training_and_test <- function(df, actual_val_col, threshold = "f
   
         eret <- evaluate_binary_(test_pred_ret, "predicted_probability", actual_val_col, threshold = threshold)
   
-        test_ret <- eret %>% dplyr::mutate(positives = true_positive + false_positive,
+        test_ret <- eret %>% dplyr::mutate(n = true_positive + false_positive + true_negative + false_negative,
+                                           positives = true_positive + false_positive,
                                            negatives = true_negative + false_negative) %>%
                              dplyr::select(auc = AUC, f_score, accuracy_rate,
                                            misclassification_rate, precision, recall,
-                                           positives, negatives)
+                                           n, positives, negatives)
         test_ret$is_test_data <- TRUE
         test_ret
       }, error = function(e){
@@ -364,7 +368,7 @@ evaluate_binary_training_and_test <- function(df, actual_val_col, threshold = "f
 
   # sort column order
   ret <- ret %>% dplyr::select(f_score, accuracy_rate, misclassification_rate, precision,
-                               recall, auc, positives, negatives, p.value, logLik, AIC, BIC,
+                               recall, auc, p.value, n, positives, negatives, logLik, AIC, BIC,
                                deviance, null.deviance, df.null, df.residual, everything())
 
   # Reorder columns. Bring group_by column first, and then is_test_data column, if it exists.
@@ -389,8 +393,9 @@ evaluate_binary_training_and_test <- function(df, actual_val_col, threshold = "f
     colnames(ret)[colnames(ret) == "precision"] <- "Precision"
     colnames(ret)[colnames(ret) == "recall"] <- "Recall"
     colnames(ret)[colnames(ret) == "auc"] <- "AUC"
-    colnames(ret)[colnames(ret) == "positives"] <- "Data Size for TRUE"
-    colnames(ret)[colnames(ret) == "negatives"] <- "Data Size for FALSE"
+    colnames(ret)[colnames(ret) == "n"] <- "Number of Rows"
+    colnames(ret)[colnames(ret) == "positives"] <- "Number of Rows for TRUE"
+    colnames(ret)[colnames(ret) == "negatives"] <- "Number of Rows for FALSE"
     colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
     colnames(ret)[colnames(ret) == "logLik"] <- "Log Likelihood"
     colnames(ret)[colnames(ret) == "deviance"] <- "Deviance"

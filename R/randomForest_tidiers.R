@@ -1227,6 +1227,7 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
             if (is.numeric(actual)) {
               predicted <- test_pred_ret$predicted_value
               root_mean_square_error <- rmse(actual, predicted)
+              test_n <- sum(!is.na(predicted)) # Sample size for test.
 
               # null_model_mean is mean of training data.
               if ("rpart" %in% class(model_object)) { # rpart case
@@ -1239,20 +1240,22 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
               rsq <- r_squared(actual, predicted, null_model_mean)
               ret <- data.frame(
                                 root_mean_square_error = root_mean_square_error,
-                                r_squared = rsq
+                                r_squared = rsq,
+                                n = test_n
                                 )
 
               if(pretty.name){
                 map = list(
                            `Root Mean Square Error` = as.symbol("root_mean_square_error"),
-                           `R Squared` = as.symbol("r_squared")
+                           `R Squared` = as.symbol("r_squared"),
+                           `Number of Rows` = as.symbol("n")
                            )
-                ret <- ret %>%
-                dplyr::rename(!!!map)
+                ret <- ret %>% dplyr::rename(!!!map)
               }
 
               ret
             } else {
+              predicted <- NULL # Just declaring variable.
               if (model$classification_type == "binary") {
                 predicted <- test_pred_ret$predicted_label
                 predicted_probability <- test_pred_ret$predicted_probability
@@ -2232,7 +2235,7 @@ calc_feature_imp <- function(df,
 #' TODO: not really for external use. hide it.
 #' TODO: use this other places doing similar thing.
 #' @export
-#' @param multi_class - TRUE when we need class and data_size, which we show for multiclass classification case.
+#' @param multi_class - TRUE when we need class and size, which we show for multiclass classification case.
 evaluate_classification <- function(actual, predicted, class, multi_class = TRUE, pretty.name = FALSE) { #TODO user better name for class not to confuse with class()
   tp <- sum(actual == class & predicted == class, na.rm = TRUE)
   tn <- sum(actual != class & predicted != class, na.rm = TRUE)
@@ -2260,7 +2263,7 @@ evaluate_classification <- function(actual, predicted, class, multi_class = TRUE
   }
 
   if (multi_class) {
-    data_size <- sum(actual == class, na.rm = TRUE)
+    n <- sum(actual == class, na.rm = TRUE)
 
     ret <- data.frame(
       class,
@@ -2269,10 +2272,10 @@ evaluate_classification <- function(actual, predicted, class, multi_class = TRUE
       1- accuracy,
       precision,
       recall,
-      data_size
+      n
     )
   }
-  else { # class, data_size is not necessary when it is binary classification with TRUE/FALSE
+  else { # class, n is not necessary when it is binary classification with TRUE/FALSE
     ret <- data.frame(
       f_score,
       accuracy,
@@ -2284,13 +2287,13 @@ evaluate_classification <- function(actual, predicted, class, multi_class = TRUE
 
   names(ret) <- if(pretty.name){
     if (multi_class) {
-      c("Class", "F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall", "Data Size")
+      c("Class", "F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall", "Number of Rows")
     } else {
       c("F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall")
     }
   } else {
     if (multi_class) {
-      c("class", "f_score", "accuracy_rate", "misclassification_rate", "precision", "recall", "data_size")
+      c("class", "f_score", "accuracy_rate", "misclassification_rate", "precision", "recall", "n")
     } else {
       c("f_score", "accuracy_rate", "misclassification_rate", "precision", "recall")
     }
@@ -2353,6 +2356,11 @@ evaluate_binary_classification <- function(actual, predicted, predicted_probabil
   }
   else {
     ret <- ret %>% mutate(auc = auc)
+  }
+  sample_n <- sum(!is.na(predicted)) # Sample size for test.
+  ret <- ret %>% dplyr::mutate(n = !!sample_n)
+  if(pretty.name){
+    ret <- ret %>% dplyr::rename(`Number of Rows` = n)
   }
   ret
 }
@@ -2523,7 +2531,8 @@ glance.ranger <- function(x, pretty.name = FALSE, ...) {
                                         "Classification" = glance.ranger.classification,
                                         "Probability estimation" = glance.ranger.classification,
                                         "Regression" = glance.ranger.regression)
-  glance.ranger.method(x, pretty.name = pretty.name, ...)
+  ret <- glance.ranger.method(x, pretty.name = pretty.name, ...)
+  ret
 }
 
 #' @export
@@ -2532,25 +2541,29 @@ glance.ranger.regression <- function(x, pretty.name, ...) {
   actual <- x$y
   root_mean_square_error <- rmse(predicted, actual)
   rsq <- r_squared(actual, predicted)
+  n <- length(actual)
   ret <- data.frame(
     # root_mean_square_error = sqrt(x$prediction.error),
     # r_squared = x$r.squared
     root_mean_square_error = root_mean_square_error,
-    r_squared = rsq
+    r_squared = rsq,
+    n = n
   )
 
   if(pretty.name){
     map = list(
       `Root Mean Square Error` = as.symbol("root_mean_square_error"),
-      `R Squared` = as.symbol("r_squared")
+      `R Squared` = as.symbol("r_squared"),
+      `Number of Rows` = as.symbol("n")
     )
     ret <- ret %>%
       dplyr::rename(!!!map)
   }
-
   ret
 }
 
+
+# This is used only for step, and not for Analytics View. TODO: We might want to unify the code.
 #' @export
 glance.ranger.classification <- function(x, pretty.name, ...) {
   # Both actual and predicted have no NA values.
@@ -2560,7 +2573,7 @@ glance.ranger.classification <- function(x, pretty.name, ...) {
 
   # Composes data.frame of classification evaluation summary.
   multi_stat <- function(class) {
-    datasize <- sum(actual == class)
+    n <- sum(actual == class)
 
     # calculate evaluation scores for each class
     tp <- sum(actual == class & predicted == class)
@@ -2580,13 +2593,13 @@ glance.ranger.classification <- function(x, pretty.name, ...) {
       1 - accuracy,
       precision,
       recall,
-      datasize
+      n
     )
 
     names(ret) <- if(pretty.name){
-      c("Class", "F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall", "Data Size")
+      c("Class", "F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall", "Number of Rows")
     } else {
-      c("class", "f_score", "accuracy_rate", "misclassification_rate", "precision", "recall", "data_size")
+      c("class", "f_score", "accuracy_rate", "misclassification_rate", "precision", "recall", "n")
     }
     ret
   }
@@ -2634,13 +2647,15 @@ glance.rpart <- function(x, pretty.name = FALSE, ...) {
   r_squared_val <- r_squared(actual, predicted)
   ret <- data.frame(
     root_mean_square_error = rmse_val,
-    r_squared = r_squared_val
+    r_squared = r_squared_val,
+    n = length(x$y)
   )
 
   if(pretty.name){
     map = list(
       `Root Mean Square Error` = as.symbol("root_mean_square_error"),
-      `R Squared` = as.symbol("r_squared")
+      `R Squared` = as.symbol("r_squared"),
+      `Number of Rows` = as.symbol("n")
     )
     ret <- ret %>%
       dplyr::rename(!!!map)
