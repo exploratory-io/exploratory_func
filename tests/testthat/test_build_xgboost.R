@@ -421,9 +421,12 @@ test_that("test build_xgboost with linear booster", {
       CARRIER = c("DL", "MQ", "AA", "DL", "MQ", "AA", "DL", "DL", "MQ", "AA", "AA", "WN", "US", "US", "DL", "EV", "9E", "EV", "DL", "DL"),
       DISTANCE = c(1587, 173, 646, 187, 273, 1062, 583, 240, 1123, 851, 852, 862, 361, 507, 1020, 1092, 342, 489, 1184, 545)), row.names = c(NA, -20L),
     class = c("tbl_df", "tbl", "data.frame"), .Names = c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE"))
+  # Error messages we have seen are...
+  # - "Check failed: !auc_error: AUC: the dataset only contains pos or neg samples"
+  # - "The target only contains positive or negative values"
   expect_error({
     model_ret <- build_model(test_data, model_func = xgboost_binary, formula = CANCELLED ~ DISTANCE, nrounds = 5, booster = "gblinear")
-  }, "The target only contains positive or negative values")
+  }, "pos.+neg") # Made the pattern rather vague intentionally so that the test is stable across version-ups.
 })
 
 test_that("test build_xgboost prediction with optimized threshold", {

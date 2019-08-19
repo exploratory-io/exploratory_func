@@ -872,3 +872,13 @@ test_that("summarize_group", {
  expect_equal(nrow(df2),1)
 })
 
+test_that("revert_factor_cols_to_logical", {
+  df <- data.frame(col1 = I(factor(c(TRUE, FALSE, NA))),
+                   col2 = I(forcats::fct_rev(factor(c(TRUE,FALSE,NA)))),
+                   col3 = I(factor(c("A","B","C"))))
+                  
+  res <- revert_factor_cols_to_logical(df)
+  expect_equal(res$col1, c(TRUE, FALSE, NA))
+  expect_equal(res$col2, c(TRUE, FALSE, NA))
+})
+

@@ -552,7 +552,11 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
 #' @param df Data frame to predict. This should have model column.
 #' @export
 prediction_training_and_test <- function(df, prediction_type="default", threshold = 0.5, ...) {
-  test_index <- df %>% dplyr::filter(!is.null(.test_index)) %>% `[[`(1, ".test_index", 1)
+  filtered <- df %>% dplyr::filter(!is.null(model))
+  if (nrow(filtered) == 0) { # No valid models were returned.
+    return(data.frame())
+  }
+  model <- filtered %>% `[[`(1, "model")
 
   grouped_cols <- colnames(df)[!colnames(df) %in% c("model", ".test_index", "source.data", ".model_metadata")]
 
@@ -567,7 +571,6 @@ prediction_training_and_test <- function(df, prediction_type="default", threshol
 
 
   if (prediction_type == "conf_mat") {
-    model <- df %>% dplyr::filter(!is.null(model)) %>% `[[`(1, "model")
     target_col <- all.vars(model$formula)[[1]]
 
     each_mat_func <- function(df) {
@@ -605,7 +608,11 @@ prediction_binary <- function(df, threshold = 0.5, ...){
   validate_empty_data(df)
 
   ret <- prediction(df, ...)
-  first_model <- df[["model"]][[1]]
+  filtered <- df %>% dplyr::filter(!is.null(model))
+  if (nrow(filtered) == 0) { # No valid models were returned.
+    return(data.frame())
+  }
+  first_model <- filtered %>% `[[`(1, "model")
 
   # converting conf_low and conf_high from regression values
   # to probability values
