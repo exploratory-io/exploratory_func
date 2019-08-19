@@ -386,14 +386,14 @@ glance.chisq_exploratory <- function(x) {
       note <- "Could not calculate Cohhen's w." 
       power_val <- NA_real_
     }
-    ret <- ret %>% dplyr::mutate(w=!!(x$cohens_w), power=!!power_val, beta=1.0-!!power_val, sample_size=!!N)
+    ret <- ret %>% dplyr::mutate(w=!!(x$cohens_w), power=!!power_val, beta=1.0-!!power_val, n=!!N)
     ret <- ret %>% rename(`Chi-Square`=statistic,
                           `Degree of Freedom`=parameter,
                           `P Value`=p.value,
                           `Effect Size (Cohen's w)`=w,
                           `Power`=power,
                           `Probability of Type 2 Error`=beta,
-                          `Sample Size`=sample_size)
+                          `Number of Rows`=n)
   }
   else {
     # If required power is specified in the arguments, estimate required sample size. 
@@ -405,15 +405,15 @@ glance.chisq_exploratory <- function(x) {
       note <<- e$message
       required_sample_size <<- NA_real_
     })
-    ret <- ret %>% dplyr::mutate(w=!!(x$cohens_w), power=!!(x$power), beta=1.0-!!(x$power), current_sample_size=!!N, required_sample_size=!!required_sample_size)
+    ret <- ret %>% dplyr::mutate(w=!!(x$cohens_w), power=!!(x$power), beta=1.0-!!(x$power), n=!!N, required_n=!!required_sample_size)
     ret <- ret %>% rename(`Chi-Square`=statistic,
                           `Degree of Freedom`=parameter,
                           `P Value`=p.value,
                           `Effect Size (Cohen's w)`=w,
                           `Target Power`=power,
                           `Target Probability of Type 2 Error`=beta,
-                          `Current Sample Size`=current_sample_size,
-                          `Required Sample Size`=required_sample_size)
+                          `Current Sample Size`=n,
+                          `Required Sample Size`=required_n)
   }
   if (!is.null(note)) { # Add Note column, if there was an error from pwr function.
     ret <- ret %>% dplyr::mutate(Note=!!note)
