@@ -2258,7 +2258,7 @@ evaluate_classification <- function(actual, predicted, class, multi_class = TRUE
   }
 
   if (multi_class) {
-    size <- sum(actual == class, na.rm = TRUE)
+    n <- sum(actual == class, na.rm = TRUE)
 
     ret <- data.frame(
       class,
@@ -2267,10 +2267,10 @@ evaluate_classification <- function(actual, predicted, class, multi_class = TRUE
       1- accuracy,
       precision,
       recall,
-      size
+      n
     )
   }
-  else { # class, size is not necessary when it is binary classification with TRUE/FALSE
+  else { # class, n is not necessary when it is binary classification with TRUE/FALSE
     ret <- data.frame(
       f_score,
       accuracy,
@@ -2282,13 +2282,13 @@ evaluate_classification <- function(actual, predicted, class, multi_class = TRUE
 
   names(ret) <- if(pretty.name){
     if (multi_class) {
-      c("Class", "F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall", "Size")
+      c("Class", "F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall", "Number of Rows")
     } else {
       c("F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall")
     }
   } else {
     if (multi_class) {
-      c("class", "f_score", "accuracy_rate", "misclassification_rate", "precision", "recall", "size")
+      c("class", "f_score", "accuracy_rate", "misclassification_rate", "precision", "recall", "n")
     } else {
       c("f_score", "accuracy_rate", "misclassification_rate", "precision", "recall")
     }
@@ -2570,7 +2570,7 @@ glance.ranger.classification <- function(x, pretty.name, ...) {
 
   # Composes data.frame of classification evaluation summary.
   multi_stat <- function(class) {
-    datasize <- sum(actual == class)
+    n <- sum(actual == class)
 
     # calculate evaluation scores for each class
     tp <- sum(actual == class & predicted == class)
@@ -2590,13 +2590,13 @@ glance.ranger.classification <- function(x, pretty.name, ...) {
       1 - accuracy,
       precision,
       recall,
-      datasize
+      n
     )
 
     names(ret) <- if(pretty.name){
-      c("Class", "F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall", "Size")
+      c("Class", "F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall", "Number of Rows")
     } else {
-      c("class", "f_score", "accuracy_rate", "misclassification_rate", "precision", "recall", "size")
+      c("class", "f_score", "accuracy_rate", "misclassification_rate", "precision", "recall", "n")
     }
     ret
   }
