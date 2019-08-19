@@ -1222,6 +1222,7 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
             if (is.numeric(actual)) {
               predicted <- test_pred_ret$predicted_value
               root_mean_square_error <- rmse(actual, predicted)
+              test_n <- sum(!is.na(predicted)) # Sample size for test.
 
               # null_model_mean is mean of training data.
               if ("rpart" %in% class(model_object)) { # rpart case
@@ -1234,20 +1235,22 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
               rsq <- r_squared(actual, predicted, null_model_mean)
               ret <- data.frame(
                                 root_mean_square_error = root_mean_square_error,
-                                r_squared = rsq
+                                r_squared = rsq,
+                                n = test_n
                                 )
 
               if(pretty.name){
                 map = list(
                            `Root Mean Square Error` = as.symbol("root_mean_square_error"),
-                           `R Squared` = as.symbol("r_squared")
+                           `R Squared` = as.symbol("r_squared"),
+                           `Number of Rows` = as.symbol("n")
                            )
-                ret <- ret %>%
-                dplyr::rename(!!!map)
+                ret <- ret %>% dplyr::rename(!!!map)
               }
 
               ret
             } else {
+              predicted <- NULL # Just declaring variable.
               if (model$classification_type == "binary") {
                 predicted <- test_pred_ret$predicted_label
                 predicted_probability <- test_pred_ret$predicted_probability
@@ -1258,6 +1261,11 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
                 predicted <- test_pred_ret$predicted_label
                 ret <- evaluate_multi_(data.frame(predicted = predicted, actual = actual),
                                        "predicted", "actual", pretty.name = pretty.name)
+              }
+              test_n <- sum(!is.na(predicted)) # Sample size for test.
+              ret <- ret %>% dplyr::mutate(n = !!test_n)
+              if(pretty.name){
+                ret <- ret %>% dplyr::rename(`Number of Rows` = n)
               }
               ret
             }
