@@ -17,9 +17,9 @@ test_that("binary prediction with character target column", {
   model_data <- build_lm.fast(test_data, `CANCELLED X`, `Carrier Name`, CARRIER, DISTANCE,
                               model_type = "glm", smote=FALSE, with_marginal_effects=TRUE, with_marginal_effects_confint=TRUE)
   ret <- model_data %>% broom::glance(model, pretty.name=TRUE)
-  expect_equal(ret$`Size`, 34)
-  expect_equal(ret$`Size for Y`, 4) # This ends up to be 4 after doubling
-  expect_equal(ret$`Size for N`, 30) # This ends up to be 30 after doubling and removing NA rows.
+  expect_equal(ret$`Number of Rows`, 34)
+  expect_equal(ret$`Number of Rows for Y`, 4) # This ends up to be 4 after doubling
+  expect_equal(ret$`Number of Rows for N`, 30) # This ends up to be 30 after doubling and removing NA rows.
   ret <- model_data %>% broom::tidy(model)
   ret <- model_data %>% broom::augment(model)
 
@@ -42,9 +42,9 @@ test_that("binary prediction with factor target column", {
 
   model_data <- build_lm.fast(test_data, `CANCELLED X`, `Carrier Name`, CARRIER, DISTANCE, model_type = "glm", smote=FALSE, with_marginal_effects=TRUE, with_marginal_effects_confint=FALSE)
   ret <- model_data %>% broom::glance(model, pretty.name=TRUE)
-  expect_equal(ret$`Size`, 34)
-  expect_equal(ret$`Size for Y`, 4) # This ends up to be 4 after doubling
-  expect_equal(ret$`Size for N`, 30) # This ends up to be 30 after doubling and removing NA rows.
+  expect_equal(ret$`Number of Rows`, 34)
+  expect_equal(ret$`Number of Rows for Y`, 4) # This ends up to be 4 after doubling
+  expect_equal(ret$`Number of Rows for N`, 30) # This ends up to be 30 after doubling and removing NA rows.
   ret <- model_data %>% broom::tidy(model)
   ret <- model_data %>% broom::augment(model)
 
@@ -118,7 +118,7 @@ test_that("Linear Regression with test rate", {
     expect_equal(colnames(pred_test), expected_cols)
 
     res <- ret %>% broom::glance(model, pretty.name=TRUE)
-    expect_equal(res$`Size`, 17)
+    expect_equal(res$`Number of Rows`, 17)
    })
 })
 
