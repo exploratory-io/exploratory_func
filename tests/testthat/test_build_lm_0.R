@@ -236,7 +236,7 @@ test_that("prediction with glm family (negativebinomial) with target column name
   expect_equal(colnames(ret),
                c("null.deviance", "df.null", "logLik",
                  "AIC", "BIC", "deviance",
-                 "df.residual", "p.value", "theta", "SE.theta",
+                 "df.residual", "p.value", "n", "theta", "SE.theta",
                  "logical.col_base",
                  "Carrier.Name_base", "CARRIER_base"))
   ret <- model_data %>% broom::tidy(model)
@@ -330,10 +330,10 @@ test_that("test GLM (Negative Binomial) summary output", {
   expect_equal(colnames(model_ret),
                c("null.deviance", "df.null", "logLik",
                  "AIC", "BIC", "deviance", "df.residual",
-                 "p.value", "theta", "SE.theta"))
+                 "p.value", "n", "theta", "SE.theta"))
   model_ret_pretty <- ret %>% broom::glance(model, pretty.name=TRUE)
   expect_equal(colnames(model_ret_pretty),
-               c("P Value", "Log Likelihood", "AIC",
+               c("P Value", "Number of Rows", "Log Likelihood", "AIC",
                  "BIC", "Deviance", "Null Deviance",
                  "DF for Null Model", "Residual DF",
                  "Theta", "SE Theta"))
