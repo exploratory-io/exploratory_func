@@ -2531,6 +2531,7 @@ glance.ranger <- function(x, pretty.name = FALSE, ...) {
   if(pretty.name){
     ret <- ret %>% dplyr::rename(`Number of Rows`= n)
   }
+  ret
 }
 
 #' @export
