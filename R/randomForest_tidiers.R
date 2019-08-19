@@ -1262,11 +1262,6 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
                 ret <- evaluate_multi_(data.frame(predicted = predicted, actual = actual),
                                        "predicted", "actual", pretty.name = pretty.name)
               }
-              test_n <- sum(!is.na(predicted)) # Sample size for test.
-              ret <- ret %>% dplyr::mutate(n = !!test_n)
-              if(pretty.name){
-                ret <- ret %>% dplyr::rename(`Number of Rows` = n)
-              }
               ret
             }
           },
@@ -2357,6 +2352,11 @@ evaluate_binary_classification <- function(actual, predicted, predicted_probabil
   else {
     ret <- ret %>% mutate(auc = auc)
   }
+  test_n <- sum(!is.na(predicted)) # Sample size for test.
+  ret <- ret %>% dplyr::mutate(n = !!test_n)
+  if(pretty.name){
+    ret <- ret %>% dplyr::rename(`Number of Rows` = n)
+  }
   ret
 }
 
@@ -2559,6 +2559,8 @@ glance.ranger.regression <- function(x, pretty.name, ...) {
   ret
 }
 
+
+# This is used only for step, and not for Analytics View. TODO: We might want to unify the code.
 #' @export
 glance.ranger.classification <- function(x, pretty.name, ...) {
   # Both actual and predicted have no NA values.
