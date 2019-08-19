@@ -280,12 +280,14 @@ evaluate_multi_ <- function(df, pred_label_col, actual_val_col, pretty.name = FA
 
     # this is to change column name
     accuracy_rate <- accuracy
+    n <- sum(!is.na(pred_values)) # Sample size for test.
 
     data.frame(
       micro_f_score,
       macro_f_score,
       accuracy_rate,
-      misclassification_rate
+      misclassification_rate,
+      n
     )
   }
 
@@ -308,6 +310,7 @@ evaluate_multi_ <- function(df, pred_label_col, actual_val_col, pretty.name = FA
     colnames(ret)[colnames(ret) == "macro_f_score"] <- "Macro-Averaged F Score"
     colnames(ret)[colnames(ret) == "accuracy_rate"] <- "Accuracy Rate"
     colnames(ret)[colnames(ret) == "misclassification_rate"] <- "Misclassification Rate"
+    colnames(ret)[colnames(ret) == "n"] <- "Number of Rows"
   }
 
   ret
