@@ -2527,10 +2527,6 @@ glance.ranger <- function(x, pretty.name = FALSE, ...) {
                                         "Probability estimation" = glance.ranger.classification,
                                         "Regression" = glance.ranger.regression)
   ret <- glance.ranger.method(x, pretty.name = pretty.name, ...)
-  ret <- ret %>% dplyr::mutate(n = !!length(x$y))
-  if(pretty.name){
-    ret <- ret %>% dplyr::rename(`Number of Rows`= n)
-  }
   ret
 }
 
@@ -2540,22 +2536,24 @@ glance.ranger.regression <- function(x, pretty.name, ...) {
   actual <- x$y
   root_mean_square_error <- rmse(predicted, actual)
   rsq <- r_squared(actual, predicted)
+  n <- length(actual)
   ret <- data.frame(
     # root_mean_square_error = sqrt(x$prediction.error),
     # r_squared = x$r.squared
     root_mean_square_error = root_mean_square_error,
-    r_squared = rsq
+    r_squared = rsq,
+    n = n
   )
 
   if(pretty.name){
     map = list(
       `Root Mean Square Error` = as.symbol("root_mean_square_error"),
-      `R Squared` = as.symbol("r_squared")
+      `R Squared` = as.symbol("r_squared"),
+      `Number of Rows` = as.symbol("n")
     )
     ret <- ret %>%
       dplyr::rename(!!!map)
   }
-
   ret
 }
 
