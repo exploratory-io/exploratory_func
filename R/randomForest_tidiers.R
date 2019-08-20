@@ -2032,6 +2032,9 @@ calc_feature_imp <- function(df,
       }
       df <- clean_df_ret$df
       c_cols <- clean_df_ret$c_cols
+      if  (length(c_cols) == 0) {
+        stop("None of the specified predictor columns has data suitable for prediction.")
+      }
       name_map <- clean_df_ret$name_map
 
       # apply smote if this is binary classification
@@ -2730,6 +2733,9 @@ exp_rpart <- function(df,
       }
       df <- clean_df_ret$df
       c_cols <- clean_df_ret$c_cols
+      if  (length(c_cols) == 0) {
+        stop("None of the specified predictor columns has data suitable for prediction.")
+      }
       name_map <- clean_df_ret$name_map
 
       # apply smote if this is binary classification
