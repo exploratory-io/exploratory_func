@@ -855,8 +855,13 @@ pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = N
       # make a count matrix if value_col is NULL
       reshape2::acast(df, formula = formula, fun.aggregate = length, fill = fill)
     } else {
-      if(na.rm && !identical(na_ratio, fun.aggregate) &&
-         !identical(na_pct, fun.aggregate) && !identical(na_count, fun.aggregate) ){
+      if(na.rm &&
+         !identical(na_ratio, fun.aggregate) &&
+         !identical(non_na_ratio, fun.aggregate) &&
+         !identical(na_pct, fun.aggregate) &&
+         !identical(non_na_pct, fun.aggregate) &&
+         !identical(na_count, fun.aggregate) &&
+         !identical(non_na_count, fun.aggregate)){
         # remove NA
         # if fun.aggregate function is na_ratio, na_pct or na_count,
         # NA should not be removed because the user wants that information
