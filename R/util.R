@@ -862,9 +862,7 @@ pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = N
          !identical(non_na_pct, fun.aggregate) &&
          !identical(na_count, fun.aggregate) &&
          !identical(non_na_count, fun.aggregate)){
-        # remove NA
-        # if fun.aggregate function is na_ratio, na_pct or na_count,
-        # NA should not be removed because the user wants that information
+        # remove NA, unless fun.aggregate function is one of the above NA related ones.
         df <- df[!is.na(df[[value_col]]),]
       }
       reshape2::acast(df, formula = formula, value.var = value_col, fun.aggregate = fun.aggregate, fill = fill)
