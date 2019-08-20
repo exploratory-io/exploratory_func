@@ -564,6 +564,7 @@ test_that("append_colnames", {
 })
 
 test_that("test pivot", {
+  set.seed(1)
   test_df <- data.frame(
     group = c(rep(letters[1:2], each = 50),"a"),
     cat1 = c(letters[round(runif(100)*5)+1], NA),
@@ -580,6 +581,9 @@ test_that("test pivot", {
 
   pivoted_with_na <- pivot(test_df, cat1 ~ cat2 + cat3, value = num3, fun.aggregate=mean, na.rm = FALSE)
   expect_true(any(is.na(pivoted_with_na)))
+
+  pivoted_with_na_ratio <- pivot(test_df, cat1 ~ cat2 , value = num3, fun.aggregate=na_ratio, na.rm = TRUE)
+  expect_true(any(pivoted_with_na_ratio %>% select(a,b,c,d) !=0)) # Verify that NA is detected.
 
 })
 
