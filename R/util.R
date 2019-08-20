@@ -813,7 +813,7 @@ pivot <- function(df, formula, value = NULL, ...) {
 #' @param fill Value to be filled for missing values
 #' @param na.rm If na should be removed from values
 #' @export
-pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = NULL, na.rm = TRUE) {
+pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = NA, na.rm = TRUE) {
   validate_empty_data(df)
 
   # create a column name for row names
@@ -842,8 +842,8 @@ pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = N
       fill <- NA_real_
     }
   } else if (is.null(fill)){
-    # this case is counting row col pairs and default is NA
-    fill <- NA_real_
+    # this case is counting row col pairs and default is 0
+    fill <- 0
   } else if (is.na(fill)) {
     # this case is counting row col pairs and
     # fill must be a numeric type of NA for data type consistency
