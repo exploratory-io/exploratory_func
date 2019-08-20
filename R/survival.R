@@ -107,7 +107,6 @@ exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, e
         }, error = function(e){
           # error like following is possible. ignore it just for this group, rather than stopping whole thing.
           # Error in solve.default(vv, temp2) : Lapack routine dgesv: system is exactly singular
-          browser()
           ret_ <- list(error=e)
           class(ret_) <- c("survdiff_exploratory", class(ret))
           ret <<- ret_
@@ -190,9 +189,12 @@ tidy.survdiff_exploratory <- function(x, ...) {
 glance.survdiff_exploratory <- function(x, ...) {
   if (is.null(x$error)) {
     ret <- broom:::glance.survdiff(x, ...)
+    ret <- ret %>% dplyr::mutate(n = !!sum(x$n, rm.na=TRUE), nevent = !!sum(x$obs, rm.na=TRUE))
     colnames(ret)[colnames(ret) == "statistic"] <- "Chi-Square"
     colnames(ret)[colnames(ret) == "df"] <- "Degree of Freedom"
     colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
+    colnames(ret)[colnames(ret) == "n"] <- "Number of Rows"
+    colnames(ret)[colnames(ret) == "nevent"] <- "Number of Events"
   }
   else {
     ret <- data.frame(Note = x$error$message, stringsAsFactors = FALSE)

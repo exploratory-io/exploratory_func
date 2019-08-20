@@ -34,7 +34,7 @@ test_that("test ranger with regression", {
   coef_ret <- model_coef(model_ret, pretty.name = TRUE)
   expect_equal(colnames(coef_ret), c("variable", "importance"))
   stats_ret <- suppressWarnings(model_stats(model_ret))
-  expect_equal(colnames(stats_ret), c("root_mean_square_error", "r_squared"))
+  expect_equal(colnames(stats_ret), c("root_mean_square_error", "r_squared", "n"))
   expected_colnames <- c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE",
                          "FNUMBER", "predicted_value")
   pred_train_ret <- suppressWarnings(prediction(model_ret, data = "training"))
@@ -57,7 +57,7 @@ test_that("test ranger with binary regression all predictor variables", {
   coef_ret <- model_coef(model_ret, pretty.name = TRUE)
   expect_equal(colnames(coef_ret), c("variable", "importance"))
   stats_ret <- suppressWarnings(model_stats(model_ret))
-  expect_equal(colnames(stats_ret), c("root_mean_square_error", "r_squared"))
+  expect_equal(colnames(stats_ret), c("root_mean_square_error", "r_squared", "n"))
   expected_colnames <- c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE",
                          "FNUMBER", "predicted_value")
   pred_train_ret <- suppressWarnings(prediction(model_ret, data = "training"))
@@ -210,7 +210,7 @@ test_that("test ranger with multinomial classification", {
   expect_equal(colnames(coef_ret), c("variable", "importance"))
   model_stats <- suppressWarnings(model_stats(model_ret, pretty.name = TRUE))
   expect_colnames <- c("Class", "F Score", "Accuracy Rate", "Misclassification Rate",
-                       "Precision", "Recall", "Data Size")
+                       "Precision", "Recall", "Number of Rows")
   expect_equal(colnames(model_stats), expect_colnames)
 
   expected_colnames <- c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE", "FNUMBER",
@@ -240,7 +240,7 @@ test_that("test ranger with multinomial classification", {
   expect_equal(colnames(coef_ret), c("variable", "importance"))
   model_stats <- suppressWarnings(model_stats(model_ret, pretty.name = TRUE))
   expect_colnames <- c("Class", "F Score", "Accuracy Rate", "Misclassification Rate",
-                       "Precision", "Recall", "Data Size")
+                       "Precision", "Recall", "Number of Rows")
   expect_equal(colnames(model_stats), expect_colnames)
 
   expected_colnames <- c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE", "FNUMBER",
@@ -369,7 +369,7 @@ test_that("calc imp negative test", { #TODO: What was this case for?
   res_partial_dependence <- model_df %>% rf_partial_dependence() %>% rename(`X-Axis`=x_value, `ARR DELAY`=y_value)
   expect_equal(colnames(res_partial_dependence), c("x_name", "X-Axis", "y_name", "ARR DELAY", "chart_type"))
   res_evaluation <- model_df %>% rf_evaluation(pretty.name = TRUE)
-  expect_equal(colnames(res_evaluation), c("Root Mean Square Error", "R Squared"))
+  expect_equal(colnames(res_evaluation), c("Root Mean Square Error", "R Squared", "Number of Rows"))
   res_tidy <- model_df %>% tidy(model, type = "scatter") %>% rename(Actual=expected_value, Predicted=predicted_value) %>% mutate(`Perfect Fit`=Predicted)
   expect_equal(colnames(res_tidy), c("Actual", "Predicted", "Perfect Fit"))
 })
