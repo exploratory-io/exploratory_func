@@ -66,7 +66,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
                         fun.aggregate = sum, na_fill_type = NULL, na_fill_value = 0,
                         cap = NULL, floor = NULL, growth = NULL, weekly.seasonality = TRUE, yearly.seasonality = TRUE,
                         daily.seasonality = "auto",
-                        holiday_col = NULL, holidays = NULL,
+                        holiday_col = NULL, holidays = NULL, holiday_country_names = NULL,
                         regressors = NULL, funs.aggregate.regressors = NULL, regressors_na_fill_type = NULL, regressors_na_fill_value = 0, ...){
   validate_empty_data(df)
 
@@ -445,6 +445,11 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
         if (!is.null(regressor_output_cols)) {
           for (regressor in regressor_output_cols) {
             m <- add_regressor(m, regressor)
+          }
+        }
+        if (!is.null(holiday_country_names)) {
+          for (country_name in holiday_country_names) {
+            m <- add_country_holidays(m, country_name = country_name)
           }
         }
         m <- fit.prophet(m, training_data)
