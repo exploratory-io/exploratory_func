@@ -15,6 +15,43 @@ to_time_unit_for_seq <- function(time_unit) {
   }
 }
 
+trim_future <- function(df, time_col, value_col, periods, time_unit) {
+  if (!is.null(value_col)) { # if value_col is there consider rows with values to be history data.
+    df <- df %>% dplyr::filter(!is.na(UQ(rlang::sym(value_col)))) # keep the rows that has values. the ones that do not are for future regressors
+  }
+  else { # if value_col does not exist, use period to determine the boundary between history and future.
+    if (time_unit %in% c("second", "sec")) {
+      time_unit_func <- lubridate::seconds
+    }
+    else if (time_unit %in% c("minute", "min")) {
+      time_unit_func <- lubridate::minutes
+    }
+    else if (time_unit == "hour") {
+      time_unit_func <- lubridate::hours
+    }
+    else if (time_unit == "day") {
+      time_unit_func <- lubridate::days
+    }
+    else if (time_unit == "week") {
+      time_unit_func <- lubridate::weeks
+    }
+    else if (time_unit == "month") {
+      time_unit_func <- base::months
+    }
+    else if (time_unit == "quarter") {
+      time_unit_func <- function(x) {
+        base::months(3 * x)
+      }
+    }
+    else { # assuming it is year.
+      time_unit_func <- lubridate::years
+    }
+    # Keep the rows older than the history/future boundary, as the history data.
+    df <- df %>% dplyr::filter(!!rlang::sym(time_col) <= (max(!!rlang::sym(time_col)) - time_unit_func(!!periods)))
+  }
+  df
+}
+
 #' NSE version of do_prophet_
 #' @export
 do_prophet <- function(df, time, value = NULL, periods = 10, holiday = NULL, ...){
@@ -227,39 +264,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
         # filter NAs on regressor columns
         df <- df %>% dplyr::filter(!!!filter_args)
         future_df <- df # keep all rows before df is filtered out to become history data.
-        if (!is.null(value_col)) { # if value_col is there consider rows with values to be history data.
-          df <- df %>% dplyr::filter(!is.na(UQ(rlang::sym(value_col)))) # keep the rows that has values. the ones that do not are for future regressors
-        }
-        else { # if value_col does not exist, use period to determine the boundary between history and future.
-          if (time_unit %in% c("second", "sec")) {
-            time_unit_func <- lubridate::seconds
-          }
-          else if (time_unit %in% c("minute", "min")) {
-            time_unit_func <- lubridate::minutes
-          }
-          else if (time_unit == "hour") {
-            time_unit_func <- lubridate::hours
-          }
-          else if (time_unit == "day") {
-            time_unit_func <- lubridate::days
-          }
-          else if (time_unit == "week") {
-            time_unit_func <- lubridate::weeks
-          }
-          else if (time_unit == "month") {
-            time_unit_func <- base::months
-          }
-          else if (time_unit == "quarter") {
-            time_unit_func <- function(x) {
-              base::months(3 * x)
-            }
-          }
-          else { # assuming it is year.
-            time_unit_func <- lubridate::years
-          }
-          # Keep the rows older than the history/future boundary, as the history data.
-          df <- df %>% dplyr::filter(!!rlang::sym(time_col) <= (max(!!rlang::sym(time_col)) - time_unit_func(!!periods)))
-        }
+        df <- trim_future(df, time_col, value_col, periods, time_unit)
         max_floored_date <- max(df[[time_col]])
         future_df <- future_df %>% dplyr::filter(UQ(rlang::sym(time_col)) > max_floored_date)
   
