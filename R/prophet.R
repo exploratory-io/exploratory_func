@@ -165,6 +165,9 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
     stop("cap must be greater than floor.")
   }
 
+  # Mapping to support some ISO2C codes, that are actually supported but with different names.
+  holiday_country_names <- recode(holiday_country_names, GB="UnitedKingdom", TR="Turkey", FR="France")
+
   # To filter NAs on regressor columns
   filter_args <- list() # default empty list
   if (!is.null(regressors)) {
