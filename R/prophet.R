@@ -223,7 +223,9 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
   
       aggregated_future_data <- NULL
       # Extra regressor case. separate the df into history and future based on the value is filled or not.
-      # Exception is when it value column is not specified (forecast is about number of rows.) AND it is test mode.
+      # When value column is not specified (forecast is about number of rows.), we do the history/future separation
+      # based on the specified period.
+      # Exception is when value column is not specified (forecast is about number of rows.) AND it is test mode.
       # In this case, we treat entire data as history data, and just let test mode logic to separate it into training and test.
       if (!is.null(regressors) && (!is.null(value_col) || !test_mode)) {
         # filter NAs on regressor columns
