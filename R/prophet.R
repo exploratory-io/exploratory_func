@@ -230,7 +230,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
       if (!is.null(regressors) && (!is.null(value_col) || !test_mode)) {
         # filter NAs on regressor columns
         df <- df %>% dplyr::filter(!!!filter_args)
-        future_df <- df # keep all rows before df is filtered out.
+        future_df <- df # keep all rows before df is filtered out to become history data.
         if (!is.null(value_col)) { # if value_col is there consider rows with values to be history data.
           df <- df %>% dplyr::filter(!is.na(UQ(rlang::sym(value_col)))) # keep the rows that has values. the ones that do not are for future regressors
         }
