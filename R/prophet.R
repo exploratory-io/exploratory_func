@@ -123,10 +123,6 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
     }
   }
 
-  if(!is.null(holiday_col) && is.null(value_col)){
-      stop("Value column must be specified to make forecast with Holiday column.")
-  }
-
   if (!is.null(cap) && !is.data.frame(cap) && !is.null(floor) && cap <= floor) {
     # validate this case. otherwise, the error will be misterious "missing value where TRUE/FALSE needed".
     stop("cap must be greater than floor.")
