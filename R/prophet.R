@@ -291,7 +291,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
           dplyr::summarise(!!!summarise_args)
       }
       else if (!is.null(holiday_col)) { # even if there is no extra regressor, if holiday column is there, we need to strip future holiday rows.
-        df <- df %>% dplyr::filter(!is.na(UQ(rlang::sym(value_col)))) # keep the rows that has values. the ones that do not are future holiday rows. 
+        df <- trim_future(df, time_col, value_col, periods, time_unit)
       }
       else if(!is.null(value_col)) { # no-extra regressor case. if value column is specified (i.e. value is not number of rows), filter NA rows.
         df <- df[!is.na(df[[value_col]]), ]
