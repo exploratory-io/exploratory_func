@@ -165,6 +165,8 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
     stop("cap must be greater than floor.")
   }
 
+  # For ISO2C codes, make it upper case.
+  holiday_country_names <- dplyr::if_else(str_length(holiday_country_names) == 2, str_to_upper(holiday_country_names), holiday_country_names)
   # Mapping to support some ISO2C codes, that are actually supported but with different names.
   holiday_country_names <- recode(holiday_country_names, GB="UnitedKingdom", TR="Turkey", FR="France")
 
