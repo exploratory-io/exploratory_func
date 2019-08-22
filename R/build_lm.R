@@ -323,7 +323,7 @@ build_lm.fast <- function(df,
       # If we are to do SMOTE, do not down sample here and let exp_balance handle it so that we do not sample out precious minority data.
       sampled_nrow <- NULL
       if (!smote) {
-        if (nrow(df) > max_nrow) {
+        if (!is.null(max_nrow) && nrow(df) > max_nrow) {
           # Record that sampling happened.
           sampled_nrow <- max_nrow
           df <- df %>% sample_rows(max_nrow)

@@ -45,7 +45,7 @@ exp_kmeans <- function(df, ...,
     set.seed(seed)
   }
   sampled_nrow <- NULL
-  if (nrow(df) > max_nrow) {
+  if (!is.null(max_nrow) && nrow(df) > max_nrow) {
     # Record that sampling happened.
     sampled_nrow <- max_nrow
     df <- df %>% sample_rows(max_nrow)

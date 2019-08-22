@@ -1800,7 +1800,7 @@ cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, nam
   # sample the data because randomForest takes long time
   # if data size is too large
   sampled_nrow <- NULL
-  if (nrow(df) > max_nrow) {
+  if (!is.null(max_nrow) && nrow(df) > max_nrow) {
     # Record that sampling happened.
     sampled_nrow <- max_nrow
     df <- df %>% sample_rows(max_nrow)
