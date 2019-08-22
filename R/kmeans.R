@@ -44,7 +44,12 @@ exp_kmeans <- function(df, ...,
   if(!is.null(seed)) { # Set seed before starting to call sample_n.
     set.seed(seed)
   }
-  df <- df %>% sample_rows(max_nrow)
+  sampled_nrow <- NULL
+  if (nrow(df) > max_nrow) {
+    # Record that sampling happened.
+    sampled_nrow <- max_nrow
+    df <- df %>% sample_rows(max_nrow)
+  }
   if (!elbow_method_mode) {
     kmeans_model_df <- df %>% build_kmeans.cols(...,
                                                 centers=centers,
@@ -64,6 +69,7 @@ exp_kmeans <- function(df, ...,
   if (!elbow_method_mode) {
     ret <- ret %>% dplyr::mutate(model = purrr::map2(model, !!kmeans_model_df$model, function(x, y) {
       x$kmeans <- y # Might need to be more careful on guaranteeing x and y are from same group, but we are not supporting group_by on UI at this point.
+      x$sampled_nrow <- sampled_nrow
       x
     }))
   }
