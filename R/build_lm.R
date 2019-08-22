@@ -321,8 +321,13 @@ build_lm.fast <- function(df,
 
       # Sample the data because randomForest takes long time if data size is too large.
       # If we are to do SMOTE, do not down sample here and let exp_balance handle it so that we do not sample out precious minority data.
+      sampled_nrow <- NULL
       if (!smote) {
-        df <- df %>% sample_rows(max_nrow)
+        if (nrow(df) > max_nrow) {
+          # Record that sampling happened.
+          sampled_nrow <- max_nrow
+          df <- df %>% sample_rows(max_nrow)
+        }
       }
 
       c_cols <- clean_cols
@@ -568,6 +573,9 @@ build_lm.fast <- function(df,
       model$terms_mapping <- names(name_map)
       names(model$terms_mapping) <- name_map
       model$orig_levels <- orig_levels
+
+      # For displaying if sampling happened or not.
+      model$sampled_nrow <- sampled_nrow
 
       # add special lm_exploratory class for adding extra info at glance().
       if (model_type == "glm") {
