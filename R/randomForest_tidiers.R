@@ -1799,7 +1799,12 @@ cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, nam
   }
   # sample the data because randomForest takes long time
   # if data size is too large
-  df <- df %>% sample_rows(max_nrow)
+  sampled_nrow <- NULL
+  if (nrow(df) > max_nrow) {
+    # Record that sampling happened.
+    sampled_nrow <- max_nrow
+    df <- df %>% sample_rows(max_nrow)
+  }
 
   if (is.logical(df[[clean_target_col]])) {
     # we need to convert logical to factor since na.roughfix only works for numeric or factor.
@@ -1924,6 +1929,7 @@ cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, nam
   ret$df <- df
   ret$c_cols <- c_cols
   ret$name_map <- name_map
+  ret$sampled_nrow <- sampled_nrow
   ret
 }
 
@@ -2186,6 +2192,7 @@ calc_feature_imp <- function(df,
       rf$y <- model.response(model_df)
       rf$df <- model_df
       rf$formula_terms <- terms(fml)
+      rf$sampled_nrow <- clean_df_ret$sampled_nrow
       list(rf = rf, test_index = test_index, source_data = source_data)
     }, error = function(e){
       if(length(grouped_cols) > 0) {
@@ -2769,6 +2776,7 @@ exp_rpart <- function(df,
       model$terms_mapping <- names(name_map)
       names(model$terms_mapping) <- name_map
       model$formula_terms <- terms(fml)
+      model$sampled_nrow <- clean_df_ret$sampled_nrow
 
       if (test_rate > 0) {
         # Handle NA rows for test. For training, rpart seems to automatically handle it, and row numbers of
