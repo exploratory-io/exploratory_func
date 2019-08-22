@@ -15,6 +15,43 @@ to_time_unit_for_seq <- function(time_unit) {
   }
 }
 
+trim_future <- function(df, time_col, value_col, periods, time_unit) {
+  if (!is.null(value_col)) { # if value_col is there consider rows with values to be history data.
+    df <- df %>% dplyr::filter(!is.na(UQ(rlang::sym(value_col)))) # keep the rows that have values. the ones that do not are for future regressors
+  }
+  else { # if value_col does not exist, use period to determine the boundary between history and future.
+    if (time_unit %in% c("second", "sec")) {
+      time_unit_func <- lubridate::seconds
+    }
+    else if (time_unit %in% c("minute", "min")) {
+      time_unit_func <- lubridate::minutes
+    }
+    else if (time_unit == "hour") {
+      time_unit_func <- lubridate::hours
+    }
+    else if (time_unit == "day") {
+      time_unit_func <- lubridate::days
+    }
+    else if (time_unit == "week") {
+      time_unit_func <- lubridate::weeks
+    }
+    else if (time_unit == "month") {
+      time_unit_func <- base::months
+    }
+    else if (time_unit == "quarter") {
+      time_unit_func <- function(x) {
+        base::months(3 * x)
+      }
+    }
+    else { # assuming it is year.
+      time_unit_func <- lubridate::years
+    }
+    # Keep the rows older than the history/future boundary, as the history data.
+    df <- df %>% dplyr::filter(!!rlang::sym(time_col) <= (max(!!rlang::sym(time_col)) - time_unit_func(!!periods)))
+  }
+  df
+}
+
 #' NSE version of do_prophet_
 #' @export
 do_prophet <- function(df, time, value = NULL, periods = 10, holiday = NULL, ...){
@@ -66,7 +103,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
                         fun.aggregate = sum, na_fill_type = NULL, na_fill_value = 0,
                         cap = NULL, floor = NULL, growth = NULL, weekly.seasonality = TRUE, yearly.seasonality = TRUE,
                         daily.seasonality = "auto",
-                        holiday_col = NULL, holidays = NULL,
+                        holiday_col = NULL, holidays = NULL, holiday_country_names = NULL,
                         regressors = NULL, funs.aggregate.regressors = NULL, regressors_na_fill_type = NULL, regressors_na_fill_value = 0, ...){
   validate_empty_data(df)
 
@@ -123,14 +160,15 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
     }
   }
 
-  if(!is.null(holiday_col) && is.null(value_col)){
-      stop("Value column must be specified to make forecast with Holiday column.")
-  }
-
   if (!is.null(cap) && !is.data.frame(cap) && !is.null(floor) && cap <= floor) {
     # validate this case. otherwise, the error will be misterious "missing value where TRUE/FALSE needed".
     stop("cap must be greater than floor.")
   }
+
+  # For ISO2C codes, make it upper case.
+  holiday_country_names <- dplyr::if_else(stringr::str_length(holiday_country_names) == 2, stringr::str_to_upper(holiday_country_names), holiday_country_names)
+  # Mapping to support some ISO2C codes, that are actually supported but with different names.
+  holiday_country_names <- dplyr::recode(holiday_country_names, GB="UnitedKingdom", TR="Turkey", FR="France")
 
   # To filter NAs on regressor columns
   filter_args <- list() # default empty list
@@ -223,45 +261,15 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
   
       aggregated_future_data <- NULL
       # Extra regressor case. separate the df into history and future based on the value is filled or not.
-      # Exception is when it value column is not specified (forecast is about number of rows.) AND it is test mode.
+      # When value column is not specified (forecast is about number of rows.), we do the history/future separation
+      # based on the specified period.
+      # Exception is when value column is not specified (forecast is about number of rows.) AND it is test mode.
       # In this case, we treat entire data as history data, and just let test mode logic to separate it into training and test.
       if (!is.null(regressors) && (!is.null(value_col) || !test_mode)) {
         # filter NAs on regressor columns
         df <- df %>% dplyr::filter(!!!filter_args)
-        future_df <- df # keep all rows before df is filtered out.
-        if (!is.null(value_col)) { # if value_col is there consider rows with values to be history data.
-          df <- df %>% dplyr::filter(!is.na(UQ(rlang::sym(value_col)))) # keep the rows that has values. the ones that do not are for future regressors
-        }
-        else { # if value_col does not exist, use period to determine the boundary between history and future.
-          if (time_unit %in% c("second", "sec")) {
-            time_unit_func <- lubridate::seconds
-          }
-          else if (time_unit %in% c("minute", "min")) {
-            time_unit_func <- lubridate::minutes
-          }
-          else if (time_unit == "hour") {
-            time_unit_func <- lubridate::hours
-          }
-          else if (time_unit == "day") {
-            time_unit_func <- lubridate::days
-          }
-          else if (time_unit == "week") {
-            time_unit_func <- lubridate::weeks
-          }
-          else if (time_unit == "month") {
-            time_unit_func <- base::months
-          }
-          else if (time_unit == "quarter") {
-            time_unit_func <- function(x) {
-              base::months(3 * x)
-            }
-          }
-          else { # assuming it is year.
-            time_unit_func <- lubridate::years
-          }
-          # Keep the rows older than the history/future boundary, as the history data.
-          df <- df %>% dplyr::filter(!!rlang::sym(time_col) <= (max(!!rlang::sym(time_col)) - time_unit_func(!!periods)))
-        }
+        future_df <- df # keep all rows before df is filtered out to become history data.
+        df <- trim_future(df, time_col, value_col, periods, time_unit)
         max_floored_date <- max(df[[time_col]])
         future_df <- future_df %>% dplyr::filter(UQ(rlang::sym(time_col)) > max_floored_date)
   
@@ -288,7 +296,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
           dplyr::summarise(!!!summarise_args)
       }
       else if (!is.null(holiday_col)) { # even if there is no extra regressor, if holiday column is there, we need to strip future holiday rows.
-        df <- df %>% dplyr::filter(!is.na(UQ(rlang::sym(value_col)))) # keep the rows that has values. the ones that do not are future holiday rows. 
+        df <- trim_future(df, time_col, value_col, periods, time_unit)
       }
       else if(!is.null(value_col)) { # no-extra regressor case. if value column is specified (i.e. value is not number of rows), filter NA rows.
         df <- df[!is.na(df[[value_col]]), ]
@@ -445,6 +453,11 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
         if (!is.null(regressor_output_cols)) {
           for (regressor in regressor_output_cols) {
             m <- add_regressor(m, regressor)
+          }
+        }
+        if (!is.null(holiday_country_names)) {
+          for (country_name in holiday_country_names) {
+            m <- add_country_holidays(m, country_name = country_name)
           }
         }
         m <- fit.prophet(m, training_data)
