@@ -17,7 +17,7 @@ to_time_unit_for_seq <- function(time_unit) {
 
 trim_future <- function(df, time_col, value_col, periods, time_unit) {
   if (!is.null(value_col)) { # if value_col is there consider rows with values to be history data.
-    df <- df %>% dplyr::filter(!is.na(UQ(rlang::sym(value_col)))) # keep the rows that has values. the ones that do not are for future regressors
+    df <- df %>% dplyr::filter(!is.na(UQ(rlang::sym(value_col)))) # keep the rows that have values. the ones that do not are for future regressors
   }
   else { # if value_col does not exist, use period to determine the boundary between history and future.
     if (time_unit %in% c("second", "sec")) {
