@@ -587,6 +587,17 @@ test_that("test pivot", {
 
 })
 
+test_that("test pivot with NA", {
+  test_df_na <- data.frame(
+    carrier = c("AA", "AA", "UA"),
+    state = c("CA", "NY", "CA"),
+    num = c(1,1,1)
+  )
+  pivoted <- test_df_na %>% pivot(state ~ carrier, value = num)
+  expect_true(any(is.na(pivoted)))
+})
+
+
 test_that("test pivot with Date", {
   test_df <- data.frame(
     dt = rep(lubridate::today() + seq(3), each = 5),
@@ -880,7 +891,7 @@ test_that("revert_factor_cols_to_logical", {
   df <- data.frame(col1 = I(factor(c(TRUE, FALSE, NA))),
                    col2 = I(forcats::fct_rev(factor(c(TRUE,FALSE,NA)))),
                    col3 = I(factor(c("A","B","C"))))
-                  
+
   res <- revert_factor_cols_to_logical(df)
   expect_equal(res$col1, c(TRUE, FALSE, NA))
   expect_equal(res$col2, c(TRUE, FALSE, NA))
