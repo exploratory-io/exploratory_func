@@ -160,7 +160,12 @@ build_coxph.fast <- function(df,
         dplyr::filter(!is.na(df[[time_col]])) # this form does not handle group_by. so moved into each_func from outside.
 
       # sample the data for performance if data size is too large.
-      df <- df %>% sample_rows(max_nrow)
+      sampled_nrow <- NULL
+      if (nrow(df) > max_nrow) {
+        # Record that sampling happened.
+        sampled_nrow <- max_nrow
+        df <- df %>% sample_rows(max_nrow)
+      }
 
       c_cols <- clean_cols
       for(col in clean_cols){
@@ -259,6 +264,7 @@ build_coxph.fast <- function(df,
       # these attributes are used in tidy of randomForest TODO: is this good for lm too?
       rf$terms_mapping <- names(name_map)
       names(rf$terms_mapping) <- name_map
+      rf$sampled_nrow <- sampled_nrow
       # add special lm_coxph class for adding extra info at glance().
       class(rf) <- c("coxph_exploratory", class(rf))
       rf
