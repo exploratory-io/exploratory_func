@@ -82,7 +82,7 @@ exp_kmeans <- function(df, ...,
                           trace = trace,
                           normalize_data = normalize_data,
                           seed=NULL) # Seed is already done in do_prcomp. Skip it.
-    ret <- data.frame(model = I(list(ret))) # Follow current output format for now. TODO: Revisit and support group_by.
+    ret <- data.frame(model = I(list(ret))) # Follow current output format for now. I() is to avoid unwanted expansion of list at creation of data frame. TODO: Revisit and support group_by.
   }
   ret %>% rowwise()
 }
