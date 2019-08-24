@@ -4,8 +4,8 @@ iterate_kmeans <- function(df, max_centers = 10,
                            nstart = 1,
                            algorithm = "Hartigan-Wong",
                            trace = FALSE,
-                           seed = NULL,
-                           elbow_method_mode=FALSE
+                           normalize_data = TRUE,
+                           seed = NULL
                            ) {
   n_centers <- seq(max_centers)
   ret <- data.frame(center = n_centers)
@@ -16,6 +16,7 @@ iterate_kmeans <- function(df, max_centers = 10,
                                          nstart = nstart,
                                          algorithm = algorithm,
                                          trace = trace,
+                                         normalize_data = normalize_data,
                                          seed=seed,
                                          keep.source=FALSE,
                                          augment=FALSE)
@@ -63,10 +64,8 @@ exp_kmeans <- function(df, ...,
                                                 seed=NULL) # Seed is already done. Skip it.
   }
 
-  # TODO: Running PCA is not necessary for elbow method case.
-  ret <- do_prcomp(df, normalize_data = normalize_data, seed = NULL, ...)
-
   if (!elbow_method_mode) {
+    ret <- do_prcomp(df, normalize_data = normalize_data, seed = NULL, ...)
     ret <- ret %>% dplyr::mutate(model = purrr::map2(model, !!kmeans_model_df$model, function(x, y) {
       x$kmeans <- y # Might need to be more careful on guaranteeing x and y are from same group, but we are not supporting group_by on UI at this point.
       x$sampled_nrow <- sampled_nrow
@@ -74,18 +73,16 @@ exp_kmeans <- function(df, ...,
     }))
   }
   else {
-    ret <- ret %>% ungroup()
-    ret <- ret %>% dplyr::mutate(model = purrr::map(model, function(x) {
-      kmeans_df <- as.data.frame(x$x)
-      ret <- iterate_kmeans(kmeans_df,
-                            max_centers = max_centers,
-                            iter.max = iter.max,
-                            nstart = nstart,
-                            algorithm = algorithm,
-                            trace = trace,
-                            seed=NULL) # Seed is already done in do_prcomp. Skip it.
-      ret
-    }))
+    kmeans_df <- df %>% dplyr::select(!!!rlang::quos(...))
+    ret <- iterate_kmeans(kmeans_df,
+                          max_centers = max_centers,
+                          iter.max = iter.max,
+                          nstart = nstart,
+                          algorithm = algorithm,
+                          trace = trace,
+                          normalize_data = normalize_data,
+                          seed=NULL) # Seed is already done in do_prcomp. Skip it.
+    ret <- data.frame(model = I(list(ret))) # Follow current output format for now. I() is to avoid unwanted expansion of list at creation of data frame. TODO: Revisit and support group_by.
   }
   ret %>% rowwise()
 }
