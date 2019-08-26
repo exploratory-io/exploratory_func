@@ -250,9 +250,10 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
 
   formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
   # pivot_ does pivot for each group.
-  pivotted_df <- pivot_(df, formula, value_col = value_col, fun.aggregate = fun.aggregate, fill = 0)
+  #pivotted_df <- pivot_(df, formula, value_col = value_col, fun.aggregate = fun.aggregate, fill = 0)
 
   chisq.test_each <- function(df) {
+    df <- pivot_(df, formula, value_col = value_col, fun.aggregate = fun.aggregate, fill = 0)
     if (length(grouped_col) > 0) {
       df <- df %>% select(-!!rlang::sym(grouped_col))
     }
@@ -289,8 +290,8 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
   # If the original data frame is grouped by "tmp",
   # overwriting it should be avoided,
   # so avoid_conflict is used here.
-  tmp_col <- avoid_conflict(colnames(pivotted_df), "model")
-  ret <- pivotted_df %>%
+  tmp_col <- avoid_conflict(colnames(df), "model") #TODO: Conflict should be an issue only with group_by columns.
+  ret <- df %>%
     dplyr::do_(.dots = setNames(list(~chisq.test_each(.)), tmp_col))
   ret
 }
