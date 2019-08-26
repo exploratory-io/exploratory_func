@@ -1,5 +1,5 @@
 context("tests for wrappers of tests")
-if(F){
+
 test_df <- data.frame(
   cat=rep(c("cat1", "cat2"), 20),
   dim = sort(rep(paste0("dim", seq(4)), 5)),
@@ -192,7 +192,6 @@ test_that("test chisq.test with p column", {
   expect_equal(nrow(ret), 1)
 
 })
-}
 
 test_that("test exp_chisq", {
   browser()
@@ -210,8 +209,6 @@ test_that("test exp_chisq", {
   browser()
   ret
 })
-
-if(F){
 
 test_that("test exp_chisq with power", {
   model_df <- exp_chisq(mtcars %>% mutate(gear=factor(gear)), gear, carb, power = 0.8) # factor order should be kept in the model
@@ -395,4 +392,3 @@ test_that("test exp_normality with column with almost always same value", {
   model_summary <- ret %>% tidy(model, type="model_summary", signif_level=0.1)
   ret
 })
-}
