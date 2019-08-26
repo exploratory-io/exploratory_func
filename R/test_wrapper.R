@@ -254,26 +254,31 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
 
   chisq.test_each <- function(df) {
     #df <- pivot_(df, formula, value_col = value_col, fun.aggregate = fun.aggregate, fill = 0)
+    browser()
     df <- df %>% dplyr::group_by(!!rlang::sym(var1_col), !!rlang::sym(var2_col))
     if (is.null(value_col)) {
-      df <- df %>% dplyr::summarize(v=n())
+      df <- df %>% dplyr::summarize(.temp_value_col=n())
     }
     else {
+      #TODO: handle name conflict with .temp_value_col and group cols.
       if (identical(sum, fun.aggregate)) {
-        df <- df %>% dplyr::summarize(v=fun.aggregate(!!rlang::sym(value_col), na.rm=TRUE))
+        df <- df %>% dplyr::summarize(.temp_value_col=fun.aggregate(!!rlang::sym(value_col), na.rm=TRUE))
       }
       else {
         # Possible fun.aggregate are, length, n_distinct, false_count (count for TRUE is done by sum),
         # na_count, non_na_count. They can/should be run without na.rm=TRUE.
-        df <- df %>% dplyr::summarize(v=fun.aggregate(!!rlang::sym(value_col)))
+        df <- df %>% dplyr::summarize(.temp_value_col=fun.aggregate(!!rlang::sym(value_col)))
       }
     }
-    df <- df %>% ungroup() %>% spread(key = !!rlang::sym(var2_col), value = v, fill=0) #TODO: handle name conflict with v and group cols.
+    browser()
+    #TODO: spread creates column named "<NA>". For consistency on UI, we want "(NA)".
+    df <- df %>% ungroup() %>% spread(key = !!rlang::sym(var2_col), value = .temp_value_col, fill=0)
     df <- df %>% mutate(!!rlang::sym(var1_col):=forcats::fct_explicit_na(as.factor(!!rlang::sym(var1_col)), na_level = "(NA)"))
 
     #if (length(grouped_col) > 0) {
     #  df <- df %>% select(-!!rlang::sym(grouped_col))
     #}
+    browser()
     df <- df %>% tibble::column_to_rownames(var=var1_col)
     x <- df %>% as.matrix()
     model <- chisq.test(x = x, correct = correct, ...)

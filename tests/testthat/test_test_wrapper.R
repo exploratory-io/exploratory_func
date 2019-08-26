@@ -1,5 +1,5 @@
 context("tests for wrappers of tests")
-
+if(F){
 test_df <- data.frame(
   cat=rep(c("cat1", "cat2"), 20),
   dim = sort(rep(paste0("dim", seq(4)), 5)),
@@ -192,12 +192,26 @@ test_that("test chisq.test with p column", {
   expect_equal(nrow(ret), 1)
 
 })
+}
 
 test_that("test exp_chisq", {
+  browser()
+          mtcars$gear[[1]] <- NA
+          mtcars$carb[[2]] <- NA
+          mtcars$cyl[[3]] <- NA
+  browser()
   ret <- exp_chisq(mtcars %>% mutate(gear=factor(gear)), gear, carb) # factor order should be kept in the model
-  ret <- exp_chisq(mtcars, gear, carb, value=cyl)
+  browser()
+  ret <- exp_chisq(mtcars, gear, carb, value=cyl, fun.aggregate=sum)
+  browser()
+  observed <- ret %>% broom::tidy(model, type="observed")
+  summary <- ret %>% broom::glance(model)
+  residuals <- ret %>% broom::tidy(model, type="residuals")
+  browser()
   ret
 })
+
+if(F){
 
 test_that("test exp_chisq with power", {
   model_df <- exp_chisq(mtcars %>% mutate(gear=factor(gear)), gear, carb, power = 0.8) # factor order should be kept in the model
@@ -381,3 +395,4 @@ test_that("test exp_normality with column with almost always same value", {
   model_summary <- ret %>% tidy(model, type="model_summary", signif_level=0.1)
   ret
 })
+}
