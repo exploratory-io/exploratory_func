@@ -13,7 +13,8 @@ col_name <- function(x, default = stop("Please supply column name", call. = FALS
   stop("Invalid column specification", call. = FALSE)
 }
 
-#' Simple cast wrapper that spreads columns which is choosed as row and col into matrix
+#' Simple cast wrapper that spreads columns which is choosed as row and col into matrix.
+#' Note that working on data frame with group_by is not supported.
 #' @param data Data frame to cast
 #' @param row Column name to be used as row
 #' @param col Column name to be used as column
