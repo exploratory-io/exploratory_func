@@ -253,10 +253,14 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
   #pivotted_df <- pivot_(df, formula, value_col = value_col, fun.aggregate = fun.aggregate, fill = 0)
 
   chisq.test_each <- function(df) {
-    df <- pivot_(df, formula, value_col = value_col, fun.aggregate = fun.aggregate, fill = 0)
-    if (length(grouped_col) > 0) {
-      df <- df %>% select(-!!rlang::sym(grouped_col))
-    }
+    #df <- pivot_(df, formula, value_col = value_col, fun.aggregate = fun.aggregate, fill = 0)
+    df <- df %>% dplyr::group_by(!!rlang::sym(var1_col), !!rlang::sym(var2_col))
+    df <- df %>% dplyr::summarize(v=n()) %>% ungroup() %>% spread(key = !!rlang::sym(var2_col), value = v, fill=0) #TODO: handle name conflict with v and group cols.
+    df <- df %>% mutate(!!rlang::sym(var1_col) :=forcats::fct_explicit_na(!!rlang::sym(var1_col)))
+
+    #if (length(grouped_col) > 0) {
+    #  df <- df %>% select(-!!rlang::sym(grouped_col))
+    #}
     df <- df %>% tibble::column_to_rownames(var=var1_col)
     x <- df %>% as.matrix()
     model <- chisq.test(x = x, correct = correct, ...)
