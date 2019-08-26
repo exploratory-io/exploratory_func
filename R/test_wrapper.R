@@ -259,7 +259,14 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
       df <- df %>% dplyr::summarize(v=n())
     }
     else {
-      df <- df %>% dplyr::summarize(v=fun.aggregate(!!rlang::sym(value_col)))
+      if (identical(sum, fun.aggregate)) {
+        df <- df %>% dplyr::summarize(v=fun.aggregate(!!rlang::sym(value_col), na.rm=TRUE))
+      }
+      else {
+        # Possible fun.aggregate are, length, n_distinct, false_count (count for TRUE is done by sum),
+        # na_count, non_na_count. They can/should be run without na.rm=TRUE.
+        df <- df %>% dplyr::summarize(v=fun.aggregate(!!rlang::sym(value_col)))
+      }
     }
     df <- df %>% ungroup() %>% spread(key = !!rlang::sym(var2_col), value = v, fill=0) #TODO: handle name conflict with v and group cols.
     df <- df %>% mutate(!!rlang::sym(var1_col):=forcats::fct_explicit_na(as.factor(!!rlang::sym(var1_col)), na_level = "(NA)"))
