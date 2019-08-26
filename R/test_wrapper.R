@@ -249,12 +249,8 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
   }
 
   formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
-  # pivot_ does pivot for each group.
-  #pivotted_df <- pivot_(df, formula, value_col = value_col, fun.aggregate = fun.aggregate, fill = 0)
 
   chisq.test_each <- function(df) {
-    #df <- pivot_(df, formula, value_col = value_col, fun.aggregate = fun.aggregate, fill = 0)
-    browser()
     df <- df %>% dplyr::group_by(!!rlang::sym(var1_col), !!rlang::sym(var2_col))
     if (is.null(value_col)) {
       df <- df %>% dplyr::summarize(.temp_value_col=n())
@@ -270,15 +266,10 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
         df <- df %>% dplyr::summarize(.temp_value_col=fun.aggregate(!!rlang::sym(value_col)))
       }
     }
-    browser()
     #TODO: spread creates column named "<NA>". For consistency on UI, we want "(NA)".
     df <- df %>% ungroup() %>% spread(key = !!rlang::sym(var2_col), value = .temp_value_col, fill=0)
     df <- df %>% mutate(!!rlang::sym(var1_col):=forcats::fct_explicit_na(as.factor(!!rlang::sym(var1_col)), na_level = "(NA)"))
 
-    #if (length(grouped_col) > 0) {
-    #  df <- df %>% select(-!!rlang::sym(grouped_col))
-    #}
-    browser()
     df <- df %>% tibble::column_to_rownames(var=var1_col)
     x <- df %>% as.matrix()
     model <- chisq.test(x = x, correct = correct, ...)
