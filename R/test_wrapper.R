@@ -251,6 +251,8 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
   formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
 
   chisq.test_each <- function(df) {
+    # TODO: For now, we are filtering out NA categories, but we should include them and display them cleanly.
+    df <- df %>% dplyr::filter(!is.na(!!rlang::sym(var1_col)) & !is.na(!!rlang::sym(var2_col)))
     df <- df %>% dplyr::group_by(!!rlang::sym(var1_col), !!rlang::sym(var2_col))
     if (is.null(value_col)) {
       df <- df %>% dplyr::summarize(.temp_value_col=n())
@@ -266,8 +268,11 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
         df <- df %>% dplyr::summarize(.temp_value_col=fun.aggregate(!!rlang::sym(value_col)))
       }
     }
-    #TODO: spread creates column named "<NA>". For consistency on UI, we want "(NA)".
+    # TODO: spread creates column named "<NA>". For consistency on UI, we want "(NA)".
+    # Note that this issue is currently avoided by filtering out rows with NA categories in the first place. 
     df <- df %>% ungroup() %>% spread(key = !!rlang::sym(var2_col), value = .temp_value_col, fill=0)
+    # na_leves is set to "(NA)" for consistency on UI.
+    # Note that this issue is currently avoided by filtering out rows with NA categories in the first place. 
     df <- df %>% mutate(!!rlang::sym(var1_col):=forcats::fct_explicit_na(as.factor(!!rlang::sym(var1_col)), na_level = "(NA)"))
 
     df <- df %>% tibble::column_to_rownames(var=var1_col)
