@@ -270,10 +270,10 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
     }
     # TODO: spread creates column named "<NA>". For consistency on UI, we want "(NA)".
     # Note that this issue is currently avoided by filtering out rows with NA categories in the first place. 
-    df <- df %>% ungroup() %>% spread(key = !!rlang::sym(var2_col), value = .temp_value_col, fill=0)
+    df <- df %>% dplyr::ungroup() %>% tidyr::spread(key = !!rlang::sym(var2_col), value = .temp_value_col, fill=0)
     # na_leves is set to "(NA)" for consistency on UI.
     # Note that this issue is currently avoided by filtering out rows with NA categories in the first place. 
-    df <- df %>% mutate(!!rlang::sym(var1_col):=forcats::fct_explicit_na(as.factor(!!rlang::sym(var1_col)), na_level = "(NA)"))
+    df <- df %>% dplyr::mutate(!!rlang::sym(var1_col):=forcats::fct_explicit_na(as.factor(!!rlang::sym(var1_col)), na_level = "(NA)"))
 
     df <- df %>% tibble::column_to_rownames(var=var1_col)
     x <- df %>% as.matrix()
