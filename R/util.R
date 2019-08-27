@@ -833,7 +833,7 @@ pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = N
 
   vars <- all.vars(formula)
 
-  # remove NA data
+  # remove rows with NA categories
   for(var in vars) {
     df <- df[!is.na(df[[var]]), ]
   }
