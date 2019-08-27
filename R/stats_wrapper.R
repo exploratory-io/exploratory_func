@@ -90,7 +90,7 @@ do_cor.kv_ <- function(df,
   }
   # column names are "{subject}.x", "{subject}.y", "value"
   output_cols <- avoid_conflict(grouped_col,
-                           c(paste0(col, c(".x", ".y")),
+                           c(paste0(col, c(".x", ".y")), # We use paste0 since str_c garbles multibyte column names here for some reason.
                              "value")
   )
 
