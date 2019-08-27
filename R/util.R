@@ -83,7 +83,7 @@ simple_cast <- function(data, row, col, val=NULL, fun.aggregate=mean, fill=0, ti
     # NAs in val column is already filtered out, and we don't need to add na.rm = TRUE to fun.aggregate.
     df <- df %>% dplyr::summarize(.temp_value_col=fun.aggregate(!!rlang::sym(val)))
     # NAs in col column is already filtered out and we don't need to handle it.
-    df <- df %>% ungroup() %>% spread(key = !!rlang::sym(col), value = .temp_value_col, fill=fill)
+    df <- df %>% dplyr::ungroup() %>% tidyr::spread(key = !!rlang::sym(col), value = .temp_value_col, fill=fill)
 
     df <- df %>% tibble::column_to_rownames(var=row)
     x <- df %>% as.matrix()
@@ -833,7 +833,7 @@ pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = N
 
   vars <- all.vars(formula)
 
-  # remove NA data
+  # remove rows with NA categories
   for(var in vars) {
     df <- df[!is.na(df[[var]]), ]
   }

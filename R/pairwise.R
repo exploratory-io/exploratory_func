@@ -28,8 +28,8 @@ do_cosine_sim.kv <- function(df, subject, key, value = NULL, distinct=FALSE, dia
 
   # column names are "{subject}.x", "{subject}.y", "value"
   cnames <- avoid_conflict(grouped_column,
-                            c(paste0(subject_col, c(".x", ".y")),
-                            "value")
+                            c(paste0(subject_col, c(".x", ".y")), # We use paste0 since str_c garbles multibyte column names here for some reason.
+                              "value")
                            )
 
   # this is executed on each group
@@ -141,7 +141,7 @@ do_dist.kv_ <- function(df,
 
   # column names are "{subject}.x", "{subject}.y", "value"
   cnames <- avoid_conflict(grouped_column,
-                           c(paste0(subject_col, c(".x", ".y")),
+                           c(paste0(subject_col, c(".x", ".y")), # We use paste0 since str_c garbles multibyte column names here for some reason.
                              "value")
                            )
 
@@ -248,7 +248,7 @@ do_kl_dist.kv_ <- function(df,
 
   # column names are "{subject}.x", "{subject}.y", "value"
   cnames <- avoid_conflict(grouped_column,
-                           c(paste0(subject_col, c(".x", ".y")),
+                           c(paste0(subject_col, c(".x", ".y")), # We use paste0 since str_c garbles multibyte column names here for some reason.
                              "value")
   )
 
