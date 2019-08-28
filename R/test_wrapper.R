@@ -857,7 +857,9 @@ exp_anova <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, f = NULL, 
 glance.anova_exploratory <- function(x) {
   ret <- broom:::tidy.aov(x) %>% slice(1:1) # there is no glance.aov. take first row of tidy.aov.
   # Term value from tidy.aov() can be garbled on Windows with multibyte column name. Overwrite with not-garled value.
-  ret$term[[1]] <- names(x$xlevels)[[1]]
+  if (!is.null(ret$term) && length(ret$term) > 0 && !is.null(x$xlevels) && length(x$xlevels) > 0) {
+    ret$term[[1]] <- names(x$xlevels)[[1]]
+  }
   ret
 }
 
@@ -867,7 +869,9 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
     note <- NULL
     ret <- broom:::tidy.aov(x)
     # Term value from tidy.aov() can be garbled on Windows with multibyte column name. Overwrite with not-garled value.
-    ret$term[[1]] <- names(x$xlevels)[[1]]
+    if (!is.null(ret$term) && length(ret$term) > 0 && !is.null(x$xlevels) && length(x$xlevels) > 0) {
+      ret$term[[1]] <- names(x$xlevels)[[1]]
+    }
     # Get number of groups (k) , and the minimum sample size amoung those groups (min_n_rows).
     data_summary <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
       dplyr::summarize(n_rows=length(!!rlang::sym(x$var1))) %>%
