@@ -13,7 +13,8 @@ col_name <- function(x, default = stop("Please supply column name", call. = FALS
   stop("Invalid column specification", call. = FALSE)
 }
 
-#' Simple cast wrapper that spreads columns which is choosed as row and col into matrix
+#' Simple cast wrapper that spreads columns which is choosed as row and col into matrix.
+#' Note that working on data frame with group_by is not supported.
 #' @param data Data frame to cast
 #' @param row Column name to be used as row
 #' @param col Column name to be used as column
@@ -76,7 +77,16 @@ simple_cast <- function(data, row, col, val=NULL, fun.aggregate=mean, fill=0, ti
     if(!val %in% colnames(data)){
       stop(paste0(val, " is not in column names"))
     }
-    data %>%  reshape2::acast(fml, value.var=val, fun.aggregate=fun.aggregate, fill=fill)
+    #data %>%  reshape2::acast(fml, value.var=val, fun.aggregate=fun.aggregate, fill=fill)
+    df <- data %>% dplyr::group_by(!!rlang::sym(row), !!rlang::sym(col))
+    # TODO: handle name conflict with .temp_value_col and group cols.
+    # NAs in val column is already filtered out, and we don't need to add na.rm = TRUE to fun.aggregate.
+    df <- df %>% dplyr::summarize(.temp_value_col=fun.aggregate(!!rlang::sym(val)))
+    # NAs in col column is already filtered out and we don't need to handle it.
+    df <- df %>% dplyr::ungroup() %>% tidyr::spread(key = !!rlang::sym(col), value = .temp_value_col, fill=fill)
+
+    df <- df %>% tibble::column_to_rownames(var=row)
+    x <- df %>% as.matrix()
   }
 }
 
@@ -823,7 +833,7 @@ pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = N
 
   vars <- all.vars(formula)
 
-  # remove NA data
+  # remove rows with NA categories
   for(var in vars) {
     df <- df[!is.na(df[[var]]), ]
   }

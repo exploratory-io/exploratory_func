@@ -249,13 +249,32 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
   }
 
   formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
-  # pivot_ does pivot for each group.
-  pivotted_df <- pivot_(df, formula, value_col = value_col, fun.aggregate = fun.aggregate, fill = 0)
 
   chisq.test_each <- function(df) {
-    if (length(grouped_col) > 0) {
-      df <- df %>% select(-!!rlang::sym(grouped_col))
+    # TODO: For now, we are filtering out NA categories, but we should include them and display them cleanly.
+    df <- df %>% dplyr::filter(!is.na(!!rlang::sym(var1_col)) & !is.na(!!rlang::sym(var2_col)))
+    df <- df %>% dplyr::group_by(!!rlang::sym(var1_col), !!rlang::sym(var2_col))
+    if (is.null(value_col)) {
+      df <- df %>% dplyr::summarize(.temp_value_col=n())
     }
+    else {
+      #TODO: handle name conflict with .temp_value_col and group cols.
+      if (identical(sum, fun.aggregate)) {
+        df <- df %>% dplyr::summarize(.temp_value_col=fun.aggregate(!!rlang::sym(value_col), na.rm=TRUE))
+      }
+      else {
+        # Possible fun.aggregate are, length, n_distinct, false_count (count for TRUE is done by sum),
+        # na_count, non_na_count. They can/should be run without na.rm=TRUE.
+        df <- df %>% dplyr::summarize(.temp_value_col=fun.aggregate(!!rlang::sym(value_col)))
+      }
+    }
+    # TODO: spread creates column named "<NA>". For consistency on UI, we want "(NA)".
+    # Note that this issue is currently avoided by filtering out rows with NA categories in the first place. 
+    df <- df %>% dplyr::ungroup() %>% tidyr::spread(key = !!rlang::sym(var2_col), value = .temp_value_col, fill=0)
+    # na_leves is set to "(NA)" for consistency on UI.
+    # Note that this issue is currently avoided by filtering out rows with NA categories in the first place. 
+    df <- df %>% dplyr::mutate(!!rlang::sym(var1_col):=forcats::fct_explicit_na(as.factor(!!rlang::sym(var1_col)), na_level = "(NA)"))
+
     df <- df %>% tibble::column_to_rownames(var=var1_col)
     x <- df %>% as.matrix()
     model <- chisq.test(x = x, correct = correct, ...)
@@ -289,8 +308,8 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
   # If the original data frame is grouped by "tmp",
   # overwriting it should be avoided,
   # so avoid_conflict is used here.
-  tmp_col <- avoid_conflict(colnames(pivotted_df), "model")
-  ret <- pivotted_df %>%
+  tmp_col <- avoid_conflict(colnames(df), "model") #TODO: Conflict should be an issue only with group_by columns.
+  ret <- df %>%
     dplyr::do_(.dots = setNames(list(~chisq.test_each(.)), tmp_col))
   ret
 }
@@ -837,6 +856,10 @@ exp_anova <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, f = NULL, 
 #' @export
 glance.anova_exploratory <- function(x) {
   ret <- broom:::tidy.aov(x) %>% slice(1:1) # there is no glance.aov. take first row of tidy.aov.
+  # Term value from tidy.aov() can be garbled on Windows with multibyte column name. Overwrite with not-garled value.
+  if (!is.null(ret$term) && length(ret$term) > 0 && !is.null(x$xlevels) && length(x$xlevels) > 0) {
+    ret$term[[1]] <- names(x$xlevels)[[1]]
+  }
   ret
 }
 
@@ -845,6 +868,10 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
   if (type == "model") {
     note <- NULL
     ret <- broom:::tidy.aov(x)
+    # Term value from tidy.aov() can be garbled on Windows with multibyte column name. Overwrite with not-garled value.
+    if (!is.null(ret$term) && length(ret$term) > 0 && !is.null(x$xlevels) && length(x$xlevels) > 0) {
+      ret$term[[1]] <- names(x$xlevels)[[1]]
+    }
     # Get number of groups (k) , and the minimum sample size amoung those groups (min_n_rows).
     data_summary <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
       dplyr::summarize(n_rows=length(!!rlang::sym(x$var1))) %>%

@@ -194,8 +194,15 @@ test_that("test chisq.test with p column", {
 })
 
 test_that("test exp_chisq", {
-  ret <- exp_chisq(mtcars %>% mutate(gear=factor(gear)), gear, carb) # factor order should be kept in the model
-  ret <- exp_chisq(mtcars, gear, carb, value=cyl)
+  mtcars2 <- mtcars
+  mtcars2$gear[[1]] <- NA # test handling of NAs
+  mtcars2$carb[[2]] <- NA
+  mtcars2$cyl[[3]] <- NA
+  ret <- exp_chisq(mtcars2 %>% mutate(gear=factor(gear)), gear, carb) # factor order should be kept in the model
+  ret <- exp_chisq(mtcars2, gear, carb, value=cyl, fun.aggregate=sum)
+  observed <- ret %>% broom::tidy(model, type="observed")
+  summary <- ret %>% broom::glance(model)
+  residuals <- ret %>% broom::tidy(model, type="residuals")
   ret
 })
 
