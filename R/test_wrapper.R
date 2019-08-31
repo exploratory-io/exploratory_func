@@ -253,6 +253,14 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
   formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
 
   chisq.test_each <- function(df) {
+    # If there is only one class of category in this class, skip it.
+    # This is effectively for multiple group case, since for single group case, it is already checked before this loop.
+    if (n_distinct(df[[var1_col]], na.rm=TRUE) < 2) {
+      return(NULL)
+    }
+    if (n_distinct(df[[var2_col]], na.rm=TRUE) < 2) {
+      return(NULL)
+    }
     # TODO: For now, we are filtering out NA categories, but we should include them and display them cleanly.
     df <- df %>% dplyr::filter(!is.na(!!rlang::sym(var1_col)) & !is.na(!!rlang::sym(var2_col)))
     df <- df %>% dplyr::group_by(!!rlang::sym(var1_col), !!rlang::sym(var2_col))
