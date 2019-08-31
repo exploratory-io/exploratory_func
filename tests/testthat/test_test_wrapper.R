@@ -247,6 +247,14 @@ test_that("test exp_chisq with group_by", {
   residuals <- ret %>% broom::tidy(model, type="residuals")
 })
 
+test_that("test exp_chisq with group_by with single class category in one of the groups", {
+  ret <- mtcars %>% filter(vs!=1 | gear==4) %>% group_by(vs) %>% exp_chisq(gear, carb, value=cyl)
+  observed <- ret %>% broom::tidy(model, type="observed")
+  summary <- ret %>% broom::glance(model)
+  expect_equal(nrow(summary), 1) # summary for only one group should be shown.
+  residuals <- ret %>% broom::tidy(model, type="residuals")
+})
+
 test_that("test exp_ttest", {
   mtcars2 <- mtcars
   mtcars2$am[[1]] <- NA # test NA filtering
