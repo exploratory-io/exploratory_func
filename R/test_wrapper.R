@@ -229,10 +229,12 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
     }
   }
   
-  if (n_distinct(df[[var1_col]]) < 2) {
+  # Check each category column has multiple classes. 
+  # Currently, we filter out NA categories later. So, counting non-NA categories only.
+  if (n_distinct(df[[var1_col]], na.rm=TRUE) < 2) {
     stop(paste0("Variable Column (", var1_col, ") has to have 2 or more kinds of values."))
   }
-  if (n_distinct(df[[var2_col]]) < 2) {
+  if (n_distinct(df[[var2_col]], na.rm=TRUE) < 2) {
     stop(paste0("Variable Column (", var2_col, ") has to have 2 or more kinds of values."))
   }
 
