@@ -22,7 +22,9 @@ calc_average_marginal_effects <- function(model, data=NULL, with_confint=FALSE) 
     else {
       me <- margins::marginal_effects(model)
     }
-    term <- stringr::str_replace(names(me), "^dydx_", "")
+    # For some reason, str_replace garbles column names generated from Date column with Japanese name. Using gsub instead to avoid the issue.
+    # term <- stringr::str_replace(names(me), "^dydx_", "")
+    term <- gsub("^dydx_", "", names(me))
     ame <- purrr::flatten_dbl(purrr::map(me, function(x){mean(x, na.rm=TRUE)}))
     ret <- data.frame(term=term, ame=ame)
     ret
