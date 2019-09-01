@@ -293,6 +293,7 @@ build_lm.fast <- function(df,
   else {
     # Cleaning of column names for marginal_effects(). Space is not handled well. Replace them with '.'.
     # Also, cleaning of column names for relaimpo. - is not handled well. Replace them with _.
+    # For some reason, str_replace garbles some column names in Japanese. Using gsub instead to avoid the issue.
     # names(clean_df) <- stringr::str_replace_all(names(df), ' ', '.') %>% stringr::str_replace_all('-', '_')
     names(clean_df) <- gsub('\\-', '_', gsub(' ', '.', names(df)))
   }
@@ -925,7 +926,8 @@ augment.lm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "
       },
       test = {
         # Minic broom:::augment.lm behavior of replacing spaces in column names. Without this, after bind_row in prediction(), such columns will end up in 2 separate columns.
-        #names(data) <- stringr::str_replace_all(names(data), ' ', '.')
+        # For some reason, str_replace garbles some column names in Japanese. Using gsub instead to avoid the issue.
+        # names(data) <- stringr::str_replace_all(names(data), ' ', '.')
         names(data) <- gsub(' ', '.', names(data))
         # Augment data with already predicted result in the model.
         data$.fitted <- restore_na(x$prediction_test$fit, x$prediction_test$unknown_category_rows_index)
@@ -996,7 +998,8 @@ evaluate_lm_training_and_test <- function(df, pretty.name = FALSE){
         m <- df %>% filter(!is.null(model)) %>% `[[`(1, "model", 1)
         actual_val_col <- all.vars(df$model[[1]]$terms)[[1]]
         # Emulate the way lm replaces the column names in the output.
-        #actual_val_col_clean <- stringr::str_replace_all(actual_val_col, ' ', '.')
+        # For some reason, str_replace garbles some column names in Japanese. Using gsub instead to avoid the issue.
+        # actual_val_col_clean <- stringr::str_replace_all(actual_val_col, ' ', '.')
         actual_val_col_clean <- gsub(' ', '.', actual_val_col)
 
         actual <- test_pred_ret[[actual_val_col_clean]]
