@@ -637,6 +637,8 @@ build_lm.fast <- function(df,
             model$marginal_effects <- calc_average_marginal_effects(model, with_confint=with_marginal_effects_confint) # This has to be done after glm_exploratory class name is set.
           }
         }
+        # Calculate partial dependencies.
+        model$partial_dependence <- partial_dependence.glm_exploratory(model, vars=c_cols, data=df, n=c(20, min(nrow(df), 20)))
       }
       else {
         class(model) <- c("lm_exploratory", class(model))
