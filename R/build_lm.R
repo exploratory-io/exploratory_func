@@ -5,7 +5,11 @@ partial_dependence.glm_exploratory = function(fit, target, vars = colnames(data)
   interaction = FALSE, uniform = TRUE, data, ...) {
 
   predict.fun = function(object, newdata) {
-    predict(object, data = newdata)
+    predict(object, newdata = newdata, type = "response")
+  }
+
+  aggregate.fun = function(x) {
+    c("preds" = mean(x))
   }
 
   args = list(
@@ -15,6 +19,7 @@ partial_dependence.glm_exploratory = function(fit, target, vars = colnames(data)
     "model" = fit,
     "uniform" = uniform,
     "predict.fun" = predict.fun,
+    "aggregate.fun" = aggregate.fun,
     ...
   )
   
