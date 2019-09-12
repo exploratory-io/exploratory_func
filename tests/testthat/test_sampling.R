@@ -35,16 +35,6 @@ test_that("calc_feature_map(regression) samples down input to 50000 rows", {
   expect_lte(nrow(ret), 50000) # should be less than or equal 50000 after sampling.
 })
 
-test_that("calc_feature_map(regression) samples down input to 50000 rows", {
-  model_df <- flight %>%
-                calc_feature_imp(`ARR DELAY`, `CAR RIER`, `ORI GIN`, `DEP DELAY`, `AIR TIME`,
-                                 test_rate = 0.3,
-                                 test_split_type = "ordered") # testing ordered split too.
-
-  ret <- model_df %>% prediction(data="training_and_test")
-  expect_lte(nrow(ret), 50000) # should be less than or equal 50000 after sampling.
-})
-
 test_that("exp_rpart(binary) samples down input to 50000 rows", {
   model_df <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`)) %>%
                 exp_rpart(is_delayed, `DIS TANCE`, `DEP DELAY`, test_rate = 0.3, binary_classification_threshold=0.5)
