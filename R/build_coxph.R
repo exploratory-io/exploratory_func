@@ -236,7 +236,7 @@ build_coxph.fast <- function(df,
           # 3. limit the number of levels in factor by fct_lump.
           #    we use ties.method to handle the case where there are many unique values. (without it, they all survive fct_lump.)
           # 4. turn NA into (Missing) factor level so that lm will not drop all the rows.
-          df[[col]] <- forcats::fct_explicit_na(forcats::fct_lump(fct_infreq(as.factor(df[[col]])), n=predictor_n, ties.method="first"))
+          df[[col]] <- forcats::fct_explicit_na(forcats::fct_lump(forcats::fct_infreq(as.factor(df[[col]])), n=predictor_n, ties.method="first"))
         } else {
           # for numeric cols, filter NA rows, because lm will anyway do this internally, and errors out
           # if the remaining rows are with single value in any predictor column.

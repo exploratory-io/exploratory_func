@@ -27,7 +27,7 @@ test_that("test parse_html_tables with japanese shift_jis table",{
   expect_equal(length(result), 1)
 })
 
-
+if (FALSE) { # Disabled for now since this test is susceptible to webpage change and unstable.
 test_that("test scrape_html_table",{
   result <- scrape_html_table('https://www.cbinsights.com/research-unicorn-companies', 1, TRUE)
   expect_equal(ncol(result), 6)
@@ -35,6 +35,7 @@ test_that("test scrape_html_table",{
   # seems it changes quite often, excluding this check.
   #expect_equal(nrow(result), 166)
 })
+}
 
 
 test_that("test scrape_html_table with japanese euc-jp table",{
