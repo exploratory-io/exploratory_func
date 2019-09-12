@@ -23,13 +23,13 @@ partial_dependence.glm_exploratory = function(fit, target, vars = colnames(data)
       args$vars = x
       if ("points" %in% names(args))
         args$points = args$points[x]
-      mp = do.call("marginalPrediction", args)
+      mp = do.call(mmpf::marginalPrediction, args)
       names(mp)[ncol(mp)] = target
       mp
     }, simplify = FALSE), fill = TRUE)
     data.table::setcolorder(pd, c(vars, colnames(pd)[!colnames(pd) %in% vars]))
   } else {
-    pd = do.call("marginalPrediction", args)
+    pd = do.call(mmpf::marginalPrediction, args)
     names(pd)[ncol(pd)] = target
   }
 
@@ -1008,6 +1008,34 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
       ret
     }
   )
+}
+
+#' wrapper for tidy type partial dependence
+#' @export
+lm_partial_dependence <- function(df, ...) { # TODO: write test for this.
+  res <- df %>% broom::tidy(model, type="partial_dependence", ...)
+  if (nrow(res) == 0) {
+    return(data.frame()) # Skip the rest of processing by returning empty data.frame.
+  }
+  grouped_col <- grouped_by(res) # When called from analytics view, this should be a single column or empty.
+                                 # grouped_by has to be on res rather than on df since dplyr::group_vars
+                                 # does not work on rowwise-grouped data frame.
+
+  if (length(grouped_col) > 0) {
+    res <- res %>% dplyr::ungroup() # ungroup to mutate group_by column.
+    # add variable name to the group_by column, so that chart is repeated by the combination of group_by column and variable name.
+    res[[grouped_col]] <- paste(as.character(res[[grouped_col]]), res$x_name)
+    res[[grouped_col]] <- forcats::fct_inorder(factor(res[[grouped_col]])) # set order to appear as facets
+    res <- res %>% dplyr::group_by(!!!rlang::syms(grouped_col)) # put back group_by for consistency
+  }
+  else {
+    res$x_name <- forcats::fct_inorder(factor(res$x_name)) # set order to appear as facets
+  }
+  # gather we did after edarf::partial_dependence call turned x_value into factor if not all variables were in a same data type like numeric.
+  # to keep the numeric or factor order (e.g. Sun, Mon, Tue) of x_value in the resulting chart, we do fct_inorder here while x_value is in order.
+  # the first factor() is for the case x_value is not already a factor, to avoid error from fct_inorder()
+  res <- res %>% dplyr::mutate(x_value = forcats::fct_inorder(factor(x_value))) # TODO: if same number appears for different variables, order will be broken.
+  res
 }
 
 #' @export
