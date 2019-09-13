@@ -7,6 +7,9 @@ handle_partial_dependence <- function(x) {
   ret <- x$partial_dependence
   var_cols <- colnames(ret)
   var_cols <- var_cols[1:(length(var_cols)-1)] # remove the last column which is the target column in case of regression.
+  if ("ranger" %in% class(x)) { # TODO: Is this really necessary?
+      var_cols <- var_cols[var_cols %in% colnames(x$df)] # to get list of predictor columns, compare with training df.
+  }
   # We used to do the following, probably for better formatting of numbers, but this had side-effect of
   # turning close numbers into a same number, when differences among numbers are small compared to their
   # absolute values. It happened with Date data turned into numeric.
@@ -40,7 +43,10 @@ handle_partial_dependence <- function(x) {
   # create mapping from column name (x_name) to facet chart type based on whether the column is numeric.
   chart_type_map <-c()
   df <- NULL
-  if (!is.null(x$data)) {  # For glm case.
+  if ("ranger" %in% class(x)) {
+    df <- x$df
+  }
+  else if (!is.null(x$data)) {  # For glm case.
     df <- x$data
   }
   else { # For lm case
