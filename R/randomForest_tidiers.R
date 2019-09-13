@@ -2670,6 +2670,53 @@ glance.rpart <- function(x, pretty.name = FALSE, ...) {
   ret
 }
 
+partial_dependence.rpart = function(fit, target, vars = colnames(data),
+  n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)),
+  interaction = FALSE, uniform = TRUE, data, ...) {
+
+  predict.fun = function(object, newdata) {
+    if (object$classification_type == "regression") {
+      predict(object, data = newdata)
+    } else { # TODO: make sure to make this case work.
+      t(apply(predict(object, data = newdata, predict.all = TRUE)$predictions, 1,
+        function(x) table(factor(x, seq_len(length(unique(data[[target]]))),
+          levels(data[[target]]))) / length(x)))
+      }
+  }
+
+  args = list(
+    "data" = data,
+    "vars" = vars,
+    "n" = n,
+    "model" = fit,
+    "uniform" = uniform,
+    "predict.fun" = predict.fun,
+    ...
+  )
+  
+  if (length(vars) > 1L & !interaction) {
+    pd = rbindlist(sapply(vars, function(x) {
+      args$vars = x
+      if ("points" %in% names(args))
+        args$points = args$points[x]
+      mp = do.call(mmpf::marginalPrediction, args)
+      if (fit$classification_type == "regression")
+        names(mp)[ncol(mp)] = target
+      mp
+    }, simplify = FALSE), fill = TRUE)
+    data.table::setcolorder(pd, c(vars, colnames(pd)[!colnames(pd) %in% vars]))
+  } else {
+    pd = do.call(mmpf::marginalPrediction, args)
+    if (fit$classification_type == "regression")
+      names(pd)[ncol(pd)] = target
+  }
+
+  attr(pd, "class") = c("pd", "data.frame")
+  attr(pd, "interaction") = interaction == TRUE
+  attr(pd, "target") = if (fit$classification_type == "regression") target else levels(fit$predictions)
+  attr(pd, "vars") = vars
+  pd
+}
 
 #' @export
 exp_rpart <- function(df,
@@ -2777,6 +2824,7 @@ exp_rpart <- function(df,
       names(model$terms_mapping) <- name_map
       model$formula_terms <- terms(fml)
       model$sampled_nrow <- clean_df_ret$sampled_nrow
+      model$partial_dependence <- partial_dependence.rpart(model, clean_target_col, vars=c_cols, data=df, n=c(20, min(nrow(df), 20)))
 
       if (test_rate > 0) {
         # Handle NA rows for test. For training, rpart seems to automatically handle it, and row numbers of
