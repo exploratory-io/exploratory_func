@@ -3115,6 +3115,10 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
 
       ret
     },
+    partial_dependence = {
+      ret <- handle_partial_dependence(x)
+      ret
+    },
     {
       stop(paste0("type ", type, " is not defined"))
     }
