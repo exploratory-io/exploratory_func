@@ -2629,9 +2629,9 @@ partial_dependence.rpart = function(fit, target, vars = colnames(data),
 
   predict.fun = function(object, newdata) {
     if (object$classification_type == "regression") {
-      predict(object, data = newdata)
+      predict(object, newdata)
     } else { # TODO: make sure to make this case work.
-      t(apply(predict(object, data = newdata, predict.all = TRUE)$predictions, 1,
+      t(apply(predict(object, newdata, predict.all = TRUE)$predictions, 1,
         function(x) table(factor(x, seq_len(length(unique(data[[target]]))),
           levels(data[[target]]))) / length(x)))
       }
