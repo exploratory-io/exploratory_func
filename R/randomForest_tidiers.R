@@ -2628,13 +2628,13 @@ partial_dependence.rpart = function(fit, target, vars = colnames(data),
   interaction = FALSE, uniform = TRUE, data, ...) {
 
   predict.fun = function(object, newdata) {
-    if (object$classification_type == "regression") {
+    if (object$classification_type != "multi") {
       predict(object, newdata)
     } else { # TODO: make sure to make this case work.
       t(apply(predict(object, newdata, predict.all = TRUE)$predictions, 1,
         function(x) table(factor(x, seq_len(length(unique(data[[target]]))),
           levels(data[[target]]))) / length(x)))
-      }
+    }
   }
 
   args = list(

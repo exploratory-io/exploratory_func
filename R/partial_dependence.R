@@ -8,7 +8,10 @@ handle_partial_dependence <- function(x) {
   var_cols <- colnames(ret)
   var_cols <- var_cols[1:(length(var_cols)-1)] # remove the last column which is the target column in case of regression.
   if ("ranger" %in% class(x)) { # TODO: Is this really necessary?
-      var_cols <- var_cols[var_cols %in% colnames(x$df)] # to get list of predictor columns, compare with training df.
+    var_cols <- var_cols[var_cols %in% colnames(x$df)] # to get list of predictor columns, compare with training df.
+  }
+  else if ("rpart" %in% class(x)) { # keep only predictor names part in classification case, where category names are also in column names.
+    var_cols <- var_cols[seq_len(length(attr(x$terms,"term.labels")))]
   }
   # We used to do the following, probably for better formatting of numbers, but this had side-effect of
   # turning close numbers into a same number, when differences among numbers are small compared to their
