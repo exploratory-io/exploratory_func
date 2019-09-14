@@ -49,7 +49,7 @@ handle_partial_dependence <- function(x) {
   if ("ranger" %in% class(x)) {
     df <- x$df
   }
-  if ("rpart" %in% class(x)) {
+  else if ("rpart" %in% class(x)) {
     # use partial_dependence itself for determining chart_time. Maybe this works for other models too?
     df <- x$partial_dependence
   }
