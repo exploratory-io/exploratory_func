@@ -1974,6 +1974,8 @@ calc_feature_imp <- function(df,
                              # Number of most important variables to calculate partial dependences on. 
                              # By default, when Boruta is on, all Confirmed/Tentative variables.
                              # 12 when Boruta is off.
+                             pd_sample_size = 20,
+                             pd_grid_resolution = 20,
                              with_boruta = FALSE,
                              boruta_max_runs = 20, # Maximal number of importance source runs.
                              boruta_p_value = 0.05, # Boruta recommends using the default 0.01 for P-value, but we are using 0.05 for consistency with other functions of ours.
@@ -2178,7 +2180,7 @@ calc_feature_imp <- function(df,
       rf$imp_vars <- imp_vars
       # Second element of n argument needs to be less than or equal to sample size, to avoid error.
       if (length(imp_vars) > 0) {
-        rf$partial_dependence <- edarf::partial_dependence(rf, vars=imp_vars, data=model_df, n=c(20, min(rf$num.samples, 20)))
+        rf$partial_dependence <- edarf::partial_dependence(rf, vars=imp_vars, data=model_df, n=c(pd_grid_resolution, min(rf$num.samples, pd_sample_size)))
       }
       else {
         rf$partial_dependence <- NULL
@@ -2628,13 +2630,13 @@ partial_dependence.rpart = function(fit, target, vars = colnames(data),
   interaction = FALSE, uniform = TRUE, data, ...) {
 
   predict.fun = function(object, newdata) {
-    if (object$classification_type != "multi") {
-      predict(object, newdata)
-    } else { # TODO: make sure to make this case work.
-      t(apply(predict(object, newdata, predict.all = TRUE)$predictions, 1,
-        function(x) table(factor(x, seq_len(length(unique(data[[target]]))),
-          levels(data[[target]]))) / length(x)))
-    }
+    # Within our use cases, rpart always returns numeric values or probability
+    # even with multiclass classification.
+    # In that case, just calling predict is enough.
+    # edarf code for ranger does something more for classification case,
+    # but it is not necessary here.
+    ret <- predict(object, newdata)
+    ret
   }
 
   args = list(
