@@ -1,6 +1,6 @@
 
 
-partial_dependence.glm_exploratory = function(fit, target, vars = colnames(data),
+partial_dependence.lm_exploratory = function(fit, target, vars = colnames(data),
   n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)),
   interaction = FALSE, uniform = TRUE, data, ...) {
 
@@ -245,6 +245,8 @@ build_lm.fast <- function(df,
                     with_marginal_effects = FALSE,
                     with_marginal_effects_confint = FALSE,
                     variable_metric = NULL,
+                    pd_sample_size = 20,
+                    pd_grid_resolution = 20,
                     seed = 1,
                     test_rate = 0.0,
                     test_split_type = "random" # "random" or "ordered"
@@ -645,7 +647,7 @@ build_lm.fast <- function(df,
         class(model) <- c("lm_exploratory", class(model))
       }
       # Calculate partial dependencies.
-      model$partial_dependence <- partial_dependence.glm_exploratory(model, target=clean_target_col, vars=c_cols, data=df, n=c(20, min(nrow(df), 20)))
+      model$partial_dependence <- partial_dependence.lm_exploratory(model, target=clean_target_col, vars=c_cols, data=df, n=c(pd_grid_resolution, min(nrow(df), pd_sample_size)))
 
       list(model = model, test_index = test_index, source_data = source_data)
 
