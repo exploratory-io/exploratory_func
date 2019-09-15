@@ -2685,6 +2685,7 @@ exp_rpart <- function(df,
                       smote_target_minority_perc = 40,
                       smote_max_synth_perc = 200,
                       smote_k = 5,
+                      max_pd_vars = 12,
                       pd_sample_size = 20,
                       pd_grid_resolution = 20,
                       seed = 1,
@@ -2781,7 +2782,11 @@ exp_rpart <- function(df,
       names(model$terms_mapping) <- name_map
       model$formula_terms <- terms(fml)
       model$sampled_nrow <- clean_df_ret$sampled_nrow
-      model$partial_dependence <- partial_dependence.rpart(model, clean_target_col, vars=c_cols, data=df, n=c(pd_grid_resolution, min(nrow(df), pd_sample_size)))
+
+      # Find list of important variables and run partial dependence on them.
+      imp_vars <- names(model$variable.importance) # model$variable.importance is already sorted by importance.
+      imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # Keep only max_pd_vars most important variables
+      model$partial_dependence <- partial_dependence.rpart(model, clean_target_col, vars=imp_vars, data=df, n=c(pd_grid_resolution, min(nrow(df), pd_sample_size)))
 
       if (test_rate > 0) {
         # Handle NA rows for test. For training, rpart seems to automatically handle it, and row numbers of
