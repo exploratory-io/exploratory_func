@@ -2685,6 +2685,8 @@ exp_rpart <- function(df,
                       smote_target_minority_perc = 40,
                       smote_max_synth_perc = 200,
                       smote_k = 5,
+                      pd_sample_size = 20,
+                      pd_grid_resolution = 20,
                       seed = 1,
                       minsplit = 20, # The minimum number of observations that must exist in a node in order for a split to be attempted. Passed down to rpart()
                       minbucket = round(minsplit/3), # The minimum number of observations in any terminal node. Passed down to rpart()
@@ -2779,7 +2781,7 @@ exp_rpart <- function(df,
       names(model$terms_mapping) <- name_map
       model$formula_terms <- terms(fml)
       model$sampled_nrow <- clean_df_ret$sampled_nrow
-      model$partial_dependence <- partial_dependence.rpart(model, clean_target_col, vars=c_cols, data=df, n=c(20, min(nrow(df), 20)))
+      model$partial_dependence <- partial_dependence.rpart(model, clean_target_col, vars=c_cols, data=df, n=c(pd_grid_resolution, min(nrow(df), pd_sample_size)))
 
       if (test_rate > 0) {
         # Handle NA rows for test. For training, rpart seems to automatically handle it, and row numbers of
