@@ -245,6 +245,7 @@ build_lm.fast <- function(df,
                     with_marginal_effects = FALSE,
                     with_marginal_effects_confint = FALSE,
                     variable_metric = NULL,
+                    p_value_threshold = 0.05,
                     max_pd_vars = 12,
                     pd_sample_size = 20,
                     pd_grid_resolution = 20,
@@ -648,18 +649,30 @@ build_lm.fast <- function(df,
         class(model) <- c("lm_exploratory", class(model))
       }
       # Calculate partial dependencies.
-      if (!is.null(model$relative_importance)) { # if importance is available, show only max_pd_vars most important vars.
+      if (!is.null(model$relative_importance) && "error" %nin% class(model$relative_importance)) { # if importance is available, show only max_pd_vars most important vars.
         importance <- attr(model$relative_importance, model$relative_importance$type)
         term <- model$relative_importance$namen[2:length(model$relative_importance$namen)]
         imp_df <- data.frame(term = term, importance = importance)
         imp_vars <- as.character((imp_df %>% arrange(-importance))$term)
         imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # Keep only max_pd_vars most important variables
       }
-      else  { # We do not have a way to determine importance. Just show all variables.
-        imp_vars <- c_cols
+      else  { # We do not have a way to determine importance. Just show all significant variables.
+        # One-liner to keep only significant predictors by matching names with result of tidy().
+        signif_df <- broom::tidy(model) %>% filter(p.value < p_value_threshold)
+        if (nrow(signif_df > 0)) {
+          imp_vars <- c_cols[sapply(c_cols,function(x){any(stringr::str_detect(signif_df$term, paste0("^`?", x)))})]
+        }
+        else  {
+          imp_vars <- c()
+        }
       }
 
-      model$partial_dependence <- partial_dependence.lm_exploratory(model, target=clean_target_col, vars=imp_vars, data=df, n=c(pd_grid_resolution, min(nrow(df), pd_sample_size)))
+      if (length(imp_vars) > 0) {
+        model$partial_dependence <- partial_dependence.lm_exploratory(model, target=clean_target_col, vars=imp_vars, data=df, n=c(pd_grid_resolution, min(nrow(df), pd_sample_size)))
+      }
+      else {
+        model$partial_dependence <- NULL
+      }
 
       list(model = model, test_index = test_index, source_data = source_data)
 
