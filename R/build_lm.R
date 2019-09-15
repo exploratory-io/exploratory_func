@@ -245,6 +245,7 @@ build_lm.fast <- function(df,
                     with_marginal_effects = FALSE,
                     with_marginal_effects_confint = FALSE,
                     variable_metric = NULL,
+                    max_pd_vars = 12,
                     pd_sample_size = 20,
                     pd_grid_resolution = 20,
                     seed = 1,
@@ -647,7 +648,18 @@ build_lm.fast <- function(df,
         class(model) <- c("lm_exploratory", class(model))
       }
       # Calculate partial dependencies.
-      model$partial_dependence <- partial_dependence.lm_exploratory(model, target=clean_target_col, vars=c_cols, data=df, n=c(pd_grid_resolution, min(nrow(df), pd_sample_size)))
+      if (!is.null(model$relative_importance)) { # if importance is available, show only max_pd_vars most important vars.
+        importance <- attr(model$relative_importance, model$relative_importance$type)
+        term <- model$relative_importance$namen[2:length(model$relative_importance$namen)]
+        imp_df <- data.frame(term = term, importance = importance)
+        imp_vars <- as.character((imp_df %>% arrange(-importance))$term)
+        imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # Keep only max_pd_vars most important variables
+      }
+      else  { # We do not have a way to determine importance. Just show all variables.
+        imp_vars <- c_cols
+      }
+
+      model$partial_dependence <- partial_dependence.lm_exploratory(model, target=clean_target_col, vars=imp_vars, data=df, n=c(pd_grid_resolution, min(nrow(df), pd_sample_size)))
 
       list(model = model, test_index = test_index, source_data = source_data)
 
