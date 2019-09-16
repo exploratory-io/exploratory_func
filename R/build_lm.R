@@ -583,7 +583,7 @@ build_lm.fast <- function(df,
               link <- "log"
             }
 
-            if (dplyr::n_distinct(df[[clean_target_col]])) {
+            if (dplyr::n_distinct(df[[clean_target_col]]) == 1) {
               # If only 1 unique value is there in target column, glm.nb seems to return error like following.
               # Error in while ((it <- it + 1) < limit && abs(del) > eps) { : 
               # missing value where TRUE/FALSE needed
@@ -671,7 +671,7 @@ build_lm.fast <- function(df,
       else  { # We do not have a way to determine importance. Just show all significant variables.
         # One-liner to keep only significant predictors by matching names with result of tidy().
         signif_df <- broom::tidy(model) %>% filter(p.value < p_value_threshold)
-        if (nrow(signif_df > 0)) {
+        if (nrow(signif_df) > 0) {
           imp_vars <- c_cols[sapply(c_cols,function(x){any(stringr::str_detect(signif_df$term, paste0("^`?", x)))})]
         }
         else  {
