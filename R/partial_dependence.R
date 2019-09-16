@@ -1,4 +1,5 @@
-
+# Common utility function called for tidy with type "partial_dependence".
+# Used for ranger, rpart, lm, and glm.
 handle_partial_dependence <- function(x) {
   if (is.null(x$partial_dependence)) {
     return(data.frame()) # Skip by returning empty data.frame.

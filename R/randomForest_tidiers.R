@@ -2625,6 +2625,7 @@ glance.rpart <- function(x, pretty.name = FALSE, ...) {
   ret
 }
 
+# Builds partial_dependency object for rpart with same structure (a data.frame with attributes.) as edarf::partial_dependence.
 partial_dependence.rpart = function(fit, target, vars = colnames(data),
   n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)),
   interaction = FALSE, uniform = TRUE, data, ...) {
