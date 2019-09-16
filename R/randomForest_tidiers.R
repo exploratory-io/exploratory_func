@@ -2784,9 +2784,14 @@ exp_rpart <- function(df,
       model$sampled_nrow <- clean_df_ret$sampled_nrow
 
       # Find list of important variables and run partial dependence on them.
-      imp_vars <- names(model$variable.importance) # model$variable.importance is already sorted by importance.
-      imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # Keep only max_pd_vars most important variables
-      model$partial_dependence <- partial_dependence.rpart(model, clean_target_col, vars=imp_vars, data=df, n=c(pd_grid_resolution, min(nrow(df), pd_sample_size)))
+      if (!is.null(model$variable.importance)) { # It is possible variable.importance is missing for example when no split happened.
+        imp_vars <- names(model$variable.importance) # model$variable.importance is already sorted by importance.
+        imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # Keep only max_pd_vars most important variables
+        model$partial_dependence <- partial_dependence.rpart(model, clean_target_col, vars=imp_vars, data=df, n=c(pd_grid_resolution, min(nrow(df), pd_sample_size)))
+      }
+      else {
+        model$partial_dependence <- NULL
+      }
 
       if (test_rate > 0) {
         # Handle NA rows for test. For training, rpart seems to automatically handle it, and row numbers of
