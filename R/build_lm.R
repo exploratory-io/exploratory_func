@@ -399,6 +399,9 @@ build_lm.fast <- function(df,
           df <- df %>% dplyr::filter(!is.na(df[[col]]) & !is.infinite(df[[col]]))
         }
       }
+      if (nrow(df) == 0) {
+        stop("No row is left after removing NA/Inf from numeric, Date, or POSIXct columns.")
+      }
       for(col in clean_cols){
         if(lubridate::is.Date(df[[col]]) || lubridate::is.POSIXct(df[[col]])) {
           c_cols <- setdiff(c_cols, col)
@@ -485,6 +488,9 @@ build_lm.fast <- function(df,
           c_cols <- setdiff(c_cols, col)
           df[[col]] <- NULL # drop the column so that SMOTE will not see it. 
         }
+      }
+      if (length(c_cols) == 0) {
+        stop("No column is left after removing columns with single value.")
       }
 
       # build formula for lm
@@ -577,6 +583,12 @@ build_lm.fast <- function(df,
               link <- "log"
             }
 
+            if (dplyr::n_distinct(df[[clean_target_col]])) {
+              # If only 1 unique value is there in target column, glm.nb seems to return error like following.
+              # Error in while ((it <- it + 1) < limit && abs(del) > eps) { : 
+              # missing value where TRUE/FALSE needed
+              stop("Target column has only one unique value.")
+            }
             # The argument link in MASS::glm.nb is evaluated by substitution with delay,
             # so the variable specified in the argument is interpreted as the link argument as it is.
             # For example, if you execute like MASS::glm.nb(fmt, data = df, link = link), the following error will occur
