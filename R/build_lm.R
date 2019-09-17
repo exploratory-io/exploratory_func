@@ -568,6 +568,13 @@ build_lm.fast <- function(df,
         }
       }
 
+      tryCatch({
+        model$vif <- car::vif(model)
+      }, error = function(e){
+        # in case of perfect multicollinearity, vif throws error with message "there are aliased coefficients in the model".
+        model$vif <- e
+      })
+
       if (test_rate > 0) {
         # Note: Do not pass df_test like data=df_test. This for some reason ends up predict returning training data prediction.
         model$prediction_test <- predict(model, df_test, se.fit = TRUE)
@@ -780,6 +787,17 @@ xlevels_to_base_level_table <- function(xlevels) {
   ret
 }
 
+vif_to_dataframe <- function(x) {
+  ret <- NULL
+  if (is.matrix(x$vif)) {
+    ret <- x$vif %>% as.data.frame() %>%  rownames_to_column(var="term") %>% rename(VIF=GVIF)
+  }
+  else {
+    ret <- data.frame(term=names(x$vif), VIF=x$vif)
+  }
+  ret
+}
+
 #' special version of tidy.lm function to use with build_lm.fast.
 #' @export
 tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, ...) { #TODO: add test
@@ -833,6 +851,15 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
         ret <- data.frame() # Skip output for this group.
         ret
       }
+    },
+    vif = {
+      if (!is.null(x$vif) && "error" %nin% class(x$vif)) {
+        ret <- vif_to_dataframe(x)
+      }
+      else {
+        ret <- data.frame() # Skip output for this group. TODO: Report error in some way.
+      }
+      ret
     }
   )
 }
@@ -910,6 +937,15 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
         dplyr::group_by(actual_value, predicted_value) %>%
         dplyr::summarize(count = n()) %>%
         dplyr::ungroup()
+      ret
+    },
+    vif = {
+      if (!is.null(x$vif) && "error" %nin% class(x$vif)) {
+        ret <- vif_to_dataframe(x)
+      }
+      else {
+        ret <- data.frame() # Skip output for this group. TODO: Report error in some way.
+      }
       ret
     }
   )
