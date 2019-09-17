@@ -572,7 +572,16 @@ build_lm.fast <- function(df,
         model$vif <- car::vif(model)
       }, error = function(e){
         # in case of perfect multicollinearity, vif throws error with message "there are aliased coefficients in the model".
-        model$vif <- e
+        # Check it it is the case. If coef() includes NA, corresponding variable is causing perfect multicollinearity.
+        coef_vec <- coef(model)
+        na_coef_vec <- coef_vec[is.na(coef_vec)]
+        if (length(na_coef_vec) > 0) {
+          na_coef_names <- names(na_coef_vec)
+          message <- paste(na_coef_names, collapse = ", ")
+          message <- paste0("Variables causing perfect collinearity : ", message)
+          e$message <- message
+        }
+        model$vif <<- e
       })
 
       if (test_rate > 0) {
