@@ -184,6 +184,7 @@ build_lm.fast <- function(df,
                     link = NULL,
                     max_nrow = 50000,
                     predictor_n = 12, # so that at least months can fit in it.
+                    normalize_predictors = FALSE,
                     smote = FALSE,
                     smote_target_minority_perc = 40,
                     smote_max_synth_perc = 200,
@@ -426,6 +427,16 @@ build_lm.fast <- function(df,
         if (length(unique_val[!is.na(unique_val)]) == 1) {
           c_cols <- setdiff(c_cols, col)
           df[[col]] <- NULL # drop the column so that SMOTE will not see it. 
+        }
+      }
+
+      # Normalize numeric predictors so that resulting coefficients are comparable among them,
+      # after all column changes for Date/POSIXct, filtering, dropping columns above are done.
+      if (normalize_predictors) {
+        for (col in c_cols) {
+          if(is.numeric(df[[col]])) {
+            df[[col]] <- normalize(df[[col]])
+          }
         }
       }
 
