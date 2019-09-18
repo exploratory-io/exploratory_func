@@ -1,3 +1,52 @@
+
+
+# Builds partial_dependency object for lm/glm with same structure (a data.frame with attributes.) as edarf::partial_dependence.
+partial_dependence.lm_exploratory <- function(fit, target, vars = colnames(data),
+  n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)), # Keeping same default of 25 as edarf::partial_dependence, although we usually overwrite from callers.
+  interaction = FALSE, uniform = TRUE, data, ...) {
+
+  predict.fun <- function(object, newdata) {
+    predict(object, newdata = newdata, type = "response")
+  }
+
+  aggregate.fun <- function(x) {
+    c("preds" = mean(x))
+  }
+
+  args = list(
+    "data" = data,
+    "vars" = vars,
+    "n" = n,
+    "model" = fit,
+    "uniform" = uniform,
+    "predict.fun" = predict.fun,
+    "aggregate.fun" = aggregate.fun,
+    ...
+  )
+  
+  if (length(vars) > 1L & !interaction) { # More than one variables are there. Iterate calling mmpf::marginalPrediction.
+    pd = rbindlist(sapply(vars, function(x) {
+      args$vars = x
+      if ("points" %in% names(args))
+        args$points = args$points[x]
+      mp = do.call(mmpf::marginalPrediction, args)
+      names(mp)[ncol(mp)] = target
+      mp
+    }, simplify = FALSE), fill = TRUE)
+    data.table::setcolorder(pd, c(vars, colnames(pd)[!colnames(pd) %in% vars]))
+  } else {
+    pd = do.call(mmpf::marginalPrediction, args)
+    names(pd)[ncol(pd)] = target
+  }
+
+  attr(pd, "class") = c("pd", "data.frame")
+  attr(pd, "interaction") = interaction == TRUE
+  attr(pd, "target") = target
+  attr(pd, "vars") = vars
+  pd
+}
+
+
 # Calculate average marginal effects from model with margins package.
 calc_average_marginal_effects <- function(model, data=NULL, with_confint=FALSE) {
   if (with_confint) {
@@ -197,6 +246,10 @@ build_lm.fast <- function(df,
                     with_marginal_effects = FALSE,
                     with_marginal_effects_confint = FALSE,
                     variable_metric = NULL,
+                    p_value_threshold = 0.05,
+                    max_pd_vars = 12,
+                    pd_sample_size = 20,
+                    pd_grid_resolution = 20,
                     seed = 1,
                     test_rate = 0.0,
                     test_split_type = "random" # "random" or "ordered"
@@ -347,6 +400,9 @@ build_lm.fast <- function(df,
           df <- df %>% dplyr::filter(!is.na(df[[col]]) & !is.infinite(df[[col]]))
         }
       }
+      if (nrow(df) == 0) {
+        stop("No row is left after removing NA/Inf from numeric, Date, or POSIXct columns.")
+      }
       for(col in clean_cols){
         if(lubridate::is.Date(df[[col]]) || lubridate::is.POSIXct(df[[col]])) {
           c_cols <- setdiff(c_cols, col)
@@ -433,6 +489,9 @@ build_lm.fast <- function(df,
           c_cols <- setdiff(c_cols, col)
           df[[col]] <- NULL # drop the column so that SMOTE will not see it. 
         }
+      }
+      if (length(c_cols) == 0) {
+        stop("No column is left after removing columns with single value.")
       }
 
       # build formula for lm
@@ -525,6 +584,12 @@ build_lm.fast <- function(df,
               link <- "log"
             }
 
+            if (dplyr::n_distinct(df[[clean_target_col]]) == 1) {
+              # If only 1 unique value is there in target column, glm.nb seems to return error like following.
+              # Error in while ((it <- it + 1) < limit && abs(del) > eps) { : 
+              # missing value where TRUE/FALSE needed
+              stop("Target column has only one unique value.")
+            }
             # The argument link in MASS::glm.nb is evaluated by substitution with delay,
             # so the variable specified in the argument is interpreted as the link argument as it is.
             # For example, if you execute like MASS::glm.nb(fmt, data = df, link = link), the following error will occur
@@ -596,6 +661,32 @@ build_lm.fast <- function(df,
       else {
         class(model) <- c("lm_exploratory", class(model))
       }
+      # Calculate partial dependencies.
+      if (!is.null(model$relative_importance) && "error" %nin% class(model$relative_importance)) { # if importance is available, show only max_pd_vars most important vars.
+        importance <- attr(model$relative_importance, model$relative_importance$type)
+        term <- model$relative_importance$namen[2:length(model$relative_importance$namen)]
+        imp_df <- data.frame(term = term, importance = importance)
+        imp_vars <- as.character((imp_df %>% arrange(-importance))$term)
+        imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # Keep only max_pd_vars most important variables
+      }
+      else  { # We do not have a way to determine importance. Just show all significant variables.
+        # One-liner to keep only significant predictors by matching names with result of tidy().
+        signif_df <- broom::tidy(model) %>% filter(p.value < p_value_threshold)
+        if (nrow(signif_df) > 0) {
+          imp_vars <- c_cols[sapply(c_cols,function(x){any(stringr::str_detect(signif_df$term, paste0("^`?", x)))})]
+        }
+        else  {
+          imp_vars <- c()
+        }
+      }
+
+      if (length(imp_vars) > 0) {
+        model$partial_dependence <- partial_dependence.lm_exploratory(model, target=clean_target_col, vars=imp_vars, data=df, n=c(pd_grid_resolution, min(nrow(df), pd_sample_size)))
+      }
+      else {
+        model$partial_dependence <- NULL
+      }
+
       list(model = model, test_index = test_index, source_data = source_data)
 
     }, error = function(e){
@@ -833,6 +924,9 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
         ret <- data.frame() # Skip output for this group.
         ret
       }
+    },
+    partial_dependence = {
+      handle_partial_dependence(x)
     }
   )
 }
@@ -911,8 +1005,39 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
         dplyr::summarize(count = n()) %>%
         dplyr::ungroup()
       ret
+    },
+    partial_dependence = {
+      handle_partial_dependence(x)
     }
   )
+}
+
+#' wrapper for tidy type partial dependence
+#' @export
+lm_partial_dependence <- function(df, ...) { # TODO: write test for this.
+  res <- df %>% broom::tidy(model, type="partial_dependence", ...)
+  if (nrow(res) == 0) {
+    return(data.frame()) # Skip the rest of processing by returning empty data.frame.
+  }
+  grouped_col <- grouped_by(res) # When called from analytics view, this should be a single column or empty.
+                                 # grouped_by has to be on res rather than on df since dplyr::group_vars
+                                 # does not work on rowwise-grouped data frame.
+
+  if (length(grouped_col) > 0) {
+    res <- res %>% dplyr::ungroup() # ungroup to mutate group_by column.
+    # add variable name to the group_by column, so that chart is repeated by the combination of group_by column and variable name.
+    res[[grouped_col]] <- paste(as.character(res[[grouped_col]]), res$x_name)
+    res[[grouped_col]] <- forcats::fct_inorder(factor(res[[grouped_col]])) # set order to appear as facets
+    res <- res %>% dplyr::group_by(!!!rlang::syms(grouped_col)) # put back group_by for consistency
+  }
+  else {
+    res$x_name <- forcats::fct_inorder(factor(res$x_name)) # set order to appear as facets
+  }
+  # gather we did after edarf::partial_dependence call turned x_value into factor if not all variables were in a same data type like numeric.
+  # to keep the numeric or factor order (e.g. Sun, Mon, Tue) of x_value in the resulting chart, we do fct_inorder here while x_value is in order.
+  # the first factor() is for the case x_value is not already a factor, to avoid error from fct_inorder()
+  res <- res %>% dplyr::mutate(x_value = forcats::fct_inorder(factor(x_value))) # TODO: if same number appears for different variables, order will be broken.
+  res
 }
 
 #' @export
