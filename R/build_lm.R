@@ -434,7 +434,7 @@ build_lm.fast <- function(df,
       # after all column changes for Date/POSIXct, filtering, dropping columns above are done.
       if (normalize_predictors) {
         for (col in c_cols) {
-          if(is.numeric(df[[col]])) {
+          if (is.numeric(df[[col]])) {
             df[[col]] <- normalize(df[[col]])
           }
         }
