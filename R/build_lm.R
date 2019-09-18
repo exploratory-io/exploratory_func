@@ -1,15 +1,15 @@
 
 
 # Builds partial_dependency object for lm/glm with same structure (a data.frame with attributes.) as edarf::partial_dependence.
-partial_dependence.lm_exploratory = function(fit, target, vars = colnames(data),
-  n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)),
+partial_dependence.lm_exploratory <- function(fit, target, vars = colnames(data),
+  n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)), # Keeping same default of 25 as edarf::partial_dependence, although we usually overwrite from callers.
   interaction = FALSE, uniform = TRUE, data, ...) {
 
-  predict.fun = function(object, newdata) {
+  predict.fun <- function(object, newdata) {
     predict(object, newdata = newdata, type = "response")
   }
 
-  aggregate.fun = function(x) {
+  aggregate.fun <- function(x) {
     c("preds" = mean(x))
   }
 
@@ -24,7 +24,7 @@ partial_dependence.lm_exploratory = function(fit, target, vars = colnames(data),
     ...
   )
   
-  if (length(vars) > 1L & !interaction) {
+  if (length(vars) > 1L & !interaction) { # More than one variables are there. Iterate calling mmpf::marginalPrediction.
     pd = rbindlist(sapply(vars, function(x) {
       args$vars = x
       if ("points" %in% names(args))
