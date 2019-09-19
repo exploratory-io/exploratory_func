@@ -496,7 +496,7 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, d = NULL, 
         res
       }
       df$.is.outlier <- FALSE #TODO: handle possibility of name conflict.
-      df$.is.outlier <- df$.is.outlier & is_outlier(df[[var1_col]])
+      df$.is.outlier <- df$.is.outlier | is_outlier(df[[var1_col]])
       df <- df %>% dplyr::filter(!.is.outlier)
       df$.is.outlier <- NULL
     }
@@ -836,7 +836,7 @@ exp_anova <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, f = NULL, 
         res
       }
       df$.is.outlier <- FALSE #TODO: handle possibility of name conflict.
-      df$.is.outlier <- df$.is.outlier & is_outlier(df[[var1_col]])
+      df$.is.outlier <- df$.is.outlier | is_outlier(df[[var1_col]])
       df <- df %>% dplyr::filter(!.is.outlier)
       df$.is.outlier <- NULL
     }

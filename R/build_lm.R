@@ -493,32 +493,31 @@ build_lm.fast <- function(df,
         stop("No column is left after removing columns with single value.")
       }
 
-      if (!is.null(target_outlier_filter_type)) {
-        is_outlier <- function(x) {
-          res <- detect_outlier(x, type=target_outlier_filter_type, threshold=target_outlier_filter_threshold) %in% c("lower", "upper")
-          res
-        }
+      if (!is.null(target_outlier_filter_type) || !is.null(predictor_outlier_filter_type)) {
         df$.is.outlier <- FALSE #TODO: handle possibility of name conflict.
-        if (is.numeric(df[[clean_target_col]])) {
-          df$.is.outlier <- df$.is.outlier | is_outlier(df[[clean_target_col]])
+        if (!is.null(target_outlier_filter_type)) {
+          is_outlier <- function(x) {
+            res <- detect_outlier(x, type=target_outlier_filter_type, threshold=target_outlier_filter_threshold) %in% c("lower", "upper")
+            res
+          }
+          if (is.numeric(df[[clean_target_col]])) {
+            df$.is.outlier <- df$.is.outlier | is_outlier(df[[clean_target_col]])
+          }
         }
-        df <- df %>% dplyr::filter(!.is.outlier)
-        df$.is.outlier <- NULL
-      }
 
-      if (!is.null(predictor_outlier_filter_type)) {
-        is_outlier <- function(x) {
-          res <- detect_outlier(x, type=predictor_outlier_filter_type, threshold=predictor_outlier_filter_threshold) %in% c("lower", "upper")
-          res
-        }
-        df$.is.outlier <- FALSE #TODO: handle possibility of name conflict.
-        for (col in c_cols) {
-          if (is.numeric(df[[col]])) {
-            df$.is.outlier <- df$.is.outlier | is_outlier(df[[col]])
+        if (!is.null(predictor_outlier_filter_type)) {
+          is_outlier <- function(x) {
+            res <- detect_outlier(x, type=predictor_outlier_filter_type, threshold=predictor_outlier_filter_threshold) %in% c("lower", "upper")
+            res
+          }
+          for (col in c_cols) {
+            if (is.numeric(df[[col]])) {
+              df$.is.outlier <- df$.is.outlier | is_outlier(df[[col]])
+            }
           }
         }
         df <- df %>% dplyr::filter(!.is.outlier)
-        df$.is.outlier <- NULL
+        df$.is.outlier <- NULL # Removing the temporary column.
       }
 
       # Normalize numeric predictors so that resulting coefficients are comparable among them,
