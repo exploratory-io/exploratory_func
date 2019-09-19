@@ -801,7 +801,9 @@ tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
 
 #' ANOVA wrapper for Analytics View
 #' @export
-exp_anova <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, f = NULL, power = NULL, beta = NULL, ...) {
+exp_anova <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, f = NULL, power = NULL, beta = NULL,
+                      outlier_filter_type = NULL, outlier_filter_threshold = NULL,
+                      ...) {
   if (!is.null(power) && !is.null(beta) && (power + beta != 1.0)) {
     stop("Specify only one of Power or Probability of Type 2 Error, or they must add up to 1.0.")
   }
@@ -828,8 +830,19 @@ exp_anova <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, f = NULL, 
   formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
 
   anova_each <- function(df) {
+    if (!is.null(outlier_filter_type)) { #TODO: duplicated code with exp_ttest.
+      is_outlier <- function(x) {
+        res <- detect_outlier(x, type=outlier_filter_type, threshold=outlier_filter_threshold) %in% c("lower", "upper")
+        res
+      }
+      df$.is.outlier <- FALSE #TODO: handle possibility of name conflict.
+      df$.is.outlier <- df$.is.outlier & is_outlier(df[[var1_col]])
+      df <- df %>% dplyr::filter(!.is.outlier)
+      df$.is.outlier <- NULL
+    }
+
     if(length(grouped_cols) > 0) {
-      # Check n_distinct again within group.
+      # Check n_distinct again within group after handling outliers.
       # Group with NA and another category does not seem to work well with aov. Eliminating such case too. TODO: We could replace NA with an explicit level.
       n_distinct_res_each <- n_distinct(df[[var2_col]], na.rm=TRUE)
       if (n_distinct_res_each < 2) {
