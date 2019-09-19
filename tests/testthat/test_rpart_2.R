@@ -26,6 +26,8 @@ test_that("exp_rpart(regression) evaluate training and test", {
                           test_rate = 0.3,
                           test_split_type = "ordered") # testing ordered split too.
 
+  ret <-  model_df %>% rf_partial_dependence()
+
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
   # expect_equal(nrow(test_ret), 1483) # Not very stable for some reason. Will revisit.
@@ -49,6 +51,8 @@ test_that("exp_rpart(regression) evaluate training and test", {
 test_that("exp_rpart(binary) evaluate training and test", {
   model_df <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`)) %>%
                 exp_rpart(is_delayed, `DIS TANCE`, `DEP DELAY`, test_rate = 0.3, binary_classification_threshold=0.5)
+
+  ret <-  model_df %>% rf_partial_dependence()
 
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
@@ -98,6 +102,8 @@ test_that("exp_rpart(multi) evaluate training and test", {
   model_df <- flight %>%
                 exp_rpart(`ORI GIN`, `DIS TANCE`, `DEP TIME`, test_rate = 0.3)
 
+  ret <-  model_df %>% rf_partial_dependence()
+
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
   # expect_equal(nrow(test_ret), 1483) # Not very stable for some reason. Will revisit.
@@ -117,4 +123,3 @@ test_that("exp_rpart(multi) evaluate training and test", {
   ret <- rf_evaluation_training_and_test(model_df)
   expect_equal(nrow(ret), 1) # 1 for train
 })
-
