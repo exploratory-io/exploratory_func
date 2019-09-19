@@ -185,6 +185,10 @@ build_lm.fast <- function(df,
                     max_nrow = 50000,
                     predictor_n = 12, # so that at least months can fit in it.
                     normalize_predictors = FALSE,
+                    target_outlier_filter_type = NULL,
+                    target_outlier_filter_threshold = NULL,
+                    predictor_outlier_filter_type = NULL,
+                    predictor_outlier_filter_threshold = NULL,
                     smote = FALSE,
                     smote_target_minority_perc = 40,
                     smote_max_synth_perc = 200,
@@ -428,6 +432,34 @@ build_lm.fast <- function(df,
           c_cols <- setdiff(c_cols, col)
           df[[col]] <- NULL # drop the column so that SMOTE will not see it. 
         }
+      }
+
+      if (!is.null(target_outlier_filter_type)) {
+        is_outlier <- function(x) {
+          res <- detect_outlier(x, type=target_outlier_filter_type, threshold=target_outlier_filter_threshold) %in% c("lower", "upper")
+          res
+        }
+        df$.is.outlier <- FALSE #TODO: handle possibility of name conflict.
+        if (is.numeric(df[[clean_target_col]])) {
+          df$.is.outlier <- df$.is.outlier & is_outlier(df[[col]])
+        }
+        df <- df %>% dplyr::filter(!.is.outlier)
+        df$.is.outlier <- NULL
+      }
+
+      if (!is.null(predictor_outlier_filter_type)) {
+        is_outlier <- function(x) {
+          res <- detect_outlier(x, type=predictor_outlier_filter_type, threshold=predictor_outlier_filter_threshold) %in% c("lower", "upper")
+          res
+        }
+        df$.is.outlier <- FALSE #TODO: handle possibility of name conflict.
+        for (col in c_cols) {
+          if (is.numeric(df[[col]])) {
+            df$.is.outlier <- df$.is.outlier & is_outlier(df[[col]])
+          }
+        }
+        df <- df %>% dplyr::filter(!.is.outlier)
+        df$.is.outlier <- NULL
       }
 
       # Normalize numeric predictors so that resulting coefficients are comparable among them,
