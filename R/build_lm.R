@@ -500,7 +500,7 @@ build_lm.fast <- function(df,
         }
         df$.is.outlier <- FALSE #TODO: handle possibility of name conflict.
         if (is.numeric(df[[clean_target_col]])) {
-          df$.is.outlier <- df$.is.outlier & is_outlier(df[[col]])
+          df$.is.outlier <- df$.is.outlier | is_outlier(df[[clean_target_col]])
         }
         df <- df %>% dplyr::filter(!.is.outlier)
         df$.is.outlier <- NULL
@@ -514,7 +514,7 @@ build_lm.fast <- function(df,
         df$.is.outlier <- FALSE #TODO: handle possibility of name conflict.
         for (col in c_cols) {
           if (is.numeric(df[[col]])) {
-            df$.is.outlier <- df$.is.outlier & is_outlier(df[[col]])
+            df$.is.outlier <- df$.is.outlier | is_outlier(df[[col]])
           }
         }
         df <- df %>% dplyr::filter(!.is.outlier)
