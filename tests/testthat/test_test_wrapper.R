@@ -345,11 +345,28 @@ test_that("test exp_ttest with group_by", {
   ret
 })
 
+test_that("test exp_ttest with outlier filter", {
+  ret <- mtcars %>% group_by(vs) %>% exp_ttest(mpg, am, outlier_filter_type="percentile", outlier_filter_threshold=0.9)
+  ret %>% tidy(model, type="model")
+  ret %>% tidy(model, type="data_summary")
+  ret
+})
+
 test_that("test exp_anova", {
   ret <- exp_anova(mtcars, mpg, am)
   ret %>% tidy(model, type="model")
   ret %>% tidy(model, type="data_summary")
   ret <- exp_anova(mtcars, mpg, gear)
+  ret %>% tidy(model, type="model")
+  ret %>% tidy(model, type="data_summary")
+  ret
+})
+
+test_that("test exp_anova with outlier filter", {
+  ret <- exp_anova(mtcars, mpg, am, outlier_filter_type="percentile", outlier_filter_threshold=0.9)
+  ret %>% tidy(model, type="model")
+  ret %>% tidy(model, type="data_summary")
+  ret <- exp_anova(mtcars, mpg, gear, outlier_filter_type="percentile", outlier_filter_threshold=0.9)
   ret %>% tidy(model, type="model")
   ret %>% tidy(model, type="data_summary")
   ret
