@@ -926,7 +926,7 @@ xlevels_to_base_level_table <- function(xlevels) {
 vif_to_dataframe <- function(x) {
   ret <- NULL
   if (is.matrix(x$vif)) {
-    ret <- x$vif %>% as.data.frame() %>%  rownames_to_column(var="term") %>% rename(VIF=GVIF)
+    ret <- x$vif %>% as.data.frame() %>%  tibble::rownames_to_column(var="term") %>% rename(VIF=GVIF)
   }
   else {
     ret <- data.frame(term=names(x$vif), VIF=x$vif)
