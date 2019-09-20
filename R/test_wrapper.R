@@ -659,6 +659,21 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
   ret
 }
 
+#' @export
+tidy.binom_test_exploratory <- function(x, type="model", conf_level=0.95) {
+  if (type == "model") {
+    note <- NULL
+    ret <- broom:::tidy.htest(x)
+    if (!is.null(note)) { # Add Note column, if there was an error from pwr function.
+      ret <- ret %>% dplyr::mutate(Note=!!note)
+    }
+  }
+  else { # type == "data"
+    ret <- x$data
+  }
+  ret
+}
+
 #' Wrapper for Wilcoxon rank sum test and signed-rank test for Analytics View
 #' @export
 #' @param conf.int - Whether to calculate estimate and confidence interval. Default FALSE. Passed to wilcox.test as part of ...
