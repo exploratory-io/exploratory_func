@@ -1193,3 +1193,55 @@ tidy.shapiro_exploratory <- function(x, type = "model", signif_level=0.05) {
     ret
   }
 }
+
+#' binomial test wrapper for Analytics View
+#' @export
+#' @param p - Probability of Null hypothesis.
+#' @param alternative - "two.sided", "less", or "greater" 
+#' @param conf.level - Level of confidence for confidence interval. Passed to t.test as part of ...
+#' @param sig.level - Significance level for power analysis. # TODO
+exp_binom_test <- function(df, var1, ...) {
+  var1_col <- col_name(substitute(var1))
+  grouped_cols <- grouped_by(df)
+ 
+  n_distinct_res <- n_distinct(df[[var1_col]]) # save n_distinct result to avoid repeating the relatively expensive call.
+  if (n_distinct_res > 2) {
+    if (n_distinct_res == 3 && any(is.na(df[[var1_col]]))) { # automatically filter NA to make number of category 2, if it is the 3rd category.
+      df <- df %>% dplyr::filter(!is.na(!!rlang::sym(var1_col)))
+    }
+    else {
+      stop(paste0("Variable Column (", var1_col, ") has to have 2 kinds of values."))
+    }
+  }
+
+  binom_test_each <- function(df) {
+    tryCatch({
+      n <- length(df[[var1_col]])
+      n_success <- df %>% filter(!!rlang::sym(var1_col) == first(!!rlang::sym(var1_col))) %>% nrow() # Count the case where the value is same as the first one as "success". TODO: handle logical, factor.
+      model <- binom.test(n_success, n, ...)
+      class(model) <- c("binom_test_exploratory", class(model))
+      model$var1 <- var1_col
+      model$data <- df
+      model
+    }, error = function(e){
+      if(length(grouped_cols) > 0) {
+        # Ignore the error if it is caused by subset of grouped data frame to show result of data frames that succeed.
+        # For example, error can happen if one of the groups does not have both values (e.g. both TRUE and FALSE) of var2.
+        NULL
+      } else {
+        stop(e)
+      }
+    })
+  }
+
+  # Calculation is executed in each group.
+  # Storing the result in this tmp_col and
+  # unnesting the result.
+  # If the original data frame is grouped by "tmp",
+  # overwriting it should be avoided,
+  # so avoid_conflict is used here.
+  tmp_col <- avoid_conflict(colnames(df), "model")
+  ret <- df %>%
+    dplyr::do_(.dots = setNames(list(~binom_test_each(.)), tmp_col))
+  ret
+}
