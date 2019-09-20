@@ -1036,7 +1036,7 @@ model_stats <- function(df, pretty.name = FALSE, ...){
     colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
     colnames(ret)[colnames(ret) == "df"] <- "Degree of Freedom"
     colnames(ret)[colnames(ret) == "logLik"] <- "Log Likelihood"
-    colnames(ret)[colnames(ret) == "deviance"] <- "Deviance"
+    colnames(ret)[colnames(ret) == "deviance"] <- "Residual Deviance"
     colnames(ret)[colnames(ret) == "df.residual"] <- "Residual DF"
     # for glm
     colnames(ret)[colnames(ret) == "null.deviance"] <- "Null Deviance"
