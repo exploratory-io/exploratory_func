@@ -135,8 +135,9 @@ test_that("Linear Regression with outlier filtering", {
                                      `Carrier Name`,
                                      model_type = "lm",
                                      test_rate = 0.3,
+                                     normalize_predictors = TRUE, # testing target normalization too.
                                      target_outlier_filter_type="percentile",
-                                     target_outlier_filter_threshold=0.9) # testing ordered split too.
+                                     target_outlier_filter_threshold=0.9) # testing outlier filter too.
 
   expect_equal(colnames(ret), c("model", ".test_index", "source.data"))
   test_rownum <- length(ret$.test_index[[1]])

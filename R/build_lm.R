@@ -233,6 +233,7 @@ build_lm.fast <- function(df,
                     link = NULL,
                     max_nrow = 50000,
                     predictor_n = 12, # so that at least months can fit in it.
+                    normalize_target = FALSE,
                     normalize_predictors = FALSE,
                     target_outlier_filter_type = NULL,
                     target_outlier_filter_threshold = NULL,
@@ -520,6 +521,13 @@ build_lm.fast <- function(df,
         df$.is.outlier <- NULL # Removing the temporary column.
       }
 
+      # Normalize numeric target variable,
+      # after all column changes for Date/POSIXct, filtering, dropping columns above are done.
+      if (normalize_target) {
+        if (is.numeric(df[[clean_target_col]])) {
+          df[[clean_target_col]] <- normalize(df[[clean_target_col]])
+        }
+      }
       # Normalize numeric predictors so that resulting coefficients are comparable among them,
       # after all column changes for Date/POSIXct, filtering, dropping columns above are done.
       if (normalize_predictors) {
