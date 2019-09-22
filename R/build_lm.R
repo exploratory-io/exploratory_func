@@ -762,7 +762,7 @@ glance.lm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
   }
 
   if(pretty.name) {
-    ret <- ret %>% dplyr::rename(`R Squared`=r.squared, `Adj R Squared`=adj.r.squared, `RMSE`=rmse, `F Ratio`=statistic, `P Value`=p.value, `Degree of Freedom`=df, `Log Likelihood`=logLik, Deviance=deviance, `Residual DF`=df.residual, `Number of Rows`=n)
+    ret <- ret %>% dplyr::rename(`R Squared`=r.squared, `Adj R Squared`=adj.r.squared, `RMSE`=rmse, `F Ratio`=statistic, `P Value`=p.value, `Degree of Freedom`=df, `Log Likelihood`=logLik, `Residual Deviance`=deviance, `Residual DF`=df.residual, `Number of Rows`=n)
     # Note column might not exist. Rename if it is there.
     colnames(ret)[colnames(ret) == "note"] <- "Note"
   }
@@ -833,8 +833,8 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
 
   if(pretty.name) {
     if (x$family$family %in% c('binomial', 'quasibinomial')) { # for binomial regressions.
-      ret <- ret %>% dplyr::rename(`Null Deviance`=null.deviance, `DF for Null Model`=df.null, `Log Likelihood`=logLik, Deviance=deviance, `Residual DF`=df.residual, `AUC`=auc) %>%
-        dplyr::select(`F Score`, `Accuracy Rate`, `Misclassification Rate`, `Precision`, `Recall`, `AUC`,`P Value`, `Number of Rows`, positives, negatives,  `Log Likelihood`, `AIC`, `BIC`, `Deviance`, `Null Deviance`, `DF for Null Model`, everything())
+      ret <- ret %>% dplyr::rename(`Null Deviance`=null.deviance, `DF for Null Model`=df.null, `Log Likelihood`=logLik, `Residual Deviance`=deviance, `Residual DF`=df.residual, `AUC`=auc) %>%
+        dplyr::select(`F Score`, `Accuracy Rate`, `Misclassification Rate`, `Precision`, `Recall`, `AUC`,`P Value`, `Number of Rows`, positives, negatives,  `Log Likelihood`, `AIC`, `BIC`, `Residual Deviance`, `Null Deviance`, `DF for Null Model`, everything())
       if (!is.null(x$orig_levels)) { 
         pos_label <- x$orig_levels[2]
         neg_label <- x$orig_levels[1]
@@ -851,8 +851,8 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
       colnames(ret)[colnames(ret) == "negatives"] <- paste0("Number of Rows for ", neg_label)
     }
     else { # for other numeric regressions.
-      ret <- ret %>% dplyr::rename(`Null Deviance`=null.deviance, `DF for Null Model`=df.null, `Log Likelihood`=logLik, Deviance=deviance, `Residual DF`=df.residual) %>%
-        dplyr::select(`P Value`, `Number of Rows`, `Log Likelihood`, `AIC`, `BIC`, `Deviance`, `Null Deviance`, `DF for Null Model`, everything())
+      ret <- ret %>% dplyr::rename(`Null Deviance`=null.deviance, `DF for Null Model`=df.null, `Log Likelihood`=logLik, `Residual Deviance`=deviance, `Residual DF`=df.residual) %>%
+        dplyr::select(`P Value`, `Number of Rows`, `Log Likelihood`, `AIC`, `BIC`, `Residual Deviance`, `Null Deviance`, `DF for Null Model`, everything())
     }
   }
 

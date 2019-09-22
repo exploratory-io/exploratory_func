@@ -398,7 +398,7 @@ evaluate_binary_training_and_test <- function(df, actual_val_col, threshold = "f
     colnames(ret)[colnames(ret) == "negatives"] <- "Number of Rows for FALSE"
     colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
     colnames(ret)[colnames(ret) == "logLik"] <- "Log Likelihood"
-    colnames(ret)[colnames(ret) == "deviance"] <- "Deviance"
+    colnames(ret)[colnames(ret) == "deviance"] <- "Residual Deviance"
     colnames(ret)[colnames(ret) == "null.deviance"] <- "Null Deviance"
     colnames(ret)[colnames(ret) == "df.null"] <- "DF for Null Model"
     colnames(ret)[colnames(ret) == "df.residual"] <- "Residual DF"
