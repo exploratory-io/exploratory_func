@@ -1252,7 +1252,7 @@ non_na_ratio <- function(x){
 #' rows to be duplicated because of more than
 #' 2 rows data frames for example.
 unnest_with_drop_ <- function(..., .drop = TRUE){
-  tidyr::unnest_(..., .drop = .drop)
+  tidyr::unnest(!!!rlang::ensyms(...), .drop = .drop)
 }
 
 #' This is a wrapper of tidyr::unnest
