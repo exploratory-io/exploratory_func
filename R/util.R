@@ -894,7 +894,7 @@ pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = N
   ret <- df %>%
     dplyr::do_(.dots=setNames(list(~pivot_each(.)), tmp_col)) %>%
     dplyr::ungroup() %>%
-    unnest_with_drop_(tmp_col)
+    unnest_with_drop(!!rlang::sym(tmp_col))
 
   if(length(rows) == 1){
     # Set same data type with original data
@@ -1154,7 +1154,7 @@ unnest_without_empty_ <- function(data, nested_col){
     # if all values in nested_col are empty
     without_empty
   } else {
-    unnest_with_drop_(without_empty, nested_col)
+    unnest_with_drop(without_empty, !!rlang::sym(nested_col))
   }
 }
 
@@ -1251,19 +1251,6 @@ non_na_ratio <- function(x){
 #' if unnesting the specified columns requires the
 #' rows to be duplicated because of more than
 #' 2 rows data frames for example.
-unnest_with_drop_ <- function(..., .drop = TRUE){
-  tidyr::unnest(!!!rlang::ensyms(...), .drop = .drop)
-}
-
-#' This is a wrapper of tidyr::unnest
-#' to change the default of .drop,
-#' so that it always drops other list
-#' columns, which is an expected behaviour
-#' for usage in this package in most cases.
-#' By default, unnest will drop other list columns
-#' if unnesting the specified columns requires the
-#' rows to be duplicated because of more than
-#' 2 rows data frames for example.
 unnest_with_drop <- function(..., .drop = TRUE){
   tidyr::unnest(..., .drop = .drop)
 }
@@ -1290,7 +1277,7 @@ do_on_each_group <- function(df, func, params = quote(list()), name = "tmp", wit
   if(with_unnest){
     ret %>%
       dplyr::ungroup() %>%
-      unnest_with_drop_(name)
+      unnest_with_drop(!!rlang::sym(name))
   }else{
     ret
   }

@@ -74,7 +74,7 @@ augment_kmeans <- function(df, model, data){
       df %>%
         dplyr::do_(.dots=setNames(list(~augment_each(.)), model_col)) %>%
         dplyr::ungroup() %>%
-        unnest_with_drop_(model_col)
+        unnest_with_drop(!!rlang::sym(model_col))
     } else {
       stop(e)
     }
@@ -1265,7 +1265,7 @@ do_survfit <- function(df, time, status, start_time = NULL, end_time = NULL, tim
   ret <- ret %>%
     dplyr::do_(.dots=setNames(list(~add_time_zero_row_each(.)), tmp_col)) %>%
     dplyr::ungroup()
-  ret <- ret %>%  unnest_with_drop_(tmp_col)
+  ret <- ret %>%  unnest_with_drop(!!rlang::sym(tmp_col))
 
   colnames(ret)[colnames(ret) == "n.risk"] <- "n_risk"
   colnames(ret)[colnames(ret) == "n.event"] <- "n_event"

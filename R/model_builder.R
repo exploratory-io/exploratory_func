@@ -142,7 +142,7 @@ build_kmeans.kv_ <- function(df,
   if(augment){
     output <- output %>%
       dplyr::ungroup() %>%
-      unnest_with_drop_(model_column)
+      unnest_with_drop(!!rlang::sym(model_column))
   } else {
     class(output[[model_column]]) <- c("list", ".model", ".model.kmeans")
   }
@@ -248,7 +248,7 @@ build_kmeans.cols <- function(df, ...,
   if(augment){
     output <- output %>%
       dplyr::ungroup() %>%
-      unnest_with_drop_(model_column)
+      unnest_with_drop(!!rlang::sym(model_column))
   } else {
     # Add a class for Exploratyry to recognize the type of .model
     class(output[[model_column]]) <- c("list", ".model", ".model.kmeans")

@@ -138,7 +138,7 @@ fill_between <- function(df, ..., .direction="down", value=NULL) {
   df <- df %>%
     dplyr::do_(.dots=setNames(list(~each_func(.)), tmp_col)) %>%
     dplyr::ungroup()
-  df <- df %>%  unnest_with_drop_(tmp_col)
+  df <- df %>% unnest_with_drop(!!rlang::sym(tmp_col))
 
   if (length(grouped_col) > 0) { # set group back
     # group_by_ fails with column name with space.

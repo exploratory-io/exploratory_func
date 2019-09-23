@@ -239,5 +239,5 @@ do_anomaly_detection_ <- function(
   test <- df %>%
     dplyr::do_(.dots=setNames(list(~do_anomaly_detection_each(.)), tmp_col)) %>%
     dplyr::ungroup() %>%
-    unnest_with_drop_(tmp_col)
+    unnest_with_drop(!!rlang::sym(tmp_col))
 }

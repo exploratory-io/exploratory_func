@@ -62,7 +62,7 @@ do_cosine_sim.kv <- function(df, subject, key, value = NULL, distinct=FALSE, dia
   df %>%
     dplyr::do_(.dots=setNames(list(~calc_doc_sim_each(.)), tmp_col)) %>%
     dplyr::ungroup() %>%
-    unnest_with_drop_(tmp_col)
+    unnest_with_drop(!!rlang::sym(tmp_col))
 
 }
 
@@ -214,7 +214,7 @@ do_dist.kv_ <- function(df,
   df %>%
     dplyr::do_(.dots=setNames(list(~calc_dist_each(.)), tmp_col)) %>%
     dplyr::ungroup() %>%
-    unnest_with_drop_(tmp_col)
+    unnest_with_drop(!!rlang::sym(tmp_col))
 }
 
 #' A symmetric version of KL-divergence
@@ -297,7 +297,7 @@ do_kl_dist.kv_ <- function(df,
   df %>%
     dplyr::do_(.dots=setNames(list(~calc_dist_each(.)), cnames[[1]])) %>%
     dplyr::ungroup() %>%
-    unnest_with_drop_(cnames[[1]])
+    unnest_with_drop(!!rlang::sym(cnames[[1]]))
 }
 
 #' Calculate distance of each pair of groups.
@@ -383,5 +383,5 @@ do_dist.cols <- function(df,
   df %>%
     dplyr::do_(.dots=setNames(list(~calc_dist_each(.)), cnames[[1]])) %>%
     dplyr::ungroup() %>%
-    unnest_with_drop_(cnames[[1]])
+    unnest_with_drop(!!rlang::sym(cnames[[1]]))
 }
