@@ -931,6 +931,7 @@ xlevels_to_base_level_table <- function(xlevels) {
   ret
 }
 
+# Takes lm/glm model with vif (variance inflation factor) and returns data frame with extracted info.
 vif_to_dataframe <- function(x) {
   ret <- NULL
   if (is.matrix(x$vif)) {
@@ -1011,7 +1012,8 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
   )
 }
 
-#' special version of tidy.glm function to use with build_lm.fast.
+#' Special version of tidy.glm function to use with build_lm.fast.
+#' In case of error, returns empty data frame, or data frame with Note column.
 #' @export
 tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, variable_metric = NULL, ...) { #TODO: add test
   switch(type,
