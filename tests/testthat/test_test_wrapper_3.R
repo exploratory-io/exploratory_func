@@ -17,3 +17,14 @@ test_that("test exp_kruskal with group_by", {
   ret
 })
 
+test_that("test exp_binom_test", {
+  browser()
+  model_df <- exp_binom_test(mtcars, am, p=0.5)
+  browser()
+  ret <- model_df %>% tidy(model, type="distribution")
+  #ret <- model_df %>% tidy(model, type="model")
+  browser()
+  ret <- model_df %>% tidy(model, type="data")
+  browser()
+  ret
+})
