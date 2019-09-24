@@ -672,6 +672,15 @@ tidy.binom_test_exploratory <- function(x, type="model", conf_level=0.95) {
     density <-dbinom(0:x$parameter, x$parameter, x$null.value)
     ret <- data.frame(n=0:x$parameter, d=density) %>% dplyr::mutate(m=if_else(n==!!x$statistic, 1, 0))
   }
+  else if (type == "power") {
+    browser()
+    density_a <-dbinom(0:x$parameter, x$parameter, x$null.value)
+    density_b <-dbinom(0:x$parameter, x$parameter, x$null.value + x$diff_to_detect) # TODO: handle other types of alternative
+    ret <- data.frame(n=0:x$parameter, a=density_a, b=density_b) %>% dplyr::mutate(m=if_else(n==!!x$statistic, 1, 0))
+    thres <- qbinom(1-x$sig.level, x$parameter, x$null.value)
+    ret <- ret %>% dplyr::mutate(crit_a=if_else(n > thres, a, NA_real_))
+    ret <- ret %>% dplyr::mutate(crit_b=if_else(n < thres, b, NA_real_))
+  }
   else { # type == "data"
     ret <- x$data
   }
@@ -1218,11 +1227,15 @@ tidy.shapiro_exploratory <- function(x, type = "model", signif_level=0.05) {
 #' @param p - Probability of Null hypothesis.
 #' @param alternative - "two.sided", "less", or "greater" 
 #' @param conf.level - Level of confidence for confidence interval. Passed to t.test as part of ...
-#' @param sig.level - Significance level for power analysis. # TODO
-exp_binom_test <- function(df, var1, ...) {
+#' @param sig.level - Significance level for power analysis.
+exp_binom_test <- function(df, var1, p = 0.5, sig.level = 0.05, diff_to_detect = 0.05, power = NULL, beta = NULL, ...) {
   var1_col <- col_name(substitute(var1))
   grouped_cols <- grouped_by(df)
  
+  if (is.null(power) && !is.null(beta)) {
+    power <- 1.0 - beta
+  }
+
   n_distinct_res <- n_distinct(df[[var1_col]]) # save n_distinct result to avoid repeating the relatively expensive call.
   if (n_distinct_res > 2) {
     if (n_distinct_res == 3 && any(is.na(df[[var1_col]]))) { # automatically filter NA to make number of category 2, if it is the 3rd category.
@@ -1242,10 +1255,13 @@ exp_binom_test <- function(df, var1, ...) {
       else {
         n_success <- df %>% filter(!!rlang::sym(var1_col) == first(!!rlang::sym(var1_col))) %>% nrow() # Count the case where the value is same as the first one as "success". TODO: handle logical, factor.
       }
-      model <- binom.test(n_success, n, ...)
+      model <- binom.test(n_success, n, p = p, ...) # For some reason, to pass p to binom.test, it needs to be explicitly specified as opposed to implicitly passing as part of "...".
       class(model) <- c("binom_test_exploratory", class(model))
       model$var1 <- var1_col
       model$data <- df
+      model$sig.level <- sig.level
+      model$power <- power
+      model$diff_to_detect <- diff_to_detect
       model
     }, error = function(e){
       if(length(grouped_cols) > 0) {
