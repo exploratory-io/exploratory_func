@@ -1232,7 +1232,12 @@ exp_binom_test <- function(df, var1, ...) {
   binom_test_each <- function(df) {
     tryCatch({
       n <- length(df[[var1_col]])
-      n_success <- df %>% filter(!!rlang::sym(var1_col) == first(!!rlang::sym(var1_col))) %>% nrow() # Count the case where the value is same as the first one as "success". TODO: handle logical, factor.
+      if (is.logical(df[[var1_col]])) {
+        n_success <- df %>% filter(!!rlang::sym(var1_col)) %>% nrow() # Count number of TRUE.
+      }
+      else {
+        n_success <- df %>% filter(!!rlang::sym(var1_col) == first(!!rlang::sym(var1_col))) %>% nrow() # Count the case where the value is same as the first one as "success". TODO: handle logical, factor.
+      }
       model <- binom.test(n_success, n, ...)
       class(model) <- c("binom_test_exploratory", class(model))
       model$var1 <- var1_col
