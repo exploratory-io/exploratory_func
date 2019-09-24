@@ -670,16 +670,20 @@ tidy.binom_test_exploratory <- function(x, type="model", conf_level=0.95) {
   }
   else if (type == "distribution") {
     density <-dbinom(0:x$parameter, x$parameter, x$null.value)
+    thres_upper <- qbinom(1-x$sig.level/2, x$parameter, x$null.value)
+    thres_lower <- qbinom(x$sig.level/2, x$parameter, x$null.value)
     ret <- data.frame(n=0:x$parameter, d=density) %>% dplyr::mutate(m=if_else(n==!!x$statistic, 1, 0))
+    ret <- ret %>% dplyr::mutate(crit=if_else(n > thres_upper | n < thres_lower, d, NA_real_))
   }
   else if (type == "power") {
     browser()
     density_a <-dbinom(0:x$parameter, x$parameter, x$null.value)
     density_b <-dbinom(0:x$parameter, x$parameter, x$null.value + x$diff_to_detect) # TODO: handle other types of alternative
     ret <- data.frame(n=0:x$parameter, a=density_a, b=density_b) %>% dplyr::mutate(m=if_else(n==!!x$statistic, 1, 0))
-    thres <- qbinom(1-x$sig.level, x$parameter, x$null.value)
-    ret <- ret %>% dplyr::mutate(crit_a=if_else(n > thres, a, NA_real_))
-    ret <- ret %>% dplyr::mutate(crit_b=if_else(n < thres, b, NA_real_))
+    thres_upper <- qbinom(1-x$sig.level/2, x$parameter, x$null.value)
+    thres_lower <- qbinom(x$sig.level/2, x$parameter, x$null.value)
+    ret <- ret %>% dplyr::mutate(crit_a=if_else(n > thres_upper | n < thres_lower, a, NA_real_))
+    ret <- ret %>% dplyr::mutate(crit_b=if_else(n < thres_upper, b, NA_real_))
   }
   else { # type == "data"
     ret <- x$data
