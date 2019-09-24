@@ -233,6 +233,12 @@ build_lm.fast <- function(df,
                     link = NULL,
                     max_nrow = 50000,
                     predictor_n = 12, # so that at least months can fit in it.
+                    normalize_target = FALSE,
+                    normalize_predictors = FALSE,
+                    target_outlier_filter_type = NULL,
+                    target_outlier_filter_threshold = NULL,
+                    predictor_outlier_filter_type = NULL,
+                    predictor_outlier_filter_threshold = NULL,
                     smote = FALSE,
                     smote_target_minority_perc = 40,
                     smote_max_synth_perc = 200,
@@ -254,13 +260,7 @@ build_lm.fast <- function(df,
                     test_rate = 0.0,
                     test_split_type = "random" # "random" or "ordered"
                     ){
-  # TODO: add test
-  # TODO: cleanup code only aplicable to randomForest. this func was started from copy of calc_feature_imp, and still adjusting for lm. 
-
-  # this seems to be the new way of NSE column selection evaluation
-  # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
   target_col <- dplyr::select_var(names(df), !! rlang::enquo(target))
-  # this evaluates select arguments like starts_with
   selected_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
 
   grouped_cols <- grouped_by(df)
@@ -494,6 +494,50 @@ build_lm.fast <- function(df,
         stop("No column is left after removing columns with single value.")
       }
 
+      if (!is.null(target_outlier_filter_type) || !is.null(predictor_outlier_filter_type)) {
+        df$.is.outlier <- FALSE #TODO: handle possibility of name conflict.
+        if (!is.null(target_outlier_filter_type)) {
+          is_outlier <- function(x) {
+            res <- detect_outlier(x, type=target_outlier_filter_type, threshold=target_outlier_filter_threshold) %in% c("lower", "upper")
+            res
+          }
+          if (is.numeric(df[[clean_target_col]])) {
+            df$.is.outlier <- df$.is.outlier | is_outlier(df[[clean_target_col]])
+          }
+        }
+
+        if (!is.null(predictor_outlier_filter_type)) {
+          is_outlier <- function(x) {
+            res <- detect_outlier(x, type=predictor_outlier_filter_type, threshold=predictor_outlier_filter_threshold) %in% c("lower", "upper")
+            res
+          }
+          for (col in c_cols) {
+            if (is.numeric(df[[col]])) {
+              df$.is.outlier <- df$.is.outlier | is_outlier(df[[col]])
+            }
+          }
+        }
+        df <- df %>% dplyr::filter(!.is.outlier)
+        df$.is.outlier <- NULL # Removing the temporary column.
+      }
+
+      # Normalize numeric target variable,
+      # after all column changes for Date/POSIXct, filtering, dropping columns above are done.
+      if (normalize_target) {
+        if (is.numeric(df[[clean_target_col]])) {
+          df[[clean_target_col]] <- normalize(df[[clean_target_col]])
+        }
+      }
+      # Normalize numeric predictors so that resulting coefficients are comparable among them,
+      # after all column changes for Date/POSIXct, filtering, dropping columns above are done.
+      if (normalize_predictors) {
+        for (col in c_cols) {
+          if (is.numeric(df[[col]])) {
+            df[[col]] <- normalize(df[[col]])
+          }
+        }
+      }
+
       # build formula for lm
       rhs <- paste0("`", c_cols, "`", collapse = " + ")
       # TODO: This clean_target_col is actually not a cleaned column name since we want lm to show real name. Clean up our variable name.
@@ -632,6 +676,22 @@ build_lm.fast <- function(df,
           })
         }
       }
+
+      tryCatch({
+        model$vif <- car::vif(model)
+      }, error = function(e){
+        # in case of perfect multicollinearity, vif throws error with message "there are aliased coefficients in the model".
+        # Check if it is the case. If coef() includes NA, corresponding variable is causing perfect multicollinearity.
+        coef_vec <- coef(model)
+        na_coef_vec <- coef_vec[is.na(coef_vec)]
+        if (length(na_coef_vec) > 0) {
+          na_coef_names <- names(na_coef_vec)
+          message <- paste(na_coef_names, collapse = ", ")
+          message <- paste0("Variables causing perfect collinearity : ", message)
+          e$message <- message
+        }
+        model$vif <<- e
+      })
 
       if (test_rate > 0) {
         # Note: Do not pass df_test like data=df_test. This for some reason ends up predict returning training data prediction.
@@ -871,6 +931,18 @@ xlevels_to_base_level_table <- function(xlevels) {
   ret
 }
 
+# Takes lm/glm model with vif (variance inflation factor) and returns data frame with extracted info.
+vif_to_dataframe <- function(x) {
+  ret <- NULL
+  if (is.matrix(x$vif)) {
+    ret <- x$vif %>% as.data.frame() %>%  tibble::rownames_to_column(var="term") %>% rename(VIF=GVIF)
+  }
+  else {
+    ret <- data.frame(term=names(x$vif), VIF=x$vif)
+  }
+  ret
+}
+
 #' special version of tidy.lm function to use with build_lm.fast.
 #' @export
 tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, ...) { #TODO: add test
@@ -925,13 +997,23 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
         ret
       }
     },
+    vif = {
+      if (!is.null(x$vif) && "error" %nin% class(x$vif)) {
+        ret <- vif_to_dataframe(x)
+      }
+      else {
+        ret <- data.frame() # Skip output for this group. TODO: Report error in some way.
+      }
+      ret
+    },
     partial_dependence = {
       handle_partial_dependence(x)
     }
   )
 }
 
-#' special version of tidy.glm function to use with build_lm.fast.
+#' Special version of tidy.glm function to use with build_lm.fast.
+#' In case of error, returns empty data frame, or data frame with Note column.
 #' @export
 tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, variable_metric = NULL, ...) { #TODO: add test
   switch(type,
@@ -1004,6 +1086,15 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
         dplyr::group_by(actual_value, predicted_value) %>%
         dplyr::summarize(count = n()) %>%
         dplyr::ungroup()
+      ret
+    },
+    vif = {
+      if (!is.null(x$vif) && "error" %nin% class(x$vif)) {
+        ret <- vif_to_dataframe(x)
+      }
+      else {
+        ret <- data.frame() # Skip output for this group. TODO: Report error in some way.
+      }
       ret
     },
     partial_dependence = {
