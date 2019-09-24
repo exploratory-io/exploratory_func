@@ -668,6 +668,10 @@ tidy.binom_test_exploratory <- function(x, type="model", conf_level=0.95) {
       ret <- ret %>% dplyr::mutate(Note=!!note)
     }
   }
+  else if (type == "distribution") {
+    density <-dbinom(0:x$parameter, x$parameter, x$null.value)
+    ret <- data.frame(n=0:x$parameter, d=density) %>% dplyr::mutate(m=if_else(n==!!x$statistic, 1, 0))
+  }
   else { # type == "data"
     ret <- x$data
   }
