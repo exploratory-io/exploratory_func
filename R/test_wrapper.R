@@ -1231,7 +1231,7 @@ tidy.shapiro_exploratory <- function(x, type = "model", signif_level=0.05) {
 #' @param alternative - "two.sided", "less", or "greater" 
 #' @param conf.level - Level of confidence for confidence interval. Passed to t.test as part of ...
 #' @param sig.level - Significance level for power analysis.
-exp_binom_test <- function(df, var1, p = 0.5, sig.level = 0.05, diff_to_detect = 0.05, power = NULL, beta = NULL, ...) {
+exp_binom_test <- function(df, var1, p = 0.5, sig.level = 0.05, diff_to_detect = NULL, power = NULL, beta = NULL, ...) {
   var1_col <- col_name(substitute(var1))
   grouped_cols <- grouped_by(df)
  
@@ -1258,13 +1258,29 @@ exp_binom_test <- function(df, var1, p = 0.5, sig.level = 0.05, diff_to_detect =
       else {
         n_success <- df %>% filter(!!rlang::sym(var1_col) == first(!!rlang::sym(var1_col))) %>% nrow() # Count the case where the value is same as the first one as "success". TODO: handle logical, factor.
       }
+
+      # Calculate Cohen's h from data.
+      cohens_h <- pwr::ES.h(p1 = n_success/n, p2 = p)
+      # Get size of Cohen's d to detect for power analysis.
+      # If neither d nor diff_to_detect is specified, use the one calculated from data.
+      if (is.null(diff_to_detect)) {
+        # If neither h nor diff_to_detect is specified, calculate Cohen's d from data.
+        cohens_h_to_detect <- cohens_h
+        diff_to_detect <- n_success/n - p
+      }
+      else { # diff_to_detect is specified.
+        cohens_h_to_detect <- pwr::ES.h(p1 = p+diff_to_detect, p2 = p)
+      }
+
       model <- binom.test(n_success, n, p = p, ...) # For some reason, to pass p to binom.test, it needs to be explicitly specified as opposed to implicitly passing as part of "...".
       class(model) <- c("binom_test_exploratory", class(model))
       model$var1 <- var1_col
       model$data <- df
       model$sig.level <- sig.level
-      model$power <- power
       model$diff_to_detect <- diff_to_detect
+      model$cohens_h <- cohens_h
+      model$cohens_h_to_detect <- cohens_h_to_detect
+      model$power <- power
       model
     }, error = function(e){
       if(length(grouped_cols) > 0) {
