@@ -676,7 +676,6 @@ tidy.binom_test_exploratory <- function(x, type="model", conf_level=0.95) {
     ret <- ret %>% dplyr::mutate(crit=if_else(n > thres_upper | n < thres_lower, d, NA_real_))
   }
   else if (type == "power") {
-    browser()
     density_a <-dbinom(0:x$parameter, x$parameter, x$null.value)
     density_b <-dbinom(0:x$parameter, x$parameter, x$null.value + x$diff_to_detect) # TODO: handle other types of alternative
     ret <- data.frame(n=0:x$parameter, a=density_a, b=density_b) %>% dplyr::mutate(m=if_else(n==!!x$statistic, 1, 0))
