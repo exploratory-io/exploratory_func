@@ -761,14 +761,17 @@ build_lm.fast <- function(df,
         imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # Keep only max_pd_vars most important variables
       }
       else  { # We do not have a way to determine importance. Just show all significant variables.
-        # One-liner to keep only significant predictors by matching names with result of tidy().
-        signif_df <- broom::tidy(model) %>% filter(p.value < p_value_threshold)
-        if (nrow(signif_df) > 0) {
-          imp_vars <- c_cols[sapply(c_cols,function(x){any(stringr::str_detect(signif_df$term, paste0("^`?", x)))})]
-        }
-        else  {
-          imp_vars <- c()
-        }
+        imp_vars <- c_cols
+
+        # We tried showing only significant variables, but decided oftentimes we wanted to see even insignificant ones. Keeping that code for now.
+        #
+        # signif_df <- broom::tidy(model) %>% filter(p.value < p_value_threshold) # One-liner to keep only significant predictors by matching names with result of tidy().
+        # if (nrow(signif_df) > 0) {
+        #   imp_vars <- c_cols[sapply(c_cols,function(x){any(stringr::str_detect(signif_df$term, paste0("^`?", x)))})]
+        # }
+        # else  {
+        #   imp_vars <- c()
+        # }
       }
 
       if (length(imp_vars) > 0) {
