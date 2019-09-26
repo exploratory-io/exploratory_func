@@ -7,6 +7,7 @@ handle_partial_dependence <- function(x) {
   # return partial dependence
   ret <- x$partial_dependence
   var_cols <- attr(x$partial_dependence, "vars")
+  target_col <- attr(x$partial_dependence, "target")
   # We used to do the following, probably for better formatting of numbers, but this had side-effect of
   # turning close numbers into a same number, when differences among numbers are small compared to their
   # absolute values. It happened with Date data turned into numeric.
@@ -18,6 +19,16 @@ handle_partial_dependence <- function(x) {
   #     ret[[var_col]] <- signif(ret[[var_col]], digits=4) # limit digits before we turn it into a factor.
   #   }
   # }
+
+  if (!is.null(x$data)) { # This is for glm case.
+    for (var_col in var_cols) {
+      if (is.factor(ret[[var_col]])) { # TODO: Support other types
+        actual_ret <- x$data %>% dplyr::group_by(!!rlang::sym(var_col)) %>% dplyr::summarise(Actual=mean(!!rlang::sym(target_col), na.rm=TRUE))
+        ret <- ret %>% dplyr::bind_rows(actual_ret)
+      }
+    }
+  }
+
   ret <- ret %>% tidyr::gather_("x_name", "x_value", var_cols, na.rm = TRUE, convert = FALSE)
   # sometimes x_value comes as numeric and not character, and it was causing error from bind_rows internally done
   # in tidy().
@@ -33,7 +44,9 @@ handle_partial_dependence <- function(x) {
   # Set original factor level back so that legend order is correct on the chart.
   # In case of logical, c("TRUE","FALSE") is stored in orig_level, so that we can
   # use it here either way.
-  if (!is.null(x$orig_levels)) {
+  # glm (binomial family) is exception here, since we only show probability of being TRUE,
+  # and instead show mean of binned actual data.
+  if (!is.null(x$orig_levels) && "glm" %nin% class(x)) {
     ret <- ret %>%  dplyr::mutate(y_name = factor(y_name, levels=x$orig_levels))
   }
 
@@ -44,7 +57,7 @@ handle_partial_dependence <- function(x) {
     df <- x$df
   }
   else if ("rpart" %in% class(x)) {
-    # use partial_dependence itself for determining chart_time. Maybe this works for other models too?
+    # use partial_dependence itself for determining chart_type. Maybe this works for other models too?
     df <- x$partial_dependence
   }
   else if (!is.null(x$data)) {  # For glm case.
