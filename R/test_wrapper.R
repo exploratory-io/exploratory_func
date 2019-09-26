@@ -664,6 +664,54 @@ tidy.binom_test_exploratory <- function(x, type="model", conf_level=0.95) {
   if (type == "model") {
     note <- NULL
     ret <- broom:::tidy.htest(x)
+
+    if (is.null(x$power)) {
+      # If power is not specified in the arguments, estimate current power.
+      tryCatch({ # pwr function can return error from equation resolver. Catch it rather than stopping the whole thing.
+        power_res <- pwr::pwr.p.test(h = x$cohens_h_to_detect, sig.level = x$sig.level, n = x$parameter, alternative = x$alternative)
+        power_val <- power_res$power
+      }, error = function(e) {
+        note <- e$message
+        power_val <<- NA_real_
+      })
+
+      ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
+        dplyr::mutate(h=!!(x$cohens_h), power=!!power_val, beta=1.0-!!power_val) %>%
+        dplyr::rename(`Number of Events`=statistic,
+                      `P Value`=p.value,
+                      `Sample Size`=parameter,
+                      Probability=estimate,
+                      `Conf High`=conf.high,
+                      `Conf Low`=conf.low,
+                      `Effect Size (Cohen's h)`=h,
+                      `Power`=power,
+                      `Probability of Type 2 Error`=beta)
+    }
+    else {
+      # If required power is specified in the arguments, estimate required sample size. 
+      tryCatch({ # pwr function can return error from equation resolver. Catch it rather than stopping the whole thing.
+        power_res <- pwr::pwr.p.test(h = x$cohens_h_to_detect, sig.level = x$sig.level, power = x$power, alternative = x$alternative)
+        required_sample_size <- power_res$n
+      }, error = function(e) {
+        note <<- e$message
+        required_sample_size <<- NA_real_
+      })
+      ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
+        dplyr::mutate(h=!!(x$cohens_h), power=!!(x$power), beta=1.0-!!(x$power)) %>%
+        dplyr::mutate(current_sample_size=x$parameter, required_sample_size=required_sample_size) %>%
+        dplyr::rename(`Number of Events`=statistic,
+                      `P Value`=p.value,
+                      `Sample Size`=parameter,
+                      Probability=estimate,
+                      `Conf High`=conf.high,
+                      `Conf Low`=conf.low,
+                      `Effect Size (Cohen's h)`=h,
+                      `Target Power`=power,
+                      `Target Probability of Type 2 Error`=beta,
+                      `Current Sample Size`=current_sample_size,
+                      `Required Sample Size`=required_sample_size)
+    }
+
     if (!is.null(note)) { # Add Note column, if there was an error from pwr function.
       ret <- ret %>% dplyr::mutate(Note=!!note)
     }
