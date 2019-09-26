@@ -675,10 +675,10 @@ tidy.binom_test_exploratory <- function(x, type="model", conf_level=0.95) {
         power_val <<- NA_real_
       })
 
-      ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
+      ret <- ret %>% dplyr::select(p.value, statistic, parameter, estimate, conf.high, conf.low) %>%
         dplyr::mutate(h=!!(x$cohens_h), power=!!power_val, beta=1.0-!!power_val) %>%
-        dplyr::rename(`Number of Events`=statistic,
-                      `P Value`=p.value,
+        dplyr::rename(`P Value`=p.value,
+                      `Number of Events`=statistic,
                       `Sample Size`=parameter,
                       Probability=estimate,
                       `Conf High`=conf.high,
@@ -696,11 +696,11 @@ tidy.binom_test_exploratory <- function(x, type="model", conf_level=0.95) {
         note <<- e$message
         required_sample_size <<- NA_real_
       })
-      ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
+      ret <- ret %>% dplyr::select(p.value, statistic, parameter, estimate, conf.high, conf.low) %>%
         dplyr::mutate(h=!!(x$cohens_h), power=!!(x$power), beta=1.0-!!(x$power)) %>%
         dplyr::mutate(current_sample_size=x$parameter, required_sample_size=required_sample_size) %>%
-        dplyr::rename(`Number of Events`=statistic,
-                      `P Value`=p.value,
+        dplyr::rename(`P Value`=p.value,
+                      `Number of Events`=statistic,
                       `Sample Size`=parameter,
                       Probability=estimate,
                       `Conf High`=conf.high,
