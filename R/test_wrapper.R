@@ -1308,16 +1308,16 @@ exp_binom_test <- function(df, var1, p = 0.5, sig.level = 0.05, diff_to_detect =
       }
 
       # Calculate Cohen's h from data.
-      cohens_h <- pwr::ES.h(p1 = n_success/n, p2 = p)
+      cohens_h <- abs(pwr::ES.h(p1 = n_success/n, p2 = p))
       # Get size of Cohen's d to detect for power analysis.
       # If neither d nor diff_to_detect is specified, use the one calculated from data.
       if (is.null(diff_to_detect)) {
         # If neither h nor diff_to_detect is specified, calculate Cohen's d from data.
         cohens_h_to_detect <- cohens_h
-        diff_to_detect <- n_success/n - p
+        diff_to_detect <- abs(n_success/n - p)
       }
       else { # diff_to_detect is specified.
-        cohens_h_to_detect <- pwr::ES.h(p1 = p+diff_to_detect, p2 = p)
+        cohens_h_to_detect <- abs(pwr::ES.h(p1 = p+diff_to_detect, p2 = p))
       }
 
       model <- binom.test(n_success, n, p = p, ...) # For some reason, to pass p to binom.test, it needs to be explicitly specified as opposed to implicitly passing as part of "...".
