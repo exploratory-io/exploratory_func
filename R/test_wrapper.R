@@ -717,7 +717,13 @@ tidy.binom_test_exploratory <- function(x, type="model", conf_level=0.95) {
     }
   }
   else if (type == "distribution") {
-    density <-dbinom(0:x$parameter, x$parameter, x$null.value)
+    if (x$parameter > 1000) {
+      grid <- as.integer(0:1000 * x$parameter / 1000)
+    }
+    else {
+      grid <- 0:x$parameter
+    }
+    density <-dbinom(grid, x$parameter, x$null.value)
     if (x$alternative == "two.sided") {
       thres_upper <- qbinom(1-x$sig.level/2, x$parameter, x$null.value)
       thres_lower <- qbinom(x$sig.level/2, x$parameter, x$null.value)
@@ -730,27 +736,33 @@ tidy.binom_test_exploratory <- function(x, type="model", conf_level=0.95) {
       thres_upper <- qbinom(1-x$sig.level, x$parameter, x$null.value)
       thres_lower <- -Inf
     }
-    ret <- data.frame(n=0:x$parameter, d=density) %>% dplyr::mutate(m=if_else(n==!!x$statistic, 1, 0))
+    ret <- data.frame(n=grid, d=density) %>% dplyr::mutate(m=if_else(n==!!x$statistic, 1, 0))
     ret <- ret %>% dplyr::mutate(crit=if_else(n > thres_upper | n < thres_lower, d, NA_real_))
   }
   else if (type == "power") {
-    density_a <-dbinom(0:x$parameter, x$parameter, x$null.value)
+    if (x$parameter > 1000) {
+      grid <- as.integer(0:1000 * x$parameter / 1000)
+    }
+    else {
+      grid <- 0:x$parameter
+    }
+    density_a <-dbinom(grid, x$parameter, x$null.value)
     if (x$alternative == "two.sided") {
       # Show curve only on the side actual data is inclining.
       if (x$estimate >= x$null.value) {
-        density_b <-dbinom(0:x$parameter, x$parameter, x$null.value + x$diff_to_detect)
+        density_b <-dbinom(grid, x$parameter, x$null.value + x$diff_to_detect)
       }
       else {
-        density_b <-dbinom(0:x$parameter, x$parameter, x$null.value - x$diff_to_detect)
+        density_b <-dbinom(grid, x$parameter, x$null.value - x$diff_to_detect)
       }
     }
     else if (x$alternative == "less") {
-      density_b <-dbinom(0:x$parameter, x$parameter, x$null.value - x$diff_to_detect)
+      density_b <-dbinom(grid, x$parameter, x$null.value - x$diff_to_detect)
     }
     else if (x$alternative == "greater") {
-      density_b <-dbinom(0:x$parameter, x$parameter, x$null.value + x$diff_to_detect)
+      density_b <-dbinom(grid, x$parameter, x$null.value + x$diff_to_detect)
     }
-    ret <- data.frame(n=0:x$parameter, a=density_a, b=density_b) %>% dplyr::mutate(m=if_else(n==!!x$statistic, 1, 0))
+    ret <- data.frame(n=grid, a=density_a, b=density_b) %>% dplyr::mutate(m=if_else(n==!!x$statistic, 1, 0))
     if (x$alternative == "two.sided") {
       thres_upper <- qbinom(1-x$sig.level/2, x$parameter, x$null.value)
       thres_lower <- qbinom(x$sig.level/2, x$parameter, x$null.value)
