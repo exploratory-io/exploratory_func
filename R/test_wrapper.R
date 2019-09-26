@@ -718,8 +718,18 @@ tidy.binom_test_exploratory <- function(x, type="model", conf_level=0.95) {
   }
   else if (type == "distribution") {
     density <-dbinom(0:x$parameter, x$parameter, x$null.value)
-    thres_upper <- qbinom(1-x$sig.level/2, x$parameter, x$null.value)
-    thres_lower <- qbinom(x$sig.level/2, x$parameter, x$null.value)
+    if (x$alternative == "two.sided") {
+      thres_upper <- qbinom(1-x$sig.level/2, x$parameter, x$null.value)
+      thres_lower <- qbinom(x$sig.level/2, x$parameter, x$null.value)
+    }
+    else if (x$alternative == "less") {
+      thres_upper <- Inf
+      thres_lower <- qbinom(x$sig.level, x$parameter, x$null.value)
+    }
+    else if (x$alternative == "greater") {
+      thres_upper <- qbinom(1-x$sig.level, x$parameter, x$null.value)
+      thres_lower <- -Inf
+    }
     ret <- data.frame(n=0:x$parameter, d=density) %>% dplyr::mutate(m=if_else(n==!!x$statistic, 1, 0))
     ret <- ret %>% dplyr::mutate(crit=if_else(n > thres_upper | n < thres_lower, d, NA_real_))
   }
