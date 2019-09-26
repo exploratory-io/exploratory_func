@@ -736,8 +736,9 @@ tidy.binom_test_exploratory <- function(x, type="model", conf_level=0.95) {
       thres_upper <- qbinom(1-x$sig.level, x$parameter, x$null.value)
       thres_lower <- -Inf
     }
-    ret <- data.frame(n=grid, d=density) %>% dplyr::mutate(m=if_else(n==!!x$statistic, 1, 0))
+    ret <- data.frame(n=grid, d=density, m=0) %>% tibble::add_row(n=!!x$statistic, m=1)
     ret <- ret %>% dplyr::mutate(crit=if_else(n > thres_upper | n < thres_lower, d, NA_real_))
+    ret <- ret %>% dplyr::mutate(n = n/(!!x$parameter) * 100) # Convert to percent
   }
   else if (type == "power") {
     if (x$parameter > 1000) {
@@ -762,7 +763,7 @@ tidy.binom_test_exploratory <- function(x, type="model", conf_level=0.95) {
     else if (x$alternative == "greater") {
       density_b <-dbinom(grid, x$parameter, x$null.value + x$diff_to_detect)
     }
-    ret <- data.frame(n=grid, a=density_a, b=density_b) %>% dplyr::mutate(m=if_else(n==!!x$statistic, 1, 0))
+    ret <- data.frame(n=grid, a=density_a, b=density_b, m=0) %>% tibble::add_row(n=!!x$statistic, m=1)
     if (x$alternative == "two.sided") {
       thres_upper <- qbinom(1-x$sig.level/2, x$parameter, x$null.value)
       thres_lower <- qbinom(x$sig.level/2, x$parameter, x$null.value)
@@ -791,6 +792,7 @@ tidy.binom_test_exploratory <- function(x, type="model", conf_level=0.95) {
     else if (x$alternative == "greater") {
       ret <- ret %>% dplyr::mutate(crit_b=if_else(n < thres_upper, b, NA_real_))
     }
+    ret <- ret %>% dplyr::mutate(n = n/(!!x$parameter) * 100) # Convert to percent
   }
   else { # type == "data"
     ret <- x$data
