@@ -735,12 +735,50 @@ tidy.binom_test_exploratory <- function(x, type="model", conf_level=0.95) {
   }
   else if (type == "power") {
     density_a <-dbinom(0:x$parameter, x$parameter, x$null.value)
-    density_b <-dbinom(0:x$parameter, x$parameter, x$null.value + x$diff_to_detect) # TODO: handle other types of alternative
+    if (x$alternative == "two.sided") {
+      # Show curve only on the side actual data is inclining.
+      if (x$estimate >= x$null.value) {
+        density_b <-dbinom(0:x$parameter, x$parameter, x$null.value + x$diff_to_detect)
+      }
+      else {
+        density_b <-dbinom(0:x$parameter, x$parameter, x$null.value - x$diff_to_detect)
+      }
+    }
+    else if (x$alternative == "less") {
+      density_b <-dbinom(0:x$parameter, x$parameter, x$null.value - x$diff_to_detect)
+    }
+    else if (x$alternative == "greater") {
+      density_b <-dbinom(0:x$parameter, x$parameter, x$null.value + x$diff_to_detect)
+    }
     ret <- data.frame(n=0:x$parameter, a=density_a, b=density_b) %>% dplyr::mutate(m=if_else(n==!!x$statistic, 1, 0))
-    thres_upper <- qbinom(1-x$sig.level/2, x$parameter, x$null.value)
-    thres_lower <- qbinom(x$sig.level/2, x$parameter, x$null.value)
+    if (x$alternative == "two.sided") {
+      thres_upper <- qbinom(1-x$sig.level/2, x$parameter, x$null.value)
+      thres_lower <- qbinom(x$sig.level/2, x$parameter, x$null.value)
+    }
+    else if (x$alternative == "less") {
+      thres_upper <- Inf
+      thres_lower <- qbinom(x$sig.level, x$parameter, x$null.value)
+    }
+    else if (x$alternative == "greater") {
+      thres_upper <- qbinom(1-x$sig.level, x$parameter, x$null.value)
+      thres_lower <- -Inf
+    }
     ret <- ret %>% dplyr::mutate(crit_a=if_else(n > thres_upper | n < thres_lower, a, NA_real_))
-    ret <- ret %>% dplyr::mutate(crit_b=if_else(n < thres_upper, b, NA_real_))
+    if (x$alternative == "two.sided") {
+      # Show curve only on the side actual data is inclining.
+      if (x$estimate >= x$null.value) {
+        ret <- ret %>% dplyr::mutate(crit_b=if_else(n < thres_upper, b, NA_real_))
+      }
+      else {
+        ret <- ret %>% dplyr::mutate(crit_b=if_else(n > thres_lower, b, NA_real_))
+      }
+    }
+    else if (x$alternative == "less") {
+      ret <- ret %>% dplyr::mutate(crit_b=if_else(n > thres_lower, b, NA_real_))
+    }
+    else if (x$alternative == "greater") {
+      ret <- ret %>% dplyr::mutate(crit_b=if_else(n < thres_upper, b, NA_real_))
+    }
   }
   else { # type == "data"
     ret <- x$data
