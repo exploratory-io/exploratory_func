@@ -26,6 +26,15 @@ handle_partial_dependence <- function(x) {
         actual_ret <- x$data %>% dplyr::group_by(!!rlang::sym(var_col)) %>% dplyr::summarise(Actual=mean(!!rlang::sym(target_col), na.rm=TRUE))
         ret <- ret %>% dplyr::bind_rows(actual_ret)
       }
+      else if (is.numeric(ret[[var_col]])) {
+        # Equal width cut:
+        actual_ret <- x$data %>% dplyr::mutate(.temp.bin.column=cut(!!rlang::sym(var_col), breaks=20)) %>% dplyr::group_by(.temp.bin.column)
+        # Equal frequency cut version:
+        # actual_ret <- x$data %>% dplyr::mutate(.temp.bin.column=ggplot2::cut_number(!!rlang::sym(var_col), 20)) %>% dplyr::group_by(.temp.bin.column)
+        actual_ret <- actual_ret %>% dplyr::summarize(Actual=mean(!!rlang::sym(target_col), na.rm=TRUE),!!rlang::sym(var_col):=mean(!!rlang::sym(var_col), na.rm=TRUE))
+        actual_ret <- actual_ret %>% dplyr::select(-.temp.bin.column)
+        ret <- ret %>% dplyr::bind_rows(actual_ret)
+      }
     }
   }
 
