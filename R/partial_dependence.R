@@ -20,6 +20,7 @@ handle_partial_dependence <- function(x) {
   #   }
   # }
 
+  # For lm/glm, show plot of means of binned original data alongside with the partial dependence.
   if ("glm" %in% class(x) || "lm" %in% class(x)) {
     if (!is.null(x$data)) {  # For glm case.
       df <- x$data
@@ -28,12 +29,12 @@ handle_partial_dependence <- function(x) {
       df <- x$model
     }
     for (var_col in var_cols) {
-      if (is.factor(ret[[var_col]])) { # TODO: Support other types
+      if (is.factor(ret[[var_col]])) {
         actual_ret <- df %>% dplyr::group_by(!!rlang::sym(var_col)) %>% dplyr::summarise(Actual=mean(!!rlang::sym(target_col), na.rm=TRUE))
         ret <- ret %>% dplyr::bind_rows(actual_ret)
       }
-      else if (is.numeric(ret[[var_col]])) {
-        # Equal width cut:
+      else if (is.numeric(ret[[var_col]])) { # Because of proprocessing we do, all columns should be either factor or numeric by now.
+        # Equal width cut: We found this gives more understandable plot compared to equal frequency cut.
         actual_ret <- df %>% dplyr::mutate(.temp.bin.column=cut(!!rlang::sym(var_col), breaks=20)) %>% dplyr::group_by(.temp.bin.column)
         # Equal frequency cut version:
         # actual_ret <- df %>% dplyr::mutate(.temp.bin.column=ggplot2::cut_number(!!rlang::sym(var_col), 20)) %>% dplyr::group_by(.temp.bin.column)
