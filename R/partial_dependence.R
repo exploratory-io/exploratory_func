@@ -20,22 +20,29 @@ handle_partial_dependence <- function(x) {
   #   }
   # }
 
-  if (!is.null(x$data)) { # This is for glm case.
+  if ("glm" %in% class(x) || "lm" %in% class(x)) {
+    if (!is.null(x$data)) {  # For glm case.
+      df <- x$data
+    }
+    else { # For lm case
+      df <- x$model
+    }
     for (var_col in var_cols) {
       if (is.factor(ret[[var_col]])) { # TODO: Support other types
-        actual_ret <- x$data %>% dplyr::group_by(!!rlang::sym(var_col)) %>% dplyr::summarise(Actual=mean(!!rlang::sym(target_col), na.rm=TRUE))
+        actual_ret <- df %>% dplyr::group_by(!!rlang::sym(var_col)) %>% dplyr::summarise(Actual=mean(!!rlang::sym(target_col), na.rm=TRUE))
         ret <- ret %>% dplyr::bind_rows(actual_ret)
       }
       else if (is.numeric(ret[[var_col]])) {
         # Equal width cut:
-        actual_ret <- x$data %>% dplyr::mutate(.temp.bin.column=cut(!!rlang::sym(var_col), breaks=20)) %>% dplyr::group_by(.temp.bin.column)
+        actual_ret <- df %>% dplyr::mutate(.temp.bin.column=cut(!!rlang::sym(var_col), breaks=20)) %>% dplyr::group_by(.temp.bin.column)
         # Equal frequency cut version:
-        # actual_ret <- x$data %>% dplyr::mutate(.temp.bin.column=ggplot2::cut_number(!!rlang::sym(var_col), 20)) %>% dplyr::group_by(.temp.bin.column)
+        # actual_ret <- df %>% dplyr::mutate(.temp.bin.column=ggplot2::cut_number(!!rlang::sym(var_col), 20)) %>% dplyr::group_by(.temp.bin.column)
         actual_ret <- actual_ret %>% dplyr::summarize(Actual=mean(!!rlang::sym(target_col), na.rm=TRUE),!!rlang::sym(var_col):=mean(!!rlang::sym(var_col), na.rm=TRUE))
         actual_ret <- actual_ret %>% dplyr::select(-.temp.bin.column)
         ret <- ret %>% dplyr::bind_rows(actual_ret)
       }
     }
+    ret <- ret %>% dplyr::rename(Model=!!rlang::sym(target_col)) # Rename target column to Model to make comparison with Actual.
   }
 
   ret <- ret %>% tidyr::gather_("x_name", "x_value", var_cols, na.rm = TRUE, convert = FALSE)
@@ -55,7 +62,10 @@ handle_partial_dependence <- function(x) {
   # use it here either way.
   # glm (binomial family) is exception here, since we only show probability of being TRUE,
   # and instead show mean of binned actual data.
-  if (!is.null(x$orig_levels) && "glm" %nin% class(x)) {
+  if ("glm" %in% class(x)) {
+    ret <- ret %>%  dplyr::mutate(y_name = factor(y_name, levels=c("Actual", "Model")))
+  }
+  else if (!is.null(x$orig_levels)) {
     ret <- ret %>%  dplyr::mutate(y_name = factor(y_name, levels=x$orig_levels))
   }
 
