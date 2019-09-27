@@ -760,7 +760,7 @@ build_lm.fast <- function(df,
         imp_vars <- as.character((imp_df %>% arrange(-importance))$term)
         imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # Keep only max_pd_vars most important variables
       }
-      else  { # We do not have a way to determine importance. Just show all significant variables.
+      else  { # We do not have a way to determine importance. Just show all variables.
         imp_vars <- c_cols
 
         # We tried showing only significant variables, but decided oftentimes we wanted to see even insignificant ones. Keeping that code for now.
