@@ -20,7 +20,8 @@ handle_partial_dependence <- function(x) {
   #   }
   # }
 
-  # For lm/glm, show plot of means of binned original data alongside with the partial dependence.
+  # For lm/glm, show plot of means of binned training data alongside with the partial dependence as "Actual" plot.
+  # Partial dependence is labeled as the "Model" plot to make comparison.
   if ("glm" %in% class(x) || "lm" %in% class(x)) {
     if (!is.null(x$data)) {  # For glm case.
       df <- x$data
@@ -29,7 +30,7 @@ handle_partial_dependence <- function(x) {
       df <- x$model
     }
     for (var_col in var_cols) {
-      if (is.factor(ret[[var_col]])) {
+      if (is.factor(ret[[var_col]])) { # In case of factor, just plot means of training data for each category.
         actual_ret <- df %>% dplyr::group_by(!!rlang::sym(var_col)) %>% dplyr::summarise(Actual=mean(!!rlang::sym(target_col), na.rm=TRUE))
         ret <- ret %>% dplyr::bind_rows(actual_ret)
       }
