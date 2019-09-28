@@ -124,6 +124,7 @@ test_that("Linear Regression with test rate", {
 
     res <- ret %>% broom::glance(model, pretty.name=TRUE)
     expect_equal(res$`Number of Rows`, 17)
+    res <- ret %>% lm_partial_dependence()
    })
 })
 
@@ -448,6 +449,7 @@ test_that("Group GLM - Poisson Destribution with test_rate", {
     expect_equal(colnames(pred_test), expected_cols)
 
     res <- ret %>% broom::glance(model, pretty.name=TRUE)
+    res <- ret %>% lm_partial_dependence()
    })
 })
 
@@ -478,6 +480,7 @@ test_that("GLM - Negative Binomial Destribution with test_rate", {
     expect_equal(colnames(pred_test), expected_cols)
 
     res <- ret %>% broom::glance(model, pretty.name=TRUE)
+    res <- ret %>% lm_partial_dependence()
    })
 })
 
@@ -512,6 +515,7 @@ test_that("Group GLM - Negative Binomial Destribution with test_rate", {
     expect_equal(colnames(pred_test), expected_cols)
 
     res <- ret %>% broom::glance(model, pretty.name=TRUE)
+    res <- ret %>% lm_partial_dependence()
    })
 })
 
@@ -542,6 +546,7 @@ test_that("Logistic Regression with test_rate", {
     expect_equal(colnames(pred_test), expected_cols)
 
     res <- ret %>% broom::glance(model, pretty.name=TRUE)
+    res <- ret %>% lm_partial_dependence()
    })
 })
 

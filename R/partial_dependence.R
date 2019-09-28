@@ -7,6 +7,7 @@ handle_partial_dependence <- function(x) {
   # return partial dependence
   ret <- x$partial_dependence
   var_cols <- attr(x$partial_dependence, "vars")
+  target_col <- attr(x$partial_dependence, "target")
   # We used to do the following, probably for better formatting of numbers, but this had side-effect of
   # turning close numbers into a same number, when differences among numbers are small compared to their
   # absolute values. It happened with Date data turned into numeric.
@@ -18,6 +19,34 @@ handle_partial_dependence <- function(x) {
   #     ret[[var_col]] <- signif(ret[[var_col]], digits=4) # limit digits before we turn it into a factor.
   #   }
   # }
+
+  # For lm/glm, show plot of means of binned training data alongside with the partial dependence as "Actual" plot.
+  # Partial dependence is labeled as the "Model" plot to make comparison.
+  if ("glm" %in% class(x) || "lm" %in% class(x)) {
+    if (!is.null(x$data)) {  # For glm case.
+      df <- x$data
+    }
+    else { # For lm case
+      df <- x$model
+    }
+    for (var_col in var_cols) {
+      if (is.factor(ret[[var_col]])) { # In case of factor, just plot means of training data for each category.
+        actual_ret <- df %>% dplyr::group_by(!!rlang::sym(var_col)) %>% dplyr::summarise(Actual=mean(!!rlang::sym(target_col), na.rm=TRUE))
+        ret <- ret %>% dplyr::bind_rows(actual_ret)
+      }
+      else if (is.numeric(ret[[var_col]])) { # Because of proprocessing we do, all columns should be either factor or numeric by now.
+        # Equal width cut: We found this gives more understandable plot compared to equal frequency cut.
+        actual_ret <- df %>% dplyr::mutate(.temp.bin.column=cut(!!rlang::sym(var_col), breaks=20)) %>% dplyr::group_by(.temp.bin.column)
+        # Equal frequency cut version:
+        # actual_ret <- df %>% dplyr::mutate(.temp.bin.column=ggplot2::cut_number(!!rlang::sym(var_col), 20)) %>% dplyr::group_by(.temp.bin.column)
+        actual_ret <- actual_ret %>% dplyr::summarize(Actual=mean(!!rlang::sym(target_col), na.rm=TRUE),!!rlang::sym(var_col):=mean(!!rlang::sym(var_col), na.rm=TRUE))
+        actual_ret <- actual_ret %>% dplyr::select(-.temp.bin.column)
+        ret <- ret %>% dplyr::bind_rows(actual_ret)
+      }
+    }
+    ret <- ret %>% dplyr::rename(Model=!!rlang::sym(target_col)) # Rename target column to Model to make comparison with Actual.
+  }
+
   ret <- ret %>% tidyr::gather_("x_name", "x_value", var_cols, na.rm = TRUE, convert = FALSE)
   # sometimes x_value comes as numeric and not character, and it was causing error from bind_rows internally done
   # in tidy().
@@ -33,7 +62,12 @@ handle_partial_dependence <- function(x) {
   # Set original factor level back so that legend order is correct on the chart.
   # In case of logical, c("TRUE","FALSE") is stored in orig_level, so that we can
   # use it here either way.
-  if (!is.null(x$orig_levels)) {
+  # glm (binomial family) is exception here, since we only show probability of being TRUE,
+  # and instead show mean of binned actual data.
+  if ("glm" %in% class(x)) {
+    ret <- ret %>%  dplyr::mutate(y_name = factor(y_name, levels=c("Actual", "Model")))
+  }
+  else if (!is.null(x$orig_levels)) {
     ret <- ret %>%  dplyr::mutate(y_name = factor(y_name, levels=x$orig_levels))
   }
 
@@ -44,7 +78,7 @@ handle_partial_dependence <- function(x) {
     df <- x$df
   }
   else if ("rpart" %in% class(x)) {
-    # use partial_dependence itself for determining chart_time. Maybe this works for other models too?
+    # use partial_dependence itself for determining chart_type. Maybe this works for other models too?
     df <- x$partial_dependence
   }
   else if (!is.null(x$data)) {  # For glm case.
