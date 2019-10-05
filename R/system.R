@@ -530,8 +530,8 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     conn <- connection_pool[[key]]
     if (!is.null(conn)){
       tryCatch({
-        # test connection
-        result <- DBI::dbGetQuery(conn,"select 1")
+        # test connection and at the same time set up the session with the server to use utf8.
+        result <- DBI::dbGetQuery(conn,"set names utf8") # This should return empty data.frame.
         if (!is.data.frame(result)) { # it can fail by returning NULL rather than throwing error.
           tryCatch({ # try to close connection and ignore error
             DBI::dbDisconnect(conn)
@@ -885,11 +885,12 @@ queryMySQL <- function(host, port, databaseName, username, password, numOfRows =
 
   conn <- getDBConnection("mysql", host, port, databaseName, username, password)
   tryCatch({
-    DBI::dbGetQuery(conn,"set names utf8")
+    # DBI::dbGetQuery(conn,"set names utf8")
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
     resultSet <- RMySQL::dbSendQuery(conn, glue_exploratory(query, .transformer = sql_glue_transformer, .envir = parent.frame()))
     df <- RMySQL::dbFetch(resultSet, n = numOfRows)
+    colnames(df) <- iconv(colnames(df),from = "utf8", to = "utf8")
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
     clearDBConnection("mysql", host, port, databaseName, username)
