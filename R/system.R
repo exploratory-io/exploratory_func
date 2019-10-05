@@ -828,9 +828,11 @@ getListOfColumns <- function(type, host, port, databaseName, username, password,
 #' API to execute a query that can be handled with DBI
 #' @export
 executeGenericQuery <- function(type, host, port, databaseName, username, password, query, catalog = "", schema = "", numOfRows = -1){
-  if (type %in% c("mysql", "aurora")) {
+  if (type %in% c("mysql", "aurora")) { # In case of MySQL, just use queryMySQL, since it has workaround to read multibyte column names without getting garbled.
     df <- queryMySQL(host, port, databaseName, username, password, numOfRows = numOfRows, query)
     df <- readr::type_convert(df)
+    # It is hackish, but to read multibyte character data correctly, type_convert helps for some reason.
+    # There is small chance of column getting converted to unwanted type, but for our usage, that is unlikely, and being able to read multibyte outweighs the potential drawback.
     return(df)
   }
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
@@ -890,7 +892,6 @@ queryMySQL <- function(host, port, databaseName, username, password, numOfRows =
 
   conn <- getDBConnection("mysql", host, port, databaseName, username, password)
   tryCatch({
-    # DBI::dbGetQuery(conn,"set names utf8")
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
     resultSet <- RMySQL::dbSendQuery(conn, glue_exploratory(query, .transformer = sql_glue_transformer, .envir = parent.frame()))
@@ -901,7 +902,7 @@ queryMySQL <- function(host, port, databaseName, username, password, numOfRows =
     stop(err)
   })
   RMySQL::dbClearResult(resultSet)
-  colnames(df) <- iconv(colnames(df),from = "utf8", to = "utf8")
+  colnames(df) <- iconv(colnames(df),from = "utf8", to = "utf8") # Work around to read multibyte column names without getting garbled.
   df
 }
 
