@@ -828,6 +828,11 @@ getListOfColumns <- function(type, host, port, databaseName, username, password,
 #' API to execute a query that can be handled with DBI
 #' @export
 executeGenericQuery <- function(type, host, port, databaseName, username, password, query, catalog = "", schema = "", numOfRows = -1){
+  if (type %in% c("mysql", "aurora")) {
+    df <- queryMySQL(host, port, databaseName, username, password, numOfRows = numOfRows, query)
+    df <- readr::type_convert(df)
+    return(df)
+  }
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
   conn <- getDBConnection(type, host, port, databaseName, username, password, catalog = catalog, schema = schema)
   tryCatch({
@@ -890,13 +895,13 @@ queryMySQL <- function(host, port, databaseName, username, password, numOfRows =
     # set envir = parent.frame() to get variables from users environment, not papckage environment
     resultSet <- RMySQL::dbSendQuery(conn, glue_exploratory(query, .transformer = sql_glue_transformer, .envir = parent.frame()))
     df <- RMySQL::dbFetch(resultSet, n = numOfRows)
-    colnames(df) <- iconv(colnames(df),from = "utf8", to = "utf8")
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
     clearDBConnection("mysql", host, port, databaseName, username)
     stop(err)
   })
   RMySQL::dbClearResult(resultSet)
+  colnames(df) <- iconv(colnames(df),from = "utf8", to = "utf8")
   df
 }
 
