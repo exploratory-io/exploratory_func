@@ -456,9 +456,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
           }
         }
         if (!is.null(holiday_country_names)) {
-          for (country_name in holiday_country_names) {
-            m <- add_country_holidays(m, country_name = country_name)
-          }
+          m <- add_country_holidays(m, country_name = holiday_country_names)
         }
         m <- fit.prophet(m, training_data)
         if (time_unit == "hour") {
