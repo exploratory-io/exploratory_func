@@ -165,10 +165,12 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
     stop("cap must be greater than floor.")
   }
 
-  # For ISO2C codes, make it upper case.
-  holiday_country_names <- dplyr::if_else(stringr::str_length(holiday_country_names) == 2, stringr::str_to_upper(holiday_country_names), holiday_country_names)
-  # Mapping to support some ISO2C codes, that are actually supported but with different names.
-  holiday_country_names <- dplyr::recode(holiday_country_names, GB="UnitedKingdom", TR="Turkey", FR="France")
+  if (!is.null(holiday_country_names)) {
+    # For ISO2C codes, make it upper case.
+    holiday_country_names <- dplyr::if_else(stringr::str_length(holiday_country_names) == 2, stringr::str_to_upper(holiday_country_names), holiday_country_names)
+    # Mapping to support some ISO2C codes, that are actually supported but with different names.
+    holiday_country_names <- dplyr::recode(holiday_country_names, GB="UnitedKingdom", TR="Turkey", FR="France")
+  }
 
   # To filter NAs on regressor columns
   filter_args <- list() # default empty list
@@ -456,9 +458,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
           }
         }
         if (!is.null(holiday_country_names)) {
-          for (country_name in holiday_country_names) {
-            m <- add_country_holidays(m, country_name = country_name)
-          }
+          m <- add_country_holidays(m, country_name = holiday_country_names)
         }
         m <- fit.prophet(m, training_data)
         if (time_unit == "hour") {

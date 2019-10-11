@@ -1,5 +1,4 @@
 context("test build_lm")
-
 test_that("test build_lm summary output ", {
   test_df = data.frame(
     num1 = seq(20) / 10.0,
@@ -298,6 +297,7 @@ test_that("prediction with glm model with SMOTE by build_lm.fast", {
   test_data <- test_data %>% mutate(CARRIER = factor(CARRIER, ordered=TRUE)) # test handling of ordered factor
 
   model_data <- build_lm.fast(test_data, `CANCELLED X`, `Carrier Name`, CARRIER, DISTANCE, model_type = "glm", smote=FALSE, with_marginal_effects=TRUE, with_marginal_effects_confint=TRUE)
+  ret <- model_data %>% lm_partial_dependence()
   ret <- model_data %>% broom::glance(model, pretty.name=TRUE)
   ret <- model_data %>% broom::tidy(model)
   ret <- model_data %>% broom::augment(model)
