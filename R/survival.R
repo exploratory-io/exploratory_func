@@ -144,7 +144,7 @@ tidy.survfit_exploratory <- function(x, ...) {
   if ("strata" %in% colnames(ret)) {
     nested <- ret %>% dplyr::group_by(strata) %>% tidyr::nest()
     nested <- nested %>% dplyr::mutate(data=purrr::map(data,~complete_times_each(.)))
-    ret <- tidyr::unnest(nested)
+    ret <- tidyr::unnest(nested) %>% dplyr::ungroup()
     # remove ".cohort=" part from strata values.
     ret <- ret %>% dplyr::mutate(strata = stringr::str_remove(strata,"^\\.cohort\\="))
     # Set original factor level back so that legend order is correct on the chart.
