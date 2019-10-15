@@ -18,7 +18,7 @@ do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, seed = NULL
   }
 
   each_func <- function(df) {
-    filtered_df <- df %>% tidyr::drop_na_(selected_cols) # TODO: take care of the case where values of a column are mostly NA
+    filtered_df <- df %>% tidyr::drop_na(!!!rlang::syms(selected_cols)) # TODO: take care of the case where values of a column are mostly NA
     if (nrow(filtered_df) == 0) { # skip this group if no row is left.
       return(NULL)
     }

@@ -48,7 +48,7 @@ simple_cast <- function(data, row, col, val=NULL, fun.aggregate=mean, fill=0, ti
   }
 
   # remove NA from row and column
-  data <- tidyr::drop_na_(data, c(row, col))
+  data <- tidyr::drop_na(data, !!rlang::sym(row), !!rlang::sym(col))
 
   if ((inherits(data[[row]], "Date") ||
       inherits(data[[row]], "POSIXct")) &&
@@ -107,7 +107,7 @@ sparse_cast <- function(data, row, col, val=NULL, fun.aggregate=sum, count = FAL
   }
 
   # remove NA from row and col
-  data <- tidyr::drop_na_(data, c(row, col))
+  data <- tidyr::drop_na(data, !!rlang::sym(row), !!rlang::sym(col))
 
   if(is.null(val)){
     # if there's no value column, it creates binary sparse matrix.

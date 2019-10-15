@@ -288,7 +288,7 @@ do_tfidf <- function(df, group, term, idf_log_scale = log, tf_weight="raw", norm
   term_col <- col_name(substitute(term))
 
   # remove NA from group and term column to avoid error
-  df <- tidyr::drop_na_(df, c(group_col, term_col))
+  df <- tidyr::drop_na(df, !!rlang::sym(group_col), !!rlang::sym(term_col))
 
   cnames <- avoid_conflict(c(group_col, term_col), c("count_of_docs", "tfidf", "tf"))
 
