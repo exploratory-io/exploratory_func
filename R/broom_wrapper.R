@@ -214,8 +214,8 @@ assign_cluster <- function(df, source_data){
   } else {
     # put one value column so that all data can be nested
     source_data %>%
-      dplyr::mutate(data = 1) %>%
-      dplyr::group_by(data) %>%
+    #  dplyr::mutate(data = 1) %>%
+    #  dplyr::group_by(data) %>%
       tidyr::nest()
   }
 
@@ -234,8 +234,10 @@ assign_cluster <- function(df, source_data){
 
   ret <- joined %>%
     dplyr::ungroup() %>%
-    dplyr::rowwise() %>%
-    broom::augment(model, data = data)
+    dplyr::mutate(augmented = purrr::map2(model, data, function(model, data) {
+      broom::augment(model, data = data)
+    })) %>% unnest_with_drop(augmented)
+
   # change factor to numeric
   ret[[".cluster"]] <- as.numeric(ret[[".cluster"]])
   colnames(ret)[colnames(ret) == ".cluster"] <- avoid_conflict(colnames(ret), "cluster")
