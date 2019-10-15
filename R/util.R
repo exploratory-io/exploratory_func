@@ -1251,8 +1251,9 @@ non_na_ratio <- function(x){
 #' if unnesting the specified columns requires the
 #' rows to be duplicated because of more than
 #' 2 rows data frames for example.
-unnest_with_drop <- function(..., .drop = TRUE){
-  tidyr::unnest(..., .drop = .drop)
+unnest_with_drop <- function(df, ...){
+  ret <- df %>% dplyr::select_if(function(x){!is.list(x)}) %>% dplyr::bind_cols(df %>% dplyr::ungroup() %>% dplyr::select(...)) %>% tidyr::unnest(...)
+  ret
 }
 
 #' validate empty data frame

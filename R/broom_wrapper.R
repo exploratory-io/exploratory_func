@@ -812,7 +812,7 @@ prediction_coxph <- function(df, time = NULL, threshold = 0.5, ...){
       ret
     }))
   ret <- ret %>% dplyr::select(!!!c("ret", group_by_names))
-  ret <- ret %>% unnest_with_drop()
+  ret <- ret %>% unnest_with_drop(ret)
 
   # set it back to non-group-by state that is same as predict() output.
   if (length(group_by_names) == 0) {
@@ -1010,7 +1010,7 @@ model_stats <- function(df, pretty.name = FALSE, ...){
       ret
     })) %>%
     dplyr::select(!!!c("ret", group_by_names)) %>%
-    unnest_with_drop()
+    unnest_with_drop(ret)
 
   # set it back to non-group-by state that is same as glance() output.
   if (length(group_by_names) == 0) {

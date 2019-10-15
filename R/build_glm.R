@@ -79,9 +79,9 @@ build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, g
     data <- dplyr::group_by(data, !!!rlang::syms(colnames(data)[group_col_index]))
   } else if (!dplyr::is.grouped_df(data)){
     # need to be grouped to nest
-    data <- data %>%
-      dplyr::mutate(.test_index = 1) %>%
-      dplyr::group_by(.test_index)
+    #data <- data %>%
+    #  dplyr::mutate(.test_index = 1) %>%
+    #  dplyr::group_by(.test_index)
   }
 
   group_col_names <- grouped_by(data)
@@ -123,7 +123,7 @@ build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, g
 
   ret <- tryCatch({
     ret <- data %>%
-      tidyr::nest(.key = "source.data") %>%
+      tidyr::nest(source.data=-dplyr::group_cols()) %>%
       # create test index
       dplyr::mutate(.test_index = purrr::map(source.data, function(df){
         sample_df_index(df, rate = test_rate)

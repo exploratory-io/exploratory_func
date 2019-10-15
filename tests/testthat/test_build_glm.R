@@ -11,7 +11,8 @@ test_that("test build_glm summary output ", {
   test_df <- test_df %>% rename(`num 1`=num1, `num 2`=num2)
   trial <- test_df %>% build_glm(`num 1` ~ `num 2` + category + with_NA, weights = weights)
 
-  expect_equal(colnames(trial), c(".test_index", "source.data", "model", ".model_metadata"))
+  #expect_equal(colnames(trial), c(".test_index", "source.data", "model", ".model_metadata"))
+  expect_equal(colnames(trial), c("source.data", ".test_index", "model", ".model_metadata"))
 
   res <- capture.output(summary(trial$model[[1]]))
   expect_lt(length(res), 50) # the output of summary should be less than 50 lines

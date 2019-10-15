@@ -61,9 +61,9 @@ build_model_ <- function(data, model_func, seed = 0, test_rate = 0, group_cols =
     processed <- dplyr::group_by(processed, !!!rlang::syms(colnames(processed)[group_col_index]))
   } else if (!dplyr::is.grouped_df(processed)){
     # need to be grouped to nest
-    processed <- processed %>%
-      dplyr::mutate(.test_index = 1) %>%
-      dplyr::group_by(.test_index)
+    #processed <- processed %>%
+    #  dplyr::mutate(.test_index = 1) %>%
+    #  dplyr::group_by(.test_index)
   }
 
   group_col_names <- grouped_by(processed)
@@ -97,7 +97,7 @@ build_model_ <- function(data, model_func, seed = 0, test_rate = 0, group_cols =
 
   ret <- tryCatch({
     ret <- processed %>%
-      tidyr::nest(.key = "source.data") %>%
+      tidyr::nest(source.data=-dplyr::group_cols()) %>%
       # create test index
       dplyr::mutate(.test_index = purrr::map(source.data, function(df){
         sample_df_index(df, rate = test_rate)
