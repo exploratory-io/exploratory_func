@@ -257,7 +257,7 @@ calc_tf_ <- function(df, group_col, term_col, weight="ratio"){
 
   ret <- (df[,colnames(df) == group_col | colnames(df)==term_col] %>%
             dplyr::group_by(!!!rlang::syms(c(group_col, term_col))) %>% # convert the column name to symbol for colum names with backticks
-            dplyr::summarise_(.dots=setNames(list(~n()), cnames[[1]])) %>%
+            dplyr::summarise(!!rlang::sym(cnames[[1]]) := n()) %>%
             dplyr::mutate_(.dots=setNames(list(weight_fml), cnames[[2]])) %>%
             dplyr::ungroup()
   )
