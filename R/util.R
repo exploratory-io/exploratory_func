@@ -1665,7 +1665,7 @@ bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_da
         if(stringr::str_length(current_df_name) > 0 && index == 1) {
           # if force_data_type is set, force character as column data types
           if(force_data_type) {
-            dataframes_updated[[current_df_name]] <- dplyr::mutate_all(dataframes[[1]], funs(as.character))
+            dataframes_updated[[current_df_name]] <- dplyr::mutate_all(dataframes[[1]], list(as.character=as.character))
           } else {
             dataframes_updated[[current_df_name]] <- dataframes[[1]]
           }
@@ -1676,7 +1676,7 @@ bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_da
           }
           # force character as column data types
           if(force_data_type) {
-            dataframes_updated[[name]] <- dplyr::mutate_all(dataframes[[name]], funs(as.character))
+            dataframes_updated[[name]] <- dplyr::mutate_all(dataframes[[name]], list(as.character=as.character))
           } else {
             dataframes_updated[[name]] <- dataframes[[name]]
           }
