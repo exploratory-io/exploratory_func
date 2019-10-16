@@ -412,7 +412,7 @@ evaluate_binary_training_and_test <- function(df, actual_val_col, threshold = "f
   }
 
   if (length(grouped_col) > 0){
-    ret <- ret %>% dplyr::arrange_(paste0("`", grouped_col, "`"))
+    ret <- ret %>% dplyr::arrange(!!!rlang::syms(grouped_col))
   }
 
   # Prettify is_test_data column. Note that column order is already taken care of.
