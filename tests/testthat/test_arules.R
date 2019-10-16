@@ -11,8 +11,8 @@ test_that("test do_apriori", {
     do_apriori(test_df, `na me`, `pro duct`, min_support=0.000000000000000001)
   })
   expect_equal(colnames(ret), c("lhs", "rhs", "support", "confidence", "lift"))
-  expect_true(is.character(ret[, "lhs"] ))
-  expect_true(!any(ret[, "lhs"] == "")) # There should be at least 1 lhs item since by default minimum number of lhs is 1.
+  expect_true(is.character(ret$lhs))
+  expect_true(!any(ret$lhs == "")) # There should be at least 1 lhs item since by default minimum number of lhs is 1.
 })
 
 test_that("test do_apriori with lhs", {
@@ -26,7 +26,7 @@ test_that("test do_apriori with lhs", {
     do_apriori(test_df, name, product, min_support=0.001, lhs="name1")
   })
   expect_equal(colnames(ret), c("lhs", "rhs", "support", "confidence", "lift"))
-  expect_true(all(ret[, "lhs"] == "name1"))
+  expect_true(all(ret$lhs == "name1"))
   get_arules_graph_data(ret)
 })
 
@@ -41,7 +41,7 @@ test_that("test do_apriori with lhs and rhs", {
     do_apriori(test_df, name, product, min_support=0.001, lhs="name1", rhs="name8")
   })
   expect_equal(colnames(ret), c("lhs", "rhs", "support", "confidence", "lift"))
-  expect_true(all(ret[, "lhs"] == "name1" & ret[, "rhs"] == "name8"))
+  expect_true(all(ret$lhs == "name1" & ret$rhs == "name8"))
   get_arules_graph_data(ret)
 })
 
