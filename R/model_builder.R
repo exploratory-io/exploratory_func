@@ -69,7 +69,7 @@ build_kmeans.kv_ <- function(df,
   model_column <- avoid_conflict(grouped_column, "model")
   source_column <- avoid_conflict(grouped_column, "source.data")
 
-  df <- tidyr::drop_na(df, !!rlang::sym(subject_col), !!rlang::sym(key_col), !!rlang::sym(value_col))
+  df <- tidyr::drop_na(df, !!!rlang::syms(c(subject_col, key_col, value_col))) # using syms() as opposed to sym() to take care of the case where value_col is NULL.
 
   if(row_col %in% grouped_column){
     stop(paste0(row_col, " is a grouping column. ungroup() may be necessary before this operation."))
