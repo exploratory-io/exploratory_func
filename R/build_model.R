@@ -59,11 +59,6 @@ build_model_ <- function(data, model_func, seed = 0, test_rate = 0, group_cols =
 
   if(!is.null(group_cols)){
     processed <- dplyr::group_by(processed, !!!rlang::syms(colnames(processed)[group_col_index]))
-  } else if (!dplyr::is.grouped_df(processed)){
-    # need to be grouped to nest
-    #processed <- processed %>%
-    #  dplyr::mutate(.test_index = 1) %>%
-    #  dplyr::group_by(.test_index)
   }
 
   group_col_names <- grouped_by(processed)

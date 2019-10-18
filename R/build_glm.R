@@ -77,11 +77,6 @@ build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, g
 
   if(!is.null(group_cols)){
     data <- dplyr::group_by(data, !!!rlang::syms(colnames(data)[group_col_index]))
-  } else if (!dplyr::is.grouped_df(data)){
-    # need to be grouped to nest
-    #data <- data %>%
-    #  dplyr::mutate(.test_index = 1) %>%
-    #  dplyr::group_by(.test_index)
   }
 
   group_col_names <- grouped_by(data)

@@ -169,11 +169,6 @@ build_lm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, gr
 
   if(!is.null(group_cols)){
     data <- dplyr::group_by(data, !!!rlang::syms(colnames(data)[group_col_index]))
-  } else if (!dplyr::is.grouped_df(data)) {
-    # grouping is necessary for tidyr::nest to work so putting one value columns
-    #data <- data %>%
-    #  dplyr::mutate(source.data = 1) %>%
-    #  dplyr::group_by(source.data)
   }
 
   group_col_names <- grouped_by(data)

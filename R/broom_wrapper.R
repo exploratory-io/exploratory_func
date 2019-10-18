@@ -212,10 +212,8 @@ assign_cluster <- function(df, source_data){
       dplyr::group_by(!!!rlang::syms(grouping_cols)) %>%
       tidyr::nest()
   } else {
-    # put one value column so that all data can be nested
+    # nest without grouping.
     source_data %>%
-    #  dplyr::mutate(data = 1) %>%
-    #  dplyr::group_by(data) %>%
       tidyr::nest()
   }
 
