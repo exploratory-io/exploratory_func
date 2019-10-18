@@ -141,7 +141,7 @@ do_cor.kv_ <- function(df,
     df %>%
       dplyr::do_(.dots=setNames(list(~do_cor_each(.)), tmp_col)) %>%
       dplyr::ungroup() %>%
-      unnest_with_drop_(tmp_col)
+      unnest_with_drop(!!rlang::sym(tmp_col))
   }
   else {
     do_on_each_group(df, do_cor_each, name = "model", with_unnest = FALSE)
@@ -198,7 +198,7 @@ do_cor.cols <- function(df, ..., use="pairwise.complete.obs", method="pearson", 
     df %>%
       dplyr::do_(.dots=setNames(list(~do_cor_each(.)), output_cols[[1]])) %>%
       dplyr::ungroup() %>%
-      unnest_with_drop_(output_cols[[1]])
+      unnest_with_drop(!!rlang::sym(output_cols[[1]]))
   }
   else {
     do_on_each_group(df, do_cor_each, name = "model", with_unnest = FALSE)
@@ -328,5 +328,5 @@ do_cmdscale_ <- function(df,
   df %>%
     dplyr::do_(.dots=setNames(list(~do_cmdscale_each(.)), tmp_col)) %>%
     dplyr::ungroup() %>%
-    unnest_with_drop_(tmp_col)
+    unnest_with_drop(!!rlang::sym(tmp_col))
 }

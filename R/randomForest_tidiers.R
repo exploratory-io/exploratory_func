@@ -1675,7 +1675,7 @@ exp_balance <- function(df,
   ret <- df %>%
     dplyr::do_(.dots=setNames(list(~each_func(.)), tmp_col)) %>%
     dplyr::ungroup() %>%
-    tidyr::unnest_(tmp_col)
+    tidyr::unnest(!!rlang::sym(tmp_col))
 
   # grouping should be kept
   if(length(grouped_col) != 0){

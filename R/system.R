@@ -261,7 +261,7 @@ js_glue_transformer <- function(code, envir) {
   val <- ifelse(is.na(val), "null", val)
 
   # for numeric it should work as is. expression like 1e+10 works on js too.
-  glue::collapse(val, sep=", ")
+  glue::glue_collapse(val, sep=", ")
 }
 
 sql_glue_transformer <- function(code, envir) {
@@ -299,7 +299,7 @@ sql_glue_transformer <- function(code, envir) {
   #       Does expression like 1e+10 work?
   # TODO: Need to handle NA here. Find out appropriate way.
   # We always collapse, unlike glue_sql.
-  glue::collapse(val, sep=", ")
+  glue::glue_collapse(val, sep=", ")
 }
 
 bigquery_glue_transformer <- function(code, envir) {
@@ -338,7 +338,7 @@ bigquery_glue_transformer <- function(code, envir) {
   #       Does expression like 1e+10 work?
   # TODO: Need to handle NA here. Find out appropriate way.
   # We always collapse, unlike glue_sql.
-  glue::collapse(val, sep=", ")
+  glue::glue_collapse(val, sep=", ")
 }
 
 #' @export

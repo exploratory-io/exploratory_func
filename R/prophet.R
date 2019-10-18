@@ -645,7 +645,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
   ret <- df %>%
     dplyr::do_(.dots=setNames(list(~do_prophet_each(.)), tmp_col)) %>%
     dplyr::ungroup()
-  ret <- ret %>%  unnest_with_drop_(tmp_col)
+  ret <- ret %>% unnest_with_drop(!!rlang::sym(tmp_col))
 
   if (length(grouped_col) > 0) {
     ret <- ret %>% dplyr::group_by(!!!rlang::syms(grouped_col))

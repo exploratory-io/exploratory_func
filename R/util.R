@@ -48,7 +48,7 @@ simple_cast <- function(data, row, col, val=NULL, fun.aggregate=mean, fill=0, ti
   }
 
   # remove NA from row and column
-  data <- tidyr::drop_na_(data, c(row, col))
+  data <- tidyr::drop_na(data, !!rlang::sym(row), !!rlang::sym(col))
 
   if ((inherits(data[[row]], "Date") ||
       inherits(data[[row]], "POSIXct")) &&
@@ -107,7 +107,7 @@ sparse_cast <- function(data, row, col, val=NULL, fun.aggregate=sum, count = FAL
   }
 
   # remove NA from row and col
-  data <- tidyr::drop_na_(data, c(row, col))
+  data <- tidyr::drop_na(data, !!rlang::sym(row), !!rlang::sym(col))
 
   if(is.null(val)){
     # if there's no value column, it creates binary sparse matrix.
@@ -894,7 +894,7 @@ pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = N
   ret <- df %>%
     dplyr::do_(.dots=setNames(list(~pivot_each(.)), tmp_col)) %>%
     dplyr::ungroup() %>%
-    unnest_with_drop_(tmp_col)
+    unnest_with_drop(!!rlang::sym(tmp_col))
 
   if(length(rows) == 1){
     # Set same data type with original data
@@ -1154,7 +1154,7 @@ unnest_without_empty_ <- function(data, nested_col){
     # if all values in nested_col are empty
     without_empty
   } else {
-    unnest_with_drop_(without_empty, nested_col)
+    unnest_with_drop(without_empty, !!rlang::sym(nested_col))
   }
 }
 
@@ -1251,21 +1251,9 @@ non_na_ratio <- function(x){
 #' if unnesting the specified columns requires the
 #' rows to be duplicated because of more than
 #' 2 rows data frames for example.
-unnest_with_drop_ <- function(..., .drop = TRUE){
-  tidyr::unnest_(..., .drop = .drop)
-}
-
-#' This is a wrapper of tidyr::unnest
-#' to change the default of .drop,
-#' so that it always drops other list
-#' columns, which is an expected behaviour
-#' for usage in this package in most cases.
-#' By default, unnest will drop other list columns
-#' if unnesting the specified columns requires the
-#' rows to be duplicated because of more than
-#' 2 rows data frames for example.
-unnest_with_drop <- function(..., .drop = TRUE){
-  tidyr::unnest(..., .drop = .drop)
+unnest_with_drop <- function(df, ...){
+  ret <- df %>% dplyr::select_if(function(x){!is.list(x)}) %>% dplyr::bind_cols(df %>% dplyr::ungroup() %>% dplyr::select(...)) %>% tidyr::unnest(...)
+  ret
 }
 
 #' validate empty data frame
@@ -1282,15 +1270,15 @@ validate_empty_data <- function(df) {
 do_on_each_group <- function(df, func, params = quote(list()), name = "tmp", with_unnest = TRUE){
   name <- avoid_conflict(colnames(df), name)
   # This is a list of arguments in do clause
-  args <- append(list(quote(.)), rlang::lang_args(params))
-  call <- rlang::new_language(func, rlang::as_pairlist(args))
+  args <- append(list(quote(.)), rlang::call_args(params))
+  call <- rlang::new_call(func, rlang::as_pairlist(args))
   ret <- df %>%
     # UQ and UQ(get_expr()) evaluates those variables
     dplyr::do(UQ(name) := UQ(rlang::get_expr(call)))
   if(with_unnest){
     ret %>%
       dplyr::ungroup() %>%
-      unnest_with_drop_(name)
+      unnest_with_drop(!!rlang::sym(name))
   }else{
     ret
   }
@@ -1302,10 +1290,10 @@ do_on_each_group_2 <- function(df, func1, func2, params1 = quote(list()), params
   name1 <- avoid_conflict(colnames(df), name1)
   name2 <- avoid_conflict(colnames(df), name2)
   # This is a list of arguments in do clause
-  args1 <- append(list(quote(.)), rlang::lang_args(params1))
-  args2 <- append(list(quote(.)), rlang::lang_args(params2))
-  call1 <- rlang::new_language(func1, rlang::as_pairlist(args1))
-  call2 <- rlang::new_language(func2, rlang::as_pairlist(args2))
+  args1 <- append(list(quote(.)), rlang::call_args(params1))
+  args2 <- append(list(quote(.)), rlang::call_args(params2))
+  call1 <- rlang::new_call(func1, rlang::as_pairlist(args1))
+  call2 <- rlang::new_call(func2, rlang::as_pairlist(args2))
   ret <- df %>%
     # UQ and UQ(get_expr()) evaluates those variables
     dplyr::do(UQ(name1) := UQ(rlang::get_expr(call1)), UQ(name2) := UQ(rlang::get_expr(call2)))
@@ -1677,7 +1665,7 @@ bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_da
         if(stringr::str_length(current_df_name) > 0 && index == 1) {
           # if force_data_type is set, force character as column data types
           if(force_data_type) {
-            dataframes_updated[[current_df_name]] <- dplyr::mutate_all(dataframes[[1]], funs(as.character))
+            dataframes_updated[[current_df_name]] <- dplyr::mutate_all(dataframes[[1]], list(as.character=as.character))
           } else {
             dataframes_updated[[current_df_name]] <- dataframes[[1]]
           }
@@ -1688,7 +1676,7 @@ bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_da
           }
           # force character as column data types
           if(force_data_type) {
-            dataframes_updated[[name]] <- dplyr::mutate_all(dataframes[[name]], funs(as.character))
+            dataframes_updated[[name]] <- dplyr::mutate_all(dataframes[[name]], list(as.character=as.character))
           } else {
             dataframes_updated[[name]] <- dataframes[[name]]
           }

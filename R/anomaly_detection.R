@@ -235,9 +235,10 @@ do_anomaly_detection_ <- function(
   # name_col is not conflicting with grouping columns
   # thanks to avoid_conflict that is used before,
   # this doesn't overwrite grouping columns.
-  tmp_col <- avoid_conflict(colnames(df), "tmp_col")
   test <- df %>%
-    dplyr::do_(.dots=setNames(list(~do_anomaly_detection_each(.)), tmp_col)) %>%
-    dplyr::ungroup() %>%
-    unnest_with_drop_(tmp_col)
+    tidyr::nest() %>% dplyr::ungroup() %>%
+    dplyr::mutate(processed = purrr::map(data, function(data) {
+      do_anomaly_detection_each(data)
+    }))
+  test %>% unnest_with_drop(processed)
 }
