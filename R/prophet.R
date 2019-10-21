@@ -184,16 +184,24 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
   # Compose arguments to pass to dplyr::summarise.
   summarise_args <- list() # default empty list
   regressor_output_cols <- NULL # Just declaring variable
+  regressor_final_output_cols <- NULL # Just declaring variable
   if (!is.null(regressors) && !is.null(funs.aggregate.regressors)) {
     summarise_args <- purrr::map2(funs.aggregate.regressors, regressors, function(func, cname) {
       quo(UQ(func)(UQ(rlang::sym(cname))))
     })
+
+    # Keep final output column names.
     if (!is.null(names(regressors))) {
-      regressor_output_cols <- names(regressors)
+      regressor_final_output_cols <- names(regressors)
     }
     else {
-      regressor_output_cols <- regressors
+      regressor_final_output_cols <- regressors
     }
+
+    # But use temporary output column names like r1, r2... We will rename them back before final output.
+    # We need this because prophet would garble those column names in the output.
+    regressor_output_cols <- paste0("r", 1:length(regressors))
+
     names(summarise_args) <- regressor_output_cols
   }
 
@@ -605,6 +613,25 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
       }
       if (value_col != "y") { # if value_col happens to be "y", do not do this, since it will make the column name "y.new".
         colnames(ret)[colnames(ret) == "y"] <- avoid_conflict(colnames(ret), value_col)
+      }
+
+      # Replace temporary regressor column names (r1, r2, ...) with the name that includes original column names.
+      if (!is.null(regressor_final_output_cols)) {
+        i <- 1
+        for (output_col in regressor_final_output_cols) {
+          tmp_col <- paste0("r", i)
+          tmp_effect_col <- paste0("r", i, "_effect")
+          tmp_upper_col <- paste0("r", i, "_upper")
+          tmp_lower_col <- paste0("r", i, "_lower")
+          output_effect_col <- paste0(output_col, "_effect")
+          output_upper_col <- paste0(output_col, "_upper")
+          output_lower_col <- paste0(output_col, "_lower")
+          colnames(ret)[colnames(ret) == tmp_col] <- avoid_conflict(colnames(ret), output_col)
+          colnames(ret)[colnames(ret) == tmp_effect_col] <- avoid_conflict(colnames(ret), output_effect_col)
+          colnames(ret)[colnames(ret) == tmp_upper_col] <- avoid_conflict(colnames(ret), output_upper_col)
+          colnames(ret)[colnames(ret) == tmp_lower_col] <- avoid_conflict(colnames(ret), output_lower_col)
+          i <- i + 1
+        }
       }
   
       # adjust column name style
