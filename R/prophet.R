@@ -184,16 +184,23 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
   # Compose arguments to pass to dplyr::summarise.
   summarise_args <- list() # default empty list
   regressor_output_cols <- NULL # Just declaring variable
+  regressor_final_output_cols <- NULL # Just declaring variable
   if (!is.null(regressors) && !is.null(funs.aggregate.regressors)) {
     summarise_args <- purrr::map2(funs.aggregate.regressors, regressors, function(func, cname) {
       quo(UQ(func)(UQ(rlang::sym(cname))))
     })
+
+    # Keep final output column names.
     if (!is.null(names(regressors))) {
-      regressor_output_cols <- names(regressors)
+      regressor_final_output_cols <- names(regressors)
     }
     else {
-      regressor_output_cols <- regressors
+      regressor_final_output_cols <- regressors
     }
+
+    # But use temporary output column names like r1, r2...
+    regressor_output_cols <- paste0("r", 1:length(regressors))
+
     names(summarise_args) <- regressor_output_cols
   }
 
