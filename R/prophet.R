@@ -613,6 +613,23 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
       if (value_col != "y") { # if value_col happens to be "y", do not do this, since it will make the column name "y.new".
         colnames(ret)[colnames(ret) == "y"] <- avoid_conflict(colnames(ret), value_col)
       }
+      if (!is.null(regressor_final_output_cols)) {
+        i <- 1
+        for (output_col in regressor_final_output_cols) {
+          tmp_col <- paste0("r", i)
+          tmp_effect_col <- paste0("r", i, "_effect")
+          tmp_upper_col <- paste0("r", i, "_upper")
+          tmp_lower_col <- paste0("r", i, "_lower")
+          output_effect_col <- paste0(output_col, "_effect")
+          output_upper_col <- paste0(output_col, "_upper")
+          output_lower_col <- paste0(output_col, "_lower")
+          colnames(ret)[colnames(ret) == tmp_col] <- avoid_conflict(colnames(ret), output_col)
+          colnames(ret)[colnames(ret) == tmp_effect_col] <- avoid_conflict(colnames(ret), output_effect_col)
+          colnames(ret)[colnames(ret) == tmp_upper_col] <- avoid_conflict(colnames(ret), output_upper_col)
+          colnames(ret)[colnames(ret) == tmp_lower_col] <- avoid_conflict(colnames(ret), output_lower_col)
+          i <- i + 1
+        }
+      }
   
       # adjust column name style
       colnames(ret)[colnames(ret) == "yhat"] <- avoid_conflict(colnames(ret), "forecasted_value")
