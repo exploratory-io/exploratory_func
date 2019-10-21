@@ -198,7 +198,8 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
       regressor_final_output_cols <- regressors
     }
 
-    # But use temporary output column names like r1, r2...
+    # But use temporary output column names like r1, r2... We will rename them back before final output.
+    # We need this because prophet would garble those column names in the output.
     regressor_output_cols <- paste0("r", 1:length(regressors))
 
     names(summarise_args) <- regressor_output_cols
@@ -613,6 +614,8 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
       if (value_col != "y") { # if value_col happens to be "y", do not do this, since it will make the column name "y.new".
         colnames(ret)[colnames(ret) == "y"] <- avoid_conflict(colnames(ret), value_col)
       }
+
+      # Replace temporary regressor column names (r1, r2, ...) with the name that includes original column names.
       if (!is.null(regressor_final_output_cols)) {
         i <- 1
         for (output_col in regressor_final_output_cols) {
