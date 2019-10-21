@@ -954,7 +954,7 @@ xlevels_to_base_level_table <- function(xlevels) {
     # Quote variable name with backtick if it includes special characters or space.
     # Special characters to detect besides space. Note that period and underscore should *not* be included here. : ~!@#$%^&*()+={}|:;'<>,/?"[]-\
     # Using grepl() as opposed to str_detect() because str_detect seems to return wrong decision when vname ends with SJIS damemoji.
-    paste0(if_else(grepl("[ ~!@#$%^&*()+={}|:;'<>,/?\"\\[\\]\\-\\\\]", vname), paste0('`',vname,'`'),vname),xlevels[[vname]])
+    paste0(if_else(grepl("[ ~!@#$%^&*()+={}|:;'<>,/?\"\\[\\]\\-\\\\]", vname, perl=TRUE), paste0('`',vname,'`'),vname),xlevels[[vname]])
   }))
   base_level <- purrr::flatten_chr(purrr::map(xlevels, function(v){rep(v[[1]],length(v))}))
   ret <- data.frame(term=term, base.level=base_level)
