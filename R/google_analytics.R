@@ -41,7 +41,7 @@ getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tok
                                      end = end_date,
                                      dimensions = dimensions,
                                      metrics = metrics,
-                                     max=99999999,
+                                     max=99999999, #make sure to get the all response. if more than 10000 rows in results, auto batching
                                      segment = segments
                                      )
 
