@@ -406,7 +406,8 @@ evaluate_binary_training_and_test <- function(df, actual_val_col, threshold = "f
     base_cols <- colnames(ret)[stringr::str_detect(colnames(ret) , "_base$")]
     if (length(base_cols) > 0) {
       for (col in base_cols) {
-        colnames(ret)[colnames(ret) == col] <- paste0("Base Level of ", stringr::str_replace(col, "_base$", ""))
+        # Using gsub as opposed to str_replace, since str_replace seems to garble Japanese column name on Windows.
+        colnames(ret)[colnames(ret) == col] <- paste0("Base Level of ", gsub("_base$", "", col))
       }
     }
   }
