@@ -9,8 +9,17 @@ getGoogleProfile <- function(tokenFileId = ""){
   googleAnalyticsR::ga_account_list()
 }
 
+getGoogleAnayticsSegmentList <- function(){
+  if(!requireNamespace("googleAnalyticsR")){stop("package googleAnalyticsR must be installed.")}
+  if(!requireNamespace("googleAuthR")){stop("package googleAuthR must be installed.")}
+
+  token <- getGoogleTokenForAnalytics(tokenFileId);
+  googleAuthR::gar_auth(token = token, skip_fetch = TRUE)
+  googleAnalyticsR::ga_segment_list()
+}
+
 #' @export
-getGoogleAnalytics <- function(tableId = 119136960, lastNDays = 30, dimensions, metrics, tokenFileId = NULL, paginate_query=FALSE, segments = NULL, ...){
+getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tokenFileId = NULL, paginate_query=FALSE, segments = NULL, ...){
   if(!requireNamespace("googleAnalyticsR")){stop("package googleAnalyticsR must be installed.")}
   loadNamespace("lubridate")
   # if segment is not null and empty string, pass it as NULL
