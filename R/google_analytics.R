@@ -1,16 +1,26 @@
 #' API to get profile for current oauth token
 #' @export
 getGoogleProfile <- function(tokenFileId = ""){
-  if(!requireNamespace("RGoogleAnalytics")){stop("package RGoogleAnalytics must be installed.")}
-  try({
-    token <- getGoogleTokenForAnalytics(tokenFileId);
-    RGoogleAnalytics::GetProfiles(token);
-  })
+  if(!requireNamespace("googleAnalyticsR")){stop("package googleAnalyticsR must be installed.")}
+  if(!requireNamespace("googleAuthR")){stop("package googleAuthR must be installed.")}
+
+  token <- getGoogleTokenForAnalytics(tokenFileId);
+  googleAuthR::gar_auth(token = token, skip_fetch = TRUE)
+  googleAnalyticsR::ga_account_list()
+}
+
+getGoogleAnayticsSegmentList <- function(){
+  if(!requireNamespace("googleAnalyticsR")){stop("package googleAnalyticsR must be installed.")}
+  if(!requireNamespace("googleAuthR")){stop("package googleAuthR must be installed.")}
+
+  token <- getGoogleTokenForAnalytics(tokenFileId);
+  googleAuthR::gar_auth(token = token, skip_fetch = TRUE)
+  googleAnalyticsR::ga_segment_list()
 }
 
 #' @export
 getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tokenFileId = NULL, paginate_query=FALSE, segments = NULL, ...){
-  if(!requireNamespace("RGoogleAnalytics")){stop("package RGoogleAnalytics must be installed.")}
+  if(!requireNamespace("googleAnalyticsR")){stop("package googleAnalyticsR must be installed.")}
   loadNamespace("lubridate")
   # if segment is not null and empty string, pass it as NULL
   # NOTE: null can be passed for data frame created with old version so need to explicitly check it.
@@ -20,19 +30,20 @@ getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tok
     segments = NULL
   }
   token <- getGoogleTokenForAnalytics(tokenFileId)
+  googleAuthR::gar_auth(token = token, skip_fetch = TRUE)
+
   start_date <- as.character(lubridate::today() - lubridate::days(lastNDays))
   #end_date <- as.character(lubridate::today() - lubridate::days(1))
   end_date <- as.character(lubridate::today())
-  query.list <- RGoogleAnalytics::Init(start.date = start_date,
-                                       end.date = end_date,
-                                       dimensions = dimensions,
-                                       metrics = metrics,
-                                       segments = segments,
-                                       max.results = 10000,
-                                       table.id = tableId)
 
-  ga.query <- RGoogleAnalytics::QueryBuilder(query.list)
-  ga.data <- RGoogleAnalytics::GetReportData(ga.query, token, paginate_query = paginate_query)
+  ga.data <- googleAnalyticsR::google_analytics_3(id = tableId,
+                                     start = start_date,
+                                     end = end_date,
+                                     dimensions = dimensions,
+                                     metrics = metrics,
+                                     max=99999999, #make sure to get the all response. if more than 10000 rows in results, auto batching
+                                     segment = segments
+                                     )
 
   if("date" %in% colnames(ga.data)){
     # modify date column to Date object from integer like 20140101
