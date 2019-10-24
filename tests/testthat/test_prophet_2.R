@@ -39,3 +39,21 @@ test_that("do_prophet with daily POSIXct data with timezone with daylight saving
   # Check that aggretated value at a daylight saving day has a valid value. Once there was an issue that broke this with Anomaly Detection, which has similar logic.
   expect_true(ret$y[200] > 0)
 })
+
+test_that("do_prophet with changepoint.range specified.", {
+  ts <- lubridate::with_tz(as.POSIXct(seq.Date(as.Date("2010-01-01"), as.Date("2010-12-31"), by="day")), tz="America/Los_Angeles")
+  raw_data <- data.frame(timestamp=ts, y=runif(length(ts)))
+  ret <- raw_data %>%
+    do_prophet(timestamp, y, 10, time_unit = "day", na_fill_type = "previous", changepoint.range = 0.95)
+  # Check that last change point is close to the end of data.
+  expect_true((ret %>% filter(!is.na(trend_change)) %>% filter(row_number()==n()))$timestamp > as.Date("2010-12-01"))
+})
+
+test_that("do_prophet with test mode with a period that is too long.", {
+  ts <- lubridate::with_tz(as.POSIXct(seq.Date(as.Date("2010-01-01"), as.Date("2010-12-31"), by="day")), tz="America/Los_Angeles")
+  raw_data <- data.frame(timestamp=ts, y=runif(length(ts)))
+  expect_error({
+    ret <- raw_data %>%
+      do_prophet(timestamp, y, 500, time_unit = "day", test_mode = TRUE)
+  }, "The time period set for the Test period is longer than the entire data.")
+})

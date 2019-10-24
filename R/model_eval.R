@@ -66,7 +66,7 @@ do_roc_ <- function(df, pred_prob_col, actual_val_col){
   ret <- df %>%
     dplyr::do_(.dots=setNames(list(~do_roc_each(.)), tmp_col)) %>%
     dplyr::ungroup() %>%
-    unnest_with_drop_(tmp_col)
+    unnest_with_drop(!!rlang::sym(tmp_col))
 
   ret
 }
@@ -131,7 +131,7 @@ evaluate_binary_ <- function(df, pred_prob_col, actual_val_col, threshold = "f_s
   ret <- df %>%
     dplyr::do_(.dots=setNames(list(~evaluate_binary_each(.)), tmp_col)) %>%
     dplyr::ungroup() %>%
-    unnest_with_drop_(tmp_col)
+    unnest_with_drop(!!rlang::sym(tmp_col))
 
   ret
 }
@@ -204,7 +204,7 @@ evaluate_regression_ <- function(df, pred_val_col, actual_val_col){
   ret <- df %>%
     dplyr::do_(.dots=setNames(list(~evaluate_regression_each(.)), tmp_col)) %>%
     dplyr::ungroup() %>%
-    unnest_with_drop_(tmp_col)
+    unnest_with_drop(!!rlang::sym(tmp_col))
 
   ret
 }
@@ -280,12 +280,14 @@ evaluate_multi_ <- function(df, pred_label_col, actual_val_col, pretty.name = FA
 
     # this is to change column name
     accuracy_rate <- accuracy
+    n <- sum(!is.na(pred_values)) # Sample size for test.
 
     data.frame(
       micro_f_score,
       macro_f_score,
       accuracy_rate,
-      misclassification_rate
+      misclassification_rate,
+      n
     )
   }
 
@@ -301,14 +303,126 @@ evaluate_multi_ <- function(df, pred_label_col, actual_val_col, pretty.name = FA
   ret <- df %>%
     dplyr::do_(.dots=setNames(list(~evaluate_multi_each(.)), tmp_col)) %>%
     dplyr::ungroup() %>%
-    unnest_with_drop_(tmp_col)
+    unnest_with_drop(!!rlang::sym(tmp_col))
 
   if (pretty.name){
     colnames(ret)[colnames(ret) == "micro_f_score"] <- "Micro-Averaged F Score"
     colnames(ret)[colnames(ret) == "macro_f_score"] <- "Macro-Averaged F Score"
     colnames(ret)[colnames(ret) == "accuracy_rate"] <- "Accuracy Rate"
     colnames(ret)[colnames(ret) == "misclassification_rate"] <- "Misclassification Rate"
+    colnames(ret)[colnames(ret) == "n"] <- "Number of Rows"
   }
 
   ret
 }
+
+# Generates Analytics View Summary Table for logistic/binomial regression. Handles Test Mode.
+#' @export
+evaluate_binary_training_and_test <- function(df, actual_val_col, threshold = "f_score", pretty.name = FALSE){
+  training_ret <- df %>% broom::glance(model, binary_classification_threshold = threshold)
+  ret <- training_ret
+
+  grouped_col <- colnames(df)[!colnames(df) %in% c("model", ".test_index", "source.data")]
+
+  # Consider it test mode if any of the element of .test_index column has non-zero length, and work on generating Summary row for prediction on test data.
+  if (purrr::some(df$.test_index, function(x){length(x)!=0})) {
+    ret$is_test_data <- FALSE # Set is_test_data FALSE for training data. Add is_test_data column only when there are test data too.
+    each_func <- function(df) {
+      if (!is.data.frame(df)) {
+        df <- tribble(~model, ~.test_index, ~source.data,
+                      df$model, df$.test_index, df$source.data)
+      }
+
+      tryCatch({
+        test_pred_ret <- prediction_binary(df, data = "test")
+  
+        # Terms Mapping
+        ## get Model Object
+        m <- df %>% filter(!is.null(model)) %>% `[[`(1, "model", 1)
+        actual_val_col <- m$terms_mapping[m$terms_mapping == actual_val_col] %>% names(.)
+  
+        eret <- evaluate_binary_(test_pred_ret, "predicted_probability", actual_val_col, threshold = threshold)
+  
+        test_ret <- eret %>% dplyr::mutate(n = true_positive + false_positive + true_negative + false_negative,
+                                           positives = true_positive + false_positive,
+                                           negatives = true_negative + false_negative) %>%
+                             dplyr::select(auc = AUC, f_score, accuracy_rate,
+                                           misclassification_rate, precision, recall,
+                                           n, positives, negatives)
+        test_ret$is_test_data <- TRUE
+        test_ret
+      }, error = function(e){
+        data.frame()
+      })
+    }
+
+    target_df <- if (length(grouped_col) > 0) {
+      df %>% group_by(!!!rlang::syms(grouped_col))
+    } else {
+      df
+    }
+
+    test_ret <- do_on_each_group(target_df, each_func, with_unnest = TRUE)
+    ret <- ret %>% dplyr::bind_rows(test_ret)
+  }
+
+  # sort column order
+  ret <- ret %>% dplyr::select(f_score, accuracy_rate, misclassification_rate, precision,
+                               recall, auc, p.value, n, positives, negatives, logLik, AIC, BIC,
+                               deviance, null.deviance, df.null, df.residual, everything())
+
+  # Reorder columns. Bring group_by column first, and then is_test_data column, if it exists.
+  if (!is.null(ret$is_test_data)) {
+    if (length(grouped_col) > 0) {
+      ret <- ret %>% dplyr::select(!!!rlang::syms(grouped_col), is_test_data, everything())
+    }
+    else {
+      ret <- ret %>% dplyr::select(is_test_data, everything())
+    }
+  }
+  else {
+    if (length(grouped_col) > 0) {
+      ret <- ret %>% dplyr::select(!!!rlang::syms(grouped_col), everything())
+    }
+  }
+
+  if (pretty.name){
+    colnames(ret)[colnames(ret) == "f_score"] <- "F Score"
+    colnames(ret)[colnames(ret) == "accuracy_rate"] <- "Accuracy Rate"
+    colnames(ret)[colnames(ret) == "misclassification_rate"] <- "Misclassification Rate"
+    colnames(ret)[colnames(ret) == "precision"] <- "Precision"
+    colnames(ret)[colnames(ret) == "recall"] <- "Recall"
+    colnames(ret)[colnames(ret) == "auc"] <- "AUC"
+    colnames(ret)[colnames(ret) == "n"] <- "Number of Rows"
+    colnames(ret)[colnames(ret) == "positives"] <- "Number of Rows for TRUE"
+    colnames(ret)[colnames(ret) == "negatives"] <- "Number of Rows for FALSE"
+    colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
+    colnames(ret)[colnames(ret) == "logLik"] <- "Log Likelihood"
+    colnames(ret)[colnames(ret) == "deviance"] <- "Residual Deviance"
+    colnames(ret)[colnames(ret) == "null.deviance"] <- "Null Deviance"
+    colnames(ret)[colnames(ret) == "df.null"] <- "DF for Null Model"
+    colnames(ret)[colnames(ret) == "df.residual"] <- "Residual DF"
+
+    base_cols <- colnames(ret)[stringr::str_detect(colnames(ret) , "_base$")]
+    if (length(base_cols) > 0) {
+      for (col in base_cols) {
+        # Using gsub as opposed to str_replace, since str_replace seems to garble Japanese column name on Windows.
+        colnames(ret)[colnames(ret) == col] <- paste0("Base Level of ", gsub("_base$", "", col))
+      }
+    }
+  }
+
+  if (length(grouped_col) > 0){
+    ret <- ret %>% dplyr::arrange(!!!rlang::syms(grouped_col))
+  }
+
+  # Prettify is_test_data column. Note that column order is already taken care of.
+  if (!is.null(ret$is_test_data) && pretty.name) {
+    ret <- ret %>%
+      dplyr::mutate(is_test_data = dplyr::if_else(is_test_data, "Test", "Training")) %>%
+      dplyr::rename(`Data Type` = is_test_data)
+  }
+  ret
+}
+
+

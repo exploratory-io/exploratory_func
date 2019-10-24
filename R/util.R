@@ -13,7 +13,8 @@ col_name <- function(x, default = stop("Please supply column name", call. = FALS
   stop("Invalid column specification", call. = FALSE)
 }
 
-#' Simple cast wrapper that spreads columns which is choosed as row and col into matrix
+#' Simple cast wrapper that spreads columns which is choosed as row and col into matrix.
+#' Note that working on data frame with group_by is not supported.
 #' @param data Data frame to cast
 #' @param row Column name to be used as row
 #' @param col Column name to be used as column
@@ -47,7 +48,7 @@ simple_cast <- function(data, row, col, val=NULL, fun.aggregate=mean, fill=0, ti
   }
 
   # remove NA from row and column
-  data <- tidyr::drop_na_(data, c(row, col))
+  data <- tidyr::drop_na(data, !!rlang::sym(row), !!rlang::sym(col))
 
   if ((inherits(data[[row]], "Date") ||
       inherits(data[[row]], "POSIXct")) &&
@@ -76,7 +77,16 @@ simple_cast <- function(data, row, col, val=NULL, fun.aggregate=mean, fill=0, ti
     if(!val %in% colnames(data)){
       stop(paste0(val, " is not in column names"))
     }
-    data %>%  reshape2::acast(fml, value.var=val, fun.aggregate=fun.aggregate, fill=fill)
+    #data %>%  reshape2::acast(fml, value.var=val, fun.aggregate=fun.aggregate, fill=fill)
+    df <- data %>% dplyr::group_by(!!rlang::sym(row), !!rlang::sym(col))
+    # TODO: handle name conflict with .temp_value_col and group cols.
+    # NAs in val column is already filtered out, and we don't need to add na.rm = TRUE to fun.aggregate.
+    df <- df %>% dplyr::summarize(.temp_value_col=fun.aggregate(!!rlang::sym(val)))
+    # NAs in col column is already filtered out and we don't need to handle it.
+    df <- df %>% dplyr::ungroup() %>% tidyr::spread(key = !!rlang::sym(col), value = .temp_value_col, fill=fill)
+
+    df <- df %>% tibble::column_to_rownames(var=row)
+    x <- df %>% as.matrix()
   }
 }
 
@@ -97,7 +107,7 @@ sparse_cast <- function(data, row, col, val=NULL, fun.aggregate=sum, count = FAL
   }
 
   # remove NA from row and col
-  data <- tidyr::drop_na_(data, c(row, col))
+  data <- tidyr::drop_na(data, !!rlang::sym(row), !!rlang::sym(col))
 
   if(is.null(val)){
     # if there's no value column, it creates binary sparse matrix.
@@ -335,11 +345,25 @@ same_type <- function(vector, original){
   } else if(is.integer(original)){
     as.integer(vector)
   } else if(inherits(original, "Date")) {
-    # when original data is Date
-    as.Date(vector, tz = lubridate::tz(original))
+    # when original data is Date.
+    # if the column is wrapped with lubridate function, it's possible that data is converted to numeric like year
+    # and character like month name. For these cases, it fails with "character string is not in a standard unambiguous format" error
+    # so fallback to original value.
+    tryCatch({as.Date(vector, tz = lubridate::tz(original))},
+              error = function(e){
+                vector
+              }
+    )
   } else if(inherits(original, "POSIXct")){
     # when original data is POSIXct
-    as.POSIXct(vector, tz = lubridate::tz(original))
+    # if the column is wrapped with lubridate function, it's possible that data is converted to numeric like year
+    # and character like month name. For these cases, it fails with "character string is not in a standard unambiguous format" error
+    # so fallback to original value.
+    tryCatch({ as.POSIXct(vector, tz = lubridate::tz(original))},
+             error = function(e) {
+               vector
+             }
+    )
   } else if (is.numeric(original)){
     as.numeric(vector)
   } else if(is.character(original)) {
@@ -560,11 +584,17 @@ expand_args <- function(call, exclude = c()){
 
 #' get sampled indice from data frame
 #' @export
-sample_df_index <- function(df, rate, seed = NULL){
-  if(!is.null(seed)){
-    set.seed(seed)
+sample_df_index <- function(df, rate, seed = NULL, ordered = FALSE){
+  if (!ordered) {
+    if(!is.null(seed)){
+      set.seed(seed)
+    }
+    sample(seq(nrow(df)), nrow(df) * rate)
   }
-  sample(seq(nrow(df)), nrow(df) * rate)
+  else {
+    # Return indexes above threshold determined by rate.
+    ceiling(nrow(df)*(1-rate)):nrow(df)
+  }
 }
 
 #' slice of 2 dimensional data that can handle empty vector
@@ -604,10 +634,12 @@ safe_slice <- function(data, index, remove = FALSE){
 add_response <- function(data, model, response_label = "predicted_response"){
   # fitted values are converted to response values through inverse link function
   # for example, inverse of logit function is used for logistic regression
-  data[[response_label]] <- if (nrow(data) == 0) {
-    numeric(0)
-  } else {
-    model$family$linkinv(data[[".fitted"]])
+  if (!is.null(data$.fitted)) {
+    data[[response_label]] <- if (nrow(data) == 0) {
+      numeric(0)
+    } else {
+      model$family$linkinv(data[[".fitted"]])
+    }
   }
   data
 }
@@ -791,7 +823,7 @@ pivot <- function(df, formula, value = NULL, ...) {
 #' @param fill Value to be filled for missing values
 #' @param na.rm If na should be removed from values
 #' @export
-pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = NULL, na.rm = TRUE) {
+pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = NA, na.rm = TRUE) {
   validate_empty_data(df)
 
   # create a column name for row names
@@ -801,7 +833,7 @@ pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = N
 
   vars <- all.vars(formula)
 
-  # remove NA data
+  # remove rows with NA categories
   for(var in vars) {
     df <- df[!is.na(df[[var]]), ]
   }
@@ -833,10 +865,14 @@ pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = N
       # make a count matrix if value_col is NULL
       reshape2::acast(df, formula = formula, fun.aggregate = length, fill = fill)
     } else {
-      if(na.rm && !identical(na_pct, fun.aggregate) && !identical(na_count, fun.aggregate) ){
-        # remove NA
-        # if fun.aggregate function is na_pct or na_count,
-        # NA should not be removed because the user wants that information
+      if(na.rm &&
+         !identical(na_ratio, fun.aggregate) &&
+         !identical(non_na_ratio, fun.aggregate) &&
+         !identical(na_pct, fun.aggregate) &&
+         !identical(non_na_pct, fun.aggregate) &&
+         !identical(na_count, fun.aggregate) &&
+         !identical(non_na_count, fun.aggregate)){
+        # remove NA, unless fun.aggregate function is one of the above NA related ones.
         df <- df[!is.na(df[[value_col]]),]
       }
       reshape2::acast(df, formula = formula, value.var = value_col, fun.aggregate = fun.aggregate, fill = fill)
@@ -858,7 +894,7 @@ pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = N
   ret <- df %>%
     dplyr::do_(.dots=setNames(list(~pivot_each(.)), tmp_col)) %>%
     dplyr::ungroup() %>%
-    unnest_with_drop_(tmp_col)
+    unnest_with_drop(!!rlang::sym(tmp_col))
 
   if(length(rows) == 1){
     # Set same data type with original data
@@ -1118,7 +1154,7 @@ unnest_without_empty_ <- function(data, nested_col){
     # if all values in nested_col are empty
     without_empty
   } else {
-    unnest_with_drop_(without_empty, nested_col)
+    unnest_with_drop(without_empty, !!rlang::sym(nested_col))
   }
 }
 
@@ -1185,6 +1221,20 @@ na_ratio <- function(x){
   sum(is.na(x)) / length(x)
 }
 
+#' Ratio of TRUE in a vector
+#' @param x vector
+#' @export
+true_ratio <- function(x){
+  sum(x, na.rm =!all(is.na(x))) / length(x)
+}
+
+#' Ratio of FALSE in a vector
+#' @param x vector
+#' @export
+false_ratio <- function(x){
+  sum(!x, na.rm =!all(is.na(x))) / length(x)
+}
+
 #' Ratio of Non NA in a vector
 #' @param x vector
 #' @export
@@ -1201,21 +1251,9 @@ non_na_ratio <- function(x){
 #' if unnesting the specified columns requires the
 #' rows to be duplicated because of more than
 #' 2 rows data frames for example.
-unnest_with_drop_ <- function(..., .drop = TRUE){
-  tidyr::unnest_(..., .drop = .drop)
-}
-
-#' This is a wrapper of tidyr::unnest
-#' to change the default of .drop,
-#' so that it always drops other list
-#' columns, which is an expected behaviour
-#' for usage in this package in most cases.
-#' By default, unnest will drop other list columns
-#' if unnesting the specified columns requires the
-#' rows to be duplicated because of more than
-#' 2 rows data frames for example.
-unnest_with_drop <- function(..., .drop = TRUE){
-  tidyr::unnest(..., .drop = .drop)
+unnest_with_drop <- function(df, ...){
+  ret <- df %>% dplyr::select_if(function(x){!is.list(x)}) %>% dplyr::bind_cols(df %>% dplyr::ungroup() %>% dplyr::select(...)) %>% tidyr::unnest(...)
+  ret
 }
 
 #' validate empty data frame
@@ -1232,15 +1270,15 @@ validate_empty_data <- function(df) {
 do_on_each_group <- function(df, func, params = quote(list()), name = "tmp", with_unnest = TRUE){
   name <- avoid_conflict(colnames(df), name)
   # This is a list of arguments in do clause
-  args <- append(list(quote(.)), rlang::lang_args(params))
-  call <- rlang::new_language(func, rlang::as_pairlist(args))
+  args <- append(list(quote(.)), rlang::call_args(params))
+  call <- rlang::new_call(func, rlang::as_pairlist(args))
   ret <- df %>%
     # UQ and UQ(get_expr()) evaluates those variables
-    dplyr::do(rlang::UQ(name) := rlang::UQ(rlang::get_expr(call)))
+    dplyr::do(UQ(name) := UQ(rlang::get_expr(call)))
   if(with_unnest){
     ret %>%
       dplyr::ungroup() %>%
-      unnest_with_drop_(name)
+      unnest_with_drop(!!rlang::sym(name))
   }else{
     ret
   }
@@ -1252,13 +1290,34 @@ do_on_each_group_2 <- function(df, func1, func2, params1 = quote(list()), params
   name1 <- avoid_conflict(colnames(df), name1)
   name2 <- avoid_conflict(colnames(df), name2)
   # This is a list of arguments in do clause
-  args1 <- append(list(quote(.)), rlang::lang_args(params1))
-  args2 <- append(list(quote(.)), rlang::lang_args(params2))
-  call1 <- rlang::new_language(func1, rlang::as_pairlist(args1))
-  call2 <- rlang::new_language(func2, rlang::as_pairlist(args2))
+  args1 <- append(list(quote(.)), rlang::call_args(params1))
+  args2 <- append(list(quote(.)), rlang::call_args(params2))
+  call1 <- rlang::new_call(func1, rlang::as_pairlist(args1))
+  call2 <- rlang::new_call(func2, rlang::as_pairlist(args2))
   ret <- df %>%
     # UQ and UQ(get_expr()) evaluates those variables
-    dplyr::do(rlang::UQ(name1) := rlang::UQ(rlang::get_expr(call1)), rlang::UQ(name2) := rlang::UQ(rlang::get_expr(call2)))
+    dplyr::do(UQ(name1) := UQ(rlang::get_expr(call1)), UQ(name2) := UQ(rlang::get_expr(call2)))
+  ret
+}
+
+#' @export
+#' Utility function that categorizes numeric column based on the type argument.
+#' For example, if type argument is aschar, the column value is categorized as character.
+categorize_numeric <- function(x, type = "asnum") {
+  ret <- NULL
+  switch(type,
+     asnum = {
+       ret <- as.numeric(x)
+     },
+     asint = {
+       ret <- as.integer(x)
+     },
+     asintby10 = {
+       ret <- floor(x/10)*10
+     },
+     aschar = {
+       ret <- as.character(x)
+     })
   ret
 }
 
@@ -1269,22 +1328,57 @@ extract_from_date <- function(x, type = "fltoyear") {
     fltoyear = {
       ret <- lubridate::floor_date(x, unit="year")
     },
+    # This key is a synonym for fltoyear and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this function.
+    rtoyear = {
+      ret <- lubridate::floor_date(x, unit="year")
+    },
     fltohalfyear = {
+      ret <- lubridate::floor_date(x, unit="halfyear")
+    },
+    # This key is a synonym for fltohalfyear and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this function.
+    rtohalfyear = {
       ret <- lubridate::floor_date(x, unit="halfyear")
     },
     fltoquarter = {
       ret <- lubridate::floor_date(x, unit="quarter")
     },
+    # This key is a synonym for fltoquarter and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this function.
+    rtoq = {
+      ret <- lubridate::floor_date(x, unit="quarter")
+    },
     fltobimonth = {
+      ret <- lubridate::floor_date(x, unit="bimonth")
+    },
+    # This key is a synonym for fltobimonth and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this function.
+    rtobimon = {
       ret <- lubridate::floor_date(x, unit="bimonth")
     },
     fltomonth = {
       ret <- lubridate::floor_date(x, unit="month")
     },
+    # This key is a synonym for fltomonth and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this function.
+    rtomon = {
+      ret <- lubridate::floor_date(x, unit="month")
+    },
     fltoweek = {
       ret <- lubridate::floor_date(x, unit="week")
     },
+    # This key is a synonym for fltoweek and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this function.
+    rtoweek = {
+      ret <- lubridate::floor_date(x, unit="week")
+    },
     fltoday = {
+      ret <- lubridate::floor_date(x, unit="day")
+    },
+    # This key is a synonym for fltoday and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this function.
+    rtoday = {
       ret <- lubridate::floor_date(x, unit="day")
     },
     year = {
@@ -1299,11 +1393,34 @@ extract_from_date <- function(x, type = "fltoyear") {
     bimonth = {
       ret <- (lubridate::month(x)+1) %/% 2
     },
+    # This key is a synonym for bimonth and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this function.
+    bimon = {
+      ret <- (lubridate::month(x)+1) %/% 2
+    },
     month = {
+      ret <- lubridate::month(x)
+    },
+    # This key is a synonym for month and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this function.
+    mon = {
       ret <- lubridate::month(x)
     },
     monthname = {
       ret <- lubridate::month(x, label=TRUE)
+    },
+    # This key is a synonym for monthname and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this function.
+    monname = {
+      ret <- lubridate::month(x, label=TRUE)
+    },
+    monthnamelong = {
+      ret <- lubridate::month(x, label=TRUE, abbr=FALSE)
+    },
+    # This key is a synonym for monthnamelong and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this function.
+    monnamelong = {
+      ret <- lubridate::month(x, label=TRUE, abbr=FALSE)
     },
     week = {
       ret <- lubridate::week(x)
@@ -1311,8 +1428,28 @@ extract_from_date <- function(x, type = "fltoyear") {
     day = {
       ret <- lubridate::day(x)
     },
+    # This key is required by Exploratory Desktop for Summarize Group Dialog
+    dayofyear = {
+      ret <- lubridate::yday(x)
+    },
+    # This key is required by Exploratory Desktop for Summarize Group Dialog.
+    dayofquarter = {
+      ret <- lubridate::qday(x)
+    },
+    # This key is required by Exploratory Desktop for Summarize Group Dialog.
+    dayofweek = {
+      ret <- lubridate::wday(x)
+    },
     wday = {
       ret <- lubridate::wday(x, label=TRUE)
+    },
+    # This key is required by Exploratory Desktop for Summarize Group Dialog.
+    wdaylong = {
+      ret <- lubridate::wday(x, label=TRUE, abbr=FALSE)
+    },
+    # This key is required by Exploratory Desktop for Chart, Analytics, and Data Wrangling.
+    weekend = {
+      ret <- weekend(x)
     },
     hour = {
       ret <- lubridate::hour(x)
@@ -1324,6 +1461,16 @@ extract_from_date <- function(x, type = "fltoyear") {
       ret <- lubridate::second(x)
     })
   ret
+}
+
+#' @export
+#' It returns Weekend if the provided date is weekend and Weekday if the provided date is weekday.
+#' @param x - Date (or POSIXct)
+weekend <- function(x){
+  ret <- dplyr::if_else(is.na(x), NA_character_,
+                        #if it's 1: Sun or 7: Sat, assume it's Weekend.
+                        dplyr::if_else(lubridate::wday(x, label = F, week_start = "7") %in% c(1,7),  "Weekend", "Weekday"))
+  factor(ret, levels = c("Weekday", "Weekend"))
 }
 
 #' @export
@@ -1344,12 +1491,18 @@ extract_from_numeric <- function(x, type = "asdisc") {
   ret
 }
 
-#' Calculate R-Squared 
+#' Calculate R-Squared
+#' @param null_model_mean - Mean value the basis null model gives.
+#'                          To calculate R-Squared for test data, one from training data should be specified here.
 #' @export
-r_squared <- function (actual, predicted) {
+r_squared <- function (actual, predicted, null_model_mean=NULL) {
   # https://stats.stackexchange.com/questions/230556/calculate-r-square-in-r-for-two-vectors
   # https://en.wikipedia.org/wiki/Coefficient_of_determination
-  ret <- 1 - (sum((actual-predicted)^2, na.rm=TRUE)/sum((actual-mean(actual, na.rm=TRUE))^2, na.rm=TRUE))
+  if (is.null(null_model_mean)) {
+    # if null_model_mean is not specified, use mean of actual.
+    null_model_mean <- mean(actual, na.rm=TRUE)
+  }
+  ret <- 1 - (sum((actual-predicted)^2, na.rm=TRUE)/sum((actual-null_model_mean)^2, na.rm=TRUE))
   ret
 }
 
@@ -1475,22 +1628,399 @@ one_hot <- function(df, key) {
   df %>% tidyr::spread(!!rlang::enquo(key), !!rlang::sym(tmp_value_col), fill = 0, sep = "_") %>% select(-!!rlang::sym(tmp_id_col))
 }
 
-#' Temporary work-around for https://github.com/tidyverse/dplyr/issues/977
-#' It seems https://github.com/tidyverse/dplyr/pull/4205 has fixed it.
-#' Will remove this work-around once dplyr release with the above fix is out.
-#' @export
-n_distinct <- function(..., na.rm = FALSE) {
-  # Use length(unique()) since it is much faster under this issue.
-  if (length(rlang::quos(...)) == 1) {
-    if (!na.rm) {
-      length(unique(...))
-    }
-    else {
-      unique_v <- unique(...)
-      length(unique_v[!is.na(unique_v)])
-    }
+# API to get a list of argument names
+extract_argument_names <- function(...) {
+  q <- rlang::quos(...)
+  purrr::map(q, function(x){rlang::quo_name(x)})
+}
+
+#'Wrapper function for dplyr::bind_rows to support named data frames when it's called inside dplyr chain.
+#'@export
+bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_data_type = FALSE, .id = NULL) {
+  # for compatiblity with dply::bind_rows
+  # if dplyr::bind_rows' .id argument is passed and id_column_name is NA
+  # use dplyr::bind_rows' .id argumetn value as id_column_name
+  if(!is.null(.id) && is.null(id_column_name)) {
+    id_column_name = .id
   }
-  else { # Fallback to regular dplyr::n_distinct. Solution with base function was as slow in this case.
-    dplyr::n_distinct(..., na.rm = na.rm)
+  # get a list of argument names to resolve data frame names passed to this bind_rows.
+  # only exception is the current data frame which is passed via dplyr pipe operation (%>%).
+  # it becomes period (.) instead of actual df name.
+  args <- extract_argument_names(...)
+  # If the dplyr::bind_rows is called within a dplyr chain like df1 %>% dplyr::bind_rows(list(df_2 = df2, df_3 = df3), .id="id"),
+  # since df1 does not have a name, the "id" column of the resulting data frame does not have the data frame name for rows from df1.
+  # To workaround this issue, set a name to the first data frame with the value specified by fistLabel argument as a pre-process
+  # then pass the updated list to dplyr::bind_rows.
+  dataframes_updated <- list()
+  # with dplyr:::flatten_bindable API, create a list of data frames from arguments passed to bind_rows.
+  dataframes <- dplyr:::flatten_bindable(rlang::dots_values(...))
+  if(force_data_type || stringr::str_length(current_df_name) >0) {
+    index <- 1;
+    # for the case where a user passes a list that contains key (data frame name) and value (data frame) pair.
+    if(!is.null(names(dataframes))) {
+      # iterate data frames list by name as a key.
+      for (name in names(dataframes)) {
+        # for the first item, it's the data frame passed via %>% operator, so it does not have a key (data frame name) yet.
+        # so populate the key with the value passed by first_id argument.
+        if(stringr::str_length(current_df_name) > 0 && index == 1) {
+          # if force_data_type is set, force character as column data types
+          if(force_data_type) {
+            dataframes_updated[[current_df_name]] <- dplyr::mutate_all(dataframes[[1]], list(as.character=as.character))
+          } else {
+            dataframes_updated[[current_df_name]] <- dataframes[[1]]
+          }
+        } else {
+          # if the key (data frame name) is empty, use index instead.
+          if(name == "") {
+            name = index;
+          }
+          # force character as column data types
+          if(force_data_type) {
+            dataframes_updated[[name]] <- dplyr::mutate_all(dataframes[[name]], list(as.character=as.character))
+          } else {
+            dataframes_updated[[name]] <- dataframes[[name]]
+          }
+        }
+        index <- index + 1
+      }
+    } else { # for the case that list does not have key (data frame name), use index number.
+      for(i in 1:length(dataframes)) {
+        # check if we can get each data frame name from the arguments
+        df_name <- args[[i]]
+        if(is.na(df_name) || df_name == "") {
+          # if we cannot find data fram name, use index i instead.
+          df_name = i
+        }
+        # if force_data_type is set, force character as column data types
+        if(force_data_type) {
+          if(stringr::str_length(current_df_name) > 0) {
+            if(i == 1) {  # for the first item, use current_df_name
+              dataframes_updated[[current_df_name]] <- dplyr::mutate_all(dataframes[[i]], funs(as.character))
+            } else {
+              dataframes_updated[[df_name]] <- dplyr::mutate_all(dataframes[[i]], funs(as.character))
+            }
+          } else {
+            dataframes_updated[[i]] <- dplyr::mutate_all(dataframes[[i]], funs(as.character))
+          }
+        } else {
+          # if we need to set data frame name to each row as a new column
+          if(stringr::str_length(current_df_name) > 0) {
+            if(i == 1) { # for the first item, use current_df_name
+              dataframes_updated[[current_df_name]] <- dataframes[[i]]
+            } else {
+              dataframes_updated[[df_name]] <- dataframes[[i]]
+            }
+          } else { # otherwise, keep using index
+            dataframes_updated[[i]] <- dataframes[[i]]
+          }
+        }
+      }
+    }
+    # create a name for the column that holds data frame name.
+    # and make sure to make the column name uniqe with avoid_conflict API.
+    if(!is.null(id_column_name)) {
+      new_id <- avoid_conflict(colnames(dataframes_updated[[1]]), id_column_name)
+    } else {
+      new_id  = id_column_name
+    }
+    #re-evaluate column data types
+    if(force_data_type) {
+      readr::type_convert(dplyr::bind_rows(dataframes_updated, .id = new_id))
+    } else {
+      dplyr::bind_rows(dataframes_updated, .id = new_id)
+    }
+  } else {
+    # if .id argument is passed, create a name for the column that holds data frame name.
+    # and make sure to make the column name uniqe with avoid_conflict API.
+    if(!is.null(id_column_name)) {
+      new_id <- avoid_conflict(colnames(dataframes[[1]]), id_column_name)
+    } else {
+      new_id <- id_column_name
+    }
+    dplyr::bind_rows(..., .id = new_id)
   }
 }
+
+#'Wrapper function for dplyr's set operations to support ignoring data type difference.
+set_operation_with_force_character <- function(func, x, y, ...) {
+  x <- dplyr::mutate_all(x, funs(as.character))
+  y <- dplyr::mutate_all(y, funs(as.character))
+  readr::type_convert(func(x, y, ...))
+}
+
+#'Wrapper function for dplyr::union to support ignoring data type difference.
+#'@export
+union <- function(x, y, force_data_type = FALSE, ...){
+  if(!is.na(force_data_type) && class(force_data_type) ==  "logical" && force_data_type == FALSE)  {
+    dplyr::union(x, y, ...)
+  } else {
+    set_operation_with_force_character(dplyr::union, x, y, ...)
+  }
+}
+
+#'Wrapper function for dplyr::union_all to support ignoring data type difference.
+#'@export
+union_all <- function(x, y, force_data_type = FALSE, ...){
+  if(!is.na(force_data_type) && class(force_data_type) ==  "logical" && force_data_type == FALSE)  {
+    dplyr::union_all(x, y, ...)
+  } else {
+    set_operation_with_force_character(dplyr::union_all, x, y, ...)
+  }
+}
+
+#'Wrapper function for dplyr::intersect to support ignoring data type difference.
+#'@export
+intersect <- function(x, y, force_data_type = FALSE, ...){
+  if(!is.na(force_data_type) && class(force_data_type) ==  "logical" && force_data_type == FALSE)  {
+    dplyr::intersect(x, y, ...)
+  } else {
+    set_operation_with_force_character(dplyr::intersect, x, y, ...)
+  }
+}
+
+#'Wrapper function for dplyr::setdiff to support ignoring data type difference.
+#'@export
+setdiff <- function(x, y, force_data_type = FALSE, ...){
+  if(!is.na(force_data_type) && class(force_data_type) ==  "logical" && force_data_type == FALSE)  {
+    dplyr::setdiff(x, y, ...)
+  } else {
+    set_operation_with_force_character(dplyr::setdiff, x, y, ...)
+  }
+}
+
+# This is written by removing unnecessary part from calculate_cohens_d.
+#'Calculate common standard deviation.
+#'@export
+calculate_common_sd <- function(var1, var2) {
+  df <- data.frame(var1=var1, var2=var2)
+  summarized <- df %>% dplyr::group_by(var2) %>%
+    dplyr::summarize(n=n(), v=var(var1, na.rm=TRUE))
+
+  lx <- summarized$n[[1]] - 1
+  ly <- summarized$n[[2]] - 1
+  vx <- summarized$v[[1]]
+  vy <- summarized$v[[2]]
+  csd <- lx * vx + ly * vy
+  csd <- csd/(lx + ly)
+  csd <- sqrt(csd) # common sd computation
+}
+
+# Reference: https://stackoverflow.com/questions/15436702/estimate-cohens-d-for-effect-size
+#'Calculate Cohen's d
+#'@export
+calculate_cohens_d <- function(var1, var2) {
+  df <- data.frame(var1=var1, var2=var2)
+  summarized <- df %>% dplyr::group_by(var2) %>%
+    dplyr::summarize(n=n(), m=mean(var1, na.rm=TRUE), v=var(var1, na.rm=TRUE))
+
+  lx <- summarized$n[[1]] - 1
+  ly <- summarized$n[[2]] - 1
+  mx <- summarized$m[[1]]
+  my <- summarized$m[[2]]
+  vx <- summarized$v[[1]]
+  vy <- summarized$v[[2]]
+  md  <- abs(mx - my) # mean difference (numerator)
+  csd <- lx * vx + ly * vy
+  csd <- csd/(lx + ly)
+  csd <- sqrt(csd) # common sd computation
+  cd  <- md/csd # cohen's d
+}
+
+# References:
+# SSb, SSt, eta squared definition: https://learningstatisticswithr.com/lsr-0.6.pdf
+# Cohen's f definition: https://en.wikipedia.org/wiki/Effect_size
+# Compared results with sjstats::cohens_f(), and powerAnalysis::ES.anova.oneway()
+# Did not use sjstats::cohens_f() to avoid requiring entire sjstats and its dependencies.
+# Did not use powerAnalysis::ES.anova.oneway() because it only works for the case all categories
+# have same number of observations.
+#'Calculate Cohen's f
+#'@export
+calculate_cohens_f <- function(var1, var2) {
+  m <- mean(var1, na.rm = TRUE)
+  df <- data.frame(var1=var1, var2=var2)
+  summarized <- df %>% dplyr::group_by(var2) %>%
+    dplyr::mutate(diff_between = mean(var1, na.rm=TRUE) - m, diff_total = var1 - m) %>% dplyr::ungroup() %>%
+    dplyr::summarize(ssb=sum(diff_between^2, na.rm=TRUE), sst=sum(diff_total^2, na.rm=TRUE))
+  ssb <- summarized$ssb # Sum of squares between groups
+  sst <- summarized$sst # Total sum of squares
+  f <- sqrt(ssb/(sst - ssb))
+  f
+}
+
+# Reference: https://rdrr.io/github/markushuff/PsychHelperFunctions/src/R/cohens_w.R
+#'Calculate Cohen's w from Chi-Square value and total number of observations.
+#'@export
+calculate_cohens_w <- function(chi_sq, N) {
+  sqrt(chi_sq/N)
+}
+
+#'Calculates mode. Function name is capitalized to avoid conflict with base::mode(), which does something other than calculating mode.
+# Reference: https://stackoverflow.com/questions/2547402/is-there-a-built-in-function-for-finding-the-mode
+#'@export
+get_mode <- function(x, na.rm = FALSE) {
+  if(na.rm){
+    x = x[!is.na(x)]
+  }
+  ux <- unique(x)
+  return(ux[which.max(tabulate(match(x, ux)))])
+}
+
+# Returns logical vector that indicates the position of rows in df that has categorical values
+# that does not appear in training_df. TRUE means such a row with unknown categorical value.
+# Used to remove such rows from test/new data before predicting with the model, to avoid error.
+get_unknown_category_rows_index_vector <- function(df, training_df) {
+  # list of unique values of each column of training_df.
+  uniq_index <- purrr::map(training_df, function(x){
+    if(is.character(x) || is.factor(x) || is.logical(x)) {
+      unique(x)
+    }
+    else {
+      NULL
+    }
+  })
+
+  # list of vectors each of which is logical vector indicating location of unknown values.
+  # TRUE means unknown value at the row position.
+  unknown_indexes <- purrr::map2(uniq_index, seq(length(uniq_index)), function(unique_values, col_index) {
+    if (is.null(unique_values)) {
+      FALSE
+    }
+    else {
+      df[[col_index]] %nin% unique_values
+    }
+  })
+
+  # Combine unknown_indexes into one logical vector that indicates location of rows with unknown values.
+  ret <- purrr::reduce(unknown_indexes,function(x,y){x|y})
+  ret
+}
+
+# Converts logical vector such as the output from get_unknown_category_rows_index_vector into
+# vector of index integer of TRUE rows.
+get_row_numbers_from_index_vector <- function(index_vector)  {
+  seq(length(index_vector))[index_vector]
+}
+
+#' Returns NA value included in prediction result excluding NA
+#' @param value - prediction results without NA
+#' @param n_data - original data length
+#' @param na_row_numbers - row numbers containing the NA value of data
+restore_na <- function(value, na_row_numbers){
+  n_data <- length(value) + length(na_row_numbers)
+  na_at <- if (!is.null(na_row_numbers)) {
+    seq_len(n_data) %in% as.integer(na_row_numbers)
+  } else {
+    NULL
+  }
+  return_value <- rep(NA, time = n_data)
+
+  if(length(na_at) > 0){
+    return_value[!na_at] <- value
+    return_value
+    if (is.factor(value)) {
+      return_value <- levels(value)[return_value]
+      return_value <- factor(return_value, levels=levels(value))
+      return_value
+    } else {
+      return_value
+    }
+  } else {
+    value
+  }
+}
+
+# Wrapper function that takes care of dplyr::group_by and dplyr::summarize as a single step.
+#' @param .data - data frame
+#' @param group_cols - Columns to group_by
+#' @param group_funs - Functions to apply to group_by columns
+#' @param ... - Name-value pairs of summary functions. The name will be the name of the variable in the result. The value should be an expression that returns a single value like min(x), n(), or sum(is.na(y)).
+#' @export
+summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...){
+  library(dplyr)
+  if(length(group_cols) == 0) {
+    .data %>% summarize(...)
+  } else {
+    # if group_cols argument is passed, make sure to ungroup first so that it won't throw an error
+    # when group_cols conflict with group columns in previous steps.
+    .data <- .data %>% dplyr::ungroup()
+    groupby_args <- list() # default empty list
+    name_list <- list()
+    name_index = 1
+    # If group_by columns and associated categorizing functionts are provided,
+    # quote the columns/functions with rlang::quo so that dplyr can understand them.
+    if (!is.null(group_cols) && !is.null(group_funs)) {
+      groupby_args <- purrr::map2(group_funs, group_cols, function(func, cname) {
+        if(is.na(func) || length(func)==0 || func == "none"){
+          rlang::quo((UQ(rlang::sym(cname))))
+        } else if (func %in% c("fltoyear","rtoyear",
+            "fltohalfyear",
+            "rtohalfyear",
+            "fltoquarter",
+            "rtoq",
+            "fltobimonth",
+            "rtobimon",
+            "fltomonth",
+            "rtomon",
+            "fltoweek",
+            "rtoweek",
+            "fltoday",
+            "rtoday",
+            "year",
+            "halfyear",
+            "quarter",
+            "bimonth",
+            "bimon",
+            "month",
+            "mon",
+            "monthname",
+            "monname",
+            "monthnamelong",
+            "monnamelong",
+            "week",
+            "dayofyear",
+            "dayofquarter",
+            "dayofweek",
+            "day",
+            "wday",
+            "wdaylong",
+            "weekend",
+            "hour",
+            "minute",
+            "second")) {
+          # For date column, call extract_from_date
+          rlang::quo(extract_from_date(UQ(rlang::sym(cname)), type = UQ(func)))
+        } else if (func %in% c("asnum","asint","asintby10","aschar")) {
+          # For numeric column, call categorize_numeric
+          rlang::quo(categorize_numeric(UQ(rlang::sym(cname)), type = UQ(func)))
+        } else { # For non-numeric and non-date related function case.
+          rlang::quo(UQ(func)(UQ(rlang::sym(cname))))
+        }
+      })
+      # Set names of group_by columns in the output.
+      name_list <- names(group_cols) # If names are specified in group_cols, use them for output.
+      if (is.null(name_list)) { # If name is not specified, use original column names.
+        name_list <- group_cols
+      }
+      names(groupby_args) <- name_list
+      # make sure to ungroup result
+      .data %>% dplyr::group_by(!!!groupby_args) %>% summarize(...) %>% dplyr::ungroup()
+    } else {
+      if(!is.null(group_cols)) { # In case only group_by columns are provied, group_by with the columns
+        # make sure to ungroup result
+        .data %>% dplyr::group_by(!!!rlang::sym(group_cols)) %>% summarize(...) %>% dplyr::ungroup()
+      } else { # In case no group_by columns are provided,skip group_by
+        .data %>% summarize(...)
+      }
+    }
+  }
+}
+
+#' calc_feature_imp (Random Forest) or exp_rpart (Decision Tree) converts logical columns into factor
+#' with level of "TRUE" and "FALSE". This function reverts such columns back to logical.
+#' @export
+revert_factor_cols_to_logical <- function(df) {
+  dplyr::mutate_if(df, function(col) {
+    is.factor(col) && length(levels(col)) == 2 && (all(levels(col) == c("TRUE", "FALSE")) || all(levels(col) == c("FALSE", "TRUE")))
+  }, as.logical)
+}
+

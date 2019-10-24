@@ -26,8 +26,8 @@
 #' @param exclude Values that should be excluded from stopwords
 #' @return Logical vector if the token is in stop words or not.
 #' @export
-is_stopword <- function(token, lang = "english", include = c(), exclude = c()){
-  token %in% get_stopwords(lang, include = include, exclude = exclude)
+is_stopword <- function(token, lang = "english", include = c(), exclude = c(), ...){
+  token %in% get_stopwords(lang, include = include, exclude = exclude, ...)
 }
 
 #' Check if the word is digits.
@@ -44,7 +44,9 @@ is_digit <- function(word){
 #' @export
 is_alphabet <- function(word){
   loadNamespace("stringr")
-  stringr::str_detect(word, "^[[:alpha:]]+$")
+  # To treat non-ascii characters as FALSE, use [a-zA-Z]
+  # instead of [:alpha:]
+  stringr::str_detect(word, "^[a-zA-Z]+$")
 }
 
 #' Get vector of stopwords
@@ -69,9 +71,10 @@ is_alphabet <- function(word){
 #' "swedish"
 #' @param include Values that should be included as stop words
 #' @param exclude Values that should be excluded from stop words
+#' @param is_twitter flag that tells if you want to get twitter related stopwords such as http and https.
 #' @return vector of stop words.
 #' @export
-get_stopwords <- function(lang = "english", include = c(), exclude = c()){
+get_stopwords <- function(lang = "english", include = c(), exclude = c(), is_twitter = TRUE){
   lang <- tolower(lang)
   stopwords <- if (lang %in% c(
     "english_snowball",
@@ -84,7 +87,10 @@ get_stopwords <- function(lang = "english", include = c(), exclude = c()){
     loadNamespace("tm")
     tm::stopwords(kind = lang)
   }
-
+  # if is_twitter argument is true, append exploratory_stopwords which contains stopwords for twitter
+  if(is_twitter) {
+    stopwords <- append(stopwords, exploratory_stopwords)
+  }
   ret <- c(stopwords[!stopwords %in% exclude], include)
   ret
 }
@@ -190,7 +196,7 @@ do_tokenize <- function(df, input, token = "words", keep_cols = FALSE,  drop = T
 }
 
 #' Get idf for terms
-calc_idf <- function(group, term, log_scale = log, smooth_idf = FALSE){
+calc_idf <- function(group, term, smooth_idf = FALSE){
   loadNamespace("Matrix")
   loadNamespace("text2vec")
   if(length(group)!=length(term)){
@@ -199,9 +205,12 @@ calc_idf <- function(group, term, log_scale = log, smooth_idf = FALSE){
   doc_fact <- as.factor(group)
   term_fact <- as.factor(term)
   sparseMat <- Matrix::sparseMatrix(i = as.numeric(doc_fact), j = as.numeric(term_fact))
-  idf <- text2vec::get_idf(sparseMat, log_scale=log_scale, smooth_idf=smooth_idf)
-  idf <- idf@x[term_fact]
+
+  m_tfidf <- text2vec::TfIdf$new(smooth_idf = smooth_idf, norm = "none")
+  result_tfidf <- m_tfidf$fit_transform(sparseMat)
+  idf <- result_tfidf@x[term_fact]
   df <- Matrix::colSums(sparseMat)[term_fact]
+
   data.frame(.df=df, .idf=idf)
 }
 
@@ -244,12 +253,10 @@ calc_tf_ <- function(df, group_col, term_col, weight="ratio"){
     val
   }
 
-  weight_fml <- as.formula(paste("~calc_weight(",cnames[[1]],")", sep=""))
-
   ret <- (df[,colnames(df) == group_col | colnames(df)==term_col] %>%
             dplyr::group_by(!!!rlang::syms(c(group_col, term_col))) %>% # convert the column name to symbol for colum names with backticks
-            dplyr::summarise_(.dots=setNames(list(~n()), cnames[[1]])) %>%
-            dplyr::mutate_(.dots=setNames(list(weight_fml), cnames[[2]])) %>%
+            dplyr::summarise(!!rlang::sym(cnames[[1]]) := n()) %>%
+            dplyr::mutate(!!rlang::sym(cnames[[2]]) := calc_weight(!!rlang::sym(cnames[[1]]))) %>%
             dplyr::ungroup()
   )
 }
@@ -258,9 +265,8 @@ calc_tf_ <- function(df, group_col, term_col, weight="ratio"){
 #' @param df Data frame which has columns of groups and their terms
 #' @param group Column of group names
 #' @param term Column of terms
-#' @param idf_log_scale
-#' Function to scale IDF. It might be worth trying log2 or log10.
-#' log10 strongly suppress the increase of idf values and log2 does it more weakly.
+#' @param [DEPRECATED] idf_log_scale
+#' Function to scale IDF. 'log' function is always applied to IDF. Setting other functions is ignored
 #' @export
 do_tfidf <- function(df, group, term, idf_log_scale = log, tf_weight="raw", norm="l2"){
   validate_empty_data(df)
@@ -272,16 +278,20 @@ do_tfidf <- function(df, group, term, idf_log_scale = log, tf_weight="raw", norm
     stop("norm argument must be l1, l2 or FALSE")
   }
 
+  if(!missing(idf_log_scale)){
+    warnings("Argument idf_log_scale is deprecated. Log is always applied to IDF.")
+  }
+
   group_col <- col_name(substitute(group))
   term_col <- col_name(substitute(term))
 
   # remove NA from group and term column to avoid error
-  df <- tidyr::drop_na_(df, c(group_col, term_col))
+  df <- tidyr::drop_na(df, !!rlang::sym(group_col), !!rlang::sym(term_col))
 
   cnames <- avoid_conflict(c(group_col, term_col), c("count_of_docs", "tfidf", "tf"))
 
   count_tbl <- calc_tf_(df, group_col, term_col, weight=tf_weight)
-  tfidf <- calc_idf(count_tbl[[group_col]], count_tbl[[term_col]], log_scale = idf_log_scale, smooth_idf = FALSE)
+  tfidf <- calc_idf(count_tbl[[group_col]], count_tbl[[term_col]], smooth_idf = FALSE)
   count_tbl[[cnames[[1]]]] <- tfidf$.df
   count_tbl[[cnames[[2]]]] <- tfidf$.idf * count_tbl[[cnames[[3]]]]
   count_tbl[[cnames[[3]]]] <- NULL
@@ -363,7 +373,7 @@ do_ngram <- function(df, token, sentence, document, maxn=2, sep="_"){
   # gather columns that have token (1 and newly created columns)
   ret <- tidyr::gather_(ret, kv_cnames[[1]], kv_cnames[[2]], c("1", colnames(ret)[(ncol(ret) - maxn + 2):ncol(ret)]), na.rm = TRUE, convert = TRUE)
   # sort the result
-  ret <- dplyr::arrange_(ret, .dots = c(document_col, sentence_col, kv_cnames[[1]]))
+  ret <- dplyr::arrange(ret, !!!rlang::syms(c(document_col, sentence_col, kv_cnames[[1]])))
   ret
 }
 
@@ -399,7 +409,10 @@ parse_number <- function(text, ...){
   if(is.numeric(text)) {
     text
   } else {
-    readr::parse_number(text, ...)
+    # For some reason, output from parse_number returns FALSE for
+    # is.vector(), which becomes a problem when it is fed to ranger
+    # as the target variable. To work it around, we apply as.numeric().
+    as.numeric(readr::parse_number(text, ...))
   }
 }
 
@@ -415,4 +428,55 @@ parse_logical <- function(text, ...){
     readr::parse_logical(text, ...)
   }
 }
+
+#'Function to extract text inside the characters like bracket.
+#'@export
+str_extract_inside <- function(column, begin = "(", end = ")") {
+  # Ref https://stackoverflow.com/questions/3926451/how-to-match-but-not-capture-part-of-a-regex
+  # Below logic creates a Regular Expression that uses lookbehind and lookahead to extract string
+  # between them.
+  # Also, regarding the "*?" (? after asterisk) in the regular expression, it's necessary to handle the case
+  # like below.
+  #> stringr::str_extract("aaa[xxx][ggg]","(?<=\\[).*(?=\\])")
+  #[1] "xxx][ggg"
+  #> stringr::str_extract("aaa[xxx][ggg]","(?<=\\[).*?(?=\\])")
+  #[1] "xxx"
+  # As you can see in the above example, with *? it can extract xxx but without it, it ends up with "xxx][ggg"
+  if(stringr::str_length(begin) > 1) {
+    stop("The begin argument must be one character.")
+  }
+  if(stringr::str_length(end) > 1) {
+    stop("The end argument must be one character.")
+  }
+  if(grepl("[A-Za-z]", begin)) {
+    stop("The begin argument must be symbol such as (, {, [.")
+  }
+  if(grepl("[A-Za-z]", end)) {
+    stop("The end argument must be symbol such as ), }, ].")
+  }
+  exp = stringr::str_c("(?<=\\", begin, ").*?(?=\\", end, ")")
+  stringr::str_extract(column, exp)
+}
+
+#'Function to extract logical value from the specified column.
+#'If true_value is provided, use it to decide TRUE or FALSE.
+#'If true_value is not provided, "true", "yes", "1", and 1 are treated as TRUE.
+#'@export
+str_logical <- function(column, true_value = NULL) {
+   # if true_value is explicitly provided, honor it
+   if(!is.null(true_value)) {
+     stringr::str_to_lower(stringr::str_trim(column)) == stringr::str_to_lower(true_value)
+   } else if (is.numeric(column)) { # for numeric columns (integer, double, numeric, etc), use as.logical
+     as.logical(column)
+   } else { # default handling.
+      # if value is "true" or "yes" or "1", return TRUE
+      target <- stringr::str_to_lower(stringr::str_trim(column))
+      ifelse (target %in% c("true", "yes", "1"),
+              TRUE,
+              # if value is "false" or "no" or "0", return FALSE.
+              # All the other cases are NA
+              ifelse(target %in%  c("false", "no", "0"), FALSE, NA))
+   }
+}
+
 

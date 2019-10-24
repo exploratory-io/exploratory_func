@@ -145,7 +145,7 @@ test_that("test nnet build_model", {
   evaluation_ret <- evaluate_multi(prediction_ret, predicted_label, label)
 
   expect_equal(nrow(evaluation_ret), 3)
-  expect_equal(ncol(evaluation_ret), 5)
+  expect_equal(ncol(evaluation_ret), 6)
 
 })
 

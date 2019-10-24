@@ -74,7 +74,7 @@ augment_kmeans <- function(df, model, data){
       df %>%
         dplyr::do_(.dots=setNames(list(~augment_each(.)), model_col)) %>%
         dplyr::ungroup() %>%
-        unnest_with_drop_(model_col)
+        unnest_with_drop(!!rlang::sym(model_col))
     } else {
       stop(e)
     }
@@ -148,7 +148,10 @@ add_prediction <- function(df, model_df, conf_int = 0.95, ...){
   # if type.predict argument is not indicated in this function
   # and models have $family$linkinv (basically, glm models have it),
   # both fitted link value column and response value column should appear in the result
-  with_response <- !("type.predict" %in% names(cll)) & !is.null(model_df[["model"]][[1]]$family) & !is.null(model_df[["model"]][[1]]$family$linkinv)
+  with_response <- !("type.predict" %in% names(cll)) &&
+                   any(lapply(model_df$model, function(s) {
+                     "family" %in% names(s) && !is.null(s$family$linkinv)
+                   }))
 
   ret <- tryCatch({
     get_result(model_df, df, aug_args, with_response)
@@ -209,10 +212,8 @@ assign_cluster <- function(df, source_data){
       dplyr::group_by(!!!rlang::syms(grouping_cols)) %>%
       tidyr::nest()
   } else {
-    # put one value column so that all data can be nested
+    # nest without grouping.
     source_data %>%
-      dplyr::mutate(data = 1) %>%
-      dplyr::group_by(data) %>%
       tidyr::nest()
   }
 
@@ -231,8 +232,10 @@ assign_cluster <- function(df, source_data){
 
   ret <- joined %>%
     dplyr::ungroup() %>%
-    dplyr::rowwise() %>%
-    broom::augment(model, data = data)
+    dplyr::mutate(augmented = purrr::map2(model, data, function(model, data) {
+      broom::augment(model, data = data)
+    })) %>% unnest_with_drop(augmented)
+
   # change factor to numeric
   ret[[".cluster"]] <- as.numeric(ret[[".cluster"]])
   colnames(ret)[colnames(ret) == ".cluster"] <- avoid_conflict(colnames(ret), "cluster")
@@ -290,7 +293,8 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
   grouping_cols <- df_cnames[!df_cnames %in% c("source.data", ".test_index", "model", ".model_metadata")]
 
 
-  if (!data %in% c("test", "training", "newdata")) {
+  if (!data %in% c("test", "training", "newdata", "training_and_test")) {
+    # Not mentioning training_and_test since it is used only by Analytics View.
     stop('data argument must be "test", "training" or "newdata"')
   }
 
@@ -304,7 +308,6 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
     }
     add_prediction(data_frame, df, conf_int = conf_int, ...)
   } else {
-    test <- data == "test"
     # parsing arguments of prediction and getting optional arguemnt for augment in ...
     cll <- match.call()
     aug_args <- expand_args(cll, exclude = c("df", "data", "data_frame", "conf_int"))
@@ -313,87 +316,125 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
     # and models have $family$linkinv (basically, glm models have it),
     # both fitted link value column and response value column should appear in the result
 
-    with_response <- !("type.predict" %in% names(cll)) && "family" %in% names(df[["model"]][[1]]) && !is.null(df[["model"]][[1]]$family$linkinv)
+    with_response <- !("type.predict" %in% names(cll)) &&
+                       any(lapply(df$model, function(s) { "family" %in% names(s) })) &&
+                       any(lapply(df$model, function(s) { !is.null(s$family$linkinv) }))
 
-    ret <- if(test){
-      # augment by test data
+    ret <- if(data == "test"){
+      if (!is.null(df$model[[1]]$prediction_test)) { # Check if model already has test prediction result.
+                                                     # This is typically the case for Analytics Views.
+        # Augment test part of data with prediction embedded in the model.
+        # This is typically for Summary tab of Analytics View on Test Mode.
 
-      # check if there is test data
-      test_sizes <- vapply(df[[".test_index"]], function(test){
-        length(test)
-      }, FUN.VALUE = 0)
-
-      if(all(test_sizes==0)){
-        stop("no test data found")
-      }
-
-      # Use formula to support expanded aug_args (especially for type.predict for logistic regression)
-      # because ... can't be passed to a function inside mutate directly.
-      # If test is TRUE, this uses newdata as an argument and if not, uses data as an argument.
-      aug_fml <- if(aug_args == ""){
-        as.formula("~list(broom::augment(model, newdata = source.data))")
-      } else {
-        as.formula(paste0("~list(broom::augment(model, newdata = source.data, ", aug_args, "))"))
-      }
-      data_to_augment <- df %>%
-        dplyr::ungroup() %>%
-        dplyr::mutate(source.data = purrr::map2(source.data, .test_index, function(df, index){
-          # keep data only in test_index
-          safe_slice(df, index)
-        })) %>%
-        dplyr::select(-.test_index)
-
-      if(".model_metadata" %in% colnames(data_to_augment)){
-        data_to_augment <- data_to_augment %>% dplyr::select(-`.model_metadata`)
-      }
-
-      augmented <- tryCatch({
-        data_to_augment %>%
-          dplyr::rowwise() %>%
-          # evaluate the formula of augment and "source.data" column will have it
-          dplyr::mutate_(.dots = list(source.data = aug_fml))
-      }, error = function(e){
-        if (grepl("arguments imply differing number of rows: ", e$message)) {
-          data_to_augment %>%
-            dplyr::mutate(source.data = purrr::map2(source.data, model, function(df, model){
-              # remove rows that have categories that aren't in training data
-              # otherwise, broom::augment causes an error
-              filtered_data <- df
-              for (cname in colnames(model$model)) {
-                filtered_data <- filtered_data[filtered_data[[cname]] %in% model$model[[cname]], ]
-              }
-
-              if(nrow(filtered_data) == 0){
-                stop("no data found that can be predicted by the model")
-              }
-
-              filtered_data
-            })) %>%
-            dplyr::rowwise() %>%
-            # evaluate the formula of augment and "data" column will have it
-            dplyr::mutate_(.dots = list(source.data = aug_fml))
+        # Use formula to support expanded aug_args (especially for type.predict for logistic regression)
+        # because ... can't be passed to a function inside mutate directly.
+        # If test is FALSE, this uses data as an argument and if not, uses newdata as an argument.
+        aug_fml_test <- if(aug_args == ""){
+          as.formula("~list(broom::augment(model, data = source.data, data_type = 'test'))")
         } else {
-          stop(e$message)
+          as.formula(paste0("~list(broom::augment(model, data = source.data, data_type = 'test', ", aug_args, "))"))
         }
-      })
-
-      augmented <- augmented %>% dplyr::ungroup()
-
-      if (with_response){
+        augmented <- df %>%
+          dplyr::ungroup() %>%
+          dplyr::mutate(source.data = purrr::map2(source.data, .test_index, function(df, index){
+            # Keep data in test_index for test data
+            safe_slice(df, index, remove = FALSE)
+          })) %>%
+          dplyr::select(-.test_index) %>%
+          dplyr::rowwise() %>%
+          # evaluate the formula of augment and "data" column will have it
+          dplyr::mutate_(.dots = list(source.data = aug_fml_test))
         augmented <- augmented %>%
-          dplyr::mutate(source.data = purrr::map2(source.data, model, add_response))
+          dplyr::ungroup()
+
+        if (with_response){
+          augmented <- augmented %>%
+            dplyr::mutate(source.data = purrr::map2(source.data, model, add_response))
+        }
+
+        augmented %>%
+          dplyr::select(-model) %>%
+          unnest_with_drop(source.data)
+      }
+      else { # test prediction result is not in the model. Need to predict from test data.
+        # augment by test data
+
+        # check if there is test data
+        test_sizes <- vapply(df[[".test_index"]], function(test){
+          length(test)
+        }, FUN.VALUE = 0)
+
+        if(all(test_sizes==0)){
+          stop("no test data found")
+        }
+
+        # Use formula to support expanded aug_args (especially for type.predict for logistic regression)
+        # because ... can't be passed to a function inside mutate directly.
+        # If test is TRUE, this uses newdata as an argument and if not, uses data as an argument.
+        aug_fml <- if(aug_args == ""){
+          as.formula("~list(broom::augment(model, newdata = source.data))")
+        } else {
+          as.formula(paste0("~list(broom::augment(model, newdata = source.data, ", aug_args, "))"))
+        }
+        data_to_augment <- df %>%
+          dplyr::ungroup() %>%
+          dplyr::mutate(source.data = purrr::map2(source.data, .test_index, function(df, index){
+            # keep data only in test_index
+            safe_slice(df, index)
+          })) %>%
+          dplyr::select(-.test_index)
+
+        if(".model_metadata" %in% colnames(data_to_augment)){
+          data_to_augment <- data_to_augment %>% dplyr::select(-`.model_metadata`)
+        }
+
+        augmented <- tryCatch({
+          data_to_augment %>%
+            dplyr::rowwise() %>%
+            # evaluate the formula of augment and "source.data" column will have it
+            dplyr::mutate_(.dots = list(source.data = aug_fml))
+        }, error = function(e){
+          if (grepl("arguments imply differing number of rows: ", e$message)) {
+            data_to_augment %>%
+              dplyr::mutate(source.data = purrr::map2(source.data, model, function(df, model){
+                # remove rows that have categories that aren't in training data
+                # otherwise, broom::augment causes an error
+                filtered_data <- df
+                for (cname in colnames(model$model)) {
+                  filtered_data <- filtered_data[filtered_data[[cname]] %in% model$model[[cname]], ]
+                }
+
+                if(nrow(filtered_data) == 0){
+                  stop("no data found that can be predicted by the model")
+                }
+
+                filtered_data
+              })) %>%
+              dplyr::rowwise() %>%
+              # evaluate the formula of augment and "data" column will have it
+              dplyr::mutate_(.dots = list(source.data = aug_fml))
+          } else {
+            stop(e$message)
+          }
+        })
+
+        augmented <- augmented %>% dplyr::ungroup()
+
+        if (with_response){
+          augmented <- augmented %>%
+            dplyr::mutate(source.data = purrr::map2(source.data, model, add_response))
+        }
+
+        ret <- augmented %>%
+          dplyr::select(-model) %>%
+          unnest_with_drop(source.data)
       }
 
-      ret <- augmented %>%
-        dplyr::select(-model) %>%
-        unnest_with_drop(source.data)
-
-    } else {
+    } else if (data == "training") {
       # augment by training data
 
       # Use formula to support expanded aug_args (especially for type.predict for logistic regression)
       # because ... can't be passed to a function inside mutate directly.
-      # If test is FALSE, this uses data as an argument and if not, uses newdata as an argument.
       aug_fml <- if(aug_args == ""){
         as.formula("~list(broom::augment(model, data = source.data))")
       } else {
@@ -419,6 +460,61 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
       augmented %>%
         dplyr::select(-model) %>%
         unnest_with_drop(source.data)
+
+    } else if (data == "training_and_test") {
+      # Augment data that includes both training part and test part of data with predictions embedded in the model.
+      # This is for Analytics View on Test Mode.
+
+      # Use formula to support expanded aug_args (especially for type.predict for logistic regression)
+      # because ... can't be passed to a function inside mutate directly.
+      # If test is FALSE, this uses data as an argument and if not, uses newdata as an argument.
+      aug_fml_training <- if(aug_args == ""){
+        as.formula("~list(broom::augment(model, data = source.data.training))")
+      } else {
+        as.formula(paste0("~list(broom::augment(model, data = source.data.training, ", aug_args, "))"))
+      }
+      aug_fml_test <- if(aug_args == ""){
+        as.formula("~list(broom::augment(model, data = source.data.test, data_type = 'test'))")
+      } else {
+        as.formula(paste0("~list(broom::augment(model, data = source.data.test, data_type = 'test', ", aug_args, "))"))
+      }
+      augmented <- df %>%
+        dplyr::ungroup() %>%
+        dplyr::mutate(source.data.training = purrr::map2(source.data, .test_index, function(df, index){
+          # Remove data in test_index for training data
+          safe_slice(df, index, remove = TRUE)
+        }), source.data.test = purrr::map2(source.data, .test_index, function(df, index){
+          # Keep data in test_index for test data
+          safe_slice(df, index, remove = FALSE)
+        })) %>%
+        dplyr::select(-.test_index) %>%
+        dplyr::rowwise() %>%
+        # evaluate the formula of augment and "data" column will have it
+        dplyr::mutate_(.dots = list(source.data.training = aug_fml_training, source.data.test = aug_fml_test))
+      augmented <- augmented %>%
+        dplyr::ungroup() %>% # ungroup is necessary here to get expected df1, df2 value in the next line.
+        dplyr::mutate(source.data = purrr::map2(source.data.training, source.data.test, function(df1, df2){
+          df1 <- df1 %>% dplyr::mutate(is_test_data=FALSE)
+          df2 <- df2 %>% dplyr::mutate(is_test_data=TRUE)
+          dplyr::bind_rows(df1, df2)
+        })) %>%
+        dplyr::select(-source.data.training, -source.data.test) %>%
+        dplyr::ungroup()
+
+      if (with_response){
+        augmented <- augmented %>%
+          dplyr::mutate(source.data = purrr::map2(source.data, model, add_response))
+      }
+
+      augmented <- augmented %>%
+        dplyr::select(-model) %>%
+        unnest_with_drop(source.data)
+
+      # Since is_test_data can go to strange position if there are columns that exists only in certain groups,
+      # move it to the last explicitly.
+      augmented <- augmented %>% select(-is_test_data, everything(), is_test_data)
+      augmented
+
     }
   }
 
@@ -450,7 +546,61 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
   dplyr::group_by(ret, !!!rlang::syms(grouping_cols))
 }
 
-#' prediction wrapper to set predicted labels
+#' prediction wrapper for both training and test data
+#' There are not much reason to call this function any more, since you can call prediction(data='training_and_test')
+#' directly. Only remaining case we need to call this is for confusion matrix.
+#' @param df Data frame to predict. This should have model column.
+#' @export
+prediction_training_and_test <- function(df, prediction_type="default", threshold = 0.5, ...) {
+  filtered <- df %>% dplyr::filter(!is.null(model))
+  if (nrow(filtered) == 0) { # No valid models were returned.
+    return(data.frame())
+  }
+  model <- filtered %>% `[[`(1, "model")
+
+  grouped_cols <- colnames(df)[!colnames(df) %in% c("model", ".test_index", "source.data", ".model_metadata")]
+
+  # Note that for ranger/rpart, even for binary prediction case, we are using "default" prediction(),
+  # and predicted_label column is set by augment.ranger.classification, which is called internally.
+  ret <- switch(prediction_type,
+                    default = prediction(df, data='training_and_test', ...),
+                    binary = prediction_binary(df,  data='training_and_test', threshold = threshold, ...),
+                    conf_mat = prediction_binary(df, data='training_and_test', threshold = threshold, ...), # Same as 'binary'. Aggregation for
+                                                                                                            # confusion matrix is done later in this function.
+                    coxph = prediction_coxph(df, data='training_and_test', ...))
+
+
+  if (prediction_type == "conf_mat") {
+    target_col <- all.vars(model$formula)[[1]]
+
+    each_mat_func <- function(df) {
+      actual_val <- df[[target_col]]
+      predicted <- df$predicted_label
+
+      df <- data.frame(
+        actual_value = actual_val,
+        predicted_value = predicted
+      ) %>%
+        dplyr::filter(!is.na(predicted_value))
+
+      # get count if it's classification
+      df <- df %>%
+        dplyr::group_by(actual_value, predicted_value) %>%
+        dplyr::summarize(count = n()) %>%
+        dplyr::ungroup()
+
+      df
+    }
+
+    target_df <- ret %>% group_by(is_test_data, add = TRUE)
+    do_on_each_group(target_df, each_mat_func, with_unnest = TRUE)
+  } else {
+    ret %>% dplyr::arrange(desc(is_test_data), .by_group = TRUE)
+  }
+}
+
+#' Wrapper around prediction() to set predicted_probability and predicted_label with optimized threshold.
+#' Currently, this is really for logistic regression and GLM, since for ranger and rpart, prediction() already returns predicted_probability and predicted_label.
 #' @param df Data frame to predict. This should have model column.
 #' @param threshold Threshold value for predicted probability or what to optimize. It can be "f_score", "accuracy", "precision", "sensitivity" or "specificity" to optimize.
 #' @export
@@ -458,7 +608,11 @@ prediction_binary <- function(df, threshold = 0.5, ...){
   validate_empty_data(df)
 
   ret <- prediction(df, ...)
-  first_model <- df[["model"]][[1]]
+  filtered <- df %>% dplyr::filter(!is.null(model))
+  if (nrow(filtered) == 0) { # No valid models were returned.
+    return(data.frame())
+  }
+  first_model <- filtered %>% `[[`(1, "model")
 
   # converting conf_low and conf_high from regression values
   # to probability values
@@ -469,12 +623,12 @@ prediction_binary <- function(df, threshold = 0.5, ...){
       if (!is.null(first_model$family$linkinv)) {
         if (any(colnames(ret) %in% "conf_low")) {
           conf_low_vec <- first_model$family$linkinv(ret[["conf_low"]])
-          ret[["conf_low"]] <- NULL
+          ret[["conf_low"]] <- NULL # Remove column once to move it to the last.
           ret[["conf_low"]] <- conf_low_vec
         }
         if (any(colnames(ret) %in% "conf_high")) {
           conf_high_vec <- first_model$family$linkinv(ret[["conf_high"]])
-          ret[["conf_high"]] <- NULL
+          ret[["conf_high"]] <- NULL # Remove column once to move it to the last.
           ret[["conf_high"]] <- conf_high_vec
         }
       }
@@ -495,15 +649,26 @@ prediction_binary <- function(df, threshold = 0.5, ...){
     }
   }
 
-  # if there is terms_mapping for randomForest, use the original column name
-  if ("randomForest" %in% class(first_model)) {
+  # if there is terms_mapping for randomForest or ranger, use the original column name
+  if ("randomForest" %in% class(first_model) || "ranger" %in% class(first_model)) {
     if (!is.na(first_model$terms_mapping) && !is.na(first_model$terms_mapping[[actual_col]])) {
       actual_col <- first_model$terms_mapping[[actual_col]]
     }
   }
 
   actual_val <- ret[[actual_col]]
-  actual_logical <- as.logical(as.numeric(actual_val))
+  actual_logical <- if ((is.character(actual_val) || is.factor(actual_val)) && "ranger" %in% class(first_model)) {
+    # For binary prediction of ranger/rpart used from Analytics View, we use prediction() rather than this prediction_binary().
+    # Only case where it comes here is via Analytics Step. Maybe even for that, we should start calling prediction() to
+    # use common code as much as possible, but for now Analytics Step of ranger keeps using prediction_binary() for the
+    # ability to overwrite classification threshold, and optimized classification threshold. TODO: Clean up this situation.
+    # And, when it is ranger, (there is no rpart Analytics Step.)
+    # we consider the first level to be "TRUE". This is different from logistic regression.
+    actual_val == levels(first_model$y)[[1]]
+  }
+  else {
+    as.logical(as.numeric(actual_val)) # From the code before adding this if clause, but can't be sure if this covers rest of the cases well. TODO: look into it.
+  }
 
   prob_col_name <- if ("predicted_response" %in% colnames(ret)) {
     "predicted_response"
@@ -532,12 +697,30 @@ prediction_binary <- function(df, threshold = 0.5, ...){
   } else if (is.numeric(actual_val)) {
     as.numeric(predicted)
   } else if (is.factor(actual_val)){
-    # create a factor vector with the same levels as actual_val
-    # predicted is logical, so should +1 to make it index
-    factor(levels(actual_val)[as.numeric(predicted) + 1], levels(actual_val))
+    if ("ranger" %in% class(first_model) || "rpart" %in% class(first_model)) {
+      # For binary prediction of ranger/rpart used from Analytics View, we use prediction() rather than this prediction_binary().
+      # Only case where it comes here is via Analytics Step. Maybe even for that, we should start calling prediction() to
+      # use common code as much as possible, but for now Analytics Step of ranger keeps using prediction_binary() for the
+      # ability to overwrite classification threshold, and optimized classification threshold. TODO: Clean up this situation.
+      # And, when it is ranger, (there is no rpart Analytics Step, but added if statement just for completeness.)
+      # we consider the first level to be "TRUE". This is different from logistic regression.
+      factor(levels(actual_val)[2 - as.numeric(predicted)], levels(actual_val))
+    }
+    else {
+      # create a factor vector with the same levels as actual_val
+      # predicted is logical, so should +1 to make it index
+      factor(levels(actual_val)[as.numeric(predicted) + 1], levels(actual_val))
+    }
   } else if (is.character(actual_val)) {
-    # modify actual_val to factor with levels used in training data
-    if(!is.null(first_model$model) && !is.null(first_model$model[[actual_col]])){
+    if ("ranger" %in% class(first_model)) {
+      # In case of ranger, TRUE corresponds to 1st factor level.
+      if_else(predicted, levels(first_model$y)[[1]], levels(first_model$y)[[2]])
+      lev <- levels(first_model$y)
+      # TRUE turns into 1 by as.numeric, which makes the index of lev 1. (2-1). FALSE makes the index 2.
+      factor(lev[2 - as.numeric(predicted)], lev)
+    }
+    else if(!is.null(first_model$model) && !is.null(first_model$model[[actual_col]])){
+      # modify actual_val to factor with levels used in training data
       lev <- first_model$model[[actual_col]] %>% levels()
       factor(lev[as.numeric(predicted) + 1], lev)
     } else {
@@ -556,8 +739,13 @@ prediction_binary <- function(df, threshold = 0.5, ...){
   }
 
   ret[["predicted_label"]] <- label
+
   colnames(ret)[colnames(ret) == prob_col_name] <- "predicted_probability"
 
+  # Move is_test_data to the last again, since new columns were added to the last in this function.
+  if (!is.null(ret$is_test_data)) {
+    ret <- ret %>% select(-is_test_data, everything(), is_test_data)
+  }
   ret
 }
 
@@ -624,7 +812,7 @@ prediction_coxph <- function(df, time = NULL, threshold = 0.5, ...){
       ret
     }))
   ret <- ret %>% dplyr::select(!!!c("ret", group_by_names))
-  ret <- ret %>% unnest_with_drop()
+  ret <- ret %>% unnest_with_drop(ret)
 
   # set it back to non-group-by state that is same as predict() output.
   if (length(group_by_names) == 0) {
@@ -822,13 +1010,22 @@ model_stats <- function(df, pretty.name = FALSE, ...){
       ret
     })) %>%
     dplyr::select(!!!c("ret", group_by_names)) %>%
-    unnest_with_drop()
+    unnest_with_drop(ret)
 
   # set it back to non-group-by state that is same as glance() output.
   if (length(group_by_names) == 0) {
     ret <- ret %>% dplyr::ungroup() %>% dplyr::select(-dummy_group_col)
   }
 
+  if ("negbin" %in% class(df$model[[1]])) {
+    x <- df$model[[1]]
+    if(pretty.name) {
+      ret <- ret %>% dplyr::mutate(`Theta`=x$theta, `SE Theta`=x$SE.theta)
+    }
+    else {
+      ret <- ret %>% dplyr::mutate(theta=x$theta, SE.theta=x$SE.theta)
+    }
+  }
 
   # adjust column name style
   if(pretty.name){
@@ -839,7 +1036,7 @@ model_stats <- function(df, pretty.name = FALSE, ...){
     colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
     colnames(ret)[colnames(ret) == "df"] <- "Degree of Freedom"
     colnames(ret)[colnames(ret) == "logLik"] <- "Log Likelihood"
-    colnames(ret)[colnames(ret) == "deviance"] <- "Deviance"
+    colnames(ret)[colnames(ret) == "deviance"] <- "Residual Deviance"
     colnames(ret)[colnames(ret) == "df.residual"] <- "Residual DF"
     # for glm
     colnames(ret)[colnames(ret) == "null.deviance"] <- "Null Deviance"
@@ -1068,7 +1265,7 @@ do_survfit <- function(df, time, status, start_time = NULL, end_time = NULL, tim
   ret <- ret %>%
     dplyr::do_(.dots=setNames(list(~add_time_zero_row_each(.)), tmp_col)) %>%
     dplyr::ungroup()
-  ret <- ret %>%  unnest_with_drop_(tmp_col)
+  ret <- ret %>%  unnest_with_drop(!!rlang::sym(tmp_col))
 
   colnames(ret)[colnames(ret) == "n.risk"] <- "n_risk"
   colnames(ret)[colnames(ret) == "n.event"] <- "n_event"

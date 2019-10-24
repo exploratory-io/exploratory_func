@@ -28,8 +28,8 @@ do_cosine_sim.kv <- function(df, subject, key, value = NULL, distinct=FALSE, dia
 
   # column names are "{subject}.x", "{subject}.y", "value"
   cnames <- avoid_conflict(grouped_column,
-                            c(stringr::str_c(subject_col, c(".x", ".y")),
-                            "value")
+                            c(paste0(subject_col, c(".x", ".y")), # We use paste0 since str_c garbles multibyte column names here for some reason.
+                              "value")
                            )
 
   # this is executed on each group
@@ -62,7 +62,7 @@ do_cosine_sim.kv <- function(df, subject, key, value = NULL, distinct=FALSE, dia
   df %>%
     dplyr::do_(.dots=setNames(list(~calc_doc_sim_each(.)), tmp_col)) %>%
     dplyr::ungroup() %>%
-    unnest_with_drop_(tmp_col)
+    unnest_with_drop(!!rlang::sym(tmp_col))
 
 }
 
@@ -141,7 +141,7 @@ do_dist.kv_ <- function(df,
 
   # column names are "{subject}.x", "{subject}.y", "value"
   cnames <- avoid_conflict(grouped_column,
-                           c(stringr::str_c(subject_col, c(".x", ".y")),
+                           c(paste0(subject_col, c(".x", ".y")), # We use paste0 since str_c garbles multibyte column names here for some reason.
                              "value")
                            )
 
@@ -214,7 +214,7 @@ do_dist.kv_ <- function(df,
   df %>%
     dplyr::do_(.dots=setNames(list(~calc_dist_each(.)), tmp_col)) %>%
     dplyr::ungroup() %>%
-    unnest_with_drop_(tmp_col)
+    unnest_with_drop(!!rlang::sym(tmp_col))
 }
 
 #' A symmetric version of KL-divergence
@@ -248,7 +248,7 @@ do_kl_dist.kv_ <- function(df,
 
   # column names are "{subject}.x", "{subject}.y", "value"
   cnames <- avoid_conflict(grouped_column,
-                           c(stringr::str_c(subject_col, c(".x", ".y")),
+                           c(paste0(subject_col, c(".x", ".y")), # We use paste0 since str_c garbles multibyte column names here for some reason.
                              "value")
   )
 
@@ -297,7 +297,7 @@ do_kl_dist.kv_ <- function(df,
   df %>%
     dplyr::do_(.dots=setNames(list(~calc_dist_each(.)), cnames[[1]])) %>%
     dplyr::ungroup() %>%
-    unnest_with_drop_(cnames[[1]])
+    unnest_with_drop(!!rlang::sym(cnames[[1]]))
 }
 
 #' Calculate distance of each pair of groups.
@@ -383,5 +383,5 @@ do_dist.cols <- function(df,
   df %>%
     dplyr::do_(.dots=setNames(list(~calc_dist_each(.)), cnames[[1]])) %>%
     dplyr::ungroup() %>%
-    unnest_with_drop_(cnames[[1]])
+    unnest_with_drop(!!rlang::sym(cnames[[1]]))
 }

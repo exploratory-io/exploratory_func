@@ -3,6 +3,23 @@
 
 context("test tidiers for randomForest")
 
+testdata_dir <- "~/.exploratory/"
+testdata_filename <- "airline_2013_10_tricky_v3_5k.csv" 
+testdata_file_path <- paste0(testdata_dir, testdata_filename)
+
+filepath <- if (!testdata_filename %in% list.files(testdata_dir)) {
+  "https://www.dropbox.com/s/f47baw5f3v0xoll/airline_2013_10_tricky_v3.csv?dl=1"
+} else {
+  testdata_file_path
+}
+
+flight <- exploratory::read_delim_file(filepath, ",", quote = "\"", skip = 0 , col_names = TRUE , na = c("","NA") , locale=readr::locale(encoding = "UTF-8", decimal_mark = "."), trim_ws = FALSE , progress = FALSE) %>% exploratory::clean_data_frame()
+
+filepath <- if (!testdata_filename %in% list.files(testdata_dir)) {
+  flight <- flight %>% sample_n(5000)
+  write.csv(flight, testdata_file_path) # save sampled-down data for performance.
+}
+
 test_that("test exp_balance with character", {
   sample_data <- data.frame(
     y = c("a", "b", "b", "b", "b", "b"),
@@ -62,6 +79,30 @@ test_that("test calc_feature_imp predicting multi-class", {
     # creating those columns in data.frame replaces spaces with .
     rename(`Tar get` = "target", `cat 10` = cat_10, `num 1` = num_1)
 
+
+  # target is character
+  # this case is to test rf_partial_dependence() output.
+  model_df <- test_data %>%
+    dplyr::group_by(Group) %>%
+    calc_feature_imp(`Tar get`,
+                     `cat 10`,
+                     cat_25,
+                      `num 1`,
+                      num_2,
+                      with_boruta=FALSE, max_pd_vars=3, # with_boruta must be FALSE, in this case to test rf_partial_dependence,
+                                                        # because, with boruta, there will be no significant variable,
+                                                        # and no partial dependence data will be returned.
+                      test_rate = 0.3)
+  
+  ret <- model_df %>% prediction(data="training_and_test")
+  conf_mat <- tidy(model_df, model, type = "conf_mat", pretty.name = TRUE) # Old pre-5.3 way. For backward compatibility on the server.
+  conf_mat <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
+  # ret <- model_df %>% rf_importance() # Skip this because Boruta is on.
+  ret <- model_df %>% rf_partial_dependence()
+  # Check that format of Group column is good for our Analytics View.
+  expect_true(stringr::str_detect(as.character(ret$Group[1]), stringr::regex("[0-2] cat\\s10$|_25$")))
+
+
   # target is character
   model_df <- test_data %>%
     dplyr::group_by(Group) %>%
@@ -69,12 +110,17 @@ test_that("test calc_feature_imp predicting multi-class", {
                      `cat 10`,
                      cat_25,
                       `num 1`,
-                      num_2, with_boruta=TRUE)
-
-  conf_mat <- tidy(model_df, model, type = "conf_mat", pretty.name = TRUE)
+                      num_2,
+                      with_boruta=TRUE, max_pd_vars=3,
+                      test_rate = 0.3)
+  
+  ret <- model_df %>% prediction(data="training_and_test")
+  conf_mat <- tidy(model_df, model, type = "conf_mat", pretty.name = TRUE) # Old pre-5.3 way. For backward compatibility on the server.
+  conf_mat <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
   # ret <- model_df %>% rf_importance() # Skip this because Boruta is on.
   ret <- model_df %>% rf_partial_dependence()
-  expect_equal(as.character(ret$Group[1]), "0 cat 10") # Check that format of Group column is good for our Analytics View. 
+  # Check that format of Group column is good for our Analytics View.
+  # expect_true(stringr::str_detect(as.character(ret$Group[1]), stringr::regex("[0-2] cat\\s10$|_25$"))) # This does not work since there is no significant variables.
   ret <- model_df %>% rf_evaluation(pretty.name=TRUE) # TODO test that output is different from binary classification with TRUE/FALSE
   ret <- model_df %>% rf_evaluation_by_class(pretty.name=TRUE)
   ret <- model_df %>% tidy(model, type="boruta")
@@ -114,6 +160,7 @@ test_that("test calc_feature_imp predicting multi-class", {
   ret <- model_df %>% tidy(model, type="boruta")
 })
 
+
 test_that("test calc_feature_imp predicting logical", {
   set.seed(0)
   nrow <- 100
@@ -133,11 +180,10 @@ test_that("test calc_feature_imp predicting logical", {
                       dplyr::starts_with("cat_"),
                       num_1,
                       num_2, predictor_n = 6, with_boruta=TRUE)
-
-  conf_mat <- tidy(model_df, model, type = "conf_mat", pretty.name = TRUE)
+  conf_mat <- model_df %>% broom::tidy(model, type = "conf_mat", pretty.name = TRUE)
 
   # test get_binary_predicted_value_from_probability
-  model <- model_df$model[[1]]
+  model <- model_df %>% filter(!is.null(model)) %>% `[[`(1, "model", 1)
   predicted_values <- get_binary_predicted_value_from_probability(model)
   expect_equal(levels(predicted_values), c("TRUE","FALSE"))
 
@@ -194,7 +240,7 @@ test_that("test randomForest with multinomial classification", {
   model_ret <- build_model(test_data,
                            model_func = randomForestMulti,
                            formula = CARRIER ~ DISTANCE,
-                           test_rate = 0.3)
+                           test_rate = 0.2)
   coef_ret <- model_coef(model_ret)
   model_stats <- model_stats(model_ret, pretty.name = TRUE)
   pred_train_ret <- prediction(model_ret, data = "training")
@@ -215,7 +261,7 @@ test_that("test randomForest with binary classification", {
   model_ret <- build_model(test_data,
                            model_func = randomForestBinary,
                            formula = `IS AA` ~ DISTANCE,
-                           test_rate = 0.3)
+                           test_rate = 0.2)
   coef_ret <- model_coef(model_ret)
   model_stats <- model_stats(model_ret, pretty.name = TRUE)
   pred_train_ret <- prediction_binary(model_ret, data = "training", threshold = "f_score") # test f_score which had issue with target column name with space once.
@@ -237,7 +283,7 @@ test_that("test randomForest with regression without localImp", {
                            model_func = randomForestBinary,
                            formula = IS_AA ~ DISTANCE,
                            localImp = FALSE,
-                           test_rate = 0.3)
+                           test_rate = 0.2)
   coef_ret <- model_coef(model_ret, pretty.name = TRUE)
   stats_ret <- model_stats(model_ret)
   pred_train_ret <- prediction(model_ret, data = "training")
@@ -318,7 +364,7 @@ test_that("test randomForest with multinomial classification", {
                            model_func = randomForestMulti,
                            formula = CARRIER ~ DISTANCE,
                            localImp = TRUE,
-                           test_rate = 0.3)
+                           test_rate = 0.2)
   coef_ret <- model_coef(model_ret)
   model_stats <- model_stats(model_ret, pretty.name = TRUE)
   pred_train_ret <- prediction(model_ret, data = "training")
@@ -340,7 +386,7 @@ test_that("test randomForest with multinomial classification", {
                            model_func = randomForestMulti,
                            formula = CARRIER ~ poly(DISTANCE, 3),
                            localImp = TRUE,
-                           test_rate = 0.3)
+                           test_rate = 0.2)
   coef_ret <- model_coef(model_ret)
   model_stats <- model_stats(model_ret, pretty.name = TRUE)
   pred_train_ret <- prediction(model_ret, data = "training")
@@ -353,4 +399,33 @@ test_that("test evaluate_classification", {
   predicted <- c(1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0)
   ret <- evaluate_classification(actual, predicted, 1)
   expect_equal(class(ret), "data.frame")
+})
+
+test_that("calc_feature_map(regression) evaluate training and test", {
+  model_df <- flight %>%
+              dplyr::group_by(`CAR RIER`) %>%
+                calc_feature_imp(`FL NUM`, `DIS TANCE`, `DEP TIME`, test_rate = 0.3)
+  ret <- rf_evaluation_training_and_test(model_df)
+  ret <- model_df %>% prediction_training_and_test()
+})
+
+test_that("calc_feature_map(binary) evaluate training and test", {
+  model_df <- flight %>% dplyr::mutate(is_delayed = as.factor(`is delayed`)) %>%
+              dplyr::group_by(`CAR RIER`) %>%
+                calc_feature_imp(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0.3)
+  ret <- rf_evaluation_training_and_test(model_df, test_rate = 0.3)
+  ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class", test_rate = 0.3)
+
+  ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat", test_rate = 0.3)
+  ret <- model_df %>% prediction_training_and_test()
+})
+
+test_that("calc_feature_map(multi) evaluate training and test", {
+  model_df <- flight %>% dplyr::group_by(`CAR RIER`) %>%
+                calc_feature_imp(`ORI GIN`, `DIS TANCE`, `DEP TIME`, test_rate = 0.3)
+  ret <- rf_evaluation_training_and_test(model_df, test_rate = 0.3, pretty.name = TRUE)
+  ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class", test_rate = 0.3)
+
+  ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat", test_rate = 0.3)
+  ret <- model_df %>% prediction_training_and_test()
 })

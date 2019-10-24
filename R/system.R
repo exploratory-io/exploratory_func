@@ -261,7 +261,7 @@ js_glue_transformer <- function(code, envir) {
   val <- ifelse(is.na(val), "null", val)
 
   # for numeric it should work as is. expression like 1e+10 works on js too.
-  glue::collapse(val, sep=", ")
+  glue::glue_collapse(val, sep=", ")
 }
 
 sql_glue_transformer <- function(code, envir) {
@@ -299,7 +299,7 @@ sql_glue_transformer <- function(code, envir) {
   #       Does expression like 1e+10 work?
   # TODO: Need to handle NA here. Find out appropriate way.
   # We always collapse, unlike glue_sql.
-  glue::collapse(val, sep=", ")
+  glue::glue_collapse(val, sep=", ")
 }
 
 bigquery_glue_transformer <- function(code, envir) {
@@ -338,7 +338,7 @@ bigquery_glue_transformer <- function(code, envir) {
   #       Does expression like 1e+10 work?
   # TODO: Need to handle NA here. Find out appropriate way.
   # We always collapse, unlike glue_sql.
-  glue::collapse(val, sep=", ")
+  glue::glue_collapse(val, sep=", ")
 }
 
 #' @export
@@ -405,9 +405,9 @@ getMongoCollectionNames <- function(host = "", port = "", database = "", usernam
   con <- getDBConnection("mongodb", host, port, database, username, password, collection = collection, isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParams, timeout = timeout)
   # command to list collections.
   # con$command is our addition in our mongolite fork.
-  result <- con$command(command = '{"listCollections":1}')
+  result <- con$run(command = '{"listCollections":1}')
   # need to check existence of ok column of result dataframe first to avoid error in error check.
-  if (!("ok" %in% colnames(result)) || !result$ok) {
+  if (!("ok" %in% names(result)) || !result$ok) {
     clearDBConnection("mongodb", host, port, database, username, collection = collection, isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParams)
     stop("listCollections command failed");
   }
@@ -508,9 +508,9 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     if (!is.null(conn)){
       # command to ping to check connection validity.
       # con$command is our addition in our mongolite fork.
-      result <- conn$command(command = '{"ping":1}')
+      result <- conn$run(command = '{"ping":1}')
       # need to check existence of ok column of result dataframe first to avoid error in error check.
-      if (!("ok" %in% colnames(result)) || !result$ok) {
+      if (!("ok" %in% names(result)) || !result$ok) {
         rm(conn) # this disconnects connection
         conn <- NULL
         # fall through to getting new connection.
@@ -530,8 +530,8 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     conn <- connection_pool[[key]]
     if (!is.null(conn)){
       tryCatch({
-        # test connection
-        result <- DBI::dbGetQuery(conn,"select 1")
+        # test connection and at the same time set up the session with the server to use utf8.
+        result <- DBI::dbGetQuery(conn,"set names utf8") # This should return empty data.frame.
         if (!is.data.frame(result)) { # it can fail by returning NULL rather than throwing error.
           tryCatch({ # try to close connection and ignore error
             DBI::dbDisconnect(conn)
@@ -559,7 +559,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     }
   } else if (type == "postgres" || type == "redshift" || type == "vertica") {
     if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
-    if(!requireNamespace("RPostgreSQL")){stop("package RPostgreSQL must be installed.")}
+    if(!requireNamespace("RPostgres")){stop("package RPostgres must be installed.")}
     # use same key "postgres" for redshift and vertica too, since they use
     # queryPostgres() too, which uses the key "postgres"
     key <- paste("postgres", host, port, databaseName, username, sep = ":")
@@ -588,12 +588,8 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       })
     }
     if (is.null(conn)) {
-      drv <- DBI::dbDriver("PostgreSQL")
-      pg_dsn = paste0(
-        'dbname=', databaseName, ' ',
-        'sslmode=prefer'
-      )
-      conn <- RPostgreSQL::dbConnect(drv, dbname=pg_dsn, user = username,
+      drv <- RPostgres::Postgres()
+      conn <- RPostgres::dbConnect(drv, dbname=databaseName, user = username,
                                      password = password, host = host, port = port)
       connection_pool[[key]] <- conn
     }
@@ -832,6 +828,13 @@ getListOfColumns <- function(type, host, port, databaseName, username, password,
 #' API to execute a query that can be handled with DBI
 #' @export
 executeGenericQuery <- function(type, host, port, databaseName, username, password, query, catalog = "", schema = "", numOfRows = -1){
+  if (type %in% c("mysql", "aurora")) { # In case of MySQL, just use queryMySQL, since it has workaround to read multibyte column names without getting garbled.
+    df <- queryMySQL(host, port, databaseName, username, password, numOfRows = numOfRows, query)
+    df <- readr::type_convert(df)
+    # It is hackish, but to read multibyte character data correctly, type_convert helps for some reason.
+    # There is small chance of column getting converted to unwanted type, but for our usage, that is unlikely, and being able to read multibyte outweighs the potential drawback.
+    return(df)
+  }
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
   conn <- getDBConnection(type, host, port, databaseName, username, password, catalog = catalog, schema = schema)
   tryCatch({
@@ -889,7 +892,6 @@ queryMySQL <- function(host, port, databaseName, username, password, numOfRows =
 
   conn <- getDBConnection("mysql", host, port, databaseName, username, password)
   tryCatch({
-    DBI::dbGetQuery(conn,"set names utf8")
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
     resultSet <- RMySQL::dbSendQuery(conn, glue_exploratory(query, .transformer = sql_glue_transformer, .envir = parent.frame()))
@@ -900,12 +902,13 @@ queryMySQL <- function(host, port, databaseName, username, password, numOfRows =
     stop(err)
   })
   RMySQL::dbClearResult(resultSet)
+  colnames(df) <- iconv(colnames(df),from = "utf8", to = "utf8") # Work around to read multibyte column names without getting garbled.
   df
 }
 
 #' @export
 queryPostgres <- function(host, port, databaseName, username, password, numOfRows = -1, query, ...){
-  if(!requireNamespace("RPostgreSQL")){stop("package RPostgreSQL must be installed.")}
+  if(!requireNamespace("RPostgres")){stop("package RPostgres must be installed.")}
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
 
   conn <- getDBConnection("postgres", host, port, databaseName, username, password)
@@ -915,14 +918,14 @@ queryPostgres <- function(host, port, databaseName, username, password, numOfRow
     # set envir = parent.frame() to get variables from users environment, not papckage environment
     # glue_sql does not quote Date or POSIXct. Let's use our sql_glue_transformer here.
     query <- glue_exploratory(query, .transformer=sql_glue_transformer, .envir = parent.frame())
-    resultSet <- RPostgreSQL::dbSendQuery(conn, query)
+    resultSet <- RPostgres::dbSendQuery(conn, query)
     df <- DBI::dbFetch(resultSet, n = numOfRows)
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
     clearDBConnection("postgres", host, port, databaseName, username)
     stop(err)
   })
-  RPostgreSQL::dbClearResult(resultSet)
+  RPostgres::dbClearResult(resultSet)
   df
 }
 
@@ -1100,9 +1103,9 @@ extractDataFromGoogleBigQueryToCloudStorage <- function(project, dataset, table,
   token <- getGoogleTokenForBigQuery(tokenFileId)
   bigrquery::set_access_cred(token)
   # call forked bigrquery for submitting extract job
-  job <- bigrquery::insert_extract_job(project, dataset, table, destinationUri,
-                                print_header=TRUE, field_delimiter=",", destination_format="CSV", compression="GZIP")
-  job <- bigrquery::wait_for(job)
+  table <- bigrquery::bq_table(project, dataset, table = table)
+  job <- bigrquery::bq_perform_extract(x = table, destination_uris = destinationUri, print_header = TRUE, destination_format = "CSV", compression = "GZIP")
+  job <- bigrquery::bq_job_wait(job)
   job
 }
 
@@ -1171,8 +1174,6 @@ getDataFromGoogleBigQueryTableViaCloudStorage <- function(bucketProjectId, dataS
   # submit a job to extract query result to cloud storage
   uri = stringr::str_c('gs://', bucket, "/", folder, "/", "exploratory_temp*.gz")
   job <- exploratory::extractDataFromGoogleBigQueryToCloudStorage(project = bucketProjectId, dataset = dataSet, table = table, uri,tokenFileId);
-  # wait for extract to be done
-  job <- bigrquery::wait_for(job)
   # download tgzip file to client
   df <- exploratory::downloadDataFromGoogleCloudStorage(bucket = bucket, folder=folder, download_dir = tempdir(), tokenFileId = tokenFileId)
 }
@@ -1203,8 +1204,9 @@ executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 1
     dataSet = dataSetTable[[1]][1]
     table = dataSetTable[[1]][2]
     bqtable <- NULL
-    query <- convertUserInputToUtf8(query)
     # submit a query to get a result (for refresh data frame case)
+    # convertUserInputToUtf8 API call for query is taken care of by exploratory::submitGoogleBigQueryJob
+    # so just pass query as is.
     result <- exploratory::submitGoogleBigQueryJob(project = bucketProjectId, sqlquery = query, tokenFieldId =  tokenFileId, useStandardSQL = useStandardSQL);
     # extranct result from Google BigQuery to Google Cloud Storage and import
     df <- getDataFromGoogleBigQueryTableViaCloudStorage(bucketProjectId, dataSet, table, bucket, folder, tokenFileId)
@@ -1217,6 +1219,8 @@ executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 1
     if(!isStandardSQL && useStandardSQL) { # honor value provided by parameter
       isStandardSQL = TRUE;
     }
+    # make sure to convert query to UTF8
+    query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
     query <- glue_exploratory(query, .transformer=bigquery_glue_transformer, .envir = parent.frame())
     tb <- bigrquery::bq_project_query(x = project, query = query, quiet = TRUE, use_legacy_sql = !isStandardSQL)
@@ -1232,7 +1236,8 @@ getGoogleBigQueryProjects <- function(tokenFileId=""){
   tryCatch({
     token <- getGoogleTokenForBigQuery(tokenFileId);
     bigrquery::set_access_cred(token)
-    projects <- bigrquery::list_projects();
+    projects <- bigrquery::bq_projects(page_size = 100, max_pages = Inf, warn = TRUE)
+    projects
   }, error = function(err){
     c("")
   })
@@ -1245,7 +1250,8 @@ getGoogleBigQueryDataSets <- function(project, tokenFileId=""){
   tryCatch({
     token <- getGoogleTokenForBigQuery(tokenFileId);
     bigrquery::set_access_cred(token)
-    resultdatasets <- bigrquery::list_datasets(project);
+    resultdatasets <- bigrquery::bq_project_datasets(project);
+    lapply(resultdatasets, function(x){x$dataset})
   }, error = function(err){
      c("")
   })
@@ -1263,7 +1269,10 @@ getGoogleBigQueryTables <- function(project, dataset, tokenFileId=""){
     # If we pass large value to max_results (via page_size argument) like 1,000,000, Google BigQuery gives
     # Error: Invalid value at 'max_results.value' (TYPE_UINT32), "1e+06" [badRequest]
     # so set 10,000 as the default value.
-    tables <- bigrquery::list_tables(project, dataset, page_size=10000);
+    # Below is just getting a list of table names and not the actual table data.
+    bqdataset <- bigrquery::bq_dataset(project = project, dataset = dataset)
+    tables <- bigrquery::bq_dataset_tables(bqdataset, page_size = 10000);
+    lapply(tables, function(x){x$table})
   }, error = function(err){
     c("")
   })
@@ -1275,7 +1284,8 @@ getGoogleBigQueryTable <- function(project, dataset, table, tokenFileId=""){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   token <- getGoogleTokenForBigQuery(tokenFileId);
   bigrquery::set_access_cred(token)
-  table <- bigrquery::get_table(project, dataset, table);
+  table <- bigrquery::bq_table(project = project, dataset = dataset, table = table)
+  table <- bigrquery::bq_table_meta(table);
 }
 
 #' API to get tables for current project, data set
@@ -1317,11 +1327,12 @@ scrape_html_table <- function(url, index, heading, encoding = NULL) {
 }
 
 
-#' function to convert labelled class to factoror
-#' see https://github.com/exploratory-io/tam/issues/1481
+#' function to convert labelled class to factor
 #' @export
 handleLabelledColumns = function(df){
-  is_labelled <- which(lapply(df, class) == "labelled")
+  # check if column class is labelled or haven_labelled, and conver them to factor.
+  # If labelled or haven_labelled are not converted to factor, appling jsonlite::toJSON to the data frame fails.
+  is_labelled <- which(lapply(df, class) %in% c("labelled", "haven_labelled"))
   df[is_labelled] <- lapply(df[is_labelled], haven::as_factor)
   df
 }

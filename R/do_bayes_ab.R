@@ -13,9 +13,10 @@
 #' * prior - Output coordinates of prior density chart.
 #' * posteriors - Output coordinates of posterior density chart of the success rate.
 #' * improvement - Output coordinate of histogram of lift, which is the ratio of performance improvement of A over B. The formula is (A - B) / B.
+#' * revert_ab - Revert which is A and which is B.
 #' @param seed Random seed for bayes test to estimate probability density.
 #' @export
-exp_bayes_ab <- function(df, converted, a_b_identifier, count = NULL, prior_mean = NULL, prior_sd = NULL, type = "model", seed = 0, ...){
+exp_bayes_ab <- function(df, converted, a_b_identifier, count = NULL, prior_mean = NULL, prior_sd = NULL, type = "model", revert_ab = FALSE, seed = 0, ...){
   # this seems to be the new way of NSE column selection evaluation
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
   a_b_identifier_col <- dplyr::select_var(names(df), !! rlang::enquo(a_b_identifier))
@@ -61,6 +62,18 @@ exp_bayes_ab <- function(df, converted, a_b_identifier, count = NULL, prior_mean
       }
       # first factor is group A, so TRUE and FALSE should be swapped
       df[[a_b_identifier_col]] <- !as.logical(as.integer(df[[a_b_identifier_col]]) - 1)
+    }
+  }
+
+  # By now, a_b_identifier_col column should be logical.
+  # To revert A/B, flip the logical and revert label (fct_lev).
+  if (revert_ab) { 
+    df[[a_b_identifier_col]] <- !df[[a_b_identifier_col]]
+    if (!is.null(fct_lev)) {
+      fct_lev <- rev(fct_lev)
+    }
+    else {
+      fct_lev <- c("FALSE", "TRUE")
     }
   }
 
@@ -350,7 +363,7 @@ tidy.bayesTest <- function(x, percentLift = 0, credInt = 0.9, type = "summary", 
     ret <- data.frame(
       group = c("A", "B"),
       ab_identifier = ab_identifier,
-      total_population = each_len,
+      n = each_len,
       converted = each_success,
       conversion_rate = each_mean,
       chance_of_being_better = c(summary_info$probability[[1]], 1-summary_info$probability[[1]]) ,
@@ -365,7 +378,7 @@ tidy.bayesTest <- function(x, percentLift = 0, credInt = 0.9, type = "summary", 
       map <- c(
         group = "Group",
         ab_identifier = "AB Identifier",
-        total_population = "Total Population",
+        n = "Number of Rows",
         converted = "Converted",
         conversion_rate = "Conversion Rate",
         chance_of_being_better = "Chance of Being Better",

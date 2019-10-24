@@ -47,10 +47,16 @@ test_that("is_alphabet", {
   expect_equal(result, c(T, F, F, F, F))
 })
 
-test_that("test get_stop_words", {
+test_that("test get_stopwords", {
   result <- get_stopwords()
   expect_true(any(result == "a"))
+  expect_true(any(result == "amp"))
+  expect_true(any(result == "http"))
+  expect_true(any(result == "https"))
+  expect_true(any(result == "t.co"))
 })
+
+
 
 test_that("test word_to_sentiment", {
   result <- word_to_sentiment("good")
@@ -296,8 +302,14 @@ test_that("parse_character", {
 })
 
 test_that("parse_number", {
+  # Parse characters
+  ret <- exploratory::parse_number(c("1", "2.1"))
+  expect_equal(ret, c(1, 2.1))
+  expect_true(is.vector(ret))
+  # Pass through input that is already numeric.
   ret <- exploratory::parse_number(c(1, 2.1))
   expect_equal(ret, c(1, 2.1))
+  expect_true(is.vector(ret))
 })
 
 test_that("parse_logical", {
@@ -305,3 +317,87 @@ test_that("parse_logical", {
   expect_equal(ret, c(TRUE, FALSE))
 })
 
+test_that("str_extract_inside", {
+  # bracket ()
+  ret <- exploratory::str_extract_inside("abc(defgh)ijk", begin = "(", end =")")
+  expect_equal(ret, c("defgh"))
+  # curly bracket {}
+  ret <- exploratory::str_extract_inside("abc(defgh)ijk", begin = "{", end ="}")
+  expect_equal(ret, NA_character_)
+  # curly bracket {}
+  ret <- exploratory::str_extract_inside("abc{123456}ijk", begin = "{", end ="}")
+  expect_equal(ret, "123456")
+  # curly bracket []
+  ret <- exploratory::str_extract_inside("abc[123456]ijk", begin = "[", end ="]")
+  expect_equal(ret, "123456")
+  # double quote ""
+  ret <- exploratory::str_extract_inside('abc"123456"ijk', begin = '"', end = '"')
+  expect_equal(ret, "123456")
+  # single quote ''
+  ret <- exploratory::str_extract_inside("abc'123456'ijk", begin = "'", end = "'")
+  expect_equal(ret, "123456")
+  # percent %
+  ret <- exploratory::str_extract_inside("abc%123456%ijk", begin = "%", end = "%")
+  expect_equal(ret, "123456")
+  # percent $
+  ret <- exploratory::str_extract_inside("abc$123456$ijk", begin = "$", end = "$")
+  expect_equal(ret, "123456")
+  # percent * $
+  ret <- exploratory::str_extract_inside("abc*123456$ijk", begin = "*", end = "$")
+  expect_equal(ret, "123456")
+
+  tryCatch({
+    ret <- exploratory::str_extract_inside("abc*123456$ijk", begin = "{{", end = "}")
+  }, error = function(e){
+    expect_equal(e$message, "The begin argument must be one character.")
+  })
+
+  tryCatch({
+    ret <- exploratory::str_extract_inside("abc*123456$ijk", begin = "n", end = "}")
+  }, error = function(e){
+    expect_equal(e$message, "The begin argument must be symbol such as (, {, [.")
+  })
+
+  tryCatch({
+    ret <- exploratory::str_extract_inside("abc*123456$ijk", begin = "{", end = "}}")
+  }, error = function(e){
+    expect_equal(e$message, "The end argument must be one character.")
+  })
+
+  tryCatch({
+    ret <- exploratory::str_extract_inside("abc*123456$ijk", begin = "{", end = "z")
+  }, error = function(e){
+    expect_equal(e$message, "The end argument must be symbol such as ), }, ].")
+  })
+
+  test_that("str_logical", {
+    ret <- exploratory::str_logical(c("yes", "yEs", "yeS", " YEs", "YeS ", "yES", "YES","no", "No", "nO", "NO ", NA))
+    expect_equal(ret, c(TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, FALSE, NA))
+    ret <- exploratory::str_logical(as.factor(c("yes", "yEs", "yeS", " YEs", "YeS ", "yES", "YES","no", "No", "nO", "NO ", NA)))
+    expect_equal(ret, c(TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, FALSE, NA))
+    ret <- exploratory::str_logical(c("true", "tRue", "trUe", "truE", "TRue", "TrUe", "TruE", "TRUe", "TRuE", "TrUE", "tRUE", "TRUE","false", "FALSE", NA))
+    expect_equal(ret, c(TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, FALSE, NA))
+    ret <- exploratory::str_logical(c("1", "0", "0", "1", "1", "1", "1", "0", "1", "1", "1", "1","1", "0", NA))
+    expect_equal(ret, c(TRUE, FALSE, FALSE, TRUE, TRUE, TRUE, TRUE, FALSE, TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, NA))
+    ret <- exploratory::str_logical(c(1, 0, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1,1, 0, NA))
+    expect_equal(ret, c(TRUE, FALSE, FALSE, TRUE, TRUE, TRUE, TRUE, FALSE, TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, NA))
+    ret <- exploratory::str_logical(as.integer(c(1, 0, 0, 2, 2, 3, 4, 0, 100, 1000, 10, 11,12, 0, NA)))
+    expect_equal(ret, c(TRUE, FALSE, FALSE, TRUE, TRUE, TRUE, TRUE, FALSE, TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, NA))
+    ret <- exploratory::str_logical(as.double(c(1.1, 0, 0, 2.2, 2.3, 3.5, 4.3, 0, 100.01, 1000.1234, 10.34343, 11.11,12.89, 0, NA)))
+    expect_equal(ret, c(TRUE, FALSE, FALSE, TRUE, TRUE, TRUE, TRUE, FALSE, TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, NA))
+    ret <- exploratory::str_logical(as.numeric(c(1.1, 0, 0, 2.2, 2.3, 3.5, 4.3, 0, 100.01, 1000.1234, 10.34343, 11.11,12.89, 0, NA)))
+    expect_equal(ret, c(TRUE, FALSE, FALSE, TRUE, TRUE, TRUE, TRUE, FALSE, TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, NA))
+    ret <- exploratory::str_logical(bit64::as.integer64(c(1.1, 0, 0, 2.2, 2.3, 3.5, 4.3, 0, 100.01, 1000.1234, 10.34343, 11.11,12.89, 0, NA)))
+    expect_equal(ret, c(TRUE, FALSE, FALSE, TRUE, TRUE, TRUE, TRUE, FALSE, TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, NA))
+    ret <- exploratory::str_logical(c("Sign Up", "Not Sign Up", "Not Sign Up", "sign Up", "sign up", "SIGN UP", "Sign UP", "Not Sign Up", "Sign Up", "Sign Up", "Sign Up", "Sign Up","Sign Up", "Not Sign Up", NA), true_value = "Sign Up")
+    expect_equal(ret, c(TRUE, FALSE, FALSE, TRUE, TRUE, TRUE, TRUE, FALSE, TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, NA))
+    ret <- exploratory::str_logical(c("yes", "ddd", "cc", "ee", "1", "0", 1, 0, "true", "false", "aa", "","", NA, NA))
+    expect_equal(ret, c(TRUE, NA, NA, NA, TRUE, FALSE, TRUE, FALSE, TRUE, FALSE, NA, NA, NA, NA, NA))
+    ret <- exploratory::str_logical(c("yes", "ddd", "cc", "ee", "1", "0", 1, 0, "true", "false", "YES", "","", NA, NA), true_value = "yes")
+    expect_equal(ret, c(TRUE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, FALSE, FALSE, NA, NA))
+    ret <- exploratory::str_logical(c(NA, NA, NA, NA, NA, NA, NA, NA))
+    expect_equal(ret, c(NA, NA, NA, NA, NA, NA, NA, NA))
+  })
+
+
+})

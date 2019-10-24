@@ -274,7 +274,7 @@ do_market_impact_ <- function(df, time_col, value_col, market_col, target_market
   ret <- df %>%
     dplyr::do_(.dots=setNames(list(~do_causal_impact_each(.)), tmp_col)) %>%
     dplyr::ungroup() %>%
-    tidyr::unnest_(tmp_col)
+    tidyr::unnest(!!rlang::sym(tmp_col))
 
   # grouping should be kept
   if(length(grouped_col) != 0){

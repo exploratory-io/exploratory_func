@@ -1,5 +1,4 @@
 context("test build_lm")
-
 test_that("test build_lm summary output ", {
   test_df = data.frame(
     num1 = seq(20) / 10.0,
@@ -210,6 +209,18 @@ test_that("prediction with glm family (binomial) and link (probit) with target c
 
   expect_true(nrow(ret) > 0)
   expect_equal(colnames(ret), c("CANCELLED.X", "logical.col", "Carrier.Name","CARRIER","DISTANCE",".fitted",".se.fit",".resid",".hat",".sigma",".cooksd",".std.resid"))
+})
+
+test_that("prediction with glm family (negativebinomial) with target column name with space by build_lm.fast", {
+  test_data <- structure(
+    list(
+      `CANCELLED X` = c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0),
+      `logical col` = c(TRUE, FALSE, TRUE, FALSE, FALSE, TRUE, FALSE, FALSE, NA, TRUE, FALSE, NA, FALSE, TRUE, FALSE, TRUE, FALSE, FALSE, FALSE, FALSE),
+      `Carrier Name` = c("Delta Air Lines", "American Eagle", "American Airlines", "Southwest Airlines", "SkyWest Airlines", "Southwest Airlines", "Southwest Airlines", "Delta Air Lines", "Southwest Airlines", "Atlantic Southeast Airlines", "American Airlines", "Southwest Airlines", "US Airways", "US Airways", "Delta Air Lines", "Atlantic Southeast Airlines", NA, "Atlantic Southeast Airlines", "Delta Air Lines", "Delta Air Lines"),
+      CARRIER = c("DL", "MQ", "AA", "DL", "MQ", "AA", "DL", "DL", "MQ", "AA", "AA", "WN", "US", "US", "DL", "EV", "9E", "EV", "DL", "DL"),
+      # testing filtering of Inf, -Inf, NA here.
+      DISTANCE = c(Inf, -Inf, NA, 187, 273, 1062, 583, 240, 1123, 851, 852, 862, 361, 507, 1020, 1092, 342, 489, 1184, 545)), row.names = c(NA, -20L),
+    class = c("tbl_df", "tbl", "data.frame"), .Names = c("CANCELLED X", "logical col", "Carrier Name", "CARRIER", "DISTANCE"))
 
   model_data <- build_lm.fast(test_data,
                               `CANCELLED X`,
@@ -224,13 +235,16 @@ test_that("prediction with glm family (binomial) and link (probit) with target c
   expect_equal(colnames(ret),
                c("null.deviance", "df.null", "logLik",
                  "AIC", "BIC", "deviance",
-                 "df.residual", "p.value", "theta", "SE.theta",
+                 "df.residual", "p.value", "n", "theta", "SE.theta",
                  "logical.col_base",
                  "Carrier.Name_base", "CARRIER_base"))
   ret <- model_data %>% broom::tidy(model)
-  expect_equal(colnames(ret),
-               c("term", "estimate", "std.error", "statistic", "p.value",
-               "conf.high", "conf.low", "base.level"))
+  expect_colnames <- c("term", "estimate", "std.error", "statistic", "p.value",
+                       "conf.high", "conf.low", "base.level")
+
+  # when model has NA value in coefficients, broom::tidy(model) return note column
+  expect_true(identical(colnames(ret), expect_colnames) ||
+                identical(colnames(ret), c(expect_colnames, "note")))
 
   ret <- model_data %>% broom::augment(model)
   expect_equal(colnames(ret),
@@ -283,6 +297,7 @@ test_that("prediction with glm model with SMOTE by build_lm.fast", {
   test_data <- test_data %>% mutate(CARRIER = factor(CARRIER, ordered=TRUE)) # test handling of ordered factor
 
   model_data <- build_lm.fast(test_data, `CANCELLED X`, `Carrier Name`, CARRIER, DISTANCE, model_type = "glm", smote=FALSE, with_marginal_effects=TRUE, with_marginal_effects_confint=TRUE)
+  ret <- model_data %>% lm_partial_dependence()
   ret <- model_data %>% broom::glance(model, pretty.name=TRUE)
   ret <- model_data %>% broom::tidy(model)
   ret <- model_data %>% broom::augment(model)
@@ -315,11 +330,11 @@ test_that("test GLM (Negative Binomial) summary output", {
   expect_equal(colnames(model_ret),
                c("null.deviance", "df.null", "logLik",
                  "AIC", "BIC", "deviance", "df.residual",
-                 "p.value", "theta", "SE.theta"))
+                 "p.value", "n", "theta", "SE.theta"))
   model_ret_pretty <- ret %>% broom::glance(model, pretty.name=TRUE)
   expect_equal(colnames(model_ret_pretty),
-               c("P Value", "Log Likelihood", "AIC",
-                 "BIC", "Deviance", "Null Deviance",
+               c("P Value", "Number of Rows", "Log Likelihood", "AIC",
+                 "BIC", "Residual Deviance", "Null Deviance",
                  "DF for Null Model", "Residual DF",
                  "Theta", "SE Theta"))
 })
@@ -350,11 +365,11 @@ test_that("test GLM (Negative Binomial) with group columns", {
   expect_equal(colnames(model_ret),
                c("CARRIER", "null.deviance", "df.null", "logLik",
                  "AIC", "BIC", "deviance", "df.residual",
-                 "p.value", "theta", "SE.theta"))
+                 "p.value", "n", "theta", "SE.theta"))
   model_ret_pretty <- ret %>% broom::glance(model, pretty.name=TRUE)
   expect_equal(colnames(model_ret_pretty),
-               c("CARRIER","P Value", "Log Likelihood", "AIC",
-                 "BIC", "Deviance", "Null Deviance",
+               c("CARRIER", "P Value", "Number of Rows", "Log Likelihood", "AIC",
+                 "BIC", "Residual Deviance", "Null Deviance",
                  "DF for Null Model", "Residual DF",
                  "Theta", "SE Theta"))
 })

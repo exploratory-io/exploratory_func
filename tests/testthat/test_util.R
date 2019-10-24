@@ -1,5 +1,120 @@
 context("check util functions")
 
+test_that("bind_rows", {
+  library(dplyr)
+  res <- mtcars %>% exploratory::bind_rows(list(acars = mtcars, bcars = mtcars), id_column_name="dataf", current_df_name="firstMtcars")
+  expect_equal(unique(res$dataf), c("firstMtcars", "acars", "bcars"))
+  res2 <- mtcars %>% exploratory::bind_rows(mtcars, mtcars, id_column_name="dataf", force_data_type = TRUE)
+  expect_equal(unique(res2$dataf), c(1,2,3))
+  # For data1, test1 column is factor data type
+  data1 <- data.frame(person = c("A","B","C"),
+                      test1 = as.factor(c(1,4,5)),
+                      test2 = c(14,25,10),
+                      test3 = c(12.5,16.0,4),
+                      test4 = c(16,23,21),
+                      test5 = as.factor(c(49,36,52)))
+  # for data2, test2 column is character data type
+  data2 <- data.frame(person = c("D","E","F"),
+                      test1 = c(8,7,2),
+                      test2 = c(14,25,10),
+                      test3 = c(6.5,12.0,19.5),
+                      test4 = as.factor(c(15,21,29)),
+                      test5 = as.factor(c(54,51,36)))
+  # if this is dplyr::bind_rows, it fails because of factor vs character data type mismatch.
+  # but exploratory::bind_rows works if force_data_type is set as TRUE.
+  res3 <- exploratory::bind_rows(data1, data2, force_data_type = TRUE)
+  expect_equal(unique(res3$person), c("A","B","C","D","E","F"))
+  # test data frames without dedicated names
+  mtcars1 <- mtcars
+  mtcars2 <- mtcars
+  mtcars3 <- mtcars
+  res4 <- mtcars1 %>% exploratory::bind_rows(mtcars2, mtcars3, current_df_name = "mtcars1", id_column_name = "ID")
+  expect_equal(unique(res4$ID), c("mtcars1","mtcars2","mtcars3"))
+  # backward compatibility check
+  res5 <- mtcars1 %>% exploratory::bind_rows(mtcars2, mtcars3, .id = "ID")
+  expect_equal(unique(res5$ID), c("1","2","3"))
+})
+
+test_that("union", {
+  library(dplyr)
+  # For data1, test1 column is factor data type
+  data1 <- data.frame(person = c("A","B","C"),
+                      test1 = as.factor(c(1,4,5)),
+                      test2 = c(14,25,10),
+                      test3 = c(12.5,16.0,4),
+                      test4 = c(16,23,21),
+                      test5 = as.factor(c(49,36,52)))
+  # for data2, test2 column is character data type
+  data2 <- data.frame(person = c("A","D","F"),
+                      test1 = c(1,7,2),
+                      test2 = c(14,25,10),
+                      test3 = c(12.5,12.0,19.5),
+                      test4 = as.factor(c(16,21,29)),
+                      test5 = as.factor(c(49,51,36)))
+  res <- exploratory::union(x = data1, y = data2, force_data_type = TRUE)
+  expect_equal(nrow(res), 5)
+})
+
+test_that("union_all", {
+  library(dplyr)
+  # For data1, test1 column is factor data type
+  data1 <- data.frame(person = c("A","B","C"),
+                      test1 = as.factor(c(1,4,5)),
+                      test2 = c(14,25,10),
+                      test3 = c(12.5,16.0,4),
+                      test4 = c(16,23,21),
+                      test5 = as.factor(c(49,36,52)))
+  # for data2, test2 column is character data type
+  data2 <- data.frame(person = c("A","D","F"),
+                      test1 = c(1,7,2),
+                      test2 = c(14,25,10),
+                      test3 = c(12.5,12.0,19.5),
+                      test4 = as.factor(c(16,21,29)),
+                      test5 = as.factor(c(49,51,36)))
+  res <- exploratory::union_all(x = data1, y = data2, force_data_type = TRUE)
+  expect_equal(nrow(res), 6)
+})
+
+test_that("intersect", {
+  library(dplyr)
+  # For data1, test1 column is factor data type
+  data1 <- data.frame(person = c("A","B","C"),
+                      test1 = as.factor(c(1,4,5)),
+                      test2 = c(14,25,10),
+                      test3 = c(12.5,16.0,4),
+                      test4 = c(16,23,21),
+                      test5 = as.factor(c(49,36,52)))
+  # for data2, test2 column is character data type
+  data2 <- data.frame(person = c("A","D","F"),
+                      test1 = c(1,7,2),
+                      test2 = c(14,25,10),
+                      test3 = c(12.5,12.0,19.5),
+                      test4 = as.factor(c(16,21,29)),
+                      test5 = as.factor(c(49,51,36)))
+  res <- exploratory::intersect(x = data1, y = data2, force_data_type = TRUE)
+  expect_equal(nrow(res), 1)
+})
+
+test_that("setdiff", {
+  library(dplyr)
+  # For data1, test1 column is factor data type
+  data1 <- data.frame(person = c("A","B","C"),
+                      test1 = as.factor(c(1,4,5)),
+                      test2 = c(14,25,10),
+                      test3 = c(12.5,16.0,4),
+                      test4 = c(16,23,21),
+                      test5 = as.factor(c(49,36,52)))
+  # for data2, test2 column is character data type
+  data2 <- data.frame(person = c("A","D","F"),
+                      test1 = c(1,7,2),
+                      test2 = c(14,25,10),
+                      test3 = c(12.5,12.0,19.5),
+                      test4 = as.factor(c(16,21,29)),
+                      test5 = as.factor(c(49,51,36)))
+  res <- exploratory::setdiff(x = data1, y = data2, force_data_type = TRUE)
+  expect_equal(nrow(res), 2)
+})
+
 test_that("test pivot with empty data frame", {
   df <- data.frame()
   expect_error({
@@ -449,6 +564,7 @@ test_that("append_colnames", {
 })
 
 test_that("test pivot", {
+  set.seed(1)
   test_df <- data.frame(
     group = c(rep(letters[1:2], each = 50),"a"),
     cat1 = c(letters[round(runif(100)*5)+1], NA),
@@ -466,7 +582,21 @@ test_that("test pivot", {
   pivoted_with_na <- pivot(test_df, cat1 ~ cat2 + cat3, value = num3, fun.aggregate=mean, na.rm = FALSE)
   expect_true(any(is.na(pivoted_with_na)))
 
+  pivoted_with_na_ratio <- pivot(test_df, cat1 ~ cat2 , value = num3, fun.aggregate=na_ratio, na.rm = TRUE)
+  expect_true(any(pivoted_with_na_ratio %>% select(a,b,c,d) !=0)) # Verify that NA is detected.
+
 })
+
+test_that("test pivot with NA", {
+  test_df_na <- data.frame(
+    carrier = c("AA", "AA", "UA"),
+    state = c("CA", "NY", "CA"),
+    num = c(1,1,1)
+  )
+  pivoted <- test_df_na %>% pivot(state ~ carrier, value = num)
+  expect_true(any(is.na(pivoted)))
+})
+
 
 test_that("test pivot with Date", {
   test_df <- data.frame(
@@ -571,6 +701,12 @@ test_that("test extract_from_date", {
   expect_equal(ret, as.Date(c("2018-01-01","2018-01-01",NA,NA)))
 })
 
+test_that("test weekend", {
+  data <- as.Date(c("2019-06-16", "2019-06-08", "2019-06-26", NA, NA))
+  ret <- weekend(data)
+  expect_equal(ret, as.factor(c("Weekend","Weekend", "Weekday", NA, NA)))
+})
+
 test_that("test %in_or_all%", {
   ret <- c(1,2,3) %in_or_all% c(1,2)
   expect_equal(ret, c(TRUE, TRUE, FALSE))
@@ -604,7 +740,7 @@ test_that("test false_count", {
 
 test_that("test get_confint", {
   mean_vals <- c(0,1,NA)
-  sd_vals <- c(1,1,1) 
+  sd_vals <- c(1,1,1)
   ret <- get_confint(mean_vals, sd_vals, conf_int = 0.975)
   expect_equal(ret, c(1.959964, 2.959964, NA), tolerance=0.0001)
 })
@@ -630,8 +766,16 @@ test_that("test safe_slice", {
   expect_equal(ret2, matrix(c(NA,3,5,6,8,NA),2,3))
 })
 
+test_that("test sameple_df_index", {
+  df <-data.frame(x=1:99,y=1:99)
+  test_index <- sample_df_index(df, 0.3, seed=1)
+  expect_equal(length(test_index), 29)
+  test_index <- sample_df_index(df, 0.3, ordered=TRUE)
+  expect_equal(length(test_index), 30)
+})
+
 test_that("test sameple_rows", {
-  df <-data.frame(x=c(1,NA,3),y=c(2,3,NA)) 
+  df <-data.frame(x=c(1,NA,3),y=c(2,3,NA))
   df <-setNames(df,c("x 1", "col 2"))
   ret <- df %>% sample_rows(2)
   expect_equal(nrow(ret), 2)
@@ -685,13 +829,71 @@ test_that("one_hot", {
   expect_equal(res$x_A, c(1,1,0,0))
 })
 
-test_that("n_distinct", {
-  res <- n_distinct(c(1,2,2,3,3,NA))
-  expect_equal(res, 4)
-  res <- n_distinct(c(1,2,2,3,3,NA), na.rm = TRUE)
-  expect_equal(res, 3)
-  res <- n_distinct(c(1, 1, 2, 3, NA), c(2, 2, 3, 4, 5))
-  expect_equal(res, 4)
-  res <- n_distinct(c(1, 1, 2, 3, NA), c(2, 2, 3, 4, 5), na.rm = TRUE)
-  expect_equal(res, 3)
+test_that("get_mode", {
+  # numeric column case
+  x <- c(1,2,2,3,NA,NA,NA)
+  res <- get_mode(x)
+  expect_true(is.na(res))
+  res <- get_mode(x, na.rm = TRUE)
+  expect_equal(res, 2)
+
+  # logical column case
+  x <- c(F,T,T,NA,NA,NA)
+  res <- get_mode(x)
+  expect_true(is.na(res))
+  res <- get_mode(x, na.rm = TRUE)
+  expect_equal(res, T)
+
+  # character column case
+  x <- c("A","B","B","C",NA,NA,NA)
+  res <- get_mode(x)
+  expect_true(is.na(res))
+  res <- get_mode(x, na.rm = TRUE)
+  expect_equal(res, "B")
+
+  # factor column case
+  x <- factor(c("A","B","B","C",NA,NA,NA))
+  res <- get_mode(x)
+  expect_true(is.na(res))
+  res <- get_mode(x, na.rm = TRUE)
+  expect_equal(as.character(res), "B")
+
+  # Date column case
+  x <-c(as.Date(c("2019-01-01","2019-01-02","2019-01-02","2019-01-03")),NA,NA,NA)
+  res <- get_mode(x)
+  expect_true(is.na(res))
+  res <- get_mode(x, na.rm = TRUE)
+  expect_equal(as.character(res), "2019-01-02")
 })
+
+test_that("get_unknown_category_rows_index", {
+  train_df <- data.frame(x=c('a','b','c'),
+                         y=c('a','b','c'))
+  test_df <- data.frame(x=c('a','c','d'),
+                        y=c('b','e','c'))
+  unknown_vector <- get_unknown_category_rows_index_vector(test_df, train_df)
+  unknown_index <- get_row_numbers_from_index_vector(unknown_vector)
+  expect_equal(unknown_index,c(2,3))
+  restored <- restore_na(c('a','b','c'), c(2,4))
+  expect_equal(restored ,c('a',NA,'b',NA,'c'))
+  restored <- restore_na(c('a','b','c'), c(1,3,5,7))
+  expect_equal(restored ,c(NA,'a',NA,'b',NA,'c',NA))
+})
+
+test_that("summarize_group", {
+ df <- mtcars %>% exploratory::summarize_group(group_cols = c(cyl="cyl", mpg_int10="mpg"), group_funs = c("none", "asintby10"), count = n())
+ expect_equal(nrow(df),5)
+ df2 <- mtcars %>% exploratory::summarize_group(group_cols = NULL, group_funs = NULL, count = n())
+ expect_equal(nrow(df2),1)
+})
+
+test_that("revert_factor_cols_to_logical", {
+  df <- data.frame(col1 = I(factor(c(TRUE, FALSE, NA))),
+                   col2 = I(forcats::fct_rev(factor(c(TRUE,FALSE,NA)))),
+                   col3 = I(factor(c("A","B","C"))))
+
+  res <- revert_factor_cols_to_logical(df)
+  expect_equal(res$col1, c(TRUE, FALSE, NA))
+  expect_equal(res$col2, c(TRUE, FALSE, NA))
+})
+

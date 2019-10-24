@@ -214,7 +214,7 @@ do_svd.kv_ <- function(df,
   ret <- df %>%
     dplyr::do_(.dots=setNames(list(~do_svd_each(.)), tmp_col)) %>%
     dplyr::ungroup() %>%
-    unnest_with_drop_(tmp_col)
+    unnest_with_drop(!!rlang::sym(tmp_col))
 
   ret
 }
@@ -396,7 +396,7 @@ do_svd.cols <- function(df,
   ret <- df %>%
     dplyr::do_(.dots=setNames(list(~do_svd_each(.)), tmp_col)) %>%
     dplyr::ungroup() %>%
-    unnest_with_drop_(tmp_col)
+    unnest_with_drop(!!rlang::sym(tmp_col))
 
   ret
 }
