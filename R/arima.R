@@ -96,6 +96,25 @@ do_arima <- function(df, time, ...,
     }
   }
 
+  # Compose arguments to pass to dplyr::summarise.
+  summarise_args <- list() # default empty list
+  regressor_output_cols <- NULL # Just declaring variable
+  if (!is.null(regressors) && !is.null(funs.aggregate.regressors)) {
+    summarise_args <- purrr::map2(funs.aggregate.regressors, regressors, function(func, cname) {
+      quo(UQ(func)(UQ(rlang::sym(cname))))
+    })
+
+    # Output column names.
+    if (!is.null(names(regressors))) {
+      regressor_output_cols <- names(regressors)
+    }
+    else {
+      regressor_output_cols <- regressors
+    }
+
+    names(summarise_args) <- regressor_output_cols
+  }
+
   # remove rows with NA time
   df <- df[!is.na(df[[time_col]]), ]
 
@@ -125,14 +144,14 @@ do_arima <- function(df, time, ...,
         dplyr::arrange(ds) %>%
         dplyr::filter(!is.na(value)) %>% # remove NA so that we do not pass data with NA, NaN, or 0 to arima
         dplyr::group_by(ds) %>%
-        dplyr::summarise_each(fun.aggregate) %>%
+        dplyr::summarise(y = fun.aggregate(value), !!!summarise_args) %>%
         dplyr::rename(y=value)
     } else {
       grouped_df <- df %>% dplyr::select(ds=time_col, regressors) %>% dplyr::arrange(ds) %>% dplyr::group_by(ds)
 
       # TODO: implement the method that summarize count and summarize_each are executed at the same time
       count_df <- grouped_df %>% dplyr::summarise(y = n())
-      aggr_df <- grouped_df %>% dplyr::summarise_each(fun.aggregate)
+      aggr_df <- grouped_df %>% dplyr::summarise(!!!summarise_args)
       count_df %>% dplyr::full_join(aggr_df, by=c("ds"="ds"))
     }
 
