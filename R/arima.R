@@ -386,7 +386,37 @@ do_arima <- function(df, time,
     })) %>% dplyr::mutate(kpss_test = purrr::map2(data, model, function(df, m) {
       differences=(forecast::arimaorder(m))[["d"]]
       diff_res <- diff(df[[value_col]], differences=differences)
+
+      type <- 1 # 1 menas "level". TODO: check if this is correct.
+      urca_pval <- function(urca_test) {
+        approx(urca_test@cval[1, ], as.numeric(sub("pct", "", 
+                                                   colnames(urca_test@cval)))/100, xout = urca_test@teststat[1], 
+               rule = 2)$y
+      }
+      kpss_wrap <- function(..., use.lag = trunc(3 * sqrt(length(x))/13)) {
+        urca::ur.kpss(..., use.lag = use.lag)
+      }
+
+      runTests <- function(x, test) {
+        tryCatch({
+          suppressWarnings(diff <- switch(test, kpss = urca_pval(kpss_wrap(x, 
+                                                                           type = c("mu", "tau")[type])),
+                                          adf = urca_pval(urca::ur.df(x, 
+                                                                type = c("drift", "trend")[type])), 
+                                          pp = urca_pval(urca::ur.pp(x, type = "Z-tau", model = c("constant", 
+                                                                                            "trend")[type])),
+                                          stop("This shouldn't happen")))
+          diff
+        }, error = function(e) {
+          # TODO: do something.
+          FALSE
+        })
+      }
+
+      #runTests(diff_res, "kpss")
+
       kpss_result <- urca::ur.kpss(diff_res)
+
       data.frame(kpss_result@cval, teststat = kpss_result@teststat)
     }))
 
