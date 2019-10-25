@@ -383,9 +383,11 @@ do_arima <- function(df, time,
     })) %>% dplyr::mutate(residual_acf = purrr::map(model, function(m) {
        acf_res <- acf(residuals(m), plot=FALSE)
        data.frame(lag = acf_res$lag, acf = acf_res$acf)
-    })) %>% dplyr::mutate(kpss_test = purrr::map(data, function(df) {
-       kpss_result <- urca::ur.kpss(df[[value_col]])
-       data.frame(kpss_result@cval, teststat = kpss_result@teststat)
+    })) %>% dplyr::mutate(kpss_test = purrr::map2(data, model, function(df, m) {
+      differences=(forecast::arimaorder(m))[["d"]]
+      diff_res <- diff(df[[value_col]], differences=differences)
+      kpss_result <- urca::ur.kpss(diff_res)
+      data.frame(kpss_result@cval, teststat = kpss_result@teststat)
     }))
 
     ret
