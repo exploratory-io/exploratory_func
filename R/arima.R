@@ -16,7 +16,7 @@
 #' @param na_fill_value - Value to fill NA when na_fill_type is "value"
 #' @param ... - extra values to be passed to prophet::prophet. listed below.
 #' @export
-do_arima <- function(df, time, ...,
+do_arima <- function(df, time,
                      valueColumn = NULL,
                      time_unit = "day",
                      periods = 10,
@@ -53,7 +53,8 @@ do_arima <- function(df, time, ...,
                      regressors = NULL,
                      funs.aggregate.regressors = NULL,
                      regressors_na_fill_type = NULL,
-                     regressors_na_fill_value = 0
+                     regressors_na_fill_value = 0,
+                     ...
                      ){
   validate_empty_data(df)
 
@@ -144,8 +145,7 @@ do_arima <- function(df, time, ...,
         dplyr::arrange(ds) %>%
         dplyr::filter(!is.na(value)) %>% # remove NA so that we do not pass data with NA, NaN, or 0 to arima
         dplyr::group_by(ds) %>%
-        dplyr::summarise(y = fun.aggregate(value), !!!summarise_args) %>%
-        dplyr::rename(y=value)
+        dplyr::summarise(y = fun.aggregate(value), !!!summarise_args)
     } else {
       grouped_df <- df %>% dplyr::select(ds=time_col, regressors) %>% dplyr::arrange(ds) %>% dplyr::group_by(ds)
 
