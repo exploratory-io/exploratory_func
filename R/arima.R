@@ -141,13 +141,14 @@ do_arima <- function(df, time,
       # remove rows with NA value_col
       df <- df[!is.na(df[[value_col]]), ]
 
-      df %>% dplyr::select(ds=time_col, value=value_col, regressors) %>%
+      df %>% dplyr::select(ds=time_col, value=value_col, unname(regressors)) %>% # unname is necessary to avoid error when regressors is named vector.
+
         dplyr::arrange(ds) %>%
         dplyr::filter(!is.na(value)) %>% # remove NA so that we do not pass data with NA, NaN, or 0 to arima
         dplyr::group_by(ds) %>%
         dplyr::summarise(y = fun.aggregate(value), !!!summarise_args)
     } else {
-      grouped_df <- df %>% dplyr::select(ds=time_col, regressors) %>% dplyr::arrange(ds) %>% dplyr::group_by(ds)
+      grouped_df <- df %>% dplyr::select(ds=time_col, unname(regressors)) %>% dplyr::arrange(ds) %>% dplyr::group_by(ds)
 
       # TODO: implement the method that summarize count and summarize_each are executed at the same time
       count_df <- grouped_df %>% dplyr::summarise(y = n())
