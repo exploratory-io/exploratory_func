@@ -355,10 +355,25 @@ do_arima <- function(df, time,
       df
 
     })) %>% dplyr::mutate(test_results = purrr::map(model, function(m) {
-       result <- forecast::checkresiduals(m, plot=FALSE)
-       data.frame(method = result$method, data.name = result$data.name,
-                     `Q*` = result$statistic,
-                     p.value = result$p.value, df = result$parameter)
+      # Repeat test for each lag.
+      browser()
+      residuals <- residuals(m)
+      freq <- frequency(residuals)
+      degree_of_freedom <- length(m$coef) # Definition of modeldf.Arima in forecast package.
+      # Logic used inside checkresiduals to automatically determine lag.
+      lag <- ifelse(freq > 1, 2 * freq, 10)
+      lag <- min(lag, round(length(residuals)/5))
+      lag <- max(degree_of_freedom + 3, lag)
+    
+      result <- data.frame(data=I(purrr::map(as.list(1:lag), function(i){forecast::checkresiduals(m, lag = i, plot=FALSE)})))
+      result <- result %>% mutate(data=purrr::map(data,function(x){
+        data.frame(method=x$method,
+                   data.name=x$data.name,
+                   statistic = x$statistic,
+                   p.value = x$p.value,
+                   df = x$parameter)
+      })) %>% unnest(data) %>% mutate(lag=row_number())
+      result
     })) %>% dplyr::mutate(residuals = purrr::map(model, function(m) {
        as.data.frame(residuals(m)) %>%
          dplyr::mutate(time = row_number()) %>%
