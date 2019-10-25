@@ -296,7 +296,7 @@ do_arima <- function(df, time,
 
     # Bind Training Data + Forecast Data
     # Revive Original column names(time_col, value_col)
-    ret <- ret %>% dplyr::mutate(data = purrr::map(data, function(df){
+    ret <- ret %>% dplyr::mutate(data = purrr::map2(data, model, function(df, model){
       df <- df %>% dplyr::bind_rows(forecast_rows)
       if (time_col != "ds") { # if time_col happens to be "ds", do not do this, since it will make the column name "ds.new"
         time_col <- avoid_conflict(colnames(df), time_col)
@@ -305,6 +305,12 @@ do_arima <- function(df, time,
       if (value_col != "y") { # if value_col happens to be "y", do not do this, since it will make the column name "y.new".
        value_col <- avoid_conflict(colnames(df), value_col)
        colnames(df)[colnames(df) == "y"] <- value_col
+      }
+
+      if (!is.null(regressor_output_cols)) {
+        for (i in 1:length(regressor_output_cols)) {
+          df[[paste0(regressor_output_cols[[i]], "_effect")]] <- df[[regressor_output_cols[[i]]]] * model$coef[[regressor_output_cols[[i]]]]
+        }
       }
 
       df
