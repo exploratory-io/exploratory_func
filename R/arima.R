@@ -356,7 +356,6 @@ do_arima <- function(df, time,
 
     })) %>% dplyr::mutate(test_results = purrr::map(model, function(m) {
       # Repeat test for each lag.
-      browser()
       residuals <- residuals(m)
       freq <- frequency(residuals)
       degree_of_freedom <- length(m$coef) # Definition of modeldf.Arima in forecast package.
@@ -380,7 +379,9 @@ do_arima <- function(df, time,
          dplyr::select(time, residuals=x)
     })) %>% dplyr::mutate(acf = purrr::map(model, function(m) {
        acf_res <- acf(m$x, plot=FALSE)
-
+       data.frame(lag = acf_res$lag, acf = acf_res$acf)
+    })) %>% dplyr::mutate(residual_acf = purrr::map(model, function(m) {
+       acf_res <- acf(residuals(m), plot=FALSE)
        data.frame(lag = acf_res$lag, acf = acf_res$acf)
     })) %>% dplyr::mutate(kpss_test = purrr::map(data, function(df) {
        kpss_result <- urca::ur.kpss(df[[value_col]])
