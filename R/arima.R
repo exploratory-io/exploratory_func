@@ -49,7 +49,12 @@ do_arima <- function(df, time, ...,
                      num.cores = 2,
                      na_fill_type = NULL,
                      na_fill_value = 0,
-                     trace = TRUE){
+                     trace = TRUE,
+                     regressors = NULL,
+                     funs.aggregate.regressors = NULL,
+                     regressors_na_fill_type = NULL,
+                     regressors_na_fill_value = 0
+                     ){
   validate_empty_data(df)
 
   loadNamespace("dplyr")
@@ -62,7 +67,7 @@ do_arima <- function(df, time, ...,
   value_col <- if(!missing(valueColumn)){
     dplyr::select_var(names(df), !! rlang::enquo(valueColumn))
   }
-  xreg_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
+  # xreg_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
 
   grouped_col <- grouped_by(df)
 
@@ -116,14 +121,14 @@ do_arima <- function(df, time, ...,
       # remove rows with NA value_col
       df <- df[!is.na(df[[value_col]]), ]
 
-      df %>% dplyr::select(ds=time_col, value=value_col, xreg_cols) %>%
+      df %>% dplyr::select(ds=time_col, value=value_col, regressors) %>%
         dplyr::arrange(ds) %>%
         dplyr::filter(!is.na(value)) %>% # remove NA so that we do not pass data with NA, NaN, or 0 to arima
         dplyr::group_by(ds) %>%
         dplyr::summarise_each(fun.aggregate) %>%
         dplyr::rename(y=value)
     } else {
-      grouped_df <- df %>% dplyr::select(ds=time_col, xreg_cols) %>% dplyr::arrange(ds) %>% dplyr::group_by(ds)
+      grouped_df <- df %>% dplyr::select(ds=time_col, regressors) %>% dplyr::arrange(ds) %>% dplyr::group_by(ds)
 
       # TODO: implement the method that summarize count and summarize_each are executed at the same time
       count_df <- grouped_df %>% dplyr::summarise(y = n())
@@ -172,7 +177,7 @@ do_arima <- function(df, time, ...,
       training_data <- aggregated_data
     }
 
-    if(length(xreg_cols) > 0 && test_mode){
+    if(length(regressors) > 0 && test_mode){
       # xreg in auto.arima must be a character vector or matrix.
       xreg <- training_data %>% dplyr::select(-ds, -y) %>% as.matrix()
       # forecast need reggression values (xreg)
@@ -354,7 +359,7 @@ do_arima <- function(df, time, ...,
   ret <- df %>%
     dplyr::do_(.dots=setNames(list(~do_arima_each(.)), tmp_col)) %>%
     dplyr::ungroup()
-  ret <- ret %>% unnest_with_drop_(tmp_col)
+  ret <- ret %>% unnest_with_drop(!!rlang::sym(tmp_col))
 
   if (length(grouped_col) > 0) {
     ret <- ret %>% dplyr::group_by(!!!rlang::syms(grouped_col))
