@@ -408,18 +408,15 @@ do_arima <- function(df, time,
                                                    colnames(urca_test@cval)))/100, xout = urca_test@teststat[1], 
                rule = 2)$y
       }
-      kpss_wrap <- function(..., use.lag = trunc(3 * sqrt(length(x))/13)) {
-        urca::ur.kpss(..., use.lag = use.lag)
+      kpss_wrap <- function(x, ..., use.lag = trunc(3 * sqrt(length(x))/13)) {
+        urca::ur.kpss(x, ..., use.lag = use.lag)
       }
 
       runTests <- function(x, test) {
         tryCatch({
-          suppressWarnings(diff <- switch(test, kpss = urca_pval(kpss_wrap(x, 
-                                                                           type = c("mu", "tau")[type])),
-                                          adf = urca_pval(urca::ur.df(x, 
-                                                                type = c("drift", "trend")[type])), 
-                                          pp = urca_pval(urca::ur.pp(x, type = "Z-tau", model = c("constant", 
-                                                                                            "trend")[type])),
+          suppressWarnings(diff <- switch(test, kpss = kpss_wrap(x, type = c("mu", "tau")[type]),
+                                          adf = urca::ur.df(x, type = c("drift", "trend")[type]), 
+                                          pp = urca::ur.pp(x, type = "Z-tau", model = c("constant", "trend")[type]),
                                           stop("This shouldn't happen")))
           diff
         }, error = function(e) {
@@ -428,11 +425,9 @@ do_arima <- function(df, time,
         })
       }
 
-      #runTests(diff_res, "kpss")
+      unit_root_test_res <- runTests(diff_res, test)
 
-      kpss_result <- urca::ur.kpss(diff_res)
-
-      data.frame(kpss_result@cval, teststat = kpss_result@teststat)
+      data.frame(unit_root_test_res@cval, teststat = unit_root_test_res@teststat)
     }))
 
     ret
