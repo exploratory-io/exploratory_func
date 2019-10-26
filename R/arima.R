@@ -394,7 +394,7 @@ do_arima <- function(df, time,
     })) %>% dplyr::mutate(residual_acf = purrr::map(model, function(m) {
        acf_res <- acf(residuals(m), plot=FALSE)
        data.frame(lag = acf_res$lag, acf = acf_res$acf)
-    })) %>% dplyr::mutate(kpss_test = purrr::map2(data, model, function(df, m) {
+    })) %>% dplyr::mutate(unit_root_test = purrr::map2(data, model, function(df, m) {
       differences=(forecast::arimaorder(m))[["d"]]
       if (differences > 0) {
         diff_res <- diff(df[[value_col]], differences=differences)
