@@ -374,9 +374,9 @@ do_arima <- function(df, time,
       })) %>% unnest(data) %>% mutate(lag=row_number())
       result
     })) %>% dplyr::mutate(residuals = purrr::map(model, function(m) {
-       as.data.frame(residuals(m)) %>%
-         dplyr::mutate(time = row_number()) %>%
-         dplyr::select(time, residuals=x)
+      result <- data.frame(residuals=as.numeric(residuals(m))) %>%
+        dplyr::mutate(time = row_number())
+      result
     })) %>% dplyr::mutate(acf = purrr::map(model, function(m) {
        acf_res <- acf(m$x, plot=FALSE)
        data.frame(lag = acf_res$lag, acf = acf_res$acf)
