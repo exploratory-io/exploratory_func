@@ -246,6 +246,7 @@ do_arima <- function(df, time,
                                       trace = trace)
                }))
     })
+    trace_output <- trace_output[grepl("(^ ARIMA|^ Best model)", trace_output)]
     conn <- textConnection(trace_output)
     model_traces <- read.table(conn, sep=":")
     close(conn)
@@ -354,7 +355,8 @@ do_arima <- function(df, time,
 
       df
 
-    })) %>% dplyr::mutate(test_results = purrr::map(model, function(m) {
+    }))
+    ret <- ret %>% dplyr::mutate(test_results = purrr::map(model, function(m) {
       # Repeat test for each lag.
       residuals <- residuals(m)
       freq <- frequency(residuals)
@@ -373,25 +375,33 @@ do_arima <- function(df, time,
                    df = x$parameter)
       })) %>% unnest(data) %>% mutate(lag=row_number())
       result
-    })) %>% dplyr::mutate(residuals = purrr::map(model, function(m) {
+    }))
+    ret <- ret %>% dplyr::mutate(residuals = purrr::map(model, function(m) {
       result <- data.frame(residuals=as.numeric(residuals(m))) %>%
         dplyr::mutate(time = row_number())
       result
-    })) %>% dplyr::mutate(acf = purrr::map(model, function(m) {
+    }))
+    ret <- ret %>% dplyr::mutate(acf = purrr::map(model, function(m) {
        acf_res <- acf(m$x, plot=FALSE)
        data.frame(lag = acf_res$lag, acf = acf_res$acf)
-    })) %>% dplyr::mutate(difference_acf = purrr::map2(data, model, function(df, m) {
+    }))
+    ret <- ret %>% dplyr::mutate(difference_acf = purrr::map2(data, model, function(df, m) {
       # ACF on difference.
-      differences=(forecast::arimaorder(m))[["d"]]
+      differences <- (forecast::arimaorder(m))[["d"]]
+      values <- df[[value_col]]
+      if (!test_mode) { # Filter out NAs coming from forecasted rows
+        values <- values[!is.na(values)]
+      }
       if (differences > 0) {
-        diff_res <- diff(df[[value_col]], differences=differences)
+        diff_res <- diff(values, differences=differences)
       }
       else {
-        diff_res <-df[[value_col]] 
+        diff_res <- values
       }
       acf_res <- acf(diff_res, plot=FALSE)
       data.frame(lag = acf_res$lag, acf = acf_res$acf)
-    })) %>% dplyr::mutate(residual_acf = purrr::map(model, function(m) {
+    }))
+    ret <- ret %>% dplyr::mutate(residual_acf = purrr::map(model, function(m) {
        acf_res <- acf(residuals(m), plot=FALSE)
        data.frame(lag = acf_res$lag, acf = acf_res$acf)
     })) %>% dplyr::mutate(unit_root_test = purrr::map2(data, model, function(df, m) {
