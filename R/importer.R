@@ -18,6 +18,10 @@ urltools::url_encode
 #' @export
 urltools::url_decode
 
+#' @importFrom psych logistic
+#' @export
+psych::logistic
+
 #' @importFrom anonymizer anonymize
 #' @export
 anonymize <- function(vec, algo = "sha256", seed = 0, chars = letters, n_chars = 5L, ...){
@@ -38,3 +42,4 @@ glance
 #' @importFrom broom augment
 #' @export
 augment
+

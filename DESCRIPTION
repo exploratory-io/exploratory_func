@@ -13,6 +13,7 @@ Imports:
     broom, 
     prediction, 
     urltools,
+    psych,
     dplyr,
     tibble,
     jsonlite,
