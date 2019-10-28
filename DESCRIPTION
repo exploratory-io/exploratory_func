@@ -15,6 +15,7 @@ Imports:
     urltools,
     psych,
     dplyr,
+    tidyr,
     tibble,
     jsonlite,
     countrycode,

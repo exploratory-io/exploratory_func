@@ -43,3 +43,7 @@ glance
 #' @export
 augment
 
+#' @export
+nest <- function(...) { # Temporary workaround to make nest return list as opposed to vctr_... classes.
+  tidyr::nest_legacy(...)
+}
