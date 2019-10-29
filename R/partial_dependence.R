@@ -53,6 +53,11 @@ handle_partial_dependence <- function(x) {
     ret <- ret %>% dplyr::bind_rows(actual_ret)
     ret <- ret %>% dplyr::rename(Model=!!rlang::sym(target_col)) # Rename target column to Model to make comparison with Actual.
   }
+  else if (!is.null(x$partial_binning)) {
+    actual_ret <- x$partial_binning
+    ret <- ret %>% dplyr::bind_rows(actual_ret)
+    ret <- ret %>% dplyr::rename(Model=!!rlang::sym(target_col)) # Rename target column to Model to make comparison with Actual.
+  }
 
   ret <- ret %>% tidyr::gather_("x_name", "x_value", var_cols, na.rm = TRUE, convert = FALSE)
   # sometimes x_value comes as numeric and not character, and it was causing error from bind_rows internally done
