@@ -2181,6 +2181,7 @@ calc_feature_imp <- function(df,
       # Second element of n argument needs to be less than or equal to sample size, to avoid error.
       if (length(imp_vars) > 0) {
         rf$partial_dependence <- edarf::partial_dependence(rf, vars=imp_vars, data=model_df, n=c(pd_grid_resolution, min(rf$num.samples, pd_sample_size)))
+        rf$partial_binning <- calc_partial_binning_data(model_df, clean_target_col, imp_vars)
       }
       else {
         rf$partial_dependence <- NULL
@@ -2789,6 +2790,7 @@ exp_rpart <- function(df,
         imp_vars <- names(model$variable.importance) # model$variable.importance is already sorted by importance.
         imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # Keep only max_pd_vars most important variables
         model$partial_dependence <- partial_dependence.rpart(model, clean_target_col, vars=imp_vars, data=df, n=c(pd_grid_resolution, min(nrow(df), pd_sample_size)))
+        model$partial_binning <- calc_partial_binning_data(df, clean_target_col, imp_vars)
       }
       else {
         model$partial_dependence <- NULL
