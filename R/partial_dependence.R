@@ -1,3 +1,23 @@
+calc_partial_binning_data <- function(df, target_col, var_cols) {
+  ret <- data.frame()
+  for (var_col in var_cols) {
+    if (is.factor(df[[var_col]])) { # In case of factor, just plot means of training data for each category.
+      actual_ret <- df %>% dplyr::group_by(!!rlang::sym(var_col)) %>% dplyr::summarise(Actual=mean(!!rlang::sym(target_col), na.rm=TRUE))
+      ret <- ret %>% dplyr::bind_rows(actual_ret)
+    }
+    else if (is.numeric(df[[var_col]])) { # Because of proprocessing we do, all columns should be either factor or numeric by now.
+      # Equal width cut: We found this gives more understandable plot compared to equal frequency cut.
+      actual_ret <- df %>% dplyr::mutate(.temp.bin.column=cut(!!rlang::sym(var_col), breaks=20)) %>% dplyr::group_by(.temp.bin.column)
+      # Equal frequency cut version:
+      # actual_ret <- df %>% dplyr::mutate(.temp.bin.column=ggplot2::cut_number(!!rlang::sym(var_col), 20)) %>% dplyr::group_by(.temp.bin.column)
+      actual_ret <- actual_ret %>% dplyr::summarize(Actual=mean(!!rlang::sym(target_col), na.rm=TRUE),!!rlang::sym(var_col):=mean(!!rlang::sym(var_col), na.rm=TRUE))
+      actual_ret <- actual_ret %>% dplyr::select(-.temp.bin.column)
+      ret <- ret %>% dplyr::bind_rows(actual_ret)
+    }
+  }
+  ret
+}
+
 # Common utility function called for tidy with type "partial_dependence".
 # Used for ranger, rpart, lm, and glm.
 handle_partial_dependence <- function(x) {
@@ -29,21 +49,8 @@ handle_partial_dependence <- function(x) {
     else { # For lm case
       df <- x$model
     }
-    for (var_col in var_cols) {
-      if (is.factor(ret[[var_col]])) { # In case of factor, just plot means of training data for each category.
-        actual_ret <- df %>% dplyr::group_by(!!rlang::sym(var_col)) %>% dplyr::summarise(Actual=mean(!!rlang::sym(target_col), na.rm=TRUE))
-        ret <- ret %>% dplyr::bind_rows(actual_ret)
-      }
-      else if (is.numeric(ret[[var_col]])) { # Because of proprocessing we do, all columns should be either factor or numeric by now.
-        # Equal width cut: We found this gives more understandable plot compared to equal frequency cut.
-        actual_ret <- df %>% dplyr::mutate(.temp.bin.column=cut(!!rlang::sym(var_col), breaks=20)) %>% dplyr::group_by(.temp.bin.column)
-        # Equal frequency cut version:
-        # actual_ret <- df %>% dplyr::mutate(.temp.bin.column=ggplot2::cut_number(!!rlang::sym(var_col), 20)) %>% dplyr::group_by(.temp.bin.column)
-        actual_ret <- actual_ret %>% dplyr::summarize(Actual=mean(!!rlang::sym(target_col), na.rm=TRUE),!!rlang::sym(var_col):=mean(!!rlang::sym(var_col), na.rm=TRUE))
-        actual_ret <- actual_ret %>% dplyr::select(-.temp.bin.column)
-        ret <- ret %>% dplyr::bind_rows(actual_ret)
-      }
-    }
+    actual_ret <- calc_partial_binning_data(df, target_col, var_cols)
+    ret <- ret %>% dplyr::bind_rows(actual_ret)
     ret <- ret %>% dplyr::rename(Model=!!rlang::sym(target_col)) # Rename target column to Model to make comparison with Actual.
   }
 
