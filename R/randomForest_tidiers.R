@@ -2670,7 +2670,7 @@ partial_dependence.rpart = function(fit, target, vars = colnames(data),
 
   attr(pd, "class") = c("pd", "data.frame")
   attr(pd, "interaction") = interaction == TRUE
-  attr(pd, "target") = if (fit$classification_type == "regression") target else levels(fit$predictions)
+  attr(pd, "target") = if (fit$classification_type %in% c("regression", "binary")) target else attr(fit,"ylevels")
   attr(pd, "vars") = vars
   pd
 }

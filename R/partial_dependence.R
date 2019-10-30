@@ -1,14 +1,14 @@
 calc_partial_binning_data <- function(df, target_col, var_cols) {
-  ret <- data.frame()
   if (is.factor(df[[target_col]]) && all(levels(df[[target_col]]) %in% c("TRUE","FALSE"))) {
     # If it is a factor with levels of only TRUE or FALSE, here we assume it is a value converted from logical.
     df <- df %>% dplyr::mutate(!!rlang::sym(target_col) := !!rlang::sym(target_col) == "TRUE") # Convert it to logical so that we can count TRUE as 1 and FALSE as 0.
   }
   else if (!is.numeric(df[[target_col]]) && !is.logical(df[[target_col]])) {
     # Other non-numeric, non-logical values are other types of classifications. For them we do not show data from binning.
-    return(ret)
+    return(NULL)
   }
 
+  ret <- data.frame()
   for (var_col in var_cols) {
     if (is.factor(df[[var_col]])) { # In case of factor, just plot means of training data for each category.
       actual_ret <- df %>% dplyr::group_by(!!rlang::sym(var_col)) %>% dplyr::summarise(Actual=mean(!!rlang::sym(target_col), na.rm=TRUE))
