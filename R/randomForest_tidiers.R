@@ -1246,7 +1246,7 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
 
               if(pretty.name){
                 map = list(
-                           `Root Mean Square Error` = as.symbol("root_mean_square_error"),
+                           `RMSE` = as.symbol("root_mean_square_error"),
                            `R Squared` = as.symbol("r_squared"),
                            `Number of Rows` = as.symbol("n")
                            )
@@ -2515,7 +2515,7 @@ glance.ranger.regression <- function(x, pretty.name, ...) {
 
   if(pretty.name){
     map = list(
-      `Root Mean Square Error` = as.symbol("root_mean_square_error"),
+      `RMSE` = as.symbol("root_mean_square_error"),
       `R Squared` = as.symbol("r_squared"),
       `Number of Rows` = as.symbol("n")
     )
@@ -2616,7 +2616,7 @@ glance.rpart <- function(x, pretty.name = FALSE, ...) {
 
   if(pretty.name){
     map = list(
-      `Root Mean Square Error` = as.symbol("root_mean_square_error"),
+      `RMSE` = as.symbol("root_mean_square_error"),
       `R Squared` = as.symbol("r_squared"),
       `Number of Rows` = as.symbol("n")
     )

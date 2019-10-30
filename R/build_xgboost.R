@@ -527,7 +527,7 @@ glance.xgb.Booster <- function(x, pretty.name = FALSE, ...) {
   ret <- x$evaluation_log %>% as.data.frame()
   if(pretty.name){
     colnames(ret)[colnames(ret) == "iter"] <- "Number of Iteration"
-    colnames(ret)[colnames(ret) == "train_rmse"] <- "Root Mean Square Error"
+    colnames(ret)[colnames(ret) == "train_rmse"] <- "RMSE"
     colnames(ret)[colnames(ret) == "train_mae"] <- "Mean Absolute Error"
     colnames(ret)[colnames(ret) == "train_logloss"] <- "Negative Log Likelihood"
     # this can be train_error@{threshold}
@@ -548,7 +548,7 @@ glance.xgb.Booster <- function(x, pretty.name = FALSE, ...) {
     colnames(ret)[colnames(ret) == "train_gamma_nloglik"] <- "Gamma Negative Log Likelihood"
     colnames(ret)[colnames(ret) == "train_gamma_deviance"] <- "Gamma Deviance"
 
-    colnames(ret)[colnames(ret) == "validation_rmse"] <- "Validation Root Mean Square Error"
+    colnames(ret)[colnames(ret) == "validation_rmse"] <- "Validation RMSE"
     colnames(ret)[colnames(ret) == "validation_mae"] <- "Validation Mean Absolute Error"
     colnames(ret)[colnames(ret) == "validation_logloss"] <- "Validation Negative Log Likelihood"
     # this can be validation_error@{threshold}
