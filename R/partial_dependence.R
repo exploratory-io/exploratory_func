@@ -1,5 +1,14 @@
 calc_partial_binning_data <- function(df, target_col, var_cols) {
   ret <- data.frame()
+  if (is.factor(df[[target_col]]) && all(levels(df[[target_col]]) %in% c("TRUE","FALSE"))) {
+    # If it is a factor with levels of only TRUE or FALSE, here we assume it is a value converted from logical.
+    df <- df %>% dplyr::mutate(!!rlang::sym(target_col) := !!rlang::sym(target_col) == "TRUE") # Convert it to logical so that we can count TRUE as 1 and FALSE as 0.
+  }
+  else if (!is.numeric(df[[target_col]]) && !is.logical(df[[target_col]])) {
+    # Other non-numeric, non-logical values are other types of classifications. For them we do not show data from binning.
+    return(ret)
+  }
+
   for (var_col in var_cols) {
     if (is.factor(df[[var_col]])) { # In case of factor, just plot means of training data for each category.
       actual_ret <- df %>% dplyr::group_by(!!rlang::sym(var_col)) %>% dplyr::summarise(Actual=mean(!!rlang::sym(target_col), na.rm=TRUE))
@@ -53,10 +62,18 @@ handle_partial_dependence <- function(x) {
     ret <- ret %>% dplyr::bind_rows(actual_ret)
     ret <- ret %>% dplyr::rename(Model=!!rlang::sym(target_col)) # Rename target column to Model to make comparison with Actual.
   }
-  else if (!is.null(x$partial_binning)) {
+  else if (!is.null(x$partial_binning)) { # For ranger/rpart, we calculate binning data at model building. Maybe we should do the same for glm/lm.
     actual_ret <- x$partial_binning
     ret <- ret %>% dplyr::bind_rows(actual_ret)
-    ret <- ret %>% dplyr::rename(Model=!!rlang::sym(target_col)) # Rename target column to Model to make comparison with Actual.
+    if (!is.null(ret[[target_col]])) {
+      ret <- ret %>% dplyr::rename(Model=!!rlang::sym(target_col)) # Rename target column to Model to make comparison with Actual.
+    }
+    else if (!is.null(ret$`TRUE`)) { # Column with name that matches target_col is not there, but TRUE column is there. This must be a binary classification case.
+      ret <- ret %>% dplyr::rename(Model=`TRUE`) # Rename target column to Model to make comparison with Actual.
+      if (!is.null(ret$`FALSE`)) {
+        ret <- ret %>% dplyr::select(-`FALSE`) # Drop FALSE column, which we will not use.
+      }
+    }
   }
 
   ret <- ret %>% tidyr::gather_("x_name", "x_value", var_cols, na.rm = TRUE, convert = FALSE)
@@ -76,7 +93,7 @@ handle_partial_dependence <- function(x) {
   # use it here either way.
   # glm (binomial family) is exception here, since we only show probability of being TRUE,
   # and instead show mean of binned actual data.
-  if ("glm" %in% class(x)) {
+  if ("glm" %in% class(x) || (!is.null(x$orig_levels) && all(x$orig_levels %in% c("TRUE","FALSE")))) {
     ret <- ret %>%  dplyr::mutate(y_name = factor(y_name, levels=c("Actual", "Model")))
   }
   else if (!is.null(x$orig_levels)) {
