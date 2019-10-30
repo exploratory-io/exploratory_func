@@ -1976,6 +1976,7 @@ calc_feature_imp <- function(df,
                              # 12 when Boruta is off.
                              pd_sample_size = 20,
                              pd_grid_resolution = 20,
+                             pd_with_bin_means = FALSE, # Default is FALSE for backward compatibility on the server
                              with_boruta = FALSE,
                              boruta_max_runs = 20, # Maximal number of importance source runs.
                              boruta_p_value = 0.05, # Boruta recommends using the default 0.01 for P-value, but we are using 0.05 for consistency with other functions of ours.
@@ -2181,7 +2182,9 @@ calc_feature_imp <- function(df,
       # Second element of n argument needs to be less than or equal to sample size, to avoid error.
       if (length(imp_vars) > 0) {
         rf$partial_dependence <- edarf::partial_dependence(rf, vars=imp_vars, data=model_df, n=c(pd_grid_resolution, min(rf$num.samples, pd_sample_size)))
-        rf$partial_binning <- calc_partial_binning_data(model_df, clean_target_col, imp_vars)
+        if (pd_with_bin_means) {
+          rf$partial_binning <- calc_partial_binning_data(model_df, clean_target_col, imp_vars)
+        }
       }
       else {
         rf$partial_dependence <- NULL
@@ -2690,6 +2693,7 @@ exp_rpart <- function(df,
                       max_pd_vars = 12,
                       pd_sample_size = 20,
                       pd_grid_resolution = 20,
+                      pd_with_bin_means = FALSE, # Default is FALSE for backward compatibility on the server
                       seed = 1,
                       minsplit = 20, # The minimum number of observations that must exist in a node in order for a split to be attempted. Passed down to rpart()
                       minbucket = round(minsplit/3), # The minimum number of observations in any terminal node. Passed down to rpart()
@@ -2790,7 +2794,9 @@ exp_rpart <- function(df,
         imp_vars <- names(model$variable.importance) # model$variable.importance is already sorted by importance.
         imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # Keep only max_pd_vars most important variables
         model$partial_dependence <- partial_dependence.rpart(model, clean_target_col, vars=imp_vars, data=df, n=c(pd_grid_resolution, min(nrow(df), pd_sample_size)))
-        model$partial_binning <- calc_partial_binning_data(df, clean_target_col, imp_vars)
+        if (pd_with_bin_means) {
+          model$partial_binning <- calc_partial_binning_data(df, clean_target_col, imp_vars)
+        }
       }
       else {
         model$partial_dependence <- NULL
