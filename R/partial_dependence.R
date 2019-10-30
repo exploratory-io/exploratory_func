@@ -1,3 +1,6 @@
+# Calculates "Actual" data to plot with partial dependence from model.
+# 1. Bin data into 20 bins alongside with the variable (x) to take partial dependende.
+# 2. Calculate mean of x and y for each bin. We will plot it with partial dependence to show how the model's prediction compares with raw data.
 calc_partial_binning_data <- function(df, target_col, var_cols) {
   if (is.factor(df[[target_col]]) && all(levels(df[[target_col]]) %in% c("TRUE","FALSE"))) {
     # If it is a factor with levels of only TRUE or FALSE, here we assume it is a value converted from logical.
