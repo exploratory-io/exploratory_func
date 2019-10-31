@@ -1031,7 +1031,7 @@ model_stats <- function(df, pretty.name = FALSE, ...){
   if(pretty.name){
     colnames(ret)[colnames(ret) == "r.squared"] <- "R Squared"
     colnames(ret)[colnames(ret) == "adj.r.squared"] <- "Adj R Squared"
-    colnames(ret)[colnames(ret) == "sigma"] <- "Root Mean Square Error"
+    colnames(ret)[colnames(ret) == "sigma"] <- "RMSE"
     colnames(ret)[colnames(ret) == "statistic"] <- "F Ratio"
     colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
     colnames(ret)[colnames(ret) == "df"] <- "Degree of Freedom"
@@ -1058,7 +1058,7 @@ model_stats <- function(df, pretty.name = FALSE, ...){
 
 
     colnames(ret)[colnames(ret) =="number_of_iteration"] <- "Number of Iteration"
-    colnames(ret)[colnames(ret) =="root_mean_square_error"] <- "Root Mean Square Error"
+    colnames(ret)[colnames(ret) =="root_mean_square_error"] <- "RMSE"
     colnames(ret)[colnames(ret) =="mean_absolute_error"] <- "Mean Absolute Error"
     colnames(ret)[colnames(ret) =="negative_log_likelihood"] <- "Negative Log Likelihood"
     colnames(ret)[colnames(ret) =="binary_misclassification_rate"] <- "Binary Misclassification Rate"

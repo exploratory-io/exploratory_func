@@ -369,7 +369,7 @@ test_that("calc imp negative test", { #TODO: What was this case for?
   res_partial_dependence <- model_df %>% rf_partial_dependence() %>% rename(`X-Axis`=x_value, `ARR DELAY`=y_value)
   expect_equal(colnames(res_partial_dependence), c("x_name", "X-Axis", "y_name", "ARR DELAY", "chart_type"))
   res_evaluation <- model_df %>% rf_evaluation(pretty.name = TRUE)
-  expect_equal(colnames(res_evaluation), c("Root Mean Square Error", "R Squared", "Number of Rows"))
+  expect_equal(colnames(res_evaluation), c("RMSE", "R Squared", "Number of Rows"))
   res_tidy <- model_df %>% tidy(model, type = "scatter") %>% rename(Actual=expected_value, Predicted=predicted_value) %>% mutate(`Perfect Fit`=Predicted)
   expect_equal(colnames(res_tidy), c("Actual", "Predicted", "Perfect Fit"))
 })
