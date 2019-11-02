@@ -1215,7 +1215,7 @@ tidy.shapiro_exploratory <- function(x, type = "model", signif_level=0.05) {
     ret <- x$model_summary
     ret <- ret %>% dplyr::mutate(normal = p.value > !!signif_level)
     ret <- ret %>% dplyr::select(-method)
-    ret <- ret %>% dplyr::rename(`Column`=col, `Statistic`=statistic, `P Value`=p.value, `Normal Distribution`=normal, `Sample Size`=sample_size)
+    ret <- ret %>% dplyr::rename(`Column`=col, `W Statistic`=statistic, `P Value`=p.value, `Normal Distribution`=normal, `Sample Size`=sample_size)
     ret
   }
 }
