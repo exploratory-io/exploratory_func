@@ -924,7 +924,7 @@ model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
     colnames(ret)[colnames(ret) == "statistic"] <- "t Ratio"
     colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
     colnames(ret)[colnames(ret) == "std.error"] <- "Std Error"
-    colnames(ret)[colnames(ret) == "estimate"] <- "Estimate"
+    colnames(ret)[colnames(ret) == "estimate"] <- "Coefficient"
     colnames(ret)[colnames(ret) == "conf.low"] <- "Conf Low"
     colnames(ret)[colnames(ret) == "conf.high"] <- "Conf High"
     colnames(ret)[colnames(ret) == "hazard_ratio"] <- "Hazard Ratio"
