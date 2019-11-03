@@ -1602,6 +1602,7 @@ exp_balance <- function(df,
       }
     }
 
+    # Remember integer column so that we can bring it back to integer later.
     integer_cols <- c()
     for(col in colnames(df)){
       if(col == target_col) { # skip target_col
