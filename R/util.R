@@ -2024,3 +2024,7 @@ revert_factor_cols_to_logical <- function(df) {
   }, as.logical)
 }
 
+is_integer <- function(x) {
+  # isTRUE is necessary since all.equal does not return FALSE for FALSE case. See ?all.equal.
+  is.integer(x) || (is.numeric(x) && isTRUE(all.equal(x, as.integer(x))))
+}
