@@ -1602,6 +1602,15 @@ exp_balance <- function(df,
       }
     }
 
+    integer_cols <- c()
+    for(col in colnames(df)){
+      if(col == target_col) { # skip target_col
+      }
+      else if(is_integer(df[[col]])) {
+        integer_cols <- c(integer_cols, col)
+      }
+    }
+
     # record orig_df at this point so that the data type reverting works fine later when we have to return this instead of smoted df.
     orig_df <- df
 
@@ -1668,6 +1677,15 @@ exp_balance <- function(df,
     for(col in factorized_cols) { # set factorized columns back to character. TODO: take care of other types.
       df_balanced[[col]] <- as.character(df_balanced[[col]])
     }
+
+    # Round to make original integer columns back to integer.
+    # Not doing so has some drawback especially in tree-based models.
+    # https://github.com/scikit-learn-contrib/imbalanced-learn/issues/154
+    # TODO: Consider SMOTE-NC.
+    for(col in integer_cols) {
+      df_balanced[[col]] <- round(df_balanced[[col]])
+    }
+
     df_balanced
   }
 
