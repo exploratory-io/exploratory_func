@@ -19,7 +19,7 @@ getGoogleAnayticsSegmentList <- function(){
 }
 
 #' @export
-getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tokenFileId = NULL, paginate_query=FALSE, segments = NULL, ...){
+getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tokenFileId = NULL, paginate_query=FALSE, segments = NULL, start_date = NULL, end_date = NULL, ...){
   if(!requireNamespace("RGoogleAnalytics")){stop("package RGoogleAnalytics must be installed.")}
   loadNamespace("lubridate")
   # if segment is not null and empty string, pass it as NULL
@@ -31,9 +31,12 @@ getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tok
   }
   token <- getGoogleTokenForAnalytics(tokenFileId)
 
-  start_date <- as.character(lubridate::today() - lubridate::days(lastNDays))
-  #end_date <- as.character(lubridate::today() - lubridate::days(1))
-  end_date <- as.character(lubridate::today())
+  if(is.null(start_date)) {
+    start_date <- as.character(lubridate::today() - lubridate::days(lastNDays))
+  }
+  if(is.null(end_date)) {
+    end_date <- as.character(lubridate::today())
+  }
 
   query.list <- RGoogleAnalytics::Init(start.date = start_date,
                                        end.date = end_date,
