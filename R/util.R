@@ -2043,5 +2043,5 @@ sample_frac <- function(tbl, size = 1, replace = FALSE, weight = NULL,.env = NUL
   if(!is.null(seed)) {
     set.seed(seed)
   }
-  dplyr::sample_frc(tbl = tbl, size = size, replace = replace, weight = weight,.env = .env, ...)
+  dplyr::sample_frac(tbl = tbl, size = size, replace = replace, weight = weight,.env = .env, ...)
 }
