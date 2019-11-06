@@ -2032,7 +2032,7 @@ is_integer <- function(x) {
 
 # Wrapper function for sample_n
 sample_n <- function(tbl, size, replace = FALSE, weight = NULL, .env= NULL, seed = NULL, ...) {
-  if(!is.na(seed)) {
+  if(!is.null(seed)) {
     set.seed(seed)
   }
   dplyr::sample_n(tbl = tbl, size = size, replace = replace, weight = weight, .env= .env, ...);
@@ -2040,7 +2040,7 @@ sample_n <- function(tbl, size, replace = FALSE, weight = NULL, .env= NULL, seed
 
 # Wrapper function for sample_frac
 sample_frac <- function(tbl, size = 1, replace = FALSE, weight = NULL,.env = NULL, seed = NULL, ...){
-  if(!is.na(seed)) {
+  if(!is.null(seed)) {
     set.seed(seed)
   }
   dplyr::sample_frc(tbl = tbl, size = size, replace = replace, weight = weight,.env = .env, ...)
