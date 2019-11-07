@@ -19,7 +19,9 @@ getGoogleAnayticsSegmentList <- function(){
 }
 
 #' @export
-getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tokenFileId = NULL, paginate_query=FALSE, segments = NULL, start_date = NULL, end_date = NULL, ...){
+getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tokenFileId = NULL,
+                               paginate_query=FALSE, segments = NULL, dateRangeType = "lastNDays",
+                               lastN = NULL, startDate = NULL, endDate = NULL, ...){
   if(!requireNamespace("RGoogleAnalytics")){stop("package RGoogleAnalytics must be installed.")}
   loadNamespace("lubridate")
   # if segment is not null and empty string, pass it as NULL
@@ -31,15 +33,28 @@ getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tok
   }
   token <- getGoogleTokenForAnalytics(tokenFileId)
 
-  if(is.null(start_date)) {
-    start_date <- as.character(lubridate::today() - lubridate::days(lastNDays))
-  }
-  if(is.null(end_date)) {
-    end_date <- as.character(lubridate::today())
+  if(dateRangeType == "lastNDays") {
+    if(is.null(lastN)) {
+      lastN <- lastNDays
+    }
+    startDate <- as.character(lubridate::today() - (lastN - 1));
+  } else if (dateRangeType == "lastNWeeks") {
+    startDate <- as.character(lubridate::today() - lubridate::weeks(lastN));
+  } else if (dateRangeType == "lastNMonths") {
+    startDate <- as.character(lubridate::today() - months(lastN));
+  } else if (dateRangeType == "lastNYears") {
+    startDate <- as.character(lubridate::today() - lubridate::years(lastN));
   }
 
-  query.list <- RGoogleAnalytics::Init(start.date = start_date,
-                                       end.date = end_date,
+  if(is.null(startDate)) {
+    startDate <- as.character(lubridate::today() - lubridate::days(lastNDays))
+  }
+  if(is.null(endDate)) {
+    endDate <- as.character(lubridate::today())
+  }
+
+  query.list <- RGoogleAnalytics::Init(start.date = startDate,
+                                       end.date = endDate,
                                        dimensions = dimensions,
                                        metrics = metrics,
                                        segments = segments,
