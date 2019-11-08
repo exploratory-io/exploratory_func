@@ -19,6 +19,17 @@ getGoogleAnayticsSegmentList <- function(){
 }
 
 #' @export
+#' @param tableId - GA's table id (a.k.a viewID).
+#' @param lastNDays - Deprecated. Use dateRangeType and lastN arguments instead.
+#' @param dimensions - GA's dimensions
+#' @param metrics - GA's metrics.
+#' @param tokenFileId - Optional. for GA data source created with old Exploratory Desktop.
+#' @param pagenamte_query - for pagination
+#' @param segments - GA's segments
+#' @param dateRangeType - Either "lastNDays", "lastNWeeks", "lastNMonths", "lastNYears", or "since"
+#' @param lastN - Corresponding numeric value for the lastNxx duration.
+#' @param startDate - When dateRangeType is "since", specify start date
+#' @param endDate - When dateRangeType is "since", you can provide end date. "today" will be used if it's not provided.
 getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tokenFileId = NULL,
                                paginate_query=FALSE, segments = NULL, dateRangeType = "lastNDays",
                                lastN = NULL, startDate = NULL, endDate = NULL, ...){
