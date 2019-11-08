@@ -24,7 +24,7 @@ getGoogleAnayticsSegmentList <- function(){
 #' @param dimensions - GA's dimensions
 #' @param metrics - GA's metrics.
 #' @param tokenFileId - Optional. for GA data source created with old Exploratory Desktop.
-#' @param pagenamte_query - for pagination
+#' @param paginamte_query - for pagination
 #' @param segments - GA's segments
 #' @param dateRangeType - Either "lastNDays", "lastNWeeks", "lastNMonths", "lastNYears", or "since"
 #' @param lastN - Corresponding numeric value for the lastNxx duration.
@@ -46,7 +46,7 @@ getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tok
 
   if(dateRangeType == "lastNDays") {
     if(is.null(lastN)) {
-      # For backward compatibility for Exploratory Desktop older than verssion 5.4.1
+      # For backward compatibility for Exploratory Desktop older than version 5.4.1
       # Previously it only supported last N Days.
       # so set lastN with lastNDays value.
       lastN <- lastNDays
