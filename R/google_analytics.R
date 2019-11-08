@@ -46,7 +46,10 @@ getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tok
 
   if(dateRangeType == "lastNDays") {
     if(is.null(lastN)) {
-      lastN <- lastNDays # For backward compatibility
+      # For backward compatibility for Exploratory Desktop older than verssion 5.4.1
+      # Previously it only supported last N Days.
+      # so set lastN with lastNDays value.
+      lastN <- lastNDays
     }
     startDate <- as.character(lubridate::today() - (lastN - 1));
   } else if (dateRangeType == "lastNWeeks") {
