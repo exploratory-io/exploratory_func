@@ -903,6 +903,6 @@ test_that("is_integer", {
 })
 
 test_that("get_week_of_month", {
-  some_dates<- seq(ymd(20191001), ymd(20191031), by='day')
+  some_dates<- seq(lubridate::ymd(20191001), lubridate::ymd(20191031), by='day')
   expect_equal(get_week_of_month(some_dates),  c(1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5))
 })
