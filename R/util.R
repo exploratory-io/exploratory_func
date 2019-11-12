@@ -1425,6 +1425,9 @@ extract_from_date <- function(x, type = "fltoyear") {
     week = {
       ret <- lubridate::week(x)
     },
+    week_of_month = {
+      ret <- exploratory::get_week_of_month(x)
+    },
     day = {
       ret <- lubridate::day(x)
     },
@@ -1977,6 +1980,7 @@ summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...){
             "monthnamelong",
             "monnamelong",
             "week",
+            "week_of_month",
             "dayofyear",
             "dayofquarter",
             "dayofweek",
