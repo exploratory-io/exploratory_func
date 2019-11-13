@@ -165,26 +165,30 @@ getGithubIssues <- function(username, password, owner, repository, ...){
 }
 
 
-getMongoURL <- function(host = NULL, port, database, username, pass, isSSL=FALSE, authSource=NULL, cluster = NULL, timeout = NULL, additionalParams = NULL, ...) {
+getMongoURL <- function(host = NULL, port, database, username, pass, isSSL=FALSE, authSource=NULL, cluster = NULL, timeout = NULL, additionalParams = NULL, subType = "", ...) {
   loadNamespace("stringr")
   loadNamespace("urltools")
 
+  protocol = "mongodb://"
+  if(subType == "dns") { #Support DNS Seedlist connection
+    protocol = "mongodb+srv://"
+  }
   if (stringr::str_length(username) > 0) {
     if(!is.null(pass) && pass != ''){
       # mongodb connection URL uses @ as a separator so need to encode password for those special characters.
       pass = urltools::url_encode(pass)
     }
     if(!is.null(host) && host != ''){
-      url = stringr::str_c("mongodb://", username, ":", pass, "@", host, ":", as.character(port), "/", database)
+      url = stringr::str_c(protocol, username, ":", pass, "@", host, ":", as.character(port), "/", database)
     } else if (!is.null(cluster) && cluster != ''){
-      url = stringr::str_c("mongodb://", username, ":", pass, "@", cluster, "/", database)
+      url = stringr::str_c(protocol, username, ":", pass, "@", cluster, "/", database)
     }
   }
   else {
     if(!is.null(host) & host != ''){
-      url = stringr::str_c("mongodb://", host, ":", as.character(port), "/", database)
+      url = stringr::str_c(protocol, host, ":", as.character(port), "/", database)
     } else if (!is.null(cluster) && cluster != ''){
-      url = stringr::str_c("mongodb://", cluster, "/", database)
+      url = stringr::str_c(protocol, cluster, "/", database)
     }
   }
   if(isSSL){
@@ -344,13 +348,13 @@ bigquery_glue_transformer <- function(code, envir) {
 #' @export
 queryMongoDB <- function(host = NULL, port = "", database, collection, username, password, query = "{}", flatten,
                          limit=100, isSSL=FALSE, authSource=NULL, fields="{}", sort="{}",
-                         skip=0, queryType = "find", pipeline="{}", cluster = NULL, timeout = NULL, additionalParamas = NULL, ...){
+                         skip=0, queryType = "find", pipeline="{}", cluster = NULL, timeout = NULL, additionalParamas = NULL, subType = NULL, ...){
   if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
   loadNamespace("jsonlite")
 
   # read stored password
   # get connection from connection pool
-  con <- getDBConnection("mongodb", host, port, database, username, password, collection = collection, isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParamas, timeout = timeout)
+  con <- getDBConnection("mongodb", host, port, database, username, password, collection = collection, isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParamas, timeout = timeout, subType = subType)
   if(fields == ""){
     fields = "{}"
   }
@@ -398,11 +402,11 @@ queryMongoDB <- function(host = NULL, port = "", database, collection, username,
 #' Returns a data frame that has names of the collections in its "name" column.
 #' @export
 getMongoCollectionNames <- function(host = "", port = "", database = "", username = "",
-                                    password ="", isSSL=FALSE, authSource=NULL, cluster = NULL, timeout = "", additionalParams = "", ...){
+                                    password ="", isSSL=FALSE, authSource=NULL, cluster = NULL, timeout = "", additionalParams = "", subType = "", ...){
   collection = "test" # dummy collection name. mongo command seems to work even if the collection does not exist.
   loadNamespace("jsonlite")
   if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
-  con <- getDBConnection("mongodb", host, port, database, username, password, collection = collection, isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParams, timeout = timeout)
+  con <- getDBConnection("mongodb", host, port, database, username, password, collection = collection, isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParams, timeout = timeout, subType = subType)
   # command to list collections.
   # con$command is our addition in our mongolite fork.
   result <- con$run(command = '{"listCollections":1}')
@@ -422,10 +426,10 @@ getMongoCollectionNames <- function(host = "", port = "", database = "", usernam
 getMongoCollectionNumberOfRows <- function(host = NULL, port = "", database = "",
                                            username = "", password = "", collection = "",
                                            isSSL=FALSE, authSource=NULL, cluster = NULL, additionalParams = "",
-                                           timeout = NULL, ...){
+                                           timeout = NULL, subType = subType, ...){
   loadNamespace("jsonlite")
   if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
-  con <- getDBConnection("mongodb", host, port, database, username, password, collection = collection, isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParams, timeout = timeout)
+  con <- getDBConnection("mongodb", host, port, database, username, password, collection = collection, isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParams, timeout = timeout, subType = subType)
   tryCatch({
     result <- con$count()
   }, error = function(err) {
@@ -490,7 +494,7 @@ clearAmazonAthenaConnection <- function(driver = "", region = "", authentication
 #' If not, new connection is created and returned.
 #' @export
 getDBConnection <- function(type, host = NULL, port = "", databaseName = "", username = "", password = "", catalog = "", schema = "", dsn="", additionalParams = "",
-                            collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, timeout = NULL) {
+                            collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, timeout = NULL, subType = "") {
 
   drv = NULL
   conn = NULL
@@ -517,7 +521,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       }
     }
     if (is.null(conn)) {
-      url = getMongoURL(host = host, port = port, database = databaseName, username = username, pass = password, isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParams, timeout = timeout)
+      url = getMongoURL(host = host, port = port, database = databaseName, username = username, pass = password, isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParams, timeout = timeout, subType = subType)
       conn <- mongolite::mongo(collection, url = url)
       connection_pool[[key]] <- conn
     }
