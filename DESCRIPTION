@@ -1,8 +1,8 @@
 Package: exploratory
 Type: Package
 Title: R package for Exploratory
-Version: 5.4.0.8
-Date: 2019-10-21
+Version: 5.4.0.19
+Date: 2019-11-03
 Authors@R: c(person("Yosuke", "Yasuda", email = "double.y.919.quick@gmail.com", role = c("aut", "cre")))
 URL: https://github.com/exploratory-io/exploratory_func
 Description: Functions for Exploratory
@@ -13,7 +13,9 @@ Imports:
     broom, 
     prediction, 
     urltools,
+    psych,
     dplyr,
+    tidyr,
     tibble,
     jsonlite,
     countrycode,

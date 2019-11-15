@@ -1425,6 +1425,9 @@ extract_from_date <- function(x, type = "fltoyear") {
     week = {
       ret <- lubridate::week(x)
     },
+    week_of_month = {
+      ret <- exploratory::get_week_of_month(x)
+    },
     day = {
       ret <- lubridate::day(x)
     },
@@ -1977,6 +1980,7 @@ summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...){
             "monthnamelong",
             "monnamelong",
             "week",
+            "week_of_month",
             "dayofyear",
             "dayofquarter",
             "dayofweek",
@@ -2024,3 +2028,29 @@ revert_factor_cols_to_logical <- function(df) {
   }, as.logical)
 }
 
+# Checks if a vector has only integer values.
+is_integer <- function(x) {
+  # isTRUE is necessary since all.equal does not return FALSE for FALSE case. See ?all.equal.
+  is.integer(x) || (is.numeric(x) && isTRUE(all.equal(x, as.integer(x))))
+}
+
+# Wrapper function for sample_n
+sample_n <- function(..., seed = NULL) {
+  if(!is.null(seed)) {
+    set.seed(seed)
+  }
+  dplyr::sample_n(...);
+}
+
+# Wrapper function for sample_frac
+sample_frac <- function(..., seed = NULL){
+  if(!is.null(seed)) {
+    set.seed(seed)
+  }
+  dplyr::sample_frac(...)
+}
+
+# Get the week number of month https://stackoverflow.com/a/58370031
+get_week_of_month <- function(date) {
+  (5 + lubridate::day(date) + lubridate::wday(lubridate::floor_date(date, "month"))) %/% 7;
+}

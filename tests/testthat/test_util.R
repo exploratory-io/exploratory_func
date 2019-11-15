@@ -897,3 +897,12 @@ test_that("revert_factor_cols_to_logical", {
   expect_equal(res$col2, c(TRUE, FALSE, NA))
 })
 
+test_that("is_integer", {
+  expect_true(is_integer(c(0,1,2,3,4,5)))
+  expect_false(is_integer(c(0,1.5,2,3,4,5)))
+})
+
+test_that("get_week_of_month", {
+  some_dates<- seq(lubridate::ymd(20191001), lubridate::ymd(20191031), by='day')
+  expect_equal(get_week_of_month(some_dates),  c(1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5))
+})

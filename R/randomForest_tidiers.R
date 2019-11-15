@@ -1246,7 +1246,7 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
 
               if(pretty.name){
                 map = list(
-                           `Root Mean Square Error` = as.symbol("root_mean_square_error"),
+                           `RMSE` = as.symbol("root_mean_square_error"),
                            `R Squared` = as.symbol("r_squared"),
                            `Number of Rows` = as.symbol("n")
                            )
@@ -1602,6 +1602,16 @@ exp_balance <- function(df,
       }
     }
 
+    # Remember integer column so that we can bring it back to integer later.
+    integer_cols <- c()
+    for(col in colnames(df)){
+      if(col == target_col) { # skip target_col
+      }
+      else if(is_integer(df[[col]])) {
+        integer_cols <- c(integer_cols, col)
+      }
+    }
+
     # record orig_df at this point so that the data type reverting works fine later when we have to return this instead of smoted df.
     orig_df <- df
 
@@ -1668,6 +1678,15 @@ exp_balance <- function(df,
     for(col in factorized_cols) { # set factorized columns back to character. TODO: take care of other types.
       df_balanced[[col]] <- as.character(df_balanced[[col]])
     }
+
+    # Round to make original integer columns back to integer.
+    # Not doing so has some drawback especially in tree-based models.
+    # https://github.com/scikit-learn-contrib/imbalanced-learn/issues/154
+    # TODO: Consider SMOTE-NC.
+    for(col in integer_cols) {
+      df_balanced[[col]] <- round(df_balanced[[col]])
+    }
+
     df_balanced
   }
 
@@ -1976,6 +1995,7 @@ calc_feature_imp <- function(df,
                              # 12 when Boruta is off.
                              pd_sample_size = 20,
                              pd_grid_resolution = 20,
+                             pd_with_bin_means = FALSE, # Default is FALSE for backward compatibility on the server
                              with_boruta = FALSE,
                              boruta_max_runs = 20, # Maximal number of importance source runs.
                              boruta_p_value = 0.05, # Boruta recommends using the default 0.01 for P-value, but we are using 0.05 for consistency with other functions of ours.
@@ -2181,6 +2201,9 @@ calc_feature_imp <- function(df,
       # Second element of n argument needs to be less than or equal to sample size, to avoid error.
       if (length(imp_vars) > 0) {
         rf$partial_dependence <- edarf::partial_dependence(rf, vars=imp_vars, data=model_df, n=c(pd_grid_resolution, min(rf$num.samples, pd_sample_size)))
+        if (pd_with_bin_means) {
+          rf$partial_binning <- calc_partial_binning_data(model_df, clean_target_col, imp_vars)
+        }
       }
       else {
         rf$partial_dependence <- NULL
@@ -2514,7 +2537,7 @@ glance.ranger.regression <- function(x, pretty.name, ...) {
 
   if(pretty.name){
     map = list(
-      `Root Mean Square Error` = as.symbol("root_mean_square_error"),
+      `RMSE` = as.symbol("root_mean_square_error"),
       `R Squared` = as.symbol("r_squared"),
       `Number of Rows` = as.symbol("n")
     )
@@ -2615,7 +2638,7 @@ glance.rpart <- function(x, pretty.name = FALSE, ...) {
 
   if(pretty.name){
     map = list(
-      `Root Mean Square Error` = as.symbol("root_mean_square_error"),
+      `RMSE` = as.symbol("root_mean_square_error"),
       `R Squared` = as.symbol("r_squared"),
       `Number of Rows` = as.symbol("n")
     )
@@ -2669,7 +2692,7 @@ partial_dependence.rpart = function(fit, target, vars = colnames(data),
 
   attr(pd, "class") = c("pd", "data.frame")
   attr(pd, "interaction") = interaction == TRUE
-  attr(pd, "target") = if (fit$classification_type == "regression") target else levels(fit$predictions)
+  attr(pd, "target") = if (fit$classification_type %in% c("regression", "binary")) target else attr(fit,"ylevels")
   attr(pd, "vars") = vars
   pd
 }
@@ -2689,6 +2712,7 @@ exp_rpart <- function(df,
                       max_pd_vars = 12,
                       pd_sample_size = 20,
                       pd_grid_resolution = 20,
+                      pd_with_bin_means = FALSE, # Default is FALSE for backward compatibility on the server
                       seed = 1,
                       minsplit = 20, # The minimum number of observations that must exist in a node in order for a split to be attempted. Passed down to rpart()
                       minbucket = round(minsplit/3), # The minimum number of observations in any terminal node. Passed down to rpart()
@@ -2789,6 +2813,9 @@ exp_rpart <- function(df,
         imp_vars <- names(model$variable.importance) # model$variable.importance is already sorted by importance.
         imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # Keep only max_pd_vars most important variables
         model$partial_dependence <- partial_dependence.rpart(model, clean_target_col, vars=imp_vars, data=df, n=c(pd_grid_resolution, min(nrow(df), pd_sample_size)))
+        if (pd_with_bin_means) {
+          model$partial_binning <- calc_partial_binning_data(df, clean_target_col, imp_vars)
+        }
       }
       else {
         model$partial_dependence <- NULL

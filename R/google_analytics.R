@@ -1,15 +1,38 @@
 #' API to get profile for current oauth token
 #' @export
 getGoogleProfile <- function(tokenFileId = ""){
-  if(!requireNamespace("RGoogleAnalytics")){stop("package RGoogleAnalytics must be installed.")}
-  try({
-    token <- getGoogleTokenForAnalytics(tokenFileId);
-    RGoogleAnalytics::GetProfiles(token);
-  })
+  if(!requireNamespace("googleAnalyticsR")){stop("package googleAnalyticsR must be installed.")}
+  if(!requireNamespace("googleAuthR")){stop("package googleAuthR must be installed.")}
+
+  token <- getGoogleTokenForAnalytics(tokenFileId);
+  googleAuthR::gar_auth(token = token, skip_fetch = TRUE)
+  googleAnalyticsR::ga_account_list()
+}
+
+getGoogleAnayticsSegmentList <- function(){
+  if(!requireNamespace("googleAnalyticsR")){stop("package googleAnalyticsR must be installed.")}
+  if(!requireNamespace("googleAuthR")){stop("package googleAuthR must be installed.")}
+
+  token <- getGoogleTokenForAnalytics(tokenFileId);
+  googleAuthR::gar_auth(token = token, skip_fetch = TRUE)
+  googleAnalyticsR::ga_segment_list()
 }
 
 #' @export
-getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tokenFileId = NULL, paginate_query=FALSE, segments = NULL, ...){
+#' @param tableId - GA's table id (a.k.a viewID).
+#' @param lastNDays - Deprecated. Use dateRangeType and lastN arguments instead.
+#' @param dimensions - GA's dimensions
+#' @param metrics - GA's metrics.
+#' @param tokenFileId - Optional. for GA data source created with old Exploratory Desktop.
+#' @param paginate_query - for pagination
+#' @param segments - GA's segments
+#' @param dateRangeType - Either "lastNDays", "lastNWeeks", "lastNMonths", "lastNYears", or "since"
+#' @param lastN - Corresponding numeric value for the lastNxx duration.
+#' @param startDate - When dateRangeType is "since", specify start date
+#' @param endDate - When dateRangeType is "since", you can provide end date. "today" will be used if it's not provided.
+getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tokenFileId = NULL,
+                               paginate_query=FALSE, segments = NULL, dateRangeType = "lastNDays",
+                               lastN = NULL, startDate = NULL, endDate = NULL, ...){
   if(!requireNamespace("RGoogleAnalytics")){stop("package RGoogleAnalytics must be installed.")}
   loadNamespace("lubridate")
   # if segment is not null and empty string, pass it as NULL
@@ -20,11 +43,32 @@ getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tok
     segments = NULL
   }
   token <- getGoogleTokenForAnalytics(tokenFileId)
-  start_date <- as.character(lubridate::today() - lubridate::days(lastNDays))
-  #end_date <- as.character(lubridate::today() - lubridate::days(1))
-  end_date <- as.character(lubridate::today())
-  query.list <- RGoogleAnalytics::Init(start.date = start_date,
-                                       end.date = end_date,
+
+  if(dateRangeType == "lastNDays") {
+    if(is.null(lastN)) {
+      # For backward compatibility for Exploratory Desktop older than version 5.4.1
+      # Previously it only supported last N Days.
+      # so set lastN with lastNDays value.
+      lastN <- lastNDays
+    }
+    startDate <- as.character(lubridate::today() - (lastN - 1));
+  } else if (dateRangeType == "lastNWeeks") {
+    startDate <- as.character(lubridate::today() - lubridate::weeks(lastN));
+  } else if (dateRangeType == "lastNMonths") {
+    startDate <- as.character(lubridate::today() - months(lastN)); # use base months function since lubridate does not have it.
+  } else if (dateRangeType == "lastNYears") {
+    startDate <- as.character(lubridate::today() - lubridate::years(lastN));
+  }
+
+  if(is.null(startDate)) {
+    startDate <- as.character(lubridate::today() - lubridate::days(lastNDays))
+  }
+  if(is.null(endDate)) {
+    endDate <- as.character(lubridate::today())
+  }
+
+  query.list <- RGoogleAnalytics::Init(start.date = startDate,
+                                       end.date = endDate,
                                        dimensions = dimensions,
                                        metrics = metrics,
                                        segments = segments,

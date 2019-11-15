@@ -1,3 +1,35 @@
+# Calculates "Actual" data to plot with partial dependence from model.
+# 1. Bin data into 20 bins alongside with the variable (x) to take partial dependende.
+# 2. Calculate mean of x and y for each bin. We will plot it with partial dependence to show how the model's prediction compares with raw data.
+calc_partial_binning_data <- function(df, target_col, var_cols) {
+  if (is.factor(df[[target_col]]) && all(levels(df[[target_col]]) %in% c("TRUE","FALSE"))) {
+    # If it is a factor with levels of only TRUE or FALSE, here we assume it is a value converted from logical.
+    df <- df %>% dplyr::mutate(!!rlang::sym(target_col) := !!rlang::sym(target_col) == "TRUE") # Convert it to logical so that we can count TRUE as 1 and FALSE as 0.
+  }
+  else if (!is.numeric(df[[target_col]]) && !is.logical(df[[target_col]])) {
+    # Other non-numeric, non-logical values are other types of classifications. For them we do not show data from binning.
+    return(NULL)
+  }
+
+  ret <- data.frame()
+  for (var_col in var_cols) {
+    if (is.factor(df[[var_col]])) { # In case of factor, just plot means of training data for each category.
+      actual_ret <- df %>% dplyr::group_by(!!rlang::sym(var_col)) %>% dplyr::summarise(Actual=mean(!!rlang::sym(target_col), na.rm=TRUE))
+      ret <- ret %>% dplyr::bind_rows(actual_ret)
+    }
+    else if (is.numeric(df[[var_col]])) { # Because of proprocessing we do, all columns should be either factor or numeric by now.
+      # Equal width cut: We found this gives more understandable plot compared to equal frequency cut.
+      actual_ret <- df %>% dplyr::mutate(.temp.bin.column=cut(!!rlang::sym(var_col), breaks=20)) %>% dplyr::group_by(.temp.bin.column)
+      # Equal frequency cut version:
+      # actual_ret <- df %>% dplyr::mutate(.temp.bin.column=ggplot2::cut_number(!!rlang::sym(var_col), 20)) %>% dplyr::group_by(.temp.bin.column)
+      actual_ret <- actual_ret %>% dplyr::summarize(Actual=mean(!!rlang::sym(target_col), na.rm=TRUE),!!rlang::sym(var_col):=mean(!!rlang::sym(var_col), na.rm=TRUE))
+      actual_ret <- actual_ret %>% dplyr::select(-.temp.bin.column)
+      ret <- ret %>% dplyr::bind_rows(actual_ret)
+    }
+  }
+  ret
+}
+
 # Common utility function called for tidy with type "partial_dependence".
 # Used for ranger, rpart, lm, and glm.
 handle_partial_dependence <- function(x) {
@@ -29,22 +61,22 @@ handle_partial_dependence <- function(x) {
     else { # For lm case
       df <- x$model
     }
-    for (var_col in var_cols) {
-      if (is.factor(ret[[var_col]])) { # In case of factor, just plot means of training data for each category.
-        actual_ret <- df %>% dplyr::group_by(!!rlang::sym(var_col)) %>% dplyr::summarise(Actual=mean(!!rlang::sym(target_col), na.rm=TRUE))
-        ret <- ret %>% dplyr::bind_rows(actual_ret)
-      }
-      else if (is.numeric(ret[[var_col]])) { # Because of proprocessing we do, all columns should be either factor or numeric by now.
-        # Equal width cut: We found this gives more understandable plot compared to equal frequency cut.
-        actual_ret <- df %>% dplyr::mutate(.temp.bin.column=cut(!!rlang::sym(var_col), breaks=20)) %>% dplyr::group_by(.temp.bin.column)
-        # Equal frequency cut version:
-        # actual_ret <- df %>% dplyr::mutate(.temp.bin.column=ggplot2::cut_number(!!rlang::sym(var_col), 20)) %>% dplyr::group_by(.temp.bin.column)
-        actual_ret <- actual_ret %>% dplyr::summarize(Actual=mean(!!rlang::sym(target_col), na.rm=TRUE),!!rlang::sym(var_col):=mean(!!rlang::sym(var_col), na.rm=TRUE))
-        actual_ret <- actual_ret %>% dplyr::select(-.temp.bin.column)
-        ret <- ret %>% dplyr::bind_rows(actual_ret)
+    actual_ret <- calc_partial_binning_data(df, target_col, var_cols)
+    ret <- ret %>% dplyr::bind_rows(actual_ret)
+    ret <- ret %>% dplyr::rename(Model=!!rlang::sym(target_col)) # Rename target column to Model to make comparison with Actual.
+  }
+  else if (!is.null(x$partial_binning)) { # For ranger/rpart, we calculate binning data at model building. Maybe we should do the same for glm/lm.
+    actual_ret <- x$partial_binning
+    ret <- ret %>% dplyr::bind_rows(actual_ret)
+    if (!is.null(ret[[target_col]])) {
+      ret <- ret %>% dplyr::rename(Model=!!rlang::sym(target_col)) # Rename target column to Model to make comparison with Actual.
+    }
+    else if (!is.null(ret$`TRUE`)) { # Column with name that matches target_col is not there, but TRUE column is there. This must be a binary classification case.
+      ret <- ret %>% dplyr::rename(Model=`TRUE`) # Rename target column to Model to make comparison with Actual.
+      if (!is.null(ret$`FALSE`)) {
+        ret <- ret %>% dplyr::select(-`FALSE`) # Drop FALSE column, which we will not use.
       }
     }
-    ret <- ret %>% dplyr::rename(Model=!!rlang::sym(target_col)) # Rename target column to Model to make comparison with Actual.
   }
 
   ret <- ret %>% tidyr::gather_("x_name", "x_value", var_cols, na.rm = TRUE, convert = FALSE)
@@ -64,7 +96,7 @@ handle_partial_dependence <- function(x) {
   # use it here either way.
   # glm (binomial family) is exception here, since we only show probability of being TRUE,
   # and instead show mean of binned actual data.
-  if ("glm" %in% class(x)) {
+  if ("glm" %in% class(x) || !is.null(x$partial_binning)) { # Or part is for ranger/rpart. They might not have partial_binning, because of being multiclass or published on server from older release.
     ret <- ret %>%  dplyr::mutate(y_name = factor(y_name, levels=c("Actual", "Model")))
   }
   else if (!is.null(x$orig_levels)) {

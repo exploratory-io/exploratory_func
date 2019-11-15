@@ -306,7 +306,7 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add tes
     colnames(ret)[colnames(ret) == "statistic"] <- "t Ratio"
     colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
     colnames(ret)[colnames(ret) == "std.error"] <- "Std Error"
-    colnames(ret)[colnames(ret) == "estimate"] <- "Estimate"
+    colnames(ret)[colnames(ret) == "estimate"] <- "Coefficient"
     colnames(ret)[colnames(ret) == "conf.low"] <- "Conf Low"
     colnames(ret)[colnames(ret) == "conf.high"] <- "Conf High"
     colnames(ret)[colnames(ret) == "hazard_ratio"] <- "Hazard Ratio"
@@ -338,7 +338,7 @@ glance.coxph_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add t
   if(pretty.name) {
     colnames(ret)[colnames(ret) == "r.squared"] <- "R Squared"
     colnames(ret)[colnames(ret) == "adj.r.squared"] <- "Adj R Squared"
-    colnames(ret)[colnames(ret) == "sigma"] <- "Root Mean Square Error"
+    colnames(ret)[colnames(ret) == "sigma"] <- "RMSE"
     colnames(ret)[colnames(ret) == "statistic"] <- "F Ratio"
     colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
     colnames(ret)[colnames(ret) == "df"] <- "Degree of Freedom"

@@ -191,6 +191,18 @@ test_that("test exp_balance with ordered factor with NA as a predictors", {
   expect_equal(levels(res$x), c("A", "B", "(Missing)"))
 })
 
+# TODO: This case is not getting synthesized data. Test with a case that generates some synthesized data.
+test_that("test exp_balance with integer numbers as a predictors", {
+  sample_data <- data.frame(
+    y = factor(c("a", "a", "b", "b", "b", "b", "b", "b", "b", "b")),
+    x = as.numeric(c(1:5, 1:5)),
+    num = runif(10)
+  )
+  res <- exp_balance(sample_data, y, target_size=12)
+  expect_true("data.frame" %in% class(res))
+  expect_true(is_integer(res$x))
+})
+
 test_that("test exp_balance with logical", {
   sample_data <- data.frame(
     y = c(TRUE, rep(FALSE,5)),
