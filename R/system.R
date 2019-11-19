@@ -1803,7 +1803,7 @@ read_delim_file <- function(file, delim, quote = '"',
                             na = c("", "NA"), quoted_na = TRUE,
                             comment = "", trim_ws = FALSE,
                             skip = 0, n_max = Inf, guess_max = min(1000, n_max),
-                            progress = interactive(), with_access_token = FALSE){
+                            progress = interactive(), with_api_key = FALSE){
   loadNamespace("readr")
   loadNamespace("stringr")
   if (stringr::str_detect(file, "^https://") ||
@@ -1814,9 +1814,9 @@ read_delim_file <- function(file, delim, quote = '"',
       if(!is.null(token)) {
         # append access_token to the URL
         if(stringr::str_detect(file, "\\?") || stringr::str_detect(file, "\\&")) {
-          file <- stringr::str_c(file, "&access_token=", token)
+          file <- stringr::str_c(file, "&api_key=", token)
         } else {
-          file <- stringr::str_c(file, "?access_token=", token)
+          file <- stringr::str_c(file, "?api_key=", token)
         }
       }
     }
