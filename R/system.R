@@ -1802,20 +1802,21 @@ read_delim_file <- function(file, delim, quote = '"',
                             locale = readr::default_locale(),
                             na = c("", "NA"), quoted_na = TRUE,
                             comment = "", trim_ws = FALSE,
-                            skip = 0, n_max = Inf, guess_max = min(1000, n_max), token_key = NULL,
-                            progress = interactive()){
+                            skip = 0, n_max = Inf, guess_max = min(1000, n_max),
+                            progress = interactive(), with_access_token = FALSE){
   loadNamespace("readr")
   loadNamespace("stringr")
   if (stringr::str_detect(file, "^https://") ||
       stringr::str_detect(file, "^http://") ||
       stringr::str_detect(file, "^ftp://")) {
-    if(!is.null(token_key)) {
-      token <- exploratory::getTokenInfo(token_key)
+    if(with_access_token){
+      token <- exploratory::getTokenInfo("exploratory-data-catalog")
       if(!is.null(token)) {
+        # append access_token to the URL
         if(stringr::str_detect(file, "\\?") || stringr::str_detect(file, "\\&")) {
-          file <- stringr::str_c(file, "&", token_key, "=", token)
+          file <- stringr::str_c(file, "&access_token=", token)
         } else {
-          file <- stringr::str_c(file, "?", token_key, "=", token)
+          file <- stringr::str_c(file, "?access_token=", token)
         }
       }
     }
