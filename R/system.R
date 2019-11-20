@@ -1809,7 +1809,7 @@ read_delim_file <- function(file, delim, quote = '"',
   if (stringr::str_detect(file, "^https://") ||
       stringr::str_detect(file, "^http://") ||
       stringr::str_detect(file, "^ftp://")) {
-    if(with_access_token){
+    if(with_api_key){
       token <- exploratory::getTokenInfo("exploratory-data-catalog")
       if(!is.null(token)) {
         # append access_token to the URL
