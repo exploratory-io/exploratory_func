@@ -2047,6 +2047,27 @@ sample_frac <- function(..., seed = NULL){
 }
 
 # Get the week number of month https://stackoverflow.com/a/58370031
+# @deprecated
 get_week_of_month <- function(date) {
   (5 + lubridate::day(date) + lubridate::wday(lubridate::floor_date(date, "month"))) %/% 7;
+}
+
+#' Wrapper function for lubridate::week
+#' @export
+#' @param date - Date value
+#' @param unit - Either "year", "querter" or "month". Default is "year".
+week <- function(date, unit="year") {
+  if (unit=="month") {
+    # Get the week number of month https://stackoverflow.com/a/58370031
+    (5 + lubridate::day(date) + lubridate::wday(lubridate::floor_date(date, "month"))) %/% 7
+  } else if (unit=="quarter") {
+    # Get the 1st day of the quarter that the given date belongs. 
+    qstart <- (floor_date(date, unit = "year") + months(3*(quarter(date)-1)))
+    # Calculate the week of the quarter from the week of the year of 
+    # the given date and the 1st day of the quarter.
+    week(date) - week(qstart) + 1
+  } else {
+    # Default: year
+    lubridate::week(date)
+  }
 }
