@@ -2062,14 +2062,9 @@ get_week_of_month <- function(date) {
 #' @param unit - Either "year", "querter" or "month". Default is "year".
 week <- function(date, unit="year") {
   if (unit=="month") {
-    # Get the week number of month https://stackoverflow.com/a/58370031
-    (5 + lubridate::day(date) + lubridate::wday(lubridate::floor_date(date, "month"))) %/% 7
+    ceiling(lubridate::day(date) / 7)
   } else if (unit=="quarter") {
-    # Get the 1st day of the quarter that the given date belongs. 
-    qstart <- (lubridate::floor_date(date, unit = "year") + months(3*(lubridate::quarter(date)-1)))
-    # Calculate the week of the quarter from the week of the year of 
-    # the given date and the 1st day of the quarter.
-    lubridate::week(date) - lubridate::week(qstart) + 1
+    ceiling(lubridate::qday(date) / 7)
   } else {
     # Default: year
     lubridate::week(date)
