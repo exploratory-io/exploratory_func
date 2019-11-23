@@ -1802,12 +1802,24 @@ read_delim_file <- function(file, delim, quote = '"',
                             locale = readr::default_locale(),
                             na = c("", "NA"), quoted_na = TRUE,
                             comment = "", trim_ws = FALSE,
-                            skip = 0, n_max = Inf, guess_max = min(1000, n_max), progress = interactive()){
+                            skip = 0, n_max = Inf, guess_max = min(1000, n_max),
+                            progress = interactive(), with_api_key = FALSE){
   loadNamespace("readr")
   loadNamespace("stringr")
   if (stringr::str_detect(file, "^https://") ||
       stringr::str_detect(file, "^http://") ||
       stringr::str_detect(file, "^ftp://")) {
+    if(with_api_key){
+      token <- exploratory::getTokenInfo("exploratory-data-catalog")
+      if(!is.null(token)) {
+        # append access_token to the URL
+        if(stringr::str_detect(file, "\\?") || stringr::str_detect(file, "\\&")) {
+          file <- stringr::str_c(file, "&api_key=", token)
+        } else {
+          file <- stringr::str_c(file, "?api_key=", token)
+        }
+      }
+    }
     tmp <- download_data_file(file, "csv")
     readr::read_delim(tmp, delim, quote = quote, escape_backslash = escape_backslash, escape_double = escape_double, col_names = col_names, col_types = col_types,
                       locale = locale, na = na, quoted_na = quoted_na, comment = comment, trim_ws = trim_ws, skip = skip, n_max = n_max, guess_max = guess_max, progress = progress)
