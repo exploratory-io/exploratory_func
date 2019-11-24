@@ -902,7 +902,9 @@ test_that("is_integer", {
   expect_false(is_integer(c(0,1.5,2,3,4,5)))
 })
 
-test_that("get_week_of_month", {
-  some_dates<- seq(lubridate::ymd(20191001), lubridate::ymd(20191031), by='day')
-  expect_equal(get_week_of_month(some_dates),  c(1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5))
+test_that("week", {
+  dates <- lubridate::ymd(c(20190101,20190107,20190108,20190131,20190201,20190207,20190208,20190701,20190707,20190708,20190731,20191201,20191207,20191208,20191231)) 
+  expect_equal(exploratory::week(dates), c(1,1,2,5,5,6,6,26,27,27,31,48,49,49,53))
+  expect_equal(exploratory::week(dates, unit="quarter"), c(1,1,2,5,5,6,6,1,1,2,5,9,10,10,14))
+  expect_equal(exploratory::week(dates, unit="month"), c(1,1,2,5,1,1,2,1,1,2,5,1,1,2,5))
 })

@@ -2051,6 +2051,22 @@ sample_frac <- function(..., seed = NULL){
 }
 
 # Get the week number of month https://stackoverflow.com/a/58370031
+# @deprecated Leave it for a while for Desktop 5.4.0.12 support.
 get_week_of_month <- function(date) {
   (5 + lubridate::day(date) + lubridate::wday(lubridate::floor_date(date, "month"))) %/% 7;
+}
+
+#' Wrapper function for lubridate::week
+#' @export
+#' @param date - Date value
+#' @param unit - Either "year", "querter" or "month". Default is "year".
+week <- function(date, unit="year") {
+  if (unit=="month") {
+    ceiling(lubridate::day(date) / 7)
+  } else if (unit=="quarter") {
+    ceiling(lubridate::qday(date) / 7)
+  } else {
+    # Default: year
+    lubridate::week(date)
+  }
 }
