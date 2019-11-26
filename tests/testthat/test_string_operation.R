@@ -306,6 +306,11 @@ test_that("parse_number", {
   ret <- exploratory::parse_number(c("1", "2.1"))
   expect_equal(ret, c(1, 2.1))
   expect_true(is.vector(ret))
+  # Parse factor
+  factor_data <- as.factor(c(1,2,3,4,5))
+  ret <- exploratory::parse_number(factor_data)
+  expect_equal(ret, c(1, 2, 3, 4, 5))
+  expect_true(is.vector(ret))
   # Pass through input that is already numeric.
   ret <- exploratory::parse_number(c(1, 2.1))
   expect_equal(ret, c(1, 2.1))
@@ -315,6 +320,14 @@ test_that("parse_number", {
 test_that("parse_logical", {
   ret <- exploratory::parse_logical(c(TRUE, FALSE))
   expect_equal(ret, c(TRUE, FALSE))
+  # Parse character
+  factor_data <- as.factor(c("TRUE", "FALSE"))
+  ret <- exploratory::parse_logical(factor_data)
+  expect_equal(ret, c(TRUE, FALSE))
+  # Parse factor
+  factor_data <- as.factor(c(0,1))
+  ret <- exploratory::parse_logical(factor_data)
+  expect_equal(ret, c(FALSE, TRUE))
 })
 
 test_that("str_extract_inside", {
