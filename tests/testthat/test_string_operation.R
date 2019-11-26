@@ -320,6 +320,14 @@ test_that("parse_number", {
 test_that("parse_logical", {
   ret <- exploratory::parse_logical(c(TRUE, FALSE))
   expect_equal(ret, c(TRUE, FALSE))
+  # Parse character
+  factor_data <- as.factor(c("TRUE", "FALSE"))
+  ret <- exploratory::parse_logical(factor_data)
+  expect_equal(ret, c(TRUE, FALSE))
+  # Parse factor
+  factor_data <- as.factor(c(0,1))
+  ret <- exploratory::parse_logical(factor_data)
+  expect_equal(ret, c(FALSE, TRUE))
 })
 
 test_that("str_extract_inside", {

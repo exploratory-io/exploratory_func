@@ -408,8 +408,8 @@ parse_number <- function(text, ...){
   # if numeric, return as is for backward compatibility.
   if(is.numeric(text)) {
     text
-  } else if (is.factor(text)) {
-    # factor data raises Error in parse_vector(x, col_number(), na = na, locale = locale, trim_ws = trim_ws) : is.character(x) is not TRUE
+  } else if (!is.character(text)) {
+    # non character data raises Error in parse_vector(x, col_number(), na = na, locale = locale, trim_ws = trim_ws) : is.character(x) is not TRUE
     # so explicitly convert it to character before call readr::parse_number
     as.numeric(readr::parse_number(as.character(text), ...))
   } else {
@@ -428,6 +428,10 @@ parse_logical <- function(text, ...){
   # So if logical, return as is for backward compatibility.
   if(is.logical(text)) {
     text
+  } else if (!is.character(text)){
+    # non character data raises Error in parse_vector(x, col_number(), na = na, locale = locale, trim_ws = trim_ws) : is.character(x) is not TRUE
+    # so explicitly convert it to character before call readr::parse_number
+    readr::parse_logical(as.character(text), ...)
   } else {
     readr::parse_logical(text, ...)
   }
