@@ -430,7 +430,7 @@ parse_logical <- function(text, ...){
     text
   } else if (!is.character(text)){
     # non character data raises Error in parse_vector(x, col_number(), na = na, locale = locale, trim_ws = trim_ws) : is.character(x) is not TRUE
-    # so explicitly convert it to character before call readr::parse_number
+    # so explicitly convert it to character before calling readr::parse_number
     readr::parse_logical(as.character(text), ...)
   } else {
     readr::parse_logical(text, ...)
@@ -486,4 +486,3 @@ str_logical <- function(column, true_value = NULL) {
               ifelse(target %in%  c("false", "no", "0"), FALSE, NA))
    }
 }
-
