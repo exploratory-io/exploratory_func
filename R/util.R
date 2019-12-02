@@ -896,15 +896,6 @@ pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = N
     dplyr::ungroup() %>%
     unnest_with_drop(!!rlang::sym(tmp_col))
 
-  if(length(rows) == 1){
-    # Set same data type with original data
-    # because it's always converted to character.
-    # When there are more than 2 rows,
-    # they are concatenated,
-    # so the data type can't be converted
-    ret[[rows]] <- same_type(ret[[rows]], original = df[[rows]])
-  }
-
   # replace NA values in new columns with fill value
   if(!is.na(fill)) {
     # exclude grouping columns and row label column
