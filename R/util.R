@@ -875,11 +875,10 @@ pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = N
         # remove NA, unless fun.aggregate function is one of the above NA related ones.
         df <- df[!is.na(df[[value_col]]),]
       }
-      reshape2::acast(df, formula = formula, value.var = value_col, fun.aggregate = fun.aggregate, fill = fill)
+      # reshape2::acast(df, formula = formula, value.var = value_col, fun.aggregate = fun.aggregate, fill = fill)
+      df %>% group_by(!!!syms(vars)) %>% summarize(value=fun.aggregate(!!sym(value_col))) %>% pivot_wider(names_from = all.vars(lazyeval::f_rhs(formula)), values_from=value)
     }
-    casted %>%
-      as.data.frame %>%
-      tibble::rownames_to_column(var = cname)
+    casted
   }
 
   grouped_col <- grouped_by(df)
