@@ -1186,7 +1186,7 @@ getDataFromGoogleBigQueryTableViaCloudStorage <- function(bucketProjectId, dataS
 #' @param maxPage - maximum number of pages to retrieve.
 #' @param writeDeposition - controls how your BigQuery write operation applies to an existing table.
 #' @param tokenFileId - file id for auth token
-#' @param bucketProjectId - Id of the Project where Google Cloud Storage Bucket belongs
+#' @param bqProjectId - Id of the Project where Google Cloud Storage Bucket belongs
 #' @param csBucket - Google Cloud Storage Bucket
 #' @param bucketFolder - Folder under Google Cloud Storage Bucket where temp files are extracted.
 #' @export
