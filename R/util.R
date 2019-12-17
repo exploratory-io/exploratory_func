@@ -805,7 +805,6 @@ append_colnames <- function(df, prefix = "", suffix = ""){
 confint_error <- function(x, level=0.95) {
   n <- sum(!is.na(x))
   s <- sd(x, na.rm = TRUE)
-  m <- mean(x, na.rm = TRUE)
   error <- qt((level+1)/2, df=n-1)*s/sqrt(n)
   error
 }
