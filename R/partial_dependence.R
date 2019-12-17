@@ -101,7 +101,7 @@ handle_partial_dependence <- function(x) {
   # glm (binomial family) is exception here, since we only show probability of being TRUE,
   # and instead show mean of binned actual data.
   if ("glm" %in% class(x) || !is.null(x$partial_binning)) { # Or part is for ranger/rpart. They might not have partial_binning, because of being multiclass or published on server from older release.
-    ret <- ret %>%  dplyr::mutate(y_name = factor(y_name, levels=c("Actual", "Model")))
+    ret <- ret %>%  dplyr::mutate(y_name = factor(y_name, levels=c("Actual", "Model", "conf_low", "conf_high")))
   }
   else if (!is.null(x$orig_levels)) {
     ret <- ret %>%  dplyr::mutate(y_name = factor(y_name, levels=x$orig_levels))
