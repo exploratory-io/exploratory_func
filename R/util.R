@@ -1040,7 +1040,11 @@ get_data_type <- function(data){
   }
 }
 
-# add confidence interval
+# Add confidence interval from .fitted column and .se.fit column.
+# This is about t-test for slope of a regression line, but here we estimate
+# confidence interval assuming normal distribution, so that we can calculate it
+# without having to know sample size.
+# https://en.wikipedia.org/wiki/Student%27s_t-test#Slope_of_a_regression_line
 add_confint <- function(data, conf_int){
   # add confidence interval if conf_int is not null and there are .fitted and .se.fit
   if (!is.null(conf_int) & ".se.fit" %in% colnames(data) & ".fitted" %in% colnames(data)) {
