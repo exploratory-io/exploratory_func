@@ -864,7 +864,6 @@ pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = N
   pivot_each <- function(df) {
     casted <- if(is.null(value_col)) {
       # make a count matrix if value_col is NULL
-      # reshape2::acast(df, formula = formula, fun.aggregate = length, fill = fill)
       df %>% dplyr::group_by(!!!rlang::syms(vars)) %>% dplyr::summarize(value=dplyr::n()) %>% tidyr::pivot_wider(names_from = !!cols, values_from=value, values_fill=list(value=!!fill))
     } else {
       if(na.rm &&
@@ -877,7 +876,6 @@ pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = N
         # remove NA, unless fun.aggregate function is one of the above NA related ones.
         df <- df[!is.na(df[[value_col]]),]
       }
-      # reshape2::acast(df, formula = formula, value.var = value_col, fun.aggregate = fun.aggregate, fill = fill)
       df %>% dplyr::group_by(!!!rlang::syms(vars)) %>% dplyr::summarize(value=fun.aggregate(!!rlang::sym(value_col))) %>% tidyr::pivot_wider(names_from = !!cols, values_from=value, values_fill=list(value=!!fill))
     }
     casted
