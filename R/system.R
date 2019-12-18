@@ -1126,7 +1126,7 @@ downloadDataFromGoogleCloudStorage <- function(bucket, folder, download_dir, tok
   # then delete the extracted files from Google Cloud Storage.
   lapply(objects$name, function(name){
     if(stringr::str_detect(name,stringr::str_c(folder, "/"))){
-      googleCloudStorageR::gcs_get_object(name, overwrite = TRUE, saveToDisk = str_c(download_dir, "/", stringr::str_replace(name, stringr::str_c(folder, "/"),"")))
+      googleCloudStorageR::gcs_get_object(name, overwrite = TRUE, saveToDisk = stringr::str_c(download_dir, "/", stringr::str_replace(name, stringr::str_c(folder, "/"),"")))
       googleCloudStorageR::gcs_delete_object(name, bucket = bucket)
     }
   });
@@ -1186,11 +1186,11 @@ getDataFromGoogleBigQueryTableViaCloudStorage <- function(bucketProjectId, dataS
 #' @param maxPage - maximum number of pages to retrieve.
 #' @param writeDeposition - controls how your BigQuery write operation applies to an existing table.
 #' @param tokenFileId - file id for auth token
-#' @param bucketProjectId - Id of the Project where Google Cloud Storage Bucket belongs
-#' @param bucket - Google Cloud Storage Bucket
-#' @param folder - Folder under Google Cloud Storage Bucket where temp files are extracted.
+#' @param bqProjectId - Id of the Project where Google Cloud Storage Bucket belongs
+#' @param csBucket - Google Cloud Storage Bucket
+#' @param bucketFolder - Folder under Google Cloud Storage Bucket where temp files are extracted.
 #' @export
-executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 100000, maxPage = 10, writeDisposition = "WRITE_TRUNCATE", tokenFileId, bucketProjectId, bucket=NULL, folder=NULL, max_connections = 8, useStandardSQL = FALSE, ...){
+executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 100000, maxPage = 10, writeDisposition = "WRITE_TRUNCATE", tokenFileId, bqProjectId, csBucket=NULL, bucketFolder=NULL, max_connections = 8, useStandardSQL = FALSE, ...){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
 
@@ -1198,21 +1198,21 @@ executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 1
 
   df <- NULL
   # if bucket is set, use Google Cloud Storage for extract and download
-  if(!is.null(bucket) && !is.na(bucket) && bucket != "" && !is.null(folder) && !is.na(folder) && folder != ""){
+  if(!is.null(csBucket) && !is.na(csBucket) && csBucket != "" && !is.null(bucketFolder) && !is.na(bucketFolder) && bucketFolder != ""){
     # destination_table looks like 'exploratory-bigquery-project:exploratory_dataset.exploratory_bq_preview_table'
-    dataSetTable = stringr::str_split(stringr::str_replace(destinationTable, stringr::str_c(bucketProjectId,":"),""),"\\.")
+    dataSetTable = stringr::str_split(stringr::str_replace(destinationTable, stringr::str_c(bqProjectId,":"),""),"\\.")
     dataSet = dataSetTable[[1]][1]
     table = dataSetTable[[1]][2]
     bqtable <- NULL
     # submit a query to get a result (for refresh data frame case)
     # convertUserInputToUtf8 API call for query is taken care of by exploratory::submitGoogleBigQueryJob
     # so just pass query as is.
-    result <- exploratory::submitGoogleBigQueryJob(project = bucketProjectId, sqlquery = query, tokenFieldId =  tokenFileId, useStandardSQL = useStandardSQL);
+    result <- exploratory::submitGoogleBigQueryJob(project = bqProjectId, sqlquery = query, tokenFieldId =  tokenFileId, useStandardSQL = useStandardSQL);
     # extranct result from Google BigQuery to Google Cloud Storage and import
-    df <- getDataFromGoogleBigQueryTableViaCloudStorage(bucketProjectId, dataSet, table, bucket, folder, tokenFileId)
+    df <- getDataFromGoogleBigQueryTableViaCloudStorage(bqProjectId, dataSet, table, csBucket, bucketFolder, tokenFileId)
   } else {
     # direct import case (for refresh data frame case)
-    bigrquery::set_access_cred(token)
+    bigrquery::bq_auth(token = token)
     # check if the query contains special key word for standardSQL
     # If we do not pass the useLegaySql argument, bigrquery set TRUE for it, so we need to expliclity set it to make standard SQL work.
     isStandardSQL <- stringr::str_detect(query, "#standardSQL")
