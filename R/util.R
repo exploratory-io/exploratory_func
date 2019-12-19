@@ -830,6 +830,7 @@ pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = N
   # column names in lhs are collapsed by "_"
   rows <- all.vars(lazyeval::f_lhs(formula))
   cname <- paste0(rows, collapse = "_")
+  cols <- all.vars(lazyeval::f_rhs(formula))
 
   vars <- all.vars(formula)
 
@@ -863,7 +864,7 @@ pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = N
   pivot_each <- function(df) {
     casted <- if(is.null(value_col)) {
       # make a count matrix if value_col is NULL
-      reshape2::acast(df, formula = formula, fun.aggregate = length, fill = fill)
+      df %>% dplyr::group_by(!!!rlang::syms(vars)) %>% dplyr::summarize(value=dplyr::n()) %>% tidyr::pivot_wider(names_from = !!cols, values_from=value, values_fill=list(value=!!fill))
     } else {
       if(na.rm &&
          !identical(na_ratio, fun.aggregate) &&
@@ -875,11 +876,9 @@ pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = N
         # remove NA, unless fun.aggregate function is one of the above NA related ones.
         df <- df[!is.na(df[[value_col]]),]
       }
-      reshape2::acast(df, formula = formula, value.var = value_col, fun.aggregate = fun.aggregate, fill = fill)
+      df %>% dplyr::group_by(!!!rlang::syms(vars)) %>% dplyr::summarize(value=fun.aggregate(!!rlang::sym(value_col))) %>% tidyr::pivot_wider(names_from = !!cols, values_from=value, values_fill=list(value=!!fill))
     }
-    casted %>%
-      as.data.frame %>%
-      tibble::rownames_to_column(var = cname)
+    casted
   }
 
   grouped_col <- grouped_by(df)
@@ -895,15 +894,6 @@ pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = N
     dplyr::do_(.dots=setNames(list(~pivot_each(.)), tmp_col)) %>%
     dplyr::ungroup() %>%
     unnest_with_drop(!!rlang::sym(tmp_col))
-
-  if(length(rows) == 1){
-    # Set same data type with original data
-    # because it's always converted to character.
-    # When there are more than 2 rows,
-    # they are concatenated,
-    # so the data type can't be converted
-    ret[[rows]] <- same_type(ret[[rows]], original = df[[rows]])
-  }
 
   # replace NA values in new columns with fill value
   if(!is.na(fill)) {
