@@ -89,7 +89,12 @@ handle_partial_dependence <- function(x) {
   ret <- ret %>% dplyr::mutate(x_value = as.character(x_value))
   # convert must be FALSE for y to make sure y_name is always character. otherwise bind_rows internally done
   # in tidy() to bind outputs from different groups errors out because y_value can be, for example, mixture of logical and character.
-  ret <- ret %>% tidyr::gather("y_name", "y_value", -x_name, -x_value, na.rm = TRUE, convert = FALSE)
+  if ("conf_high" %in% colnames(ret)) { # if the data is with confidence interval.
+    ret <- ret %>% tidyr::gather("y_name", "y_value", -x_name, -x_value, -conf_high, -conf_low, na.rm = TRUE, convert = FALSE)
+  }
+  else {
+    ret <- ret %>% tidyr::gather("y_name", "y_value", -x_name, -x_value, na.rm = TRUE, convert = FALSE)
+  }
   ret <- ret %>% dplyr::mutate(x_name = forcats::fct_relevel(x_name, x$imp_vars)) # set factor level order so that charts appear in order of importance.
   # set order to ret and turn it back to character, so that the order is kept when groups are bound.
   # if it were kept as factor, when groups are bound, only the factor order from the first group would be respected.
