@@ -162,13 +162,15 @@ tidy.survfit_exploratory <- function(x, ...) {
     ret <- complete_times_each(ret)
   }
 
-  colnames(ret)[colnames(ret) == "n.risk"] <- "n_risk"
-  colnames(ret)[colnames(ret) == "n.event"] <- "n_event"
-  colnames(ret)[colnames(ret) == "n.censor"] <- "n_censor"
-  colnames(ret)[colnames(ret) == "std.error"] <- "std_error"
-  colnames(ret)[colnames(ret) == "conf.low"] <- "conf_low"
-  colnames(ret)[colnames(ret) == "conf.high"] <- "conf_high"
-  colnames(ret)[colnames(ret) == "strata"] <- "cohort"
+  colnames(ret)[colnames(ret) == "time"] <- "Time"
+  colnames(ret)[colnames(ret) == "estimate"] <- "Estimate"
+  colnames(ret)[colnames(ret) == "n.risk"] <- "Observations"
+  colnames(ret)[colnames(ret) == "n.event"] <- "Events"
+  colnames(ret)[colnames(ret) == "n.censor"] <- "Censored"
+  colnames(ret)[colnames(ret) == "std.error"] <- "Std Error"
+  colnames(ret)[colnames(ret) == "conf.low"] <- "Conf Low"
+  colnames(ret)[colnames(ret) == "conf.high"] <- "Conf High"
+  colnames(ret)[colnames(ret) == "strata"] <- "Cohort"
   ret
 }
 
