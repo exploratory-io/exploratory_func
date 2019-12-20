@@ -163,7 +163,7 @@ tidy.survfit_exploratory <- function(x, ...) {
   }
 
   colnames(ret)[colnames(ret) == "time"] <- "Time"
-  colnames(ret)[colnames(ret) == "estimate"] <- "Estimate"
+  colnames(ret)[colnames(ret) == "estimate"] <- "Survival Rate"
   colnames(ret)[colnames(ret) == "n.risk"] <- "Observations"
   colnames(ret)[colnames(ret) == "n.event"] <- "Events"
   colnames(ret)[colnames(ret) == "n.censor"] <- "Censored"
