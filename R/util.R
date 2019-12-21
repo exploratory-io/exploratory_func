@@ -843,14 +843,14 @@ pivot_ <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fu
     new_col_cols <- col_cols
   }
 
-  vars <- c(row_cols, col_cols)
-  funcs <- c(row_funs, col_funs)
+  all_cols <- c(row_cols, col_cols)
+  all_funs <- c(row_funs, col_funs)
   new_cols <- c(new_row_cols, new_col_cols)
-  group_cols_arg <- vars
+  group_cols_arg <- all_cols
   names(group_cols_arg) <- new_cols
 
   # remove rows with NA categories. TODO: Why do we need this? Can it be an old reshape2::acast requirement?
-  for(var in vars) {
+  for(var in all_cols) {
     df <- df[!is.na(df[[var]]), ]
   }
 
@@ -879,7 +879,7 @@ pivot_ <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fu
   pivot_each <- function(df) {
     casted <- if(is.null(value_col)) {
       # make a count matrix if value_col is NULL
-      df %>% summarize_group(group_cols = group_cols_arg, group_funs = funcs, value=dplyr::n()) %>% tidyr::pivot_wider(names_from = !!new_col_cols, values_from=value, values_fill=list(value=!!fill), names_sep=cols_sep)
+      df %>% summarize_group(group_cols = group_cols_arg, group_funs = all_funs, value=dplyr::n()) %>% tidyr::pivot_wider(names_from = !!new_col_cols, values_from=value, values_fill=list(value=!!fill), names_sep=cols_sep)
     } else {
       if(na.rm &&
          !identical(na_ratio, fun.aggregate) &&
@@ -891,7 +891,7 @@ pivot_ <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fu
         # remove NA, unless fun.aggregate function is one of the above NA related ones.
         df <- df[!is.na(df[[value_col]]),]
       }
-      df %>% summarize_group(group_cols = group_cols_arg, group_funs = funcs, value=fun.aggregate(!!rlang::sym(value_col))) %>% tidyr::pivot_wider(names_from = !!new_col_cols, values_from=value, values_fill=list(value=!!fill), names_sep=cols_sep)
+      df %>% summarize_group(group_cols = group_cols_arg, group_funs = all_funs, value=fun.aggregate(!!rlang::sym(value_col))) %>% tidyr::pivot_wider(names_from = !!new_col_cols, values_from=value, values_fill=list(value=!!fill), names_sep=cols_sep)
     }
     casted
   }
