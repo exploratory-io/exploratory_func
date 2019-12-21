@@ -823,18 +823,19 @@ pivot <- function(df, formula, value = NULL, ...) {
 #' @param fill Value to be filled for missing values
 #' @param na.rm If na should be removed from values
 #' @export
-pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = NA, na.rm = TRUE) {
+#pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = NA, na.rm = TRUE) {
+pivot_ <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_funs = NULL, value_col = NULL, fun.aggregate = mean, fill = NA, na.rm = TRUE) {
   validate_empty_data(df)
 
   # create a column name for row names
   # column names in lhs are collapsed by "_"
-  rows <- all.vars(lazyeval::f_lhs(formula))
   cname <- paste0(rows, collapse = "_")
   cols <- all.vars(lazyeval::f_rhs(formula))
 
-  vars <- all.vars(formula)
+  vars <- c(row_cols, col_cols)
+  funs <- c(row_funs, col_funs)
 
-  # remove rows with NA categories
+  # remove rows with NA categories. TODO: Why do we need this? Can it be an old reshape2::acast requirement?
   for(var in vars) {
     df <- df[!is.na(df[[var]]), ]
   }
@@ -864,7 +865,8 @@ pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = N
   pivot_each <- function(df) {
     casted <- if(is.null(value_col)) {
       # make a count matrix if value_col is NULL
-      df %>% dplyr::group_by(!!!rlang::syms(vars)) %>% dplyr::summarize(value=dplyr::n()) %>% tidyr::pivot_wider(names_from = !!cols, values_from=value, values_fill=list(value=!!fill))
+      df %>% summarize_group(group_cols = vars, group_funs = funs, value=dplyr::n()) %>% tidyr::pivot_wider(names_from = !!col_cols, values_from=value, values_fill=list(value=!!fill))
+      # df %>% dplyr::group_by(!!!rlang::syms(vars)) %>% dplyr::summarize(value=dplyr::n()) %>% tidyr::pivot_wider(names_from = !!cols, values_from=value, values_fill=list(value=!!fill))
     } else {
       if(na.rm &&
          !identical(na_ratio, fun.aggregate) &&
