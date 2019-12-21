@@ -584,6 +584,9 @@ test_that("test pivot", {
   pivoted_with_na <- pivot(test_df, row_cols=c("cat1"), col_cols=c("cat2", "cat3"), value = num3, fun.aggregate=mean, na.rm = FALSE)
   expect_true(any(is.na(pivoted_with_na)))
 
+  pivoted_with_names_sep <- pivot(test_df, row_cols=c("cat1"), col_cols=c("cat2", "cat3"), value = num3, fun.aggregate=mean, na.rm = FALSE, names_sep='-')
+  expect_true("b-a" %in% colnames(pivoted_with_names_sep)) # make sure column names are separated by '-'.
+
   pivoted_with_na_ratio <- pivot(test_df, row_cols=c("cat1"), col_cols=c("cat2") , value = num3, fun.aggregate=na_ratio, na.rm = TRUE)
   expect_true(any(pivoted_with_na_ratio %>% select(a,b,c,d) !=0)) # Verify that NA is detected.
 
