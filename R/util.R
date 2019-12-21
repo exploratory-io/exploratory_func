@@ -827,6 +827,10 @@ pivot <- function(df, formula, value = NULL, ...) {
 pivot_ <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_funs = NULL, value_col = NULL, fun.aggregate = mean, fill = NA, na.rm = TRUE) {
   validate_empty_data(df)
 
+  # Create column names like Order_Date_wday.
+  new_row_cols <- if_else(row_funs == "none", row_cols, paste0(row_cols, '_', row_funs))
+  new_col_cols <- if_else(col_funs == "none", col_cols, paste0(col_cols, '_', col_funs))
+
   vars <- c(row_cols, col_cols)
   funs <- c(row_funs, col_funs)
 
