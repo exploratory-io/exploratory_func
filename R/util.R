@@ -828,11 +828,22 @@ pivot_ <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fu
   validate_empty_data(df)
 
   # Create column names like Order_Date_wday.
-  new_row_cols <- if_else(row_funs == "none", row_cols, paste0(row_cols, '_', row_funs))
-  new_col_cols <- if_else(col_funs == "none", col_cols, paste0(col_cols, '_', col_funs))
+  if (!is.null(row_funs)) {
+    new_row_cols <- if_else(row_funs == "none", row_cols, paste0(row_cols, '_', row_funs))
+  }
+  else {
+    new_row_cols <- row_cols
+  }
+
+  if (!is.null(col_funs)) {
+    new_col_cols <- if_else(col_funs == "none", col_cols, paste0(col_cols, '_', col_funs))
+  }
+  else {
+    new_col_cols <- col_cols
+  }
 
   vars <- c(row_cols, col_cols)
-  funs <- c(row_funs, col_funs)
+  funcs <- c(row_funs, col_funs)
   new_cols <- c(new_row_cols, new_col_cols)
   group_cols_arg <- vars
   names(group_cols_arg) <- new_cols
@@ -867,7 +878,7 @@ pivot_ <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fu
   pivot_each <- function(df) {
     casted <- if(is.null(value_col)) {
       # make a count matrix if value_col is NULL
-      df %>% summarize_group(group_cols = !!group_cols_arg, group_funs = !!funs, value=dplyr::n()) %>% tidyr::pivot_wider(names_from = !!new_col_cols, values_from=value, values_fill=list(value=!!fill))
+      df %>% summarize_group(group_cols = group_cols_arg, group_funs = funcs, value=dplyr::n()) %>% tidyr::pivot_wider(names_from = !!new_col_cols, values_from=value, values_fill=list(value=!!fill))
       # df %>% dplyr::group_by(!!!rlang::syms(vars)) %>% dplyr::summarize(value=dplyr::n()) %>% tidyr::pivot_wider(names_from = !!cols, values_from=value, values_fill=list(value=!!fill))
     } else {
       if(na.rm &&
@@ -880,7 +891,7 @@ pivot_ <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fu
         # remove NA, unless fun.aggregate function is one of the above NA related ones.
         df <- df[!is.na(df[[value_col]]),]
       }
-      df %>% summarize_group(group_cols = !!group_cols_arg, group_funs = !!funs, value=fun.aggregate(!!rlang::sym(value_col))) %>% tidyr::pivot_wider(names_from = !!new_col_cols, values_from=value, values_fill=list(value=!!fill))
+      df %>% summarize_group(group_cols = !!group_cols_arg, group_funs = !!funcs, value=fun.aggregate(!!rlang::sym(value_col))) %>% tidyr::pivot_wider(names_from = !!new_col_cols, values_from=value, values_fill=list(value=!!fill))
       # df %>% dplyr::group_by(!!!rlang::syms(vars)) %>% dplyr::summarize(value=fun.aggregate(!!rlang::sym(value_col))) %>% tidyr::pivot_wider(names_from = !!cols, values_from=value, values_fill=list(value=!!fill))
     }
     casted
@@ -2006,7 +2017,7 @@ summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...){
     } else {
       if(!is.null(group_cols)) { # In case only group_by columns are provied, group_by with the columns
         # make sure to ungroup result
-        .data %>% dplyr::group_by(!!!rlang::sym(group_cols)) %>% summarize(...) %>% dplyr::ungroup()
+        .data %>% dplyr::group_by(!!!rlang::syms(group_cols)) %>% summarize(...) %>% dplyr::ungroup()
       } else { # In case no group_by columns are provided,skip group_by
         .data %>% summarize(...)
       }
