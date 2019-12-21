@@ -827,10 +827,6 @@ pivot <- function(df, formula, value = NULL, ...) {
 pivot_ <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_funs = NULL, value_col = NULL, fun.aggregate = mean, fill = NA, na.rm = TRUE) {
   validate_empty_data(df)
 
-  # create a column name for row names
-  # column names in lhs are collapsed by "_"
-  cols <- all.vars(lazyeval::f_rhs(formula))
-
   vars <- c(row_cols, col_cols)
   funs <- c(row_funs, col_funs)
 
@@ -877,7 +873,8 @@ pivot_ <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fu
         # remove NA, unless fun.aggregate function is one of the above NA related ones.
         df <- df[!is.na(df[[value_col]]),]
       }
-      df %>% dplyr::group_by(!!!rlang::syms(vars)) %>% dplyr::summarize(value=fun.aggregate(!!rlang::sym(value_col))) %>% tidyr::pivot_wider(names_from = !!cols, values_from=value, values_fill=list(value=!!fill))
+      df %>% summarize_group(group_cols = vars, group_funs = funs, value=fun.aggregate(!!rlang::sym(value_col))) %>% tidyr::pivot_wider(names_from = !!col_cols, values_from=value, values_fill=list(value=!!fill))
+      # df %>% dplyr::group_by(!!!rlang::syms(vars)) %>% dplyr::summarize(value=fun.aggregate(!!rlang::sym(value_col))) %>% tidyr::pivot_wider(names_from = !!cols, values_from=value, values_fill=list(value=!!fill))
     }
     casted
   }
