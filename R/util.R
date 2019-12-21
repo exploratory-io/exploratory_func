@@ -891,7 +891,7 @@ pivot_ <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fu
         # remove NA, unless fun.aggregate function is one of the above NA related ones.
         df <- df[!is.na(df[[value_col]]),]
       }
-      df %>% summarize_group(group_cols = !!group_cols_arg, group_funs = !!funcs, value=fun.aggregate(!!rlang::sym(value_col))) %>% tidyr::pivot_wider(names_from = !!new_col_cols, values_from=value, values_fill=list(value=!!fill))
+      df %>% summarize_group(group_cols = group_cols_arg, group_funs = funcs, value=fun.aggregate(!!rlang::sym(value_col))) %>% tidyr::pivot_wider(names_from = !!new_col_cols, values_from=value, values_fill=list(value=!!fill))
       # df %>% dplyr::group_by(!!!rlang::syms(vars)) %>% dplyr::summarize(value=fun.aggregate(!!rlang::sym(value_col))) %>% tidyr::pivot_wider(names_from = !!cols, values_from=value, values_fill=list(value=!!fill))
     }
     casted
@@ -1946,7 +1946,7 @@ restore_na <- function(value, na_row_numbers){
 #' @export
 summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...){
   library(dplyr)
-  if(length(group_cols) == 0) {
+  ret <- if(length(group_cols) == 0) {
     .data %>% summarize(...)
   } else {
     # if group_cols argument is passed, make sure to ungroup first so that it won't throw an error
@@ -2023,6 +2023,7 @@ summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...){
       }
     }
   }
+  ret
 }
 
 #' calc_feature_imp (Random Forest) or exp_rpart (Decision Tree) converts logical columns into factor
