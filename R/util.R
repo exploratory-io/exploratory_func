@@ -829,7 +829,6 @@ pivot_ <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fu
 
   # create a column name for row names
   # column names in lhs are collapsed by "_"
-  cname <- paste0(rows, collapse = "_")
   cols <- all.vars(lazyeval::f_rhs(formula))
 
   vars <- c(row_cols, col_cols)
@@ -900,7 +899,7 @@ pivot_ <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fu
   # replace NA values in new columns with fill value
   if(!is.na(fill)) {
     # exclude grouping columns and row label column
-    newcols <- setdiff(colnames(ret), c(grouped_col, cname))
+    newcols <- setdiff(colnames(ret), c(grouped_col, row_cols))
     # create key value with list
     # whose keys are value columns
     # and values are fill
