@@ -819,12 +819,13 @@ pivot <- function(df, row_cols, col_cols, row_funs = NULL, col_funs = NULL, valu
 #' @param col_cols - Columns to be the columns of the resulting pivot table.
 #' @param row_funs - Functions to be applied on row_cols before grouping.
 #' @param col_funs - Functions to be applied on col_cols before grouping.
-#' @param value_col Column name for value. If null, values are count
-#' @param fun.aggregate Function to aggregate duplicated columns
-#' @param fill Value to be filled for missing values
-#' @param na.rm If na should be removed from values
+#' @param value_col - Column name for value. If null, values are count
+#' @param fun.aggregate - Function to aggregate duplicated columns
+#' @param fill - Value to be filled for missing values
+#' @param na.rm - If na should be removed from values
+#' @param cols_sep - If na should be removed from values
 #' @export
-pivot_ <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_funs = NULL, value_col = NULL, fun.aggregate = mean, fill = NA, na.rm = TRUE, names_sep = "_") {
+pivot_ <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_funs = NULL, value_col = NULL, fun.aggregate = mean, fill = NA, na.rm = TRUE, cols_sep = "_") {
   validate_empty_data(df)
 
   # Create column names like Order_Date_wday.
@@ -878,7 +879,7 @@ pivot_ <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fu
   pivot_each <- function(df) {
     casted <- if(is.null(value_col)) {
       # make a count matrix if value_col is NULL
-      df %>% summarize_group(group_cols = group_cols_arg, group_funs = funcs, value=dplyr::n()) %>% tidyr::pivot_wider(names_from = !!new_col_cols, values_from=value, values_fill=list(value=!!fill), names_sep=names_sep)
+      df %>% summarize_group(group_cols = group_cols_arg, group_funs = funcs, value=dplyr::n()) %>% tidyr::pivot_wider(names_from = !!new_col_cols, values_from=value, values_fill=list(value=!!fill), names_sep=cols_sep)
     } else {
       if(na.rm &&
          !identical(na_ratio, fun.aggregate) &&
@@ -890,7 +891,7 @@ pivot_ <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fu
         # remove NA, unless fun.aggregate function is one of the above NA related ones.
         df <- df[!is.na(df[[value_col]]),]
       }
-      df %>% summarize_group(group_cols = group_cols_arg, group_funs = funcs, value=fun.aggregate(!!rlang::sym(value_col))) %>% tidyr::pivot_wider(names_from = !!new_col_cols, values_from=value, values_fill=list(value=!!fill), names_sep=names_sep)
+      df %>% summarize_group(group_cols = group_cols_arg, group_funs = funcs, value=fun.aggregate(!!rlang::sym(value_col))) %>% tidyr::pivot_wider(names_from = !!new_col_cols, values_from=value, values_fill=list(value=!!fill), names_sep=cols_sep)
     }
     casted
   }
