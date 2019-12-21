@@ -610,6 +610,18 @@ test_that("test pivot with Date", {
   expect_true(pivoted$dt %>% inherits("Date"))
 })
 
+test_that("test pivot with Date funcs", {
+  test_df <- data.frame(
+    dt = rep(as.Date("2019-12-20") + seq(3)*10, each = 5),
+    col = rep(seq(5), 3),
+    val = seq(15)
+  )
+
+  pivoted <- pivot(test_df, row_cols=c("dt"), row_funs=c("wday"), col_cols=c("dt"), col_funs=c("week"), value = val)
+  expect_true(all(pivoted$dt_wday %in% c("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")))
+  expect_equal(colnames(pivoted), c("dt_wday","3", "52", "2"))
+})
+
 test_that("test pivot with POSIXct", {
   test_df <- data.frame(
     dt = rep(lubridate::now() + seq(3), each = 5),
