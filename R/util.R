@@ -808,9 +808,9 @@ get_confint <- function(val, se, conf_int = 0.95) {
 
 #' NSE version of pivot_
 #' @export
-pivot <- function(df, formula, value = NULL, ...) {
+pivot <- function(df, row_cols, col_cols, row_funs = NULL, col_funs = NULL, value = NULL, ...) {
   value_col <- col_name(substitute(value))
-  pivot_(df, formula = formula, value_col = value_col, ...)
+  pivot_(df, row_cols = row_cols, col_cols = col_cols, row_funs = row_funs, col_funs = col_funs, value_col = value_col, ...)
 }
 
 #' pivot columns based on formula
