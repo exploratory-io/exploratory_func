@@ -974,6 +974,20 @@ vif_to_dataframe <- function(x) {
   ret
 }
 
+var_to_terms <- function(var, x) {
+  if (is.factor(x$model[[var]])) {
+    paste0(var, levels(x$model[[var]]))
+  }
+  else {
+    var
+  }
+}
+
+get_var_min_pvalue <- function(var, coef_df, x) {
+  terms <- var_to_terms(as.character(var), x)
+  min(coef_df$p.value[coef_df$term %in% terms])
+}
+
 #' special version of tidy.lm function to use with build_lm.fast.
 #' @export
 tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, ...) { #TODO: add test
@@ -1015,11 +1029,16 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
         ret <- data.frame(term = term, importance = importance, importance.high = importance.high, importance.low = importance.low)
         # Reorder factor by the value of relative importance (lmg).
         ret <- ret %>% dplyr::mutate(term = forcats::fct_reorder(term, importance, .fun = sum, .desc = TRUE))
+        coef_df <- broom:::tidy.lm(x)
+        ret <- ret %>% mutate(p.value=purrr::map(term, function(var) {
+          get_var_min_pvalue(var, coef_df, x)
+        }))
         if (pretty.name) {
           ret <- ret %>% rename(`Variable` = term,
                                 `Relative Importance` = importance,
                                 `Relative Importance High` = importance.high,
-                                `Relative Importance Low` = importance.low)
+                                `Relative Importance Low` = importance.low,
+                                `P Value` = p.value)
         }
         ret
       }
