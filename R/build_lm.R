@@ -974,18 +974,23 @@ vif_to_dataframe <- function(x) {
   ret
 }
 
-var_to_terms <- function(var, x) {
+# From name of variable, returns possible names of terms returned from lm.
+var_to_possible_terms <- function(var, x) {
   if (is.factor(x$model[[var]])) {
+    # Possibly, the variable name in the term name is quoted with backtic.
     c(paste0(var, levels(x$model[[var]])),
       paste0('`', var, '`', levels(x$model[[var]])))
   }
   else {
+    # Possibly, the term name is quoted with backtic.
     c(var, paste0('`', var, '`'))
   }
 }
 
+# Returns P-value for the variable. For categorical, the smallest value is returned.
+# For the color of relative importance bar chart.
 get_var_min_pvalue <- function(var, coef_df, x) {
-  terms <- var_to_terms(as.character(var), x)
+  terms <- var_to_possible_terms(as.character(var), x)
   min(coef_df$p.value[coef_df$term %in% terms])
 }
 
