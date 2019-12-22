@@ -976,10 +976,11 @@ vif_to_dataframe <- function(x) {
 
 var_to_terms <- function(var, x) {
   if (is.factor(x$model[[var]])) {
-    paste0(var, levels(x$model[[var]]))
+    c(paste0(var, levels(x$model[[var]])),
+      paste0('`', var, '`', levels(x$model[[var]])))
   }
   else {
-    var
+    c(var, paste0('`', var, '`'))
   }
 }
 
