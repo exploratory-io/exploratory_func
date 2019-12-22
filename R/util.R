@@ -828,14 +828,17 @@ pivot <- function(df, row_cols, col_cols, row_funs = NULL, col_funs = NULL, valu
 pivot_ <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_funs = NULL, value_col = NULL, fun.aggregate = mean, fill = NA, na.rm = TRUE, cols_sep = "_") {
   validate_empty_data(df)
 
-  # Create column names like Order_Date_wday.
-  if (!is.null(row_funs)) {
-    new_row_cols <- if_else(row_funs == "none", row_cols, paste0(row_cols, '_', row_funs))
+  # Output row column names can be specified as names of row_cols. Extract them.
+  if (!is.null(names(row_cols))) {
+    new_row_cols <- names(row_cols)
   }
   else {
     new_row_cols <- row_cols
   }
 
+  # Create new_col_cols, which is output column names of summarize_group.
+  # Since new_col_cols are purely internal in this function, no need to look at names(col_cols) unlike row_cols.
+  # Just make sure to make them unique.
   if (!is.null(col_funs)) {
     new_col_cols <- if_else(col_funs == "none", col_cols, paste0(col_cols, '_', col_funs))
   }
@@ -845,9 +848,9 @@ pivot_ <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fu
 
   all_cols <- c(row_cols, col_cols)
   all_funs <- c(row_funs, col_funs)
-  new_cols <- c(new_row_cols, new_col_cols)
+  all_new_cols <- c(new_row_cols, new_col_cols)
   group_cols_arg <- all_cols
-  names(group_cols_arg) <- new_cols
+  names(group_cols_arg) <- all_new_cols
 
   # remove rows with NA categories. TODO: Why do we need this? Can it be an old reshape2::acast requirement?
   for(var in all_cols) {
