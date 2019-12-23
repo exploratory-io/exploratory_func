@@ -118,7 +118,7 @@ test_that("setdiff", {
 test_that("test pivot with empty data frame", {
   df <- data.frame()
   expect_error({
-    pivot(df, row ~ col)
+    pivot(df, row_cols=c("row"), col_cols=c("col"))
   }, "Input data frame is empty.")
 })
 
