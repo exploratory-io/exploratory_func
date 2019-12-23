@@ -916,7 +916,7 @@ pivot_ <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fu
   # replace NA values in new columns with fill value
   if(!is.na(fill)) {
     # exclude grouping columns and row label column
-    newcols <- setdiff(colnames(ret), c(grouped_col, row_cols))
+    newcols <- setdiff(colnames(ret), c(grouped_col, new_row_cols))
     # create key value with list
     # whose keys are value columns
     # and values are fill
