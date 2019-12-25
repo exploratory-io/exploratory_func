@@ -34,6 +34,10 @@ test_that("calc_feature_map(regression) evaluate training and test", {
   ret <- rf_evaluation_training_and_test(model_df, pretty.name = TRUE)
   expect_equal(nrow(ret), 2) # 2 for train and test
 
+  # retrieve partial dependence data.
+  ret <- model_df %>% rf_partial_dependence()
+  expect_equal(class(ret$conf_high), "numeric") # make sure that it is with conf int for actual binning data.
+
   model_df <- flight %>%
                 calc_feature_imp(`FL NUM`, `DIS TANCE`, `DEP TIME`, test_rate = 0, pd_with_bin_means = TRUE)
   ret <- model_df %>% prediction(data="training_and_test")
