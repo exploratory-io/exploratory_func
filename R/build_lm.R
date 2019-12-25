@@ -1172,8 +1172,10 @@ lm_partial_dependence <- function(df, ...) { # TODO: write test for this.
 
   if (length(grouped_col) > 0) {
     res <- res %>% dplyr::ungroup() # ungroup to mutate group_by column.
+    # Folloing is not necessary since we separately display partial dependence plot for each group since v5.5.
     # add variable name to the group_by column, so that chart is repeated by the combination of group_by column and variable name.
-    res[[grouped_col]] <- paste(as.character(res[[grouped_col]]), res$x_name)
+    # res[[grouped_col]] <- paste(as.character(res[[grouped_col]]), res$x_name)
+
     res[[grouped_col]] <- forcats::fct_inorder(factor(res[[grouped_col]])) # set order to appear as facets
     res <- res %>% dplyr::group_by(!!!rlang::syms(grouped_col)) # put back group_by for consistency
   }

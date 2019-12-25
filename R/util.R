@@ -797,6 +797,18 @@ append_colnames <- function(df, prefix = "", suffix = ""){
   df
 }
 
+#' Returns half-width of confidence interval of given vector. NAs are skipped and not counted.
+#' This is useful when used in dplyr::summarize().
+#' It seems there is no commonly accepted name for half-width of confidence interval, but here we name it confint_error based on the name 'margin of error'.
+#' Reference for naming: https://ncss-wpengine.netdna-ssl.com/wp-content/themes/ncss/pdf/Procedures/PASS/Confidence_Intervals_for_One_Mean.pdf
+#' @export
+confint_error <- function(x, level=0.95) {
+  n <- sum(!is.na(x))
+  s <- sd(x, na.rm = TRUE)
+  error <- qt((level+1)/2, df=n-1)*s/sqrt(n)
+  error
+}
+
 #' get confidence interval value
 #' @param val Predicted value
 #' @param conf_int Confidence interval to get
@@ -808,34 +820,52 @@ get_confint <- function(val, se, conf_int = 0.95) {
 
 #' NSE version of pivot_
 #' @export
-pivot <- function(df, formula, value = NULL, ...) {
+pivot <- function(df, row_cols, col_cols, row_funs = NULL, col_funs = NULL, value = NULL, ...) {
   value_col <- col_name(substitute(value))
-  pivot_(df, formula = formula, value_col = value_col, ...)
+  pivot_(df, row_cols = row_cols, col_cols = col_cols, row_funs = row_funs, col_funs = col_funs, value_col = value_col, ...)
 }
 
 #' pivot columns based on formula
 #' @param df Data frame to pivot
-#' @param formula lhs is composed of columns for rows and rhs is for cols
-#' For example, data1 + data2 ~ var1 + var2 makes a matrix of combinations of
-#' values in data1, data2 pair and var, var2 pair
-#' @param value_col Column name for value. If null, values are count
-#' @param fun.aggregate Function to aggregate duplicated columns
-#' @param fill Value to be filled for missing values
-#' @param na.rm If na should be removed from values
+#' @param row_cols - Columns to be the rows of the resulting pivot table.
+#' @param col_cols - Columns to be the columns of the resulting pivot table.
+#' @param row_funs - Functions to be applied on row_cols before grouping.
+#' @param col_funs - Functions to be applied on col_cols before grouping.
+#' @param value_col - Column name for value. If null, values are count
+#' @param fun.aggregate - Function to aggregate duplicated columns
+#' @param fill - Value to be filled for missing values
+#' @param na.rm - If na should be removed from values
+#' @param cols_sep - If na should be removed from values
 #' @export
-pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = NA, na.rm = TRUE) {
+pivot_ <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_funs = NULL, value_col = NULL, fun.aggregate = mean, fill = NA, na.rm = TRUE, cols_sep = "_") {
   validate_empty_data(df)
 
-  # create a column name for row names
-  # column names in lhs are collapsed by "_"
-  rows <- all.vars(lazyeval::f_lhs(formula))
-  cname <- paste0(rows, collapse = "_")
-  cols <- all.vars(lazyeval::f_rhs(formula))
+  # Output row column names can be specified as names of row_cols. Extract them.
+  if (!is.null(names(row_cols))) {
+    new_row_cols <- names(row_cols)
+  }
+  else {
+    new_row_cols <- row_cols
+  }
 
-  vars <- all.vars(formula)
+  # Create new_col_cols, which is output column names of summarize_group.
+  # Since new_col_cols are purely internal in this function, no need to look at names(col_cols) unlike row_cols.
+  # Just make sure to make them unique.
+  if (!is.null(col_funs)) {
+    new_col_cols <- if_else(col_funs == "none", col_cols, paste0(col_cols, '_', col_funs))
+  }
+  else {
+    new_col_cols <- col_cols
+  }
 
-  # remove rows with NA categories
-  for(var in vars) {
+  all_cols <- c(row_cols, col_cols)
+  all_funs <- c(row_funs, col_funs)
+  all_new_cols <- c(new_row_cols, new_col_cols)
+  group_cols_arg <- all_cols
+  names(group_cols_arg) <- all_new_cols
+
+  # remove rows with NA categories. TODO: Why do we need this? Can it be an old reshape2::acast requirement?
+  for(var in all_cols) {
     df <- df[!is.na(df[[var]]), ]
   }
 
@@ -864,7 +894,7 @@ pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = N
   pivot_each <- function(df) {
     casted <- if(is.null(value_col)) {
       # make a count matrix if value_col is NULL
-      df %>% dplyr::group_by(!!!rlang::syms(vars)) %>% dplyr::summarize(value=dplyr::n()) %>% tidyr::pivot_wider(names_from = !!cols, values_from=value, values_fill=list(value=!!fill))
+      df %>% summarize_group(group_cols = group_cols_arg, group_funs = all_funs, value=dplyr::n()) %>% tidyr::pivot_wider(names_from = !!new_col_cols, values_from=value, values_fill=list(value=!!fill), names_sep=cols_sep)
     } else {
       if(na.rm &&
          !identical(na_ratio, fun.aggregate) &&
@@ -876,7 +906,7 @@ pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = N
         # remove NA, unless fun.aggregate function is one of the above NA related ones.
         df <- df[!is.na(df[[value_col]]),]
       }
-      df %>% dplyr::group_by(!!!rlang::syms(vars)) %>% dplyr::summarize(value=fun.aggregate(!!rlang::sym(value_col))) %>% tidyr::pivot_wider(names_from = !!cols, values_from=value, values_fill=list(value=!!fill))
+      df %>% summarize_group(group_cols = group_cols_arg, group_funs = all_funs, value=fun.aggregate(!!rlang::sym(value_col))) %>% tidyr::pivot_wider(names_from = !!new_col_cols, values_from=value, values_fill=list(value=!!fill), names_sep=cols_sep)
     }
     casted
   }
@@ -898,7 +928,7 @@ pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = N
   # replace NA values in new columns with fill value
   if(!is.na(fill)) {
     # exclude grouping columns and row label column
-    newcols <- setdiff(colnames(ret), c(grouped_col, cname))
+    newcols <- setdiff(colnames(ret), c(grouped_col, new_row_cols))
     # create key value with list
     # whose keys are value columns
     # and values are fill
@@ -1018,7 +1048,11 @@ get_data_type <- function(data){
   }
 }
 
-# add confidence interval
+# Add confidence interval from .fitted column and .se.fit column.
+# This is about t-test for slope of a regression line, but here we estimate
+# confidence interval assuming normal distribution, so that we can calculate it
+# without having to know sample size.
+# https://en.wikipedia.org/wiki/Student%27s_t-test#Slope_of_a_regression_line
 add_confint <- function(data, conf_int){
   # add confidence interval if conf_int is not null and there are .fitted and .se.fit
   if (!is.null(conf_int) & ".se.fit" %in% colnames(data) & ".fitted" %in% colnames(data)) {
@@ -1930,7 +1964,7 @@ restore_na <- function(value, na_row_numbers){
 #' @export
 summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...){
   library(dplyr)
-  if(length(group_cols) == 0) {
+  ret <- if(length(group_cols) == 0) {
     .data %>% summarize(...)
   } else {
     # if group_cols argument is passed, make sure to ungroup first so that it won't throw an error
@@ -2001,12 +2035,13 @@ summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...){
     } else {
       if(!is.null(group_cols)) { # In case only group_by columns are provied, group_by with the columns
         # make sure to ungroup result
-        .data %>% dplyr::group_by(!!!rlang::sym(group_cols)) %>% summarize(...) %>% dplyr::ungroup()
+        .data %>% dplyr::group_by(!!!rlang::syms(group_cols)) %>% summarize(...) %>% dplyr::ungroup()
       } else { # In case no group_by columns are provided,skip group_by
         .data %>% summarize(...)
       }
     }
   }
+  ret
 }
 
 #' calc_feature_imp (Random Forest) or exp_rpart (Decision Tree) converts logical columns into factor
