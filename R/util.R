@@ -797,6 +797,18 @@ append_colnames <- function(df, prefix = "", suffix = ""){
   df
 }
 
+#' Returns half-width of confidence interval of given vector. NAs are skipped and not counted.
+#' This is useful when used in dplyr::summarize().
+#' It seems there is no commonly accepted name for half-width of confidence interval, but here we name it confint_error based on the name 'margin of error'.
+#' Reference for naming: https://ncss-wpengine.netdna-ssl.com/wp-content/themes/ncss/pdf/Procedures/PASS/Confidence_Intervals_for_One_Mean.pdf
+#' @export
+confint_error <- function(x, level=0.95) {
+  n <- sum(!is.na(x))
+  s <- sd(x, na.rm = TRUE)
+  error <- qt((level+1)/2, df=n-1)*s/sqrt(n)
+  error
+}
+
 #' get confidence interval value
 #' @param val Predicted value
 #' @param conf_int Confidence interval to get
@@ -1036,7 +1048,11 @@ get_data_type <- function(data){
   }
 }
 
-# add confidence interval
+# Add confidence interval from .fitted column and .se.fit column.
+# This is about t-test for slope of a regression line, but here we estimate
+# confidence interval assuming normal distribution, so that we can calculate it
+# without having to know sample size.
+# https://en.wikipedia.org/wiki/Student%27s_t-test#Slope_of_a_regression_line
 add_confint <- function(data, conf_int){
   # add confidence interval if conf_int is not null and there are .fitted and .se.fit
   if (!is.null(conf_int) & ".se.fit" %in% colnames(data) & ".fitted" %in% colnames(data)) {
