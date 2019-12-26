@@ -25,7 +25,7 @@ test_that("test relative importance", {
   )
   model_df <- test_df %>% build_lm.fast(num1, num2, num3, num4, cat1, relimp = TRUE, relimp_type = "first")
   ret <- model_df %>% broom::tidy(model, type="relative_importance")
-  expect_equal(colnames(ret), c("term", "importance", "importance.high", "importance.low"))
+  expect_equal(colnames(ret), c("term", "importance", "importance.high", "importance.low", "p.value"))
 })
 
 test_that("test build_lm with keep.source FALSE ", {
