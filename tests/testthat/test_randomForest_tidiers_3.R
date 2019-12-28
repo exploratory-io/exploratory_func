@@ -81,7 +81,7 @@ test_that("calc_feature_map(binary) evaluate training and test", {
   ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
 })
 
-test_that("calc_feature_map(binary(factor(logical))) evaluate training and test", {
+test_that("calc_feature_map(factor(TRUE, FALSE)) evaluate training and test", { # This case should be treated as multi-class.
   # `is delayed` is not logical for some reason.
   # To test binary prediction, need to cast it into logical.
   model_df <- flight %>% dplyr::mutate(is_delayed = factor(as.logical(`is delayed`))) %>% filter(!is.na(is_delayed)) %>%
@@ -112,7 +112,7 @@ test_that("calc_feature_map(binary(factor(logical))) evaluate training and test"
   ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
 })
 
-test_that("calc_feature_map(binary(factor(character))) evaluate training and test", {
+test_that("calc_feature_map(binary(factor(A,B))) evaluate training and test", {
   # `is delayed` is not logical for some reason.
   # To test binary prediction, need to cast it into logical.
   model_df <- flight %>% dplyr::mutate(is_delayed = factor(if_else(as.logical(`is delayed`), "A","B"))) %>% filter(!is.na(is_delayed)) %>%
