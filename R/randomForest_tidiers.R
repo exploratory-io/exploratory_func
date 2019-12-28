@@ -1713,12 +1713,9 @@ get_classification_type <- function(v) {
   # if not, it is classification
   if (!is.numeric(v)) {
     if (!is.logical(v)) {
-      if (length(unique(v)) == 2) {
-        classification_type <- "binary"
-      }
-      else {
-        classification_type <- "multi"
-      }
+      # Even if number of unique number is 2, we treat it as multi-class as opposed to binary,
+      # since our logic for binary classification depends on the condition that the values are TRUE and FALSE.
+      classification_type <- "multi"
     }
     else {
       classification_type <- "binary"
