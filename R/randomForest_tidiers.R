@@ -2381,7 +2381,7 @@ evaluate_binary_classification <- function(actual, predicted, predicted_probabil
     # Since multi_class = FALSE is specified, Number of Rows is not added here. Will add later.
     ret <- evaluate_classification(actual, predicted, true_class, multi_class = FALSE, pretty.name = pretty.name)
   }
-  else {
+  else { # Because get_classification_type() considers it binary classification only when target is logical, it should never come here, but cowardly keeping the code for now.
     ret <- evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
   }
   if (pretty.name) {
