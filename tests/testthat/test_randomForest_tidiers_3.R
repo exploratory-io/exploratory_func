@@ -81,7 +81,7 @@ test_that("calc_feature_map(binary) evaluate training and test", {
   ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
 })
 
-test_that("calc_feature_map(binary(factor)) evaluate training and test", {
+test_that("calc_feature_map(factor(TRUE, FALSE)) evaluate training and test", { # This case should be treated as multi-class.
   # `is delayed` is not logical for some reason.
   # To test binary prediction, need to cast it into logical.
   model_df <- flight %>% dplyr::mutate(is_delayed = factor(as.logical(`is delayed`))) %>% filter(!is.na(is_delayed)) %>%
@@ -95,7 +95,37 @@ test_that("calc_feature_map(binary(factor)) evaluate training and test", {
 
   ret <- rf_evaluation_training_and_test(model_df, pretty.name=T, binary_classification_threshold=0.5)
   expect_equal(nrow(ret), 2) # 2 for train and test
+  ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class")
+  expect_equal(nrow(ret), 4) # 4 for train/test times TRUE/FALSE
 
+  ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
+  model_df <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`)) %>%
+                calc_feature_imp(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0, pd_with_bin_means = TRUE)
+  ret <- model_df %>% prediction(data="training_and_test")
+  train_ret <- ret %>% filter(is_test_data==FALSE)
+  expect_equal(nrow(train_ret), 5000)
+
+  ret <- rf_evaluation_training_and_test(model_df)
+  expect_equal(nrow(ret), 1) # 1 for train
+
+  ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class")
+  ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
+})
+
+test_that("calc_feature_map(binary(factor(A,B))) evaluate training and test", {
+  # `is delayed` is not logical for some reason.
+  # To test binary prediction, need to cast it into logical.
+  model_df <- flight %>% dplyr::mutate(is_delayed = factor(if_else(as.logical(`is delayed`), "A","B"))) %>% filter(!is.na(is_delayed)) %>%
+                calc_feature_imp(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0.3, pd_with_bin_means = TRUE)
+
+  ret <- model_df %>% prediction(data="training_and_test")
+  test_ret <- ret %>% filter(is_test_data==TRUE)
+  # expect_equal(nrow(test_ret), 1500) Fails now, since we filter numeric NA. Revive when we do not need to.
+  train_ret <- ret %>% filter(is_test_data==FALSE)
+  # expect_equal(nrow(train_ret), 3500) Fails now, since we filter numeric NA. Revive when we do not need to.
+
+  ret <- rf_evaluation_training_and_test(model_df, pretty.name=T, binary_classification_threshold=0.5)
+  expect_equal(nrow(ret), 2) # 2 for train and test
   ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class")
   expect_equal(nrow(ret), 4) # 4 for train/test times TRUE/FALSE
 
