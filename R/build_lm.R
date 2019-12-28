@@ -1119,7 +1119,7 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
       target_col <- as.character(lazyeval::f_lhs(x$formula)) # get target column name
       actual_val = x$model[[target_col]]
 
-      predicted = x$fitted.value > 0.5 # TODO: make threshold adjustable
+      predicted = x$fitted.value > 0.5 # TODO: make threshold adjustable. Note: This part of code seems to be unused. Check and remove.
       # convert predicted to original set of values. should be either logical, numeric, or factor.
       predicted <- if (is.logical(actual_val)) {
         predicted
