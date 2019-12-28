@@ -2381,6 +2381,7 @@ evaluate_binary_classification <- function(actual, predicted, predicted_probabil
       # For ranger, even if level for label "TRUE" is 2, we always treat level 1 as TRUE, for simplicity for now.
       true_class <- levels(actual)[[1]]
     }
+    # Since multi_class = FALSE is specified, Number of Rows is not added here. Will add later.
     ret <- evaluate_classification(actual, predicted, true_class, multi_class = FALSE, pretty.name = pretty.name)
   }
   else {
@@ -2392,7 +2393,7 @@ evaluate_binary_classification <- function(actual, predicted, predicted_probabil
   else {
     ret <- ret %>% mutate(auc = auc)
   }
-  # TODO: Look into when Number of Rows is already added.
+  # Add Number of Rows here for the case ret came from evaluate_classification(multi_class = FALSE).
   if (is.null(ret$n) && is.null(ret$`Number of Rows`)) {
     sample_n <- sum(!is.na(predicted)) # Sample size for test.
     ret <- ret %>% dplyr::mutate(n = !!sample_n)
