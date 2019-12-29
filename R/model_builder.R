@@ -3,7 +3,7 @@
 
 #' integrated build_kmeans
 #' @export
-build_kmeans <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0, seed=0){
+build_kmeans <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0, seed=1){
   validate_empty_data(df)
 
   if (!is.null(skv)) {
@@ -47,7 +47,7 @@ build_kmeans.kv_ <- function(df,
                              trace = FALSE,
                              normalize_data = TRUE,
                              keep.source = TRUE,
-                             seed = 0,
+                             seed = 1,
                              augment=TRUE,
                              fun.aggregate=mean,
                              fill=0){
@@ -159,7 +159,7 @@ build_kmeans.cols <- function(df, ...,
                             trace = FALSE,
                             normalize_data = TRUE,
                             keep.source = TRUE,
-                            seed = 0,
+                            seed = 1,
                             augment=TRUE
                             ){
   validate_empty_data(df)
