@@ -184,7 +184,7 @@ build_kmeans.cols <- function(df, ...,
     na.omit()
   omit_row <- attr(omit_df, "na.action")
   if(!is.null(omit_row)){
-    df <- df[setdiff(seq(nrow(df)), omit_row), drop=FALSE] # drop=FALSE to avoid getting converted to vector
+    df <- df[setdiff(seq(nrow(df)), omit_row),] # For row filtering like this, drop=FALSE is not necessary.
   }
 
   build_kmeans_each <- function(df){
