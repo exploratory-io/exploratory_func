@@ -17,13 +17,15 @@ to_time_unit_for_seq <- function(time_unit) {
 
 # Trim future part of pre-aggregation data, when it is with external regressors or holidays.
 trim_future <- function(df, time_col, value_col, periods, time_unit) {
-  # We used to do this based on if value column value is NA or not, but since it does not work with function like na_count,
-  # we are now always doing this based on specified period.
-
-  #if (!is.null(value_col)) { # if value_col is there consider rows with values to be history data.
-  #  df <- df %>% dplyr::filter(!is.na(UQ(rlang::sym(value_col)))) # keep the rows that have values. the ones that do not are for future regressors
-  #}
-  #else { # if value_col does not exist, use period to determine the boundary between history and future.
+  if (!is.null(value_col)) { # if value_col is there consider rows with values to be history data.
+    # Figure out the max time with non-na value, and use it as the boundary.
+    # We do this as opposed to filter out all rows with NAs, to work with functions like na_count, and to keep extra regressor info as much as possible.
+    # NAs are later handled by na.rm=TRUE option of aggregate function.
+    non_na_df <- df %>% dplyr::filter(!is.na(UQ(rlang::sym(value_col))))
+    max_non_na_time <- max(non_na_df[[time_col]], na.rm=TRUE)
+    df <- df %>% dplyr::filter(!!rlang::sym(time_col) <= !!max_non_na_time)
+  }
+  else { # if value_col does not exist, use period to determine the boundary between history and future.
     if (time_unit %in% c("second", "sec")) {
       time_unit_func <- lubridate::seconds
     }
@@ -52,7 +54,7 @@ trim_future <- function(df, time_col, value_col, periods, time_unit) {
     }
     # Keep the rows older than the history/future boundary, as the history data.
     df <- df %>% dplyr::filter(!!rlang::sym(time_col) <= (max(!!rlang::sym(time_col)) - time_unit_func(!!periods)))
-  #}
+  }
   df
 }
 
@@ -328,7 +330,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
         df <- trim_future(df, time_col, value_col, periods, time_unit)
       }
       else if(!is.null(value_col)) { # no-extra regressor case. if value column is specified (i.e. value is not number of rows), filter NA rows.
-        df <- df[!is.na(df[[value_col]]), ]
+        # df <- df[!is.na(df[[value_col]]), ] # Now we handle NAs with na.rm=TRUE on aggregate function.
       }
   
   
@@ -463,9 +465,9 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
         }
         training_data <- training_data %>% head(-periods)
   
-        # we got correct set of training data by filling missing date/time,
+        # We got correct set of training data by filling missing date/time,
         # but now, filter them out again.
-        # by doing so, we affect future table, and skip prediction (interpolation)
+        # By doing so, we affect future table, and skip prediction (interpolation)
         # for all missing date/time, which could be expensive if the training data is sparse.
         # keep the last row even if it does not have training data, to mark the end of training period, which is the start of test period.
         training_data <- training_data %>% dplyr::filter(!is.na(y) | row_number() == n())
