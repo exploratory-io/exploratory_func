@@ -33,7 +33,7 @@ build_lr <- function(df, ...) {
 #' @param test_rate Ratio of test data
 #' @param seed Random seed to control test data sampling
 #' @export
-build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, group_cols = NULL, test_rate = 0, seed = 0){
+build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, group_cols = NULL, test_rate = 0, seed = 1){
   validate_empty_data(data)
 
   # make variables factor sorted by the frequency

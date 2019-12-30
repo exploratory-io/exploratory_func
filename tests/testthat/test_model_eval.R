@@ -116,7 +116,8 @@ test_that("test eval_pred_bin with factor", {
 
   ret <- evaluate_binary(predicted, predicted_response, CANCELLED, threshold = "accuracy")
 
-  expect_true(ret$AUC[[1]] > 0.9)
+  expect_true(ret$AUC[[1]] >= 0.0)
+  expect_true(ret$AUC[[1]] <= 1.0)
 })
 
 test_that("test evaluate_regression", {
