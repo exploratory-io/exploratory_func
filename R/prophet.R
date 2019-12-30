@@ -342,8 +342,23 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
           # we saw a case where rstan crashes with the last row with 0 y value.
           dplyr::filter(!is.na(value)) %>%
           dplyr::group_by(ds)
-        grouped_df %>% 
-          dplyr::summarise(y = fun.aggregate(value), cap = fun.aggregate(cap_col), !!!summarise_args)
+        # For common functions that require na.rm=TRUE to handle NA, add it.
+        if (identical(sum, fun.aggregate) ||
+            identical(mean, fun.aggregate) ||
+            identical(median, fun.aggregate) ||
+            identical(min, fun.aggregate) ||
+            identical(max, fun.aggregate) ||
+            identical(sd, fun.aggregate) ||
+            identical(var, fun.aggregate) ||
+            identical(IQR, fun.aggregate) ||
+            identical(mad, fun.aggregate)) {
+          grouped_df %>% 
+            dplyr::summarise(y = fun.aggregate(value), cap = fun.aggregate(cap_col, na.rm=TRUE), !!!summarise_args)
+        }
+        else {
+          grouped_df %>% 
+            dplyr::summarise(y = fun.aggregate(value), cap = fun.aggregate(cap_col), !!!summarise_args)
+        }
       } else if (!is.null(value_col)){
         grouped_df <- df %>%
           dplyr::transmute(
@@ -353,8 +368,22 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
           ) %>%
           dplyr::filter(!is.na(value)) %>% # remove NA so that we do not pass data with NA, NaN, or 0 to prophet
           dplyr::group_by(ds)
-        grouped_df %>%
-          dplyr::summarise(y = fun.aggregate(value), !!!summarise_args)
+        if (identical(sum, fun.aggregate) ||
+            identical(mean, fun.aggregate) ||
+            identical(median, fun.aggregate) ||
+            identical(min, fun.aggregate) ||
+            identical(max, fun.aggregate) ||
+            identical(sd, fun.aggregate) ||
+            identical(var, fun.aggregate) ||
+            identical(IQR, fun.aggregate) ||
+            identical(mad, fun.aggregate)) {
+          grouped_df %>% 
+            dplyr::summarise(y = fun.aggregate(value, na.rm=TRUE), !!!summarise_args)
+        }
+        else {
+          grouped_df %>% 
+            dplyr::summarise(y = fun.aggregate(value), !!!summarise_args)
+        }
       } else { # value_col is not specified. The forecast is about number of rows.
         # Note: We ignore cap column in this case for now.
         df %>%
