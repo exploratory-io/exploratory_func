@@ -34,6 +34,46 @@ test_that("do_prophet with extra regressor without target column (Number of Rows
   expect_equal(ret$timestamp[[length(ret$timestamp)]], as.Date("2012-01-11"))
 })
 
+test_that("do_prophet with extra regressor with NAs without target column (Number of Rows) with test mode", {
+  set.seed(1)
+  ts <- rep(seq.Date(as.Date("2010-01-01"), as.Date("2012-01-11"), by="day"), 3) # make multiple rows for each day to test aggregation.
+  raw_data <- data.frame(timestamp=ts, count=round(runif(length(ts))/0.1)+1)
+  ts2 <- rep(seq.Date(as.Date("2010-01-01"), as.Date("2012-01-11"), by="day"), 3) # make multiple rows for each day to test aggregation.
+  regressor_data <- data.frame(timestamp=ts2, regressor=runif(length(ts2)))
+  regressor_data <- regressor_data %>% mutate(regressor=if_else(regressor < 1, NA_real_, regressor)) # inject NAs in regressor to test na.rm on aggregate function.
+  combined_data <- raw_data %>% full_join(regressor_data, by=c("timestamp"="timestamp"))
+  combined_data <- combined_data %>% mutate(count=if_else(is.na(count),1,count))
+  uncounted_data <- combined_data %>% tidyr::uncount(count)
+  ret <- uncounted_data %>%
+    do_prophet(timestamp, NULL, 10, time_unit = "day", regressors = c("regressor"), funs.aggregate.regressors = c(mean), test_mode = TRUE, na_fill_type="value", na_fill_value=0, regressors_na_fill_type="value", regressors_na_fill_value=0)
+  # verify the last date with forecasted_value
+  expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2012-01-11")) 
+  # verify the end of training data.
+  expect_equal(last((ret %>% filter(!is_test_data))$timestamp), as.Date("2012-01-01")) 
+  # verify the last date in the data
+  expect_equal(ret$timestamp[[length(ret$timestamp)]], as.Date("2012-01-11"))
+})
+
+test_that("do_prophet with extra regressor with NAs for entirety of some dates without target column (Number of Rows) with test mode", {
+  set.seed(1)
+  ts <- rep(seq.Date(as.Date("2010-01-01"), as.Date("2012-01-11"), by="day"), 3) # make multiple rows for each day to test aggregation.
+  raw_data <- data.frame(timestamp=ts, count=round(runif(length(ts))/0.1)+1)
+  ts2 <- rep(seq.Date(as.Date("2010-01-01"), as.Date("2012-01-11"), by="day"), 3) # make multiple rows for each day to test aggregation.
+  regressor_data <- data.frame(timestamp=ts2, regressor=runif(length(ts2)))
+  regressor_data <- regressor_data %>% mutate(regressor=if_else(timestamp %in% c(as.Date("2011-01-01"), as.Date("2012-01-10")), NA_real_, regressor)) # inject NAs in regressor for an entire day to test post aggregation NA filtering, as opposed to na.rm on aggregate function.
+  combined_data <- raw_data %>% full_join(regressor_data, by=c("timestamp"="timestamp"))
+  combined_data <- combined_data %>% mutate(count=if_else(is.na(count),1,count))
+  uncounted_data <- combined_data %>% tidyr::uncount(count)
+  ret <- uncounted_data %>%
+    do_prophet(timestamp, NULL, 10, time_unit = "day", regressors = c("regressor"), funs.aggregate.regressors = c(mean), test_mode = TRUE, na_fill_type="value", na_fill_value=0, regressors_na_fill_type="value", regressors_na_fill_value=0)
+  # verify the last date with forecasted_value
+  expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2012-01-11")) 
+  # verify the end of training data.
+  expect_equal(last((ret %>% filter(!is_test_data))$timestamp), as.Date("2012-01-01")) 
+  # verify the last date in the data
+  expect_equal(ret$timestamp[[length(ret$timestamp)]], as.Date("2012-01-11"))
+})
+
 test_that("do_prophet with extra regressor without target column (Number of Rows) with time unit of month", {
   ts <- seq.Date(as.Date("2010-01-01"), as.Date("2012-01-01"), by="month")
   raw_data <- data.frame(timestamp=ts, count=round(runif(length(ts))/0.1)+1)
