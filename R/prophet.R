@@ -295,7 +295,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
       # based on the specified period.
       # Exception is when value column is not specified (forecast is about number of rows.) AND it is test mode.
       # In this case, we treat entire data as history data, and just let test mode logic to separate it into training and test.
-      if (!is.null(regressors) && (!is.null(value_col) || !test_mode)) {
+      if (!is.null(regressors) && !(is.null(value_col) && test_mode)) {
         # We used to filter NAs on regressor columns here, but now we don't and instead add na.rm to funs.aggregate.regressors.
         # This should pick up more info, and works with function like na_count too.
         #df <- df %>% dplyr::filter(!!!filter_args)
