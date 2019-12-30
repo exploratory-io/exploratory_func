@@ -325,6 +325,14 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
           ) %>%
           dplyr::group_by(ds) %>%
           dplyr::summarise(!!!summarise_args)
+
+        # It seems prophet internally removes the rows with NA regressor values for future data, unlike for history data, but to avoid being dependent on that behavior,
+        # let's remove them here for future data too.
+        if (!is.null(regressor_output_cols)) {
+          for (regressor_col in regressor_output_cols) {
+            aggregated_future_data <- aggregated_future_data %>% dplyr::filter(!is.na(!!sym(regressor_col)))
+          }
+        }
       }
       else if (!is.null(holiday_col)) { # even if there is no extra regressor, if holiday column is there, we need to strip future holiday rows.
         df <- trim_future(df, time_col, value_col, periods, time_unit)
