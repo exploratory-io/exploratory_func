@@ -15,11 +15,15 @@ to_time_unit_for_seq <- function(time_unit) {
   }
 }
 
+# Trim future part of pre-aggregation data, when it is with external regressors or holidays.
 trim_future <- function(df, time_col, value_col, periods, time_unit) {
-  if (!is.null(value_col)) { # if value_col is there consider rows with values to be history data.
-    df <- df %>% dplyr::filter(!is.na(UQ(rlang::sym(value_col)))) # keep the rows that have values. the ones that do not are for future regressors
-  }
-  else { # if value_col does not exist, use period to determine the boundary between history and future.
+  # We used to do this based on if value column value is NA or not, but since it does not work with function like na_count,
+  # we are now always doing this based on specified period.
+
+  #if (!is.null(value_col)) { # if value_col is there consider rows with values to be history data.
+  #  df <- df %>% dplyr::filter(!is.na(UQ(rlang::sym(value_col)))) # keep the rows that have values. the ones that do not are for future regressors
+  #}
+  #else { # if value_col does not exist, use period to determine the boundary between history and future.
     if (time_unit %in% c("second", "sec")) {
       time_unit_func <- lubridate::seconds
     }
@@ -48,7 +52,7 @@ trim_future <- function(df, time_col, value_col, periods, time_unit) {
     }
     # Keep the rows older than the history/future boundary, as the history data.
     df <- df %>% dplyr::filter(!!rlang::sym(time_col) <= (max(!!rlang::sym(time_col)) - time_unit_func(!!periods)))
-  }
+  #}
   df
 }
 
@@ -290,8 +294,9 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
       # Exception is when value column is not specified (forecast is about number of rows.) AND it is test mode.
       # In this case, we treat entire data as history data, and just let test mode logic to separate it into training and test.
       if (!is.null(regressors) && (!is.null(value_col) || !test_mode)) {
-        # filter NAs on regressor columns
-        df <- df %>% dplyr::filter(!!!filter_args)
+        # We used to filter NAs on regressor columns here, but now we don't and instead add na.rm to funs.aggregate.regressors.
+        # This should pick up more info, and works with function like na_count too.
+        #df <- df %>% dplyr::filter(!!!filter_args)
         future_df <- df # keep all rows before df is filtered out to become history data.
         df <- trim_future(df, time_col, value_col, periods, time_unit)
         max_floored_date <- max(df[[time_col]])
