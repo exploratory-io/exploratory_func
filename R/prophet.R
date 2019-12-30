@@ -331,7 +331,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
       aggregated_data <- if (!is.null(value_col) && ("cap" %in% colnames(df))) {
         # preserve cap column if it is there, so that cap argument as future data frame works.
         # apply same aggregation as value to cap.
-        df %>%
+        grouped_df <- df %>%
           dplyr::transmute(
             ds = UQ(rlang::sym(time_col)),
             value = UQ(rlang::sym(value_col)),
@@ -341,17 +341,19 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
           # remove NA so that we do not pass data with NA, NaN, or 0 to prophet, which we are not very sure what would happen.
           # we saw a case where rstan crashes with the last row with 0 y value.
           dplyr::filter(!is.na(value)) %>%
-          dplyr::group_by(ds) %>%
+          dplyr::group_by(ds)
+        grouped_df %>% 
           dplyr::summarise(y = fun.aggregate(value), cap = fun.aggregate(cap_col), !!!summarise_args)
       } else if (!is.null(value_col)){
-        df %>%
+        grouped_df <- df %>%
           dplyr::transmute(
             ds = UQ(rlang::sym(time_col)),
             value = UQ(rlang::sym(value_col)),
             !!!rlang::syms(unname(regressors)) # this should be able to handle regressor=NULL case fine.
           ) %>%
           dplyr::filter(!is.na(value)) %>% # remove NA so that we do not pass data with NA, NaN, or 0 to prophet
-          dplyr::group_by(ds) %>%
+          dplyr::group_by(ds)
+        grouped_df %>%
           dplyr::summarise(y = fun.aggregate(value), !!!summarise_args)
       } else { # value_col is not specified. The forecast is about number of rows.
         # Note: We ignore cap column in this case for now.
