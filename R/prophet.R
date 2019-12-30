@@ -187,7 +187,21 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
   regressor_final_output_cols <- NULL # Just declaring variable
   if (!is.null(regressors) && !is.null(funs.aggregate.regressors)) {
     summarise_args <- purrr::map2(funs.aggregate.regressors, regressors, function(func, cname) {
-      quo(UQ(func)(UQ(rlang::sym(cname))))
+      # For common functions that require na.rm=TRUE to handle NA, add it.
+      if (identical(sum, func) ||
+          identical(mean, func) ||
+          identical(median, func) ||
+          identical(min, func) ||
+          identical(max, func) ||
+          identical(sd, func) ||
+          identical(var, func) ||
+          identical(IQR, func) ||
+          identical(mad, func)) {
+        quo(UQ(func)(UQ(rlang::sym(cname)), na.rm=TRUE))
+      }
+      else {
+        quo(UQ(func)(UQ(rlang::sym(cname))))
+      }
     })
 
     # Keep final output column names.
