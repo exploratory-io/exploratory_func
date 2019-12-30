@@ -421,7 +421,13 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
           aggregated_data <- aggregated_data %>% dplyr::mutate(!!sym(regressor_col) := fill_ts_na(!!sym(regressor_col), ds, type = !!regressors_na_fill_type, val = !!regressors_na_fill_value))
         }
       }
-  
+
+      # If there is still NAs in regressor columns at this point after aggregation and possible fill, they have to be filtered out to avoid error.
+      if (!is.null(regressor_output_cols)) {
+        for (regressor_col in regressor_output_cols) {
+          aggregated_data <- aggregated_data %>% dplyr::filter(!is.na(!!sym(regressor_col)))
+        }
+      }
   
       if (time_unit %in% c("week", "month", "quarter", "year")) { # if time_unit is larger than day (the next level is week), having weekly.seasonality does not make sense.
         weekly.seasonality <- FALSE
