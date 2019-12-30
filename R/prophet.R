@@ -340,7 +340,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
           ) %>%
           # remove NA so that we do not pass data with NA, NaN, or 0 to prophet, which we are not very sure what would happen.
           # we saw a case where rstan crashes with the last row with 0 y value.
-          dplyr::filter(!is.na(value)) %>%
+          # dplyr::filter(!is.na(value)) %>% # Commented out, since now we handle NAs with na.rm option of fun.aggregate. This way, extra regressor info for each period is preserved better.
           dplyr::group_by(ds)
         # For common functions that require na.rm=TRUE to handle NA, add it.
         if (identical(sum, fun.aggregate) ||
@@ -366,7 +366,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
             value = UQ(rlang::sym(value_col)),
             !!!rlang::syms(unname(regressors)) # this should be able to handle regressor=NULL case fine.
           ) %>%
-          dplyr::filter(!is.na(value)) %>% # remove NA so that we do not pass data with NA, NaN, or 0 to prophet
+          # dplyr::filter(!is.na(value)) %>% # Commented out, since now we handle NAs with na.rm option of fun.aggregate. This way, extra regressor info for each period is preserved better.
           dplyr::group_by(ds)
         if (identical(sum, fun.aggregate) ||
             identical(mean, fun.aggregate) ||
