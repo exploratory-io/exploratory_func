@@ -39,8 +39,8 @@ test_that("do_prophet with extra regressor with NAs without target column (Numbe
   ts <- rep(seq.Date(as.Date("2010-01-01"), as.Date("2012-01-11"), by="day"), 3) # make multiple rows for each day to test aggregation.
   raw_data <- data.frame(timestamp=ts, count=round(runif(length(ts))/0.1)+1)
   ts2 <- rep(seq.Date(as.Date("2010-01-01"), as.Date("2012-01-11"), by="day"), 3) # make multiple rows for each day to test aggregation.
-  regressor_data <- data.frame(timestamp=ts2, regressor=runif(length(ts2)))
-  regressor_data <- regressor_data %>% mutate(regressor=if_else(regressor < 1, NA_real_, regressor)) # inject NAs in regressor to test na.rm on aggregate function.
+  regressor_data <- data.frame(timestamp=ts2, regressor=rnorm(length(ts2)))
+  regressor_data <- regressor_data %>% mutate(regressor=if_else(regressor < 0, NA_real_, regressor)) # inject NAs in regressor to test na.rm on aggregate function.
   combined_data <- raw_data %>% full_join(regressor_data, by=c("timestamp"="timestamp"))
   combined_data <- combined_data %>% mutate(count=if_else(is.na(count),1,count))
   uncounted_data <- combined_data %>% tidyr::uncount(count)
@@ -78,7 +78,7 @@ test_that("do_prophet with extra regressor with NAs for entirety of some dates w
   ts <- rep(seq.Date(as.Date("2010-01-01"), as.Date("2012-01-11"), by="day"), 3) # make multiple rows for each day to test aggregation.
   raw_data <- data.frame(timestamp=ts, count=round(runif(length(ts))/0.1)+1)
   ts2 <- rep(seq.Date(as.Date("2010-01-01"), as.Date("2012-01-11"), by="day"), 3) # make multiple rows for each day to test aggregation.
-  regressor_data <- data.frame(timestamp=ts2, regressor=runif(length(ts2)))
+  regressor_data <- data.frame(timestamp=ts2, regressor=rnorm(length(ts2)))
   regressor_data <- regressor_data %>% mutate(regressor=if_else(timestamp %in% c(as.Date("2011-01-01"), as.Date("2012-01-10")), NA_real_, regressor)) # inject NAs in regressor for an entire day to test post aggregation NA filtering, as opposed to na.rm on aggregate function.
   combined_data <- raw_data %>% full_join(regressor_data, by=c("timestamp"="timestamp"))
   combined_data <- combined_data %>% mutate(count=if_else(is.na(count),1,count))
