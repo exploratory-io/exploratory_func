@@ -54,6 +54,25 @@ test_that("do_prophet with extra regressor with NAs without target column (Numbe
   expect_equal(ret$timestamp[[length(ret$timestamp)]], as.Date("2012-01-11"))
 })
 
+test_that("do_prophet with extra regressor with NAs, with na_count functions on target and regressor with test mode", {
+  set.seed(1)
+  ts <- rep(seq.Date(as.Date("2010-01-01"), as.Date("2012-01-11"), by="day"), 3) # make multiple rows for each day to test aggregation.
+  raw_data <- data.frame(timestamp=ts, val=round(rnorm(length(ts)))+1)
+  raw_data <- raw_data %>% mutate(val=if_else(val < 0, NA_real_, val)) # inject NAs in target to test na_count aggregate function.
+  ts2 <- rep(seq.Date(as.Date("2010-01-01"), as.Date("2012-01-11"), by="day"), 3) # make multiple rows for each day to test aggregation.
+  regressor_data <- data.frame(timestamp=ts2, regressor=rnorm(length(ts2)))
+  regressor_data <- regressor_data %>% mutate(regressor=if_else(regressor < 0, NA_real_, regressor)) # inject NAs in regressor to test na.rm on aggregate function.
+  combined_data <- raw_data %>% full_join(regressor_data, by=c("timestamp"="timestamp"))
+  ret <- combined_data %>%
+    do_prophet(timestamp, val, 10, time_unit = "day", fun.aggregate=na_count, regressors = c("regressor"), funs.aggregate.regressors = c(na_count), test_mode = TRUE, na_fill_type="value", na_fill_value=0, regressors_na_fill_type="value", regressors_na_fill_value=0)
+  # verify the last date with forecasted_value
+  expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2012-01-11")) 
+  # verify the end of training data.
+  expect_equal(last((ret %>% filter(!is_test_data))$timestamp), as.Date("2012-01-01")) 
+  # verify the last date in the data
+  expect_equal(ret$timestamp[[length(ret$timestamp)]], as.Date("2012-01-11"))
+})
+
 test_that("do_prophet with extra regressor with NAs for entirety of some dates without target column (Number of Rows) with test mode", {
   set.seed(1)
   ts <- rep(seq.Date(as.Date("2010-01-01"), as.Date("2012-01-11"), by="day"), 3) # make multiple rows for each day to test aggregation.
