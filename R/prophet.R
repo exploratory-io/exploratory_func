@@ -58,6 +58,23 @@ trim_future <- function(df, time_col, value_col, periods, time_unit) {
   df
 }
 
+is_na_rm_func <- function(func) {
+  if (identical(sum, func) ||
+      identical(mean, func) ||
+      identical(median, func) ||
+      identical(min, func) ||
+      identical(max, func) ||
+      identical(sd, func) ||
+      identical(var, func) ||
+      identical(IQR, func) ||
+      identical(mad, func)) {
+    return(TRUE)
+  }
+  else {
+    return(FALSE)
+  }
+}
+
 #' NSE version of do_prophet_
 #' @export
 do_prophet <- function(df, time, value = NULL, periods = 10, holiday = NULL, ...){
@@ -194,15 +211,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
   if (!is.null(regressors) && !is.null(funs.aggregate.regressors)) {
     summarise_args <- purrr::map2(funs.aggregate.regressors, regressors, function(func, cname) {
       # For common functions that require na.rm=TRUE to handle NA, add it.
-      if (identical(sum, func) ||
-          identical(mean, func) ||
-          identical(median, func) ||
-          identical(min, func) ||
-          identical(max, func) ||
-          identical(sd, func) ||
-          identical(var, func) ||
-          identical(IQR, func) ||
-          identical(mad, func)) {
+      if (is_na_rm_func(func)) {
         quo(UQ(func)(UQ(rlang::sym(cname)), na.rm=TRUE))
       }
       else {
@@ -358,15 +367,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
           # dplyr::filter(!is.na(value)) %>% # Commented out, since now we handle NAs with na.rm option of fun.aggregate. This way, extra regressor info for each period is preserved better.
           dplyr::group_by(ds)
         # For common functions that require na.rm=TRUE to handle NA, add it.
-        if (identical(sum, fun.aggregate) ||
-            identical(mean, fun.aggregate) ||
-            identical(median, fun.aggregate) ||
-            identical(min, fun.aggregate) ||
-            identical(max, fun.aggregate) ||
-            identical(sd, fun.aggregate) ||
-            identical(var, fun.aggregate) ||
-            identical(IQR, fun.aggregate) ||
-            identical(mad, fun.aggregate)) {
+        if (is_na_rm_func(fun.aggregate)) {
           grouped_df %>% 
             dplyr::summarise(y = fun.aggregate(value), cap = fun.aggregate(cap_col, na.rm=TRUE), !!!summarise_args)
         }
@@ -383,15 +384,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
           ) %>%
           # dplyr::filter(!is.na(value)) %>% # Commented out, since now we handle NAs with na.rm option of fun.aggregate. This way, extra regressor info for each period is preserved better.
           dplyr::group_by(ds)
-        if (identical(sum, fun.aggregate) ||
-            identical(mean, fun.aggregate) ||
-            identical(median, fun.aggregate) ||
-            identical(min, fun.aggregate) ||
-            identical(max, fun.aggregate) ||
-            identical(sd, fun.aggregate) ||
-            identical(var, fun.aggregate) ||
-            identical(IQR, fun.aggregate) ||
-            identical(mad, fun.aggregate)) {
+        if (is_na_rm_func(fun.aggregate)) {
           grouped_df %>% 
             dplyr::summarise(y = fun.aggregate(value, na.rm=TRUE), !!!summarise_args)
         }
