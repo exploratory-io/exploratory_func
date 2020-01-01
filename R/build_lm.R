@@ -1,3 +1,52 @@
+
+
+# Builds partial_dependency object for lm/glm with same structure (a data.frame with attributes.) as edarf::partial_dependence.
+partial_dependence.lm_exploratory <- function(fit, target, vars = colnames(data),
+  n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)), # Keeping same default of 25 as edarf::partial_dependence, although we usually overwrite from callers.
+  interaction = FALSE, uniform = TRUE, data, ...) {
+
+  predict.fun <- function(object, newdata) {
+    predict(object, newdata = newdata, type = "response")
+  }
+
+  aggregate.fun <- function(x) {
+    c("preds" = mean(x))
+  }
+
+  args = list(
+    "data" = data,
+    "vars" = vars,
+    "n" = n,
+    "model" = fit,
+    "uniform" = uniform,
+    "predict.fun" = predict.fun,
+    "aggregate.fun" = aggregate.fun,
+    ...
+  )
+  
+  if (length(vars) > 1L & !interaction) { # More than one variables are there. Iterate calling mmpf::marginalPrediction.
+    pd = rbindlist(sapply(vars, function(x) {
+      args$vars = x
+      if ("points" %in% names(args))
+        args$points = args$points[x]
+      mp = do.call(mmpf::marginalPrediction, args)
+      names(mp)[ncol(mp)] = target
+      mp
+    }, simplify = FALSE), fill = TRUE)
+    data.table::setcolorder(pd, c(vars, colnames(pd)[!colnames(pd) %in% vars]))
+  } else {
+    pd = do.call(mmpf::marginalPrediction, args)
+    names(pd)[ncol(pd)] = target
+  }
+
+  attr(pd, "class") = c("pd", "data.frame")
+  attr(pd, "interaction") = interaction == TRUE
+  attr(pd, "target") = target
+  attr(pd, "vars") = vars
+  pd
+}
+
+
 # Calculate average marginal effects from model with margins package.
 calc_average_marginal_effects <- function(model, data=NULL, with_confint=FALSE) {
   if (with_confint) {
@@ -22,11 +71,44 @@ calc_average_marginal_effects <- function(model, data=NULL, with_confint=FALSE) 
     else {
       me <- margins::marginal_effects(model)
     }
-    term <- stringr::str_replace(names(me), "^dydx_", "")
+    # For some reason, str_replace garbles column names generated from Date column with Japanese name. Using gsub instead to avoid the issue.
+    # term <- stringr::str_replace(names(me), "^dydx_", "")
+    term <- gsub("^dydx_", "", names(me))
     ame <- purrr::flatten_dbl(purrr::map(me, function(x){mean(x, na.rm=TRUE)}))
     ret <- data.frame(term=term, ame=ame)
     ret
   }
+}
+
+# VIF calculation definition from car::vif.
+# Copied to avoid having to import many dependency packages.
+vif <- function(mod, ...) {
+    if (any(is.na(coef(mod)))) 
+        stop ("there are aliased coefficients in the model")
+    v <- vcov(mod)
+    assign <- attr(model.matrix(mod), "assign")
+    if (names(coefficients(mod)[1]) == "(Intercept)") {
+        v <- v[-1, -1]
+        assign <- assign[-1]
+    }
+    else warning("No intercept: vifs may not be sensible.")
+    terms <- labels(terms(mod))
+    n.terms <- length(terms)
+    if (n.terms < 2) stop("model contains fewer than 2 terms")
+    R <- cov2cor(v)
+    detR <- det(R)
+    result <- matrix(0, n.terms, 3)
+    rownames(result) <- terms
+    colnames(result) <- c("GVIF", "Df", "GVIF^(1/(2*Df))")
+    for (term in 1:n.terms) {
+        subs <- which(assign == term)
+        result[term, 1] <- det(as.matrix(R[subs, subs])) *
+            det(as.matrix(R[-subs, -subs])) / detR
+        result[term, 2] <- length(subs)
+    }
+    if (all(result[, 2] == 1)) result <- result[, 1]
+    else result[, 3] <- result[, 1]^(1/(2 * result[, 2]))
+    result
 }
 
 
@@ -41,7 +123,7 @@ calc_average_marginal_effects <- function(model, data=NULL, with_confint=FALSE) 
 #' @param test_rate Ratio of test data
 #' @param seed Random seed to control test data sampling
 #' @export
-build_lm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, group_cols = NULL, test_rate = 0.0, seed = 0){
+build_lm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, group_cols = NULL, test_rate = 0.0, seed = 1){
   validate_empty_data(data)
 
   # make variables factor sorted by the frequency
@@ -87,11 +169,6 @@ build_lm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, gr
 
   if(!is.null(group_cols)){
     data <- dplyr::group_by(data, !!!rlang::syms(colnames(data)[group_col_index]))
-  } else if (!dplyr::is.grouped_df(data)) {
-    # grouping is necessary for tidyr::nest to work so putting one value columns
-    data <- data %>%
-      dplyr::mutate(source.data = 1) %>%
-      dplyr::group_by(source.data)
   }
 
   group_col_names <- grouped_by(data)
@@ -113,7 +190,7 @@ build_lm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, gr
 
   ret <- tryCatch({
     ret <- data %>%
-      tidyr::nest(.key = "source.data") %>%
+      tidyr::nest(source.data=-dplyr::group_cols()) %>%
       # create test index
       dplyr::mutate(.test_index = purrr::map(source.data, function(df){
         sample_df_index(df, rate = test_rate)
@@ -182,6 +259,12 @@ build_lm.fast <- function(df,
                     link = NULL,
                     max_nrow = 50000,
                     predictor_n = 12, # so that at least months can fit in it.
+                    normalize_target = FALSE,
+                    normalize_predictors = FALSE,
+                    target_outlier_filter_type = NULL,
+                    target_outlier_filter_threshold = NULL,
+                    predictor_outlier_filter_type = NULL,
+                    predictor_outlier_filter_threshold = NULL,
                     smote = FALSE,
                     smote_target_minority_perc = 40,
                     smote_max_synth_perc = 200,
@@ -195,17 +278,15 @@ build_lm.fast <- function(df,
                     with_marginal_effects = FALSE,
                     with_marginal_effects_confint = FALSE,
                     variable_metric = NULL,
+                    p_value_threshold = 0.05,
+                    max_pd_vars = 12,
+                    pd_sample_size = 20,
+                    pd_grid_resolution = 20,
                     seed = 1,
                     test_rate = 0.0,
                     test_split_type = "random" # "random" or "ordered"
                     ){
-  # TODO: add test
-  # TODO: cleanup code only aplicable to randomForest. this func was started from copy of calc_feature_imp, and still adjusting for lm. 
-
-  # this seems to be the new way of NSE column selection evaluation
-  # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
   target_col <- dplyr::select_var(names(df), !! rlang::enquo(target))
-  # this evaluates select arguments like starts_with
   selected_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
 
   grouped_cols <- grouped_by(df)
@@ -291,7 +372,9 @@ build_lm.fast <- function(df,
   else {
     # Cleaning of column names for marginal_effects(). Space is not handled well. Replace them with '.'.
     # Also, cleaning of column names for relaimpo. - is not handled well. Replace them with _.
-    names(clean_df) <- stringr::str_replace_all(names(df), ' ', '.') %>% stringr::str_replace_all('-', '_')
+    # For some reason, str_replace garbles some column names in Japanese. Using gsub instead to avoid the issue.
+    # names(clean_df) <- stringr::str_replace_all(names(df), ' ', '.') %>% stringr::str_replace_all('-', '_')
+    names(clean_df) <- gsub('\\-', '_', gsub(' ', '.', names(df)))
   }
   # this mapping will be used to restore column names
   name_map <- colnames(clean_df)
@@ -321,8 +404,13 @@ build_lm.fast <- function(df,
 
       # Sample the data because randomForest takes long time if data size is too large.
       # If we are to do SMOTE, do not down sample here and let exp_balance handle it so that we do not sample out precious minority data.
+      sampled_nrow <- NULL
       if (!smote) {
-        df <- df %>% sample_rows(max_nrow)
+        if (!is.null(max_nrow) && nrow(df) > max_nrow) {
+          # Record that sampling happened.
+          sampled_nrow <- max_nrow
+          df <- df %>% sample_rows(max_nrow)
+        }
       }
 
       c_cols <- clean_cols
@@ -337,6 +425,9 @@ build_lm.fast <- function(df,
           # Do the same for Date/POSIXct, because we will create numeric columns from them.
           df <- df %>% dplyr::filter(!is.na(df[[col]]) & !is.infinite(df[[col]]))
         }
+      }
+      if (nrow(df) == 0) {
+        stop("No row is left after removing NA/Inf from numeric, Date, or POSIXct columns.")
       }
       for(col in clean_cols){
         if(lubridate::is.Date(df[[col]]) || lubridate::is.POSIXct(df[[col]])) {
@@ -423,6 +514,53 @@ build_lm.fast <- function(df,
         if (length(unique_val[!is.na(unique_val)]) == 1) {
           c_cols <- setdiff(c_cols, col)
           df[[col]] <- NULL # drop the column so that SMOTE will not see it. 
+        }
+      }
+      if (length(c_cols) == 0) {
+        stop("No column is left after removing columns with single value.")
+      }
+
+      if (!is.null(target_outlier_filter_type) || !is.null(predictor_outlier_filter_type)) {
+        df$.is.outlier <- FALSE #TODO: handle possibility of name conflict.
+        if (!is.null(target_outlier_filter_type)) {
+          is_outlier <- function(x) {
+            res <- detect_outlier(x, type=target_outlier_filter_type, threshold=target_outlier_filter_threshold) %in% c("lower", "upper")
+            res
+          }
+          if (is.numeric(df[[clean_target_col]])) {
+            df$.is.outlier <- df$.is.outlier | is_outlier(df[[clean_target_col]])
+          }
+        }
+
+        if (!is.null(predictor_outlier_filter_type)) {
+          is_outlier <- function(x) {
+            res <- detect_outlier(x, type=predictor_outlier_filter_type, threshold=predictor_outlier_filter_threshold) %in% c("lower", "upper")
+            res
+          }
+          for (col in c_cols) {
+            if (is.numeric(df[[col]])) {
+              df$.is.outlier <- df$.is.outlier | is_outlier(df[[col]])
+            }
+          }
+        }
+        df <- df %>% dplyr::filter(!.is.outlier)
+        df$.is.outlier <- NULL # Removing the temporary column.
+      }
+
+      # Normalize numeric target variable,
+      # after all column changes for Date/POSIXct, filtering, dropping columns above are done.
+      if (normalize_target) {
+        if (is.numeric(df[[clean_target_col]])) {
+          df[[clean_target_col]] <- normalize(df[[clean_target_col]])
+        }
+      }
+      # Normalize numeric predictors so that resulting coefficients are comparable among them,
+      # after all column changes for Date/POSIXct, filtering, dropping columns above are done.
+      if (normalize_predictors) {
+        for (col in c_cols) {
+          if (is.numeric(df[[col]])) {
+            df[[col]] <- normalize(df[[col]])
+          }
         }
       }
 
@@ -516,6 +654,12 @@ build_lm.fast <- function(df,
               link <- "log"
             }
 
+            if (dplyr::n_distinct(df[[clean_target_col]]) == 1) {
+              # If only 1 unique value is there in target column, glm.nb seems to return error like following.
+              # Error in while ((it <- it + 1) < limit && abs(del) > eps) { : 
+              # missing value where TRUE/FALSE needed
+              stop("Target column has only one unique value.")
+            }
             # The argument link in MASS::glm.nb is evaluated by substitution with delay,
             # so the variable specified in the argument is interpreted as the link argument as it is.
             # For example, if you execute like MASS::glm.nb(fmt, data = df, link = link), the following error will occur
@@ -559,6 +703,22 @@ build_lm.fast <- function(df,
         }
       }
 
+      tryCatch({
+        model$vif <- vif(model)
+      }, error = function(e){
+        # in case of perfect multicollinearity, vif throws error with message "there are aliased coefficients in the model".
+        # Check if it is the case. If coef() includes NA, corresponding variable is causing perfect multicollinearity.
+        coef_vec <- coef(model)
+        na_coef_vec <- coef_vec[is.na(coef_vec)]
+        if (length(na_coef_vec) > 0) {
+          na_coef_names <- names(na_coef_vec)
+          message <- paste(na_coef_names, collapse = ", ")
+          message <- paste0("Variables causing perfect collinearity : ", message)
+          e$message <- message
+        }
+        model$vif <<- e
+      })
+
       if (test_rate > 0) {
         # Note: Do not pass df_test like data=df_test. This for some reason ends up predict returning training data prediction.
         model$prediction_test <- predict(model, df_test, se.fit = TRUE)
@@ -568,6 +728,9 @@ build_lm.fast <- function(df,
       model$terms_mapping <- names(name_map)
       names(model$terms_mapping) <- name_map
       model$orig_levels <- orig_levels
+
+      # For displaying if sampling happened or not.
+      model$sampled_nrow <- sampled_nrow
 
       # add special lm_exploratory class for adding extra info at glance().
       if (model_type == "glm") {
@@ -584,6 +747,35 @@ build_lm.fast <- function(df,
       else {
         class(model) <- c("lm_exploratory", class(model))
       }
+      # Calculate partial dependencies.
+      if (!is.null(model$relative_importance) && "error" %nin% class(model$relative_importance)) { # if importance is available, show only max_pd_vars most important vars.
+        importance <- attr(model$relative_importance, model$relative_importance$type)
+        term <- model$relative_importance$namen[2:length(model$relative_importance$namen)]
+        imp_df <- data.frame(term = term, importance = importance)
+        imp_vars <- as.character((imp_df %>% arrange(-importance))$term)
+        imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # Keep only max_pd_vars most important variables
+      }
+      else  { # We do not have a way to determine importance. Just show all variables.
+        imp_vars <- c_cols
+
+        # We tried showing only significant variables, but decided oftentimes we wanted to see even insignificant ones. Keeping that code for now.
+        #
+        # signif_df <- broom::tidy(model) %>% filter(p.value < p_value_threshold) # One-liner to keep only significant predictors by matching names with result of tidy().
+        # if (nrow(signif_df) > 0) {
+        #   imp_vars <- c_cols[sapply(c_cols,function(x){any(stringr::str_detect(signif_df$term, paste0("^`?", x)))})]
+        # }
+        # else  {
+        #   imp_vars <- c()
+        # }
+      }
+
+      if (length(imp_vars) > 0) {
+        model$partial_dependence <- partial_dependence.lm_exploratory(model, target=clean_target_col, vars=imp_vars, data=df, n=c(pd_grid_resolution, min(nrow(df), pd_sample_size)))
+      }
+      else {
+        model$partial_dependence <- NULL
+      }
+
       list(model = model, test_index = test_index, source_data = source_data)
 
     }, error = function(e){
@@ -659,7 +851,7 @@ glance.lm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
   }
 
   if(pretty.name) {
-    ret <- ret %>% dplyr::rename(`R Squared`=r.squared, `Adj R Squared`=adj.r.squared, `RMSE`=rmse, `F Ratio`=statistic, `P Value`=p.value, `Degree of Freedom`=df, `Log Likelihood`=logLik, Deviance=deviance, `Residual DF`=df.residual, `Number of Rows`=n)
+    ret <- ret %>% dplyr::rename(`R Squared`=r.squared, `Adj R Squared`=adj.r.squared, `RMSE`=rmse, `F Ratio`=statistic, `P Value`=p.value, `Degree of Freedom`=df, `Log Likelihood`=logLik, `Residual Deviance`=deviance, `Residual DF`=df.residual, `Number of Rows`=n)
     # Note column might not exist. Rename if it is there.
     colnames(ret)[colnames(ret) == "note"] <- "Note"
   }
@@ -730,8 +922,8 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
 
   if(pretty.name) {
     if (x$family$family %in% c('binomial', 'quasibinomial')) { # for binomial regressions.
-      ret <- ret %>% dplyr::rename(`Null Deviance`=null.deviance, `DF for Null Model`=df.null, `Log Likelihood`=logLik, Deviance=deviance, `Residual DF`=df.residual, `AUC`=auc) %>%
-        dplyr::select(`F Score`, `Accuracy Rate`, `Misclassification Rate`, `Precision`, `Recall`, `AUC`,`P Value`, `Number of Rows`, positives, negatives,  `Log Likelihood`, `AIC`, `BIC`, `Deviance`, `Null Deviance`, `DF for Null Model`, everything())
+      ret <- ret %>% dplyr::rename(`Null Deviance`=null.deviance, `DF for Null Model`=df.null, `Log Likelihood`=logLik, `Residual Deviance`=deviance, `Residual DF`=df.residual, `AUC`=auc) %>%
+        dplyr::select(`F Score`, `Accuracy Rate`, `Misclassification Rate`, `Precision`, `Recall`, `AUC`,`P Value`, `Number of Rows`, positives, negatives,  `Log Likelihood`, `AIC`, `BIC`, `Residual Deviance`, `Null Deviance`, `DF for Null Model`, everything())
       if (!is.null(x$orig_levels)) { 
         pos_label <- x$orig_levels[2]
         neg_label <- x$orig_levels[1]
@@ -748,8 +940,8 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
       colnames(ret)[colnames(ret) == "negatives"] <- paste0("Number of Rows for ", neg_label)
     }
     else { # for other numeric regressions.
-      ret <- ret %>% dplyr::rename(`Null Deviance`=null.deviance, `DF for Null Model`=df.null, `Log Likelihood`=logLik, Deviance=deviance, `Residual DF`=df.residual) %>%
-        dplyr::select(`P Value`, `Number of Rows`, `Log Likelihood`, `AIC`, `BIC`, `Deviance`, `Null Deviance`, `DF for Null Model`, everything())
+      ret <- ret %>% dplyr::rename(`Null Deviance`=null.deviance, `DF for Null Model`=df.null, `Log Likelihood`=logLik, `Residual Deviance`=deviance, `Residual DF`=df.residual) %>%
+        dplyr::select(`P Value`, `Number of Rows`, `Log Likelihood`, `AIC`, `BIC`, `Residual Deviance`, `Null Deviance`, `DF for Null Model`, everything())
     }
   }
 
@@ -761,11 +953,45 @@ xlevels_to_base_level_table <- function(xlevels) {
   term <- purrr::flatten_chr(purrr::map(names(xlevels), function(vname) {
     # Quote variable name with backtick if it includes special characters or space.
     # Special characters to detect besides space. Note that period and underscore should *not* be included here. : ~!@#$%^&*()+={}|:;'<>,/?"[]-\
-    paste0(if_else(stringr::str_detect(vname,"[ ~!@#$%^&*()+={}|:;'<>,/?\"\\[\\]\\-\\\\]"),paste0('`',vname,'`'),vname),xlevels[[vname]])
+    # Using grepl() as opposed to str_detect() because str_detect seems to return wrong decision when vname ends with SJIS damemoji.
+    # perl=TRUE is required here, since it seems this regex does not detect space, tilde, etc. without perl=TRUE for some reason.
+    paste0(if_else(grepl("[ ~!@#$%^&*()+={}|:;'<>,/?\"\\[\\]\\-\\\\]", vname, perl=TRUE), paste0('`',vname,'`'),vname),xlevels[[vname]])
   }))
   base_level <- purrr::flatten_chr(purrr::map(xlevels, function(v){rep(v[[1]],length(v))}))
   ret <- data.frame(term=term, base.level=base_level)
   ret
+}
+
+# Takes lm/glm model with vif (variance inflation factor) and returns data frame with extracted info.
+vif_to_dataframe <- function(x) {
+  ret <- NULL
+  if (is.matrix(x$vif)) {
+    ret <- x$vif %>% as.data.frame() %>%  tibble::rownames_to_column(var="term") %>% rename(VIF=GVIF)
+  }
+  else {
+    ret <- data.frame(term=names(x$vif), VIF=x$vif)
+  }
+  ret
+}
+
+# From name of variable, returns possible names of terms returned from lm.
+var_to_possible_terms <- function(var, x) {
+  if (is.factor(x$model[[var]])) {
+    # Possibly, the variable name in the term name is quoted with backtic.
+    c(paste0(var, levels(x$model[[var]])),
+      paste0('`', var, '`', levels(x$model[[var]])))
+  }
+  else {
+    # Possibly, the term name is quoted with backtic.
+    c(var, paste0('`', var, '`'))
+  }
+}
+
+# Returns P-value for the variable. For categorical, the smallest value is returned.
+# For the color of relative importance bar chart.
+get_var_min_pvalue <- function(var, coef_df, x) {
+  terms <- var_to_possible_terms(as.character(var), x)
+  min(coef_df$p.value[coef_df$term %in% terms])
 }
 
 #' special version of tidy.lm function to use with build_lm.fast.
@@ -809,11 +1035,16 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
         ret <- data.frame(term = term, importance = importance, importance.high = importance.high, importance.low = importance.low)
         # Reorder factor by the value of relative importance (lmg).
         ret <- ret %>% dplyr::mutate(term = forcats::fct_reorder(term, importance, .fun = sum, .desc = TRUE))
+        coef_df <- broom:::tidy.lm(x)
+        ret <- ret %>% mutate(p.value=purrr::map(term, function(var) {
+          get_var_min_pvalue(var, coef_df, x)
+        }))
         if (pretty.name) {
           ret <- ret %>% rename(`Variable` = term,
                                 `Relative Importance` = importance,
                                 `Relative Importance High` = importance.high,
-                                `Relative Importance Low` = importance.low)
+                                `Relative Importance Low` = importance.low,
+                                `P Value` = p.value)
         }
         ret
       }
@@ -821,11 +1052,24 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
         ret <- data.frame() # Skip output for this group.
         ret
       }
+    },
+    vif = {
+      if (!is.null(x$vif) && "error" %nin% class(x$vif)) {
+        ret <- vif_to_dataframe(x)
+      }
+      else {
+        ret <- data.frame() # Skip output for this group. TODO: Report error in some way.
+      }
+      ret
+    },
+    partial_dependence = {
+      handle_partial_dependence(x)
     }
   )
 }
 
-#' special version of tidy.glm function to use with build_lm.fast.
+#' Special version of tidy.glm function to use with build_lm.fast.
+#' In case of error, returns empty data frame, or data frame with Note column.
 #' @export
 tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, variable_metric = NULL, ...) { #TODO: add test
   switch(type,
@@ -875,7 +1119,7 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
       target_col <- as.character(lazyeval::f_lhs(x$formula)) # get target column name
       actual_val = x$model[[target_col]]
 
-      predicted = x$fitted.value > 0.5 # TODO: make threshold adjustable
+      predicted = x$fitted.value > 0.5 # TODO: make threshold adjustable. Note: This part of code seems to be unused. Check and remove.
       # convert predicted to original set of values. should be either logical, numeric, or factor.
       predicted <- if (is.logical(actual_val)) {
         predicted
@@ -899,8 +1143,50 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
         dplyr::summarize(count = n()) %>%
         dplyr::ungroup()
       ret
+    },
+    vif = {
+      if (!is.null(x$vif) && "error" %nin% class(x$vif)) {
+        ret <- vif_to_dataframe(x)
+      }
+      else {
+        ret <- data.frame() # Skip output for this group. TODO: Report error in some way.
+      }
+      ret
+    },
+    partial_dependence = {
+      handle_partial_dependence(x)
     }
   )
+}
+
+#' wrapper for tidy type partial dependence
+#' @export
+lm_partial_dependence <- function(df, ...) { # TODO: write test for this.
+  res <- df %>% broom::tidy(model, type="partial_dependence", ...)
+  if (nrow(res) == 0) {
+    return(data.frame()) # Skip the rest of processing by returning empty data.frame.
+  }
+  grouped_col <- grouped_by(res) # When called from analytics view, this should be a single column or empty.
+                                 # grouped_by has to be on res rather than on df since dplyr::group_vars
+                                 # does not work on rowwise-grouped data frame.
+
+  if (length(grouped_col) > 0) {
+    res <- res %>% dplyr::ungroup() # ungroup to mutate group_by column.
+    # Folloing is not necessary since we separately display partial dependence plot for each group since v5.5.
+    # add variable name to the group_by column, so that chart is repeated by the combination of group_by column and variable name.
+    # res[[grouped_col]] <- paste(as.character(res[[grouped_col]]), res$x_name)
+
+    res[[grouped_col]] <- forcats::fct_inorder(factor(res[[grouped_col]])) # set order to appear as facets
+    res <- res %>% dplyr::group_by(!!!rlang::syms(grouped_col)) # put back group_by for consistency
+  }
+  else {
+    res$x_name <- forcats::fct_inorder(factor(res$x_name)) # set order to appear as facets
+  }
+  # gather we did after edarf::partial_dependence call turned x_value into factor if not all variables were in a same data type like numeric.
+  # to keep the numeric or factor order (e.g. Sun, Mon, Tue) of x_value in the resulting chart, we do fct_inorder here while x_value is in order.
+  # the first factor() is for the case x_value is not already a factor, to avoid error from fct_inorder()
+  res <- res %>% dplyr::mutate(x_value = forcats::fct_inorder(factor(x_value))) # TODO: if same number appears for different variables, order will be broken.
+  res
 }
 
 #' @export
@@ -914,7 +1200,9 @@ augment.lm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "
       },
       test = {
         # Minic broom:::augment.lm behavior of replacing spaces in column names. Without this, after bind_row in prediction(), such columns will end up in 2 separate columns.
-        names(data) <- stringr::str_replace_all(names(data), ' ', '.')
+        # For some reason, str_replace garbles some column names in Japanese. Using gsub instead to avoid the issue.
+        # names(data) <- stringr::str_replace_all(names(data), ' ', '.')
+        names(data) <- gsub(' ', '.', names(data))
         # Augment data with already predicted result in the model.
         data$.fitted <- restore_na(x$prediction_test$fit, x$prediction_test$unknown_category_rows_index)
         data$.se.fit <- restore_na(x$prediction_test$se.fit, x$prediction_test$unknown_category_rows_index)
@@ -984,7 +1272,9 @@ evaluate_lm_training_and_test <- function(df, pretty.name = FALSE){
         m <- df %>% filter(!is.null(model)) %>% `[[`(1, "model", 1)
         actual_val_col <- all.vars(df$model[[1]]$terms)[[1]]
         # Emulate the way lm replaces the column names in the output.
-        actual_val_col_clean <- stringr::str_replace_all(actual_val_col, ' ', '.')
+        # For some reason, str_replace garbles some column names in Japanese. Using gsub instead to avoid the issue.
+        # actual_val_col_clean <- stringr::str_replace_all(actual_val_col, ' ', '.')
+        actual_val_col_clean <- gsub(' ', '.', actual_val_col)
 
         actual <- test_pred_ret[[actual_val_col_clean]]
         predicted <- test_pred_ret$predicted_value

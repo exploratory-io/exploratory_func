@@ -253,12 +253,10 @@ calc_tf_ <- function(df, group_col, term_col, weight="ratio"){
     val
   }
 
-  weight_fml <- as.formula(paste("~calc_weight(",cnames[[1]],")", sep=""))
-
   ret <- (df[,colnames(df) == group_col | colnames(df)==term_col] %>%
             dplyr::group_by(!!!rlang::syms(c(group_col, term_col))) %>% # convert the column name to symbol for colum names with backticks
-            dplyr::summarise_(.dots=setNames(list(~n()), cnames[[1]])) %>%
-            dplyr::mutate_(.dots=setNames(list(weight_fml), cnames[[2]])) %>%
+            dplyr::summarise(!!rlang::sym(cnames[[1]]) := n()) %>%
+            dplyr::mutate(!!rlang::sym(cnames[[2]]) := calc_weight(!!rlang::sym(cnames[[1]]))) %>%
             dplyr::ungroup()
   )
 }
@@ -288,7 +286,7 @@ do_tfidf <- function(df, group, term, idf_log_scale = log, tf_weight="raw", norm
   term_col <- col_name(substitute(term))
 
   # remove NA from group and term column to avoid error
-  df <- tidyr::drop_na_(df, c(group_col, term_col))
+  df <- tidyr::drop_na(df, !!rlang::sym(group_col), !!rlang::sym(term_col))
 
   cnames <- avoid_conflict(c(group_col, term_col), c("count_of_docs", "tfidf", "tf"))
 
@@ -375,7 +373,7 @@ do_ngram <- function(df, token, sentence, document, maxn=2, sep="_"){
   # gather columns that have token (1 and newly created columns)
   ret <- tidyr::gather_(ret, kv_cnames[[1]], kv_cnames[[2]], c("1", colnames(ret)[(ncol(ret) - maxn + 2):ncol(ret)]), na.rm = TRUE, convert = TRUE)
   # sort the result
-  ret <- dplyr::arrange_(ret, .dots = c(document_col, sentence_col, kv_cnames[[1]]))
+  ret <- dplyr::arrange(ret, !!!rlang::syms(c(document_col, sentence_col, kv_cnames[[1]])))
   ret
 }
 
@@ -410,6 +408,10 @@ parse_number <- function(text, ...){
   # if numeric, return as is for backward compatibility.
   if(is.numeric(text)) {
     text
+  } else if (!is.character(text)) {
+    # non character data raises Error in parse_vector(x, col_number(), na = na, locale = locale, trim_ws = trim_ws) : is.character(x) is not TRUE
+    # so explicitly convert it to character before calling readr::parse_number
+    as.numeric(readr::parse_number(as.character(text), ...))
   } else {
     # For some reason, output from parse_number returns FALSE for
     # is.vector(), which becomes a problem when it is fed to ranger
@@ -426,6 +428,10 @@ parse_logical <- function(text, ...){
   # So if logical, return as is for backward compatibility.
   if(is.logical(text)) {
     text
+  } else if (!is.character(text)){
+    # non character data raises Error in parse_vector(x, col_number(), na = na, locale = locale, trim_ws = trim_ws) : is.character(x) is not TRUE
+    # so explicitly convert it to character before calling readr::parse_number
+    readr::parse_logical(as.character(text), ...)
   } else {
     readr::parse_logical(text, ...)
   }
@@ -480,5 +486,3 @@ str_logical <- function(column, true_value = NULL) {
               ifelse(target %in%  c("false", "no", "0"), FALSE, NA))
    }
 }
-
-

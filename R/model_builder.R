@@ -3,7 +3,7 @@
 
 #' integrated build_kmeans
 #' @export
-build_kmeans <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0, seed=0){
+build_kmeans <- function(df, ..., skv = NULL, fun.aggregate=mean, fill=0, seed=1){
   validate_empty_data(df)
 
   if (!is.null(skv)) {
@@ -47,7 +47,7 @@ build_kmeans.kv_ <- function(df,
                              trace = FALSE,
                              normalize_data = TRUE,
                              keep.source = TRUE,
-                             seed = 0,
+                             seed = 1,
                              augment=TRUE,
                              fun.aggregate=mean,
                              fill=0){
@@ -69,7 +69,7 @@ build_kmeans.kv_ <- function(df,
   model_column <- avoid_conflict(grouped_column, "model")
   source_column <- avoid_conflict(grouped_column, "source.data")
 
-  df <- tidyr::drop_na_(df, c(subject_col, key_col, value_col))
+  df <- tidyr::drop_na(df, !!!rlang::syms(c(subject_col, key_col, value_col))) # using syms() as opposed to sym() to take care of the case where value_col is NULL.
 
   if(row_col %in% grouped_column){
     stop(paste0(row_col, " is a grouping column. ungroup() may be necessary before this operation."))
@@ -142,7 +142,7 @@ build_kmeans.kv_ <- function(df,
   if(augment){
     output <- output %>%
       dplyr::ungroup() %>%
-      unnest_with_drop_(model_column)
+      unnest_with_drop(!!rlang::sym(model_column))
   } else {
     class(output[[model_column]]) <- c("list", ".model", ".model.kmeans")
   }
@@ -159,7 +159,7 @@ build_kmeans.cols <- function(df, ...,
                             trace = FALSE,
                             normalize_data = TRUE,
                             keep.source = TRUE,
-                            seed = 0,
+                            seed = 1,
                             augment=TRUE
                             ){
   validate_empty_data(df)
@@ -179,19 +179,19 @@ build_kmeans.cols <- function(df, ...,
   # this gets a vector of column names which are selected by dots argument
   selected_column <- evaluate_select(df, .dots=select_dots, grouped_column)
 
-  omit_df <- df[,selected_column] %>%
+  omit_df <- df[,selected_column, drop=FALSE] %>% # drop=FALSE to avoid getting converted to vector
     as_numeric_matrix_(selected_column) %>%
     na.omit()
   omit_row <- attr(omit_df, "na.action")
   if(!is.null(omit_row)){
-    df <- df[setdiff(seq(nrow(df)), omit_row), ]
+    df <- df[setdiff(seq(nrow(df)), omit_row),] # For row filtering like this, drop=FALSE is not necessary.
   }
 
   build_kmeans_each <- function(df){
     # remove grouping column
     # to avoid it appears as duplicated column
     # after unnesting the result
-    df <- df[, !colnames(df) %in% grouped_column]
+    df <- df[, !colnames(df) %in% grouped_column, drop=FALSE] # drop=FALSE to avoid getting converted to vector
     kmeans_ret <- tryCatch({
       if(nrow(df) == 0 | ncol(df) == 0){
         stop("No data after removing NA")
@@ -248,7 +248,7 @@ build_kmeans.cols <- function(df, ...,
   if(augment){
     output <- output %>%
       dplyr::ungroup() %>%
-      unnest_with_drop_(model_column)
+      unnest_with_drop(!!rlang::sym(model_column))
   } else {
     # Add a class for Exploratyry to recognize the type of .model
     class(output[[model_column]]) <- c("list", ".model", ".model.kmeans")

@@ -144,7 +144,7 @@ tidy.survfit_exploratory <- function(x, ...) {
   if ("strata" %in% colnames(ret)) {
     nested <- ret %>% dplyr::group_by(strata) %>% tidyr::nest()
     nested <- nested %>% dplyr::mutate(data=purrr::map(data,~complete_times_each(.)))
-    ret <- tidyr::unnest(nested)
+    ret <- tidyr::unnest(nested) %>% dplyr::ungroup()
     # remove ".cohort=" part from strata values.
     ret <- ret %>% dplyr::mutate(strata = stringr::str_remove(strata,"^\\.cohort\\="))
     # Set original factor level back so that legend order is correct on the chart.
@@ -162,13 +162,15 @@ tidy.survfit_exploratory <- function(x, ...) {
     ret <- complete_times_each(ret)
   }
 
-  colnames(ret)[colnames(ret) == "n.risk"] <- "n_risk"
-  colnames(ret)[colnames(ret) == "n.event"] <- "n_event"
-  colnames(ret)[colnames(ret) == "n.censor"] <- "n_censor"
-  colnames(ret)[colnames(ret) == "std.error"] <- "std_error"
-  colnames(ret)[colnames(ret) == "conf.low"] <- "conf_low"
-  colnames(ret)[colnames(ret) == "conf.high"] <- "conf_high"
-  colnames(ret)[colnames(ret) == "strata"] <- "cohort"
+  colnames(ret)[colnames(ret) == "time"] <- "Time"
+  colnames(ret)[colnames(ret) == "estimate"] <- "Survival Rate"
+  colnames(ret)[colnames(ret) == "n.risk"] <- "Observations"
+  colnames(ret)[colnames(ret) == "n.event"] <- "Events"
+  colnames(ret)[colnames(ret) == "n.censor"] <- "Censored"
+  colnames(ret)[colnames(ret) == "std.error"] <- "Std Error"
+  colnames(ret)[colnames(ret) == "conf.low"] <- "Conf Low"
+  colnames(ret)[colnames(ret) == "conf.high"] <- "Conf High"
+  colnames(ret)[colnames(ret) == "strata"] <- "Cohort"
   ret
 }
 

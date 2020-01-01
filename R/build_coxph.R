@@ -160,7 +160,12 @@ build_coxph.fast <- function(df,
         dplyr::filter(!is.na(df[[time_col]])) # this form does not handle group_by. so moved into each_func from outside.
 
       # sample the data for performance if data size is too large.
-      df <- df %>% sample_rows(max_nrow)
+      sampled_nrow <- NULL
+      if (!is.null(max_nrow) && nrow(df) > max_nrow) {
+        # Record that sampling happened.
+        sampled_nrow <- max_nrow
+        df <- df %>% sample_rows(max_nrow)
+      }
 
       c_cols <- clean_cols
       for(col in clean_cols){
@@ -231,7 +236,7 @@ build_coxph.fast <- function(df,
           # 3. limit the number of levels in factor by fct_lump.
           #    we use ties.method to handle the case where there are many unique values. (without it, they all survive fct_lump.)
           # 4. turn NA into (Missing) factor level so that lm will not drop all the rows.
-          df[[col]] <- forcats::fct_explicit_na(forcats::fct_lump(fct_infreq(as.factor(df[[col]])), n=predictor_n, ties.method="first"))
+          df[[col]] <- forcats::fct_explicit_na(forcats::fct_lump(forcats::fct_infreq(as.factor(df[[col]])), n=predictor_n, ties.method="first"))
         } else {
           # for numeric cols, filter NA rows, because lm will anyway do this internally, and errors out
           # if the remaining rows are with single value in any predictor column.
@@ -259,6 +264,7 @@ build_coxph.fast <- function(df,
       # these attributes are used in tidy of randomForest TODO: is this good for lm too?
       rf$terms_mapping <- names(name_map)
       names(rf$terms_mapping) <- name_map
+      rf$sampled_nrow <- sampled_nrow
       # add special lm_coxph class for adding extra info at glance().
       class(rf) <- c("coxph_exploratory", class(rf))
       rf
@@ -300,7 +306,7 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add tes
     colnames(ret)[colnames(ret) == "statistic"] <- "t Ratio"
     colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
     colnames(ret)[colnames(ret) == "std.error"] <- "Std Error"
-    colnames(ret)[colnames(ret) == "estimate"] <- "Estimate"
+    colnames(ret)[colnames(ret) == "estimate"] <- "Coefficient"
     colnames(ret)[colnames(ret) == "conf.low"] <- "Conf Low"
     colnames(ret)[colnames(ret) == "conf.high"] <- "Conf High"
     colnames(ret)[colnames(ret) == "hazard_ratio"] <- "Hazard Ratio"
@@ -332,7 +338,7 @@ glance.coxph_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add t
   if(pretty.name) {
     colnames(ret)[colnames(ret) == "r.squared"] <- "R Squared"
     colnames(ret)[colnames(ret) == "adj.r.squared"] <- "Adj R Squared"
-    colnames(ret)[colnames(ret) == "sigma"] <- "Root Mean Square Error"
+    colnames(ret)[colnames(ret) == "sigma"] <- "RMSE"
     colnames(ret)[colnames(ret) == "statistic"] <- "F Ratio"
     colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
     colnames(ret)[colnames(ret) == "df"] <- "Degree of Freedom"

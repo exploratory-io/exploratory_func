@@ -194,8 +194,15 @@ test_that("test chisq.test with p column", {
 })
 
 test_that("test exp_chisq", {
-  ret <- exp_chisq(mtcars %>% mutate(gear=factor(gear)), gear, carb) # factor order should be kept in the model
-  ret <- exp_chisq(mtcars, gear, carb, value=cyl)
+  mtcars2 <- mtcars
+  mtcars2$gear[[1]] <- NA # test handling of NAs
+  mtcars2$carb[[2]] <- NA
+  mtcars2$cyl[[3]] <- NA
+  ret <- exp_chisq(mtcars2 %>% mutate(gear=factor(gear)), gear, carb) # factor order should be kept in the model
+  ret <- exp_chisq(mtcars2, gear, carb, value=cyl, fun.aggregate=sum)
+  observed <- ret %>% broom::tidy(model, type="observed")
+  summary <- ret %>% broom::glance(model)
+  residuals <- ret %>% broom::tidy(model, type="residuals")
   ret
 })
 
@@ -237,6 +244,14 @@ test_that("test exp_chisq with group_by", {
   ret <- mtcars %>% group_by(vs) %>% exp_chisq(gear, carb, value=cyl)
   observed <- ret %>% broom::tidy(model, type="observed")
   summary <- ret %>% broom::glance(model)
+  residuals <- ret %>% broom::tidy(model, type="residuals")
+})
+
+test_that("test exp_chisq with group_by with single class category in one of the groups", {
+  ret <- mtcars %>% filter(vs!=1 | gear==4) %>% group_by(vs) %>% exp_chisq(gear, carb, value=cyl)
+  observed <- ret %>% broom::tidy(model, type="observed")
+  summary <- ret %>% broom::glance(model)
+  expect_equal(nrow(summary), 1) # summary for only one group should be shown.
   residuals <- ret %>% broom::tidy(model, type="residuals")
 })
 
@@ -330,11 +345,28 @@ test_that("test exp_ttest with group_by", {
   ret
 })
 
+test_that("test exp_ttest with outlier filter", {
+  ret <- mtcars %>% group_by(vs) %>% exp_ttest(mpg, am, outlier_filter_type="percentile", outlier_filter_threshold=0.9)
+  ret %>% tidy(model, type="model")
+  ret %>% tidy(model, type="data_summary")
+  ret
+})
+
 test_that("test exp_anova", {
   ret <- exp_anova(mtcars, mpg, am)
   ret %>% tidy(model, type="model")
   ret %>% tidy(model, type="data_summary")
   ret <- exp_anova(mtcars, mpg, gear)
+  ret %>% tidy(model, type="model")
+  ret %>% tidy(model, type="data_summary")
+  ret
+})
+
+test_that("test exp_anova with outlier filter", {
+  ret <- exp_anova(mtcars, mpg, am, outlier_filter_type="percentile", outlier_filter_threshold=0.9)
+  ret %>% tidy(model, type="model")
+  ret %>% tidy(model, type="data_summary")
+  ret <- exp_anova(mtcars, mpg, gear, outlier_filter_type="percentile", outlier_filter_threshold=0.9)
   ret %>% tidy(model, type="model")
   ret %>% tidy(model, type="data_summary")
   ret

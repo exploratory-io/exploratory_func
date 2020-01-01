@@ -1,6 +1,6 @@
 #' @rdname build_model_
 #' @export
-build_model <- function(data, model_func, seed = 0, test_rate = 0, group_cols = c(), reserved_colnames = c(), ...) {
+build_model <- function(data, model_func, seed = 1, test_rate = 0, group_cols = c(), reserved_colnames = c(), ...) {
   .dots <- lazyeval::dots_capture(...)
   build_model_(
     data = data,
@@ -22,7 +22,7 @@ build_model <- function(data, model_func, seed = 0, test_rate = 0, group_cols = 
 #' @param .dots Additional parameters to work around error of non standard evaluation.
 #' @param ... Parameters for model_func
 #' @export
-build_model_ <- function(data, model_func, seed = 0, test_rate = 0, group_cols = c(), reserved_colnames = c(), .dots, ...) {
+build_model_ <- function(data, model_func, seed = 1, test_rate = 0, group_cols = c(), reserved_colnames = c(), .dots, ...) {
   validate_empty_data(data)
 
   if(!is.null(seed)){
@@ -59,11 +59,6 @@ build_model_ <- function(data, model_func, seed = 0, test_rate = 0, group_cols =
 
   if(!is.null(group_cols)){
     processed <- dplyr::group_by(processed, !!!rlang::syms(colnames(processed)[group_col_index]))
-  } else if (!dplyr::is.grouped_df(processed)){
-    # need to be grouped to nest
-    processed <- processed %>%
-      dplyr::mutate(.test_index = 1) %>%
-      dplyr::group_by(.test_index)
   }
 
   group_col_names <- grouped_by(processed)
@@ -97,7 +92,7 @@ build_model_ <- function(data, model_func, seed = 0, test_rate = 0, group_cols =
 
   ret <- tryCatch({
     ret <- processed %>%
-      tidyr::nest(.key = "source.data") %>%
+      tidyr::nest(source.data=-dplyr::group_cols()) %>%
       # create test index
       dplyr::mutate(.test_index = purrr::map(source.data, function(df){
         sample_df_index(df, rate = test_rate)

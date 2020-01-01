@@ -13,7 +13,8 @@ col_name <- function(x, default = stop("Please supply column name", call. = FALS
   stop("Invalid column specification", call. = FALSE)
 }
 
-#' Simple cast wrapper that spreads columns which is choosed as row and col into matrix
+#' Simple cast wrapper that spreads columns which is choosed as row and col into matrix.
+#' Note that working on data frame with group_by is not supported.
 #' @param data Data frame to cast
 #' @param row Column name to be used as row
 #' @param col Column name to be used as column
@@ -47,7 +48,7 @@ simple_cast <- function(data, row, col, val=NULL, fun.aggregate=mean, fill=0, ti
   }
 
   # remove NA from row and column
-  data <- tidyr::drop_na_(data, c(row, col))
+  data <- tidyr::drop_na(data, !!rlang::sym(row), !!rlang::sym(col))
 
   if ((inherits(data[[row]], "Date") ||
       inherits(data[[row]], "POSIXct")) &&
@@ -76,7 +77,16 @@ simple_cast <- function(data, row, col, val=NULL, fun.aggregate=mean, fill=0, ti
     if(!val %in% colnames(data)){
       stop(paste0(val, " is not in column names"))
     }
-    data %>%  reshape2::acast(fml, value.var=val, fun.aggregate=fun.aggregate, fill=fill)
+    #data %>%  reshape2::acast(fml, value.var=val, fun.aggregate=fun.aggregate, fill=fill)
+    df <- data %>% dplyr::group_by(!!rlang::sym(row), !!rlang::sym(col))
+    # TODO: handle name conflict with .temp_value_col and group cols.
+    # NAs in val column is already filtered out, and we don't need to add na.rm = TRUE to fun.aggregate.
+    df <- df %>% dplyr::summarize(.temp_value_col=fun.aggregate(!!rlang::sym(val)))
+    # NAs in col column is already filtered out and we don't need to handle it.
+    df <- df %>% dplyr::ungroup() %>% tidyr::spread(key = !!rlang::sym(col), value = .temp_value_col, fill=fill)
+
+    df <- df %>% tibble::column_to_rownames(var=row)
+    x <- df %>% as.matrix()
   }
 }
 
@@ -97,7 +107,7 @@ sparse_cast <- function(data, row, col, val=NULL, fun.aggregate=sum, count = FAL
   }
 
   # remove NA from row and col
-  data <- tidyr::drop_na_(data, c(row, col))
+  data <- tidyr::drop_na(data, !!rlang::sym(row), !!rlang::sym(col))
 
   if(is.null(val)){
     # if there's no value column, it creates binary sparse matrix.
@@ -787,6 +797,18 @@ append_colnames <- function(df, prefix = "", suffix = ""){
   df
 }
 
+#' Returns half-width of confidence interval of given vector. NAs are skipped and not counted.
+#' This is useful when used in dplyr::summarize().
+#' It seems there is no commonly accepted name for half-width of confidence interval, but here we name it confint_error based on the name 'margin of error'.
+#' Reference for naming: https://ncss-wpengine.netdna-ssl.com/wp-content/themes/ncss/pdf/Procedures/PASS/Confidence_Intervals_for_One_Mean.pdf
+#' @export
+confint_error <- function(x, level=0.95) {
+  n <- sum(!is.na(x))
+  s <- sd(x, na.rm = TRUE)
+  error <- qt((level+1)/2, df=n-1)*s/sqrt(n)
+  error
+}
+
 #' get confidence interval value
 #' @param val Predicted value
 #' @param conf_int Confidence interval to get
@@ -798,33 +820,52 @@ get_confint <- function(val, se, conf_int = 0.95) {
 
 #' NSE version of pivot_
 #' @export
-pivot <- function(df, formula, value = NULL, ...) {
+pivot <- function(df, row_cols, col_cols, row_funs = NULL, col_funs = NULL, value = NULL, ...) {
   value_col <- col_name(substitute(value))
-  pivot_(df, formula = formula, value_col = value_col, ...)
+  pivot_(df, row_cols = row_cols, col_cols = col_cols, row_funs = row_funs, col_funs = col_funs, value_col = value_col, ...)
 }
 
 #' pivot columns based on formula
 #' @param df Data frame to pivot
-#' @param formula lhs is composed of columns for rows and rhs is for cols
-#' For example, data1 + data2 ~ var1 + var2 makes a matrix of combinations of
-#' values in data1, data2 pair and var, var2 pair
-#' @param value_col Column name for value. If null, values are count
-#' @param fun.aggregate Function to aggregate duplicated columns
-#' @param fill Value to be filled for missing values
-#' @param na.rm If na should be removed from values
+#' @param row_cols - Columns to be the rows of the resulting pivot table.
+#' @param col_cols - Columns to be the columns of the resulting pivot table.
+#' @param row_funs - Functions to be applied on row_cols before grouping.
+#' @param col_funs - Functions to be applied on col_cols before grouping.
+#' @param value_col - Column name for value. If null, values are count
+#' @param fun.aggregate - Function to aggregate duplicated columns
+#' @param fill - Value to be filled for missing values
+#' @param na.rm - If na should be removed from values
+#' @param cols_sep - If na should be removed from values
 #' @export
-pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = NULL, na.rm = TRUE) {
+pivot_ <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_funs = NULL, value_col = NULL, fun.aggregate = mean, fill = NA, na.rm = TRUE, cols_sep = "_") {
   validate_empty_data(df)
 
-  # create a column name for row names
-  # column names in lhs are collapsed by "_"
-  rows <- all.vars(lazyeval::f_lhs(formula))
-  cname <- paste0(rows, collapse = "_")
+  # Output row column names can be specified as names of row_cols. Extract them.
+  if (!is.null(names(row_cols))) {
+    new_row_cols <- names(row_cols)
+  }
+  else {
+    new_row_cols <- row_cols
+  }
 
-  vars <- all.vars(formula)
+  # Create new_col_cols, which is output column names of summarize_group.
+  # Since new_col_cols are purely internal in this function, no need to look at names(col_cols) unlike row_cols.
+  # Just make sure to make them unique.
+  if (!is.null(col_funs)) {
+    new_col_cols <- if_else(col_funs == "none", col_cols, paste0(col_cols, '_', col_funs))
+  }
+  else {
+    new_col_cols <- col_cols
+  }
 
-  # remove NA data
-  for(var in vars) {
+  all_cols <- c(row_cols, col_cols)
+  all_funs <- c(row_funs, col_funs)
+  all_new_cols <- c(new_row_cols, new_col_cols)
+  group_cols_arg <- all_cols
+  names(group_cols_arg) <- all_new_cols
+
+  # remove rows with NA categories. TODO: Why do we need this? Can it be an old reshape2::acast requirement?
+  for(var in all_cols) {
     df <- df[!is.na(df[[var]]), ]
   }
 
@@ -853,19 +894,21 @@ pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = N
   pivot_each <- function(df) {
     casted <- if(is.null(value_col)) {
       # make a count matrix if value_col is NULL
-      reshape2::acast(df, formula = formula, fun.aggregate = length, fill = fill)
+      df %>% summarize_group(group_cols = group_cols_arg, group_funs = all_funs, value=dplyr::n()) %>% tidyr::pivot_wider(names_from = !!new_col_cols, values_from=value, values_fill=list(value=!!fill), names_sep=cols_sep)
     } else {
-      if(na.rm && !identical(na_pct, fun.aggregate) && !identical(na_count, fun.aggregate) ){
-        # remove NA
-        # if fun.aggregate function is na_pct or na_count,
-        # NA should not be removed because the user wants that information
+      if(na.rm &&
+         !identical(na_ratio, fun.aggregate) &&
+         !identical(non_na_ratio, fun.aggregate) &&
+         !identical(na_pct, fun.aggregate) &&
+         !identical(non_na_pct, fun.aggregate) &&
+         !identical(na_count, fun.aggregate) &&
+         !identical(non_na_count, fun.aggregate)){
+        # remove NA, unless fun.aggregate function is one of the above NA related ones.
         df <- df[!is.na(df[[value_col]]),]
       }
-      reshape2::acast(df, formula = formula, value.var = value_col, fun.aggregate = fun.aggregate, fill = fill)
+      df %>% summarize_group(group_cols = group_cols_arg, group_funs = all_funs, value=fun.aggregate(!!rlang::sym(value_col))) %>% tidyr::pivot_wider(names_from = !!new_col_cols, values_from=value, values_fill=list(value=!!fill), names_sep=cols_sep)
     }
-    casted %>%
-      as.data.frame %>%
-      tibble::rownames_to_column(var = cname)
+    casted
   }
 
   grouped_col <- grouped_by(df)
@@ -880,21 +923,12 @@ pivot_ <- function(df, formula, value_col = NULL, fun.aggregate = mean, fill = N
   ret <- df %>%
     dplyr::do_(.dots=setNames(list(~pivot_each(.)), tmp_col)) %>%
     dplyr::ungroup() %>%
-    unnest_with_drop_(tmp_col)
-
-  if(length(rows) == 1){
-    # Set same data type with original data
-    # because it's always converted to character.
-    # When there are more than 2 rows,
-    # they are concatenated,
-    # so the data type can't be converted
-    ret[[rows]] <- same_type(ret[[rows]], original = df[[rows]])
-  }
+    unnest_with_drop(!!rlang::sym(tmp_col))
 
   # replace NA values in new columns with fill value
   if(!is.na(fill)) {
     # exclude grouping columns and row label column
-    newcols <- setdiff(colnames(ret), c(grouped_col, cname))
+    newcols <- setdiff(colnames(ret), c(grouped_col, new_row_cols))
     # create key value with list
     # whose keys are value columns
     # and values are fill
@@ -1014,7 +1048,11 @@ get_data_type <- function(data){
   }
 }
 
-# add confidence interval
+# Add confidence interval from .fitted column and .se.fit column.
+# This is about t-test for slope of a regression line, but here we estimate
+# confidence interval assuming normal distribution, so that we can calculate it
+# without having to know sample size.
+# https://en.wikipedia.org/wiki/Student%27s_t-test#Slope_of_a_regression_line
 add_confint <- function(data, conf_int){
   # add confidence interval if conf_int is not null and there are .fitted and .se.fit
   if (!is.null(conf_int) & ".se.fit" %in% colnames(data) & ".fitted" %in% colnames(data)) {
@@ -1140,7 +1178,7 @@ unnest_without_empty_ <- function(data, nested_col){
     # if all values in nested_col are empty
     without_empty
   } else {
-    unnest_with_drop_(without_empty, nested_col)
+    unnest_with_drop(without_empty, !!rlang::sym(nested_col))
   }
 }
 
@@ -1237,21 +1275,9 @@ non_na_ratio <- function(x){
 #' if unnesting the specified columns requires the
 #' rows to be duplicated because of more than
 #' 2 rows data frames for example.
-unnest_with_drop_ <- function(..., .drop = TRUE){
-  tidyr::unnest_(..., .drop = .drop)
-}
-
-#' This is a wrapper of tidyr::unnest
-#' to change the default of .drop,
-#' so that it always drops other list
-#' columns, which is an expected behaviour
-#' for usage in this package in most cases.
-#' By default, unnest will drop other list columns
-#' if unnesting the specified columns requires the
-#' rows to be duplicated because of more than
-#' 2 rows data frames for example.
-unnest_with_drop <- function(..., .drop = TRUE){
-  tidyr::unnest(..., .drop = .drop)
+unnest_with_drop <- function(df, ...){
+  ret <- df %>% dplyr::select_if(function(x){!is.list(x)}) %>% dplyr::bind_cols(df %>% dplyr::ungroup() %>% dplyr::select(...)) %>% tidyr::unnest(...)
+  ret
 }
 
 #' validate empty data frame
@@ -1268,15 +1294,15 @@ validate_empty_data <- function(df) {
 do_on_each_group <- function(df, func, params = quote(list()), name = "tmp", with_unnest = TRUE){
   name <- avoid_conflict(colnames(df), name)
   # This is a list of arguments in do clause
-  args <- append(list(quote(.)), rlang::lang_args(params))
-  call <- rlang::new_language(func, rlang::as_pairlist(args))
+  args <- append(list(quote(.)), rlang::call_args(params))
+  call <- rlang::new_call(func, rlang::as_pairlist(args))
   ret <- df %>%
     # UQ and UQ(get_expr()) evaluates those variables
     dplyr::do(UQ(name) := UQ(rlang::get_expr(call)))
   if(with_unnest){
     ret %>%
       dplyr::ungroup() %>%
-      unnest_with_drop_(name)
+      unnest_with_drop(!!rlang::sym(name))
   }else{
     ret
   }
@@ -1288,10 +1314,10 @@ do_on_each_group_2 <- function(df, func1, func2, params1 = quote(list()), params
   name1 <- avoid_conflict(colnames(df), name1)
   name2 <- avoid_conflict(colnames(df), name2)
   # This is a list of arguments in do clause
-  args1 <- append(list(quote(.)), rlang::lang_args(params1))
-  args2 <- append(list(quote(.)), rlang::lang_args(params2))
-  call1 <- rlang::new_language(func1, rlang::as_pairlist(args1))
-  call2 <- rlang::new_language(func2, rlang::as_pairlist(args2))
+  args1 <- append(list(quote(.)), rlang::call_args(params1))
+  args2 <- append(list(quote(.)), rlang::call_args(params2))
+  call1 <- rlang::new_call(func1, rlang::as_pairlist(args1))
+  call2 <- rlang::new_call(func2, rlang::as_pairlist(args2))
   ret <- df %>%
     # UQ and UQ(get_expr()) evaluates those variables
     dplyr::do(UQ(name1) := UQ(rlang::get_expr(call1)), UQ(name2) := UQ(rlang::get_expr(call2)))
@@ -1422,6 +1448,9 @@ extract_from_date <- function(x, type = "fltoyear") {
     },
     week = {
       ret <- lubridate::week(x)
+    },
+    week_of_month = {
+      ret <- exploratory::get_week_of_month(x)
     },
     day = {
       ret <- lubridate::day(x)
@@ -1663,7 +1692,7 @@ bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_da
         if(stringr::str_length(current_df_name) > 0 && index == 1) {
           # if force_data_type is set, force character as column data types
           if(force_data_type) {
-            dataframes_updated[[current_df_name]] <- dplyr::mutate_all(dataframes[[1]], funs(as.character))
+            dataframes_updated[[current_df_name]] <- dplyr::mutate_all(dataframes[[1]], list(as.character=as.character))
           } else {
             dataframes_updated[[current_df_name]] <- dataframes[[1]]
           }
@@ -1674,7 +1703,7 @@ bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_da
           }
           # force character as column data types
           if(force_data_type) {
-            dataframes_updated[[name]] <- dplyr::mutate_all(dataframes[[name]], funs(as.character))
+            dataframes_updated[[name]] <- dplyr::mutate_all(dataframes[[name]], list(as.character=as.character))
           } else {
             dataframes_updated[[name]] <- dataframes[[name]]
           }
@@ -1935,7 +1964,7 @@ restore_na <- function(value, na_row_numbers){
 #' @export
 summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...){
   library(dplyr)
-  if(length(group_cols) == 0) {
+  ret <- if(length(group_cols) == 0) {
     .data %>% summarize(...)
   } else {
     # if group_cols argument is passed, make sure to ungroup first so that it won't throw an error
@@ -1975,6 +2004,7 @@ summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...){
             "monthnamelong",
             "monnamelong",
             "week",
+            "week_of_month",
             "dayofyear",
             "dayofquarter",
             "dayofweek",
@@ -2005,12 +2035,13 @@ summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...){
     } else {
       if(!is.null(group_cols)) { # In case only group_by columns are provied, group_by with the columns
         # make sure to ungroup result
-        .data %>% dplyr::group_by(!!!rlang::sym(group_cols)) %>% summarize(...) %>% dplyr::ungroup()
+        .data %>% dplyr::group_by(!!!rlang::syms(group_cols)) %>% summarize(...) %>% dplyr::ungroup()
       } else { # In case no group_by columns are provided,skip group_by
         .data %>% summarize(...)
       }
     }
   }
+  ret
 }
 
 #' calc_feature_imp (Random Forest) or exp_rpart (Decision Tree) converts logical columns into factor
@@ -2022,3 +2053,45 @@ revert_factor_cols_to_logical <- function(df) {
   }, as.logical)
 }
 
+# Checks if a vector has only integer values.
+is_integer <- function(x) {
+  # isTRUE is necessary since all.equal does not return FALSE for FALSE case. See ?all.equal.
+  is.integer(x) || (is.numeric(x) && isTRUE(all.equal(x, as.integer(x))))
+}
+
+# Wrapper function for sample_n
+sample_n <- function(..., seed = NULL) {
+  if(!is.null(seed)) {
+    set.seed(seed)
+  }
+  dplyr::sample_n(...);
+}
+
+# Wrapper function for sample_frac
+sample_frac <- function(..., seed = NULL){
+  if(!is.null(seed)) {
+    set.seed(seed)
+  }
+  dplyr::sample_frac(...)
+}
+
+# Get the week number of month https://stackoverflow.com/a/58370031
+# @deprecated Leave it for a while for Desktop 5.4.0.12 support.
+get_week_of_month <- function(date) {
+  (5 + lubridate::day(date) + lubridate::wday(lubridate::floor_date(date, "month"))) %/% 7;
+}
+
+#' Wrapper function for lubridate::week
+#' @export
+#' @param date - Date value
+#' @param unit - Either "year", "querter" or "month". Default is "year".
+week <- function(date, unit="year") {
+  if (unit=="month") {
+    ceiling(lubridate::day(date) / 7)
+  } else if (unit=="quarter") {
+    ceiling(lubridate::qday(date) / 7)
+  } else {
+    # Default: year
+    lubridate::week(date)
+  }
+}

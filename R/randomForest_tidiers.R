@@ -1246,7 +1246,7 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
 
               if(pretty.name){
                 map = list(
-                           `Root Mean Square Error` = as.symbol("root_mean_square_error"),
+                           `RMSE` = as.symbol("root_mean_square_error"),
                            `R Squared` = as.symbol("r_squared"),
                            `Number of Rows` = as.symbol("n")
                            )
@@ -1353,8 +1353,11 @@ rf_partial_dependence <- function(df, ...) { # TODO: write test for this.
 
   if (length(grouped_col) > 0) {
     res <- res %>% dplyr::ungroup() # ungroup to mutate group_by column.
+
+    # Folloing is not necessary since we separately display partial dependence plot for each group since v5.5.
     # add variable name to the group_by column, so that chart is repeated by the combination of group_by column and variable name.
-    res[[grouped_col]] <- paste(as.character(res[[grouped_col]]), res$x_name)
+    # res[[grouped_col]] <- paste(as.character(res[[grouped_col]]), res$x_name)
+
     res[[grouped_col]] <- forcats::fct_inorder(factor(res[[grouped_col]])) # set order to appear as facets
     res <- res %>% dplyr::group_by(!!!rlang::syms(grouped_col)) # put back group_by for consistency
   }
@@ -1602,6 +1605,16 @@ exp_balance <- function(df,
       }
     }
 
+    # Remember integer column so that we can bring it back to integer later.
+    integer_cols <- c()
+    for(col in colnames(df)){
+      if(col == target_col) { # skip target_col
+      }
+      else if(is_integer(df[[col]])) {
+        integer_cols <- c(integer_cols, col)
+      }
+    }
+
     # record orig_df at this point so that the data type reverting works fine later when we have to return this instead of smoted df.
     orig_df <- df
 
@@ -1668,6 +1681,15 @@ exp_balance <- function(df,
     for(col in factorized_cols) { # set factorized columns back to character. TODO: take care of other types.
       df_balanced[[col]] <- as.character(df_balanced[[col]])
     }
+
+    # Round to make original integer columns back to integer.
+    # Not doing so has some drawback especially in tree-based models.
+    # https://github.com/scikit-learn-contrib/imbalanced-learn/issues/154
+    # TODO: Consider SMOTE-NC.
+    for(col in integer_cols) {
+      df_balanced[[col]] <- round(df_balanced[[col]])
+    }
+
     df_balanced
   }
 
@@ -1675,7 +1697,7 @@ exp_balance <- function(df,
   ret <- df %>%
     dplyr::do_(.dots=setNames(list(~each_func(.)), tmp_col)) %>%
     dplyr::ungroup() %>%
-    tidyr::unnest_(tmp_col)
+    tidyr::unnest(!!rlang::sym(tmp_col))
 
   # grouping should be kept
   if(length(grouped_col) != 0){
@@ -1691,12 +1713,9 @@ get_classification_type <- function(v) {
   # if not, it is classification
   if (!is.numeric(v)) {
     if (!is.logical(v)) {
-      if (length(unique(v)) == 2) {
-        classification_type <- "binary"
-      }
-      else {
-        classification_type <- "multi"
-      }
+      # Even if number of unique number is 2, we treat it as multi-class as opposed to binary,
+      # since our logic for binary classification depends on the condition that the values are TRUE and FALSE.
+      classification_type <- "multi"
     }
     else {
       classification_type <- "binary"
@@ -1799,7 +1818,12 @@ cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, nam
   }
   # sample the data because randomForest takes long time
   # if data size is too large
-  df <- df %>% sample_rows(max_nrow)
+  sampled_nrow <- NULL
+  if (!is.null(max_nrow) && nrow(df) > max_nrow) {
+    # Record that sampling happened.
+    sampled_nrow <- max_nrow
+    df <- df %>% sample_rows(max_nrow)
+  }
 
   if (is.logical(df[[clean_target_col]])) {
     # we need to convert logical to factor since na.roughfix only works for numeric or factor.
@@ -1924,6 +1948,7 @@ cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, nam
   ret$df <- df
   ret$c_cols <- c_cols
   ret$name_map <- name_map
+  ret$sampled_nrow <- sampled_nrow
   ret
 }
 
@@ -1968,6 +1993,9 @@ calc_feature_imp <- function(df,
                              # Number of most important variables to calculate partial dependences on. 
                              # By default, when Boruta is on, all Confirmed/Tentative variables.
                              # 12 when Boruta is off.
+                             pd_sample_size = 20,
+                             pd_grid_resolution = 20,
+                             pd_with_bin_means = FALSE, # Default is FALSE for backward compatibility on the server
                              with_boruta = FALSE,
                              boruta_max_runs = 20, # Maximal number of importance source runs.
                              boruta_p_value = 0.05, # Boruta recommends using the default 0.01 for P-value, but we are using 0.05 for consistency with other functions of ours.
@@ -2175,7 +2203,10 @@ calc_feature_imp <- function(df,
       rf$imp_vars <- imp_vars
       # Second element of n argument needs to be less than or equal to sample size, to avoid error.
       if (length(imp_vars) > 0) {
-        rf$partial_dependence <- edarf::partial_dependence(rf, vars=imp_vars, data=model_df, n=c(20, min(rf$num.samples, 20)))
+        rf$partial_dependence <- edarf::partial_dependence(rf, vars=imp_vars, data=model_df, n=c(pd_grid_resolution, min(rf$num.samples, pd_sample_size)))
+        if (pd_with_bin_means) {
+          rf$partial_binning <- calc_partial_binning_data(model_df, clean_target_col, imp_vars)
+        }
       }
       else {
         rf$partial_dependence <- NULL
@@ -2189,6 +2220,7 @@ calc_feature_imp <- function(df,
       rf$y <- model.response(model_df)
       rf$df <- model_df
       rf$formula_terms <- terms(fml)
+      rf$sampled_nrow <- clean_df_ret$sampled_nrow
       list(rf = rf, test_index = test_index, source_data = source_data)
     }, error = function(e){
       if(length(grouped_cols) > 0) {
@@ -2349,9 +2381,10 @@ evaluate_binary_classification <- function(actual, predicted, predicted_probabil
       # For ranger, even if level for label "TRUE" is 2, we always treat level 1 as TRUE, for simplicity for now.
       true_class <- levels(actual)[[1]]
     }
+    # Since multi_class = FALSE is specified, Number of Rows is not added here. Will add later.
     ret <- evaluate_classification(actual, predicted, true_class, multi_class = FALSE, pretty.name = pretty.name)
   }
-  else {
+  else { # Because get_classification_type() considers it binary classification only when target is logical, it should never come here, but cowardly keeping the code for now.
     ret <- evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
   }
   if (pretty.name) {
@@ -2360,10 +2393,13 @@ evaluate_binary_classification <- function(actual, predicted, predicted_probabil
   else {
     ret <- ret %>% mutate(auc = auc)
   }
-  sample_n <- sum(!is.na(predicted)) # Sample size for test.
-  ret <- ret %>% dplyr::mutate(n = !!sample_n)
-  if(pretty.name){
-    ret <- ret %>% dplyr::rename(`Number of Rows` = n)
+  # Add Number of Rows here for the case ret came from evaluate_classification(multi_class = FALSE).
+  if (is.null(ret$n) && is.null(ret$`Number of Rows`)) {
+    sample_n <- sum(!is.na(predicted)) # Sample size for test.
+    ret <- ret %>% dplyr::mutate(n = !!sample_n)
+    if(pretty.name){
+      ret <- ret %>% dplyr::rename(`Number of Rows` = n)
+    }
   }
   ret
 }
@@ -2463,54 +2499,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, binary_clas
       ret
     },
     partial_dependence = {
-      if (is.null(x$partial_dependence)) {
-        return(data.frame()) # Skip by returning empty data.frame.
-      }
-      # return partial dependence
-      ret <- x$partial_dependence
-      var_cols <- colnames(ret)
-      var_cols <- var_cols[1:(length(var_cols)-1)] # remove the last column which is the target column in case of regression.
-      var_cols <- var_cols[var_cols %in% colnames(x$df)] # to get list of predictor columns, compare with training df.
-      # We used to do the following, probably for better formatting of numbers, but this had side-effect of
-      # turning close numbers into a same number, when differences among numbers are small compared to their
-      # absolute values. It happened with Date data turned into numeric.
-      # Now we are turning the numbers into factors as is.
-      # Number of unique values should be small (20) here since the grid we specify with edarf is c(20,20).
-      #
-      # for (var_col in var_cols) {
-      #   if (is.numeric(ret[[var_col]])) {
-      #     ret[[var_col]] <- signif(ret[[var_col]], digits=4) # limit digits before we turn it into a factor.
-      #   }
-      # }
-      ret <- ret %>% tidyr::gather_("x_name", "x_value", var_cols, na.rm = TRUE, convert = FALSE)
-      # sometimes x_value comes as numeric and not character, and it was causing error from bind_rows internally done
-      # in tidy().
-      ret <- ret %>% dplyr::mutate(x_value = as.character(x_value))
-      # convert must be FALSE for y to make sure y_name is always character. otherwise bind_rows internally done
-      # in tidy() to bind outputs from different groups errors out because y_value can be, for example, mixture of logical and character.
-      ret <- ret %>% tidyr::gather("y_name", "y_value", -x_name, -x_value, na.rm = TRUE, convert = FALSE)
-      ret <- ret %>% dplyr::mutate(x_name = forcats::fct_relevel(x_name, x$imp_vars)) # set factor level order so that charts appear in order of importance.
-      # set order to ret and turn it back to character, so that the order is kept when groups are bound.
-      # if it were kept as factor, when groups are bound, only the factor order from the first group would be respected.
-      ret <- ret %>% dplyr::arrange(x_name) %>% dplyr::mutate(x_name = as.character(x_name))
-
-      # Set original factor level back so that legend order is correct on the chart.
-      # In case of logical, c("TRUE","FALSE") is stored in orig_level, so that we can
-      # use it here either way.
-      if (!is.null(x$orig_levels)) {
-        ret <- ret %>%  dplyr::mutate(y_name = factor(y_name, levels=x$orig_levels))
-      }
-
-      # create mapping from column name (x_name) to facet chart type based on whether the column is numeric.
-      chart_type_map <-c()
-      for(col in colnames(x$df)) {
-        chart_type_map <- c(chart_type_map, is.numeric(x$df[[col]]))
-      }
-      chart_type_map <- ifelse(chart_type_map, "line", "scatter")
-      names(chart_type_map) <- colnames(x$df)
-
-      ret <- ret %>%  dplyr::mutate(chart_type = chart_type_map[x_name])
-      ret <- ret %>% dplyr::mutate(x_name = x$terms_mapping[x_name]) # map variable names to original.
+      ret <- handle_partial_dependence(x)
       ret
     },
     boruta = {
@@ -2555,7 +2544,7 @@ glance.ranger.regression <- function(x, pretty.name, ...) {
 
   if(pretty.name){
     map = list(
-      `Root Mean Square Error` = as.symbol("root_mean_square_error"),
+      `RMSE` = as.symbol("root_mean_square_error"),
       `R Squared` = as.symbol("r_squared"),
       `Number of Rows` = as.symbol("n")
     )
@@ -2656,7 +2645,7 @@ glance.rpart <- function(x, pretty.name = FALSE, ...) {
 
   if(pretty.name){
     map = list(
-      `Root Mean Square Error` = as.symbol("root_mean_square_error"),
+      `RMSE` = as.symbol("root_mean_square_error"),
       `R Squared` = as.symbol("r_squared"),
       `Number of Rows` = as.symbol("n")
     )
@@ -2666,6 +2655,54 @@ glance.rpart <- function(x, pretty.name = FALSE, ...) {
   ret
 }
 
+# Builds partial_dependency object for rpart with same structure (a data.frame with attributes.) as edarf::partial_dependence.
+partial_dependence.rpart = function(fit, target, vars = colnames(data),
+  n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)), # Keeping same default of 25 as edarf::partial_dependence, although we usually overwrite from callers.
+  interaction = FALSE, uniform = TRUE, data, ...) {
+
+  predict.fun <- function(object, newdata) {
+    # Within our use cases, rpart always returns numeric values or probability
+    # even with multiclass classification.
+    # In that case, just calling predict is enough.
+    # edarf code for ranger does something more for classification case,
+    # but it is not necessary here.
+    ret <- predict(object, newdata)
+    ret
+  }
+
+  args = list(
+    "data" = data,
+    "vars" = vars,
+    "n" = n,
+    "model" = fit,
+    "uniform" = uniform,
+    "predict.fun" = predict.fun,
+    ...
+  )
+  
+  if (length(vars) > 1L & !interaction) { # More than one variables are there. Iterate calling mmpf::marginalPrediction.
+    pd = rbindlist(sapply(vars, function(x) {
+      args$vars = x
+      if ("points" %in% names(args))
+        args$points = args$points[x]
+      mp = do.call(mmpf::marginalPrediction, args)
+      if (fit$classification_type == "regression")
+        names(mp)[ncol(mp)] = target
+      mp
+    }, simplify = FALSE), fill = TRUE)
+    data.table::setcolorder(pd, c(vars, colnames(pd)[!colnames(pd) %in% vars]))
+  } else {
+    pd = do.call(mmpf::marginalPrediction, args)
+    if (fit$classification_type == "regression")
+      names(pd)[ncol(pd)] = target
+  }
+
+  attr(pd, "class") = c("pd", "data.frame")
+  attr(pd, "interaction") = interaction == TRUE
+  attr(pd, "target") = if (fit$classification_type %in% c("regression", "binary")) target else attr(fit,"ylevels")
+  attr(pd, "vars") = vars
+  pd
+}
 
 #' @export
 exp_rpart <- function(df,
@@ -2679,6 +2716,10 @@ exp_rpart <- function(df,
                       smote_target_minority_perc = 40,
                       smote_max_synth_perc = 200,
                       smote_k = 5,
+                      max_pd_vars = 12,
+                      pd_sample_size = 20,
+                      pd_grid_resolution = 20,
+                      pd_with_bin_means = FALSE, # Default is FALSE for backward compatibility on the server
                       seed = 1,
                       minsplit = 20, # The minimum number of observations that must exist in a node in order for a split to be attempted. Passed down to rpart()
                       minbucket = round(minsplit/3), # The minimum number of observations in any terminal node. Passed down to rpart()
@@ -2775,6 +2816,20 @@ exp_rpart <- function(df,
       model$terms_mapping <- names(name_map)
       names(model$terms_mapping) <- name_map
       model$formula_terms <- terms(fml)
+      model$sampled_nrow <- clean_df_ret$sampled_nrow
+
+      # Find list of important variables and run partial dependence on them.
+      if (!is.null(model$variable.importance)) { # It is possible variable.importance is missing for example when no split happened.
+        imp_vars <- names(model$variable.importance) # model$variable.importance is already sorted by importance.
+        imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # Keep only max_pd_vars most important variables
+        model$partial_dependence <- partial_dependence.rpart(model, clean_target_col, vars=imp_vars, data=df, n=c(pd_grid_resolution, min(nrow(df), pd_sample_size)))
+        if (pd_with_bin_means) {
+          model$partial_binning <- calc_partial_binning_data(df, clean_target_col, imp_vars)
+        }
+      }
+      else {
+        model$partial_dependence <- NULL
+      }
 
       if (test_rate > 0) {
         # Handle NA rows for test. For training, rpart seems to automatically handle it, and row numbers of
@@ -3110,6 +3165,10 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
       ) %>%
         dplyr::filter(!is.na(predicted_value))
 
+      ret
+    },
+    partial_dependence = {
+      ret <- handle_partial_dependence(x)
       ret
     },
     {

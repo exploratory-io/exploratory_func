@@ -66,7 +66,7 @@ do_roc_ <- function(df, pred_prob_col, actual_val_col){
   ret <- df %>%
     dplyr::do_(.dots=setNames(list(~do_roc_each(.)), tmp_col)) %>%
     dplyr::ungroup() %>%
-    unnest_with_drop_(tmp_col)
+    unnest_with_drop(!!rlang::sym(tmp_col))
 
   ret
 }
@@ -131,7 +131,7 @@ evaluate_binary_ <- function(df, pred_prob_col, actual_val_col, threshold = "f_s
   ret <- df %>%
     dplyr::do_(.dots=setNames(list(~evaluate_binary_each(.)), tmp_col)) %>%
     dplyr::ungroup() %>%
-    unnest_with_drop_(tmp_col)
+    unnest_with_drop(!!rlang::sym(tmp_col))
 
   ret
 }
@@ -204,7 +204,7 @@ evaluate_regression_ <- function(df, pred_val_col, actual_val_col){
   ret <- df %>%
     dplyr::do_(.dots=setNames(list(~evaluate_regression_each(.)), tmp_col)) %>%
     dplyr::ungroup() %>%
-    unnest_with_drop_(tmp_col)
+    unnest_with_drop(!!rlang::sym(tmp_col))
 
   ret
 }
@@ -303,7 +303,7 @@ evaluate_multi_ <- function(df, pred_label_col, actual_val_col, pretty.name = FA
   ret <- df %>%
     dplyr::do_(.dots=setNames(list(~evaluate_multi_each(.)), tmp_col)) %>%
     dplyr::ungroup() %>%
-    unnest_with_drop_(tmp_col)
+    unnest_with_drop(!!rlang::sym(tmp_col))
 
   if (pretty.name){
     colnames(ret)[colnames(ret) == "micro_f_score"] <- "Micro-Averaged F Score"
@@ -398,7 +398,7 @@ evaluate_binary_training_and_test <- function(df, actual_val_col, threshold = "f
     colnames(ret)[colnames(ret) == "negatives"] <- "Number of Rows for FALSE"
     colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
     colnames(ret)[colnames(ret) == "logLik"] <- "Log Likelihood"
-    colnames(ret)[colnames(ret) == "deviance"] <- "Deviance"
+    colnames(ret)[colnames(ret) == "deviance"] <- "Residual Deviance"
     colnames(ret)[colnames(ret) == "null.deviance"] <- "Null Deviance"
     colnames(ret)[colnames(ret) == "df.null"] <- "DF for Null Model"
     colnames(ret)[colnames(ret) == "df.residual"] <- "Residual DF"
@@ -406,13 +406,14 @@ evaluate_binary_training_and_test <- function(df, actual_val_col, threshold = "f
     base_cols <- colnames(ret)[stringr::str_detect(colnames(ret) , "_base$")]
     if (length(base_cols) > 0) {
       for (col in base_cols) {
-        colnames(ret)[colnames(ret) == col] <- paste0("Base Level of ", stringr::str_replace(col, "_base$", ""))
+        # Using gsub as opposed to str_replace, since str_replace seems to garble Japanese column name on Windows.
+        colnames(ret)[colnames(ret) == col] <- paste0("Base Level of ", gsub("_base$", "", col))
       }
     }
   }
 
   if (length(grouped_col) > 0){
-    ret <- ret %>% dplyr::arrange_(paste0("`", grouped_col, "`"))
+    ret <- ret %>% dplyr::arrange(!!!rlang::syms(grouped_col))
   }
 
   # Prettify is_test_data column. Note that column order is already taken care of.

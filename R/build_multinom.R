@@ -53,7 +53,7 @@ augment.multinom <- function(model, data = NULL, newdata = NULL, ...) {
 
     # in case of training data, NA of terms in both right and left side should be removed
     vars <- all.vars(model$terms)
-    data <- tidyr::drop_na_(data, vars)
+    data <- tidyr::drop_na(data, !!!rlang::syms(vars))
 
 
     ret[[predicted_label_col]] <- stats::predict(model)
@@ -67,7 +67,7 @@ augment.multinom <- function(model, data = NULL, newdata = NULL, ...) {
 
     # in case of test data, NA of terms only in right hand side should be removed
     vars <- all.vars(model$terms)[-1]
-    newdata <- tidyr::drop_na_(newdata, vars)
+    newdata <- tidyr::drop_na(newdata, !!!rlang::syms(vars))
 
     prob_mat <-  stats::predict(model, newdata, type = "prob")
     # if newdata is one row or classification labels are two,

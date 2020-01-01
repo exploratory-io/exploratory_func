@@ -74,7 +74,7 @@ augment_kmeans <- function(df, model, data){
       df %>%
         dplyr::do_(.dots=setNames(list(~augment_each(.)), model_col)) %>%
         dplyr::ungroup() %>%
-        unnest_with_drop_(model_col)
+        unnest_with_drop(!!rlang::sym(model_col))
     } else {
       stop(e)
     }
@@ -212,10 +212,8 @@ assign_cluster <- function(df, source_data){
       dplyr::group_by(!!!rlang::syms(grouping_cols)) %>%
       tidyr::nest()
   } else {
-    # put one value column so that all data can be nested
+    # nest without grouping.
     source_data %>%
-      dplyr::mutate(data = 1) %>%
-      dplyr::group_by(data) %>%
       tidyr::nest()
   }
 
@@ -234,8 +232,10 @@ assign_cluster <- function(df, source_data){
 
   ret <- joined %>%
     dplyr::ungroup() %>%
-    dplyr::rowwise() %>%
-    broom::augment(model, data = data)
+    dplyr::mutate(augmented = purrr::map2(model, data, function(model, data) {
+      broom::augment(model, data = data)
+    })) %>% unnest_with_drop(augmented)
+
   # change factor to numeric
   ret[[".cluster"]] <- as.numeric(ret[[".cluster"]])
   colnames(ret)[colnames(ret) == ".cluster"] <- avoid_conflict(colnames(ret), "cluster")
@@ -812,7 +812,7 @@ prediction_coxph <- function(df, time = NULL, threshold = 0.5, ...){
       ret
     }))
   ret <- ret %>% dplyr::select(!!!c("ret", group_by_names))
-  ret <- ret %>% unnest_with_drop()
+  ret <- ret %>% unnest_with_drop(ret)
 
   # set it back to non-group-by state that is same as predict() output.
   if (length(group_by_names) == 0) {
@@ -924,7 +924,7 @@ model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
     colnames(ret)[colnames(ret) == "statistic"] <- "t Ratio"
     colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
     colnames(ret)[colnames(ret) == "std.error"] <- "Std Error"
-    colnames(ret)[colnames(ret) == "estimate"] <- "Estimate"
+    colnames(ret)[colnames(ret) == "estimate"] <- "Coefficient"
     colnames(ret)[colnames(ret) == "conf.low"] <- "Conf Low"
     colnames(ret)[colnames(ret) == "conf.high"] <- "Conf High"
     colnames(ret)[colnames(ret) == "hazard_ratio"] <- "Hazard Ratio"
@@ -1010,7 +1010,7 @@ model_stats <- function(df, pretty.name = FALSE, ...){
       ret
     })) %>%
     dplyr::select(!!!c("ret", group_by_names)) %>%
-    unnest_with_drop()
+    unnest_with_drop(ret)
 
   # set it back to non-group-by state that is same as glance() output.
   if (length(group_by_names) == 0) {
@@ -1031,12 +1031,12 @@ model_stats <- function(df, pretty.name = FALSE, ...){
   if(pretty.name){
     colnames(ret)[colnames(ret) == "r.squared"] <- "R Squared"
     colnames(ret)[colnames(ret) == "adj.r.squared"] <- "Adj R Squared"
-    colnames(ret)[colnames(ret) == "sigma"] <- "Root Mean Square Error"
+    colnames(ret)[colnames(ret) == "sigma"] <- "RMSE"
     colnames(ret)[colnames(ret) == "statistic"] <- "F Ratio"
     colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
     colnames(ret)[colnames(ret) == "df"] <- "Degree of Freedom"
     colnames(ret)[colnames(ret) == "logLik"] <- "Log Likelihood"
-    colnames(ret)[colnames(ret) == "deviance"] <- "Deviance"
+    colnames(ret)[colnames(ret) == "deviance"] <- "Residual Deviance"
     colnames(ret)[colnames(ret) == "df.residual"] <- "Residual DF"
     # for glm
     colnames(ret)[colnames(ret) == "null.deviance"] <- "Null Deviance"
@@ -1058,7 +1058,7 @@ model_stats <- function(df, pretty.name = FALSE, ...){
 
 
     colnames(ret)[colnames(ret) =="number_of_iteration"] <- "Number of Iteration"
-    colnames(ret)[colnames(ret) =="root_mean_square_error"] <- "Root Mean Square Error"
+    colnames(ret)[colnames(ret) =="root_mean_square_error"] <- "RMSE"
     colnames(ret)[colnames(ret) =="mean_absolute_error"] <- "Mean Absolute Error"
     colnames(ret)[colnames(ret) =="negative_log_likelihood"] <- "Negative Log Likelihood"
     colnames(ret)[colnames(ret) =="binary_misclassification_rate"] <- "Binary Misclassification Rate"
@@ -1265,7 +1265,7 @@ do_survfit <- function(df, time, status, start_time = NULL, end_time = NULL, tim
   ret <- ret %>%
     dplyr::do_(.dots=setNames(list(~add_time_zero_row_each(.)), tmp_col)) %>%
     dplyr::ungroup()
-  ret <- ret %>%  unnest_with_drop_(tmp_col)
+  ret <- ret %>%  unnest_with_drop(!!rlang::sym(tmp_col))
 
   colnames(ret)[colnames(ret) == "n.risk"] <- "n_risk"
   colnames(ret)[colnames(ret) == "n.event"] <- "n_event"

@@ -18,13 +18,18 @@ do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, seed = NULL
   }
 
   each_func <- function(df) {
-    filtered_df <- df %>% tidyr::drop_na_(selected_cols) # TODO: take care of the case where values of a column are mostly NA
+    filtered_df <- df %>% tidyr::drop_na(!!!rlang::syms(selected_cols)) # TODO: take care of the case where values of a column are mostly NA
     if (nrow(filtered_df) == 0) { # skip this group if no row is left.
       return(NULL)
     }
     # sample the data for quicker turn around on UI,
     # if data size is larger than specified max_nrow.
-    filtered_df <- filtered_df %>% sample_rows(max_nrow)
+    sampled_nrow <- NULL
+    if (!is.null(max_nrow) && nrow(filtered_df) > max_nrow) {
+      # Record that sampling happened.
+      sampled_nrow <- max_nrow
+      filtered_df <- filtered_df %>% sample_rows(max_nrow)
+    }
 
     # select_ was not able to handle space in target_col. let's do it in base R way.
     cleaned_df <- filtered_df[,colnames(filtered_df) %in% selected_cols, drop=FALSE]
@@ -44,6 +49,7 @@ do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, seed = NULL
     fit <- prcomp(cleaned_df, scale.=normalize_data)
     fit$df <- filtered_df # add filtered df to model so that we can bind_col it for output. It needs to be the filtered one to match row number.
     fit$grouped_cols <- grouped_cols
+    fit$sampled_nrow <- sampled_nrow
     class(fit) <- c("prcomp_exploratory", class(fit))
     fit
   }

@@ -1,5 +1,4 @@
 context("test build_lm")
-
 test_that("test build_lm summary output ", {
   test_df = data.frame(
     num1 = seq(20) / 10.0,
@@ -26,7 +25,7 @@ test_that("test relative importance", {
   )
   model_df <- test_df %>% build_lm.fast(num1, num2, num3, num4, cat1, relimp = TRUE, relimp_type = "first")
   ret <- model_df %>% broom::tidy(model, type="relative_importance")
-  expect_equal(colnames(ret), c("term", "importance", "importance.high", "importance.low"))
+  expect_equal(colnames(ret), c("term", "importance", "importance.high", "importance.low", "p.value"))
 })
 
 test_that("test build_lm with keep.source FALSE ", {
@@ -298,6 +297,7 @@ test_that("prediction with glm model with SMOTE by build_lm.fast", {
   test_data <- test_data %>% mutate(CARRIER = factor(CARRIER, ordered=TRUE)) # test handling of ordered factor
 
   model_data <- build_lm.fast(test_data, `CANCELLED X`, `Carrier Name`, CARRIER, DISTANCE, model_type = "glm", smote=FALSE, with_marginal_effects=TRUE, with_marginal_effects_confint=TRUE)
+  ret <- model_data %>% lm_partial_dependence()
   ret <- model_data %>% broom::glance(model, pretty.name=TRUE)
   ret <- model_data %>% broom::tidy(model)
   ret <- model_data %>% broom::augment(model)
@@ -334,7 +334,7 @@ test_that("test GLM (Negative Binomial) summary output", {
   model_ret_pretty <- ret %>% broom::glance(model, pretty.name=TRUE)
   expect_equal(colnames(model_ret_pretty),
                c("P Value", "Number of Rows", "Log Likelihood", "AIC",
-                 "BIC", "Deviance", "Null Deviance",
+                 "BIC", "Residual Deviance", "Null Deviance",
                  "DF for Null Model", "Residual DF",
                  "Theta", "SE Theta"))
 })
@@ -369,7 +369,7 @@ test_that("test GLM (Negative Binomial) with group columns", {
   model_ret_pretty <- ret %>% broom::glance(model, pretty.name=TRUE)
   expect_equal(colnames(model_ret_pretty),
                c("CARRIER", "P Value", "Number of Rows", "Log Likelihood", "AIC",
-                 "BIC", "Deviance", "Null Deviance",
+                 "BIC", "Residual Deviance", "Null Deviance",
                  "DF for Null Model", "Residual DF",
                  "Theta", "SE Theta"))
 })

@@ -69,7 +69,7 @@ do_t.test <- function(df, value, key=NULL, ...){
   df %>%
     dplyr::do_(.dots=setNames(list(~do_t.test_each(df = ., ...)), model_col)) %>%
     dplyr::ungroup() %>%
-    unnest_with_drop_(model_col)
+    unnest_with_drop(!!rlang::sym(model_col))
 }
 
 #' wrapper for var.test, which compares variances
@@ -120,7 +120,7 @@ do_var.test <- function(df, value, key, ...){
   df %>%
     dplyr::do_(.dots=setNames(list(~do_var.test_each(df = ., ...)), model_col)) %>%
     dplyr::ungroup() %>%
-    unnest_with_drop_(model_col)
+    unnest_with_drop(!!rlang::sym(model_col))
 }
 
 #' Non standard evaluation version of do_chisq.test_
@@ -190,7 +190,7 @@ do_chisq.test_ <- function(df,
   df %>%
     dplyr::do_(.dots = setNames(list(~chisq.test_each(.)), tmp_col)) %>%
     dplyr::ungroup() %>%
-    unnest_with_drop_(tmp_col)
+    unnest_with_drop(!!rlang::sym(tmp_col))
 }
 
 #' Chi-Square test wrapper for Analytics View
@@ -229,10 +229,12 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
     }
   }
   
-  if (n_distinct(df[[var1_col]]) < 2) {
+  # Check each category column has multiple classes. 
+  # Currently, we filter out NA categories later. So, counting non-NA categories only.
+  if (n_distinct(df[[var1_col]], na.rm=TRUE) < 2) {
     stop(paste0("Variable Column (", var1_col, ") has to have 2 or more kinds of values."))
   }
-  if (n_distinct(df[[var2_col]]) < 2) {
+  if (n_distinct(df[[var2_col]], na.rm=TRUE) < 2) {
     stop(paste0("Variable Column (", var2_col, ") has to have 2 or more kinds of values."))
   }
 
@@ -249,13 +251,40 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
   }
 
   formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
-  # pivot_ does pivot for each group.
-  pivotted_df <- pivot_(df, formula, value_col = value_col, fun.aggregate = fun.aggregate, fill = 0)
 
   chisq.test_each <- function(df) {
-    if (length(grouped_col) > 0) {
-      df <- df %>% select(-!!rlang::sym(grouped_col))
+    # If there is only one class of category in this class, skip it.
+    # This is effectively for multiple group case, since for single group case, it is already checked before this loop.
+    if (n_distinct(df[[var1_col]], na.rm=TRUE) < 2) {
+      return(NULL)
     }
+    if (n_distinct(df[[var2_col]], na.rm=TRUE) < 2) {
+      return(NULL)
+    }
+    # TODO: For now, we are filtering out NA categories, but we should include them and display them cleanly.
+    df <- df %>% dplyr::filter(!is.na(!!rlang::sym(var1_col)) & !is.na(!!rlang::sym(var2_col)))
+    df <- df %>% dplyr::group_by(!!rlang::sym(var1_col), !!rlang::sym(var2_col))
+    if (is.null(value_col)) {
+      df <- df %>% dplyr::summarize(.temp_value_col=n())
+    }
+    else {
+      #TODO: handle name conflict with .temp_value_col and group cols.
+      if (identical(sum, fun.aggregate)) {
+        df <- df %>% dplyr::summarize(.temp_value_col=fun.aggregate(!!rlang::sym(value_col), na.rm=TRUE))
+      }
+      else {
+        # Possible fun.aggregate are, length, n_distinct, false_count (count for TRUE is done by sum),
+        # na_count, non_na_count. They can/should be run without na.rm=TRUE.
+        df <- df %>% dplyr::summarize(.temp_value_col=fun.aggregate(!!rlang::sym(value_col)))
+      }
+    }
+    # TODO: spread creates column named "<NA>". For consistency on UI, we want "(NA)".
+    # Note that this issue is currently avoided by filtering out rows with NA categories in the first place. 
+    df <- df %>% dplyr::ungroup() %>% tidyr::spread(key = !!rlang::sym(var2_col), value = .temp_value_col, fill=0)
+    # na_leves is set to "(NA)" for consistency on UI.
+    # Note that this issue is currently avoided by filtering out rows with NA categories in the first place. 
+    df <- df %>% dplyr::mutate(!!rlang::sym(var1_col):=forcats::fct_explicit_na(as.factor(!!rlang::sym(var1_col)), na_level = "(NA)"))
+
     df <- df %>% tibble::column_to_rownames(var=var1_col)
     x <- df %>% as.matrix()
     model <- chisq.test(x = x, correct = correct, ...)
@@ -289,8 +318,8 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
   # If the original data frame is grouped by "tmp",
   # overwriting it should be avoided,
   # so avoid_conflict is used here.
-  tmp_col <- avoid_conflict(colnames(pivotted_df), "model")
-  ret <- pivotted_df %>%
+  tmp_col <- avoid_conflict(colnames(df), "model") #TODO: Conflict should be an issue only with group_by columns.
+  ret <- df %>%
     dplyr::do_(.dots = setNames(list(~chisq.test_each(.)), tmp_col))
   ret
 }
@@ -426,7 +455,9 @@ glance.chisq_exploratory <- function(x) {
 #' @export
 #' @param conf.level - Level of confidence for confidence interval. Passed to t.test as part of ...
 #' @param sig.level - Significance level for power analysis.
-exp_ttest <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, d = NULL, common_sd = NULL, diff_to_detect = NULL, power = NULL, beta = NULL, ...) {
+exp_ttest <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, d = NULL, common_sd = NULL, diff_to_detect = NULL, power = NULL, beta = NULL,
+                      outlier_filter_type = NULL, outlier_filter_threshold = NULL,
+                      ...) {
   if (!is.null(power) && !is.null(beta) && (power + beta != 1.0)) {
     stop("Specify only one of Power or Probability of Type 2 Error, or they must add up to 1.0.")
   }
@@ -459,8 +490,19 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, d = NULL, 
   formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
 
   ttest_each <- function(df) {
+    if (!is.null(outlier_filter_type)) {
+      is_outlier <- function(x) {
+        res <- detect_outlier(x, type=outlier_filter_type, threshold=outlier_filter_threshold) %in% c("lower", "upper")
+        res
+      }
+      df$.is.outlier <- FALSE #TODO: handle possibility of name conflict.
+      df$.is.outlier <- df$.is.outlier | is_outlier(df[[var1_col]])
+      df <- df %>% dplyr::filter(!.is.outlier)
+      df$.is.outlier <- NULL
+    }
+
     if(length(grouped_cols) > 0) {
-      n_distinct_res_each <- n_distinct(df[[var2_col]]) # check n_distinct again within group.
+      n_distinct_res_each <- n_distinct(df[[var2_col]]) # check n_distinct again within group after handling outlier.
       if (n_distinct_res_each != 2) {
         return(NULL)
       }
@@ -759,7 +801,9 @@ tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
 
 #' ANOVA wrapper for Analytics View
 #' @export
-exp_anova <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, f = NULL, power = NULL, beta = NULL, ...) {
+exp_anova <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, f = NULL, power = NULL, beta = NULL,
+                      outlier_filter_type = NULL, outlier_filter_threshold = NULL,
+                      ...) {
   if (!is.null(power) && !is.null(beta) && (power + beta != 1.0)) {
     stop("Specify only one of Power or Probability of Type 2 Error, or they must add up to 1.0.")
   }
@@ -786,8 +830,19 @@ exp_anova <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, f = NULL, 
   formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
 
   anova_each <- function(df) {
+    if (!is.null(outlier_filter_type)) { #TODO: duplicated code with exp_ttest.
+      is_outlier <- function(x) {
+        res <- detect_outlier(x, type=outlier_filter_type, threshold=outlier_filter_threshold) %in% c("lower", "upper")
+        res
+      }
+      df$.is.outlier <- FALSE #TODO: handle possibility of name conflict.
+      df$.is.outlier <- df$.is.outlier | is_outlier(df[[var1_col]])
+      df <- df %>% dplyr::filter(!.is.outlier)
+      df$.is.outlier <- NULL
+    }
+
     if(length(grouped_cols) > 0) {
-      # Check n_distinct again within group.
+      # Check n_distinct again within group after handling outliers.
       # Group with NA and another category does not seem to work well with aov. Eliminating such case too. TODO: We could replace NA with an explicit level.
       n_distinct_res_each <- n_distinct(df[[var2_col]], na.rm=TRUE)
       if (n_distinct_res_each < 2) {
@@ -837,6 +892,10 @@ exp_anova <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, f = NULL, 
 #' @export
 glance.anova_exploratory <- function(x) {
   ret <- broom:::tidy.aov(x) %>% slice(1:1) # there is no glance.aov. take first row of tidy.aov.
+  # Term value from tidy.aov() can be garbled on Windows with multibyte column name. Overwrite with not-garled value.
+  if (!is.null(ret$term) && length(ret$term) > 0 && !is.null(x$xlevels) && length(x$xlevels) > 0) {
+    ret$term[[1]] <- names(x$xlevels)[[1]]
+  }
   ret
 }
 
@@ -845,6 +904,10 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
   if (type == "model") {
     note <- NULL
     ret <- broom:::tidy.aov(x)
+    # Term value from tidy.aov() can be garbled on Windows with multibyte column name. Overwrite with not-garled value.
+    if (!is.null(ret$term) && length(ret$term) > 0 && !is.null(x$xlevels) && length(x$xlevels) > 0) {
+      ret$term[[1]] <- names(x$xlevels)[[1]]
+    }
     # Get number of groups (k) , and the minimum sample size amoung those groups (min_n_rows).
     data_summary <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
       dplyr::summarize(n_rows=length(!!rlang::sym(x$var1))) %>%
@@ -1152,7 +1215,7 @@ tidy.shapiro_exploratory <- function(x, type = "model", signif_level=0.05) {
     ret <- x$model_summary
     ret <- ret %>% dplyr::mutate(normal = p.value > !!signif_level)
     ret <- ret %>% dplyr::select(-method)
-    ret <- ret %>% dplyr::rename(`Column`=col, `Statistic`=statistic, `P Value`=p.value, `Normal Distribution`=normal, `Sample Size`=sample_size)
+    ret <- ret %>% dplyr::rename(`Column`=col, `W Statistic`=statistic, `P Value`=p.value, `Normal Distribution`=normal, `Sample Size`=sample_size)
     ret
   }
 }

@@ -16,7 +16,7 @@
 #' * revert_ab - Revert which is A and which is B.
 #' @param seed Random seed for bayes test to estimate probability density.
 #' @export
-exp_bayes_ab <- function(df, converted, a_b_identifier, count = NULL, prior_mean = NULL, prior_sd = NULL, type = "model", revert_ab = FALSE, seed = 0, ...){
+exp_bayes_ab <- function(df, converted, a_b_identifier, count = NULL, prior_mean = NULL, prior_sd = NULL, type = "model", revert_ab = FALSE, seed = 1, ...){
   # this seems to be the new way of NSE column selection evaluation
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
   a_b_identifier_col <- dplyr::select_var(names(df), !! rlang::enquo(a_b_identifier))
@@ -178,7 +178,7 @@ exp_bayes_ab <- function(df, converted, a_b_identifier, count = NULL, prior_mean
 #' * improvement - Output coordinate of histogram of lift, which is the ratio of performance improvement of A over B. The formula is (A - B) / B.
 #' @param seed Random seed for bayes test to estimate probability density.
 #' @export
-do_bayes_ab <- function(df, a_b_identifier, total_count, conversion_rate, prior_mean = NULL, prior_sd = NULL, type = "model", seed = 0, ...){
+do_bayes_ab <- function(df, a_b_identifier, total_count, conversion_rate, prior_mean = NULL, prior_sd = NULL, type = "model", seed = 1, ...){
   # this seems to be the new way of NSE column selection evaluation
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
   a_b_identifier_col <- dplyr::select_var(names(df), !! rlang::enquo(a_b_identifier))

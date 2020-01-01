@@ -25,7 +25,7 @@ test_that("test do_svd cols with NA long", {
 
   test_df$value[[3]] <- NA_real_
 
-  test_df <- pivot(test_df, axis1 ~ col, value = value)
+  test_df <- pivot(test_df, row_cols=c("axis1"), col_cols=c("col"), value = value)
 
   ret <- do_svd(test_df, dplyr::starts_with("col"), output = "long")
 
@@ -42,7 +42,7 @@ test_that("test do_svd cols with NA", {
 
   test_df$value[[3]] <- NA_real_
 
-  test_df <- pivot(test_df, axis1 ~ col, value = value)
+  test_df <- pivot(test_df, row_cols=c("axis1"), col_cols=c("col"), value = value)
 
   ret <- do_svd(test_df, dplyr::starts_with("col"), output = "wide")
 
@@ -59,7 +59,7 @@ test_that("test do_svd cols dimension with NA long", {
 
   test_df$value[[3]] <- NA_real_
 
-  test_df <- pivot(test_df, axis1 ~ col, value = value)
+  test_df <- pivot(test_df, row_cols=c("axis1"), col_cols=c("col"), value = value)
 
   ret <- do_svd(test_df, dplyr::starts_with("col"), output = "long", type = "dimension")
 
@@ -76,7 +76,7 @@ test_that("test do_svd cols dimension with NA wide", {
 
   test_df$value[[3]] <- NA_real_
 
-  test_df <- pivot(test_df, axis1 ~ col, value = value)
+  test_df <- pivot(test_df, row_cols=c("axis1"), col_cols=c("col"), value = value)
 
   ret <- do_svd(test_df, dplyr::starts_with("col"), output = "wide", type = "dimension")
 
@@ -93,7 +93,7 @@ test_that("test do_svd cols variance with NA long", {
 
   test_df$value[[3]] <- NA_real_
 
-  test_df <- pivot(test_df, axis1 ~ col, value = value)
+  test_df <- pivot(test_df, row_cols=c("axis1"), col_cols=c("col"), value = value)
 
   ret <- do_svd(test_df, dplyr::starts_with("col"), output = "long", type = "variance")
 
@@ -110,7 +110,7 @@ test_that("test do_svd cols variance with NA wide", {
 
   test_df$value[[3]] <- NA_real_
 
-  test_df <- pivot(test_df, axis1 ~ col, value = value)
+  test_df <- pivot(test_df, row_cols=c("axis1"), col_cols=c("col"), value = value)
 
   ret <- do_svd(test_df, dplyr::starts_with("col"), output = "wide", type = "variance")
 

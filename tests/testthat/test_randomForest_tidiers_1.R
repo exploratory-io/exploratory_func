@@ -99,8 +99,8 @@ test_that("test calc_feature_imp predicting multi-class", {
   conf_mat <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
   # ret <- model_df %>% rf_importance() # Skip this because Boruta is on.
   ret <- model_df %>% rf_partial_dependence()
-  # Check that format of Group column is good for our Analytics View.
-  expect_true(stringr::str_detect(as.character(ret$Group[1]), stringr::regex("[0-2] cat\\s10$|_25$")))
+  # Check the content of group column.
+  expect_true(stringr::str_detect(as.character(ret$Group[1]), stringr::regex("[0-2]$")))
 
 
   # target is character

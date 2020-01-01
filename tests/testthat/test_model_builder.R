@@ -264,7 +264,7 @@ test_that("test build_kmeans skv with wrong column name", {
     test_df %>%
       build_kmeans(skv = c("vec1", "vec"), centers=2) %>%
       augment_kmeans(model, data = source.data)
-  }, "Unknown column `vec` ")
+  }, "object 'vec' not found")
 })
 
 test_that("test build_kmeans cols with wrong column name", {

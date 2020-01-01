@@ -15,7 +15,10 @@ test_that("binary prediction with character target column", {
   test_data <- dplyr::bind_rows(test_data, test_data)
 
   model_data <- build_lm.fast(test_data, `CANCELLED X`, `Carrier Name`, CARRIER, DISTANCE,
+                              normalize_predictors = TRUE,
                               model_type = "glm", smote=FALSE, with_marginal_effects=TRUE, with_marginal_effects_confint=TRUE)
+  ret <- model_data %>% tidy(model, type="vif")
+
   ret <- model_data %>% broom::glance(model, pretty.name=TRUE)
   expect_equal(ret$`Number of Rows`, 34)
   expect_equal(ret$`Number of Rows for Y`, 4) # This ends up to be 4 after doubling
@@ -100,6 +103,8 @@ test_that("Linear Regression with test rate", {
                                      model_type = "lm",
                                      test_rate = 0.1,
                                      test_split_type = "ordered") # testing ordered split too.
+  res <- ret %>% tidy(model, type="vif")
+
   expect_equal(colnames(ret), c("model", ".test_index", "source.data"))
   test_rownum <- length(ret$.test_index[[1]])
   training_rownum <- nrow(test_data) - test_rownum
@@ -119,6 +124,42 @@ test_that("Linear Regression with test rate", {
 
     res <- ret %>% broom::glance(model, pretty.name=TRUE)
     expect_equal(res$`Number of Rows`, 17)
+    res <- ret %>% lm_partial_dependence()
+   })
+})
+
+
+test_that("Linear Regression with outlier filtering", {
+  ret <- test_data %>% build_lm.fast(`DISTANCE`,
+                                     `ARR_TIME`,
+                                     `DERAY_TIME`,
+                                     `Carrier Name`,
+                                     model_type = "lm",
+                                     test_rate = 0.3,
+                                     normalize_predictors = TRUE, # testing target normalization too.
+                                     target_outlier_filter_type="percentile",
+                                     target_outlier_filter_threshold=0.9) # testing outlier filter too.
+
+  expect_equal(colnames(ret), c("model", ".test_index", "source.data"))
+  test_rownum <- length(ret$.test_index[[1]])
+  #training_rownum <- nrow(test_data) - test_rownum
+  training_rownum <- nrow(ret$source.data[[1]]) - test_rownum
+
+  suppressWarnings({
+    pred_training <- prediction(ret, data = "training")
+    pred_test <- prediction(ret, data = "test")
+    expect_equal(training_rownum, nrow(pred_training))
+    expect_equal(test_rownum, nrow(pred_test))
+
+    expected_cols <- c("Carrier.Name", "DISTANCE", "ARR_TIME", "DERAY_TIME",
+                       "predicted_value", "standard_error", "conf_low", "conf_high", "residuals", "hat",
+                       "residual_standard_deviation", "cooks_distance", "standardised_residuals")
+    expect_equal(colnames(pred_training), expected_cols)
+    expected_cols <- c("Carrier.Name", "DISTANCE", "ARR_TIME", "DERAY_TIME", "predicted_value", "standard_error", "conf_low", "conf_high")
+    expect_equal(colnames(pred_test), expected_cols)
+
+    res <- ret %>% broom::glance(model, pretty.name=TRUE)
+    expect_equal(res$`Number of Rows`, 12)
    })
 })
 
@@ -408,6 +449,7 @@ test_that("Group GLM - Poisson Destribution with test_rate", {
     expect_equal(colnames(pred_test), expected_cols)
 
     res <- ret %>% broom::glance(model, pretty.name=TRUE)
+    res <- ret %>% lm_partial_dependence()
    })
 })
 
@@ -438,6 +480,7 @@ test_that("GLM - Negative Binomial Destribution with test_rate", {
     expect_equal(colnames(pred_test), expected_cols)
 
     res <- ret %>% broom::glance(model, pretty.name=TRUE)
+    res <- ret %>% lm_partial_dependence()
    })
 })
 
@@ -472,6 +515,7 @@ test_that("Group GLM - Negative Binomial Destribution with test_rate", {
     expect_equal(colnames(pred_test), expected_cols)
 
     res <- ret %>% broom::glance(model, pretty.name=TRUE)
+    res <- ret %>% lm_partial_dependence()
    })
 })
 
@@ -502,6 +546,7 @@ test_that("Logistic Regression with test_rate", {
     expect_equal(colnames(pred_test), expected_cols)
 
     res <- ret %>% broom::glance(model, pretty.name=TRUE)
+    res <- ret %>% lm_partial_dependence()
    })
 })
 
