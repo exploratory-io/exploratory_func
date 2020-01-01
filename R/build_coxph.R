@@ -254,6 +254,9 @@ build_coxph.fast <- function(df,
           df[[col]] <- NULL # drop the column so that SMOTE will not see it. 
         }
       }
+      if (length(c_cols) == 0) {
+        stop("No predictor column is left after removing columns with single value.")
+      }
 
       # build formula for lm
       rhs <- paste0("`", c_cols, "`", collapse = " + ")
