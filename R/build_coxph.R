@@ -255,7 +255,7 @@ build_coxph.fast <- function(df,
         }
       }
       if (length(c_cols) == 0) {
-        stop("No predictor column is left after removing columns with single value.")
+        stop("The selected predictor variables are invalid since they have only one unique values.")
       }
 
       # build formula for lm

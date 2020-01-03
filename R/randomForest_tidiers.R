@@ -2061,7 +2061,7 @@ calc_feature_imp <- function(df,
       df <- clean_df_ret$df
       c_cols <- clean_df_ret$c_cols
       if  (length(c_cols) == 0) {
-        stop("No predictor column is left after removing columns with single value.")
+        stop("The selected predictor variables are invalid since they have only one unique values.")
       }
       name_map <- clean_df_ret$name_map
 
@@ -2775,7 +2775,7 @@ exp_rpart <- function(df,
       df <- clean_df_ret$df
       c_cols <- clean_df_ret$c_cols
       if  (length(c_cols) == 0) {
-        stop("No predictor column is left after removing columns with single value.")
+        stop("The selected predictor variables are invalid since they have only one unique values.")
       }
       name_map <- clean_df_ret$name_map
 
