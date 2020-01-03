@@ -28,6 +28,17 @@ test_that("test relative importance", {
   expect_equal(colnames(ret), c("term", "importance", "importance.high", "importance.low", "p.value"))
 })
 
+test_that("test relative importance", {
+  expect_error({
+    test_df = data.frame(
+      num1 = runif(20),
+      num2 = 1,
+      num3 = 1
+    )
+    model_df <- test_df %>% build_lm.fast(num1, num2, num3)
+  }, "The selected predictor variables are invalid since they have only one unique values.")
+})
+
 test_that("test build_lm with keep.source FALSE ", {
   test_df = data.frame(
     num1 = seq(20) / 10.0,
