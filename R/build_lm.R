@@ -517,7 +517,7 @@ build_lm.fast <- function(df,
         }
       }
       if (length(c_cols) == 0) {
-        stop("No column is left after removing columns with single value.")
+        stop("The selected predictor variables are invalid since they have only one unique values.")
       }
 
       if (!is.null(target_outlier_filter_type) || !is.null(predictor_outlier_filter_type)) {

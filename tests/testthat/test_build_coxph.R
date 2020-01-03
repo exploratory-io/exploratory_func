@@ -15,6 +15,17 @@ test_that("test build_coxph.fast", {
   ret <- model_df %>% broom::glance(model, pretty.name=TRUE)
 })
 
+test_that("build_coxpy.fast() error handling for predictor with single unique value", {
+  expect_error({
+    df <- survival::lung # this data has NAs.
+    df <- df %>% mutate(age = 50) # Test for single unique value error handling.
+    df <- df %>% rename(`ti me`=time, `sta tus`=status, `a ge`=age, `se-x`=sex)
+    df <- df %>% mutate(ph.ecog = factor(ph.ecog, ordered=TRUE)) # test handling of ordered factor
+    df <- df %>% mutate(`se-x` = `se-x`==1) # test handling of logical
+    model_df <- df %>% build_coxph.fast(`ti me`, `sta tus`, `a ge`, predictor_n = 2)
+  }, "The selected predictor variables are invalid since they have only one unique values.")
+})
+
 # Note: we used to have Japanese column name test, but removed since
 # it was not a simple matter to make it work on Windows where we need to use
 # SJIS. We test multibyte column names with other test suite.

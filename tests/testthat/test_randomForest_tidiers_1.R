@@ -429,3 +429,10 @@ test_that("calc_feature_map(multi) evaluate training and test", {
   ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat", test_rate = 0.3)
   ret <- model_df %>% prediction_training_and_test()
 })
+
+test_that("calc_feature_map() error handling for predictor with single unique value", {
+  expect_error({
+    model_df <- flight %>% mutate(Const=1) %>%
+      calc_feature_imp(`FL NUM`, Const, test_rate = 0.3)
+  }, "The selected predictor variables are invalid since they have only one unique values.")
+})
