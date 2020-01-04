@@ -13,7 +13,7 @@ test_that("test row_as_header", {
 
   expect_equal(ret, structure(
     list(x2 = c(1L, 3L), x_2 = c(-1L, -3L), b = c("a", "c")),
-    .Names = c("x2", "x_2", "b"),
+    .Names = c("X2", "X2_2", "b"),
     row.names = c(1L, 3L),
     class = "data.frame"))
 
@@ -34,7 +34,7 @@ test_that("test row_as_header with factor", {
   ret <- row_as_header(test_df, row_index = 2)
   ret2 <- row_as_header(test_df, row_index = 2, clean_names = FALSE)
 
-  expect_equal(c("x2", "x_2", "b"), colnames(ret))
+  expect_equal(c("X2", "X2_2", "b"), colnames(ret))
   expect_equal(c("2", "-2", "b"), colnames(ret2))
 })
 
