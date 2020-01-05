@@ -738,7 +738,18 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
 }
 
 #' @export
-tidy.prophet_exploratory <- function(x) {
-  x$result
+tidy.prophet_exploratory <- function(x, type="result") {
+  if (type == "result") {
+    x$result
+  }
+  else if (type == "coef") { # Returns coefficients of external regressors.
+    coef_df <- x$model$train.component.cols %>% mutate(val=x$model$params$beta[1,])
+    coef_df <- coef_df %>%
+      mutate_at(vars(starts_with('r')), ~if_else(.==1, val, NA_real_)) %>%
+      select(starts_with('r')) %>%
+      tidyr::pivot_longer(starts_with('r'), names_to="name",values_to="value", values_drop_na=TRUE)
+    res <- coef_df %>% mutate(name=x$regressor_name_map[name])
+    res
+  }
 }
 
