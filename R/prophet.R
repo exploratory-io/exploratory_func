@@ -705,7 +705,9 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
       colnames(ret)[colnames(ret) == "weekly_lower"] <- avoid_conflict(colnames(ret), "weekly_low")
       colnames(ret)[colnames(ret) == "cap.x"] <- avoid_conflict(colnames(ret), "cap_forecast")
       colnames(ret)[colnames(ret) == "cap.y"] <- avoid_conflict(colnames(ret), "cap_model")
-      ret
+      model <- list(result=ret, model=m)
+      class(model) <- c("prophet_exploratory", class(model))
+      model
     }, error = function(e){
       if(length(grouped_col) > 0) {
         # ignore the error if
@@ -727,14 +729,14 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
   # name_col is not conflicting with grouping columns
   # thanks to avoid_conflict that is used before,
   # this doesn't overwrite grouping columns.
-  tmp_col <- avoid_conflict(colnames(df), "tmp_col")
+  tmp_col <- avoid_conflict(colnames(df), "model") #TODO: Conflict should be an issue only with group_by columns.
   ret <- df %>%
-    dplyr::do_(.dots=setNames(list(~do_prophet_each(.)), tmp_col)) %>%
-    dplyr::ungroup()
-  ret <- ret %>% unnest_with_drop(!!rlang::sym(tmp_col))
-
-  if (length(grouped_col) > 0) {
-    ret <- ret %>% dplyr::group_by(!!!rlang::syms(grouped_col))
-  }
+    dplyr::do_(.dots=setNames(list(~do_prophet_each(.)), tmp_col))
   ret
 }
+
+#' @export
+tidy.prophet_exploratory <- function(x) {
+  x$result
+}
+
