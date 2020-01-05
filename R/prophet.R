@@ -705,7 +705,9 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
       colnames(ret)[colnames(ret) == "weekly_lower"] <- avoid_conflict(colnames(ret), "weekly_low")
       colnames(ret)[colnames(ret) == "cap.x"] <- avoid_conflict(colnames(ret), "cap_forecast")
       colnames(ret)[colnames(ret) == "cap.y"] <- avoid_conflict(colnames(ret), "cap_model")
-      model <- list(result=ret, model=m)
+      regressor_name_map <- regressor_final_output_cols
+      names(regressor_name_map) <- regressor_output_cols
+      model <- list(result=ret, model=m, regressor_name_map=regressor_name_map)
       class(model) <- c("prophet_exploratory", class(model))
       model
     }, error = function(e){
