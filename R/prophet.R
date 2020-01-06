@@ -760,7 +760,8 @@ tidy.prophet_exploratory <- function(x, type="result") {
       select(matches('(_effect$|^yearly$|^weekly$|^daily$|^hourly$|^holidays$)')) %>%
       summarise_all(.funs=~sd(.,na.rm=TRUE)) %>%
       pivot_longer(everything()) %>%
-      arrange(desc(value))
+      mutate(name = recode(name, yearly='Yearly', weekly='Weekly', daily='Daily', hourly='Hourly', holidays='Holidays')) %>%
+      mutate(name = stringr::str_remove(name, '_effect$'))
     res
   }
 }
