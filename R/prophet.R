@@ -707,7 +707,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
       colnames(ret)[colnames(ret) == "cap.y"] <- avoid_conflict(colnames(ret), "cap_model")
       regressor_name_map <- regressor_final_output_cols
       names(regressor_name_map) <- regressor_output_cols
-      model <- list(result=ret, model=m, regressor_name_map=regressor_name_map)
+      model <- list(result=ret, model=m, test_mode=test_mode, value_col=value_col, regressor_name_map=regressor_name_map)
       class(model) <- c("prophet_exploratory", class(model))
       model
     }, error = function(e){
@@ -742,13 +742,25 @@ tidy.prophet_exploratory <- function(x, type="result") {
   if (type == "result") {
     x$result
   }
-  else if (type == "coef") { # Returns coefficients of external regressors.
-    coef_df <- x$model$train.component.cols %>% mutate(val=x$model$params$beta[1,])
-    coef_df <- coef_df %>%
-      mutate_at(vars(starts_with('r')), ~if_else(.==1, val, NA_real_)) %>%
-      select(starts_with('r')) %>%
-      tidyr::pivot_longer(starts_with('r'), names_to="name",values_to="value", values_drop_na=TRUE)
-    res <- coef_df %>% mutate(name=x$regressor_name_map[name])
+  else if (type == "coef") { # Returns coefficients (beta) of external regressors and seasonalities.
+    # Keep only training data for reverse calculation of beta.
+    if (x$test_mode) {
+      res <- x$result %>% dplyr::filter(!is_test_data)
+    }
+    else {
+      if (is.null(x$value_col)) {
+        res <- x$result %>% dplyr::filter(!is.na(count))
+      }
+      else {
+        res <- x$result %>% dplyr::filter(!is.na(!!rlang::sym(x$value_col)))
+      }
+    }
+    # Calculate SDs of effects of regressors and seasonalities. For regressors, this equals to (absolute value of) beta by definition.
+    res <- res %>%
+      select(matches('(_effect$|^yearly$|^weekly$|^daily$|^hourly$|^holidays$)')) %>%
+      summarise_all(.funs=~sd(.,na.rm=TRUE)) %>%
+      pivot_longer(everything()) %>%
+      arrange(desc(value))
     res
   }
 }
