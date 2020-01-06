@@ -1,11 +1,13 @@
 context("test prophet functions")
-
+if(F){
 test_that("do_prophet with aggregation", {
   data("raw_data", package = "AnomalyDetection")
   raw_data$timestamp <- as.POSIXct(raw_data$timestamp)
   raw_data <- raw_data %>% rename(`time stamp`=timestamp, `cou nt`=count)
+  browser()
   ret <- raw_data %>%
     do_prophet(`time stamp`, `cou nt`, 10, time_unit = "day")
+  browser()
   ret <- raw_data %>%
     do_prophet(`time stamp`, `cou nt`, 10, time_unit = "hour")
   ret <- raw_data %>% tail(100) %>%
@@ -35,6 +37,7 @@ test_that("do_prophet with aggregation", {
   # verify that the last forecasted_value is not NA to test #9211
   expect_true(!is.na(ret$forecasted_value[[length(ret$forecasted_value)]]))
 })
+}
 
 if(F){
 # This test is too slow. TODO: make it faster and enable.
@@ -105,15 +108,22 @@ test_that("do_prophet test mode with year as time units", {
   # verify that the last forecasted_value is not NA to test #9211
   expect_true(!is.na(ret$forecasted_value[[length(ret$forecasted_value)]]))
 })
+}
 
-test_that("do_prophet with extra regressor", {
+test_that("do_prophet with extra regressors", {
   ts <- seq.Date(as.Date("2010-01-01"), as.Date("2012-01-01"), by="day")
   raw_data <- data.frame(timestamp=ts, data=runif(length(ts)))
   ts2 <- seq.Date(as.Date("2010-01-01"), as.Date("2013-01-01"), by="day")
-  regressor_data <- data.frame(timestamp=ts2, regressor=runif(length(ts2)))
+  regressor_data <- data.frame(timestamp=ts2, regressor1=runif(length(ts2)), regressor2=runif(length(ts2)))
   combined_data <- raw_data %>% full_join(regressor_data, by=c("timestamp"="timestamp"))
-  ret <- combined_data %>%
-    do_prophet(timestamp, data, 10, time_unit = "day", regressors = c("regressor"), funs.aggregate.regressors = c(mean))
+  browser()
+  model_df <- combined_data %>%
+    do_prophet(timestamp, data, 10, time_unit = "day", regressors = c("regressor1","regressor2"), funs.aggregate.regressors = c(mean))
+  browser()
+  coef_df <- model_df %>% tidy(model, type="coef")
+  expect_equal(names(coef_df), c("name","value"))
+  browser()
+  ret <- model_df %>% tidy(model)
   # verify the last date with forecasted_value
   expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2012-01-11")) 
   # verify the last date in the data is the end of regressor data
@@ -126,14 +136,20 @@ test_that("do_prophet with extra regressor with holiday column", {
   ts2 <- seq.Date(as.Date("2010-01-01"), as.Date("2013-01-01"), by="day")
   regressor_data <- data.frame(timestamp=ts2, regressor=runif(length(ts2)), holiday=if_else(runif(length(ts2)) > 0.90,"holiday",NA_character_))
   combined_data <- raw_data %>% full_join(regressor_data, by=c("timestamp"="timestamp"))
-  ret <- combined_data %>%
+  model_df <- combined_data %>%
     do_prophet(timestamp, data, 10, time_unit = "day", regressors = c("regressor"), funs.aggregate.regressors = c(mean), holiday=holiday)
+  browser()
+  coef_df <- model_df %>% tidy(model, type="coef")
+  expect_equal(names(coef_df), c("name","value"))
+  browser()
+  ret <- model_df %>% tidy(model)
   # verify the last date with forecasted_value
   expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2012-01-11")) 
   # verify the last date in the data is the end of regressor data
   expect_equal(ret$timestamp[[length(ret$timestamp)]], as.Date("2013-01-01"))
 })
 
+if(F){
 test_that("do_prophet with holiday column", {
   ts <- seq.Date(as.Date("2010-01-01"), as.Date("2012-01-01"), by="day")
   raw_data <- data.frame(timestamp=ts, data=runif(length(ts)))
