@@ -1213,7 +1213,7 @@ executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 1
   } else {
     # direct import case (for refresh data frame case)
 
-    # bigquery::set_access_cred is deprecated, however, switching to bigquery::bq_auth foreces the oauth token gets refreshed
+    # bigquery::set_access_cred is deprecated, however, switching to bigquery::bq_auth forces the oauth token refresh
     # inside of it. We don't want this since Exploratory Desktop always sends a valid oauth token and use it without refreshing it.
     # so for now, stick to bigrquery::set_access_cred
     bigrquery::set_access_cred(token)
