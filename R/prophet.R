@@ -782,9 +782,8 @@ tidy.prophet_exploratory <- function(x, type="result") {
       dplyr::select(matches('(_effect$|^yearly$|^weekly$|^daily$|^hourly$|^holidays$)')) %>%
       dplyr::summarise_all(.funs=~sd(.,na.rm=TRUE)) %>%
       tidyr::pivot_longer(everything(), names_to='Variable', values_to='Importance') %>%
-      dplyr::mutate(Variable = recode(Variable, yearly='Yearly', weekly='Weekly', daily='Daily', hourly='Hourly', holidays='Holidays')) %>%
+      dplyr::mutate(Variable = dplyr::recode(Variable, yearly='Yearly', weekly='Weekly', daily='Daily', hourly='Hourly', holidays='Holidays')) %>%
       dplyr::mutate(Variable = stringr::str_remove(Variable, '_effect$'))
     res
   }
 }
-
