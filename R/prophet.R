@@ -127,7 +127,8 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
                         cap = NULL, floor = NULL, growth = NULL, weekly.seasonality = TRUE, yearly.seasonality = TRUE,
                         daily.seasonality = "auto",
                         holiday_col = NULL, holidays = NULL, holiday_country_names = NULL,
-                        regressors = NULL, funs.aggregate.regressors = NULL, regressors_na_fill_type = NULL, regressors_na_fill_value = 0, ...){
+                        regressors = NULL, funs.aggregate.regressors = NULL, regressors_na_fill_type = NULL, regressors_na_fill_value = 0,
+                        output = "data", ...) {
   validate_empty_data(df)
 
   # Pseudo code of preprocessing:
@@ -707,11 +708,16 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
       colnames(ret)[colnames(ret) == "weekly_lower"] <- avoid_conflict(colnames(ret), "weekly_low")
       colnames(ret)[colnames(ret) == "cap.x"] <- avoid_conflict(colnames(ret), "cap_forecast")
       colnames(ret)[colnames(ret) == "cap.y"] <- avoid_conflict(colnames(ret), "cap_model")
-      regressor_name_map <- regressor_final_output_cols
-      names(regressor_name_map) <- regressor_output_cols
-      model <- list(result=ret, model=m, test_mode=test_mode, value_col=value_col, regressor_name_map=regressor_name_map)
-      class(model) <- c("prophet_exploratory", class(model))
-      model
+      if (output == "data") { # Pre-5.5 backward compatibility mode.
+        ret
+      }
+      else {
+        regressor_name_map <- regressor_final_output_cols
+        names(regressor_name_map) <- regressor_output_cols
+        model <- list(result=ret, model=m, test_mode=test_mode, value_col=value_col, regressor_name_map=regressor_name_map)
+        class(model) <- c("prophet_exploratory", class(model))
+        model
+      }
     }, error = function(e){
       if(length(grouped_col) > 0) {
         # ignore the error if
@@ -733,10 +739,23 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
   # name_col is not conflicting with grouping columns
   # thanks to avoid_conflict that is used before,
   # this doesn't overwrite grouping columns.
-  tmp_col <- avoid_conflict(colnames(df), "model") #TODO: Conflict should be an issue only with group_by columns.
-  ret <- df %>%
-    dplyr::do_(.dots=setNames(list(~do_prophet_each(.)), tmp_col))
-  ret
+  if (output == "data") { # Pre-5.5 backward compatibility mode.
+    tmp_col <- avoid_conflict(colnames(df), "tmp_col")
+    ret <- df %>%
+      dplyr::do_(.dots=setNames(list(~do_prophet_each(.)), tmp_col)) %>%
+      dplyr::ungroup()
+    ret <- ret %>% unnest_with_drop(!!rlang::sym(tmp_col))
+    if (length(grouped_col) > 0) {
+      ret <- ret %>% dplyr::group_by(!!!rlang::syms(grouped_col))
+    }
+    ret
+  }
+  else {
+    tmp_col <- avoid_conflict(colnames(df), "model") #TODO: Conflict should be an issue only with group_by columns.
+    ret <- df %>%
+      dplyr::do_(.dots=setNames(list(~do_prophet_each(.)), tmp_col))
+    ret
+  }
 }
 
 #' @export
