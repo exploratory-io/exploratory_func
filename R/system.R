@@ -1212,7 +1212,11 @@ executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 1
     df <- getDataFromGoogleBigQueryTableViaCloudStorage(bqProjectId, dataSet, table, csBucket, bucketFolder, tokenFileId)
   } else {
     # direct import case (for refresh data frame case)
-    bigrquery::bq_auth(token = token)
+
+    # bigquery::set_access_cred is deprecated, however, switching to bigquery::bq_auth forces the oauth token refresh
+    # inside of it. We don't want this since Exploratory Desktop always sends a valid oauth token and use it without refreshing it.
+    # so for now, stick to bigrquery::set_access_cred
+    bigrquery::set_access_cred(token)
     # check if the query contains special key word for standardSQL
     # If we do not pass the useLegaySql argument, bigrquery set TRUE for it, so we need to expliclity set it to make standard SQL work.
     isStandardSQL <- stringr::str_detect(query, "#standardSQL")

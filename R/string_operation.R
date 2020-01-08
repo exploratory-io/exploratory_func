@@ -381,7 +381,11 @@ do_ngram <- function(df, token, sentence, document, maxn=2, sep="_"){
 #' @export
 get_sentiment <- function(text){
   loadNamespace("sentimentr")
-  sentimentr::sentiment_by(text)$ave_sentiment
+  if(is.character(text)) {
+    sentimentr::sentiment_by(text)$ave_sentiment
+  } else { # sentiment_by fails if the text is not character so convert it to character first
+    sentimentr::sentiment_by(as.character(text))$ave_sentiment
+  }
 }
 
 #' Wrapper function for readr::parse_character
