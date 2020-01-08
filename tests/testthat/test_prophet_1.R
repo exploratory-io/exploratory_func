@@ -113,7 +113,7 @@ test_that("do_prophet with extra regressors", {
   model_df <- combined_data %>%
     do_prophet(timestamp, data, 10, time_unit = "day", regressors = c("regressor1","regressor2"), funs.aggregate.regressors = c(mean), output="model")
   coef_df <- model_df %>% tidy(model, type="coef")
-  expect_equal(names(coef_df), c("name","value"))
+  expect_equal(names(coef_df), c("Variable","Importance"))
   ret <- model_df %>% tidy(model)
   # verify the last date with forecasted_value
   expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2012-01-11")) 
@@ -130,7 +130,7 @@ test_that("do_prophet with extra regressor with holiday column", {
   model_df <- combined_data %>%
     do_prophet(timestamp, data, 10, time_unit = "day", regressors = c("regressor"), funs.aggregate.regressors = c(mean), holiday=holiday, output="model")
   coef_df <- model_df %>% tidy(model, type="coef")
-  expect_equal(names(coef_df), c("name","value"))
+  expect_equal(names(coef_df), c("Variable","Importance"))
   ret <- model_df %>% tidy(model)
   # verify the last date with forecasted_value
   expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2012-01-11")) 
