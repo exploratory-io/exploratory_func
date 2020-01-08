@@ -343,13 +343,15 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
           }
         }
       }
-      else if (!is.null(holiday_col)) { # even if there is no extra regressor, if holiday column is there, we need to strip future holiday rows.
+      # Even if there is no extra regressor, if holiday column is there, we need to strip future holiday rows.
+      # Again, exception is when value column is not specified (forecast is about number of rows.) AND it is test mode.
+      # In this case, we treat entire data as history data, and just let test mode logic to separate it into training and test.
+      else if (!is.null(holiday_col) && !(is.null(value_col) && test_mode)) {
         df <- trim_future(df, time_col, value_col, periods, time_unit)
       }
       else if(!is.null(value_col)) { # no-extra regressor case. if value column is specified (i.e. value is not number of rows), filter NA rows.
         # df <- df[!is.na(df[[value_col]]), ] # Now we handle NAs with na.rm=TRUE on aggregate function.
       }
-  
   
       # note that prophet only takes columns with predetermined names like ds, y, cap, as input
       aggregated_data <- if (!is.null(value_col) && ("cap" %in% colnames(df))) {
