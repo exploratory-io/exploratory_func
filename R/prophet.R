@@ -127,7 +127,8 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
                         cap = NULL, floor = NULL, growth = NULL, weekly.seasonality = TRUE, yearly.seasonality = TRUE,
                         daily.seasonality = "auto",
                         holiday_col = NULL, holidays = NULL, holiday_country_names = NULL,
-                        regressors = NULL, funs.aggregate.regressors = NULL, regressors_na_fill_type = NULL, regressors_na_fill_value = 0, ...){
+                        regressors = NULL, funs.aggregate.regressors = NULL, regressors_na_fill_type = NULL, regressors_na_fill_value = 0,
+                        output = "data", ...) {
   validate_empty_data(df)
 
   # Pseudo code of preprocessing:
@@ -343,13 +344,15 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
           }
         }
       }
-      else if (!is.null(holiday_col)) { # even if there is no extra regressor, if holiday column is there, we need to strip future holiday rows.
+      # Even if there is no extra regressor, if holiday column is there, we need to strip future holiday rows.
+      # Again, exception is when value column is not specified (forecast is about number of rows.) AND it is test mode.
+      # In this case, we treat entire data as history data, and just let test mode logic to separate it into training and test.
+      else if (!is.null(holiday_col) && !(is.null(value_col) && test_mode)) {
         df <- trim_future(df, time_col, value_col, periods, time_unit)
       }
       else if(!is.null(value_col)) { # no-extra regressor case. if value column is specified (i.e. value is not number of rows), filter NA rows.
         # df <- df[!is.na(df[[value_col]]), ] # Now we handle NAs with na.rm=TRUE on aggregate function.
       }
-  
   
       # note that prophet only takes columns with predetermined names like ds, y, cap, as input
       aggregated_data <- if (!is.null(value_col) && ("cap" %in% colnames(df))) {
@@ -705,7 +708,16 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
       colnames(ret)[colnames(ret) == "weekly_lower"] <- avoid_conflict(colnames(ret), "weekly_low")
       colnames(ret)[colnames(ret) == "cap.x"] <- avoid_conflict(colnames(ret), "cap_forecast")
       colnames(ret)[colnames(ret) == "cap.y"] <- avoid_conflict(colnames(ret), "cap_model")
-      ret
+      if (output == "data") { # Pre-5.5 backward compatibility mode.
+        ret
+      }
+      else {
+        regressor_name_map <- regressor_final_output_cols
+        names(regressor_name_map) <- regressor_output_cols
+        model <- list(result=ret, model=m, test_mode=test_mode, value_col=value_col, regressor_name_map=regressor_name_map)
+        class(model) <- c("prophet_exploratory", class(model))
+        model
+      }
     }, error = function(e){
       if(length(grouped_col) > 0) {
         # ignore the error if
@@ -727,14 +739,51 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
   # name_col is not conflicting with grouping columns
   # thanks to avoid_conflict that is used before,
   # this doesn't overwrite grouping columns.
-  tmp_col <- avoid_conflict(colnames(df), "tmp_col")
-  ret <- df %>%
-    dplyr::do_(.dots=setNames(list(~do_prophet_each(.)), tmp_col)) %>%
-    dplyr::ungroup()
-  ret <- ret %>% unnest_with_drop(!!rlang::sym(tmp_col))
-
-  if (length(grouped_col) > 0) {
-    ret <- ret %>% dplyr::group_by(!!!rlang::syms(grouped_col))
+  if (output == "data") { # Pre-5.5 backward compatibility mode.
+    tmp_col <- avoid_conflict(colnames(df), "tmp_col")
+    ret <- df %>%
+      dplyr::do_(.dots=setNames(list(~do_prophet_each(.)), tmp_col)) %>%
+      dplyr::ungroup()
+    ret <- ret %>% unnest_with_drop(!!rlang::sym(tmp_col))
+    if (length(grouped_col) > 0) {
+      ret <- ret %>% dplyr::group_by(!!!rlang::syms(grouped_col))
+    }
+    ret
   }
-  ret
+  else {
+    tmp_col <- avoid_conflict(colnames(df), "model") #TODO: Conflict should be an issue only with group_by columns.
+    ret <- df %>%
+      dplyr::do_(.dots=setNames(list(~do_prophet_each(.)), tmp_col))
+    ret
+  }
+}
+
+#' @export
+tidy.prophet_exploratory <- function(x, type="result") {
+  if (type == "result") {
+    x$result
+  }
+  else if (type == "coef") { # Returns coefficients (beta) of external regressors and seasonalities.
+    # Keep only training data for reverse calculation of beta.
+    if (x$test_mode) {
+      res <- x$result %>% dplyr::filter(!is_test_data)
+    }
+    else {
+      if (is.null(x$value_col)) {
+        res <- x$result %>% dplyr::filter(!is.na(count))
+      }
+      else {
+        res <- x$result %>% dplyr::filter(!is.na(!!rlang::sym(x$value_col)))
+      }
+    }
+    # Calculate SDs of effects of regressors and seasonalities. For regressors, this equals to (absolute value of) beta by definition.
+    # Reference: https://github.com/facebook/prophet/issues/928
+    res <- res %>%
+      dplyr::select(matches('(_effect$|^yearly$|^weekly$|^daily$|^hourly$|^holidays$)')) %>%
+      dplyr::summarise_all(.funs=~sd(.,na.rm=TRUE)) %>%
+      tidyr::pivot_longer(everything(), names_to='Variable', values_to='Importance') %>%
+      dplyr::mutate(Variable = dplyr::recode(Variable, yearly='Yearly', weekly='Weekly', daily='Daily', hourly='Hourly', holidays='Holidays')) %>%
+      dplyr::mutate(Variable = stringr::str_remove(Variable, '_effect$'))
+    res
+  }
 }
