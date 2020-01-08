@@ -758,11 +758,11 @@ tidy.prophet_exploratory <- function(x, type="result") {
     # Calculate SDs of effects of regressors and seasonalities. For regressors, this equals to (absolute value of) beta by definition.
     # Reference: https://github.com/facebook/prophet/issues/928
     res <- res %>%
-      select(matches('(_effect$|^yearly$|^weekly$|^daily$|^hourly$|^holidays$)')) %>%
-      summarise_all(.funs=~sd(.,na.rm=TRUE)) %>%
-      pivot_longer(everything()) %>%
-      mutate(name = recode(name, yearly='Yearly', weekly='Weekly', daily='Daily', hourly='Hourly', holidays='Holidays')) %>%
-      mutate(name = stringr::str_remove(name, '_effect$'))
+      dplyr::select(matches('(_effect$|^yearly$|^weekly$|^daily$|^hourly$|^holidays$)')) %>%
+      dplyr::summarise_all(.funs=~sd(.,na.rm=TRUE)) %>%
+      tidyr::pivot_longer(everything(), names_to='Variable', values_to='Importance') %>%
+      dplyr::mutate(name = recode(name, yearly='Yearly', weekly='Weekly', daily='Daily', hourly='Hourly', holidays='Holidays')) %>%
+      dplyr::mutate(name = stringr::str_remove(name, '_effect$'))
     res
   }
 }
