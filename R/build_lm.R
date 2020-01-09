@@ -822,14 +822,6 @@ build_lm.fast <- function(df,
 glance.lm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
   ret <- broom:::glance.lm(x)
 
-  for(var in names(x$xlevels)) { # extract base levels info on factor/character columns from lm model
-    if(pretty.name) {
-      ret[paste0("Base Level of ", var)] <- x$xlevels[[var]][[1]]
-    }
-    else {
-      ret[paste0(var, "_base")] <- x$xlevels[[var]][[1]]
-    }
-  }
   # Adjust the subtle difference between sigma (Residual Standard Error) and RMSE.
   # In RMSE, division is done by observation size, while it is by residual degree of freedom in sigma.
   # https://www.rdocumentation.org/packages/sjstats/versions/0.17.4/topics/cv
@@ -909,15 +901,6 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
     # Show number of rows for positive case and negative case, especially so that result of SMOTE is visible.
     ret$positives <- sum(x$y == 1, na.rm = TRUE)
     ret$negatives <- sum(x$y != 1, na.rm = TRUE)
-  }
-
-  for(var in names(x$xlevels)) { # extract base levels info on factor/character columns from lm model
-    if(pretty.name) {
-      ret[paste0("Base Level of ", var)] <- x$xlevels[[var]][[1]]
-    }
-    else {
-      ret[paste0(var, "_base")] <- x$xlevels[[var]][[1]]
-    }
   }
 
   if(pretty.name) {
