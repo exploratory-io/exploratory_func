@@ -298,7 +298,7 @@ test_that("evaluate binary classification model by training and test", {
     eret <- evaluate_binary_training_and_test(ret, "CANCELLED X", pretty.name = TRUE)
     expect_cols <- c("Data Type", "F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall", "AUC",
                      "P Value", "Number of Rows", "Number of Rows for TRUE", "Number of Rows for FALSE", "Log Likelihood", "AIC", "BIC",
-                     "Residual Deviance", "Null Deviance", "DF for Null Model", "Residual DF", "Base Level of Carrier.Name")
+                     "Residual Deviance", "Null Deviance", "DF for Null Model", "Residual DF")
 
     expect_equal(colnames(eret), expect_cols)
   })
