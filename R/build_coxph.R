@@ -330,14 +330,6 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add tes
 glance.coxph_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
   ret <- broom:::glance.coxph(x, model, pretty.name = pretty.name, ...)
 
-  for(var in names(x$xlevels)) { # extract base levels info on factor/character columns from lm model
-    if(pretty.name) {
-      ret[paste0("Base Level of ", var)] <- x$xlevels[[var]][[1]]
-    }
-    else {
-      ret[paste0(var, "_base")] <- x$xlevels[[var]][[1]]
-    }
-  }
   if(pretty.name) {
     colnames(ret)[colnames(ret) == "r.squared"] <- "R Squared"
     colnames(ret)[colnames(ret) == "adj.r.squared"] <- "Adj R Squared"

@@ -246,9 +246,7 @@ test_that("prediction with glm family (negativebinomial) with target column name
   expect_equal(colnames(ret),
                c("null.deviance", "df.null", "logLik",
                  "AIC", "BIC", "deviance",
-                 "df.residual", "p.value", "n", "theta", "SE.theta",
-                 "logical.col_base",
-                 "Carrier.Name_base", "CARRIER_base"))
+                 "df.residual", "p.value", "n", "theta", "SE.theta"))
   ret <- model_data %>% broom::tidy(model)
   expect_colnames <- c("term", "estimate", "std.error", "statistic", "p.value",
                        "conf.high", "conf.low", "base.level")

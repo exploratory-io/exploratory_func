@@ -57,7 +57,7 @@ handle_partial_dependence <- function(x) {
   # }
 
   # For lm/glm, show plot of means of binned training data alongside with the partial dependence as "Actual" plot.
-  # Partial dependence is labeled as the "Model" plot to make comparison.
+  # Partial dependence is labeled as the "Predicted" plot to make comparison.
   if ("glm" %in% class(x) || "lm" %in% class(x)) {
     if (!is.null(x$data)) {  # For glm case.
       df <- x$data
@@ -67,16 +67,16 @@ handle_partial_dependence <- function(x) {
     }
     actual_ret <- calc_partial_binning_data(df, target_col, var_cols)
     ret <- ret %>% dplyr::bind_rows(actual_ret)
-    ret <- ret %>% dplyr::rename(Model=!!rlang::sym(target_col)) # Rename target column to Model to make comparison with Actual.
+    ret <- ret %>% dplyr::rename(Predicted=!!rlang::sym(target_col)) # Rename target column to Predicted to make comparison with Actual.
   }
   else if (!is.null(x$partial_binning)) { # For ranger/rpart, we calculate binning data at model building. Maybe we should do the same for glm/lm.
     actual_ret <- x$partial_binning
     ret <- ret %>% dplyr::bind_rows(actual_ret)
     if (!is.null(ret[[target_col]])) {
-      ret <- ret %>% dplyr::rename(Model=!!rlang::sym(target_col)) # Rename target column to Model to make comparison with Actual.
+      ret <- ret %>% dplyr::rename(Predicted=!!rlang::sym(target_col)) # Rename target column to Predicted to make comparison with Actual.
     }
     else if (!is.null(ret$`TRUE`)) { # Column with name that matches target_col is not there, but TRUE column is there. This must be a binary classification case.
-      ret <- ret %>% dplyr::rename(Model=`TRUE`) # Rename target column to Model to make comparison with Actual.
+      ret <- ret %>% dplyr::rename(Predicted=`TRUE`) # Rename target column to Predicted to make comparison with Actual.
       if (!is.null(ret$`FALSE`)) {
         ret <- ret %>% dplyr::select(-`FALSE`) # Drop FALSE column, which we will not use.
       }
@@ -106,7 +106,7 @@ handle_partial_dependence <- function(x) {
   # glm (binomial family) is exception here, since we only show probability of being TRUE,
   # and instead show mean of binned actual data.
   if ("glm" %in% class(x) || !is.null(x$partial_binning)) { # Or part is for ranger/rpart. They might not have partial_binning, because of being multiclass or published on server from older release.
-    ret <- ret %>%  dplyr::mutate(y_name = factor(y_name, levels=c("Actual", "Model", "conf_low", "conf_high")))
+    ret <- ret %>%  dplyr::mutate(y_name = factor(y_name, levels=c("Actual", "Predicted", "conf_low", "conf_high")))
   }
   else if (!is.null(x$orig_levels)) {
     ret <- ret %>%  dplyr::mutate(y_name = factor(y_name, levels=x$orig_levels))
