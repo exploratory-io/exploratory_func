@@ -15,9 +15,15 @@ to_time_unit_for_seq <- function(time_unit) {
   }
 }
 
+# Trim future part of pre-aggregation data, when it is with external regressors or holidays.
 trim_future <- function(df, time_col, value_col, periods, time_unit) {
   if (!is.null(value_col)) { # if value_col is there consider rows with values to be history data.
-    df <- df %>% dplyr::filter(!is.na(UQ(rlang::sym(value_col)))) # keep the rows that have values. the ones that do not are for future regressors
+    # Figure out the max time with non-na value, and use it as the boundary.
+    # We do this as opposed to filter out all rows with NAs, to work with functions like na_count, and to keep extra regressor info as much as possible.
+    # NAs are later handled by na.rm=TRUE option of aggregate function.
+    non_na_df <- df %>% dplyr::filter(!is.na(UQ(rlang::sym(value_col))))
+    max_non_na_time <- max(non_na_df[[time_col]], na.rm=TRUE)
+    df <- df %>% dplyr::filter(!!rlang::sym(time_col) <= !!max_non_na_time)
   }
   else { # if value_col does not exist, use period to determine the boundary between history and future.
     if (time_unit %in% c("second", "sec")) {
@@ -50,6 +56,23 @@ trim_future <- function(df, time_col, value_col, periods, time_unit) {
     df <- df %>% dplyr::filter(!!rlang::sym(time_col) <= (max(!!rlang::sym(time_col)) - time_unit_func(!!periods)))
   }
   df
+}
+
+is_na_rm_func <- function(func) {
+  if (identical(sum, func) ||
+      identical(mean, func) ||
+      identical(median, func) ||
+      identical(min, func) ||
+      identical(max, func) ||
+      identical(sd, func) ||
+      identical(var, func) ||
+      identical(IQR, func) ||
+      identical(mad, func)) {
+    return(TRUE)
+  }
+  else {
+    return(FALSE)
+  }
 }
 
 #' NSE version of do_prophet_
@@ -104,7 +127,8 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
                         cap = NULL, floor = NULL, growth = NULL, weekly.seasonality = TRUE, yearly.seasonality = TRUE,
                         daily.seasonality = "auto",
                         holiday_col = NULL, holidays = NULL, holiday_country_names = NULL,
-                        regressors = NULL, funs.aggregate.regressors = NULL, regressors_na_fill_type = NULL, regressors_na_fill_value = 0, ...){
+                        regressors = NULL, funs.aggregate.regressors = NULL, regressors_na_fill_type = NULL, regressors_na_fill_value = 0,
+                        output = "data", ...) {
   validate_empty_data(df)
 
   # Pseudo code of preprocessing:
@@ -187,7 +211,13 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
   regressor_final_output_cols <- NULL # Just declaring variable
   if (!is.null(regressors) && !is.null(funs.aggregate.regressors)) {
     summarise_args <- purrr::map2(funs.aggregate.regressors, regressors, function(func, cname) {
-      quo(UQ(func)(UQ(rlang::sym(cname))))
+      # For common functions that require na.rm=TRUE to handle NA, add it.
+      if (is_na_rm_func(func)) {
+        quo(UQ(func)(UQ(rlang::sym(cname)), na.rm=TRUE))
+      }
+      else {
+        quo(UQ(func)(UQ(rlang::sym(cname))))
+      }
     })
 
     # Keep final output column names.
@@ -275,9 +305,10 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
       # based on the specified period.
       # Exception is when value column is not specified (forecast is about number of rows.) AND it is test mode.
       # In this case, we treat entire data as history data, and just let test mode logic to separate it into training and test.
-      if (!is.null(regressors) && (!is.null(value_col) || !test_mode)) {
-        # filter NAs on regressor columns
-        df <- df %>% dplyr::filter(!!!filter_args)
+      if (!is.null(regressors) && !(is.null(value_col) && test_mode)) {
+        # We used to filter NAs on regressor columns here, but now we don't and instead add na.rm to funs.aggregate.regressors.
+        # This should pick up more info, and works with function like na_count too.
+        #df <- df %>% dplyr::filter(!!!filter_args)
         future_df <- df # keep all rows before df is filtered out to become history data.
         df <- trim_future(df, time_col, value_col, periods, time_unit)
         max_floored_date <- max(df[[time_col]])
@@ -304,20 +335,30 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
           ) %>%
           dplyr::group_by(ds) %>%
           dplyr::summarise(!!!summarise_args)
+
+        # It seems prophet internally removes the rows with NA regressor values for future data, unlike for history data, but to avoid being dependent on that behavior,
+        # let's remove them here for future data too.
+        if (!is.null(regressor_output_cols)) {
+          for (regressor_col in regressor_output_cols) {
+            aggregated_future_data <- aggregated_future_data %>% dplyr::filter(!is.na(!!sym(regressor_col)))
+          }
+        }
       }
-      else if (!is.null(holiday_col)) { # even if there is no extra regressor, if holiday column is there, we need to strip future holiday rows.
+      # Even if there is no extra regressor, if holiday column is there, we need to strip future holiday rows.
+      # Again, exception is when value column is not specified (forecast is about number of rows.) AND it is test mode.
+      # In this case, we treat entire data as history data, and just let test mode logic to separate it into training and test.
+      else if (!is.null(holiday_col) && !(is.null(value_col) && test_mode)) {
         df <- trim_future(df, time_col, value_col, periods, time_unit)
       }
       else if(!is.null(value_col)) { # no-extra regressor case. if value column is specified (i.e. value is not number of rows), filter NA rows.
-        df <- df[!is.na(df[[value_col]]), ]
+        # df <- df[!is.na(df[[value_col]]), ] # Now we handle NAs with na.rm=TRUE on aggregate function.
       }
-  
   
       # note that prophet only takes columns with predetermined names like ds, y, cap, as input
       aggregated_data <- if (!is.null(value_col) && ("cap" %in% colnames(df))) {
         # preserve cap column if it is there, so that cap argument as future data frame works.
         # apply same aggregation as value to cap.
-        df %>%
+        grouped_df <- df %>%
           dplyr::transmute(
             ds = UQ(rlang::sym(time_col)),
             value = UQ(rlang::sym(value_col)),
@@ -326,19 +367,34 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
           ) %>%
           # remove NA so that we do not pass data with NA, NaN, or 0 to prophet, which we are not very sure what would happen.
           # we saw a case where rstan crashes with the last row with 0 y value.
-          dplyr::filter(!is.na(value)) %>%
-          dplyr::group_by(ds) %>%
-          dplyr::summarise(y = fun.aggregate(value), cap = fun.aggregate(cap_col), !!!summarise_args)
+          # dplyr::filter(!is.na(value)) %>% # Commented out, since now we handle NAs with na.rm option of fun.aggregate. This way, extra regressor info for each period is preserved better.
+          dplyr::group_by(ds)
+        # For common functions that require na.rm=TRUE to handle NA, add it.
+        if (is_na_rm_func(fun.aggregate)) {
+          grouped_df %>% 
+            dplyr::summarise(y = fun.aggregate(value), cap = fun.aggregate(cap_col, na.rm=TRUE), !!!summarise_args)
+        }
+        else {
+          grouped_df %>% 
+            dplyr::summarise(y = fun.aggregate(value), cap = fun.aggregate(cap_col), !!!summarise_args)
+        }
       } else if (!is.null(value_col)){
-        df %>%
+        grouped_df <- df %>%
           dplyr::transmute(
             ds = UQ(rlang::sym(time_col)),
             value = UQ(rlang::sym(value_col)),
             !!!rlang::syms(unname(regressors)) # this should be able to handle regressor=NULL case fine.
           ) %>%
-          dplyr::filter(!is.na(value)) %>% # remove NA so that we do not pass data with NA, NaN, or 0 to prophet
-          dplyr::group_by(ds) %>%
-          dplyr::summarise(y = fun.aggregate(value), !!!summarise_args)
+          # dplyr::filter(!is.na(value)) %>% # Commented out, since now we handle NAs with na.rm option of fun.aggregate. This way, extra regressor info for each period is preserved better.
+          dplyr::group_by(ds)
+        if (is_na_rm_func(fun.aggregate)) {
+          grouped_df %>% 
+            dplyr::summarise(y = fun.aggregate(value, na.rm=TRUE), !!!summarise_args)
+        }
+        else {
+          grouped_df %>% 
+            dplyr::summarise(y = fun.aggregate(value), !!!summarise_args)
+        }
       } else { # value_col is not specified. The forecast is about number of rows.
         # Note: We ignore cap column in this case for now.
         df %>%
@@ -369,7 +425,13 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
           aggregated_data <- aggregated_data %>% dplyr::mutate(!!sym(regressor_col) := fill_ts_na(!!sym(regressor_col), ds, type = !!regressors_na_fill_type, val = !!regressors_na_fill_value))
         }
       }
-  
+
+      # If there is still NAs in regressor columns at this point after aggregation and possible fill, they have to be filtered out to avoid error.
+      if (!is.null(regressor_output_cols)) {
+        for (regressor_col in regressor_output_cols) {
+          aggregated_data <- aggregated_data %>% dplyr::filter(!is.na(!!sym(regressor_col)))
+        }
+      }
   
       if (time_unit %in% c("week", "month", "quarter", "year")) { # if time_unit is larger than day (the next level is week), having weekly.seasonality does not make sense.
         weekly.seasonality <- FALSE
@@ -413,9 +475,9 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
         }
         training_data <- training_data %>% head(-periods)
   
-        # we got correct set of training data by filling missing date/time,
+        # We got correct set of training data by filling missing date/time,
         # but now, filter them out again.
-        # by doing so, we affect future table, and skip prediction (interpolation)
+        # By doing so, we affect future table, and skip prediction (interpolation)
         # for all missing date/time, which could be expensive if the training data is sparse.
         # keep the last row even if it does not have training data, to mark the end of training period, which is the start of test period.
         training_data <- training_data %>% dplyr::filter(!is.na(y) | row_number() == n())
@@ -646,7 +708,16 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
       colnames(ret)[colnames(ret) == "weekly_lower"] <- avoid_conflict(colnames(ret), "weekly_low")
       colnames(ret)[colnames(ret) == "cap.x"] <- avoid_conflict(colnames(ret), "cap_forecast")
       colnames(ret)[colnames(ret) == "cap.y"] <- avoid_conflict(colnames(ret), "cap_model")
-      ret
+      if (output == "data") { # Pre-5.5 backward compatibility mode.
+        ret
+      }
+      else {
+        regressor_name_map <- regressor_final_output_cols
+        names(regressor_name_map) <- regressor_output_cols
+        model <- list(result=ret, model=m, test_mode=test_mode, value_col=value_col, regressor_name_map=regressor_name_map)
+        class(model) <- c("prophet_exploratory", class(model))
+        model
+      }
     }, error = function(e){
       if(length(grouped_col) > 0) {
         # ignore the error if
@@ -668,14 +739,51 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
   # name_col is not conflicting with grouping columns
   # thanks to avoid_conflict that is used before,
   # this doesn't overwrite grouping columns.
-  tmp_col <- avoid_conflict(colnames(df), "tmp_col")
-  ret <- df %>%
-    dplyr::do_(.dots=setNames(list(~do_prophet_each(.)), tmp_col)) %>%
-    dplyr::ungroup()
-  ret <- ret %>% unnest_with_drop(!!rlang::sym(tmp_col))
-
-  if (length(grouped_col) > 0) {
-    ret <- ret %>% dplyr::group_by(!!!rlang::syms(grouped_col))
+  if (output == "data") { # Pre-5.5 backward compatibility mode.
+    tmp_col <- avoid_conflict(colnames(df), "tmp_col")
+    ret <- df %>%
+      dplyr::do_(.dots=setNames(list(~do_prophet_each(.)), tmp_col)) %>%
+      dplyr::ungroup()
+    ret <- ret %>% unnest_with_drop(!!rlang::sym(tmp_col))
+    if (length(grouped_col) > 0) {
+      ret <- ret %>% dplyr::group_by(!!!rlang::syms(grouped_col))
+    }
+    ret
   }
-  ret
+  else {
+    tmp_col <- avoid_conflict(colnames(df), "model") #TODO: Conflict should be an issue only with group_by columns.
+    ret <- df %>%
+      dplyr::do_(.dots=setNames(list(~do_prophet_each(.)), tmp_col))
+    ret
+  }
+}
+
+#' @export
+tidy.prophet_exploratory <- function(x, type="result") {
+  if (type == "result") {
+    x$result
+  }
+  else if (type == "coef") { # Returns coefficients (beta) of external regressors and seasonalities.
+    # Keep only training data for reverse calculation of beta.
+    if (x$test_mode) {
+      res <- x$result %>% dplyr::filter(!is_test_data)
+    }
+    else {
+      if (is.null(x$value_col)) {
+        res <- x$result %>% dplyr::filter(!is.na(count))
+      }
+      else {
+        res <- x$result %>% dplyr::filter(!is.na(!!rlang::sym(x$value_col)))
+      }
+    }
+    # Calculate SDs of effects of regressors and seasonalities. For regressors, this equals to (absolute value of) beta by definition.
+    # Reference: https://github.com/facebook/prophet/issues/928
+    res <- res %>%
+      dplyr::select(matches('(_effect$|^yearly$|^weekly$|^daily$|^hourly$|^holidays$)')) %>%
+      dplyr::summarise_all(.funs=~sd(.,na.rm=TRUE)) %>%
+      tidyr::pivot_longer(everything(), names_to='Variable', values_to='Importance') %>%
+      dplyr::mutate(Variable = dplyr::recode(Variable, yearly='Yearly', weekly='Weekly', daily='Daily', hourly='Hourly', holidays='Holidays')) %>%
+      dplyr::mutate(Variable = stringr::str_remove(Variable, '_effect$'))
+    res
+  }
 }

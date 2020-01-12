@@ -118,7 +118,7 @@ test_that("setdiff", {
 test_that("test pivot with empty data frame", {
   df <- data.frame()
   expect_error({
-    pivot(df, row ~ col)
+    pivot(df, row_cols=c("row"), col_cols=c("col"))
   }, "Input data frame is empty.")
 })
 
@@ -573,16 +573,21 @@ test_that("test pivot", {
     num3 = c(NA, seq(100))
   )
 
-  pivoted <- pivot(test_df, cat1+cat3 ~ cat2)
-  expect_true("cat1_cat3" %in% colnames(pivoted))
+  pivoted <- pivot(test_df, row_cols=c("cat1","cat3"), col_cols=c("cat2"))
+  #pivoted <- pivot(test_df, cat1+cat3 ~ cat2)
+  expect_true("cat1" %in% colnames(pivoted))
+  expect_true("cat3" %in% colnames(pivoted))
 
-  pivoted_with_val <- pivot(test_df, cat1 ~ cat2 + cat3, value = num3, fun.aggregate=mean, fill = 0)
+  pivoted_with_val <- pivot(test_df, row_cols=c("cat1"), col_cols=c("cat2","cat3"), value = num3, fun.aggregate=mean, fill = 0)
   expect_true(all(!is.na(pivoted_with_val)))
 
-  pivoted_with_na <- pivot(test_df, cat1 ~ cat2 + cat3, value = num3, fun.aggregate=mean, na.rm = FALSE)
+  pivoted_with_na <- pivot(test_df, row_cols=c("cat1"), col_cols=c("cat2", "cat3"), value = num3, fun.aggregate=mean, na.rm = FALSE)
   expect_true(any(is.na(pivoted_with_na)))
 
-  pivoted_with_na_ratio <- pivot(test_df, cat1 ~ cat2 , value = num3, fun.aggregate=na_ratio, na.rm = TRUE)
+  pivoted_with_cols_sep <- pivot(test_df, row_cols=c("cat1"), col_cols=c("cat2", "cat3"), value = num3, fun.aggregate=mean, na.rm = FALSE, cols_sep='-')
+  expect_true("b-a" %in% colnames(pivoted_with_cols_sep)) # make sure column names are separated by '-'.
+
+  pivoted_with_na_ratio <- pivot(test_df, row_cols=c("cat1"), col_cols=c("cat2") , value = num3, fun.aggregate=na_ratio, na.rm = TRUE)
   expect_true(any(pivoted_with_na_ratio %>% select(a,b,c,d) !=0)) # Verify that NA is detected.
 
 })
@@ -593,10 +598,9 @@ test_that("test pivot with NA", {
     state = c("CA", "NY", "CA"),
     num = c(1,1,1)
   )
-  pivoted <- test_df_na %>% pivot(state ~ carrier, value = num)
+  pivoted <- test_df_na %>% pivot(row_cols=c("state"), col_cols=c("carrier"), value = num)
   expect_true(any(is.na(pivoted)))
 })
-
 
 test_that("test pivot with Date", {
   test_df <- data.frame(
@@ -605,8 +609,32 @@ test_that("test pivot with Date", {
     val = seq(15)
   )
 
-  pivoted <- pivot(test_df, dt ~ col, value = val)
+  pivoted <- pivot(test_df, row_cols=c("dt"), col_cols=c("col"), value = val)
   expect_true(pivoted$dt %>% inherits("Date"))
+})
+
+test_that("test pivot with Date funcs", {
+  test_df <- data.frame(
+    dt = rep(as.Date("2019-12-20") + seq(3)*10, each = 5),
+    col = rep(seq(5), 3),
+    val = seq(15)
+  )
+
+  pivoted <- pivot(test_df, row_cols=c(dt_wday="dt"), row_funs=c("wday"), col_cols=c("dt"), col_funs=c("week"), value = val)
+  expect_true(all(pivoted$dt_wday %in% c("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")))
+  expect_equal(colnames(pivoted), c("dt_wday","3", "52", "2"))
+})
+
+test_that("test pivot with Date funcs with fill", { # There was a case where error happened with this case with fill (commit 0745f491).
+  test_df <- data.frame(
+    dt = rep(as.Date("2019-12-20") + seq(3)*10, each = 5),
+    col = rep(seq(5), 3),
+    val = seq(15)
+  )
+
+  pivoted <- pivot(test_df, row_cols=c(dt_wday="dt"), row_funs=c("wday"), col_cols=c("dt"), col_funs=c("week"), value = val, fill=0)
+  expect_true(all(pivoted$dt_wday %in% c("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")))
+  expect_equal(colnames(pivoted), c("dt_wday","3", "52", "2"))
 })
 
 test_that("test pivot with POSIXct", {
@@ -616,7 +644,7 @@ test_that("test pivot with POSIXct", {
     val = seq(15)
   )
 
-  pivoted <- pivot(test_df, dt ~ col, value = val)
+  pivoted <- pivot(test_df, row_cols=c("dt"), col_cols=c("col"), value = val)
   expect_true(pivoted$dt %>% inherits("POSIXct"))
 })
 
@@ -632,7 +660,7 @@ test_that("test pivot with group_by and dirty colum names", {
 
   grouped_pivoted <- test_df %>%
     dplyr::group_by(group) %>%
-    pivot(`cat 1`+ `cat-2` ~ `cat 3`)
+    pivot(row_cols=c("cat 1", "cat-2"), col_cols=c("cat 3"))
   expect_true("group" %in% colnames(grouped_pivoted))
   expect_equal("group", grouped_by(grouped_pivoted))
 })
@@ -902,7 +930,9 @@ test_that("is_integer", {
   expect_false(is_integer(c(0,1.5,2,3,4,5)))
 })
 
-test_that("get_week_of_month", {
-  some_dates<- seq(lubridate::ymd(20191001), lubridate::ymd(20191031), by='day')
-  expect_equal(get_week_of_month(some_dates),  c(1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5))
+test_that("week", {
+  dates <- lubridate::ymd(c(20190101,20190107,20190108,20190131,20190201,20190207,20190208,20190701,20190707,20190708,20190731,20191201,20191207,20191208,20191231)) 
+  expect_equal(exploratory::week(dates), c(1,1,2,5,5,6,6,26,27,27,31,48,49,49,53))
+  expect_equal(exploratory::week(dates, unit="quarter"), c(1,1,2,5,5,6,6,1,1,2,5,9,10,10,14))
+  expect_equal(exploratory::week(dates, unit="month"), c(1,1,2,5,1,1,2,1,1,2,5,1,1,2,5))
 })

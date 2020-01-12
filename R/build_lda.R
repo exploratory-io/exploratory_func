@@ -15,7 +15,7 @@ build_lda <- function(df, document, token, count = NULL,
                       method = "VEM",
                       iter = 2000,
                       burnin = 0,
-                      seed = 0,
+                      seed = 1,
                       keep.source = TRUE,
                       group_cols = NULL){
   validate_empty_data(df)

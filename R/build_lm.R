@@ -123,7 +123,7 @@ vif <- function(mod, ...) {
 #' @param test_rate Ratio of test data
 #' @param seed Random seed to control test data sampling
 #' @export
-build_lm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, group_cols = NULL, test_rate = 0.0, seed = 0){
+build_lm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, group_cols = NULL, test_rate = 0.0, seed = 1){
   validate_empty_data(data)
 
   # make variables factor sorted by the frequency
@@ -517,7 +517,7 @@ build_lm.fast <- function(df,
         }
       }
       if (length(c_cols) == 0) {
-        stop("No column is left after removing columns with single value.")
+        stop("The selected predictor variables are invalid since they have only one unique values.")
       }
 
       if (!is.null(target_outlier_filter_type) || !is.null(predictor_outlier_filter_type)) {
@@ -822,14 +822,6 @@ build_lm.fast <- function(df,
 glance.lm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
   ret <- broom:::glance.lm(x)
 
-  for(var in names(x$xlevels)) { # extract base levels info on factor/character columns from lm model
-    if(pretty.name) {
-      ret[paste0("Base Level of ", var)] <- x$xlevels[[var]][[1]]
-    }
-    else {
-      ret[paste0(var, "_base")] <- x$xlevels[[var]][[1]]
-    }
-  }
   # Adjust the subtle difference between sigma (Residual Standard Error) and RMSE.
   # In RMSE, division is done by observation size, while it is by residual degree of freedom in sigma.
   # https://www.rdocumentation.org/packages/sjstats/versions/0.17.4/topics/cv
@@ -911,15 +903,6 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
     ret$negatives <- sum(x$y != 1, na.rm = TRUE)
   }
 
-  for(var in names(x$xlevels)) { # extract base levels info on factor/character columns from lm model
-    if(pretty.name) {
-      ret[paste0("Base Level of ", var)] <- x$xlevels[[var]][[1]]
-    }
-    else {
-      ret[paste0(var, "_base")] <- x$xlevels[[var]][[1]]
-    }
-  }
-
   if(pretty.name) {
     if (x$family$family %in% c('binomial', 'quasibinomial')) { # for binomial regressions.
       ret <- ret %>% dplyr::rename(`Null Deviance`=null.deviance, `DF for Null Model`=df.null, `Log Likelihood`=logLik, `Residual Deviance`=deviance, `Residual DF`=df.residual, `AUC`=auc) %>%
@@ -974,6 +957,26 @@ vif_to_dataframe <- function(x) {
   ret
 }
 
+# From name of variable, returns possible names of terms returned from lm.
+var_to_possible_terms <- function(var, x) {
+  if (is.factor(x$model[[var]])) {
+    # Possibly, the variable name in the term name is quoted with backtic.
+    c(paste0(var, levels(x$model[[var]])),
+      paste0('`', var, '`', levels(x$model[[var]])))
+  }
+  else {
+    # Possibly, the term name is quoted with backtic.
+    c(var, paste0('`', var, '`'))
+  }
+}
+
+# Returns P-value for the variable. For categorical, the smallest value is returned.
+# For the color of relative importance bar chart.
+get_var_min_pvalue <- function(var, coef_df, x) {
+  terms <- var_to_possible_terms(as.character(var), x)
+  min(coef_df$p.value[coef_df$term %in% terms])
+}
+
 #' special version of tidy.lm function to use with build_lm.fast.
 #' @export
 tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, ...) { #TODO: add test
@@ -1015,11 +1018,16 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
         ret <- data.frame(term = term, importance = importance, importance.high = importance.high, importance.low = importance.low)
         # Reorder factor by the value of relative importance (lmg).
         ret <- ret %>% dplyr::mutate(term = forcats::fct_reorder(term, importance, .fun = sum, .desc = TRUE))
+        coef_df <- broom:::tidy.lm(x)
+        ret <- ret %>% mutate(p.value=purrr::map(term, function(var) {
+          get_var_min_pvalue(var, coef_df, x)
+        }))
         if (pretty.name) {
           ret <- ret %>% rename(`Variable` = term,
                                 `Relative Importance` = importance,
                                 `Relative Importance High` = importance.high,
-                                `Relative Importance Low` = importance.low)
+                                `Relative Importance Low` = importance.low,
+                                `P Value` = p.value)
         }
         ret
       }
@@ -1094,7 +1102,7 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
       target_col <- as.character(lazyeval::f_lhs(x$formula)) # get target column name
       actual_val = x$model[[target_col]]
 
-      predicted = x$fitted.value > 0.5 # TODO: make threshold adjustable
+      predicted = x$fitted.value > 0.5 # TODO: make threshold adjustable. Note: This part of code seems to be unused. Check and remove.
       # convert predicted to original set of values. should be either logical, numeric, or factor.
       predicted <- if (is.logical(actual_val)) {
         predicted
@@ -1147,8 +1155,10 @@ lm_partial_dependence <- function(df, ...) { # TODO: write test for this.
 
   if (length(grouped_col) > 0) {
     res <- res %>% dplyr::ungroup() # ungroup to mutate group_by column.
+    # Folloing is not necessary since we separately display partial dependence plot for each group since v5.5.
     # add variable name to the group_by column, so that chart is repeated by the combination of group_by column and variable name.
-    res[[grouped_col]] <- paste(as.character(res[[grouped_col]]), res$x_name)
+    # res[[grouped_col]] <- paste(as.character(res[[grouped_col]]), res$x_name)
+
     res[[grouped_col]] <- forcats::fct_inorder(factor(res[[grouped_col]])) # set order to appear as facets
     res <- res %>% dplyr::group_by(!!!rlang::syms(grouped_col)) # put back group_by for consistency
   }

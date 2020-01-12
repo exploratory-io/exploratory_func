@@ -381,7 +381,11 @@ do_ngram <- function(df, token, sentence, document, maxn=2, sep="_"){
 #' @export
 get_sentiment <- function(text){
   loadNamespace("sentimentr")
-  sentimentr::sentiment_by(text)$ave_sentiment
+  if(is.character(text)) {
+    sentimentr::sentiment_by(text)$ave_sentiment
+  } else { # sentiment_by fails if the text is not character so convert it to character first
+    sentimentr::sentiment_by(as.character(text))$ave_sentiment
+  }
 }
 
 #' Wrapper function for readr::parse_character
@@ -408,6 +412,10 @@ parse_number <- function(text, ...){
   # if numeric, return as is for backward compatibility.
   if(is.numeric(text)) {
     text
+  } else if (!is.character(text)) {
+    # non character data raises Error in parse_vector(x, col_number(), na = na, locale = locale, trim_ws = trim_ws) : is.character(x) is not TRUE
+    # so explicitly convert it to character before calling readr::parse_number
+    as.numeric(readr::parse_number(as.character(text), ...))
   } else {
     # For some reason, output from parse_number returns FALSE for
     # is.vector(), which becomes a problem when it is fed to ranger
@@ -424,6 +432,10 @@ parse_logical <- function(text, ...){
   # So if logical, return as is for backward compatibility.
   if(is.logical(text)) {
     text
+  } else if (!is.character(text)){
+    # non character data raises Error in parse_vector(x, col_number(), na = na, locale = locale, trim_ws = trim_ws) : is.character(x) is not TRUE
+    # so explicitly convert it to character before calling readr::parse_number
+    readr::parse_logical(as.character(text), ...)
   } else {
     readr::parse_logical(text, ...)
   }
@@ -478,5 +490,3 @@ str_logical <- function(column, true_value = NULL) {
               ifelse(target %in%  c("false", "no", "0"), FALSE, NA))
    }
 }
-
-

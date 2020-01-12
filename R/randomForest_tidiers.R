@@ -1353,8 +1353,11 @@ rf_partial_dependence <- function(df, ...) { # TODO: write test for this.
 
   if (length(grouped_col) > 0) {
     res <- res %>% dplyr::ungroup() # ungroup to mutate group_by column.
+
+    # Folloing is not necessary since we separately display partial dependence plot for each group since v5.5.
     # add variable name to the group_by column, so that chart is repeated by the combination of group_by column and variable name.
-    res[[grouped_col]] <- paste(as.character(res[[grouped_col]]), res$x_name)
+    # res[[grouped_col]] <- paste(as.character(res[[grouped_col]]), res$x_name)
+
     res[[grouped_col]] <- forcats::fct_inorder(factor(res[[grouped_col]])) # set order to appear as facets
     res <- res %>% dplyr::group_by(!!!rlang::syms(grouped_col)) # put back group_by for consistency
   }
@@ -1710,12 +1713,9 @@ get_classification_type <- function(v) {
   # if not, it is classification
   if (!is.numeric(v)) {
     if (!is.logical(v)) {
-      if (length(unique(v)) == 2) {
-        classification_type <- "binary"
-      }
-      else {
-        classification_type <- "multi"
-      }
+      # Even if number of unique number is 2, we treat it as multi-class as opposed to binary,
+      # since our logic for binary classification depends on the condition that the values are TRUE and FALSE.
+      classification_type <- "multi"
     }
     else {
       classification_type <- "binary"
@@ -2060,6 +2060,9 @@ calc_feature_imp <- function(df,
       }
       df <- clean_df_ret$df
       c_cols <- clean_df_ret$c_cols
+      if  (length(c_cols) == 0) {
+        stop("The selected predictor variables are invalid since they have only one unique values.")
+      }
       name_map <- clean_df_ret$name_map
 
       # apply smote if this is binary classification
@@ -2378,9 +2381,10 @@ evaluate_binary_classification <- function(actual, predicted, predicted_probabil
       # For ranger, even if level for label "TRUE" is 2, we always treat level 1 as TRUE, for simplicity for now.
       true_class <- levels(actual)[[1]]
     }
+    # Since multi_class = FALSE is specified, Number of Rows is not added here. Will add later.
     ret <- evaluate_classification(actual, predicted, true_class, multi_class = FALSE, pretty.name = pretty.name)
   }
-  else {
+  else { # Because get_classification_type() considers it binary classification only when target is logical, it should never come here, but cowardly keeping the code for now.
     ret <- evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
   }
   if (pretty.name) {
@@ -2389,10 +2393,13 @@ evaluate_binary_classification <- function(actual, predicted, predicted_probabil
   else {
     ret <- ret %>% mutate(auc = auc)
   }
-  sample_n <- sum(!is.na(predicted)) # Sample size for test.
-  ret <- ret %>% dplyr::mutate(n = !!sample_n)
-  if(pretty.name){
-    ret <- ret %>% dplyr::rename(`Number of Rows` = n)
+  # Add Number of Rows here for the case ret came from evaluate_classification(multi_class = FALSE).
+  if (is.null(ret$n) && is.null(ret$`Number of Rows`)) {
+    sample_n <- sum(!is.na(predicted)) # Sample size for test.
+    ret <- ret %>% dplyr::mutate(n = !!sample_n)
+    if(pretty.name){
+      ret <- ret %>% dplyr::rename(`Number of Rows` = n)
+    }
   }
   ret
 }
@@ -2767,6 +2774,9 @@ exp_rpart <- function(df,
       }
       df <- clean_df_ret$df
       c_cols <- clean_df_ret$c_cols
+      if  (length(c_cols) == 0) {
+        stop("The selected predictor variables are invalid since they have only one unique values.")
+      }
       name_map <- clean_df_ret$name_map
 
       # apply smote if this is binary classification

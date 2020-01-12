@@ -24,7 +24,7 @@ psych::logistic
 
 #' @importFrom anonymizer anonymize
 #' @export
-anonymize <- function(vec, algo = "sha256", seed = 0, chars = letters, n_chars = 5L, ...){
+anonymize <- function(vec, algo = "sha256", seed = 1, chars = letters, n_chars = 5L, ...){
   anonymizer::anonymize(vec, .algo = algo, .seed = seed, .chars = chars, .n_chars = n_chars, ...)
 }
 

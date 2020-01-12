@@ -99,8 +99,8 @@ test_that("test calc_feature_imp predicting multi-class", {
   conf_mat <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
   # ret <- model_df %>% rf_importance() # Skip this because Boruta is on.
   ret <- model_df %>% rf_partial_dependence()
-  # Check that format of Group column is good for our Analytics View.
-  expect_true(stringr::str_detect(as.character(ret$Group[1]), stringr::regex("[0-2] cat\\s10$|_25$")))
+  # Check the content of group column.
+  expect_true(stringr::str_detect(as.character(ret$Group[1]), stringr::regex("[0-2]$")))
 
 
   # target is character
@@ -428,4 +428,11 @@ test_that("calc_feature_map(multi) evaluate training and test", {
 
   ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat", test_rate = 0.3)
   ret <- model_df %>% prediction_training_and_test()
+})
+
+test_that("calc_feature_map() error handling for predictor with single unique value", {
+  expect_error({
+    model_df <- flight %>% mutate(Const=1) %>%
+      calc_feature_imp(`FL NUM`, Const, test_rate = 0.3)
+  }, "The selected predictor variables are invalid since they have only one unique values.")
 })

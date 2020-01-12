@@ -44,7 +44,7 @@ test_that("test exp_survival", {
   data2 <- data %>% mutate(`o s` = "Windows") # test single value cohort case
   ret <- data2 %>% exp_survival(`weeks on service`, `is churned`, cohort=`o s`)
   ret1 <- ret %>% tidy(model1)
-  expect_true(!is.null(ret1$cohort))
+  expect_true(!is.null(ret1$Cohort))
   ret2 <- ret %>% tidy(model2)
   ret3 <- ret %>% glance(model2)
   expect_true(is.character(ret3$Note)) # There should be Note column with error.
@@ -52,14 +52,14 @@ test_that("test exp_survival", {
   data3 <- data %>% mutate(`o s` = factor(`o s`)) # test cohort as factor
   ret <- data3 %>% exp_survival(`weeks on service`, `is churned`, cohort=`o s`)
   ret1 <- ret %>% tidy(model1)
-  expect_true(is.factor(ret1$cohort)) # factor levels should be kept
+  expect_true(is.factor(ret1$Cohort)) # factor levels should be kept
   ret2 <- ret %>% tidy(model2)
   ret3 <- ret %>% glance(model2)
 
   data3 <- data %>% mutate(`o s` = `o s` == "Windows") # test cohort as logical 
   ret <- data3 %>% exp_survival(`weeks on service`, `is churned`, cohort=`o s`)
   ret1 <- ret %>% tidy(model1)
-  expect_true(is.factor(ret1$cohort))
+  expect_true(is.factor(ret1$Cohort))
   ret2 <- ret %>% tidy(model2)
   ret3 <- ret %>% glance(model2)
 
