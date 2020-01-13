@@ -406,11 +406,13 @@ do_arima <- function(df, time,
        data.frame(lag = acf_res$lag, acf = acf_res$acf)
     })) %>% dplyr::mutate(unit_root_test = purrr::map2(data, model, function(df, m) {
       differences=(forecast::arimaorder(m))[["d"]]
+      values <- df[[value_col]]
+      values <- values[!is.na(values)] # Remove NAs. They are appended at the end, because of binding of forecasted rows.
       if (differences > 0) {
-        diff_res <- diff(df[[value_col]], differences=differences)
+        diff_res <- diff(values, differences=differences)
       }
       else {
-        diff_res <-df[[value_col]] 
+        diff_res <- values 
       }
       type <- 1 # 1 menas "level". TODO: check if this is correct.
       urca_pval <- function(urca_test) {
@@ -431,7 +433,7 @@ do_arima <- function(df, time,
           diff
         }, error = function(e) {
           # TODO: do something.
-          FALSE
+          stop(e)
         })
       }
 
