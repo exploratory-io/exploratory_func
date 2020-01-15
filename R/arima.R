@@ -213,74 +213,82 @@ do_arima <- function(df, time,
     # auto.arima has no trace objects, just output to stdout/stderr
     # So, if trace value is needed, the output must be captured.
     ret <- NULL
-    trace_output <- capture.output({
-      ret <- training_data %>% tidyr::nest() %>%
-               dplyr::mutate(model = purrr::map(data, function(df) {
-                 forecast::auto.arima(training_data[, "y"],
-                                      xreg = xreg,
-                                      d = d,
-                                      D = D,
-                                      max.d = max.d,
-                                      max.D = max.D,
-                                      max.p = max.p,
-                                      max.q = max.q,
-                                      max.P = max.P,
-                                      max.Q = max.Q,
-                                      start.p = start.p,
-                                      start.q = start.q,
-                                      start.P = start.P,
-                                      start.Q = start.Q,
-                                      max.order = max.order,
-                                      seasonal=seasonal,
-                                      stepwise=stepwise,
-                                      stationary = FALSE,
-                                      ic = ic,
-                                      allowdrift = allowdrift,
-                                      allowmean = allowmean,
-                                      lambda = lambda,
-                                      biasadj = biasad,
-                                      test = test,
-                                      seasonal.test = seasonal.test,
-                                      parallel = parallel,
-                                      num.cores = num.cores,
-                                      trace = trace)
-               }))
-    })
-    trace_output <- trace_output[grepl("(^ ARIMA|^ Best model)", trace_output)]
-    conn <- textConnection(trace_output)
-    model_traces <- read.table(conn, sep=":")
-    close(conn)
 
-    # Add model traces
-    ret <- ret %>% dplyr::mutate(model_traces = purrr::map(data, function(df){
-      model_traces
-    }))
+    browser()
+    training_tsibble <- tsibble(ds = training_data$ds, y = training_data$y)
+    browser()
+    model_df <- training_tsibble %>% model(arima=ARIMA(y))
+    forecasted_df <- model_df %>% forecast(h=periods) %>% hilo(level = c(80, 95))
+    browser()
 
-    # Forecast
-    forecast_obj <- forecast::forecast(ret$model[[1]],
-                                       xreg=forecast_xreg,
-                                       h=periods, level=c(80))
+    # trace_output <- capture.output({
+    #   ret <- training_data %>% tidyr::nest() %>%
+    #            dplyr::mutate(model = purrr::map(data, function(df) {
+    #              forecast::auto.arima(training_data[, "y"],
+    #                                   xreg = xreg,
+    #                                   d = d,
+    #                                   D = D,
+    #                                   max.d = max.d,
+    #                                   max.D = max.D,
+    #                                   max.p = max.p,
+    #                                   max.q = max.q,
+    #                                   max.P = max.P,
+    #                                   max.Q = max.Q,
+    #                                   start.p = start.p,
+    #                                   start.q = start.q,
+    #                                   start.P = start.P,
+    #                                   start.Q = start.Q,
+    #                                   max.order = max.order,
+    #                                   seasonal=seasonal,
+    #                                   stepwise=stepwise,
+    #                                   stationary = FALSE,
+    #                                   ic = ic,
+    #                                   allowdrift = allowdrift,
+    #                                   allowmean = allowmean,
+    #                                   lambda = lambda,
+    #                                   biasadj = biasad,
+    #                                   test = test,
+    #                                   seasonal.test = seasonal.test,
+    #                                   parallel = parallel,
+    #                                   num.cores = num.cores,
+    #                                   trace = trace)
+    #            }))
+    # })
+    # trace_output <- trace_output[grepl("(^ ARIMA|^ Best model)", trace_output)]
+    # conn <- textConnection(trace_output)
+    # model_traces <- read.table(conn, sep=":")
+    # close(conn)
+    #
+    # # Add model traces
+    # ret <- ret %>% dplyr::mutate(model_traces = purrr::map(data, function(df){
+    #   model_traces
+    # }))
+    # # Forecast
+    # forecast_obj <- forecast::forecast(ret$model[[1]],
+    #                                    xreg=forecast_xreg,
+    #                                    h=periods, level=c(80))
+    # forecast_df <- as_tibble(forecast_obj)
 
-    forecast_df <- as_tibble(forecast_obj)
+    fitted_df <- model_df %>% fitted()
+    fitted_training_df <- training_data %>% dplyr::mutate(forecasted_value=fitted_df$.fitted)
 
-    # Extract fitted values for training data.
-    ret <- ret %>% dplyr::mutate(data = purrr::map2(data, model, function(df, m){
-      # m$fitted is ts class and column name is "x"
-      # So in order to extract ts values, use m$fitted[, "x"]
-      fitted_values = if(is.null(dim(m$fitted))){
-        # when auto.arima with xreg, m$fitted has no dim.
-        m$fitted
-      } else {
-        m$fitted[, "x"]
-      }
+    # # Extract fitted values for training data.
+    # ret <- ret %>% dplyr::mutate(data = purrr::map2(data, model, function(df, m){
+    #   # m$fitted is ts class and column name is "x"
+    #   # So in order to extract ts values, use m$fitted[, "x"]
+    #   fitted_values = if(is.null(dim(m$fitted))){
+    #     # when auto.arima with xreg, m$fitted has no dim.
+    #     m$fitted
+    #   } else {
+    #     m$fitted[, "x"]
+    #   }
+    #   df %>% dplyr::mutate(forecasted_value=fitted_values)
+    # }))
 
-      df %>% dplyr::mutate(forecasted_value=fitted_values)
-    }))
-
-    forecast_rows <- tibble(ds=create_ts_seq(ret$data[[1]]$ds, max, max, time_unit, start_add=1, to_add=periods),
-                            forecasted_value=forecast_df[["Point Forecast"]],
-                            forecasted_value_high=forecast_df[["Hi 80"]],
-                            forecasted_value_low=forecast_df[["Lo 80"]])
+    forecast_rows <- tibble(ds=forecasted_df$ds,
+                            forecasted_value=forecasted_df$y,
+                            forecasted_value_high=purrr::flatten_dbl(purrr::map(forecasted_df$`80%`,function(x){x$.upper})),
+                            forecasted_value_low=purrr::flatten_dbl(purrr::map(forecasted_df$`80%`,function(x){x$.lower})))
 
     if (test_mode){
       ret <- ret %>% dplyr::mutate(data = purrr::map(data, function(df){
