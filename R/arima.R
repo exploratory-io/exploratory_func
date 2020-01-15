@@ -323,8 +323,11 @@ do_arima <- function(df, time,
       ret_df <- ret_df %>% dplyr::select(-is_test_data, is_test_data)
     }
 
-    ret <- tibble(data = list(ret_df))
+    class(model_df$arima) <- c("arima_exploratory", class(model_df$arima))
+    ret <- tibble(data = list(ret_df), model = list(model_df$arima))
+    browser()
 
+    if(F){
     ret <- ret %>% dplyr::mutate(model_meta = purrr::map(model, function(m){
       # TODO: imple broom::glance
       ar_terms <- m$coef %>% names() %>% .[stringr::str_detect(., "^s?ar[0-9]*")]
@@ -443,6 +446,7 @@ do_arima <- function(df, time,
 
       data.frame(unit_root_test_res@cval, teststat = unit_root_test_res@teststat)
     }))
+    }
 
     ret
   }
@@ -493,3 +497,7 @@ create_ts_seq <- function(ds, start_func, to_func, time_unit, start_add=0, to_ad
   ts
  }
 
+#' @export
+glance.arima_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
+  data.frame(x=1)
+}
