@@ -291,11 +291,8 @@ do_arima <- function(df, time,
                             forecasted_value_low=purrr::flatten_dbl(purrr::map(forecasted_df$`80%`,function(x){x$.lower})))
 
     if (test_mode){
-      ret <- ret %>% dplyr::mutate(data = purrr::map(data, function(df){
-        df$is_test_data <- FALSE
-        df
-      }))
-      forecast_rows$y <- tail(filled_aggregated_data, periods)[["y"]]
+      fitted_training_df$is_test_data <- FALSE
+      forecast_rows$y <- tail(filled_aggregated_data, periods)[["y"]] #TODO: consider if this is always correct.
       forecast_rows$is_test_data <- TRUE 
     }
 
@@ -305,31 +302,28 @@ do_arima <- function(df, time,
 
     # Bind Training Data + Forecast Data
     # Revive Original column names(time_col, value_col)
-    ret <- ret %>% dplyr::mutate(data = purrr::map2(data, model, function(df, model){
-      df <- df %>% dplyr::bind_rows(forecast_rows)
-      if (time_col != "ds") { # if time_col happens to be "ds", do not do this, since it will make the column name "ds.new"
-        time_col <- avoid_conflict(colnames(df), time_col)
-        colnames(df)[colnames(df) == "ds"] <- time_col
-      }
-      if (value_col != "y") { # if value_col happens to be "y", do not do this, since it will make the column name "y.new".
-       value_col <- avoid_conflict(colnames(df), value_col)
-       colnames(df)[colnames(df) == "y"] <- value_col
-      }
+    ret_df <- fitted_training_df %>% dplyr::bind_rows(forecast_rows)
+    if (time_col != "ds") { # if time_col happens to be "ds", do not do this, since it will make the column name "ds.new"
+      time_col <- avoid_conflict(colnames(ret_df), time_col)
+      colnames(ret_df)[colnames(ret_df) == "ds"] <- time_col
+    }
+    if (value_col != "y") { # if value_col happens to be "y", do not do this, since it will make the column name "y.new".
+      value_col <- avoid_conflict(colnames(ret_df), value_col)
+      colnames(ret_df)[colnames(ret_df) == "y"] <- value_col
+    }
 
-      if (!is.null(regressor_output_cols)) {
-        for (i in 1:length(regressor_output_cols)) {
-          df[[paste0(regressor_output_cols[[i]], "_effect")]] <- df[[regressor_output_cols[[i]]]] * model$coef[[regressor_output_cols[[i]]]]
-        }
-      }
-
-      df
-    }))
+    # TODO: Add regressor effect columns. Make this work again.
+    # if (!is.null(regressor_output_cols)) {
+    #   for (i in 1:length(regressor_output_cols)) {
+    #     ret_df[[paste0(regressor_output_cols[[i]], "_effect")]] <- ret_df[[regressor_output_cols[[i]]]] * model$coef[[regressor_output_cols[[i]]]]
+    #   }
+    # }
 
     if (test_mode) {
-      ret <- ret %>% dplyr::mutate(data=purrr::map(data, function(df) {
-        df %>% dplyr::select(-is_test_data, is_test_data)
-      }))
+      ret_df <- ret_df %>% dplyr::select(-is_test_data, is_test_data)
     }
+
+    ret <- tibble(data = list(ret_df))
 
     ret <- ret %>% dplyr::mutate(model_meta = purrr::map(model, function(m){
       # TODO: imple broom::glance
