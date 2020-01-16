@@ -329,39 +329,6 @@ do_arima <- function(df, time,
     ret <- tibble(data = list(ret_df), model = list(model_df))
 
     if(F){
-    ret <- ret %>% dplyr::mutate(model_meta = purrr::map(model, function(m){
-      # TODO: imple broom::glance
-      ar_terms <- m$coef %>% names() %>% .[stringr::str_detect(., "^s?ar[0-9]*")]
-      ma_terms <- m$coef %>% names() %>% .[stringr::str_detect(., "^s?ma[0-9]*")]
-
-      repeatability <- function(m, term_names){
-        abs(polyroot(c(1, coef(m)[term_names])))
-      }
-
-      stationarity <- function(m, term_names){
-        abs(polyroot(c(1, -coef(m)[term_names])))
-      }
-
-      ar_stationarity <- setNames(stationarity(m, ar_terms), as.list(ar_terms))
-      ma_repeatability <- setNames(repeatability(m, ma_terms), as.list(ma_terms))
-
-      df <- data.frame(AIC=m$aic, BIC=m$bic, AICC=m$aicc, as.list(forecast::arimaorder(m)), forecast::accuracy(m))
-
-      if(length(ar_stationarity) > 0){
-        ar_stationarity_df <- as.data.frame(as.list(ar_stationarity)) %>%
-                                dplyr::rename_all(funs(stringr::str_c(., "_stationarity")))
-        df <- merge(df, ar_stationarity_df)
-      }
-
-      if(length(ma_repeatability) > 0){
-        ma_stationarity_df <- as.data.frame(as.list(ma_repeatability)) %>%
-                                 dplyr::rename_all(funs(stringr::str_c(., "_repeatability")))
-        df <- merge(df, ma_stationarity_df)
-      }
-
-      df
-
-    }))
     ret <- ret %>% dplyr::mutate(test_results = purrr::map(model, function(m) {
       # Repeat test for each lag.
       residuals <- residuals(m)
