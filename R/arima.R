@@ -329,7 +329,9 @@ do_arima <- function(df, time,
     ret <- tibble(data = list(ret_df), model = list(model_df))
 
     # Add ACF.
-    ret <- ret %>% mutate(acf = list(!!feasts::ACF(training_tsibble, y)))
+    acf_res <- acf(training_tsibble$y, plot=FALSE)
+    acf_df <- data.frame(lag = acf_res$lag, acf = acf_res$acf)
+    ret <- ret %>% mutate(acf = list(!!acf_df))
 
     # Add difference ACF.
     differences <- model_df$arima[[1]]$fit$spec$d
@@ -342,6 +344,16 @@ do_arima <- function(df, time,
     acf_res <- acf(diff_res, plot=FALSE)
     difference_acf <- data.frame(lag = acf_res$lag, acf = acf_res$acf)
     ret <- ret %>% mutate(difference_acf = list(!!difference_acf))
+
+    # Add residual ACF
+    residuals_df <- model_df %>% residuals()
+    residual_acf <- residuals_df %>% feasts::ACF(.resid)
+    ret <- ret %>% mutate(residual_acf = list(!!residual_acf))
+
+    # Add residual
+    colnames(residuals_df)[colnames(residuals_df) == "ds"] <- time_col
+    colnames(residuals_df)[colnames(residuals_df) == ".resid"] <- value_col
+    ret <- ret %>% mutate(residuals= list(!!residuals_df))
 
     # Add unit root test result
     type <- 1 # 1 menas "level". TODO: check if this is correct.
