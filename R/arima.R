@@ -214,9 +214,9 @@ do_arima <- function(df, time,
     # So, if trace value is needed, the output must be captured.
     ret <- NULL
 
-    training_tsibble <- tsibble(ds = training_data$ds, y = training_data$y)
-    model_df <- training_tsibble %>% model(arima=ARIMA(y))
-    forecasted_df <- model_df %>% forecast(h=periods) %>% hilo(level = c(80, 95))
+    training_tsibble <- tsibble::tsibble(ds = training_data$ds, y = training_data$y)
+    model_df <- training_tsibble %>% fabletools::model(arima=fable::ARIMA(y))
+    forecasted_df <- model_df %>% fabletools::forecast(h=periods) %>% fabletools::hilo(level = c(80, 95))
 
     # trace_output <- capture.output({
     #   ret <- training_data %>% tidyr::nest() %>%
@@ -337,7 +337,7 @@ do_arima <- function(df, time,
       diff_res <- diff(training_tsibble$y, differences = differences)
     }
     else {
-      diff_res <- values
+      diff_res <- training_tsibble$y
     }
     acf_res <- acf(diff_res, plot=FALSE)
     difference_acf <- data.frame(lag = acf_res$lag, acf = acf_res$acf)
