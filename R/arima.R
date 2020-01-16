@@ -500,8 +500,7 @@ create_ts_seq <- function(ds, start_func, to_func, time_unit, start_add=0, to_ad
 
 #' @export
 glance.ARIMA_exploratory <- function(m, pretty.name = FALSE, ...) { #TODO: add test
-  browser()
-  if(F){
+  if(F){ # Old code with forecast for reference. TODO: Move applicable parts to the code with fable.
   ar_terms <- m$coef %>% names() %>% .[stringr::str_detect(., "^s?ar[0-9]*")]
   ma_terms <- m$coef %>% names() %>% .[stringr::str_detect(., "^s?ma[0-9]*")]
 
@@ -531,6 +530,7 @@ glance.ARIMA_exploratory <- function(m, pretty.name = FALSE, ...) { #TODO: add t
   }
   df
   }
-  fable:::glance.ARIMA(m)
+  # Remove list columns ar_roots and ma_roots for now. TODO: Make use of those info too.
+  ret <- fable:::glance.ARIMA(m) %>% dplyr::select(-ar_roots, -ma_roots)
 
 }
