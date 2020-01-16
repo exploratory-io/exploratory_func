@@ -343,6 +343,36 @@ do_arima <- function(df, time,
     difference_acf <- data.frame(lag = acf_res$lag, acf = acf_res$acf)
     ret <- ret %>% mutate(difference_acf = list(!!difference_acf))
 
+    # Add unit root test result
+    type <- 1 # 1 menas "level". TODO: check if this is correct.
+    urca_pval <- function(urca_test) {
+      approx(urca_test@cval[1, ], as.numeric(sub("pct", "", 
+                                                 colnames(urca_test@cval)))/100, xout = urca_test@teststat[1], 
+             rule = 2)$y
+    }
+    kpss_wrap <- function(x, ..., use.lag = trunc(3 * sqrt(length(x))/13)) {
+      urca::ur.kpss(x, ..., use.lag = use.lag)
+    }
+
+    runTests <- function(x, test) {
+      tryCatch({
+        suppressWarnings(diff <- switch(test, kpss = kpss_wrap(x, type = c("mu", "tau")[type]),
+                                        adf = urca::ur.df(x, type = c("drift", "trend")[type]), 
+                                        pp = urca::ur.pp(x, type = "Z-tau", model = c("constant", "trend")[type]),
+                                        stop("This shouldn't happen")))
+        diff
+      }, error = function(e) {
+        # TODO: do something.
+        stop(e)
+      })
+    }
+
+    unit_root_test_res <- runTests(diff_res, test)
+    unit_root_test_res <- data.frame(unit_root_test_res@cval, teststat = unit_root_test_res@teststat)
+    ret <- ret %>% mutate(unit_root_test = list(!!unit_root_test_res))
+
+
+
     if(F){
     ret <- ret %>% dplyr::mutate(test_results = purrr::map(model, function(m) {
       # Repeat test for each lag.
