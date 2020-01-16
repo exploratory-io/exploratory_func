@@ -214,12 +214,9 @@ do_arima <- function(df, time,
     # So, if trace value is needed, the output must be captured.
     ret <- NULL
 
-    browser()
     training_tsibble <- tsibble(ds = training_data$ds, y = training_data$y)
-    browser()
     model_df <- training_tsibble %>% model(arima=ARIMA(y))
     forecasted_df <- model_df %>% forecast(h=periods) %>% hilo(level = c(80, 95))
-    browser()
 
     # trace_output <- capture.output({
     #   ret <- training_data %>% tidyr::nest() %>%
@@ -323,9 +320,13 @@ do_arima <- function(df, time,
       ret_df <- ret_df %>% dplyr::select(-is_test_data, is_test_data)
     }
 
-    class(model_df$arima) <- c("arima_exploratory", class(model_df$arima))
-    ret <- tibble(data = list(ret_df), model = list(model_df$arima))
     browser()
+    class(model_df$arima[[1]]$fit) <- c("ARIMA_exploratory", class(model_df$arima[[1]]$fit))
+    # Note that model column is mable, rather than model object.
+    # It seems this is how fable is designed so that multiple models can be applied to a same data at once.
+    # Applying tidy() etc. on a mable seems to in turn call tidy() on each model stored in mable.
+    # Reference: https://github.com/tidyverts/fable/issues/91
+    ret <- tibble(data = list(ret_df), model = list(model_df))
 
     if(F){
     ret <- ret %>% dplyr::mutate(model_meta = purrr::map(model, function(m){
@@ -498,6 +499,38 @@ create_ts_seq <- function(ds, start_func, to_func, time_unit, start_add=0, to_ad
  }
 
 #' @export
-glance.arima_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
-  data.frame(x=1)
+glance.ARIMA_exploratory <- function(m, pretty.name = FALSE, ...) { #TODO: add test
+  browser()
+  if(F){
+  ar_terms <- m$coef %>% names() %>% .[stringr::str_detect(., "^s?ar[0-9]*")]
+  ma_terms <- m$coef %>% names() %>% .[stringr::str_detect(., "^s?ma[0-9]*")]
+
+  repeatability <- function(m, term_names){
+    abs(polyroot(c(1, coef(m)[term_names])))
+  }
+
+  stationarity <- function(m, term_names){
+    abs(polyroot(c(1, -coef(m)[term_names])))
+  }
+
+  ar_stationarity <- setNames(stationarity(m, ar_terms), as.list(ar_terms))
+  ma_repeatability <- setNames(repeatability(m, ma_terms), as.list(ma_terms))
+
+  df <- data.frame(AIC=m$aic, BIC=m$bic, AICC=m$aicc, as.list(forecast::arimaorder(m)), forecast::accuracy(m))
+
+  if(length(ar_stationarity) > 0){
+    ar_stationarity_df <- as.data.frame(as.list(ar_stationarity)) %>%
+                            dplyr::rename_all(funs(stringr::str_c(., "_stationarity")))
+    df <- merge(df, ar_stationarity_df)
+  }
+
+  if(length(ma_repeatability) > 0){
+    ma_stationarity_df <- as.data.frame(as.list(ma_repeatability)) %>%
+                             dplyr::rename_all(funs(stringr::str_c(., "_repeatability")))
+    df <- merge(df, ma_stationarity_df)
+  }
+  df
+  }
+  fable:::glance.ARIMA(m)
+
 }
