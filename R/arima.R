@@ -328,6 +328,21 @@ do_arima <- function(df, time,
     # Reference: https://github.com/tidyverts/fable/issues/91
     ret <- tibble(data = list(ret_df), model = list(model_df))
 
+    # Add ACF.
+    ret <- ret %>% mutate(acf = list(!!feasts::ACF(training_tsibble, y)))
+
+    # Add difference ACF.
+    differences <- model_df$arima[[1]]$fit$spec$d
+    if (differences > 0) {
+      diff_res <- diff(training_tsibble$y, differences = differences)
+    }
+    else {
+      diff_res <- values
+    }
+    acf_res <- acf(diff_res, plot=FALSE)
+    difference_acf <- data.frame(lag = acf_res$lag, acf = acf_res$acf)
+    ret <- ret %>% mutate(difference_acf = list(!!difference_acf))
+
     if(F){
     ret <- ret %>% dplyr::mutate(test_results = purrr::map(model, function(m) {
       # Repeat test for each lag.
