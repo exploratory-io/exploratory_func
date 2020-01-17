@@ -392,7 +392,7 @@ do_arima <- function(df, time,
     lag <- min(lag, round(length(residuals)/5))
     lag <- max(degree_of_freedom + 3, lag)
     residual_test <- feasts::ljung_box(residuals, lag=lag, dof=degree_of_freedom)
-    residual_test <- tibble(statistic=residual_test[[1]], p.value=residual_test[[2]])
+    residual_test <- tibble(statistic=residual_test[[1]], p.value=residual_test[[2]], lag=lag, dof=degree_of_freedom)
     ret <- ret %>% mutate(residual_test = list(!!residual_test))
 
     if(F){
@@ -533,8 +533,9 @@ create_ts_seq <- function(ds, start_func, to_func, time_unit, start_add=0, to_ad
  }
 
 #' @export
-glance.ARIMA_exploratory <- function(m, pretty.name = FALSE, ...) { #TODO: add test
-  if(F){ # Old code with forecast for reference. TODO: Move applicable parts to the code with fable.
+glance.ARIMA_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
+  m <- x$model # x$model is the model object of Arima class.
+
   ar_terms <- m$coef %>% names() %>% .[stringr::str_detect(., "^s?ar[0-9]*")]
   ma_terms <- m$coef %>% names() %>% .[stringr::str_detect(., "^s?ma[0-9]*")]
 
@@ -549,22 +550,32 @@ glance.ARIMA_exploratory <- function(m, pretty.name = FALSE, ...) { #TODO: add t
   ar_stationarity <- setNames(stationarity(m, ar_terms), as.list(ar_terms))
   ma_repeatability <- setNames(repeatability(m, ma_terms), as.list(ma_terms))
 
-  df <- data.frame(AIC=m$aic, BIC=m$bic, AICC=m$aicc, as.list(forecast::arimaorder(m)), forecast::accuracy(m))
+  # forecast::accuracy(m) seems to be returning NaNs.
+  # df <- data.frame(AIC=m$aic, BIC=m$bic, AICc=m$aicc, as.list(forecast::arimaorder(m)), forecast::accuracy(m))
+  # TODO: migrate out from forecast package.
+  df <- data.frame(AIC=m$aic, BIC=m$bic, AICc=m$aicc, as.list(forecast::arimaorder(m)))
 
-  if(length(ar_stationarity) > 0){
-    ar_stationarity_df <- as.data.frame(as.list(ar_stationarity)) %>%
-                            dplyr::rename_all(funs(stringr::str_c(., "_stationarity")))
-    df <- merge(df, ar_stationarity_df)
-  }
+  if(F) { # Skipped for now. TODO: Revive it.
+    if(length(ar_stationarity) > 0){
+      ar_stationarity_df <- as.data.frame(as.list(ar_stationarity)) %>%
+                              dplyr::rename_all(funs(stringr::str_c(., "_stationarity")))
+      df <- merge(df, ar_stationarity_df)
+    }
 
-  if(length(ma_repeatability) > 0){
-    ma_stationarity_df <- as.data.frame(as.list(ma_repeatability)) %>%
-                             dplyr::rename_all(funs(stringr::str_c(., "_repeatability")))
-    df <- merge(df, ma_stationarity_df)
+    if(length(ma_repeatability) > 0){
+      ma_stationarity_df <- as.data.frame(as.list(ma_repeatability)) %>%
+                               dplyr::rename_all(funs(stringr::str_c(., "_repeatability")))
+      df <- merge(df, ma_stationarity_df)
+    }
   }
   df
-  }
+  # Version that makes use of fable:::glance.ARIMA().
   # Remove list columns ar_roots and ma_roots for now. TODO: Make use of those info too.
-  ret <- fable:::glance.ARIMA(m) %>% dplyr::select(-ar_roots, -ma_roots)
+  # ret <- fable:::glance.ARIMA(x) %>% dplyr::select(-ar_roots, -ma_roots)
+  # --- Example output ---
+  # A tibble: 1 x 5
+  #   sigma2 log_lik   AIC  AICc   BIC
+  #    <dbl>   <dbl> <dbl> <dbl> <dbl>
+  # 1 0.0293    499. -995. -995. -984.
 
 }
