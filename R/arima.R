@@ -383,7 +383,17 @@ do_arima <- function(df, time,
     unit_root_test_res <- data.frame(unit_root_test_res@cval, teststat = unit_root_test_res@teststat)
     ret <- ret %>% mutate(unit_root_test = list(!!unit_root_test_res))
 
-
+    m <- model_df$arima[[1]]$fit$model # model of "Arima" class. Q: is this from stats package?
+    residuals <- residuals(m) # residual has to be extracted from above model to get freq at the next line.
+    freq <- frequency(residuals)
+    degree_of_freedom <- length(m$coef) # Definition of modeldf.Arima in forecast package.
+    # Logic used inside checkresiduals to automatically determine lag.
+    lag <- ifelse(freq > 1, 2 * freq, 10)
+    lag <- min(lag, round(length(residuals)/5))
+    lag <- max(degree_of_freedom + 3, lag)
+    residual_test <- feasts::ljung_box(residuals, lag=lag, dof=degree_of_freedom)
+    residual_test <- tibble(statistic=residual_test[[1]], p.value=residual_test[[2]])
+    ret <- ret %>% mutate(residual_test = list(!!residual_test))
 
     if(F){
     ret <- ret %>% dplyr::mutate(test_results = purrr::map(model, function(m) {
