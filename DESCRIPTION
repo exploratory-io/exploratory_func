@@ -42,8 +42,7 @@ Imports:
     dtw,
     snakecase,
     textshape,
-    V8,
-    forecast
+    V8
 Suggests:
     testthat,
     twitteR,
