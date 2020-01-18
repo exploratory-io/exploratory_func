@@ -1919,21 +1919,6 @@ cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, nam
     }
   }
 
-  # This check should be done after all possible filtering.
-  # Return NULL if there is only one row
-  # for a class of target variable because
-  # rondomForest enters infinite loop
-  # in such case.
-  # The group with NULL is removed when
-  # unnesting the result
-  # TODO: Should we just filter such row and go on??
-  for (level in levels(df[[clean_target_col]])) {
-    if(sum(df[[clean_target_col]] == level, na.rm = TRUE) == 1) {
-      return(NULL)
-    }
-  }
-
-
   # remove columns with only one unique value
   cols_copy <- c_cols
   for (col in cols_copy) {
