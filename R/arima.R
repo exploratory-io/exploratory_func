@@ -222,6 +222,8 @@ do_arima <- function(df, time,
                                            ))
     forecasted_df <- model_df %>% fabletools::forecast(h=periods) %>% fabletools::hilo(level = c(80, 95))
 
+    # Old code with forecast::auto.arima kept for reference while moving to fable::ARIMA.
+    #
     # trace_output <- capture.output({
     #   ret <- training_data %>% tidyr::nest() %>%
     #            dplyr::mutate(model = purrr::map(data, function(df) {
@@ -324,7 +326,6 @@ do_arima <- function(df, time,
       ret_df <- ret_df %>% dplyr::select(-is_test_data, is_test_data)
     }
 
-    browser()
     class(model_df$arima[[1]]$fit) <- c("ARIMA_exploratory", class(model_df$arima[[1]]$fit))
     # Note that model column is mable, rather than model object.
     # It seems this is how fable is designed so that multiple models can be applied to a same data at once.
