@@ -1160,7 +1160,13 @@ rf_importance <- function(data, ...) {
 #' wrapper for tidy type evaluation
 #' @export
 rf_evaluation <- function(data, ...) {
-  broom::tidy(data, model, type = "evaluation", ...)
+  ret <- broom::tidy(data, model, type = "evaluation", ...)
+  if (!is.null(ret$Note)) {
+    # Bring Note column to the last.
+    # It is hard to control the position of Note column inside tidy, and hence we do it here.
+    ret <- ret %>% dplyr::select(-Note, everything(), Note)
+  }
+  ret
 }
 
 #' wrapper for tidy type evaluation_by_class
