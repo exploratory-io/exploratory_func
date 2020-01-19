@@ -2003,6 +2003,7 @@ calc_feature_imp <- function(df,
                              test_rate = 0.0,
                              test_split_type = "random" # "random" or "ordered"
                              ){
+
   if(!is.null(seed)){
     set.seed(seed)
   }
@@ -2229,7 +2230,8 @@ calc_feature_imp <- function(df,
         # grouped data frame
         # to show result of
         # data frames that succeed
-        NULL
+        class(e) <- c("ranger", class(e))
+        list(rf = e, test_index = NULL, source_data = NULL)
       } else {
         stop(e)
       }
@@ -2407,24 +2409,32 @@ evaluate_binary_classification <- function(actual, predicted, predicted_probabil
 #' @export
 #' @param type "importance", "evaluation" or "conf_mat". Feature importance, evaluated scores or confusion matrix of training data.
 tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, binary_classification_threshold = 0.5, ...) {
+  if ("error" %in% class(x) && type != "evaluation") {
+    ret <- data.frame()
+    return(ret)
+  }
   switch(
     type,
     importance = {
       # return variable importance
-      imp <- ranger::importance(x)
-
-      ret <- data.frame(
-        variable = x$terms_mapping[names(imp)],
-        importance = imp,
-        stringsAsFactors = FALSE
-      )
-
+      tryCatch({
+        imp <- ranger::importance(x)
+        ret <- data.frame(
+          variable = x$terms_mapping[names(imp)],
+          importance = imp,
+          stringsAsFactors = FALSE
+          )
+      }, error = function(e){
+        ret <<- data.frame()
+      })
       ret
     },
     evaluation = {
+      if ("error" %in% class(x)) {
+        return(glance(x, pretty.name = pretty.name, ...))
+      }
       # get evaluation scores from training data
       actual <- x$y
-
       if(is.numeric(actual)){
         glance(x, pretty.name = pretty.name, ...)
       } else {
@@ -2519,6 +2529,10 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, binary_clas
 # This is used from Analytics View only when classification type is regression.
 #' @export
 glance.ranger <- function(x, pretty.name = FALSE, ...) {
+  if ("error" %in% class(x)) {
+    ret <- data.frame(Note = x$message)
+    return(ret)
+  }
   glance.ranger.method <- switch(x[["treetype"]],
                                         "Classification" = glance.ranger.classification,
                                         "Probability estimation" = glance.ranger.classification,

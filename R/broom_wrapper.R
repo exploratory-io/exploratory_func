@@ -479,6 +479,7 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
         as.formula(paste0("~list(broom::augment(model, data = source.data.test, data_type = 'test', ", aug_args, "))"))
       }
       augmented <- df %>%
+        filter("error" %nin% class(model)) %>%
         dplyr::ungroup() %>%
         dplyr::mutate(source.data.training = purrr::map2(source.data, .test_index, function(df, index){
           # Remove data in test_index for training data
