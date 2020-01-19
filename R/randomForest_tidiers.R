@@ -2225,11 +2225,8 @@ calc_feature_imp <- function(df,
       list(rf = rf, test_index = test_index, source_data = source_data)
     }, error = function(e){
       if(length(grouped_cols) > 0) {
-        # ignore the error if
-        # it is caused by subset of
-        # grouped data frame
-        # to show result of
-        # data frames that succeed
+        # In repeat-by case, we report group-specific error in the Summary table,
+        # so that analysis on other groups can go on.
         class(e) <- c("ranger", class(e))
         list(rf = e, test_index = NULL, source_data = NULL)
       } else {
@@ -2266,6 +2263,14 @@ calc_feature_imp <- function(df,
           })) %>%
           dplyr::select(-data) %>%
           dplyr::rowwise()
+
+  # If all the groups are errors, it would be hard to handle resulting data frames
+  # at the chart preprocessors. Hence, we instead stop the processing here
+  # and just throw the error from the first group.
+  if (purrr::every(ret$model, function(x) {"error" %in% class(x)})) {
+    stop(ret$model[[1]])
+  }
+
   ret
 }
 
