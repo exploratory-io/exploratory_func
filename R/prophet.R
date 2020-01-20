@@ -764,7 +764,7 @@ tidy.prophet_exploratory <- function(x, type="result") {
     x$result
   }
   else if (type == "coef") { # Returns coefficients (beta) of external regressors and seasonalities.
-    # Keep only training data for reverse calculation of beta.
+    # Keep only training data for reverse calculation of beta, as standard deviations of effects.
     if (x$test_mode) {
       res <- x$result %>% dplyr::filter(!is_test_data)
     }
@@ -779,11 +779,17 @@ tidy.prophet_exploratory <- function(x, type="result") {
     # Calculate SDs of effects of regressors and seasonalities. For regressors, this equals to (absolute value of) beta by definition.
     # Reference: https://github.com/facebook/prophet/issues/928
     res <- res %>%
-      dplyr::select(matches('(_effect$|^yearly$|^weekly$|^daily$|^hourly$|^holidays$)')) %>%
-      dplyr::summarise_all(.funs=~sd(.,na.rm=TRUE)) %>%
-      tidyr::pivot_longer(everything(), names_to='Variable', values_to='Importance') %>%
-      dplyr::mutate(Variable = dplyr::recode(Variable, yearly='Yearly', weekly='Weekly', daily='Daily', hourly='Hourly', holidays='Holidays')) %>%
-      dplyr::mutate(Variable = stringr::str_remove(Variable, '_effect$'))
+      dplyr::select(matches('(_effect$|^yearly$|^weekly$|^daily$|^hourly$|^holidays$)'))
+
+    # Check if any columns are left before further calculation, to avoid error.
+    # If not, returning the empty data frame as is would be handled by the chart as empty data case.
+    if (length(colnames(res)) > 0) {
+      res <- res %>%
+        dplyr::summarise_all(.funs=~sd(.,na.rm=TRUE)) %>%
+        tidyr::pivot_longer(everything(), names_to='Variable', values_to='Importance') %>%
+        dplyr::mutate(Variable = dplyr::recode(Variable, yearly='Yearly', weekly='Weekly', daily='Daily', hourly='Hourly', holidays='Holidays')) %>%
+        dplyr::mutate(Variable = stringr::str_remove(Variable, '_effect$'))
+    }
     res
   }
 }
