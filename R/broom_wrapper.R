@@ -336,7 +336,9 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
         }
         augmented <- df %>%
           dplyr::ungroup() %>%
-          dplyr::filter("error" %nin% class(model)) %>% # Since this errors out under rowwise, should be done after ungroup().
+          # Filter out error classes we are using for conveying error info to Summary table.
+          # Note that dplyr::filter("error" %nin% class(model)) does not work since class(model) evaluates as "list".
+          dplyr::filter(purrr::flatten_lgl(purrr::map(model, function(x){"error" %nin% class(x)}))) %>%  # Since this errors out under rowwise, should be done after ungroup().
           dplyr::mutate(source.data = purrr::map2(source.data, .test_index, function(df, index){
             # Keep data in test_index for test data
             safe_slice(df, index, remove = FALSE)
@@ -379,7 +381,7 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
         }
         data_to_augment <- df %>%
           dplyr::ungroup() %>%
-          dplyr::filter("error" %nin% class(model)) %>% # Since this errors out under rowwise, should be done after ungroup().
+          dplyr::filter(purrr::flatten_lgl(purrr::map(model, function(x){"error" %nin% class(x)}))) %>%  # Since this errors out under rowwise, should be done after ungroup().
           dplyr::mutate(source.data = purrr::map2(source.data, .test_index, function(df, index){
             # keep data only in test_index
             safe_slice(df, index)
@@ -444,7 +446,7 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
       }
       augmented <- df %>%
         dplyr::ungroup() %>%
-        dplyr::filter("error" %nin% class(model)) %>% # Since this errors out under rowwise, should be done after ungroup().
+        dplyr::filter(purrr::flatten_lgl(purrr::map(model, function(x){"error" %nin% class(x)}))) %>%  # Since this errors out under rowwise, should be done after ungroup().
         dplyr::mutate(source.data = purrr::map2(source.data, .test_index, function(df, index){
           # remove data in test_index
           safe_slice(df, index, remove = TRUE)
@@ -483,7 +485,7 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
       }
       augmented <- df %>%
         dplyr::ungroup() %>%
-        dplyr::filter("error" %nin% class(model)) %>% # Since this errors out under rowwise, should be done after ungroup().
+        dplyr::filter(purrr::flatten_lgl(purrr::map(model, function(x){"error" %nin% class(x)}))) %>%  # Since this errors out under rowwise, should be done after ungroup().
         dplyr::mutate(source.data.training = purrr::map2(source.data, .test_index, function(df, index){
           # Remove data in test_index for training data
           safe_slice(df, index, remove = TRUE)
@@ -611,8 +613,8 @@ prediction_training_and_test <- function(df, prediction_type="default", threshol
 #' @param threshold Threshold value for predicted probability or what to optimize. It can be "f_score", "accuracy", "precision", "sensitivity" or "specificity" to optimize.
 #' @export
 prediction_binary <- function(df, threshold = 0.5, ...){
-  # ungroup() is necessary to avoid error under rowwise(). Putting rowwise at the end to put it back to rowwise again. TODO: Is it possible that the input is not under rowwise?
-  df <- df %>% ungroup() %>% dplyr::filter(purrr::flatten_lgl(purrr::map(model, function(x){!is.null(x) & "error" %nin% class(x)}))) %>% rowwise()
+  # ungroup() is necessary to avoid error under rowwise(). Putting rowwise at the end to put it back to rowwise again. TODO: Is it possible that the input is not under rowwise and our adding rowwise affect processing that follows?
+  df <- df %>% ungroup() %>% dplyr::filter(purrr::flatten_lgl(purrr::map(model, function(x){!is.null(x) & "error" %nin% class(x)}))) %>% dplyr::rowwise()
 
   if (nrow(df) == 0) { # No valid models were returned.
     return(data.frame())
