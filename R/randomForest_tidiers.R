@@ -978,6 +978,10 @@ augment.ranger.regression <- function(x, data = NULL, newdata = NULL, data_type 
 #' augment for rpart model
 #' @export
 augment.rpart <- function(x, data = NULL, newdata = NULL, ...) {
+  if ("error" %in% class(x)) {
+    ret <- data.frame()
+    return(ret)
+  }
   # Extract data from model
   # This is from https://github.com/mdlincoln/broom/blob/e3cdf5f3363ab9514e5b61a56c6277cb0d9899fd/R/rf_tidiers.R
   if (is.null(data)) {
@@ -2647,6 +2651,10 @@ glance.ranger.classification <- function(x, pretty.name, ...) {
 # This is used from Analytics View only when classification type is regression.
 #' @export
 glance.rpart <- function(x, pretty.name = FALSE, ...) {
+  if ("error" %in% class(x)) {
+    ret <- data.frame(Note = x$message)
+    return(ret)
+  }
   actual <- x$y
   predicted <- predict(x)
   rmse_val <- rmse(actual, predicted)
@@ -2866,12 +2874,10 @@ exp_rpart <- function(df,
       list(model = model, test_index = test_index, source_data = source_data)
     }, error = function(e){
       if(length(grouped_cols) > 0) {
-        # ignore the error if
-        # it is caused by subset of
-        # grouped data frame
-        # to show result of
-        # data frames that succeed
-        NULL
+        # In repeat-by case, we report group-specific error in the Summary table,
+        # so that analysis on other groups can go on.
+        class(e) <- c("rpart", class(e))
+        list(model = e, test_index = NULL, source_data = NULL)
       } else {
         stop(e)
       }
@@ -3078,11 +3084,14 @@ get_predicted_probability_rpart <- function(x, data_type = "training") {
 #' @export
 #' @param type "importance", "evaluation" or "conf_mat". Feature importance, evaluated scores or confusion matrix of training data.
 tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
+  if ("error" %in% class(x) && type != "evaluation") {
+    ret <- data.frame()
+    return(ret)
+  }
   switch(
     type,
     importance = {
       # return variable importance
-
       imp <- x$variable.importance
 
       ret <- data.frame(
@@ -3090,7 +3099,6 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
         importance = imp,
         stringsAsFactors = FALSE
       )
-
       ret
     },
     evaluation = {
