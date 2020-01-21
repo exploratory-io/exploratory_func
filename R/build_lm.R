@@ -1355,5 +1355,10 @@ evaluate_lm_training_and_test <- function(df, pretty.name = FALSE){
       dplyr::rename(`Data Type` = is_test_data)
   }
 
+  # Bring Note column at the end.
+  if (!is.null(ret$Note)) {
+    ret <- ret %>% dplyr::select(-Note, everything(), Note)
+  }
+
   ret
 }
