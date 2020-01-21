@@ -437,5 +437,5 @@ test_that("calc_feature_map() error handling for predictor with single unique va
   expect_error({
     model_df <- flight %>% mutate(Const=1) %>%
       calc_feature_imp(`FL NUM`, Const, test_rate = 0.3)
-  }, "The selected predictor variables are invalid since they have only one unique values.")
+  }, "Invalid Predictors: Only one unique value.")
 })

@@ -69,5 +69,5 @@ test_that("exp_rpart() error handling for predictor with single unique value", {
   expect_error({
     model_df <- flight %>% mutate(Const=1) %>%
       exp_rpart(`ORIGIN STATE ABR`,Const, test_rate = 0.3)
-  }, "The selected predictor variables are invalid since they have only one unique values.")
+  }, "Invalid Predictors: Only one unique value.")
 })

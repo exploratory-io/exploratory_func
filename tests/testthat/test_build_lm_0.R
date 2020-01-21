@@ -36,7 +36,7 @@ test_that("test relative importance", {
       num3 = 1
     )
     model_df <- test_df %>% build_lm.fast(num1, num2, num3)
-  }, "The selected predictor variables are invalid since they have only one unique values.")
+  }, "Invalid Predictors: Only one unique value.")
 })
 
 test_that("test build_lm with keep.source FALSE ", {
