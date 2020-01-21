@@ -51,6 +51,9 @@ test_that("test exp_balance with logical", {
   expect_equal(any(is.na(res$y)), FALSE) # no NA is expected
 })
 
+# randomForest package had an infinite loop issue with this case,
+# but ranger, which we use instead of randomForest now, does not have this problem.
+# We keep testing this just in case.
 test_that("test calc_feature_imp when the number of rows of classes is one", {
   sample_data <- data.frame(
     y = c("a", "b", "b", "b", "b", "c"),
@@ -61,7 +64,7 @@ test_that("test calc_feature_imp when the number of rows of classes is one", {
     calc_feature_imp(y, num, importance_measure = "impurity")
   ret <- model_df %>% rf_importance()
 
-  expect_equal(nrow(ret), 0)
+  expect_equal(nrow(ret), 1)
 })
 
 test_that("test calc_feature_imp predicting multi-class", {
