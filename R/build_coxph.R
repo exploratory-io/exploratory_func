@@ -255,7 +255,8 @@ build_coxph.fast <- function(df,
         }
       }
       if (length(c_cols) == 0) {
-        stop("The selected predictor variables are invalid since they have only one unique values.")
+        # Previous version of message - stop("The selected predictor variables are invalid since they have only one unique values.")
+        stop("Invalid Predictors: Only one unique value.") # Message is made short so that it fits well in the Summary table.
       }
 
       # build formula for lm

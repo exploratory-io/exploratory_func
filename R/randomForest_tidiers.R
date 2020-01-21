@@ -2061,7 +2061,8 @@ calc_feature_imp <- function(df,
       df <- clean_df_ret$df
       c_cols <- clean_df_ret$c_cols
       if  (length(c_cols) == 0) {
-        stop("The selected predictor variables are invalid since they have only one unique values.")
+        # Previous version of message - stop("The selected predictor variables are invalid since they have only one unique values.")
+        stop("Invalid Predictors: Only one unique value.") # Message is made short so that it fits well in the Summary table.
       }
       name_map <- clean_df_ret$name_map
 
@@ -2797,7 +2798,8 @@ exp_rpart <- function(df,
       df <- clean_df_ret$df
       c_cols <- clean_df_ret$c_cols
       if  (length(c_cols) == 0) {
-        stop("The selected predictor variables are invalid since they have only one unique values.")
+        # Previous version of message - stop("The selected predictor variables are invalid since they have only one unique values.")
+        stop("Invalid Predictors: Only one unique value.") # Message is made short so that it fits well in the Summary table.
       }
       name_map <- clean_df_ret$name_map
 
