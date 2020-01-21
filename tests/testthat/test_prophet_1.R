@@ -104,6 +104,18 @@ test_that("do_prophet test mode with year as time units", {
   expect_true(!is.na(ret$forecasted_value[[length(ret$forecasted_value)]]))
 })
 
+test_that("do_prophet with short data (test for coef)", {
+  ts <- seq.Date(as.Date("2010-01-01"), as.Date("2010-01-13"), by="day")
+  raw_data <- data.frame(timestamp=ts, data=runif(length(ts)))
+  model_df <- raw_data %>%
+    do_prophet(timestamp, data, 10, time_unit = "day", funs.aggregate.regressors = c(mean), yearly.seasonality = "auto", weekly.seasonality = "auto", output="model")
+  coef_df <- model_df %>% tidy(model, type="coef")
+  expect_equal(length(names(coef_df)), 0)
+  ret <- model_df %>% tidy(model)
+  # verify the last date with forecasted_value
+  expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2010-01-23")) 
+})
+
 test_that("do_prophet with extra regressors", {
   ts <- seq.Date(as.Date("2010-01-01"), as.Date("2012-01-01"), by="day")
   raw_data <- data.frame(timestamp=ts, data=runif(length(ts)))
