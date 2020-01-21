@@ -18,9 +18,9 @@ uploadGoogleSheet <- function(filepath, title, overwrite = FALSE){
 #' @param treatTheseAsNA - character vector that each item represents NA
 #' @param firstRowAsHeader - argument to control if you want to treat first row as header
 #' @param commentChar - treat the character as comment.
-#' @param detectDataTypes - column types you want to assign.
+#' @param guessDataType - flag to tell if you want googlesheets::gs_read to guess column data type
 #' @export
-getGoogleSheet <- function(title, sheetName, skipNRows = 0, treatTheseAsNA, firstRowAsHeader = TRUE, commentChar, tokenFileId=NULL, detectDataTypes=TRUE, ...){
+getGoogleSheet <- function(title, sheetName, skipNRows = 0, treatTheseAsNA, firstRowAsHeader = TRUE, commentChar, tokenFileId=NULL, guessDataType=TRUE, ...){
   if(!requireNamespace("googlesheets")){stop("package googlesheets must be installed.")}
   if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
 
@@ -28,8 +28,8 @@ getGoogleSheet <- function(title, sheetName, skipNRows = 0, treatTheseAsNA, firs
   googlesheets::gs_auth(token)
   gsheet <- googlesheets::gs_title(title)
   col_types <- NULL
-  if(!detectDataTypes) {
-    # if detectDataTypes is FALSE, use character as the default column data type.
+  if(!guessDataType) {
+    # if guessDataType is FALSE, use character as the default column data type.
     col_types <- c(.default="c")
   }
   df <- gsheet %>% googlesheets::gs_read(ws = sheetName, skip = skipNRows, na = treatTheseAsNA, col_names = firstRowAsHeader, comment = commentChar, col_types = col_types)
