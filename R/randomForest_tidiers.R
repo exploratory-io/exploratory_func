@@ -767,6 +767,10 @@ augment.randomForest <- augment.randomForest.formula
 #' augment for randomForest(ranger) model
 #' @export
 augment.ranger <- function(x, data = NULL, newdata = NULL, ...) {
+  if ("error" %in% class(x)) {
+    ret <- data.frame()
+    return(ret)
+  }
   # Extract data from model
   # This is from https://github.com/mdlincoln/broom/blob/e3cdf5f3363ab9514e5b61a56c6277cb0d9899fd/R/rf_tidiers.R
   if (is.null(data)) {
