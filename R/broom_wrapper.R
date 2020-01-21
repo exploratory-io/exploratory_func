@@ -557,7 +557,8 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
 #' @export
 prediction_training_and_test <- function(df, prediction_type="default", threshold = 0.5, ...) {
   # ungroup() is to avoid error from filter that happens under rowwise.
-  filtered <- df %>% ungroup() %>% dplyr::filter(!is.null(model) & "error" %nin% class(model))
+  # filtered <- df %>% ungroup() %>% dplyr::filter(!is.null(model) & "error" %nin% class(model))
+  filtered <- df %>% ungroup() %>% dplyr::filter(purrr::flatten_lgl(purrr::map(model, function(x){!is.null(x) & "error" %nin% class(x)})))
   if (nrow(filtered) == 0) { # No valid models were returned.
     return(data.frame())
   }
@@ -610,15 +611,15 @@ prediction_training_and_test <- function(df, prediction_type="default", threshol
 #' @param threshold Threshold value for predicted probability or what to optimize. It can be "f_score", "accuracy", "precision", "sensitivity" or "specificity" to optimize.
 #' @export
 prediction_binary <- function(df, threshold = 0.5, ...){
-  df <- df %>% dplyr::filter(!is.null(model) & "error" %nin% class(model))
-  validate_empty_data(df)
+  # ungroup() is necessary to avoid error under rowwise(). Putting rowwise at the end to put it back to rowwise again. TODO: Is it possible that the input is not under rowwise?
+  df <- df %>% ungroup() %>% dplyr::filter(purrr::flatten_lgl(purrr::map(model, function(x){!is.null(x) & "error" %nin% class(x)}))) %>% rowwise()
 
-  ret <- prediction(df, ...)
-  filtered <- df %>% dplyr::filter(!is.null(model))
-  if (nrow(filtered) == 0) { # No valid models were returned.
+  if (nrow(df) == 0) { # No valid models were returned.
     return(data.frame())
   }
-  first_model <- filtered %>% `[[`(1, "model")
+  first_model <- df %>% `[[`(1, "model")
+
+  ret <- prediction(df, ...)
 
   # converting conf_low and conf_high from regression values
   # to probability values
