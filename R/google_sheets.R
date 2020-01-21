@@ -18,13 +18,22 @@ uploadGoogleSheet <- function(filepath, title, overwrite = FALSE){
 #' @param treatTheseAsNA - character vector that each item represents NA
 #' @param firstRowAsHeader - argument to control if you want to treat first row as header
 #' @param commentChar - treat the character as comment.
+#' @param colTypes - column types you want to assign.
 #' @export
-getGoogleSheet <- function(title, sheetName, skipNRows = 0, treatTheseAsNA, firstRowAsHeader = TRUE, commentChar, tokenFileId=NULL, ...){
+getGoogleSheet <- function(title, sheetName, skipNRows = 0, treatTheseAsNA, firstRowAsHeader = TRUE, commentChar, tokenFileId=NULL, colTypes=NULL, ...){
   if(!requireNamespace("googlesheets")){stop("package googlesheets must be installed.")}
+  if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
+
   token <- getGoogleTokenForSheet(tokenFileId)
   googlesheets::gs_auth(token)
   gsheet <- googlesheets::gs_title(title)
-  df <- gsheet %>% googlesheets::gs_read(ws = sheetName, skip = skipNRows, na = treatTheseAsNA, col_names = firstRowAsHeader, comment = commentChar)
+  col_type <- colTypes
+  if(!is.null(colTypes)) {
+    # From Exploratory Desktop, colTypes parameter value is passed as a string like "colA='c', colB='c'"
+    # so need to convert it as an expression like c(colA='c', colB='c')
+    col_types <- rlang::parse_expr(stringr::str_c("c(", colTypes, ")"))
+  }
+  df <- gsheet %>% googlesheets::gs_read(ws = sheetName, skip = skipNRows, na = treatTheseAsNA, col_names = firstRowAsHeader, comment = commentChar, col_types = col_types )
   df
 }
 
