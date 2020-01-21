@@ -609,6 +609,7 @@ prediction_training_and_test <- function(df, prediction_type="default", threshol
 #' @param threshold Threshold value for predicted probability or what to optimize. It can be "f_score", "accuracy", "precision", "sensitivity" or "specificity" to optimize.
 #' @export
 prediction_binary <- function(df, threshold = 0.5, ...){
+  df <- df %>% dplyr::filter(!is.null(model) & "error" %nin% class(model))
   validate_empty_data(df)
 
   ret <- prediction(df, ...)

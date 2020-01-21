@@ -780,12 +780,15 @@ build_lm.fast <- function(df,
 
     }, error = function(e){
       if(length(grouped_cols) > 0) {
-        # ignore the error if
-        # it is caused by subset of
-        # grouped data frame
-        # to show result of
-        # data frames that succeed
-        NULL
+        # In repeat-by case, we report group-specific error in the Summary table,
+        # so that analysis on other groups can go on.
+        if (model_type == "glm") {
+          class(e) <- c("glm_exploratory", class(e))
+        }
+        else {
+          class(e) <- c("lm_exploratory", class(e))
+        }
+        list(model = e, test_index = NULL, source_data = NULL)
       } else {
         stop(e)
       }
@@ -820,6 +823,10 @@ build_lm.fast <- function(df,
 #' special version of glance.lm function to use with build_lm.fast.
 #' @export
 glance.lm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
+  if ("error" %in% class(x)) {
+    ret <- data.frame(Note = x$message)
+    return(ret)
+  }
   ret <- broom:::glance.lm(x)
 
   # Adjust the subtle difference between sigma (Residual Standard Error) and RMSE.
@@ -853,6 +860,10 @@ glance.lm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
 #' special version of glance.lm function to use with build_lm.fast.
 #' @export
 glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification_threshold = 0.5, ...) { #TODO: add test
+  if ("error" %in% class(x)) {
+    ret <- data.frame(Note = x$message)
+    return(ret)
+  }
   ret <- broom:::glance.glm(x)
 
   # calculate model p-value since glm does not provide it as is.
@@ -980,6 +991,10 @@ get_var_min_pvalue <- function(var, coef_df, x) {
 #' special version of tidy.lm function to use with build_lm.fast.
 #' @export
 tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, ...) { #TODO: add test
+  if ("error" %in% class(x)) {
+    ret <- data.frame()
+    return(ret)
+  }
   switch(type,
     coefficients = {
       ret <- broom:::tidy.lm(x) # it seems that tidy.lm takes care of glm too
@@ -1055,6 +1070,10 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
 #' In case of error, returns empty data frame, or data frame with Note column.
 #' @export
 tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, variable_metric = NULL, ...) { #TODO: add test
+  if ("error" %in% class(x)) {
+    ret <- data.frame()
+    return(ret)
+  }
   switch(type,
     coefficients = {
       ret <- broom:::tidy.lm(x) # it seems that tidy.lm takes care of glm too
@@ -1174,6 +1193,10 @@ lm_partial_dependence <- function(df, ...) { # TODO: write test for this.
 
 #' @export
 augment.lm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "training", ...) {
+  if ("error" %in% class(x)) {
+    ret <- data.frame()
+    return(ret)
+  }
   if(!is.null(newdata)) { # Call broom:::augment.lm as is
     broom:::augment.lm(x, data = data, newdata = newdata, ...)
   } else if (!is.null(data)) {
@@ -1199,6 +1222,10 @@ augment.lm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "
 
 #' @export
 augment.glm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "training", ...) {
+  if ("error" %in% class(x)) {
+    ret <- data.frame()
+    return(ret)
+  }
   if(!is.null(newdata)) {
     # Calling broom:::augment.glm fails with 'NextMethod' called from an anonymous function
     # It seems augment.glm is only calling NextMethod, which is falling back to broom:::augment.lm.
