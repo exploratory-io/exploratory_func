@@ -30,7 +30,7 @@ getGoogleSheet <- function(title, sheetName, skipNRows = 0, treatTheseAsNA, firs
   col_type <- colTypes
   if(!is.null(colTypes)) {
     # From Exploratory Desktop, colTypes parameter value is passed as a string like "colA='c', colB='c'"
-    # so need to convert it as an expression like c(colA='c', colB='c')
+    # so need to convert it to an expression like c(colA='c', colB='c')
     col_types <- rlang::parse_expr(stringr::str_c("c(", colTypes, ")"))
   }
   df <- gsheet %>% googlesheets::gs_read(ws = sheetName, skip = skipNRows, na = treatTheseAsNA, col_names = firstRowAsHeader, comment = commentChar, col_types = col_types )
