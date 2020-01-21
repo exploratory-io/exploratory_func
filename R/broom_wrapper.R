@@ -335,8 +335,8 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
           as.formula(paste0("~list(broom::augment(model, data = source.data, data_type = 'test', ", aug_args, "))"))
         }
         augmented <- df %>%
-          dplyr::filter("error" %nin% class(model)) %>%
           dplyr::ungroup() %>%
+          dplyr::filter("error" %nin% class(model)) %>% # Since this errors out under rowwise, should be done after ungroup().
           dplyr::mutate(source.data = purrr::map2(source.data, .test_index, function(df, index){
             # Keep data in test_index for test data
             safe_slice(df, index, remove = FALSE)
@@ -378,8 +378,8 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
           as.formula(paste0("~list(broom::augment(model, newdata = source.data, ", aug_args, "))"))
         }
         data_to_augment <- df %>%
-          dplyr::filter("error" %nin% class(model)) %>%
           dplyr::ungroup() %>%
+          dplyr::filter("error" %nin% class(model)) %>% # Since this errors out under rowwise, should be done after ungroup().
           dplyr::mutate(source.data = purrr::map2(source.data, .test_index, function(df, index){
             # keep data only in test_index
             safe_slice(df, index)
@@ -443,8 +443,8 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
         as.formula(paste0("~list(broom::augment(model, data = source.data, ", aug_args, "))"))
       }
       augmented <- df %>%
-        dplyr::filter("error" %nin% class(model)) %>%
         dplyr::ungroup() %>%
+        dplyr::filter("error" %nin% class(model)) %>% # Since this errors out under rowwise, should be done after ungroup().
         dplyr::mutate(source.data = purrr::map2(source.data, .test_index, function(df, index){
           # remove data in test_index
           safe_slice(df, index, remove = TRUE)
@@ -482,8 +482,8 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
         as.formula(paste0("~list(broom::augment(model, data = source.data.test, data_type = 'test', ", aug_args, "))"))
       }
       augmented <- df %>%
-        dplyr::filter("error" %nin% class(model)) %>%
         dplyr::ungroup() %>%
+        dplyr::filter("error" %nin% class(model)) %>% # Since this errors out under rowwise, should be done after ungroup().
         dplyr::mutate(source.data.training = purrr::map2(source.data, .test_index, function(df, index){
           # Remove data in test_index for training data
           safe_slice(df, index, remove = TRUE)
@@ -556,7 +556,8 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
 #' @param df Data frame to predict. This should have model column.
 #' @export
 prediction_training_and_test <- function(df, prediction_type="default", threshold = 0.5, ...) {
-  filtered <- df %>% dplyr::filter(!is.null(model) & "error" %nin% class(model))
+  # ungroup() is to avoid error from filter that happens under rowwise.
+  filtered <- df %>% ungroup() %>% dplyr::filter(!is.null(model) & "error" %nin% class(model))
   if (nrow(filtered) == 0) { # No valid models were returned.
     return(data.frame())
   }
