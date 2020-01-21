@@ -371,13 +371,13 @@ test_that("test GLM (Negative Binomial) with group columns", {
                          family = "negativebinomial")
   expect_equal(length(ret[["CARRIER"]]), 8)
   model_ret <- ret %>% broom::glance(model)
-  expect_equal(colnames(model_ret),
-               c("CARRIER", "null.deviance", "df.null", "logLik",
+  expect_equal(colnames(model_ret), # Position of Note columns is adjusted on Exploratory-side
+               c("CARRIER", "Note", "null.deviance", "df.null", "logLik",
                  "AIC", "BIC", "deviance", "df.residual",
                  "p.value", "n", "theta", "SE.theta"))
   model_ret_pretty <- ret %>% broom::glance(model, pretty.name=TRUE)
-  expect_equal(colnames(model_ret_pretty),
-               c("CARRIER", "P Value", "Number of Rows", "Log Likelihood", "AIC",
+  expect_equal(colnames(model_ret_pretty), # Position of Note columns is adjusted on Exploratory-side
+               c("CARRIER", "Note", "P Value", "Number of Rows", "Log Likelihood", "AIC",
                  "BIC", "Residual Deviance", "Null Deviance",
                  "DF for Null Model", "Residual DF",
                  "Theta", "SE Theta"))
