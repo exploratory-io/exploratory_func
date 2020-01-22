@@ -557,6 +557,7 @@ glance.ARIMA_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add t
   # TODO: migrate out from forecast package.
 
   # Extract ARIMA orders (p,d,q) and Seasonal ARIMA orders (P, D, Q) from the model.
+  # Reference: https://otexts.com/fpp2/seasonal-arima.html
   order <- m$arma[c(1, 6, 2, 3, 7, 4, 5)]
   names(order) <- c("p", "d", "q", "P", "D", "Q", "Frequency")
   seasonal <- (order[7] > 1 & sum(order[4:6]) > 0)
