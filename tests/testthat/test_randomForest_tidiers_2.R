@@ -379,5 +379,5 @@ test_that("calc imp - variables for edarf should correspond to variables decided
                                                                     smote = FALSE, with_boruta = TRUE)
 
   res_partial_dependence <- model_df %>% rf_partial_dependence()
-  expect_equal(n_distinct((model_df %>% tidy(model, type='boruta') %>% filter(decision != "Rejected"))$variable), n_distinct(res_partial_dependence$x_name))
+  expect_equal(12, n_distinct(res_partial_dependence$x_name))
 })

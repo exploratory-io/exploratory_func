@@ -756,8 +756,16 @@ build_lm.fast <- function(df,
         imp_vars <- as.character((imp_df %>% arrange(-importance))$term)
         imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # Keep only max_pd_vars most important variables
       }
-      else  { # We do not have a way to determine importance. Just show all variables.
-        imp_vars <- c_cols
+      else  {
+        # Show only max_pd_vars most significant (ones with the smallest P values) vars.
+        # For categorical, pick the smallest P value among all classes of it.
+        c_cols_list <- as.list(c_cols)
+        coef_df <- broom::tidy(model)
+        # str_detect matches with all categorical class terms that belongs to the variable.
+        p_values_list <- c_cols_list %>% purrr::map(function(x){(coef_df %>% filter(stringr::str_detect(term, paste0("^`?", x))) %>% summarize(p.value=min(p.value, na.rm=TRUE)))$p.value})
+        p_values_df <- tibble(term=c_cols, p.value=purrr::flatten_dbl(p_values_list))
+        imp_vars <- (p_values_df %>% dplyr::arrange(p.value))$term
+        imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # Keep only max_pd_vars most important variables
 
         # We tried showing only significant variables, but decided oftentimes we wanted to see even insignificant ones. Keeping that code for now.
         #
