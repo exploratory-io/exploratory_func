@@ -1947,11 +1947,11 @@ extract_importance_history_from_boruta <- function(x) {
   res
 }
 
-# Extract vector of column names in the order of importance, except for rejected ones.
+# Extract vector of column names in the order of importance.
 # Used to determine variables to run partial dependency on.
 extract_important_variables_from_boruta <- function(x) {
   res <- extract_importance_history_from_boruta(x)
-  res <- res %>% dplyr::filter(decision != "Rejected")
+  # res <- res %>% dplyr::filter(decision != "Rejected") # We used to filter out rejected variables, but now we don't for consistency with others like lm.
   res <- res %>% dplyr::group_by(variable) %>% dplyr::summarize(importance = median(importance, na.rm = TRUE))
   res <- res %>% dplyr::arrange(desc(importance))
   res$variable
@@ -2145,10 +2145,12 @@ calc_feature_imp <- function(df,
         rf$boruta$terms_mapping <- names(name_map)
         names(rf$boruta$terms_mapping) <- name_map
         class(rf$boruta) <- c("Boruta_exploratory", class(rf$boruta))
-        # Show all variables with Confirmed or Tentative decision.
         imp_vars <- extract_important_variables_from_boruta(rf$boruta)
+        if (is.null(max_pd_vars)) {
+          max_pd_vars <- 12 # Number of most important variables to calculate partial dependences on. Default 12 fits well with either 3 or 4 columns of facets.
+        }
         # max_pd_vars is not applied by default with Boruta.
-        if (!is.null(max_pd_vars) && length(imp_vars) > 0) {
+        if (length(imp_vars) > 0) {
           imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
         }
       }
