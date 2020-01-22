@@ -23,7 +23,7 @@ test_that("build_coxpy.fast() error handling for predictor with single unique va
     df <- df %>% mutate(ph.ecog = factor(ph.ecog, ordered=TRUE)) # test handling of ordered factor
     df <- df %>% mutate(`se-x` = `se-x`==1) # test handling of logical
     model_df <- df %>% build_coxph.fast(`ti me`, `sta tus`, `a ge`, predictor_n = 2)
-  }, "The selected predictor variables are invalid since they have only one unique values.")
+  }, "Invalid Predictors: Only one unique value.")
 })
 
 # Note: we used to have Japanese column name test, but removed since

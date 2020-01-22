@@ -767,6 +767,10 @@ augment.randomForest <- augment.randomForest.formula
 #' augment for randomForest(ranger) model
 #' @export
 augment.ranger <- function(x, data = NULL, newdata = NULL, ...) {
+  if ("error" %in% class(x)) {
+    ret <- data.frame()
+    return(ret)
+  }
   # Extract data from model
   # This is from https://github.com/mdlincoln/broom/blob/e3cdf5f3363ab9514e5b61a56c6277cb0d9899fd/R/rf_tidiers.R
   if (is.null(data)) {
@@ -974,6 +978,10 @@ augment.ranger.regression <- function(x, data = NULL, newdata = NULL, data_type 
 #' augment for rpart model
 #' @export
 augment.rpart <- function(x, data = NULL, newdata = NULL, ...) {
+  if ("error" %in% class(x)) {
+    ret <- data.frame()
+    return(ret)
+  }
   # Extract data from model
   # This is from https://github.com/mdlincoln/broom/blob/e3cdf5f3363ab9514e5b61a56c6277cb0d9899fd/R/rf_tidiers.R
   if (is.null(data)) {
@@ -1160,7 +1168,13 @@ rf_importance <- function(data, ...) {
 #' wrapper for tidy type evaluation
 #' @export
 rf_evaluation <- function(data, ...) {
-  broom::tidy(data, model, type = "evaluation", ...)
+  ret <- broom::tidy(data, model, type = "evaluation", ...)
+  if (!is.null(ret$Note)) {
+    # Bring Note column to the last.
+    # It is hard to control the position of Note column inside tidy, and hence we do it here.
+    ret <- ret %>% dplyr::select(-Note, everything(), Note)
+  }
+  ret
 }
 
 #' wrapper for tidy type evaluation_by_class
@@ -1988,6 +2002,7 @@ calc_feature_imp <- function(df,
                              test_rate = 0.0,
                              test_split_type = "random" # "random" or "ordered"
                              ){
+
   if(!is.null(seed)){
     set.seed(seed)
   }
@@ -2046,7 +2061,8 @@ calc_feature_imp <- function(df,
       df <- clean_df_ret$df
       c_cols <- clean_df_ret$c_cols
       if  (length(c_cols) == 0) {
-        stop("The selected predictor variables are invalid since they have only one unique values.")
+        # Previous version of message - stop("The selected predictor variables are invalid since they have only one unique values.")
+        stop("Invalid Predictors: Only one unique value.") # Message is made short so that it fits well in the Summary table.
       }
       name_map <- clean_df_ret$name_map
 
@@ -2209,12 +2225,10 @@ calc_feature_imp <- function(df,
       list(rf = rf, test_index = test_index, source_data = source_data)
     }, error = function(e){
       if(length(grouped_cols) > 0) {
-        # ignore the error if
-        # it is caused by subset of
-        # grouped data frame
-        # to show result of
-        # data frames that succeed
-        NULL
+        # In repeat-by case, we report group-specific error in the Summary table,
+        # so that analysis on other groups can go on.
+        class(e) <- c("ranger", class(e))
+        list(rf = e, test_index = NULL, source_data = NULL)
       } else {
         stop(e)
       }
@@ -2249,6 +2263,14 @@ calc_feature_imp <- function(df,
           })) %>%
           dplyr::select(-data) %>%
           dplyr::rowwise()
+
+  # If all the groups are errors, it would be hard to handle resulting data frames
+  # at the chart preprocessors. Hence, we instead stop the processing here
+  # and just throw the error from the first group.
+  if (purrr::every(ret$model, function(x) {"error" %in% class(x)})) {
+    stop(ret$model[[1]])
+  }
+
   ret
 }
 
@@ -2392,24 +2414,32 @@ evaluate_binary_classification <- function(actual, predicted, predicted_probabil
 #' @export
 #' @param type "importance", "evaluation" or "conf_mat". Feature importance, evaluated scores or confusion matrix of training data.
 tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, binary_classification_threshold = 0.5, ...) {
+  if ("error" %in% class(x) && type != "evaluation") {
+    ret <- data.frame()
+    return(ret)
+  }
   switch(
     type,
     importance = {
       # return variable importance
-      imp <- ranger::importance(x)
-
-      ret <- data.frame(
-        variable = x$terms_mapping[names(imp)],
-        importance = imp,
-        stringsAsFactors = FALSE
-      )
-
+      tryCatch({
+        imp <- ranger::importance(x)
+        ret <- data.frame(
+          variable = x$terms_mapping[names(imp)],
+          importance = imp,
+          stringsAsFactors = FALSE
+          )
+      }, error = function(e){
+        ret <<- data.frame()
+      })
       ret
     },
     evaluation = {
+      if ("error" %in% class(x)) {
+        return(glance(x, pretty.name = pretty.name, ...))
+      }
       # get evaluation scores from training data
       actual <- x$y
-
       if(is.numeric(actual)){
         glance(x, pretty.name = pretty.name, ...)
       } else {
@@ -2504,6 +2534,10 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, binary_clas
 # This is used from Analytics View only when classification type is regression.
 #' @export
 glance.ranger <- function(x, pretty.name = FALSE, ...) {
+  if ("error" %in% class(x)) {
+    ret <- data.frame(Note = x$message)
+    return(ret)
+  }
   glance.ranger.method <- switch(x[["treetype"]],
                                         "Classification" = glance.ranger.classification,
                                         "Probability estimation" = glance.ranger.classification,
@@ -2618,6 +2652,10 @@ glance.ranger.classification <- function(x, pretty.name, ...) {
 # This is used from Analytics View only when classification type is regression.
 #' @export
 glance.rpart <- function(x, pretty.name = FALSE, ...) {
+  if ("error" %in% class(x)) {
+    ret <- data.frame(Note = x$message)
+    return(ret)
+  }
   actual <- x$y
   predicted <- predict(x)
   rmse_val <- rmse(actual, predicted)
@@ -2760,7 +2798,8 @@ exp_rpart <- function(df,
       df <- clean_df_ret$df
       c_cols <- clean_df_ret$c_cols
       if  (length(c_cols) == 0) {
-        stop("The selected predictor variables are invalid since they have only one unique values.")
+        # Previous version of message - stop("The selected predictor variables are invalid since they have only one unique values.")
+        stop("Invalid Predictors: Only one unique value.") # Message is made short so that it fits well in the Summary table.
       }
       name_map <- clean_df_ret$name_map
 
@@ -2837,12 +2876,10 @@ exp_rpart <- function(df,
       list(model = model, test_index = test_index, source_data = source_data)
     }, error = function(e){
       if(length(grouped_cols) > 0) {
-        # ignore the error if
-        # it is caused by subset of
-        # grouped data frame
-        # to show result of
-        # data frames that succeed
-        NULL
+        # In repeat-by case, we report group-specific error in the Summary table,
+        # so that analysis on other groups can go on.
+        class(e) <- c("rpart", class(e))
+        list(model = e, test_index = NULL, source_data = NULL)
       } else {
         stop(e)
       }
@@ -3049,11 +3086,14 @@ get_predicted_probability_rpart <- function(x, data_type = "training") {
 #' @export
 #' @param type "importance", "evaluation" or "conf_mat". Feature importance, evaluated scores or confusion matrix of training data.
 tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
+  if ("error" %in% class(x) && type != "evaluation") {
+    ret <- data.frame()
+    return(ret)
+  }
   switch(
     type,
     importance = {
       # return variable importance
-
       imp <- x$variable.importance
 
       ret <- data.frame(
@@ -3061,7 +3101,6 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
         importance = imp,
         stringsAsFactors = FALSE
       )
-
       ret
     },
     evaluation = {

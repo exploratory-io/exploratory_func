@@ -255,7 +255,8 @@ build_coxph.fast <- function(df,
         }
       }
       if (length(c_cols) == 0) {
-        stop("The selected predictor variables are invalid since they have only one unique values.")
+        # Previous version of message - stop("The selected predictor variables are invalid since they have only one unique values.")
+        stop("Invalid Predictors: Only one unique value.") # Message is made short so that it fits well in the Summary table.
       }
 
       # build formula for lm
@@ -273,12 +274,10 @@ build_coxph.fast <- function(df,
       rf
     }, error = function(e){
       if(length(grouped_cols) > 0) {
-        # ignore the error if
-        # it is caused by subset of
-        # grouped data frame
-        # to show result of
-        # data frames that succeed
-        NULL
+        # In repeat-by case, we report group-specific error in the Summary table,
+        # so that analysis on other groups can go on.
+        class(e) <- c("coxph_exploratory", class(e))
+        e
       } else {
         stop(e)
       }
@@ -291,6 +290,10 @@ build_coxph.fast <- function(df,
 #' special version of tidy.coxph function to use with build_coxph.fast.
 #' @export
 tidy.coxph_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
+  if ("error" %in% class(x)) {
+    ret <- data.frame()
+    return(ret)
+  }
   ret <- broom:::tidy.coxph(x) # it seems that tidy.lm takes care of glm too
   ret <- ret %>% dplyr::mutate(
     hazard_ratio = exp(estimate)
@@ -328,6 +331,10 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add tes
 #' special version of glance.coxph function to use with build_coxph.fast.
 #' @export
 glance.coxph_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
+  if ("error" %in% class(x)) {
+    ret <- data.frame(Note = x$message)
+    return(ret)
+  }
   ret <- broom:::glance.coxph(x, model, pretty.name = pretty.name, ...)
 
   if(pretty.name) {
