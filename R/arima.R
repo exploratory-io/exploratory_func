@@ -58,9 +58,6 @@ do_arima <- function(df, time,
                      ){
   validate_empty_data(df)
 
-  loadNamespace("dplyr")
-  loadNamespace("forecast")
-
   time_col <- dplyr::select_var(names(df), !! rlang::enquo(time))
 
   # if valueColumns is not set (value is NULL by default)
@@ -558,7 +555,17 @@ glance.ARIMA_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add t
   # forecast::accuracy(m) seems to be returning NaNs.
   # df <- data.frame(AIC=m$aic, BIC=m$bic, AICc=m$aicc, as.list(forecast::arimaorder(m)), forecast::accuracy(m))
   # TODO: migrate out from forecast package.
-  df <- data.frame(AIC=m$aic, BIC=m$bic, AICc=m$aicc, as.list(forecast::arimaorder(m)))
+
+  # Extract ARIMA orders (p,d,q) and Seasonal ARIMA orders (P, D, Q) from the model.
+  # Reference: https://otexts.com/fpp2/seasonal-arima.html
+  order <- m$arma[c(1, 6, 2, 3, 7, 4, 5)]
+  names(order) <- c("p", "d", "q", "P", "D", "Q", "Frequency")
+  seasonal <- (order[7] > 1 & sum(order[4:6]) > 0)
+  if (!seasonal) {
+    order <- order[1:3]
+  }
+
+  df <- data.frame(AIC=m$aic, BIC=m$bic, AICc=m$aicc, as.list(order))
 
   if(F) { # Skipped for now. TODO: Revive it.
     if(length(ar_stationarity) > 0){
