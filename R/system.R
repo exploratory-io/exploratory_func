@@ -498,8 +498,9 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
   if(type == "mongodb") {
     if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
     loadNamespace("jsonlite")
-    if(!is.null(connectionString) && stringr::str_length(connectionString)>1) {
-      key <- connectionString
+    if(!is.null(connectionString) && connectionString != '') {
+      # make sure to include collection as a key since connection varies per collection.
+      key <- paste(connectionString, collection, sep = ":")
     } else if(!is.null(host) && host != ''){
       key <- paste("mongodb", host, port, databaseName, collection, username, toString(isSSL), authSource, additionalParams, sep = ":")
     } else if (!is.null(cluster) && cluster != '') {
@@ -519,7 +520,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       }
     }
     if (is.null(conn)) {
-      if(!is.null(connectionString) && stringr::str_length(connectionString)>1) {
+      if(!is.null(connectionString) && connectionString != '') {
         # if connection string is provided, use it for the url.
         url <- connectionString
       } else {
@@ -714,8 +715,9 @@ clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, user
                               collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, connectionString = NULL) {
   if (type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora")) { #TODO: implement for other types too
     if (type %in% c("mongodb")) {
-      if(!is.na(connectionString)) {
-        key <- connectionString
+      if(!is.na(connectionString) && connectionString != '') {
+        # make sure to include collection as a key since connection varies per collection.
+        key <- paste(connectionString, collection, sep = ":")
       } else if(!is.na(host) && host != ''){
         key <- paste("mongodb", host, port, databaseName, collection, username, toString(isSSL), authSource, additionalParams, sep = ":")
       } else if (!is.na(cluster) && cluster != '') {
