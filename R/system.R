@@ -520,6 +520,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     }
     if (is.null(conn)) {
       if(!is.null(connectionString) && stringr::str_length(connectionString)>1) {
+        # if connection string is provided, use it for the url.
         url <- connectionString
       } else {
         url <- getMongoURL(host = host, port = port, database = databaseName, username = username, pass = password, isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParams, timeout = timeout)
