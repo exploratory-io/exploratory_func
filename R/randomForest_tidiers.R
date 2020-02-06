@@ -1775,27 +1775,16 @@ cleanup_df <- function(df, target_col, selected_cols, grouped_cols, target_n, pr
     }
   }
 
-  if (map_name) {
-    # randomForest fails if columns are not clean
-    clean_df <- df
+  # randomForest fails if columns are not clean
+  clean_df <- df
 
+  if (map_name) {
     # This mapping will be used to restore column names
     # We used to use janitor::clean_names(df), but
     # since we are setting the names back anyway,
     # we can use names like c1, c2 which is guaranteed to be safe
     # regardless of original column names.
     name_map <- paste0("c",1:length(colnames(df)))
-    names(name_map) <- colnames(df)
-
-    # clean_names changes column names
-    # without chaning grouping column name
-    # information in the data frame
-    # and it causes an error,
-    # so the value of grouping columns
-    # should be still the names of grouping columns
-    name_map[grouped_cols] <- grouped_cols
-    colnames(clean_df) <- name_map
-  }
   else {
     # do not do mapping.
     # we need this mode for rpart since the plotting will be done directly from the model
@@ -1803,10 +1792,18 @@ cleanup_df <- function(df, target_col, selected_cols, grouped_cols, target_n, pr
     # fortunately, rpart seems to be robust enough against strange column names
     # even on sjis windows.
     # just create a map with same names so that the rest of the code works.
-    clean_df <- df
     name_map <- colnames(df)
-    names(name_map) <- colnames(df)
   }
+  names(name_map) <- colnames(df)
+
+  # clean_names changes column names
+  # without chaning grouping column name
+  # information in the data frame
+  # and it causes an error,
+  # so the value of grouping columns
+  # should be still the names of grouping columns
+  name_map[grouped_cols] <- grouped_cols
+  colnames(clean_df) <- name_map
 
   clean_target_col <- name_map[target_col]
   clean_cols <- name_map[cols]
