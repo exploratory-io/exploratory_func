@@ -1785,6 +1785,7 @@ cleanup_df <- function(df, target_col, selected_cols, grouped_cols, target_n, pr
     # we can use names like c1, c2 which is guaranteed to be safe
     # regardless of original column names.
     name_map <- paste0("c",1:length(colnames(df)))
+  }
   else {
     # do not do mapping.
     # we need this mode for rpart since the plotting will be done directly from the model
