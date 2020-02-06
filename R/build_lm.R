@@ -366,12 +366,20 @@ build_lm.fast <- function(df,
 
   # Replace spaces with dots in column names. margins::marginal_effects() fails without it.
   clean_df <- df
-  # Cleaning of column names for marginal_effects(). Comma and Space are not handled well. Replace them with '.'.
+  # Cleaning of column names for marginal_effects(). Space is not handled well. Replace them with '.'.
   # ()"' are known to be ok as of version 5.5.2.
   # Also, cleaning of column names for relaimpo. - is not handled well. Replace them with _.
+  # Also, cleaning of column names for mmpf::marginalPrediction (for partial dependence). Comma is not handled well. Replace them with '.'.
   # For some reason, str_replace garbles some column names in Japanese. Using gsub instead to avoid the issue.
   # names(clean_df) <- stringr::str_replace_all(names(df), ' ', '.') %>% stringr::str_replace_all('-', '_')
-  names(clean_df) <- gsub('\\-', '_', gsub('[, ]', '.', names(df)))
+  if (model_type == "lm") {
+    # For lm, we can skip column names cleaning for marginal_effects (space), since we do not use them.
+    names(clean_df) <- gsub('\\-', '_', gsub('[,]', '.', names(df)))
+  }
+  else {
+    # For glm, we can skip column names cleaning for relaimpo (-), since we do not use them.
+    names(clean_df) <- gsub('[, ]', '.', names(df))
+  }
   # this mapping will be used to restore column names
   name_map <- colnames(clean_df)
   names(name_map) <- colnames(df)

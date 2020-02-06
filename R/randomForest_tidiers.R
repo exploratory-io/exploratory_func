@@ -1794,7 +1794,7 @@ cleanup_df <- function(df, target_col, selected_cols, grouped_cols, target_n, pr
     # even on sjis windows.
     # just create a map with almost same names so that the rest of the code works.
 
-    # Cleaning of column names for marginal_effects(). Comma is not handled well. Replace them with '.'.
+    # Cleaning of column names for mmpf::marginalPrediction (for partial dependence). Comma is not handled well. Replace them with '.'.
     # ()"' and spaces are known to be ok as of version 5.5.2.
     name_map <- gsub('[,]', '.', colnames(df))
   }
