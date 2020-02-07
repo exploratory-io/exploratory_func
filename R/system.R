@@ -531,7 +531,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     }
   } else if(type == "mysql" || type == "aurora") {
     if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
-    if(!requireNamespace("RMySQL")){stop("package RMySQL must be installed.")}
+    if(!requireNamespace("RMariaDB")){stop("package RMariaDB must be installed.")}
     # use same key "mysql" for aurora too, since it uses
     # queryMySQL() too, which uses the key "mysql"
     key <- paste("mysql", host, port, databaseName, username, sep = ":")
@@ -560,8 +560,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       })
     }
     if (is.null(conn)) {
-      drv <- DBI::dbDriver("MySQL")
-      conn = RMySQL::dbConnect(drv, dbname = databaseName, username = username,
+      conn = RMariaDB::dbConnect(RMariaDB::MariaDB(), dbname = databaseName, username = username,
                                password = password, host = host, port = port)
       connection_pool[[key]] <- conn
     }
@@ -898,21 +897,21 @@ queryNeo4j <- function(host, port,  username, password, query, isSSL = FALSE, ..
 
 #' @export
 queryMySQL <- function(host, port, databaseName, username, password, numOfRows = -1, query, ...){
-  if(!requireNamespace("RMySQL")){stop("package RMySQL must be installed.")}
+  if(!requireNamespace("RMariaDB")){stop("package RMariaDB must be installed.")}
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
 
   conn <- getDBConnection("mysql", host, port, databaseName, username, password)
   tryCatch({
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
-    resultSet <- RMySQL::dbSendQuery(conn, glue_exploratory(query, .transformer = sql_glue_transformer, .envir = parent.frame()))
-    df <- RMySQL::dbFetch(resultSet, n = numOfRows)
+    resultSet <- RMariaDB::dbSendQuery(conn, glue_exploratory(query, .transformer = sql_glue_transformer, .envir = parent.frame()))
+    df <- RMariaDB::dbFetch(resultSet, n = numOfRows)
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
     clearDBConnection("mysql", host, port, databaseName, username)
     stop(err)
   })
-  RMySQL::dbClearResult(resultSet)
+  RMariaDB::dbClearResult(resultSet)
   colnames(df) <- iconv(colnames(df),from = "utf8", to = "utf8") # Work around to read multibyte column names without getting garbled.
   df
 }
