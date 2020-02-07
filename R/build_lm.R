@@ -366,20 +366,13 @@ build_lm.fast <- function(df,
 
   # Replace spaces with dots in column names. margins::marginal_effects() fails without it.
   clean_df <- df
-  # Cleaning of column names for marginal_effects(). Space is not handled well. Replace them with '.'.
-  # ()"' are known to be ok as of version 5.5.2.
-  # Also, cleaning of column names for relaimpo. - is not handled well. Replace them with _.
-  # Also, cleaning of column names for mmpf::marginalPrediction (for partial dependence). Comma is not handled well. Replace them with '.'.
-  # For some reason, str_replace garbles some column names in Japanese. Using gsub instead to avoid the issue.
-  # names(clean_df) <- stringr::str_replace_all(names(df), ' ', '.') %>% stringr::str_replace_all('-', '_')
-  if (model_type == "lm") {
-    # For lm, we can skip column names cleaning for marginal_effects (space), since we do not use them.
-    names(clean_df) <- gsub('\\-', '_', gsub('[,]', '.', names(df)))
-  }
-  else {
-    # For glm, we can skip column names cleaning for relaimpo (-), since we do not use them.
-    names(clean_df) <- gsub('[, ]', '.', names(df))
-  }
+  # Replace column names with names like c1, c2...
+  # We avoid following known issues by this.
+  # - Column name issue for marginal_effects(). Space is not handled well.
+  #   ()"' are known to be ok as of version 5.5.2.
+  # - Column name issue for relaimpo. - is not handled well.
+  # - Column name issue for mmpf::marginalPrediction (for partial dependence). Comma is not handled well.
+  names(clean_df) <- paste0("c",1:length(colnames(clean_df)))
   # this mapping will be used to restore column names
   name_map <- colnames(clean_df)
   names(name_map) <- colnames(df)
@@ -1210,10 +1203,11 @@ augment.lm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "
     ret <- data.frame()
     return(ret)
   }
+
   if(!is.null(newdata)) { # Call broom:::augment.lm as is
-    broom:::augment.lm(x, data = data, newdata = newdata, ...)
+    ret <- broom:::augment.lm(x, data = data, newdata = newdata, ...)
   } else if (!is.null(data)) {
-    switch(data_type,
+    ret <- switch(data_type,
       training = { # Call broom:::augment.lm as is
         broom:::augment.lm(x, data = data, newdata = newdata, ...)
       },
@@ -1229,8 +1223,11 @@ augment.lm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "
       })
   }
   else {
-    broom:::augment.lm(x, ...)
+    ret <- broom:::augment.lm(x, ...)
   }
+  # Rename columns back to the original names.
+  names(ret) <- coalesce(x$terms_mapping[names(ret)], names(ret))
+  ret
 }
 
 #' @export
