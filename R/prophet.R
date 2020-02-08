@@ -781,14 +781,18 @@ tidy.prophet_exploratory <- function(x, type="result") {
     res <- res %>%
       dplyr::select(matches('(_effect$|^yearly$|^weekly$|^daily$|^hourly$|^holidays$)'))
 
-    # Check if any columns are left before further calculation, to avoid error.
-    # If not, returning the empty data frame as is would be handled by the chart as empty data case.
-    if (length(colnames(res)) > 0) {
+    # Check if multiple columns are left before further calculation,
+    # since no column would result in error, and importance for only one column would be rather pointless. 
+    # If not, returning the empty data frame would be handled by the chart as empty data case.
+    if (length(colnames(res)) > 1) {
       res <- res %>%
         dplyr::summarise_all(.funs=~sd(.,na.rm=TRUE)) %>%
         tidyr::pivot_longer(everything(), names_to='Variable', values_to='Importance') %>%
         dplyr::mutate(Variable = dplyr::recode(Variable, yearly='Yearly', weekly='Weekly', daily='Daily', hourly='Hourly', holidays='Holidays')) %>%
         dplyr::mutate(Variable = stringr::str_remove(Variable, '_effect$'))
+    }
+    else {
+      res <- data.frame()
     }
     res
   }
