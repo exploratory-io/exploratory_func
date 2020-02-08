@@ -1291,12 +1291,10 @@ evaluate_lm_training_and_test <- function(df, pretty.name = FALSE){
         ## get Model Object
         m <- df %>% filter(!is.null(model)) %>% `[[`(1, "model", 1)
         actual_val_col <- all.vars(df$model[[1]]$terms)[[1]]
-        # Emulate the way lm replaces the column names in the output.
-        # For some reason, str_replace garbles some column names in Japanese. Using gsub instead to avoid the issue.
-        # actual_val_col_clean <- stringr::str_replace_all(actual_val_col, ' ', '.')
-        actual_val_col_clean <- gsub(' ', '.', actual_val_col)
+        # Get original target column name.
+        actual_val_col_orig <- df$model[[1]]$terms_mapping[[actual_val_col]]
 
-        actual <- test_pred_ret[[actual_val_col_clean]]
+        actual <- test_pred_ret[[actual_val_col_orig]]
         predicted <- test_pred_ret$predicted_value
         root_mean_square_error <- rmse(actual, predicted)
         test_n <- sum(!is.na(predicted)) # Sample size for test.
