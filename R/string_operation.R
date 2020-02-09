@@ -116,6 +116,76 @@ word_to_sentiment <- function(words, lexicon="bing"){
 
 #' Tokenize text and unnest
 #' @param df Data frame
+#' @param text Set a column of which you want to tokenize.
+#' @param token Select the unit of token from "character" or "word".
+#' @param keep_cols Whether existing columns should be kept or not.
+#' @param drop Whether input column should be removed.
+#' @param with_id Whether output should contain original document id in each document.
+#' @param output Set a column name for the new column to store the tokenized values.
+#' @return Data frame with tokenized column.
+#' @export
+do_tokenize_japanese <- function(df, text_col, token = "word", keep_cols = FALSE,
+                                 drop = TRUE, with_id = TRUE, output = "token",
+                                 remove_punc = TRUE, remove_numbers = TRUE,
+                                 remove_symbols = TRUE, remove_twitter = TRUE,
+                                 remove_url = TRUE, ...){
+
+  if(!requireNamespace("quanteda")){stop("package quanteda must be installed.")}
+  if(!requireNamespace("dplyr")){stop("package dplyr must be installed.")}
+  if(!requireNamespace("tidyr")){stop("package tidyr must be installed.")}
+  if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
+
+  # Always put document_id to know what document the tokens are from
+  doc_id <- avoid_conflict(colnames(df), "document_id")
+  # For the output column names (i.e. "token" and "count"), make sure that
+  # these column names become unique in case we keep original columns.
+  count_col <- "count"
+  token_col <- output
+  if(keep_cols) {
+    count_col <- avoid_conflict(colnames(df), "count")
+    token_col <- avoid_conflict(colnames(df), output)
+  }
+  # This is SE version of dplyr::mutate(df, doc_id = row_number())
+  df <- dplyr::mutate_(df, .dots=setNames(list(~row_number()),doc_id))
+  orig_input_col <- col_name(substitute(text_col))
+  textData <- df %>% dplyr::select(orig_input_col) %>% dplyr::rename("text" = orig_input_col)
+  # Create a corpus from the text column then tokenize.
+  dfm <- quanteda::corpus(textData) %>%
+    quanteda::tokens(what = token, remove_punc = remove_punc, remove_numbers = remove_numbers,
+                     remove_symbols = remove_symbols, remove_twitter = remove_twitter,
+                     remove_url = remove_url) %>%
+    quanteda::tokens_wordstem() %>%
+    quanteda::dfm()
+  # Now convert result dfm to a data frame
+  result <- quanteda::convert(dfm, to = "data.frame") %>%
+    # Convert the data frame from "wide" to "long" format by tidyr::gather.
+    tidyr::gather(key = !!token_col, value = !!count_col, which(sapply(., is.numeric)), na.rm = TRUE, convert = TRUE) %>%
+    # Exlucde not used tokens for the document.
+    dplyr::filter(!!as.name(count_col) > 0) %>%
+    # The document colmn value loos like text100 so remove text part to make it numeric.
+    dplyr::mutate(document_id = as.numeric(stringr::str_remove(document, "text"))) %>%
+    # Drop document column
+    dplyr::select(-document) %>%
+    # Sort result by document_id to align with original data frame's order.
+    dplyr::arrange(document_id)
+
+  if(keep_cols) {
+    # If we need to keep original columns, then bring them back by joining the result data frame with original data frame.
+    result <- result %>%  dplyr::left_join(df, by=c("document_id", "document_id"))
+    if(drop) { # drop the text column
+      result <- result %>% dplyr::select(-orig_input_col)
+    }
+  } else if(!drop) { # Bring back the text column by by joining the result data frame with original data frame and drop unwanted columns.
+    result <- result %>% dplyr::left_join(df, by=c("document_id", "document_id")) %>% select(document_id, !!count_col, !!token_col, !!text_col);
+  }
+  if(!with_id) { # Drop the document_id column
+    result <- result %>% dplyr::select(-document_id)
+  }
+  result
+}
+
+#' Tokenize text and unnest
+#' @param df Data frame
 #' @param input Set a column of which you want to split the text or tokenize.
 #' @param token Select the unit of token from "characters", "words", "sentences", "lines", "paragraphs", and "regex".
 #' @param keep_cols Whether existing columns should be kept or not
