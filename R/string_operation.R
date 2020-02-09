@@ -125,7 +125,7 @@ word_to_sentiment <- function(words, lexicon="bing"){
 #' @return Data frame with tokenized column.
 #' @export
 do_tokenize_japanese <- function(df, text_col, token = "word", keep_cols = FALSE,
-                                 drop = TRUE, with_id = TRUE, output = "token",
+                                 drop = TRUE, with_id = TRUE, output = token,
                                  remove_punc = TRUE, remove_numbers = TRUE,
                                  remove_symbols = TRUE, remove_twitter = TRUE,
                                  remove_url = TRUE, ...){
@@ -137,13 +137,13 @@ do_tokenize_japanese <- function(df, text_col, token = "word", keep_cols = FALSE
 
   # Always put document_id to know what document the tokens are from
   doc_id <- avoid_conflict(colnames(df), "document_id")
+  output_col <- avoid_conflict(colnames(df), col_name(substitute(output)))
   # For the output column names (i.e. "token" and "count"), make sure that
   # these column names become unique in case we keep original columns.
   count_col <- "count"
-  token_col <- output
+  token_col <- output_col
   if(keep_cols) {
     count_col <- avoid_conflict(colnames(df), "count")
-    token_col <- avoid_conflict(colnames(df), output)
   }
   # This is SE version of dplyr::mutate(df, doc_id = row_number())
   df <- dplyr::mutate_(df, .dots=setNames(list(~row_number()),doc_id))
@@ -171,12 +171,13 @@ do_tokenize_japanese <- function(df, text_col, token = "word", keep_cols = FALSE
 
   if(keep_cols) {
     # If we need to keep original columns, then bring them back by joining the result data frame with original data frame.
-    result <- result %>%  dplyr::left_join(df, by=c("document_id", "document_id"))
+    result <- df %>%  dplyr::left_join(result, by=c("document_id", "document_id"))
     if(drop) { # drop the text column
       result <- result %>% dplyr::select(-orig_input_col)
     }
   } else if(!drop) { # Bring back the text column by by joining the result data frame with original data frame and drop unwanted columns.
-    result <- result %>% dplyr::left_join(df, by=c("document_id", "document_id")) %>% select(document_id, !!count_col, !!token_col, !!text_col);
+    result <- df %>% dplyr::left_join(result, by=c("document_id", "document_id")) %>%
+      select(document_id, !!count_col, !!token_col, orig_input_col);
   }
   if(!with_id) { # Drop the document_id column
     result <- result %>% dplyr::select(-document_id)
