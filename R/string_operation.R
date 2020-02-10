@@ -127,6 +127,7 @@ word_to_sentiment <- function(words, lexicon="bing"){
 do_tokenize_cjk <- function(df, text_col, token = "word", keep_cols = FALSE,
                                  drop = TRUE, with_id = TRUE, output = token,
                                  remove_punc = TRUE, remove_numbers = TRUE,
+                                 remove_hyphens = TRUE, remove_separators = TRUE,
                                  remove_symbols = TRUE, remove_twitter = TRUE,
                                  remove_url = TRUE, ...){
 
@@ -153,6 +154,7 @@ do_tokenize_cjk <- function(df, text_col, token = "word", keep_cols = FALSE,
   dfm <- quanteda::corpus(textData) %>%
     quanteda::tokens(what = token, remove_punc = remove_punc, remove_numbers = remove_numbers,
                      remove_symbols = remove_symbols, remove_twitter = remove_twitter,
+                     remove_hyphens = remove_hyphens, remove_separators = remove_separators,
                      remove_url = remove_url) %>%
     quanteda::tokens_wordstem() %>%
     quanteda::dfm()
