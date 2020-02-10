@@ -162,7 +162,7 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
   result <- quanteda::convert(dfm, to = "data.frame") %>%
     # Convert the data frame from "wide" to "long" format by tidyr::gather.
     tidyr::gather(key = !!token_col, value = !!count_col, which(sapply(., is.numeric)), na.rm = TRUE, convert = TRUE) %>%
-    # Exlucde not used tokens for the document.
+    # Exclude unused tokens for the document.
     dplyr::filter(!!as.name(count_col) > 0) %>%
     # The document colmn value loos like text100 so remove text part to make it numeric.
     dplyr::mutate(document_id = as.numeric(stringr::str_remove(document, "text"))) %>%
