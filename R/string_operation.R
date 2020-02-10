@@ -114,7 +114,7 @@ word_to_sentiment <- function(words, lexicon="bing"){
   ret
 }
 
-#' Tokenize text for Chinese, Japanese, and Korean.
+#' Tokenize text with ICU.
 #' @param df Data frame
 #' @param text Set a column of which you want to tokenize.
 #' @param token Select the unit of token from "character" or "word".
@@ -124,7 +124,7 @@ word_to_sentiment <- function(words, lexicon="bing"){
 #' @param output Set a column name for the new column to store the tokenized values.
 #' @return Data frame with tokenized column.
 #' @export
-do_tokenize_cjk <- function(df, text_col, token = "word", keep_cols = FALSE,
+do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
                                  drop = TRUE, with_id = TRUE, output = token,
                                  remove_punc = TRUE, remove_numbers = TRUE,
                                  remove_hyphens = FALSE, remove_separators = TRUE,
