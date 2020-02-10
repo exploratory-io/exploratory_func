@@ -127,7 +127,7 @@ word_to_sentiment <- function(words, lexicon="bing"){
 do_tokenize_cjk <- function(df, text_col, token = "word", keep_cols = FALSE,
                                  drop = TRUE, with_id = TRUE, output = token,
                                  remove_punc = TRUE, remove_numbers = TRUE,
-                                 remove_hyphens = TRUE, remove_separators = TRUE,
+                                 remove_hyphens = FALSE, remove_separators = TRUE,
                                  remove_symbols = TRUE, remove_twitter = TRUE,
                                  remove_url = TRUE, ...){
 
