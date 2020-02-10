@@ -164,7 +164,7 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
     tidyr::gather(key = !!token_col, value = !!count_col, which(sapply(., is.numeric)), na.rm = TRUE, convert = TRUE) %>%
     # Exclude unused tokens for the document.
     dplyr::filter(!!as.name(count_col) > 0) %>%
-    # The document colmn value loos like text100 so remove text part to make it numeric.
+    # The document column value loos like "text100". Remove text part to make it numeric.
     dplyr::mutate(document_id = as.numeric(stringr::str_remove(document, "text"))) %>%
     # Drop document column
     dplyr::select(-document) %>%
