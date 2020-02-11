@@ -1789,7 +1789,7 @@ read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL,
       df <- readxl::read_excel(path, sheet = sheet, col_names = col_names, col_types = col_types, na = na, trim_ws = trim_ws, skip = skip, n_max = n_max)
     }
   }
-  if(!is.null(tzone)) {
+  if(!is.null(tzone)) { # if timezone is specified, apply the timezeon to POSIXct columns
     df <- df %>% dplyr::mutate_if(lubridate::is.POSIXct, funs(lubridate::force_tz(., tzone=tzone)))
   }
   df
