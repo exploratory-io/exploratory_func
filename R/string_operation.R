@@ -164,16 +164,16 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
   docCol <- resultTemp[c(1)]
   # Exclude the "document" column
   result <- resultTemp[c(-1)]
-  # Then bring the column back as internal id col
+  # Then bring the column back as internal document column
   result$document.exp.token.col <- docCol$document
 
   # Convert the data frame from "wide" to "long" format by tidyr::gather.
   result <- result %>% tidyr::gather(key = !!token_col, value = !!count_col, which(sapply(., is.numeric)), na.rm = TRUE, convert = TRUE) %>%
     # Exclude unused tokens for the document.
     dplyr::filter(!!as.name(count_col) > 0) %>%
-    # The document column value looks like "text100". Remove text part to make it numeric.
+    # The internal document column value looks like "text100". Remove text part to make it numeric.
     dplyr::mutate(document_id = as.numeric(stringr::str_remove(document.exp.token.col, "text"))) %>%
-    # Drop document column
+    # Drop document internal document column
     dplyr::select(-document.exp.token.col) %>%
     # Sort result by document_id to align with original data frame's order.
     dplyr::arrange(document_id)
