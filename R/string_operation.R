@@ -159,15 +159,22 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
     quanteda::tokens_wordstem() %>%
     quanteda::dfm()
   # Now convert result dfm to a data frame
-  result <- quanteda::convert(dfm, to = "data.frame") %>%
-    # Convert the data frame from "wide" to "long" format by tidyr::gather.
-    tidyr::gather(key = !!token_col, value = !!count_col, which(sapply(., is.numeric)), na.rm = TRUE, convert = TRUE) %>%
+  resultTemp <- quanteda::convert(dfm, to = "data.frame")
+  # The first column name returned by quanteda::convert is always "document" so rename it to avoid it conflicts with other tokens
+  docCol <- resultTemp[c(1)]
+  # Exclude the "document" column
+  result <- resultTemp[c(-1)]
+  # Then bring the column back as internal id col
+  result$document.exp.token.col <- docCol$document
+
+  # Convert the data frame from "wide" to "long" format by tidyr::gather.
+  result <- result %>% tidyr::gather(key = !!token_col, value = !!count_col, which(sapply(., is.numeric)), na.rm = TRUE, convert = TRUE) %>%
     # Exclude unused tokens for the document.
     dplyr::filter(!!as.name(count_col) > 0) %>%
     # The document column value looks like "text100". Remove text part to make it numeric.
-    dplyr::mutate(document_id = as.numeric(stringr::str_remove(document, "text"))) %>%
+    dplyr::mutate(document_id = as.numeric(stringr::str_remove(document.exp.token.col, "text"))) %>%
     # Drop document column
-    dplyr::select(-document) %>%
+    dplyr::select(-document.exp.token.col) %>%
     # Sort result by document_id to align with original data frame's order.
     dplyr::arrange(document_id)
 
