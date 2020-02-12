@@ -485,6 +485,10 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
       else {
         training_data <- aggregated_data
       }
+
+      if (nrow(training_data) < 2) {
+        stop("The aggregated training data has less than 2 rows.")
+      }
   
       if (!is.null(cap) && is.data.frame(cap)) {
         # in this case, cap is the future data frame with cap, specified by user.
@@ -720,13 +724,16 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
       }
     }, error = function(e){
       if(length(grouped_col) > 0) {
-        # ignore the error if
-        # it is caused by subset of
-        # grouped data frame
-        # to show result of
-        # data frames that succeed.
+        # keep going if the error is caused by subset of
+        # grouped data frame, to show result of data frames that succeed.
         # For debugging purpose, return one row with error message in note column.
-        data.frame(note = e$message)
+        if (output == "data") { # Pre-5.5 backward compatibility mode.
+          data.frame(note = e$message)
+        }
+        else {
+          class(e) <- c("prophet_exploratory", class(e))
+          e
+        }
       } else {
         stop(e)
       }
@@ -759,7 +766,25 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
 }
 
 #' @export
+glance.prophet_exploratory <- function(x) {
+  if ("error" %in% class(x)) {
+    return(data.frame(Note = x$message))
+  }
+  else {
+    if (x$test_mode) {
+      x$result %>% dplyr::summarize(RMSE=exploratory::rmse(!!rlang::sym(x$value_col), forecasted_value, is_test_data), MAE=exploratory::mae(!!rlang::sym(x$value_col), forecasted_value, is_test_data), MAPE=exploratory::mape(!!rlang::sym(x$value_col), forecasted_value, is_test_data), MASE=exploratory::mase(!!rlang::sym(x$value_col), forecasted_value, is_test_data), `Number of Rows for Training`=sum(!is_test_data), `Number of Rows for Test`=sum(is_test_data))
+    }
+    else {
+      x$result %>% dplyr::summarize(RMSE=exploratory::rmse(!!rlang::sym(x$value_col), forecasted_value, !is.na(!!rlang::sym(x$value_col))), MAE=exploratory::mae(!!rlang::sym(x$value_col), forecasted_value, !is.na(!!rlang::sym(x$value_col))), MAPE=exploratory::mape(!!rlang::sym(x$value_col), forecasted_value, !is.na(!!rlang::sym(x$value_col))), `Number of Rows for Training`=sum(!is.na(!!rlang::sym(x$value_col))))
+    }
+  }
+}
+
+#' @export
 tidy.prophet_exploratory <- function(x, type="result") {
+  if ("error" %in% class(x)) { # Filter error case. We might need to add glance to display the error message.
+    return(data.frame())
+  }
   if (type == "result") {
     x$result
   }
