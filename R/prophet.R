@@ -485,6 +485,10 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
       else {
         training_data <- aggregated_data
       }
+
+      if (nrow(training_data) < 2) {
+        stop("The aggregated training data has less than 2 rows.")
+      }
   
       if (!is.null(cap) && is.data.frame(cap)) {
         # in this case, cap is the future data frame with cap, specified by user.
