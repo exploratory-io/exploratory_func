@@ -1039,6 +1039,7 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
           ret <- ret %>% rename(Note=note)
         }
       }
+      # Map coefficient names back to original.
       ret$term <- map_terms_to_orig(ret$term, x$terms_mapping)
       if (pretty.name) {
         ret <- ret %>% rename(Term=term, Coefficient=estimate, `Std Error`=std.error,
@@ -1131,6 +1132,8 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
           ret <- ret %>% rename(Note=note)
         }
       }
+      # Map coefficient names back to original.
+      ret$term <- map_terms_to_orig(ret$term, x$terms_mapping)
       if (pretty.name) {
         ret <- ret %>% rename(Term=term, Coefficient=estimate, `Std Error`=std.error,
                               `t Ratio`=statistic, `P Value`=p.value, `Conf Low`=conf.low, `Conf High`=conf.high,
