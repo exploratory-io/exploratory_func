@@ -661,7 +661,7 @@ prediction_binary <- function(df, threshold = 0.5, ...){
   }
 
   # if there is terms_mapping for randomForest, ranger, or glm_exploratory, use the original column name
-  if (!is.na(first_model$terms_mapping) && !is.na(first_model$terms_mapping[[actual_col]])) {
+  if (!is.null(first_model$terms_mapping) && !is.null(first_model$terms_mapping[[actual_col]])) {
     actual_col <- first_model$terms_mapping[[actual_col]]
   }
 
