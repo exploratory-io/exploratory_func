@@ -564,7 +564,7 @@ test_that("test prediction(data='training_and_test') by glm", {
                      "hat", "residual_standard_deviation",
                      "cooks_distance", "standardised_residuals",
                      "is_test_data")
-  expected_cols_2 <- c("klass", "Carrier.Name", "DISTANCE",
+  expected_cols_2 <- c("klass", "Carrier Name", "DISTANCE",
                      "ARR_TIME", "DERAY_TIME", "predicted_value",
                      "standard_error", "conf_low", "conf_high", "residuals",
                      "hat", "residual_standard_deviation",
