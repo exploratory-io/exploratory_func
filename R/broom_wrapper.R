@@ -580,8 +580,8 @@ prediction_training_and_test <- function(df, prediction_type="default", threshol
 
   if (prediction_type == "conf_mat") {
     target_col <- all.vars(model$formula)[[1]]
-    # Get original target column name.
-    target_col_orig <- df$model[[1]]$terms_mapping[[target_col]]
+    # Get original target column name. Use the model filtered above so that it is always a valid model rather than an error object.
+    target_col_orig <- model$terms_mapping[[target_col]]
 
     each_mat_func <- function(df) {
       actual_val <- df[[target_col_orig]]
