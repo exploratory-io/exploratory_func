@@ -116,7 +116,7 @@ do_cor.kv_ <- function(df,
         zero.rm = FALSE
       )
     } else {
-      ret <- mat_to_df(cor_mat, cnames=output_cols, diag=diag, na.rm = FALSE)
+      ret <- mat_to_df(cor_mat, cnames=output_cols, diag=diag, na.rm = FALSE, zero.rm=FALSE)
     }
 
     if (return_type == "data.frame") {
@@ -177,9 +177,9 @@ do_cor.cols <- function(df, ..., use="pairwise.complete.obs", method="pearson", 
 
     cor_mat <- cor(mat, use = use, method = method)
     if(distinct){
-      ret <- upper_gather(cor_mat, diag=diag, cnames=output_cols)
+      ret <- upper_gather(cor_mat, diag=diag, cnames=output_cols, zero.rm=FALSE)
     } else {
-      ret <- mat_to_df(cor_mat, cnames=output_cols,diag=diag)
+      ret <- mat_to_df(cor_mat, cnames=output_cols, diag=diag, zero.rm=FALSE)
     }
 
     if (return_type == "data.frame") {
