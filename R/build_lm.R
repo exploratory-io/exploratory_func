@@ -1239,10 +1239,6 @@ augment.lm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "
         broom:::augment.lm(x, data = data, newdata = newdata, ...)
       },
       test = {
-        # Minic broom:::augment.lm behavior of replacing spaces in column names. Without this, after bind_row in prediction(), such columns will end up in 2 separate columns.
-        # For some reason, str_replace garbles some column names in Japanese. Using gsub instead to avoid the issue.
-        # names(data) <- stringr::str_replace_all(names(data), ' ', '.')
-        names(data) <- gsub(' ', '.', names(data))
         # Augment data with already predicted result in the model.
         data$.fitted <- restore_na(x$prediction_test$fit, x$prediction_test$unknown_category_rows_index)
         data$.se.fit <- restore_na(x$prediction_test$se.fit, x$prediction_test$unknown_category_rows_index)
