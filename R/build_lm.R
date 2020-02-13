@@ -716,6 +716,24 @@ build_lm.fast <- function(df,
                                                                 bty = relimp_bootstrap_type, level = relimp_conf_level)
           }, error = function(e){
             # This can fail when columns are not linearly independent. Record error and keep going.
+            # in case of perfect multicollinearity, relaimpo throws error with following message.
+            # "covg must be \n a positive definite covariance matrix \n or a data matrix / data frame with linearly independent columns."
+            # Check if it is the case. If coef() includes NA, corresponding variable is causing perfect multicollinearity.
+            # TODO: Consolidate code with vif case.
+            coef_vec <- coef(model)
+            na_coef_vec <- coef_vec[is.na(coef_vec)]
+            if (length(na_coef_vec) > 0) {
+              na_coef_names <- names(na_coef_vec)
+              na_coef_names <- map_terms_to_orig(na_coef_names, terms_mapping) # Map column names in the message back to original.
+              message <- paste(na_coef_names, collapse = ", ")
+              message <- paste0("Variables causing perfect collinearity : ", message)
+              e$message <- message
+            }
+            else if (e$message == "covg must be \n a positive definite covariance matrix \n or a data matrix / data frame with linearly independent columns.") {
+              # We have seen cases where above check on coef passes, but still this error is thrown for some reason.
+              # Just tell that this means perfect multicollinearity.
+              e$message <- "Calculation of variable importance failed most likely due to perfect multicollinearity."
+            }
             model$relative_importance <<- e
           })
         }
@@ -873,9 +891,6 @@ glance.lm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
   # so that we can report the error in Summary table (return from tidy()).
   if (!is.null(x$relative_importance) && "error" %in% class(x$relative_importance)) {
     note <- x$relative_importance$message
-    if (note == "covg must be \n a positive definite covariance matrix \n or a data matrix / data frame with linearly independent columns.") {
-      note <- "Calculation of variable importance failed most likely due to perfect multicollinearity."
-    }
     ret <- ret %>% dplyr::mutate(note=note)
   }
 
