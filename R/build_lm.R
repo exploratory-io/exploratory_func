@@ -966,11 +966,15 @@ xlevels_to_base_level_table <- function(xlevels) {
 vif_to_dataframe <- function(x) {
   ret <- NULL
   if (is.matrix(x$vif)) {
+    # It is a matrix when there are categorical variables.
     ret <- x$vif %>% as.data.frame() %>%  tibble::rownames_to_column(var="term") %>% rename(VIF=GVIF)
   }
   else {
+    # It is a vector when there is no categorical variable.
     ret <- data.frame(term=names(x$vif), VIF=x$vif)
   }
+  # Map variable names back to the original.
+  ret$term <- x$terms_mapping[ret$term]
   ret
 }
 
@@ -992,6 +996,15 @@ var_to_possible_terms <- function(var, x) {
 get_var_min_pvalue <- function(var, coef_df, x) {
   terms <- var_to_possible_terms(as.character(var), x)
   min(coef_df$p.value[coef_df$term %in% terms])
+}
+
+map_terms_to_orig <- function(terms, mapping) {
+  browser()
+  var_names <- str_extract(terms, "^c[0-9]+")
+  var_values <- str_remove(terms, "^c[0-9]+")
+  var_names_orig <- mapping[var_names]
+  ret <- dplyr::if_else(is.na(var_names), terms, dplyr::if_else(var_values == "", var_names_orig, paste0(var_names_orig, ": ", var_values)))
+  ret
 }
 
 #' special version of tidy.lm function to use with build_lm.fast.
@@ -1018,6 +1031,7 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
           ret <- ret %>% rename(Note=note)
         }
       }
+      ret$term <- map_terms_to_orig(ret$term, x$terms_mapping)
       if (pretty.name) {
         ret <- ret %>% rename(Term=term, Coefficient=estimate, `Std Error`=std.error,
                               `t Ratio`=statistic, `P Value`=p.value,
@@ -1043,6 +1057,8 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
         ret <- ret %>% mutate(p.value=purrr::map(term, function(var) {
           get_var_min_pvalue(var, coef_df, x)
         }))
+        # Map variable names back to the original.
+        ret$term <- x$terms_mapping[ret$term]
         if (pretty.name) {
           ret <- ret %>% rename(`Variable` = term,
                                 `Relative Importance` = importance,
