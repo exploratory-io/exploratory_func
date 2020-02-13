@@ -240,6 +240,21 @@ build_lm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, gr
   ret
 }
 
+# Map terms back to the original variable names.
+# If term is for categorical variable, e.g. c1_UA,
+# it will be mapped to name like "Carrier: UA".
+map_terms_to_orig <- function(terms, mapping) {
+  # Extract name part and value part of the coefficient name separately.
+  var_names <- stringr::str_extract(terms, "^c[0-9]+_")
+  var_values <- stringr::str_remove(terms, "^c[0-9]+_")
+  var_names_orig <- mapping[var_names] # Map variable names back to the original.
+  # is.na(var_names) is for "(Intercept)".
+  # var_values == "" is for numerical variables.
+  # Categorical variables are expected to have var_values.
+  ret <- dplyr::if_else(is.na(var_names), terms, dplyr::if_else(var_values == "", var_names_orig, paste0(var_names_orig, ": ", var_values)))
+  ret
+}
+
 #' builds lm model quickly for analytics view.
 #' @param relimp - Whether to enable relative importance by relaimpo.
 #' @param relimp_type - Passed down to boot.relimp, but "lmg" seems to be the recommended option, but is very slow. default is "first".
@@ -706,6 +721,10 @@ build_lm.fast <- function(df,
         }
       }
 
+      # Reverse mapping of variable names.
+      terms_mapping <- names(name_map)
+      names(terms_mapping) <- name_map
+
       tryCatch({
         model$vif <- vif(model)
       }, error = function(e){
@@ -715,6 +734,7 @@ build_lm.fast <- function(df,
         na_coef_vec <- coef_vec[is.na(coef_vec)]
         if (length(na_coef_vec) > 0) {
           na_coef_names <- names(na_coef_vec)
+          na_coef_names <- map_terms_to_orig(na_coef_names, terms_mapping) # Map column names in the message back to original.
           message <- paste(na_coef_names, collapse = ", ")
           message <- paste0("Variables causing perfect collinearity : ", message)
           e$message <- message
@@ -728,8 +748,7 @@ build_lm.fast <- function(df,
         model$prediction_test$unknown_category_rows_index <- unknown_category_rows_index
       }
       # these attributes are used in tidy of randomForest TODO: is this good for lm too?
-      model$terms_mapping <- names(name_map)
-      names(model$terms_mapping) <- name_map
+      model$terms_mapping <- terms_mapping
       model$orig_levels <- orig_levels
 
       # For displaying if sampling happened or not.
@@ -1001,21 +1020,6 @@ var_to_possible_terms <- function(var, x) {
 get_var_min_pvalue <- function(var, coef_df, x) {
   terms <- var_to_possible_terms(as.character(var), x)
   min(coef_df$p.value[coef_df$term %in% terms])
-}
-
-# Map terms back to the original variable names.
-# If term is for categorical variable, e.g. c1_UA,
-# it will be mapped to name like "Carrier: UA".
-map_terms_to_orig <- function(terms, mapping) {
-  # Extract name part and value part of the coefficient name separately.
-  var_names <- stringr::str_extract(terms, "^c[0-9]+_")
-  var_values <- stringr::str_remove(terms, "^c[0-9]+_")
-  var_names_orig <- mapping[var_names] # Map variable names back to the original.
-  # is.na(var_names) is for "(Intercept)".
-  # var_values == "" is for numerical variables.
-  # Categorical variables are expected to have var_values.
-  ret <- dplyr::if_else(is.na(var_names), terms, dplyr::if_else(var_values == "", var_names_orig, paste0(var_names_orig, ": ", var_values)))
-  ret
 }
 
 #' special version of tidy.lm function to use with build_lm.fast.
