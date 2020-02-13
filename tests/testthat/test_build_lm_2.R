@@ -546,8 +546,9 @@ test_that("Logistic Regression with test_rate", {
     expected_cols <- c("CANCELLED X", "Carrier Name", "ARR_TIME", "DERAY_TIME", "predicted_value", "standard_error",
                        "conf_low", "conf_high", "predicted_response")
     expect_equal(colnames(pred_test), expected_cols)
-
     res <- ret %>% broom::glance(model, pretty.name=TRUE)
+    res <- ret %>% evaluate_binary_training_and_test(`CANCELLED X`, threshold = 0.5, pretty.name=TRUE)
+    expect_equal(nrow(res), 2) # 2 for training and test.
     res <- ret %>% lm_partial_dependence()
    })
 })
