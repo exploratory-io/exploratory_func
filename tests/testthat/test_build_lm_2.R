@@ -17,8 +17,7 @@ test_that("binary prediction with character target column", {
   model_data <- build_lm.fast(test_data, `CANCELLED X`, `Carrier Name`, CARRIER, DISTANCE,
                               normalize_predictors = TRUE,
                               model_type = "glm", smote=FALSE, with_marginal_effects=TRUE, with_marginal_effects_confint=TRUE)
-  ret <- model_data %>% tidy(model, type="vif")
-
+  ret <- model_data %>% broom::tidy(model, type="vif")
   ret <- model_data %>% broom::glance(model, pretty.name=TRUE)
   expect_equal(ret$`Number of Rows`, 34)
   expect_equal(ret$`Number of Rows for Y`, 4) # This ends up to be 4 after doubling
@@ -103,8 +102,10 @@ test_that("Linear Regression with test rate", {
                                      model_type = "lm",
                                      test_rate = 0.1,
                                      test_split_type = "ordered") # testing ordered split too.
-  res <- ret %>% tidy(model, type="vif")
-
+  res <- ret %>% broom::tidy(model)
+  expect_true("Carrier Name: American Airlines" %in% res$term)
+  res <- ret %>% broom::tidy(model, type="vif")
+  expect_true("Carrier Name" %in% res$term)
   expect_equal(colnames(ret), c("model", ".test_index", "source.data"))
   test_rownum <- length(ret$.test_index[[1]])
   training_rownum <- nrow(test_data) - test_rownum
@@ -584,4 +585,3 @@ test_that("Group Logistic Regression with test_rate", {
     res <- ret %>% broom::glance(model, pretty.name=TRUE)
    })
 })
-
