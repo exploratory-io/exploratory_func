@@ -106,6 +106,17 @@ do_cor.kv_ <- function(df,
       time_unit = time_unit,
       na.rm = TRUE
     )
+    if (dim(mat)[[1]] < 2) {
+      # Correlation require 2 or more rows.
+      if (length(grouped_col) > 0) {
+        # Skip this group in this case. TODO: Report error.
+        return(NULL)
+      }
+      else {
+        # This is the only group. Throw error.
+        stop("More than 1 aggregated measures per category are required to calculate correlations.")
+      }
+    }
     cor_mat <- cor(mat, use = use, method = method)
     if(distinct){
       ret <- upper_gather(
@@ -170,6 +181,17 @@ do_cor.cols <- function(df, ..., use="pairwise.complete.obs", method="pearson", 
   output_cols <- avoid_conflict(grouped_col, c("pair.name.x", "pair.name.y", "value"))
   # check if the df's grouped
   do_cor_each <- function(df){
+    if (nrow(df) < 2) {
+      # Correlation require 2 or more rows.
+      if (length(grouped_col) > 0) {
+        # Skip this group in this case. TODO: Report error.
+        return(NULL)
+      }
+      else {
+        # This is the only group. Throw error.
+        stop("More than 1 row are required to calculate correlations.")
+      }
+    }
     mat <- dplyr::select(df, !!!select_dots) %>%  as.matrix()
     # sort the column name so that the output of pair.name.1 and pair.name.2 will be sorted
     # it's better to be sorted so that heatmap in exploratory can be triangle if distinct is TRUE
