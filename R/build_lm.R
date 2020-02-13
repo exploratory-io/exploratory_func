@@ -1264,9 +1264,9 @@ augment.glm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = 
     # Calling broom:::augment.glm fails with 'NextMethod' called from an anonymous function
     # It seems augment.glm is only calling NextMethod, which is falling back to broom:::augment.lm.
     # So, we are just directly calling augment.lm here.
-    broom:::augment.lm(x, data = data, newdata = newdata, ...)
+    ret <- broom:::augment.lm(x, data = data, newdata = newdata, ...)
   } else if (!is.null(data)) {
-    switch(data_type,
+    ret <- switch(data_type,
       training = { # Call broom:::augment.lm as is
         broom:::augment.lm(x, data = data, newdata = newdata, ...)
       },
@@ -1278,8 +1278,11 @@ augment.glm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = 
       })
   }
   else {
-    broom:::augment.lm(x, ...)
+    ret <- broom:::augment.lm(x, ...)
   }
+  # Rename columns back to the original names.
+  names(ret) <- coalesce(x$terms_mapping[names(ret)], names(ret))
+  ret
 }
 
 # For some reason, find_data called from inside margins::marginal_effects() fails in Exploratory.
