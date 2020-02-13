@@ -91,7 +91,6 @@ evaluate_binary_ <- function(df, pred_prob_col, actual_val_col, threshold = "f_s
   validate_empty_data(df)
 
   evaluate_binary_each <- function(df){
-
     actual_val <- df[[actual_val_col]]
     pred_prob <- df[[pred_prob_col]]
 
@@ -318,7 +317,8 @@ evaluate_multi_ <- function(df, pred_label_col, actual_val_col, pretty.name = FA
 
 # Generates Analytics View Summary Table for logistic/binomial regression. Handles Test Mode.
 #' @export
-evaluate_binary_training_and_test <- function(df, actual_val_col, threshold = "f_score", pretty.name = FALSE){
+evaluate_binary_training_and_test <- function(df, actual_val, threshold = "f_score", pretty.name = FALSE){
+  actual_val_col <- col_name(substitute(actual_val)) # Get name of column as string.
   training_ret <- df %>% broom::glance(model, binary_classification_threshold = threshold)
   ret <- training_ret
 
@@ -336,11 +336,7 @@ evaluate_binary_training_and_test <- function(df, actual_val_col, threshold = "f
       tryCatch({
         test_pred_ret <- prediction_binary(df, data = "test")
   
-        # Terms Mapping
-        ## get Model Object
-        m <- df %>% filter(!is.null(model)) %>% `[[`(1, "model", 1)
-        actual_val_col <- m$terms_mapping[m$terms_mapping == actual_val_col] %>% names(.)
-  
+        # Evaluate the binary classification result.
         eret <- evaluate_binary_(test_pred_ret, "predicted_probability", actual_val_col, threshold = threshold)
   
         test_ret <- eret %>% dplyr::mutate(n = true_positive + false_positive + true_negative + false_negative,
