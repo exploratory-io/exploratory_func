@@ -366,13 +366,15 @@ build_lm.fast <- function(df,
 
   # Replace spaces with dots in column names. margins::marginal_effects() fails without it.
   clean_df <- df
-  # Replace column names with names like c1, c2...
+  # Replace column names with names like c1_, c2_...
+  # _ is so that name part and value part of categorical coefficient can be separated later,
+  # even with values that starts with number like "9E".
   # We avoid following known issues by this.
   # - Column name issue for marginal_effects(). Space is not handled well.
   #   ()"' are known to be ok as of version 5.5.2.
   # - Column name issue for relaimpo. - is not handled well.
   # - Column name issue for mmpf::marginalPrediction (for partial dependence). Comma is not handled well.
-  names(clean_df) <- paste0("c",1:length(colnames(clean_df)))
+  names(clean_df) <- paste0("c",1:length(colnames(clean_df)), "_")
   # this mapping will be used to restore column names
   name_map <- colnames(clean_df)
   names(name_map) <- colnames(df)
@@ -998,11 +1000,17 @@ get_var_min_pvalue <- function(var, coef_df, x) {
   min(coef_df$p.value[coef_df$term %in% terms])
 }
 
+# Map terms back to the original variable names.
+# If term is for categorical variable, e.g. c1_UA,
+# it will be mapped to name like "Carrier: UA".
 map_terms_to_orig <- function(terms, mapping) {
-  browser()
-  var_names <- str_extract(terms, "^c[0-9]+")
-  var_values <- str_remove(terms, "^c[0-9]+")
-  var_names_orig <- mapping[var_names]
+  # Extract name part and value part of the coefficient name separately.
+  var_names <- stringr::str_extract(terms, "^c[0-9]+_")
+  var_values <- stringr::str_remove(terms, "^c[0-9]+_")
+  var_names_orig <- mapping[var_names] # Map variable names back to the original.
+  # is.na(var_names) is for "(Intercept)".
+  # var_values == "" is for numerical variables.
+  # Categorical variables are expected to have var_values.
   ret <- dplyr::if_else(is.na(var_names), terms, dplyr::if_else(var_values == "", var_names_orig, paste0(var_names_orig, ": ", var_values)))
   ret
 }
