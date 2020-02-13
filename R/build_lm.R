@@ -374,6 +374,9 @@ build_lm.fast <- function(df,
   #   ()"' are known to be ok as of version 5.5.2.
   # - Column name issue for relaimpo. - is not handled well.
   # - Column name issue for mmpf::marginalPrediction (for partial dependence). Comma is not handled well.
+  # Note that the data frames in source_data column are with the replaced column names for simplicity,
+  # rather than the original column names, unlike what we do for ranger or rpart. (Maybe we should do it for ranger or rpart.)
+  # The reverse mapping of the column names are done in augment.lm_exploratory or augment.glm_exploratory.
   names(clean_df) <- paste0("c",1:length(colnames(clean_df)), "_")
   # this mapping will be used to restore column names
   name_map <- colnames(clean_df)
