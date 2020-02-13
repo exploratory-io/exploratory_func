@@ -533,6 +533,7 @@ test_that("Logistic Regression with test_rate", {
 
   suppressWarnings({
     pred_training_and_test <- ret %>% prediction_binary(data = 'training_and_test', threshold = 0.5)
+    pred_training_and_test_conf_mat <- ret %>% prediction_training_and_test(prediction_type = 'conf_mat', threshold = 0.5)
     pred_training <- prediction(ret, data = "training")
     pred_test <- prediction(ret, data = "test")
     expect_equal(training_rownum, nrow(pred_training))

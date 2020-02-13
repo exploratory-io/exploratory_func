@@ -580,9 +580,11 @@ prediction_training_and_test <- function(df, prediction_type="default", threshol
 
   if (prediction_type == "conf_mat") {
     target_col <- all.vars(model$formula)[[1]]
+    # Get original target column name.
+    target_col_orig <- df$model[[1]]$terms_mapping[[target_col]]
 
     each_mat_func <- function(df) {
-      actual_val <- df[[target_col]]
+      actual_val <- df[[target_col_orig]]
       predicted <- df$predicted_label
 
       df <- data.frame(
@@ -658,11 +660,9 @@ prediction_binary <- function(df, threshold = 0.5, ...){
     }
   }
 
-  # if there is terms_mapping for randomForest or ranger, use the original column name
-  if ("randomForest" %in% class(first_model) || "ranger" %in% class(first_model)) {
-    if (!is.na(first_model$terms_mapping) && !is.na(first_model$terms_mapping[[actual_col]])) {
-      actual_col <- first_model$terms_mapping[[actual_col]]
-    }
+  # if there is terms_mapping for randomForest, ranger, or glm_exploratory, use the original column name
+  if (!is.na(first_model$terms_mapping) && !is.na(first_model$terms_mapping[[actual_col]])) {
+    actual_col <- first_model$terms_mapping[[actual_col]]
   }
 
   actual_val <- ret[[actual_col]]
