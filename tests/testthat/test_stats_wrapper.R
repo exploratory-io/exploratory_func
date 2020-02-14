@@ -71,6 +71,14 @@ test_that("do_cor with zero correlations", {
   expect_equal(nrow(res), 9) # Make sure rows for all 9 combinations are there even though some have 0 correlation values.
 })
 
+test_that("do_cor should skip group with only one row.", {
+  df <- data.frame(x=c(1,1,0,0),y=c(1,0,1,0),z=c(T,T,T,F))
+  model_df <- df %>% group_by(z) %>% do_cor(`x`, `y`, method = "pearson", distinct = FALSE, diag = TRUE, return_type = "model")
+  res <- model_df %>% tidy(model, type='cor')
+  # verify that the group of z==F is skipped.
+  expect_equal(nrow(res %>% filter(z==F)), 0)
+})
+
 test_that("test do_svd.kv with fill", {
   test_df <- data.frame(
     rand=runif(20, min = 0, max=10),
