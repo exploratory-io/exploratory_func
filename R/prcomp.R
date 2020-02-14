@@ -10,7 +10,7 @@ do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, seed = NULL
   selected_cols <- setdiff(selected_cols, grouped_cols)
 
   if (any(selected_cols %in% grouped_cols)) {
-    stop("grouping column is used as variable columns")
+    stop("Repeat-By column cannot be used as a variable column.")
   }
 
   if(!is.null(seed)) { # Set seed before starting to call sample_n.
