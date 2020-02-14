@@ -179,7 +179,7 @@ test_that("prediction with target column name with space by build_lm.fast", {
   ret <- model_data %>% broom::augment(model)
 
   expect_true(nrow(ret) > 0)
-  expect_equal(colnames(ret), c("CANCELLED.X", "logical.col", "Carrier.Name","CARRIER","DISTANCE",".fitted",".se.fit",".resid",".hat",".sigma",".cooksd",".std.resid"))
+  expect_equal(colnames(ret), c("CANCELLED:X", "logical col", "Carrier-Name","CARRIER","DISTANCE",".fitted",".se.fit",".resid",".hat",".sigma",".cooksd",".std.resid"))
 })
 
 test_that("prediction with glm family (binomial) and link (probit) with target column name with space by build_lm.fast", {
@@ -219,7 +219,7 @@ test_that("prediction with glm family (binomial) and link (probit) with target c
   ret <- model_data %>% broom::augment(model)
 
   expect_true(nrow(ret) > 0)
-  expect_equal(colnames(ret), c("CANCELLED.X", "logical.col", "Carrier.Name","CARRIER","DISTANCE",".fitted",".se.fit",".resid",".hat",".sigma",".cooksd",".std.resid"))
+  expect_equal(colnames(ret), c("CANCELLED X", "logical col", "Carrier Name","CARRIER","DISTANCE",".fitted",".se.fit",".resid",".hat",".sigma",".cooksd",".std.resid"))
 })
 
 test_that("prediction with glm family (negativebinomial) with target column name with space by build_lm.fast", {
@@ -257,7 +257,7 @@ test_that("prediction with glm family (negativebinomial) with target column name
 
   ret <- model_data %>% broom::augment(model)
   expect_equal(colnames(ret),
-               c("CANCELLED.X", "logical.col", "Carrier.Name", "CARRIER", "DISTANCE",
+               c("CANCELLED X", "logical col", "Carrier Name", "CARRIER", "DISTANCE",
                  ".fitted", ".resid", ".hat", ".sigma", ".cooksd", ".std.resid"))
 })
 
@@ -286,7 +286,7 @@ if (Sys.info()["sysname"] != "Windows") {
     ret <- model_data %>% broom::augment(model)
   
     expect_true(nrow(ret) > 0)
-    expect_equal(colnames(ret), c("キャンセル.X", "論理.col", "航空会社.Name","CARRIER","DISTANCE",".fitted",".se.fit",".resid",".hat",".sigma",".cooksd",".std.resid"))
+    expect_equal(colnames(ret), c("キャンセル X", "論理 col", "航空会社 Name","CARRIER","DISTANCE",".fitted",".se.fit",".resid",".hat",".sigma",".cooksd",".std.resid"))
   })
 }
 

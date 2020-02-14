@@ -240,6 +240,21 @@ build_lm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, gr
   ret
 }
 
+# Map terms back to the original variable names.
+# If term is for categorical variable, e.g. c1_UA,
+# it will be mapped to name like "Carrier: UA".
+map_terms_to_orig <- function(terms, mapping) {
+  # Extract name part and value part of the coefficient name separately.
+  var_names <- stringr::str_extract(terms, "^c[0-9]+_")
+  var_values <- stringr::str_remove(terms, "^c[0-9]+_")
+  var_names_orig <- mapping[var_names] # Map variable names back to the original.
+  # is.na(var_names) is for "(Intercept)".
+  # var_values == "" is for numerical variables.
+  # Categorical variables are expected to have var_values.
+  ret <- dplyr::if_else(is.na(var_names), terms, dplyr::if_else(var_values == "", var_names_orig, paste0(var_names_orig, ": ", var_values)))
+  ret
+}
+
 #' builds lm model quickly for analytics view.
 #' @param relimp - Whether to enable relative importance by relaimpo.
 #' @param relimp_type - Passed down to boot.relimp, but "lmg" seems to be the recommended option, but is very slow. default is "first".
@@ -366,16 +381,18 @@ build_lm.fast <- function(df,
 
   # Replace spaces with dots in column names. margins::marginal_effects() fails without it.
   clean_df <- df
-  if (model_type == "lm") {
-    # For lm, we can skip column names cleaning, since we do not use marginal_effects().
-  }
-  else {
-    # Cleaning of column names for marginal_effects(). Space is not handled well. Replace them with '.'.
-    # Also, cleaning of column names for relaimpo. - is not handled well. Replace them with _.
-    # For some reason, str_replace garbles some column names in Japanese. Using gsub instead to avoid the issue.
-    # names(clean_df) <- stringr::str_replace_all(names(df), ' ', '.') %>% stringr::str_replace_all('-', '_')
-    names(clean_df) <- gsub('\\-', '_', gsub(' ', '.', names(df)))
-  }
+  # Replace column names with names like c1_, c2_...
+  # _ is so that name part and value part of categorical coefficient can be separated later,
+  # even with values that starts with number like "9E".
+  # We avoid following known issues by this.
+  # - Column name issue for marginal_effects(). Space is not handled well.
+  #   ()"' are known to be ok as of version 5.5.2.
+  # - Column name issue for relaimpo. - is not handled well.
+  # - Column name issue for mmpf::marginalPrediction (for partial dependence). Comma is not handled well.
+  # Note that the data frames in source_data column are with the replaced column names for simplicity,
+  # rather than the original column names, unlike what we do for ranger or rpart. (Maybe we should do it for ranger or rpart.)
+  # The reverse mapping of the column names are done in augment.lm_exploratory or augment.glm_exploratory.
+  names(clean_df) <- paste0("c",1:length(colnames(clean_df)), "_")
   # this mapping will be used to restore column names
   name_map <- colnames(clean_df)
   names(name_map) <- colnames(df)
@@ -699,10 +716,32 @@ build_lm.fast <- function(df,
                                                                 bty = relimp_bootstrap_type, level = relimp_conf_level)
           }, error = function(e){
             # This can fail when columns are not linearly independent. Record error and keep going.
+            # in case of perfect multicollinearity, relaimpo throws error with following message.
+            # "covg must be \n a positive definite covariance matrix \n or a data matrix / data frame with linearly independent columns."
+            # Check if it is the case. If coef() includes NA, corresponding variable is causing perfect multicollinearity.
+            # TODO: Consolidate code with vif case.
+            coef_vec <- coef(model)
+            na_coef_vec <- coef_vec[is.na(coef_vec)]
+            if (length(na_coef_vec) > 0) {
+              na_coef_names <- names(na_coef_vec)
+              na_coef_names <- map_terms_to_orig(na_coef_names, terms_mapping) # Map column names in the message back to original.
+              message <- paste(na_coef_names, collapse = ", ")
+              message <- paste0("Variables causing perfect collinearity : ", message)
+              e$message <- message
+            }
+            else if (e$message == "covg must be \n a positive definite covariance matrix \n or a data matrix / data frame with linearly independent columns.") {
+              # We have seen cases where above check on coef passes, but still this error is thrown for some reason.
+              # Just tell that this means perfect multicollinearity.
+              e$message <- "Calculation of variable importance failed most likely due to perfect multicollinearity."
+            }
             model$relative_importance <<- e
           })
         }
       }
+
+      # Reverse mapping of variable names.
+      terms_mapping <- names(name_map)
+      names(terms_mapping) <- name_map
 
       tryCatch({
         model$vif <- vif(model)
@@ -713,6 +752,7 @@ build_lm.fast <- function(df,
         na_coef_vec <- coef_vec[is.na(coef_vec)]
         if (length(na_coef_vec) > 0) {
           na_coef_names <- names(na_coef_vec)
+          na_coef_names <- map_terms_to_orig(na_coef_names, terms_mapping) # Map column names in the message back to original.
           message <- paste(na_coef_names, collapse = ", ")
           message <- paste0("Variables causing perfect collinearity : ", message)
           e$message <- message
@@ -726,8 +766,7 @@ build_lm.fast <- function(df,
         model$prediction_test$unknown_category_rows_index <- unknown_category_rows_index
       }
       # these attributes are used in tidy of randomForest TODO: is this good for lm too?
-      model$terms_mapping <- names(name_map)
-      names(model$terms_mapping) <- name_map
+      model$terms_mapping <- terms_mapping
       model$orig_levels <- orig_levels
 
       # For displaying if sampling happened or not.
@@ -852,9 +891,6 @@ glance.lm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
   # so that we can report the error in Summary table (return from tidy()).
   if (!is.null(x$relative_importance) && "error" %in% class(x$relative_importance)) {
     note <- x$relative_importance$message
-    if (note == "covg must be \n a positive definite covariance matrix \n or a data matrix / data frame with linearly independent columns.") {
-      note <- "Calculation of variable importance failed most likely due to perfect multicollinearity."
-    }
     ret <- ret %>% dplyr::mutate(note=note)
   }
 
@@ -969,11 +1005,15 @@ xlevels_to_base_level_table <- function(xlevels) {
 vif_to_dataframe <- function(x) {
   ret <- NULL
   if (is.matrix(x$vif)) {
+    # It is a matrix when there are categorical variables.
     ret <- x$vif %>% as.data.frame() %>%  tibble::rownames_to_column(var="term") %>% rename(VIF=GVIF)
   }
   else {
+    # It is a vector when there is no categorical variable.
     ret <- data.frame(term=names(x$vif), VIF=x$vif)
   }
+  # Map variable names back to the original.
+  ret$term <- x$terms_mapping[ret$term]
   ret
 }
 
@@ -1021,6 +1061,8 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
           ret <- ret %>% rename(Note=note)
         }
       }
+      # Map coefficient names back to original.
+      ret$term <- map_terms_to_orig(ret$term, x$terms_mapping)
       if (pretty.name) {
         ret <- ret %>% rename(Term=term, Coefficient=estimate, `Std Error`=std.error,
                               `t Ratio`=statistic, `P Value`=p.value,
@@ -1046,6 +1088,8 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
         ret <- ret %>% mutate(p.value=purrr::map(term, function(var) {
           get_var_min_pvalue(var, coef_df, x)
         }))
+        # Map variable names back to the original.
+        ret$term <- x$terms_mapping[ret$term]
         if (pretty.name) {
           ret <- ret %>% rename(`Variable` = term,
                                 `Relative Importance` = importance,
@@ -1110,6 +1154,8 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
           ret <- ret %>% rename(Note=note)
         }
       }
+      # Map coefficient names back to original.
+      ret$term <- map_terms_to_orig(ret$term, x$terms_mapping)
       if (pretty.name) {
         ret <- ret %>% rename(Term=term, Coefficient=estimate, `Std Error`=std.error,
                               `t Ratio`=statistic, `P Value`=p.value, `Conf Low`=conf.low, `Conf High`=conf.high,
@@ -1206,18 +1252,15 @@ augment.lm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "
     ret <- data.frame()
     return(ret)
   }
+
   if(!is.null(newdata)) { # Call broom:::augment.lm as is
-    broom:::augment.lm(x, data = data, newdata = newdata, ...)
+    ret <- broom:::augment.lm(x, data = data, newdata = newdata, ...)
   } else if (!is.null(data)) {
-    switch(data_type,
+    ret <- switch(data_type,
       training = { # Call broom:::augment.lm as is
         broom:::augment.lm(x, data = data, newdata = newdata, ...)
       },
       test = {
-        # Minic broom:::augment.lm behavior of replacing spaces in column names. Without this, after bind_row in prediction(), such columns will end up in 2 separate columns.
-        # For some reason, str_replace garbles some column names in Japanese. Using gsub instead to avoid the issue.
-        # names(data) <- stringr::str_replace_all(names(data), ' ', '.')
-        names(data) <- gsub(' ', '.', names(data))
         # Augment data with already predicted result in the model.
         data$.fitted <- restore_na(x$prediction_test$fit, x$prediction_test$unknown_category_rows_index)
         data$.se.fit <- restore_na(x$prediction_test$se.fit, x$prediction_test$unknown_category_rows_index)
@@ -1225,8 +1268,11 @@ augment.lm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "
       })
   }
   else {
-    broom:::augment.lm(x, ...)
+    ret <- broom:::augment.lm(x, ...)
   }
+  # Rename columns back to the original names.
+  names(ret) <- coalesce(x$terms_mapping[names(ret)], names(ret))
+  ret
 }
 
 #' @export
@@ -1239,9 +1285,9 @@ augment.glm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = 
     # Calling broom:::augment.glm fails with 'NextMethod' called from an anonymous function
     # It seems augment.glm is only calling NextMethod, which is falling back to broom:::augment.lm.
     # So, we are just directly calling augment.lm here.
-    broom:::augment.lm(x, data = data, newdata = newdata, ...)
+    ret <- broom:::augment.lm(x, data = data, newdata = newdata, ...)
   } else if (!is.null(data)) {
-    switch(data_type,
+    ret <- switch(data_type,
       training = { # Call broom:::augment.lm as is
         broom:::augment.lm(x, data = data, newdata = newdata, ...)
       },
@@ -1253,8 +1299,11 @@ augment.glm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = 
       })
   }
   else {
-    broom:::augment.lm(x, ...)
+    ret <- broom:::augment.lm(x, ...)
   }
+  # Rename columns back to the original names.
+  names(ret) <- coalesce(x$terms_mapping[names(ret)], names(ret))
+  ret
 }
 
 # For some reason, find_data called from inside margins::marginal_effects() fails in Exploratory.
@@ -1290,12 +1339,10 @@ evaluate_lm_training_and_test <- function(df, pretty.name = FALSE){
         ## get Model Object
         m <- df %>% filter(!is.null(model)) %>% `[[`(1, "model", 1)
         actual_val_col <- all.vars(df$model[[1]]$terms)[[1]]
-        # Emulate the way lm replaces the column names in the output.
-        # For some reason, str_replace garbles some column names in Japanese. Using gsub instead to avoid the issue.
-        # actual_val_col_clean <- stringr::str_replace_all(actual_val_col, ' ', '.')
-        actual_val_col_clean <- gsub(' ', '.', actual_val_col)
+        # Get original target column name.
+        actual_val_col_orig <- df$model[[1]]$terms_mapping[[actual_val_col]]
 
-        actual <- test_pred_ret[[actual_val_col_clean]]
+        actual <- test_pred_ret[[actual_val_col_orig]]
         predicted <- test_pred_ret$predicted_value
         root_mean_square_error <- rmse(actual, predicted)
         test_n <- sum(!is.na(predicted)) # Sample size for test.
