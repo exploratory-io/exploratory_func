@@ -42,8 +42,15 @@ do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, seed = NULL
         cleaned_df <- cleaned_df[colnames(cleaned_df) != col]
       }
     }
-    if (length(colnames(cleaned_df)) == 0) { # skip this group if no column is left.
-      return(NULL)
+    if (length(colnames(cleaned_df)) < 2) {
+      if (length(grouped_cols) < 1) {
+        # If without group_by, throw error to display message.
+        stop("After preprocessing, less than 2 columns are left for PCA.")
+      }
+      else {
+        # skip this group if less than 2 column is left. (We can't handle single column for now.)
+        return(NULL)
+      }
     }
     # "scale." is an argument name. There is no such operator like ".=". 
     fit <- prcomp(cleaned_df, scale.=normalize_data)
