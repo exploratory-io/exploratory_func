@@ -1819,8 +1819,10 @@ setdiff <- function(x, y, force_data_type = FALSE, ...){
 #'@export
 recode <- function(x, ...){
   ret <- dplyr::recode(x, ...)
-  if (is.character(x) && is.character(ret)) {
-    Encoding(ret) <- Encoding(x)
+  if (is.character(x) && is.character(ret) &&
+      all(Encoding(x) == 'UTF-8') &&
+      all(Encoding(ret %in% c('UTF-8', 'unknown')))) {
+    ret <- enc2utf8(ret)
   }
   ret
 }
