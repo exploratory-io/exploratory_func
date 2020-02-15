@@ -27,6 +27,9 @@
 #' @return Logical vector if the token is in stop words or not.
 #' @export
 is_stopword <- function(token, lang = "english", include = c(), exclude = c(), ...){
+  if(lang == "japanese") { # for Japanese, assume the token is stopword if it's one letter
+    token %in% get_stopwords(lang, include = include, exclude = exclude, ...) || str_detect(token, "^[\\\u3040-\\\u309f]$")
+  }
   token %in% get_stopwords(lang, include = include, exclude = exclude, ...)
 }
 
@@ -75,6 +78,7 @@ is_alphabet <- function(word){
 #' @return vector of stop words.
 #' @export
 get_stopwords <- function(lang = "english", include = c(), exclude = c(), is_twitter = TRUE){
+  if(!requireNamespace("tidystopwords")){stop("package tidystopwords must be installed.")}
   lang <- tolower(lang)
   stopwords <- if (lang %in% c(
     "english_snowball",
