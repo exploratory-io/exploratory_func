@@ -26,9 +26,9 @@
 #' @param exclude Values that should be excluded from stopwords
 #' @return Logical vector if the token is in stop words or not.
 #' @export
-is_stopword <- function(token, lang = "english", include = c(), exclude = c(), ...){
-  if(lang == "japanese") { # for Japanese, assume the token is stopword if it's one letter
-    token %in% get_stopwords(lang, include = include, exclude = exclude, ...) || str_detect(token, "^[\\\u3040-\\\u309f]$")
+is_stopword <- function(token, lang = "english", include = c(), exclude = c(), hiragana_word_length_to_assume_stopword = 0, ...){
+  if(hiragana_word_length_to_assume_stopword > 0) { # for Japanese, assume the token is stopword if it's one letter
+    token %in% get_stopwords(lang, include = include, exclude = exclude, ...) || stringr::str_detect(token, stringr::str_c("^[\\\u3040-\\\u309f]{1,", hiragana_word_length_to_assume_stopword, "}$"))
   }
   token %in% get_stopwords(lang, include = include, exclude = exclude, ...)
 }
@@ -209,11 +209,10 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
   # if stopwords_lang is provided, remove the stopwords for the language.
   if(!is.null(stopwords_lang)) {
     stop_words <- exploratory::get_stopwords(lang = stopwords_lang)
-    result <- result %>% dplyr::filter(!!as.name(token_col) %nin% stop_words)
-  }
-  if(hiragana_word_length_to_remove > 0) { # for remove Japanese Hiragana handling
+    result <- result %>% dplyr::filter(!is_stopword(!!rlang::sym(token_col), lang = stopwords_lang, hiragana_word_length_to_assume_stopword = hiragana_word_length_to_remove))
+  } else if(hiragana_word_length_to_remove > 0) { # for remove Japanese Hiragana handling
     result <- result %>%
-      dplyr::filter(!stringr::str_detect(!!as.name(token_col), stringr::str_c("^[\\\u3040-\\\u309f]{1,", hiragana_word_length_to_remove, "}$", sep = "")) )
+      dplyr::filter(!stringr::str_detect(!!rlang::sym(token_col), stringr::str_c("^[\\\u3040-\\\u309f]{1,", hiragana_word_length_to_remove, "}$", sep = "")) )
   }
   result
 }
