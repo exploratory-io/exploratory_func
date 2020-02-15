@@ -91,7 +91,8 @@ get_stopwords <- function(lang = "english", include = c(), exclude = c(), is_twi
   if(is_twitter) {
     stopwords <- append(stopwords, exploratory_stopwords)
   }
-  ret <- c(stopwords[!stopwords %in% exclude], include)
+  # tidystopwords required language name with Titlt Case so make sure it's title case.
+  ret <- c(stopwords[!stopwords %in% exclude], include, tidystopwords::generate_stoplist(stringr::str_to_title(lang)))
   ret
 }
 
@@ -129,7 +130,7 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
                                  remove_punc = TRUE, remove_numbers = TRUE,
                                  remove_hyphens = FALSE, remove_separators = TRUE,
                                  remove_symbols = TRUE, remove_twitter = TRUE,
-                                 remove_url = TRUE, ...){
+                                 remove_url = TRUE, stopwords_lang = NULL, ...){
 
   if(!requireNamespace("quanteda")){stop("package quanteda must be installed.")}
   if(!requireNamespace("dplyr")){stop("package dplyr must be installed.")}
@@ -151,12 +152,12 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
   orig_input_col <- col_name(substitute(text_col))
   textData <- df %>% dplyr::select(orig_input_col) %>% dplyr::rename("text" = orig_input_col)
   # Create a corpus from the text column then tokenize.
-  dfm <- quanteda::corpus(textData) %>%
+  tokens <- quanteda::corpus(textData) %>%
     quanteda::tokens(what = token, remove_punc = remove_punc, remove_numbers = remove_numbers,
                      remove_symbols = remove_symbols, remove_twitter = remove_twitter,
                      remove_hyphens = remove_hyphens, remove_separators = remove_separators,
-                     remove_url = remove_url) %>%
-    quanteda::tokens_wordstem() %>%
+                     remove_url = remove_url)
+  dfm <- tokens %>% quanteda::tokens_wordstem() %>%
     quanteda::dfm()
   # Now convert result dfm to a data frame
   resultTemp <- quanteda::convert(dfm, to = "data.frame")
@@ -191,6 +192,15 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
   if(!with_id) { # Drop the document_id column
     result <- result %>% dplyr::select(-document_id)
   }
+  # if stopwords_lang is provided, remove the stopwords for the language.
+  if(!is.null(stopwords_lang)) {
+    stop_words <- exploratory::get_stopwords(lang = stopwords_lang)
+    result <- result %>% dplyr::filter(!!as.name(token_col) %nin% stop_words)
+    if(stringr::str_to_lower(stopwords_lang) == "japanese") { # for Japanese exclude one letter Hiragana
+      result <- result %>% dplyr::filter(!stringr::str_detect(!!as.name(token_col), "^[\\\u3040-\\\u309f]$") )
+    }
+  }
+
   result
 }
 
@@ -205,7 +215,7 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
 #' @param to_lower Whether output should be lower cased.
 #' @return Data frame with tokenized column
 #' @export
-do_tokenize <- function(df, input, token = "words", keep_cols = FALSE,  drop = TRUE, with_id = TRUE, output = token, ...){
+do_tokenize <- function(df, input, token = "words", keep_cols = FALSE,  drop = TRUE, with_id = TRUE, output = token, stopwords_lang = NULL, ...){
   validate_empty_data(df)
 
   loadNamespace("tidytext")
@@ -272,6 +282,12 @@ do_tokenize <- function(df, input, token = "words", keep_cols = FALSE,  drop = T
   # the following does not work with error that says := is unknown. do it base-R way.
   # ret <- ret %>% dplyr::rename(!!rlang::sym(orig_input_col) := !!rlang::sym(input_col))
   colnames(ret)[colnames(ret) == input_col] <- orig_input_col
+  # if stopwords_lang is provided, remove the stopwords for the language.
+  if(!is.null(stopwords_lang)) {
+    stop_words <- exploratory::get_stopwords(lang = stopwords_lang)
+    ret <- ret %>% dplyr::filter(!!as.name(output_col) %nin% stop_words)
+  }
+
   ret
 }
 
