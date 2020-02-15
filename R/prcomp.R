@@ -45,7 +45,7 @@ do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, seed = NULL
     if (length(colnames(cleaned_df)) < 2) {
       if (length(grouped_cols) < 1) {
         # If without group_by, throw error to display message.
-        stop("After preprocessing, less than 2 columns are left for PCA.")
+        stop("There are not enough columns after removing the columns with only NA or a single value.")
       }
       else {
         # skip this group if less than 2 column is left. (We can't handle single column for now.)
