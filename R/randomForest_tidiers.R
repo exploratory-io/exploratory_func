@@ -2022,6 +2022,9 @@ calc_feature_imp <- function(df,
 
   grouped_cols <- grouped_by(df)
 
+  # Remember if the target column was originally numeric or logical before converting type.
+  is_target_logical_or_numeric <- is.numeric(df[[target_col]]) || is.logical(df[[target_col]])
+
   orig_levels <- NULL
   if (is.factor(df[[target_col]])) {
     orig_levels <- levels(df[[target_col]])
@@ -2208,7 +2211,8 @@ calc_feature_imp <- function(df,
       # Second element of n argument needs to be less than or equal to sample size, to avoid error.
       if (length(imp_vars) > 0) {
         rf$partial_dependence <- edarf::partial_dependence(rf, vars=imp_vars, data=model_df, n=c(pd_grid_resolution, min(rf$num.samples, pd_sample_size)))
-        if (pd_with_bin_means) {
+        if (pd_with_bin_means && is_target_logical_or_numeric) {
+          # We calculate means of bins only for logical or numeric target to keep the visualization simple.
           rf$partial_binning <- calc_partial_binning_data(model_df, clean_target_col, imp_vars)
         }
       }
