@@ -1821,7 +1821,7 @@ recode <- function(x, ...){
   ret <- dplyr::recode(x, ...)
   if (is.character(x) && is.character(ret) &&
       all(Encoding(x) == 'UTF-8') &&
-      all(Encoding(ret %in% c('UTF-8', 'unknown')))) {
+      all(Encoding(ret) %in% c('UTF-8', 'unknown'))) {
     ret <- enc2utf8(ret)
   }
   ret
