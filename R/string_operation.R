@@ -29,9 +29,11 @@
 #' @export
 is_stopword <- function(token, lang = "english", include = c(), exclude = c(), hiragana_word_length_to_assume_stopword = 0, ...){
   if(hiragana_word_length_to_assume_stopword > 0) { # for Japanese, assume the token is stopword if it's one letter
-    token %in% get_stopwords(lang, include = include, exclude = exclude, ...) || stringr::str_detect(token, stringr::str_c("^[\\\u3040-\\\u309f]{1,", hiragana_word_length_to_assume_stopword, "}$"))
+    result <- token %in% get_stopwords(lang, include = include, exclude = exclude, ...) | stringr::str_detect(token, stringr::str_c("^[\\\u3040-\\\u309f]{1,", hiragana_word_length_to_assume_stopword, "}$"))
+  } else {
+    result <- token %in% get_stopwords(lang, include = include, exclude = exclude, ...)
   }
-  token %in% get_stopwords(lang, include = include, exclude = exclude, ...)
+  result
 }
 
 #' Check if the word is digits.
@@ -209,7 +211,6 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
   }
   # if stopwords_lang is provided, remove the stopwords for the language.
   if(!is.null(stopwords_lang)) {
-    stop_words <- exploratory::get_stopwords(lang = stopwords_lang)
     result <- result %>% dplyr::filter(!is_stopword(!!rlang::sym(token_col), lang = stopwords_lang, hiragana_word_length_to_assume_stopword = hiragana_word_length_to_remove))
   } else if(hiragana_word_length_to_remove > 0) { # for remove Japanese Hiragana handling
     result <- result %>%
@@ -298,10 +299,8 @@ do_tokenize <- function(df, input, token = "words", keep_cols = FALSE,  drop = T
   colnames(ret)[colnames(ret) == input_col] <- orig_input_col
   # if stopwords_lang is provided, remove the stopwords for the language.
   if(!is.null(stopwords_lang)) {
-    stop_words <- exploratory::get_stopwords(lang = stopwords_lang)
-    ret <- ret %>% dplyr::filter(!!rlang::sym(output_col) %nin% stop_words)
+    ret <- ret %>% dplyr::filter(!is_stopword(!!rlang::sym(output_col), lang = stopwords_lang))
   }
-
   ret
 }
 
