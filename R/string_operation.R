@@ -127,7 +127,7 @@ word_to_sentiment <- function(words, lexicon="bing"){
 #' @param drop Whether input column should be removed.
 #' @param with_id Whether output should contain original document id in each document.
 #' @param output Set a column name for the new column to store the tokenized values.
-#' @param remove_punc Whether it should remove punctuations.
+#' @param remove_punct Whether it should remove punctuations.
 #' @param remove_numbers Whether it should remove numbers.
 #' @param remove_hyphens Whether it should remove hyphens.
 #' @param remove_separators Whether it should remove separators.
@@ -135,14 +135,16 @@ word_to_sentiment <- function(words, lexicon="bing"){
 #' @param remove_twitter Whether it should remove remove Twitter characters @ and #.
 #' @param remove_url Whether it should remove URL starts with http(s).
 #' @param stopwords_lang Language for the stopwords that need to be excluded from the result.
+#' @param hiragana_word_length_to_remove Legnth of a Hiragana word that needs to be excluded from the result.
 #' @return Data frame with tokenized column.
 #' @export
 do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
                                  drop = TRUE, with_id = TRUE, output = token,
-                                 remove_punc = TRUE, remove_numbers = TRUE,
+                                 remove_punct = TRUE, remove_numbers = TRUE,
                                  remove_hyphens = FALSE, remove_separators = TRUE,
                                  remove_symbols = TRUE, remove_twitter = TRUE,
-                                 remove_url = TRUE, stopwords_lang = NULL, ...){
+                                 remove_url = TRUE, stopwords_lang = NULL,
+                                 hiragana_word_length_to_remove = 0, ...){
 
   if(!requireNamespace("quanteda")){stop("package quanteda must be installed.")}
   if(!requireNamespace("dplyr")){stop("package dplyr must be installed.")}
@@ -165,7 +167,7 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
   textData <- df %>% dplyr::select(orig_input_col) %>% dplyr::rename("text" = orig_input_col)
   # Create a corpus from the text column then tokenize.
   dfm <- quanteda::corpus(textData) %>%
-    quanteda::tokens(what = token, remove_punc = remove_punc, remove_numbers = remove_numbers,
+    quanteda::tokens(what = token, remove_punct = remove_punct, remove_numbers = remove_numbers,
                      remove_symbols = remove_symbols, remove_twitter = remove_twitter,
                      remove_hyphens = remove_hyphens, remove_separators = remove_separators,
                      remove_url = remove_url) %>%
@@ -208,11 +210,11 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
   if(!is.null(stopwords_lang)) {
     stop_words <- exploratory::get_stopwords(lang = stopwords_lang)
     result <- result %>% dplyr::filter(!!as.name(token_col) %nin% stop_words)
-    if(stringr::str_to_lower(stopwords_lang) == "japanese") { # for Japanese exclude one letter Hiragana too
-      result <- result %>% dplyr::filter(!stringr::str_detect(!!as.name(token_col), "^[\\\u3040-\\\u309f]$") )
-    }
   }
-
+  if(hiragana_word_length_to_remove > 0) { # for remove Japanese Hiragana handling
+    result <- result %>%
+      dplyr::filter(!stringr::str_detect(!!as.name(token_col), stringr::str_c("^[\\\u3040-\\\u309f]{1,", hiragana_word_length_to_remove, "}$", sep = "")) )
+  }
   result
 }
 
