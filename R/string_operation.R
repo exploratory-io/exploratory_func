@@ -24,6 +24,7 @@
 #' "onix"
 #' @param include Values that should be included as stopwords
 #' @param exclude Values that should be excluded from stopwords
+#' @param hiragana_word_length_to_assume_stopword Assume it as a stopword if the token is a Hirgana word whose the legnth is fewer than this or equal to this.
 #' @return Logical vector if the token is in stop words or not.
 #' @export
 is_stopword <- function(token, lang = "english", include = c(), exclude = c(), hiragana_word_length_to_assume_stopword = 0, ...){
