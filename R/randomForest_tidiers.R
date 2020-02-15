@@ -2022,6 +2022,9 @@ calc_feature_imp <- function(df,
 
   grouped_cols <- grouped_by(df)
 
+  # Remember if the target column was originally numeric or logical before converting type.
+  is_target_logical_or_numeric <- is.numeric(df[[target_col]]) || is.logical(df[[target_col]])
+
   orig_levels <- NULL
   if (is.factor(df[[target_col]])) {
     orig_levels <- levels(df[[target_col]])
@@ -2208,7 +2211,8 @@ calc_feature_imp <- function(df,
       # Second element of n argument needs to be less than or equal to sample size, to avoid error.
       if (length(imp_vars) > 0) {
         rf$partial_dependence <- edarf::partial_dependence(rf, vars=imp_vars, data=model_df, n=c(pd_grid_resolution, min(rf$num.samples, pd_sample_size)))
-        if (pd_with_bin_means) {
+        if (pd_with_bin_means && is_target_logical_or_numeric) {
+          # We calculate means of bins only for logical or numeric target to keep the visualization simple.
           rf$partial_binning <- calc_partial_binning_data(model_df, clean_target_col, imp_vars)
         }
       }
@@ -2772,6 +2776,9 @@ exp_rpart <- function(df,
 
   grouped_cols <- grouped_by(df)
 
+  # Remember if the target column was originally numeric or logical before converting type.
+  is_target_logical_or_numeric <- is.numeric(df[[target_col]]) || is.logical(df[[target_col]])
+
   clean_ret <- cleanup_df(df, target_col, selected_cols, grouped_cols, target_n, predictor_n, map_name=FALSE)
 
   clean_df <- clean_ret$clean_df
@@ -2850,7 +2857,8 @@ exp_rpart <- function(df,
         imp_vars <- names(model$variable.importance) # model$variable.importance is already sorted by importance.
         imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # Keep only max_pd_vars most important variables
         model$partial_dependence <- partial_dependence.rpart(model, clean_target_col, vars=imp_vars, data=df, n=c(pd_grid_resolution, min(nrow(df), pd_sample_size)))
-        if (pd_with_bin_means) {
+        if (pd_with_bin_means && is_target_logical_or_numeric) {
+          # We calculate means of bins only for logical or numeric target to keep the visualization simple.
           model$partial_binning <- calc_partial_binning_data(df, clean_target_col, imp_vars)
         }
       }
