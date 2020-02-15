@@ -127,6 +127,14 @@ word_to_sentiment <- function(words, lexicon="bing"){
 #' @param drop Whether input column should be removed.
 #' @param with_id Whether output should contain original document id in each document.
 #' @param output Set a column name for the new column to store the tokenized values.
+#' @param remove_punc Whether it should remove punctuations.
+#' @param remove_numbers Whether it should remove numbers.
+#' @param remove_hyphens Whether it should remove hyphens.
+#' @param remove_separators Whether it should remove separators.
+#' @param remove_symbols Whether it should remove symbols.
+#' @param remove_twitter Whether it should remove remove Twitter characters @ and #.
+#' @param remove_url Whether it should remove URL starts with http(s).
+#' @param stopwords_lang Language for the stopwords that need to be excluded from the result.
 #' @return Data frame with tokenized column.
 #' @export
 do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
@@ -156,12 +164,12 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
   orig_input_col <- col_name(substitute(text_col))
   textData <- df %>% dplyr::select(orig_input_col) %>% dplyr::rename("text" = orig_input_col)
   # Create a corpus from the text column then tokenize.
-  tokens <- quanteda::corpus(textData) %>%
+  dfm <- quanteda::corpus(textData) %>%
     quanteda::tokens(what = token, remove_punc = remove_punc, remove_numbers = remove_numbers,
                      remove_symbols = remove_symbols, remove_twitter = remove_twitter,
                      remove_hyphens = remove_hyphens, remove_separators = remove_separators,
-                     remove_url = remove_url)
-  dfm <- tokens %>% quanteda::tokens_wordstem() %>%
+                     remove_url = remove_url) %>%
+    quanteda::tokens_wordstem() %>%
     quanteda::dfm()
   # Now convert result dfm to a data frame
   resultTemp <- quanteda::convert(dfm, to = "data.frame")
@@ -200,7 +208,7 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
   if(!is.null(stopwords_lang)) {
     stop_words <- exploratory::get_stopwords(lang = stopwords_lang)
     result <- result %>% dplyr::filter(!!as.name(token_col) %nin% stop_words)
-    if(stringr::str_to_lower(stopwords_lang) == "japanese") { # for Japanese exclude one letter Hiragana
+    if(stringr::str_to_lower(stopwords_lang) == "japanese") { # for Japanese exclude one letter Hiragana too
       result <- result %>% dplyr::filter(!stringr::str_detect(!!as.name(token_col), "^[\\\u3040-\\\u309f]$") )
     }
   }
@@ -216,7 +224,7 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
 #' @param drop Whether input column should be removed.
 #' @param with_id Whether output should contain original document id and sentence id in each document.
 #' @param output Set a column name for the new column to store the tokenized values.
-#' @param to_lower Whether output should be lower cased.
+#' @param stopwords_lang Language for the stopwords that need to be excluded from the result.
 #' @return Data frame with tokenized column
 #' @export
 do_tokenize <- function(df, input, token = "words", keep_cols = FALSE,  drop = TRUE, with_id = TRUE, output = token, stopwords_lang = NULL, ...){
