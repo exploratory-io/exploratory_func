@@ -298,7 +298,7 @@ do_tokenize <- function(df, input, token = "words", keep_cols = FALSE,  drop = T
   # if stopwords_lang is provided, remove the stopwords for the language.
   if(!is.null(stopwords_lang)) {
     stop_words <- exploratory::get_stopwords(lang = stopwords_lang)
-    ret <- ret %>% dplyr::filter(!!as.name(output_col) %nin% stop_words)
+    ret <- ret %>% dplyr::filter(!!rlang::sym(output_col) %nin% stop_words)
   }
 
   ret
