@@ -1819,10 +1819,16 @@ setdiff <- function(x, y, force_data_type = FALSE, ...){
 #'@export
 recode <- function(x, ...){
   ret <- dplyr::recode(x, ...)
-  if (is.character(x) && is.character(ret) &&
-      all(Encoding(x) == 'UTF-8') &&
+  # Workaround for the issue that Encoding of recoded row values becomes 'unknown' on Windows.
+  if (Sys.info()['sysname'] == 'Windows' &&
+      is.character(x) && is.character(ret) &&
+      all(Encoding(x) == 'UTF-8') && # Do it only when all values were originally UTF-8, and some turned into 'unknown'.
       all(Encoding(ret) %in% c('UTF-8', 'unknown'))) {
-    ret <- enc2utf8(ret)
+    ret <- tryCatch({
+      enc2utf8(ret)
+    }, error = function(e) { # In case of error, just use the original.
+      ret
+    })
   }
   ret
 }
