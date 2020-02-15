@@ -1815,6 +1815,16 @@ setdiff <- function(x, y, force_data_type = FALSE, ...){
   }
 }
 
+#'Wrapper function for dplyr::recode to workaround encoding info getting lost. 
+#'@export
+recode <- function(x, ...){
+  ret <- dplyr::recode(x, ...)
+  if (is.character(x) && is.character(ret)) {
+    Encoding(ret) <- Encoding(x)
+  }
+  ret
+}
+
 # This is written by removing unnecessary part from calculate_cohens_d.
 #'Calculate common standard deviation.
 #'@export
