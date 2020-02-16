@@ -65,7 +65,10 @@ exp_kmeans <- function(df, ...,
   }
 
   if (!elbow_method_mode) {
-    ret <- do_prcomp(df, normalize_data = normalize_data, seed = NULL, ...)
+    # This is about how UI-side is done, but it can handle single column case, only if it is single column from the beginnig.
+    # Check that and pass that info to do_prcomp() as allow_single_column.
+    allow_single_column <- length(rlang::quos(...)) == 1
+    ret <- do_prcomp(df, normalize_data = normalize_data, allow_single_column = allow_single_column, seed = NULL, ...)
     ret <- ret %>% dplyr::mutate(model = purrr::map2(model, !!kmeans_model_df$model, function(x, y) {
       x$kmeans <- y # Might need to be more careful on guaranteeing x and y are from same group, but we are not supporting group_by on UI at this point.
       x$sampled_nrow <- sampled_nrow
