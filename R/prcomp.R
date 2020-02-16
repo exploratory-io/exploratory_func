@@ -1,6 +1,6 @@
 #' do PCA
 #' @export
-do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, seed = NULL) { # TODO: write test
+do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, allow_single_column = FALSE, seed = NULL) { # TODO: write test
   # this evaluates select arguments like starts_with
   selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
 
@@ -42,7 +42,13 @@ do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, seed = NULL
         cleaned_df <- cleaned_df[colnames(cleaned_df) != col]
       }
     }
-    if (length(colnames(cleaned_df)) < 2) {
+    if (allow_single_column) { # This is when exp_kmeans calling this function wants to go ahead even with single column.
+      min_ncol <- 1
+    }
+    else {
+      min_ncol <- 2
+    }
+    if (length(colnames(cleaned_df)) < min_ncol) {
       if (length(grouped_cols) < 1) {
         # If without group_by, throw error to display message.
         stop("There are not enough columns after removing the columns with only NA or a single value.")

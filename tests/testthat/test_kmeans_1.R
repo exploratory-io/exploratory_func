@@ -12,7 +12,7 @@ test_that("exp_kmeans", {
   res <- model_df %>% tidy(model, type="gathered_data", normalize_data=TRUE, n_sample=20)
 })
 
-test_that("exp_kemans with strange column name", {
+test_that("exp_kmeans with strange column name", {
   df <- mtcars %>%
     rename(`Cy l` = cyl) %>%
     mutate(new_col = c(rep("A", n() - 10), rep("B", 10)))
@@ -25,7 +25,7 @@ test_that("exp_kemans with strange column name", {
   res <- model_df %>% tidy(model, type="gathered_data", normalize_data=TRUE, n_sample=100) # testing n_sample more than nrow()
 })
 
-test_that("exp_kemans with single column name", {
+test_that("exp_kmeans with single column name", {
   model_df <- exp_kmeans(mtcars, mpg)
   model_df %>% tidy(model, type="variances")
   # model_df %>% tidy(model, type="loadings") # Not used.
