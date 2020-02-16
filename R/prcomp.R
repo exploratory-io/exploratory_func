@@ -1,4 +1,5 @@
 #' do PCA
+#' allow_single_column - Do not throw error and go ahead with PCA even if only one column is left after preprocessing. For K-means.
 #' @export
 do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, allow_single_column = FALSE, seed = NULL) { # TODO: write test
   # this evaluates select arguments like starts_with
