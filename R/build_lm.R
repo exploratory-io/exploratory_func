@@ -582,6 +582,10 @@ build_lm.fast <- function(df,
         }
       }
 
+      # Reverse mapping of variable names.
+      terms_mapping <- names(name_map)
+      names(terms_mapping) <- name_map
+
       # build formula for lm
       rhs <- paste0("`", c_cols, "`", collapse = " + ")
       # TODO: This clean_target_col is actually not a cleaned column name since we want lm to show real name. Clean up our variable name.
@@ -738,10 +742,6 @@ build_lm.fast <- function(df,
           })
         }
       }
-
-      # Reverse mapping of variable names.
-      terms_mapping <- names(name_map)
-      names(terms_mapping) <- name_map
 
       tryCatch({
         model$vif <- vif(model)
