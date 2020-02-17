@@ -24,6 +24,7 @@ test_that("check languages", {
     "spanish",
     "swedish",
     "japanese",
+    "tamil", # from tidystopwords
     "english_SMART",
     "english_snowball",
     "english_onix"
