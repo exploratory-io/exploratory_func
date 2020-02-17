@@ -106,7 +106,7 @@ get_stopwords <- function(lang = "english", include = c(), exclude = c(), is_twi
     "swedish")) {
     loadNamespace("tm")
     tm::stopwords(kind = lang)
-  } else { # set empty string as a fallback.
+  } else { # set empty vector as a fallback.
     c()
   }
   # if is_twitter argument is true, append exploratory_stopwords which contains stopwords for twitter
