@@ -98,7 +98,8 @@ get_stopwords <- function(lang = "english", include = c(), exclude = c(), is_twi
   if(is_twitter) {
     stopwords <- append(stopwords, exploratory_stopwords)
   }
-  # if lang is not in below special cases, append stopwords from tidystopwords
+  # if lang is not in below special cases, append stopwords from tidystopwords package because tidystopwords provides
+  # wide range of stopwords such as http and https which are not inclued in tm package.
   if (lang %nin% c(
     "english_snowball",
     "english_onix",
