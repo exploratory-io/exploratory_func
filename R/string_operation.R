@@ -98,8 +98,16 @@ get_stopwords <- function(lang = "english", include = c(), exclude = c(), is_twi
   if(is_twitter) {
     stopwords <- append(stopwords, exploratory_stopwords)
   }
-  # tidystopwords required language name with Title Case so make sure it's title case.
-  ret <- c(stopwords[!stopwords %in% exclude], include, tidystopwords::generate_stoplist(stringr::str_to_title(lang)))
+  # if lang is not in below special cases, append stopwords from tidystopwords package because tidystopwords provides
+  # wide range of stopwords such as http and https which are not inclued in tm package.
+  if (lang %nin% c(
+    "english_snowball",
+    "english_onix",
+    "english_smart")){
+    # tidystopwords required language name with Title Case so make sure it's title case.
+    stopwords <- append(stopwords, tidystopwords::generate_stoplist(stringr::str_to_title(lang)))
+  }
+  ret <- c(stopwords[!stopwords %in% exclude], include)
   ret
 }
 
