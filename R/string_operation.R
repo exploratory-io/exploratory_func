@@ -103,7 +103,7 @@ get_stopwords <- function(lang = "english", include = c(), exclude = c(), is_twi
     "portuguese",
     "russian",
     "spanish",
-    "swedis")) {
+    "swedish")) {
     loadNamespace("tm")
     tm::stopwords(kind = lang)
   } else { # set empty string as a fallback.
