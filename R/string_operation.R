@@ -90,9 +90,24 @@ get_stopwords <- function(lang = "english", include = c(), exclude = c(), is_twi
     "japanese")){
     # these data are created from data-raw/create_internal_data.R
     get(paste0("stopwords_", lang))
-  } else {
+  } else if(lang %in% c( # tm only supports these language for stopwords
+    "danish",
+    "dutch",
+    "english",
+    "finnish",
+    "french",
+    "german",
+    "hungarian",
+    "italian",
+    "norwegian",
+    "portuguese",
+    "russian",
+    "spanish",
+    "swedish")) {
     loadNamespace("tm")
     tm::stopwords(kind = lang)
+  } else { # set empty vector as a fallback.
+    c()
   }
   # if is_twitter argument is true, append exploratory_stopwords which contains stopwords for twitter
   if(is_twitter) {
