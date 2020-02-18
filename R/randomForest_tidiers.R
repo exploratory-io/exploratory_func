@@ -1187,6 +1187,8 @@ rf_evaluation_by_class <- function(data, ...) {
 #' wrapper for tidy type evaluation
 #' @export
 rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.name = FALSE, ...) {
+  # Filter out the rows from failed models.
+  # This is working depending on rowwise grouping. (Note for when we move out of it.)
   filtered <- data %>% dplyr::filter(!is.null(model) & !"error" %in% class(model))
   if (nrow(filtered) == 0) { # No valid models were returned.
     return(data.frame())
