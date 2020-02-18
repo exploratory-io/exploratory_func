@@ -1187,7 +1187,9 @@ rf_evaluation_by_class <- function(data, ...) {
 #' wrapper for tidy type evaluation
 #' @export
 rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.name = FALSE, ...) {
-  filtered <- data %>% dplyr::filter(!is.null(model))
+  # Filter out the rows from failed models.
+  # This is working depending on rowwise grouping. (Note for when we move out of it.)
+  filtered <- data %>% dplyr::filter(!is.null(model) & !"error" %in% class(model))
   if (nrow(filtered) == 0) { # No valid models were returned.
     return(data.frame())
   }
@@ -1196,6 +1198,8 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
   test_index <- filtered %>% `[[`(1, ".test_index", 1)
 
   # Get evaluation for training part. Just passing down to rf_evaluation does it, since it is done off of data embeded in the model.
+  # Here we use data with failed model too (data) as opposed to the one without them (filtered),
+  # so that we can report the error on the Note column of Summary table.
   if (!is.null(model)) {
     training_ret <- switch(type,
                            evaluation = rf_evaluation(data, pretty.name = pretty.name, ...),
@@ -1314,7 +1318,8 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
 
     # data is already grouped rowwise, but to get group column value on the output, we need to group it explicitly with the group column.
     if (length(grouped_col) > 0) {
-      data <- data %>% group_by(!!!rlang::syms(grouped_col))
+      # Use data without failed model (filtered) here, since the routine for test data cannot handle such rows.
+      data <- filtered %>% group_by(!!!rlang::syms(grouped_col))
     }
 
     test_ret <- do_on_each_group(data, each_func, with_unnest = TRUE)
