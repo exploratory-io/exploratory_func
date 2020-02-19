@@ -50,7 +50,7 @@ getGoogleSheetList <- function(tokenFileId=""){
   token = getGoogleTokenForSheet(tokenFileId)
   googlesheets4::sheets_set_token(token)
   googledrive::drive_set_token(token)
-  googlesheets4::sheets_find(order_by = "createdTime desc")
+  googlesheets4::sheets_find()
 }
 
 #' API to get a list of available google sheets
