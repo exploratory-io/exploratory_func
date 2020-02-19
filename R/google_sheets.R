@@ -10,7 +10,7 @@ uploadGoogleSheet <- function(filepath, title, overwrite = FALSE){
   token <- getGoogleTokenForSheet("")
   googlesheets4::sheets_set_token(token)
   googledrive::drive_set_token(token)
-  sheet <- googledrive::drive_upload(filepath, title, overwrite = overwrite)
+  sheet <- googledrive::drive_upload(filepath, title, type = "spreadsheet", overwrite = overwrite)
 }
 
 #' API to get google sheet data
@@ -37,7 +37,11 @@ getGoogleSheet <- function(title, sheetName, skipNRows = 0, treatTheseAsNA = NUL
     # if guessDataType is FALSE, use character as the default column data type.
     col_types <- c(.default="c")
   }
-  df <- gsheet %>% googlesheets4::read_sheet(range = sheetName, skip = skipNRows, na = treatTheseAsNA, col_names = firstRowAsHeader, col_types = col_types)
+  if(!is.null(treatTheseAsNA)) {
+    df <- gsheet %>% googlesheets4::read_sheet(range = sheetName, skip = skipNRows, na = treatTheseAsNA, col_names = firstRowAsHeader, col_types = col_types)
+  } else {
+    df <- gsheet %>% googlesheets4::read_sheet(range = sheetName, skip = skipNRows, col_names = firstRowAsHeader, col_types = col_types)
+  }
   df
 }
 
