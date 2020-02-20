@@ -170,7 +170,7 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
                                  remove_hyphens = FALSE, remove_separators = TRUE,
                                  remove_symbols = TRUE, remove_twitter = TRUE,
                                  remove_url = TRUE, stopwords_lang = NULL,
-                                 hiragana_word_length_to_remove = 0, ...){
+                                 hiragana_word_length_to_remove = 2, ...){
 
   if(!requireNamespace("quanteda")){stop("package quanteda must be installed.")}
   if(!requireNamespace("dplyr")){stop("package dplyr must be installed.")}
@@ -251,9 +251,11 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
 #' @param with_id Whether output should contain original document id and sentence id in each document.
 #' @param output Set a column name for the new column to store the tokenized values.
 #' @param stopwords_lang Language for the stopwords that need to be excluded from the result.
+#' @param remove_punct Whether it should remove punctuations.
+#' @param remove_numbers Whether it should remove numbers.
 #' @return Data frame with tokenized column
 #' @export
-do_tokenize <- function(df, input, token = "words", keep_cols = FALSE,  drop = TRUE, with_id = TRUE, output = token, stopwords_lang = NULL, ...){
+do_tokenize <- function(df, input, token = "words", keep_cols = FALSE,  drop = TRUE, with_id = TRUE, output = token, stopwords_lang = NULL, remove_punct = TRUE, remove_numbers = TRUE, ...){
   validate_empty_data(df)
 
   loadNamespace("tidytext")
@@ -294,7 +296,7 @@ do_tokenize <- function(df, input, token = "words", keep_cols = FALSE,  drop = T
     # so that it won't duplicate other columns,
     # which will be joined later
     tokenize_df <- df[,c(doc_id, input_col)]
-    sentences <- tidytext::unnest_tokens_(tokenize_df, output_col, input_col, token="sentences", drop=TRUE, ...)
+    sentences <- tidytext::unnest_tokens_(tokenize_df, output_col, input_col, token="sentences", drop=TRUE, strip_punct = remove_punct, ...)
 
     # as.symbol is used for colum names with backticks
     grouped <- dplyr::group_by(sentences, !!!rlang::syms(doc_id))
@@ -305,7 +307,7 @@ do_tokenize <- function(df, input, token = "words", keep_cols = FALSE,  drop = T
 
     # split into tokens
     tokenize_df <- dplyr::ungroup(tokenize_df)
-    tokenized <- tidytext::unnest_tokens_(tokenize_df, output_col, output_col, token=token, drop=TRUE, ...)
+    tokenized <- tidytext::unnest_tokens_(tokenize_df, output_col, output_col, token=token, strip_punct=remove_punct, drop=TRUE, ...)
 
     if(drop){
       df[[input_col]] <- NULL
@@ -313,7 +315,7 @@ do_tokenize <- function(df, input, token = "words", keep_cols = FALSE,  drop = T
 
     ret <- dplyr::right_join(df, tokenized, by=doc_id)
   } else {
-    ret <- tidytext::unnest_tokens_(df, col_name(substitute(output)), input_col, token=token, drop=drop, ...)
+    ret <- tidytext::unnest_tokens_(df, col_name(substitute(output)), input_col, token=token, strip_punct=remove_punct, drop=drop, ...)
   }
 
   # set the column name to original.
@@ -323,6 +325,10 @@ do_tokenize <- function(df, input, token = "words", keep_cols = FALSE,  drop = T
   # if stopwords_lang is provided, remove the stopwords for the language.
   if(!is.null(stopwords_lang)) {
     ret <- ret %>% dplyr::filter(!is_stopword(!!rlang::sym(output_col), lang = stopwords_lang))
+  }
+  if(remove_numbers) {
+    # remoe if the token is all number characters.
+    ret <- ret %>% dplyr::filter(!stringr::str_detect(!!rlang::sym(output_col), '^[:digit:]+$'))
   }
   ret
 }

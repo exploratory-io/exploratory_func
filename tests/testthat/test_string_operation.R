@@ -109,8 +109,29 @@ test_that("do_tokenize with keep_cols = TRUE with sentences", {
     stringsAsFactors = FALSE)
   result <- test_df %>%
     do_tokenize(input, drop=FALSE, token = "sentences", keep_cols = TRUE)
-  expect_equal(result$token[[1]], "hello world!")
+  expect_equal(result$token[[1]], "hello world")
   expect_equal(ncol(result), 4)
+})
+
+test_that("do_tokenize with remove_numbers", {
+  test_df <- data.frame(
+    input = c("12345 aaa", "12aabb33", "123456 34567 88999"),
+    extra_col = seq(3),
+    stringsAsFactors = FALSE)
+  result <- test_df %>%
+    do_tokenize(input, drop=FALSE, keep_cols = TRUE, remove_numbers = TRUE)
+  expect_equal(result$token[[1]], "aaa")
+  expect_equal(result$token[[2]], "12aabb33")
+})
+
+test_that("do_tokenize with remove_punct", {
+  test_df <- data.frame(
+    input = c("#1 )*^%$ 2345 ^&*()", ":;:+-][", "00:01:00"),
+    extra_col = seq(3),
+    stringsAsFactors = FALSE)
+  result <- test_df %>%
+    do_tokenize(input, drop=FALSE, keep_cols = TRUE, remove_punct = FALSE, remove_numbers = FALSE)
+  expect_equal(result$token[[1]], "#")
 })
 
 test_that("do_tokenize with token=words", {
@@ -133,14 +154,14 @@ test_that("do_tokenize when names conflict", {
 test_that("do_tokenize with token=sentence", {
   result <- test_df %>%
     do_tokenize(input, token="sentences")
-  expect_equal(result$token[[1]], "hello world!")
+  expect_equal(result$token[[1]], "hello world")
   expect_equal(ncol(result), 2)
 })
 
 test_that("do_tokenize should work with output", {
   result <- test_df %>%
     do_tokenize(input, output=sentence, token="sentences")
-  expect_equal(result$sentence[[2]], "this is a data frame for test.")
+  expect_equal(result$sentence[[2]], "this is a data frame for test")
 })
 
 test_that("calc_idf", {
