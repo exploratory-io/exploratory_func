@@ -1219,7 +1219,9 @@ executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 1
     # so just pass query as is.
     result <- exploratory::submitGoogleBigQueryJob(project = bqProjectId, sqlquery = query, tokenFieldId =  tokenFileId, useStandardSQL = useStandardSQL);
     # extranct result from Google BigQuery to Google Cloud Storage and import
-    df <- getDataFromGoogleBigQueryTableViaCloudStorage(bqProjectId, dataSet, table, csBucket, bucketFolder, tokenFileId)
+    # Since Google might assign new tableId and datasetId, always get datasetId and tableId from the job result (result is a data frame).
+    # To get the only one value for datasetId and tableId, use dplyr::first.
+    df <- getDataFromGoogleBigQueryTableViaCloudStorage(bqProjectId, as.character(dplyr::first(result$datasetId)), as.character(dplyr::first(result$tableId)), csBucket, bucketFolder, tokenFileId)
   } else {
     # direct import case (for refresh data frame case)
 
