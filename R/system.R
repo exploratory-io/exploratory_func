@@ -559,7 +559,8 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         # fall through to getting new connection.
       })
     }
-    if (is.null(conn)) {
+    # if the connection is null or the connection is invalid, create a new one.
+    if (is.null(conn) || !DBI::dbIsValid(conn)) {
       conn = RMariaDB::dbConnect(RMariaDB::MariaDB(), dbname = databaseName, username = username,
                                password = password, host = host, port = port)
       connection_pool[[key]] <- conn
@@ -594,7 +595,8 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         # fall through to getting new connection.
       })
     }
-    if (is.null(conn)) {
+    # if the connection is null or the connection is invalid, create a new one.
+    if (is.null(conn) || !DBI::dbIsValid(conn)) {
       drv <- RPostgres::Postgres()
       conn <- RPostgres::dbConnect(drv, dbname=databaseName, user = username,
                                      password = password, host = host, port = port)
@@ -629,7 +631,8 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         # fall through to getting new connection.
       })
     }
-    if (is.null(conn)) {
+    # if the connection is null or the connection is invalid, create a new one.
+    if (is.null(conn) || !DBI::dbIsValid(conn)) {
       loadNamespace("RPresto")
       drv <- RPresto::Presto()
       # To workaround Presto Authentication issue, set X-Presto-User to http header.
