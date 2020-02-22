@@ -775,7 +775,7 @@ glance.prophet_exploratory <- function(x) {
       x$result %>% dplyr::summarize(RMSE=exploratory::rmse(!!rlang::sym(x$value_col), forecasted_value, is_test_data), MAE=exploratory::mae(!!rlang::sym(x$value_col), forecasted_value, is_test_data), MAPE=exploratory::mape(!!rlang::sym(x$value_col), forecasted_value, is_test_data), MASE=exploratory::mase(!!rlang::sym(x$value_col), forecasted_value, is_test_data), `Number of Rows for Training`=sum(!is_test_data), `Number of Rows for Test`=sum(is_test_data))
     }
     else {
-      x$result %>% dplyr::summarize(RMSE=exploratory::rmse(!!rlang::sym(x$value_col), forecasted_value, !is.na(!!rlang::sym(x$value_col))), MAE=exploratory::mae(!!rlang::sym(x$value_col), forecasted_value, !is.na(!!rlang::sym(x$value_col))), MAPE=exploratory::mape(!!rlang::sym(x$value_col), forecasted_value, !is.na(!!rlang::sym(x$value_col))), `Number of Rows for Training`=sum(!is.na(!!rlang::sym(x$value_col))))
+      x$result %>% dplyr::summarize(RMSE=exploratory::rmse(!!rlang::sym(x$value_col), forecasted_value, !is.na(!!rlang::sym(x$value_col))), MAE=exploratory::mae(!!rlang::sym(x$value_col), forecasted_value, !is.na(!!rlang::sym(x$value_col))), MAPE=exploratory::mape(!!rlang::sym(x$value_col), forecasted_value, !is.na(!!rlang::sym(x$value_col))), `Number of Rows`=sum(!is.na(!!rlang::sym(x$value_col))))
     }
   }
 }
