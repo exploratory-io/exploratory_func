@@ -559,7 +559,8 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         # fall through to getting new connection.
       })
     }
-    if (is.null(conn)) {
+    # if the connection is null or the connection is invalid, create a new one.
+    if (is.null(conn) || !DBI::dbIsValid(conn)) {
       conn = RMariaDB::dbConnect(RMariaDB::MariaDB(), dbname = databaseName, username = username,
                                password = password, host = host, port = port)
       connection_pool[[key]] <- conn
@@ -594,7 +595,8 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         # fall through to getting new connection.
       })
     }
-    if (is.null(conn)) {
+    # if the connection is null or the connection is invalid, create a new one.
+    if (is.null(conn) || !DBI::dbIsValid(conn)) {
       drv <- RPostgres::Postgres()
       conn <- RPostgres::dbConnect(drv, dbname=databaseName, user = username,
                                      password = password, host = host, port = port)
@@ -629,7 +631,8 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         # fall through to getting new connection.
       })
     }
-    if (is.null(conn)) {
+    # if the connection is null or the connection is invalid, create a new one.
+    if (is.null(conn) || !DBI::dbIsValid(conn)) {
       loadNamespace("RPresto")
       drv <- RPresto::Presto()
       # To workaround Presto Authentication issue, set X-Presto-User to http header.
@@ -1219,7 +1222,9 @@ executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 1
     # so just pass query as is.
     result <- exploratory::submitGoogleBigQueryJob(project = bqProjectId, sqlquery = query, tokenFieldId =  tokenFileId, useStandardSQL = useStandardSQL);
     # extranct result from Google BigQuery to Google Cloud Storage and import
-    df <- getDataFromGoogleBigQueryTableViaCloudStorage(bqProjectId, dataSet, table, csBucket, bucketFolder, tokenFileId)
+    # Since Google might assign new tableId and datasetId, always get datasetId and tableId from the job result (result is a data frame).
+    # To get the only one value for datasetId and tableId, use dplyr::first.
+    df <- getDataFromGoogleBigQueryTableViaCloudStorage(bqProjectId, as.character(dplyr::first(result$datasetId)), as.character(dplyr::first(result$tableId)), csBucket, bucketFolder, tokenFileId)
   } else {
     # direct import case (for refresh data frame case)
 

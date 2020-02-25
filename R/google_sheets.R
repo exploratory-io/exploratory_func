@@ -54,7 +54,8 @@ getGoogleSheetList <- function(tokenFileId=""){
   token = getGoogleTokenForSheet(tokenFileId)
   googlesheets4::sheets_set_token(token)
   googledrive::drive_set_token(token)
-  googlesheets4::sheets_find()
+  # To improve peformance, only get id, name and canEdit for each spreadsheet.
+  googledrive::drive_find(type = "spreadsheet", pageSize=1000, fields="files/id, files/name, files/capabilities/canEdit, nextPageToken")
 }
 
 #' API to get a list of available google sheets

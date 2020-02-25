@@ -114,6 +114,12 @@ getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tok
     ga.data <- ga.data %>% dplyr::mutate( dateHour = lubridate::ymd_h(dateHour) )
   }
 
+  if("dateHourMinute" %in% colnames(ga.data)){
+    # modify date column to POSIXct object from integer like 202001210000
+    loadNamespace("lubridate")
+    ga.data <- ga.data %>% dplyr::mutate( dateHourMinute = lubridate::ymd_hms(dateHourMinute, truncated = 1) )
+  }
+
   if("sessionCount" %in% colnames(ga.data)){
     # sessionCount is sometimes returned as character and numeric other times.
     # let's always cast it to numeric

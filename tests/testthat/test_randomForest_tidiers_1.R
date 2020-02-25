@@ -4,7 +4,7 @@
 context("test tidiers for randomForest")
 
 testdata_dir <- "~/.exploratory/"
-testdata_filename <- "airline_2013_10_tricky_v3_5k.csv" 
+testdata_filename <- "airline_2013_10_tricky_v3_5k.csv"
 testdata_file_path <- paste0(testdata_dir, testdata_filename)
 
 filepath <- if (!testdata_filename %in% list.files(testdata_dir)) {
@@ -96,7 +96,7 @@ test_that("test calc_feature_imp predicting multi-class", {
                                                         # because, with boruta, there will be no significant variable,
                                                         # and no partial dependence data will be returned.
                       test_rate = 0.3)
-  
+
   ret <- model_df %>% prediction(data="training_and_test")
   conf_mat <- tidy(model_df, model, type = "conf_mat", pretty.name = TRUE) # Old pre-5.3 way. For backward compatibility on the server.
   conf_mat <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
@@ -116,7 +116,7 @@ test_that("test calc_feature_imp predicting multi-class", {
                       num_2,
                       with_boruta=TRUE, max_pd_vars=3,
                       test_rate = 0.3)
-  
+
   ret <- model_df %>% prediction(data="training_and_test")
   conf_mat <- tidy(model_df, model, type = "conf_mat", pretty.name = TRUE) # Old pre-5.3 way. For backward compatibility on the server.
   conf_mat <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
