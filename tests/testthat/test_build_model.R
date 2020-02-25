@@ -1,5 +1,42 @@
 context("build model test")
 
+test_that("lm with select", {
+  test_data <- data.frame(
+    sin = sin(seq(10)),
+    x = seq(10),
+    y = c(seq(9), NA_real_),
+    z = rep(letters[1:2], each = 5),
+    weight = rep(c(3, 4), 5),
+    group = rep(letters[1:2], 5)
+  ) %>%
+    dplyr::rename(`with space` = x)
+
+  lm_model_df <- test_data %>%
+    dplyr::group_by(group) %>%
+    build_model_with_select(response = sin, `with space`, y, weight, model_func = stats::lm, params = list(na.action = na.omit, weights = log(weight)))
+  expect_equal(nrow(lm_model_df), 2)
+})
+
+test_that("lm with select everything", {
+  test_data <- data.frame(
+    sin = sin(seq(10)),
+    x = seq(10),
+    y = c(seq(9), NA_real_),
+    z = rep(letters[1:2], each = 5),
+    weight = rep(c(3, 4), 5),
+    group = rep(letters[1:2], 5)
+  ) %>%
+    dplyr::rename(`with space` = x)
+
+  lm_model_df <- test_data %>%
+    dplyr::group_by(group) %>%
+    build_model_with_select(response = sin, dplyr::everything(), model_func = stats::lm, params = list(na.action = na.omit, weights = log(weight)))
+  valid_formula <- vapply(lm_model_df$model, function(mod){
+    all(all.vars(mod$formula) != "sin")
+  }, FUN.VALUE = FALSE)
+  expect_true(all(valid_formula))
+})
+
 test_that("test nnet build_model", {
   test_data <- structure(
     list(
