@@ -1405,6 +1405,21 @@ extract_from_date <- function(x, type = "fltoyear") {
     rtoday = {
       ret <- lubridate::floor_date(x, unit="day")
     },
+    # This key is a synonym for fltoday and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this function.
+    rtohour = {
+      ret <- lubridate::floor_date(x, unit="hour")
+    },
+    # This key is a synonym for fltoday and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this function.
+    rtomin = {
+      ret <- lubridate::floor_date(x, unit="minute")
+    },
+    # This key is a synonym for fltoday and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
+    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this function.
+    rtosec = {
+      ret <- lubridate::floor_date(x, unit="second")
+    },
     year = {
       ret <- lubridate::year(x)
     },
@@ -1815,7 +1830,7 @@ setdiff <- function(x, y, force_data_type = FALSE, ...){
   }
 }
 
-#'Wrapper function for dplyr::recode to workaround encoding info getting lost. 
+#'Wrapper function for dplyr::recode to workaround encoding info getting lost.
 #'@export
 recode <- function(x, ...){
   ret <- dplyr::recode(x, ...)
@@ -2012,6 +2027,9 @@ summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...){
             "rtoweek",
             "fltoday",
             "rtoday",
+            "rtohour",
+            "rtomin",
+            "rtosec",
             "year",
             "halfyear",
             "quarter",
