@@ -22,8 +22,9 @@ uploadGoogleSheet <- function(filepath, title, overwrite = FALSE){
 #' @param firstRowAsHeader - argument to control if you want to treat first row as header
 #' @param commentChar - treat the character as comment.
 #' @param guessDataType - flag to tell if you want googlesheets::gs_read to guess column data type
+#' @param tzone - timezone
 #' @export
-getGoogleSheet <- function(title, sheetName, skipNRows = 0, treatTheseAsNA = NULL, firstRowAsHeader = TRUE, commentChar, tokenFileId=NULL, guessDataType=TRUE, ...){
+getGoogleSheet <- function(title, sheetName, skipNRows = 0, treatTheseAsNA = NULL, firstRowAsHeader = TRUE, commentChar, tokenFileId=NULL, guessDataType=TRUE, tzone=NULL, ...){
   if(!requireNamespace("googlesheets4")){stop("package googlesheets4 must be installed.")}
   if(!requireNamespace("googledrive")){stop("package googledrive must be installed.")}
   if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
@@ -41,6 +42,9 @@ getGoogleSheet <- function(title, sheetName, skipNRows = 0, treatTheseAsNA = NUL
     df <- gsheet %>% googlesheets4::read_sheet(range = sheetName, skip = skipNRows, na = treatTheseAsNA, col_names = firstRowAsHeader, col_types = col_types)
   } else {
     df <- gsheet %>% googlesheets4::read_sheet(range = sheetName, skip = skipNRows, col_names = firstRowAsHeader, col_types = col_types)
+  }
+  if(!is.null(tzone)) { # if timezone is specified, apply the timezeon to POSIXct columns
+    df <- df %>% dplyr::mutate_if(lubridate::is.POSIXct, funs(lubridate::force_tz(., tzone=tzone)))
   }
   df
 }
