@@ -1405,18 +1405,15 @@ extract_from_date <- function(x, type = "fltoyear") {
     rtoday = {
       ret <- lubridate::floor_date(x, unit="day")
     },
-    # This key is a synonym for fltoday and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
-    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this function.
+    # This key is required by Exploratory Desktop for Summarize Group Dialog
     rtohour = {
       ret <- lubridate::floor_date(x, unit="hour")
     },
-    # This key is a synonym for fltoday and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
-    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this function.
+    # This key is required by Exploratory Desktop for Summarize Group Dialog
     rtomin = {
       ret <- lubridate::floor_date(x, unit="minute")
     },
-    # This key is a synonym for fltoday and is required by Exploratory Desktop for Chart and Summarize Group Dialog.
-    # The reason for having the synonym is that Analytics and Chart/Summarize Group Dialog use two different keys for this function.
+    # This key is required by Exploratory Desktop for Summarize Group Dialog
     rtosec = {
       ret <- lubridate::floor_date(x, unit="second")
     },
