@@ -1579,7 +1579,7 @@ rmse <- function(actual, predicted, is_test_data=NULL) {
 mape <- function(actual, predicted, is_test_data) {
   actual <- actual[is_test_data]
   predicted <- predicted[is_test_data]
-  ret <- mean(abs((actual-predicted)/actual) * 100, na.rm=TRUE)
+  ret <- mean(abs((actual-predicted)/actual), na.rm=TRUE)
   ret
 }
 
