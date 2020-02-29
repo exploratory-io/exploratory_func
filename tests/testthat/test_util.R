@@ -443,10 +443,10 @@ test_that("evaluate_select negative test", { # TODO: we should move out from old
   )
   expect_error({
     evaluate_select(test_df, c("co1"))
-  }, "undefined columns selected")
+  }) # Error message here is not consistent between linux ("") and others ("undefined columns selected"). Just verifying it results in error.
   expect_error({
     evaluate_select(test_df, c("dplyr::starts_with('something')"))
-  }) # Error message here is not consistent between linux and others. Just verifying it results in error.
+  }) # Error message here is not consistent between linux ("") and others ("no column selected"). Just verifying it results in error.
 })
 
 test_that("list_to_text should return NA", {
