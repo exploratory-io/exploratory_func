@@ -171,13 +171,12 @@ build_kmeans.cols <- function(df, ...,
   if (!is.null(seed)) {
     set.seed(seed)
   }
-  select_dots <- lazyeval::lazy_dots(...)
 
   grouped_column <- grouped_by(df)
   model_column <- avoid_conflict(grouped_column, "model")
   source_column <- avoid_conflict(grouped_column, "source.data")
   # this gets a vector of column names which are selected by dots argument
-  selected_column <- evaluate_select(df, .dots=select_dots, grouped_column)
+  selected_column <- dplyr::select_vars(names(df), !!! rlang::quos(...))
 
   omit_df <- df[,selected_column, drop=FALSE] %>% # drop=FALSE to avoid getting converted to vector
     as_numeric_matrix_(selected_column) %>%

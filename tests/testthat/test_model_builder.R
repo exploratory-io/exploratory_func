@@ -273,5 +273,5 @@ test_that("test build_kmeans cols with wrong column name", {
     test_df %>%
       build_kmeans(vec, vec10, centers=2) %>%
       augment_kmeans(model, data = source.data)
-  }, "undefined columns selected")
+  }, "object 'vec' not found")
 })
