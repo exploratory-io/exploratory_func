@@ -264,7 +264,7 @@ test_that("test build_kmeans skv with wrong column name", {
     test_df %>%
       build_kmeans(skv = c("vec1", "vec"), centers=2) %>%
       augment_kmeans(model, data = source.data)
-  }, "object 'vec' not found")
+  }) # Error message here is not consistent between linux and others. Just verifying it results in error.
 })
 
 test_that("test build_kmeans cols with wrong column name", {
@@ -273,5 +273,5 @@ test_that("test build_kmeans cols with wrong column name", {
     test_df %>%
       build_kmeans(vec, vec10, centers=2) %>%
       augment_kmeans(model, data = source.data)
-  }, "object 'vec' not found")
+  }) # Error message here is not consistent between linux and others. Just verifying it results in error.
 })
