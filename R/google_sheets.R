@@ -65,7 +65,7 @@ getGoogleSheetList <- function(tokenFileId=""){
 #' API to get a list of available google sheets
 #' @export
 getGoogleSheetWorkSheetList <- function(tokenFileId="", title){
-  if(!requireNamespace("googlesheets4")){stop("package googlesheets must be installed.")}
+  if(!requireNamespace("googlesheets4")){stop("package googlesheets4 must be installed.")}
   if(!requireNamespace("googledrive")){stop("package googledrive must be installed.")}
 
   token = getGoogleTokenForSheet(tokenFileId)
