@@ -33,7 +33,7 @@ get_mailchimp_data <- function(endpoint = "export/1.0/list", date_type = "exact"
       if(!date_type %in% c("days", "weeks", "months", "years")){
         stop("date_type must be \"days\", \"weeks\", \"months\", \"years\" or \"exact\"")
       }
-      date_since <- lubridate::today() - lubridate::period(as.numeric(date_since), units = date_type)
+      date_since <- lubridate::today() %m-% lubridate::period(as.numeric(date_since), units = date_type)
       if(is.na(date_since)){
         stop("Value for Date Range is invalid. Please put a number.")
       }
