@@ -490,7 +490,7 @@ clearAmazonAthenaConnection <- function(driver = "", region = "", authentication
 #' If not, new connection is created and returned.
 #' @export
 getDBConnection <- function(type, host = NULL, port = "", databaseName = "", username = "", password = "", catalog = "", schema = "", dsn="", additionalParams = "",
-                            collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, timeout = NULL, connectionString = NULL, driver = "", subStype = "") {
+                            collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, timeout = NULL, connectionString = NULL, driver = "") {
 
   drv = NULL
   conn = NULL
@@ -644,14 +644,38 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
                                password = password, host = host, port = port, schema = schema, catalog = catalog, session.timezone = Sys.timezone(location = TRUE))
       connection_pool[[key]] <- conn
     }
-  } else if (type == "odbc") {
+  } else if (type == "odbc" || type == "mssqlserver") {
     # do those package loading only when we need to use odbc in this if statement,
     # so that we will not have error at our server environemnt where RODBC is not there.
     if(!requireNamespace("RODBC")){stop("package RODBC must be installed.")}
 
     loadNamespace("RODBC")
     connect <- function() {
-      if(dsn != ""){
+      if(type == "mssqlserver") {
+        connstr <- stringr::str_c("RODBC::odbcConnect(\"Driver={", driver, "};", sep="")
+        if(host != "") {
+          connstr <- stringr::str_c(connstr, ", Server=tcp:", host, ",")
+        }
+        if(port != ""){
+          connstr <- stringr::str_c(connstr, port, ";")
+        }
+        if(databaseName != "") {
+          connstr <- stringr::str_c(connstr, ", Database = ", databaseName, ";")
+        }
+        if(username != ""){
+          connstr <- stringr::str_c(connstr, ", Uid = ", username, ";")
+        }
+        if(password != ""){
+          connstr <- stringr::str_c(connstr, ", Pwd = '", password, ";")
+        }
+        if(additionalParams == ""){
+          connstr <- stringr::str_c(connstr, ")")
+        } else {
+          connstr <- stringr::str_c(connstr, ",", additionalParams, ")")
+        }
+        conn <- eval(parse(text=connstr))
+        conn <- RODBC::odbcDriverConnect(connectionString)
+      } else if(dsn != ""){ # for Dremio
         connstr <- stringr::str_c("RODBC::odbcConnect(dsn = '", dsn , "'")
         if(username != ""){
           connstr <- stringr::str_c(connstr, ", uid = '", username, "'")
@@ -665,27 +689,6 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
           connstr <- stringr::str_c(connstr, ",", additionalParams, ")")
         }
         conn <- eval(parse(text=connstr))
-      } else if (subType == "mssqlserver") {
-        connstr <- stringr::str_c("RODBC::odbcConnect(\"Driver={", driver, "};", sep="")
-        if(host != "") {
-          connstr <- stringr::str_c(connstr, ", Server=tcp:", host, ";")
-        }
-        if(port != ""){
-          connstr <- stringr::str_c(connstr, port, ";")
-        }
-        if(username != ""){
-          connstr <- stringr::str_c(connstr, ", uid = '", username, "'")
-        }
-        if(password != ""){
-          connstr <- stringr::str_c(connstr, ", pwd = '", password, "'")
-        }
-        if(additionalParams == ""){
-          connstr <- stringr::str_c(connstr, ")")
-        } else {
-          connstr <- stringr::str_c(connstr, ",", additionalParams, ")")
-        }
-        conn <- eval(parse(text=connstr))
-        conn <- RODBC::odbcDriverConnect(connectionString)
       } else if (host != "") { # for dremio direct access
         # Until Dremio ODBC Driver 1.3.14.1043 for Mac, Dremio ODBC driver's name was
         # "Dremio ODBC Driver" on Mac, but it changed to "Dremio Connector", which is same as the Window version
@@ -1012,10 +1015,12 @@ queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IA
 #' @param port - Database port number
 #' @param as.is - Flag to tell if you honor data types from ODBC
 #'
-queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, query, stringsAsFactors = FALSE, host="", port="", as.is = TRUE, driver = "", subType = "", ...){
+queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, query, stringsAsFactors = FALSE, host="", port="", as.is = TRUE, databaseName="", driver = "", type = "", ...){
   if(!requireNamespace("RODBC")){stop("package RODBC must be installed.")}
-
-  conn <- getDBConnection("odbc", host, port, NULL, username, password, dsn = dsn, additionalParams = additionalParams, driver = driver, subType = subType)
+  if(type == "") {
+    type <- "odbc"
+  }
+  conn <- getDBConnection(type, host, port, NULL, username, password, dsn = dsn, additionalParams = additionalParams, databaseName = databaseName, driver = driver)
   tryCatch({
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
@@ -1024,7 +1029,7 @@ queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, q
     if (!is.data.frame(df)) {
       # when it is error, RODBC::sqlQuery() does not stop() (throw) with error most of the cases.
       # in such cases, df is a character vecter rather than a data.frame.
-      clearDBConnection("odbc", NULL, NULL, NULL, username, dsn = dsn, additionalParams = additionalParams)
+      clearDBConnection(type, NULL, NULL, NULL, username, dsn = dsn, additionalParams = additionalParams)
       stop(paste(df, collapse = "\n"))
     }
     if (!user_env$pool_connection) {
@@ -1038,7 +1043,7 @@ queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, q
   }, error = function(err) {
     # for some cases like conn not being an open connection, sqlQuery still throws error. handle it here.
     # clear connection in pool so that new connection will be used for the next try
-    clearDBConnection("odbc", NULL, NULL, NULL, username, dsn = dsn, additionalParams = additionalParams)
+    clearDBConnection(type, NULL, NULL, NULL, username, dsn = dsn, additionalParams = additionalParams)
     stop(err)
   })
   df
