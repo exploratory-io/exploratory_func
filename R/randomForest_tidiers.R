@@ -2447,6 +2447,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, binary_clas
       ret
     },
     evaluation = {
+      # Delegate showing error for failed models to grance().
       if ("error" %in% class(x)) {
         return(glance(x, pretty.name = pretty.name, ...))
       }
@@ -3120,6 +3121,10 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
       ret
     },
     evaluation = {
+      # Delegate showing error for failed models to grance().
+      if ("error" %in% class(x)) {
+        return(glance(x, pretty.name = pretty.name, ...))
+      }
       # get evaluation scores from training data
 
       if(x$classification_type == "regression"){
