@@ -436,17 +436,17 @@ test_that("evaluate_select", {
   expect_equal(ret, c("col1", "col2"))
 })
 
-test_that("evaluate_select negative test", {
+test_that("evaluate_select negative test", { # TODO: we should move out from old lazy eval scheme.
   test_df <- data.frame(
     col1 = as.character(seq(10)),
     col2 = as.character(0 - seq(10))
   )
   expect_error({
     evaluate_select(test_df, c("co1"))
-  }, "undefined columns selected")
+  }) # Error message here is not consistent between linux ("") and others ("undefined columns selected"). Just verifying it results in error.
   expect_error({
     evaluate_select(test_df, c("dplyr::starts_with('something')"))
-  }, "no column selected")
+  }) # Error message here is not consistent between linux ("") and others ("no column selected"). Just verifying it results in error.
 })
 
 test_that("list_to_text should return NA", {
