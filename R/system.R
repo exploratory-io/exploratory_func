@@ -1012,10 +1012,10 @@ queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IA
 #' @param port - Database port number
 #' @param as.is - Flag to tell if you honor data types from ODBC
 #'
-queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, query, stringsAsFactors = FALSE, host="", port="", as.is = TRUE, ...){
+queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, query, stringsAsFactors = FALSE, host="", port="", as.is = TRUE, driver = "", subType = "", ...){
   if(!requireNamespace("RODBC")){stop("package RODBC must be installed.")}
 
-  conn <- getDBConnection("odbc", host, port, NULL, username, password, dsn = dsn, additionalParams = additionalParams)
+  conn <- getDBConnection("odbc", host, port, NULL, username, password, dsn = dsn, additionalParams = additionalParams, driver = driver, subType = subType)
   tryCatch({
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
