@@ -44,6 +44,14 @@ getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tok
   }
   token <- getGoogleTokenForAnalytics(tokenFileId)
 
+  # When calculating startDate, to avoid the result becomes NA like below two cases,
+  # use %m-% instead of - for years and months.
+  #
+  #> lubridate::today() - months(lastN) # if today is 2020-03-30 and lastN is 1, it returns NA
+  # [1] NA
+  # > lubridate::today() - lubridate::years(lastN) # if today is 2020-02-29 it returns NA
+  # [1] NA
+
   if(dateRangeType == "lastNDays") {
     if(is.null(lastN)) {
       # For backward compatibility for Exploratory Desktop older than version 5.4.1
