@@ -44,6 +44,14 @@ getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tok
   }
   token <- getGoogleTokenForAnalytics(tokenFileId)
 
+  # When calculating startDate, to avoid the result becomes NA like below two cases,
+  # use %m-% instead of - for years and months.
+  #
+  #> lubridate::today() - months(lastN) # if today is 2020-03-30 and lastN is 1, it returns NA
+  # [1] NA
+  # > lubridate::today() - lubridate::years(lastN) # if today is 2020-02-29 it returns NA
+  # [1] NA
+
   if(dateRangeType == "lastNDays") {
     if(is.null(lastN)) {
       # For backward compatibility for Exploratory Desktop older than version 5.4.1
@@ -55,9 +63,9 @@ getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tok
   } else if (dateRangeType == "lastNWeeks") {
     startDate <- as.character(lubridate::today() - lubridate::weeks(lastN));
   } else if (dateRangeType == "lastNMonths") {
-    startDate <- as.character(lubridate::today() - months(lastN)); # use base months function since lubridate does not have it.
+    startDate <- as.character(lubridate::today() %m-% months(lastN)); # use base months function since lubridate does not have it.
   } else if (dateRangeType == "lastNYears") {
-    startDate <- as.character(lubridate::today() - lubridate::years(lastN));
+    startDate <- as.character(lubridate::today() %m-% lubridate::years(lastN));
   } else if (dateRangeType == "yesterday") {
     startDate = as.character(lubridate::today() - 1);
     endDate = startDate;
@@ -77,10 +85,10 @@ getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tok
     startDate = as.character(lubridate::floor_date(lubridate::today(),"week") - lubridate::weeks(1));
     endDate = as.character(lubridate::today() - 1);
   } else if (dateRangeType == "lastMonthToYesterday") {
-    startDate = as.character(lubridate::floor_date(lubridate::today(), "month") - months(1));
+    startDate = as.character(lubridate::floor_date(lubridate::today(), "month") %m-% months(1));
     endDate = as.character(lubridate::today() - 1);
   } else if (dateRangeType == "lastYearToYesterday") {
-    startDate = as.character(lubridate::floor_date(lubridate::today(), "year") - lubridate::years(1));
+    startDate = as.character(lubridate::floor_date(lubridate::today(), "year") %m-% lubridate::years(1));
     endDate = as.character(lubridate::today() - 1);
   }
 
