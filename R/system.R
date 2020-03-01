@@ -652,29 +652,29 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     loadNamespace("RODBC")
     connect <- function() {
       if(type == "mssqlserver") {
-        connstr <- stringr::str_c("RODBC::odbcConnect(\"Driver={", driver, "};", sep="")
+        connstr <- stringr::str_c("Driver={", driver, "}", sep="")
         if(host != "") {
-          connstr <- stringr::str_c(connstr, ", Server=tcp:", host, ",")
+          connstr <- stringr::str_c(connstr, ";Server=tcp:", host, sep="")
         }
         if(port != ""){
-          connstr <- stringr::str_c(connstr, port, ";")
+          connstr <- stringr::str_c(connstr, ",", port, ";", sep = "")
         }
         if(databaseName != "") {
-          connstr <- stringr::str_c(connstr, ", Database = ", databaseName, ";")
+          connstr <- stringr::str_c(connstr, "Database=", databaseName, ";", sep="")
         }
         if(username != ""){
-          connstr <- stringr::str_c(connstr, ", Uid = ", username, ";")
+          connstr <- stringr::str_c(connstr, "Uid=", username, ";", sep="")
         }
         if(password != ""){
-          connstr <- stringr::str_c(connstr, ", Pwd = '", password, ";")
+          connstr <- stringr::str_c(connstr, "Pwd=", password, sep="")
         }
+        connstr <- stringr::str_c(connstr, ";Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30")
         if(additionalParams == ""){
-          connstr <- stringr::str_c(connstr, ")")
+          connstr <- stringr::str_c(connstr, "" , sep="")
         } else {
-          connstr <- stringr::str_c(connstr, ",", additionalParams, ")")
+          connstr <- stringr::str_c(connstr, ";," ,additionalParams, "", sep="")
         }
-        conn <- eval(parse(text=connstr))
-        conn <- RODBC::odbcDriverConnect(connectionString)
+        conn <- RODBC::odbcDriverConnect(connstr)
       } else if(dsn != ""){ # for Dremio
         connstr <- stringr::str_c("RODBC::odbcConnect(dsn = '", dsn , "'")
         if(username != ""){
@@ -720,7 +720,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     # TODO: We may be able to check connection instead by RODBC::sqlTable() or something instead of this,
     # but we are not very sure of a sure way to check connection for all possible types of ODBC databases.
     if (user_env$pool_connection) {
-      key <- paste("odbc", dsn, host, username, additionalParams, driver, sep = ":")
+      key <- paste(type, dsn, host, username, additionalParams, driver, sep = ":")
       conn <- connection_pool[[key]]
     }
     if (is.null(conn)) {
