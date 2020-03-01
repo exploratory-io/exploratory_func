@@ -34,14 +34,13 @@ get_mailchimp_data <- function(endpoint = "export/1.0/list", date_type = "exact"
         stop("date_type must be \"days\", \"weeks\", \"months\", \"years\" or \"exact\"")
       }
       if(date_type %in% c("months", "years")) {
-        # To avoid the result became NA like below two cases.
+        # To avoid the result becomes NA like below two cases, use %m-% instead of - for years and months.
         #
         #> as.Date("2020-02-29") - lubridate::period(2, units = "years")
         # [1] NA
         # > as.Date("2020-03-30") - lubridate::period(1, units = "months")
         # [1] NA
         #
-        # Use %m-% instead of - for years and months.
         date_since <- lubridate::today() %m-% lubridate::period(as.numeric(date_since), units = date_type)
       } else {
         date_since <- lubridate::today() - lubridate::period(as.numeric(date_since), units = date_type)
