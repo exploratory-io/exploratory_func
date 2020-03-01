@@ -6,7 +6,7 @@ test_that("pair_count", {
     let = rep(letters[seq(5)], each = 2)
   )
   test_df <- test_df %>% rename(`se q`=seq, `le t`=let)
-  ret <- test_df %>% pair_count(`se q`, `le t`)
+  ret <- test_df %>% pair_count(`se q`, `le t`, distinct = FALSE, sort = FALSE)
   expect_equal(nrow(ret), 20)
   expect_true(all(ret[["value"]] == 2))
   ret <- test_df %>% pair_count(`se q`, `le t`, distinct = FALSE,  diag = TRUE, sort = TRUE)
@@ -24,7 +24,7 @@ test_that("pair_count", {
     ),
     stringsAsFactors = FALSE
   )
-  ret1 <- pair_count(test_df, group, chars)
+  ret1 <- pair_count(test_df, group, chars, distinct = FALSE, sort = FALSE)
 
   expect_equal(ret1[["chars.x"]], c("a", "a", "a", "a", "b", "c", "c",
                                    "d", "b", "c", "d", NA, "d", "d", NA, NA))
