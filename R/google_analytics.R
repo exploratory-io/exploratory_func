@@ -53,7 +53,7 @@ getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tok
     }
     startDate <- as.character(lubridate::today() - (lastN - 1));
   } else if (dateRangeType == "lastNWeeks") {
-    startDate <- as.character(lubridate::today() %m-% lubridate::weeks(lastN));
+    startDate <- as.character(lubridate::today() - lubridate::weeks(lastN));
   } else if (dateRangeType == "lastNMonths") {
     startDate <- as.character(lubridate::today() %m-% months(lastN)); # use base months function since lubridate does not have it.
   } else if (dateRangeType == "lastNYears") {
@@ -74,7 +74,7 @@ getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tok
     startDate = as.character(lubridate::floor_date(lubridate::today(), "year"));
     endDate = as.character(lubridate::today() - 1);
   } else if (dateRangeType == "lastWeekToYesterday") {
-    startDate = as.character(lubridate::floor_date(lubridate::today(),"week") %m-% lubridate::weeks(1));
+    startDate = as.character(lubridate::floor_date(lubridate::today(),"week") - lubridate::weeks(1));
     endDate = as.character(lubridate::today() - 1);
   } else if (dateRangeType == "lastMonthToYesterday") {
     startDate = as.character(lubridate::floor_date(lubridate::today(), "month") %m-% months(1));
