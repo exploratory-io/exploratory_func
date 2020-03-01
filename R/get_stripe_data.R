@@ -46,7 +46,19 @@ get_stripe_data <- function(endpoint = "balance/history",
       if(!date_type %in% c("days", "weeks", "months", "years")){
         stop("date_type must be \"days\", \"weeks\", \"months\", \"years\" or \"exact\"")
       }
-      date_since <- lubridate::today() %m-% lubridate::period(as.numeric(date_since), units = date_type)
+      if(date_type %in% c("months", "years")) {
+        # To avoid the result became NA like below two cases.
+        #
+        #> as.Date("2020-02-29") - lubridate::period(2, units = "years")
+        # [1] NA
+        # > as.Date("2020-03-30") - lubridate::period(1, units = "months")
+        # [1] NA
+        #
+        # Use %m-% instead of - for years and months.
+        date_since <- lubridate::today() %m-% lubridate::period(as.numeric(date_since), units = date_type)
+      } else {
+        date_since <- lubridate::today() - lubridate::period(as.numeric(date_since), units = date_type)
+      }
     } else {
       # format validation if it can be regarded as Date format
       date_since <- tryCatch({

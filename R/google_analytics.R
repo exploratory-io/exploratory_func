@@ -85,7 +85,7 @@ getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tok
   }
 
   if(is.null(startDate)) {
-    startDate <- as.character(lubridate::today() %m-% lubridate::days(lastNDays))
+    startDate <- as.character(lubridate::today() - lubridate::days(lastNDays))
   }
   if(is.null(endDate)) {
     endDate <- as.character(lubridate::today())
