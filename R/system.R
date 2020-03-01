@@ -490,7 +490,7 @@ clearAmazonAthenaConnection <- function(driver = "", region = "", authentication
 #' If not, new connection is created and returned.
 #' @export
 getDBConnection <- function(type, host = NULL, port = "", databaseName = "", username = "", password = "", catalog = "", schema = "", dsn="", additionalParams = "",
-                            collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, timeout = NULL, connectionString = NULL) {
+                            collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, timeout = NULL, connectionString = NULL, driver = "", subStype = "") {
 
   drv = NULL
   conn = NULL
@@ -665,6 +665,27 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
           connstr <- stringr::str_c(connstr, ",", additionalParams, ")")
         }
         conn <- eval(parse(text=connstr))
+      } else if (subType == "mssqlserver") {
+        connstr <- stringr::str_c("RODBC::odbcConnect(\"Driver={", driver, "};", sep="")
+        if(host != "") {
+          connstr <- stringr::str_c(connstr, ", Server=tcp:", host, ";")
+        }
+        if(port != ""){
+          connstr <- stringr::str_c(connstr, port, ";")
+        }
+        if(username != ""){
+          connstr <- stringr::str_c(connstr, ", uid = '", username, "'")
+        }
+        if(password != ""){
+          connstr <- stringr::str_c(connstr, ", pwd = '", password, "'")
+        }
+        if(additionalParams == ""){
+          connstr <- stringr::str_c(connstr, ")")
+        } else {
+          connstr <- stringr::str_c(connstr, ",", additionalParams, ")")
+        }
+        conn <- eval(parse(text=connstr))
+        conn <- RODBC::odbcDriverConnect(connectionString)
       } else if (host != "") { # for dremio direct access
         # Until Dremio ODBC Driver 1.3.14.1043 for Mac, Dremio ODBC driver's name was
         # "Dremio ODBC Driver" on Mac, but it changed to "Dremio Connector", which is same as the Window version
@@ -696,7 +717,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     # TODO: We may be able to check connection instead by RODBC::sqlTable() or something instead of this,
     # but we are not very sure of a sure way to check connection for all possible types of ODBC databases.
     if (user_env$pool_connection) {
-      key <- paste("odbc", dsn, host, username, additionalParams, sep = ":")
+      key <- paste("odbc", dsn, host, username, additionalParams, driver, sep = ":")
       conn <- connection_pool[[key]]
     }
     if (is.null(conn)) {
@@ -767,7 +788,7 @@ clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, user
       }
     }
     else { # odbc
-      key <- paste("odbc", dsn, username, additionalParams, sep = ":")
+      key <- paste("odbc", dsn, username, additionalParams, driver, sep = ":")
       conn <- connection_pool[[key]]
       if (!is.null(conn)) {
         tryCatch({ # try to close connection and ignore error
