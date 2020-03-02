@@ -668,7 +668,6 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         if(password != ""){
           connstr <- stringr::str_c(connstr, "Pwd=", password, sep="")
         }
-        connstr <- stringr::str_c(connstr, ";Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30")
         if(additionalParams == ""){
           connstr <- stringr::str_c(connstr, "" , sep="")
         } else {
