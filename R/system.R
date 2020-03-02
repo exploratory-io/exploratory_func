@@ -1015,7 +1015,7 @@ queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IA
 #' @param port - Database port number
 #' @param as.is - Flag to tell if you honor data types from ODBC
 #'
-queryODBC <- function(dsn="", username, password, additionalParams, numOfRows = 0, query, stringsAsFactors = FALSE, host="", port="", as.is = TRUE, databaseName="", driver = "", type = "", ...){
+queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows = 0, query, stringsAsFactors = FALSE, host="", port="", as.is = TRUE, databaseName="", driver = "", type = "", ...){
   if(!requireNamespace("RODBC")){stop("package RODBC must be installed.")}
   if(type == "") {
     type <- "odbc"
