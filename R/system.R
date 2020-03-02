@@ -810,7 +810,7 @@ clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, user
       }
     }
     else { # odbc
-      key <- paste("odbc", dsn, username, additionalParams, driver, sep = ":")
+      key <- paste("odbc", dsn, username, additionalParams, sep = ":")
       conn <- connection_pool[[key]]
       if (!is.null(conn)) {
         tryCatch({ # try to close connection and ignore error
