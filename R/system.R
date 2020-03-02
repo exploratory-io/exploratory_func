@@ -1020,7 +1020,7 @@ queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, q
   if(type == "") {
     type <- "odbc"
   }
-  conn <- getDBConnection(type, host, port, NULL, username, password, dsn = dsn, additionalParams = additionalParams, databaseName = databaseName, driver = driver)
+  conn <- getDBConnection(type = type, host = host, port = port, NULL, username = username, password = password, dsn = dsn, additionalParams = additionalParams, databaseName = databaseName, driver = driver)
   tryCatch({
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
