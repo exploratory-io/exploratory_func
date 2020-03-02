@@ -712,8 +712,6 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     }
     if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
     if(!requireNamespace("odbc")){stop("package RPostgres must be installed.")}
-    # use same key "postgres" for redshift and vertica too, since they use
-    # queryPostgres() too, which uses the key "postgres"
     key <- paste("mssqlserver", host, port, databaseName, username, sep = ":")
     conn <- connection_pool[[key]]
     if (!is.null(conn)){
@@ -1049,11 +1047,11 @@ queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
     query <- glue_exploratory(query, .transformer=sql_glue_transformer, .envir = parent.frame())
-    if(type == "mssqlserver") {
+    if(type == "mssqlserver") { # now odbc package is used for MS SQL Server Data Source so use DBI APIs.
       if(!requireNamespace("odbc")){stop("package odbc must be installed.")}
       resultSet <- DBI::dbSendQuery(conn, query)
       df <- DBI::dbFetch(resultSet, n = numOfRows)
-    } else {
+    } else { # For RODBC based ODBC Data Soruces, use RODBC API.
       if(!requireNamespace("RODBC")){stop("package RODBC must be installed.")}
       df <- RODBC::sqlQuery(conn, query, as.is = as.is, max = numOfRows, stringsAsFactors=stringsAsFactors)
     }
