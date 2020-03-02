@@ -652,6 +652,10 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     loadNamespace("RODBC")
     connect <- function() {
       if(type == "mssqlserver") {
+        # if platform is Linux use predefined one
+        if(Sys.info()["sysname"]=="Linux"){
+          driver <-  "ODBC Driver 17 for SQL Server";
+        }
         connstr <- stringr::str_c("Driver={", driver, "}", sep="")
         if(host != "") {
           connstr <- stringr::str_c(connstr, ";Server=tcp:", host, sep="")
