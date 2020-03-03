@@ -26,7 +26,7 @@ uploadGoogleSheet <- function(filepath, title, overwrite = FALSE){
 #' @param tzone - timezone
 #' @param id - ID off the sheet
 #' @export
-getGoogleSheet <- function(title, sheetName, skipNRows = 0, treatTheseAsNA = NULL, firstRowAsHeader = TRUE, commentChar, tokenFileId=NULL, guessDataType=TRUE, tzone=NULL, id=NULL, ...){
+getGoogleSheet <- function(title, sheetName, skipNRows = 0, treatTheseAsNA = NULL, firstRowAsHeader = TRUE, commentChar, tokenFileId = NULL, guessDataType = TRUE, tzone = NULL, id = NULL, ...){
   if(!requireNamespace("googlesheets4")){stop("package googlesheets4 must be installed.")}
   if(!requireNamespace("googledrive")){stop("package googledrive must be installed.")}
   if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
