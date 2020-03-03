@@ -34,8 +34,8 @@ getGoogleSheet <- function(title, sheetName, skipNRows = 0, treatTheseAsNA = NUL
   token <- getGoogleTokenForSheet(tokenFileId)
   googlesheets4::sheets_set_token(token)
   googledrive::drive_set_token(token)
-  # For some of the sheets, below API does not return result with title, so try wit the id if id parameter is passed.
-  # if id is not provided, try it with title.
+  # For some of the sheets, below API does not return result with title, so try it with the id if id parameter is passed.
+  # If id is not provided, try it with title.
   if(!is.null(id)) {
     gsheet <- googledrive::drive_get(id = id)
   } else {
@@ -81,6 +81,8 @@ getGoogleSheetWorkSheetList <- function(tokenFileId="", title, id=""){
   token = getGoogleTokenForSheet(tokenFileId)
   googlesheets4::sheets_set_token(token)
   googledrive::drive_set_token(token)
+  # For some of the sheets, below API does not return result with title, so try it with the id if id parameter is passed.
+  # If id is not provided, try it with title.
   if(id != "") {
     sheet <- googledrive::drive_get(id = id)
   } else {
