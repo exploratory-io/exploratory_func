@@ -74,7 +74,11 @@ getGoogleSheetList <- function(tokenFileId=""){
 
 #' API to get a list of available google sheets
 #' @export
-getGoogleSheetWorkSheetList <- function(tokenFileId="", title, id=""){
+#' @param tokenFileId - No longer used. It was kept for backward compatibility for the old Desktop Versions that don't handle OAuth token in server side.
+#' @param title - title of the sheet
+#' @param id - ID of the sheet
+#' @export
+getGoogleSheetWorkSheetList <- function(tokenFileId = "", title, id = NULL){
   if(!requireNamespace("googlesheets4")){stop("package googlesheets4 must be installed.")}
   if(!requireNamespace("googledrive")){stop("package googledrive must be installed.")}
 
@@ -83,7 +87,7 @@ getGoogleSheetWorkSheetList <- function(tokenFileId="", title, id=""){
   googledrive::drive_set_token(token)
   # For some of the sheets, below API does not return result with title so try it with the id if id parameter is passed.
   # If id is not provided, try it with title.
-  if(id != "") {
+  if(!is.null(id)) {
     sheet <- googledrive::drive_get(id = id)
   } else {
     sheet <- googledrive::drive_get(title)
