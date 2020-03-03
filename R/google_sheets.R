@@ -24,7 +24,7 @@ uploadGoogleSheet <- function(filepath, title, overwrite = FALSE){
 #' @param tokenFileId - No longer used. It was kept for backward compatibility for the old Desktop Versions that don't handle OAuth token in server side.
 #' @param guessDataType - flag to tell if you want googlesheets::gs_read to guess column data type
 #' @param tzone - timezone
-#' @param id - ID off the sheet
+#' @param id - ID of the sheet
 #' @export
 getGoogleSheet <- function(title, sheetName, skipNRows = 0, treatTheseAsNA = NULL, firstRowAsHeader = TRUE, commentChar, tokenFileId = NULL, guessDataType = TRUE, tzone = NULL, id = NULL, ...){
   if(!requireNamespace("googlesheets4")){stop("package googlesheets4 must be installed.")}
