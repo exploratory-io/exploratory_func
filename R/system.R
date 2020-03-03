@@ -705,7 +705,8 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         connection_pool[[key]] <- conn
       }
     }
-  } else if (type == "mssqlserver") {
+  } else if (type == "mssqlserver") {# The type sqlserver is already used for RODBC based one and "mssqlserver" is passed from Exploratory Desktop.
+
     # if platform is Linux use predefined one
     if(Sys.info()["sysname"]=="Linux"){
       driver <-  "ODBC Driver 17 for SQL Server";
@@ -1047,7 +1048,9 @@ queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
     query <- glue_exploratory(query, .transformer=sql_glue_transformer, .envir = parent.frame())
-    if(type == "mssqlserver") { # now odbc package is used for MS SQL Server Data Source so use DBI APIs.
+    # now odbc package is used for MS SQL Server Data Source so use DBI APIs.
+    # The type sqlserver is already used for RODBC based one so "mssqlserver" is passed from Exploratory Desktop.
+    if(type == "mssqlserver") {
       if(!requireNamespace("odbc")){stop("package odbc must be installed.")}
       resultSet <- DBI::dbSendQuery(conn, query)
       df <- DBI::dbFetch(resultSet, n = numOfRows)
