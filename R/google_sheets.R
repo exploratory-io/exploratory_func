@@ -21,11 +21,12 @@ uploadGoogleSheet <- function(filepath, title, overwrite = FALSE){
 #' @param treatTheseAsNA - character vector that each item represents NA
 #' @param firstRowAsHeader - argument to control if you want to treat first row as header
 #' @param commentChar - treat the character as comment.
+#' @param tokenFileId - No longer used. It was kept for backward compatibility for the old Desktop Versions that don't handle OAuth token in server side.
 #' @param guessDataType - flag to tell if you want googlesheets::gs_read to guess column data type
 #' @param tzone - timezone
-#' @param id
+#' @param id - ID off the sheet
 #' @export
-getGoogleSheet <- function(title, sheetName, skipNRows = 0, treatTheseAsNA = NULL, firstRowAsHeader = TRUE, commentChar, tokenFileId=NULL, guessDataType=TRUE, tzone=NULL, id="", ...){
+getGoogleSheet <- function(title, sheetName, skipNRows = 0, treatTheseAsNA = NULL, firstRowAsHeader = TRUE, commentChar, tokenFileId=NULL, guessDataType=TRUE, tzone=NULL, id=NULL, ...){
   if(!requireNamespace("googlesheets4")){stop("package googlesheets4 must be installed.")}
   if(!requireNamespace("googledrive")){stop("package googledrive must be installed.")}
   if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
@@ -33,7 +34,7 @@ getGoogleSheet <- function(title, sheetName, skipNRows = 0, treatTheseAsNA = NUL
   token <- getGoogleTokenForSheet(tokenFileId)
   googlesheets4::sheets_set_token(token)
   googledrive::drive_set_token(token)
-  if(id != "") {
+  if(!is.null(id)) {
     gsheet <- googledrive::drive_get(id = id)
   } else {
     gsheet <- googledrive::drive_get(title)
