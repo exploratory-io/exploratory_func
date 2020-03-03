@@ -34,6 +34,8 @@ getGoogleSheet <- function(title, sheetName, skipNRows = 0, treatTheseAsNA = NUL
   token <- getGoogleTokenForSheet(tokenFileId)
   googlesheets4::sheets_set_token(token)
   googledrive::drive_set_token(token)
+  # For some of the sheets, below API does not return result with title, so try wit the id if id parameter is passed.
+  # if id is not provided, try it with title.
   if(!is.null(id)) {
     gsheet <- googledrive::drive_get(id = id)
   } else {
@@ -44,6 +46,8 @@ getGoogleSheet <- function(title, sheetName, skipNRows = 0, treatTheseAsNA = NUL
     # if guessDataType is FALSE, use character as the default column data type.
     col_types <- c(.default="c")
   }
+  # The "na" argument of googlesheets4::read_sheet does not accept null,
+  # so if the treatTheseAsNA is null, do not pass it to googlesheets4::read_sheet
   if(!is.null(treatTheseAsNA)) {
     df <- gsheet %>% googlesheets4::read_sheet(range = sheetName, skip = skipNRows, na = treatTheseAsNA, col_names = firstRowAsHeader, col_types = col_types)
   } else {
