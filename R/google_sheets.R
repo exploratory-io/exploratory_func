@@ -23,8 +23,9 @@ uploadGoogleSheet <- function(filepath, title, overwrite = FALSE){
 #' @param commentChar - treat the character as comment.
 #' @param guessDataType - flag to tell if you want googlesheets::gs_read to guess column data type
 #' @param tzone - timezone
+#' @param id
 #' @export
-getGoogleSheet <- function(title, sheetName, skipNRows = 0, treatTheseAsNA = NULL, firstRowAsHeader = TRUE, commentChar, tokenFileId=NULL, guessDataType=TRUE, tzone=NULL, ...){
+getGoogleSheet <- function(title, sheetName, skipNRows = 0, treatTheseAsNA = NULL, firstRowAsHeader = TRUE, commentChar, tokenFileId=NULL, guessDataType=TRUE, tzone=NULL, id="", ...){
   if(!requireNamespace("googlesheets4")){stop("package googlesheets4 must be installed.")}
   if(!requireNamespace("googledrive")){stop("package googledrive must be installed.")}
   if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
@@ -32,7 +33,11 @@ getGoogleSheet <- function(title, sheetName, skipNRows = 0, treatTheseAsNA = NUL
   token <- getGoogleTokenForSheet(tokenFileId)
   googlesheets4::sheets_set_token(token)
   googledrive::drive_set_token(token)
-  gsheet <- googledrive::drive_get(title)
+  if(id != "") {
+    gsheet <- googledrive::drive_get(id = id)
+  } else {
+    gsheet <- googledrive::drive_get(title)
+  }
   col_types <- NULL
   if(!guessDataType) {
     # if guessDataType is FALSE, use character as the default column data type.
@@ -64,13 +69,17 @@ getGoogleSheetList <- function(tokenFileId=""){
 
 #' API to get a list of available google sheets
 #' @export
-getGoogleSheetWorkSheetList <- function(tokenFileId="", title){
+getGoogleSheetWorkSheetList <- function(tokenFileId="", title, id=""){
   if(!requireNamespace("googlesheets4")){stop("package googlesheets4 must be installed.")}
   if(!requireNamespace("googledrive")){stop("package googledrive must be installed.")}
 
   token = getGoogleTokenForSheet(tokenFileId)
   googlesheets4::sheets_set_token(token)
   googledrive::drive_set_token(token)
-  sheet <- googledrive::drive_get(title)
+  if(id != "") {
+    sheet <- googledrive::drive_get(id = id)
+  } else {
+    sheet <- googledrive::drive_get(title)
+  }
   googlesheets4::sheets_sheets(sheet)
 }

@@ -22,13 +22,19 @@ filepath <- if (!testdata_filename %in% list.files(testdata_dir)) {
 }
 
 # Add group_by. Cases without group_by is covered in test_randomForest_tidiers_3.R.
-flight <- flight %>% group_by(`CAR RIER`)
+flight <- flight %>%
+  # Add a row for a group that would fail in model building, because of having only 1 row.
+  add_row(`CAR RIER`="DUMMY", `ARR DELAY`=1, `DIS TANCE`=1, `DEP DELAY`=1, `is delayed`=TRUE, `FL NUM`=1) %>%
+  group_by(`CAR RIER`)
 
 
 test_that("calc_feature_map(regression) evaluate training and test", {
   model_df <- flight %>%
                 calc_feature_imp(`FL NUM`, `DIS TANCE`, `DEP TIME`, test_rate = 0.3)
   ret <- rf_evaluation_training_and_test(model_df, test_rate = 0.3)
+  expect_equal(nrow(ret %>% filter(`CAR RIER`=="DUMMY")), 1) # Row for the group with error.
+  expect_equal(nrow(ret %>% filter(`CAR RIER`=="DUMMY" & !is.na(Note))), 1) # Row for the group with error should have message in Note column. 
+  browser()
 
   ret <- model_df %>% prediction_training_and_test()
   test_ret <- ret %>% filter(is_test_data==TRUE)
@@ -49,6 +55,8 @@ test_that("calc_feature_map(binary) evaluate training and test", {
                 dplyr::mutate(is_delayed = as.factor(`is delayed`)) %>%
                 calc_feature_imp(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0.3)
   ret <- rf_evaluation_training_and_test(model_df, test_rate = 0.3)
+  expect_equal(nrow(ret %>% filter(`CAR RIER`=="DUMMY")), 1) # Row for the group with error.
+  expect_equal(nrow(ret %>% filter(`CAR RIER`=="DUMMY" & !is.na(Note))), 1) # Row for the group with error should have message in Note column. 
   ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class", test_rate = 0.3)
   ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat", test_rate = 0.3)
 
@@ -73,6 +81,8 @@ test_that("calc_feature_map(binary) evaluate training and test with SMOTE", {
                 dplyr::mutate(is_delayed = as.factor(`is delayed`)) %>%
                 calc_feature_imp(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0.3, smote = TRUE)
   ret <- rf_evaluation_training_and_test(model_df, test_rate = 0.3)
+  expect_equal(nrow(ret %>% filter(`CAR RIER`=="DUMMY")), 1) # Row for the group with error.
+  expect_equal(nrow(ret %>% filter(`CAR RIER`=="DUMMY" & !is.na(Note))), 1) # Row for the group with error should have message in Note column. 
   ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class", test_rate = 0.3)
   ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat", test_rate = 0.3)
 
@@ -95,6 +105,8 @@ test_that("calc_feature_map(multi) evaluate training and test", {
   model_df <- flight %>%
                 calc_feature_imp(`ORI GIN`, `DIS TANCE`, `DEP TIME`, test_rate = 0.3)
   ret <- rf_evaluation_training_and_test(model_df, test_rate = 0.3, pretty.name = TRUE)
+  expect_equal(nrow(ret %>% filter(`CAR RIER`=="DUMMY")), 1) # Row for the group with error.
+  expect_equal(nrow(ret %>% filter(`CAR RIER`=="DUMMY" & !is.na(Note))), 1) # Row for the group with error should have message in Note column. 
   ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class", test_rate = 0.3)
   ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat", test_rate = 0.3)
 
