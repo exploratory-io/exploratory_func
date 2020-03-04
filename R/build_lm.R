@@ -1013,6 +1013,7 @@ vif_to_dataframe <- function(x) {
     ret <- data.frame(term=names(x$vif), VIF=x$vif)
   }
   # Map variable names back to the original.
+  # as.character is to be safe by converting from factor. With factor, reverse mapping result will be messed up.
   ret$term <- x$terms_mapping[as.character(ret$term)]
   ret
 }
@@ -1089,6 +1090,7 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
           get_var_min_pvalue(var, coef_df, x)
         }))
         # Map variable names back to the original.
+        # as.character is to be safe by converting from factor. With factor, reverse mapping result will be messed up.
         ret$term <- x$terms_mapping[as.character(ret$term)]
         if (pretty.name) {
           ret <- ret %>% rename(`Variable` = term,
