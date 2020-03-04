@@ -37,6 +37,9 @@ test_that("exp_rpart(regression) evaluate training and test", {
   ret <- rf_evaluation_training_and_test(model_df)
   expect_equal(nrow(ret), 2) # 2 for train and test
 
+  # Check order of result of variable importance.
+  expect_equal(as.character((model_df %>% tidy(model, type="importance") %>% arrange(-importance))$variable), c("DIS TANCE", "DEP TIME"))
+
   # Training only case
   model_df <- flight %>%
                 exp_rpart(`FL NUM`, `DIS TANCE`, `DEP TIME`, test_rate = 0)
