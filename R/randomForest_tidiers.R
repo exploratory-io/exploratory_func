@@ -329,7 +329,8 @@ tidy.randomForest.classification <- function(x, pretty.name = FALSE, type = "imp
     if(!is.null(x$terms_mapping)) {
       # these terms names might be cleaned by janitor::clean_names
       # so reverse them
-      imp_m[[1]] <- x$terms_mapping[imp_m[[1]]]
+      # as.character is to be safe by converting from factor. With factor, reverse mapping result will be messed up.
+      imp_m[[1]] <- x$terms_mapping[as.character(imp_m[[1]])]
     }
 
     if (ncol(imp_m) > 3){
@@ -416,7 +417,8 @@ tidy.randomForest.regression <- function(x, pretty.name = FALSE, ...) {
   if(!is.null(x$terms_mapping)) {
     # these terms names might be cleaned by janitor::clean_names
     # so reverse them
-    imp_m[[1]] <- x$terms_mapping[imp_m[[1]]]
+    # as.character is to be safe by converting from factor. With factor, reverse mapping result will be messed up.
+    imp_m[[1]] <- x$terms_mapping[as.character(imp_m[[1]])]
   }
 
   colnames(imp_m) <- if(pretty.name) {
@@ -3224,7 +3226,8 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
 
 tidy.Boruta_exploratory <- function(x, ...) {
   res <- extract_importance_history_from_boruta(x)
-  res$variable <- x$terms_mapping[res$variable] # Map variable names back to original.
+  # as.character is to be safe by converting from factor. With factor, reverse mapping result will be messed up.
+  res$variable <- x$terms_mapping[as.character(res$variable)] # Map variable names back to original.
   res <- res %>% dplyr::mutate(variable = forcats::fct_reorder(variable, importance, .fun = median, .desc = TRUE))
   # Reorder types of decision in the order of more important to less important.
   res <- res %>% dplyr::mutate(decision = forcats::fct_relevel(decision, "Confirmed", "Tentative", "Rejected"))
