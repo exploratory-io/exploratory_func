@@ -490,7 +490,7 @@ clearAmazonAthenaConnection <- function(driver = "", region = "", authentication
 #' If not, new connection is created and returned.
 #' @export
 getDBConnection <- function(type, host = NULL, port = "", databaseName = "", username = "", password = "", catalog = "", schema = "", dsn="", additionalParams = "",
-                            collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, timeout = NULL, connectionString = NULL, driver = "") {
+                            collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, timeout = NULL, connectionString = NULL, driver = NULL) {
 
   drv = NULL
   conn = NULL
@@ -707,12 +707,15 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     }
   } else if (type == "mssqlserver") {# The type sqlserver is already used for RODBC based one and "mssqlserver" is passed from Exploratory Desktop.
 
-    # if platform is Linux use predefined one
+    # If the platform is Linux, set the below predefined driver installed on Collaboration Server
+    # so that this data soure can be scheduled.
     if(Sys.info()["sysname"]=="Linux"){
       driver <-  "ODBC Driver 17 for SQL Server";
     }
+    # mssqlserver uses odbc package instead of RODBC to allow users to schedule the data source
+    # on server side, so make sure odbc package is installed.
     if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
-    if(!requireNamespace("odbc")){stop("package RPostgres must be installed.")}
+    if(!requireNamespace("odbc")){stop("package odbc must be installed.")}
     key <- paste("mssqlserver", host, port, databaseName, username, sep = ":")
     conn <- connection_pool[[key]]
     if (!is.null(conn)){
@@ -1038,6 +1041,9 @@ queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IA
 #' @param host - Server where the database is running.
 #' @param port - Database port number
 #' @param as.is - Flag to tell if you honor data types from ODBC
+#' @param dataBaseName - For MS SQL Server - name of the SQL Database
+#' @param driver - For MS SQL Server - namme of the ODBC driver
+#' @param type - For MS SQL Server "mssqlserver" is passed as type.For others, "odbc" is passed as type.
 #'
 queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows = 0, query, stringsAsFactors = FALSE, host="", port="", as.is = TRUE, databaseName="", driver = "", type = "", ...){
   if(type == "") {
@@ -1079,6 +1085,7 @@ queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows
     clearDBConnection(type, NULL, NULL, NULL, username, dsn = dsn, additionalParams = additionalParams)
     stop(err)
   })
+  # mssqlserver uses result set so make sure clear the result set.
   if(type == "mssqlserver") {
     DBI::dbClearResult(resultSet)
   }
