@@ -490,7 +490,7 @@ clearAmazonAthenaConnection <- function(driver = "", region = "", authentication
 #' If not, new connection is created and returned.
 #' @export
 getDBConnection <- function(type, host = NULL, port = "", databaseName = "", username = "", password = "", catalog = "", schema = "", dsn="", additionalParams = "",
-                            collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, timeout = NULL, connectionString = NULL) {
+                            collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, timeout = NULL, connectionString = NULL, driver = NULL) {
 
   drv = NULL
   conn = NULL
@@ -651,7 +651,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
 
     loadNamespace("RODBC")
     connect <- function() {
-      if(dsn != ""){
+      if(dsn != ""){ # for Dremio DSN and other DSN based ODBC connection.
         connstr <- stringr::str_c("RODBC::odbcConnect(dsn = '", dsn , "'")
         if(username != ""){
           connstr <- stringr::str_c(connstr, ", uid = '", username, "'")
@@ -696,7 +696,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     # TODO: We may be able to check connection instead by RODBC::sqlTable() or something instead of this,
     # but we are not very sure of a sure way to check connection for all possible types of ODBC databases.
     if (user_env$pool_connection) {
-      key <- paste("odbc", dsn, host, username, additionalParams, sep = ":")
+      key <- paste(type, dsn, host, username, additionalParams, driver, sep = ":")
       conn <- connection_pool[[key]]
     }
     if (is.null(conn)) {
@@ -704,6 +704,55 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       if (user_env$pool_connection) { # pool connection if connection pooling is on.
         connection_pool[[key]] <- conn
       }
+    }
+  } else if (type == "mssqlserver") {# The type sqlserver is already used for RODBC based one and "mssqlserver" is passed from Exploratory Desktop.
+
+    # If the platform is Linux, set the below predefined driver installed on Collaboration Server
+    # so that this data soure can be scheduled.
+    if(Sys.info()["sysname"]=="Linux"){
+      driver <-  "ODBC Driver 17 for SQL Server";
+    }
+    # mssqlserver uses odbc package instead of RODBC for two reasons:
+    # 1) The "ODBC Driver 17 for SQL Server" driver does not work on Mac with RODBC.
+    # 2) To allow users to schedule the data source on server side.
+    # So make sure odbc package is installed.
+    if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
+    if(!requireNamespace("odbc")){stop("package odbc must be installed.")}
+    key <- paste("mssqlserver", host, port, databaseName, username, sep = ":")
+    conn <- connection_pool[[key]]
+    if (!is.null(conn)){
+      tryCatch({
+        # test connection
+        result <- DBI::dbGetQuery(conn,"select 1")
+        if (!is.data.frame(result)) { # it can fail by returning NULL rather than throwing error.
+          tryCatch({ # try to close connection and ignore error
+            DBI::dbDisconnect(conn)
+          }, warning = function(w) {
+          }, error = function(e) {
+          })
+          conn <- NULL
+          # fall through to getting new connection.
+        }
+      }, error = function(err) {
+        tryCatch({ # try to close connection and ignore error
+          DBI::dbDisconnect(conn)
+        }, warning = function(w) {
+        }, error = function(e) {
+        })
+        conn <- NULL
+        # fall through to getting new connection.
+      })
+    }
+    # if the connection is null or the connection is invalid, create a new one.
+    if (is.null(conn) || !DBI::dbIsValid(conn)) {
+      conn <- DBI::dbConnect(odbc::odbc(),
+                             Driver = driver,
+                             Server = host,
+                             Database = databaseName,
+                             UID = username,
+                             PWD = password,
+                             Port = port)
+      connection_pool[[key]] <- conn
     }
   }
   conn
@@ -781,6 +830,10 @@ clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, user
   }
 }
 
+isConnecitonPoolEnabbled <- function(type){
+  type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora", "presto", "treasuredata", "mssqlserver")
+}
+
 #' @export
 getListOfTables <- function(type, host, port, databaseName = NULL, username, password, catalog = "", schema = ""){
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
@@ -791,7 +844,7 @@ getListOfTables <- function(type, host, port, databaseName = NULL, username, pas
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
     clearDBConnection(type, host, port, databaseName, username, catalog = catalog, schema = schema)
-    if (!type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora", "presto", "treasuredata")) { # only if conn pool is not used yet
+    if (!isConnecitonPoolEnabbled(type)) { # only if conn pool is not used yet
       tryCatch({ # try to close connection and ignore error
         DBI::dbDisconnect(conn)
       }, warning = function(w) {
@@ -800,7 +853,7 @@ getListOfTables <- function(type, host, port, databaseName = NULL, username, pas
     }
     stop(err)
   })
-  if (!type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora", "presto", "treasuredata")) { # only if conn pool is not used yet
+  if (!!isConnecitonPoolEnabbled(type)) { # only if conn pool is not used yet
     tryCatch({ # try to close connection and ignore error
       DBI::dbDisconnect(conn)
     }, warning = function(w) {
@@ -819,7 +872,7 @@ getListOfColumns <- function(type, host, port, databaseName, username, password,
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
     clearDBConnection(type, host, port, databaseName, username)
-    if (!type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora")) { # only if conn pool is not used yet
+    if (!!isConnecitonPoolEnabbled(type)) { # only if conn pool is not used yet
       tryCatch({ # try to close connection and ignore error
         DBI::dbDisconnect(conn)
       }, warning = function(w) {
@@ -828,7 +881,7 @@ getListOfColumns <- function(type, host, port, databaseName, username, password,
     }
     stop(err)
   })
-  if (!type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora", "presto", "treasuredata")) { # only if conn pool is not used yet
+  if (!!isConnecitonPoolEnabbled(type)) { # only if conn pool is not used yet
     tryCatch({ # try to close connection and ignore error
       DBI::dbDisconnect(conn)
     }, warning = function(w) {
@@ -858,7 +911,7 @@ executeGenericQuery <- function(type, host, port, databaseName, username, passwo
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
     clearDBConnection(type, host, port, databaseName, username, catalog = catalog, schema = schema)
-    if (!type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora", "presto", "treasuredata")) { # only if conn pool is not used yet
+    if (!!isConnecitonPoolEnabbled(type)) { # only if conn pool is not used yet
       tryCatch({ # try to close connection and ignore error
         DBI::dbDisconnect(conn)
       }, warning = function(w) {
@@ -868,7 +921,7 @@ executeGenericQuery <- function(type, host, port, databaseName, username, passwo
     stop(err)
   })
   DBI::dbClearResult(resultSet)
-  if (!type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora", "presto", "treasuredata")) { # only if conn pool is not used yet
+  if (!!isConnecitonPoolEnabbled(type)) { # only if conn pool is not used yet
     tryCatch({ # try to close connection and ignore error
       DBI::dbDisconnect(conn)
     }, warning = function(w) {
@@ -990,20 +1043,34 @@ queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IA
 #' @param host - Server where the database is running.
 #' @param port - Database port number
 #' @param as.is - Flag to tell if you honor data types from ODBC
+#' @param dataBaseName - For MS SQL Server - name of the SQL Database
+#' @param driver - For MS SQL Server - namme of the ODBC driver
+#' @param type - For MS SQL Server "mssqlserver" is passed as type. For others,"odbc" is passed as type.
 #'
-queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, query, stringsAsFactors = FALSE, host="", port="", as.is = TRUE, ...){
-  if(!requireNamespace("RODBC")){stop("package RODBC must be installed.")}
-
-  conn <- getDBConnection("odbc", host, port, NULL, username, password, dsn = dsn, additionalParams = additionalParams)
+queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows = 0, query, stringsAsFactors = FALSE, host="", port="", as.is = TRUE, databaseName="", driver = "", type = "", ...){
+  if(type == "") {
+    type <- "odbc"
+  }
+  conn <- getDBConnection(type = type, host = host, port = port, NULL, username = username, password = password, dsn = dsn, additionalParams = additionalParams, databaseName = databaseName, driver = driver)
   tryCatch({
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
     query <- glue_exploratory(query, .transformer=sql_glue_transformer, .envir = parent.frame())
-    df <- RODBC::sqlQuery(conn, query, as.is = as.is, max = numOfRows, stringsAsFactors=stringsAsFactors)
+    # now odbc package is used for MS SQL Server Data Source so use DBI APIs.
+    # The type sqlserver is already used for RODBC based one so "mssqlserver" is passed from Exploratory Desktop.
+    if(type == "mssqlserver") {
+      if(!requireNamespace("odbc")){stop("package odbc must be installed.")}
+      resultSet <- DBI::dbSendQuery(conn, query)
+      df <- DBI::dbFetch(resultSet, n = numOfRows)
+    } else { # For RODBC based ODBC Data Soruces, use RODBC API.
+      if(!requireNamespace("RODBC")){stop("package RODBC must be installed.")}
+      df <- RODBC::sqlQuery(conn, query, as.is = as.is, max = numOfRows, stringsAsFactors=stringsAsFactors)
+    }
+
     if (!is.data.frame(df)) {
       # when it is error, RODBC::sqlQuery() does not stop() (throw) with error most of the cases.
       # in such cases, df is a character vecter rather than a data.frame.
-      clearDBConnection("odbc", NULL, NULL, NULL, username, dsn = dsn, additionalParams = additionalParams)
+      clearDBConnection(type, NULL, NULL, NULL, username, dsn = dsn, additionalParams = additionalParams)
       stop(paste(df, collapse = "\n"))
     }
     if (!user_env$pool_connection) {
@@ -1017,9 +1084,16 @@ queryODBC <- function(dsn,username, password, additionalParams, numOfRows = 0, q
   }, error = function(err) {
     # for some cases like conn not being an open connection, sqlQuery still throws error. handle it here.
     # clear connection in pool so that new connection will be used for the next try
-    clearDBConnection("odbc", NULL, NULL, NULL, username, dsn = dsn, additionalParams = additionalParams)
+    clearDBConnection(type, NULL, NULL, NULL, username, dsn = dsn, additionalParams = additionalParams)
     stop(err)
   })
+  # mssqlserver uses odbc package and DBI package
+  # and it gets result set with DBI package.
+  # So make sure to clear the result set.
+  # For RDOBC based case, it does not use result set.
+  if(type == "mssqlserver") {
+    DBI::dbClearResult(resultSet)
+  }
   df
 }
 
