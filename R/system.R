@@ -712,8 +712,10 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     if(Sys.info()["sysname"]=="Linux"){
       driver <-  "ODBC Driver 17 for SQL Server";
     }
-    # mssqlserver uses odbc package instead of RODBC to allow users to schedule the data source
-    # on server side, so make sure odbc package is installed.
+    # mssqlserver uses odbc package instead of RODBC for two reasons:
+    # 1) The ODBC Driver 17 for SQL Server driver does not work on Mac with RODBC.
+    # 2) To allow users to schedule the data source on server side.
+    # So make sure odbc package is installed.
     if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
     if(!requireNamespace("odbc")){stop("package odbc must be installed.")}
     key <- paste("mssqlserver", host, port, databaseName, username, sep = ":")
@@ -1085,7 +1087,10 @@ queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows
     clearDBConnection(type, NULL, NULL, NULL, username, dsn = dsn, additionalParams = additionalParams)
     stop(err)
   })
-  # mssqlserver uses result set so make sure clear the result set.
+  # mssqlserver uses odbc package and DBI package
+  # and it gets result set with DBI package.
+  # So make sure clear the result set.
+  # For RDOBC based case, it does not use result set.
   if(type == "mssqlserver") {
     DBI::dbClearResult(resultSet)
   }
