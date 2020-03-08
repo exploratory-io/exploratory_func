@@ -1089,7 +1089,7 @@ queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows
   })
   # mssqlserver uses odbc package and DBI package
   # and it gets result set with DBI package.
-  # So make sure clear the result set.
+  # So make sure to clear the result set.
   # For RDOBC based case, it does not use result set.
   if(type == "mssqlserver") {
     DBI::dbClearResult(resultSet)
