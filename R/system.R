@@ -1043,7 +1043,7 @@ queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IA
 #' @param as.is - Flag to tell if you honor data types from ODBC
 #' @param dataBaseName - For MS SQL Server - name of the SQL Database
 #' @param driver - For MS SQL Server - namme of the ODBC driver
-#' @param type - For MS SQL Server "mssqlserver" is passed as type.For others, "odbc" is passed as type.
+#' @param type - For MS SQL Server "mssqlserver" is passed as type. For others,"odbc" is passed as type.
 #'
 queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows = 0, query, stringsAsFactors = FALSE, host="", port="", as.is = TRUE, databaseName="", driver = "", type = "", ...){
   if(type == "") {
