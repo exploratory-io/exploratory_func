@@ -713,7 +713,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       driver <-  "ODBC Driver 17 for SQL Server";
     }
     # mssqlserver uses odbc package instead of RODBC for two reasons:
-    # 1) The ODBC Driver 17 for SQL Server driver does not work on Mac with RODBC.
+    # 1) The "ODBC Driver 17 for SQL Server" driver does not work on Mac with RODBC.
     # 2) To allow users to schedule the data source on server side.
     # So make sure odbc package is installed.
     if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
