@@ -479,6 +479,7 @@ sample_rows <- function(df, size, seed = NULL, ...) {
     set.seed(seed)
   }
 
+  # To evaluate size for each group rather than for entire data frame, just like dplyr::sample_n does, loop through groups by nest/mutate/unnest.
   grouped_cols <- grouped_by(df)
   if (length(grouped_cols) > 0) {
     nested <- df %>% tidyr::nest(.temp.data=-(!!grouped_cols)) #TODO: avoid possibility of column name conflict between .temp.data and group_by columns.
