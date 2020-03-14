@@ -475,12 +475,24 @@ list_concat <- function(..., collapse = FALSE){
 #' wrapper around sample_n to avoid error caused by fewer rows than size.
 #' @export
 sample_rows <- function(df, size, ...) {
-  if (!is.null(size) && nrow(df) > size) {
-    dplyr::sample_n(df, size, ...)
+  grouped_cols <- grouped_by(df)
+  if (length(grouped_cols) > 0) {
+    nested <- df %>% tidyr::nest(data=-(!!grouped_cols))
+  } else {
+    nested <- df %>% tidyr::nest()
   }
-  else {
-    df
-  }
+
+  ret <- nested %>% dplyr::mutate(data = purrr::map(data, function(df){
+    if (!is.null(size) && nrow(df) > size) {
+      dplyr::sample_n(df, size, ...)
+    }
+    else {
+      df
+    }
+  }))
+
+  ret <- ret %> tidyr::unnest(cols=data)
+  ret
 }
 
 #' replace sequence of spaces or periods with
