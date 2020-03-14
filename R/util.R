@@ -479,7 +479,7 @@ sample_rows <- function(df, size, ...) {
   if (length(grouped_cols) > 0) {
     nested <- df %>% tidyr::nest(data=-(!!grouped_cols))
   } else {
-    nested <- df %>% tidyr::nest()
+    nested <- df %>% tidyr::nest(data=everything())
   }
 
   ret <- nested %>% dplyr::mutate(data = purrr::map(data, function(df){
@@ -491,7 +491,9 @@ sample_rows <- function(df, size, ...) {
     }
   }))
 
-  ret <- ret %> tidyr::unnest(cols=data)
+  # For some reason, the output after unnest has group_by columns whose order is reverted.
+  # ungroup, group_by is to set the order of group_by columns back to the original.
+  ret <- ret %>% tidyr::unnest(cols=data) %>% dplyr::ungroup() %>% dplyr::group_by(!!!rlang::syms(grouped_cols))
   ret
 }
 
