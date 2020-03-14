@@ -811,6 +811,14 @@ test_that("test sameple_rows", {
   expect_equal(nrow(ret), 3)
 })
 
+test_that("test sameple_rows with group_by", {
+  ret <- mtcars %>% group_by(am, vs) %>% sample_rows(3, seed=1)
+  expect_equal(nrow(ret), 12) # 3 rows times 4 groups
+  expect_equal(grouped_by(ret), c("am", "vs")) # group_by columns should be kept
+  # Set of columns should be preserved, though group_by columns are brought to the beginning, which is a known not-so-great behavior.
+  expect_true(all(colnames(ret) %in% c("vs","am","mpg","cyl","disp","hp","drat","wt","qsec","gear","carb")))
+})
+
 test_that("test unnest_without_empty", {
   df <- data.frame(x=c(1,2,3))
   # create empty row in y
