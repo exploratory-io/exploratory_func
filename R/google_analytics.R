@@ -62,7 +62,7 @@ getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tok
     }
     startDate <- as.character(lubridate::today() - (lastN - 1));
   } else if (dateRangeType == 'lastNDaysExcludeToday'){
-    startDate <- as.character(lubridate::today() - (lastN));
+    startDate <- as.character(lubridate::today() - lubridate::days(lastN));
     endDate <- as.character(lubridate::today() - lubridate::days(1));
   } else if (dateRangeType == "lastNWeeks") {
     startDate <- as.character(lubridate::today() - lubridate::weeks(lastN));
