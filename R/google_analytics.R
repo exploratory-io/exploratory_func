@@ -30,9 +30,10 @@ getGoogleAnayticsSegmentList <- function(){
 #' @param lastN - Corresponding numeric value for the lastNxx duration.
 #' @param startDate - When dateRangeType is "since", specify start date
 #' @param endDate - When dateRangeType is "since", you can provide end date. "today" will be used if it's not provided.
+#' @param tzone - timezone applied to POSIXct column
 getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tokenFileId = NULL,
                                paginate_query=FALSE, segments = NULL, dateRangeType = "lastNDays",
-                               lastN = NULL, startDate = NULL, endDate = NULL, ...){
+                               lastN = NULL, startDate = NULL, endDate = NULL, tzone = NULL, ...){
   if(!requireNamespace("RGoogleAnalytics")){stop("package RGoogleAnalytics must be installed.")}
   loadNamespace("lubridate")
   # if segment is not null and empty string, pass it as NULL
@@ -59,13 +60,60 @@ getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tok
       # so set lastN with lastNDays value.
       lastN <- lastNDays
     }
-    startDate <- as.character(lubridate::today() - (lastN - 1));
+    startDate <- as.character(lubridate::today() - lubridate::days(lastN - 1));
+  } else if (dateRangeType == 'lastNDaysExcludeToday'){
+    startDate <- as.character(lubridate::today() - lubridate::days(lastN));
+    endDate <- as.character(lubridate::today() - lubridate::days(1));
   } else if (dateRangeType == "lastNWeeks") {
     startDate <- as.character(lubridate::today() - lubridate::weeks(lastN));
+  } else if (dateRangeType == "lastNWeeksExcludeThisWeek") {
+    startDate <- as.character(floor_date(today(), unit = "week") - lubridate::weeks(lastN));
+    endDate <- as.character(floor_date(today(), unit = "week") - days(1));
+  } else if (dateRangeType == 'lastNWeeksExcludeToday') {
+    startDate <- as.character(lubridate::today() - lubridate::weeks(lastN));
+    endDate <- as.character(lubridate::today() - lubridate::days(1));
   } else if (dateRangeType == "lastNMonths") {
     startDate <- as.character(lubridate::today() %m-% months(lastN)); # use base months function since lubridate does not have it.
+  } else if (dateRangeType == "lastNMonthsExcludeThisMonth") {
+    startDate <- as.character(lubridate::floor_date(lubridate::today(), unit = "month") %m-% months(lastN)); # use base months function since lubridate does not have it.
+    endDate <- as.character(lubridate::floor_date(lubridate::today(), unit = "month") - days(1))
+  } else if (dateRangeType == "lastNMonthsExcludeThisWeek"){
+    startDate <- as.character(lubridate::floor_date(lubridate::today(), unit = "week") %m-% months(lastN)); # use base months function since lubridate does not have it.
+    endDate <- as.character(lubridate::floor_date(lubridate::today(), unit = "week") - days(1))
+  } else if (dateRangeType == "lastNMonthsExcludeToday") {
+    startDate <- as.character(lubridate::today() %m-% months(lastN)); # use base months function since lubridate does not have it.
+    endDate <- as.character(lubridate::today() - lubridate::days(1))
+  } else if (dateRangeType == "lastNQuarters") {
+    startDate <- as.character(lubridate::today() %m-% months(lastN*3));
+  } else if (dateRangeType == "lastNQuartersExcludeThisQuarter") {
+    startDate <- as.character(lubridate::floor_date(today(), unit = "quarter") %m-% months(lastN*3));
+    endDate <- as.character(lubridate::floor_date(lubridate::today(), unit = "quarter") - days(1));
+  } else if (dateRangeType == "lastNQuartersExcludeThisMonth"){
+    startDate <- as.character(lubridate::floor_date(lubridate::today(), unit = "month") %m-% months(lastN*3));
+    endDate <- as.character(lubridate::floor_date(today(), unit = "month") - days(1));
+  } else if (dateRangeType == "lastNQuartersExcludeThisWeek") {
+    startDate <- as.character(lubridate::floor_date(lubridate::today(), unit = "week") %m-% months(lastN*3));
+    endDate <-as.character(lubridate::floor_date(lubridate::today(), unit = "weeek") - days(1));
+  } else if (dateRangeType == "lastNQuartersExcludeToday") {
+    startDate <- as.character(lubridate::today() %m-% months(lastN*3));
+    endDate <-as.character(lubridate::today() - days(1));
   } else if (dateRangeType == "lastNYears") {
     startDate <- as.character(lubridate::today() %m-% lubridate::years(lastN));
+  } else if (dateRangeType == "lastNYearsExcludeThisYear") {
+    startDate <- as.character(lubridate::floor_date(lubridate::today(), unit = "year") %m-% lubridate::years(lastN));
+    endDate <- as.character(lubridate::floor_date(lubridate::today(), unit = "year") - days(1));
+  } else if (dateRangeType == "lastNYearsExcludeThisQuarter") {
+    startDate <- as.character(lubridate::floor_date(today(), unit = "quarter") %m-% lubridate::years(lastN));
+    endDate <- as.character(lubridate::floor_date(lubridate::today(), unit = "quarter") - days(1));
+  } else if (dateRangeType == "lastNYearsExcludeThisMonth"){
+    startDate <- as.character(lubridate::floor_date(lubridate::today(), unit = "month") %m-% lubridate::years(lastN));
+    endDate <- as.character(lubridate::floor_date(today(), unit = "month") - days(1));
+  } else if (dateRangeType == "lastNYearsExcludeThisWeek") {
+    startDate <- as.character(lubridate::floor_date(lubridate::today(), unit = "week") %m-% lubridate::years(lastN));
+    endDate <- as.character(lubridate::floor_date(lubridate::today(), unit = "weeek") - days(1));
+  } else if (dateRangeType == "lastNYearsExcludeToday") {
+    startDate <- as.character(lubridate::today() %m-% lubridate::years(lastN));
+    endDate <- as.character(lubridate::today() - days(1));
   } else if (dateRangeType == "yesterday") {
     startDate = as.character(lubridate::today() - 1);
     endDate = startDate;
@@ -138,6 +186,9 @@ getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tok
     # sessionCount is sometimes returned as character and numeric other times.
     # let's always cast it to numeric
     ga.data <- ga.data %>% dplyr::mutate( daysSinceLastSession = as.numeric(daysSinceLastSession) )
+  }
+  if(!is.null(tzone)) { # if timezone is specified, apply the timezeon to POSIXct columns
+    ga.data <- ga.data %>% dplyr::mutate_if(lubridate::is.POSIXct, funs(lubridate::force_tz(., tzone=tzone)))
   }
 
   ga.data
