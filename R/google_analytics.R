@@ -60,12 +60,59 @@ getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tok
       lastN <- lastNDays
     }
     startDate <- as.character(lubridate::today() - (lastN - 1));
+  } else if (dateRangeType == 'lastNDaysExcludeToday'){
+    startDate <- as.character(lubridate::today() - (lastN));
+    endDate <- as.character(lubridate::today() - lubridate::days(1));
   } else if (dateRangeType == "lastNWeeks") {
     startDate <- as.character(lubridate::today() - lubridate::weeks(lastN));
+  } else if (dateRangeType == "lastNWeeksExcludeThisWeek") {
+    startDate <- as.character(floor_date(today(), unit = "week") - lubridate::weeks(lastN));
+    endDate <- as.character(floor_date(today(), unit = "week") - days(1));
+  } else if (dateRangeType == 'lastNWeeksExcludeToday') {
+    startDate <- as.character(lubridate::today() - lubridate::weeks(lastN));
+    endDate <- as.character(lubridate::today() - lubridate::days(1));
   } else if (dateRangeType == "lastNMonths") {
     startDate <- as.character(lubridate::today() %m-% months(lastN)); # use base months function since lubridate does not have it.
+  } else if (dateRangeType == "lastNMonthsExcludeThisMonth") {
+    startDate <- as.character(lubridate::floor_date(lubridate::today(), unit = "month") %m-% months(lastN)); # use base months function since lubridate does not have it.
+    endDate <- as.character(lubridate::floor_date(lubridate::today(), unit = "month") - days(1))
+  } else if (dateRangeType == "lastNMonthsExcludeThisWeek"){
+    startDate <- as.character(lubridate::floor_date(lubridate::today(), unit = "week") %m-% months(lastN)); # use base months function since lubridate does not have it.
+    endDate <- as.character(lubridate::floor_date(lubridate::today(), unit = "week") - days(1))
+  } else if (dateRangeType == "lastNMonthsExcludeToday") {
+    startDate <- as.character(lubridate::today() %m-% months(lastN)); # use base months function since lubridate does not have it.
+    endDate <- as.character(lubridate::today() - lubridate::days(1))
+  } else if (dateRangeType == "lastNQuarters") {
+    startDate <- as.character(lubridate::today() %m-% months(lastN*3));
+  } else if (dateRangeType == "lastNQuartersExcludeThisQuarter") {
+    startDate <- as.character(lubridate::floor_date(today(), unit = "quarter") %m-% months(lastN*3));
+    endDate <- as.character(lubridate::floor_date(lubridate::today(), unit = "quarter") - days(1));
+  } else if (dateRangeType == "lastNQuartersExcludeThisMonth"){
+    startDate <- as.character(lubridate::floor_date(lubridate::today(), unit = "month") %m-% months(lastN*3));
+    endDate <- as.character(lubridate::floor_date(today(), unit = "month") - days(1));
+  } else if (dateRangeType == "lastNQuartersExcludeThisWeek") {
+    startDate <- as.character(lubridate::floor_date(lubridate::today(), unit = "week") %m-% months(lastN*3));
+    endDate <-as.character(lubridate::floor_date(lubridate::today(), unit = "weeek") - days(1));
+  } else if (dateRangeType == "lastNQuartersExcludeToday") {
+    startDate <- as.character(lubridate::today() %m-% months(lastN*3));
+    endDate <-as.character(lubridate::today() - days(1));
   } else if (dateRangeType == "lastNYears") {
     startDate <- as.character(lubridate::today() %m-% lubridate::years(lastN));
+  } else if (dateRangeType == "lastNYearsExcludeThisYear") {
+    startDate <- as.character(lubridate::floor_date(lubridate::today(), unit = "year") %m-% lubridate::years(lastN));
+    endDate <- as.character(lubridate::floor_date(lubridate::today(), unit = "year") - days(1));
+  } else if (dateRangeType == "lastNYearsExcludeThisQuarter") {
+    startDate <- as.character(lubridate::floor_date(today(), unit = "quarter") %m-% lubridate::years(lastN));
+    endDate <- as.character(lubridate::floor_date(lubridate::today(), unit = "quarter") - days(1));
+  } else if (dateRangeType == "lastNYearsExcludeThisMonth"){
+    startDate <- as.character(lubridate::floor_date(lubridate::today(), unit = "month") %m-% lubridate::years(lastN));
+    endDate <- as.character(lubridate::floor_date(today(), unit = "month") - days(1));
+  } else if (dateRangeType == "lastNYearsExcludeThisWeek") {
+    startDate <- as.character(lubridate::floor_date(lubridate::today(), unit = "week") %m-% lubridate::years(lastN));
+    endDate <- as.character(lubridate::floor_date(lubridate::today(), unit = "weeek") - days(1));
+  } else if (dateRangeType == "lastNYearsExcludeToday") {
+    startDate <- as.character(lubridate::today() %m-% lubridate::years(lastN));
+    endDate <- as.character(lubridate::today() - days(1));
   } else if (dateRangeType == "yesterday") {
     startDate = as.character(lubridate::today() - 1);
     endDate = startDate;
