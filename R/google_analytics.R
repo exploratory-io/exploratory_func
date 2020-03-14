@@ -30,9 +30,10 @@ getGoogleAnayticsSegmentList <- function(){
 #' @param lastN - Corresponding numeric value for the lastNxx duration.
 #' @param startDate - When dateRangeType is "since", specify start date
 #' @param endDate - When dateRangeType is "since", you can provide end date. "today" will be used if it's not provided.
+#' @param tzone - timezone applied to POSIXct column
 getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tokenFileId = NULL,
                                paginate_query=FALSE, segments = NULL, dateRangeType = "lastNDays",
-                               lastN = NULL, startDate = NULL, endDate = NULL, ...){
+                               lastN = NULL, startDate = NULL, endDate = NULL, tzone = NULL, ...){
   if(!requireNamespace("RGoogleAnalytics")){stop("package RGoogleAnalytics must be installed.")}
   loadNamespace("lubridate")
   # if segment is not null and empty string, pass it as NULL
@@ -185,6 +186,9 @@ getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tok
     # sessionCount is sometimes returned as character and numeric other times.
     # let's always cast it to numeric
     ga.data <- ga.data %>% dplyr::mutate( daysSinceLastSession = as.numeric(daysSinceLastSession) )
+  }
+  if(!is.null(tzone)) { # if timezone is specified, apply the timezeon to POSIXct columns
+    ga.data <- ga.data %>% dplyr::mutate_if(lubridate::is.POSIXct, funs(lubridate::force_tz(., tzone=tzone)))
   }
 
   ga.data
