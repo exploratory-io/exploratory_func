@@ -477,12 +477,12 @@ list_concat <- function(..., collapse = FALSE){
 sample_rows <- function(df, size, ...) {
   grouped_cols <- grouped_by(df)
   if (length(grouped_cols) > 0) {
-    nested <- df %>% tidyr::nest(data=-(!!grouped_cols))
+    nested <- df %>% tidyr::nest(.temp=-(!!grouped_cols))
   } else {
-    nested <- df %>% tidyr::nest(data=everything())
+    nested <- df %>% tidyr::nest(.temp=everything()) # Without .temp=everything(), warning is displayed.
   }
 
-  ret <- nested %>% dplyr::mutate(data = purrr::map(data, function(df){
+  ret <- nested %>% dplyr::mutate(.temp = purrr::map(.temp, function(df){
     if (!is.null(size) && nrow(df) > size) {
       dplyr::sample_n(df, size, ...)
     }
@@ -493,7 +493,7 @@ sample_rows <- function(df, size, ...) {
 
   # For some reason, the output after unnest has group_by columns whose order is reverted.
   # ungroup, group_by is to set the order of group_by columns back to the original.
-  ret <- ret %>% tidyr::unnest(cols=data) %>% dplyr::ungroup() %>% dplyr::group_by(!!!rlang::syms(grouped_cols))
+  ret <- ret %>% tidyr::unnest(cols=.temp) %>% dplyr::ungroup() %>% dplyr::group_by(!!!rlang::syms(grouped_cols))
   ret
 }
 
