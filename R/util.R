@@ -474,13 +474,35 @@ list_concat <- function(..., collapse = FALSE){
 
 #' wrapper around sample_n to avoid error caused by fewer rows than size.
 #' @export
-sample_rows <- function(df, size, ...) {
-  if (!is.null(size) && nrow(df) > size) {
-    dplyr::sample_n(df, size, ...)
+sample_rows <- function(df, size, seed = NULL, ...) {
+  if(!is.null(seed)) {
+    set.seed(seed)
   }
-  else {
-    df
+
+  # To evaluate size for each group rather than for entire data frame, just like dplyr::sample_n does, loop through groups by nest/mutate/unnest.
+  grouped_cols <- grouped_by(df)
+  if (length(grouped_cols) > 0) {
+    nested <- df %>% tidyr::nest(.temp.data=-(!!grouped_cols)) #TODO: avoid possibility of column name conflict between .temp.data and group_by columns.
+  } else {
+    nested <- df %>% tidyr::nest(.temp.data=everything()) # Without .temp.data=everything(), warning is displayed.
   }
+
+  ret <- nested %>% dplyr::mutate(.temp.data = purrr::map(.temp.data, function(df){
+    if (!is.null(size) && nrow(df) > size) {
+      dplyr::sample_n(df, size, ...)
+    }
+    else {
+      df
+    }
+  }))
+
+  ret <- ret %>% tidyr::unnest(cols=.temp.data)
+  # For some reason, the output after unnest has group_by columns whose order is reverted.
+  # ungroup, group_by is to set the order of group_by columns back to the original.
+  if (length(grouped_cols) > 0) {
+    ret <- ret %>% dplyr::ungroup() %>% dplyr::group_by(!!!rlang::syms(grouped_cols))
+  }
+  ret
 }
 
 #' replace sequence of spaces or periods with
