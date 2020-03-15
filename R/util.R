@@ -832,6 +832,10 @@ confint_radius <- function(x, level=0.95) {
   error
 }
 
+#' Returns half-width of confidence interval of population proportion of the given logical vector. NAs are skipped and not counted.
+#' This is useful when used in dplyr::summarize().
+#' Reference: http://www.r-tutor.com/elementary-statistics/interval-estimation/interval-estimate-population-proportion
+#' @export
 prop_confint_radius <- function(x, level=0.95) {
   n <- sum(!is.na(x))
   t <- sum(x, na.rm = TRUE)
