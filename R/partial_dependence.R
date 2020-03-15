@@ -15,7 +15,12 @@ calc_partial_binning_data <- function(df, target_col, var_cols) {
   for (var_col in var_cols) {
     if (is.factor(df[[var_col]])) { # In case of factor, just plot means of training data for each category.
       grouped <- df %>% dplyr::group_by(!!rlang::sym(var_col))
-      summarized <- grouped %>% dplyr::summarize(Actual=mean(!!rlang::sym(target_col), na.rm=TRUE), error=confint_error(!!rlang::sym(target_col)))
+      if (!is.logical(df[[target_col]])) { # When not logical (when numeric), calculate regular confidence interval.
+        summarized <- grouped %>% dplyr::summarize(Actual=mean(!!rlang::sym(target_col), na.rm=TRUE), error=confint_error(!!rlang::sym(target_col)))
+      }
+      else { # When logical, calculate confidence interval of population proportion.
+        summarized <- grouped %>% dplyr::summarize(Actual=mean(!!rlang::sym(target_col), na.rm=TRUE), error=prop_confint_radius(!!rlang::sym(target_col)))
+      }
       actual_ret <- summarised %>% dplyr::mutate(conf_low=Actual-error, conf_high=Actual+error)
       actual_ret <- actual_ret %>% dplyr::select(-error)
       ret <- ret %>% dplyr::bind_rows(actual_ret)
@@ -25,7 +30,11 @@ calc_partial_binning_data <- function(df, target_col, var_cols) {
       grouped <- df %>% dplyr::mutate(.temp.bin.column=cut(!!rlang::sym(var_col), breaks=20)) %>% dplyr::group_by(.temp.bin.column)
       # Equal frequency cut version:
       # actual_ret <- df %>% dplyr::mutate(.temp.bin.column=ggplot2::cut_number(!!rlang::sym(var_col), 20)) %>% dplyr::group_by(.temp.bin.column)
-      summarized <- grouped %>% dplyr::summarize(Actual=mean(!!rlang::sym(target_col), na.rm=TRUE), error=confint_error(!!rlang::sym(target_col)), !!rlang::sym(var_col):=mean(!!rlang::sym(var_col), na.rm=TRUE))
+      if (!is.logical(df[[target_col]])) { # When not logical (when numeric), calculate regular confidence interval.
+        summarized <- grouped %>% dplyr::summarize(Actual=mean(!!rlang::sym(target_col), na.rm=TRUE), error=confint_error(!!rlang::sym(target_col)), !!rlang::sym(var_col):=mean(!!rlang::sym(var_col), na.rm=TRUE))
+      else { # When logical, calculate confidence interval of population proportion.
+        summarized <- grouped %>% dplyr::summarize(Actual=mean(!!rlang::sym(target_col), na.rm=TRUE), error=prop_confint_radius(!!rlang::sym(target_col)), !!rlang::sym(var_col):=mean(!!rlang::sym(var_col), na.rm=TRUE))
+      }
       actual_ret <- summarized %>% dplyr::mutate(conf_low=Actual-error, conf_high=Actual+error)
       actual_ret <- actual_ret %>% dplyr::select(-.temp.bin.column, -error)
       ret <- ret %>% dplyr::bind_rows(actual_ret)
