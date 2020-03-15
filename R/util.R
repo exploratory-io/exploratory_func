@@ -831,6 +831,14 @@ confint_error <- function(x, level=0.95) {
   error
 }
 
+prop_confint_radius <- function(x, level=0.95) {
+  n <- sum(!is.na(x))
+  t <- sum(x, na.rm = TRUE)
+  p <- t/n
+  error <- qnorm((level+1)/2)*sqrt(p*(1-p)/n)
+  error
+}
+
 #' get confidence interval value
 #' @param val Predicted value
 #' @param conf_int Confidence interval to get
