@@ -2869,6 +2869,7 @@ exp_rpart <- function(df,
           # We calculate means of bins only for logical or numeric target to keep the visualization simple.
           model$partial_binning <- calc_partial_binning_data(df, clean_target_col, imp_vars)
         }
+        model$imp_vars <- imp_vars # keep imp_vars in the model for ordering of charts based on the importance.
       }
       else {
         model$partial_dependence <- NULL
