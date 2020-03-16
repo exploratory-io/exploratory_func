@@ -821,13 +821,26 @@ append_colnames <- function(df, prefix = "", suffix = ""){
 
 #' Returns half-width of confidence interval of given vector. NAs are skipped and not counted.
 #' This is useful when used in dplyr::summarize().
-#' It seems there is no commonly accepted name for half-width of confidence interval, but here we name it confint_error based on the name 'margin of error'.
+#' It seems there is no commonly accepted name for half-width of confidence interval.
 #' Reference for naming: https://ncss-wpengine.netdna-ssl.com/wp-content/themes/ncss/pdf/Procedures/PASS/Confidence_Intervals_for_One_Mean.pdf
+#' Here we name it confint_radius.
 #' @export
-confint_error <- function(x, level=0.95) {
+confint_radius <- function(x, level=0.95) {
   n <- sum(!is.na(x))
   s <- sd(x, na.rm = TRUE)
   error <- qt((level+1)/2, df=n-1)*s/sqrt(n)
+  error
+}
+
+#' Returns half-width of confidence interval of population proportion of the given logical vector. NAs are skipped and not counted.
+#' This is useful when used in dplyr::summarize().
+#' Reference: http://www.r-tutor.com/elementary-statistics/interval-estimation/interval-estimate-population-proportion
+#' @export
+prop_confint_radius <- function(x, level=0.95) {
+  n <- sum(!is.na(x))
+  t <- sum(x, na.rm = TRUE)
+  p <- t/n
+  error <- qnorm((level+1)/2)*sqrt(p*(1-p)/n)
   error
 }
 

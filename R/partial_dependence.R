@@ -14,19 +14,29 @@ calc_partial_binning_data <- function(df, target_col, var_cols) {
   ret <- data.frame()
   for (var_col in var_cols) {
     if (is.factor(df[[var_col]])) { # In case of factor, just plot means of training data for each category.
-      actual_ret <- df %>% dplyr::group_by(!!rlang::sym(var_col)) %>%
-        dplyr::summarise(Actual=mean(!!rlang::sym(target_col), na.rm=TRUE), error=confint_error(!!rlang::sym(target_col))) %>%
-        dplyr::mutate(conf_low=Actual-error, conf_high=Actual+error)
+      grouped <- df %>% dplyr::group_by(!!rlang::sym(var_col))
+      if (!is.logical(df[[target_col]])) { # When not logical (when numeric), calculate regular confidence interval.
+        summarized <- grouped %>% dplyr::summarize(Actual=mean(!!rlang::sym(target_col), na.rm=TRUE), error=confint_radius(!!rlang::sym(target_col)))
+      }
+      else { # When logical, calculate confidence interval of population proportion.
+        summarized <- grouped %>% dplyr::summarize(Actual=mean(!!rlang::sym(target_col), na.rm=TRUE), error=prop_confint_radius(!!rlang::sym(target_col)))
+      }
+      actual_ret <- summarized %>% dplyr::mutate(conf_low=Actual-error, conf_high=Actual+error)
       actual_ret <- actual_ret %>% dplyr::select(-error)
       ret <- ret %>% dplyr::bind_rows(actual_ret)
     }
     else if (is.numeric(df[[var_col]])) { # Because of proprocessing we do, all columns should be either factor or numeric by now.
       # Equal width cut: We found this gives more understandable plot compared to equal frequency cut.
-      actual_ret <- df %>% dplyr::mutate(.temp.bin.column=cut(!!rlang::sym(var_col), breaks=20)) %>% dplyr::group_by(.temp.bin.column)
+      grouped <- df %>% dplyr::mutate(.temp.bin.column=cut(!!rlang::sym(var_col), breaks=20)) %>% dplyr::group_by(.temp.bin.column)
       # Equal frequency cut version:
       # actual_ret <- df %>% dplyr::mutate(.temp.bin.column=ggplot2::cut_number(!!rlang::sym(var_col), 20)) %>% dplyr::group_by(.temp.bin.column)
-      actual_ret <- actual_ret %>% dplyr::summarize(Actual=mean(!!rlang::sym(target_col), na.rm=TRUE), error=confint_error(!!rlang::sym(target_col)), !!rlang::sym(var_col):=mean(!!rlang::sym(var_col), na.rm=TRUE)) %>%
-        dplyr::mutate(conf_low=Actual-error, conf_high=Actual+error)
+      if (!is.logical(df[[target_col]])) { # When not logical (when numeric), calculate regular confidence interval.
+        summarized <- grouped %>% dplyr::summarize(Actual=mean(!!rlang::sym(target_col), na.rm=TRUE), error=confint_radius(!!rlang::sym(target_col)), !!rlang::sym(var_col):=mean(!!rlang::sym(var_col), na.rm=TRUE))
+      }
+      else { # When logical, calculate confidence interval of population proportion.
+        summarized <- grouped %>% dplyr::summarize(Actual=mean(!!rlang::sym(target_col), na.rm=TRUE), error=prop_confint_radius(!!rlang::sym(target_col)), !!rlang::sym(var_col):=mean(!!rlang::sym(var_col), na.rm=TRUE))
+      }
+      actual_ret <- summarized %>% dplyr::mutate(conf_low=Actual-error, conf_high=Actual+error)
       actual_ret <- actual_ret %>% dplyr::select(-.temp.bin.column, -error)
       ret <- ret %>% dplyr::bind_rows(actual_ret)
     }
