@@ -147,7 +147,7 @@ handle_partial_dependence <- function(x) {
   ret <- ret %>%  dplyr::mutate(chart_type = chart_type_map[x_name])
 
   # Sort the rows for scatter plots for categorical predictor variables, by Predicted values.
-  nested <- ret %>% dplyr::group_by(x_name, y_name) %>% tidyr::nest(.temp.data=c(-x_name)) #TODO: avoid possibility of column name conflict between .temp.data and group_by columns.
+  nested <- ret %>% dplyr::group_by(x_name) %>% tidyr::nest(.temp.data=c(-x_name)) #TODO: avoid possibility of column name conflict between .temp.data and group_by columns.
   nested <- nested %>% dplyr::mutate(.temp.data = purrr::map(.temp.data, function(df){
     if (df$chart_type[[1]]=="scatter" && "Predicted" %in% unique(df$y_name)) {
       # set factor level order so that scatters are sorted by Predicted values. We don't do this for multiclass classification.
