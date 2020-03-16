@@ -145,6 +145,30 @@ handle_partial_dependence <- function(x) {
   names(chart_type_map) <- colnames(df)
 
   ret <- ret %>%  dplyr::mutate(chart_type = chart_type_map[x_name])
+
+  # Sort the rows for scatter plots for categorical predictor variables, by Predicted values.
+  nested <- ret %>% dplyr::group_by(x_name) %>% tidyr::nest(.temp.data=c(-x_name)) #TODO: avoid possibility of column name conflict between .temp.data and group_by columns.
+  nested <- nested %>% dplyr::mutate(.temp.data = purrr::map(.temp.data, function(df){
+    # We do the sorting only for scatter chart with Predicted values. This eliminates line charts or multiclass classifications.
+    if (df$chart_type[[1]]=="scatter" && "Predicted" %in% unique(df$y_name)) {
+      # Set x_value factor level order first for the sorting at the next step.
+      df <- df %>% dplyr::mutate(x_value = forcats::fct_reorder2(x_value, y_name, y_value, function(name, value) {
+        if ("Predicted" %in% name) {
+          first(value[name=="Predicted"])
+        }
+        else { # This should not happen but giving reasonable default just in case.
+          first(value)
+        }
+      }))
+      df <- df %>% dplyr::arrange(x_value)
+      df %>% dplyr::mutate(x_value = as.character(x_value)) # After sorting, change it back to character, so that it does not mess up the chart.
+    }
+    else {
+      df
+    }
+  }))
+  ret <- nested %>% tidyr::unnest(cols=.temp.data) %>% dplyr::ungroup()
+
   ret <- ret %>% dplyr::mutate(x_name = x$terms_mapping[x_name]) # map variable names to original.
   ret
 }
