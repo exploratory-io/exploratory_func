@@ -750,6 +750,14 @@ tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
       ret <- ret %>% dplyr::select(statistic, p.value, method)
     }
 
+    # Get sample sizes for the 2 groups (n1, n2).
+    data_summary <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
+      dplyr::summarize(n_rows=length(!!rlang::sym(x$var1)))
+    n1 <- data_summary$n_rows[[1]] # number of 1st class
+    n2 <- data_summary$n_rows[[2]] # number of 2nd class
+    v1 <- data_summary[[x$var2]][[1]] # value for 1st class
+    v2 <- data_summary[[x$var2]][[2]] # value for 2nd class
+
     # Switch the name of statistic based on the type of performed test.
     if (stringr::str_detect(ret$method[[1]], "signed rank test")) {
       ret <- ret %>% dplyr::rename(`W Statistic`=statistic)
@@ -770,6 +778,9 @@ tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
                      `Method`=method)
     }
 
+    ret <- ret %>% dplyr::mutate(`Number of Rows`=!!(n1+n2))
+    ret <- ret %>% dplyr::mutate(!!rlang::sym(paste0("Number of Rows for ", v1)):=!!n1)
+    ret <- ret %>% dplyr::mutate(!!rlang::sym(paste0("Number of Rows for ", v2)):=!!n2)
     if (!is.null(note)) { # Code to add Note column if there was an error. Not used for this particular function yet.
       ret <- ret %>% dplyr::mutate(Note=!!note)
     }
