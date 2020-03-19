@@ -582,8 +582,10 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
     # Get sample sizes for the 2 groups (n1, n2).
     data_summary <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
       dplyr::summarize(n_rows=length(!!rlang::sym(x$var1)))
-    n1 <- data_summary$n_rows[[1]]
-    n2 <- data_summary$n_rows[[2]]
+    n1 <- data_summary$n_rows[[1]] # number of 1st class
+    n2 <- data_summary$n_rows[[2]] # number of 2nd class
+    v1 <- data_summary[[x$var2]][[1]] # value for 1st class
+    v2 <- data_summary[[x$var2]][[2]] # value for 2nd class
     if (is.null(x$power)) {
       # If power is not specified in the arguments, estimate current power.
       # TODO: pwr functions does not seem to have argument for equal variance. Is it ok? 
@@ -638,6 +640,9 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
                       `Current Sample Size (Each Group)`=current_sample_size,
                       `Required Sample Size (Each Group)`=required_sample_size)
     }
+    ret <- ret %>% dplyr::mutate(`Number of Rows`=!!(n1+n2))
+    ret <- ret %>% dplyr::mutate(!!rlang::sym(paste0("Number of Rows for ", v1)):=!!n1)
+    ret <- ret %>% dplyr::mutate(!!rlang::sym(paste0("Number of Rows for ", v2)):=!!n2)
     if (!is.null(note)) { # Add Note column, if there was an error from pwr function.
       ret <- ret %>% dplyr::mutate(Note=!!note)
     }
