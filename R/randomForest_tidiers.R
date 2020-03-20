@@ -2174,7 +2174,7 @@ calc_feature_imp <- function(df,
         class(rf$boruta) <- c("Boruta_exploratory", class(rf$boruta))
         imp_vars <- extract_important_variables_from_boruta(rf$boruta)
         if (is.null(max_pd_vars)) {
-          max_pd_vars <- 12 # Number of most important variables to calculate partial dependences on. Default 12 fits well with either 3 or 4 columns of facets.
+          max_pd_vars <- 20 # Number of most important variables to calculate partial dependences on. This used to be 12 but we decided it was a little too small.
         }
         # max_pd_vars is not applied by default with Boruta.
         if (length(imp_vars) > 0) {
@@ -2190,7 +2190,7 @@ calc_feature_imp <- function(df,
         ) %>% dplyr::arrange(-importance)
         imp_vars <- imp_df$variable
         if (is.null(max_pd_vars)) {
-          max_pd_vars <- 12 # Number of most important variables to calculate partial dependences on. Default 12 fits well with either 3 or 4 columns of facets.
+          max_pd_vars <- 20 # Number of most important variables to calculate partial dependences on. This used to be 12 but we decided it was a little too small.
         }
         imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
         # code to separate numeric and categorical. keeping it for now for possibility of design change
@@ -2754,7 +2754,7 @@ exp_rpart <- function(df,
                       smote_target_minority_perc = 40,
                       smote_max_synth_perc = 200,
                       smote_k = 5,
-                      max_pd_vars = 12,
+                      max_pd_vars = 20,
                       pd_sample_size = 20,
                       pd_grid_resolution = 20,
                       pd_with_bin_means = FALSE, # Default is FALSE for backward compatibility on the server
