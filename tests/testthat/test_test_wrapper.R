@@ -258,10 +258,10 @@ test_that("test exp_chisq with group_by with single class category in one of the
 test_that("test exp_ttest", {
   mtcars2 <- mtcars
   mtcars2$am[[1]] <- NA # test NA filtering
-  ret <- exp_ttest(mtcars2, mpg, am)
-  ret %>% tidy(model, type="model")
-  ret %>% tidy(model, type="data_summary")
-  ret
+  model_df <- exp_ttest(mtcars2, mpg, am)
+  ret <- model_df %>% tidy(model, type="model")
+  expect_true("Number of Rows" %in% colnames(ret))
+  model_df %>% tidy(model, type="data_summary")
 })
 
 test_that("test exp_ttest with var.equal = TRUE", {
