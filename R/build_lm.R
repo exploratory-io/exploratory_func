@@ -1124,8 +1124,14 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
 #' Special version of tidy.glm function to use with build_lm.fast.
 #' In case of error, returns empty data frame, or data frame with Note column.
 #' @export
-tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, variable_metric = NULL, ...) { #TODO: add test
+tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, variable_metric = NULL, converged_only = FALSE, ...) { #TODO: add test
   if ("error" %in% class(x)) {
+    ret <- data.frame()
+    return(ret)
+  }
+  # Skip if model did not converge. We are using this to skip coefficient scatter plot with very large coefficients,
+  # or if odds ratio is used, Inf or 0 odds ratios.
+  if (converged_only && !x$converged) {
     ret <- data.frame()
     return(ret)
   }
