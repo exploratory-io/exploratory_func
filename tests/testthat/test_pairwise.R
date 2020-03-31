@@ -244,14 +244,27 @@ test_that("test do_dist without val", {
 test_that("test do_dist.cols", {
   loadNamespace("dplyr")
 
-  test_df <- data.frame(var1=c(1,2,2,2), var2=c(2,1,1,1))
+  test_df <- data.frame(var1=c(1,2,2,2), var2=c(2,1,1,1), var3=c(0,0,2,3))
 
   result <- (
     test_df %>%
       do_dist.cols(dplyr::starts_with("var"))
   )
 
-  expect_equal(result$value, c(2,2))
+  expect_equal(sum(!is.na(result$value)), 6) # Elements other than diagonal.
+})
+
+test_that("test do_dist.cols with only lower triangle", {
+  loadNamespace("dplyr")
+
+  test_df <- data.frame(var1=c(1,2,2,2), var2=c(2,1,1,1), var3=c(0,0,2,3))
+
+  result <- (
+    test_df %>%
+      do_dist.cols(dplyr::starts_with("var"), distinct=TRUE)
+  )
+
+  expect_equal(sum(!is.na(result$value)), 3) # Only lower triangle elements.
 })
 
 test_that("test do_dist.kv for grouped data frame as subject error", {

@@ -240,6 +240,7 @@ upper_gather <- function(mat, names=NULL, diag=NULL, cnames = c("Var1", "Var2", 
       tmat != 0
     } else {
       tmat
+      #is.na(tmat) | !is.na(tmat) # Just return matrix of same shape with TRUE for all the values.
     }
     # preserve NA if na.rm is FALSE
     if(!na.rm){
