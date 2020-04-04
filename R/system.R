@@ -1685,6 +1685,81 @@ statecode <- function(input = input, output_type = output_type) {
   return (as.character(state_name_id_map[[output_type]][match(input_normalized, state_name_id_map$normalized_name)]))
 }
 
+#' It can add 'longitude' and 'latitude' columns to a data frame which has 
+#' a column with US state 2-letter codes. 
+#' 
+#' Example:
+#' > exploratory::geocode_us_state(data.frame(state=c("CA", "NY")), "state")
+#' state  longitude latitude
+#' 1    CA -119.41793 36.77826
+#' 2    NY  -74.21793 43.29943 
+#' 
+geocode_us_state <- function(df, statecode_colname) {
+  mapping <- "state" 
+  names(mapping) <- statecode_colname
+  df %>% left_join(us_state_coordinates, by=mapping)  
+}
+
+#' It can add 'longitude' and 'latitude' columns to a data frame which has 
+#' a column with US state and county FIPS codes. 
+#' 
+#' Example:
+#' > exploratory::geocode_us_county(data.frame(code=c("01003", "13005")), "code")
+#'    code longitude latitude
+#' 1 01003 -87.74607 30.65922
+#' 2 13005 -82.38786 31.56333
+geocode_us_county <- function(df, fipscode_colname) {
+  mapping <- "fips" 
+  names(mapping) <- fipscode_colname
+  df %>% left_join(us_county_coordinates, by=mapping)  
+}
+
+#' It can add 'longitude' and 'latitude' columns to a data frame which has 
+#' a column with ISO 2-letter country codes. 
+#' 
+#' Example:
+#' > exploratory::geocode_world_country(data.frame(code=c("JP", "GB")), "code")
+#'   code  longitude latitude
+#' 1   JP 138.252924 36.20482
+#' 2   GB  -3.435973 55.37805
+#' 
+geocode_world_country <- function(df, countrycode_colname) {
+  mapping <- "iso2c" 
+  names(mapping) <- countrycode_colname
+  df %>% left_join(world_country_coordinates, by=mapping)  
+}
+
+#' It can add 'longitude' and 'latitude' columns to a data frame which has 
+#' a column with Japan prefecture names.
+#' 
+#' Example:
+#' 
+#' > exploratory::geocode_japan_prefecture(data.frame(name=c("東京","北海道")), "name")
+#'     name longitude latitude
+#' 1   東京  139.6917 35.68949
+#' 2 北海道  141.3468 43.06461 
+#' 
+geocode_japan_prefecture <- function(df, prefecture_colname) {
+  mapping <- "name" 
+  names(mapping) <- prefecture_colname
+  df %>% left_join(jp_prefecture_coordinates, by=mapping) 
+}
+
+#' Converts Japan prefecture names into various formats. 
+#' Currently, it can converts names into the short name format, 
+#' which has a name without the suffix such as "-to", "-ken". 
+#' 
+#' Example:
+#' > exploratory::prefecturecode(c("東京都","京都府"), output_type="name")
+#' [1] "東京" "京都"
+prefecturecode <- function(prefecture, output_type="name") {
+  # TODO: support other input/output types. 
+  pref_normalized <- gsub("[ \\.\\'\\-]", "", prefecture)
+  # Remove trailing "tofuken". Do not remove "do" from "Hokkaido".
+  pref_normalized <- gsub("[\u90FD\u5E9C\u770C]$", "", pref_normalized)
+  pref_normalized
+}
+
 #' Converts pair of state name and county name into county ID,
 #' which is concatenation of FIPS state code and FIPS county code.
 #'
@@ -2001,4 +2076,3 @@ read_raw_lines <- function(file, locale = readr::default_locale(), na = characte
   # use line as column name
   df <- data.frame(line = line, stringsAsFactors = FALSE)
 }
-
