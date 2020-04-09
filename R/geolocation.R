@@ -34,7 +34,7 @@ countrycode <- function(sourcevar, origin, destination, warn = TRUE, nomatch = N
     df <- data.frame(q=sourcevar) %>%
       mutate(iso2c= countrycode::countrycode(x, origin = "iso2c", destination = destination, warn=F),
              iso3c= countrycode::countrycode(x, origin = "iso3c", destination = destination, warn=F), 
-             name = countrycode::countrycode(x, origin = "country.name", destination = destination, warn=F)
+             name = countrycode::countrycode(x, origin = "country.name", destination = destination, warn=F),
              a=coalesce(iso2c, iso3c, name))
     df$a
   } else {
