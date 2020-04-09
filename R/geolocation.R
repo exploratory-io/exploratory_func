@@ -19,5 +19,26 @@ maxmind_closure <- function(type){
 #'@export
 ip_to_country <- maxmind_closure("country_name")
 
+
+#' countrycode wrapper. 
+#' 
+#' There is one special origin type "flex". By setting this, you can pass
+#' the country data in either "iso2c", "iso3c" or "country.name" format. 
+#' Multiple formats can be mixed.  
+#'  
 #' @export
-countrycode <- countrycode::countrycode
+countrycode <- function(sourcevar, origin, destination, warn = TRUE, nomatch = NA, 
+  custom_dict = NULL, custom_match = NULL, origin_regex = FALSE) {
+      
+  if (origin=="flex") {
+    df <- data.frame(q=sourcevar) %>%
+      mutate(iso2c= countrycode::countrycode(x, origin = "iso2c", destination = destination, warn=F),
+             iso3c= countrycode::countrycode(x, origin = "iso3c", destination = destination, warn=F), 
+             name = countrycode::countrycode(x, origin = "country.name", destination = destination, warn=F)
+             a=coalesce(iso2c, iso3c, name))
+    df$a
+  } else {
+    countrycode::countrycode(sourcevar, origin, destination, warn, nomatch, 
+      custom_dict, custom_match, origin_regex)
+  }
+}
