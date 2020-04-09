@@ -1821,44 +1821,39 @@ bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_da
 }
 
 #'Wrapper function for dplyr's set operations to support ignoring data type difference.
-set_operation_with_force_character <- function(func, x, y, encoding = NULL, ...) {
+set_operation_with_force_character <- function(func, x, y, ...) {
   x <- dplyr::mutate_all(x, funs(as.character))
   y <- dplyr::mutate_all(y, funs(as.character))
-  # if encoding is passed, use it to set locale argument of readr::type_convert to avoid unwanted garbled character on Windows for non-ascii data.
-  if(!is.null(encoding)) {
-    readr::type_convert(func(x, y, ...), locale = readr::locale(encoding = encoding))
-  } else {
-    readr::type_convert(func(x, y, ...))
-  }
+  readr::type_convert(func(x, y, ...))
 }
 
 #'Wrapper function for dplyr::union to support ignoring data type difference.
 #'@export
-union <- function(x, y, force_data_type = FALSE, encoding = NULL, ...){
+union <- function(x, y, force_data_type = FALSE, ...){
   if(!is.na(force_data_type) && class(force_data_type) ==  "logical" && force_data_type == FALSE)  {
     dplyr::union(x, y, ...)
   } else {
-    set_operation_with_force_character(dplyr::union, x, y, encoding = encoding, ...)
+    set_operation_with_force_character(dplyr::union, x, y, ...)
   }
 }
 
 #'Wrapper function for dplyr::union_all to support ignoring data type difference.
 #'@export
-union_all <- function(x, y, force_data_type = FALSE, encoding = NULL, ...){
+union_all <- function(x, y, force_data_type = FALSE, ...){
   if(!is.na(force_data_type) && class(force_data_type) ==  "logical" && force_data_type == FALSE)  {
     dplyr::union_all(x, y, ...)
   } else {
-    set_operation_with_force_character(dplyr::union_all, x, y, encoding, ...)
+    set_operation_with_force_character(dplyr::union_all, x, y, ...)
   }
 }
 
 #'Wrapper function for dplyr::intersect to support ignoring data type difference.
 #'@export
-intersect <- function(x, y, force_data_type = FALSE, encoding = NULL, ...){
+intersect <- function(x, y, force_data_type = FALSE, ...){
   if(!is.na(force_data_type) && class(force_data_type) ==  "logical" && force_data_type == FALSE)  {
     dplyr::intersect(x, y, ...)
   } else {
-    set_operation_with_force_character(dplyr::intersect, x, y, encoding = encoding, ...)
+    set_operation_with_force_character(dplyr::intersect, x, y, ...)
   }
 }
 
