@@ -1826,7 +1826,7 @@ set_operation_with_force_character <- function(func, x, y, encoding = NULL, ...)
   y <- dplyr::mutate_all(y, funs(as.character))
   # if encoding is passed, use it to set locale argument of readr::type_convert to avoid unwanted garbled character on Windows for non-ascii data.
   if(!is.null(encoding)) {
-    readr::type_convert(func(x, y, ...), locale = readr::locale(encoding = encodeing))
+    readr::type_convert(func(x, y, ...), locale = readr::locale(encoding = encoding))
   } else {
     readr::type_convert(func(x, y, ...))
   }
