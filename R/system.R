@@ -1753,9 +1753,10 @@ geocode_japan_prefecture <- function(df, prefecture_colname) {
 #' > exploratory::prefecturecode(prefecturecode(c("東京都","京都府", "Kanagawa-ken", "Iwate", "あいち"), output_type="name")
 #' [1] 東京   京都   神奈川 岩手   愛知  
 prefecturecode <- function(prefecture, output_type="name") {
+  loadNamespace("stringr")
   # TODO: support other output types. 
   # Clean up the input.
-  pref_normalized <- str_trim(tolower(prefecture))
+  pref_normalized <- stringr::str_trim(tolower(prefecture))
   # Remove trailing "tofuken". Do not remove "do" from "Hokkaido" (in Japanese).
   pref_normalized <- gsub("[\u90FD\u5E9C\u770C]$", "", pref_normalized)
   # Remove trailing "tofuken". Do not remove "do" from "Hokkaido" (in Roma-ji).

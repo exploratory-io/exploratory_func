@@ -29,12 +29,13 @@ ip_to_country <- maxmind_closure("country_name")
 #' @export
 countrycode <- function(sourcevar, origin, destination, warn = TRUE, nomatch = NA, 
   custom_dict = NULL, custom_match = NULL, origin_regex = FALSE) {
+  loadNamespace("countrycode")
       
   if (origin=="flex") {
     df <- data.frame(q=sourcevar) %>%
-      mutate(iso2c= countrycode::countrycode(x, origin = "iso2c", destination = destination, warn=F),
-             iso3c= countrycode::countrycode(x, origin = "iso3c", destination = destination, warn=F), 
-             name = countrycode::countrycode(x, origin = "country.name", destination = destination, warn=F),
+      mutate(iso2c= countrycode::countrycode(q, origin = "iso2c", destination = destination, warn=F),
+             iso3c= countrycode::countrycode(q, origin = "iso3c", destination = destination, warn=F), 
+             name = countrycode::countrycode(q, origin = "country.name", destination = destination, warn=F),
              a=coalesce(iso2c, iso3c, name))
     df$a
   } else {
