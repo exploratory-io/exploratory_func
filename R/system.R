@@ -1761,7 +1761,7 @@ prefecturecode <- function(prefecture, output_type="name") {
   # Remove trailing "tofuken". Do not remove "do" from "Hokkaido" (in Roma-ji).
   pref_normalized <- gsub("[_ \\.\\-](to|fu|hu|ken)$", "", pref_normalized)
   # Return the matching IDs.
-  return (jp_prefecture_name_id_map$id[match(pref_normalized, jp_prefecture_name_id_map$name)])
+  return (as.character(jp_prefecture_name_id_map$id[match(pref_normalized, jp_prefecture_name_id_map$name)]))
 }
 
 #' Converts pair of state name and county name into county ID,
