@@ -1710,7 +1710,7 @@ extract_argument_names <- function(...) {
 
 #'Wrapper function for dplyr::bind_rows to support named data frames when it's called inside dplyr chain.
 #'@export
-bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_data_type = FALSE, .id = NULL) {
+bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_data_type = FALSE, .id = NULL, encoding = NULL) {
   # for compatiblity with dply::bind_rows
   # if dplyr::bind_rows' .id argument is passed and id_column_name is NA
   # use dplyr::bind_rows' .id argumetn value as id_column_name
@@ -1799,7 +1799,12 @@ bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_da
     }
     #re-evaluate column data types
     if(force_data_type) {
-      readr::type_convert(dplyr::bind_rows(dataframes_updated, .id = new_id))
+      # if encoding is passed, use it to set locale argument of readr::type_convert to avoid unwanted garbled character on Windows for non-ascii data.
+      if(!is.null(encoding)) {
+        readr::type_convert(dplyr::bind_rows(dataframes_updated, .id = new_id), locale = readr::locale(encoding = encoding))
+      } else {
+        readr::type_convert(dplyr::bind_rows(dataframes_updated, .id = new_id))
+      }
     } else {
       dplyr::bind_rows(dataframes_updated, .id = new_id)
     }
@@ -1816,39 +1821,44 @@ bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_da
 }
 
 #'Wrapper function for dplyr's set operations to support ignoring data type difference.
-set_operation_with_force_character <- function(func, x, y, ...) {
+set_operation_with_force_character <- function(func, x, y, encoding = NULL, ...) {
   x <- dplyr::mutate_all(x, funs(as.character))
   y <- dplyr::mutate_all(y, funs(as.character))
-  readr::type_convert(func(x, y, ...))
+  # if encoding is passed, use it to set locale argument of readr::type_convert to avoid unwanted garbled character on Windows for non-ascii data.
+  if(!is.null(encoding)) {
+    readr::type_convert(func(x, y, ...), locale = readr::locale(encoding = encodeing))
+  } else {
+    readr::type_convert(func(x, y, ...))
+  }
 }
 
 #'Wrapper function for dplyr::union to support ignoring data type difference.
 #'@export
-union <- function(x, y, force_data_type = FALSE, ...){
+union <- function(x, y, force_data_type = FALSE, encoding = NULL, ...){
   if(!is.na(force_data_type) && class(force_data_type) ==  "logical" && force_data_type == FALSE)  {
     dplyr::union(x, y, ...)
   } else {
-    set_operation_with_force_character(dplyr::union, x, y, ...)
+    set_operation_with_force_character(dplyr::union, x, y, encoding = encoding, ...)
   }
 }
 
 #'Wrapper function for dplyr::union_all to support ignoring data type difference.
 #'@export
-union_all <- function(x, y, force_data_type = FALSE, ...){
+union_all <- function(x, y, force_data_type = FALSE, encoding = NULL, ...){
   if(!is.na(force_data_type) && class(force_data_type) ==  "logical" && force_data_type == FALSE)  {
     dplyr::union_all(x, y, ...)
   } else {
-    set_operation_with_force_character(dplyr::union_all, x, y, ...)
+    set_operation_with_force_character(dplyr::union_all, x, y, encoding, ...)
   }
 }
 
 #'Wrapper function for dplyr::intersect to support ignoring data type difference.
 #'@export
-intersect <- function(x, y, force_data_type = FALSE, ...){
+intersect <- function(x, y, force_data_type = FALSE, encoding = NULL, ...){
   if(!is.na(force_data_type) && class(force_data_type) ==  "logical" && force_data_type == FALSE)  {
     dplyr::intersect(x, y, ...)
   } else {
-    set_operation_with_force_character(dplyr::intersect, x, y, ...)
+    set_operation_with_force_character(dplyr::intersect, x, y, encoding = encoding, ...)
   }
 }
 
