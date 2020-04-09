@@ -13,6 +13,12 @@ test_that("countrycode", {
   # German to French
   res <- countrycode('Albanien', 'country.name.de', 'iso.name.fr')
   expect_equal(res, "Albanie (l')")
+  
+  
+  # origin="flex" special mode. Input can be in either iso2c, iso3c or name.
+  res <- exploratory::countrycode(c('Afghanistan', 'USA', 'NZ'), 'flex', 'iso2c')
+  expect_equal(res, c('AF', 'US', 'NZ'))
+  
 })
 
 test_that("ip to country", {
@@ -32,6 +38,10 @@ test_that("ip to country", {
 test_that("prefecturecode", {
   res <- exploratory::prefecturecode(c('東京都', '京都府', "北海道"), output_type="name")
   expect_equal(res, c('東京', '京都', "北海道"))
+  
+  # Test names in Roma-ji and Hiragana.
+  res <- exploratory::prefecturecode(c("東京都", "京都府", "Kanagawa-ken", "Iwate", "あいち"), output_type="name")
+  expect_equal(res, c('東京', '京都', "神奈川", "岩手", "愛知"))
 })
 
 test_that("geocode_us_state", {
