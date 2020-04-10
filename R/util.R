@@ -1799,7 +1799,10 @@ bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_da
     }
     #re-evaluate column data types
     if(force_data_type) {
-      # if encoding is passed, use it to set locale argument of readr::type_convert to avoid unwanted garbled character on Windows for non-ascii data.
+      # If encoding is passed, use it to set locale argument of readr::type_convert to avoid unwanted garbled character on Windows for non-ascii data with 'unknown' encoding.
+      # 'unknown' encoding can happen with dplyr::recode and dplyr::case_when.
+      # We are already working them around by having wrappers for those functions in the first place, but we keep this encoding
+      # argument so that we can work it around if we find new cases.
       if(!is.null(encoding)) {
         readr::type_convert(dplyr::bind_rows(dataframes_updated, .id = new_id), locale = readr::locale(encoding = encoding))
       } else {
