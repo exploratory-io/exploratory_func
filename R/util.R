@@ -1888,6 +1888,24 @@ recode <- function(x, ...){
   ret
 }
 
+#'Wrapper function for dplyr::case_when to workaround encoding info getting lost.
+#'@export
+case_when <- function(x, ...){
+  ret <- dplyr::case_when(x, ...)
+  # Workaround for the issue that Encoding of recoded values becomes 'unknown' on Windows.
+  # Such values are displayed fine on the spot, but later if bind_row is applied,
+  # they get garbled. Working it around by converting to UTF-8.
+  if (Sys.info()['sysname'] == 'Windows' &&
+      (is.character(ret))) { # The resulting character column's encoding seems to become 'unknown'.
+    ret <- tryCatch({
+      enc2utf8(ret)
+    }, error = function(e) { # In case of error, just use the original.
+      ret
+    })
+  }
+  ret
+}
+
 # This is written by removing unnecessary part from calculate_cohens_d.
 #'Calculate common standard deviation.
 #'@export
