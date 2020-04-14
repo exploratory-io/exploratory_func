@@ -1,3 +1,12 @@
+calc_permutation_importances <- function(fit, target, vars, data) {
+  var_list <- as.list(vars)
+  importances <- purrr::map(var_list, function(var) {
+    mmpf::permutationImportance(data, var, target, fit)
+  })
+  importances <- purrr::flatten_dbl(importances)
+  importances_df <- tibble(term=vars, importance=importances)
+  importances_df
+}
 
 
 # Builds partial_dependency object for lm/glm with same structure (a data.frame with attributes.) as edarf::partial_dependence.
