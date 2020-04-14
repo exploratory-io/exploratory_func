@@ -1710,7 +1710,7 @@ extract_argument_names <- function(...) {
 
 #'Wrapper function for dplyr::bind_rows to support named data frames when it's called inside dplyr chain.
 #'@export
-bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_data_type = FALSE, .id = NULL) {
+bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_data_type = FALSE, .id = NULL, encoding = NULL) {
   # for compatiblity with dply::bind_rows
   # if dplyr::bind_rows' .id argument is passed and id_column_name is NA
   # use dplyr::bind_rows' .id argumetn value as id_column_name
@@ -1799,7 +1799,15 @@ bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_da
     }
     #re-evaluate column data types
     if(force_data_type) {
-      readr::type_convert(dplyr::bind_rows(dataframes_updated, .id = new_id))
+      # If encoding is passed, use it to set locale argument of readr::type_convert to avoid unwanted garbled character on Windows for non-ascii data with 'unknown' encoding.
+      # 'unknown' encoding can happen with dplyr::recode and dplyr::case_when.
+      # We are already working them around by having wrappers for those functions in the first place, but we keep this encoding
+      # argument so that we can work it around if we find new cases.
+      if(!is.null(encoding)) {
+        readr::type_convert(dplyr::bind_rows(dataframes_updated, .id = new_id), locale = readr::locale(encoding = encoding))
+      } else {
+        readr::type_convert(dplyr::bind_rows(dataframes_updated, .id = new_id))
+      }
     } else {
       dplyr::bind_rows(dataframes_updated, .id = new_id)
     }
@@ -1870,9 +1878,28 @@ recode <- function(x, ...){
   # Such values are displayed fine on the spot, but later if bind_row is applied,
   # they get garbled. Working it around by converting to UTF-8.
   if (Sys.info()['sysname'] == 'Windows' &&
-      is.character(x) && is.character(ret) &&
-      all(Encoding(x) == 'UTF-8') && # Do it only when all values were originally UTF-8, and some turned into 'unknown'.
-      all(Encoding(ret) %in% c('UTF-8', 'unknown'))) {
+      ((is.character(x) && is.character(ret) &&
+        all(Encoding(x) == 'UTF-8') && # Do it only when all values were originally UTF-8, and some turned into 'unknown'.
+        all(Encoding(ret) %in% c('UTF-8', 'unknown'))) ||
+       (!is.character(x) || is.character(ret)))) { # If original is non-character column like numeric, the resulting column's encoding seems to become 'unknown' too.
+    ret <- tryCatch({
+      enc2utf8(ret)
+    }, error = function(e) { # In case of error, just use the original.
+      ret
+    })
+  }
+  ret
+}
+
+#'Wrapper function for dplyr::case_when to workaround encoding info getting lost.
+#'@export
+case_when <- function(x, ...){
+  ret <- dplyr::case_when(x, ...)
+  # Workaround for the issue that Encoding of recoded values becomes 'unknown' on Windows.
+  # Such values are displayed fine on the spot, but later if bind_row is applied,
+  # they get garbled. Working it around by converting to UTF-8.
+  if (Sys.info()['sysname'] == 'Windows' &&
+      (is.character(ret))) { # The resulting character column's encoding seems to become 'unknown'.
     ret <- tryCatch({
       enc2utf8(ret)
     }, error = function(e) { # In case of error, just use the original.
