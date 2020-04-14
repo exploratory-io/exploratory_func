@@ -1230,6 +1230,9 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
     },
     partial_dependence = {
       handle_partial_dependence(x)
+    },
+    permutation_importance = {
+      x$permutationImportance
     }
   )
 }
