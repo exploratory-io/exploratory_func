@@ -1,7 +1,10 @@
 calc_permutation_importances <- function(fit, target, vars, data) {
   var_list <- as.list(vars)
   importances <- purrr::map(var_list, function(var) {
-    mmpf::permutationImportance(data, var, target, fit)
+    # For some reason, default loss.fun, which is mean((x - y)^2) returns NA, even with na.rm=TRUE.
+    mmpf::permutationImportance(data, var, target, fit,
+                                predict.fun = function(object,newdata){predict(object,type = "response",newdata=newdata)},
+                                loss.fun = function(x,y){-sum(log(1- abs(x - y)),na.rm = TRUE)}) # Use minus log likelyhood as loss function, like logistic regression does.
   })
   importances <- purrr::flatten_dbl(importances)
   importances_df <- tibble(term=vars, importance=importances)
@@ -1232,7 +1235,11 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
       handle_partial_dependence(x)
     },
     permutation_importance = {
-      x$permutationImportance
+      ret <- x$permutation_importance
+      # Map variable names back to the original.
+      # as.character is to be safe by converting from factor. With factor, reverse mapping result will be messed up.
+      ret$term <- x$terms_mapping[as.character(ret$term)]
+      ret
     }
   )
 }
