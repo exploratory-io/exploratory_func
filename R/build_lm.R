@@ -1,4 +1,4 @@
-calc_permutation_importances <- function(fit, target, vars, data) {
+calc_permutation_importance_logistic <- function(fit, target, vars, data) {
   var_list <- as.list(vars)
   importances <- purrr::map(var_list, function(var) {
     # For some reason, default loss.fun, which is mean((x - y)^2) returns NA, even with na.rm=TRUE.
@@ -707,7 +707,7 @@ build_lm.fast <- function(df,
             model <- stats::glm(fml, data = df, family = family_arg)
           }
         }
-        model$permutation_importance <- calc_permutation_importances(model, clean_target_col, clean_cols, df)
+        model$permutation_importance <- calc_permutation_importance_logistic(model, clean_target_col, clean_cols, df)
       }
       else {
         # split training and test data
