@@ -1,10 +1,22 @@
 calc_permutation_importance_logistic <- function(fit, target, vars, data) {
   var_list <- as.list(vars)
   importances <- purrr::map(var_list, function(var) {
-    # For some reason, default loss.fun, which is mean((x - y)^2) returns NA, even with na.rm=TRUE.
-    mmpf::permutationImportance(data, var, target, fit,
+    mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
                                 predict.fun = function(object,newdata){predict(object,type = "response",newdata=newdata)},
-                                loss.fun = function(x,y){-sum(log(1- abs(x - y)),na.rm = TRUE)}) # Use minus log likelyhood as loss function, like logistic regression does.
+                                # Use minus log likelyhood as loss function, since it is what logistic regression tried to optimise. 
+                                loss.fun = function(x,y){-sum(log(1- abs(x - y)),na.rm = TRUE)})
+  })
+  importances <- purrr::flatten_dbl(importances)
+  importances_df <- tibble(term=vars, importance=importances)
+  importances_df
+}
+
+calc_permutation_importance_linear <- function(fit, target, vars, data) {
+  var_list <- as.list(vars)
+  importances <- purrr::map(var_list, function(var) {
+    mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
+                                # For some reason, default loss.fun, which is mean((x - y)^2) returns NA, even with na.rm=TRUE. Rewrote it with sum() to avoid the issue.
+                                loss.fun = function(x,y){sum((x - y)^2,na.rm = TRUE)/length(x)})
   })
   importances <- purrr::flatten_dbl(importances)
   importances_df <- tibble(term=vars, importance=importances)
@@ -754,6 +766,7 @@ build_lm.fast <- function(df,
             model$relative_importance <<- e
           })
         }
+        model$permutation_importance <- calc_permutation_importance_linear(model, clean_target_col, clean_cols, df)
       }
 
       tryCatch({
@@ -1130,6 +1143,13 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
     },
     partial_dependence = {
       handle_partial_dependence(x)
+    },
+    permutation_importance = {
+      ret <- x$permutation_importance
+      # Map variable names back to the original.
+      # as.character is to be safe by converting from factor. With factor, reverse mapping result will be messed up.
+      ret$term <- x$terms_mapping[as.character(ret$term)]
+      ret
     }
   )
 }
