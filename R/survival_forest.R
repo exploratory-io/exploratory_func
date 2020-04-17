@@ -231,7 +231,8 @@ tidy.ranger_survival_exploratory <- function(x, pretty.name = FALSE, ...) { #TOD
     ret <- data.frame()
     return(ret)
   }
+  class(x) <- 'ranger' # This seems to be necessary to make ranger::importance work, eliminating ranger_survival_exploratory.
   importance_vec <- ranger::importance(x)
-  ret <- tibble::tibble(term=names(importance_vec), importance=importance_vec)
+  ret <- tibble::tibble(variable=names(importance_vec), importance=importance_vec)
   ret
 }
