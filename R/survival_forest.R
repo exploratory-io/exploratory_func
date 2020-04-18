@@ -277,7 +277,7 @@ exp_survival_forest <- function(df,
       names(rf$terms_mapping) <- name_map
       rf$sampled_nrow <- sampled_nrow
 
-      rf$partial_dependence <- partial_dependence.ranger_survival_exploratory(rf, vars = clean_cols, n = c(10, 25), data = df)
+      rf$partial_dependence <- partial_dependence.ranger_survival_exploratory(rf, vars = clean_cols, n = c(5, 25), data = df)
 
       # add special lm_coxph class for adding extra info at glance().
       class(rf) <- c("ranger_survival_exploratory", class(rf))
@@ -312,6 +312,8 @@ tidy.ranger_survival_exploratory <- function(x, type = 'importance', ...) { #TOD
       ret
     },
     partial_dependence = {
-      x$partial_dependence
+      ret <- x$partial_dependence
+      ret <- ret %>% mutate(chart_type = 'line')
+      ret
     })
 }
