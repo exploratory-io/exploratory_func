@@ -1,4 +1,74 @@
 
+partial_dependence.ranger_survival_exploratory <- function(fit, vars = colnames(data),
+  n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)), # Keeping same default of 25 as edarf::partial_dependence, although we usually overwrite from callers.
+  interaction = FALSE, uniform = TRUE, data, ...) {
+
+  predict.fun <- function(object, newdata) {
+    predict(object, data=newdata)$survival
+  }
+
+  aggregate.fun <- function(x) {
+    mean(x)
+  }
+
+  args = list(
+    "data" = data,
+    "vars" = vars,
+    "n" = n,
+    "model" = fit,
+    "uniform" = uniform,
+    "predict.fun" = predict.fun,
+    "aggregate.fun" = aggregate.fun,
+    ...
+  )
+  
+  if (length(vars) > 1L & !interaction) { # More than one variables are there. Iterate calling mmpf::marginalPrediction.
+    pd = data.table::rbindlist(sapply(vars, function(x) {
+      args$vars = x
+      if ("points" %in% names(args))
+        args$points = args$points[x]
+      mp = do.call(mmpf::marginalPrediction, args)
+      mp
+    }, simplify = FALSE), fill = TRUE)
+    data.table::setcolorder(pd, c(vars, colnames(pd)[!colnames(pd) %in% vars]))
+  } else {
+    pd = do.call(mmpf::marginalPrediction, args)
+  }
+
+  attr(pd, "class") = c("pd", "data.frame")
+  attr(pd, "interaction") = interaction == TRUE
+  attr(pd, "vars") = vars
+  # Format of pd looks like this:
+  #        trt age        V1        V2        V3        V4        V5        V6        V7        V8        V9       V10
+  # 1 1.000000  NA 0.9984156 0.9971480 0.9867692 0.9843847 0.9631721 0.9357729 0.9165525 0.8988693 0.8679139 0.8532433
+  # 2 1.111111  NA 0.9984156 0.9971480 0.9867692 0.9843847 0.9631721 0.9357729 0.9165525 0.8988693 0.8679139 0.8532433
+  # 3 1.222222  NA 0.9984156 0.9971480 0.9867692 0.9843847 0.9631721 0.9357729 0.9165525 0.8988693 0.8679139 0.8532433
+  ret <- pd %>% pivot_longer(matches('^V[0-9]+$'),names_to = 'period', values_to = 'survival')
+  ret <- ret %>% mutate(period = as.numeric(str_remove(period,'^V')))
+  # Format of ret looks like this:
+  #     trt   age period survival
+  #   <dbl> <dbl>  <dbl>    <dbl>
+  # 1     1    NA      1    0.997
+  # 2     1    NA      2    0.995
+  # 3     1    NA      3    0.984
+  # 4     1    NA      4    0.981
+  ret %>% pivot_longer(c(-period, -survival) ,names_to = 'variable', values_to = 'value', values_drop_na=TRUE)
+  # Format of ret looks like this:
+  #   period survival variable value
+  #   <chr>     <dbl> <chr>    <dbl>
+  # 1 1         0.997 trt          1
+  # 2 2         0.995 trt          1
+  # 3 3         0.984 trt          1
+  # 4 4         0.981 trt          1
+  # 5 5         0.963 trt          1
+  # 6 6         0.938 trt          1
+  # 7 7         0.931 trt          1
+  # 8 8         0.920 trt          1
+  # 9 9         0.902 trt          1
+  #10 10        0.896 trt          1
+  ret
+}
+
 #' builds cox model quickly by way of sampling or fct_lumn, for analytics view.
 #' @export
 exp_survival_forest <- function(df,
