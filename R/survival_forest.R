@@ -52,6 +52,14 @@ partial_dependence.ranger_survival_exploratory <- function(fit, vars = colnames(
   # 2     1    NA      2    0.995
   # 3     1    NA      3    0.984
   # 4     1    NA      4    0.981
+
+  chart_type_map <- c()
+  for(col in colnames(ret)) {
+    chart_type_map <- c(chart_type_map, is.numeric(ret[[col]]))
+  }
+  chart_type_map <- ifelse(chart_type_map, "line", "scatter")
+  names(chart_type_map) <- colnames(ret)
+
   ret <- ret %>% pivot_longer(c(-period, -survival) ,names_to = 'variable', values_to = 'value', values_ptype = list(value=character()), values_drop_na=TRUE)
   # Format of ret looks like this:
   #   period survival variable value
@@ -66,6 +74,7 @@ partial_dependence.ranger_survival_exploratory <- function(fit, vars = colnames(
   # 8 8         0.920 trt          1
   # 9 9         0.902 trt          1
   #10 10        0.896 trt          1
+  ret <- ret %>%  dplyr::mutate(chart_type = chart_type_map[variable])
   ret
 }
 
@@ -311,9 +320,14 @@ tidy.ranger_survival_exploratory <- function(x, type = 'importance', ...) { #TOD
       ret <- tibble::tibble(variable=names(importance_vec), importance=importance_vec)
       ret
     },
-    partial_dependence = {
+    partial_dependence_survival_curve = {
       ret <- x$partial_dependence
       ret <- ret %>% mutate(chart_type = 'line')
+      ret
+    },
+    partial_dependence = {
+      ret <- x$partial_dependence
+      ret <- ret %>% dplyr::filter(period %in% c(quantile(period, 0.25, type=1), quantile(period, 0.5, type=1), quantile(period, 0.75, type=1)))
       ret
     })
 }
