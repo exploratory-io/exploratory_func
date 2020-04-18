@@ -52,7 +52,7 @@ partial_dependence.ranger_survival_exploratory <- function(fit, vars = colnames(
   # 2     1    NA      2    0.995
   # 3     1    NA      3    0.984
   # 4     1    NA      4    0.981
-  ret %>% pivot_longer(c(-period, -survival) ,names_to = 'variable', values_to = 'value', values_drop_na=TRUE)
+  ret <- ret %>% pivot_longer(c(-period, -survival) ,names_to = 'variable', values_to = 'value', values_drop_na=TRUE)
   # Format of ret looks like this:
   #   period survival variable value
   #   <chr>     <dbl> <chr>    <dbl>
@@ -276,6 +276,9 @@ exp_survival_forest <- function(df,
       rf$terms_mapping <- names(name_map)
       names(rf$terms_mapping) <- name_map
       rf$sampled_nrow <- sampled_nrow
+
+      rf$partial_dependence <- partial_dependence.ranger_survival_exploratory(rf, vars = clean_cols, n = c(10, 25), data = df)
+
       # add special lm_coxph class for adding extra info at glance().
       class(rf) <- c("ranger_survival_exploratory", class(rf))
       rf
@@ -296,13 +299,19 @@ exp_survival_forest <- function(df,
 
 #' special version of tidy.coxph function to use with build_coxph.fast.
 #' @export
-tidy.ranger_survival_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
+tidy.ranger_survival_exploratory <- function(x, type = 'importance', ...) { #TODO: add test
   if ("error" %in% class(x)) {
     ret <- data.frame()
     return(ret)
   }
-  class(x) <- 'ranger' # This seems to be necessary to make ranger::importance work, eliminating ranger_survival_exploratory.
-  importance_vec <- ranger::importance(x)
-  ret <- tibble::tibble(variable=names(importance_vec), importance=importance_vec)
-  ret
+  switch(type,
+    importance = {
+      class(x) <- 'ranger' # This seems to be necessary to make ranger::importance work, eliminating ranger_survival_exploratory.
+      importance_vec <- ranger::importance(x)
+      ret <- tibble::tibble(variable=names(importance_vec), importance=importance_vec)
+      ret
+    },
+    partial_dependence = {
+      x$partial_dependence
+    })
 }

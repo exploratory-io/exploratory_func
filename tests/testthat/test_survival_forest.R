@@ -11,7 +11,9 @@ test_that("test exp_survival_forest", {
   browser()
   expect_equal(class(model_df$model[[1]]), c("ranger_survival_exploratory"))
   browser()
-  ret <- model_df %>% broom::tidy(model)
+  ret <- model_df %>% broom::tidy(model, type='partial_dependence')
+  browser()
+  ret <- model_df %>% broom::tidy(model, type='importance')
   browser()
 })
 
