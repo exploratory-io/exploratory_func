@@ -1,7 +1,10 @@
 calc_survival_curves_with_strata <- function(df, time_col, status_col, vars) {
-  # TODO: categorize numeric vars
   vars_list <- as.list(vars)
   curve_dfs_list <- purrr::map(vars_list, function(var) {
+    if (is.numeric(df[[var]])) { # categorize numeric column into 10 bins.
+      grouped <- df %>% dplyr::mutate(.temp.bin.column=cut(!!rlang::sym(var), breaks=10)) %>% dplyr::group_by(.temp.bin.column)
+      df <- grouped %>% dplyr::mutate(!!rlang::sym(var):=mean(!!rlang::sym(var), na.rm=TRUE))
+    }
     fml <- as.formula(paste0("survival::Surv(`", time_col, "`,`", status_col, "`) ~ `", var, "`"))
     fit <- survival::survfit(fml, data = df)
     ret <- broom:::tidy.survfit(fit)
