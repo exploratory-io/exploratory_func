@@ -1,4 +1,12 @@
 calc_survival_curves_with_strata <- function(df, time_col, status_col, vars) {
+  # Create map from variable name to chart type. TODO: Eliminate duplicated code.
+  chart_type_map <- c()
+  for(col in colnames(df)) {
+    chart_type_map <- c(chart_type_map, is.numeric(df[[col]]))
+  }
+  chart_type_map <- ifelse(chart_type_map, "line", "scatter")
+  names(chart_type_map) <- colnames(ret)
+
   vars_list <- as.list(vars)
   curve_dfs_list <- purrr::map(vars_list, function(var) {
     if (is.numeric(df[[var]])) { # categorize numeric column into 10 bins.
@@ -11,6 +19,8 @@ calc_survival_curves_with_strata <- function(df, time_col, status_col, vars) {
     ret
   })
   ret <- data.table::rbindlist(curve_dfs_list)
+  ret <- ret %>% separate(strata, into = c('variable','value'), sep='=') %>% rename(survival=estimate, period=time)
+  ret <- ret %>% dplyr::mutate(chart_type = chart_type_map[variable])
   ret
 }
 
@@ -302,6 +312,7 @@ exp_survival_forest <- function(df,
       rf$sampled_nrow <- sampled_nrow
 
       rf$partial_dependence <- partial_dependence.ranger_survival_exploratory(rf, vars = clean_cols, n = c(5, 25), data = df)
+      rf$survival_curves <- calc_survival_curves_with_strata(df, clean_time_col, clean_status_col, clean_cols)
 
       # add special lm_coxph class for adding extra info at glance().
       class(rf) <- c("ranger_survival_exploratory", class(rf))
@@ -342,7 +353,14 @@ tidy.ranger_survival_exploratory <- function(x, type = 'importance', ...) { #TOD
     },
     partial_dependence = {
       ret <- x$partial_dependence
-      ret <- ret %>% dplyr::filter(period %in% c(quantile(period, 0.5, type=1)))
+      period_to_plot <- quantile(ret$period, 0.5, type=1)
+      ret <- ret %>% dplyr::filter(period == !!period_to_plot) %>%
+        mutate(type='Prediction')
+      actual <- x$survival_curves %>%
+        filter(period <= !!period_to_plot) %>%
+        group_by(variable, value) %>% filter(period == max(period)) %>% ungroup() %>%
+        mutate(type='Actual')
+      ret <- ret %>% dplyr::bind_rows(actual)
       ret
     })
 }
