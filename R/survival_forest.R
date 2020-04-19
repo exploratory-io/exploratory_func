@@ -1,3 +1,15 @@
+calc_survival_curves_with_strata <- function(df, time_col, status_col, vars) {
+  # TODO: categorize numeric vars
+  vars_list <- as.list(vars)
+  curve_dfs_list <- purrr::map(vars_list, function(var) {
+    fml <- as.formula(paste0("survival::Surv(`", time_col, "`,`", status_col, "`) ~ `", var, "`"))
+    fit <- survival::survfit(fml, data = df)
+    ret <- broom:::tidy.survfit(fit)
+    ret
+  })
+  ret <- data.table::rbindlist(curve_dfs_list)
+  ret
+}
 
 partial_dependence.ranger_survival_exploratory <- function(fit, vars = colnames(data),
   n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)), # Keeping same default of 25 as edarf::partial_dependence, although we usually overwrite from callers.
