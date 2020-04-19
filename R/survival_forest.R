@@ -5,7 +5,7 @@ calc_survival_curves_with_strata <- function(df, time_col, status_col, vars) {
     chart_type_map <- c(chart_type_map, is.numeric(df[[col]]))
   }
   chart_type_map <- ifelse(chart_type_map, "line", "scatter")
-  names(chart_type_map) <- colnames(ret)
+  names(chart_type_map) <- colnames(df)
 
   vars_list <- as.list(vars)
   curve_dfs_list <- purrr::map(vars_list, function(var) {
@@ -19,7 +19,7 @@ calc_survival_curves_with_strata <- function(df, time_col, status_col, vars) {
     ret
   })
   ret <- data.table::rbindlist(curve_dfs_list)
-  ret <- ret %>% separate(strata, into = c('variable','value'), sep='=') %>% rename(survival=estimate, period=time)
+  ret <- ret %>% tidyr::separate(strata, into = c('variable','value'), sep='=') %>% rename(survival=estimate, period=time)
   ret <- ret %>% dplyr::mutate(chart_type = chart_type_map[variable])
   ret
 }
