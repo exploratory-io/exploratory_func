@@ -110,6 +110,9 @@ exp_survival_forest <- function(df,
                     status,
                     ...,
                     max_nrow = 50000, # With 50000 rows, taking 6 to 7 seconds on late-2016 Macbook Pro.
+                    max_sample_size = NULL, # Half of max_nrow.
+                    ntree = 20,
+                    nodesize = 12,
                     predictor_n = 12, # so that at least months can fit in it.
                     seed = 1
                     ){
@@ -305,7 +308,17 @@ exp_survival_forest <- function(df,
       # TODO: This clean_target_col is actually not a cleaned column name since we want lm to show real name. Clean up our variable name.
       # TODO: see if the above is appropriate for coxph
       fml <- as.formula(paste0("survival::Surv(`", clean_time_col, "`, `", clean_status_col, "`) ~ ", rhs))
-      rf <- ranger::ranger(fml, data = df, importance = 'permutation')
+      # all or max_sample_size data will be used for randomForest
+      # to grow a tree
+      if (is.null(max_sample_size)) { # default to half of max_nrow
+        max_sample_size = max_nrow/2
+      }
+      sample.fraction <- min(c(max_sample_size / max_nrow, 1))
+      rf <- ranger::ranger(fml, data = df, importance = 'impurity',
+        num.trees = ntree,
+        min.node.size = nodesize,
+        keep.inbag=TRUE,
+        sample.fraction = sample.fraction)
       # these attributes are used in tidy of randomForest TODO: is this good for lm too?
       rf$terms_mapping <- names(name_map)
       names(rf$terms_mapping) <- name_map
