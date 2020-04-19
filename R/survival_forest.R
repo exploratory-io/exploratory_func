@@ -327,7 +327,7 @@ tidy.ranger_survival_exploratory <- function(x, type = 'importance', ...) { #TOD
     },
     partial_dependence = {
       ret <- x$partial_dependence
-      ret <- ret %>% dplyr::filter(period %in% c(quantile(period, 0.25, type=1), quantile(period, 0.5, type=1), quantile(period, 0.75, type=1)))
+      ret <- ret %>% dplyr::filter(period %in% c(quantile(period, 0.5, type=1)))
       ret
     })
 }
