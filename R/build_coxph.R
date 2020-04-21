@@ -64,8 +64,11 @@ build_coxph <- function(data, formula, max_categories = NULL, min_group_size = N
 
 
 calc_efron_log_likelihood <- function(lp, time, status) {
+  if (is.data.frame(time)) { # Since mmpf::permutationImportance passes down time as tibble, convert it to vector. TODO: Do this at more appropriate place.
+    time <- time[[1]]
+  }
   tmp_df <- tibble::tibble(time=time,
-                           status=status,
+                           status=as.numeric(status), # Handle logical status. TODO: Handle it better.
                            lp=lp,
                            theta=exp(lp))
   tmp_df <- tmp_df %>% dplyr::group_by(time) %>%
@@ -93,7 +96,7 @@ calc_efron_log_likelihood <- function(lp, time, status) {
 calc_permutation_importance_coxph <- function(fit, time_col, status_col, vars, data) {
    var_list <- as.list(vars)
    importances <- purrr::map(var_list, function(var) {
-    mmpf::permutationImportance(data, vars=var, y=time_col, model=fit,
+    mmpf::permutationImportance(data, vars=var, y=time_col, model=fit, nperm=1,
                                 predict.fun = function(object,newdata){as.matrix(tibble(lp=predict(object,newdata=newdata),status=newdata[[status_col]]))},
                                 # Use minus log likelyhood (Efron) as loss function, since it is what Cox regression tried to optimise. 
                                 loss.fun = function(x,y){-calc_efron_log_likelihood(x[,1], y, x[,2])})
@@ -332,11 +335,20 @@ build_coxph.fast <- function(df,
 
 #' special version of tidy.coxph function to use with build_coxph.fast.
 #' @export
-tidy.coxph_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
+tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = NULL, ...) { #TODO: add test
   if ("error" %in% class(x)) {
     ret <- data.frame()
     return(ret)
   }
+
+  if (type == 'permutation_importance') {
+    ret <- x$permutation_importance
+    # Map variable names back to the original.
+    # as.character is to be safe by converting from factor. With factor, reverse mapping result will be messed up.
+    ret$term <- x$terms_mapping[as.character(ret$term)]
+    return(ret)
+  }
+
   ret <- broom:::tidy.coxph(x) # it seems that tidy.lm takes care of glm too
   ret <- ret %>% dplyr::mutate(
     hazard_ratio = exp(estimate)
