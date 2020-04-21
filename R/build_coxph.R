@@ -93,7 +93,7 @@ calc_efron_log_likelihood <- function(lp, time, status) {
 calc_permutation_importance_coxph <- function(fit, time_col, status_col, vars, data) {
    var_list <- as.list(vars)
    importances <- purrr::map(var_list, function(var) {
-    mmpf::permutationImportance(lung, vars=var, y=time_col, model=fit,
+    mmpf::permutationImportance(data, vars=var, y=time_col, model=fit,
                                 predict.fun = function(object,newdata){as.matrix(tibble(lp=predict(object,newdata=newdata),status=newdata[[status_col]]))},
                                 # Use minus log likelyhood (Efron) as loss function, since it is what Cox regression tried to optimise. 
                                 loss.fun = function(x,y){-calc_efron_log_likelihood(x[,1], y, x[,2])})
@@ -310,6 +310,8 @@ build_coxph.fast <- function(df,
       rf$terms_mapping <- names(name_map)
       names(rf$terms_mapping) <- name_map
       rf$sampled_nrow <- sampled_nrow
+
+      rf$permutation_importance <- calc_permutation_importance_coxph(rf, clean_time_col, clean_status_col, c_cols, df)
       # add special lm_coxph class for adding extra info at glance().
       class(rf) <- c("coxph_exploratory", class(rf))
       rf
