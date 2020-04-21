@@ -461,7 +461,7 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coef', ...) {
         mutate(type='Actual')
       ret <- ret %>% dplyr::bind_rows(actual)
       ret
-    })
+    },
     coef = {
       ret <- broom:::tidy.coxph(x) # it seems that tidy.lm takes care of glm too
       ret <- ret %>% dplyr::mutate(
