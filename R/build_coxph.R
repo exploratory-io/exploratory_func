@@ -62,6 +62,38 @@ build_coxph <- function(data, formula, max_categories = NULL, min_group_size = N
               ...)
 }
 
+
+calc_efron_log_likelihood <- function(model, df, time_col, status_col) {
+  lp <- predict(model, newdata = df)
+
+  df <- df %>% mutate(status = status - 1) # Making 1,2 to 0,1
+
+  tmp_df <- tibble::tibble(time=df[[time_col]],
+                           status=df[[status_col]],
+                           lp=lp,
+                           theta=exp(lp))
+  tmp_df <- tmp_df %>% dplyr::group_by(time) %>%
+    dplyr::summarize(sum_lp_event = sum(lp*status),
+                     sum_theta_event = sum(theta*status),
+                     num_event = sum(status),
+                     sum_theta = sum(theta))
+
+  tmp_df <- tmp_df %>% dplyr::mutate(sum_theta_risk = rev(cumsum(rev(sum_theta))))
+
+  tmp_df <- tmp_df %>% dplyr::mutate(contrib = purrr::pmap(list(sum_lp_event, sum_theta_event, num_event, sum_theta_risk),
+                                                    function(sum_lp_event, sum_theta_event, num_event, sum_theta_risk) {
+    if (num_event == 0) return(0)
+
+    subtraction_term <- 0
+    for (l in 0:(num_event-1)) {
+      subtraction_term <- subtraction_term + log(sum_theta_risk - l/num_event*sum_theta_event)
+    }
+    contrib <- sum_lp_event - subtraction_term
+    contrib
+  }))
+  sum(purrr::flatten_dbl(tmp_df$contrib))
+}
+
 #' builds cox model quickly by way of sampling or fct_lumn, for analytics view.
 #' @export
 build_coxph.fast <- function(df,
