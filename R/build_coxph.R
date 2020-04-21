@@ -431,52 +431,55 @@ build_coxph.fast <- function(df,
 
 #' special version of tidy.coxph function to use with build_coxph.fast.
 #' @export
-tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = NULL, ...) { #TODO: add test
+tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coef', ...) { #TODO: add test
   if ("error" %in% class(x)) {
     ret <- data.frame()
     return(ret)
   }
 
-  if (type == 'permutation_importance') {
-    ret <- x$permutation_importance
-    # Map variable names back to the original.
-    # as.character is to be safe by converting from factor. With factor, reverse mapping result will be messed up.
-    ret$term <- x$terms_mapping[as.character(ret$term)]
-    return(ret)
-  }
+  switch(type,
+    permutation_importance = {
+      ret <- x$permutation_importance
+      # Map variable names back to the original.
+      # as.character is to be safe by converting from factor. With factor, reverse mapping result will be messed up.
+      ret$term <- x$terms_mapping[as.character(ret$term)]
+      ret
+    },
+    coef = {
+      ret <- broom:::tidy.coxph(x) # it seems that tidy.lm takes care of glm too
+      ret <- ret %>% dplyr::mutate(
+        hazard_ratio = exp(estimate)
+      )
+      base_level_table <- xlevels_to_base_level_table(x$xlevels)
+      ret <- ret %>% dplyr::left_join(base_level_table, by="term")
 
-  ret <- broom:::tidy.coxph(x) # it seems that tidy.lm takes care of glm too
-  ret <- ret %>% dplyr::mutate(
-    hazard_ratio = exp(estimate)
+      # Rows with NA estimates are due to perfect multicollinearity. Explain it in Note column.
+      # https://www.rdocumentation.org/packages/survival/versions/2.44-1.1/topics/coxph - Take a look at explanation for singular.ok.
+      if (any(is.na(ret$estimate))) {
+        ret <- ret %>% dplyr::mutate(note=if_else(is.na(estimate), "Dropped most likely due to perfect multicollinearity.", NA_character_))
+      }
+
+      if (pretty.name){
+        colnames(ret)[colnames(ret) == "term"] <- "Term"
+        colnames(ret)[colnames(ret) == "statistic"] <- "t Ratio"
+        colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
+        colnames(ret)[colnames(ret) == "std.error"] <- "Std Error"
+        colnames(ret)[colnames(ret) == "estimate"] <- "Coefficient"
+        colnames(ret)[colnames(ret) == "conf.low"] <- "Conf Low"
+        colnames(ret)[colnames(ret) == "conf.high"] <- "Conf High"
+        colnames(ret)[colnames(ret) == "hazard_ratio"] <- "Hazard Ratio"
+        colnames(ret)[colnames(ret) == "base.level"] <- "Base Level"
+        colnames(ret)[colnames(ret) == "note"] <- "Note"
+      } else {
+        colnames(ret)[colnames(ret) == "statistic"] <- "t_ratio"
+        colnames(ret)[colnames(ret) == "p.value"] <- "p_value"
+        colnames(ret)[colnames(ret) == "std.error"] <- "std_error"
+        colnames(ret)[colnames(ret) == "conf.low"] <- "conf_low"
+        colnames(ret)[colnames(ret) == "conf.high"] <- "conf_high"
+      }
+      ret
+    }
   )
-  base_level_table <- xlevels_to_base_level_table(x$xlevels)
-  ret <- ret %>% dplyr::left_join(base_level_table, by="term")
-
-  # Rows with NA estimates are due to perfect multicollinearity. Explain it in Note column.
-  # https://www.rdocumentation.org/packages/survival/versions/2.44-1.1/topics/coxph - Take a look at explanation for singular.ok.
-  if (any(is.na(ret$estimate))) {
-    ret <- ret %>% dplyr::mutate(note=if_else(is.na(estimate), "Dropped most likely due to perfect multicollinearity.", NA_character_))
-  }
-
-  if (pretty.name){
-    colnames(ret)[colnames(ret) == "term"] <- "Term"
-    colnames(ret)[colnames(ret) == "statistic"] <- "t Ratio"
-    colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
-    colnames(ret)[colnames(ret) == "std.error"] <- "Std Error"
-    colnames(ret)[colnames(ret) == "estimate"] <- "Coefficient"
-    colnames(ret)[colnames(ret) == "conf.low"] <- "Conf Low"
-    colnames(ret)[colnames(ret) == "conf.high"] <- "Conf High"
-    colnames(ret)[colnames(ret) == "hazard_ratio"] <- "Hazard Ratio"
-    colnames(ret)[colnames(ret) == "base.level"] <- "Base Level"
-    colnames(ret)[colnames(ret) == "note"] <- "Note"
-  } else {
-    colnames(ret)[colnames(ret) == "statistic"] <- "t_ratio"
-    colnames(ret)[colnames(ret) == "p.value"] <- "p_value"
-    colnames(ret)[colnames(ret) == "std.error"] <- "std_error"
-    colnames(ret)[colnames(ret) == "conf.low"] <- "conf_low"
-    colnames(ret)[colnames(ret) == "conf.high"] <- "conf_high"
-  }
-  ret
 }
 
 #' special version of glance.coxph function to use with build_coxph.fast.
