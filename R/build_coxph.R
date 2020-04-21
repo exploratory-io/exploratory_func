@@ -445,6 +445,23 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coef', ...) {
       ret$term <- x$terms_mapping[as.character(ret$term)]
       ret
     },
+    partial_dependence_survival_curve = {
+      ret <- x$partial_dependence
+      ret <- ret %>% mutate(chart_type = 'line')
+      ret
+    },
+    partial_dependence = {
+      ret <- x$partial_dependence
+      period_to_plot <- quantile(ret$period, 0.5, type=1)
+      ret <- ret %>% dplyr::filter(period == !!period_to_plot) %>%
+        mutate(type='Prediction')
+      actual <- x$survival_curves %>%
+        filter(period <= !!period_to_plot) %>%
+        group_by(variable, value) %>% filter(period == max(period)) %>% ungroup() %>%
+        mutate(type='Actual')
+      ret <- ret %>% dplyr::bind_rows(actual)
+      ret
+    })
     coef = {
       ret <- broom:::tidy.coxph(x) # it seems that tidy.lm takes care of glm too
       ret <- ret %>% dplyr::mutate(
