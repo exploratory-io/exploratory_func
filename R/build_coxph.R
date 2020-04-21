@@ -411,6 +411,7 @@ build_coxph.fast <- function(df,
 
       rf$permutation_importance <- calc_permutation_importance_coxph(rf, clean_time_col, clean_status_col, c_cols, df)
       rf$partial_dependence <- partial_dependence.coxph_exploratory(rf, vars = c_cols, n = c(5, 25), data = df)
+      rf$survival_curves <- calc_survival_curves_with_strata(df, clean_time_col, clean_status_col, c_cols)
       # add special lm_coxph class for adding extra info at glance().
       class(rf) <- c("coxph_exploratory", class(rf))
       rf
