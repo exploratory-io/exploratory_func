@@ -62,6 +62,101 @@ build_coxph <- function(data, formula, max_categories = NULL, min_group_size = N
               ...)
 }
 
+partial_dependence.coxph_exploratory <- function(fit, vars = colnames(data),
+  n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)), # Keeping same default of 25 as edarf::partial_dependence, although we usually overwrite from callers.
+  interaction = FALSE, uniform = TRUE, data, ...) {
+
+  predict.fun <- function(object, newdata) {
+    res <- broom::tidy(survival::survfit(object, newdata = newdata))
+    # time n.risk n.event n.censor estimate.1 estimate.2 estimate.3 estimate.4 estimate.5 estimate.6
+    #   <dbl>  <dbl>   <dbl>    <dbl>      <dbl>      <dbl>      <dbl>      <dbl>      <dbl>      <dbl>
+    # 1     5    228       1        0      0.994      0.994      0.995      0.995      0.995      0.994
+    # 2    11    227       3        0      0.975      0.978      0.982      0.981      0.980      0.975
+    # 3    12    224       1        0      0.969      0.972      0.977      0.977      0.975      0.969
+    # 4    13    223       2        0      0.957      0.961      0.968      0.967      0.966      0.957
+
+    # TODO: There is info on confidence interval, but we are not making use of them here.
+    res <- t(res %>% select(starts_with('estimate.')))
+    #                   V1        V2        V3        V4        V5        V6        V7        V8
+    # estimate.1 0.9937747 0.9751551 0.9689481 0.9565364 0.9503338 0.9441345 0.9379359 0.9317387
+    # estimate.2 0.9943782 0.9775431 0.9719241 0.9606775 0.9550519 0.9494257 0.9437965 0.9381650
+    # estimate.3 0.9954157 0.9816588 0.9770575 0.9678330 0.9632114 0.9585842 0.9539495 0.9493078
+    # estimate.4 0.9953371 0.9813465 0.9766677 0.9672892 0.9625909 0.9578874 0.9531767 0.9484592
+    # estimate.5 0.9950931 0.9803774 0.9754587 0.9656028 0.9606673 0.9557276 0.9507815 0.9458296
+    res
+  }
+
+  aggregate.fun <- function(x) {
+    mean(x)
+  }
+
+  args = list(
+    "data" = data,
+    "vars" = vars,
+    "n" = n,
+    "model" = fit,
+    "uniform" = uniform,
+    "predict.fun" = predict.fun,
+    "aggregate.fun" = aggregate.fun,
+    ...
+  )
+  
+  if (length(vars) > 1L & !interaction) { # More than one variables are there. Iterate calling mmpf::marginalPrediction.
+    pd = data.table::rbindlist(sapply(vars, function(x) {
+      args$vars = x
+      if ("points" %in% names(args))
+        args$points = args$points[x]
+      mp = do.call(mmpf::marginalPrediction, args)
+      mp
+    }, simplify = FALSE), fill = TRUE)
+    data.table::setcolorder(pd, c(vars, colnames(pd)[!colnames(pd) %in% vars]))
+  } else {
+    pd = do.call(mmpf::marginalPrediction, args)
+  }
+  browser()
+
+  attr(pd, "class") = c("pd", "data.frame")
+  attr(pd, "interaction") = interaction == TRUE
+  attr(pd, "vars") = vars
+  # Format of pd looks like this:
+  #        trt age        V1        V2        V3        V4        V5        V6        V7        V8        V9       V10
+  # 1 1.000000  NA 0.9984156 0.9971480 0.9867692 0.9843847 0.9631721 0.9357729 0.9165525 0.8988693 0.8679139 0.8532433
+  # 2 1.111111  NA 0.9984156 0.9971480 0.9867692 0.9843847 0.9631721 0.9357729 0.9165525 0.8988693 0.8679139 0.8532433
+  # 3 1.222222  NA 0.9984156 0.9971480 0.9867692 0.9843847 0.9631721 0.9357729 0.9165525 0.8988693 0.8679139 0.8532433
+  ret <- pd %>% pivot_longer(matches('^V[0-9]+$'),names_to = 'period', values_to = 'survival')
+  ret <- ret %>% mutate(period = as.numeric(str_remove(period,'^V')))
+  # Format of ret looks like this:
+  #     trt   age period survival
+  #   <dbl> <dbl>  <dbl>    <dbl>
+  # 1     1    NA      1    0.997
+  # 2     1    NA      2    0.995
+  # 3     1    NA      3    0.984
+  # 4     1    NA      4    0.981
+
+  chart_type_map <- c()
+  for(col in colnames(ret)) {
+    chart_type_map <- c(chart_type_map, is.numeric(ret[[col]]))
+  }
+  chart_type_map <- ifelse(chart_type_map, "line", "scatter")
+  names(chart_type_map) <- colnames(ret)
+
+  ret <- ret %>% pivot_longer(c(-period, -survival) ,names_to = 'variable', values_to = 'value', values_ptype = list(value=character()), values_drop_na=TRUE)
+  # Format of ret looks like this:
+  #   period survival variable value
+  #   <chr>     <dbl> <chr>    <dbl>
+  # 1 1         0.997 trt          1
+  # 2 2         0.995 trt          1
+  # 3 3         0.984 trt          1
+  # 4 4         0.981 trt          1
+  # 5 5         0.963 trt          1
+  # 6 6         0.938 trt          1
+  # 7 7         0.931 trt          1
+  # 8 8         0.920 trt          1
+  # 9 9         0.902 trt          1
+  #10 10        0.896 trt          1
+  ret <- ret %>%  dplyr::mutate(chart_type = chart_type_map[variable])
+  ret
+}
 
 calc_efron_log_likelihood <- function(lp, time, status) {
   if (is.data.frame(time)) { # Since mmpf::permutationImportance passes down time as tibble, convert it to vector. TODO: Do this at more appropriate place.
@@ -315,6 +410,7 @@ build_coxph.fast <- function(df,
       rf$sampled_nrow <- sampled_nrow
 
       rf$permutation_importance <- calc_permutation_importance_coxph(rf, clean_time_col, clean_status_col, c_cols, df)
+      rf$partial_dependence <- partial_dependence.coxph_exploratory(rf, vars = c_cols, n = c(5, 25), data = df)
       # add special lm_coxph class for adding extra info at glance().
       class(rf) <- c("coxph_exploratory", class(rf))
       rf
