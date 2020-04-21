@@ -63,13 +63,9 @@ build_coxph <- function(data, formula, max_categories = NULL, min_group_size = N
 }
 
 
-calc_efron_log_likelihood <- function(model, df, time_col, status_col) {
-  lp <- predict(model, newdata = df)
-
-  df <- df %>% mutate(status = status - 1) # Making 1,2 to 0,1
-
-  tmp_df <- tibble::tibble(time=df[[time_col]],
-                           status=df[[status_col]],
+calc_efron_log_likelihood <- function(lp, time, status) {
+  tmp_df <- tibble::tibble(time=time,
+                           status=status,
                            lp=lp,
                            theta=exp(lp))
   tmp_df <- tmp_df %>% dplyr::group_by(time) %>%
