@@ -158,6 +158,14 @@ partial_dependence.coxph_exploratory <- function(fit, vars = colnames(data),
   ret
 }
 
+# Efron's partial log likelihood approximation.
+# We use this as the cost function for permutation importance of Cox regression.
+# References:
+# http://www.math.ucsd.edu/~rxu/math284/slect5.pdf
+# https://bydmitry.github.io/efron-tensorflow.html
+# https://en.wikipedia.org/wiki/Proportional_hazards_model
+# 
+# lp - Linear predictor
 calc_efron_log_likelihood <- function(lp, time, status) {
   if (is.data.frame(time)) { # Since mmpf::permutationImportance passes down time as tibble, convert it to vector. TODO: Do this at more appropriate place.
     time <- time[[1]]
