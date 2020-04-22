@@ -24,9 +24,10 @@ calc_survival_curves_with_strata <- function(df, time_col, status_col, vars) {
   ret
 }
 
-partial_dependence.ranger_survival_exploratory <- function(fit, vars = colnames(data),
+partial_dependence.ranger_survival_exploratory <- function(fit, time_col, vars = colnames(data),
   n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)), # Keeping same default of 25 as edarf::partial_dependence, although we usually overwrite from callers.
   interaction = FALSE, uniform = TRUE, data, ...) {
+  times <- sort(unique(data[[time_col]])) # Keep vector of actual times to map time index to actual time later.
 
   predict.fun <- function(object, newdata) {
     predict(object, data=newdata)$survival
@@ -99,6 +100,7 @@ partial_dependence.ranger_survival_exploratory <- function(fit, vars = colnames(
   # 8 8         0.920 trt          1
   # 9 9         0.902 trt          1
   #10 10        0.896 trt          1
+  ret <- ret %>%  dplyr::mutate(period = (!!times)[period]) # Map back period from index to actual time.
   ret <- ret %>%  dplyr::mutate(chart_type = chart_type_map[variable])
   ret
 }
@@ -324,7 +326,7 @@ exp_survival_forest <- function(df,
       names(rf$terms_mapping) <- name_map
       rf$sampled_nrow <- sampled_nrow
 
-      rf$partial_dependence <- partial_dependence.ranger_survival_exploratory(rf, vars = clean_cols, n = c(5, 25), data = df)
+      rf$partial_dependence <- partial_dependence.ranger_survival_exploratory(rf, clean_time_col, vars = clean_cols, n = c(5, 25), data = df)
       rf$survival_curves <- calc_survival_curves_with_strata(df, clean_time_col, clean_status_col, clean_cols)
 
       # add special lm_coxph class for adding extra info at glance().
