@@ -62,13 +62,14 @@ build_coxph <- function(data, formula, max_categories = NULL, min_group_size = N
               ...)
 }
 
-partial_dependence.coxph_exploratory <- function(fit, vars = colnames(data),
+partial_dependence.coxph_exploratory <- function(fit, time_col, vars = colnames(data),
   n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)), # Keeping same default of 25 as edarf::partial_dependence, although we usually overwrite from callers.
   interaction = FALSE, uniform = TRUE, data, ...) {
+  times <- sort(unique(data[[time_col]])) # Keep vector of actual times to map time index to actual time later.
 
   predict.fun <- function(object, newdata) {
     res <- broom::tidy(survival::survfit(object, newdata = newdata))
-    # time n.risk n.event n.censor estimate.1 estimate.2 estimate.3 estimate.4 estimate.5 estimate.6
+    #    time n.risk n.event n.censor estimate.1 estimate.2 estimate.3 estimate.4 estimate.5 estimate.6
     #   <dbl>  <dbl>   <dbl>    <dbl>      <dbl>      <dbl>      <dbl>      <dbl>      <dbl>      <dbl>
     # 1     5    228       1        0      0.994      0.994      0.995      0.995      0.995      0.994
     # 2    11    227       3        0      0.975      0.978      0.982      0.981      0.980      0.975
@@ -113,7 +114,6 @@ partial_dependence.coxph_exploratory <- function(fit, vars = colnames(data),
   } else {
     pd = do.call(mmpf::marginalPrediction, args)
   }
-  browser()
 
   attr(pd, "class") = c("pd", "data.frame")
   attr(pd, "interaction") = interaction == TRUE
@@ -154,6 +154,7 @@ partial_dependence.coxph_exploratory <- function(fit, vars = colnames(data),
   # 8 8         0.920 trt          1
   # 9 9         0.902 trt          1
   #10 10        0.896 trt          1
+  ret <- ret %>%  dplyr::mutate(period = (!!times)[period]) # Map back period from index to actual time.
   ret <- ret %>%  dplyr::mutate(chart_type = chart_type_map[variable])
   ret
 }
@@ -418,7 +419,7 @@ build_coxph.fast <- function(df,
       rf$sampled_nrow <- sampled_nrow
 
       rf$permutation_importance <- calc_permutation_importance_coxph(rf, clean_time_col, clean_status_col, c_cols, df)
-      rf$partial_dependence <- partial_dependence.coxph_exploratory(rf, vars = c_cols, n = c(5, 25), data = df)
+      rf$partial_dependence <- partial_dependence.coxph_exploratory(rf, clean_time_col, vars = c_cols, n = c(5, 25), data = df)
       rf$survival_curves <- calc_survival_curves_with_strata(df, clean_time_col, clean_status_col, c_cols)
       # add special lm_coxph class for adding extra info at glance().
       class(rf) <- c("coxph_exploratory", class(rf))
