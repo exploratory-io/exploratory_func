@@ -516,7 +516,8 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coef', ...) {
       if (any(is.na(ret$estimate))) {
         ret <- ret %>% dplyr::mutate(note=if_else(is.na(estimate), "Dropped most likely due to perfect multicollinearity.", NA_character_))
       }
-
+      # Map coefficient names back to original.
+      ret$term <- map_terms_to_orig(ret$term, x$terms_mapping)
       if (pretty.name){
         colnames(ret)[colnames(ret) == "term"] <- "Term"
         colnames(ret)[colnames(ret) == "statistic"] <- "t Ratio"
