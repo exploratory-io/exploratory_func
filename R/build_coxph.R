@@ -305,7 +305,10 @@ build_coxph.fast <- function(df,
   # randomForest fails if columns are not clean. TODO is this needed?
   #clean_df <- janitor::clean_names(df)
   clean_df <- df # turn off clean_names for lm
-  # this mapping will be used to restore column names
+  # Replace column names with names like c1_, c2_...
+  # _ is so that name part and value part of categorical coefficient can be separated later,
+  # even with values that starts with number like "9E".
+  names(clean_df) <- paste0("c",1:length(colnames(clean_df)), "_")
   name_map <- colnames(clean_df)
   names(name_map) <- colnames(df)
 
@@ -329,9 +332,9 @@ build_coxph.fast <- function(df,
         # for numeric cols, filter NA rows, because lm will anyway do this internally, and errors out
         # if the remaining rows are with single value in any predictor column.
         # filter Inf/-Inf too to avoid error at lm.
-        dplyr::filter(!is.na(df[[time_col]]) & !is.infinite(df[[time_col]])) # this form does not handle group_by. so moved into each_func from outside.
+        dplyr::filter(!is.na(df[[clean_time_col]]) & !is.infinite(df[[clean_time_col]])) # this form does not handle group_by. so moved into each_func from outside.
       df <- df %>%
-        dplyr::filter(!is.na(df[[time_col]])) # this form does not handle group_by. so moved into each_func from outside.
+        dplyr::filter(!is.na(df[[clean_time_col]])) # this form does not handle group_by. so moved into each_func from outside.
 
       # sample the data for performance if data size is too large.
       sampled_nrow <- NULL
