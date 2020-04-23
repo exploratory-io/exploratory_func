@@ -470,7 +470,7 @@ build_coxph.fast <- function(df,
 
 #' special version of tidy.coxph function to use with build_coxph.fast.
 #' @export
-tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coef', ...) { #TODO: add test
+tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients', ...) { #TODO: add test
   if ("error" %in% class(x)) {
     ret <- data.frame()
     return(ret)
@@ -503,7 +503,7 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coef', ...) {
       ret <- ret %>% dplyr::mutate(variable = x$terms_mapping[variable]) # map variable names to original.
       ret
     },
-    coef = {
+    coefficients = {
       ret <- broom:::tidy.coxph(x) # it seems that tidy.lm takes care of glm too
       ret <- ret %>% dplyr::mutate(
         hazard_ratio = exp(estimate)
