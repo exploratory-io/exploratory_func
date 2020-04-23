@@ -487,6 +487,7 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coef', ...) {
     partial_dependence_survival_curve = {
       ret <- x$partial_dependence
       ret <- ret %>% mutate(chart_type = 'line')
+      ret <- ret %>% dplyr::mutate(variable = x$terms_mapping[variable]) # map variable names to original.
       ret
     },
     partial_dependence = {
@@ -499,6 +500,7 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coef', ...) {
         group_by(variable, value) %>% filter(period == max(period)) %>% ungroup() %>%
         mutate(type='Actual')
       ret <- ret %>% dplyr::bind_rows(actual)
+      ret <- ret %>% dplyr::mutate(variable = x$terms_mapping[variable]) # map variable names to original.
       ret
     },
     coef = {
