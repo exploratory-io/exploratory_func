@@ -77,13 +77,18 @@ partial_dependence.coxph_exploratory <- function(fit, time_col, vars = colnames(
     # 4    13    223       2        0      0.957      0.961      0.968      0.967      0.966      0.957
 
     # TODO: There is info on confidence interval, but we are not making use of them here.
-    res <- t(res %>% select(starts_with('estimate.')))
+    est <- as.data.frame(t(res %>% select(starts_with('estimate.'))))
     #                   V1        V2        V3        V4        V5        V6        V7        V8
     # estimate.1 0.9937747 0.9751551 0.9689481 0.9565364 0.9503338 0.9441345 0.9379359 0.9317387
     # estimate.2 0.9943782 0.9775431 0.9719241 0.9606775 0.9550519 0.9494257 0.9437965 0.9381650
     # estimate.3 0.9954157 0.9816588 0.9770575 0.9678330 0.9632114 0.9585842 0.9539495 0.9493078
     # estimate.4 0.9953371 0.9813465 0.9766677 0.9672892 0.9625909 0.9578874 0.9531767 0.9484592
     # estimate.5 0.9950931 0.9803774 0.9754587 0.9656028 0.9606673 0.9557276 0.9507815 0.9458296
+    high <- as.data.frame(t(res %>% select(starts_with('conf.high.'))))
+    high <- high %>% dplyr::rename_at(vars(starts_with('V')), funs(stringr::str_replace(., 'V', 'H')))
+    low <- as.data.frame(t(res %>% select(starts_with('conf.low.'))))
+    low <- low %>% dplyr::rename_at(vars(starts_with('V')), funs(stringr::str_replace(., 'V', 'L')))
+    res <- dplyr::bind_cols(est, high, low)
     res
   }
 
@@ -119,12 +124,24 @@ partial_dependence.coxph_exploratory <- function(fit, time_col, vars = colnames(
   attr(pd, "interaction") = interaction == TRUE
   attr(pd, "vars") = vars
   # Format of pd looks like this:
-  #        trt age        V1        V2        V3        V4        V5        V6        V7        V8        V9       V10
-  # 1 1.000000  NA 0.9984156 0.9971480 0.9867692 0.9843847 0.9631721 0.9357729 0.9165525 0.8988693 0.8679139 0.8532433
-  # 2 1.111111  NA 0.9984156 0.9971480 0.9867692 0.9843847 0.9631721 0.9357729 0.9165525 0.8988693 0.8679139 0.8532433
-  # 3 1.222222  NA 0.9984156 0.9971480 0.9867692 0.9843847 0.9631721 0.9357729 0.9165525 0.8988693 0.8679139 0.8532433
-  ret <- pd %>% pivot_longer(matches('^V[0-9]+$'),names_to = 'period', values_to = 'survival')
-  ret <- ret %>% mutate(period = as.numeric(str_remove(period,'^V')))
+  #        trt age        V1        V2        V3        V4        V5           H1        H2           L1        L2        L3 
+  # 1 1.000000  NA 0.9984156 0.9971480 0.9867692 0.9843847 0.9631721... 0.9357729 0.9165525... 0.8988693 0.8679139 0.8532433
+  # 2 1.111111  NA 0.9984156 0.9971480 0.9867692 0.9843847 0.9631721... 0.9357729 0.9165525... 0.8988693 0.8679139 0.8532433
+  # 3 1.222222  NA 0.9984156 0.9971480 0.9867692 0.9843847 0.9631721... 0.9357729 0.9165525... 0.8988693 0.8679139 0.8532433
+  ret <- pd %>% tidyr::pivot_longer(matches('^[VHL][0-9]+$'),names_to = 'period', values_to = 'survival')
+  # Format of ret looks like this:
+  #   trt   age period survival
+  # <dbl> <dbl>  <dbl>    <dbl>
+  #     1    NA     V1    0.997
+  #     1    NA     V2    0.995
+  # ...
+  #     1    NA     H1    1.000
+  #     1    NA     H2    0.999
+  # ...
+  #     1    NA     L1    0.984
+  #     1    NA     L2    0.981
+  ret <- ret %>% tidyr::separate(period, sep=1, into=c("type","period"), remove=TRUE) 
+  ret <- ret %>% dplyr::mutate(period = as.numeric(period))
   # Format of ret looks like this:
   #     trt   age period survival
   #   <dbl> <dbl>  <dbl>    <dbl>
@@ -132,6 +149,15 @@ partial_dependence.coxph_exploratory <- function(fit, time_col, vars = colnames(
   # 2     1    NA      2    0.995
   # 3     1    NA      3    0.984
   # 4     1    NA      4    0.981
+  ret <- ret %>% tidyr::pivot_wider(names_from="type", values_from="survival")
+  # Format of ret looks like this:
+  #  `age` `sex` period     V     H     L
+  # <dbl> <fct>  <dbl>  <dbl> <dbl> <dbl>
+  #    39 <NA>       1  0.996     1 0.988
+  #    39 <NA>       2  0.992     1 0.979
+  #    39 <NA>       3  0.988     1 0.972
+  #    39 <NA>       4  0.984     1 0.964
+  ret <- ret %>% dplyr::rename(survival=V, conf.high=H, conf.low=L)
 
   chart_type_map <- c()
   for(col in colnames(ret)) {
@@ -140,7 +166,7 @@ partial_dependence.coxph_exploratory <- function(fit, time_col, vars = colnames(
   chart_type_map <- ifelse(chart_type_map, "line", "scatter")
   names(chart_type_map) <- colnames(ret)
 
-  ret <- ret %>% pivot_longer(c(-period, -survival) ,names_to = 'variable', values_to = 'value', values_ptype = list(value=character()), values_drop_na=TRUE)
+  ret <- ret %>% tidyr::pivot_longer(c(-period, -survival, -conf.high, -conf.low) ,names_to = 'variable', values_to = 'value', values_ptype = list(value=character()), values_drop_na=TRUE)
   # Format of ret looks like this:
   #   period survival variable value
   #   <chr>     <dbl> <chr>    <dbl>
