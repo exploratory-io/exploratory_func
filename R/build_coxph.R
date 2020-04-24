@@ -470,7 +470,7 @@ build_coxph.fast <- function(df,
 
 #' special version of tidy.coxph function to use with build_coxph.fast.
 #' @export
-tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients', ...) { #TODO: add test
+tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients', pd_survival_time = NULL, ...) { #TODO: add test
   if ("error" %in% class(x)) {
     ret <- data.frame()
     return(ret)
@@ -492,11 +492,15 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients'
     },
     partial_dependence = {
       ret <- x$partial_dependence
-      period_to_plot <- quantile(ret$period, 0.5, type=1)
-      ret <- ret %>% dplyr::filter(period == !!period_to_plot) %>%
+      if (is.null(pd_survival_time)) { # By default, use median.
+        pd_survival_time <- quantile(ret$period, 0.5, type=1)
+      }
+      ret <- ret %>% 
+        filter(period <= !!pd_survival_time) %>% # Extract the latest period that does not exceed pd_survival_time
+        group_by(variable, value) %>% filter(period == max(period)) %>% ungroup() %>%
         mutate(type='Prediction')
       actual <- x$survival_curves %>%
-        filter(period <= !!period_to_plot) %>%
+        filter(period <= !!pd_survival_time) %>% # Extract the latest period that does not exceed pd_survival_time
         group_by(variable, value) %>% filter(period == max(period)) %>% ungroup() %>%
         mutate(type='Actual')
       ret <- ret %>% dplyr::bind_rows(actual)
