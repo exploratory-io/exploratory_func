@@ -70,7 +70,7 @@ partial_dependence.ranger_survival_exploratory <- function(fit, time_col, vars =
   # 2 1.111111  NA 0.9984156 0.9971480 0.9867692 0.9843847 0.9631721 0.9357729 0.9165525 0.8988693 0.8679139 0.8532433
   # 3 1.222222  NA 0.9984156 0.9971480 0.9867692 0.9843847 0.9631721 0.9357729 0.9165525 0.8988693 0.8679139 0.8532433
   ret <- pd %>% pivot_longer(matches('^V[0-9]+$'),names_to = 'period', values_to = 'survival')
-  ret <- ret %>% mutate(period = as.numeric(str_remove(period,'^V')))
+  ret <- ret %>% mutate(period = as.numeric(stringr::str_remove(period,'^V')))
   # Format of ret looks like this:
   #     trt   age period survival
   #   <dbl> <dbl>  <dbl>    <dbl>
@@ -352,7 +352,7 @@ exp_survival_forest <- function(df,
 
 #' special version of tidy.coxph function to use with build_coxph.fast.
 #' @export
-tidy.ranger_survival_exploratory <- function(x, type = 'importance', ...) { #TODO: add test
+tidy.ranger_survival_exploratory <- function(x, type = 'importance', pd_survival_time = NULL, ...) { #TODO: add test
   if ("error" %in% class(x)) {
     ret <- data.frame()
     return(ret)
@@ -373,11 +373,15 @@ tidy.ranger_survival_exploratory <- function(x, type = 'importance', ...) { #TOD
     },
     partial_dependence = {
       ret <- x$partial_dependence
-      period_to_plot <- quantile(ret$period, 0.5, type=1)
-      ret <- ret %>% dplyr::filter(period == !!period_to_plot) %>%
+      if (is.null(pd_survival_time)) { # By default, use median.
+        pd_survival_time <- quantile(ret$period, 0.5, type=1)
+      }
+      ret <- ret %>%
+        filter(period <= !!pd_survival_time) %>% # Extract the latest period that does not exceed pd_survival_time
+        group_by(variable, value) %>% filter(period == max(period)) %>% ungroup() %>%
         mutate(type='Prediction')
       actual <- x$survival_curves %>%
-        filter(period <= !!period_to_plot) %>%
+        filter(period <= !!pd_survival_time) %>% # Extract the latest period that does not exceed pd_survival_time
         group_by(variable, value) %>% filter(period == max(period)) %>% ungroup() %>%
         mutate(type='Actual')
       ret <- ret %>% dplyr::bind_rows(actual)
