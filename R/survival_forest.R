@@ -63,6 +63,11 @@ partial_dependence.ranger_survival_exploratory <- function(fit, time_col, vars =
     }, simplify = FALSE), fill = TRUE)
     data.table::setcolorder(pd, c(vars, colnames(pd)[!colnames(pd) %in% vars]))
   } else {
+    if (!is.numeric(data[[vars]])) { # If categorical, cover all categories in the data.
+      n_tmp <- args$n
+      n_tmp[1] <- length(unique(data[[vars]]))
+      args$n <- n_tmp
+    }
     pd = do.call(mmpf::marginalPrediction, args)
   }
 

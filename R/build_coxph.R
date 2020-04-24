@@ -113,7 +113,6 @@ partial_dependence.coxph_exploratory <- function(fit, time_col, vars = colnames(
       if ("points" %in% names(args))
         args$points = args$points[x]
       if (!is.numeric(data[[x]])) { # If categorical, cover all categories in the data.
-        browser()
         n_tmp <- args$n
         n_tmp[1] <- length(unique(data[[x]]))
         args$n <- n_tmp
@@ -123,6 +122,11 @@ partial_dependence.coxph_exploratory <- function(fit, time_col, vars = colnames(
     }, simplify = FALSE), fill = TRUE)
     data.table::setcolorder(pd, c(vars, colnames(pd)[!colnames(pd) %in% vars]))
   } else {
+    if (!is.numeric(data[[vars]])) { # If categorical, cover all categories in the data.
+      n_tmp <- args$n
+      n_tmp[1] <- length(unique(data[[vars]]))
+      args$n <- n_tmp
+    }
     pd = do.call(mmpf::marginalPrediction, args)
   }
 
