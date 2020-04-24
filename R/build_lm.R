@@ -255,6 +255,24 @@ map_terms_to_orig <- function(terms, mapping) {
   ret
 }
 
+preprocess_pre_sample <- function(df, target_col, predictor_cols) {
+  # cols will be filtered to remove invalid columns
+  for (col in predictor_cols) {
+    if(all(is.na(df[[col]]))){
+      # remove columns if they are all NA
+      df[[col]] <- NULL # drop the column so that SMOTE will not see it. 
+    }
+  }
+
+  df <- df %>%
+    # dplyr::filter(!is.na(!!target_col))  TODO: this was not filtering, and replaced it with the next line. check other similar places.
+    # for numeric cols, filter NA rows, because lm will anyway do this internally, and errors out
+    # if the remaining rows are with single value in any predictor column.
+    # filter Inf/-Inf too to avoid error at lm.
+    dplyr::filter(!is.na(df[[target_col]]) & !is.infinite(df[[target_col]])) # this form does not handle group_by. so moved into each_func from outside.
+  df
+}
+
 #' builds lm model quickly for analytics view.
 #' @param relimp - Whether to enable relative importance by relaimpo.
 #' @param relimp_type - Passed down to boot.relimp, but "lmg" seems to be the recommended option, but is very slow. default is "first".
@@ -402,23 +420,8 @@ build_lm.fast <- function(df,
     tryCatch({
       df_test <- NULL # declare variable for test data
 
-      # cols will be filtered to remove invalid columns
-      cols <- clean_cols
-      for (col in clean_cols) {
-        if(all(is.na(df[[col]]))){
-          # remove columns if they are all NA
-          cols <- setdiff(cols, col)
-          df[[col]] <- NULL # drop the column so that SMOTE will not see it. 
-        }
-      }
-      clean_cols <- cols
-
-      df <- df %>%
-        # dplyr::filter(!is.na(!!target_col))  TODO: this was not filtering, and replaced it with the next line. check other similar places.
-        # for numeric cols, filter NA rows, because lm will anyway do this internally, and errors out
-        # if the remaining rows are with single value in any predictor column.
-        # filter Inf/-Inf too to avoid error at lm.
-        dplyr::filter(!is.na(df[[clean_target_col]]) & !is.infinite(df[[clean_target_col]])) # this form does not handle group_by. so moved into each_func from outside.
+      df <- preprocess_pre_sample(df, clean_target_col, clean_cols)
+      clean_cols <- intersect(clean_cols, colnames(df))
 
       # Sample the data because randomForest takes long time if data size is too large.
       # If we are to do SMOTE, do not down sample here and let exp_balance handle it so that we do not sample out precious minority data.
