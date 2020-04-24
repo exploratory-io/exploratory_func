@@ -368,17 +368,6 @@ build_lm.fast <- function(df,
     }
   }
 
-  # cols will be filtered to remove invalid columns
-  cols <- selected_cols
-
-  for (col in selected_cols) {
-    if(all(is.na(df[[col]]))){
-      # remove columns if they are all NA
-      cols <- setdiff(cols, col)
-      df[[col]] <- NULL # drop the column so that SMOTE will not see it. 
-    }
-  }
-
   # Replace spaces with dots in column names. margins::marginal_effects() fails without it.
   clean_df <- df
   # Replace column names with names like c1_, c2_...
@@ -407,11 +396,23 @@ build_lm.fast <- function(df,
   colnames(clean_df) <- name_map
 
   clean_target_col <- name_map[target_col]
-  clean_cols <- name_map[cols]
+  clean_cols <- name_map[selected_cols]
 
   each_func <- function(df) {
     tryCatch({
       df_test <- NULL # declare variable for test data
+
+      # cols will be filtered to remove invalid columns
+      cols <- clean_cols
+      for (col in clean_cols) {
+        if(all(is.na(df[[col]]))){
+          # remove columns if they are all NA
+          cols <- setdiff(cols, col)
+          df[[col]] <- NULL # drop the column so that SMOTE will not see it. 
+        }
+      }
+      clean_cols <- cols
+
       df <- df %>%
         # dplyr::filter(!is.na(!!target_col))  TODO: this was not filtering, and replaced it with the next line. check other similar places.
         # for numeric cols, filter NA rows, because lm will anyway do this internally, and errors out
