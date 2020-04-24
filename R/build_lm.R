@@ -273,7 +273,8 @@ preprocess_pre_sample <- function(df, target_col, predictor_cols) {
   df
 }
 
-preprocess_post_sample <- function(df, target_col, predictor_cols) {
+preprocess_post_sample <- function(df, target_col, predictor_cols,
+                                   predictor_n = 12) { # so that at least months can fit in it.
   c_cols <- predictor_cols
   # To avoid unused factor level that causes margins::marginal_effects() to fail, filtering operation has
   # to be done before factor level adjustments. Because of that, the for statement below has to
@@ -381,6 +382,7 @@ preprocess_post_sample <- function(df, target_col, predictor_cols) {
     # Previous version of message - stop("The selected predictor variables are invalid since they have only one unique values.")
     stop("Invalid Predictors: Only one unique value.") # Message is made short so that it fits well in the Summary table.
   }
+  attr(df, 'predictors') <- c_cols # Pass up list of updated predictor column names.
   df
 }
 
@@ -545,113 +547,8 @@ build_lm.fast <- function(df,
         }
       }
 
-      c_cols <- clean_cols
-      # To avoid unused factor level that causes margins::marginal_effects() to fail, filtering operation has
-      # to be done before factor level adjustments. Because of that, the for statement below has to
-      # be separate from the for statement after that, and done first.
-      for(col in clean_cols){
-        if(is.numeric(df[[col]]) || lubridate::is.Date(df[[col]]) || lubridate::is.POSIXct(df[[col]])) {
-          # For numeric cols, filter NA rows, because lm will anyway do this internally, and errors out
-          # if the remaining rows are with single value in any predictor column.
-          # Filter Inf/-Inf too to avoid error at lm.
-          # Do the same for Date/POSIXct, because we will create numeric columns from them.
-          df <- df %>% dplyr::filter(!is.na(df[[col]]) & !is.infinite(df[[col]]))
-        }
-      }
-      if (nrow(df) == 0) {
-        stop("No row is left after removing NA/Inf from numeric, Date, or POSIXct columns.")
-      }
-      for(col in clean_cols){
-        if(lubridate::is.Date(df[[col]]) || lubridate::is.POSIXct(df[[col]])) {
-          c_cols <- setdiff(c_cols, col)
-
-          absolute_time_col <- avoid_conflict(colnames(df), paste0(col, "_abs_time"))
-          wday_col <- avoid_conflict(colnames(df), paste0(col, "_w_"))
-          day_col <- avoid_conflict(colnames(df), paste0(col, "_day_of_month"))
-          yday_col <- avoid_conflict(colnames(df), paste0(col, "_day_of_year"))
-          month_col <- avoid_conflict(colnames(df), paste0(col, "_m_"))
-          year_col <- avoid_conflict(colnames(df), paste0(col, "_year"))
-          new_name <- c(absolute_time_col, wday_col, day_col, yday_col, month_col, year_col)
-          names(new_name) <- paste(
-            names(name_map)[name_map == col],
-            c(
-              "_abs_time",
-              "_w_",
-              "_day_of_month",
-              "_day_of_year",
-              "_m_",
-              "_year"
-            ), sep="")
-
-          name_map <- c(name_map, new_name)
-
-          c_cols <- c(c_cols, absolute_time_col, wday_col, day_col, yday_col, month_col, year_col)
-          df[[absolute_time_col]] <- as.numeric(df[[col]])
-          # turn it into unordered factor since if it is ordered factor,
-          # lm/glm takes polynomial terms (Linear, Quadratic, Cubic, and so on) and use them as variables,
-          # which we do not want for this function.
-          # Reference: https://hlplab.wordpress.com/2008/01/28/the-mysterious-l-q-and-c/
-          df[[wday_col]] <- factor(lubridate::wday(df[[col]], label=TRUE), ordered=FALSE)
-          df[[day_col]] <- lubridate::day(df[[col]])
-          df[[yday_col]] <- lubridate::yday(df[[col]])
-          # turn it into unordered factor for the same reason as wday.
-          df[[month_col]] <- factor(lubridate::month(df[[col]], label=TRUE), ordered=FALSE)
-          df[[year_col]] <- lubridate::year(df[[col]])
-          if(lubridate::is.POSIXct(df[[col]])) {
-            hour_col <- avoid_conflict(colnames(df), paste0(col, "_hour"))
-            new_name <- c(hour_col)
-            names(new_name) <- paste(
-              names(name_map)[name_map == col],
-              c(
-                "_hour"
-              ), sep="")
-            name_map <- c(name_map, new_name)
-
-            c_cols <- c(c_cols, hour_col)
-            df[[hour_col]] <- factor(lubridate::hour(df[[col]])) # treat hour as category
-          }
-          df[[col]] <- NULL # drop original Date/POSIXct column to pass SMOTE later.
-        } else if(is.factor(df[[col]])) {
-          df[[col]] <- forcats::fct_drop(df[[col]]) # margins::marginal_effects() fails if unused factor level exists. Drop them to avoid it.
-          # 1. if the data is factor, respect the levels and keep first 10 levels, and make others "Others" level.
-          # 2. if the data is ordered factor, turn it into unordered. For ordered factor,
-          #    lm/glm takes polynomial terms (Linear, Quadratic, Cubic, and so on) and use them as variables,
-          #    which we do not want for this function.
-          if (length(levels(df[[col]])) >= predictor_n + 2) {
-            df[[col]] <- forcats::fct_other(factor(df[[col]], ordered=FALSE), keep=levels(df[[col]])[1:predictor_n])
-          }
-          else {
-            df[[col]] <- factor(df[[col]], ordered=FALSE)
-          }
-          # turn NA into (Missing) factor level. Without this, lm or glm drops rows internally.
-          df[[col]] <- forcats::fct_explicit_na(df[[col]])
-        } else if(is.logical(df[[col]])) {
-          # 1. convert data to factor if predictors are logical. (as.factor() on logical always puts FALSE as the first level, which is what we want for predictor.)
-          # 2. turn NA into (Missing) factor level so that lm will not drop all the rows.
-          df[[col]] <- forcats::fct_explicit_na(as.factor(df[[col]]))
-        } else if(!is.numeric(df[[col]])) {
-          # 1. convert data to factor if predictors are not numeric or logical
-          #    and limit the number of levels in factor by fct_lump.
-          #    we use ties.method to handle the case where there are many unique values. (without it, they all survive fct_lump.)
-          #    TODO: see if ties.method would make sense for calc_feature_imp.
-          # 2. turn NA into (Missing) factor level so that lm will not drop all the rows.
-          df[[col]] <- forcats::fct_explicit_na(forcats::fct_lump(forcats::fct_infreq(as.factor(df[[col]])), n=predictor_n, ties.method="first"))
-        }
-      }
-
-      # remove columns with only one unique value
-      cols_copy <- c_cols
-      for (col in cols_copy) {
-        unique_val <- unique(df[[col]])
-        if (length(unique_val[!is.na(unique_val)]) == 1) {
-          c_cols <- setdiff(c_cols, col)
-          df[[col]] <- NULL # drop the column so that SMOTE will not see it. 
-        }
-      }
-      if (length(c_cols) == 0) {
-        # Previous version of message - stop("The selected predictor variables are invalid since they have only one unique values.")
-        stop("Invalid Predictors: Only one unique value.") # Message is made short so that it fits well in the Summary table.
-      }
+      df <- preprocess_post_sample(df, clean_target_col, clean_cols, predictor_n = predictor_n)
+      c_cols <- attr(df, 'predictors') # predictors are updated (added and/or removed) in preprocess_post_sample. Catch up with it.
 
       if (!is.null(target_outlier_filter_type) || !is.null(predictor_outlier_filter_type)) {
         df$.is.outlier <- FALSE #TODO: handle possibility of name conflict.
