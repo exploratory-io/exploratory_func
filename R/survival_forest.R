@@ -216,6 +216,8 @@ exp_survival_forest <- function(df,
         df <- df %>% sample_rows(max_nrow)
       }
 
+      # Some columns will be removed from clean_cols to make the set of columns in c_cols.
+      # c_cols is the one to be fed to the building of the model.
       c_cols <- clean_cols
       for(col in clean_cols){
         if(lubridate::is.Date(df[[col]]) || lubridate::is.POSIXct(df[[col]])) {
@@ -329,8 +331,8 @@ exp_survival_forest <- function(df,
       names(rf$terms_mapping) <- name_map
       rf$sampled_nrow <- sampled_nrow
 
-      rf$partial_dependence <- partial_dependence.ranger_survival_exploratory(rf, clean_time_col, vars = clean_cols, n = c(5, 25), data = df)
-      rf$survival_curves <- calc_survival_curves_with_strata(df, clean_time_col, clean_status_col, clean_cols)
+      rf$partial_dependence <- partial_dependence.ranger_survival_exploratory(rf, clean_time_col, vars = c_cols, n = c(5, 25), data = df)
+      rf$survival_curves <- calc_survival_curves_with_strata(df, clean_time_col, clean_status_col, c_cols)
 
       # add special lm_coxph class for adding extra info at glance().
       class(rf) <- c("ranger_survival_exploratory", class(rf))
