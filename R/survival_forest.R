@@ -53,6 +53,11 @@ partial_dependence.ranger_survival_exploratory <- function(fit, time_col, vars =
       args$vars = x
       if ("points" %in% names(args))
         args$points = args$points[x]
+      if (!is.numeric(data[[x]])) { # If categorical, cover all categories in the data.
+        n_tmp <- args$n
+        n_tmp[1] <- length(unique(data[[x]]))
+        args$n <- n_tmp
+      }
       mp = do.call(mmpf::marginalPrediction, args)
       mp
     }, simplify = FALSE), fill = TRUE)
