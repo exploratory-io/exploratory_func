@@ -257,9 +257,11 @@ map_terms_to_orig <- function(terms, mapping) {
 
 preprocess_pre_sample <- function(df, target_col, predictor_cols) {
   # cols will be filtered to remove invalid columns
+  cols <- predictor_cols
   for (col in predictor_cols) {
-    if(all(is.na(df[[col]]))){
-      # remove columns if they are all NA
+    if(all(is.na(df[[col]]) | is.infinite(df[[col]]))){
+      # remove columns if they are all NA or Inf
+      cols <- setdiff(cols, col)
       df[[col]] <- NULL # drop the column so that SMOTE will not see it. 
     }
   }
@@ -270,6 +272,7 @@ preprocess_pre_sample <- function(df, target_col, predictor_cols) {
     # if the remaining rows are with single value in any predictor column.
     # filter Inf/-Inf too to avoid error at lm.
     dplyr::filter(!is.na(df[[target_col]]) & !is.infinite(df[[target_col]])) # this form does not handle group_by. so moved into each_func from outside.
+  attr(df, 'predictors') <- cols
   df
 }
 
@@ -534,7 +537,7 @@ build_lm.fast <- function(df,
       df_test <- NULL # declare variable for test data
 
       df <- preprocess_pre_sample(df, clean_target_col, clean_cols)
-      clean_cols <- intersect(clean_cols, colnames(df))
+      clean_cols <- attr(df, 'predictors') # predictors are updated (removed) in preprocess_pre_sample. Catch up with it.
 
       # Sample the data because randomForest takes long time if data size is too large.
       # If we are to do SMOTE, do not down sample here and let exp_balance handle it so that we do not sample out precious minority data.
