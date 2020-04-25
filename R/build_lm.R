@@ -357,7 +357,7 @@ preprocess_regression_data_after_sample <- function(df, target_col, predictor_co
       # 2. if the data is ordered factor, turn it into unordered. For ordered factor,
       #    lm/glm takes polynomial terms (Linear, Quadratic, Cubic, and so on) and use them as variables,
       #    which we do not want for this function.
-      if (length(levels(df[[col]])) >= predictor_n + 2) {
+      if (length(levels(df[[col]])) > predictor_n + 1) { # +1 is for 'Others' group.
         df[[col]] <- forcats::fct_other(factor(df[[col]], ordered=FALSE), keep=levels(df[[col]])[1:predictor_n])
       }
       else {
