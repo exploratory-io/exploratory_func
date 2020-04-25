@@ -255,6 +255,8 @@ map_terms_to_orig <- function(terms, mapping) {
   ret
 }
 
+# Common preprocessing of regression data to be done BEFORE sampling.
+# Only common operations to be done, for example, in Summary View too.
 preprocess_regression_data_before_sample <- function(df, target_col, predictor_cols) {
   # cols will be filtered to remove invalid columns
   cols <- predictor_cols
@@ -276,6 +278,8 @@ preprocess_regression_data_before_sample <- function(df, target_col, predictor_c
   df
 }
 
+# Common preprocessing of regression data to be done AFTER sampling.
+# Only common operations to be done, for example, in Summary View too.
 preprocess_regression_data_after_sample <- function(df, target_col, predictor_cols,
                                                     predictor_n = 12) { # so that at least months can fit in it.
   c_cols <- predictor_cols
