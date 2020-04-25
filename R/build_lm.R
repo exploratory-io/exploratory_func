@@ -278,21 +278,11 @@ preprocess_regression_data_before_sample <- function(df, target_col, predictor_c
     # if the remaining rows are with single value in any predictor column.
     # filter Inf/-Inf too to avoid error at lm.
     dplyr::filter(!is.na(df[[target_col]]) & !is.infinite(df[[target_col]])) # this form does not handle group_by. so moved into each_func from outside.
-  attr(df, 'predictors') <- cols
-  df
-}
 
-#' Common preprocessing of regression data to be done AFTER sampling.
-#' Only common operations to be done, for example, in Summary View too.
-#' @export
-preprocess_regression_data_after_sample <- function(df, target_col, predictor_cols,
-                                                    predictor_n = 12, # so that at least months can fit in it.
-                                                    name_map = NULL) {
-  c_cols <- predictor_cols
   # To avoid unused factor level that causes margins::marginal_effects() to fail, filtering operation has
-  # to be done before factor level adjustments. Because of that, the for statement below has to
-  # be separate from the for statement after that, and done first.
-  for(col in predictor_cols){
+  # to be done before factor level adjustments.
+  # This is done before sampling so that we will end up with more valid rows in the end.
+  for(col in cols){
     if(is.numeric(df[[col]]) || lubridate::is.Date(df[[col]]) || lubridate::is.POSIXct(df[[col]])) {
       # For numeric cols, filter NA rows, because lm will anyway do this internally, and errors out
       # if the remaining rows are with single value in any predictor column.
@@ -304,6 +294,17 @@ preprocess_regression_data_after_sample <- function(df, target_col, predictor_co
   if (nrow(df) == 0) {
     stop("No row is left after removing NA/Inf from numeric, Date, or POSIXct columns.")
   }
+  attr(df, 'predictors') <- cols
+  df
+}
+
+#' Common preprocessing of regression data to be done AFTER sampling.
+#' Only common operations to be done, for example, in Summary View too.
+#' @export
+preprocess_regression_data_after_sample <- function(df, target_col, predictor_cols,
+                                                    predictor_n = 12, # so that at least months can fit in it.
+                                                    name_map = NULL) {
+  c_cols <- predictor_cols
   for(col in predictor_cols){
     if(lubridate::is.Date(df[[col]]) || lubridate::is.POSIXct(df[[col]])) {
       c_cols <- setdiff(c_cols, col)
