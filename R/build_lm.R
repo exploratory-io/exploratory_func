@@ -283,7 +283,8 @@ preprocess_regression_data_before_sample <- function(df, target_col, predictor_c
 #' Only common operations to be done, for example, in Summary View too.
 #' @export
 preprocess_regression_data_after_sample <- function(df, target_col, predictor_cols,
-                                                    predictor_n = 12) { # so that at least months can fit in it.
+                                                    predictor_n = 12, # so that at least months can fit in it.
+                                                    name_map = NULL) {
   c_cols <- predictor_cols
   # To avoid unused factor level that causes margins::marginal_effects() to fail, filtering operation has
   # to be done before factor level adjustments. Because of that, the for statement below has to
@@ -392,6 +393,7 @@ preprocess_regression_data_after_sample <- function(df, target_col, predictor_co
     stop("Invalid Predictors: Only one unique value.") # Message is made short so that it fits well in the Summary table.
   }
   attr(df, 'predictors') <- c_cols # Pass up list of updated predictor column names.
+  attr(df, 'name_map') <- name_map # Pass up list of updated column name map. Just for legacy Date/POSIXct column handling. 
   df
 }
 
@@ -556,8 +558,9 @@ build_lm.fast <- function(df,
         }
       }
 
-      df <- preprocess_regression_data_after_sample(df, clean_target_col, clean_cols, predictor_n = predictor_n)
+      df <- preprocess_regression_data_after_sample(df, clean_target_col, clean_cols, predictor_n = predictor_n, name_map = name_map)
       c_cols <- attr(df, 'predictors') # predictors are updated (added and/or removed) in preprocess_post_sample. Catch up with it.
+      name_map <- attr(df, 'name_map')
 
       if (!is.null(target_outlier_filter_type) || !is.null(predictor_outlier_filter_type)) {
         df$.is.outlier <- FALSE #TODO: handle possibility of name conflict.
