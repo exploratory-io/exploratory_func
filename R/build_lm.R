@@ -268,6 +268,9 @@ preprocess_regression_data_before_sample <- function(df, target_col, predictor_c
       df[[col]] <- NULL # drop the column so that SMOTE will not see it. 
     }
   }
+  if (length(cols) == 0) {
+    stop("No predictor column is left after removing columns with only NA or Inf values.")
+  }
 
   df <- df %>%
     # dplyr::filter(!is.na(!!target_col))  TODO: this was not filtering, and replaced it with the next line. check other similar places.
