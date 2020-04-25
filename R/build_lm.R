@@ -255,7 +255,7 @@ map_terms_to_orig <- function(terms, mapping) {
   ret
 }
 
-preprocess_pre_sample <- function(df, target_col, predictor_cols) {
+preprocess_regression_data_before_sample <- function(df, target_col, predictor_cols) {
   # cols will be filtered to remove invalid columns
   cols <- predictor_cols
   for (col in predictor_cols) {
@@ -276,8 +276,8 @@ preprocess_pre_sample <- function(df, target_col, predictor_cols) {
   df
 }
 
-preprocess_post_sample <- function(df, target_col, predictor_cols,
-                                   predictor_n = 12) { # so that at least months can fit in it.
+preprocess_regression_data_after_sample <- function(df, target_col, predictor_cols,
+                                                    predictor_n = 12) { # so that at least months can fit in it.
   c_cols <- predictor_cols
   # To avoid unused factor level that causes margins::marginal_effects() to fail, filtering operation has
   # to be done before factor level adjustments. Because of that, the for statement below has to
@@ -536,7 +536,7 @@ build_lm.fast <- function(df,
     tryCatch({
       df_test <- NULL # declare variable for test data
 
-      df <- preprocess_pre_sample(df, clean_target_col, clean_cols)
+      df <- preprocess_regression_data_before_sample(df, clean_target_col, clean_cols)
       clean_cols <- attr(df, 'predictors') # predictors are updated (removed) in preprocess_pre_sample. Catch up with it.
 
       # Sample the data because randomForest takes long time if data size is too large.
@@ -550,7 +550,7 @@ build_lm.fast <- function(df,
         }
       }
 
-      df <- preprocess_post_sample(df, clean_target_col, clean_cols, predictor_n = predictor_n)
+      df <- preprocess_regression_data_after_sample(df, clean_target_col, clean_cols, predictor_n = predictor_n)
       c_cols <- attr(df, 'predictors') # predictors are updated (added and/or removed) in preprocess_post_sample. Catch up with it.
 
       if (!is.null(target_outlier_filter_type) || !is.null(predictor_outlier_filter_type)) {
