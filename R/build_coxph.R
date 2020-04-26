@@ -476,6 +476,13 @@ build_coxph.fast <- function(df,
       rf$partial_dependence <- partial_dependence.coxph_exploratory(rf, clean_time_col, vars = imp_vars, n = c(9, 25), data = df) # grid of 9 is convenient for both PDP and survival curves.
       rf$pd_survival_time <- pd_survival_time
       rf$survival_curves <- calc_survival_curves_with_strata(df, clean_time_col, clean_status_col, imp_vars)
+
+      tryCatch({
+        rf$vif <- calc_vif(rf)
+      }, error = function(e){
+        rf$vif <<- e
+      })
+
       # add special lm_coxph class for adding extra info at glance().
       class(rf) <- c("coxph_exploratory", class(rf))
       rf
@@ -572,6 +579,15 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients'
         colnames(ret)[colnames(ret) == "std.error"] <- "std_error"
         colnames(ret)[colnames(ret) == "conf.low"] <- "conf_low"
         colnames(ret)[colnames(ret) == "conf.high"] <- "conf_high"
+      }
+      ret
+    },
+    vif = {
+      if (!is.null(x$vif) && "error" %nin% class(x$vif)) {
+        ret <- vif_to_dataframe(x)
+      }
+      else {
+        ret <- data.frame() # Skip output for this group. TODO: Report error in some way.
       }
       ret
     }
