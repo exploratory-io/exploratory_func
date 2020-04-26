@@ -341,7 +341,7 @@ exp_survival_forest <- function(df,
       names(rf$terms_mapping) <- name_map
       rf$sampled_nrow <- sampled_nrow
 
-      rf$partial_dependence <- partial_dependence.ranger_survival_exploratory(rf, clean_time_col, vars = c_cols, n = c(5, 25), data = df)
+      rf$partial_dependence <- partial_dependence.ranger_survival_exploratory(rf, clean_time_col, vars = c_cols, n = c(9, 25), data = df) # grid of 9 is convenient for both PDP and survival curves.
       rf$survival_curves <- calc_survival_curves_with_strata(df, clean_time_col, clean_status_col, c_cols)
 
       # add special lm_coxph class for adding extra info at glance().

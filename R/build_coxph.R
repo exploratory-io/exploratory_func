@@ -458,7 +458,7 @@ build_coxph.fast <- function(df,
       rf$sampled_nrow <- sampled_nrow
 
       rf$permutation_importance <- calc_permutation_importance_coxph(rf, clean_time_col, clean_status_col, c_cols, df)
-      rf$partial_dependence <- partial_dependence.coxph_exploratory(rf, clean_time_col, vars = c_cols, n = c(5, 25), data = df)
+      rf$partial_dependence <- partial_dependence.coxph_exploratory(rf, clean_time_col, vars = c_cols, n = c(9, 25), data = df) # grid of 9 is convenient for both PDP and survival curves.
       rf$survival_curves <- calc_survival_curves_with_strata(df, clean_time_col, clean_status_col, c_cols)
       # add special lm_coxph class for adding extra info at glance().
       class(rf) <- c("coxph_exploratory", class(rf))
@@ -496,6 +496,15 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients'
     },
     partial_dependence_survival_curve = {
       ret <- x$partial_dependence
+      ret <- ret %>% group_by(variable) %>% nest() %>%
+        mutate(data = purrr::map(data,function(df){ # Show only 5 lines out of 9 lines for survival curve.
+          if (df$chart_type[[1]] == 'line') {
+            df %>% mutate(value_index=as.integer(fct_inorder(value))) %>% filter(value_index %% 2 == 1)
+          }
+          else {
+            df
+          }
+        })) %>% unnest()
       ret <- ret %>% mutate(chart_type = 'line')
       ret <- ret %>% dplyr::mutate(variable = x$terms_mapping[variable]) # map variable names to original.
       ret
