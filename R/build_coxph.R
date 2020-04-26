@@ -255,6 +255,7 @@ build_coxph.fast <- function(df,
                     max_nrow = 50000, # With 50000 rows, taking 6 to 7 seconds on late-2016 Macbook Pro.
                     predictor_n = 12, # so that at least months can fit in it.
                     max_pd_vars = NULL,
+                    pd_survival_time = NULL,
                     seed = 1
                     ){
   # TODO: cleanup code only aplicable to randomForest. this func was started from copy of calc_feature_imp, and still adjusting for lm. 
@@ -300,6 +301,10 @@ build_coxph.fast <- function(df,
   # check time_col
   if (!is.numeric(df[[time_col]])) {
     stop(paste0("Time column (", time_col, ") must be numeric"))
+  }
+
+  if (is.null(pd_survival_time)) { # By default, use median.
+    pd_survival_time <- median(df[[time_col]], na.rm=TRUE)
   }
 
   # cols will be filtered to remove invalid columns
@@ -469,7 +474,7 @@ build_coxph.fast <- function(df,
       }
       imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
       rf$partial_dependence <- partial_dependence.coxph_exploratory(rf, clean_time_col, vars = imp_vars, n = c(9, 25), data = df) # grid of 9 is convenient for both PDP and survival curves.
-
+      rf$pd_survival_time <- pd_survival_time
       rf$survival_curves <- calc_survival_curves_with_strata(df, clean_time_col, clean_status_col, imp_vars)
       # add special lm_coxph class for adding extra info at glance().
       class(rf) <- c("coxph_exploratory", class(rf))
@@ -491,7 +496,7 @@ build_coxph.fast <- function(df,
 
 #' special version of tidy.coxph function to use with build_coxph.fast.
 #' @export
-tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients', pd_survival_time = NULL, ...) { #TODO: add test
+tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients', ...) { #TODO: add test
   if ("error" %in% class(x)) {
     ret <- data.frame()
     return(ret)
@@ -522,9 +527,7 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients'
     },
     partial_dependence = {
       ret <- x$partial_dependence
-      if (is.null(pd_survival_time)) { # By default, use median.
-        pd_survival_time <- quantile(ret$period, 0.5, type=1)
-      }
+      pd_survival_time <- x$pd_survival_time
       ret <- ret %>% 
         filter(period <= !!pd_survival_time) %>% # Extract the latest period that does not exceed pd_survival_time
         group_by(variable, value) %>% filter(period == max(period)) %>% ungroup() %>%
