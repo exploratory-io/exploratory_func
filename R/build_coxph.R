@@ -254,6 +254,7 @@ build_coxph.fast <- function(df,
                     ...,
                     max_nrow = 50000, # With 50000 rows, taking 6 to 7 seconds on late-2016 Macbook Pro.
                     predictor_n = 12, # so that at least months can fit in it.
+                    max_pd_vars = NULL,
                     seed = 1
                     ){
   # TODO: cleanup code only aplicable to randomForest. this func was started from copy of calc_feature_imp, and still adjusting for lm. 
@@ -458,7 +459,17 @@ build_coxph.fast <- function(df,
       rf$sampled_nrow <- sampled_nrow
 
       rf$permutation_importance <- calc_permutation_importance_coxph(rf, clean_time_col, clean_status_col, c_cols, df)
-      rf$partial_dependence <- partial_dependence.coxph_exploratory(rf, clean_time_col, vars = c_cols, n = c(9, 25), data = df) # grid of 9 is convenient for both PDP and survival curves.
+
+      # get importance to decice variables for partial dependence
+      imp_df <- rf$permutation_importance
+      imp_df <- imp_df %>% dplyr::arrange(-importance)
+      imp_vars <- imp_df$term
+      if (is.null(max_pd_vars)) {
+        max_pd_vars <- 20 # Number of most important variables to calculate partial dependences on. This used to be 12 but we decided it was a little too small.
+      }
+      imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
+      rf$partial_dependence <- partial_dependence.coxph_exploratory(rf, clean_time_col, vars = imp_vars, n = c(9, 25), data = df) # grid of 9 is convenient for both PDP and survival curves.
+
       rf$survival_curves <- calc_survival_curves_with_strata(df, clean_time_col, clean_status_col, c_cols)
       # add special lm_coxph class for adding extra info at glance().
       class(rf) <- c("coxph_exploratory", class(rf))
