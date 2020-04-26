@@ -791,7 +791,7 @@ build_lm.fast <- function(df,
       }
 
       tryCatch({
-        model$vif <- vif(model)
+        model$vif <- calc_vif(model)
       }, error = function(e){
         model$vif <<- e
       })
