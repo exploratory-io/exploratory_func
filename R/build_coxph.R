@@ -527,10 +527,9 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients'
           else {
             df %>% dplyr::mutate(value_index=as.integer(forcats::fct_inorder(value))) %>% dplyr::mutate(value_index=value_index+5)
           }
-        })) %>% tidyr::unnest() %>% dplyr::ungroup()
+        })) %>% tidyr::unnest() %>% dplyr::ungroup() %>% dplyr::mutate(value_index=factor(value_index)) # Make value_index a factor to control color.
       ret <- ret %>% dplyr::mutate(chart_type = 'line')
       ret <- ret %>% dplyr::mutate(variable = x$terms_mapping[variable]) # map variable names to original.
-      browser()
       ret
     },
     partial_dependence = {
