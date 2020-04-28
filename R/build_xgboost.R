@@ -282,10 +282,16 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, ...) {
       data
     }
 
-    mat <- if(!is.null(x$is_sparse) && x$is_sparse){
-      Matrix::sparse.model.matrix(x$terms, ret_data, xlev = x$xlevels)
+    if(!is.null(x$is_sparse) && x$is_sparse){
+      # Set na.action to na.pass.
+      # Since XGBoost can predict with NAs in predictors, creation of sparse matrix should not remove NA rows.
+      # https://stackoverflow.com/questions/29732720/sparse-model-matrix-loses-rows-in-r
+      na.action_tmp <- getOption('na.action')
+      options(na.action='na.pass')
+      mat <- Matrix::sparse.model.matrix(x$terms, ret_data, xlev = x$xlevels)
+      options(na.action=na.action_tmp)
     } else {
-      model.matrix(x$terms, model.frame(ret_data, na.action = na.pass, xlev = x$xlevels))
+      mat <- model.matrix(x$terms, model.frame(ret_data, na.action = na.pass, xlev = x$xlevels))
     }
 
     predicted <- stats::predict(x, mat)
