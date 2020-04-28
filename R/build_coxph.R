@@ -522,10 +522,10 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients'
       ret <- ret %>% dplyr::group_by(variable) %>% tidyr::nest() %>%
         mutate(data = purrr::map(data,function(df){ # Show only 5 lines out of 9 lines for survival curve.
           if (df$chart_type[[1]] == 'line') {
-            df %>% dplyr::mutate(value_index=as.integer(forcats::fct_inorder(value))) %>% dplyr::filter(value_index %% 2 == 1)
+            df %>% dplyr::mutate(value_index=as.integer(forcats::fct_inorder(value))) %>% dplyr::filter(value_index %% 2 == 1) %>% dplyr::mutate(value_index=ceiling(value_index/2))
           }
           else {
-            df
+            df %>% dplyr::mutate(value_index=as.integer(forcats::fct_inorder(value))) %>% dplyr::mutate(value_index=value_index+5)
           }
         })) %>% tidyr::unnest() %>% dplyr::ungroup()
       ret <- ret %>% dplyr::mutate(chart_type = 'line')
