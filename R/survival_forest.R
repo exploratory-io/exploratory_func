@@ -79,8 +79,8 @@ partial_dependence.ranger_survival_exploratory <- function(fit, time_col, vars =
   # 1 1.000000  NA 0.9984156 0.9971480 0.9867692 0.9843847 0.9631721 0.9357729 0.9165525 0.8988693 0.8679139 0.8532433
   # 2 1.111111  NA 0.9984156 0.9971480 0.9867692 0.9843847 0.9631721 0.9357729 0.9165525 0.8988693 0.8679139 0.8532433
   # 3 1.222222  NA 0.9984156 0.9971480 0.9867692 0.9843847 0.9631721 0.9357729 0.9165525 0.8988693 0.8679139 0.8532433
-  ret <- pd %>% pivot_longer(matches('^V[0-9]+$'),names_to = 'period', values_to = 'survival')
-  ret <- ret %>% mutate(period = as.numeric(stringr::str_remove(period,'^V')))
+  ret <- pd %>% tidyr::pivot_longer(matches('^V[0-9]+$'),names_to = 'period', values_to = 'survival')
+  ret <- ret %>% dplyr::mutate(period = as.numeric(stringr::str_remove(period,'^V')))
   # Format of ret looks like this:
   #     trt   age period survival
   #   <dbl> <dbl>  <dbl>    <dbl>
@@ -96,7 +96,7 @@ partial_dependence.ranger_survival_exploratory <- function(fit, time_col, vars =
   chart_type_map <- ifelse(chart_type_map, "line", "scatter")
   names(chart_type_map) <- colnames(ret)
 
-  ret <- ret %>% pivot_longer(c(-period, -survival) ,names_to = 'variable', values_to = 'value', values_ptype = list(value=character()), values_drop_na=TRUE)
+  ret <- ret %>% tidyr::pivot_longer(c(-period, -survival) ,names_to = 'variable', values_to = 'value', values_ptype = list(value=character()), values_drop_na=TRUE)
   # Format of ret looks like this:
   #   period survival variable value
   #   <chr>     <dbl> <chr>    <dbl>
@@ -399,7 +399,7 @@ tidy.ranger_survival_exploratory <- function(x, type = 'importance', ...) { #TOD
     partial_dependence_survival_curve = {
       ret <- x$partial_dependence
       ret <- ret %>% dplyr::group_by(variable) %>% tidyr::nest() %>%
-        mutate(data = purrr::map(data,function(df){ # Show only 5 lines out of 9 lines for survival curve.
+        dplyr::mutate(data = purrr::map(data,function(df){ # Show only 5 lines out of 9 lines for survival curve.
           if (df$chart_type[[1]] == 'line') {
             df %>% dplyr::mutate(value_index=as.integer(forcats::fct_inorder(value))) %>% dplyr::filter(value_index %% 2 == 1) %>% dplyr::mutate(value_index=ceiling(value_index/2))
           }
@@ -415,13 +415,13 @@ tidy.ranger_survival_exploratory <- function(x, type = 'importance', ...) { #TOD
       ret <- x$partial_dependence
       pd_survival_time <- x$pd_survival_time
       ret <- ret %>%
-        filter(period <= !!pd_survival_time) %>% # Extract the latest period that does not exceed pd_survival_time
-        group_by(variable, value) %>% filter(period == max(period)) %>% ungroup() %>%
-        mutate(type='Prediction')
+        dplyr::filter(period <= !!pd_survival_time) %>% # Extract the latest period that does not exceed pd_survival_time
+        dplyr::group_by(variable, value) %>% dplyr::filter(period == max(period)) %>% dplyr::ungroup() %>%
+        dplyr::mutate(type='Prediction')
       actual <- x$survival_curves %>%
-        filter(period <= !!pd_survival_time) %>% # Extract the latest period that does not exceed pd_survival_time
-        group_by(variable, value) %>% filter(period == max(period)) %>% ungroup() %>%
-        mutate(type='Actual')
+        dplyr::filter(period <= !!pd_survival_time) %>% # Extract the latest period that does not exceed pd_survival_time
+        dplyr::group_by(variable, value) %>% dplyr::filter(period == max(period)) %>% dplyr::ungroup() %>%
+        dplyr::mutate(type='Actual')
       ret <- ret %>% dplyr::bind_rows(actual)
       ret <- ret %>% dplyr::mutate(variable = x$terms_mapping[variable]) # map variable names to original.
       ret
