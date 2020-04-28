@@ -398,16 +398,16 @@ tidy.ranger_survival_exploratory <- function(x, type = 'importance', ...) { #TOD
     },
     partial_dependence_survival_curve = {
       ret <- x$partial_dependence
-      ret <- ret %>% group_by(variable) %>% nest() %>%
+      ret <- ret %>% dplyr::group_by(variable) %>% tidyr::nest() %>%
         mutate(data = purrr::map(data,function(df){ # Show only 5 lines out of 9 lines for survival curve.
           if (df$chart_type[[1]] == 'line') {
-            df %>% mutate(value_index=as.integer(fct_inorder(value))) %>% filter(value_index %% 2 == 1)
+            df %>% dplyr::mutate(value_index=as.integer(forcats::fct_inorder(value))) %>% dplyr::filter(value_index %% 2 == 1) %>% dplyr::mutate(value_index=ceiling(value_index/2))
           }
           else {
-            df
+            df %>% dplyr::mutate(value_index=as.integer(forcats::fct_inorder(value))) %>% dplyr::mutate(value_index=value_index+5)
           }
-        })) %>% unnest()
-      ret <- ret %>% mutate(chart_type = 'line')
+        })) %>% tidyr::unnest() %>% dplyr::ungroup() %>% dplyr::mutate(value_index=factor(value_index)) # Make value_index a factor to control color.
+      ret <- ret %>% dplyr::mutate(chart_type = 'line')
       ret <- ret %>% dplyr::mutate(variable = x$terms_mapping[variable]) # map variable names to original.
       ret
     },
