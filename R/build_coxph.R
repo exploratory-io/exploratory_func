@@ -519,17 +519,18 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients'
     },
     partial_dependence_survival_curve = {
       ret <- x$partial_dependence
-      ret <- ret %>% group_by(variable) %>% nest() %>%
+      ret <- ret %>% dplyr::group_by(variable) %>% tidyr::nest() %>%
         mutate(data = purrr::map(data,function(df){ # Show only 5 lines out of 9 lines for survival curve.
           if (df$chart_type[[1]] == 'line') {
-            df %>% mutate(value_index=as.integer(fct_inorder(value))) %>% filter(value_index %% 2 == 1)
+            df %>% dplyr::mutate(value_index=as.integer(forcats::fct_inorder(value))) %>% dplyr::filter(value_index %% 2 == 1)
           }
           else {
             df
           }
-        })) %>% unnest()
-      ret <- ret %>% mutate(chart_type = 'line')
+        })) %>% tidyr::unnest() %>% dplyr::ungroup()
+      ret <- ret %>% dplyr::mutate(chart_type = 'line')
       ret <- ret %>% dplyr::mutate(variable = x$terms_mapping[variable]) # map variable names to original.
+      browser()
       ret
     },
     partial_dependence = {
