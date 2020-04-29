@@ -503,9 +503,10 @@ build_coxph.fast <- function(df,
       })
 
       if (test_rate > 0) {
+        # TODO: Adjust the following code from build_lm.fast for this function.
         # Note: Do not pass df_test like data=df_test. This for some reason ends up predict returning training data prediction.
-        rf$prediction_test <- predict(rf, df_test, se.fit = TRUE)
-        rf$unknown_category_rows_index <- unknown_category_rows_index
+        # rf$prediction_test <- predict(rf, df_test, se.fit = TRUE)
+        # rf$unknown_category_rows_index <- unknown_category_rows_index
       }
       rf$test_index <- test_index
       rf$source_data <- source_data
