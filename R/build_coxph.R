@@ -566,6 +566,7 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients'
       ret <- ret %>% 
         filter(period <= !!pd_survival_time) %>% # Extract the latest period that does not exceed pd_survival_time
         group_by(variable, value) %>% filter(period == max(period)) %>% ungroup() %>%
+        select(-conf.high, -conf.low) %>% # Temporarily remove confidence interval to be uniform with other Analytics Views.
         mutate(type='Prediction')
       actual <- x$survival_curves %>%
         filter(period <= !!pd_survival_time) %>% # Extract the latest period that does not exceed pd_survival_time

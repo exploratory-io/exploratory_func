@@ -128,7 +128,9 @@ exp_survival_forest <- function(df,
                     predictor_n = 12, # so that at least months can fit in it.
                     max_pd_vars = NULL,
                     pd_survival_time = NULL,
-                    seed = 1
+                    seed = 1,
+                    test_rate = 0.0,
+                    test_split_type = "random" # "random" or "ordered"
                     ){
   # TODO: cleanup code only aplicable to randomForest. this func was started from copy of calc_feature_imp, and still adjusting for lm. 
 
@@ -144,6 +146,12 @@ exp_survival_forest <- function(df,
 
   # remove grouped col or time/status col
   selected_cols <- setdiff(selected_cols, c(grouped_cols, time_col, status_col))
+
+  if(test_rate < 0 | 1 < test_rate){
+    stop("test_rate must be between 0 and 1")
+  } else if (test_rate == 1){
+    stop("test_rate must be less than 1")
+  }
 
   if (any(c(time_col, status_col, selected_cols) %in% grouped_cols)) {
     stop("grouping column is used as variable columns")
@@ -326,6 +334,17 @@ exp_survival_forest <- function(df,
         stop("Invalid Predictors: Only one unique value.") # Message is made short so that it fits well in the Summary table.
       }
 
+      # split training and test data
+      source_data <- df
+      test_index <- sample_df_index(source_data, rate = test_rate, ordered = (test_split_type == "ordered"))
+      df <- safe_slice(source_data, test_index, remove = TRUE)
+      if (test_rate > 0) {
+        df_test <- safe_slice(source_data, test_index, remove = FALSE)
+        unknown_category_rows_index_vector <- get_unknown_category_rows_index_vector(df_test, df)
+        df_test <- df_test[!unknown_category_rows_index_vector, , drop = FALSE] # 2nd arg must be empty.
+        unknown_category_rows_index <- get_row_numbers_from_index_vector(unknown_category_rows_index_vector)
+      }
+
       # build formula for lm
       rhs <- paste0("`", c_cols, "`", collapse = " + ")
       # TODO: This clean_target_col is actually not a cleaned column name since we want lm to show real name. Clean up our variable name.
@@ -363,6 +382,15 @@ exp_survival_forest <- function(df,
       rf$pd_survival_time <- pd_survival_time
       rf$survival_curves <- calc_survival_curves_with_strata(df, clean_time_col, clean_status_col, imp_vars)
 
+      if (test_rate > 0) {
+        # TODO: Adjust the following code from build_lm.fast for this function.
+        # Note: Do not pass df_test like data=df_test. This for some reason ends up predict returning training data prediction.
+        # rf$prediction_test <- predict(rf, df_test, se.fit = TRUE)
+        # rf$unknown_category_rows_index <- unknown_category_rows_index
+      }
+      rf$test_index <- test_index
+      rf$source_data <- source_data
+
       # add special lm_coxph class for adding extra info at glance().
       class(rf) <- c("ranger_survival_exploratory", class(rf))
       rf
@@ -388,6 +416,7 @@ tidy.ranger_survival_exploratory <- function(x, type = 'importance', ...) { #TOD
     ret <- data.frame()
     return(ret)
   }
+  browser()
   switch(type,
     importance = {
       class(x) <- 'ranger' # This seems to be necessary to make ranger::importance work, eliminating ranger_survival_exploratory.
@@ -426,4 +455,25 @@ tidy.ranger_survival_exploratory <- function(x, type = 'importance', ...) { #TOD
       ret <- ret %>% dplyr::mutate(variable = x$terms_mapping[variable]) # map variable names to original.
       ret
     })
+}
+
+#' @export
+augment.ranger_survival_exploratory <- function(x, ...) {
+  if ("error" %in% class(x)) {
+    ret <- data.frame(Note = x$message)
+    return(ret)
+  }
+  browser()
+  data <- x$source_data
+  pred <- predict(x, data=data)
+  ret <- bind_cols(data, as.data.frame(pred$survival))
+
+  # Convert column names back to the original.
+  for (i in 1:length(x$terms_mapping)) {
+    converted <- names(x$terms_mapping)[i]
+    original <- x$terms_mapping[i]
+    colnames(ret)[colnames(ret) == converted] <- original
+  }
+  browser()
+  ret
 }
