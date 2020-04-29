@@ -416,7 +416,6 @@ tidy.ranger_survival_exploratory <- function(x, type = 'importance', ...) { #TOD
     ret <- data.frame()
     return(ret)
   }
-  browser()
   switch(type,
     importance = {
       class(x) <- 'ranger' # This seems to be necessary to make ranger::importance work, eliminating ranger_survival_exploratory.
@@ -463,10 +462,17 @@ augment.ranger_survival_exploratory <- function(x, ...) {
     ret <- data.frame(Note = x$message)
     return(ret)
   }
-  browser()
   data <- x$source_data
   pred <- predict(x, data=data)
-  ret <- bind_cols(data, as.data.frame(pred$survival))
+
+  pd_survival_time <- x$pd_survival_time
+  unique_death_times <- x$forest$unique.death.times
+  survival_time <- max(unique_death_times[unique_death_times <= pd_survival_time])
+  survival_time_index <- match(survival_time, unique_death_times)
+  predicted_survival <- pred$survival[,survival_time_index]
+  ret <- data
+  ret$`Predicted Survival Rate`<- predicted_survival
+  colnames(ret)[colnames(ret) == ".time"] <- "Survival Time"
 
   # Convert column names back to the original.
   for (i in 1:length(x$terms_mapping)) {
@@ -474,6 +480,5 @@ augment.ranger_survival_exploratory <- function(x, ...) {
     original <- x$terms_mapping[i]
     colnames(ret)[colnames(ret) == converted] <- original
   }
-  browser()
   ret
 }
