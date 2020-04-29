@@ -656,3 +656,14 @@ glance.coxph_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add t
   }
   ret
 }
+
+#' @export
+augment.coxph_exploratory <- function(x, ...) {
+  if ("error" %in% class(x)) {
+    ret <- data.frame(Note = x$message)
+    return(ret)
+  }
+  data <- x$source_data
+  ret <- broom:::augment.coxph(x, data = data, ...)
+  ret
+}
