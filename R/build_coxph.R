@@ -665,6 +665,17 @@ augment.coxph_exploratory <- function(x, ...) {
   }
   data <- x$source_data
   ret <- broom:::augment.coxph(x, data = data, ...)
+
+  time <- x$pd_survival_time
+  # basehaz returns base cumulative hazard.
+  bh <- survival::basehaz(x)
+  # create a function to interpolate function that returns cumulative hazard.
+  bh_fun <- approxfun(bh$time, bh$hazard)
+  cumhaz_base = bh_fun(time)
+  # transform linear predictor (.fitted) into predicted_probability.
+  # predicted_probability is 1 - (y of survival curve).
+  ret <- ret %>% dplyr::mutate(predicted_probability = 1 - exp(-cumhaz_base * exp(.fitted)))
+
   # Convert column names back to the original.
   for (i in 1:length(x$terms_mapping)) {
     converted <- names(x$terms_mapping)[i]
