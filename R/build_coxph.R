@@ -665,5 +665,11 @@ augment.coxph_exploratory <- function(x, ...) {
   }
   data <- x$source_data
   ret <- broom:::augment.coxph(x, data = data, ...)
+  # Convert column names back to the original.
+  for (i in 1:length(x$terms_mapping)) {
+    converted <- names(x$terms_mapping)[i]
+    original <- x$terms_mapping[i]
+    colnames(ret)[colnames(ret) == converted] <- original
+  }
   ret
 }
