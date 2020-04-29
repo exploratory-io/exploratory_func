@@ -629,8 +629,7 @@ glance.coxph_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add t
     ret <- data.frame(Note = x$message)
     return(ret)
   }
-  browser()
-  ret <- broom:::glance.coxph(x, model, pretty.name = pretty.name, ...)
+  ret <- broom:::glance.coxph(x, pretty.name = pretty.name, ...)
 
   if(pretty.name) {
     colnames(ret)[colnames(ret) == "r.squared"] <- "R Squared"
