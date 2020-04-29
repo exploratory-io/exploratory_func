@@ -675,7 +675,8 @@ augment.coxph_exploratory <- function(x, ...) {
   cumhaz_base = bh_fun(time)
   # transform linear predictor (.fitted) into predicted_probability.
   # predicted_probability is 1 - (y of survival curve).
-  ret <- ret %>% dplyr::mutate(predicted_probability = 1 - exp(-cumhaz_base * exp(.fitted)))
+  ret <- ret %>% dplyr::mutate(time_for_prediction = pd_survival_time,
+                               predicted_probability = 1 - exp(-cumhaz_base * exp(.fitted)))
 
   # Prettify names.
   colnames(ret)[colnames(ret) == ".time"] <- "Survival Time"
