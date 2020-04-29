@@ -256,7 +256,9 @@ build_coxph.fast <- function(df,
                     predictor_n = 12, # so that at least months can fit in it.
                     max_pd_vars = NULL,
                     pd_survival_time = NULL,
-                    seed = 1
+                    seed = 1,
+                    test_rate = 0.0,
+                    test_split_type = "random" # "random" or "ordered"
                     ){
   # TODO: cleanup code only aplicable to randomForest. this func was started from copy of calc_feature_imp, and still adjusting for lm. 
 
@@ -272,6 +274,12 @@ build_coxph.fast <- function(df,
 
   # remove grouped col or time/status col
   selected_cols <- setdiff(selected_cols, c(grouped_cols, time_col, status_col))
+
+  if(test_rate < 0 | 1 < test_rate){
+    stop("test_rate must be between 0 and 1")
+  } else if (test_rate == 1){
+    stop("test_rate must be less than 1")
+  }
 
   if (any(c(time_col, status_col, selected_cols) %in% grouped_cols)) {
     stop("grouping column is used as variable columns")
@@ -452,6 +460,17 @@ build_coxph.fast <- function(df,
         stop("Invalid Predictors: Only one unique value.") # Message is made short so that it fits well in the Summary table.
       }
 
+      # split training and test data
+      source_data <- df
+      test_index <- sample_df_index(source_data, rate = test_rate, ordered = (test_split_type == "ordered"))
+      df <- safe_slice(source_data, test_index, remove = TRUE)
+      if (test_rate > 0) {
+        df_test <- safe_slice(source_data, test_index, remove = FALSE)
+        unknown_category_rows_index_vector <- get_unknown_category_rows_index_vector(df_test, df)
+        df_test <- df_test[!unknown_category_rows_index_vector, , drop = FALSE] # 2nd arg must be empty.
+        unknown_category_rows_index <- get_row_numbers_from_index_vector(unknown_category_rows_index_vector)
+      }
+
       # build formula for lm
       rhs <- paste0("`", c_cols, "`", collapse = " + ")
       # TODO: This clean_target_col is actually not a cleaned column name since we want lm to show real name. Clean up our variable name.
@@ -482,6 +501,14 @@ build_coxph.fast <- function(df,
       }, error = function(e){
         rf$vif <<- e
       })
+
+      if (test_rate > 0) {
+        # Note: Do not pass df_test like data=df_test. This for some reason ends up predict returning training data prediction.
+        rf$prediction_test <- predict(rf, df_test, se.fit = TRUE)
+        rf$unknown_category_rows_index <- unknown_category_rows_index
+      }
+      rf$test_index <- test_index
+      rf$source_data <- source_data
 
       # add special lm_coxph class for adding extra info at glance().
       class(rf) <- c("coxph_exploratory", class(rf))
@@ -601,6 +628,7 @@ glance.coxph_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add t
     ret <- data.frame(Note = x$message)
     return(ret)
   }
+  browser()
   ret <- broom:::glance.coxph(x, model, pretty.name = pretty.name, ...)
 
   if(pretty.name) {
