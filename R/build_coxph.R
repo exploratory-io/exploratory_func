@@ -677,6 +677,14 @@ augment.coxph_exploratory <- function(x, ...) {
   # predicted_probability is 1 - (y of survival curve).
   ret <- ret %>% dplyr::mutate(predicted_probability = 1 - exp(-cumhaz_base * exp(.fitted)))
 
+  # Prettify names.
+  colnames(ret)[colnames(ret) == ".time"] <- "Survival Time"
+  colnames(ret)[colnames(ret) == ".fitted"] <- "Linear Predictor"
+  colnames(ret)[colnames(ret) == ".se.fit"] <- "Std Error"
+  colnames(ret)[colnames(ret) == ".resid"] <- "Residual"
+  colnames(ret)[colnames(ret) == ".resid"] <- "Residual"
+  colnames(ret)[colnames(ret) == "predicted_probability"] <- "Predicted Survival Rate"
+
   # Convert column names back to the original.
   for (i in 1:length(x$terms_mapping)) {
     converted <- names(x$terms_mapping)[i]
