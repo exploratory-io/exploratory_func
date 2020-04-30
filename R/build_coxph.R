@@ -358,7 +358,7 @@ build_coxph.fast <- function(df,
         # filter Inf/-Inf too to avoid error at lm.
         dplyr::filter(!is.na(df[[clean_time_col]]) & !is.infinite(df[[clean_time_col]])) # this form does not handle group_by. so moved into each_func from outside.
       df <- df %>%
-        dplyr::filter(!is.na(df[[clean_time_col]])) # this form does not handle group_by. so moved into each_func from outside.
+        dplyr::filter(!is.na(df[[clean_status_col]])) # this form does not handle group_by. so moved into each_func from outside.
 
       # sample the data for performance if data size is too large.
       sampled_nrow <- NULL
