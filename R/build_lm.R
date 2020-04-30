@@ -747,7 +747,7 @@ build_lm.fast <- function(df,
             model <- stats::glm(fml, data = df, family = family_arg)
           }
         }
-        model$permutation_importance <- calc_permutation_importance_logistic(model, clean_target_col, clean_cols, df)
+        model$permutation_importance <- calc_permutation_importance_logistic(model, clean_target_col, c_cols, df)
       }
       else {
         # split training and test data
@@ -794,7 +794,7 @@ build_lm.fast <- function(df,
             model$relative_importance <<- e
           })
         }
-        model$permutation_importance <- calc_permutation_importance_linear(model, clean_target_col, clean_cols, df)
+        model$permutation_importance <- calc_permutation_importance_linear(model, clean_target_col, c_cols, df)
       }
 
       tryCatch({
