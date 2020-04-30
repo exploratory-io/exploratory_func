@@ -255,7 +255,7 @@ build_coxph.fast <- function(df,
                     max_nrow = 50000, # With 50000 rows, taking 6 to 7 seconds on late-2016 Macbook Pro.
                     predictor_n = 12, # so that at least months can fit in it.
                     max_pd_vars = NULL,
-                    pd_survival_time = NULL,
+                    pred_survival_time = NULL,
                     seed = 1,
                     test_rate = 0.0,
                     test_split_type = "random" # "random" or "ordered"
@@ -311,8 +311,8 @@ build_coxph.fast <- function(df,
     stop(paste0("Time column (", time_col, ") must be numeric"))
   }
 
-  if (is.null(pd_survival_time)) { # By default, use median.
-    pd_survival_time <- median(df[[time_col]], na.rm=TRUE)
+  if (is.null(pred_survival_time)) { # By default, use median.
+    pred_survival_time <- median(df[[time_col]], na.rm=TRUE)
   }
 
   # cols will be filtered to remove invalid columns
@@ -493,7 +493,7 @@ build_coxph.fast <- function(df,
       }
       imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
       rf$partial_dependence <- partial_dependence.coxph_exploratory(rf, clean_time_col, vars = imp_vars, n = c(9, 25), data = df) # grid of 9 is convenient for both PDP and survival curves.
-      rf$pd_survival_time <- pd_survival_time
+      rf$pred_survival_time <- pred_survival_time
       rf$survival_curves <- calc_survival_curves_with_strata(df, clean_time_col, clean_status_col, imp_vars)
 
       tryCatch({
@@ -562,14 +562,14 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients'
     },
     partial_dependence = {
       ret <- x$partial_dependence
-      pd_survival_time <- x$pd_survival_time
+      pred_survival_time <- x$pred_survival_time
       ret <- ret %>% 
-        filter(period <= !!pd_survival_time) %>% # Extract the latest period that does not exceed pd_survival_time
+        filter(period <= !!pred_survival_time) %>% # Extract the latest period that does not exceed pred_survival_time
         group_by(variable, value) %>% filter(period == max(period)) %>% ungroup() %>%
         select(-conf.high, -conf.low) %>% # Temporarily remove confidence interval to be uniform with other Analytics Views.
         mutate(type='Prediction')
       actual <- x$survival_curves %>%
-        filter(period <= !!pd_survival_time) %>% # Extract the latest period that does not exceed pd_survival_time
+        filter(period <= !!pred_survival_time) %>% # Extract the latest period that does not exceed pred_survival_time
         group_by(variable, value) %>% filter(period == max(period)) %>% ungroup() %>%
         mutate(type='Actual')
       ret <- ret %>% dplyr::bind_rows(actual)
@@ -667,7 +667,7 @@ augment.coxph_exploratory <- function(x, ...) {
   data <- x$source_data
   ret <- broom:::augment.coxph(x, data = data, ...)
 
-  time <- x$pd_survival_time
+  time <- x$pred_survival_time
   # basehaz returns base cumulative hazard.
   bh <- survival::basehaz(x)
   # create a function to interpolate function that returns cumulative hazard.

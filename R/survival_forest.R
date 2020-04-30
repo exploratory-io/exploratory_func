@@ -127,7 +127,7 @@ exp_survival_forest <- function(df,
                     nodesize = 12,
                     predictor_n = 12, # so that at least months can fit in it.
                     max_pd_vars = NULL,
-                    pd_survival_time = NULL,
+                    pred_survival_time = NULL,
                     seed = 1,
                     test_rate = 0.0,
                     test_split_type = "random" # "random" or "ordered"
@@ -183,8 +183,8 @@ exp_survival_forest <- function(df,
     stop(paste0("Time column (", time_col, ") must be numeric"))
   }
 
-  if (is.null(pd_survival_time)) { # By default, use median.
-    pd_survival_time <- median(df[[time_col]], na.rm=TRUE)
+  if (is.null(pred_survival_time)) { # By default, use median.
+    pred_survival_time <- median(df[[time_col]], na.rm=TRUE)
   }
 
   # cols will be filtered to remove invalid columns
@@ -379,7 +379,7 @@ exp_survival_forest <- function(df,
       imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
 
       rf$partial_dependence <- partial_dependence.ranger_survival_exploratory(rf, clean_time_col, vars = imp_vars, n = c(9, 25), data = df) # grid of 9 is convenient for both PDP and survival curves.
-      rf$pd_survival_time <- pd_survival_time
+      rf$pred_survival_time <- pred_survival_time
       rf$survival_curves <- calc_survival_curves_with_strata(df, clean_time_col, clean_status_col, imp_vars)
 
       if (test_rate > 0) {
@@ -441,13 +441,13 @@ tidy.ranger_survival_exploratory <- function(x, type = 'importance', ...) { #TOD
     },
     partial_dependence = {
       ret <- x$partial_dependence
-      pd_survival_time <- x$pd_survival_time
+      pred_survival_time <- x$pred_survival_time
       ret <- ret %>%
-        dplyr::filter(period <= !!pd_survival_time) %>% # Extract the latest period that does not exceed pd_survival_time
+        dplyr::filter(period <= !!pred_survival_time) %>% # Extract the latest period that does not exceed pred_survival_time
         dplyr::group_by(variable, value) %>% dplyr::filter(period == max(period)) %>% dplyr::ungroup() %>%
         dplyr::mutate(type='Prediction')
       actual <- x$survival_curves %>%
-        dplyr::filter(period <= !!pd_survival_time) %>% # Extract the latest period that does not exceed pd_survival_time
+        dplyr::filter(period <= !!pred_survival_time) %>% # Extract the latest period that does not exceed pred_survival_time
         dplyr::group_by(variable, value) %>% dplyr::filter(period == max(period)) %>% dplyr::ungroup() %>%
         dplyr::mutate(type='Actual')
       ret <- ret %>% dplyr::bind_rows(actual)
@@ -465,13 +465,13 @@ augment.ranger_survival_exploratory <- function(x, ...) {
   data <- x$source_data
   pred <- predict(x, data=data)
 
-  pd_survival_time <- x$pd_survival_time
+  pred_survival_time <- x$pred_survival_time
   unique_death_times <- x$forest$unique.death.times
-  survival_time <- max(unique_death_times[unique_death_times <= pd_survival_time])
+  survival_time <- max(unique_death_times[unique_death_times <= pred_survival_time])
   survival_time_index <- match(survival_time, unique_death_times)
   predicted_survival <- pred$survival[,survival_time_index]
   ret <- data
-  ret$`Survival Time for Prediction`<- pd_survival_time
+  ret$`Survival Time for Prediction`<- pred_survival_time
   ret$`Predicted Survival Rate`<- predicted_survival
 
   # Convert column names back to the original.
