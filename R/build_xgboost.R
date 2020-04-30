@@ -619,4 +619,3 @@ glance.xgb.Booster <- function(x, pretty.name = FALSE, ...) {
   }
   ret
 }
-
