@@ -1,3 +1,4 @@
+# Calculates permutation importance for logistic regression.
 calc_permutation_importance_logistic <- function(fit, target, vars, data) {
   var_list <- as.list(vars)
   importances <- purrr::map(var_list, function(var) {
@@ -11,10 +12,12 @@ calc_permutation_importance_logistic <- function(fit, target, vars, data) {
   importances_df
 }
 
+# Calculates permutation importance for linear regression.
 calc_permutation_importance_linear <- function(fit, target, vars, data) {
   var_list <- as.list(vars)
   importances <- purrr::map(var_list, function(var) {
     mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
+                                # predict.fun can be the default function, which is predict(object, newdata=newdata).
                                 # For some reason, default loss.fun, which is mean((x - y)^2) returns NA, even with na.rm=TRUE. Rewrote it with sum() to avoid the issue.
                                 loss.fun = function(x,y){sum((x - y)^2,na.rm = TRUE)/length(x)})
   })
