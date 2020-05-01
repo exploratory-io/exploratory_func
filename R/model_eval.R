@@ -363,8 +363,8 @@ evaluate_binary_training_and_test <- function(df, actual_val, threshold = "f_sco
   }
 
   # sort column order
-  ret <- ret %>% dplyr::select(f_score, accuracy_rate, misclassification_rate, precision,
-                               recall, auc, p.value, n, positives, negatives, logLik, AIC, BIC,
+  ret <- ret %>% dplyr::select(auc, f_score, accuracy_rate, misclassification_rate, precision,
+                               recall, p.value, n, positives, negatives, logLik, AIC, BIC,
                                deviance, null.deviance, df.null, df.residual, everything())
 
   # Reorder columns. Bring group_by column first, and then is_test_data column, if it exists.

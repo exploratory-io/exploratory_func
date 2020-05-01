@@ -1045,7 +1045,7 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
   if(pretty.name) {
     if (x$family$family %in% c('binomial', 'quasibinomial')) { # for binomial regressions.
       ret <- ret %>% dplyr::rename(`Null Deviance`=null.deviance, `DF for Null Model`=df.null, `Log Likelihood`=logLik, `Residual Deviance`=deviance, `Residual DF`=df.residual, `AUC`=auc) %>%
-        dplyr::select(`F Score`, `Accuracy Rate`, `Misclassification Rate`, `Precision`, `Recall`, `AUC`,`P Value`, `Number of Rows`, positives, negatives,  `Log Likelihood`, `AIC`, `BIC`, `Residual Deviance`, `Null Deviance`, `DF for Null Model`, everything())
+        dplyr::select(AUC, `F Score`, `Accuracy Rate`, `Misclassification Rate`, `Precision`, `Recall`, `P Value`, `Number of Rows`, positives, negatives,  `Log Likelihood`, `AIC`, `BIC`, `Residual Deviance`, `Null Deviance`, `DF for Null Model`, everything())
       if (!is.null(x$orig_levels)) { 
         pos_label <- x$orig_levels[2]
         neg_label <- x$orig_levels[1]
