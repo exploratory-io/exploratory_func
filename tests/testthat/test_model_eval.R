@@ -279,6 +279,7 @@ test_data <- structure(
     class = c("tbl_df", "tbl", "data.frame"), .Names = c("CANCELLED X", "Carrier Name", "CARRIER", "DISTANCE", "ARR_TIME", "DERAY_TIME"))
 
 test_data$klass <- c(rep("A", 10), rep("B", 10))
+# Make target variable logical. (We will support only logical as logistic regression target.)
 test_data <- test_data %>% dplyr::mutate(`CANCELLED X` = `CANCELLED X` == 'Y')
 
 test_that("evaluate binary classification model by training and test", {
