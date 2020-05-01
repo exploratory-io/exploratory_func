@@ -345,7 +345,7 @@ exp_survival_forest <- function(df,
         unknown_category_rows_index <- get_row_numbers_from_index_vector(unknown_category_rows_index_vector)
       }
 
-      # build formula for lm
+      # build formula for survival forest.
       rhs <- paste0("`", c_cols, "`", collapse = " + ")
       # TODO: This clean_target_col is actually not a cleaned column name since we want lm to show real name. Clean up our variable name.
       # TODO: see if the above is appropriate for coxph
