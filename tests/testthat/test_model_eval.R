@@ -279,9 +279,11 @@ test_data <- structure(
     class = c("tbl_df", "tbl", "data.frame"), .Names = c("CANCELLED X", "Carrier Name", "CARRIER", "DISTANCE", "ARR_TIME", "DERAY_TIME"))
 
 test_data$klass <- c(rep("A", 10), rep("B", 10))
+# Make target variable logical. (We will support only logical as logistic regression target.)
+test_data <- test_data %>% dplyr::mutate(`CANCELLED X` = `CANCELLED X` == 'Y')
 
 test_that("evaluate binary classification model by training and test", {
-  test_data[["CANCELLED X"]] <- test_data[["CANCELLED X"]] %>% as.factor() %>% as.numeric() -1
+  # test_data[["CANCELLED X"]] <- test_data[["CANCELLED X"]] %>% as.factor() %>% as.numeric() -1
   ret <- test_data %>% build_lm.fast(`CANCELLED X`,
                                      `ARR_TIME`,
                                      `DERAY_TIME`,
@@ -303,6 +305,7 @@ test_that("evaluate binary classification model by training and test", {
     expect_equal(colnames(eret), expect_cols)
   })
 })
+
 
 test_that("Group evaluate binary classification model by training and test", {
   group_data <- test_data %>% group_by(klass)
@@ -350,4 +353,3 @@ test_that("Group evaluate binary classification model by training and test with 
     expect_gte(eret_precision$precision[1], eret_acc$precision[1])
   })
 })
-
