@@ -94,7 +94,7 @@ partial_dependence.coxph_exploratory <- function(fit, time_col, vars = colnames(
   }
 
   aggregate.fun <- function(x) {
-    mean(x)
+    mean(x, na.rm = TRUE)
   }
 
   args = list(
@@ -204,7 +204,7 @@ partial_dependence.coxph_exploratory <- function(fit, time_col, vars = colnames(
 # https://en.wikipedia.org/wiki/Proportional_hazards_model
 # 
 # lp - Linear predictor
-calc_efron_log_likelihood <- function(lp, time, status) {
+calc_efron_log_likelihood <- function(lp, time, status) { # TODO: Add a test to validate the outcome of this function.
   if (is.data.frame(time)) { # Since mmpf::permutationImportance passes down time as tibble, convert it to vector. TODO: Do this at more appropriate place.
     time <- time[[1]]
   }
@@ -220,6 +220,7 @@ calc_efron_log_likelihood <- function(lp, time, status) {
 
   tmp_df <- tmp_df %>% dplyr::mutate(sum_theta_risk = rev(cumsum(rev(sum_theta))))
 
+  # contrib is contribution to the log likelihood from a point of time.
   tmp_df <- tmp_df %>% dplyr::mutate(contrib = purrr::pmap(list(sum_lp_event, sum_theta_event, num_event, sum_theta_risk),
                                                     function(sum_lp_event, sum_theta_event, num_event, sum_theta_risk) {
     if (num_event == 0) return(0)
@@ -231,7 +232,8 @@ calc_efron_log_likelihood <- function(lp, time, status) {
     contrib <- sum_lp_event - subtraction_term
     contrib
   }))
-  sum(purrr::flatten_dbl(tmp_df$contrib))
+  # Sum up the contributions to come up with the log likelihood.
+  sum(purrr::flatten_dbl(tmp_df$contrib), na.rm = TRUE)
 }
 
 # Calculates permutation importance for Cox regression.
