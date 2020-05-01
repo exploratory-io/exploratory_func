@@ -488,6 +488,12 @@ build_lm.fast <- function(df,
     link <- "logit"
   }
 
+  if (family == "binomial" && (is.null(link) || link == "logit")) {
+    if (!is.logical(df[[target_col]])) {
+      stop("Target variable for logistic regression must be a logical.")
+    }
+  }
+
   if(test_rate < 0 | 1 < test_rate){
     stop("test_rate must be between 0 and 1")
   } else if (test_rate == 1){
@@ -751,7 +757,7 @@ build_lm.fast <- function(df,
             model <- stats::glm(fml, data = df, family = family_arg)
           }
         }
-        if (family == "binomial" && (is.null(link) || link == "logit")) {
+        if (family == "binomial" && (is.null(link) || link == "logit")) { # Currently we have permutation importance only for logistic regression.
           model$permutation_importance <- calc_permutation_importance_logistic(model, clean_target_col, c_cols, df)
         }
       }
