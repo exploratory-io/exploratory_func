@@ -489,7 +489,7 @@ build_coxph.fast <- function(df,
 
       model$permutation_importance <- calc_permutation_importance_coxph(model, clean_time_col, clean_status_col, c_cols, df)
 
-      # get importance to decice variables for partial dependence
+      # get importance to decide variables for partial dependence
       imp_df <- model$permutation_importance
       imp_df <- imp_df %>% dplyr::arrange(-importance)
       imp_vars <- imp_df$term
