@@ -2409,10 +2409,10 @@ evaluate_binary_classification <- function(actual, predicted, predicted_probabil
     ret <- evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
   }
   if (pretty.name) {
-    ret <- ret %>% mutate(AUC = auc)
+    ret <- dplyr::bind_cols(tibble::tibble(AUC = auc), ret)
   }
   else {
-    ret <- ret %>% mutate(auc = auc)
+    ret <- dplyr::bind_cols(tibble::tibble(auc = auc), ret)
   }
   # Add Number of Rows here for the case ret came from evaluate_classification(multi_class = FALSE).
   if (is.null(ret$n) && is.null(ret$`Number of Rows`)) {
