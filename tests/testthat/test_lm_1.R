@@ -69,6 +69,13 @@ test_that("build_lm.fast (logistic regression(logical)) evaluate training and te
   ret <- model_df %>% prediction_training_and_test(prediction_type = 'conf_mat', threshold = 0.5)
 })
 
+test_that("build_lm.fast (logistic regression(character)) evaluate training and test", {
+  expect_error({
+    model_df <- flight %>% mutate(`is delayed`=if_else(as.logical(`is delayed`), "A", "B")) %>%
+      build_lm.fast(`is delayed`, `DIS TANCE`, `DEP TIME`, model_type = "glm", test_rate = 0.3)
+  }, "Target variable for logistic regression must be a logical.")
+})
+
 test_that("build_lm.fast (logistic regression) evaluate training and test with SMOTE", {
   # test mode case
   model_df <- flight %>%

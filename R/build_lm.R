@@ -483,13 +483,14 @@ build_lm.fast <- function(df,
     with_marginal_effects <- TRUE
   }
 
-  if (model_type  == "glm" && is.null(family)) {
+  if (model_type == "glm" && is.null(family)) {
     family <- "binomial" # default for glm is logistic regression.
     link <- "logit"
   }
 
-  if (family == "binomial" && (is.null(link) || link == "logit")) {
-    if (!is.logical(df[[target_col]])) {
+  if (model_type == "glm" && family == "binomial" && (is.null(link) || link == "logit")) {
+    if (!is.logical(df[[target_col]]) && !is.numeric(df[[target_col]])) {
+      # numeric still works, but our official guidance will be to use logical.
       stop("Target variable for logistic regression must be a logical.")
     }
   }
