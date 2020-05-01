@@ -481,7 +481,8 @@ build_lm.fast <- function(df,
   }
 
   if (model_type  == "glm" && is.null(family)) {
-    family = "binomial" # default for glm is logistic regression.
+    family <- "binomial" # default for glm is logistic regression.
+    link <- "logit"
   }
 
   if(test_rate < 0 | 1 < test_rate){
@@ -747,7 +748,9 @@ build_lm.fast <- function(df,
             model <- stats::glm(fml, data = df, family = family_arg)
           }
         }
-        model$permutation_importance <- calc_permutation_importance_logistic(model, clean_target_col, c_cols, df)
+        if (family == "binomial" && link == "logit") {
+          model$permutation_importance <- calc_permutation_importance_logistic(model, clean_target_col, c_cols, df)
+        }
       }
       else {
         # split training and test data
