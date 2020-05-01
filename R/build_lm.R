@@ -748,7 +748,7 @@ build_lm.fast <- function(df,
             model <- stats::glm(fml, data = df, family = family_arg)
           }
         }
-        if (family == "binomial" && link == "logit") {
+        if (family == "binomial" && (is.null(link) || link == "logit")) {
           model$permutation_importance <- calc_permutation_importance_logistic(model, clean_target_col, c_cols, df)
         }
       }
