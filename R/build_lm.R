@@ -1029,14 +1029,8 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
     ret2 <- ret2[, 2:6]
     ret <- ret %>% bind_cols(ret2)
 
-    # calculate AUC from ROC
-    roc_df <- data.frame(actual = x$y, predicted_probability = x$fitted.value)
-    roc <- roc_df %>% do_roc_(actual_val_col = "actual", pred_prob_col = "predicted_probability")
-    # use numeric index so that it won't be disturbed by name change
-    # 2 should be false positive rate (x axis) and 1 should be true positive rate (yaxis)
-    # calculate the area under the plots
-    auc <- sum((roc[[2]] - dplyr::lag(roc[[2]])) * roc[[1]], na.rm = TRUE)
-    ret$auc <- auc
+    # calculate AUC
+    ret$auc <- auroc(x$fitted.value, x$y)
     # Show number of rows for positive case and negative case, especially so that result of SMOTE is visible.
     ret$positives <- sum(x$y == 1, na.rm = TRUE)
     ret$negatives <- sum(x$y != 1, na.rm = TRUE)
