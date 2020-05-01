@@ -16,7 +16,7 @@ calc_permutation_importance_linear <- function(fit, target, vars, data) {
   importances <- purrr::map(var_list, function(var) {
     mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
                                 # For some reason, default loss.fun, which is mean((x - y)^2) returns NA, even with na.rm=TRUE. Rewrote it with sum() to avoid the issue.
-                                loss.fun = function(x,y){sum((x - y)^2,na.rm = TRUE)/length(x)})
+                                loss.fun = function(x,y){sum((x - y)^2, na.rm = TRUE)/length(x)})
   })
   importances <- purrr::flatten_dbl(importances)
   importances_df <- tibble(term=vars, importance=importances)
