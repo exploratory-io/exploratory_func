@@ -9,6 +9,9 @@ test_that("binary prediction with character target column", {
       DISTANCE = c(Inf, -Inf, NA, 187, 273, 1062, 583, 240, 1123, 851, 852, 862, 361, 507, 1020, 1092, 342, 489, 1184, 545)), row.names = c(NA, -20L),
     class = c("tbl_df", "tbl", "data.frame"), .Names = c("CANCELLED X", "Carrier Name", "CARRIER", "DISTANCE"))
 
+  # Make target variable logical. (We will support only logical as logistic regression target.)
+  test_data <- test_data %>% dplyr::mutate(`CANCELLED X` = `CANCELLED X` == 'Y')
+
   # duplicate rows to make some predictable data
   # otherwise, the number of rows of the result of prediction becomes 0
   test_data <- dplyr::bind_rows(test_data, test_data)
@@ -19,8 +22,8 @@ test_that("binary prediction with character target column", {
   ret <- model_data %>% broom::tidy(model, type="vif")
   ret <- model_data %>% broom::glance(model, pretty.name=TRUE)
   expect_equal(ret$`Number of Rows`, 34)
-  expect_equal(ret$`Number of Rows for Y`, 4) # This ends up to be 4 after doubling
-  expect_equal(ret$`Number of Rows for N`, 30) # This ends up to be 30 after doubling and removing NA rows.
+  expect_equal(ret$`Number of Rows for TRUE`, 4) # This ends up to be 4 after doubling
+  expect_equal(ret$`Number of Rows for FALSE`, 30) # This ends up to be 30 after doubling and removing NA rows.
   ret <- model_data %>% broom::tidy(model)
   ret <- model_data %>% broom::augment(model)
 
@@ -37,6 +40,9 @@ test_that("binary prediction with factor target column", {
       DISTANCE = c(Inf, -Inf, NA, 187, 273, 1062, 583, 240, 1123, 851, 852, 862, 361, 507, 1020, 1092, 342, 489, 1184, 545)), row.names = c(NA, -20L),
     class = c("tbl_df", "tbl", "data.frame"), .Names = c("CANCELLED X", "Carrier Name", "CARRIER", "DISTANCE"))
 
+  # Make target variable logical. (We will support only logical as logistic regression target.)
+  test_data <- test_data %>% dplyr::mutate(`CANCELLED X` = `CANCELLED X` == 'Y')
+
   # duplicate rows to make some predictable data
   # otherwise, the number of rows of the result of prediction becomes 0
   test_data <- dplyr::bind_rows(test_data, test_data)
@@ -44,8 +50,8 @@ test_that("binary prediction with factor target column", {
   model_data <- build_lm.fast(test_data, `CANCELLED X`, `Carrier Name`, CARRIER, DISTANCE, model_type = "glm", smote=FALSE, with_marginal_effects=TRUE, with_marginal_effects_confint=FALSE)
   ret <- model_data %>% broom::glance(model, pretty.name=TRUE)
   expect_equal(ret$`Number of Rows`, 34)
-  expect_equal(ret$`Number of Rows for Y`, 4) # This ends up to be 4 after doubling
-  expect_equal(ret$`Number of Rows for N`, 30) # This ends up to be 30 after doubling and removing NA rows.
+  expect_equal(ret$`Number of Rows for TRUE`, 4) # This ends up to be 4 after doubling
+  expect_equal(ret$`Number of Rows for FALSE`, 30) # This ends up to be 30 after doubling and removing NA rows.
   ret <- model_data %>% broom::tidy(model)
   ret <- model_data %>% broom::augment(model)
 
@@ -61,6 +67,9 @@ test_that("binary prediction with variable_metric argument", {
       # testing filtering of Inf, -Inf, NA here.
       DISTANCE = c(Inf, -Inf, NA, 187, 273, 1062, 583, 240, 1123, 851, 852, 862, 361, 507, 1020, 1092, 342, 489, 1184, 545)), row.names = c(NA, -20L),
     class = c("tbl_df", "tbl", "data.frame"), .Names = c("CANCELLED X", "Carrier Name", "CARRIER", "DISTANCE"))
+
+  # Make target variable logical. (We will support only logical as logistic regression target.)
+  test_data <- test_data %>% dplyr::mutate(`CANCELLED X` = `CANCELLED X` == 'Y')
 
   # duplicate rows to make some predictable data
   # otherwise, the number of rows of the result of prediction becomes 0
@@ -90,6 +99,9 @@ test_data <- structure(
       DERAY_TIME = c(12, 42, 321, 31, 3, 43, 342, 764, 123, 43, 50, 12, 876, 12, 34, 45, 84, 25, 87, 352, 10)
       ), row.names = c(NA, -20L),
     class = c("tbl_df", "tbl", "data.frame"), .Names = c("CANCELLED X", "Carrier Name", "CARRIER", "DISTANCE", "ARR_TIME", "DERAY_TIME"))
+
+# Make target variable logical. (We will support only logical as logistic regression target.)
+test_data <- test_data %>% dplyr::mutate(`CANCELLED X` = `CANCELLED X` == 'Y')
 
 test_data$klass <- c(rep("A", 10), rep("B", 10))
 
