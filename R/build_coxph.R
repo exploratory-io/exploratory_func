@@ -62,6 +62,7 @@ build_coxph <- function(data, formula, max_categories = NULL, min_group_size = N
               ...)
 }
 
+# Calculates partial dependence for Cox regression.
 partial_dependence.coxph_exploratory <- function(fit, time_col, vars = colnames(data),
   n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)), # Keeping same default of 25 as edarf::partial_dependence, although we usually overwrite from callers.
   interaction = FALSE, uniform = TRUE, data, ...) {
@@ -233,6 +234,7 @@ calc_efron_log_likelihood <- function(lp, time, status) {
   sum(purrr::flatten_dbl(tmp_df$contrib))
 }
 
+# Calculates permutation importance for Cox regression.
 calc_permutation_importance_coxph <- function(fit, time_col, status_col, vars, data) {
    var_list <- as.list(vars)
    importances <- purrr::map(var_list, function(var) {
@@ -664,6 +666,7 @@ augment.coxph_exploratory <- function(x, ...) {
     ret <- data.frame(Note = x$message)
     return(ret)
   }
+  # TODO: handle training/test split.
   data <- x$source_data
   ret <- broom:::augment.coxph(x, data = data, ...)
 

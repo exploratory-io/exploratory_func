@@ -1,3 +1,4 @@
+# Calculates survival curves with Kaplan-Meier with strata specified by vars argument.
 calc_survival_curves_with_strata <- function(df, time_col, status_col, vars) {
   # Create map from variable name to chart type. TODO: Eliminate duplicated code.
   chart_type_map <- c()
@@ -24,6 +25,7 @@ calc_survival_curves_with_strata <- function(df, time_col, status_col, vars) {
   ret
 }
 
+# Calculates partial dependence. The output is survival curves at different values of the specified variables.
 partial_dependence.ranger_survival_exploratory <- function(fit, time_col, vars = colnames(data),
   n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)), # Keeping same default of 25 as edarf::partial_dependence, although we usually overwrite from callers.
   interaction = FALSE, uniform = TRUE, data, ...) {

@@ -111,6 +111,7 @@ vif <- function(mod, ...) {
     result
 }
 
+# Calculate VIF and throw user friendly message in case of perfect collinearity.
 calc_vif <- function(model) {
   tryCatch({
     vif(model)
