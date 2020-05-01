@@ -355,6 +355,7 @@ build_coxph.fast <- function(df,
 
   each_func <- function(df) {
     tryCatch({
+      # TODO: Make use of the common preprocessing functions used in build_lm.fast.
       df <- df %>%
         # dplyr::filter(!is.na(!!target_col))  TODO: this was not filtering, and replaced it with the next line. check other similar places.
         # for numeric cols, filter NA rows, because lm will anyway do this internally, and errors out
@@ -552,8 +553,9 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients'
     partial_dependence_survival_curve = {
       ret <- x$partial_dependence
       ret <- ret %>% dplyr::group_by(variable) %>% tidyr::nest() %>%
-        mutate(data = purrr::map(data,function(df){ # Show only 5 lines out of 9 lines for survival curve.
+        mutate(data = purrr::map(data,function(df){
           if (df$chart_type[[1]] == 'line') {
+            # %% 2 is to show only 5 lines out of 9 lines for survival curves variated by a numeric variable.
             df %>% dplyr::mutate(value_index=as.integer(forcats::fct_inorder(value))) %>% dplyr::filter(value_index %% 2 == 1) %>% dplyr::mutate(value_index=ceiling(value_index/2))
           }
           else {
