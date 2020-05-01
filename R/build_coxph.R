@@ -480,44 +480,44 @@ build_coxph.fast <- function(df,
       # TODO: This clean_target_col is actually not a cleaned column name since we want lm to show real name. Clean up our variable name.
       # TODO: see if the above is appropriate for coxph
       fml <- as.formula(paste0("survival::Surv(`", clean_time_col, "`, `", clean_status_col, "`) ~ ", rhs))
-      rf <- survival::coxph(fml, data = df)
+      model <- survival::coxph(fml, data = df)
       # these attributes are used in tidy of randomForest TODO: is this good for lm too?
-      rf$terms_mapping <- names(name_map)
-      names(rf$terms_mapping) <- name_map
-      rf$sampled_nrow <- sampled_nrow
+      model$terms_mapping <- names(name_map)
+      names(model$terms_mapping) <- name_map
+      model$sampled_nrow <- sampled_nrow
 
-      rf$permutation_importance <- calc_permutation_importance_coxph(rf, clean_time_col, clean_status_col, c_cols, df)
+      model$permutation_importance <- calc_permutation_importance_coxph(model, clean_time_col, clean_status_col, c_cols, df)
 
       # get importance to decice variables for partial dependence
-      imp_df <- rf$permutation_importance
+      imp_df <- model$permutation_importance
       imp_df <- imp_df %>% dplyr::arrange(-importance)
       imp_vars <- imp_df$term
       if (is.null(max_pd_vars)) {
         max_pd_vars <- 20 # Number of most important variables to calculate partial dependences on. This used to be 12 but we decided it was a little too small.
       }
       imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
-      rf$partial_dependence <- partial_dependence.coxph_exploratory(rf, clean_time_col, vars = imp_vars, n = c(9, 25), data = df) # grid of 9 is convenient for both PDP and survival curves.
-      rf$pred_survival_time <- pred_survival_time
-      rf$survival_curves <- calc_survival_curves_with_strata(df, clean_time_col, clean_status_col, imp_vars)
+      model$partial_dependence <- partial_dependence.coxph_exploratory(model, clean_time_col, vars = imp_vars, n = c(9, 25), data = df) # grid of 9 is convenient for both PDP and survival curves.
+      model$pred_survival_time <- pred_survival_time
+      model$survival_curves <- calc_survival_curves_with_strata(df, clean_time_col, clean_status_col, imp_vars)
 
       tryCatch({
-        rf$vif <- calc_vif(rf)
+        model$vif <- calc_vif(model)
       }, error = function(e){
-        rf$vif <<- e
+        model$vif <<- e
       })
 
       if (test_rate > 0) {
         # TODO: Adjust the following code from build_lm.fast for this function.
         # Note: Do not pass df_test like data=df_test. This for some reason ends up predict returning training data prediction.
-        # rf$prediction_test <- predict(rf, df_test, se.fit = TRUE)
-        # rf$unknown_category_rows_index <- unknown_category_rows_index
+        # model$prediction_test <- predict(model, df_test, se.fit = TRUE)
+        # model$unknown_category_rows_index <- unknown_category_rows_index
       }
-      rf$test_index <- test_index
-      rf$source_data <- source_data
+      model$test_index <- test_index
+      model$source_data <- source_data
 
       # add special lm_coxph class for adding extra info at glance().
-      class(rf) <- c("coxph_exploratory", class(rf))
-      rf
+      class(model) <- c("coxph_exploratory", class(model))
+      model
     }, error = function(e){
       if(length(grouped_cols) > 0) {
         # In repeat-by case, we report group-specific error in the Summary table,
