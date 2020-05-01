@@ -586,6 +586,7 @@ test_that("test prediction_training_and_test by glm", {
       class = c("tbl_df", "tbl", "data.frame"), .Names = c("CANCELLED X", "Carrier Name", "CARRIER", "DISTANCE", "ARR_TIME", "DERAY_TIME"))
   
   test_data$klass <- c(rep("A", 10), rep("B", 10))
+  test_data <- test_data %>% dplyr::mutate(`CANCELLED X` = `CANCELLED X` == 'Y')
   model_ret <- test_data %>% build_lm.fast(`CANCELLED X`,
                                      `ARR_TIME`,
                                      `DERAY_TIME`,
