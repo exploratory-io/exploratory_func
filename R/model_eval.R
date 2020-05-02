@@ -25,6 +25,10 @@ do_roc_ <- function(df, pred_prob_col, actual_val_col, grid = NULL, with_auc = F
   fpr_col <- avoid_conflict(group_cols, "false_positive_rate")
 
   do_roc_each <- function(df){
+    # filter out NAs upfront.
+    df <- df %>% dplyr::filter(!is.na(!!rlang::sym(pred_prob_col)) && !is.na(!!rlang::sym(actual_val_col)))
+    df[[actual_val_col]] <- binary_label(df[[actual_val_col]])
+
     if (with_auc) { # Calculate AUC.
       auc <- auroc(df[[pred_prob_col]], df[[actual_val_col]])
     }
@@ -32,9 +36,8 @@ do_roc_ <- function(df, pred_prob_col, actual_val_col, grid = NULL, with_auc = F
     # sort descending order by predicted probability
     arranged <- df[order(-df[[pred_prob_col]]), ]
 
-    # remove na and get actual values
-    val <- arranged[[actual_val_col]][!is.na(arranged[[actual_val_col]])]
-    val <- binary_label(val)
+    # and get actual values
+    val <- arranged[[actual_val_col]]
 
     act_sum <- sum(val)
 
@@ -62,7 +65,8 @@ do_roc_ <- function(df, pred_prob_col, actual_val_col, grid = NULL, with_auc = F
     if (!is.null(grid)) { # Apply grid to reduce data size for drawing chart.
       ret <- ret %>% dplyr::mutate(fpr = floor(fpr*grid)/grid) %>%
         dplyr::group_by(fpr) %>%
-        dplyr::summarize(tpr=min(tpr)) 
+        dplyr::summarize(tpr=min(tpr)) %>%
+        dplyr::select(tpr, fpr) # Column ornder is reverted here. Put the order back to original.
     }
 
     colnames(ret)[colnames(ret) == "tpr"] <- tpr_col
