@@ -1986,6 +1986,7 @@ calculate_cohens_f_squared <- function(r2) {
 
 # References:
 # https://stats.stackexchange.com/questions/415037/effect-size-calculation-for-kruskal-wallis-mean-rank-test
+# https://rcompanion.org/handbook/F_08.html
 #'Calculate epsilon squared, which is an effect size of Kruskal-Wallis test.
 #'@export
 calculate_epsilon_squared <- function(KW, Groups, N) {
