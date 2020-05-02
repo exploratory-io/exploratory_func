@@ -293,12 +293,12 @@ test_that("evaluate binary classification model by training and test", {
                                      test_rate = 0.5)
   suppressWarnings({
     eret <- evaluate_binary_training_and_test(ret, "CANCELLED X")
-    expect_cols <-  c("is_test_data", "f_score", "accuracy_rate", "misclassification_rate", "precision", "recall", "auc",
+    expect_cols <-  c("is_test_data", "auc", "f_score", "accuracy_rate", "misclassification_rate", "precision", "recall",
                       "p.value", "n", "positives", "negatives", "logLik", "AIC", "BIC", "deviance",
                       "null.deviance", "df.null", "df.residual")
     expect_equal(colnames(eret), expect_cols)
     eret <- evaluate_binary_training_and_test(ret, "CANCELLED X", pretty.name = TRUE)
-    expect_cols <- c("Data Type", "F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall", "AUC",
+    expect_cols <- c("Data Type", "AUC", "F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall",
                      "P Value", "Number of Rows", "Number of Rows for TRUE", "Number of Rows for FALSE", "Log Likelihood", "AIC", "BIC",
                      "Residual Deviance", "Null Deviance", "DF for Null Model", "Residual DF")
 
@@ -318,12 +318,12 @@ test_that("Group evaluate binary classification model by training and test", {
                          test_rate = 0.5)
   suppressWarnings({
     eret <- evaluate_binary_training_and_test(ret, "CANCELLED X")
-    expect_cols <-  c("klass", "is_test_data", "f_score", "accuracy_rate", "misclassification_rate", "precision", "recall", "auc",
+    expect_cols <-  c("klass", "is_test_data", "auc", "f_score", "accuracy_rate", "misclassification_rate", "precision", "recall",
                       "p.value", "n", "positives", "negatives", "logLik", "AIC", "BIC", "deviance",
                       "null.deviance", "df.null", "df.residual")
     expect_equal(colnames(eret), expect_cols)
     eret <- evaluate_binary_training_and_test(ret, "CANCELLED X", pretty.name = TRUE)
-    expect_cols <- c("klass", "Data Type", "F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall", "AUC",
+    expect_cols <- c("klass", "Data Type", "AUC", "F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall",
                      "P Value", "Number of Rows", "Number of Rows for TRUE", "Number of Rows for FALSE", "Log Likelihood", "AIC", "BIC",
                      "Residual Deviance", "Null Deviance", "DF for Null Model", "Residual DF")
 
