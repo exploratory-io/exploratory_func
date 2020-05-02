@@ -3,18 +3,20 @@
 #' @param pred_prob Column name for probability
 #' @param actual_val Column name for actual values
 #' @export
-do_roc <- function(df, pred_prob, actual_val){
+do_roc <- function(df, pred_prob, actual_val, ...){
   pred_prob_col <- col_name(substitute(pred_prob))
   actual_val_col <- col_name(substitute(actual_val))
-  do_roc_(df, pred_prob_col, actual_val_col)
+  do_roc_(df, pred_prob_col, actual_val_col, ...)
 }
 
 #' Return cordinations for ROC curve
 #' @param df Data frame
 #' @param pred_prob_col Column name for probability
 #' @param actual_val_col Column name for actual values
+#' @param grid Grid size to reduce data size for drawing chart.
+#' @param with_auc When set to TRUE, AUC is calculated and added as a column of the output.
 #' @export
-do_roc_ <- function(df, pred_prob_col, actual_val_col){
+do_roc_ <- function(df, pred_prob_col, actual_val_col, grid = NULL, with_auc = FALSE){
   validate_empty_data(df)
 
   group_cols <- grouped_by(df)
@@ -23,12 +25,19 @@ do_roc_ <- function(df, pred_prob_col, actual_val_col){
   fpr_col <- avoid_conflict(group_cols, "false_positive_rate")
 
   do_roc_each <- function(df){
+    # filter out NAs upfront.
+    df <- df %>% dplyr::filter(!is.na(!!rlang::sym(pred_prob_col)) && !is.na(!!rlang::sym(actual_val_col)))
+    df[[actual_val_col]] <- binary_label(df[[actual_val_col]])
+
+    if (with_auc) { # Calculate AUC.
+      auc <- auroc(df[[pred_prob_col]], df[[actual_val_col]])
+    }
+
     # sort descending order by predicted probability
     arranged <- df[order(-df[[pred_prob_col]]), ]
 
-    # remove na and get actual values
-    val <- arranged[[actual_val_col]][!is.na(arranged[[actual_val_col]])]
-    val <- binary_label(val)
+    # and get actual values
+    val <- arranged[[actual_val_col]]
 
     act_sum <- sum(val)
 
@@ -52,7 +61,21 @@ do_roc_ <- function(df, pred_prob_col, actual_val_col){
       tpr,
       fpr
     )
-    colnames(ret) <- c(tpr_col, fpr_col)
+
+    if (!is.null(grid)) { # Apply grid to reduce data size for drawing chart.
+      ret <- ret %>% dplyr::mutate(fpr = floor(fpr*grid)/grid) %>%
+        dplyr::group_by(fpr) %>%
+        dplyr::summarize(tpr=min(tpr)) %>%
+        dplyr::select(tpr, fpr) # Column ornder is reverted here. Put the order back to original.
+    }
+
+    colnames(ret)[colnames(ret) == "tpr"] <- tpr_col
+    colnames(ret)[colnames(ret) == "fpr"] <- fpr_col
+
+    if (with_auc) {
+      ret <- ret %>% dplyr::mutate(auc = auc)
+    }
+
     ret
   }
 
