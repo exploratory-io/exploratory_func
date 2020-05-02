@@ -2387,12 +2387,8 @@ evaluate_binary_classification <- function(actual, predicted, predicted_probabil
   else {
     actual_for_roc <- as.integer(actual)==1
   }
-  roc_df <- data.frame(actual = actual_for_roc, predicted_probability = predicted_probability)
-  roc <- roc_df %>% do_roc_(actual_val_col = "actual", pred_prob_col = "predicted_probability")
-  # use numeric index so that it won't be disturbed by name change
-  # 2 should be false positive rate (x axis) and 1 should be true positive rate (yaxis)
-  # calculate the area under the plots
-  auc <- sum((roc[[2]] - dplyr::lag(roc[[2]])) * roc[[1]], na.rm = TRUE)
+  auc <- auroc(predicted_probability, actual_for_roc)
+
   if (is.factor(actual) && "TRUE" %in% levels(actual)) { # target was logical and converted to factor.
     if (is_rpart) {
       # For rpart, level for "TRUE" is 2, and that does not work with the logic in else clause.
