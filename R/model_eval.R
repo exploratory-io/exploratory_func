@@ -60,7 +60,8 @@ do_roc_ <- function(df, pred_prob_col, actual_val_col, grid = NULL){
         dplyr::summarize(tpr=min(tpr)) 
     }
 
-    colnames(ret) <- c(tpr_col, fpr_col)
+    colnames(ret)[colnames(ret) == "tpr"] <- tpr_col
+    colnames(ret)[colnames(ret) == "fpr"] <- fpr_col
     ret
   }
 
