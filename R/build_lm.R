@@ -1029,14 +1029,8 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
     ret2 <- ret2[, 2:6]
     ret <- ret %>% bind_cols(ret2)
 
-    # calculate AUC from ROC
-    roc_df <- data.frame(actual = x$y, predicted_probability = x$fitted.value)
-    roc <- roc_df %>% do_roc_(actual_val_col = "actual", pred_prob_col = "predicted_probability")
-    # use numeric index so that it won't be disturbed by name change
-    # 2 should be false positive rate (x axis) and 1 should be true positive rate (yaxis)
-    # calculate the area under the plots
-    auc <- sum((roc[[2]] - dplyr::lag(roc[[2]])) * roc[[1]], na.rm = TRUE)
-    ret$auc <- auc
+    # calculate AUC
+    ret$auc <- auroc(x$fitted.value, x$y)
     # Show number of rows for positive case and negative case, especially so that result of SMOTE is visible.
     ret$positives <- sum(x$y == 1, na.rm = TRUE)
     ret$negatives <- sum(x$y != 1, na.rm = TRUE)
@@ -1045,7 +1039,7 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
   if(pretty.name) {
     if (x$family$family %in% c('binomial', 'quasibinomial')) { # for binomial regressions.
       ret <- ret %>% dplyr::rename(`Null Deviance`=null.deviance, `DF for Null Model`=df.null, `Log Likelihood`=logLik, `Residual Deviance`=deviance, `Residual DF`=df.residual, `AUC`=auc) %>%
-        dplyr::select(`F Score`, `Accuracy Rate`, `Misclassification Rate`, `Precision`, `Recall`, `AUC`,`P Value`, `Number of Rows`, positives, negatives,  `Log Likelihood`, `AIC`, `BIC`, `Residual Deviance`, `Null Deviance`, `DF for Null Model`, everything())
+        dplyr::select(AUC, `F Score`, `Accuracy Rate`, `Misclassification Rate`, `Precision`, `Recall`, `P Value`, `Number of Rows`, positives, negatives,  `Log Likelihood`, `AIC`, `BIC`, `Residual Deviance`, `Null Deviance`, `DF for Null Model`, everything())
       if (!is.null(x$orig_levels)) { 
         pos_label <- x$orig_levels[2]
         neg_label <- x$orig_levels[1]
