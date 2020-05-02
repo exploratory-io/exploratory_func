@@ -1975,6 +1975,19 @@ calculate_cohens_w <- function(chi_sq, N) {
   sqrt(chi_sq/N)
 }
 
+# References:
+# Cohen's f2 definition: https://en.wikipedia.org/wiki/Effect_size
+#'Calculate Cohen's f squared, which is an effect size of F-test for multiple regression.
+#'@export
+calculate_cohens_f_squared <- function(r2) {
+  f2 <- r2 / (1 - r2)
+  f2
+}
+
+# References:
+# https://stats.stackexchange.com/questions/415037/effect-size-calculation-for-kruskal-wallis-mean-rank-test
+#'Calculate epsilon squared, which is an effect size of Kruskal-Wallis test.
+#'@export
 calculate_epsilon_squared <- function(KW, Groups, N) {
   P = KW$p.value
   CHI = qchisq(P, Groups-1, lower.tail=FALSE)
