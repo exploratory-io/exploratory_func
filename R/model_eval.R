@@ -15,7 +15,7 @@ do_roc <- function(df, pred_prob, actual_val, ...){
 #' @param actual_val_col Column name for actual values
 #' @param grid Grid size to reduce data size for drawing chart.
 #' @export
-do_roc_ <- function(df, pred_prob_col, actual_val_col, grid = NULL){
+do_roc_ <- function(df, pred_prob_col, actual_val_col, grid = NULL, with_auc = FALSE){
   validate_empty_data(df)
 
   group_cols <- grouped_by(df)
@@ -24,6 +24,10 @@ do_roc_ <- function(df, pred_prob_col, actual_val_col, grid = NULL){
   fpr_col <- avoid_conflict(group_cols, "false_positive_rate")
 
   do_roc_each <- function(df){
+    if (with_auc) {
+      auc <- auroc(df[[pred_prob_col]], df[[actual_val_col]])
+    }
+
     # sort descending order by predicted probability
     arranged <- df[order(-df[[pred_prob_col]]), ]
 
@@ -62,6 +66,11 @@ do_roc_ <- function(df, pred_prob_col, actual_val_col, grid = NULL){
 
     colnames(ret)[colnames(ret) == "tpr"] <- tpr_col
     colnames(ret)[colnames(ret) == "fpr"] <- fpr_col
+
+    if (with_auc) {
+      ret %>% dplyr::mutate(auc = auc)
+    }
+
     ret
   }
 
