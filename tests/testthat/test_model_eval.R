@@ -14,8 +14,10 @@ test_that("test do_roc", {
   predicted <- prediction(model_data)
 
   ret <- do_roc(predicted, predicted_response, CANCELLED)
-
   expect_equal(colnames(ret), c("true_positive_rate", "false_positive_rate"))
+
+  ret <- do_roc(predicted, predicted_response, CANCELLED, grid=100, with_auc=TRUE)
+  expect_equal(colnames(ret), c("true_positive_rate", "false_positive_rate", "auc"))
 
 })
 
@@ -35,8 +37,10 @@ test_that("test do_roc with factor", {
   predicted <- prediction(model_data)
 
   ret <- do_roc(predicted, predicted_response, CANCELLED)
-
   expect_equal(colnames(ret), c("true_positive_rate", "false_positive_rate"))
+
+  ret <- do_roc(predicted, predicted_response, CANCELLED, grid=100, with_auc=TRUE)
+  expect_equal(colnames(ret), c("true_positive_rate", "false_positive_rate", "auc"))
 })
 
 test_that("test do_roc with 2 numeric values", {
