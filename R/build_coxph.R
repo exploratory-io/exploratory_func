@@ -502,7 +502,7 @@ build_coxph.fast <- function(df,
       model$survival_curves <- calc_survival_curves_with_strata(df, clean_time_col, clean_status_col, imp_vars)
 
       tryCatch({
-        model$vif <- calc_vif(model)
+        model$vif <- calc_vif(model, model$terms_mapping)
       }, error = function(e){
         model$vif <<- e
       })

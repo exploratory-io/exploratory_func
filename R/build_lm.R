@@ -139,7 +139,7 @@ vif <- function(mod, ...) {
 }
 
 # Calculate VIF and throw user friendly message in case of perfect collinearity.
-calc_vif <- function(model) {
+calc_vif <- function(model, terms_mapping) {
   tryCatch({
     vif(model)
   }, error = function(e){
@@ -838,7 +838,7 @@ build_lm.fast <- function(df,
       }
 
       tryCatch({
-        model$vif <- calc_vif(model)
+        model$vif <- calc_vif(model, terms_mapping)
       }, error = function(e){
         model$vif <<- e
       })
