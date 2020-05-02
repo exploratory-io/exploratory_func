@@ -68,7 +68,7 @@ do_roc_ <- function(df, pred_prob_col, actual_val_col, grid = NULL, with_auc = F
     colnames(ret)[colnames(ret) == "fpr"] <- fpr_col
 
     if (with_auc) {
-      ret %>% dplyr::mutate(auc = auc)
+      ret <- ret %>% dplyr::mutate(auc = auc)
     }
 
     ret
