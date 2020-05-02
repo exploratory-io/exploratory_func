@@ -1975,6 +1975,13 @@ calculate_cohens_w <- function(chi_sq, N) {
   sqrt(chi_sq/N)
 }
 
+calculate_epsilon_squared <- function(KW, Groups, N) {
+  P = KW$p.value
+  CHI = qchisq(P, Groups-1, lower.tail=FALSE)
+  Epsilon2 = CHI / (N-1)
+  Epsilon2
+}
+
 #'Calculates mode. Function name is capitalized to avoid conflict with base::mode(), which does something other than calculating mode.
 # Reference: https://stackoverflow.com/questions/2547402/is-there-a-built-in-function-for-finding-the-mode
 #'@export
