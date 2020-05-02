@@ -3,18 +3,19 @@
 #' @param pred_prob Column name for probability
 #' @param actual_val Column name for actual values
 #' @export
-do_roc <- function(df, pred_prob, actual_val){
+do_roc <- function(df, pred_prob, actual_val, ...){
   pred_prob_col <- col_name(substitute(pred_prob))
   actual_val_col <- col_name(substitute(actual_val))
-  do_roc_(df, pred_prob_col, actual_val_col)
+  do_roc_(df, pred_prob_col, actual_val_col, ...)
 }
 
 #' Return cordinations for ROC curve
 #' @param df Data frame
 #' @param pred_prob_col Column name for probability
 #' @param actual_val_col Column name for actual values
+#' @param grid Grid size to reduce data size for drawing chart.
 #' @export
-do_roc_ <- function(df, pred_prob_col, actual_val_col){
+do_roc_ <- function(df, pred_prob_col, actual_val_col, grid = NULL){
   validate_empty_data(df)
 
   group_cols <- grouped_by(df)
@@ -52,6 +53,13 @@ do_roc_ <- function(df, pred_prob_col, actual_val_col){
       tpr,
       fpr
     )
+
+    if (!is.null(grid)) { # Apply grid to reduce data size for drawing chart.
+      ret <- ret %>% dplyr::mutate(fpr = floor(fpr*grid)/grid) %>%
+        dplyr::group_by(fpr) %>%
+        dplyr::summarize(tpr=min(tpr)) 
+    }
+
     colnames(ret) <- c(tpr_col, fpr_col)
     ret
   }
