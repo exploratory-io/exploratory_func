@@ -2193,6 +2193,9 @@ week <- function(date, unit="year") {
   }
 }
 
+#' Calculates area under ROC. (AUC)
+#' @export
+#' Reference: https://blog.mbq.me/augh-roc/
 auroc <- function(score, bool) {
   n1 <- sum(!bool)
   n2 <- sum(bool)
