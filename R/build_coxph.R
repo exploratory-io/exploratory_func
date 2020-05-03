@@ -386,8 +386,6 @@ build_coxph.fast <- function(df,
 
       # build formula for lm
       rhs <- paste0("`", c_cols, "`", collapse = " + ")
-      # TODO: This clean_time_col is actually not a cleaned column name since we want lm to show real name. Clean up our variable name.
-      # TODO: see if the above is appropriate for coxph
       fml <- as.formula(paste0("survival::Surv(`", clean_time_col, "`, `", clean_status_col, "`) ~ ", rhs))
       model <- survival::coxph(fml, data = df)
       # these attributes are used in tidy of randomForest TODO: is this good for lm too?
