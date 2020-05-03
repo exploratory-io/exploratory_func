@@ -226,13 +226,10 @@ exp_survival_forest <- function(df,
   each_func <- function(df) {
     tryCatch({
       df <- df %>%
-        # dplyr::filter(!is.na(!!target_col))  TODO: this was not filtering, and replaced it with the next line. check other similar places.
-        # for numeric cols, filter NA rows, because lm will anyway do this internally, and errors out
-        # if the remaining rows are with single value in any predictor column.
-        # filter Inf/-Inf too to avoid error at lm.
-        dplyr::filter(!is.na(df[[clean_time_col]]) & !is.infinite(df[[clean_time_col]])) # this form does not handle group_by. so moved into each_func from outside.
-      df <- df %>%
         dplyr::filter(!is.na(df[[clean_status_col]])) # this form does not handle group_by. so moved into each_func from outside.
+
+      df <- preprocess_regression_data_before_sample(df, clean_time_col, clean_cols)
+      clean_cols <- attr(df, 'predictors') # predictors are updated (removed) in preprocess_pre_sample. Catch up with it.
 
       # sample the data for performance if data size is too large.
       sampled_nrow <- NULL
@@ -242,99 +239,9 @@ exp_survival_forest <- function(df,
         df <- df %>% sample_rows(max_nrow)
       }
 
-      # Some columns will be removed from clean_cols to make the set of columns in c_cols.
-      # c_cols is the one to be fed to the building of the model.
-      c_cols <- clean_cols
-      for(col in clean_cols){
-        if(lubridate::is.Date(df[[col]]) || lubridate::is.POSIXct(df[[col]])) {
-          c_cols <- setdiff(c_cols, col)
-
-          absolute_time_col <- avoid_conflict(colnames(df), paste0(col, "_abs_time"))
-          wday_col <- avoid_conflict(colnames(df), paste0(col, "_w_"))
-          day_col <- avoid_conflict(colnames(df), paste0(col, "_day_of_month"))
-          yday_col <- avoid_conflict(colnames(df), paste0(col, "_day_of_year"))
-          month_col <- avoid_conflict(colnames(df), paste0(col, "_m_"))
-          year_col <- avoid_conflict(colnames(df), paste0(col, "_year"))
-          new_name <- c(absolute_time_col, wday_col, day_col, yday_col, month_col, year_col)
-          names(new_name) <- paste(
-            names(name_map)[name_map == col],
-            c(
-              "_abs_time",
-              "_w_",
-              "_day_of_month",
-              "_day_of_year",
-              "_m_",
-              "_year"
-            ), sep="")
-
-          name_map <- c(name_map, new_name)
-
-          c_cols <- c(c_cols, absolute_time_col, wday_col, day_col, yday_col, month_col, year_col)
-          df[[absolute_time_col]] <- as.numeric(df[[col]])
-          # turn it into unordered factor since if it is ordered factor, the name of term is broken
-          df[[wday_col]] <- factor(lubridate::wday(df[[col]], label=TRUE), ordered=FALSE)
-          df[[day_col]] <- lubridate::day(df[[col]])
-          df[[yday_col]] <- lubridate::yday(df[[col]])
-          # turn it into unordered factor since if it is ordered factor, the name of term is broken
-          df[[month_col]] <- factor(lubridate::month(df[[col]], label=TRUE), ordered=FALSE)
-          df[[year_col]] <- lubridate::year(df[[col]])
-          if(lubridate::is.POSIXct(df[[col]])) {
-            hour_col <- avoid_conflict(colnames(df), paste0(col, "_hour"))
-            new_name <- c(hour_col)
-            names(new_name) <- paste(
-              names(name_map)[name_map == col],
-              c(
-                "_hour"
-              ), sep="")
-            name_map <- c(name_map, new_name)
-
-            c_cols <- c(c_cols, hour_col)
-            df[[hour_col]] <- factor(lubridate::hour(df[[col]])) # treat hour as category
-          }
-          df[[col]] <- NULL # drop original Date/POSIXct column to pass SMOTE later.
-        } else if(is.factor(df[[col]])) {
-          # 1. if the data is factor, respect the levels and keep first 10 levels, and make others "Others" level.
-          # 2. if the data is ordered factor, turn it into unordered. For ordered factor,
-          #    coxph takes polynomial terms (Linear, Quadratic, Cubic, and so on) and use them as variables,
-          #    which we do not want for this function.
-          if (length(levels(df[[col]])) >= predictor_n + 2) {
-            df[[col]] <- forcats::fct_other(factor(df[[col]], ordered=FALSE), keep=levels(df[[col]])[1:predictor_n])
-          }
-          else {
-            df[[col]] <- factor(df[[col]], ordered=FALSE)
-          }
-        } else if(is.logical(df[[col]])) {
-          # 1. convert data to factor if predictors are logical. (as.factor() on logical always puts FALSE as the first level, which is what we want for predictor.)
-          # 2. turn NA into (Missing) factor level so that lm will not drop all the rows.
-          df[[col]] <- forcats::fct_explicit_na(as.factor(df[[col]]))
-        } else if(!is.numeric(df[[col]])) {
-          # 1. convert data to factor if predictors are not numeric or logical.
-          # 2. sort levels by frequency so that base level is the most frequent category.
-          # 3. limit the number of levels in factor by fct_lump.
-          #    we use ties.method to handle the case where there are many unique values. (without it, they all survive fct_lump.)
-          # 4. turn NA into (Missing) factor level so that lm will not drop all the rows.
-          df[[col]] <- forcats::fct_explicit_na(forcats::fct_lump(forcats::fct_infreq(as.factor(df[[col]])), n=predictor_n, ties.method="first"))
-        } else {
-          # for numeric cols, filter NA rows, because lm will anyway do this internally, and errors out
-          # if the remaining rows are with single value in any predictor column.
-          # filter Inf/-Inf too to avoid error at lm.
-          df <- df %>% dplyr::filter(!is.na(df[[col]]) & !is.infinite(df[[col]]))
-        }
-      }
-
-      # remove columns with only one unique value
-      cols_copy <- c_cols
-      for (col in cols_copy) {
-        unique_val <- unique(df[[col]])
-        if (length(unique_val[!is.na(unique_val)]) == 1) {
-          c_cols <- setdiff(c_cols, col)
-          df[[col]] <- NULL # drop the column so that SMOTE will not see it. 
-        }
-      }
-      if (length(c_cols) == 0) {
-        # Previous version of message - stop("The selected predictor variables are invalid since they have only one unique values.")
-        stop("Invalid Predictors: Only one unique value.") # Message is made short so that it fits well in the Summary table.
-      }
+      df <- preprocess_regression_data_after_sample(df, clean_target_col, clean_cols, predictor_n = predictor_n, name_map = name_map)
+      c_cols <- attr(df, 'predictors') # predictors are updated (added and/or removed) in preprocess_post_sample. Catch up with it.
+      name_map <- attr(df, 'name_map')
 
       # split training and test data
       source_data <- df
