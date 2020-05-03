@@ -1,6 +1,5 @@
 context("test exp_survival_forest")
 
-if(F){ # Temporarily skip failing test.
 test_that("test exp_survival_forest", {
   df <- survival::lung # this data has NAs.
   df <- df %>% rename(`ti me`=time, `sta tus`=status, `a ge`=age, `se-x`=sex)
@@ -13,7 +12,6 @@ test_that("test exp_survival_forest", {
   ret <- model_df %>% broom::tidy(model, type='partial_dependence')
   ret <- model_df %>% broom::tidy(model, type='importance')
 })
-}
 
 test_that("exp_survival_forest error handling for predictor with single unique value", {
   expect_error({
