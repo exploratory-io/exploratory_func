@@ -359,8 +359,8 @@ evaluate_binary_training_and_test <- function(df, actual_val, threshold = "f_sco
         eret <- evaluate_binary_(test_pred_ret, "predicted_probability", actual_val_col, threshold = threshold)
   
         test_ret <- eret %>% dplyr::mutate(n = true_positive + false_positive + true_negative + false_negative,
-                                           positives = true_positive + false_positive,
-                                           negatives = true_negative + false_negative) %>%
+                                           positives = true_positive + false_negative,
+                                           negatives = true_negative + false_positive) %>%
                              dplyr::select(auc = AUC, f_score, accuracy_rate,
                                            misclassification_rate, precision, recall,
                                            n, positives, negatives)
