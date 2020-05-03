@@ -239,7 +239,7 @@ exp_survival_forest <- function(df,
         df <- df %>% sample_rows(max_nrow)
       }
 
-      df <- preprocess_regression_data_after_sample(df, clean_target_col, clean_cols, predictor_n = predictor_n, name_map = name_map)
+      df <- preprocess_regression_data_after_sample(df, clean_time_col, clean_cols, predictor_n = predictor_n, name_map = name_map)
       c_cols <- attr(df, 'predictors') # predictors are updated (added and/or removed) in preprocess_post_sample. Catch up with it.
       name_map <- attr(df, 'name_map')
 
@@ -256,7 +256,7 @@ exp_survival_forest <- function(df,
 
       # build formula for survival forest.
       rhs <- paste0("`", c_cols, "`", collapse = " + ")
-      # TODO: This clean_target_col is actually not a cleaned column name since we want lm to show real name. Clean up our variable name.
+      # TODO: This clean_time_col is actually not a cleaned column name since we want lm to show real name. Clean up our variable name.
       # TODO: see if the above is appropriate for coxph
       fml <- as.formula(paste0("survival::Surv(`", clean_time_col, "`, `", clean_status_col, "`) ~ ", rhs))
       # all or max_sample_size data will be used for randomForest
