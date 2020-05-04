@@ -26,6 +26,22 @@ calc_permutation_importance_linear <- function(fit, target, vars, data) {
   importances_df
 }
 
+# Calculates permutation importance for logistic regression.
+calc_permutation_importance_poisson <- function(fit, target, vars, data) {
+  var_list <- as.list(vars)
+  importances <- purrr::map(var_list, function(var) {
+    mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
+                                predict.fun = function(object,newdata){predict(object,type = "link",newdata=newdata)},
+                                # Use minus log likelyhood as loss function.
+                                # Reference: https://en.wikipedia.org/wiki/Poisson_regression#Maximum_likelihood-based_parameter_estimation
+                                #            https://stats.stackexchange.com/questions/70054/how-is-it-possible-that-poisson-glm-accepts-non-integer-numbers
+                                loss.fun = function(x,y){-sum(y*x-exp(x), na.rm = TRUE)})
+  })
+  importances <- purrr::flatten_dbl(importances)
+  importances_df <- tibble(term=vars, importance=importances)
+  importances_df
+}
+
 
 # Builds partial_dependency object for lm/glm with same structure (a data.frame with attributes.) as edarf::partial_dependence.
 partial_dependence.lm_exploratory <- function(fit, target, vars = colnames(data),
@@ -787,6 +803,9 @@ build_lm.fast <- function(df,
         }
         if (family == "binomial" && (is.null(link) || link == "logit")) { # Currently we have permutation importance only for logistic regression.
           model$permutation_importance <- calc_permutation_importance_logistic(model, clean_target_col, c_cols, df)
+        }
+        if (family == "poisson" && (is.null(link) || link == "log")) { # Currently we have permutation importance only for logistic regression.
+          model$permutation_importance <- calc_permutation_importance_poisson(model, clean_target_col, c_cols, df)
         }
       }
       else {
