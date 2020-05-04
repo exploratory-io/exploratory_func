@@ -1325,6 +1325,10 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
       handle_partial_dependence(x)
     },
     permutation_importance = {
+      if (is.null(x$permutation_importance)) {
+        ret <- data.frame() # Permutation importance is not supported for the family and link function. Return empty data.frame to avoid error.
+        return(ret)
+      }
       ret <- x$permutation_importance
       # Map variable names back to the original.
       # as.character is to be safe by converting from factor. With factor, reverse mapping result will be messed up.
