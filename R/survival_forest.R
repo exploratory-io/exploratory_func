@@ -297,6 +297,8 @@ exp_survival_forest <- function(df,
       }
       rf$test_index <- test_index
       rf$source_data <- source_data
+      rf$time_col <- clean_time_col
+      rf$status_col <- clean_status_col
 
       # add special lm_coxph class for adding extra info at glance().
       class(rf) <- c("ranger_survival_exploratory", class(rf))
@@ -361,6 +363,21 @@ tidy.ranger_survival_exploratory <- function(x, type = 'importance', ...) { #TOD
       ret <- ret %>% dplyr::mutate(variable = x$terms_mapping[variable]) # map variable names to original.
       ret
     })
+}
+
+#' @export
+glance.ranger_survival_exploratory <- function(x, type = 'importance', ...) { #TODO: add test
+  if ("error" %in% class(x)) {
+    ret <- data.frame(Note = x$message)
+    return(ret)
+  }
+  n_events <- sum(x$source_data[[x$status_col]])
+  n_censors <- sum(!x$source_data[[x$status_col]])
+  n_rows <- nrow(x$source_data)
+  ret <- tibble::tibble(`Number of Events` = n_events,
+                 `Number of Censors` = n_censors,
+                 `Number of Rows` = n_rows)
+  ret
 }
 
 #' @export

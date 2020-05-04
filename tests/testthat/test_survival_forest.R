@@ -4,8 +4,10 @@ test_that("test exp_survival_forest", {
   df <- survival::lung # this data has NAs.
   df <- df %>% rename(`ti me`=time, `sta tus`=status, `a ge`=age, `se-x`=sex)
   df <- df %>% mutate(ph.ecog = factor(ph.ecog, ordered=TRUE)) # test handling of ordered factor
+  df <- df %>% mutate(`sta tus` = `sta tus`==2) # we allow only logical status
   df <- df %>% mutate(`se-x` = `se-x`==1) # test handling of logical
   model_df <- df %>% exp_survival_forest(`ti me`, `sta tus`, `a ge`, `se-x`, ph.ecog, ph.karno, pat.karno, meal.cal, wt.loss, predictor_n = 2)
+  ret <- model_df %>% broom::glance(model)
   ret <- model_df %>% broom::augment(model)
   ret <- model_df %>% broom::tidy(model, type='partial_dependence_survival_curve')
   expect_equal(class(model_df$model[[1]]), c("ranger_survival_exploratory", "ranger"))
