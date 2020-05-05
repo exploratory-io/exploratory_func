@@ -31,6 +31,7 @@ calc_permutation_importance_gaussian <- function(fit, target, vars, data) {
   var_list <- as.list(vars)
   importances <- purrr::map(var_list, function(var) {
     mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
+                                # type needs to be "response" so that x in loss.fun can be used to calculate sum of squares with any choice of link function.
                                 predict.fun = function(object,newdata){predict(object,type = "response",newdata=newdata)},
                                 # For some reason, default loss.fun, which is mean((x - y)^2) returns NA, even with na.rm=TRUE. Rewrote it with sum() to avoid the issue.
                                 loss.fun = function(x,y){sum((x - y)^2, na.rm = TRUE)/length(x)})
@@ -45,6 +46,7 @@ calc_permutation_importance_poisson <- function(fit, target, vars, data) {
   var_list <- as.list(vars)
   importances <- purrr::map(var_list, function(var) {
     mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
+                                # type needs to be "link" since x in loss.fun expects linear predictor.
                                 predict.fun = function(object,newdata){predict(object,type = "link",newdata=newdata)},
                                 # Use minus log likelyhood as loss function.
                                 # Reference: https://en.wikipedia.org/wiki/Poisson_regression#Maximum_likelihood-based_parameter_estimation
