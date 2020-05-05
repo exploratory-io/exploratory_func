@@ -235,6 +235,7 @@ test_that("GLM - Normal Destribution with test_rate", {
     expect_equal(colnames(pred_test), expected_cols)
 
     res <- ret %>% broom::glance(model, pretty.name=TRUE)
+    res <- ret %>% broom::tidy(model, type="permutation_importance")
    })
 })
 
@@ -269,6 +270,7 @@ test_that("Group GLM - Normal Destribution with test_rate", {
     expect_equal(colnames(pred_test), expected_cols)
 
     res <- ret %>% broom::glance(model, pretty.name=TRUE)
+    res <- ret %>% broom::tidy(model, type="permutation_importance")
    })
 })
 
@@ -427,6 +429,7 @@ test_that("GLM - poisson Destribution with test_rate", {
     expect_equal(colnames(pred_test), expected_cols)
 
     res <- ret %>% broom::glance(model, pretty.name=TRUE)
+    res <- ret %>% broom::tidy(model, type="permutation_importance")
    })
 })
 
@@ -461,6 +464,7 @@ test_that("Group GLM - Poisson Destribution with test_rate", {
     expect_equal(colnames(pred_test), expected_cols)
 
     res <- ret %>% broom::glance(model, pretty.name=TRUE)
+    res <- ret %>% broom::tidy(model, type="permutation_importance")
     res <- ret %>% lm_partial_dependence()
    })
 })
@@ -492,6 +496,7 @@ test_that("GLM - Negative Binomial Destribution with test_rate", {
     expect_equal(colnames(pred_test), expected_cols)
 
     res <- ret %>% broom::glance(model, pretty.name=TRUE)
+    res <- ret %>% broom::tidy(model, type="permutation_importance")
     res <- ret %>% lm_partial_dependence()
    })
 })
@@ -527,6 +532,7 @@ test_that("Group GLM - Negative Binomial Destribution with test_rate", {
     expect_equal(colnames(pred_test), expected_cols)
 
     res <- ret %>% broom::glance(model, pretty.name=TRUE)
+    res <- ret %>% broom::tidy(model, type="permutation_importance")
     res <- ret %>% lm_partial_dependence()
    })
 })

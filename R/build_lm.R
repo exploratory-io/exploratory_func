@@ -1,5 +1,5 @@
-# Calculates permutation importance for logistic regression.
-calc_permutation_importance_logistic <- function(fit, target, vars, data) {
+# Calculates permutation importance for binomial (including logistic) regression.
+calc_permutation_importance_binomial <- function(fit, target, vars, data) {
   var_list <- as.list(vars)
   importances <- purrr::map(var_list, function(var) {
     mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
@@ -20,6 +20,38 @@ calc_permutation_importance_linear <- function(fit, target, vars, data) {
                                 # predict.fun can be the default function, which is predict(object, newdata=newdata).
                                 # For some reason, default loss.fun, which is mean((x - y)^2) returns NA, even with na.rm=TRUE. Rewrote it with sum() to avoid the issue.
                                 loss.fun = function(x,y){sum((x - y)^2, na.rm = TRUE)/length(x)})
+  })
+  importances <- purrr::flatten_dbl(importances)
+  importances_df <- tibble(term=vars, importance=importances)
+  importances_df
+}
+
+# Calculates permutation importance for GLM Gaussian regression.
+calc_permutation_importance_gaussian <- function(fit, target, vars, data) {
+  var_list <- as.list(vars)
+  importances <- purrr::map(var_list, function(var) {
+    mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
+                                # type needs to be "response" so that x in loss.fun can be used to calculate sum of squares with any choice of link function.
+                                predict.fun = function(object,newdata){predict(object,type = "response",newdata=newdata)},
+                                # For some reason, default loss.fun, which is mean((x - y)^2) returns NA, even with na.rm=TRUE. Rewrote it with sum() to avoid the issue.
+                                loss.fun = function(x,y){sum((x - y)^2, na.rm = TRUE)/length(x)})
+  })
+  importances <- purrr::flatten_dbl(importances)
+  importances_df <- tibble(term=vars, importance=importances)
+  importances_df
+}
+
+# Calculates permutation importance for logistic regression.
+calc_permutation_importance_poisson <- function(fit, target, vars, data) {
+  var_list <- as.list(vars)
+  importances <- purrr::map(var_list, function(var) {
+    mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
+                                # type needs to be "link" since x in loss.fun expects linear predictor.
+                                predict.fun = function(object,newdata){predict(object,type = "link",newdata=newdata)},
+                                # Use minus log likelyhood as loss function.
+                                # Reference: https://en.wikipedia.org/wiki/Poisson_regression#Maximum_likelihood-based_parameter_estimation
+                                #            https://stats.stackexchange.com/questions/70054/how-is-it-possible-that-poisson-glm-accepts-non-integer-numbers
+                                loss.fun = function(x,y){-sum(y*x-exp(x), na.rm = TRUE)})
   })
   importances <- purrr::flatten_dbl(importances)
   importances_df <- tibble(term=vars, importance=importances)
@@ -785,8 +817,14 @@ build_lm.fast <- function(df,
             model <- stats::glm(fml, data = df, family = family_arg)
           }
         }
-        if (family == "binomial" && (is.null(link) || link == "logit")) { # Currently we have permutation importance only for logistic regression.
-          model$permutation_importance <- calc_permutation_importance_logistic(model, clean_target_col, c_cols, df)
+        if (family == "binomial") {
+          model$permutation_importance <- calc_permutation_importance_binomial(model, clean_target_col, c_cols, df)
+        }
+        else if (family == "poisson" && (is.null(link) || link == "log")) { # Currently we have permutation importance only for logistic regression.
+          model$permutation_importance <- calc_permutation_importance_poisson(model, clean_target_col, c_cols, df)
+        }
+        else if (family == "gaussian") {
+          model$permutation_importance <- calc_permutation_importance_gaussian(model, clean_target_col, c_cols, df)
         }
       }
       else {
@@ -1306,6 +1344,10 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
       handle_partial_dependence(x)
     },
     permutation_importance = {
+      if (is.null(x$permutation_importance)) {
+        ret <- data.frame() # Permutation importance is not supported for the family and link function. Return empty data.frame to avoid error.
+        return(ret)
+      }
       ret <- x$permutation_importance
       # Map variable names back to the original.
       # as.character is to be safe by converting from factor. With factor, reverse mapping result will be messed up.
