@@ -1037,10 +1037,14 @@ exp_kruskal <- function(df, var1, var2, func2 = NULL, ...) {
   each_func <- function(df) {
     tryCatch({
       model <- kruskal.test(formula, data = df, ...)
+      N <- nrow(df)
+      Groups <- dplyr::n_distinct(df[[var2_col]])
+      epsilon_squared <- calculate_epsilon_squared(model, Groups, N)
       class(model) <- c("kruskal_exploratory", class(model))
       model$var1 <- var1_col
       model$var2 <- var2_col
       model$data <- df
+      model$epsilon_squared <- epsilon_squared
       model
     }, error = function(e){
       if(length(grouped_cols) > 0) {
@@ -1069,10 +1073,11 @@ tidy.kruskal_exploratory <- function(x, type="model", conf_level=0.95) {
   if (type == "model") {
     note <- NULL
     ret <- broom:::tidy.htest(x)
-    ret <- ret %>% dplyr::select(statistic, p.value, method)
+    ret <- ret %>% dplyr::select(statistic, p.value) # Removed method since it is always "Kruskal-Wallis rank sum test" here.
+    ret <- ret %>% dplyr::mutate(epsilon_squared=!!x$epsilon_squared)
     ret <- ret %>% dplyr::rename(`H Statistic` = statistic,
                                  `P Value`=p.value,
-                                 `Method`=method)
+                                 `Effect Size (Epsilon Squared)`=epsilon_squared)
     if (!is.null(note)) { # Add Note column, if there was an error from pwr function.
       ret <- ret %>% dplyr::mutate(Note=!!note)
     }
