@@ -3,18 +3,20 @@
 #' @param pred_prob Column name for probability
 #' @param actual_val Column name for actual values
 #' @export
-do_roc <- function(df, pred_prob, actual_val){
+do_roc <- function(df, pred_prob, actual_val, ...){
   pred_prob_col <- col_name(substitute(pred_prob))
   actual_val_col <- col_name(substitute(actual_val))
-  do_roc_(df, pred_prob_col, actual_val_col)
+  do_roc_(df, pred_prob_col, actual_val_col, ...)
 }
 
 #' Return cordinations for ROC curve
 #' @param df Data frame
 #' @param pred_prob_col Column name for probability
 #' @param actual_val_col Column name for actual values
+#' @param grid Grid size to reduce data size for drawing chart.
+#' @param with_auc When set to TRUE, AUC is calculated and added as a column of the output.
 #' @export
-do_roc_ <- function(df, pred_prob_col, actual_val_col){
+do_roc_ <- function(df, pred_prob_col, actual_val_col, grid = NULL, with_auc = FALSE){
   validate_empty_data(df)
 
   group_cols <- grouped_by(df)
@@ -23,12 +25,19 @@ do_roc_ <- function(df, pred_prob_col, actual_val_col){
   fpr_col <- avoid_conflict(group_cols, "false_positive_rate")
 
   do_roc_each <- function(df){
+    # filter out NAs upfront.
+    df <- df %>% dplyr::filter(!is.na(!!rlang::sym(pred_prob_col)) && !is.na(!!rlang::sym(actual_val_col)))
+    df[[actual_val_col]] <- binary_label(df[[actual_val_col]])
+
+    if (with_auc) { # Calculate AUC.
+      auc <- auroc(df[[pred_prob_col]], df[[actual_val_col]])
+    }
+
     # sort descending order by predicted probability
     arranged <- df[order(-df[[pred_prob_col]]), ]
 
-    # remove na and get actual values
-    val <- arranged[[actual_val_col]][!is.na(arranged[[actual_val_col]])]
-    val <- binary_label(val)
+    # and get actual values
+    val <- arranged[[actual_val_col]]
 
     act_sum <- sum(val)
 
@@ -52,7 +61,21 @@ do_roc_ <- function(df, pred_prob_col, actual_val_col){
       tpr,
       fpr
     )
-    colnames(ret) <- c(tpr_col, fpr_col)
+
+    if (!is.null(grid)) { # Apply grid to reduce data size for drawing chart.
+      ret <- ret %>% dplyr::mutate(fpr = floor(fpr*grid)/grid) %>%
+        dplyr::group_by(fpr) %>%
+        dplyr::summarize(tpr=min(tpr)) %>%
+        dplyr::select(tpr, fpr) # Column ornder is reverted here. Put the order back to original.
+    }
+
+    colnames(ret)[colnames(ret) == "tpr"] <- tpr_col
+    colnames(ret)[colnames(ret) == "fpr"] <- fpr_col
+
+    if (with_auc) {
+      ret <- ret %>% dplyr::mutate(auc = auc)
+    }
+
     ret
   }
 
@@ -336,8 +359,8 @@ evaluate_binary_training_and_test <- function(df, actual_val, threshold = "f_sco
         eret <- evaluate_binary_(test_pred_ret, "predicted_probability", actual_val_col, threshold = threshold)
   
         test_ret <- eret %>% dplyr::mutate(n = true_positive + false_positive + true_negative + false_negative,
-                                           positives = true_positive + false_positive,
-                                           negatives = true_negative + false_negative) %>%
+                                           positives = true_positive + false_negative,
+                                           negatives = true_negative + false_positive) %>%
                              dplyr::select(auc = AUC, f_score, accuracy_rate,
                                            misclassification_rate, precision, recall,
                                            n, positives, negatives)
@@ -360,7 +383,7 @@ evaluate_binary_training_and_test <- function(df, actual_val, threshold = "f_sco
 
   # sort column order
   ret <- ret %>% dplyr::select(auc, f_score, accuracy_rate, misclassification_rate, precision,
-                               recall, p.value, n, positives, negatives, logLik, AIC, BIC,
+                               recall, p.value, positives, negatives, n, logLik, AIC, BIC, # The order of positives, negatives, n is made the same as random forest and decision tree.
                                deviance, null.deviance, df.null, df.residual, everything())
 
   # Reorder columns. Bring group_by column first, and then is_test_data column, if it exists.

@@ -2332,12 +2332,16 @@ evaluate_classification <- function(actual, predicted, class, multi_class = TRUE
     )
   }
   else { # class, n is not necessary when it is binary classification with TRUE/FALSE
+    nt <- tp + fn
+    nf <- fp + tn
     ret <- data.frame(
       f_score,
       accuracy,
       1- accuracy,
       precision,
-      recall
+      recall,
+      nt,
+      nf
     )
   }
 
@@ -2345,13 +2349,13 @@ evaluate_classification <- function(actual, predicted, class, multi_class = TRUE
     if (multi_class) {
       c("Class", "F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall", "Number of Rows")
     } else {
-      c("F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall")
+      c("F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall", "Number of Rows for TRUE", "Number of Rows for FALSE")
     }
   } else {
     if (multi_class) {
       c("class", "f_score", "accuracy_rate", "misclassification_rate", "precision", "recall", "n")
     } else {
-      c("f_score", "accuracy_rate", "misclassification_rate", "precision", "recall")
+      c("f_score", "accuracy_rate", "misclassification_rate", "precision", "recall", "n_true", "n_false")
     }
   }
   ret

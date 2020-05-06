@@ -14,8 +14,10 @@ test_that("test do_roc", {
   predicted <- prediction(model_data)
 
   ret <- do_roc(predicted, predicted_response, CANCELLED)
-
   expect_equal(colnames(ret), c("true_positive_rate", "false_positive_rate"))
+
+  ret <- do_roc(predicted, predicted_response, CANCELLED, grid=100, with_auc=TRUE)
+  expect_equal(colnames(ret), c("true_positive_rate", "false_positive_rate", "auc"))
 
 })
 
@@ -35,8 +37,10 @@ test_that("test do_roc with factor", {
   predicted <- prediction(model_data)
 
   ret <- do_roc(predicted, predicted_response, CANCELLED)
-
   expect_equal(colnames(ret), c("true_positive_rate", "false_positive_rate"))
+
+  ret <- do_roc(predicted, predicted_response, CANCELLED, grid=100, with_auc=TRUE)
+  expect_equal(colnames(ret), c("true_positive_rate", "false_positive_rate", "auc"))
 })
 
 test_that("test do_roc with 2 numeric values", {
@@ -293,13 +297,13 @@ test_that("evaluate binary classification model by training and test", {
                                      test_rate = 0.5)
   suppressWarnings({
     eret <- evaluate_binary_training_and_test(ret, "CANCELLED X")
-    expect_cols <-  c("is_test_data", "f_score", "accuracy_rate", "misclassification_rate", "precision", "recall", "auc",
-                      "p.value", "n", "positives", "negatives", "logLik", "AIC", "BIC", "deviance",
+    expect_cols <-  c("is_test_data", "auc", "f_score", "accuracy_rate", "misclassification_rate", "precision", "recall",
+                      "p.value", "positives", "negatives", "n", "logLik", "AIC", "BIC", "deviance",
                       "null.deviance", "df.null", "df.residual")
     expect_equal(colnames(eret), expect_cols)
     eret <- evaluate_binary_training_and_test(ret, "CANCELLED X", pretty.name = TRUE)
-    expect_cols <- c("Data Type", "F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall", "AUC",
-                     "P Value", "Number of Rows", "Number of Rows for TRUE", "Number of Rows for FALSE", "Log Likelihood", "AIC", "BIC",
+    expect_cols <- c("Data Type", "AUC", "F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall",
+                     "P Value", "Number of Rows for TRUE", "Number of Rows for FALSE", "Number of Rows", "Log Likelihood", "AIC", "BIC",
                      "Residual Deviance", "Null Deviance", "DF for Null Model", "Residual DF")
 
     expect_equal(colnames(eret), expect_cols)
@@ -318,13 +322,13 @@ test_that("Group evaluate binary classification model by training and test", {
                          test_rate = 0.5)
   suppressWarnings({
     eret <- evaluate_binary_training_and_test(ret, "CANCELLED X")
-    expect_cols <-  c("klass", "is_test_data", "f_score", "accuracy_rate", "misclassification_rate", "precision", "recall", "auc",
-                      "p.value", "n", "positives", "negatives", "logLik", "AIC", "BIC", "deviance",
+    expect_cols <-  c("klass", "is_test_data", "auc", "f_score", "accuracy_rate", "misclassification_rate", "precision", "recall",
+                      "p.value", "positives", "negatives", "n", "logLik", "AIC", "BIC", "deviance",
                       "null.deviance", "df.null", "df.residual")
     expect_equal(colnames(eret), expect_cols)
     eret <- evaluate_binary_training_and_test(ret, "CANCELLED X", pretty.name = TRUE)
-    expect_cols <- c("klass", "Data Type", "F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall", "AUC",
-                     "P Value", "Number of Rows", "Number of Rows for TRUE", "Number of Rows for FALSE", "Log Likelihood", "AIC", "BIC",
+    expect_cols <- c("klass", "Data Type", "AUC", "F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall",
+                     "P Value", "Number of Rows for TRUE", "Number of Rows for FALSE", "Number of Rows", "Log Likelihood", "AIC", "BIC",
                      "Residual Deviance", "Null Deviance", "DF for Null Model", "Residual DF")
 
     expect_equal(colnames(eret), expect_cols)

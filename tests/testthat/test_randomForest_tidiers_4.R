@@ -34,7 +34,6 @@ test_that("calc_feature_map(regression) evaluate training and test", {
   ret <- rf_evaluation_training_and_test(model_df, test_rate = 0.3)
   expect_equal(nrow(ret %>% filter(`CAR RIER`=="DUMMY")), 1) # Row for the group with error.
   expect_equal(nrow(ret %>% filter(`CAR RIER`=="DUMMY" & !is.na(Note))), 1) # Row for the group with error should have message in Note column. 
-  browser()
 
   ret <- model_df %>% prediction_training_and_test()
   test_ret <- ret %>% filter(is_test_data==TRUE)
