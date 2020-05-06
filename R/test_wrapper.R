@@ -1073,10 +1073,12 @@ tidy.kruskal_exploratory <- function(x, type="model", conf_level=0.95) {
   if (type == "model") {
     note <- NULL
     ret <- broom:::tidy.htest(x)
-    ret <- ret %>% dplyr::select(statistic, p.value, method)
+    ret <- ret %>% dplyr::select(statistic, p.value) # Removed method since it is always "Kruskal-Wallis rank sum test" here.
+    ret <- ret %>% dplyr::mutate(epsilon_squared=!!x$epsilon_squared)
     ret <- ret %>% dplyr::rename(`H Statistic` = statistic,
                                  `P Value`=p.value,
-                                 `Method`=method)
+                                 `Method`=method,
+                                 `Effect Size (Epsilon Squared)`=epsilon_squared)
     if (!is.null(note)) { # Add Note column, if there was an error from pwr function.
       ret <- ret %>% dplyr::mutate(Note=!!note)
     }
