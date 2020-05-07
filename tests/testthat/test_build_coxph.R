@@ -8,6 +8,7 @@ test_that("test build_coxph.fast", {
   model_df <- df %>% build_coxph.fast(`ti me`, `sta tus`, `a ge`, `se-x`, ph.ecog, ph.karno, pat.karno, meal.cal, wt.loss, predictor_n = 2)
   expect_equal(class(model_df$model[[1]]), c("coxph_exploratory","coxph"))
   ret <- model_df %>% broom::augment(model)
+  ret <- model_df %>% broom::tidy(model, type='partial_dependence')
   ret <- model_df %>% broom::tidy(model, type='partial_dependence_survival_curve')
   ret <- model_df %>% broom::tidy(model, type='vif')
   ret <- model_df %>% broom::tidy(model)

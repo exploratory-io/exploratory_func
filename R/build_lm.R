@@ -944,6 +944,7 @@ build_lm.fast <- function(df,
       }
 
       if (length(imp_vars) > 0) {
+        model$imp_vars <- imp_vars
         model$partial_dependence <- partial_dependence.lm_exploratory(model, target=clean_target_col, vars=imp_vars, data=df, n=c(pd_grid_resolution, min(nrow(df), pd_sample_size)))
       }
       else {

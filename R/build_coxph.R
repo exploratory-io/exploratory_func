@@ -403,6 +403,7 @@ build_coxph.fast <- function(df,
         max_pd_vars <- 20 # Number of most important variables to calculate partial dependences on. This used to be 12 but we decided it was a little too small.
       }
       imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
+      model$imp_vars <- imp_vars
       model$partial_dependence <- partial_dependence.coxph_exploratory(model, clean_time_col, vars = imp_vars, n = c(9, 25), data = df) # grid of 9 is convenient for both PDP and survival curves.
       model$pred_survival_time <- pred_survival_time
       model$survival_curves <- calc_survival_curves_with_strata(df, clean_time_col, clean_status_col, imp_vars)
@@ -485,6 +486,10 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients'
         group_by(variable, value) %>% filter(period == max(period)) %>% ungroup() %>%
         mutate(type='Actual')
       ret <- actual %>% dplyr::bind_rows(ret) # actual rows need to come first for the order of chart drawing.
+      ret <- ret %>% dplyr::mutate(variable = forcats::fct_relevel(variable, x$imp_vars)) # set factor level order so that charts appear in order of importance.
+      # set order to ret and turn it back to character, so that the order is kept when groups are bound.
+      # if it were kept as factor, when groups are bound, only the factor order from the first group would be respected.
+      ret <- ret %>% dplyr::arrange(variable) %>% dplyr::mutate(variable = as.character(variable))
       ret <- ret %>% dplyr::mutate(variable = x$terms_mapping[variable]) # map variable names to original.
       ret
     },
