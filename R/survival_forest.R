@@ -357,7 +357,7 @@ tidy.ranger_survival_exploratory <- function(x, type = 'importance', ...) { #TOD
         dplyr::filter(period <= !!pred_survival_time) %>% # Extract the latest period that does not exceed pred_survival_time
         dplyr::group_by(variable, value) %>% dplyr::filter(period == max(period)) %>% dplyr::ungroup() %>%
         dplyr::mutate(type='Actual')
-      ret <- ret %>% dplyr::bind_rows(actual)
+      ret <- actual %>% dplyr::bind_rows(ret) # actual rows need to come first for the order of chart drawing.
       ret <- ret %>% dplyr::mutate(variable = x$terms_mapping[variable]) # map variable names to original.
       ret
     })

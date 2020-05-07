@@ -484,7 +484,7 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients'
         filter(period <= !!pred_survival_time) %>% # Extract the latest period that does not exceed pred_survival_time
         group_by(variable, value) %>% filter(period == max(period)) %>% ungroup() %>%
         mutate(type='Actual')
-      ret <- ret %>% dplyr::bind_rows(actual)
+      ret <- actual %>% dplyr::bind_rows(ret) # actual rows need to come first for the order of chart drawing.
       ret <- ret %>% dplyr::mutate(variable = x$terms_mapping[variable]) # map variable names to original.
       ret
     },
