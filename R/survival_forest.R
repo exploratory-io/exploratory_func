@@ -284,7 +284,7 @@ exp_survival_forest <- function(df,
         max_pd_vars <- 20 # Number of most important variables to calculate partial dependences on. This used to be 12 but we decided it was a little too small.
       }
       imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
-
+      rf$imp_vars <- imp_vars
       rf$partial_dependence <- partial_dependence.ranger_survival_exploratory(rf, clean_time_col, vars = imp_vars, n = c(9, 25), data = df) # grid of 9 is convenient for both PDP and survival curves.
       rf$pred_survival_time <- pred_survival_time
       rf$survival_curves <- calc_survival_curves_with_strata(df, clean_time_col, clean_status_col, imp_vars)
@@ -342,6 +342,10 @@ tidy.ranger_survival_exploratory <- function(x, type = 'importance', ...) { #TOD
             df %>% dplyr::mutate(value_index=as.integer(forcats::fct_inorder(value))) %>% dplyr::mutate(value_index=value_index+5)
           }
         })) %>% tidyr::unnest() %>% dplyr::ungroup() %>% dplyr::mutate(value_index=factor(value_index)) # Make value_index a factor to control color.
+      ret <- ret %>% dplyr::mutate(variable = forcats::fct_relevel(variable, !!x$imp_vars)) # set factor level order so that charts appear in order of importance.
+      # set order to ret and turn it back to character, so that the order is kept when groups are bound.
+      # if it were kept as factor, when groups are bound, only the factor order from the first group would be respected.
+      ret <- ret %>% dplyr::arrange(variable) %>% dplyr::mutate(variable = as.character(variable))
       ret <- ret %>% dplyr::mutate(chart_type = 'line')
       ret <- ret %>% dplyr::mutate(variable = x$terms_mapping[variable]) # map variable names to original.
       ret
@@ -358,6 +362,10 @@ tidy.ranger_survival_exploratory <- function(x, type = 'importance', ...) { #TOD
         dplyr::group_by(variable, value) %>% dplyr::filter(period == max(period)) %>% dplyr::ungroup() %>%
         dplyr::mutate(type='Actual')
       ret <- actual %>% dplyr::bind_rows(ret) # actual rows need to come first for the order of chart drawing.
+      ret <- ret %>% dplyr::mutate(variable = forcats::fct_relevel(variable, !!x$imp_vars)) # set factor level order so that charts appear in order of importance.
+      # set order to ret and turn it back to character, so that the order is kept when groups are bound.
+      # if it were kept as factor, when groups are bound, only the factor order from the first group would be respected.
+      ret <- ret %>% dplyr::arrange(variable) %>% dplyr::mutate(variable = as.character(variable))
       ret <- ret %>% dplyr::mutate(variable = x$terms_mapping[variable]) # map variable names to original.
       ret
     })
