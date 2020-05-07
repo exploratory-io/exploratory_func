@@ -916,6 +916,11 @@ build_lm.fast <- function(df,
         imp_vars <- as.character((imp_df %>% arrange(-importance))$term)
         imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # Keep only max_pd_vars most important variables
       }
+      else if (!is.null(model$permutation_importance) && "error" %nin% class(model$permutation_importance)) { # if importance is available, show only max_pd_vars most important vars.
+        imp_df <- model$permutation_importance
+        imp_vars <- as.character((imp_df %>% arrange(-importance))$term)
+        imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # Keep only max_pd_vars most important variables
+      }
       else  {
         # Show only max_pd_vars most significant (ones with the smallest P values) vars.
         # For categorical, pick the smallest P value among all classes of it.
