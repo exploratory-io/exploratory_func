@@ -2435,17 +2435,22 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, binary_clas
   switch(
     type,
     importance = {
-      # return variable importance
-      tryCatch({
-        imp <- ranger::importance(x)
-        ret <- data.frame(
-          variable = x$terms_mapping[names(imp)],
-          importance = imp,
-          stringsAsFactors = FALSE
-          )
-      }, error = function(e){
-        ret <<- data.frame()
-      })
+      if (length(x$imp_vars) > 1) { # Do not show importance if there is only one variable.
+        # return variable importance
+        tryCatch({
+          imp <- ranger::importance(x)
+          ret <- data.frame(
+            variable = x$terms_mapping[names(imp)],
+            importance = imp,
+            stringsAsFactors = FALSE
+            )
+        }, error = function(e){
+          ret <<- data.frame()
+        })
+      }
+      else {
+        ret <- data.frame()
+      }
       ret
     },
     evaluation = {
