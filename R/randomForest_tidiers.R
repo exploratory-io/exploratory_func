@@ -3114,15 +3114,20 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
   switch(
     type,
     importance = {
-      # return variable importance
-      imp <- x$variable.importance
+      if (length(x$imp_vars) > 1) {
+        # return variable importance
+        imp <- x$variable.importance
 
-      ret <- data.frame(
-        variable = x$terms_mapping[names(imp)],
-        importance = imp,
-        stringsAsFactors = FALSE
-      )
-      ret
+        ret <- data.frame(
+          variable = x$terms_mapping[names(imp)],
+          importance = imp,
+          stringsAsFactors = FALSE
+        )
+        ret
+      }
+      else { # If there is only one variable, return empty data.frame to skip.
+        data.frame()
+      }
     },
     evaluation = {
       # Delegate showing error for failed models to grance().
