@@ -817,14 +817,16 @@ build_lm.fast <- function(df,
             model <- stats::glm(fml, data = df, family = family_arg)
           }
         }
-        if (family == "binomial") {
-          model$permutation_importance <- calc_permutation_importance_binomial(model, clean_target_col, c_cols, df)
-        }
-        else if (family == "poisson" && (is.null(link) || link == "log")) { # Currently we have permutation importance only for logistic regression.
-          model$permutation_importance <- calc_permutation_importance_poisson(model, clean_target_col, c_cols, df)
-        }
-        else if (family == "gaussian") {
-          model$permutation_importance <- calc_permutation_importance_gaussian(model, clean_target_col, c_cols, df)
+        if (length(c_cols) > 1) { # Skip importance calculation if there is only one variable.
+          if (family == "binomial") {
+            model$permutation_importance <- calc_permutation_importance_binomial(model, clean_target_col, c_cols, df)
+          }
+          else if (family == "poisson" && (is.null(link) || link == "log")) { # Currently we have permutation importance only for logistic regression.
+            model$permutation_importance <- calc_permutation_importance_poisson(model, clean_target_col, c_cols, df)
+          }
+          else if (family == "gaussian") {
+            model$permutation_importance <- calc_permutation_importance_gaussian(model, clean_target_col, c_cols, df)
+          }
         }
       }
       else {
@@ -872,7 +874,9 @@ build_lm.fast <- function(df,
             model$relative_importance <<- e
           })
         }
-        model$permutation_importance <- calc_permutation_importance_linear(model, clean_target_col, c_cols, df)
+        if (length(c_cols) > 1) { # Skip importance calculation if there is only one variable.
+          model$permutation_importance <- calc_permutation_importance_linear(model, clean_target_col, c_cols, df)
+        }
       }
 
       tryCatch({
@@ -1240,11 +1244,16 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
       handle_partial_dependence(x)
     },
     permutation_importance = {
-      ret <- x$permutation_importance
-      # Map variable names back to the original.
-      # as.character is to be safe by converting from factor. With factor, reverse mapping result will be messed up.
-      ret$term <- x$terms_mapping[as.character(ret$term)]
-      ret
+      if (!is.null(x$permutation_importance)) {
+        ret <- x$permutation_importance
+        # Map variable names back to the original.
+        # as.character is to be safe by converting from factor. With factor, reverse mapping result will be messed up.
+        ret$term <- x$terms_mapping[as.character(ret$term)]
+        ret
+      }
+      else {
+        data.frame() # Return empty data frame.
+      }
     }
   )
 }
