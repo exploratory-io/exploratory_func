@@ -145,6 +145,7 @@ exp_survival_forest <- function(df,
                     nodesize = 12,
                     predictor_n = 12, # so that at least months can fit in it.
                     max_pd_vars = NULL,
+                    pd_sample_size = 20,
                     pred_survival_time = NULL,
                     seed = 1,
                     test_rate = 0.0,
@@ -307,7 +308,7 @@ exp_survival_forest <- function(df,
       }
       imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
       rf$imp_vars <- imp_vars
-      rf$partial_dependence <- partial_dependence.ranger_survival_exploratory(rf, clean_time_col, vars = imp_vars, n = c(9, 25), data = df) # grid of 9 is convenient for both PDP and survival curves.
+      rf$partial_dependence <- partial_dependence.ranger_survival_exploratory(rf, clean_time_col, vars = imp_vars, n = c(9, pd_sample_size), data = df) # grid of 9 is convenient for both PDP and survival curves.
       rf$pred_survival_time <- pred_survival_time
       rf$survival_curves <- calc_survival_curves_with_strata(df, clean_time_col, clean_status_col, imp_vars)
 
