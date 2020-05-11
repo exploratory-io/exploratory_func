@@ -273,13 +273,19 @@ exp_survival_forest <- function(df,
       names(rf$terms_mapping) <- name_map
       rf$sampled_nrow <- sampled_nrow
 
-      # get importance to decice variables for partial dependence
-      imp <- ranger::importance(rf)
-      imp_df <- tibble::tibble( # Use tibble since data.frame() would make variable factors, which breaks things in following steps.
-        variable = names(imp),
-        importance = imp
-      ) %>% dplyr::arrange(-importance)
-      imp_vars <- imp_df$variable
+      if (length(c_cols) > 0) { # Show importance only when there are multiple variables.
+        # get importance to decide variables for partial dependence
+        imp <- ranger::importance(rf)
+        imp_df <- tibble::tibble( # Use tibble since data.frame() would make variable factors, which breaks things in following steps.
+          variable = names(imp),
+          importance = imp
+        ) %>% dplyr::arrange(-importance)
+        imp_vars <- imp_df$variable
+      }
+      else {
+        imp_vars <- c_cols
+      }
+
       if (is.null(max_pd_vars)) {
         max_pd_vars <- 20 # Number of most important variables to calculate partial dependences on. This used to be 12 but we decided it was a little too small.
       }
@@ -325,11 +331,16 @@ tidy.ranger_survival_exploratory <- function(x, type = 'importance', ...) { #TOD
   }
   switch(type,
     importance = {
-      class(x) <- 'ranger' # This seems to be necessary to make ranger::importance work, eliminating ranger_survival_exploratory.
-      importance_vec <- ranger::importance(x)
-      ret <- tibble::tibble(variable=names(importance_vec), importance=importance_vec)
-      ret <- ret %>% dplyr::mutate(variable = x$terms_mapping[variable]) # map variable names to original.
-      ret
+      if (length(x$imp_vars) > 0) { # Show importance only when there are multiple variables.
+        class(x) <- 'ranger' # This seems to be necessary to make ranger::importance work, eliminating ranger_survival_exploratory.
+        importance_vec <- ranger::importance(x)
+        ret <- tibble::tibble(variable=names(importance_vec), importance=importance_vec)
+        ret <- ret %>% dplyr::mutate(variable = x$terms_mapping[variable]) # map variable names to original.
+        ret
+      }
+      else {
+        data.frame() # Return empty data frame.
+      }
     },
     partial_dependence_survival_curve = {
       ret <- x$partial_dependence
