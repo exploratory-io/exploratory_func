@@ -35,15 +35,6 @@ test_that("ip to country", {
   }
 })
 
-test_that("prefecturecode", {
-  res <- exploratory::prefecturecode(c('東京都', '京都府', "北海道"), output_type="name")
-  expect_equal(res, c('東京', '京都', "北海道"))
-  
-  # Test names in Roma-ji and Hiragana.
-  res <- exploratory::prefecturecode(c("東京都", "京都府", "Kanagawa-ken", "Iwate", "あいち"), output_type="name")
-  expect_equal(res, c('東京', '京都', "神奈川", "岩手", "愛知"))
-})
-
 test_that("geocode_us_state", {
   res <- exploratory::geocode_us_state(data.frame(state=c("CA", "NY")), "state")
   expect_equal(TRUE, all(!is.na(res$longitude)))
@@ -58,12 +49,6 @@ test_that("geocode_us_county", {
 
 test_that("geocode_world_country", {
   res <- exploratory::geocode_world_country(data.frame(code=c("JP", "GB")), "code")
-  expect_equal(TRUE, all(!is.na(res$longitude)))
-  expect_equal(TRUE, all(!is.na(res$latitude)))
-})
-
-test_that("geocode_japan_prefecture", {
-  res <- exploratory::geocode_japan_prefecture(data.frame(name=c("東京","北海道")), "name")
   expect_equal(TRUE, all(!is.na(res$longitude)))
   expect_equal(TRUE, all(!is.na(res$latitude)))
 })
