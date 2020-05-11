@@ -393,12 +393,17 @@ build_coxph.fast <- function(df,
       names(model$terms_mapping) <- name_map
       model$sampled_nrow <- sampled_nrow
 
-      model$permutation_importance <- calc_permutation_importance_coxph(model, clean_time_col, clean_status_col, c_cols, df)
+      if (length(c_cols) > 1) {
+        model$permutation_importance <- calc_permutation_importance_coxph(model, clean_time_col, clean_status_col, c_cols, df)
+        # get importance to decide variables for partial dependence
+        imp_df <- model$permutation_importance
+        imp_df <- imp_df %>% dplyr::arrange(-importance)
+        imp_vars <- imp_df$term
+      }
+      else {
+        imp_vars <- c_cols
+      }
 
-      # get importance to decide variables for partial dependence
-      imp_df <- model$permutation_importance
-      imp_df <- imp_df %>% dplyr::arrange(-importance)
-      imp_vars <- imp_df$term
       if (is.null(max_pd_vars)) {
         max_pd_vars <- 20 # Number of most important variables to calculate partial dependences on. This used to be 12 but we decided it was a little too small.
       }
@@ -451,6 +456,9 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients'
 
   switch(type,
     permutation_importance = {
+      if (is.null(x$permutation_importance)) {
+        return(data.frame())
+      }
       ret <- x$permutation_importance
       # Map variable names back to the original.
       # as.character is to be safe by converting from factor. With factor, reverse mapping result will be messed up.
