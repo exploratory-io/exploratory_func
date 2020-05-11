@@ -273,7 +273,7 @@ exp_survival_forest <- function(df,
       names(rf$terms_mapping) <- name_map
       rf$sampled_nrow <- sampled_nrow
 
-      if (length(c_cols) > 0) { # Show importance only when there are multiple variables.
+      if (length(c_cols) > 1) { # Show importance only when there are multiple variables.
         # get importance to decide variables for partial dependence
         imp <- ranger::importance(rf)
         imp_df <- tibble::tibble( # Use tibble since data.frame() would make variable factors, which breaks things in following steps.
@@ -331,7 +331,7 @@ tidy.ranger_survival_exploratory <- function(x, type = 'importance', ...) { #TOD
   }
   switch(type,
     importance = {
-      if (length(x$imp_vars) > 0) { # Show importance only when there are multiple variables.
+      if (length(x$imp_vars) > 1) { # Show importance only when there are multiple variables.
         class(x) <- 'ranger' # This seems to be necessary to make ranger::importance work, eliminating ranger_survival_exploratory.
         importance_vec <- ranger::importance(x)
         ret <- tibble::tibble(variable=names(importance_vec), importance=importance_vec)
