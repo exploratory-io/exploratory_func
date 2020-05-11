@@ -118,6 +118,14 @@ partial_dependence.coxph_exploratory <- function(fit, time_col, vars = colnames(
         n_tmp[1] <- length(unique(data[[x]]))
         args$n <- n_tmp
       }
+      else if (all(data[[x]] %% 1 == 0)) { # Adjust for integer with a few unique values
+        n_uniq <- max(data[[x]]) - min(data[[x]]) + 1
+        if (n_uniq <= 5) {
+          n_tmp <- args$n
+          n_tmp[1] <- n_uniq
+          args$n <- n_tmp
+        }
+      }
       mp = do.call(mmpf::marginalPrediction, args)
       mp
     }, simplify = FALSE), fill = TRUE)
@@ -127,6 +135,14 @@ partial_dependence.coxph_exploratory <- function(fit, time_col, vars = colnames(
       n_tmp <- args$n
       n_tmp[1] <- length(unique(data[[vars]]))
       args$n <- n_tmp
+    }
+    else if (all(data[[vars]] %% 1 == 0)) { # Adjust for integer with a few unique values
+      n_uniq <- max(data[[vars]]) - min(data[[vars]]) + 1
+      if (n_uniq <= 5) {
+        n_tmp <- args$n
+        n_tmp[1] <- n_uniq
+        args$n <- n_tmp
+      }
     }
     pd = do.call(mmpf::marginalPrediction, args)
   }
@@ -475,8 +491,12 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients'
       ret <- ret %>% dplyr::group_by(variable) %>% tidyr::nest() %>%
         mutate(data = purrr::map(data,function(df){
           if (df$chart_type[[1]] == 'line') {
+            ret <- df %>% dplyr::mutate(value_index=as.integer(forcats::fct_inorder(value)))
             # %% 2 is to show only 5 lines out of 9 lines for survival curves variated by a numeric variable.
-            df %>% dplyr::mutate(value_index=as.integer(forcats::fct_inorder(value))) %>% dplyr::filter(value_index %% 2 == 1) %>% dplyr::mutate(value_index=ceiling(value_index/2))
+            if (max(ret$value_index) >= 9) { # It is possible that value index is less than 9 for integer with 5 or less unique values.
+              ret <- ret %>% dplyr::filter(value_index %% 2 == 1) %>% dplyr::mutate(value_index=ceiling(value_index/2))
+            }
+            ret
           }
           else {
             df %>% dplyr::mutate(value_index=as.integer(forcats::fct_inorder(value))) %>% dplyr::mutate(value_index=value_index+5)
