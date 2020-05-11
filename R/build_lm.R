@@ -1271,6 +1271,7 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
         ret <- ret %>% mutate(odds_ratio=exp(estimate))
         if (!is.null(variable_metric) && variable_metric == "odds_ratio") { # For Analytics View, overwrite conf.low/conf.high with those of odds ratio.
           ret <- ret %>% mutate(conf.low=exp(conf.low), conf.high=exp(conf.high))
+          ret <- ret %>% select(term, odds_ratio, conf.high, conf.low, everything()) # Bring odds ratio upfront together with its confidence interval.
         }
       }
       if (!is.null(x$marginal_effects)) {
