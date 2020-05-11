@@ -11,8 +11,8 @@ test_that("detect_outlier", {
     dplyr::group_by(group) %>%
     dplyr::mutate(is_outlier = detect_outlier(value))
 
-  expect_equal(ret$is_outlier, factor(c(c("upper", rep("normal", 10), "lower"),c("upper", rep("normal", 10), "lower")),
-                                      levels = c("lower", "normal", "upper"),
+  expect_equal(ret$is_outlier, factor(c(c("Upper", rep("Normal", 10), "Lower"),c("Upper", rep("Normal", 10), "Lower")),
+                                      levels = c("Lower", "Normal", "Upper"),
                                       ordered=TRUE))
 
 })
@@ -28,8 +28,8 @@ test_that("detect_outlier with quantile", {
     dplyr::group_by(group) %>%
     dplyr::mutate(is_outlier = detect_outlier(value, type = "percentile", threshold = 0.95))
 
-  expect_equal(ret$is_outlier, factor(c(c("upper", rep("normal", 10), "lower"),c("upper", rep("normal", 10), "lower")),
-                                      levels = c("lower", "normal", "upper"),
+  expect_equal(ret$is_outlier, factor(c(c("Upper", rep("Normal", 10), "Lower"),c("Upper", rep("Normal", 10), "Lower")),
+                                      levels = c("Lower", "Normal", "Upper"),
                                       ordered=TRUE))
 
 })
@@ -45,8 +45,8 @@ test_that("detect_outlier with quantile", {
     dplyr::group_by(group) %>%
     dplyr::mutate(is_outlier = detect_outlier(value, type = "percentile", threshold = 0.05))
 
-  expect_equal(ret$is_outlier, factor(c(c("upper", rep("normal", 10), "lower"),c("upper", rep("normal", 10), "lower")),
-                                      levels = c("lower", "normal", "upper"),
+  expect_equal(ret$is_outlier, factor(c(c("Upper", rep("Normal", 10), "Lower"),c("Upper", rep("Normal", 10), "Lower")),
+                                      levels = c("Lower", "Normal", "Upper"),
                                       ordered=TRUE))
 
 })
@@ -61,8 +61,8 @@ test_that("detect_outlier with standard_deviation", {
   ret <- data %>%
     dplyr::group_by(group) %>%
     dplyr::mutate(is_outlier = detect_outlier(value, type = "standard_deviation", threshold = 1.63))
-  expect_equal(ret$is_outlier, factor(c(c("upper", rep("normal", 10), "lower"),c("upper", rep("normal", 10), "lower")),
-                                      levels = c("lower", "normal", "upper"),
+  expect_equal(ret$is_outlier, factor(c(c("Upper", rep("Normal", 10), "Lower"),c("Upper", rep("Normal", 10), "Lower")),
+                                      levels = c("Lower", "Normal", "Upper"),
                                       ordered=TRUE))
 })
 
@@ -78,8 +78,8 @@ test_that("detect_outlier with NAs", {
     dplyr::group_by(group) %>%
     dplyr::mutate(is_outlier = detect_outlier(value))
 
-  expect_equal(ret$is_outlier, factor(c(c("upper", rep("normal", 10), "lower", NA),c("upper", rep("normal", 10), "lower", NA)),
-                                      levels = c("lower", "normal", "upper"),
+  expect_equal(ret$is_outlier, factor(c(c("Upper", rep("Normal", 10), "Lower", NA),c("Upper", rep("Normal", 10), "Lower", NA)),
+                                      levels = c("Lower", "Normal", "Upper"),
                                       ordered=TRUE))
 
 })
@@ -95,8 +95,8 @@ test_that("detect_outlier with quantile with NAs", {
     dplyr::group_by(group) %>%
     dplyr::mutate(is_outlier = detect_outlier(value, type = "percentile", threshold = 0.95))
 
-  expect_equal(ret$is_outlier, factor(c(c("upper", rep("normal", 10), "lower", NA),c("upper", rep("normal", 10), "lower", NA)),
-                                      levels = c("lower", "normal", "upper"),
+  expect_equal(ret$is_outlier, factor(c(c("Upper", rep("Normal", 10), "Lower", NA),c("Upper", rep("Normal", 10), "Lower", NA)),
+                                      levels = c("Lower", "Normal", "Upper"),
                                       ordered=TRUE))
 
 })
@@ -112,8 +112,8 @@ test_that("detect_outlier with quantile with NAs", {
     dplyr::group_by(group) %>%
     dplyr::mutate(is_outlier = detect_outlier(value, type = "percentile", threshold = 0.05))
 
-  expect_equal(ret$is_outlier, factor(c(c("upper", rep("normal", 10), "lower", NA),c("upper", rep("normal", 10), "lower", NA)),
-                                      levels = c("lower", "normal", "upper"),
+  expect_equal(ret$is_outlier, factor(c(c("Upper", rep("Normal", 10), "Lower", NA),c("Upper", rep("Normal", 10), "Lower", NA)),
+                                      levels = c("Lower", "Normal", "Upper"),
                                       ordered=TRUE))
 
 })
@@ -128,7 +128,7 @@ test_that("detect_outlier with standard_deviation with NAs", {
   ret <- data %>%
     dplyr::group_by(group) %>%
     dplyr::mutate(is_outlier = detect_outlier(value, type = "standard_deviation", threshold = 1.63))
-  expect_equal(ret$is_outlier, factor(c(c("upper", rep("normal", 10), "lower", NA),c("upper", rep("normal", 10), "lower", NA)),
-                                      levels = c("lower", "normal", "upper"),
+  expect_equal(ret$is_outlier, factor(c(c("Upper", rep("Normal", 10), "Lower", NA),c("Upper", rep("Normal", 10), "Lower", NA)),
+                                      levels = c("Lower", "Normal", "Upper"),
                                       ordered=TRUE))
 })

@@ -492,7 +492,7 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, d = NULL, 
   ttest_each <- function(df) {
     if (!is.null(outlier_filter_type)) {
       is_outlier <- function(x) {
-        res <- detect_outlier(x, type=outlier_filter_type, threshold=outlier_filter_threshold) %in% c("lower", "upper")
+        res <- detect_outlier(x, type=outlier_filter_type, threshold=outlier_filter_threshold) %in% c("Lower", "Upper")
         res
       }
       df$.is.outlier <- FALSE #TODO: handle possibility of name conflict.
@@ -848,7 +848,7 @@ exp_anova <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, f = NULL, 
   anova_each <- function(df) {
     if (!is.null(outlier_filter_type)) { #TODO: duplicated code with exp_ttest.
       is_outlier <- function(x) {
-        res <- detect_outlier(x, type=outlier_filter_type, threshold=outlier_filter_threshold) %in% c("lower", "upper")
+        res <- detect_outlier(x, type=outlier_filter_type, threshold=outlier_filter_threshold) %in% c("Lower", "Upper")
         res
       }
       df$.is.outlier <- FALSE #TODO: handle possibility of name conflict.

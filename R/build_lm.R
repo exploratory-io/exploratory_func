@@ -664,7 +664,7 @@ build_lm.fast <- function(df,
         df$.is.outlier <- FALSE #TODO: handle possibility of name conflict.
         if (!is.null(target_outlier_filter_type)) {
           is_outlier <- function(x) {
-            res <- detect_outlier(x, type=target_outlier_filter_type, threshold=target_outlier_filter_threshold) %in% c("lower", "upper")
+            res <- detect_outlier(x, type=target_outlier_filter_type, threshold=target_outlier_filter_threshold) %in% c("Lower", "Upper")
             res
           }
           if (is.numeric(df[[clean_target_col]])) {
@@ -674,7 +674,7 @@ build_lm.fast <- function(df,
 
         if (!is.null(predictor_outlier_filter_type)) {
           is_outlier <- function(x) {
-            res <- detect_outlier(x, type=predictor_outlier_filter_type, threshold=predictor_outlier_filter_threshold) %in% c("lower", "upper")
+            res <- detect_outlier(x, type=predictor_outlier_filter_type, threshold=predictor_outlier_filter_threshold) %in% c("Lower", "Upper")
             res
           }
           for (col in c_cols) {
@@ -757,7 +757,7 @@ build_lm.fast <- function(df,
 
         # when family is negativebinomial, use MASS::glm.nb
         if (is.null(link) && family != "negativebinomial") {
-          model <- stats::glm(fml, data = df, family = family) 
+          model <- stats::glm(fml, data = df, family = family)
         }
         else {
           if (family == "gaussian") {
@@ -800,7 +800,7 @@ build_lm.fast <- function(df,
 
             if (dplyr::n_distinct(df[[clean_target_col]]) == 1) {
               # If only 1 unique value is there in target column, glm.nb seems to return error like following.
-              # Error in while ((it <- it + 1) < limit && abs(del) > eps) { : 
+              # Error in while ((it <- it + 1) < limit && abs(del) > eps) { :
               # missing value where TRUE/FALSE needed
               stop("Target column has only one unique value.")
             }
@@ -839,7 +839,7 @@ build_lm.fast <- function(df,
           unknown_category_rows_index <- get_row_numbers_from_index_vector(unknown_category_rows_index_vector)
         }
 
-        model <- stats::lm(fml, data = df) 
+        model <- stats::lm(fml, data = df)
         if (relimp && length(c_cols) > 1) { # relimp seems to work only when there are multiple predictors, which makes sense since it is "relative".
           tryCatch({
             # Calculate relative importance.
@@ -1043,7 +1043,7 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
   f0 <- x$formula # copy formula as a basis for null model.
   lazyeval::f_rhs(f0) <- 1 # create null model formula.
   x0 <- glm(f0, x$model, family = x$family) # build null model. Use x$model rather than x$data since x$model seems to be the data after glm handled missingness.
-  pvalue <- with(anova(x0,x),pchisq(Deviance,Df,lower.tail=FALSE)[2]) 
+  pvalue <- with(anova(x0,x),pchisq(Deviance,Df,lower.tail=FALSE)[2])
   if(pretty.name) {
     ret <- ret %>% dplyr::mutate(`P Value`=!!pvalue, `Number of Rows`=!!length(x$y))
   }
@@ -1060,9 +1060,9 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
       ret <- ret %>% dplyr::mutate(theta=!!(x$theta), SE.theta=!!(x$SE.theta))
     }
   }
-  
+
   if (x$family$family %in% c('binomial', 'quasibinomial')) { # only for logistic regression.
-    # Calculate F Score, Accuracy Rate, Misclassification Rate, Precision, Recall, Number of Rows 
+    # Calculate F Score, Accuracy Rate, Misclassification Rate, Precision, Recall, Number of Rows
     threshold_value <- if (is.numeric(binary_classification_threshold)) {
       binary_classification_threshold
     } else {
@@ -1084,7 +1084,7 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
     if (x$family$family %in% c('binomial', 'quasibinomial')) { # for binomial regressions.
       ret <- ret %>% dplyr::rename(`Null Deviance`=null.deviance, `DF for Null Model`=df.null, `Log Likelihood`=logLik, `Residual Deviance`=deviance, `Residual DF`=df.residual, `AUC`=auc) %>%
         dplyr::select(AUC, `F Score`, `Accuracy Rate`, `Misclassification Rate`, `Precision`, `Recall`, `P Value`, `Number of Rows`, positives, negatives,  `Log Likelihood`, `AIC`, `BIC`, `Residual Deviance`, `Null Deviance`, `DF for Null Model`, everything())
-      if (!is.null(x$orig_levels)) { 
+      if (!is.null(x$orig_levels)) {
         pos_label <- x$orig_levels[2]
         neg_label <- x$orig_levels[1]
       }
