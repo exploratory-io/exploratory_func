@@ -2864,16 +2864,17 @@ exp_rpart <- function(df,
       if (!is.null(model$variable.importance)) { # It is possible variable.importance is missing for example when no split happened.
         imp_vars <- names(model$variable.importance) # model$variable.importance is already sorted by importance.
         imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # Keep only max_pd_vars most important variables
-        model$partial_dependence <- partial_dependence.rpart(model, clean_target_col, vars=imp_vars, data=df, n=c(pd_grid_resolution, min(nrow(df), pd_sample_size)))
-        if (pd_with_bin_means && is_target_logical_or_numeric) {
-          # We calculate means of bins only for logical or numeric target to keep the visualization simple.
-          model$partial_binning <- calc_partial_binning_data(df, clean_target_col, imp_vars)
-        }
-        model$imp_vars <- imp_vars # keep imp_vars in the model for ordering of charts based on the importance.
       }
       else {
-        model$partial_dependence <- NULL
+        imp_vars <- c_cols[1:min(length(c_cols), max_pd_vars)] # Keep only max_pd_vars first cols since we have no way to know importance.
       }
+
+      model$partial_dependence <- partial_dependence.rpart(model, clean_target_col, vars=imp_vars, data=df, n=c(pd_grid_resolution, min(nrow(df), pd_sample_size)))
+      if (pd_with_bin_means && is_target_logical_or_numeric) {
+        # We calculate means of bins only for logical or numeric target to keep the visualization simple.
+        model$partial_binning <- calc_partial_binning_data(df, clean_target_col, imp_vars)
+      }
+      model$imp_vars <- imp_vars # keep imp_vars in the model for ordering of charts based on the importance.
 
       if (test_rate > 0) {
         # Handle NA rows for test. For training, rpart seems to automatically handle it, and row numbers of
