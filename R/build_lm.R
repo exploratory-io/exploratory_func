@@ -1143,8 +1143,8 @@ vif_to_dataframe <- function(x) {
   ret
 }
 
-# From name of variable, returns possible names of terms returned from lm.
-var_to_possible_terms <- function(var, x) {
+# From name of variable, returns possible names of terms returned from lm/glm.
+var_to_possible_terms_lm <- function(var, x) {
   if (is.factor(x$model[[var]])) {
     # Possibly, the variable name in the term name is quoted with backtic.
     c(paste0(var, levels(x$model[[var]])),
@@ -1156,10 +1156,27 @@ var_to_possible_terms <- function(var, x) {
   }
 }
 
+# From name of variable, returns possible names of terms returned from coxph.
+var_to_possible_terms_coxph <- function(var, x) {
+  if (!is.null(x$xlevels[[var]])) {
+    # Possibly, the variable name in the term name is quoted with backtic.
+    paste0(var, x$xlevels[[var]])
+  }
+  else {
+    # Possibly, the term name is quoted with backtic.
+    var
+  }
+}
+
 # Returns P-value for the variable. For categorical, the smallest value is returned.
 # For the color of relative importance bar chart.
 get_var_min_pvalue <- function(var, coef_df, x) {
-  terms <- var_to_possible_terms(as.character(var), x)
+  if ("coxph" %in% class(x)) {
+    terms <- var_to_possible_terms_coxph(as.character(var), x)
+  }
+  else { # We assume it is lm or glm here.
+    terms <- var_to_possible_terms_lm(as.character(var), x)
+  }
   min(coef_df$p.value[coef_df$term %in% terms])
 }
 
@@ -1369,6 +1386,11 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
         return(ret)
       }
       ret <- x$permutation_importance
+      # Add p.value column.
+      coef_df <- broom:::tidy.lm(x)
+      ret <- ret %>% mutate(p.value=purrr::map(term, function(var) {
+        get_var_min_pvalue(var, coef_df, x)
+      }))
       # Map variable names back to the original.
       # as.character is to be safe by converting from factor. With factor, reverse mapping result will be messed up.
       ret$term <- x$terms_mapping[as.character(ret$term)]

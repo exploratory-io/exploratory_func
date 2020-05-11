@@ -460,6 +460,11 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients'
         return(data.frame())
       }
       ret <- x$permutation_importance
+      # Add p.value column.
+      coef_df <- broom:::tidy.coxph(x)
+      ret <- ret %>% mutate(p.value=purrr::map(term, function(var) {
+        get_var_min_pvalue(var, coef_df, x)
+      }))
       # Map variable names back to the original.
       # as.character is to be safe by converting from factor. With factor, reverse mapping result will be messed up.
       ret$term <- x$terms_mapping[as.character(ret$term)]
