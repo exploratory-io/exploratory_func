@@ -348,6 +348,15 @@ tidy.ranger_survival_exploratory <- function(x, type = 'importance', ...) { #TOD
       ret <- ret %>% dplyr::arrange(variable) %>% dplyr::mutate(variable = as.character(variable))
       ret <- ret %>% dplyr::mutate(chart_type = 'line')
       ret <- ret %>% dplyr::mutate(variable = x$terms_mapping[variable]) # map variable names to original.
+
+      # Reduce number of unique x-axis values for better chart drawing performance, and not to overflow it.
+      grid <- 50
+      divider <- max(ret$period) %/% grid
+      if (divider >= 2) {
+        ret <- ret %>% dplyr::mutate(period = period %/% divider * divider) %>%
+          group_by(variable, value, chart_type, value_index, period) %>%
+          dplyr::summarize(survival=max(survival))
+      }
       ret
     },
     partial_dependence = {
