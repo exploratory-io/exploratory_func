@@ -472,12 +472,6 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients'
             df %>% dplyr::mutate(value_index=as.integer(forcats::fct_inorder(value))) %>% dplyr::mutate(value_index=value_index+5)
           }
         })) %>% tidyr::unnest() %>% dplyr::ungroup() %>% dplyr::mutate(value_index=factor(value_index)) # Make value_index a factor to control color.
-      ret <- ret %>% dplyr::mutate(variable = forcats::fct_relevel(variable, !!x$imp_vars)) # set factor level order so that charts appear in order of importance.
-      # set order to ret and turn it back to character, so that the order is kept when groups are bound.
-      # if it were kept as factor, when groups are bound, only the factor order from the first group would be respected.
-      ret <- ret %>% dplyr::arrange(variable) %>% dplyr::mutate(variable = as.character(variable))
-      ret <- ret %>% dplyr::mutate(chart_type = 'line')
-      ret <- ret %>% dplyr::mutate(variable = x$terms_mapping[variable]) # map variable names to original.
 
       # Reduce number of unique x-axis values for better chart drawing performance, and not to overflow it.
       grid <- 50
@@ -485,8 +479,16 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients'
       if (divider >= 2) {
         ret <- ret %>% dplyr::mutate(period = period %/% divider * divider) %>%
           group_by(variable, value, chart_type, value_index, period) %>%
-          dplyr::summarize(survival=max(survival))
+          dplyr::summarize(survival=max(survival)) %>%
+          dplyr::ungroup()
       }
+
+      ret <- ret %>% dplyr::mutate(variable = forcats::fct_relevel(variable, !!x$imp_vars)) # set factor level order so that charts appear in order of importance.
+      # set order to ret and turn it back to character, so that the order is kept when groups are bound.
+      # if it were kept as factor, when groups are bound, only the factor order from the first group would be respected.
+      ret <- ret %>% dplyr::arrange(variable) %>% dplyr::mutate(variable = as.character(variable))
+      ret <- ret %>% dplyr::mutate(chart_type = 'line')
+      ret <- ret %>% dplyr::mutate(variable = x$terms_mapping[variable]) # map variable names to original.
       ret
     },
     partial_dependence = {
