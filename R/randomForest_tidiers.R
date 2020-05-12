@@ -2000,7 +2000,7 @@ calc_feature_imp <- function(df,
                              # Number of most important variables to calculate partial dependences on. 
                              # By default, when Boruta is on, all Confirmed/Tentative variables.
                              # 12 when Boruta is off.
-                             pd_sample_size = 20,
+                             pd_sample_size = 500,
                              pd_grid_resolution = 20,
                              pd_with_bin_means = FALSE, # Default is FALSE for backward compatibility on the server
                              with_boruta = FALSE,
@@ -2761,7 +2761,7 @@ exp_rpart <- function(df,
                       smote_max_synth_perc = 200,
                       smote_k = 5,
                       max_pd_vars = 20,
-                      pd_sample_size = 20,
+                      pd_sample_size = 500,
                       pd_grid_resolution = 20,
                       pd_with_bin_means = FALSE, # Default is FALSE for backward compatibility on the server
                       seed = 1,
