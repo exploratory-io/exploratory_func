@@ -55,7 +55,6 @@ test_that("test exp_balance with logical", {
 # but ranger, which we use instead of randomForest now, does not have this problem.
 # We keep testing this just in case.
 test_that("test calc_feature_imp when the number of rows of classes is one", {
-          browser()
   sample_data <- data.frame(
     y = c("a", "b", "b", "b", "b", "c"),
     num = runif(6),
