@@ -95,7 +95,7 @@ partial_dependence.coxph_exploratory <- function(fit, time_col, vars = colnames(
 
   aggregate.fun <- function(x) {
     # na.rm needs to be FALSE, since even when only one of the sample has
-    # NA confidende interval, the mean conf int of the rest would not cleanly match with the mean
+    # NA confidence interval, the mean conf int of the rest would not cleanly match with the mean
     # of survival rate. (Survival rate typically would not be NA even when confidence interval is NA.)
     mean(x, na.rm = FALSE)
   }
