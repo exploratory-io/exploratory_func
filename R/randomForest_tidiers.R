@@ -2109,7 +2109,8 @@ calc_feature_imp <- function(df,
       }
       sample.fraction <- min(c(max_sample_size / max_nrow, 1))
 
-      if (with_boruta) { # Run only either Boruta or ranger::importance.
+      if (with_boruta || # Run only either Boruta or ranger::importance.
+          length(c_cols) <= 1) { # Calculate importance only when there are multiple variables.
         ranger_importance_measure <- "none"
       }
       else {
@@ -2183,12 +2184,17 @@ calc_feature_imp <- function(df,
       }
       else {
         # return partial dependence
-        imp <- ranger::importance(rf)
-        imp_df <- data.frame(
-          variable = names(imp),
-          importance = imp
-        ) %>% dplyr::arrange(-importance)
-        imp_vars <- imp_df$variable
+        if (length(c_cols) > 1) { # Calculate importance only when there are multiple variables.
+          imp <- ranger::importance(rf)
+          imp_df <- data.frame(
+            variable = names(imp),
+            importance = imp
+          ) %>% dplyr::arrange(-importance)
+          imp_vars <- imp_df$variable
+        }
+        else {
+          imp_vars <- c_cols # Just use c_cols as is for imp_vars to calculate partial dependence anyway.
+        }
         if (is.null(max_pd_vars)) {
           max_pd_vars <- 20 # Number of most important variables to calculate partial dependences on. This used to be 12 but we decided it was a little too small.
         }
@@ -2435,22 +2441,17 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, binary_clas
   switch(
     type,
     importance = {
-      if (length(x$imp_vars) > 1) { # Do not show importance if there is only one variable.
-        # return variable importance
-        tryCatch({
-          imp <- ranger::importance(x)
-          ret <- data.frame(
-            variable = x$terms_mapping[names(imp)],
-            importance = imp,
-            stringsAsFactors = FALSE
-            )
-        }, error = function(e){
-          ret <<- data.frame()
-        })
-      }
-      else {
-        ret <- data.frame()
-      }
+      # return variable importance
+      tryCatch({
+        imp <- ranger::importance(x)
+        ret <- data.frame(
+          variable = x$terms_mapping[names(imp)],
+          importance = imp,
+          stringsAsFactors = FALSE
+          )
+      }, error = function(e){
+        ret <<- data.frame()
+      })
       ret
     },
     evaluation = {
