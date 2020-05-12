@@ -7,7 +7,7 @@ test_that("test build_coxph.fast", {
   df <- df %>% mutate(`se-x` = `se-x`==1) # test handling of logical
   model_df <- df %>% build_coxph.fast(`ti me`, `sta tus`, `a ge`, `se-x`, ph.ecog, ph.karno, pat.karno, meal.cal, wt.loss, predictor_n = 2)
   expect_equal(class(model_df$model[[1]]), c("coxph_exploratory","coxph"))
-  ret <- model_df %>% broom::augment(model)
+  ret <- model_df %>% broom::tidy(model, type='permutation_importance')
   ret <- model_df %>% broom::tidy(model, type='partial_dependence')
   ret <- model_df %>% broom::tidy(model, type='partial_dependence_survival_curve')
   ret <- model_df %>% broom::tidy(model, type='vif')
@@ -17,6 +17,7 @@ test_that("test build_coxph.fast", {
   expect_equal(ret2$na_count, 0)
 
   ret <- model_df %>% broom::glance(model, pretty.name=TRUE)
+  ret <- model_df %>% broom::augment(model)
 })
 
 test_that("build_coxpy.fast() error handling for predictor with single unique value", {

@@ -2109,7 +2109,8 @@ calc_feature_imp <- function(df,
       }
       sample.fraction <- min(c(max_sample_size / max_nrow, 1))
 
-      if (with_boruta) { # Run only either Boruta or ranger::importance.
+      if (with_boruta || # Run only either Boruta or ranger::importance.
+          length(c_cols) <= 1) { # Calculate importance only when there are multiple variables.
         ranger_importance_measure <- "none"
       }
       else {
@@ -2183,12 +2184,17 @@ calc_feature_imp <- function(df,
       }
       else {
         # return partial dependence
-        imp <- ranger::importance(rf)
-        imp_df <- data.frame(
-          variable = names(imp),
-          importance = imp
-        ) %>% dplyr::arrange(-importance)
-        imp_vars <- imp_df$variable
+        if (length(c_cols) > 1) { # Calculate importance only when there are multiple variables.
+          imp <- ranger::importance(rf)
+          imp_df <- data.frame(
+            variable = names(imp),
+            importance = imp
+          ) %>% dplyr::arrange(-importance)
+          imp_vars <- imp_df$variable
+        }
+        else {
+          imp_vars <- c_cols # Just use c_cols as is for imp_vars to calculate partial dependence anyway.
+        }
         if (is.null(max_pd_vars)) {
           max_pd_vars <- 20 # Number of most important variables to calculate partial dependences on. This used to be 12 but we decided it was a little too small.
         }
@@ -2864,16 +2870,17 @@ exp_rpart <- function(df,
       if (!is.null(model$variable.importance)) { # It is possible variable.importance is missing for example when no split happened.
         imp_vars <- names(model$variable.importance) # model$variable.importance is already sorted by importance.
         imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # Keep only max_pd_vars most important variables
-        model$partial_dependence <- partial_dependence.rpart(model, clean_target_col, vars=imp_vars, data=df, n=c(pd_grid_resolution, min(nrow(df), pd_sample_size)))
-        if (pd_with_bin_means && is_target_logical_or_numeric) {
-          # We calculate means of bins only for logical or numeric target to keep the visualization simple.
-          model$partial_binning <- calc_partial_binning_data(df, clean_target_col, imp_vars)
-        }
-        model$imp_vars <- imp_vars # keep imp_vars in the model for ordering of charts based on the importance.
       }
       else {
-        model$partial_dependence <- NULL
+        imp_vars <- c_cols[1:min(length(c_cols), max_pd_vars)] # Keep only max_pd_vars first cols since we have no way to know importance.
       }
+
+      model$partial_dependence <- partial_dependence.rpart(model, clean_target_col, vars=imp_vars, data=df, n=c(pd_grid_resolution, min(nrow(df), pd_sample_size)))
+      if (pd_with_bin_means && is_target_logical_or_numeric) {
+        # We calculate means of bins only for logical or numeric target to keep the visualization simple.
+        model$partial_binning <- calc_partial_binning_data(df, clean_target_col, imp_vars)
+      }
+      model$imp_vars <- imp_vars # keep imp_vars in the model for ordering of charts based on the importance.
 
       if (test_rate > 0) {
         # Handle NA rows for test. For training, rpart seems to automatically handle it, and row numbers of
@@ -3113,15 +3120,20 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
   switch(
     type,
     importance = {
-      # return variable importance
-      imp <- x$variable.importance
+      if (length(x$imp_vars) > 1) {
+        # return variable importance
+        imp <- x$variable.importance
 
-      ret <- data.frame(
-        variable = x$terms_mapping[names(imp)],
-        importance = imp,
-        stringsAsFactors = FALSE
-      )
-      ret
+        ret <- data.frame(
+          variable = x$terms_mapping[names(imp)],
+          importance = imp,
+          stringsAsFactors = FALSE
+        )
+        ret
+      }
+      else { # If there is only one variable, return empty data.frame to skip.
+        data.frame()
+      }
     },
     evaluation = {
       # Delegate showing error for failed models to grance().

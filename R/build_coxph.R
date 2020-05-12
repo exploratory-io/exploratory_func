@@ -118,6 +118,14 @@ partial_dependence.coxph_exploratory <- function(fit, time_col, vars = colnames(
         n_tmp[1] <- length(unique(data[[x]]))
         args$n <- n_tmp
       }
+      else if (all(data[[x]] %% 1 == 0)) { # Adjust for integer with a few unique values
+        n_uniq <- max(data[[x]]) - min(data[[x]]) + 1
+        if (n_uniq <= 5) {
+          n_tmp <- args$n
+          n_tmp[1] <- n_uniq
+          args$n <- n_tmp
+        }
+      }
       mp = do.call(mmpf::marginalPrediction, args)
       mp
     }, simplify = FALSE), fill = TRUE)
@@ -127,6 +135,14 @@ partial_dependence.coxph_exploratory <- function(fit, time_col, vars = colnames(
       n_tmp <- args$n
       n_tmp[1] <- length(unique(data[[vars]]))
       args$n <- n_tmp
+    }
+    else if (all(data[[vars]] %% 1 == 0)) { # Adjust for integer with a few unique values
+      n_uniq <- max(data[[vars]]) - min(data[[vars]]) + 1
+      if (n_uniq <= 5) {
+        n_tmp <- args$n
+        n_tmp[1] <- n_uniq
+        args$n <- n_tmp
+      }
     }
     pd = do.call(mmpf::marginalPrediction, args)
   }
@@ -259,6 +275,7 @@ build_coxph.fast <- function(df,
                     max_nrow = 50000, # With 50000 rows, taking 6 to 7 seconds on late-2016 Macbook Pro.
                     predictor_n = 12, # so that at least months can fit in it.
                     max_pd_vars = NULL,
+                    pd_sample_size = 20,
                     pred_survival_time = NULL,
                     seed = 1,
                     test_rate = 0.0,
@@ -393,18 +410,23 @@ build_coxph.fast <- function(df,
       names(model$terms_mapping) <- name_map
       model$sampled_nrow <- sampled_nrow
 
-      model$permutation_importance <- calc_permutation_importance_coxph(model, clean_time_col, clean_status_col, c_cols, df)
+      if (length(c_cols) > 1) {
+        model$permutation_importance <- calc_permutation_importance_coxph(model, clean_time_col, clean_status_col, c_cols, df)
+        # get importance to decide variables for partial dependence
+        imp_df <- model$permutation_importance
+        imp_df <- imp_df %>% dplyr::arrange(-importance)
+        imp_vars <- imp_df$term
+      }
+      else {
+        imp_vars <- c_cols
+      }
 
-      # get importance to decide variables for partial dependence
-      imp_df <- model$permutation_importance
-      imp_df <- imp_df %>% dplyr::arrange(-importance)
-      imp_vars <- imp_df$term
       if (is.null(max_pd_vars)) {
         max_pd_vars <- 20 # Number of most important variables to calculate partial dependences on. This used to be 12 but we decided it was a little too small.
       }
       imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
       model$imp_vars <- imp_vars
-      model$partial_dependence <- partial_dependence.coxph_exploratory(model, clean_time_col, vars = imp_vars, n = c(9, 25), data = df) # grid of 9 is convenient for both PDP and survival curves.
+      model$partial_dependence <- partial_dependence.coxph_exploratory(model, clean_time_col, vars = imp_vars, n = c(9, pd_sample_size), data = df) # grid of 9 is convenient for both PDP and survival curves.
       model$pred_survival_time <- pred_survival_time
       model$survival_curves <- calc_survival_curves_with_strata(df, clean_time_col, clean_status_col, imp_vars)
 
@@ -451,7 +473,15 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients'
 
   switch(type,
     permutation_importance = {
+      if (is.null(x$permutation_importance)) {
+        return(data.frame())
+      }
       ret <- x$permutation_importance
+      # Add p.value column.
+      coef_df <- broom:::tidy.coxph(x)
+      ret <- ret %>% mutate(p.value=purrr::map(term, function(var) {
+        get_var_min_pvalue(var, coef_df, x)
+      }))
       # Map variable names back to the original.
       # as.character is to be safe by converting from factor. With factor, reverse mapping result will be messed up.
       ret$term <- x$terms_mapping[as.character(ret$term)]
@@ -462,8 +492,12 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients'
       ret <- ret %>% dplyr::group_by(variable) %>% tidyr::nest() %>%
         mutate(data = purrr::map(data,function(df){
           if (df$chart_type[[1]] == 'line') {
+            ret <- df %>% dplyr::mutate(value_index=as.integer(forcats::fct_inorder(value)))
             # %% 2 is to show only 5 lines out of 9 lines for survival curves variated by a numeric variable.
-            df %>% dplyr::mutate(value_index=as.integer(forcats::fct_inorder(value))) %>% dplyr::filter(value_index %% 2 == 1) %>% dplyr::mutate(value_index=ceiling(value_index/2))
+            if (max(ret$value_index) >= 9) { # It is possible that value index is less than 9 for integer with 5 or less unique values.
+              ret <- ret %>% dplyr::filter(value_index %% 2 == 1) %>% dplyr::mutate(value_index=ceiling(value_index/2))
+            }
+            ret
           }
           else {
             df %>% dplyr::mutate(value_index=as.integer(forcats::fct_inorder(value))) %>% dplyr::mutate(value_index=value_index+5)
