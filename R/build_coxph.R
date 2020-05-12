@@ -474,7 +474,7 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients'
         })) %>% tidyr::unnest() %>% dplyr::ungroup() %>% dplyr::mutate(value_index=factor(value_index)) # Make value_index a factor to control color.
 
       # Reduce number of unique x-axis values for better chart drawing performance, and not to overflow it.
-      grid <- 50
+      grid <- 40
       divider <- max(ret$period) %/% grid
       if (divider >= 2) {
         ret <- ret %>% dplyr::mutate(period = period %/% divider * divider) %>%
