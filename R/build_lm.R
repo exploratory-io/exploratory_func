@@ -664,7 +664,7 @@ build_lm.fast <- function(df,
         df$.is.outlier <- FALSE #TODO: handle possibility of name conflict.
         if (!is.null(target_outlier_filter_type)) {
           is_outlier <- function(x) {
-            res <- detect_outlier(x, type=target_outlier_filter_type, threshold=target_outlier_filter_threshold) %in% c("lower", "upper")
+            res <- detect_outlier(x, type=target_outlier_filter_type, threshold=target_outlier_filter_threshold) %in% c("Lower", "Upper")
             res
           }
           if (is.numeric(df[[clean_target_col]])) {
@@ -674,7 +674,7 @@ build_lm.fast <- function(df,
 
         if (!is.null(predictor_outlier_filter_type)) {
           is_outlier <- function(x) {
-            res <- detect_outlier(x, type=predictor_outlier_filter_type, threshold=predictor_outlier_filter_threshold) %in% c("lower", "upper")
+            res <- detect_outlier(x, type=predictor_outlier_filter_type, threshold=predictor_outlier_filter_threshold) %in% c("Lower", "Upper")
             res
           }
           for (col in c_cols) {

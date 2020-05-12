@@ -2,10 +2,10 @@
 #' ref: https://www.r-bloggers.com/outlier-detection-and-treatment-with-r/
 #' @export
 detect_outlier <- function (vec, type = "iqr", threshold = NULL) {
-  
+
   # Fill the data with "normal". Leave NAs as NAs.
-  ret <- factor(if_else(is.na(vec), as.character(NA), "normal"),
-                levels = c("lower", "normal", "upper"),
+  ret <- factor(if_else(is.na(vec), as.character(NA), "Normal"),
+                levels = c("Lower", "Normal", "Upper"),
                 ordered=TRUE)
   type <- tolower(type)
 
@@ -17,8 +17,8 @@ detect_outlier <- function (vec, type = "iqr", threshold = NULL) {
     upper_whisker <- q[4]+1.5*IQR
     lower_whisker <- q[2]-1.5*IQR
 
-    ret[(vec < lower_whisker)] <- "lower"
-    ret[(vec > upper_whisker)] <- "upper"
+    ret[(vec < lower_whisker)] <- "Lower"
+    ret[(vec > upper_whisker)] <- "Upper"
   }, percentile = {
     if(is.null(threshold)){
       threshold <- 0.95
@@ -29,8 +29,8 @@ detect_outlier <- function (vec, type = "iqr", threshold = NULL) {
       threshold <- 1-threshold
     }
     q <- quantile(vec, probs = c(1-threshold, threshold), na.rm = TRUE)
-    ret[(vec < q[1])] <- "lower"
-    ret[(vec > q[2])] <- "upper"
+    ret[(vec < q[1])] <- "Lower"
+    ret[(vec > q[2])] <- "Upper"
   }, standard_deviation = {
     if(is.null(threshold)){
       threshold <- 2
@@ -40,8 +40,8 @@ detect_outlier <- function (vec, type = "iqr", threshold = NULL) {
     }
     m <- mean(vec, na.rm = TRUE)
     s <- sd(vec, na.rm = TRUE)
-    ret[(vec < m - threshold * s) ] <- "lower"
-    ret[(vec > m + threshold * s)] <- "upper"
+    ret[(vec < m - threshold * s) ] <- "Lower"
+    ret[(vec > m + threshold * s)] <- "Upper"
   })
   ret
 }
