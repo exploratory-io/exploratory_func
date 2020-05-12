@@ -278,7 +278,7 @@ build_coxph.fast <- function(df,
                     max_nrow = 50000, # With 50000 rows, taking 6 to 7 seconds on late-2016 Macbook Pro.
                     predictor_n = 12, # so that at least months can fit in it.
                     max_pd_vars = NULL,
-                    pd_sample_size = 20,
+                    pd_sample_size = 25, # Because of performance issue, this is kept small unlike other models for which we usually use 500.
                     pred_survival_time = NULL,
                     seed = 1,
                     test_rate = 0.0,
@@ -429,7 +429,7 @@ build_coxph.fast <- function(df,
       }
       imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
       model$imp_vars <- imp_vars
-      model$partial_dependence <- partial_dependence.coxph_exploratory(model, clean_time_col, vars = imp_vars, n = c(9, pd_sample_size), data = df) # grid of 9 is convenient for both PDP and survival curves.
+      model$partial_dependence <- partial_dependence.coxph_exploratory(model, clean_time_col, vars = imp_vars, n = c(9, min(nrow(df), pd_sample_size)), data = df) # grid of 9 is convenient for both PDP and survival curves.
       model$pred_survival_time <- pred_survival_time
       model$survival_curves <- calc_survival_curves_with_strata(df, clean_time_col, clean_status_col, imp_vars)
 
