@@ -57,14 +57,15 @@ test_that("test exp_balance with logical", {
 test_that("test calc_feature_imp when the number of rows of classes is one", {
   sample_data <- data.frame(
     y = c("a", "b", "b", "b", "b", "c"),
-    num = runif(6)
+    num = runif(6),
+    num2 = runif(6)
   )
 
   model_df <- sample_data %>%
-    calc_feature_imp(y, num, importance_measure = "impurity")
+    calc_feature_imp(y, num, num2, importance_measure = "impurity")
   ret <- model_df %>% rf_importance()
 
-  expect_equal(nrow(ret), 1)
+  expect_equal(nrow(ret), 2)
 })
 
 test_that("test calc_feature_imp predicting multi-class", {
