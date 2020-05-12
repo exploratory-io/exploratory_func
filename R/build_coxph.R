@@ -94,7 +94,10 @@ partial_dependence.coxph_exploratory <- function(fit, time_col, vars = colnames(
   }
 
   aggregate.fun <- function(x) {
-    mean(x, na.rm = TRUE)
+    # na.rm needs to be FALSE, since even when only one of the sample has
+    # NA confidence interval, the mean conf int of the rest would not cleanly match with the mean
+    # of survival rate. (Survival rate typically would not be NA even when confidence interval is NA.)
+    mean(x, na.rm = FALSE)
   }
 
   args = list(
@@ -275,7 +278,7 @@ build_coxph.fast <- function(df,
                     max_nrow = 50000, # With 50000 rows, taking 6 to 7 seconds on late-2016 Macbook Pro.
                     predictor_n = 12, # so that at least months can fit in it.
                     max_pd_vars = NULL,
-                    pd_sample_size = 20,
+                    pd_sample_size = 25, # Because of performance issue, this is kept small unlike other models for which we usually use 500.
                     pred_survival_time = NULL,
                     seed = 1,
                     test_rate = 0.0,
@@ -426,7 +429,7 @@ build_coxph.fast <- function(df,
       }
       imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
       model$imp_vars <- imp_vars
-      model$partial_dependence <- partial_dependence.coxph_exploratory(model, clean_time_col, vars = imp_vars, n = c(9, pd_sample_size), data = df) # grid of 9 is convenient for both PDP and survival curves.
+      model$partial_dependence <- partial_dependence.coxph_exploratory(model, clean_time_col, vars = imp_vars, n = c(9, min(nrow(df), pd_sample_size)), data = df) # grid of 9 is convenient for both PDP and survival curves.
       model$pred_survival_time <- pred_survival_time
       model$survival_curves <- calc_survival_curves_with_strata(df, clean_time_col, clean_status_col, imp_vars)
 
@@ -503,6 +506,17 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients'
             df %>% dplyr::mutate(value_index=as.integer(forcats::fct_inorder(value))) %>% dplyr::mutate(value_index=value_index+5)
           }
         })) %>% tidyr::unnest() %>% dplyr::ungroup() %>% dplyr::mutate(value_index=factor(value_index)) # Make value_index a factor to control color.
+
+      # Reduce number of unique x-axis values for better chart drawing performance, and not to overflow it.
+      grid <- 40
+      divider <- max(ret$period) %/% grid
+      if (divider >= 2) {
+        ret <- ret %>% dplyr::mutate(period = period %/% divider * divider) %>%
+          group_by(variable, value, chart_type, value_index, period) %>%
+          dplyr::summarize(survival=max(survival)) %>%
+          dplyr::ungroup()
+      }
+
       ret <- ret %>% dplyr::mutate(variable = forcats::fct_relevel(variable, !!x$imp_vars)) # set factor level order so that charts appear in order of importance.
       # set order to ret and turn it back to character, so that the order is kept when groups are bound.
       # if it were kept as factor, when groups are bound, only the factor order from the first group would be respected.
