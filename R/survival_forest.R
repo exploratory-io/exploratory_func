@@ -147,6 +147,8 @@ exp_survival_forest <- function(df,
                     max_pd_vars = NULL,
                     pd_sample_size = 500,
                     pred_survival_time = NULL,
+                    predictor_outlier_filter_type = NULL,
+                    predictor_outlier_filter_threshold = NULL,
                     seed = 1,
                     test_rate = 0.0,
                     test_split_type = "random" # "random" or "ordered"
@@ -259,6 +261,12 @@ exp_survival_forest <- function(df,
       df <- preprocess_regression_data_after_sample(df, clean_time_col, clean_cols, predictor_n = predictor_n, name_map = name_map)
       c_cols <- attr(df, 'predictors') # predictors are updated (added and/or removed) in preprocess_post_sample. Catch up with it.
       name_map <- attr(df, 'name_map')
+
+      df <- remove_outliers_for_regression_data(df, clean_time_col, c_cols,
+                                                NULL, #target_outlier_filter_type
+                                                NULL, #target_outlier_filter_threshold
+                                                predictor_outlier_filter_type,
+                                                predictor_outlier_filter_threshold)
 
       # split training and test data
       source_data <- df
