@@ -518,6 +518,7 @@ remove_outliers_for_regression_data <- function(df, target_col, predictor_cols,
     df <- df %>% dplyr::filter(!.is.outlier)
     df$.is.outlier <- NULL # Removing the temporary column.
   }
+  df
 }
 
 #' builds lm model quickly for analytics view.
@@ -693,32 +694,11 @@ build_lm.fast <- function(df,
       c_cols <- attr(df, 'predictors') # predictors are updated (added and/or removed) in preprocess_post_sample. Catch up with it.
       name_map <- attr(df, 'name_map')
 
-      if (!is.null(target_outlier_filter_type) || !is.null(predictor_outlier_filter_type)) {
-        df$.is.outlier <- FALSE #TODO: handle possibility of name conflict.
-        if (!is.null(target_outlier_filter_type)) {
-          is_outlier <- function(x) {
-            res <- detect_outlier(x, type=target_outlier_filter_type, threshold=target_outlier_filter_threshold) %in% c("Lower", "Upper")
-            res
-          }
-          if (is.numeric(df[[clean_target_col]])) {
-            df$.is.outlier <- df$.is.outlier | is_outlier(df[[clean_target_col]])
-          }
-        }
-
-        if (!is.null(predictor_outlier_filter_type)) {
-          is_outlier <- function(x) {
-            res <- detect_outlier(x, type=predictor_outlier_filter_type, threshold=predictor_outlier_filter_threshold) %in% c("Lower", "Upper")
-            res
-          }
-          for (col in c_cols) {
-            if (is.numeric(df[[col]])) {
-              df$.is.outlier <- df$.is.outlier | is_outlier(df[[col]])
-            }
-          }
-        }
-        df <- df %>% dplyr::filter(!.is.outlier)
-        df$.is.outlier <- NULL # Removing the temporary column.
-      }
+      df <- remove_outliers_for_regression_data(df, clean_target_col, c_cols,
+                                                target_outlier_filter_type,
+                                                target_outlier_filter_threshold,
+                                                predictor_outlier_filter_type,
+                                                predictor_outlier_filter_threshold)
 
       # Normalize numeric target variable,
       # after all column changes for Date/POSIXct, filtering, dropping columns above are done.
