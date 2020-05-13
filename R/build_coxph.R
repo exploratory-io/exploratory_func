@@ -280,6 +280,8 @@ build_coxph.fast <- function(df,
                     max_pd_vars = NULL,
                     pd_sample_size = 25, # Because of performance issue, this is kept small unlike other models for which we usually use 500.
                     pred_survival_time = NULL,
+                    predictor_outlier_filter_type = NULL,
+                    predictor_outlier_filter_threshold = NULL,
                     seed = 1,
                     test_rate = 0.0,
                     test_split_type = "random" # "random" or "ordered"
@@ -389,9 +391,24 @@ build_coxph.fast <- function(df,
         df <- df %>% sample_rows(max_nrow)
       }
 
+      # Remove outliers if specified so.
+      # This has to be done before preprocess_regression_data_after_sample, since it can remove rows and reduce number of unique values,
+      # just like sampling.
+      df <- remove_outliers_for_regression_data(df, clean_time_col, clean_cols,
+                                                NULL, #target_outlier_filter_type
+                                                NULL, #target_outlier_filter_threshold
+                                                predictor_outlier_filter_type,
+                                                predictor_outlier_filter_threshold)
+
       df <- preprocess_regression_data_after_sample(df, clean_time_col, clean_cols, predictor_n = predictor_n, name_map = name_map)
       c_cols <- attr(df, 'predictors') # predictors are updated (added and/or removed) in preprocess_post_sample. Catch up with it.
       name_map <- attr(df, 'name_map')
+
+      df <- remove_outliers_for_regression_data(df, clean_time_col, c_cols,
+                                                NULL, #target_outlier_filter_type
+                                                NULL, #target_outlier_filter_threshold
+                                                predictor_outlier_filter_type,
+                                                predictor_outlier_filter_threshold)
 
       # split training and test data
       source_data <- df
@@ -484,7 +501,7 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients'
       coef_df <- broom:::tidy.coxph(x)
       ret <- ret %>% mutate(p.value=purrr::map(term, function(var) {
         get_var_min_pvalue(var, coef_df, x)
-      }))
+      })) %>% mutate(p.value=as.numeric(p.value)) # Make list into numeric vector.
       # Map variable names back to the original.
       # as.character is to be safe by converting from factor. With factor, reverse mapping result will be messed up.
       ret$term <- x$terms_mapping[as.character(ret$term)]

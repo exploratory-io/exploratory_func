@@ -487,6 +487,40 @@ preprocess_regression_data_after_sample <- function(df, target_col, predictor_co
   df
 }
 
+remove_outliers_for_regression_data <- function(df, target_col, predictor_cols,
+                                                target_outlier_filter_type,
+                                                target_outlier_filter_threshold,
+                                                predictor_outlier_filter_type,
+                                                predictor_outlier_filter_threshold) {
+  if (!is.null(target_outlier_filter_type) || !is.null(predictor_outlier_filter_type)) {
+    df$.is.outlier <- FALSE #TODO: handle possibility of name conflict.
+    if (!is.null(target_outlier_filter_type)) {
+      is_outlier <- function(x) {
+        res <- detect_outlier(x, type=target_outlier_filter_type, threshold=target_outlier_filter_threshold) %in% c("Lower", "Upper")
+        res
+      }
+      if (is.numeric(df[[target_col]])) {
+        df$.is.outlier <- df$.is.outlier | is_outlier(df[[target_col]])
+      }
+    }
+
+    if (!is.null(predictor_outlier_filter_type)) {
+      is_outlier <- function(x) {
+        res <- detect_outlier(x, type=predictor_outlier_filter_type, threshold=predictor_outlier_filter_threshold) %in% c("Lower", "Upper")
+        res
+      }
+      for (col in predictor_cols) {
+        if (is.numeric(df[[col]])) {
+          df$.is.outlier <- df$.is.outlier | is_outlier(df[[col]])
+        }
+      }
+    }
+    df <- df %>% dplyr::filter(!.is.outlier)
+    df$.is.outlier <- NULL # Removing the temporary column.
+  }
+  df
+}
+
 #' builds lm model quickly for analytics view.
 #' @param relimp - Whether to enable relative importance by relaimpo.
 #' @param relimp_type - Passed down to boot.relimp, but "lmg" seems to be the recommended option, but is very slow. default is "first".
@@ -656,36 +690,18 @@ build_lm.fast <- function(df,
         }
       }
 
+      # Remove outliers if specified so.
+      # This has to be done before preprocess_regression_data_after_sample, since it can remove rows and reduce number of unique values,
+      # just like sampling.
+      df <- remove_outliers_for_regression_data(df, clean_target_col, clean_cols,
+                                                target_outlier_filter_type,
+                                                target_outlier_filter_threshold,
+                                                predictor_outlier_filter_type,
+                                                predictor_outlier_filter_threshold)
+
       df <- preprocess_regression_data_after_sample(df, clean_target_col, clean_cols, predictor_n = predictor_n, name_map = name_map)
       c_cols <- attr(df, 'predictors') # predictors are updated (added and/or removed) in preprocess_post_sample. Catch up with it.
       name_map <- attr(df, 'name_map')
-
-      if (!is.null(target_outlier_filter_type) || !is.null(predictor_outlier_filter_type)) {
-        df$.is.outlier <- FALSE #TODO: handle possibility of name conflict.
-        if (!is.null(target_outlier_filter_type)) {
-          is_outlier <- function(x) {
-            res <- detect_outlier(x, type=target_outlier_filter_type, threshold=target_outlier_filter_threshold) %in% c("Lower", "Upper")
-            res
-          }
-          if (is.numeric(df[[clean_target_col]])) {
-            df$.is.outlier <- df$.is.outlier | is_outlier(df[[clean_target_col]])
-          }
-        }
-
-        if (!is.null(predictor_outlier_filter_type)) {
-          is_outlier <- function(x) {
-            res <- detect_outlier(x, type=predictor_outlier_filter_type, threshold=predictor_outlier_filter_threshold) %in% c("Lower", "Upper")
-            res
-          }
-          for (col in c_cols) {
-            if (is.numeric(df[[col]])) {
-              df$.is.outlier <- df$.is.outlier | is_outlier(df[[col]])
-            }
-          }
-        }
-        df <- df %>% dplyr::filter(!.is.outlier)
-        df$.is.outlier <- NULL # Removing the temporary column.
-      }
 
       # Normalize numeric target variable,
       # after all column changes for Date/POSIXct, filtering, dropping columns above are done.
@@ -1267,7 +1283,7 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
         coef_df <- broom:::tidy.lm(x)
         ret <- ret %>% mutate(p.value=purrr::map(term, function(var) {
           get_var_min_pvalue(var, coef_df, x)
-        }))
+        })) %>% mutate(p.value=as.numeric(p.value)) # Make list into numeric vector.
         # Map variable names back to the original.
         # as.character is to be safe by converting from factor. With factor, reverse mapping result will be messed up.
         ret$term <- x$terms_mapping[as.character(ret$term)]
@@ -1391,7 +1407,7 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
       coef_df <- broom:::tidy.lm(x)
       ret <- ret %>% mutate(p.value=purrr::map(term, function(var) {
         get_var_min_pvalue(var, coef_df, x)
-      }))
+      })) %>% mutate(p.value=as.numeric(p.value)) # Make list into numeric vector.
       # Map variable names back to the original.
       # as.character is to be safe by converting from factor. With factor, reverse mapping result will be messed up.
       ret$term <- x$terms_mapping[as.character(ret$term)]

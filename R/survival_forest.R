@@ -147,6 +147,8 @@ exp_survival_forest <- function(df,
                     max_pd_vars = NULL,
                     pd_sample_size = 500,
                     pred_survival_time = NULL,
+                    predictor_outlier_filter_type = NULL,
+                    predictor_outlier_filter_threshold = NULL,
                     seed = 1,
                     test_rate = 0.0,
                     test_split_type = "random" # "random" or "ordered"
@@ -255,6 +257,15 @@ exp_survival_forest <- function(df,
         sampled_nrow <- max_nrow
         df <- df %>% sample_rows(max_nrow)
       }
+
+      # Remove outliers if specified so.
+      # This has to be done before preprocess_regression_data_after_sample, since it can remove rows and reduce number of unique values,
+      # just like sampling.
+      df <- remove_outliers_for_regression_data(df, clean_time_col, clean_cols,
+                                                NULL, #target_outlier_filter_type
+                                                NULL, #target_outlier_filter_threshold
+                                                predictor_outlier_filter_type,
+                                                predictor_outlier_filter_threshold)
 
       df <- preprocess_regression_data_after_sample(df, clean_time_col, clean_cols, predictor_n = predictor_n, name_map = name_map)
       c_cols <- attr(df, 'predictors') # predictors are updated (added and/or removed) in preprocess_post_sample. Catch up with it.
