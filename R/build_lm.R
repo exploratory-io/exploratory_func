@@ -845,7 +845,7 @@ build_lm.fast <- function(df,
           }
         }
         else {
-          error <- simpleError("Variable importance was not calculated because there is only one variable.")
+          error <- simpleError("Variable importance requires two or more variables.")
           model$permutation_importance <- error
         }
       }
@@ -898,7 +898,7 @@ build_lm.fast <- function(df,
           model$permutation_importance <- calc_permutation_importance_linear(model, clean_target_col, c_cols, df)
         }
         else {
-          error <- simpleError("Variable importance was not calculated because there is only one variable.")
+          error <- simpleError("Variable importance requires two or more variables.")
           model$permutation_importance <- error
         }
       }

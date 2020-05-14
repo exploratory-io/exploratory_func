@@ -438,7 +438,7 @@ build_coxph.fast <- function(df,
         imp_vars <- imp_df$term
       }
       else {
-        error <- simpleError("Variable importance was not calculated because there is only one variable.")
+        error <- simpleError("Variable importance requires two or more variables.")
         model$permutation_importance <- error
         imp_vars <- c_cols
       }
