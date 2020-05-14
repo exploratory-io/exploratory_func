@@ -1038,8 +1038,7 @@ exp_kruskal <- function(df, var1, var2, func2 = NULL, ...) {
     tryCatch({
       model <- kruskal.test(formula, data = df, ...)
       N <- nrow(df)
-      Groups <- dplyr::n_distinct(df[[var2_col]])
-      epsilon_squared <- calculate_epsilon_squared(model, Groups, N)
+      epsilon_squared <- calculate_epsilon_squared(model, N)
       class(model) <- c("kruskal_exploratory", class(model))
       model$var1 <- var1_col
       model$var2 <- var2_col
