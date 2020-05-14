@@ -1285,7 +1285,7 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
       handle_partial_dependence(x)
     },
     permutation_importance = {
-      if (is.null(x$permutation_importance) || "error" %in% class(x)) {
+      if (is.null(x$permutation_importance) || "error" %in% class(x$permutation_importance)) {
         # Permutation importance is not supported for the family and link function, or skipped because there is only one variable.
         # Return empty data.frame to avoid error.
         ret <- data.frame()
@@ -1294,9 +1294,9 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
       ret <- x$permutation_importance
       # Add p.value column.
       coef_df <- broom:::tidy.lm(x)
-      ret <- ret %>% mutate(p.value=purrr::map(term, function(var) {
+      ret <- ret %>% dplyr::mutate(p.value=purrr::map(term, function(var) {
         get_var_min_pvalue(var, coef_df, x)
-      })) %>% mutate(p.value=as.numeric(p.value)) # Make list into numeric vector.
+      })) %>% dplyr::mutate(p.value=as.numeric(p.value)) # Make list into numeric vector.
       # Map variable names back to the original.
       # as.character is to be safe by converting from factor. With factor, reverse mapping result will be messed up.
       ret$term <- x$terms_mapping[as.character(ret$term)]
@@ -1407,7 +1407,7 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
       handle_partial_dependence(x)
     },
     permutation_importance = {
-      if (is.null(x$permutation_importance) || "error" %in% class(x)) {
+      if (is.null(x$permutation_importance) || "error" %in% class(x$permutation_importance)) {
         # Permutation importance is not supported for the family and link function, or skipped because there is only one variable.
         # Return empty data.frame to avoid error.
         ret <- data.frame()
@@ -1416,9 +1416,9 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
       ret <- x$permutation_importance
       # Add p.value column.
       coef_df <- broom:::tidy.lm(x)
-      ret <- ret %>% mutate(p.value=purrr::map(term, function(var) {
+      ret <- ret %>% dplyr::mutate(p.value=purrr::map(term, function(var) {
         get_var_min_pvalue(var, coef_df, x)
-      })) %>% mutate(p.value=as.numeric(p.value)) # Make list into numeric vector.
+      })) %>% dplyr::mutate(p.value=as.numeric(p.value)) # Make list into numeric vector.
       # Map variable names back to the original.
       # as.character is to be safe by converting from factor. With factor, reverse mapping result will be messed up.
       ret$term <- x$terms_mapping[as.character(ret$term)]
