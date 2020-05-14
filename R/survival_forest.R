@@ -308,6 +308,7 @@ exp_survival_forest <- function(df,
           variable = names(imp),
           importance = imp
         ) %>% dplyr::arrange(-importance)
+        rf$imp_df <- imp_df
         imp_vars <- imp_df$variable
       }
       else {
@@ -359,10 +360,8 @@ tidy.ranger_survival_exploratory <- function(x, type = 'importance', ...) { #TOD
   }
   switch(type,
     importance = {
-      if (length(x$imp_vars) > 1) { # Show importance only when there are multiple variables.
-        class(x) <- 'ranger' # This seems to be necessary to make ranger::importance work, eliminating ranger_survival_exploratory.
-        importance_vec <- ranger::importance(x)
-        ret <- tibble::tibble(variable=names(importance_vec), importance=importance_vec)
+      if (!is.null(x$imp_df)) { # Show importance only when there are multiple variables.
+        ret <- x$imp_df
         ret <- ret %>% dplyr::mutate(variable = x$terms_mapping[variable]) # map variable names to original.
         ret
       }
