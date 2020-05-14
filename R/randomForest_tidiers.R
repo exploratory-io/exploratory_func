@@ -2867,7 +2867,12 @@ exp_rpart <- function(df,
       model$sampled_nrow <- clean_df_ret$sampled_nrow
 
       # Find list of important variables and run partial dependence on them.
-      if (!is.null(model$variable.importance)) { # It is possible variable.importance is missing for example when no split happened.
+      if (length(c_cols) <= 1) { # Show importance only when there are multiple variables.
+        error <- simpleError("Variable importance requires two or more variables.")
+        model$imp_df <- error
+        imp_vars <- c_cols
+      }
+      else if (!is.null(model$variable.importance)) { # It is possible variable.importance is missing for example when no split happened.
         imp <- model$variable.importance
         imp_vars <- names(imp) # model$variable.importance is already sorted by importance.
         imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # Keep only max_pd_vars most important variables
@@ -2877,6 +2882,8 @@ exp_rpart <- function(df,
         )
       }
       else {
+        error <- simpleError("Variable importance is not available because there is no split in the decision tree.")
+        model$imp_df <- error
         imp_vars <- c_cols[1:min(length(c_cols), max_pd_vars)] # Keep only max_pd_vars first cols since we have no way to know importance.
       }
 
@@ -3125,15 +3132,15 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
   switch(
     type,
     importance = {
-      if (!is.null(x$imp_df)) {
-        # return variable importance
-        ret <- x$imp_df
-        ret <- ret %>% dplyr::mutate(variable = x$terms_mapping[variable]) # map variable names to original.
-        ret
+      if (is.null(x$imp_df) || "error" %in% class(x$imp_df)) {
+        # Permutation importance is not supported for the family and link function, or skipped because there is only one variable.
+        # Return empty data.frame to avoid error.
+        ret <- data.frame()
+        return(ret)
       }
-      else { # If there is only one variable, return empty data.frame to skip.
-        data.frame()
-      }
+      ret <- x$imp_df
+      ret <- ret %>% dplyr::mutate(variable = x$terms_mapping[variable]) # map variable names to original.
+      ret
     },
     evaluation = {
       # Delegate showing error for failed models to grance().
