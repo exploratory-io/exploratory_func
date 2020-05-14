@@ -2186,13 +2186,16 @@ calc_feature_imp <- function(df,
         # return partial dependence
         if (length(c_cols) > 1) { # Calculate importance only when there are multiple variables.
           imp <- ranger::importance(rf)
-          imp_df <- data.frame(
+          imp_df <- tibble::tibble( # Use tibble since data.frame() would make variable factors, which breaks things in following steps.
             variable = names(imp),
             importance = imp
           ) %>% dplyr::arrange(-importance)
+          rf$imp_df <- imp_df
           imp_vars <- imp_df$variable
         }
         else {
+          error <- simpleError("Variable importance requires two or more variables.")
+          rf$imp_df <- error
           imp_vars <- c_cols # Just use c_cols as is for imp_vars to calculate partial dependence anyway.
         }
         if (is.null(max_pd_vars)) {
@@ -2441,17 +2444,14 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, binary_clas
   switch(
     type,
     importance = {
-      # return variable importance
-      tryCatch({
-        imp <- ranger::importance(x)
-        ret <- data.frame(
-          variable = x$terms_mapping[names(imp)],
-          importance = imp,
-          stringsAsFactors = FALSE
-          )
-      }, error = function(e){
-        ret <<- data.frame()
-      })
+      if (is.null(x$imp_df) || "error" %in% class(x$imp_df)) {
+        # Permutation importance is not supported for the family and link function, or skipped because there is only one variable.
+        # Return empty data.frame to avoid error.
+        ret <- data.frame()
+        return(ret)
+      }
+      ret <- x$imp_df
+      ret <- ret %>% dplyr::mutate(variable = x$terms_mapping[variable]) # map variable names to original.
       ret
     },
     evaluation = {
