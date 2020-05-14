@@ -2868,8 +2868,13 @@ exp_rpart <- function(df,
 
       # Find list of important variables and run partial dependence on them.
       if (!is.null(model$variable.importance)) { # It is possible variable.importance is missing for example when no split happened.
-        imp_vars <- names(model$variable.importance) # model$variable.importance is already sorted by importance.
+        imp <- model$variable.importance
+        imp_vars <- names(imp) # model$variable.importance is already sorted by importance.
         imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # Keep only max_pd_vars most important variables
+        model$imp_df <- tibble::tibble(
+          variable = names(imp),
+          importance = imp
+        )
       }
       else {
         imp_vars <- c_cols[1:min(length(c_cols), max_pd_vars)] # Keep only max_pd_vars first cols since we have no way to know importance.
@@ -3120,15 +3125,10 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
   switch(
     type,
     importance = {
-      if (length(x$imp_vars) > 1) {
+      if (!is.null(x$imp_df)) {
         # return variable importance
-        imp <- x$variable.importance
-
-        ret <- data.frame(
-          variable = x$terms_mapping[names(imp)],
-          importance = imp,
-          stringsAsFactors = FALSE
-        )
+        ret <- x$imp_df
+        ret <- ret %>% dplyr::mutate(variable = x$terms_mapping[variable]) # map variable names to original.
         ret
       }
       else { # If there is only one variable, return empty data.frame to skip.
