@@ -486,6 +486,91 @@ clearAmazonAthenaConnection <- function(driver = "", region = "", authentication
   rm(list = key, envir = connection_pool)
 }
 
+#' @export
+getSQLServerConnection <- function(driver = "", server = "", port = 1433,
+                                   database = "", user = "", password = "", additional_params = "", ...){
+  loadNamespace("odbc")
+
+  # Get Driver Name lists in odbc.ini.
+  drivers <- odbc::odbcListDrivers() %>%
+               dplyr::select(name) %>%
+               unique() %>%
+               dplyr::arrange(name) %>%
+               unclass() %>% `[[`("name")
+  if (!driver %in% drivers) stop(paste0("driver: ", driver, " is not setting in odbc.ini."))
+
+  conn_str <- stringr::str_c(c("Driver", "Server", "Port", "uid", "pwd", "Database"),
+                             c(driver, server, port, user, password, database),
+                             sep="=", collapse=";")
+  if (additional_params != "") {
+    conn_str <- stringr::str_c(conn_str, additional_params, sep=";")
+  }
+
+  conn <- NULL
+
+  if (user_env$pool_connection) {
+    conn <- connection_pool[[conn_str]]
+  }
+
+  if (is.null(conn)) {
+     conn <- odbc::dbConnect(odbc::odbc(), .connection_string=conn_str)
+  }
+
+  if (user_env$pool_connection) {
+    connection_pool[[conn_str]] <- conn
+  }
+
+  conn
+}
+
+#' @export
+querySQLServer <- function(driver = "", server = "", port = 1433,
+                           database = "", user = "", password = "", additional_params = "",
+                           query = "", numOfRows = -1, ...){
+
+  if(!requireNamespace("odbc")){ stop("package odbc must be installed.") }
+
+  conn <- getSQLServerConnection(driver = driver, server = server, port = port,
+                                 database = database, user = user, password = password,
+                                 additional_params = additional_params, ...)
+  tryCatch({
+    query <- convertUserInputToUtf8(query)
+    query <- glue_exploratory(query, .transformer=sql_glue_transformer, .envir = parent.frame())
+    res <- odbc::dbSendQuery(conn, query)
+
+    df <- odbc::dbFetch(res, n = numOfRows)
+  }, error = function(e){
+    clearSQLServerConnection(driver = driver, server = server, port = port,
+                             database = database, user = user, password = password,
+                             additional_params = additional_params, ...)
+    stop(e)
+  })
+
+  odbc::dbClearResult(res)
+
+  df
+}
+
+#' @export
+clearSQLServerConnection <- function(driver = "", server = "", port = 1433,
+                                     database = "", user = "", password = "", additional_params = "", ...){
+  conn_str <- stringr::str_c(c("Driver", "Server", "Port", "uid", "pwd", "Database"),
+                             c(driver, server, port, user, password, database),
+                             sep="=", collapse=";")
+  if (additional_params != "") {
+    conn_str <- stringr::str_c(conn_str, additional_params, sep=";")
+  }
+
+  conn <- connection_pool[[conn_str]]
+  tryCatch({
+    odbc::dbDisconnect(conn)
+  },
+  warnings=function(w){},
+  error=function(e){})
+
+  rm(list = conn_str, envir = connection_pool)
+}
+
 #' Returns specified connection from pool if it exists in the pool.
 #' If not, new connection is created and returned.
 #' @export
