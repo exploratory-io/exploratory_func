@@ -2444,10 +2444,23 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, binary_clas
   switch(
     type,
     importance = {
-      if (is.null(x$imp_df) || "error" %in% class(x$imp_df)) {
+      if ("error" %in% class(x$imp_df)) {
         # Permutation importance is not supported for the family and link function, or skipped because there is only one variable.
         # Return empty data.frame to avoid error.
         ret <- data.frame()
+        return(ret)
+      }
+      else if (is.null(x$imp_df)) { # This means it is for Step, as opposed to Analytics View. TODO: We might want to separate function for Step and Analytics View.
+        tryCatch({
+          imp <- ranger::importance(x)
+          ret <- tibble::tibble( # Use tibble since data.frame() would make variable factors, which breaks things in following steps.
+            variable = x$terms_mapping[names(imp)],
+            importance = imp
+          ) %>% dplyr::arrange(-importance)
+
+        }, error = function(e){	
+          ret <<- data.frame()	
+        })
         return(ret)
       }
       ret <- x$imp_df
