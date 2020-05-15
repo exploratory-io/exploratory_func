@@ -2186,13 +2186,16 @@ calc_feature_imp <- function(df,
         # return partial dependence
         if (length(c_cols) > 1) { # Calculate importance only when there are multiple variables.
           imp <- ranger::importance(rf)
-          imp_df <- data.frame(
+          imp_df <- tibble::tibble( # Use tibble since data.frame() would make variable factors, which breaks things in following steps.
             variable = names(imp),
             importance = imp
           ) %>% dplyr::arrange(-importance)
+          rf$imp_df <- imp_df
           imp_vars <- imp_df$variable
         }
         else {
+          error <- simpleError("Variable importance requires two or more variables.")
+          rf$imp_df <- error
           imp_vars <- c_cols # Just use c_cols as is for imp_vars to calculate partial dependence anyway.
         }
         if (is.null(max_pd_vars)) {
@@ -2441,17 +2444,27 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, binary_clas
   switch(
     type,
     importance = {
-      # return variable importance
-      tryCatch({
-        imp <- ranger::importance(x)
-        ret <- data.frame(
-          variable = x$terms_mapping[names(imp)],
-          importance = imp,
-          stringsAsFactors = FALSE
-          )
-      }, error = function(e){
-        ret <<- data.frame()
-      })
+      if ("error" %in% class(x$imp_df)) {
+        # Permutation importance is not supported for the family and link function, or skipped because there is only one variable.
+        # Return empty data.frame to avoid error.
+        ret <- data.frame()
+        return(ret)
+      }
+      else if (is.null(x$imp_df)) { # This means it is for Step, as opposed to Analytics View. TODO: We might want to separate function for Step and Analytics View.
+        tryCatch({
+          imp <- ranger::importance(x)
+          ret <- tibble::tibble( # Use tibble since data.frame() would make variable factors, which breaks things in following steps.
+            variable = x$terms_mapping[names(imp)],
+            importance = imp
+          ) %>% dplyr::arrange(-importance)
+
+        }, error = function(e){	
+          ret <<- data.frame()	
+        })
+        return(ret)
+      }
+      ret <- x$imp_df
+      ret <- ret %>% dplyr::mutate(variable = x$terms_mapping[variable]) # map variable names to original.
       ret
     },
     evaluation = {
@@ -2867,11 +2880,23 @@ exp_rpart <- function(df,
       model$sampled_nrow <- clean_df_ret$sampled_nrow
 
       # Find list of important variables and run partial dependence on them.
-      if (!is.null(model$variable.importance)) { # It is possible variable.importance is missing for example when no split happened.
-        imp_vars <- names(model$variable.importance) # model$variable.importance is already sorted by importance.
+      if (length(c_cols) <= 1) { # Show importance only when there are multiple variables.
+        error <- simpleError("Variable importance requires two or more variables.")
+        model$imp_df <- error
+        imp_vars <- c_cols
+      }
+      else if (!is.null(model$variable.importance)) { # It is possible variable.importance is missing for example when no split happened.
+        imp <- model$variable.importance
+        imp_vars <- names(imp) # model$variable.importance is already sorted by importance.
         imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # Keep only max_pd_vars most important variables
+        model$imp_df <- tibble::tibble(
+          variable = names(imp),
+          importance = imp
+        )
       }
       else {
+        error <- simpleError("Variable importance is not available because there is no split in the decision tree.")
+        model$imp_df <- error
         imp_vars <- c_cols[1:min(length(c_cols), max_pd_vars)] # Keep only max_pd_vars first cols since we have no way to know importance.
       }
 
@@ -3120,20 +3145,15 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
   switch(
     type,
     importance = {
-      if (length(x$imp_vars) > 1) {
-        # return variable importance
-        imp <- x$variable.importance
-
-        ret <- data.frame(
-          variable = x$terms_mapping[names(imp)],
-          importance = imp,
-          stringsAsFactors = FALSE
-        )
-        ret
+      if (is.null(x$imp_df) || "error" %in% class(x$imp_df)) {
+        # Permutation importance is not supported for the family and link function, or skipped because there is only one variable.
+        # Return empty data.frame to avoid error.
+        ret <- data.frame()
+        return(ret)
       }
-      else { # If there is only one variable, return empty data.frame to skip.
-        data.frame()
-      }
+      ret <- x$imp_df
+      ret <- ret %>% dplyr::mutate(variable = x$terms_mapping[variable]) # map variable names to original.
+      ret
     },
     evaluation = {
       # Delegate showing error for failed models to grance().

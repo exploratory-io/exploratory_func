@@ -308,9 +308,12 @@ exp_survival_forest <- function(df,
           variable = names(imp),
           importance = imp
         ) %>% dplyr::arrange(-importance)
+        rf$imp_df <- imp_df
         imp_vars <- imp_df$variable
       }
       else {
+        error <- simpleError("Variable importance requires two or more variables.")
+        rf$imp_df <- error
         imp_vars <- c_cols
       }
 
@@ -359,16 +362,15 @@ tidy.ranger_survival_exploratory <- function(x, type = 'importance', ...) { #TOD
   }
   switch(type,
     importance = {
-      if (length(x$imp_vars) > 1) { # Show importance only when there are multiple variables.
-        class(x) <- 'ranger' # This seems to be necessary to make ranger::importance work, eliminating ranger_survival_exploratory.
-        importance_vec <- ranger::importance(x)
-        ret <- tibble::tibble(variable=names(importance_vec), importance=importance_vec)
-        ret <- ret %>% dplyr::mutate(variable = x$terms_mapping[variable]) # map variable names to original.
-        ret
+      if (is.null(x$imp_df) || "error" %in% class(x$imp_df)) {
+        # Permutation importance is not supported for the family and link function, or skipped because there is only one variable.
+        # Return empty data.frame to avoid error.
+        ret <- data.frame()
+        return(ret)
       }
-      else {
-        data.frame() # Return empty data frame.
-      }
+      ret <- x$imp_df
+      ret <- ret %>% dplyr::mutate(variable = x$terms_mapping[variable]) # map variable names to original.
+      ret
     },
     partial_dependence_survival_curve = {
       ret <- x$partial_dependence

@@ -24,7 +24,7 @@ if (!testdata_filename %in% list.files(testdata_dir)) {
 
 test_that("build_lm.fast (linear regression) evaluate training and test", {
   model_df <- flight %>%
-                build_lm.fast(`ARR DELAY`, `DIS TANCE`, `DEP DELAY`, `CAR RIER`, relimp = TRUE, relimp_type = "first", test_rate = 0.3, seed=1)
+                build_lm.fast(`ARR DELAY`, `DIS TANCE`, `DEP DELAY`, `CAR RIER`, test_rate = 0.3, seed=1)
 
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
@@ -35,8 +35,14 @@ test_that("build_lm.fast (linear regression) evaluate training and test", {
   expect_equal(nrow(ret), 2) # 2 for train and test
 
   # Check order of variable importance result.
-  ret <- model_df %>% broom::tidy(model, type="relative_importance")
+  ret <- model_df %>% broom::tidy(model, type="permutation_importance")
   expect_equal((ret %>% arrange(-importance))$term, c("DEP DELAY", "CAR RIER", "DIS TANCE"))
+
+  # Test univariate case handling
+  model_df <- flight %>%
+                build_lm.fast(`ARR DELAY`, `DIS TANCE`, relimp = TRUE, relimp_type = "first", test_rate = 0.3, seed=1)
+  ret <- model_df %>% broom::tidy(model, type="permutation_importance")
+  expect_equal(nrow(ret), 0)
 })
 
 test_that("build_lm.fast (logistic regression(numeric)) evaluate training and test", {
