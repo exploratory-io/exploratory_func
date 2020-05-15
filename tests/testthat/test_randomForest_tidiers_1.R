@@ -68,6 +68,18 @@ test_that("test calc_feature_imp when the number of rows of classes is one", {
   expect_equal(nrow(ret), 2)
 })
 
+test_that("test calc_feature_imp when there in only one predictor", {
+  sample_data <- data.frame(
+    y = c("a", "b", "b", "b", "b", "c"),
+    num = runif(6)
+  )
+
+  model_df <- sample_data %>%
+    calc_feature_imp(y, num, importance_measure = "impurity")
+  ret <- model_df %>% rf_importance()
+  expect_equal(nrow(ret), 0) # Empty data frame should be returned.
+})
+
 test_that("test calc_feature_imp predicting multi-class", {
   set.seed(0)
   nrow <- 100
