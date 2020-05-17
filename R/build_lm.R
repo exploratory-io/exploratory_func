@@ -337,7 +337,7 @@ map_terms_to_orig <- function(terms, mapping) {
 #' Common preprocessing of regression data to be done BEFORE sampling.
 #' Only common operations to be done, for example, in Summary View too.
 #' @export
-preprocess_regression_data_before_sample <- function(df, target_col, predictor_cols) {
+preprocess_regression_data_before_sample <- function(df, target_col, predictor_cols, filter_target_na_inf=TRUE, filter_predictor_numeric_na=TRUE) {
   # cols will be filtered to remove invalid columns
   cols <- predictor_cols
   for (col in predictor_cols) {
@@ -351,12 +351,14 @@ preprocess_regression_data_before_sample <- function(df, target_col, predictor_c
     stop("No predictor column is left after removing columns with only NA or Inf values.")
   }
 
-  df <- df %>%
-    # dplyr::filter(!is.na(!!target_col))  TODO: this was not filtering, and replaced it with the next line. check other similar places.
-    # for numeric cols, filter NA rows, because lm will anyway do this internally, and errors out
-    # if the remaining rows are with single value in any predictor column.
-    # filter Inf/-Inf too to avoid error at lm.
-    dplyr::filter(!is.na(df[[target_col]]) & !is.infinite(df[[target_col]])) # this form does not handle group_by. so moved into each_func from outside.
+  if (filter_target_na_inf){ # For ranger, this is not necessary.
+    df <- df %>%
+      # dplyr::filter(!is.na(!!target_col))  TODO: this was not filtering, and replaced it with the next line. check other similar places.
+      # for numeric cols, filter NA rows, because lm will anyway do this internally, and errors out
+      # if the remaining rows are with single value in any predictor column.
+      # filter Inf/-Inf too to avoid error at lm.
+      dplyr::filter(!is.na(df[[target_col]]) & !is.infinite(df[[target_col]])) # this form does not handle group_by. so moved into each_func from outside.
+  }
 
   # To avoid unused factor level that causes margins::marginal_effects() to fail, filtering operation has
   # to be done before factor level adjustments.
@@ -367,7 +369,21 @@ preprocess_regression_data_before_sample <- function(df, target_col, predictor_c
       # if the remaining rows are with single value in any predictor column.
       # Filter Inf/-Inf too to avoid error at lm.
       # Do the same for Date/POSIXct, because we will create numeric columns from them.
-      df <- df %>% dplyr::filter(!is.na(df[[col]]) & !is.infinite(df[[col]]))
+
+      # For rpart, filter NAs for numeric columns to avoid instability. It seems that the resulting tree from rpart sometimes becomes
+      # simplistic (e.g. only one split in the tree), especially in Exploratory for some reason, if we let rpart handle the handling of NAs,
+      # even though it is supposed to just filter out rows with NAs, which is same as what we are doing here.
+      if (filter_predictor_numeric_na) {
+        df <- df %>% dplyr::filter(!is.na(df[[col]]) & !is.infinite(df[[col]]))
+      }
+      else {
+        # For ranger, removing numeric NA is not necessary.
+        # But even for ranger, filter Inf/-Inf to avoid following error from ranger.
+        # Error in seq.default(min(x, na.rm = TRUE), max(x, na.rm = TRUE), length.out = length.out) : 'from' must be a finite number
+        # TODO: In exp_rpart and calc_feature_imp, we have logic to remember and restore NA rows, but they are probably not made use of
+        # if we filter NA rows here.
+        df <- df %>% dplyr::filter(!is.infinite(df[[col]]))
+      }
     }
   }
   if (nrow(df) == 0) {

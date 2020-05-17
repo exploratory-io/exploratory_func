@@ -1835,9 +1835,10 @@ cleanup_df <- function(df, target_col, selected_cols, grouped_cols, target_n, pr
 }
 
 cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, name_map, predictor_n, revert_logical_levels=TRUE, filter_numeric_na=FALSE) {
-  if (is.factor(df[[clean_target_col]])) { # to avoid error in edarf::partial_dependence(), remove levels that is not used in this group.
-    df[[clean_target_col]] <- forcats::fct_drop(df[[clean_target_col]])
-  }
+  df <- preprocess_regression_data_before_sample(df, clean_target_col, clean_cols,
+                                                 filter_target_na_inf=FALSE,
+                                                 filter_predictor_numeric_na=filter_numeric_na)
+  clean_cols <- attr(df, 'predictors') # predictors are updated (removed) in preprocess_pre_sample. Catch up with it.
   # sample the data because randomForest takes long time
   # if data size is too large
   sampled_nrow <- NULL
