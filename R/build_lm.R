@@ -474,6 +474,7 @@ preprocess_regression_data_after_sample <- function(df, target_col, predictor_co
     } else if(is.logical(df[[col]])) {
       # 1. convert data to factor if predictors are logical. (as.factor() on logical always puts FALSE as the first level, which is what we want for predictor.)
       # 2. turn NA into (Missing) factor level so that lm will not drop all the rows.
+      # For ranger, we need to convert logical to factor too since na.roughfix only works for numeric or factor.
       df[[col]] <- forcats::fct_explicit_na(as.factor(df[[col]]))
     } else if(!is.numeric(df[[col]])) {
       # 1. convert data to factor if predictors are not numeric or logical
