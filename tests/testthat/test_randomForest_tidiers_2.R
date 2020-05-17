@@ -80,7 +80,7 @@ test_that("test ranger with binary classification with logical column", {
   expect_equal(colnames(coef_ret), c("variable", "importance"))
 
   model_stats <- suppressWarnings(model_stats(model_ret, pretty.name = TRUE))
-  expect_colnames <- c("F Score", "Accuracy Rate", "Misclassification Rate",
+  expect_colnames <- c("AUC", "F Score", "Accuracy Rate", "Misclassification Rate",
                        "Precision", "Recall")
   expect_equal(colnames(model_stats), expect_colnames)
 
@@ -125,7 +125,7 @@ test_that("test ranger with binary classification with factor", {
   expect_equal(colnames(coef_ret), c("variable", "importance"))
 
   model_stats <- suppressWarnings(model_stats(model_ret, pretty.name = TRUE))
-  expect_colnames <- c("F Score", "Accuracy Rate", "Misclassification Rate",
+  expect_colnames <- c("AUC", "F Score", "Accuracy Rate", "Misclassification Rate",
                        "Precision", "Recall")
   expect_equal(colnames(model_stats), expect_colnames)
 
@@ -170,7 +170,7 @@ test_that("test ranger with binary classification (all predictor_varials)", {
   expect_equal(colnames(coef_ret), c("variable", "importance"))
 
   model_stats <- suppressWarnings(model_stats(model_ret, pretty.name = TRUE))
-  expect_colnames <- c("F Score", "Accuracy Rate", "Misclassification Rate",
+  expect_colnames <- c("AUC", "F Score", "Accuracy Rate", "Misclassification Rate",
                        "Precision", "Recall")
   expect_equal(colnames(model_stats), expect_colnames)
 
