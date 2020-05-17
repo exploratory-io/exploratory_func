@@ -2230,22 +2230,14 @@ evaluate_classification <- function(actual, predicted, class, multi_class = TRUE
   fn <- sum(actual == class & predicted != class, na.rm = TRUE)
 
   precision <- tp / (tp + fp)
-  # this avoids NA
-  if(tp+fp == 0) {
-    precision <- 0
-  }
-
   recall <- tp / (tp + fn)
-  # this avoids NA
-  if(tp+fn == 0) {
-    recall <- 0
-  }
 
   accuracy <- (tp + tn) / (tp + fp + tn + fn)
 
   f_score <- 2 * ((precision * recall) / (precision + recall))
-  # this avoids NA
-  if(precision + recall == 0) {
+  # This avoids NaN. If both precision and recall are 0, it makes sense for f score to be 0.
+  # is.nan() on precision and recall is necessary to avoid error here.
+  if(!is.nan(precision) && !is.nan(recall) && precision + recall == 0) {
     f_score <- 0
   }
 
