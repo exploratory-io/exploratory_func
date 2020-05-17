@@ -1869,88 +1869,9 @@ cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, nam
     }
   }
 
-  c_cols <- clean_cols
-  for(col in clean_cols){
-    if(lubridate::is.Date(df[[col]]) || lubridate::is.POSIXct(df[[col]])) {
-      c_cols <- setdiff(c_cols, col)
-
-      absolute_time_col <- avoid_conflict(colnames(df), paste0(col, "_abs_time"))
-      wday_col <- avoid_conflict(colnames(df), paste0(col, "_day_of_week"))
-      day_col <- avoid_conflict(colnames(df), paste0(col, "_day_of_month"))
-      yday_col <- avoid_conflict(colnames(df), paste0(col, "_day_of_year"))
-      month_col <- avoid_conflict(colnames(df), paste0(col, "_month"))
-      year_col <- avoid_conflict(colnames(df), paste0(col, "_year"))
-      new_name <- c(absolute_time_col, wday_col, day_col, yday_col, month_col, year_col)
-      names(new_name) <- paste(
-        names(name_map)[name_map == col],
-        c(
-          "_abs_time",
-          "_day_of_week",
-          "_day_of_month",
-          "_day_of_year",
-          "_month",
-          "_year"
-        ), sep="")
-
-      name_map <- c(name_map, new_name)
-
-      c_cols <- c(c_cols, absolute_time_col, wday_col, day_col, yday_col, month_col, year_col)
-      df[[absolute_time_col]] <- as.numeric(df[[col]])
-      df[[wday_col]] <- lubridate::wday(df[[col]], label=TRUE)
-      df[[day_col]] <- lubridate::day(df[[col]])
-      df[[yday_col]] <- lubridate::yday(df[[col]])
-      df[[month_col]] <- lubridate::month(df[[col]], label=TRUE)
-      df[[year_col]] <- lubridate::year(df[[col]])
-      if(lubridate::is.POSIXct(df[[col]])) {
-        hour_col <- avoid_conflict(colnames(df), paste0(col, "_hour"))
-        new_name <- c(hour_col)
-        names(new_name) <- paste(
-          names(name_map)[name_map == col],
-          c(
-            "_hour"
-          ), sep="")
-        name_map <- c(name_map, new_name)
-
-        c_cols <- c(c_cols, hour_col)
-        df[[hour_col]] <- factor(lubridate::hour(df[[col]])) # treat hour as category
-      }
-      df[[col]] <- NULL # drop original Date/POSIXct column to pass SMOTE later.
-    } else if(is.factor(df[[col]])) {
-      # if the data is factor, respect the levels and keep first 10 levels, and make others "Others" level.
-      if (length(levels(df[[col]])) >= predictor_n + 2) {
-        df[[col]] <- forcats::fct_other(df[[col]], keep=levels(df[[col]])[1:predictor_n])
-      }
-    } else if(!is.numeric(df[[col]])) {
-      # convert data to factor if predictors are not numeric.
-      # and limit the number of levels in factor by fct_lump.
-      # we need to convert logical to factor too since na.roughfix only works for numeric or factor.
-      df[[col]] <- forcats::fct_explicit_na(forcats::fct_lump(as.factor(df[[col]]), n=predictor_n, ties.method="first"))
-    } else {
-      # Filter Inf/-Inf to avoid following error from ranger.
-      # Error in seq.default(min(x, na.rm = TRUE), max(x, na.rm = TRUE), length.out = length.out) : 'from' must be a finite number
-      # TODO: In exp_rpart and calc_feature_imp, we have logic to remember and restore NA rows, but they are probably not made use of
-      # if we filter NA rows here.
-      if (filter_numeric_na) {
-        # Also, filter NAs for numeric columns to avoid instability from rpart. It seems that the resulting tree from rpart sometimes becomes
-        # simplistic (e.g. only one split in the tree), especially in Exploratory for some reason, if we let rpart handle the handling of NAs,
-        # even though it is supposed to just filter out rows with NAs, which is same as what we are doing here.
-        df <- df %>% dplyr::filter(!is.infinite(.[[col]]) & !is.na(.[[col]]))
-      }
-      else {
-        df <- df %>% dplyr::filter(!is.infinite(.[[col]]))
-      }
-    }
-  }
-
-  # remove columns with only one unique value
-  cols_copy <- c_cols
-  for (col in cols_copy) {
-    unique_val <- unique(df[[col]])
-    if (length(unique_val[!is.na(unique_val)]) <= 1) {
-      c_cols <- setdiff(c_cols, col)
-      df[[col]] <- NULL # drop the column so that SMOTE will not see it.
-    }
-  }
+  df <- preprocess_regression_data_after_sample(df, clean_target_col, clean_cols, predictor_n = predictor_n, name_map = name_map)
+  c_cols <- attr(df, 'predictors') # predictors are updated (added and/or removed) in preprocess_post_sample. Catch up with it.
+  name_map <- attr(df, 'name_map')
 
   ret <- new.env()
   ret$df <- df
