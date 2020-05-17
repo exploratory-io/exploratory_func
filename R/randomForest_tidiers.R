@@ -2574,15 +2574,15 @@ glance.ranger.classification <- function(x, pretty.name, ...) {
   # Composes data.frame of binary classification evaluation summary.
   single_stat <- function(act, pred) {
     #       predicted
-    #actual  FALSE TRUE
-    #  FALSE    tn   fp
-    #  TRUE     fn   tp
+    #actual   TRUE FALSE
+    #  TRUE    tp    fn
+    #  FALSE   fp    tn
 
     conf_mat <- table(act, pred)
-    tp <- conf_mat[4]
-    tn <- conf_mat[1]
-    fn <- conf_mat[2]
-    fp <- conf_mat[3]
+    tp <- conf_mat[1]
+    tn <- conf_mat[4]
+    fn <- conf_mat[3]
+    fp <- conf_mat[2]
     precision <- tp / (tp + fp)
     recall <- tp / (tp + fn)
     accuracy <- (tp + tn) / (tp + tn + fp + fn)
@@ -2599,7 +2599,18 @@ glance.ranger.classification <- function(x, pretty.name, ...) {
   }
 
   if (x$classification_type == "binary") {
-    single_stat(actual, predicted)
+    ret <- single_stat(actual, predicted)
+    pred_prob <- x$prediction_training$predictions[,levels(actual)[1]]
+    actual_val <- actual == levels(actual)[1] # Make it a logical
+    # calculate AUC
+    auc <- auroc(pred_prob, actual_val)
+    auc_ret <- data.frame(auc)
+    if (pretty.name) {
+      auc_ret <- auc_ret %>% dplyr::rename(AUC=auc)
+    }
+    ret <- cbind(auc_ret, ret)
+    ret
+
   } else {
     dplyr::bind_rows(lapply(levels(actual), multi_stat))
   }
