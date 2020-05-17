@@ -2117,7 +2117,7 @@ calc_feature_imp <- function(df,
         # "permutation" or "impurity".
         ranger_importance_measure <- importance_measure
       }
-      rf <- ranger::ranger(
+      model <- ranger::ranger(
         fml,
         data = model_df,
         importance = ranger_importance_measure,
@@ -2130,7 +2130,7 @@ calc_feature_imp <- function(df,
       # prediction result in the ranger model (ret$predictions) is for some reason different from and worse than
       # the prediction separately done with the same training data.
       # Make prediction with training data here and keep it, so that we can use this separate prediction for prediction, evaluation, etc.
-      rf$prediction_training <- predict(rf, model_df)
+      model$prediction_training <- predict(model, model_df)
 
       if (test_rate > 0) {
         na_row_numbers_test <- ranger.find_na(c_cols, data = df_test)
@@ -2139,12 +2139,12 @@ calc_feature_imp <- function(df,
         unknown_category_rows_index_vector <- get_unknown_category_rows_index_vector(df_test_clean, df %>% dplyr::select(!!!rlang::syms(c_cols)))
         df_test_clean <- df_test_clean[!unknown_category_rows_index_vector, , drop = FALSE] # 2nd arg must be empty.
         unknown_category_rows_index <- get_row_numbers_from_index_vector(unknown_category_rows_index_vector)
-        prediction_test <- predict(rf, df_test_clean)
+        prediction_test <- predict(model, df_test_clean)
         # TODO: Following current convention for the name na.action to keep na row index, but we might want to rethink.
         # We do not keep this for training since na.roughfix should fill values and not delete rows.
         prediction_test$na.action = na_row_numbers_test
         prediction_test$unknown_category_rows_index = unknown_category_rows_index
-        rf$prediction_test <- prediction_test
+        model$prediction_test <- prediction_test
       }
 
       if (with_boruta) { # Run only either Boruta or ranger::importance.
@@ -2154,7 +2154,7 @@ calc_feature_imp <- function(df,
         else { # default to equivalent of "permutation".
           getImp <- Boruta::getImpRfZ
         }
-        rf$boruta <- Boruta::Boruta(
+        model$boruta <- Boruta::Boruta(
           fml,
           data = model_df,
           doTrace = 0,
@@ -2168,12 +2168,12 @@ calc_feature_imp <- function(df,
           probability = (classification_type == "binary") # build probability tree for AUC only for binary classification.
         )
         # These attributes are used in tidy. They are also at ranger level, but we are making Boruta object self-contained.
-        rf$boruta$classification_type <- classification_type
-        rf$boruta$orig_levels <- orig_levels
-        rf$boruta$terms_mapping <- names(name_map)
-        names(rf$boruta$terms_mapping) <- name_map
-        class(rf$boruta) <- c("Boruta_exploratory", class(rf$boruta))
-        imp_vars <- extract_important_variables_from_boruta(rf$boruta)
+        model$boruta$classification_type <- classification_type
+        model$boruta$orig_levels <- orig_levels
+        model$boruta$terms_mapping <- names(name_map)
+        names(model$boruta$terms_mapping) <- name_map
+        class(model$boruta) <- c("Boruta_exploratory", class(model$boruta))
+        imp_vars <- extract_important_variables_from_boruta(model$boruta)
         if (is.null(max_pd_vars)) {
           max_pd_vars <- 20 # Number of most important variables to calculate partial dependences on. This used to be 12 but we decided it was a little too small.
         }
@@ -2185,17 +2185,17 @@ calc_feature_imp <- function(df,
       else {
         # return partial dependence
         if (length(c_cols) > 1) { # Calculate importance only when there are multiple variables.
-          imp <- ranger::importance(rf)
+          imp <- ranger::importance(model)
           imp_df <- tibble::tibble( # Use tibble since data.frame() would make variable factors, which breaks things in following steps.
             variable = names(imp),
             importance = imp
           ) %>% dplyr::arrange(-importance)
-          rf$imp_df <- imp_df
+          model$imp_df <- imp_df
           imp_vars <- imp_df$variable
         }
         else {
           error <- simpleError("Variable importance requires two or more variables.")
-          rf$imp_df <- error
+          model$imp_df <- error
           imp_vars <- c_cols # Just use c_cols as is for imp_vars to calculate partial dependence anyway.
         }
         if (is.null(max_pd_vars)) {
@@ -2223,35 +2223,35 @@ calc_feature_imp <- function(df,
         # }
       }
       imp_vars <- as.character(imp_vars) # for some reason imp_vars is converted to factor at this point. turn it back to character.
-      rf$imp_vars <- imp_vars
+      model$imp_vars <- imp_vars
       # Second element of n argument needs to be less than or equal to sample size, to avoid error.
       if (length(imp_vars) > 0) {
-        rf$partial_dependence <- edarf::partial_dependence(rf, vars=imp_vars, data=model_df, n=c(pd_grid_resolution, min(rf$num.samples, pd_sample_size)))
+        model$partial_dependence <- edarf::partial_dependence(model, vars=imp_vars, data=model_df, n=c(pd_grid_resolution, min(model$num.samples, pd_sample_size)))
         if (pd_with_bin_means && is_target_logical_or_numeric) {
           # We calculate means of bins only for logical or numeric target to keep the visualization simple.
-          rf$partial_binning <- calc_partial_binning_data(model_df, clean_target_col, imp_vars)
+          model$partial_binning <- calc_partial_binning_data(model_df, clean_target_col, imp_vars)
         }
       }
       else {
-        rf$partial_dependence <- NULL
+        model$partial_dependence <- NULL
       }
 
       # these attributes are used in tidy of randomForest
-      rf$classification_type <- classification_type
-      rf$orig_levels <- orig_levels
-      rf$terms_mapping <- names(name_map)
-      names(rf$terms_mapping) <- name_map
-      rf$y <- model.response(model_df)
-      rf$df <- model_df
-      rf$formula_terms <- terms(fml)
-      rf$sampled_nrow <- clean_df_ret$sampled_nrow
-      list(rf = rf, test_index = test_index, source_data = source_data)
+      model$classification_type <- classification_type
+      model$orig_levels <- orig_levels
+      model$terms_mapping <- names(name_map)
+      names(model$terms_mapping) <- name_map
+      model$y <- model.response(model_df)
+      model$df <- model_df
+      model$formula_terms <- terms(fml)
+      model$sampled_nrow <- clean_df_ret$sampled_nrow
+      list(model = model, test_index = test_index, source_data = source_data)
     }, error = function(e){
       if(length(grouped_cols) > 0) {
         # In repeat-by case, we report group-specific error in the Summary table,
         # so that analysis on other groups can go on.
         class(e) <- c("ranger", class(e))
-        list(rf = e, test_index = NULL, source_data = NULL)
+        list(model = e, test_index = NULL, source_data = NULL)
       } else {
         stop(e)
       }
@@ -2271,7 +2271,7 @@ calc_feature_imp <- function(df,
 
   # Retrieve model, test index and source data stored in model_and_data_col column (list) and store them in separate columns
   ret <- ret %>% dplyr::mutate(model = purrr::map(data, function(df){
-            df[[model_and_data_col]][[1]]$rf
+            df[[model_and_data_col]][[1]]$model
           })) %>%
           dplyr::mutate(.test_index = purrr::map(data, function(df){
             df[[model_and_data_col]][[1]]$test_index
