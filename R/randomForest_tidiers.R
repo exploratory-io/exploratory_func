@@ -2530,39 +2530,6 @@ glance.ranger.classification <- function(x, pretty.name, ...) {
   predicted <- ranger.predict_value_from_prob(x$forest$levels, x$prediction_training$predictions, x$y)
   levels(predicted) <- levels(actual)
 
-  # Composes data.frame of classification evaluation summary.
-  multi_stat <- function(class) {
-    n <- sum(actual == class)
-
-    # calculate evaluation scores for each class
-    tp <- sum(actual == class & predicted == class)
-    tn <- sum(actual != class & predicted != class)
-    fp <- sum(actual != class & predicted == class)
-    fn <- sum(actual == class & predicted != class)
-
-    precision <- tp / (tp + fp)
-    recall <- tp / (tp + fn)
-    accuracy <- (tp + tn) / (tp + tn + fp + fn)
-    f_score <- 2 * ((precision * recall) / (precision + recall))
-
-    ret <- data.frame(
-      class,
-      f_score,
-      accuracy,
-      1 - accuracy,
-      precision,
-      recall,
-      n
-    )
-
-    names(ret) <- if(pretty.name){
-      c("Class", "F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall", "Number of Rows")
-    } else {
-      c("class", "f_score", "accuracy_rate", "misclassification_rate", "precision", "recall", "n")
-    }
-    ret
-  }
-
   # Composes data.frame of binary classification evaluation summary.
   single_stat <- function(act, pred) {
     #       predicted
@@ -2604,7 +2571,8 @@ glance.ranger.classification <- function(x, pretty.name, ...) {
     ret
 
   } else {
-    dplyr::bind_rows(lapply(levels(actual), multi_stat))
+    # Multiclass classification metrics
+    evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
   }
 }
 
