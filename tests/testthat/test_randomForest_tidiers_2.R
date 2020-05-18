@@ -209,8 +209,8 @@ test_that("test ranger with multinomial classification", {
   coef_ret <- model_coef(model_ret)
   expect_equal(colnames(coef_ret), c("variable", "importance"))
   model_stats <- suppressWarnings(model_stats(model_ret, pretty.name = TRUE))
-  expect_colnames <- c("Class", "F Score", "Accuracy Rate", "Misclassification Rate",
-                       "Precision", "Recall", "Number of Rows")
+  expect_colnames <- c("Micro-Averaged F Score", "Macro-Averaged F Score", "Accuracy Rate", "Misclassification Rate",
+                       "Number of Rows")
   expect_equal(colnames(model_stats), expect_colnames)
 
   expected_colnames <- c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE", "FNUMBER",
@@ -239,8 +239,8 @@ test_that("test ranger with multinomial classification", {
   coef_ret <- model_coef(model_ret)
   expect_equal(colnames(coef_ret), c("variable", "importance"))
   model_stats <- suppressWarnings(model_stats(model_ret, pretty.name = TRUE))
-  expect_colnames <- c("Class", "F Score", "Accuracy Rate", "Misclassification Rate",
-                       "Precision", "Recall", "Number of Rows")
+  expect_colnames <- c("Micro-Averaged F Score", "Macro-Averaged F Score", "Accuracy Rate", "Misclassification Rate",
+                       "Number of Rows")
   expect_equal(colnames(model_stats), expect_colnames)
 
   expected_colnames <- c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE", "FNUMBER",
