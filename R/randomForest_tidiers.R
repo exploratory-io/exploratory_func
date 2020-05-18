@@ -1835,9 +1835,10 @@ cleanup_df <- function(df, target_col, selected_cols, grouped_cols, target_n, pr
 }
 
 cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, name_map, predictor_n, revert_logical_levels=TRUE, filter_numeric_na=FALSE) {
-  if (is.factor(df[[clean_target_col]])) { # to avoid error in edarf::partial_dependence(), remove levels that is not used in this group.
-    df[[clean_target_col]] <- forcats::fct_drop(df[[clean_target_col]])
-  }
+  df <- preprocess_regression_data_before_sample(df, clean_target_col, clean_cols,
+                                                 filter_target_na_inf=FALSE,
+                                                 filter_predictor_numeric_na=filter_numeric_na)
+  clean_cols <- attr(df, 'predictors') # predictors are updated (removed) in preprocess_pre_sample. Catch up with it.
   # sample the data because randomForest takes long time
   # if data size is too large
   sampled_nrow <- NULL
@@ -1868,88 +1869,9 @@ cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, nam
     }
   }
 
-  c_cols <- clean_cols
-  for(col in clean_cols){
-    if(lubridate::is.Date(df[[col]]) || lubridate::is.POSIXct(df[[col]])) {
-      c_cols <- setdiff(c_cols, col)
-
-      absolute_time_col <- avoid_conflict(colnames(df), paste0(col, "_abs_time"))
-      wday_col <- avoid_conflict(colnames(df), paste0(col, "_day_of_week"))
-      day_col <- avoid_conflict(colnames(df), paste0(col, "_day_of_month"))
-      yday_col <- avoid_conflict(colnames(df), paste0(col, "_day_of_year"))
-      month_col <- avoid_conflict(colnames(df), paste0(col, "_month"))
-      year_col <- avoid_conflict(colnames(df), paste0(col, "_year"))
-      new_name <- c(absolute_time_col, wday_col, day_col, yday_col, month_col, year_col)
-      names(new_name) <- paste(
-        names(name_map)[name_map == col],
-        c(
-          "_abs_time",
-          "_day_of_week",
-          "_day_of_month",
-          "_day_of_year",
-          "_month",
-          "_year"
-        ), sep="")
-
-      name_map <- c(name_map, new_name)
-
-      c_cols <- c(c_cols, absolute_time_col, wday_col, day_col, yday_col, month_col, year_col)
-      df[[absolute_time_col]] <- as.numeric(df[[col]])
-      df[[wday_col]] <- lubridate::wday(df[[col]], label=TRUE)
-      df[[day_col]] <- lubridate::day(df[[col]])
-      df[[yday_col]] <- lubridate::yday(df[[col]])
-      df[[month_col]] <- lubridate::month(df[[col]], label=TRUE)
-      df[[year_col]] <- lubridate::year(df[[col]])
-      if(lubridate::is.POSIXct(df[[col]])) {
-        hour_col <- avoid_conflict(colnames(df), paste0(col, "_hour"))
-        new_name <- c(hour_col)
-        names(new_name) <- paste(
-          names(name_map)[name_map == col],
-          c(
-            "_hour"
-          ), sep="")
-        name_map <- c(name_map, new_name)
-
-        c_cols <- c(c_cols, hour_col)
-        df[[hour_col]] <- factor(lubridate::hour(df[[col]])) # treat hour as category
-      }
-      df[[col]] <- NULL # drop original Date/POSIXct column to pass SMOTE later.
-    } else if(is.factor(df[[col]])) {
-      # if the data is factor, respect the levels and keep first 10 levels, and make others "Others" level.
-      if (length(levels(df[[col]])) >= predictor_n + 2) {
-        df[[col]] <- forcats::fct_other(df[[col]], keep=levels(df[[col]])[1:predictor_n])
-      }
-    } else if(!is.numeric(df[[col]])) {
-      # convert data to factor if predictors are not numeric.
-      # and limit the number of levels in factor by fct_lump.
-      # we need to convert logical to factor too since na.roughfix only works for numeric or factor.
-      df[[col]] <- forcats::fct_explicit_na(forcats::fct_lump(as.factor(df[[col]]), n=predictor_n, ties.method="first"))
-    } else {
-      # Filter Inf/-Inf to avoid following error from ranger.
-      # Error in seq.default(min(x, na.rm = TRUE), max(x, na.rm = TRUE), length.out = length.out) : 'from' must be a finite number
-      # TODO: In exp_rpart and calc_feature_imp, we have logic to remember and restore NA rows, but they are probably not made use of
-      # if we filter NA rows here.
-      if (filter_numeric_na) {
-        # Also, filter NAs for numeric columns to avoid instability from rpart. It seems that the resulting tree from rpart sometimes becomes
-        # simplistic (e.g. only one split in the tree), especially in Exploratory for some reason, if we let rpart handle the handling of NAs,
-        # even though it is supposed to just filter out rows with NAs, which is same as what we are doing here.
-        df <- df %>% dplyr::filter(!is.infinite(.[[col]]) & !is.na(.[[col]]))
-      }
-      else {
-        df <- df %>% dplyr::filter(!is.infinite(.[[col]]))
-      }
-    }
-  }
-
-  # remove columns with only one unique value
-  cols_copy <- c_cols
-  for (col in cols_copy) {
-    unique_val <- unique(df[[col]])
-    if (length(unique_val[!is.na(unique_val)]) <= 1) {
-      c_cols <- setdiff(c_cols, col)
-      df[[col]] <- NULL # drop the column so that SMOTE will not see it.
-    }
-  }
+  df <- preprocess_regression_data_after_sample(df, clean_target_col, clean_cols, predictor_n = predictor_n, name_map = name_map)
+  c_cols <- attr(df, 'predictors') # predictors are updated (added and/or removed) in preprocess_post_sample. Catch up with it.
+  name_map <- attr(df, 'name_map')
 
   ret <- new.env()
   ret$df <- df
@@ -2117,7 +2039,7 @@ calc_feature_imp <- function(df,
         # "permutation" or "impurity".
         ranger_importance_measure <- importance_measure
       }
-      rf <- ranger::ranger(
+      model <- ranger::ranger(
         fml,
         data = model_df,
         importance = ranger_importance_measure,
@@ -2130,7 +2052,7 @@ calc_feature_imp <- function(df,
       # prediction result in the ranger model (ret$predictions) is for some reason different from and worse than
       # the prediction separately done with the same training data.
       # Make prediction with training data here and keep it, so that we can use this separate prediction for prediction, evaluation, etc.
-      rf$prediction_training <- predict(rf, model_df)
+      model$prediction_training <- predict(model, model_df)
 
       if (test_rate > 0) {
         na_row_numbers_test <- ranger.find_na(c_cols, data = df_test)
@@ -2139,12 +2061,12 @@ calc_feature_imp <- function(df,
         unknown_category_rows_index_vector <- get_unknown_category_rows_index_vector(df_test_clean, df %>% dplyr::select(!!!rlang::syms(c_cols)))
         df_test_clean <- df_test_clean[!unknown_category_rows_index_vector, , drop = FALSE] # 2nd arg must be empty.
         unknown_category_rows_index <- get_row_numbers_from_index_vector(unknown_category_rows_index_vector)
-        prediction_test <- predict(rf, df_test_clean)
+        prediction_test <- predict(model, df_test_clean)
         # TODO: Following current convention for the name na.action to keep na row index, but we might want to rethink.
         # We do not keep this for training since na.roughfix should fill values and not delete rows.
         prediction_test$na.action = na_row_numbers_test
         prediction_test$unknown_category_rows_index = unknown_category_rows_index
-        rf$prediction_test <- prediction_test
+        model$prediction_test <- prediction_test
       }
 
       if (with_boruta) { # Run only either Boruta or ranger::importance.
@@ -2154,7 +2076,7 @@ calc_feature_imp <- function(df,
         else { # default to equivalent of "permutation".
           getImp <- Boruta::getImpRfZ
         }
-        rf$boruta <- Boruta::Boruta(
+        model$boruta <- Boruta::Boruta(
           fml,
           data = model_df,
           doTrace = 0,
@@ -2168,12 +2090,12 @@ calc_feature_imp <- function(df,
           probability = (classification_type == "binary") # build probability tree for AUC only for binary classification.
         )
         # These attributes are used in tidy. They are also at ranger level, but we are making Boruta object self-contained.
-        rf$boruta$classification_type <- classification_type
-        rf$boruta$orig_levels <- orig_levels
-        rf$boruta$terms_mapping <- names(name_map)
-        names(rf$boruta$terms_mapping) <- name_map
-        class(rf$boruta) <- c("Boruta_exploratory", class(rf$boruta))
-        imp_vars <- extract_important_variables_from_boruta(rf$boruta)
+        model$boruta$classification_type <- classification_type
+        model$boruta$orig_levels <- orig_levels
+        model$boruta$terms_mapping <- names(name_map)
+        names(model$boruta$terms_mapping) <- name_map
+        class(model$boruta) <- c("Boruta_exploratory", class(model$boruta))
+        imp_vars <- extract_important_variables_from_boruta(model$boruta)
         if (is.null(max_pd_vars)) {
           max_pd_vars <- 20 # Number of most important variables to calculate partial dependences on. This used to be 12 but we decided it was a little too small.
         }
@@ -2185,17 +2107,17 @@ calc_feature_imp <- function(df,
       else {
         # return partial dependence
         if (length(c_cols) > 1) { # Calculate importance only when there are multiple variables.
-          imp <- ranger::importance(rf)
+          imp <- ranger::importance(model)
           imp_df <- tibble::tibble( # Use tibble since data.frame() would make variable factors, which breaks things in following steps.
             variable = names(imp),
             importance = imp
           ) %>% dplyr::arrange(-importance)
-          rf$imp_df <- imp_df
+          model$imp_df <- imp_df
           imp_vars <- imp_df$variable
         }
         else {
           error <- simpleError("Variable importance requires two or more variables.")
-          rf$imp_df <- error
+          model$imp_df <- error
           imp_vars <- c_cols # Just use c_cols as is for imp_vars to calculate partial dependence anyway.
         }
         if (is.null(max_pd_vars)) {
@@ -2223,35 +2145,35 @@ calc_feature_imp <- function(df,
         # }
       }
       imp_vars <- as.character(imp_vars) # for some reason imp_vars is converted to factor at this point. turn it back to character.
-      rf$imp_vars <- imp_vars
+      model$imp_vars <- imp_vars
       # Second element of n argument needs to be less than or equal to sample size, to avoid error.
       if (length(imp_vars) > 0) {
-        rf$partial_dependence <- edarf::partial_dependence(rf, vars=imp_vars, data=model_df, n=c(pd_grid_resolution, min(rf$num.samples, pd_sample_size)))
+        model$partial_dependence <- edarf::partial_dependence(model, vars=imp_vars, data=model_df, n=c(pd_grid_resolution, min(model$num.samples, pd_sample_size)))
         if (pd_with_bin_means && is_target_logical_or_numeric) {
           # We calculate means of bins only for logical or numeric target to keep the visualization simple.
-          rf$partial_binning <- calc_partial_binning_data(model_df, clean_target_col, imp_vars)
+          model$partial_binning <- calc_partial_binning_data(model_df, clean_target_col, imp_vars)
         }
       }
       else {
-        rf$partial_dependence <- NULL
+        model$partial_dependence <- NULL
       }
 
       # these attributes are used in tidy of randomForest
-      rf$classification_type <- classification_type
-      rf$orig_levels <- orig_levels
-      rf$terms_mapping <- names(name_map)
-      names(rf$terms_mapping) <- name_map
-      rf$y <- model.response(model_df)
-      rf$df <- model_df
-      rf$formula_terms <- terms(fml)
-      rf$sampled_nrow <- clean_df_ret$sampled_nrow
-      list(rf = rf, test_index = test_index, source_data = source_data)
+      model$classification_type <- classification_type
+      model$orig_levels <- orig_levels
+      model$terms_mapping <- names(name_map)
+      names(model$terms_mapping) <- name_map
+      model$y <- model.response(model_df)
+      model$df <- model_df
+      model$formula_terms <- terms(fml)
+      model$sampled_nrow <- clean_df_ret$sampled_nrow
+      list(model = model, test_index = test_index, source_data = source_data)
     }, error = function(e){
       if(length(grouped_cols) > 0) {
         # In repeat-by case, we report group-specific error in the Summary table,
         # so that analysis on other groups can go on.
         class(e) <- c("ranger", class(e))
-        list(rf = e, test_index = NULL, source_data = NULL)
+        list(model = e, test_index = NULL, source_data = NULL)
       } else {
         stop(e)
       }
@@ -2271,7 +2193,7 @@ calc_feature_imp <- function(df,
 
   # Retrieve model, test index and source data stored in model_and_data_col column (list) and store them in separate columns
   ret <- ret %>% dplyr::mutate(model = purrr::map(data, function(df){
-            df[[model_and_data_col]][[1]]$rf
+            df[[model_and_data_col]][[1]]$model
           })) %>%
           dplyr::mutate(.test_index = purrr::map(data, function(df){
             df[[model_and_data_col]][[1]]$test_index
@@ -2308,22 +2230,14 @@ evaluate_classification <- function(actual, predicted, class, multi_class = TRUE
   fn <- sum(actual == class & predicted != class, na.rm = TRUE)
 
   precision <- tp / (tp + fp)
-  # this avoids NA
-  if(tp+fp == 0) {
-    precision <- 0
-  }
-
   recall <- tp / (tp + fn)
-  # this avoids NA
-  if(tp+fn == 0) {
-    recall <- 0
-  }
 
   accuracy <- (tp + tn) / (tp + fp + tn + fn)
 
   f_score <- 2 * ((precision * recall) / (precision + recall))
-  # this avoids NA
-  if(precision + recall == 0) {
+  # This avoids NaN. If both precision and recall are 0, it makes sense for f score to be 0.
+  # is.nan() on precision and recall is necessary to avoid error here.
+  if(!is.nan(precision) && !is.nan(recall) && precision + recall == 0) {
     f_score <- 0
   }
 
@@ -2616,51 +2530,18 @@ glance.ranger.classification <- function(x, pretty.name, ...) {
   predicted <- ranger.predict_value_from_prob(x$forest$levels, x$prediction_training$predictions, x$y)
   levels(predicted) <- levels(actual)
 
-  # Composes data.frame of classification evaluation summary.
-  multi_stat <- function(class) {
-    n <- sum(actual == class)
-
-    # calculate evaluation scores for each class
-    tp <- sum(actual == class & predicted == class)
-    tn <- sum(actual != class & predicted != class)
-    fp <- sum(actual != class & predicted == class)
-    fn <- sum(actual == class & predicted != class)
-
-    precision <- tp / (tp + fp)
-    recall <- tp / (tp + fn)
-    accuracy <- (tp + tn) / (tp + tn + fp + fn)
-    f_score <- 2 * ((precision * recall) / (precision + recall))
-
-    ret <- data.frame(
-      class,
-      f_score,
-      accuracy,
-      1 - accuracy,
-      precision,
-      recall,
-      n
-    )
-
-    names(ret) <- if(pretty.name){
-      c("Class", "F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall", "Number of Rows")
-    } else {
-      c("class", "f_score", "accuracy_rate", "misclassification_rate", "precision", "recall", "n")
-    }
-    ret
-  }
-
   # Composes data.frame of binary classification evaluation summary.
   single_stat <- function(act, pred) {
     #       predicted
-    #actual  FALSE TRUE
-    #  FALSE    tn   fp
-    #  TRUE     fn   tp
+    #actual   TRUE FALSE
+    #  TRUE    tp    fn
+    #  FALSE   fp    tn
 
     conf_mat <- table(act, pred)
-    tp <- conf_mat[4]
-    tn <- conf_mat[1]
-    fn <- conf_mat[2]
-    fp <- conf_mat[3]
+    tp <- conf_mat[1]
+    tn <- conf_mat[4]
+    fn <- conf_mat[3]
+    fp <- conf_mat[2]
     precision <- tp / (tp + fp)
     recall <- tp / (tp + fn)
     accuracy <- (tp + tn) / (tp + tn + fp + fn)
@@ -2677,9 +2558,21 @@ glance.ranger.classification <- function(x, pretty.name, ...) {
   }
 
   if (x$classification_type == "binary") {
-    single_stat(actual, predicted)
+    ret <- single_stat(actual, predicted)
+    pred_prob <- x$prediction_training$predictions[,levels(actual)[1]]
+    actual_val <- actual == levels(actual)[1] # Make it a logical
+    # calculate AUC
+    auc <- auroc(pred_prob, actual_val)
+    auc_ret <- data.frame(auc)
+    if (pretty.name) {
+      auc_ret <- auc_ret %>% dplyr::rename(AUC=auc)
+    }
+    ret <- cbind(auc_ret, ret)
+    ret
+
   } else {
-    dplyr::bind_rows(lapply(levels(actual), multi_stat))
+    # Multiclass classification metrics
+    evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
   }
 }
 
