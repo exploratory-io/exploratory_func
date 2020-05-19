@@ -438,6 +438,8 @@ build_coxph.fast <- function(df,
         imp_vars <- imp_df$term
       }
       else {
+        error <- simpleError("Variable importance requires two or more variables.")
+        model$permutation_importance <- error
         imp_vars <- c_cols
       }
 
@@ -493,8 +495,11 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients'
 
   switch(type,
     permutation_importance = {
-      if (is.null(x$permutation_importance)) {
-        return(data.frame())
+      if (is.null(x$permutation_importance) || "error" %in% class(x$permutation_importance)) {
+        # Permutation importance is not supported for the family and link function, or skipped because there is only one variable.
+        # Return empty data.frame to avoid error.
+        ret <- data.frame()
+        return(ret)
       }
       ret <- x$permutation_importance
       # Add p.value column.

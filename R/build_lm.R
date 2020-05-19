@@ -337,7 +337,7 @@ map_terms_to_orig <- function(terms, mapping) {
 #' Common preprocessing of regression data to be done BEFORE sampling.
 #' Only common operations to be done, for example, in Summary View too.
 #' @export
-preprocess_regression_data_before_sample <- function(df, target_col, predictor_cols) {
+preprocess_regression_data_before_sample <- function(df, target_col, predictor_cols, filter_target_na_inf=TRUE, filter_predictor_numeric_na=TRUE) {
   # cols will be filtered to remove invalid columns
   cols <- predictor_cols
   for (col in predictor_cols) {
@@ -351,12 +351,14 @@ preprocess_regression_data_before_sample <- function(df, target_col, predictor_c
     stop("No predictor column is left after removing columns with only NA or Inf values.")
   }
 
-  df <- df %>%
-    # dplyr::filter(!is.na(!!target_col))  TODO: this was not filtering, and replaced it with the next line. check other similar places.
-    # for numeric cols, filter NA rows, because lm will anyway do this internally, and errors out
-    # if the remaining rows are with single value in any predictor column.
-    # filter Inf/-Inf too to avoid error at lm.
-    dplyr::filter(!is.na(df[[target_col]]) & !is.infinite(df[[target_col]])) # this form does not handle group_by. so moved into each_func from outside.
+  if (filter_target_na_inf){ # For ranger, this is not necessary.
+    df <- df %>%
+      # dplyr::filter(!is.na(!!target_col))  TODO: this was not filtering, and replaced it with the next line. check other similar places.
+      # for numeric cols, filter NA rows, because lm will anyway do this internally, and errors out
+      # if the remaining rows are with single value in any predictor column.
+      # filter Inf/-Inf too to avoid error at lm.
+      dplyr::filter(!is.na(df[[target_col]]) & !is.infinite(df[[target_col]])) # this form does not handle group_by. so moved into each_func from outside.
+  }
 
   # To avoid unused factor level that causes margins::marginal_effects() to fail, filtering operation has
   # to be done before factor level adjustments.
@@ -367,7 +369,21 @@ preprocess_regression_data_before_sample <- function(df, target_col, predictor_c
       # if the remaining rows are with single value in any predictor column.
       # Filter Inf/-Inf too to avoid error at lm.
       # Do the same for Date/POSIXct, because we will create numeric columns from them.
-      df <- df %>% dplyr::filter(!is.na(df[[col]]) & !is.infinite(df[[col]]))
+
+      # For rpart, filter NAs for numeric columns to avoid instability. It seems that the resulting tree from rpart sometimes becomes
+      # simplistic (e.g. only one split in the tree), especially in Exploratory for some reason, if we let rpart handle the handling of NAs,
+      # even though it is supposed to just filter out rows with NAs, which is same as what we are doing here.
+      if (filter_predictor_numeric_na) {
+        df <- df %>% dplyr::filter(!is.na(df[[col]]) & !is.infinite(df[[col]]))
+      }
+      else {
+        # For ranger, removing numeric NA is not necessary.
+        # But even for ranger, filter Inf/-Inf to avoid following error from ranger.
+        # Error in seq.default(min(x, na.rm = TRUE), max(x, na.rm = TRUE), length.out = length.out) : 'from' must be a finite number
+        # TODO: In exp_rpart and calc_feature_imp, we have logic to remember and restore NA rows, but they are probably not made use of
+        # if we filter NA rows here.
+        df <- df %>% dplyr::filter(!is.infinite(df[[col]]))
+      }
     }
   }
   if (nrow(df) == 0) {
@@ -458,6 +474,7 @@ preprocess_regression_data_after_sample <- function(df, target_col, predictor_co
     } else if(is.logical(df[[col]])) {
       # 1. convert data to factor if predictors are logical. (as.factor() on logical always puts FALSE as the first level, which is what we want for predictor.)
       # 2. turn NA into (Missing) factor level so that lm will not drop all the rows.
+      # For ranger, we need to convert logical to factor too since na.roughfix only works for numeric or factor.
       df[[col]] <- forcats::fct_explicit_na(as.factor(df[[col]]))
     } else if(!is.numeric(df[[col]])) {
       # 1. convert data to factor if predictors are not numeric or logical
@@ -844,6 +861,10 @@ build_lm.fast <- function(df,
             model$permutation_importance <- calc_permutation_importance_gaussian(model, clean_target_col, c_cols, df)
           }
         }
+        else {
+          error <- simpleError("Variable importance requires two or more variables.")
+          model$permutation_importance <- error
+        }
       }
       else {
         # split training and test data
@@ -892,6 +913,10 @@ build_lm.fast <- function(df,
         }
         if (length(c_cols) > 1) { # Skip importance calculation if there is only one variable.
           model$permutation_importance <- calc_permutation_importance_linear(model, clean_target_col, c_cols, df)
+        }
+        else {
+          error <- simpleError("Variable importance requires two or more variables.")
+          model$permutation_importance <- error
         }
       }
 
@@ -1277,21 +1302,22 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
       handle_partial_dependence(x)
     },
     permutation_importance = {
-      if (!is.null(x$permutation_importance)) {
-        ret <- x$permutation_importance
-        # Add p.value column.
-        coef_df <- broom:::tidy.lm(x)
-        ret <- ret %>% mutate(p.value=purrr::map(term, function(var) {
-          get_var_min_pvalue(var, coef_df, x)
-        })) %>% mutate(p.value=as.numeric(p.value)) # Make list into numeric vector.
-        # Map variable names back to the original.
-        # as.character is to be safe by converting from factor. With factor, reverse mapping result will be messed up.
-        ret$term <- x$terms_mapping[as.character(ret$term)]
-        ret
+      if (is.null(x$permutation_importance) || "error" %in% class(x$permutation_importance)) {
+        # Permutation importance is not supported for the family and link function, or skipped because there is only one variable.
+        # Return empty data.frame to avoid error.
+        ret <- data.frame()
+        return(ret)
       }
-      else {
-        data.frame() # Return empty data frame.
-      }
+      ret <- x$permutation_importance
+      # Add p.value column.
+      coef_df <- broom:::tidy.lm(x)
+      ret <- ret %>% dplyr::mutate(p.value=purrr::map(term, function(var) {
+        get_var_min_pvalue(var, coef_df, x)
+      })) %>% dplyr::mutate(p.value=as.numeric(p.value)) # Make list into numeric vector.
+      # Map variable names back to the original.
+      # as.character is to be safe by converting from factor. With factor, reverse mapping result will be messed up.
+      ret$term <- x$terms_mapping[as.character(ret$term)]
+      ret
     }
   )
 }
@@ -1398,16 +1424,18 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
       handle_partial_dependence(x)
     },
     permutation_importance = {
-      if (is.null(x$permutation_importance)) {
-        ret <- data.frame() # Permutation importance is not supported for the family and link function. Return empty data.frame to avoid error.
+      if (is.null(x$permutation_importance) || "error" %in% class(x$permutation_importance)) {
+        # Permutation importance is not supported for the family and link function, or skipped because there is only one variable.
+        # Return empty data.frame to avoid error.
+        ret <- data.frame()
         return(ret)
       }
       ret <- x$permutation_importance
       # Add p.value column.
       coef_df <- broom:::tidy.lm(x)
-      ret <- ret %>% mutate(p.value=purrr::map(term, function(var) {
+      ret <- ret %>% dplyr::mutate(p.value=purrr::map(term, function(var) {
         get_var_min_pvalue(var, coef_df, x)
-      })) %>% mutate(p.value=as.numeric(p.value)) # Make list into numeric vector.
+      })) %>% dplyr::mutate(p.value=as.numeric(p.value)) # Make list into numeric vector.
       # Map variable names back to the original.
       # as.character is to be safe by converting from factor. With factor, reverse mapping result will be messed up.
       ret$term <- x$terms_mapping[as.character(ret$term)]
