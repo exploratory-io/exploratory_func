@@ -182,7 +182,13 @@ randomForestMulti <- function(data, formula, na.action = na.omit, ...) {
 # TODO: Make it a common routine and use it from calc_feature_imp too.
 rangerCore <- function(data, formula, na.action = na.omit,
                        importance_mode = "permutation",
-                       model_type = "regression", ...) {
+                       model_type = "regression",
+                       # Default for num.tree, sample.fraction, min.node.size are
+                       # made same as the Analytics View (calc_feature_imp).
+                       num.tree = 20,
+                       sample.fraction = 0.5,
+                       min.node.size = 12,
+                       ...) {
   target_col <- all.vars(formula)[[1]]
   original_val <- data[[target_col]]
   original_colnames <- colnames(data)
@@ -240,7 +246,11 @@ rangerCore <- function(data, formula, na.action = na.omit,
                    data = data,
                    probability = stringr::str_detect(model_type, "classification"),
                    keep.inbag = TRUE,
-                   importance = importance_mode, ...)
+                   importance = importance_mode,
+                   num.tree = num.tree,
+                   sample.fraction = sample.fraction,
+                   min.node.size = min.node.size,
+                   ...)
   }, error = function(e){
     if (e$message == "NA/NaN/Inf in foreign function call (arg 1)"){
       stop("Categorical and numerical predictors can't be used at the same time.")
