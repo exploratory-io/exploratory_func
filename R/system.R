@@ -1636,8 +1636,8 @@ getObjectFromRdata <- function(rdata_path, object_name){
 clean_data_frame <- function(x) {
   df <- tibble::repair_names(jsonlite::flatten(x))
   original_names <- names(df)
-  # remove tab, new line, carriage return from column names
-  clean_names <- original_names  %>% gsub("[\r\n\t]", "", .)
+  # remove tab, new line, carriage return, and backspace from column names
+  clean_names <- original_names  %>% gsub("[\r\n\t\\]", "", .)
   names(df) <- clean_names
   df
 }
