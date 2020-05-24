@@ -16,6 +16,7 @@ filepath <- if (!testdata_filename %in% list.files(testdata_dir)) {
 flight <- exploratory::read_delim_file(filepath, ",", quote = "\"", skip = 0 , col_names = TRUE , na = c("","NA") , locale=readr::locale(encoding = "UTF-8", decimal_mark = "."), trim_ws = FALSE , progress = FALSE) %>% exploratory::clean_data_frame()
 
 if (!testdata_filename %in% list.files(testdata_dir)) {
+  set.seed(1) # Trying setting seed before sampling to make boruta importance test result stable on our Mac test machine.
   flight <- flight %>% sample_n(5000)
   write.csv(flight, testdata_file_path) # save sampled-down data for performance.
 }
