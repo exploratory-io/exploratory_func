@@ -245,7 +245,7 @@ js_glue_transformer <- function(code, envir) {
     val <- ""
   }
   else if (is.numeric(val)) {
-    # do not converted number to scientific notation.
+    # Do not convert number to scientific notation.
     val <- format(val, scientific = FALSE)
   }
   else if (is.character(val) || is.factor(val)) {
