@@ -285,7 +285,7 @@ sql_glue_transformer <- function(code, envir) {
     val <- "NULL" # With PostgreSQL, "IN (NULL)" is valid while "IN ()" is syntax error. TODO: Test other databases.
   }
   else if (is.numeric(val)) {
-    # do not converted number to scientific notation.
+    # Do not convert number to scientific notation.
     val <- format(val, scientific = F)
   }
   else if (is.character(val) || is.factor(val)) {
