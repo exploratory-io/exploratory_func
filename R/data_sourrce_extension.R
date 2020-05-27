@@ -28,7 +28,7 @@ execute_tidyquant <- function(stocks = NULL, from = NULL, to = NULL) {
     # If no stocks identified, return all SP500
     ret <- tidyquant::tq_index("SP500") %>%
       select(1) %>%
-      tq_get(get = "stock.prices", from = from, to = to)
+      tidyquant::tq_get(get = "stock.prices", from = from, to = to)
   } else {
     # If stocks listed, parse and return
     ret <- stringr::str_trim(stocks) %>%
