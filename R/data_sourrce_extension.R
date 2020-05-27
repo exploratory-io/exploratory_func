@@ -1,4 +1,5 @@
-# Wrapper API for riem_measure data soruces
+#' Wrapper API for riem_measure data soruces
+#' @export
 get_riem_measures <- function(station = "SFO", date_start = "2020-01-01", date_end = NULL){
   loadNamespace("riem")
 
@@ -8,7 +9,8 @@ get_riem_measures <- function(station = "SFO", date_start = "2020-01-01", date_e
   riem::riem_measures(station = station, date_start = date_start, date_end = date_end)
 }
 
-# Wrapper API for tidyquant data source
+#' Wrapper API for tidyquant data source
+#' @export
 execute_tidyquant <- function(stocks = NULL, from = NULL, to = NULL) {
   loadNamespace("tidyquant")
   loadNamespace("stringr")
@@ -31,7 +33,7 @@ execute_tidyquant <- function(stocks = NULL, from = NULL, to = NULL) {
     # If stocks listed, parse and return
     ret <- stringr::str_trim(stocks) %>%
       unlist() %>%
-      tq_get(get = "stock.prices", from = from, to = to)
+      tidyquant::tq_get(get = "stock.prices", from = from, to = to)
   }
   ret
 }
