@@ -207,3 +207,36 @@ test_that("bigquery_glue_transformer", {
 
 
 })
+
+
+test_that("prefecturecode", {
+  
+  df <- readRDS(url("https://www.dropbox.com/s/eygfwy9mo7xn9xb/prefecturecode_testdata.rds?raw=1"))
+  
+  res <- exploratory::prefecturecode(df$hiragana, output_type="name")
+  expect_equal(FALSE, any(is.na(res)))
+  
+  res <- exploratory::prefecturecode(df$kanji.with.todofuken, output_type="name")
+  expect_equal(FALSE, any(is.na(res)))
+  
+  res <- exploratory::prefecturecode(df$kanji, output_type="name")
+  expect_equal(FALSE, any(is.na(res)))
+
+  res <- exploratory::prefecturecode(df$romaji.wikipedia, output_type="name")
+  expect_equal(FALSE, any(is.na(res)))
+
+  res <- exploratory::prefecturecode(df$romaji.normalized, output_type="name")
+  expect_equal(FALSE, any(is.na(res)))
+
+  res <- exploratory::prefecturecode(df$romaji.test, output_type="name")
+  expect_equal(FALSE, any(is.na(res)))
+
+})
+
+test_that("geocode_japan_prefecture", {
+  df <- readRDS(url("https://www.dropbox.com/s/eygfwy9mo7xn9xb/prefecturecode_testdata.rds?raw=1"))
+
+  res <- exploratory::geocode_japan_prefecture(df, "kanji")
+  expect_equal(FALSE, any(is.na(res$longitude)))
+  expect_equal(FALSE, any(is.na(res$latitude)))
+})
