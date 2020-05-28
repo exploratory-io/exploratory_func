@@ -1750,17 +1750,20 @@ geocode_japan_prefecture <- function(df, prefecture_colname) {
 #' which has a name without the suffix such as "-to", "-ken". 
 #' 
 #' Example:
-#' > exploratory::prefecturecode(prefecturecode(c("東京都","京都府", "Kanagawa-ken", "Iwate", "あいち"), output_type="name")
-#' [1] 東京   京都   神奈川 岩手   愛知  
+#' > prefecturecode(c("東京都", "京都", "Kanagawa-ken", "Iwate", "あいち", "Kōchi"), output_type="name")
+#' [1] "東京"   "京都"   "神奈川" "岩手"   "愛知"   "高知"
+
 prefecturecode <- function(prefecture, output_type="name") {
   loadNamespace("stringr")
   # TODO: support other output types. 
   # Clean up the input.
   pref_normalized <- stringr::str_trim(tolower(prefecture))
-  # Remove trailing "tofuken". Do not remove "do" from "Hokkaido" (in Japanese).
-  pref_normalized <- gsub("[\u90FD\u5E9C\u770C]$", "", pref_normalized)
+  # Remove trailing "tofuken". Do not remove "do" from "Hokkaido" and "to" from "Kyoto" (in Japanese).
+  pref_normalized <- dplyr::if_else(pref_normalized=="\u4EAC\u90FD", pref_normalized, gsub("[\u90FD\u5E9C\u770C]$", "", pref_normalized))
   # Remove trailing "tofuken". Do not remove "do" from "Hokkaido" (in Roma-ji).
   pref_normalized <- gsub("[_ \\.\\-](to|fu|hu|ken)$", "", pref_normalized)
+  # Convert "o" with macron to simple "o".
+  pref_normalized <- gsub("\u014D", "o", pref_normalized)
   # Return the matching IDs.
   return (as.character(jp_prefecture_name_id_map$id[match(pref_normalized, jp_prefecture_name_id_map$name)]))
 }

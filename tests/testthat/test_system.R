@@ -191,3 +191,36 @@ test_that("bigquery_glue_transformer", {
   res <- glue_exploratory("select * from emp where deptname in (@{dept_names}) and empid > @{empid_above}", .transformer=bigquery_glue_transformer)
   expect_equal(as.character(res), "select * from emp where deptname in (NULL) and empid > 1100")
 })
+
+
+test_that("prefecturecode", {
+  
+  df <- readRDS(url("https://www.dropbox.com/s/eygfwy9mo7xn9xb/prefecturecode_testdata.rds?raw=1"))
+  
+  res <- exploratory::prefecturecode(df$hiragana, output_type="name")
+  expect_equal(FALSE, any(is.na(res)))
+  
+  res <- exploratory::prefecturecode(df$kanji.with.todofuken, output_type="name")
+  expect_equal(FALSE, any(is.na(res)))
+  
+  res <- exploratory::prefecturecode(df$kanji, output_type="name")
+  expect_equal(FALSE, any(is.na(res)))
+
+  res <- exploratory::prefecturecode(df$romaji.wikipedia, output_type="name")
+  expect_equal(FALSE, any(is.na(res)))
+
+  res <- exploratory::prefecturecode(df$romaji.normalized, output_type="name")
+  expect_equal(FALSE, any(is.na(res)))
+
+  res <- exploratory::prefecturecode(df$romaji.test, output_type="name")
+  expect_equal(FALSE, any(is.na(res)))
+
+})
+
+test_that("geocode_japan_prefecture", {
+  df <- readRDS(url("https://www.dropbox.com/s/eygfwy9mo7xn9xb/prefecturecode_testdata.rds?raw=1"))
+
+  res <- exploratory::geocode_japan_prefecture(df, "kanji")
+  expect_equal(FLASE, any(is.na(res$longitude)))
+  expect_equal(FALSE, any(is.na(res$latitude)))
+})
