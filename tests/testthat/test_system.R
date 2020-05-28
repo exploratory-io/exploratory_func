@@ -221,6 +221,6 @@ test_that("geocode_japan_prefecture", {
   df <- readRDS(url("https://www.dropbox.com/s/eygfwy9mo7xn9xb/prefecturecode_testdata.rds?raw=1"))
 
   res <- exploratory::geocode_japan_prefecture(df, "kanji")
-  expect_equal(FLASE, any(is.na(res$longitude)))
+  expect_equal(FALSE, any(is.na(res$longitude)))
   expect_equal(FALSE, any(is.na(res$latitude)))
 })
