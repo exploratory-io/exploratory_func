@@ -1750,8 +1750,8 @@ geocode_japan_prefecture <- function(df, prefecture_colname) {
 #' which has a name without the suffix such as "-to", "-ken". 
 #' 
 #' Example:
-#' > prefecturecode(c("東京都", "京都", "Kanagawa-ken", "Iwate", "あいち", "Kōchi"), output_type="name")
-#' [1] "東京"   "京都"   "神奈川" "岩手"   "愛知"   "高知"
+#' > prefecturecode(c("東京都", "京都", "Kanagawa-ken", "Iwate", "あいち", "Kōchi", "gunma"), output_type="name")
+#' [1] "東京"   "京都"   "神奈川" "岩手"   "愛知"   "高知"    "群馬"
 
 prefecturecode <- function(prefecture, output_type="name") {
   loadNamespace("stringr")
@@ -1764,6 +1764,8 @@ prefecturecode <- function(prefecture, output_type="name") {
   pref_normalized <- gsub("[_ \\.\\-](to|fu|hu|ken)$", "", pref_normalized)
   # Convert "o" with macron to simple "o".
   pref_normalized <- gsub("\u014D", "o", pref_normalized)
+  # Convert "gunma" to "gumma".
+  pref_normalized <- dplyr::if_else(pref_normalized=="gunma", "gumma" ,pref_normalized)
   # Return the matching IDs.
   return (as.character(jp_prefecture_name_id_map$id[match(pref_normalized, jp_prefecture_name_id_map$name)]))
 }
