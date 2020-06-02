@@ -2052,7 +2052,7 @@ read_delim_file <- function(file, delim, quote = '"',
       } else {
         stop(e);
       }
-      })
+    })
 
   }
 }
