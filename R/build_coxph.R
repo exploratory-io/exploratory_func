@@ -69,7 +69,17 @@ partial_dependence.coxph_exploratory <- function(fit, time_col, vars = colnames(
   times <- sort(unique(data[[time_col]])) # Keep vector of actual times to map time index to actual time later.
 
   predict.fun <- function(object, newdata) {
-    res <- broom::tidy(survival::survfit(object, newdata = newdata))
+    res <- tryCatch({
+      broom::tidy(survival::survfit(object, newdata = newdata))
+    }, error = function(e){
+      # Overwrite message for a rare known case where numeric overflow happens inside survival::agsurv, to be a little more user-friendly.
+      if (stringr::str_detect(e$message, "NA\\/NaN\\/Inf in foreign function call \\(arg 6\\)")) {
+        stop("Numeric overflow happened in the calculation of predicted survival curves.")
+      }
+      else {
+        stop(e)
+      }
+    })
     #    time n.risk n.event n.censor estimate.1 estimate.2 estimate.3 estimate.4 estimate.5 estimate.6
     #   <dbl>  <dbl>   <dbl>    <dbl>      <dbl>      <dbl>      <dbl>      <dbl>      <dbl>      <dbl>
     # 1     5    228       1        0      0.994      0.994      0.995      0.995      0.995      0.994
