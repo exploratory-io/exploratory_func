@@ -2017,7 +2017,7 @@ read_delim_file <- function(file, delim, quote = '"',
       # For Exploraotry Desktkop, it's already taken care of by Desktop so just show the error message as is.
       if(Sys.info()["sysname"]=="Linux" && stringr::str_detect(stringr::str_to_lower(e$message), "invalid multibyte")) {
         if(locale$encoding == "Shift_JIS") {
-         stop("The CSV file could be CP932 instead of Shift_JIS. Select CP932 as encoding and try again.");
+          stop("The CSV file could be CP932 instead of Shift_JIS. Select CP932 as encoding and try again.");
         } else if (locale$encoding == "CP932") {
           stop("The CSV file could be CP932 instead of Shift_JIS. Select CP932 as encoding and try again.");
         } else {
