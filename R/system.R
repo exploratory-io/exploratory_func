@@ -2022,7 +2022,7 @@ read_delim_file <- function(file, delim, quote = '"',
         } else if (locale$encoding == "CP932") {
           stop("The encoding of the file may be Shift_JIS instead of CP932. Select Shift_JIS as encoding and try again.");
         } else {
-          stop(stringr::str_c("The CSV file encoding seems not ", locale$encoding, ". Select other encoding and try again."));
+          stop(stringr::str_c("The encoding of the file may not be ", locale$encoding, ". Select other encoding and try again."));
         }
       } else {
         stop(e);
