@@ -2014,8 +2014,25 @@ read_delim_file <- function(file, delim, quote = '"',
       }
     }
     tmp <- download_data_file(file, "csv")
-    readr::read_delim(tmp, delim, quote = quote, escape_backslash = escape_backslash, escape_double = escape_double, col_names = col_names, col_types = col_types,
-                      locale = locale, na = na, quoted_na = quoted_na, comment = comment, trim_ws = trim_ws, skip = skip, n_max = n_max, guess_max = guess_max, progress = progress)
+    tryCatch({ # try to close connection and ignore error
+      readr::read_delim(tmp, delim, quote = quote, escape_backslash = escape_backslash, escape_double = escape_double, col_names = col_names, col_types = col_types,
+                        locale = locale, na = na, quoted_na = quoted_na, comment = comment, trim_ws = trim_ws, skip = skip, n_max = n_max, guess_max = guess_max, progress = progress)
+    }, error = function(e) {
+      # For the case it's running on Linux (Collaboration Server), show more user friendly message.
+      # For Exploraotry Desktkop, it's already taken care of by Desktop so just show the error message as is.
+      # When an incorrect encoding is used, "Error in make.names(x) : invalid multibyte string 1" error message is returned.
+      if(Sys.info()["sysname"]=="Linux" && stringr::str_detect(stringr::str_to_lower(e$message), "invalid multibyte")) {
+        if(locale$encoding == "Shift_JIS") {
+          stop("The encoding of the file may be CP932 instead of Shift_JIS. Select CP932 as encoding and try again.");
+        } else if (locale$encoding == "CP932") {
+          stop("The encoding of the file may be Shift_JIS instead of CP932. Select Shift_JIS as encoding and try again.");
+        } else {
+          stop(stringr::str_c("The encoding of the file may not be ", locale$encoding, ". Select other encoding and try again."));
+        }
+      } else {
+        stop(e);
+      }
+    })
   } else {
     # if it's local file simply call readr::read_delim
     # reading through file() is to be able to read files with path that includes multibyte chars.
@@ -2024,8 +2041,25 @@ read_delim_file <- function(file, delim, quote = '"',
     if(stringi::stri_enc_mark(file) != "ASCII"){
       file_path <- file(file)
     }
-    readr::read_delim(file_path, delim, quote = quote, escape_backslash = escape_backslash, escape_double = escape_double, col_names = col_names, col_types = col_types,
-                      locale = locale, na = na, quoted_na = quoted_na, comment = comment, trim_ws = trim_ws, skip = skip, n_max = n_max, guess_max = guess_max, progress = progress)
+    tryCatch({ # try to close connection and ignore error
+      readr::read_delim(file_path, delim, quote = quote, escape_backslash = escape_backslash, escape_double = escape_double, col_names = col_names, col_types = col_types,
+                        locale = locale, na = na, quoted_na = quoted_na, comment = comment, trim_ws = trim_ws, skip = skip, n_max = n_max, guess_max = guess_max, progress = progress)
+    }, error = function(e) {
+      # For the case it's running on Linux (Collaboration Server), show more user friendly message.
+      # For Exploraotry Desktkop, it's already taken care of by Desktop so just show the error message as is.
+      # When an incorrect encoding is used, "Error in make.names(x) : invalid multibyte string 1" error message is returned.
+      if(Sys.info()["sysname"]=="Linux" && stringr::str_detect(stringr::str_to_lower(e$message), "invalid multibyte")) {
+        if(locale$encoding == "Shift_JIS") {
+          stop("The encoding of the file may be CP932 instead of Shift_JIS. Select CP932 as encoding and try again.");
+        } else if (locale$encoding == "CP932") {
+          stop("The encoding of the file may be Shift_JIS instead of CP932. Select Shift_JIS as encoding and try again.");
+        } else {
+          stop(stringr::str_c("The encoding of the file may not be ", locale$encoding, ". Select other encoding and try again."));
+        }
+      } else {
+        stop(e);
+      }
+    })
 
   }
 }
