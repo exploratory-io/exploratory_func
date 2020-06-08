@@ -573,8 +573,9 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     }
     # if the connection is null or the connection is invalid, create a new one.
     if (is.null(conn) || !DBI::dbIsValid(conn)) {
+      # To avoid integer64 handling issues in charts, etc., use numeric as the R type to receive bigint data rather than default integer64 by specifying bigint argument.
       conn = RMariaDB::dbConnect(RMariaDB::MariaDB(), dbname = databaseName, username = username,
-                               password = password, host = host, port = port)
+                               password = password, host = host, port = port, bigint = "numeric")
       connection_pool[[key]] <- conn
     }
   } else if (type == "postgres" || type == "redshift" || type == "vertica") {
@@ -611,7 +612,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     if (is.null(conn) || !DBI::dbIsValid(conn)) {
       drv <- RPostgres::Postgres()
       conn <- RPostgres::dbConnect(drv, dbname=databaseName, user = username,
-                                     password = password, host = host, port = port)
+                                     password = password, host = host, port = port, bigint = "numeric")
       connection_pool[[key]] <- conn
     }
   } else if (type == "presto" || type == "treasuredata") {
@@ -763,7 +764,8 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
                              Database = databaseName,
                              UID = username,
                              PWD = password,
-                             Port = port)
+                             Port = port,
+                             bigint = "numeric")
       connection_pool[[key]] <- conn
     }
   }
