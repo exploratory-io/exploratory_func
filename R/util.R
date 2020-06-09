@@ -930,7 +930,7 @@ pivot <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fun
   }
 
   pivot_each <- function(df) {
-    casted <- if(is.null(value_col)) {
+    res <- if(is.null(value_col)) {
       # make a count matrix if value_col is NULL
       df %>% summarize_group(group_cols = group_cols_arg, group_funs = all_funs, value=dplyr::n())
     } else {
@@ -946,10 +946,10 @@ pivot <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fun
       }
       df %>% summarize_group(group_cols = group_cols_arg, group_funs = all_funs, value=fun.aggregate(!!rlang::sym(value_col)))
     }
-    casted <- casted %>% dplyr::arrange(!!!rlang::syms(new_col_cols))
-    casted <- casted %>% tidyr::pivot_wider(names_from = !!new_col_cols, values_from=value, values_fill=list(value=!!fill), names_sep=cols_sep)
-    casted <- casted %>% dplyr::arrange(!!!rlang::syms(new_row_cols))
-    casted
+    res <- res %>% dplyr::arrange(!!!rlang::syms(new_col_cols)) # arrange before pivot_wider, so that the create columns are sorted.
+    res <- res %>% tidyr::pivot_wider(names_from = !!new_col_cols, values_from=value, values_fill=list(value=!!fill), names_sep=cols_sep)
+    res <- res %>% dplyr::arrange(!!!rlang::syms(new_row_cols)) # arrange grouping rows.
+    res
   }
 
   grouped_col <- grouped_by(df)
