@@ -622,7 +622,7 @@ test_that("test pivot with Date funcs", {
 
   pivoted <- pivot(test_df, row_cols=c(dt_wday="dt"), row_funs=c("wday"), col_cols=c("dt"), col_funs=c("week"), value = val)
   expect_true(all(pivoted$dt_wday %in% c("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")))
-  expect_equal(colnames(pivoted), c("dt_wday","3", "52", "2"))
+  expect_equal(colnames(pivoted), c("dt_wday","2", "3", "52"))
 })
 
 test_that("test pivot with Date funcs with fill", { # There was a case where error happened with this case with fill (commit 0745f491).
@@ -634,7 +634,7 @@ test_that("test pivot with Date funcs with fill", { # There was a case where err
 
   pivoted <- pivot(test_df, row_cols=c(dt_wday="dt"), row_funs=c("wday"), col_cols=c("dt"), col_funs=c("week"), value = val, fill=0)
   expect_true(all(pivoted$dt_wday %in% c("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")))
-  expect_equal(colnames(pivoted), c("dt_wday","3", "52", "2"))
+  expect_equal(colnames(pivoted), c("dt_wday","2", "3", "52"))
 })
 
 test_that("test pivot with POSIXct", {
