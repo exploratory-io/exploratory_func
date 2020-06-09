@@ -859,7 +859,7 @@ pivot_ <- function(df, row_cols, col_cols, row_funs = NULL, col_funs = NULL, val
   pivot(df, row_cols = row_cols, col_cols = col_cols, row_funs = row_funs, col_funs = col_funs, value = value_col, ...)
 }
 
-#' pivot columns based on formula
+#' Calculate a pivot table.
 #' @param df Data frame to pivot
 #' @param row_cols - Columns to be the rows of the resulting pivot table.
 #' @param col_cols - Columns to be the columns of the resulting pivot table.
