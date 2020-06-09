@@ -853,11 +853,10 @@ get_confint <- function(val, se, conf_int = 0.95) {
   val + critval * se
 }
 
-#' NSE version of pivot_
+#' SE version of pivot. For backward compatibility.
 #' @export
-pivot <- function(df, row_cols, col_cols, row_funs = NULL, col_funs = NULL, value = NULL, ...) {
-  value_col <- col_name(substitute(value))
-  pivot_(df, row_cols = row_cols, col_cols = col_cols, row_funs = row_funs, col_funs = col_funs, value_col = value_col, ...)
+pivot_ <- function(df, row_cols, col_cols, row_funs = NULL, col_funs = NULL, value_col = NULL, ...) {
+  pivot(df, row_cols = row_cols, col_cols = col_cols, row_funs = row_funs, col_funs = col_funs, value = value_col, ...)
 }
 
 #' pivot columns based on formula
@@ -866,14 +865,18 @@ pivot <- function(df, row_cols, col_cols, row_funs = NULL, col_funs = NULL, valu
 #' @param col_cols - Columns to be the columns of the resulting pivot table.
 #' @param row_funs - Functions to be applied on row_cols before grouping.
 #' @param col_funs - Functions to be applied on col_cols before grouping.
-#' @param value_col - Column name for value. If null, values are count
+#' @param value - Column name for value. If null, values are count
 #' @param fun.aggregate - Function to aggregate duplicated columns
 #' @param fill - Value to be filled for missing values
 #' @param na.rm - If na should be removed from values
 #' @param cols_sep - If na should be removed from values
 #' @export
-pivot_ <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_funs = NULL, value_col = NULL, fun.aggregate = mean, fill = NA, na.rm = TRUE, cols_sep = "_") {
+pivot <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_funs = NULL, value = NULL, fun.aggregate = mean, fill = NA, na.rm = TRUE, cols_sep = "_") {
   validate_empty_data(df)
+
+  value_col <- if(!missing(value)){
+    dplyr::select_var(names(df), !! rlang::enquo(value))
+  }
 
   # Output row column names can be specified as names of row_cols. Extract them.
   if (!is.null(names(row_cols))) {
@@ -939,7 +942,7 @@ pivot_ <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fu
          !identical(na_count, fun.aggregate) &&
          !identical(non_na_count, fun.aggregate)){
         # remove NA, unless fun.aggregate function is one of the above NA related ones.
-        df <- df[!is.na(df[[value_col]]),]
+        df <- df %>% dplyr::filter(!is.na(!!rlang::sym(value_col)))
       }
       df %>% summarize_group(group_cols = group_cols_arg, group_funs = all_funs, value=fun.aggregate(!!rlang::sym(value_col)))
     }
