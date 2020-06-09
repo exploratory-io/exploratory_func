@@ -943,7 +943,9 @@ pivot_ <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fu
       }
       df %>% summarize_group(group_cols = group_cols_arg, group_funs = all_funs, value=fun.aggregate(!!rlang::sym(value_col)))
     }
+    casted <- casted %>% dplyr::arrange(!!!rlang::syms(new_col_cols))
     casted <- casted %>% tidyr::pivot_wider(names_from = !!new_col_cols, values_from=value, values_fill=list(value=!!fill), names_sep=cols_sep)
+    casted <- casted %>% dplyr::arrange(!!!rlang::syms(new_row_cols))
     casted
   }
 
