@@ -2158,7 +2158,7 @@ calc_feature_imp <- function(df,
       model$imp_vars <- imp_vars
       # Second element of n argument needs to be less than or equal to sample size, to avoid error.
       if (length(imp_vars) > 0) {
-        model$partial_dependence <- edarf::partial_dependence(model, vars=imp_vars, data=model_df, n=c(pd_grid_resolution, min(model$num.samples, pd_sample_size)))
+        model$partial_dependence <- partial_dependence.ranger(model, vars=imp_vars, data=model_df, n=c(pd_grid_resolution, min(model$num.samples, pd_sample_size)))
         if (pd_with_bin_means && is_target_logical_or_numeric) {
           # We calculate means of bins only for logical or numeric target to keep the visualization simple.
           model$partial_binning <- calc_partial_binning_data(model_df, clean_target_col, imp_vars)
@@ -2613,6 +2613,57 @@ glance.rpart <- function(x, pretty.name = FALSE, ...) {
       dplyr::rename(!!!map)
   }
   ret
+}
+
+# Builds partial_dependency object for ranger. Originally from edarf:::partial_dependence.ranger.
+partial_dependence.ranger <- function(fit, vars = colnames(data),
+  n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)),
+  interaction = FALSE, uniform = TRUE, data, ...) {
+
+  target = strsplit(strsplit(as.character(fit$call), "formula")[[2]], " ~")[[1]][[1]]
+
+  predict.fun = function(object, newdata) {
+    if (object$treetype != "Classification") {
+      predict(object, data = newdata)$predictions
+    } else {
+      t(apply(predict(object, data = newdata, predict.all = TRUE)$predictions, 1,
+        function(x) table(factor(x, seq_len(length(unique(data[[target]]))),
+          levels(data[[target]]))) / length(x)))
+      }
+  }
+
+  args = list(
+    "data" = data,
+    "vars" = vars,
+    "n" = n,
+    "model" = fit,
+    "uniform" = uniform,
+    "predict.fun" = predict.fun,
+    ...
+  )
+  
+  if (length(vars) > 1L & !interaction) {
+    pd = rbindlist(sapply(vars, function(x) {
+      args$vars = x
+      if ("points" %in% names(args))
+        args$points = args$points[x]
+      mp = do.call(mmpf::marginalPrediction, args)
+      if (fit$treetype == "Regression")
+        names(mp)[ncol(mp)] = target
+      mp
+    }, simplify = FALSE), fill = TRUE)
+    data.table::setcolorder(pd, c(vars, colnames(pd)[!colnames(pd) %in% vars]))
+  } else {
+    pd = do.call(mmpf::marginalPrediction, args)
+    if (fit$treetype == "Regression")
+      names(pd)[ncol(pd)] = target
+  }
+
+  attr(pd, "class") = c("pd", "data.frame")
+  attr(pd, "interaction") = interaction == TRUE
+  attr(pd, "target") = if (fit$treetype != "Classification") target else levels(fit$predictions)
+  attr(pd, "vars") = vars
+  pd
 }
 
 # Builds partial_dependency object for rpart with same structure (a data.frame with attributes.) as edarf::partial_dependence.
