@@ -1565,7 +1565,7 @@ evaluate_lm_training_and_test <- function(df, pretty.name = FALSE){
       tryCatch({
         test_pred_ret <- prediction(df, data = "test")
         ## get Model Object
-        m <- df %>% filter(!is.null(model)) %>% `[[`(1, "model", 1)
+        m <- (df %>% filter(!is.null(model)))$model[[1]]
         actual_val_col <- all.vars(df$model[[1]]$terms)[[1]]
         # Get original target column name.
         actual_val_col_orig <- df$model[[1]]$terms_mapping[[actual_val_col]]
