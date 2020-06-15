@@ -1732,8 +1732,10 @@ bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_da
   # To workaround this issue, set a name to the first data frame with the value specified by fistLabel argument as a pre-process
   # then pass the updated list to dplyr::bind_rows.
   dataframes_updated <- list()
-  # with dplyr:::flatten_bindable API, create a list of data frames from arguments passed to bind_rows.
-  dataframes <- dplyr:::flatten_bindable(rlang::dots_values(...))
+  # Create a list of data frames from arguments passed to bind_rows.
+  # In order to avoid unexpected data structure change by flattening, 
+  # we call dots_values here instead of dots_list. 
+  dataframes <- rlang::dots_values(...)
   if(force_data_type || stringr::str_length(current_df_name) >0) {
     index <- 1;
     # for the case where a user passes a list that contains key (data frame name) and value (data frame) pair.
