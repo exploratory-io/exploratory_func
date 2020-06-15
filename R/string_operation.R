@@ -296,7 +296,7 @@ do_tokenize <- function(df, input, token = "words", keep_cols = FALSE,  drop = T
     # so that it won't duplicate other columns,
     # which will be joined later
     tokenize_df <- df[,c(doc_id, input_col)]
-    sentences <- tidytext::unnest_tokens_(tokenize_df, output_col, input_col, token="sentences", drop=TRUE, strip_punct = remove_punct, ...)
+    sentences <- tidytext::unnest_tokens(tokenize_df, !!rlang::sym(output_col), !!rlang::sym(input_col), token="sentences", drop=TRUE, strip_punct = remove_punct, ...)
 
     # as.symbol is used for colum names with backticks
     grouped <- dplyr::group_by(sentences, !!!rlang::syms(doc_id))
@@ -307,7 +307,7 @@ do_tokenize <- function(df, input, token = "words", keep_cols = FALSE,  drop = T
 
     # split into tokens
     tokenize_df <- dplyr::ungroup(tokenize_df)
-    tokenized <- tidytext::unnest_tokens_(tokenize_df, output_col, output_col, token=token, strip_punct=remove_punct, drop=TRUE, ...)
+    tokenized <- tidytext::unnest_tokens(tokenize_df, !!rlang::sym(output_col), !!rlang::sym(output_col), token=token, strip_punct=remove_punct, drop=TRUE, ...)
 
     if(drop){
       df[[input_col]] <- NULL
@@ -315,7 +315,7 @@ do_tokenize <- function(df, input, token = "words", keep_cols = FALSE,  drop = T
 
     ret <- dplyr::right_join(df, tokenized, by=doc_id)
   } else {
-    ret <- tidytext::unnest_tokens_(df, col_name(substitute(output)), input_col, token=token, strip_punct=remove_punct, drop=drop, ...)
+    ret <- tidytext::unnest_tokens(df, !!rlang::sym(output_col), !!rlang::sym(input_col), token=token, strip_punct=remove_punct, drop=drop, ...)
   }
 
   # set the column name to original.
