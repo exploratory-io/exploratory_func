@@ -1733,6 +1733,8 @@ bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_da
   # then pass the updated list to dplyr::bind_rows.
   dataframes_updated <- list()
   # Create a list of data frames from arguments passed to bind_rows.
+  # In order to avoid unexpected data structure change by flattening, 
+  # we call dots_values here instead of dots_list. 
   dataframes <- rlang::dots_values(...)
   if(force_data_type || stringr::str_length(current_df_name) >0) {
     index <- 1;
