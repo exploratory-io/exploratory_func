@@ -1340,6 +1340,7 @@ do_on_each_group <- function(df, func, params = quote(list()), name = "tmp", wit
   ret <- df %>%
     # UQ and UQ(get_expr()) evaluates those variables
     dplyr::do(UQ(name) := UQ(rlang::get_expr(call)))
+  ret <- ret %>% dplyr::ungroup() # At R4.0 update, noticed that purrr::map called inside mutate misbehaves. Removing rowwise grouping. TODO: Do away with do().
   if(with_unnest){
     ret %>%
       dplyr::ungroup() %>%
