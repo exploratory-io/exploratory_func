@@ -176,7 +176,7 @@ do_cor.cols <- function(df, ..., use="pairwise.complete.obs", method="pearson", 
   # select columns using dplyr::select logic
   # using the new way of NSE column selection evaluation
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
-  select_dots <- dplyr::select_vars(names(df), !!! rlang::quos(...))
+  select_dots <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
   grouped_col <- grouped_by(df)
   output_cols <- avoid_conflict(grouped_col, c("pair.name.x", "pair.name.y", "value"))
   # check if the df's grouped

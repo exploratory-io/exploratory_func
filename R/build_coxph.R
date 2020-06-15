@@ -301,10 +301,10 @@ build_coxph.fast <- function(df,
   # using the new way of NSE column selection evaluation
   # ref: http://dplyr.tidyverse.org/articles/programming.html
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
-  time_col <- dplyr::select_var(names(df), !! rlang::enquo(time))
-  status_col <- dplyr::select_var(names(df), !! rlang::enquo(status))
+  time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(time))
+  status_col <- tidyselect::vars_select(names(df), !! rlang::enquo(status))
   # this evaluates select arguments like starts_with
-  selected_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
+  selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
 
   grouped_cols <- grouped_by(df)
 

@@ -584,8 +584,8 @@ build_lm.fast <- function(df,
                     test_rate = 0.0,
                     test_split_type = "random" # "random" or "ordered"
                     ){
-  target_col <- dplyr::select_var(names(df), !! rlang::enquo(target))
-  selected_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
+  target_col <- tidyselect::vars_select(names(df), !! rlang::enquo(target))
+  selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
 
   grouped_cols <- grouped_by(df)
 

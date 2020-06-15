@@ -875,7 +875,7 @@ pivot <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fun
   validate_empty_data(df)
 
   value_col <- if(!missing(value)){
-    dplyr::select_var(names(df), !! rlang::enquo(value))
+    tidyselect::vars_select(names(df), !! rlang::enquo(value))
   }
 
   # Output row column names can be specified as names of row_cols. Extract them.

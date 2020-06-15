@@ -1589,7 +1589,7 @@ exp_balance <- function(df,
   }
   # this seems to be the new way of NSE column selection evaluation
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
-  target_col <- dplyr::select_var(names(df), !! rlang::enquo(target))
+  target_col <- tidyselect::vars_select(names(df), !! rlang::enquo(target))
   was_target_logical <- is.logical(df[[target_col]]) # record if the target was logical originally and turn it back to logical if so.
   was_target_character <- is.character(df[[target_col]])
   was_target_factor <- is.factor(df[[target_col]])
@@ -1955,9 +1955,9 @@ calc_feature_imp <- function(df,
 
   # this seems to be the new way of NSE column selection evaluation
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
-  target_col <- dplyr::select_var(names(df), !! rlang::enquo(target))
+  target_col <- tidyselect::vars_select(names(df), !! rlang::enquo(target))
   # this evaluates select arguments like starts_with
-  selected_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
+  selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
 
   grouped_cols <- grouped_by(df)
 
@@ -2751,9 +2751,9 @@ exp_rpart <- function(df,
 
   # this seems to be the new way of NSE column selection evaluation
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
-  target_col <- dplyr::select_var(names(df), !! rlang::enquo(target))
+  target_col <- tidyselect::vars_select(names(df), !! rlang::enquo(target))
   # this evaluates select arguments like starts_with
-  selected_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
+  selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
 
   grouped_cols <- grouped_by(df)
 
