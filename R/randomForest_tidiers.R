@@ -1206,8 +1206,8 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
     return(data.frame())
   }
 
-  model <-  filtered %>% `[[`(1, "model", 1)
-  test_index <- filtered %>% `[[`(1, ".test_index", 1)
+  model <-  filtered$model[[1]]
+  test_index <- filtered$.test_index[[1]]
 
   # Get evaluation for training part. Just passing down to rf_evaluation does it, since it is done off of data embeded in the model.
   # Here we use data with failed model too (data) as opposed to the one without them (filtered),

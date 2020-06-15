@@ -564,7 +564,7 @@ prediction_training_and_test <- function(df, prediction_type="default", threshol
   if (nrow(filtered) == 0) { # No valid models were returned.
     return(data.frame())
   }
-  model <- filtered %>% `[[`(1, "model")
+  model <- filtered$model[[1]]
 
   grouped_cols <- colnames(df)[!colnames(df) %in% c("model", ".test_index", "source.data", ".model_metadata")]
 
@@ -621,7 +621,7 @@ prediction_binary <- function(df, threshold = 0.5, ...){
   if (nrow(df) == 0) { # No valid models were returned.
     return(data.frame())
   }
-  first_model <- df %>% `[[`(1, "model")
+  first_model <- df$model[[1]]
 
   ret <- prediction(df, ...)
 
