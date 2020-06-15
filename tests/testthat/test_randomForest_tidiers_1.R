@@ -199,7 +199,7 @@ test_that("test calc_feature_imp predicting logical", {
   conf_mat <- model_df %>% broom::tidy(model, type = "conf_mat", pretty.name = TRUE)
 
   # test get_binary_predicted_value_from_probability
-  model <- model_df %>% filter(!is.null(model)) %>% `[[`(1, "model", 1)
+  model <- (model_df %>% filter(!is.null(model)))$model[[1]]
   predicted_values <- get_binary_predicted_value_from_probability(model)
   expect_equal(levels(predicted_values), c("TRUE","FALSE"))
 
