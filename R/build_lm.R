@@ -1240,7 +1240,7 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
         # put it back to show them.
         # reference: https://stats.stackexchange.com/questions/25804/why-would-r-return-na-as-a-lm-coefficient
         removed_coef_df <- data.frame(term=names(x$coefficients[is.na(x$coefficients)]), note="Dropped most likely due to perfect multicollinearity.")
-        ret <- ret %>% bind_rows(removed_coef_df)
+        ret <- ret %>% dplyr::bind_rows(removed_coef_df)
         if (pretty.name) {
           ret <- ret %>% rename(Note=note)
         }
@@ -1359,7 +1359,7 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
         # put it back to show them.
         # reference: https://stats.stackexchange.com/questions/25804/why-would-r-return-na-as-a-lm-coefficient
         removed_coef_df <- data.frame(term=names(x$coefficients[is.na(x$coefficients)]), note="Dropped most likely due to perfect multicollinearity.")
-        ret <- ret %>% bind_rows(removed_coef_df)
+        ret <- ret %>% dplyr::bind_rows(removed_coef_df)
         if (pretty.name) {
           ret <- ret %>% rename(Note=note)
         }

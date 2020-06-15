@@ -65,7 +65,7 @@ tidy.princomp_exploratory <- function(x, type="variances", ...) { #TODO: add tes
     loadings_df <- rownames_to_column(as.data.frame(loadings_matrix), var="measure_name") #TODO: what if name conflicts?
     loadings_df <- loadings_df %>% rename(Measures=Comp.2) # use different column name for Comp.2 of measures.
     loadings_df0 <- loadings_df %>% mutate(Comp.1=0, Measures=0) # create df for origin of coordinates.
-    loadings_df <- loadings_df0 %>% bind_rows(loadings_df)
+    loadings_df <- loadings_df0 %>% dplyr::bind_rows(loadings_df)
     res <- res %>% dplyr::bind_rows(loadings_df)
     # fill group_by column so that Repeat By on chart works fine. loadings_df does not have values for the group_by column.
     res <- res %>% tidyr::fill(x$grouped_cols)
