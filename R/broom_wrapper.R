@@ -115,15 +115,14 @@ add_prediction <- function(df, model_df, conf_int = 0.95, ...){
     # Use formula to support expanded aug_args (especially for type.predict for logistic regression)
     # because ... can't be passed to a function inside mutate directly.
     aug_fml <- if(aug_args == ""){
-      as.formula("~list(broom::augment(model, newdata = df))")
+      "broom::augment(m, newdata = df)"
     } else {
-      as.formula(paste0("~list(broom::augment(model, newdata = df, ", aug_args, "))"))
+      paste0("broom::augment(m, newdata = df, ", aug_args, ")")
     }
     ret <- model_df %>%
       # result of aug_fml will be stored in .text_index column
       # .test_index is used because model_df has it and won't be used here
-      dplyr::mutate_(.dots = list(.test_index = aug_fml)) %>%
-      dplyr::ungroup()
+      dplyr::mutate(.test_index=purrr::map(model, function(m){eval(parse(text=aug_fml))})) 
 
     ret <- if(with_respose) {
       ret %>%
