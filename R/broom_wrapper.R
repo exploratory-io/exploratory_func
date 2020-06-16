@@ -96,6 +96,9 @@ add_prediction <- function(df, model_df, conf_int = 0.95, ...){
   cll <- match.call()
   aug_args <- expand_args(cll, exclude = c("df", "model_df"))
 
+  # model_df should not be rowwise grouped here. TODO: Should this be done here, or should we do this when model_df is created, for example in build_model?
+  model_df <- model_df %>% dplyr::ungroup()
+
   # validate data frame based on meta info
   model_meta <- model_df[[".model_metadata"]]
   if(!is.null(model_meta)){
