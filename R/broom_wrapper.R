@@ -468,14 +468,14 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
       # because ... can't be passed to a function inside mutate directly.
       # If test is FALSE, this uses data as an argument and if not, uses newdata as an argument.
       aug_fml_training <- if(aug_args == ""){
-        as.formula("~list(broom::augment(model, data = source.data.training))")
+        "broom::augment(m, data = df)"
       } else {
-        as.formula(paste0("~list(broom::augment(model, data = source.data.training, ", aug_args, "))"))
+        paste0("broom::augment(m, data = df, ", aug_args, ")")
       }
       aug_fml_test <- if(aug_args == ""){
-        as.formula("~list(broom::augment(model, data = source.data.test, data_type = 'test'))")
+        "broom::augment(m, data = df, data_type = 'test')"
       } else {
-        as.formula(paste0("~list(broom::augment(model, data = source.data.test, data_type = 'test', ", aug_args, "))"))
+        paste0("broom::augment(m, data = df, data_type = 'test', ", aug_args, ")")
       }
       augmented <- df %>%
         dplyr::ungroup() %>%
@@ -488,9 +488,9 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
           safe_slice(df, index, remove = FALSE)
         })) %>%
         dplyr::select(-.test_index) %>%
-        dplyr::rowwise() %>%
         # evaluate the formula of augment and "data" column will have it
-        dplyr::mutate_(.dots = list(source.data.training = aug_fml_training, source.data.test = aug_fml_test))
+        dplyr::mutate(source.data.training = purrr::map(model, source.data.training, function(m, df){eval(parse(text=aug_fml_training))}),
+                      source.data.test = purrr::map(model, source.data.test, function(m, df){eval(parse(text=aug_fml_test))}))
       augmented <- augmented %>%
         dplyr::ungroup() %>% # ungroup is necessary here to get expected df1, df2 value in the next line.
         dplyr::mutate(source.data = purrr::map2(source.data.training, source.data.test, function(df1, df2){
@@ -1106,8 +1106,10 @@ model_anova <- function(df, pretty.name = FALSE){
   validate_empty_data(df)
 
   ret <- suppressWarnings({
-    # this causes warning for Deviance, Resid..Df, Resid..Dev in glm model
-    df %>% dplyr::mutate(model = list(anova(model))) %>% broom::tidy(model)
+    # this causes warning for Deviance, Resid..Df, Resid..Dev in glm model. TODO: Is this still true?
+    df %>% dplyr::mutate(output=purrr::map(model,function(m){broom::tidy(anova(m))})) %>%
+      dplyr::select(-source.data, -.test_index, -model, -.model_metadata) %>%
+      tidyr::unnest(output)
   })
   if(pretty.name){
     colnames(ret)[colnames(ret) == "term"] <- "Term"
