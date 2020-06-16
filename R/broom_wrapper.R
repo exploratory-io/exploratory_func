@@ -1290,11 +1290,15 @@ model_confint <- function(df, ...){
   # this expands dots arguemtns to character
   arg_char <- expand_args(caller, exclude = c("df"))
   if (arg_char != "") {
-    fml <- as.formula(paste0("~list(stats::confint(model, ", arg_char, "))"))
+    fml <- paste0("broom::tidy(stats::confint(m, ", arg_char, "))")
   } else {
-    fml <- as.formula(paste0("~list(stats::confint(model))"))
+    fml <- paste0("broom::tidy(stats::confint(m))")
   }
-  ret <- df %>% dplyr::mutate_(.dots = list(model = fml)) %>% broom::tidy(model)
+
+  ret <- df %>% dplyr::mutate(output=purrr::map(model,function(m){eval(parse(text=fml))})) %>%
+      dplyr::select(-source.data, -.test_index, -model, -.model_metadata) %>%
+      tidyr::unnest(output)
+
   colnames(ret)[colnames(ret) == ".rownames"] <- "Term"
   # original columns are like X0.5..   X99.5.., so replace X to Prob and remove trailing dots
   new_p_cnames <- stringr::str_replace(colnames(ret)[(ncol(ret)-1):ncol(ret)], "X", "Prob ") %>%
