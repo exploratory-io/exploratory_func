@@ -2,7 +2,6 @@ context("test broom wrappers")
 
 set.seed(0)
 test_df <- data.frame(vec1 = seq(10), vec2 = seq(10), random = runif(10, min=0, max=10))
-
 test_that("test data frame prediction by xgboost with group", {
   train_data <- structure(list(age = c(66L, 44L, 21L, 78L, 28L, 40L, 61L, 60L,
                                        43L, 49L, 52L, 25L, 58L, 46L, 40L, 32L, 22L, 23L, 17L, 24L),
@@ -144,9 +143,10 @@ test_that("do_kmeans.kv augment", {
     key=rep(paste("dim", rep(seq(3))), each=2),
     value=seq(3), stringsAsFactors = F
   )
-  result <- test_df %>%
+  model_df <- test_df %>%
     dplyr::group_by(group) %>%
-    build_kmeans.kv(subject, key, value, keep.source=TRUE, centers=1, augment = FALSE) %>%
+    build_kmeans.kv(subject, key, value, keep.source=TRUE, centers=1, augment = FALSE)
+  result <- model_df %>%
     augment_kmeans(model, source.data)
   expect_true(is.integer(result[["cluster"]]))
   expect_true(all(result[["cluster"]] == 1))
@@ -169,7 +169,6 @@ test_that("do_kmeans.kv augment", {
   expect_true(is.integer(result[["cluster"]]))
   expect_true(all(result[["cluster"]] == 1))
 })
-
 
 
 test_that("predict lm with new data", {
