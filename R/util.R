@@ -1734,9 +1734,21 @@ bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_da
   # then pass the updated list to dplyr::bind_rows.
   dataframes_updated <- list()
   # Create a list of data frames from arguments passed to bind_rows.
+  dataframes <- list()
   # In order to avoid unexpected data structure change by flattening, 
   # we call dots_values here instead of dots_list. 
-  dataframes <- rlang::dots_values(...)
+  # Since return from dots_values can be a nested list, let's flatten it here.
+  purrr::map(rlang::dots_values(...), function(x) {
+    if ('data.frame' %in% class(x)) {
+      # If x is a data frame, need to enclose it with list() to add to a list. https://stackoverflow.com/questions/33177118/append-a-data-frame-to-a-list
+      dataframes <<- c(dataframes, list(x))
+    }
+    else {
+      # Here we assume that x is a list of data frames. 
+      dataframes <<- c(dataframes, x)
+    }
+  })
+
   if(force_data_type || stringr::str_length(current_df_name) >0) {
     index <- 1;
     # for the case where a user passes a list that contains key (data frame name) and value (data frame) pair.
