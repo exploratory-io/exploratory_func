@@ -176,7 +176,7 @@ build_kmeans.cols <- function(df, ...,
   model_column <- avoid_conflict(grouped_column, "model")
   source_column <- avoid_conflict(grouped_column, "source.data")
   # this gets a vector of column names which are selected by dots argument
-  selected_column <- tidyselect::vars_select(names(df), !!! rlang::quos(...), exclude=grouped_column)
+  selected_column <- tidyselect::vars_select(names(df), !!! rlang::quos(...), .exclude=grouped_column)
 
   omit_df <- df[,selected_column, drop=FALSE] %>% # drop=FALSE to avoid getting converted to vector
     as_numeric_matrix_(selected_column) %>%
