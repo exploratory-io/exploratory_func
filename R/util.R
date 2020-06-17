@@ -436,9 +436,9 @@ list_extract <- function(column, position = 1, rownum = 1){
 list_to_text <- function(column, sep = ", "){
   loadNamespace("stringr")
   ret <- sapply(column, function(x) {
-    ret <- stringr::str_c(x, collapse = sep)
+    ret <- stringr::str_c(stringr::str_replace_na(x), collapse = sep)
     if(identical(ret, character(0))){
-      # if it's character(0)
+      # if it's character(0). Not too sure if this would still happen now that we do str_replace_na first.
       NA
     } else {
       ret

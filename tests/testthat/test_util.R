@@ -1,5 +1,4 @@
 context("check util functions")
-
 test_that("bind_rows", {
   library(dplyr)
   res <- mtcars %>% exploratory::bind_rows(list(acars = mtcars, bcars = mtcars), id_column_name="dataf", current_df_name="firstMtcars")
@@ -462,7 +461,7 @@ test_that("list_to_text should return NA", {
   test_df[["test_list"]] <- test_list
   ret <- dplyr::mutate(test_df, text = list_to_text(test_list) )
 
-  expect_equal(ret[["text"]], c(rep(NA, 3), rep("b, b, b, b, b", 7)))
+  expect_equal(ret[["text"]], c("NA", "", "NA, b", rep("b, b, b, b, b", 7)))
 })
 
 test_that("list_concat", {
