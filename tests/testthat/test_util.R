@@ -826,7 +826,8 @@ test_that("test unnest_without_empty", {
   # not sure what was the case unnest_without_empty was required at this point.
   # maybe we don't need unnest_without_empty anymore??
   ret <- df %>% unnest_without_empty(y)
-  expect_equal(ret, data.frame(x=c(1,3,3),y=c(1,1,1)))
+  expect_equal(ret$x, c(1,3,3))
+  expect_equal(ret$y, c(1,1,1))
 
   # create empty row in y
   df$y <- lapply(c(1,0,2),function(x){data.frame(z=rep(1,x), w=rep(2,x))})
@@ -834,7 +835,9 @@ test_that("test unnest_without_empty", {
   # not sure what was the case unnest_without_empty was required at this point.
   # maybe we don't need unnest_without_empty anymore??
   ret <- df %>% unnest_without_empty(y)
-  expect_equal(ret, data.frame(x=c(1,3,3),z=c(1,1,1),w=c(2,2,2)))
+  expect_equal(ret$x, c(1,3,3))
+  expect_equal(ret$z, c(1,1,1))
+  expect_equal(ret$w, c(2,2,2))
 })
 
 test_that("r_squared", {
