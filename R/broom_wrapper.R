@@ -39,46 +39,38 @@ augment_kmeans <- function(df, model, data){
   if(!data_col %in% colnames(df)){
     stop(paste(data_col, "is not in column names"), sep=" ")
   }
-  ret <- tryCatch({
+  if (is.null(attr(df$model[[1]], "subject_colname"))) { # Distinguish between columns case ank skv case.
     # use do.call to evaluate data_col from a variable
     augment_func <- get("augment", asNamespace("broom"))
     ret <- do.call(augment_func, list(df, model_col, data=data_col))
     # cluster column is factor labeled "1", "2"..., so convert it to integer to avoid confusion
     ret[[ncol(ret)]] <- ret[[ncol(ret)]]
-    ret
-  },
-  error = function(e){
+  }
+  else {
     loadNamespace("dplyr")
+    # bind .cluster column refering subject names
+    grouped_col <- grouped_by(df)
+    cluster_col <- avoid_conflict(grouped_col, ".cluster")
 
-    # Detecting skv case by looking at error message. TODO: This should be done in more reliable way. 
-    if(grepl("Column .+ must be length .+ \\(the number of rows\\) or one, not",e$message) ||
-       grepl("arguments imply differing number of rows",e$message)){ # This line is so that we pass test even with old (0.4.4) broom.
-      # bind .cluster column refering subject names
-      grouped_col <- grouped_by(df)
-      cluster_col <- avoid_conflict(grouped_col, ".cluster")
-
-      augment_each <- function(df_each){
-        source_data <- df_each[[data_col]]
-        kmeans_obj <- df_each[[model_col]]
-        if(!is.data.frame(source_data)){
-          source_data <- source_data[[1]]
-          kmeans_obj <- kmeans_obj[[1]]
-        }
-
-        subject_colname <- attr(kmeans_obj, "subject_colname")
-        index <- as.factor(source_data[[subject_colname]])
-        source_data[[cluster_col]] <- kmeans_obj$cluster[index]
-        source_data
+    augment_each <- function(df_each){
+      source_data <- df_each[[data_col]]
+      kmeans_obj <- df_each[[model_col]]
+      if(!is.data.frame(source_data)){
+        source_data <- source_data[[1]]
+        kmeans_obj <- kmeans_obj[[1]]
       }
 
-      df %>%
-        dplyr::do_(.dots=setNames(list(~augment_each(.)), model_col)) %>%
-        dplyr::ungroup() %>%
-        unnest_with_drop(!!rlang::sym(model_col))
-    } else {
-      stop(e)
+      subject_colname <- attr(kmeans_obj, "subject_colname")
+      index <- as.factor(source_data[[subject_colname]])
+      source_data[[cluster_col]] <- kmeans_obj$cluster[index]
+      source_data
     }
-  })
+
+    ret <- df %>%
+      dplyr::do_(.dots=setNames(list(~augment_each(.)), model_col)) %>%
+      dplyr::ungroup() %>%
+      unnest_with_drop(!!rlang::sym(model_col))
+  }
   # update .cluster to cluster or cluster.new if it exists
   colnames(ret)[[ncol(ret)]] <- avoid_conflict(colnames(ret), "cluster")
   ret
