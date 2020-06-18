@@ -2201,6 +2201,7 @@ calc_feature_imp <- function(df,
     ret <- ret %>% tidyr::nest()
   }
 
+  ret <- ret %>% dplyr::ungroup() # Remove rowwise grouping so that following mutate works as expected.
   # Retrieve model, test index and source data stored in model_and_data_col column (list) and store them in separate columns
   ret <- ret %>% dplyr::mutate(model = purrr::map(data, function(df){
             df[[model_and_data_col]][[1]]$model
@@ -2904,6 +2905,7 @@ exp_rpart <- function(df,
     ret <- ret %>% tidyr::nest()
   }
 
+  ret <- ret %>% dplyr::ungroup() # Remove rowwise grouping so that following mutate works as expected.
   # Retrieve model, test index and source data stored in model_and_data_col column (list) and store them in separate columns
   ret <- ret %>% dplyr::mutate(model = purrr::map(data, function(df){
             df[[model_and_data_col]][[1]]$model
