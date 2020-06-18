@@ -256,7 +256,7 @@ do_svd.cols <- function(df,
 
   # using the new way of NSE column selection evaluation
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
-  select_dots <- dplyr::select_vars(names(df), !!! rlang::quos(...))
+  select_dots <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
 
   value_colname <- avoid_conflict(grouped_col, "value")
 

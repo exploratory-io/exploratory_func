@@ -436,9 +436,9 @@ list_extract <- function(column, position = 1, rownum = 1){
 list_to_text <- function(column, sep = ", "){
   loadNamespace("stringr")
   ret <- sapply(column, function(x) {
-    ret <- stringr::str_c(x, collapse = sep)
+    ret <- stringr::str_c(stringr::str_replace_na(x), collapse = sep)
     if(identical(ret, character(0))){
-      # if it's character(0)
+      # if it's character(0). Not too sure if this would still happen now that we do str_replace_na first.
       NA
     } else {
       ret
@@ -875,7 +875,7 @@ pivot <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fun
   validate_empty_data(df)
 
   value_col <- if(!missing(value)){
-    dplyr::select_var(names(df), !! rlang::enquo(value))
+    tidyselect::vars_select(names(df), !! rlang::enquo(value))
   }
 
   # Output row column names can be specified as names of row_cols. Extract them.
@@ -1340,6 +1340,7 @@ do_on_each_group <- function(df, func, params = quote(list()), name = "tmp", wit
   ret <- df %>%
     # UQ and UQ(get_expr()) evaluates those variables
     dplyr::do(UQ(name) := UQ(rlang::get_expr(call)))
+  ret <- ret %>% dplyr::ungroup() # At R4.0 update, noticed that purrr::map called inside mutate misbehaves. Removing rowwise grouping. TODO: Do away with do().
   if(with_unnest){
     ret %>%
       dplyr::ungroup() %>%
@@ -1733,9 +1734,21 @@ bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_da
   # then pass the updated list to dplyr::bind_rows.
   dataframes_updated <- list()
   # Create a list of data frames from arguments passed to bind_rows.
+  dataframes <- list()
   # In order to avoid unexpected data structure change by flattening, 
   # we call dots_values here instead of dots_list. 
-  dataframes <- rlang::dots_values(...)
+  # Since return from dots_values can be a nested list, let's flatten it here.
+  purrr::map(rlang::dots_values(...), function(x) {
+    if ('data.frame' %in% class(x)) {
+      # If x is a data frame, need to enclose it with list() to add to a list. https://stackoverflow.com/questions/33177118/append-a-data-frame-to-a-list
+      dataframes <<- c(dataframes, list(x))
+    }
+    else {
+      # Here we assume that x is a list of data frames. 
+      dataframes <<- c(dataframes, x)
+    }
+  })
+
   if(force_data_type || stringr::str_length(current_df_name) >0) {
     index <- 1;
     # for the case where a user passes a list that contains key (data frame name) and value (data frame) pair.

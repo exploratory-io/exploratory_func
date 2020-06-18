@@ -1206,8 +1206,8 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
     return(data.frame())
   }
 
-  model <-  filtered %>% `[[`(1, "model", 1)
-  test_index <- filtered %>% `[[`(1, ".test_index", 1)
+  model <-  filtered$model[[1]]
+  test_index <- filtered$.test_index[[1]]
 
   # Get evaluation for training part. Just passing down to rf_evaluation does it, since it is done off of data embeded in the model.
   # Here we use data with failed model too (data) as opposed to the one without them (filtered),
@@ -1589,7 +1589,7 @@ exp_balance <- function(df,
   }
   # this seems to be the new way of NSE column selection evaluation
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
-  target_col <- dplyr::select_var(names(df), !! rlang::enquo(target))
+  target_col <- tidyselect::vars_select(names(df), !! rlang::enquo(target))
   was_target_logical <- is.logical(df[[target_col]]) # record if the target was logical originally and turn it back to logical if so.
   was_target_character <- is.character(df[[target_col]])
   was_target_factor <- is.factor(df[[target_col]])
@@ -1955,9 +1955,9 @@ calc_feature_imp <- function(df,
 
   # this seems to be the new way of NSE column selection evaluation
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
-  target_col <- dplyr::select_var(names(df), !! rlang::enquo(target))
+  target_col <- tidyselect::vars_select(names(df), !! rlang::enquo(target))
   # this evaluates select arguments like starts_with
-  selected_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
+  selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
 
   grouped_cols <- grouped_by(df)
 
@@ -2158,7 +2158,7 @@ calc_feature_imp <- function(df,
       model$imp_vars <- imp_vars
       # Second element of n argument needs to be less than or equal to sample size, to avoid error.
       if (length(imp_vars) > 0) {
-        model$partial_dependence <- edarf::partial_dependence(model, vars=imp_vars, data=model_df, n=c(pd_grid_resolution, min(model$num.samples, pd_sample_size)))
+        model$partial_dependence <- partial_dependence.ranger(model, vars=imp_vars, data=model_df, n=c(pd_grid_resolution, min(model$num.samples, pd_sample_size)))
         if (pd_with_bin_means && is_target_logical_or_numeric) {
           # We calculate means of bins only for logical or numeric target to keep the visualization simple.
           model$partial_binning <- calc_partial_binning_data(model_df, clean_target_col, imp_vars)
@@ -2615,6 +2615,57 @@ glance.rpart <- function(x, pretty.name = FALSE, ...) {
   ret
 }
 
+# Builds partial_dependency object for ranger. Originally from edarf:::partial_dependence.ranger.
+partial_dependence.ranger <- function(fit, vars = colnames(data),
+  n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)),
+  interaction = FALSE, uniform = TRUE, data, ...) {
+
+  target = strsplit(strsplit(as.character(fit$call), "formula")[[2]], " ~")[[1]][[1]]
+
+  predict.fun = function(object, newdata) {
+    if (object$treetype != "Classification") {
+      predict(object, data = newdata)$predictions
+    } else {
+      t(apply(predict(object, data = newdata, predict.all = TRUE)$predictions, 1,
+        function(x) table(factor(x, seq_len(length(unique(data[[target]]))),
+          levels(data[[target]]))) / length(x)))
+      }
+  }
+
+  args = list(
+    "data" = data,
+    "vars" = vars,
+    "n" = n,
+    "model" = fit,
+    "uniform" = uniform,
+    "predict.fun" = predict.fun,
+    ...
+  )
+  
+  if (length(vars) > 1L & !interaction) {
+    pd = rbindlist(sapply(vars, function(x) {
+      args$vars = x
+      if ("points" %in% names(args))
+        args$points = args$points[x]
+      mp = do.call(mmpf::marginalPrediction, args)
+      if (fit$treetype == "Regression")
+        names(mp)[ncol(mp)] = target
+      mp
+    }, simplify = FALSE), fill = TRUE)
+    data.table::setcolorder(pd, c(vars, colnames(pd)[!colnames(pd) %in% vars]))
+  } else {
+    pd = do.call(mmpf::marginalPrediction, args)
+    if (fit$treetype == "Regression")
+      names(pd)[ncol(pd)] = target
+  }
+
+  attr(pd, "class") = c("pd", "data.frame")
+  attr(pd, "interaction") = interaction == TRUE
+  attr(pd, "target") = if (fit$treetype != "Classification") target else levels(fit$predictions)
+  attr(pd, "vars") = vars
+  pd
+}
+
 # Builds partial_dependency object for rpart with same structure (a data.frame with attributes.) as edarf::partial_dependence.
 partial_dependence.rpart = function(fit, target, vars = colnames(data),
   n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)), # Keeping same default of 25 as edarf::partial_dependence, although we usually overwrite from callers.
@@ -2700,9 +2751,9 @@ exp_rpart <- function(df,
 
   # this seems to be the new way of NSE column selection evaluation
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
-  target_col <- dplyr::select_var(names(df), !! rlang::enquo(target))
+  target_col <- tidyselect::vars_select(names(df), !! rlang::enquo(target))
   # this evaluates select arguments like starts_with
-  selected_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
+  selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
 
   grouped_cols <- grouped_by(df)
 

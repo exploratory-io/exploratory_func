@@ -144,9 +144,9 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
     # scale loading_matrix so that the scale of measures and data points matches in the scatter plot.
     loadings_matrix <- loadings_matrix * scale_ratio
     loadings_df <- tibble::rownames_to_column(as.data.frame(loadings_matrix), var="measure_name") #TODO: what if name conflicts?
-    loadings_df <- loadings_df %>% rename(Measures=PC2) # use different column name for PC2 of measures.
-    loadings_df0 <- loadings_df %>% mutate(PC1=0, Measures=0) # create df for origin of coordinates.
-    loadings_df <- loadings_df0 %>% bind_rows(loadings_df)
+    loadings_df <- loadings_df %>% dplyr::rename(Measures=PC2) # use different column name for PC2 of measures.
+    loadings_df0 <- loadings_df %>% dplyr::mutate(PC1=0, Measures=0) # create df for origin of coordinates.
+    loadings_df <- loadings_df0 %>% dplyr::bind_rows(loadings_df)
     res <- res %>% dplyr::bind_rows(loadings_df)
     # fill group_by column so that Repeat By on chart works fine. loadings_df does not have values for the group_by column.
     res <- res %>% tidyr::fill(x$grouped_cols)
@@ -161,7 +161,7 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
     res <- res %>% dplyr::bind_cols(as.data.frame(x$x))
     column_names <- attr(x$rotation, "dimname")[[1]] 
     if (normalize_data) {
-      res <- res %>% mutate_at(column_names, exploratory::normalize)
+      res <- res %>% dplyr::mutate_at(column_names, exploratory::normalize)
     }
 
     if (!is.null(n_sample)) { # default is no sampling.

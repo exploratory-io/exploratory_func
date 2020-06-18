@@ -119,7 +119,7 @@ fill_between_v <- function(v, .direction="down", value=NULL) {
 #' @export
 fill_between <- function(df, ..., .direction="down", value=NULL) {
   # this evaluates select arguments like starts_with
-  selected_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
+  selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
   grouped_col <- grouped_by(df)
 
   each_func <- function(df) {

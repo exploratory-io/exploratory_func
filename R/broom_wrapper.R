@@ -39,46 +39,38 @@ augment_kmeans <- function(df, model, data){
   if(!data_col %in% colnames(df)){
     stop(paste(data_col, "is not in column names"), sep=" ")
   }
-  ret <- tryCatch({
+  if (is.null(attr(df$model[[1]], "subject_colname"))) { # Distinguish between columns case ank skv case.
     # use do.call to evaluate data_col from a variable
     augment_func <- get("augment", asNamespace("broom"))
     ret <- do.call(augment_func, list(df, model_col, data=data_col))
     # cluster column is factor labeled "1", "2"..., so convert it to integer to avoid confusion
     ret[[ncol(ret)]] <- ret[[ncol(ret)]]
-    ret
-  },
-  error = function(e){
+  }
+  else {
     loadNamespace("dplyr")
+    # bind .cluster column refering subject names
+    grouped_col <- grouped_by(df)
+    cluster_col <- avoid_conflict(grouped_col, ".cluster")
 
-    # Detecting skv case by looking at error message. TODO: This should be done in more reliable way. 
-    if(grepl("Column .+ must be length .+ \\(the number of rows\\) or one, not",e$message) ||
-       grepl("arguments imply differing number of rows",e$message)){ # This line is so that we pass test even with old (0.4.4) broom.
-      # bind .cluster column refering subject names
-      grouped_col <- grouped_by(df)
-      cluster_col <- avoid_conflict(grouped_col, ".cluster")
-
-      augment_each <- function(df_each){
-        source_data <- df_each[[data_col]]
-        kmeans_obj <- df_each[[model_col]]
-        if(!is.data.frame(source_data)){
-          source_data <- source_data[[1]]
-          kmeans_obj <- kmeans_obj[[1]]
-        }
-
-        subject_colname <- attr(kmeans_obj, "subject_colname")
-        index <- as.factor(source_data[[subject_colname]])
-        source_data[[cluster_col]] <- kmeans_obj$cluster[index]
-        source_data
+    augment_each <- function(df_each){
+      source_data <- df_each[[data_col]]
+      kmeans_obj <- df_each[[model_col]]
+      if(!is.data.frame(source_data)){
+        source_data <- source_data[[1]]
+        kmeans_obj <- kmeans_obj[[1]]
       }
 
-      df %>%
-        dplyr::do_(.dots=setNames(list(~augment_each(.)), model_col)) %>%
-        dplyr::ungroup() %>%
-        unnest_with_drop(!!rlang::sym(model_col))
-    } else {
-      stop(e)
+      subject_colname <- attr(kmeans_obj, "subject_colname")
+      index <- as.factor(source_data[[subject_colname]])
+      source_data[[cluster_col]] <- kmeans_obj$cluster[index]
+      source_data
     }
-  })
+
+    ret <- df %>%
+      dplyr::do_(.dots=setNames(list(~augment_each(.)), model_col)) %>%
+      dplyr::ungroup() %>%
+      unnest_with_drop(!!rlang::sym(model_col))
+  }
   # update .cluster to cluster or cluster.new if it exists
   colnames(ret)[[ncol(ret)]] <- avoid_conflict(colnames(ret), "cluster")
   ret
@@ -95,6 +87,9 @@ add_prediction <- function(df, model_df, conf_int = 0.95, ...){
   # parsing arguments of add_prediction and getting optional arguemnt for augment in ...
   cll <- match.call()
   aug_args <- expand_args(cll, exclude = c("df", "model_df"))
+
+  # model_df should not be rowwise grouped here. TODO: Should this be done here, or should we do this when model_df is created, for example in build_model?
+  model_df <- model_df %>% dplyr::ungroup()
 
   # validate data frame based on meta info
   model_meta <- model_df[[".model_metadata"]]
@@ -115,15 +110,14 @@ add_prediction <- function(df, model_df, conf_int = 0.95, ...){
     # Use formula to support expanded aug_args (especially for type.predict for logistic regression)
     # because ... can't be passed to a function inside mutate directly.
     aug_fml <- if(aug_args == ""){
-      as.formula("~list(broom::augment(model, newdata = df))")
+      "broom::augment(m, newdata = df)"
     } else {
-      as.formula(paste0("~list(broom::augment(model, newdata = df, ", aug_args, "))"))
+      paste0("broom::augment(m, newdata = df, ", aug_args, ")")
     }
     ret <- model_df %>%
       # result of aug_fml will be stored in .text_index column
       # .test_index is used because model_df has it and won't be used here
-      dplyr::mutate_(.dots = list(.test_index = aug_fml)) %>%
-      dplyr::ungroup()
+      dplyr::mutate(.test_index=purrr::map(model, function(m){eval(parse(text=aug_fml))})) 
 
     ret <- if(with_respose) {
       ret %>%
@@ -330,9 +324,9 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
         # because ... can't be passed to a function inside mutate directly.
         # If test is FALSE, this uses data as an argument and if not, uses newdata as an argument.
         aug_fml_test <- if(aug_args == ""){
-          as.formula("~list(broom::augment(model, data = source.data, data_type = 'test'))")
+          "broom::augment(m, data = df, data_type='test')"
         } else {
-          as.formula(paste0("~list(broom::augment(model, data = source.data, data_type = 'test', ", aug_args, "))"))
+          paste0("broom::augment(m, data = df, data_type='test', ", aug_args, ")")
         }
         augmented <- df %>%
           dplyr::ungroup() %>%
@@ -344,9 +338,8 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
             safe_slice(df, index, remove = FALSE)
           })) %>%
           dplyr::select(-.test_index) %>%
-          dplyr::rowwise() %>%
           # evaluate the formula of augment and "data" column will have it
-          dplyr::mutate_(.dots = list(source.data = aug_fml_test))
+          dplyr::mutate(source.data=purrr::map2(model, source.data, function(m,df){eval(parse(text=aug_fml_test))})) 
         augmented <- augmented %>%
           dplyr::ungroup()
 
@@ -375,9 +368,9 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
         # because ... can't be passed to a function inside mutate directly.
         # If test is TRUE, this uses newdata as an argument and if not, uses data as an argument.
         aug_fml <- if(aug_args == ""){
-          as.formula("~list(broom::augment(model, newdata = source.data))")
+          "broom::augment(m, newdata = df)"
         } else {
-          as.formula(paste0("~list(broom::augment(model, newdata = source.data, ", aug_args, "))"))
+          paste0("broom::augment(m, newdata = df, ", aug_args, ")")
         }
         data_to_augment <- df %>%
           dplyr::ungroup() %>%
@@ -394,9 +387,8 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
 
         augmented <- tryCatch({
           data_to_augment %>%
-            dplyr::rowwise() %>%
-            # evaluate the formula of augment and "source.data" column will have it
-            dplyr::mutate_(.dots = list(source.data = aug_fml))
+            # evaluate the formula of augment and "data" column will have it
+            dplyr::mutate(source.data=purrr::map2(model, source.data, function(m,df){eval(parse(text=aug_fml))})) 
         }, error = function(e){
           if (grepl("arguments imply differing number of rows: ", e$message)) {
             data_to_augment %>%
@@ -414,9 +406,8 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
 
                 filtered_data
               })) %>%
-              dplyr::rowwise() %>%
               # evaluate the formula of augment and "data" column will have it
-              dplyr::mutate_(.dots = list(source.data = aug_fml))
+              dplyr::mutate(source.data=purrr::map2(model, source.data, function(m,df){eval(parse(text=aug_fml))}))
           } else {
             stop(e$message)
           }
@@ -440,9 +431,9 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
       # Use formula to support expanded aug_args (especially for type.predict for logistic regression)
       # because ... can't be passed to a function inside mutate directly.
       aug_fml <- if(aug_args == ""){
-        as.formula("~list(broom::augment(model, data = source.data))")
+        "broom::augment(m, data = df)"
       } else {
-        as.formula(paste0("~list(broom::augment(model, data = source.data, ", aug_args, "))"))
+        paste0("broom::augment(m, data = df, ", aug_args, ")")
       }
       augmented <- df %>%
         dplyr::ungroup() %>%
@@ -452,10 +443,8 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
           safe_slice(df, index, remove = TRUE)
         })) %>%
         dplyr::select(-.test_index) %>%
-        dplyr::rowwise() %>%
         # evaluate the formula of augment and "data" column will have it
-        dplyr::mutate_(.dots = list(source.data = aug_fml)) %>%
-        dplyr::ungroup()
+        dplyr::mutate(source.data=purrr::map2(model, source.data, function(m, df){eval(parse(text=aug_fml))}))
 
       if (with_response){
         augmented <- augmented %>%
@@ -474,14 +463,14 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
       # because ... can't be passed to a function inside mutate directly.
       # If test is FALSE, this uses data as an argument and if not, uses newdata as an argument.
       aug_fml_training <- if(aug_args == ""){
-        as.formula("~list(broom::augment(model, data = source.data.training))")
+        "broom::augment(m, data = df)"
       } else {
-        as.formula(paste0("~list(broom::augment(model, data = source.data.training, ", aug_args, "))"))
+        paste0("broom::augment(m, data = df, ", aug_args, ")")
       }
       aug_fml_test <- if(aug_args == ""){
-        as.formula("~list(broom::augment(model, data = source.data.test, data_type = 'test'))")
+        "broom::augment(m, data = df, data_type = 'test')"
       } else {
-        as.formula(paste0("~list(broom::augment(model, data = source.data.test, data_type = 'test', ", aug_args, "))"))
+        paste0("broom::augment(m, data = df, data_type = 'test', ", aug_args, ")")
       }
       augmented <- df %>%
         dplyr::ungroup() %>%
@@ -494,9 +483,9 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
           safe_slice(df, index, remove = FALSE)
         })) %>%
         dplyr::select(-.test_index) %>%
-        dplyr::rowwise() %>%
         # evaluate the formula of augment and "data" column will have it
-        dplyr::mutate_(.dots = list(source.data.training = aug_fml_training, source.data.test = aug_fml_test))
+        dplyr::mutate(source.data.training = purrr::map2(model, source.data.training, function(m, df){eval(parse(text=aug_fml_training))}),
+                      source.data.test = purrr::map2(model, source.data.test, function(m, df){eval(parse(text=aug_fml_test))}))
       augmented <- augmented %>%
         dplyr::ungroup() %>% # ungroup is necessary here to get expected df1, df2 value in the next line.
         dplyr::mutate(source.data = purrr::map2(source.data.training, source.data.test, function(df1, df2){
@@ -564,7 +553,7 @@ prediction_training_and_test <- function(df, prediction_type="default", threshol
   if (nrow(filtered) == 0) { # No valid models were returned.
     return(data.frame())
   }
-  model <- filtered %>% `[[`(1, "model")
+  model <- filtered$model[[1]]
 
   grouped_cols <- colnames(df)[!colnames(df) %in% c("model", ".test_index", "source.data", ".model_metadata")]
 
@@ -621,7 +610,7 @@ prediction_binary <- function(df, threshold = 0.5, ...){
   if (nrow(df) == 0) { # No valid models were returned.
     return(data.frame())
   }
-  first_model <- df %>% `[[`(1, "model")
+  first_model <- df$model[[1]]
 
   ret <- prediction(df, ...)
 
@@ -1112,8 +1101,10 @@ model_anova <- function(df, pretty.name = FALSE){
   validate_empty_data(df)
 
   ret <- suppressWarnings({
-    # this causes warning for Deviance, Resid..Df, Resid..Dev in glm model
-    df %>% dplyr::mutate(model = list(anova(model))) %>% broom::tidy(model)
+    # this causes warning for Deviance, Resid..Df, Resid..Dev in glm model. TODO: Is this still true?
+    df %>% dplyr::mutate(output=purrr::map(model,function(m){broom::tidy(anova(m))})) %>%
+      dplyr::select(-source.data, -.test_index, -model, -.model_metadata) %>%
+      tidyr::unnest(output)
   })
   if(pretty.name){
     colnames(ret)[colnames(ret) == "term"] <- "Term"
@@ -1294,11 +1285,15 @@ model_confint <- function(df, ...){
   # this expands dots arguemtns to character
   arg_char <- expand_args(caller, exclude = c("df"))
   if (arg_char != "") {
-    fml <- as.formula(paste0("~list(stats::confint(model, ", arg_char, "))"))
+    fml <- paste0("broom::tidy(stats::confint(m, ", arg_char, "))")
   } else {
-    fml <- as.formula(paste0("~list(stats::confint(model))"))
+    fml <- paste0("broom::tidy(stats::confint(m))")
   }
-  ret <- df %>% dplyr::mutate_(.dots = list(model = fml)) %>% broom::tidy(model)
+
+  ret <- df %>% dplyr::mutate(output=purrr::map(model,function(m){eval(parse(text=fml))})) %>%
+      dplyr::select(-source.data, -.test_index, -model, -.model_metadata) %>%
+      tidyr::unnest(output)
+
   colnames(ret)[colnames(ret) == ".rownames"] <- "Term"
   # original columns are like X0.5..   X99.5.., so replace X to Prob and remove trailing dots
   new_p_cnames <- stringr::str_replace(colnames(ret)[(ncol(ret)-1):ncol(ret)], "X", "Prob ") %>%
