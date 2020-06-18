@@ -2207,7 +2207,7 @@ sample_n <- function(..., seed = NULL) {
 }
 
 # Wrapper function for slice_sample
-sample_slice <- function(..., seed = NULL) {
+slice_sample <- function(..., seed = NULL) {
   if(!is.null(seed)) {
     set.seed(seed)
   }
