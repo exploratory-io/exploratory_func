@@ -1022,6 +1022,7 @@ build_lm.fast <- function(df,
   } else {
     ret <- ret %>% tidyr::nest()
   }
+  ret <- ret %>% dplyr::ungroup() # Remove rowwise grouping so that following mutate works as expected.
   ret %>% dplyr::mutate(model = purrr::map(data, function(df){
             df[[model_and_data_col]][[1]]$model
           })) %>%

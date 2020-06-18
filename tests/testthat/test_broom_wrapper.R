@@ -1,5 +1,4 @@
 context("test broom wrappers")
-
 set.seed(0)
 test_df <- data.frame(vec1 = seq(10), vec2 = seq(10), random = runif(10, min=0, max=10))
 test_that("test data frame prediction by xgboost with group", {
