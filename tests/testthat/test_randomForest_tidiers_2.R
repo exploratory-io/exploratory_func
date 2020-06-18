@@ -13,7 +13,7 @@ filepath <- if (!testdata_filename %in% list.files(testdata_dir)) {
 flight <- exploratory::read_delim_file(filepath, ",", quote = "\"", skip = 0 , col_names = TRUE , na = c("","NA") , locale=readr::locale(encoding = "UTF-8", decimal_mark = "."), trim_ws = FALSE , progress = FALSE) %>% exploratory::clean_data_frame()
 
 filepath <- if (!testdata_filename %in% list.files(testdata_dir)) {
-  flight <- flight %>% sample_n(5000)
+  flight <- flight %>% slice_sample(n=5000)
   write.csv(flight, testdata_file_path) # save sampled-down data for performance.
 }
 
@@ -359,11 +359,11 @@ test_that("in the case of a unkown target variable of predictiton ranger with mu
 
   pred_train_ret <- suppressWarnings(prediction(model_ret, data = "newdata", data_frame = test_data))
   expect_equal(pred_train_ret[1, "predicted_label"]$predicted_label, NA_character_)
- 
+
 })
 
 test_that("calc imp negative test", { #TODO: What was this case for?
-  model_df <- flight %>% dplyr::sample_n(4000) %>% calc_feature_imp(`ARR DELAY`, `YE AR`, `MON TH`, `DAY OF MONTH`, `FL DATE`, `TAIL NUM`, `FL NUM`, `ORI GIN`, `ORIGIN CITY NAME`, `ORIGIN STATE ABR`, `DE ST`, `DEST CITY NAME`, `DEST STATE ABR`, `DEP TIME`, `DEP DELAY`, `ARR TIME`, `CAN CELLED`, `CANCELLATION CODE`, `AIR TIME`, `DIS TANCE`, `WEATHER DELAY`, `delay ed`, `is UA`, `is delayed`, `end time`, `is UA or AA`, smote = FALSE)
+  model_df <- flight %>% slice_sample(n=4000) %>% calc_feature_imp(`ARR DELAY`, `YE AR`, `MON TH`, `DAY OF MONTH`, `FL DATE`, `TAIL NUM`, `FL NUM`, `ORI GIN`, `ORIGIN CITY NAME`, `ORIGIN STATE ABR`, `DE ST`, `DEST CITY NAME`, `DEST STATE ABR`, `DEP TIME`, `DEP DELAY`, `ARR TIME`, `CAN CELLED`, `CANCELLATION CODE`, `AIR TIME`, `DIS TANCE`, `WEATHER DELAY`, `delay ed`, `is UA`, `is delayed`, `end time`, `is UA or AA`, smote = FALSE)
   res_importance <- model_df %>% rf_importance()
   expect_equal(colnames(res_importance), c("variable", "importance"))
   res_partial_dependence <- model_df %>% rf_partial_dependence() %>% rename(`X-Axis`=x_value, `ARR DELAY`=y_value)
@@ -375,7 +375,7 @@ test_that("calc imp negative test", { #TODO: What was this case for?
 })
 
 test_that("calc imp - variables for edarf should correspond to variables decided to be Confirmed or Tentative by Boruta", {
-  model_df <- flight %>% dplyr::sample_n(4000) %>% calc_feature_imp(`ARR DELAY`, `YE AR`, `MON TH`, `DAY OF MONTH`, `FL DATE`, `TAIL NUM`, `FL NUM`, `ORI GIN`, `ORIGIN CITY NAME`, `ORIGIN STATE ABR`, `DE ST`, `DEST CITY NAME`, `DEST STATE ABR`, `DEP TIME`, `DEP DELAY`, `ARR TIME`, `CAN CELLED`, `CANCELLATION CODE`, `AIR TIME`, `DIS TANCE`, `WEATHER DELAY`, `delay ed`, `is UA`, `is delayed`, `end time`, `is UA or AA`,
+  model_df <- flight %>% slice_sample(n=4000) %>% calc_feature_imp(`ARR DELAY`, `YE AR`, `MON TH`, `DAY OF MONTH`, `FL DATE`, `TAIL NUM`, `FL NUM`, `ORI GIN`, `ORIGIN CITY NAME`, `ORIGIN STATE ABR`, `DE ST`, `DEST CITY NAME`, `DEST STATE ABR`, `DEP TIME`, `DEP DELAY`, `ARR TIME`, `CAN CELLED`, `CANCELLATION CODE`, `AIR TIME`, `DIS TANCE`, `WEATHER DELAY`, `delay ed`, `is UA`, `is delayed`, `end time`, `is UA or AA`,
                                                                     smote = FALSE, with_boruta = TRUE)
 
   res_partial_dependence <- model_df %>% rf_partial_dependence()

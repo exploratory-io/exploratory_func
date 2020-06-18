@@ -489,7 +489,7 @@ sample_rows <- function(df, size, seed = NULL, ...) {
 
   ret <- nested %>% dplyr::mutate(.temp.data = purrr::map(.temp.data, function(df){
     if (!is.null(size) && nrow(df) > size) {
-      dplyr::sample_n(df, size, ...)
+      slice_sample(df, n = size, ...)
     }
     else {
       df
@@ -2198,6 +2198,7 @@ is_integer <- function(x) {
 }
 
 # Wrapper function for sample_n
+# obsoleted. use sample_slie instead.
 sample_n <- function(..., seed = NULL) {
   if(!is.null(seed)) {
     set.seed(seed)
@@ -2205,7 +2206,16 @@ sample_n <- function(..., seed = NULL) {
   dplyr::sample_n(...);
 }
 
+# Wrapper function for slice_sample
+sample_slice <- function(..., seed = NULL) {
+  if(!is.null(seed)) {
+    set.seed(seed)
+  }
+  dplyr::slice_sample(...);
+}
+
 # Wrapper function for sample_frac
+# obsoleted. use sample_slie instead.
 sample_frac <- function(..., seed = NULL){
   if(!is.null(seed)) {
     set.seed(seed)
