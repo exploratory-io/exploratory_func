@@ -248,12 +248,12 @@ test_that("test build_kmeans.cols", {
   expect_true(is.factor(ret$cluster))
 })
 
-test_that("test build_kmeans", {
+test_that("test build_kmeans when there is already a column named cluster", {
   test_df[["cluster"]] <- rep(1, nrow(test_df))
   result <- test_df %>%
     build_kmeans(skv = c("vec1", "vec2"), centers=2, augment = FALSE) %>%
     augment_kmeans(model, data = source.data)
-  expect_true(is.factor(result[["cluster.new"]]))
+  expect_true(is.numeric(result[["cluster.new"]]))
   expect_equal(length(colnames(result)[colnames(result) == "cluster"]), 1)
   expect_equal(length(colnames(result)[colnames(result) == "cluster.new"]), 1)
 })
