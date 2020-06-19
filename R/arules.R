@@ -169,7 +169,7 @@ get_arules_graph_data <- function(rules, max_rules=30, rules_metric="support") {
       rules <- rules %>% dplyr::filter(UQ(rlang::sym(rules_metric)) != min(UQ(rlang::sym(rules_metric))))
     }
     else {
-      rules <- rules %>% sample_n(max_rules) # in this case, just sample so that plotting will not take very long time.
+      rules <- rules %>% slice_sample(n = max_rules) # in this case, just sample so that plotting will not take very long time.
     }
   }
 

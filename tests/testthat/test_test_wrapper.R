@@ -284,7 +284,7 @@ test_that("test exp_ttest with alternative = greater", {
 
 test_that("test exp_ttest with paired = TRUE", {
   # Make sample size equal between groups for paired t-test.
-  mtcars2 <- mtcars %>% group_by(am) %>% sample_n(6) %>% ungroup()
+  mtcars2 <- mtcars %>% group_by(am) %>% slice_sample(n=6) %>% ungroup()
   ret <- exp_ttest(mtcars2, mpg, am, paired = TRUE)
   ret %>% tidy(model, type="model")
   ret %>% tidy(model, type="data_summary")
@@ -302,7 +302,7 @@ test_that("test exp_ttest with power", {
 
 test_that("test exp_ttest with power with paired = TRUE", {
   # Make sample size equal between groups for paired t-test.
-  mtcars2 <- mtcars %>% group_by(am) %>% sample_n(6) %>% ungroup()
+  mtcars2 <- mtcars %>% group_by(am) %>% slice_sample(n=6) %>% ungroup()
   ret <- exp_ttest(mtcars2, mpg, am, paired = TRUE, power = 0.8)
   ret %>% tidy(model, type="model")
   ret %>% tidy(model, type="data_summary")

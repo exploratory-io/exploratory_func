@@ -22,7 +22,7 @@ if (!exists("flight_downloaded")) {
 }
 
 # Add group_by. Cases without group_by is covered in test_randomForest_tidiers_3.R.
-flight <- flight %>% sample_n(5000) %>% group_by(`CAR RIER`)
+flight <- flight %>% slice_sample(n=5000) %>% group_by(`CAR RIER`)
 
 
 test_that("calc_feature_map(regression) evaluate training and test", {
