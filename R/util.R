@@ -2198,7 +2198,7 @@ is_integer <- function(x) {
 }
 
 # Wrapper function for sample_n
-# obsoleted. use sample_slie instead.
+# obsoleted. use slice_sample instead.
 sample_n <- function(..., seed = NULL) {
   if(!is.null(seed)) {
     set.seed(seed)
