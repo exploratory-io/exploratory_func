@@ -56,21 +56,12 @@ getOAuthToken <- function(clientId, secret, appName, endpointType, scopeList, to
 #' @export
 getGoogleTokenForAnalytics <- function(tokenFileId = "", useCache=TRUE){
   if(!requireNamespace("RGoogleAnalytics")){stop("package RGoogleAnalytics must be installed")}
-  # As per Kan, this can be hard coded since Google limits acces per ViewID (tableID) and
-  # not by clientID
-  clientId <- "1066595427418-aeppbdhi7bj7g0osn8jpj4p6r9vus7ci.apps.googleusercontent.com"
-  secret <-  "wGVbD4fttv_shYreB3PXcjDY"
   appName = "google"
-  endpointType = "google"
   # retrieve token info from environment
   # main purpose is to enable server refresh
   token_info <- getTokenInfo("googleanalytics")
   if(is.null(token_info)){
-    tokenFileName ="ga_token.rds"
-    scopeList = c("https://www.googleapis.com/auth/analytics.readonly")
-    token = getOAuthToken(clientId, secret, appName, endpointType, scopeList, tokenFileName, tokenFileId, useCache)
-    RGoogleAnalytics::ValidateToken(token)
-    token
+    stop("OAuth token is not set for Google Analytics.")
   } else {
     HttrOAuthToken2.0$new(
       authorize = "https://accounts.google.com/o/oauth2/auth",
@@ -108,10 +99,7 @@ refreshGoogleTokenForAnalysis <- function(tokenFileId){
 getGoogleTokenForSheet <- function(tokenFileId="", useCache=TRUE){
   # As per Kan, this can be hard coded since Google limits acces per ViewID (tableID) and
   # not by clientID
-  clientId <- "1066595427418-aeppbdhi7bj7g0osn8jpj4p6r9vus7ci.apps.googleusercontent.com"
-  secret <-  "wGVbD4fttv_shYreB3PXcjDY"
   appName = "google"
-  endpointType = "google"
   # retrieve token info from environment
   # main purpose is to enable server refresh
   token_info <- getTokenInfo("googlesheet") # this should be googlesheets but our plunin is already named googlesheet
@@ -130,10 +118,7 @@ getGoogleTokenForSheet <- function(tokenFileId="", useCache=TRUE){
       )
     )
   } else {
-    tokenFileName ="gs_token.rds"
-    scopeList <- c("https://spreadsheets.google.com/feeds","https://www.googleapis.com/auth/drive")
-    token = getOAuthToken(clientId, secret, appName, endpointType, scopeList, tokenFileName, tokenFileId, useCache)
-    token
+    stop("OAuth token is not set for Google Sheets.")
   }
 }
 
@@ -148,9 +133,7 @@ refreshGoogleTokenForSheet <- function(tokenFileId){
 #' @export
 getTwitterToken <- function(tokenFileId="", useCache=TRUE){
   if(!requireNamespace("rtweet")){stop("package rtweet must be installed.")}
-  consumer_key = "kYrHnqx62YaCoy6g0x967BGBq"
   appName = "twitter"
-  endpointType = "twitter"
   # retrieve token info from environment
   # main purpose is to enable server refresh
   token_info <- getTokenInfo("twitter")
@@ -171,9 +154,7 @@ getTwitterToken <- function(tokenFileId="", useCache=TRUE){
       )
     )
   } else {
-    tokenFileName ="twitter_token.rds"
-    # Get OAuth credentials (For twitter use OAuth1.0)
-    getOAuthToken(consumer_key, consumer_secret, appName, endpointType, "", tokenFileName, tokenFileId, useCache, version = "1.0")
+    stop("OAuth token is not set for Twitter.")
   }
 }
 
@@ -188,13 +169,7 @@ refreshTwitterToken <- function(tokenFileId){
 getGoogleTokenForBigQuery <- function(tokenFileId="", useCache=TRUE){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
 
-  clientId <- "1066595427418-aeppbdhi7bj7g0osn8jpj4p6r9vus7ci.apps.googleusercontent.com"
-  secret <-  "wGVbD4fttv_shYreB3PXcjDY"
-  scopeList = c("https://www.googleapis.com/auth/bigquery",
-            "https://www.googleapis.com/auth/cloud-platform",
-            "https://www.googleapis.com/auth/devstorage.read_write")
   appName = "google"
-  endpointType = "google"
   # retrieve token info from environment
   # main purpose is to enable server refresh
   token_info <- getTokenInfo("googlebigquery") # this should be googlesheets but our plunin is already named googlebigquery
@@ -213,8 +188,7 @@ getGoogleTokenForBigQuery <- function(tokenFileId="", useCache=TRUE){
       )
     )
   } else {
-    tokenFileName ="bigquery_token.rds"
-    getOAuthToken(clientId, secret, appName, endpointType, scopeList, tokenFileName, tokenFileId, useCache)
+    stop("OAuth token is not set for Google BigQuery.")
   }
 }
 
