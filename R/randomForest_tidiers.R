@@ -1236,10 +1236,10 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
     each_func <- function(df) {
       # With the way this is called, df becomes list rather than data.frame.
       # Make it data.frame again so that prediction() can be applied on it.
-      if (!is.data.frame(df)) {
+      #if (!is.data.frame(df)) {
         df <- tibble::tribble(~model, ~.test_index, ~source.data,
                               df$model, df$.test_index, df$source.data)
-      }
+      #}
       if (is.null(df$model[[1]])) { # model is NULL. Skip this group.
         return(data.frame())
       }

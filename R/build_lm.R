@@ -1031,11 +1031,6 @@ build_lm.fast <- function(df,
           })) %>%
           dplyr::mutate(source.data = purrr::map(data, function(df){
             data <- df[[model_and_data_col]][[1]]$source_data
-            if (length(grouped_cols) > 0 && !is.null(data)) {
-              data %>% dplyr::select(-grouped_cols)
-            } else {
-              data
-            }
           })) %>%
           dplyr::select(-data) %>%
           dplyr::rowwise()
@@ -1558,10 +1553,10 @@ evaluate_lm_training_and_test <- function(df, pretty.name = FALSE){
     each_func <- function(df){
       # With the way this is called, df becomes list rather than data.frame.
       # Make it data.frame again so that prediction() can be applied on it.
-      if (!is.data.frame(df)) {
+      #if (!is.data.frame(df)) {
         df <- tibble::tribble(~model, ~.test_index, ~source.data,
                               df$model, df$.test_index, df$source.data)
-      }
+      #}
 
       tryCatch({
         test_pred_ret <- prediction(df, data = "test")

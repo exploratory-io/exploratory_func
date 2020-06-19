@@ -1335,11 +1335,14 @@ validate_empty_data <- function(df) {
 do_on_each_group <- function(df, func, params = quote(list()), name = "tmp", with_unnest = TRUE){
   name <- avoid_conflict(colnames(df), name)
   # This is a list of arguments in do clause
-  args <- append(list(quote(.)), rlang::call_args(params))
+  args <- append(list(quote(across())), rlang::call_args(params))
+  ###args <- append(list(quote(.)), rlang::call_args(params))
   call <- rlang::new_call(func, rlang::as_pairlist(args))
-  ret <- df %>%
-    # UQ and UQ(get_expr()) evaluates those variables
-    dplyr::do(UQ(name) := UQ(rlang::get_expr(call)))
+  ###ret <- df %>% dplyr::do(UQ(name) := UQ(rlang::get_expr(call)))
+  ret <- df %>% dplyr::summarize(!!rlang::sym(name) := list(UQ(rlang::get_expr(call))))
+  if (length(grouped_by(df)) > 0) { # Trying to keep same behavior as old implementation with do().
+    ret <- ret %>% dplyr::rowwise()
+  }
   if(with_unnest){
     ret %>%
       dplyr::ungroup() %>%
@@ -1734,8 +1737,8 @@ bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_da
   dataframes_updated <- list()
   # Create a list of data frames from arguments passed to bind_rows.
   dataframes <- list()
-  # In order to avoid unexpected data structure change by flattening, 
-  # we call dots_values here instead of dots_list. 
+  # In order to avoid unexpected data structure change by flattening,
+  # we call dots_values here instead of dots_list.
   # Since return from dots_values can be a nested list, let's flatten it here.
   purrr::map(rlang::dots_values(...), function(x) {
     if ('data.frame' %in% class(x)) {
@@ -1743,7 +1746,7 @@ bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_da
       dataframes <<- c(dataframes, list(x))
     }
     else {
-      # Here we assume that x is a list of data frames. 
+      # Here we assume that x is a list of data frames.
       dataframes <<- c(dataframes, x)
     }
   })

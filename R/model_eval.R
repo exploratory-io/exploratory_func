@@ -347,10 +347,10 @@ evaluate_binary_training_and_test <- function(df, actual_val, threshold = "f_sco
   if (purrr::some(df$.test_index, function(x){length(x)!=0})) {
     ret$is_test_data <- FALSE # Set is_test_data FALSE for training data. Add is_test_data column only when there are test data too.
     each_func <- function(df) {
-      if (!is.data.frame(df)) {
+      #if (!is.data.frame(df)) {
         df <- tribble(~model, ~.test_index, ~source.data,
                       df$model, df$.test_index, df$source.data)
-      }
+      #}
 
       tryCatch({
         test_pred_ret <- prediction_binary(df, data = "test")
