@@ -553,14 +553,19 @@ parse_number <- function(text, ...){
   } else if (!is.character(text)) {
     # non character data raises Error in parse_vector(x, col_number(), na = na, locale = locale, trim_ws = trim_ws) : is.character(x) is not TRUE
     # so explicitly convert it to character before calling readr::parse_number
-    as.numeric(readr::parse_number(as.character(text), ...))
+    # Passing non-ascii character to readr::parse_number causes an error so remove non-ascii character before calling readr::parse_number.
+    # ref: https://github.com/tidyverse/readr/issues/1111
+    as.numeric(readr::parse_number(gsub('[^\x20-\x7E]', '', as.character(text)), ...))
   } else {
     # For some reason, output from parse_number returns FALSE for
     # is.vector(), which becomes a problem when it is fed to ranger
     # as the target variable. To work it around, we apply as.numeric().
-    as.numeric(readr::parse_number(text, ...))
+    # Passing non-ascii character to readr::parse_number causes an error so remove non-ascii character before calling readr::parse_number.
+    # ref: https://github.com/tidyverse/readr/issues/1111
+    as.numeric(readr::parse_number(gsub('[^\x20-\x7E]', '', text), ...))
   }
 }
+
 
 #' Wrapper function for readr::parse_logical
 #' @param text to parse
