@@ -1102,7 +1102,8 @@ model_anova <- function(df, pretty.name = FALSE){
 
   ret <- suppressWarnings({
     # this causes warning for Deviance, Resid..Df, Resid..Dev in glm model. TODO: Is this still true?
-    df %>% dplyr::mutate(output=purrr::map(model,function(m){broom::tidy(anova(m))})) %>%
+    df %>% dplyr::ungroup() %>%
+      dplyr::mutate(output=purrr::map(model,function(m){broom::tidy(anova(m))})) %>%
       dplyr::select(-source.data, -.test_index, -model, -.model_metadata) %>%
       tidyr::unnest(output)
   })
@@ -1290,7 +1291,9 @@ model_confint <- function(df, ...){
     fml <- paste0("broom::tidy(stats::confint(m))")
   }
 
-  ret <- df %>% dplyr::mutate(output=purrr::map(model,function(m){eval(parse(text=fml))})) %>%
+  ret <- df %>% 
+      dplyr::ungroup() %>%
+      dplyr::mutate(output=purrr::map(model,function(m){eval(parse(text=fml))})) %>%
       dplyr::select(-source.data, -.test_index, -model, -.model_metadata) %>%
       tidyr::unnest(output)
 
