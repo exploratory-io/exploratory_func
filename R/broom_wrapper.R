@@ -1160,11 +1160,15 @@ prediction_survfit <- function(df, newdata = NULL, ...){
   # this expands dots arguemtns to character
   arg_char <- expand_args(caller, exclude = c("df"))
   if (arg_char != "") {
-    fml <- as.formula(paste0("~list(survival::survfit(model, ", arg_char, "))"))
+    fml <- paste0("broom::tidy(survival::survfit(m, ", arg_char, "))")
   } else {
-    fml <- as.formula(paste0("~list(survival::survfit(model))"))
+    fml <- paste0("broom::tidy(survival::survfit(m))")
   }
-  ret <- df %>% dplyr::mutate_(.dots = list(model = fml)) %>% broom::tidy(model)
+  ret <- df %>% 
+      dplyr::ungroup() %>%
+      dplyr::mutate(output=purrr::map(model,function(m){eval(parse(text=fml))})) %>%
+      dplyr::select(-source.data, -.test_index, -model, -.model_metadata) %>%
+      tidyr::unnest(output)
 
   # if newdata exists and has more than one row, make output data frame tidy.
   # original output is in wide-format with columns like estimate.1, estimate.2, ...
