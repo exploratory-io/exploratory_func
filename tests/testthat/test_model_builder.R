@@ -1,6 +1,7 @@
 context("test model builders")
 
 loadNamespace("exploratory")
+set.seed(1)
 test_df <- data.frame(
   vec1=seq(10),
   vec2=10-seq(10),
