@@ -1181,11 +1181,11 @@ prediction_survfit <- function(df, newdata = NULL, ...){
       united_colnames = c(united_colnames, united_colname)
     }
     # gather the united values into key column (.cohort.temp) and value column (.val.temp)
-    gathered <- ret %>% gather_(".cohort.temp", ".val.temp", united_colnames)
+    gathered <- ret %>% tidyr::gather_(".cohort.temp", ".val.temp", united_colnames)
     # separte the value column to reverse the effect of unite() we did before.
-    ret <- gathered %>% separate_(".val.temp",c("estimate", "std_error", "conf_high", "conf_low"),sep="_")
+    ret <- gathered %>% tidyr::separate_(".val.temp",c("estimate", "std_error", "conf_high", "conf_low"),sep="_")
     # convert characterized data back to numeric.
-    ret <- ret %>% mutate(estimate = as.numeric(estimate), std_error = as.numeric(std_error), conf_high = as.numeric(conf_high), conf_low = as.numeric(conf_low))
+    ret <- ret %>% dplyr::mutate(estimate = as.numeric(estimate), std_error = as.numeric(std_error), conf_high = as.numeric(conf_high), conf_low = as.numeric(conf_low))
     # replace the cohort name with a string that is a concatenation of values that represents the cohort.
     # but, omit newdata column that has only 1 unique value from the cohort names we create here.
     selected_newdata_colnames <- non_single_value_colnames(newdata)
@@ -1193,7 +1193,7 @@ prediction_survfit <- function(df, newdata = NULL, ...){
     selected_newdata <- newdata[, selected_newdata_colnames, drop = FALSE]
     cohorts_labels <- selected_newdata %>% tidyr::unite(label, everything())
     for (i in 1:nrow(selected_newdata)){
-      ret <- ret %>% mutate(.cohort.temp = if_else(paste0("est", i) == .cohort.temp, cohorts_labels$label[[i]], .cohort.temp))
+      ret <- ret %>% dplyr::mutate(.cohort.temp = if_else(paste0("est", i) == .cohort.temp, cohorts_labels$label[[i]], .cohort.temp))
     }
     # replace the .cohort.temp column name with name like "age_sex".
     colnames(ret)[colnames(ret) == ".cohort.temp"] <- paste0(colnames(selected_newdata), collapse = "_")
