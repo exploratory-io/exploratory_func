@@ -1102,7 +1102,8 @@ model_anova <- function(df, pretty.name = FALSE){
 
   ret <- suppressWarnings({
     # this causes warning for Deviance, Resid..Df, Resid..Dev in glm model. TODO: Is this still true?
-    df %>% dplyr::mutate(output=purrr::map(model,function(m){broom::tidy(anova(m))})) %>%
+    df %>% dplyr::ungroup() %>%
+      dplyr::mutate(output=purrr::map(model,function(m){broom::tidy(anova(m))})) %>%
       dplyr::select(-source.data, -.test_index, -model, -.model_metadata) %>%
       tidyr::unnest(output)
   })
@@ -1159,11 +1160,15 @@ prediction_survfit <- function(df, newdata = NULL, ...){
   # this expands dots arguemtns to character
   arg_char <- expand_args(caller, exclude = c("df"))
   if (arg_char != "") {
-    fml <- as.formula(paste0("~list(survival::survfit(model, ", arg_char, "))"))
+    fml <- paste0("broom::tidy(survival::survfit(m, ", arg_char, "))")
   } else {
-    fml <- as.formula(paste0("~list(survival::survfit(model))"))
+    fml <- paste0("broom::tidy(survival::survfit(m))")
   }
-  ret <- df %>% dplyr::mutate_(.dots = list(model = fml)) %>% broom::tidy(model)
+  ret <- df %>% 
+      dplyr::ungroup() %>%
+      dplyr::mutate(output=purrr::map(model,function(m){eval(parse(text=fml))})) %>%
+      dplyr::select(-source.data, -.test_index, -model, -.model_metadata) %>%
+      tidyr::unnest(output)
 
   # if newdata exists and has more than one row, make output data frame tidy.
   # original output is in wide-format with columns like estimate.1, estimate.2, ...
@@ -1176,11 +1181,11 @@ prediction_survfit <- function(df, newdata = NULL, ...){
       united_colnames = c(united_colnames, united_colname)
     }
     # gather the united values into key column (.cohort.temp) and value column (.val.temp)
-    gathered <- ret %>% gather_(".cohort.temp", ".val.temp", united_colnames)
+    gathered <- ret %>% tidyr::gather_(".cohort.temp", ".val.temp", united_colnames)
     # separte the value column to reverse the effect of unite() we did before.
-    ret <- gathered %>% separate_(".val.temp",c("estimate", "std_error", "conf_high", "conf_low"),sep="_")
+    ret <- gathered %>% tidyr::separate_(".val.temp",c("estimate", "std_error", "conf_high", "conf_low"),sep="_")
     # convert characterized data back to numeric.
-    ret <- ret %>% mutate(estimate = as.numeric(estimate), std_error = as.numeric(std_error), conf_high = as.numeric(conf_high), conf_low = as.numeric(conf_low))
+    ret <- ret %>% dplyr::mutate(estimate = as.numeric(estimate), std_error = as.numeric(std_error), conf_high = as.numeric(conf_high), conf_low = as.numeric(conf_low))
     # replace the cohort name with a string that is a concatenation of values that represents the cohort.
     # but, omit newdata column that has only 1 unique value from the cohort names we create here.
     selected_newdata_colnames <- non_single_value_colnames(newdata)
@@ -1188,7 +1193,7 @@ prediction_survfit <- function(df, newdata = NULL, ...){
     selected_newdata <- newdata[, selected_newdata_colnames, drop = FALSE]
     cohorts_labels <- selected_newdata %>% tidyr::unite(label, everything())
     for (i in 1:nrow(selected_newdata)){
-      ret <- ret %>% mutate(.cohort.temp = if_else(paste0("est", i) == .cohort.temp, cohorts_labels$label[[i]], .cohort.temp))
+      ret <- ret %>% dplyr::mutate(.cohort.temp = if_else(paste0("est", i) == .cohort.temp, cohorts_labels$label[[i]], .cohort.temp))
     }
     # replace the .cohort.temp column name with name like "age_sex".
     colnames(ret)[colnames(ret) == ".cohort.temp"] <- paste0(colnames(selected_newdata), collapse = "_")
@@ -1290,7 +1295,9 @@ model_confint <- function(df, ...){
     fml <- paste0("broom::tidy(stats::confint(m))")
   }
 
-  ret <- df %>% dplyr::mutate(output=purrr::map(model,function(m){eval(parse(text=fml))})) %>%
+  ret <- df %>% 
+      dplyr::ungroup() %>%
+      dplyr::mutate(output=purrr::map(model,function(m){eval(parse(text=fml))})) %>%
       dplyr::select(-source.data, -.test_index, -model, -.model_metadata) %>%
       tidyr::unnest(output)
 
