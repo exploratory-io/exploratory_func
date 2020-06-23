@@ -143,7 +143,7 @@ getTwitterToken <- function(tokenFileId="", useCache=TRUE){
       authorize = "https://api.twitter.com/oauth/authenticate",
       access = "https://api.twitter.com/oauth/access_token",
       appname = "twitter",
-      key = consumer_key,
+      key = "kYrHnqx62YaCoy6g0x967BGBq",
       secret = token_info$consumer_sc,
       credentials = list(
         oauth_token = token_info$oauth_token,
