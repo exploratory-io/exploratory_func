@@ -575,6 +575,31 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients'
       # set order to ret and turn it back to character, so that the order is kept when groups are bound.
       # if it were kept as factor, when groups are bound, only the factor order from the first group would be respected.
       ret <- ret %>% dplyr::arrange(variable) %>% dplyr::mutate(variable = as.character(variable))
+
+      # TODO: Modularize this part of the code, which is common for all the partial dependence code.
+      # Sort the rows for scatter plots for categorical predictor variables, by Predicted values.
+      nested <- ret %>% dplyr::group_by(variable) %>% tidyr::nest(.temp.data=c(-variable)) #TODO: avoid possibility of column name conflict between .temp.data and group_by columns.
+      nested <- nested %>% dplyr::mutate(.temp.data = purrr::map(.temp.data, function(df){
+        # We do the sorting only for scatter chart with Predicted values. This eliminates line charts or multiclass classifications.
+        if (df$chart_type[[1]]=="scatter" && "Prediction" %in% unique(df$type)) {
+          # Set value factor level order first for the sorting at the next step.
+          df <- df %>% dplyr::mutate(value = forcats::fct_reorder2(value, type, survival, function(name, value) {
+            if ("Prediction" %in% name) {
+              -first(value[name=="Prediction"]) # Since we want to eventually display event occurrence rate instead of survival, adding -.
+            }
+            else { # This should not happen but giving reasonable default just in case.
+              -first(value)
+            }
+          }))
+          df <- df %>% dplyr::arrange(value)
+          df %>% dplyr::mutate(value = as.character(value)) # After sorting, change it back to character, so that it does not mess up the chart.
+        }
+        else {
+          df
+        }
+      }))
+      ret <- nested %>% tidyr::unnest(cols=.temp.data) %>% dplyr::ungroup()
+
       ret <- ret %>% dplyr::mutate(variable = x$terms_mapping[variable]) # map variable names to original.
       ret
     },
