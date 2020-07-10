@@ -197,8 +197,8 @@ exp_survival_forest <- function(df,
     stop(paste0("Time column (", time_col, ") must be numeric"))
   }
 
-  if (is.null(pred_survival_time)) { # By default, use median.
-    pred_survival_time <- median(df[[time_col]], na.rm=TRUE)
+  if (is.null(pred_survival_time)) { # By default, use median of observations with event.
+    pred_survival_time <- median((df %>% dplyr::filter(!!rlang::sym(status_col)))[[time_col]], na.rm=TRUE)
   }
 
   # cols will be filtered to remove invalid columns
