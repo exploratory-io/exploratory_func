@@ -2,6 +2,7 @@ context("test exp_survival_forest")
 
 test_that("test exp_survival_forest", {
   df <- survival::lung # this data has NAs.
+  df <- df %>% mutate(status = status==2)
   df <- df %>% rename(`ti me`=time, `sta tus`=status, `a ge`=age, `se-x`=sex)
   df <- df %>% mutate(ph.ecog = factor(ph.ecog, ordered=TRUE)) # test handling of ordered factor
   df <- df %>% mutate(`se-x` = `se-x`==1) # test handling of logical
@@ -15,6 +16,7 @@ test_that("test exp_survival_forest", {
 
 test_that("test exp_survival_forest with outtlier filtering", {
   df <- survival::lung # this data has NAs.
+  df <- df %>% mutate(status = status==2)
   df <- df %>% rename(`ti me`=time, `sta tus`=status, `a ge`=age, `se-x`=sex)
   df <- df %>% mutate(ph.ecog = factor(ph.ecog, ordered=TRUE)) # test handling of ordered factor
   df <- df %>% mutate(`se-x` = `se-x`==1) # test handling of logical
@@ -29,6 +31,7 @@ test_that("test exp_survival_forest with outtlier filtering", {
 test_that("exp_survival_forest error handling for predictor with single unique value", {
   expect_error({
     df <- survival::lung # this data has NAs.
+    df <- df %>% mutate(status = status==2)
     df <- df %>% mutate(age = 50) # Test for single unique value error handling.
     df <- df %>% rename(`ti me`=time, `sta tus`=status, `a ge`=age, `se-x`=sex)
     df <- df %>% mutate(ph.ecog = factor(ph.ecog, ordered=TRUE)) # test handling of ordered factor

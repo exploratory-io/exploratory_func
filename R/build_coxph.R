@@ -331,16 +331,8 @@ build_coxph.fast <- function(df,
   }
 
   # check status_col.
-  if (!is.numeric(df[[status_col]]) && !is.logical(df[[status_col]])) {
-    stop(paste0("Status column (", status_col, ")  must be logical or numeric with values of 1 (dead) or 0 (alive)."))
-  }
-  if (is.numeric(df[[status_col]])) {
-    unique_val <- unique(df[[status_col]])
-    sorted_unique_val <- sort(unique_val[!is.na(unique_val)])
-    if (!all(sorted_unique_val == c(0,1)) & !all(sorted_unique_val == c(1,2))) {
-      # we allow 1,2 too since survivial works with it, but we are not promoting it for simplicity.
-      stop(paste0("Status column (", status_col, ")  must be logical or numeric with values of 1 (dead) or 0 (alive)."))
-    }
+  if (!is.logical(df[[status_col]])) {
+    stop(paste0("Status column (", status_col, ")  must be logical."))
   }
 
   # check time_col
@@ -348,8 +340,12 @@ build_coxph.fast <- function(df,
     stop(paste0("Time column (", time_col, ") must be numeric"))
   }
 
-  if (is.null(pred_survival_time)) { # By default, use median.
-    pred_survival_time <- median(df[[time_col]], na.rm=TRUE)
+  if (is.null(pred_survival_time)) {
+    # By default, use mean of observations with event.
+    # median gave a point where survival rate was still predicted 100% in one of our test case.
+    pred_survival_time <- mean((df %>% dplyr::filter(!!rlang::sym(status_col)))[[time_col]], na.rm=TRUE)
+    # Pick maximum of existing values equal or less than the actual mean.
+    pred_survival_time <- max((df %>% dplyr::filter(!!rlang::sym(time_col) <= !!pred_survival_time))[[time_col]], na.rm=TRUE)
   }
 
   # cols will be filtered to remove invalid columns
@@ -496,6 +492,33 @@ build_coxph.fast <- function(df,
   do_on_each_group(clean_df, each_func, name = "model", with_unnest = FALSE)
 }
 
+survival_pdp_sort_categorical <- function(ret) {
+  # TODO: Modularize this part of the code, which is common for all the partial dependence code.
+  # Sort the rows for scatter plots for categorical predictor variables, by Predicted values.
+  nested <- ret %>% dplyr::group_by(variable) %>% tidyr::nest(.temp.data=c(-variable)) #TODO: avoid possibility of column name conflict between .temp.data and group_by columns.
+  nested <- nested %>% dplyr::mutate(.temp.data = purrr::map(.temp.data, function(df){
+    # We do the sorting only for scatter chart with Predicted values. This eliminates line charts or multiclass classifications.
+    if (df$chart_type[[1]]=="scatter" && "Prediction" %in% unique(df$type)) {
+      # Set value factor level order first for the sorting at the next step.
+      df <- df %>% dplyr::mutate(value = forcats::fct_reorder2(value, type, survival, function(name, value) {
+        if ("Prediction" %in% name) {
+          -first(value[name=="Prediction"]) # Since we want to eventually display event occurrence rate instead of survival, adding -.
+        }
+        else { # This should not happen but giving reasonable default just in case.
+          -first(value)
+        }
+      }))
+      df <- df %>% dplyr::arrange(value)
+      df %>% dplyr::mutate(value = as.character(value)) # After sorting, change it back to character, so that it does not mess up the chart.
+    }
+    else {
+      df
+    }
+  }))
+  ret <- nested %>% tidyr::unnest(cols=.temp.data) %>% dplyr::ungroup()
+  ret
+}
+
 #' special version of tidy.coxph function to use with build_coxph.fast.
 #' @export
 tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients', ...) { #TODO: add test
@@ -575,6 +598,7 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients'
       # set order to ret and turn it back to character, so that the order is kept when groups are bound.
       # if it were kept as factor, when groups are bound, only the factor order from the first group would be respected.
       ret <- ret %>% dplyr::arrange(variable) %>% dplyr::mutate(variable = as.character(variable))
+      ret <- ret %>% survival_pdp_sort_categorical()
       ret <- ret %>% dplyr::mutate(variable = x$terms_mapping[variable]) # map variable names to original.
       ret
     },
