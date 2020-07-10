@@ -1897,7 +1897,10 @@ extract_importance_history_from_boruta <- function(x) {
   res <- tidyr::gather(as.data.frame(x$ImpHistory), "variable","importance")
   decisions <- data.frame(variable=names(x$finalDecision), decision=x$finalDecision)
   res <- res %>% dplyr::left_join(decisions, by = "variable")
-  res <- res %>% dplyr::filter(decision %in% c("Confirmed", "Tentative", "Rejected")) # Remove rows with NA, which are shadow variables
+  # Remove rows with NA, which are shadow variables.
+  # Also remove -Inf importance which seems to mean removed rejected variables in the iterations toward the end.
+  # If we kept those -Inf values, the x-axis ordering of boxplot would be messed up.
+  res <- res %>% dplyr::filter(decision %in% c("Confirmed", "Tentative", "Rejected") & importance != -Inf)
   res
 }
 
