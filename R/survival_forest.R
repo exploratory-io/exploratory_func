@@ -188,16 +188,8 @@ exp_survival_forest <- function(df,
   }
 
   # check status_col.
-  if (!is.numeric(df[[status_col]]) && !is.logical(df[[status_col]])) {
-    stop(paste0("Status column (", status_col, ")  must be logical or numeric with values of 1 (dead) or 0 (alive)."))
-  }
-  if (is.numeric(df[[status_col]])) {
-    unique_val <- unique(df[[status_col]])
-    sorted_unique_val <- sort(unique_val[!is.na(unique_val)])
-    if (!all(sorted_unique_val == c(0,1)) & !all(sorted_unique_val == c(1,2))) {
-      # we allow 1,2 too since survivial works with it, but we are not promoting it for simplicity.
-      stop(paste0("Status column (", status_col, ")  must be logical or numeric with values of 1 (dead) or 0 (alive)."))
-    }
+  if (!is.logical(df[[status_col]])) {
+    stop(paste0("Status column (", status_col, ")  must be logical."))
   }
 
   # check time_col
