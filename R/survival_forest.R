@@ -424,6 +424,7 @@ tidy.ranger_survival_exploratory <- function(x, type = 'importance', ...) { #TOD
       # set order to ret and turn it back to character, so that the order is kept when groups are bound.
       # if it were kept as factor, when groups are bound, only the factor order from the first group would be respected.
       ret <- ret %>% dplyr::arrange(variable) %>% dplyr::mutate(variable = as.character(variable))
+      ret <- ret %>% survival_pdp_sort_categorical()
       ret <- ret %>% dplyr::mutate(variable = x$terms_mapping[variable]) # map variable names to original.
       ret
     })
