@@ -340,8 +340,12 @@ build_coxph.fast <- function(df,
     stop(paste0("Time column (", time_col, ") must be numeric"))
   }
 
-  if (is.null(pred_survival_time)) { # By default, use median of observations with event.
-    pred_survival_time <- median((df %>% dplyr::filter(!!rlang::sym(status_col)))[[time_col]], na.rm=TRUE)
+  if (is.null(pred_survival_time)) {
+    # By default, use mean of observations with event.
+    # median gave a point where survival rate was still predicted 100% in one of our test case.
+    pred_survival_time <- mean((df %>% dplyr::filter(!!rlang::sym(status_col)))[[time_col]], na.rm=TRUE)
+    # Pick maximum of existing values equal or less than the actual mean.
+    pred_survival_time <- max((df %>% dplyr::filter(!!rlang::sym(time_col) <= !!pred_survival_time))[[time_col]], na.rm=TRUE)
   }
 
   # cols will be filtered to remove invalid columns
