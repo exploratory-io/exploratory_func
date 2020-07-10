@@ -2,6 +2,7 @@ context("test build_coxph")
 
 test_that("test build_coxph.fast", {
   df <- survival::lung # this data has NAs.
+  df <- df %>% mutate(status = status==2)
   df <- df %>% rename(`ti me`=time, `sta tus`=status, `a ge`=age, `se-x`=sex)
   df <- df %>% mutate(ph.ecog = factor(ph.ecog, ordered=TRUE)) # test handling of ordered factor
   df <- df %>% mutate(`se-x` = `se-x`==1) # test handling of logical
@@ -22,6 +23,7 @@ test_that("test build_coxph.fast", {
 
 test_that("test build_coxph.fast with outlier filtering", {
   df <- survival::lung # this data has NAs.
+  df <- df %>% mutate(status = status==2)
   df <- df %>% rename(`ti me`=time, `sta tus`=status, `a ge`=age, `se-x`=sex)
   df <- df %>% mutate(ph.ecog = factor(ph.ecog, ordered=TRUE)) # test handling of ordered factor
   df <- df %>% mutate(`se-x` = `se-x`==1) # test handling of logical
@@ -43,6 +45,7 @@ test_that("test build_coxph.fast with outlier filtering", {
 test_that("build_coxpy.fast() error handling for predictor with single unique value", {
   expect_error({
     df <- survival::lung # this data has NAs.
+    df <- df %>% mutate(status = status==2)
     df <- df %>% mutate(age = 50) # Test for single unique value error handling.
     df <- df %>% rename(`ti me`=time, `sta tus`=status, `a ge`=age, `se-x`=sex)
     df <- df %>% mutate(ph.ecog = factor(ph.ecog, ordered=TRUE)) # test handling of ordered factor
@@ -53,6 +56,7 @@ test_that("build_coxpy.fast() error handling for predictor with single unique va
 
 test_that("build_coxph()", {
   df <- survival::lung # this data has NAs.
+  df <- df %>% mutate(status = status==2)
   df <- df %>% rename(`ti me`=time, `sta tus`=status, `a ge`=age, `se-x`=sex)
   df <- df %>% mutate(`se-x` = `se-x`==1) # test handling of logical
   model_df <- df %>% build_coxph(survival::Surv(`ti me`, `sta tus`) ~ `a ge` + `se-x`, test_rate=0.3)
