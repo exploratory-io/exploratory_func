@@ -1968,6 +1968,7 @@ read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL,
         new_path <- tempfile(fileext = stringr::str_c(".", tools::file_ext(path)))
         file.copy(path, new_path)
         df <- readxl::read_excel(new_path, sheet = sheet, col_names = col_names, col_types = col_types, na = na, trim_ws = trim_ws, skip = skip, n_max = n_max)
+        file.remove(new_path)
       }
       else {
         # If it's local file without multibyte path, simply call readxl::read_excel
@@ -1996,7 +1997,9 @@ get_excel_sheets <- function(path){
     if (Sys.info()[["sysname"]] == "Windows" && grepl("[^ -~]", path)) {
       new_path <- tempfile(fileext = stringr::str_c(".", tools::file_ext(path)))
       file.copy(path, new_path)
-      readxl::excel_sheets(new_path)
+      ret <- readxl::excel_sheets(new_path)
+      file.remove(new_path)
+      ret
     }
     else {
       # If it's local file without multibyte path, simply call readxl::read_sheets.
