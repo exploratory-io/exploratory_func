@@ -1965,7 +1965,7 @@ read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL,
     # trim white space needs to be done first since it cleans column names
     if(trim_ws == TRUE) {
       # use trimws from base to remove ending and trailing white space for character columns
-      df <- df %>% dplyr::mutate_if(is.character, funs(trimws(.)))
+      df <- df %>% dplyr::mutate(dplyr::across(is.character, trimws))
     }
     if(col_names == FALSE) {
       # For backward comatilibity, use X__1, X__2, .. for default column names
