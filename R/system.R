@@ -1947,8 +1947,8 @@ read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL,
       } else {
         df <- openxlsx::read.xlsx(xlsxFile = new_path, sheet = sheet, colNames = col_names, startRow = skip+1, na.strings = na, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols, check.names = check.names, detectDates = detectDates)
       }
-      # preserve original column name for backward comaptibility (ref: https://github.com/awalker89/openxlsx/issues/102)
-      # TODO: Do we really need to call read.xlsx again for this?
+      # Preserve original column name for backward comaptibility (ref: https://github.com/awalker89/openxlsx/issues/102)
+      # Calling read.xlsx again looks inefficient, but it seems this is the only solution suggested in the above issue page.
       colnames(df) <- openxlsx::read.xlsx(xlsxFile = new_path, sheet = sheet, rows = (skip+1), check.names = FALSE, colNames = FALSE) %>% as.character()
       file.remove(new_path)
     }
@@ -1958,8 +1958,8 @@ read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL,
       } else {
         df <- openxlsx::read.xlsx(xlsxFile = path, sheet = sheet, colNames = col_names, startRow = skip+1, na.strings = na, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols, check.names = check.names, detectDates = detectDates)
       }
-      # preserve original column name for backward comaptibility (ref: https://github.com/awalker89/openxlsx/issues/102)
-      # TODO: Do we really need to call read.xlsx again for this?
+      # Preserve original column name for backward comaptibility (ref: https://github.com/awalker89/openxlsx/issues/102)
+      # Calling read.xlsx again looks inefficient, but it seems this is the only solution suggested in the above issue page.
       colnames(df) <- openxlsx::read.xlsx(xlsxFile = path, sheet = sheet, rows = (skip+1), check.names = FALSE, colNames = FALSE) %>% as.character()
     }
     # trim white space needs to be done first since it cleans column names
