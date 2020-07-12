@@ -1938,10 +1938,23 @@ read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL,
   df <- NULL
   # for .xlsx file extension
   if(stringr::str_detect(path, '\\.xlsx') & use_readxl == FALSE) {
-    if(n_max != Inf) {
-      df <- openxlsx::read.xlsx(xlsxFile = path, rows=(skip+1):n_max, sheet = sheet, colNames = col_names, na.strings = na, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols , check.names = check.names, detectDates = detectDates)
-    } else {
-      df <- openxlsx::read.xlsx(xlsxFile = path, sheet = sheet, colNames = col_names, startRow = skip+1, na.strings = na, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols, check.names = check.names, detectDates = detectDates)
+    # On Windows, if the path has multibyte chars, work around error from readxl::read_excel by copying the file to temp directory.
+    if (Sys.info()[["sysname"]] == "Windows" && grepl("[^ -~]", path)) {
+      new_path <- tempfile(fileext = stringr::str_c(".", tools::file_ext(path)))
+      file.copy(path, new_path)
+      if (n_max != Inf) {
+        df <- openxlsx::read.xlsx(xlsxFile = new_path, rows=(skip+1):n_max, sheet = sheet, colNames = col_names, na.strings = na, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols , check.names = check.names, detectDates = detectDates)
+      } else {
+        df <- openxlsx::read.xlsx(xlsxFile = new_path, sheet = sheet, colNames = col_names, startRow = skip+1, na.strings = na, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols, check.names = check.names, detectDates = detectDates)
+      }
+      file.remove(new_path)
+    }
+    else {
+      if (n_max != Inf) {
+        df <- openxlsx::read.xlsx(xlsxFile = path, rows=(skip+1):n_max, sheet = sheet, colNames = col_names, na.strings = na, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols , check.names = check.names, detectDates = detectDates)
+      } else {
+        df <- openxlsx::read.xlsx(xlsxFile = path, sheet = sheet, colNames = col_names, startRow = skip+1, na.strings = na, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols, check.names = check.names, detectDates = detectDates)
+      }
     }
     # trim white space needs to be done first since it cleans column names
     if(trim_ws == TRUE) {
