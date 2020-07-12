@@ -1963,9 +1963,9 @@ read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL,
       tmp <- download_data_file(path, "excel")
       df <- readxl::read_excel(tmp, sheet = sheet, col_names = col_names, col_types = col_types, na = na, trim_ws = trim_ws, skip = skip, n_max = n_max)
     } else {
-      # If the path has multibyte chars, work around error from readxl::read_excel by copying the file to temp directory.
-      if (grepl("[^ -~]", path)) {
-        new_path <- paste0(tempfile(), '.', tools::file_ext(path))
+      # On Windows, if the path has multibyte chars, work around error from readxl::read_excel by copying the file to temp directory.
+      if (Sys.info()[["sysname"]] == "Windows" && grepl("[^ -~]", path)) {
+        new_path <- tempfile(fileext = stringr::str_c(".", tools::file_ext(path)))
         file.copy(path, new_path)
         df <- readxl::read_excel(new_path, sheet = sheet, col_names = col_names, col_types = col_types, na = na, trim_ws = trim_ws, skip = skip, n_max = n_max)
       }
@@ -1992,9 +1992,9 @@ get_excel_sheets <- function(path){
     tmp <- download_data_file(path, "excel")
     readxl::excel_sheets(tmp)
   } else {
-    # If the path has multibyte chars, work around error from readxl::excel_sheets by copying the file to temp directory.
-    if (grepl("[^ -~]", path)) {
-      new_path <- paste0(tempfile(), '.', tools::file_ext(path))
+    # On Windows, if the path has multibyte chars, work around error from readxl::excel_sheets by copying the file to temp directory.
+    if (Sys.info()[["sysname"]] == "Windows" && grepl("[^ -~]", path)) {
+      new_path <- tempfile(fileext = stringr::str_c(".", tools::file_ext(path)))
       file.copy(path, new_path)
       readxl::excel_sheets(new_path)
     }
