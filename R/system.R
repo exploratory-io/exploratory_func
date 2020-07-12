@@ -1964,7 +1964,9 @@ read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL,
       df <- readxl::read_excel(tmp, sheet = sheet, col_names = col_names, col_types = col_types, na = na, trim_ws = trim_ws, skip = skip, n_max = n_max)
     } else {
       # if it's local file simply call readxl::read_excel
-      df <- readxl::read_excel(path, sheet = sheet, col_names = col_names, col_types = col_types, na = na, trim_ws = trim_ws, skip = skip, n_max = n_max)
+      new_path <- paste0(tempfile(), '.xlsx')
+      file.copy(path, new_path)
+      df <- readxl::read_excel(new_path, sheet = sheet, col_names = col_names, col_types = col_types, na = na, trim_ws = trim_ws, skip = skip, n_max = n_max)
     }
   }
   if(!is.null(tzone)) { # if timezone is specified, apply the timezeon to POSIXct columns
@@ -1985,7 +1987,9 @@ get_excel_sheets <- function(path){
     readxl::excel_sheets(tmp)
   } else {
     # if it's local file simply call readxl::read_excel
-    readxl::excel_sheets(path)
+    new_path <- paste0(tempfile(), '.xlsx')
+    file.copy(path, new_path)
+    readxl::excel_sheets(new_path)
   }
 }
 
