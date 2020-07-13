@@ -345,6 +345,32 @@ sql_glue_transformer <- function(code, envir) {
 }
 
 bigquery_glue_transformer <- function(code, envir) {
+  tokens <- stringr::str_split(code, ',')
+  tokens <- tokens[[1]]
+  code <- tokens[1]
+
+  # Parse arguments part. e.g. @{param1, quote=FALSE}
+  if (length(tokens) > 1) {
+    args <- tokens[2:length(tokens)]
+    args <- stringr::str_split(args, '=')
+    args <- purrr::map(args, trimws)
+    names <- purrr::map(args, function(x){x[1]})
+    values <- purrr::map(args, function(x){x[2]})
+    names(values) <- names
+  }
+  if (!is.null(values$quote) && values$quote == "FALSE") {
+    quote <- FALSE
+  }
+  else {
+    quote <- TRUE # Quote string by default.
+  }
+  if (!is.null(values$escape) && values$escape== "FALSE") {
+    escape <- FALSE
+  }
+  else {
+    escape <- TRUE # Escape for single quote by default.
+  }
+
   # Trim white spaces.
   code <- trimws(code)
 
@@ -367,17 +393,25 @@ bigquery_glue_transformer <- function(code, envir) {
   else if (is.character(val) || is.factor(val)) {
     # escape for Standard SQL for bigquery
     # https://cloud.google.com/bigquery/docs/reference/standard-sql/lexical
-    val <- gsub("\\", "\\\\", val, fixed=TRUE) # Escape literal backslash
-    val <- gsub("\'", "\\\'", val, fixed=TRUE) # Escape literal single quote
-    val <- paste0("'", val, "'")
+    if (escape) {
+      val <- gsub("\\", "\\\\", val, fixed=TRUE) # Escape literal backslash
+      val <- gsub("\'", "\\\'", val, fixed=TRUE) # Escape literal single quote
+    }
+    if (quote) {
+      val <- paste0("'", val, "'")
+    }
   }
   else if (lubridate::is.Date(val)) {
     val <- as.character(val)
-    val <- paste0("'", val, "'") # Athena and PostgreSQL quotes date with single quote. e.g. '2019-01-01'
+    if (quote) {
+      val <- paste0("'", val, "'") # Athena and PostgreSQL quotes date with single quote. e.g. '2019-01-01'
+    }
   }
   else if (lubridate::is.POSIXt(val)) {
     val <- as.character(val)
-    val <- paste0("'", val, "'") # Athena and PostgreSQL quotes timestamp with single quote. e.g. '2019-01-01 00:00:00'
+    if (quote) {
+      val <- paste0("'", val, "'") # Athena and PostgreSQL quotes timestamp with single quote. e.g. '2019-01-01 00:00:00'
+    }
   }
 
   # TODO: How should we handle logical?

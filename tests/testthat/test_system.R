@@ -193,6 +193,8 @@ test_that("bigquery_glue_transformer", {
   exploratory_env$v <- c("a","b","c")
   res <- glue_exploratory("@{ `v` }", .transformer=bigquery_glue_transformer)
   expect_equal(as.character(res), "'a', 'b', 'c'") # Not sure if this behavior works for all types of databases.
+  res <- glue_exploratory("@{ `v` , quote = FALSE }", .transformer=bigquery_glue_transformer)
+  expect_equal(as.character(res), "a, b, c") # No quote case
 
   exploratory_env$dept_names <- c("Sales","HR","CEO's secretary", "Data Science\\Statistics")
   exploratory_env$empid_above <- 1100
