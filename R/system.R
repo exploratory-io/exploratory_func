@@ -243,13 +243,13 @@ js_glue_transformer <- function(code, envir) {
     values <- purrr::map(args, function(x){x[2]})
     names(values) <- names
   }
-  if (!is.null(values$quote) && values$quote == "FALSE") {
+  if (!is.null(values$quote) && values$quote %in% c("FALSE", "F", "false", "NO", "no")) {
     quote <- FALSE
   }
   else {
     quote <- TRUE # Quote string by default.
   }
-  if (!is.null(values$escape) && values$escape== "FALSE") {
+  if (!is.null(values$escape) && values$escape %in% c("FALSE", "F", "false", "NO", "no")) {
     escape <- FALSE
   }
   else {
@@ -317,13 +317,13 @@ sql_glue_transformer <- function(code, envir) {
     values <- purrr::map(args, function(x){x[2]})
     names(values) <- names
   }
-  if (!is.null(values$quote) && values$quote == "FALSE") {
+  if (!is.null(values$quote) && values$quote %in% c("FALSE", "F", "false", "NO", "no")) {
     quote <- FALSE
   }
   else {
     quote <- TRUE # Quote string by default.
   }
-  if (!is.null(values$escape) && values$escape== "FALSE") {
+  if (!is.null(values$escape) && values$escape %in% c("FALSE", "F", "false", "NO", "no")) {
     escape <- FALSE
   }
   else {
@@ -393,13 +393,13 @@ bigquery_glue_transformer <- function(code, envir) {
     values <- purrr::map(args, function(x){x[2]})
     names(values) <- names
   }
-  if (!is.null(values$quote) && values$quote == "FALSE") {
+  if (!is.null(values$quote) && values$quote %in% c("FALSE", "F", "false", "NO", "no")) {
     quote <- FALSE
   }
   else {
     quote <- TRUE # Quote string by default.
   }
-  if (!is.null(values$escape) && values$escape== "FALSE") {
+  if (!is.null(values$escape) && values$escape %in% c("FALSE", "F", "false", "NO", "no")) {
     escape <- FALSE
   }
   else {
