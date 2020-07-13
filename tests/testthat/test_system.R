@@ -137,6 +137,12 @@ test_that("countycode", {
 test_that("js_glue_transformer", {
   exploratory_env <- new.env()
 
+  exploratory_env$v <- c("a","b","c")
+  res <- glue_exploratory("@{ `v` }", .transformer=js_glue_transformer)
+  expect_equal(as.character(res), '"a", "b", "c"') # default quote case.
+  res <- glue_exploratory("@{`v`, quote=FALSE}", .transformer=js_glue_transformer)
+  expect_equal(as.character(res), "a, b, c") # No quote case.
+
   exploratory_env$v <- c(T,F,NA)
   res <- glue_exploratory("@{v}", .transformer=js_glue_transformer)
   expect_equal(as.character(res), "true, false, null")
