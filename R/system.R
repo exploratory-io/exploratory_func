@@ -269,6 +269,26 @@ js_glue_transformer <- function(code, envir) {
 }
 
 sql_glue_transformer <- function(code, envir) {
+  tokens <- stringr::str_split(code, ',')
+  tokens <- tokens[[1]]
+  code <- tokens[1]
+
+  # Parse arguments part. e.g. @{param1, quote=FALSE}
+  if (length(tokens) > 1) {
+    args <- tokens[2:length(tokens)]
+    args <- stringr::str_split(args, '=')
+    args <- purrr::map(args, trimws)
+    names <- purrr::map(args, function(x){x[1]})
+    values <- purrr::map(args, function(x){x[2]})
+    names(values) <- names
+  }
+  if (!is.null(values$quote) && values$quote == "FALSE") {
+    quote <- FALSE
+  }
+  else {
+    quote <- TRUE
+  }
+
   # Trim white spaces.
   code <- trimws(code)
 
