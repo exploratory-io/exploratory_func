@@ -286,7 +286,13 @@ sql_glue_transformer <- function(code, envir) {
     quote <- FALSE
   }
   else {
-    quote <- TRUE
+    quote <- TRUE # Quote string by default.
+  }
+  if (!is.null(values$escape) && values$escape== "FALSE") {
+    escape <- FALSE
+  }
+  else {
+    escape <- TRUE # Escape for single quote by default.
   }
 
   # Trim white spaces.
@@ -311,16 +317,24 @@ sql_glue_transformer <- function(code, envir) {
   else if (is.character(val) || is.factor(val)) {
     # escape for SQL
     # TODO: check if this makes sense for Dremio and Athena
-    val <- gsub("'", "''", val, fixed=TRUE) # both Oracle and SQL Server escapes single quote by doubling them.
-    val <- paste0("'", val, "'") # both Oracle and SQL Server quotes strings with single quote.
+    if (escape) {
+      val <- gsub("'", "''", val, fixed=TRUE) # both Oracle and SQL Server escapes single quote by doubling them.
+    }
+    if (quote) {
+      val <- paste0("'", val, "'") # both Oracle and SQL Server quotes strings with single quote.
+    }
   }
   else if (lubridate::is.Date(val)) {
     val <- as.character(val)
-    val <- paste0("'", val, "'") # Athena and PostgreSQL quotes date with single quote. e.g. '2019-01-01'
+    if (quote) {
+      val <- paste0("'", val, "'") # Athena and PostgreSQL quotes date with single quote. e.g. '2019-01-01'
+    }
   }
   else if (lubridate::is.POSIXt(val)) {
     val <- as.character(val)
-    val <- paste0("'", val, "'") # Athena and PostgreSQL quotes timestamp with single quote. e.g. '2019-01-01 00:00:00'
+    if (quote) {
+      val <- paste0("'", val, "'") # Athena and PostgreSQL quotes timestamp with single quote. e.g. '2019-01-01 00:00:00'
+    }
   }
 
   # TODO: How should we handle logical?
