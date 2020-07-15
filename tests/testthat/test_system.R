@@ -137,6 +137,12 @@ test_that("countycode", {
 test_that("js_glue_transformer", {
   exploratory_env <- new.env()
 
+  exploratory_env$v <- c("a","b","c")
+  res <- glue_exploratory("@{ `v` }", .transformer=js_glue_transformer)
+  expect_equal(as.character(res), '"a", "b", "c"') # default quote case.
+  res <- glue_exploratory("@{`v`, quote=FALSE}", .transformer=js_glue_transformer)
+  expect_equal(as.character(res), "a, b, c") # No quote case.
+
   exploratory_env$v <- c(T,F,NA)
   res <- glue_exploratory("@{v}", .transformer=js_glue_transformer)
   expect_equal(as.character(res), "true, false, null")
@@ -166,6 +172,8 @@ test_that("sql_glue_transformer", {
   exploratory_env$v <- c("a","b","c")
   res <- glue_exploratory("@{ `v` }", .transformer=sql_glue_transformer)
   expect_equal(as.character(res), "'a', 'b', 'c'") # Not sure if this behavior works for all types of databases.
+  res <- glue_exploratory("@{`v`, quote=FALSE}", .transformer=sql_glue_transformer)
+  expect_equal(as.character(res), "a, b, c") # No quote case.
 
   exploratory_env$dept_names <- c("Sales","HR","CEO's secretary", "Data Science\\Statistics")
   exploratory_env$empid_above <- 1100
@@ -191,6 +199,8 @@ test_that("bigquery_glue_transformer", {
   exploratory_env$v <- c("a","b","c")
   res <- glue_exploratory("@{ `v` }", .transformer=bigquery_glue_transformer)
   expect_equal(as.character(res), "'a', 'b', 'c'") # Not sure if this behavior works for all types of databases.
+  res <- glue_exploratory("@{ `v` , quote = FALSE }", .transformer=bigquery_glue_transformer)
+  expect_equal(as.character(res), "a, b, c") # No quote case
 
   exploratory_env$dept_names <- c("Sales","HR","CEO's secretary", "Data Science\\Statistics")
   exploratory_env$empid_above <- 1100
