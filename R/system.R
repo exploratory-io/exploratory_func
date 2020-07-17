@@ -229,10 +229,10 @@ glue_exploratory <- function(text, .transformer, .envir = parent.frame()) {
 
 # glue transformer for mongo js query.
 # supports character, factor, logical, Date, POSIXct, POSIXlt, and numeric.
-js_glue_transformer <- function(code, envir) {
-  tokens <- stringr::str_split(code, ',')
+js_glue_transformer <- function(expr, envir) {
+  tokens <- stringr::str_split(expr, ',')
   tokens <- tokens[[1]]
-  code <- tokens[1]
+  name <- tokens[1]
   values <- NULL;
 
   # Parse arguments part. e.g. @{param1, quote=FALSE}
@@ -248,26 +248,35 @@ js_glue_transformer <- function(code, envir) {
     quote <- FALSE
   }
   else {
-    quote <- TRUE # Quote string by default.
+    quote <- NULL # Check default config for the parameter.
   }
   if (!is.null(values) && !is.null(values$escape) && values$escape %in% c("FALSE", "F", "false", "NO", "no")) {
     escape <- FALSE
   }
   else {
-    escape <- TRUE # Escape for single quote by default.
+    escape <- NULL # Check default config for the parameter.
   }
 
   # Trim white spaces.
-  code <- trimws(code)
+  name <- trimws(name)
 
   # Strip quote by ``.
-  should_strip <- grepl("^`.+`$", code)
+  should_strip <- grepl("^`.+`$", name)
   if (should_strip) {
-    code <- sub("^`", "", code)
-    code <- sub("`$", "", code)
+    name <- sub("^`", "", name)
+    name <- sub("`$", "", name)
   }
-  code <- paste0("exploratory_env$`", code, "`")
+  code <- paste0("exploratory_env$`", name, "`")
+
   val <- eval(parse(text = code), envir)
+
+  if (is.null(quote)) {
+    quote <- TRUE
+  }
+  if (is.null(escape)) {
+    escape <- TRUE
+  }
+
   if (is.null(val)) { # NULL in R is same as empty vector. Print empty string.
     val <- ""
   }
@@ -390,10 +399,10 @@ sql_glue_transformer <- function(expr, envir) {
   glue::glue_collapse(val, sep=", ")
 }
 
-bigquery_glue_transformer <- function(code, envir) {
-  tokens <- stringr::str_split(code, ',')
+bigquery_glue_transformer <- function(expr, envir) {
+  tokens <- stringr::str_split(expr, ',')
   tokens <- tokens[[1]]
-  code <- tokens[1]
+  name <- tokens[1]
   values <- NULL
 
   # Parse arguments part. e.g. @{param1, quote=FALSE}
@@ -409,27 +418,36 @@ bigquery_glue_transformer <- function(code, envir) {
     quote <- FALSE
   }
   else {
-    quote <- TRUE # Quote string by default.
+    quote <- NULL # Check default config for the parameter.
   }
   if (!is.null(values) && !is.null(values$escape) && values$escape %in% c("FALSE", "F", "false", "NO", "no")) {
     escape <- FALSE
   }
   else {
-    escape <- TRUE # Escape for single quote by default.
+    escape <- NULL # Check default config for the parameter.
   }
 
   # Trim white spaces.
-  code <- trimws(code)
+  name <- trimws(name)
 
   # Strip quote by ``.
-  should_strip <- grepl("^`.+`$", code)
+  should_strip <- grepl("^`.+`$", name)
   if (should_strip) {
-    code <- sub("^`", "", code)
-    code <- sub("`$", "", code)
+    name <- sub("^`", "", name)
+    name <- sub("`$", "", name)
   }
-  code <- paste0("exploratory_env$`", code, "`")
+
+  code <- paste0("exploratory_env$`", name, "`")
 
   val <- eval(parse(text = code), envir)
+
+  if (is.null(quote)) {
+    quote <- TRUE
+  }
+  if (is.null(escape)) {
+    escape <- TRUE
+  }
+
   if (is.null(val)) { # NULL in R is same as empty vector. Print empty string.
     val <- "NULL" # With BigQuery, "IN (NULL)" is valid while "IN ()" is syntax error.
   }
