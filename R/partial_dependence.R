@@ -124,6 +124,7 @@ handle_partial_dependence <- function(x) {
 
   # create mapping from column name (x_name) to facet chart type based on whether the column is numeric.
   chart_type_map <-c()
+  x_type_map <-c()
   df <- NULL
   if ("ranger" %in% class(x)) {
     df <- x$df
@@ -139,18 +140,32 @@ handle_partial_dependence <- function(x) {
     df <- x$model
   }
   for(col in colnames(df)) {
-    chart_type_map <- c(chart_type_map, is.numeric(df[[col]]))
+    if (is.numeric(df[[col]])) {
+      x_type <- "numeric"
+      chart_type <- "line"
+    }
+    else if (is.logical(df[[col]])) {
+      x_type <- "logical"
+      chart_type <- "scatter"
+    }
+    else {
+      x_type <- "character" # Since we turn charactors into factor in preprocessing (fct_lump) and cannot distinguish the original type at this point, for now, we treat both factors and characters as "characters" here.
+      chart_type <- "scatter"
+    }
+    x_type_map <- c(x_type_map, x_type)
+    chart_type_map <- c(chart_type_map, chart_type)
   }
-  chart_type_map <- ifelse(chart_type_map, "line", "scatter")
+  names(x_type_map) <- colnames(df)
   names(chart_type_map) <- colnames(df)
 
   ret <- ret %>%  dplyr::mutate(chart_type = chart_type_map[x_name])
+  ret <- ret %>%  dplyr::mutate(x_type = x_type_map[x_name])
 
   # Sort the rows for scatter plots for categorical predictor variables, by Predicted values.
   nested <- ret %>% dplyr::group_by(x_name) %>% tidyr::nest(.temp.data=c(-x_name)) #TODO: avoid possibility of column name conflict between .temp.data and group_by columns.
   nested <- nested %>% dplyr::mutate(.temp.data = purrr::map(.temp.data, function(df){
     # We do the sorting only for scatter chart with Predicted values. This eliminates line charts or multiclass classifications.
-    if (df$chart_type[[1]]=="scatter" && "Predicted" %in% unique(df$y_name)) {
+    if (df$x_type[[1]]=="character" && "Predicted" %in% unique(df$y_name)) {
       # Set x_value factor level order first for the sorting at the next step.
       df <- df %>% dplyr::mutate(x_value = forcats::fct_reorder2(x_value, y_name, y_value, function(name, value) {
         if ("Predicted" %in% name) {
