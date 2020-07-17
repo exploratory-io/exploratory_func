@@ -136,6 +136,7 @@ test_that("countycode", {
 
 test_that("js_glue_transformer", {
   exploratory_env <- new.env()
+  exploratory_env$.config <- new.env()
 
   exploratory_env$v <- c("a","b","c")
   res <- glue_exploratory("@{ `v` }", .transformer=js_glue_transformer)
@@ -164,6 +165,7 @@ test_that("js_glue_transformer", {
 
 test_that("sql_glue_transformer", {
   exploratory_env <- new.env()
+  exploratory_env$.config <- new.env()
 
   exploratory_env$v <- c(1,2,3)
   res <- glue_exploratory("@{ v }", .transformer=sql_glue_transformer)
@@ -191,6 +193,7 @@ test_that("sql_glue_transformer", {
 
 test_that("bigquery_glue_transformer", {
   exploratory_env <- new.env()
+  exploratory_env$.config <- new.env()
 
   exploratory_env$v <- c(1,2,3)
   res <- glue_exploratory("@{ v }", .transformer=bigquery_glue_transformer)

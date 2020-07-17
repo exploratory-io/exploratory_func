@@ -356,10 +356,18 @@ sql_glue_transformer <- function(expr, envir) {
   val <- eval(parse(text = code), envir)
 
   if (is.null(quote)) {
-    quote <- TRUE
+    code <- paste0("dplyr::if_else(is.null(exploratory_env$.config$`", name, "`),NULL,exploratory_env$.config$`", name, "`$quote)")
+    quote <- eval(parse(text = code), envir)
+    if (is.null(quote)) {
+      quote <- TRUE
+    }
   }
   if (is.null(escape)) {
-    escape <- TRUE
+    code <- paste0("dplyr::if_else(is.null(exploratory_env$.config$`", name, "`),NULL,exploratory_env$.config$`", name, "`$escape)")
+    escape <- eval(parse(text = code), envir)
+    if (is.null(escape)) {
+      escape <- TRUE
+    }
   }
 
   if (is.null(val)) { # NULL in R is same as empty vector. Print empty string.
