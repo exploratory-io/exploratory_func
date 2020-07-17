@@ -228,7 +228,7 @@ glue_exploratory <- function(text, .transformer, .envir = parent.frame()) {
 }
 
 get_variable_config <- function(variable_name, config_name, envir) {
-  code <- paste0("dplyr::if_else(is.null(exploratory_env$.config$`", variable_name, "`),NULL,exploratory_env$.config$`", variable_name, "`$`", config_name, "`)")
+  code <- paste0("if(is.null(exploratory_env$.config$`", variable_name, "`)){NULL}else{exploratory_env$.config$`", variable_name, "`$`", config_name, "`}")
   ret <- eval(parse(text = code), envir)
   ret
 }

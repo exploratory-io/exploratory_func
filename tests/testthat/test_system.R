@@ -1,5 +1,4 @@
 context("test system functions")
-
 test_that("test clean_data_frame",{
   # create df with dupicated columns names and data frame type column
   df <- data.frame(a = 1:5, a = 2:6)
@@ -143,6 +142,11 @@ test_that("js_glue_transformer", {
   expect_equal(as.character(res), '"a", "b", "c"') # default quote case.
   res <- glue_exploratory("@{`v`, quote=FALSE}", .transformer=js_glue_transformer)
   expect_equal(as.character(res), "a, b, c") # No quote case.
+  exploratory_env$.config$v <- new.env()
+  exploratory_env$.config$v$quote <- FALSE # Made the default no quote.
+  res <- glue_exploratory("@{`v`}", .transformer=js_glue_transformer)
+  expect_equal(as.character(res), "a, b, c") # No quote result 
+  rm("v", envir=exploratory_env$.config) # clear config.
 
   exploratory_env$v <- c(T,F,NA)
   res <- glue_exploratory("@{v}", .transformer=js_glue_transformer)
@@ -162,7 +166,6 @@ test_that("js_glue_transformer", {
   res <- glue_exploratory("{stock:{$in:[@{stock_symbols}]}}", .transformer=js_glue_transformer)
   expect_equal(as.character(res), "{stock:{$in:[]}}", "message")
 })
-
 test_that("sql_glue_transformer", {
   exploratory_env <- new.env()
   exploratory_env$.config <- new.env()
