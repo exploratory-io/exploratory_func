@@ -277,10 +277,16 @@ js_glue_transformer <- function(expr, envir) {
   val <- eval(parse(text = code), envir)
 
   if (is.null(quote)) {
-    quote <- TRUE
+    quote <- get_variable_config(name, "quote", envir)
+    if (is.null(quote)) {
+      quote <- TRUE
+    }
   }
   if (is.null(escape)) {
-    escape <- TRUE
+    escape <- get_variable_config(name, "escape", envir)
+    if (is.null(escape)) {
+      escape <- TRUE
+    }
   }
 
   if (is.null(val)) { # NULL in R is same as empty vector. Print empty string.
@@ -454,10 +460,16 @@ bigquery_glue_transformer <- function(expr, envir) {
   val <- eval(parse(text = code), envir)
 
   if (is.null(quote)) {
-    quote <- TRUE
+    quote <- get_variable_config(name, "quote", envir)
+    if (is.null(quote)) {
+      quote <- TRUE
+    }
   }
   if (is.null(escape)) {
-    escape <- TRUE
+    escape <- get_variable_config(name, "escape", envir)
+    if (is.null(escape)) {
+      escape <- TRUE
+    }
   }
 
   if (is.null(val)) { # NULL in R is same as empty vector. Print empty string.
