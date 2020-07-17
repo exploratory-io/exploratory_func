@@ -227,6 +227,12 @@ glue_exploratory <- function(text, .transformer, .envir = parent.frame()) {
   ret
 }
 
+get_variable_config <- function(variable_name, config_name, envir) {
+  code <- paste0("dplyr::if_else(is.null(exploratory_env$.config$`", variable_name, "`),NULL,exploratory_env$.config$`", variable_name, "`$`", config_name, "`)")
+  ret <- eval(parse(text = code), envir)
+  ret
+}
+
 # glue transformer for mongo js query.
 # supports character, factor, logical, Date, POSIXct, POSIXlt, and numeric.
 js_glue_transformer <- function(expr, envir) {
@@ -356,15 +362,13 @@ sql_glue_transformer <- function(expr, envir) {
   val <- eval(parse(text = code), envir)
 
   if (is.null(quote)) {
-    code <- paste0("dplyr::if_else(is.null(exploratory_env$.config$`", name, "`),NULL,exploratory_env$.config$`", name, "`$quote)")
-    quote <- eval(parse(text = code), envir)
+    quote <- get_variable_config(name, "quote", envir)
     if (is.null(quote)) {
       quote <- TRUE
     }
   }
   if (is.null(escape)) {
-    code <- paste0("dplyr::if_else(is.null(exploratory_env$.config$`", name, "`),NULL,exploratory_env$.config$`", name, "`$escape)")
-    escape <- eval(parse(text = code), envir)
+    escape <- get_variable_config(name, "escape", envir)
     if (is.null(escape)) {
       escape <- TRUE
     }
