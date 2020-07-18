@@ -144,7 +144,8 @@ handle_partial_dependence <- function(x) {
       x_type <- "numeric"
       chart_type <- "line"
     }
-    else if (is.logical(df[[col]])) {
+    # Since we turn logical into factor in preprocess_regression_data_after_sample(), detect them accordingly.
+    else if (is.factor(df[[col]]) && all(levels(df[[col]]) %in% c("TRUE", "FALSE", "(Missing)"))) {
       x_type <- "logical"
       chart_type <- "scatter"
     }
@@ -175,6 +176,12 @@ handle_partial_dependence <- function(x) {
           first(value)
         }
       }))
+      df <- df %>% dplyr::arrange(x_value)
+      df %>% dplyr::mutate(x_value = as.character(x_value)) # After sorting, change it back to character, so that it does not mess up the chart.
+    }
+    else if (df$x_type[[1]]=="logical" && "Predicted" %in% unique(df$y_name)) {
+      # Set factor label order for sorting. There may be unused level, but should not matter since we change it back to character after sort.
+      df <- df %>% dplyr::mutate(x_value = factor(x_value, levels=c("TRUE","FALSE","(Missing)")))
       df <- df %>% dplyr::arrange(x_value)
       df %>% dplyr::mutate(x_value = as.character(x_value)) # After sorting, change it back to character, so that it does not mess up the chart.
     }
