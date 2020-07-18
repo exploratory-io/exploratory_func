@@ -2,10 +2,25 @@
 calc_survival_curves_with_strata <- function(df, time_col, status_col, vars) {
   # Create map from variable name to chart type. TODO: Eliminate duplicated code.
   chart_type_map <- c()
+  x_type_map <-c()
   for(col in colnames(df)) {
-    chart_type_map <- c(chart_type_map, is.numeric(df[[col]]))
+    if (is.numeric(df[[col]])) {
+      x_type <- "numeric"
+      chart_type <- "line"
+    }
+    # Since we turn logical into factor in preprocess_regression_data_after_sample(), detect them accordingly.
+    else if (is.factor(df[[col]]) && all(levels(df[[col]]) %in% c("TRUE", "FALSE", "(Missing)"))) {
+      x_type <- "logical"
+      chart_type <- "scatter"
+    }
+    else {
+      x_type <- "character" # Since we turn charactors into factor in preprocessing (fct_lump) and cannot distinguish the original type at this point, for now, we treat both factors and characters as "characters" here.
+      chart_type <- "scatter"
+    }
+    x_type_map <- c(x_type_map, x_type)
+    chart_type_map <- c(chart_type_map, chart_type)
   }
-  chart_type_map <- ifelse(chart_type_map, "line", "scatter")
+  names(x_type_map) <- colnames(df)
   names(chart_type_map) <- colnames(df)
 
   vars_list <- as.list(vars)
@@ -22,6 +37,7 @@ calc_survival_curves_with_strata <- function(df, time_col, status_col, vars) {
   ret <- data.table::rbindlist(curve_dfs_list)
   ret <- ret %>% tidyr::separate(strata, into = c('variable','value'), sep='=') %>% rename(survival=estimate, period=time)
   ret <- ret %>% dplyr::mutate(chart_type = chart_type_map[variable])
+  ret <- ret %>% dplyr::mutate(x_type = x_type_map[variable])
   ret
 }
 

@@ -200,10 +200,25 @@ partial_dependence.coxph_exploratory <- function(fit, time_col, vars = colnames(
   ret <- ret %>% dplyr::rename(survival=V, conf.high=H, conf.low=L)
 
   chart_type_map <- c()
+  x_type_map <-c()
   for(col in colnames(ret)) {
-    chart_type_map <- c(chart_type_map, is.numeric(ret[[col]]))
+    if (is.numeric(ret[[col]])) {
+      x_type <- "numeric"
+      chart_type <- "line"
+    }
+    # Since we turn logical into factor in preprocess_regression_data_after_sample(), detect them accordingly.
+    else if (is.factor(ret[[col]]) && all(levels(ret[[col]]) %in% c("TRUE", "FALSE", "(Missing)"))) {
+      x_type <- "logical"
+      chart_type <- "scatter"
+    }
+    else {
+      x_type <- "character" # Since we turn charactors into factor in preprocessing (fct_lump) and cannot distinguish the original type at this point, for now, we treat both factors and characters as "characters" here.
+      chart_type <- "scatter"
+    }
+    x_type_map <- c(x_type_map, x_type)
+    chart_type_map <- c(chart_type_map, chart_type)
   }
-  chart_type_map <- ifelse(chart_type_map, "line", "scatter")
+  names(x_type_map) <- colnames(ret)
   names(chart_type_map) <- colnames(ret)
 
   # To avoid "Error: Can't convert <double> to <character>." from pivot_longer we need to use values_transform rather than values_ptype. https://github.com/tidyverse/tidyr/issues/980
@@ -221,8 +236,9 @@ partial_dependence.coxph_exploratory <- function(fit, time_col, vars = colnames(
   # 8 8         0.920 trt          1
   # 9 9         0.902 trt          1
   #10 10        0.896 trt          1
-  ret <- ret %>%  dplyr::mutate(period = (!!times)[period]) # Map back period from index to actual time.
-  ret <- ret %>%  dplyr::mutate(chart_type = chart_type_map[variable])
+  ret <- ret %>% dplyr::mutate(period = (!!times)[period]) # Map back period from index to actual time.
+  ret <- ret %>% dplyr::mutate(chart_type = chart_type_map[variable])
+  ret <- ret %>% dplyr::mutate(x_type = x_type_map[variable])
   ret
 }
 
@@ -498,7 +514,7 @@ survival_pdp_sort_categorical <- function(ret) {
   nested <- ret %>% dplyr::group_by(variable) %>% tidyr::nest(.temp.data=c(-variable)) #TODO: avoid possibility of column name conflict between .temp.data and group_by columns.
   nested <- nested %>% dplyr::mutate(.temp.data = purrr::map(.temp.data, function(df){
     # We do the sorting only for scatter chart with Predicted values. This eliminates line charts or multiclass classifications.
-    if (df$chart_type[[1]]=="scatter" && "Prediction" %in% unique(df$type)) {
+    if (df$x_type[[1]]=="character" && "Prediction" %in% unique(df$type)) {
       # Set value factor level order first for the sorting at the next step.
       df <- df %>% dplyr::mutate(value = forcats::fct_reorder2(value, type, survival, function(name, value) {
         if ("Prediction" %in% name) {
@@ -508,6 +524,12 @@ survival_pdp_sort_categorical <- function(ret) {
           -first(value)
         }
       }))
+      df <- df %>% dplyr::arrange(value)
+      df %>% dplyr::mutate(value = as.character(value)) # After sorting, change it back to character, so that it does not mess up the chart.
+    }
+    else if (df$x_type[[1]]=="logical" && "Prediction" %in% unique(df$type)) {
+      # Set factor label order for sorting. There may be unused level, but should not matter since we change it back to character after sort.
+      df <- df %>% dplyr::mutate(value = factor(value, levels=c("TRUE","FALSE","(Missing)")))
       df <- df %>% dplyr::arrange(value)
       df %>% dplyr::mutate(value = as.character(value)) # After sorting, change it back to character, so that it does not mess up the chart.
     }
