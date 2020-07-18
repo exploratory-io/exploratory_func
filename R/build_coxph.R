@@ -514,7 +514,7 @@ survival_pdp_sort_categorical <- function(ret) {
   nested <- ret %>% dplyr::group_by(variable) %>% tidyr::nest(.temp.data=c(-variable)) #TODO: avoid possibility of column name conflict between .temp.data and group_by columns.
   nested <- nested %>% dplyr::mutate(.temp.data = purrr::map(.temp.data, function(df){
     # We do the sorting only for scatter chart with Predicted values. This eliminates line charts or multiclass classifications.
-    if (df$chart_type[[1]]=="scatter" && "Prediction" %in% unique(df$type)) {
+    if (df$x_type[[1]]=="character" && "Prediction" %in% unique(df$type)) {
       # Set value factor level order first for the sorting at the next step.
       df <- df %>% dplyr::mutate(value = forcats::fct_reorder2(value, type, survival, function(name, value) {
         if ("Prediction" %in% name) {
@@ -524,6 +524,12 @@ survival_pdp_sort_categorical <- function(ret) {
           -first(value)
         }
       }))
+      df <- df %>% dplyr::arrange(value)
+      df %>% dplyr::mutate(value = as.character(value)) # After sorting, change it back to character, so that it does not mess up the chart.
+    }
+    else if (df$x_type[[1]]=="logical" && "Prediction" %in% unique(df$type)) {
+      # Set factor label order for sorting. There may be unused level, but should not matter since we change it back to character after sort.
+      df <- df %>% dplyr::mutate(value = factor(value, levels=c("TRUE","FALSE","(Missing)")))
       df <- df %>% dplyr::arrange(value)
       df %>% dplyr::mutate(value = as.character(value)) # After sorting, change it back to character, so that it does not mess up the chart.
     }
