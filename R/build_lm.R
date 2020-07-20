@@ -1219,7 +1219,8 @@ get_var_min_pvalue <- function(var, coef_df, x) {
   else { # We assume it is lm or glm here.
     terms <- var_to_possible_terms_lm(as.character(var), x)
   }
-  min(coef_df$p.value[coef_df$term %in% terms])
+  # na.rm is necessary to handle the case where part of categorical variables are dropped due to perfect collinearity.
+  min(coef_df$p.value[coef_df$term %in% terms], na.rm=TRUE)
 }
 
 #' special version of tidy.lm function to use with build_lm.fast.
