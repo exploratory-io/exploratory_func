@@ -599,7 +599,8 @@ prediction_training_and_test <- function(df, prediction_type="default", threshol
 }
 
 #' Wrapper around prediction() to set predicted_probability and predicted_label with optimized threshold.
-#' Currently, this is really for logistic regression and GLM, since for ranger and rpart, prediction() already returns predicted_probability and predicted_label.
+#' Currently, in terms of Analytics View, this is really for logistic regression and GLM, since for ranger and rpart, prediction() already returns predicted_probability and predicted_label.
+#' For Model Steps, even for ranger, this function is used.
 #' @param df Data frame to predict. This should have model column.
 #' @param threshold Threshold value for predicted probability or what to optimize. It can be "f_score", "accuracy", "precision", "sensitivity" or "specificity" to optimize.
 #' @export
@@ -690,7 +691,10 @@ prediction_binary <- function(df, threshold = 0.5, ...){
 
   predicted <- ret[[prob_col_name]] >= thres
 
-  label <- if (is.logical(actual_val)) {
+  # Here, we are trying to cast the predicted to the same data type as the actual value column of test data (or new data if it for some reason has the target column).
+  label <- if (is.null(actual_val)) {
+    predicted # newdata case, which is usually without actual value column. Just return the logical as is for now.
+  } else if (is.logical(actual_val)) {
     predicted
   } else if (is.numeric(actual_val)) {
     as.numeric(predicted)

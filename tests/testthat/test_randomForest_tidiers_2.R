@@ -25,7 +25,6 @@ test_data <- structure(
       DISTANCE = c(NA, 173, 646, 187, 273, 1062, 583, 240, 1123, 851, 852, NA, 361, 507, 1020, 1092, 342, NA, 1184, 545),
       FNUMBER= c(21, NA, 6, 87, 23, 12, 3, 0, 13, 1, 85, 82, 31, 57, 20, 12, 42, 49, NA, 45)), row.names = c(NA, -20L),
     class = c("tbl_df", "tbl", "data.frame"), .Names = c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE", "FNUMBER"))
-
 test_that("test ranger with regression", {
   model_ret <- build_model(test_data,
                            model_func = rangerReg,
@@ -44,6 +43,8 @@ test_that("test ranger with regression", {
   expect_equal(colnames(pred_test_ret), expected_colnames)
 
   pred_test_newdata_ret <- prediction(model_ret, data = "newdata", data_frame = test_data %>% select(-FNUMBER))
+  expected_colnames <- c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE",
+                         "predicted_value")
   expect_equal(colnames(pred_test_newdata_ret), expected_colnames)
 })
 
@@ -64,9 +65,10 @@ test_that("test ranger with binary regression all predictor variables", {
   expect_equal(colnames(pred_train_ret), expected_colnames)
 
   pred_test_newdata_ret <- prediction(model_ret, data = "newdata", data_frame = test_data %>% select(-FNUMBER))
+  expected_colnames <- c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE",
+                         "predicted_value")
   expect_equal(colnames(pred_test_newdata_ret), expected_colnames)
 })
-
 test_that("test ranger with binary classification with logical column", {
   test_data[["IS AA"]] <- factor(test_data$CARRIER == "AA") # test target column name with space
   test_data[1, "IS AA"] <- NA
@@ -105,13 +107,14 @@ test_that("test ranger with binary classification with logical column", {
   pred_test_ret2 <- suppressWarnings(prediction(model_ret, data = "test"))
   expect_equal(colnames(pred_test_ret2), expect_colnames)
 
+  expect_colnames <- c("CANCELLED", "Carrier Name", "CARRIER",
+                       "DISTANCE", "FNUMBER", "predicted_probability", "predicted_label")
   pred_test_newdata_ret <- suppressWarnings(prediction_binary(model_ret, data = "newdata", data_frame = test_data %>% select(-`IS AA`)))
   expect_equal(colnames(pred_test_newdata_ret), expect_colnames)
 
   pred_test_newdata_ret2 <- suppressWarnings(prediction_binary(model_ret, data = "newdata", data_frame = test_data %>% select(-`IS AA`)))
   expect_equal(colnames(pred_test_newdata_ret2), expect_colnames)
 })
-
 test_that("test ranger with binary classification with factor", {
   test_data[["IS AA"]] <- if_else(test_data$CARRIER == "AA", "AA", "Not AA") # test target column name with space
   test_data[1, "IS AA"] <- NA
@@ -150,6 +153,8 @@ test_that("test ranger with binary classification with factor", {
   pred_test_ret2 <- suppressWarnings(prediction(model_ret, data = "test"))
   expect_equal(colnames(pred_test_ret2), expect_colnames)
 
+  expect_colnames <- c("CANCELLED", "Carrier Name", "CARRIER",
+                       "DISTANCE", "FNUMBER", "predicted_probability", "predicted_label")
   pred_test_newdata_ret <- suppressWarnings(prediction_binary(model_ret, data = "newdata", data_frame = test_data %>% select(-`IS AA`)))
   expect_equal(colnames(pred_test_newdata_ret), expect_colnames)
 
@@ -191,6 +196,8 @@ test_that("test ranger with binary classification (all predictor_varials)", {
   pred_test_ret2 <- suppressWarnings(prediction(model_ret, data = "test"))
   expect_equal(colnames(pred_test_ret2), expect_colnames)
 
+  expect_colnames <- c("CANCELLED", "Carrier Name", "CARRIER",
+                       "DISTANCE", "FNUMBER", "predicted_probability", "predicted_label")
   pred_test_newdata_ret <- suppressWarnings(prediction_binary(model_ret, data = "newdata", data_frame = test_data %>% select(-`IS AA`)))
   expect_equal(colnames(pred_test_newdata_ret), expect_colnames)
 
@@ -224,6 +231,10 @@ test_that("test ranger with multinomial classification", {
   pred_test_ret <- suppressWarnings(prediction(model_ret, data = "test"))
   expect_equal(colnames(pred_test_ret), expected_colnames)
 
+  expected_colnames <- c("CANCELLED", "Carrier Name", "DISTANCE", "FNUMBER",
+                         "IS_AA", "predicted_probability_DL", "predicted_probability_AA",
+                         "predicted_probability_MQ", "predicted_probability_EV", "predicted_probability_US",
+                         "predicted_probability_9E", "predicted_probability", "predicted_label")
   pred_test_newdata_ret <- suppressWarnings(prediction(model_ret, data = "newdata", data_frame = test_data %>% select(-CARRIER)))
   expect_equal(colnames(pred_test_newdata_ret), expected_colnames)
 })
@@ -254,6 +265,10 @@ test_that("test ranger with multinomial classification", {
   pred_test_ret <- suppressWarnings(prediction(model_ret, data = "test"))
   expect_equal(colnames(pred_test_ret), expected_colnames)
 
+  expected_colnames <- c("CANCELLED", "Carrier Name", "DISTANCE", "FNUMBER",
+                         "IS_AA", "predicted_probability_DL", "predicted_probability_AA",
+                         "predicted_probability_MQ", "predicted_probability_EV", "predicted_probability_US",
+                         "predicted_probability", "predicted_label")
   pred_test_newdata_ret <- suppressWarnings(prediction(model_ret, data = "newdata", data_frame = test_data %>% select(-CARRIER)))
   expect_equal(colnames(pred_test_newdata_ret), expected_colnames)
 })
