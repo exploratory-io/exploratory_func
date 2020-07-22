@@ -43,7 +43,7 @@ test_that("test ranger with regression", {
   pred_test_ret <- prediction(model_ret, data = "test")
   expect_equal(colnames(pred_test_ret), expected_colnames)
 
-  pred_test_newdata_ret <- prediction(model_ret, data = "newdata", data_frame = test_data)
+  pred_test_newdata_ret <- prediction(model_ret, data = "newdata", data_frame = test_data %>% select(-FNUMBER))
   expect_equal(colnames(pred_test_newdata_ret), expected_colnames)
 })
 
@@ -63,7 +63,7 @@ test_that("test ranger with binary regression all predictor variables", {
   pred_train_ret <- suppressWarnings(prediction(model_ret, data = "training"))
   expect_equal(colnames(pred_train_ret), expected_colnames)
 
-  pred_test_newdata_ret <- prediction(model_ret, data = "newdata", data_frame = test_data)
+  pred_test_newdata_ret <- prediction(model_ret, data = "newdata", data_frame = test_data %>% select(-FNUMBER))
   expect_equal(colnames(pred_test_newdata_ret), expected_colnames)
 })
 
@@ -105,10 +105,10 @@ test_that("test ranger with binary classification with logical column", {
   pred_test_ret2 <- suppressWarnings(prediction(model_ret, data = "test"))
   expect_equal(colnames(pred_test_ret2), expect_colnames)
 
-  pred_test_newdata_ret <- suppressWarnings(prediction_binary(model_ret, data = "newdata", data_frame = test_data))
+  pred_test_newdata_ret <- suppressWarnings(prediction_binary(model_ret, data = "newdata", data_frame = test_data %>% select(-`IS AA`)))
   expect_equal(colnames(pred_test_newdata_ret), expect_colnames)
 
-  pred_test_newdata_ret2 <- suppressWarnings(prediction_binary(model_ret, data = "newdata", data_frame = test_data))
+  pred_test_newdata_ret2 <- suppressWarnings(prediction_binary(model_ret, data = "newdata", data_frame = test_data %>% select(-`IS AA`)))
   expect_equal(colnames(pred_test_newdata_ret2), expect_colnames)
 })
 
@@ -150,10 +150,10 @@ test_that("test ranger with binary classification with factor", {
   pred_test_ret2 <- suppressWarnings(prediction(model_ret, data = "test"))
   expect_equal(colnames(pred_test_ret2), expect_colnames)
 
-  pred_test_newdata_ret <- suppressWarnings(prediction_binary(model_ret, data = "newdata", data_frame = test_data))
+  pred_test_newdata_ret <- suppressWarnings(prediction_binary(model_ret, data = "newdata", data_frame = test_data %>% select(-`IS AA`)))
   expect_equal(colnames(pred_test_newdata_ret), expect_colnames)
 
-  pred_test_newdata_ret2 <- suppressWarnings(prediction_binary(model_ret, data = "newdata", data_frame = test_data))
+  pred_test_newdata_ret2 <- suppressWarnings(prediction_binary(model_ret, data = "newdata", data_frame = test_data %>% select(-`IS AA`)))
   expect_equal(colnames(pred_test_newdata_ret2), expect_colnames)
 })
 
@@ -191,10 +191,10 @@ test_that("test ranger with binary classification (all predictor_varials)", {
   pred_test_ret2 <- suppressWarnings(prediction(model_ret, data = "test"))
   expect_equal(colnames(pred_test_ret2), expect_colnames)
 
-  pred_test_newdata_ret <- suppressWarnings(prediction_binary(model_ret, data = "newdata", data_frame = test_data))
+  pred_test_newdata_ret <- suppressWarnings(prediction_binary(model_ret, data = "newdata", data_frame = test_data %>% select(-`IS AA`)))
   expect_equal(colnames(pred_test_newdata_ret), expect_colnames)
 
-  pred_test_newdata_ret2 <- suppressWarnings(prediction(model_ret, data = "newdata", data_frame = test_data))
+  pred_test_newdata_ret2 <- suppressWarnings(prediction(model_ret, data = "newdata", data_frame = test_data %>% select(-`IS AA`)))
   expect_equal(colnames(pred_test_newdata_ret2), expect_colnames)
 })
 
@@ -224,7 +224,7 @@ test_that("test ranger with multinomial classification", {
   pred_test_ret <- suppressWarnings(prediction(model_ret, data = "test"))
   expect_equal(colnames(pred_test_ret), expected_colnames)
 
-  pred_test_newdata_ret <- suppressWarnings(prediction(model_ret, data = "newdata", data_frame = test_data))
+  pred_test_newdata_ret <- suppressWarnings(prediction(model_ret, data = "newdata", data_frame = test_data %>% select(-CARRIER)))
   expect_equal(colnames(pred_test_newdata_ret), expected_colnames)
 })
 
@@ -254,7 +254,7 @@ test_that("test ranger with multinomial classification", {
   pred_test_ret <- suppressWarnings(prediction(model_ret, data = "test"))
   expect_equal(colnames(pred_test_ret), expected_colnames)
 
-  pred_test_newdata_ret <- suppressWarnings(prediction(model_ret, data = "newdata", data_frame = test_data))
+  pred_test_newdata_ret <- suppressWarnings(prediction(model_ret, data = "newdata", data_frame = test_data %>% select(-CARRIER)))
   expect_equal(colnames(pred_test_newdata_ret), expected_colnames)
 })
 
@@ -328,7 +328,7 @@ test_that("in the case of a single target variable single_value ranger with bina
   })
   test_data[1, "IS_TRUE"] <- FALSE
 
-  pred_train_ret <- suppressWarnings(prediction(model_ret, data = "newdata", data_frame = test_data))
+  pred_train_ret <- suppressWarnings(prediction(model_ret, data = "newdata", data_frame = test_data %>% select(-IS_TRUE)))
   expect_true(is.na(pred_train_ret[1, "predicted_label"]$predicted_label))
  
 })
@@ -343,7 +343,7 @@ test_that("in the case of a single target variable single_value ranger with mult
   })
   test_data[1, "CATEGORY"] <- "ME"
 
-  pred_train_ret <- suppressWarnings(prediction(model_ret, data = "newdata", data_frame = test_data))
+  pred_train_ret <- suppressWarnings(prediction(model_ret, data = "newdata", data_frame = test_data %>% select(-CATEGORY)))
   expect_equal(pred_train_ret[1, "predicted_label"]$predicted_label, NA_character_)
  
 })
@@ -357,7 +357,7 @@ test_that("in the case of a unkown target variable of predictiton ranger with mu
   })
   test_data[1, "CARRIER"] <- "UNKOWN_CARRIER"
 
-  pred_train_ret <- suppressWarnings(prediction(model_ret, data = "newdata", data_frame = test_data))
+  pred_train_ret <- suppressWarnings(prediction(model_ret, data = "newdata", data_frame = test_data %>% select(-CARRIER)))
   expect_equal(pred_train_ret[1, "predicted_label"]$predicted_label, NA_character_)
 
 })
