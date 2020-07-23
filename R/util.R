@@ -334,7 +334,10 @@ mat_to_df <- function(mat, cnames=NULL, na.rm=TRUE, zero.rm = TRUE, diag=TRUE){
 
 #' match the type of two vector
 same_type <- function(vector, original){
-  if(is.factor(original)){
+  if(is.null(original)){
+    vector
+  }
+  else if(is.factor(original)){
     if(all(vector[!is.na(vector)] %in% levels(original))){
       # if original is factor and vector has all values,
       # should return factor with same levels

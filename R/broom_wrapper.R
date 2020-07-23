@@ -599,7 +599,8 @@ prediction_training_and_test <- function(df, prediction_type="default", threshol
 }
 
 #' Wrapper around prediction() to set predicted_probability and predicted_label with optimized threshold.
-#' Currently, this is really for logistic regression and GLM, since for ranger and rpart, prediction() already returns predicted_probability and predicted_label.
+#' Currently, in terms of Analytics View, this is really for logistic regression and GLM, since for ranger and rpart, prediction() already returns predicted_probability and predicted_label.
+#' For Model Steps, even for ranger, this function is used.
 #' @param df Data frame to predict. This should have model column.
 #' @param threshold Threshold value for predicted probability or what to optimize. It can be "f_score", "accuracy", "precision", "sensitivity" or "specificity" to optimize.
 #' @export
@@ -690,7 +691,19 @@ prediction_binary <- function(df, threshold = 0.5, ...){
 
   predicted <- ret[[prob_col_name]] >= thres
 
-  label <- if (is.logical(actual_val)) {
+  # Here, we are trying to cast the predicted to the same data type as the actual value column of test data (or new data if it for some reason has the target column).
+  label <- if (is.null(actual_val)) {
+    # newdata case, which is usually without actual value column. Just return the logical as is for now.
+    if(!is.null(df[["model"]][[1]]) && !is.null(df[["model"]][[1]]$y_levels)){
+      # this is new data prediction for xgboost_binary
+      # to check levels of response column because
+      # it might be factor with two levels, 2 numbers or logical
+      # so the predicted result must be the same type too
+      df[["model"]][[1]]$y_levels[as.numeric(predicted) + 1]
+    } else {
+      predicted # Just return the logical as is for now.
+    }
+  } else if (is.logical(actual_val)) {
     predicted
   } else if (is.numeric(actual_val)) {
     as.numeric(predicted)
@@ -725,15 +738,7 @@ prediction_binary <- function(df, threshold = 0.5, ...){
       NULL
     }
   } else {
-    if(!is.null(df[["model"]][[1]]) && !is.null(df[["model"]][[1]]$y_levels)){
-      # this is new data prediction for xgboost_binary
-      # to check levels of response column because
-      # it might be factor with two levels, 2 numbers or logical
-      # so the predicted result must be the same type too
-      df[["model"]][[1]]$y_levels[as.numeric(predicted) + 1]
-    } else {
-      NULL
-    }
+    predicted # There should not be any case that reaches here, but in such case, just return the logical as is for now.
   }
 
   ret[["predicted_label"]] <- label
