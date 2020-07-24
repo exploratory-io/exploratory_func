@@ -179,6 +179,7 @@ exp_survival_forest <- function(df,
   status_col <- tidyselect::vars_select(names(df), !! rlang::enquo(status))
   # this evaluates select arguments like starts_with
   selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
+  # Sort predictors so that the result of permutation importance is stable against change of column order.
   selected_cols <- sort(selected_cols)
 
   grouped_cols <- grouped_by(df)
