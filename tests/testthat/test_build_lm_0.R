@@ -125,7 +125,6 @@ test_that("build_lm with evaluation", {
                                       ))
 
 })
-
 test_that("prediction with categorical columns", {
   test_data <- structure(
     list(
