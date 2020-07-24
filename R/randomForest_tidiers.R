@@ -1961,6 +1961,7 @@ calc_feature_imp <- function(df,
   target_col <- tidyselect::vars_select(names(df), !! rlang::enquo(target))
   # this evaluates select arguments like starts_with
   selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
+  selected_cols <- sort(selected_cols)
 
   grouped_cols <- grouped_by(df)
 
@@ -2758,6 +2759,7 @@ exp_rpart <- function(df,
   target_col <- tidyselect::vars_select(names(df), !! rlang::enquo(target))
   # this evaluates select arguments like starts_with
   selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
+  selected_cols <- sort(selected_cols)
 
   grouped_cols <- grouped_by(df)
 

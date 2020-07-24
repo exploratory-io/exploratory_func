@@ -586,6 +586,7 @@ build_lm.fast <- function(df,
                     ){
   target_col <- tidyselect::vars_select(names(df), !! rlang::enquo(target))
   selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
+  selected_cols <- sort(selected_cols)
 
   grouped_cols <- grouped_by(df)
 
