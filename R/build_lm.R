@@ -586,7 +586,6 @@ build_lm.fast <- function(df,
                     ){
   target_col <- tidyselect::vars_select(names(df), !! rlang::enquo(target))
   selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
-  selected_cols <- sort(selected_cols)
 
   grouped_cols <- grouped_by(df)
 
@@ -604,6 +603,12 @@ build_lm.fast <- function(df,
       # numeric still works, but our official guidance will be to use logical.
       stop("Target variable for logistic regression must be a logical.")
     }
+  }
+
+  # If we do permutation importance, sort predictors so that the result of it is stable against change of column order.
+  # Otherwise, avoid sorting so that user has control over the order of variables on partial dependence plot.
+  if (family %in% c("binomial", "gaussian") || (family == "poisson" && (is.null(link) || link == "log"))) {
+    selected_cols <- sort(selected_cols)
   }
 
   if(test_rate < 0 | 1 < test_rate){
@@ -855,7 +860,7 @@ build_lm.fast <- function(df,
           if (family == "binomial") {
             model$permutation_importance <- calc_permutation_importance_binomial(model, clean_target_col, c_cols, df)
           }
-          else if (family == "poisson" && (is.null(link) || link == "log")) { # Currently we have permutation importance only for logistic regression.
+          else if (family == "poisson" && (is.null(link) || link == "log")) {
             model$permutation_importance <- calc_permutation_importance_poisson(model, clean_target_col, c_cols, df)
           }
           else if (family == "gaussian") {
