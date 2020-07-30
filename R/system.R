@@ -1463,7 +1463,8 @@ getGoogleBigQueryDataSets <- function(project, tokenFileId=""){
   tryCatch({
     token <- getGoogleTokenForBigQuery(tokenFileId);
     bigrquery::set_access_cred(token)
-    resultdatasets <- bigrquery::bq_project_datasets(project);
+    # make sure to pass  max_pages as Inf to get all the datasets
+    resultdatasets <- bigrquery::bq_project_datasets(project, page_size=1000, max_pages=Inf);
     lapply(resultdatasets, function(x){x$dataset})
   }, error = function(err){
      c("")
