@@ -1297,10 +1297,18 @@ submitGoogleBigQueryJob <- function(project, sqlquery, destination_table, write_
 #' @export
 getDataFromGoogleBigQueryTable <- function(project, dataset, table, page_size = 10000, max_page, tokenFileId, max_connections = 8){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
+  # Begin Workaround ref: https://github.com/r-dbi/bigrquery/issues/395
+  # Remember original scipen
+  original_scipen = getOption("scipen")
+  # Temporary override it with 20 to workaround: Invalid value at 'start_index' (TYPE_UINT64), "1e+05" [invalid] error
+  options(scipen = 20)
   token <- getGoogleTokenForBigQuery(tokenFileId)
   bigrquery::set_access_cred(token)
   tb <- bigrquery::bq_table(project = project, dataset = dataset, table = table)
-  bigrquery::bq_table_download(tb,  page_size = page_size, max_results = max_page, quiet = TRUE, max_connections = max_connections)
+  df <- bigrquery::bq_table_download(tb,  page_size = page_size, max_results = max_page, quiet = TRUE, max_connections = max_connections)
+  # Set original scipen
+  options(scipen = original_scipen)
+  df
 }
 
 #' API to extract data from google BigQuery table to Google Cloud Storage
@@ -1402,6 +1410,11 @@ executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 1
   if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
 
   token <- getGoogleTokenForBigQuery(tokenFileId)
+  # Begin Workaround ref: https://github.com/r-dbi/bigrquery/issues/395
+  # Remember original scipen
+  original_scipen = getOption("scipen")
+  # Temporary override it with 20 to workaround: Invalid value at 'start_index' (TYPE_UINT64), "1e+05" [invalid] error
+  options(scipen = 20)
 
   df <- NULL
   # if bucket is set, use Google Cloud Storage for extract and download
@@ -1439,6 +1452,8 @@ executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 1
     tb <- bigrquery::bq_project_query(x = project, query = query, quiet = TRUE, use_legacy_sql = !isStandardSQL)
     df <- bigrquery::bq_table_download(x = tb, max_results = Inf, page_size = pageSize, max_connections = max_connections, quiet = TRUE)
   }
+  # Set original scipen
+  options(scipen = original_scipen)
   df
 }
 
