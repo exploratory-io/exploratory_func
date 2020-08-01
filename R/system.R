@@ -1297,18 +1297,20 @@ submitGoogleBigQueryJob <- function(project, sqlquery, destination_table, write_
 #' @export
 getDataFromGoogleBigQueryTable <- function(project, dataset, table, page_size = 10000, max_page, tokenFileId, max_connections = 8){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
-  # Begin Workaround ref: https://github.com/r-dbi/bigrquery/issues/395
   # Remember original scipen
   original_scipen = getOption("scipen")
-  # Temporary override it with 20 to workaround: Invalid value at 'start_index' (TYPE_UINT64), "1e+05" [invalid] error
-  options(scipen = 20)
-  token <- getGoogleTokenForBigQuery(tokenFileId)
-  bigrquery::set_access_cred(token)
-  tb <- bigrquery::bq_table(project = project, dataset = dataset, table = table)
-  df <- bigrquery::bq_table_download(tb,  page_size = page_size, max_results = max_page, quiet = TRUE, max_connections = max_connections)
-  # Set original scipen
-  options(scipen = original_scipen)
-  df
+  tryCatch({
+    # Workaround ref: https://github.com/r-dbi/bigrquery/issues/395
+    # Temporary override it with 20 to workaround: Invalid value at 'start_index' (TYPE_UINT64), "1e+05" [invalid] error
+    options(scipen = 20)
+    token <- getGoogleTokenForBigQuery(tokenFileId)
+    bigrquery::set_access_cred(token)
+    tb <- bigrquery::bq_table(project = project, dataset = dataset, table = table)
+    bigrquery::bq_table_download(tb,  page_size = page_size, max_results = max_page, quiet = TRUE, max_connections = max_connections)
+  }, finally = {
+    # Set original scipen
+    options(scipen = original_scipen)
+  })
 }
 
 #' API to extract data from google BigQuery table to Google Cloud Storage
@@ -1408,53 +1410,54 @@ getDataFromGoogleBigQueryTableViaCloudStorage <- function(bucketProjectId, dataS
 executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 100000, maxPage = 10, writeDisposition = "WRITE_TRUNCATE", tokenFileId, bqProjectId, csBucket=NULL, bucketFolder=NULL, max_connections = 8, useStandardSQL = FALSE, ...){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
-
   token <- getGoogleTokenForBigQuery(tokenFileId)
-  # Begin Workaround ref: https://github.com/r-dbi/bigrquery/issues/395
   # Remember original scipen
   original_scipen = getOption("scipen")
-  # Temporary override it with 20 to workaround: Invalid value at 'start_index' (TYPE_UINT64), "1e+05" [invalid] error
-  options(scipen = 20)
+  tryCatch({
+    # Workaround ref: https://github.com/r-dbi/bigrquery/issues/395
+    # Temporary override it with 20 to workaround: Invalid value at 'start_index' (TYPE_UINT64), "1e+05" [invalid] error
+    options(scipen = 20)
+    df <- NULL
+    # if bucket is set, use Google Cloud Storage for extract and download
+    if(!is.null(csBucket) && !is.na(csBucket) && csBucket != "" && !is.null(bucketFolder) && !is.na(bucketFolder) && bucketFolder != ""){
+      # destination_table looks like 'exploratory-bigquery-project:exploratory_dataset.exploratory_bq_preview_table'
+      dataSetTable = stringr::str_split(stringr::str_replace(destinationTable, stringr::str_c(bqProjectId,":"),""),"\\.")
+      dataSet = dataSetTable[[1]][1]
+      table = dataSetTable[[1]][2]
+      bqtable <- NULL
+      # submit a query to get a result (for refresh data frame case)
+      # convertUserInputToUtf8 API call for query is taken care of by exploratory::submitGoogleBigQueryJob
+      # so just pass query as is.
+      result <- exploratory::submitGoogleBigQueryJob(project = bqProjectId, sqlquery = query, tokenFieldId =  tokenFileId, useStandardSQL = useStandardSQL);
+      # extranct result from Google BigQuery to Google Cloud Storage and import
+      # Since Google might assign new tableId and datasetId, always get datasetId and tableId from the job result (result is a data frame).
+      # To get the only one value for datasetId and tableId, use dplyr::first.
+      df <- getDataFromGoogleBigQueryTableViaCloudStorage(bqProjectId, as.character(dplyr::first(result$datasetId)), as.character(dplyr::first(result$tableId)), csBucket, bucketFolder, tokenFileId)
+    } else {
+      # direct import case (for refresh data frame case)
 
-  df <- NULL
-  # if bucket is set, use Google Cloud Storage for extract and download
-  if(!is.null(csBucket) && !is.na(csBucket) && csBucket != "" && !is.null(bucketFolder) && !is.na(bucketFolder) && bucketFolder != ""){
-    # destination_table looks like 'exploratory-bigquery-project:exploratory_dataset.exploratory_bq_preview_table'
-    dataSetTable = stringr::str_split(stringr::str_replace(destinationTable, stringr::str_c(bqProjectId,":"),""),"\\.")
-    dataSet = dataSetTable[[1]][1]
-    table = dataSetTable[[1]][2]
-    bqtable <- NULL
-    # submit a query to get a result (for refresh data frame case)
-    # convertUserInputToUtf8 API call for query is taken care of by exploratory::submitGoogleBigQueryJob
-    # so just pass query as is.
-    result <- exploratory::submitGoogleBigQueryJob(project = bqProjectId, sqlquery = query, tokenFieldId =  tokenFileId, useStandardSQL = useStandardSQL);
-    # extranct result from Google BigQuery to Google Cloud Storage and import
-    # Since Google might assign new tableId and datasetId, always get datasetId and tableId from the job result (result is a data frame).
-    # To get the only one value for datasetId and tableId, use dplyr::first.
-    df <- getDataFromGoogleBigQueryTableViaCloudStorage(bqProjectId, as.character(dplyr::first(result$datasetId)), as.character(dplyr::first(result$tableId)), csBucket, bucketFolder, tokenFileId)
-  } else {
-    # direct import case (for refresh data frame case)
-
-    # bigquery::set_access_cred is deprecated, however, switching to bigquery::bq_auth forces the oauth token refresh
-    # inside of it. We don't want this since Exploratory Desktop always sends a valid oauth token and use it without refreshing it.
-    # so for now, stick to bigrquery::set_access_cred
-    bigrquery::set_access_cred(token)
-    # check if the query contains special key word for standardSQL
-    # If we do not pass the useLegaySql argument, bigrquery set TRUE for it, so we need to expliclity set it to make standard SQL work.
-    isStandardSQL <- stringr::str_detect(query, "#standardSQL")
-    if(!isStandardSQL && useStandardSQL) { # honor value provided by parameter
-      isStandardSQL = TRUE;
+      # bigquery::set_access_cred is deprecated, however, switching to bigquery::bq_auth forces the oauth token refresh
+      # inside of it. We don't want this since Exploratory Desktop always sends a valid oauth token and use it without refreshing it.
+      # so for now, stick to bigrquery::set_access_cred
+      bigrquery::set_access_cred(token)
+      # check if the query contains special key word for standardSQL
+      # If we do not pass the useLegaySql argument, bigrquery set TRUE for it, so we need to expliclity set it to make standard SQL work.
+      isStandardSQL <- stringr::str_detect(query, "#standardSQL")
+      if(!isStandardSQL && useStandardSQL) { # honor value provided by parameter
+        isStandardSQL = TRUE;
+      }
+      # make sure to convert query to UTF8
+      query <- convertUserInputToUtf8(query)
+      # set envir = parent.frame() to get variables from users environment, not papckage environment
+      query <- glue_exploratory(query, .transformer=bigquery_glue_transformer, .envir = parent.frame())
+      tb <- bigrquery::bq_project_query(x = project, query = query, quiet = TRUE, use_legacy_sql = !isStandardSQL)
+      df <- bigrquery::bq_table_download(x = tb, max_results = Inf, page_size = pageSize, max_connections = max_connections, quiet = TRUE)
     }
-    # make sure to convert query to UTF8
-    query <- convertUserInputToUtf8(query)
-    # set envir = parent.frame() to get variables from users environment, not papckage environment
-    query <- glue_exploratory(query, .transformer=bigquery_glue_transformer, .envir = parent.frame())
-    tb <- bigrquery::bq_project_query(x = project, query = query, quiet = TRUE, use_legacy_sql = !isStandardSQL)
-    df <- bigrquery::bq_table_download(x = tb, max_results = Inf, page_size = pageSize, max_connections = max_connections, quiet = TRUE)
-  }
-  # Set original scipen
-  options(scipen = original_scipen)
-  df
+    df
+  } ,finally = {
+    # Set original scipen
+    options(scipen = original_scipen)
+  })
 }
 
 #' API to get projects for current oauth token
