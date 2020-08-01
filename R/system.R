@@ -1454,7 +1454,7 @@ executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 1
       df <- bigrquery::bq_table_download(x = tb, max_results = Inf, page_size = pageSize, max_connections = max_connections, quiet = TRUE)
     }
     df
-  } ,finally = {
+  }, finally = {
     # Set original scipen
     options(scipen = original_scipen)
   })
