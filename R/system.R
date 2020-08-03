@@ -423,6 +423,9 @@ sql_glue_transformer <- function(expr, envir) {
       escape <- NULL # Check default config for the parameter.
     }
   }
+  else {
+    escape <- NULL # Check default config for the parameter.
+  }
 
   # Trim white spaces.
   name <- trimws(name)
