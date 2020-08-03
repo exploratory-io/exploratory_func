@@ -255,7 +255,7 @@ js_glue_transformer <- function(expr, envir) {
     if (values$quote %in% c("FALSE", "F", "false", "NO", "No", "no")) {
       quote <- ''
     }
-    if (values$quote %in% c("TRUE", "T", "true", "YES", "Yes", "yes")) {
+    else if (values$quote %in% c("TRUE", "T", "true", "YES", "Yes", "yes")) {
       # TRUE means same as default, which is double quote.
       quote <- '"'
     }
@@ -279,7 +279,7 @@ js_glue_transformer <- function(expr, envir) {
     if (values$escape %in% c("FALSE", "F", "false", "NO", "No", "no")) {
       escape <- ''
     }
-    if (values$escape %in% c("TRUE", "T", "true", "YES", "Yes", "yes")) {
+    else if (values$escape %in% c("TRUE", "T", "true", "YES", "Yes", "yes")) {
       # TRUE means same as default, which is double quote.
       escape <- '"'
     }
@@ -383,7 +383,7 @@ sql_glue_transformer <- function(expr, envir) {
     if (values$quote %in% c("FALSE", "F", "false", "NO", "No", "no")) {
       quote <- ''
     }
-    if (values$quote %in% c("TRUE", "T", "true", "YES", "Yes", "yes")) {
+    else if (values$quote %in% c("TRUE", "T", "true", "YES", "Yes", "yes")) {
       # TRUE means same as default, which is single quote.
       quote <- "'"
     }
@@ -407,7 +407,7 @@ sql_glue_transformer <- function(expr, envir) {
     if (values$escape %in% c("FALSE", "F", "false", "NO", "No", "no")) {
       escape <- ''
     }
-    if (values$escape %in% c("TRUE", "T", "true", "YES", "Yes", "yes")) {
+    else if (values$escape %in% c("TRUE", "T", "true", "YES", "Yes", "yes")) {
       # TRUE means same as default, which is single quote.
       escape <- "'"
     }
