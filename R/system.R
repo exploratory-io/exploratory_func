@@ -270,8 +270,22 @@ js_glue_transformer <- function(expr, envir) {
   else {
     quote <- NULL # Check default config for the parameter.
   }
-  if (!is.null(values) && !is.null(values$escape) && values$escape %in% c("FALSE", "F", "false", "NO", "no")) {
-    escape <- FALSE
+
+  if (!is.null(values) && !is.null(values$escape)) {
+    if (values$escape %in% c("FALSE", "F", "false", "NO", "no")) {
+      escape <- ''
+    }
+    else if (grepl("^'.+'$", values$escape)) { # Single quoted.
+      escape <- sub("^'", "", values$escape)
+      escape <- sub("'$", "", escape)
+    }
+    else if (grepl('^".+"$', values$escape)) { # Double quoted.
+      escape <- sub('^"', "", values$escape)
+      escape <- sub('"$', "", escape)
+    }
+    else { # Double quote by default.
+      escape <- '"'
+    }
   }
   else {
     escape <- NULL # Check default config for the parameter.
@@ -290,6 +304,7 @@ js_glue_transformer <- function(expr, envir) {
 
   val <- eval(parse(text = code), envir)
 
+  # Check the default config for the variable.
   if (is.null(quote)) {
     quote <- get_variable_config(name, "quote", envir)
     if (is.null(quote)) {
@@ -299,7 +314,7 @@ js_glue_transformer <- function(expr, envir) {
   if (is.null(escape)) {
     escape <- get_variable_config(name, "escape", envir)
     if (is.null(escape)) {
-      escape <- TRUE
+      escape <- quote # Match with quote by default.
     }
   }
 
@@ -311,10 +326,13 @@ js_glue_transformer <- function(expr, envir) {
     val <- format(val, scientific = FALSE)
   }
   else if (is.character(val) || is.factor(val)) {
-    # escape for js
-    if (escape) {
+    if (escape == '"') { # Escape for double quote
       val <- gsub("\\", "\\\\", val, fixed=TRUE)
       val <- gsub("\"", "\\\"", val, fixed=TRUE)
+    }
+    else if (escape == "'") { # Escape for single quote
+      val <- gsub("\\", "\\\\", val, fixed=TRUE)
+      val <- gsub("'", "\\'", val, fixed=TRUE)
     }
     val <- paste0(quote, val, quote)
   }
@@ -322,12 +340,7 @@ js_glue_transformer <- function(expr, envir) {
     val <- ifelse(val, "true", "false")
   }
   else if (lubridate::is.Date(val) || lubridate::is.POSIXt(val)) {
-    if (quote) {
-      val <- paste0("new Date(\"", as.character(val), "\")")
-    }
-    else {
-      val <- as.character(val)
-    }
+    val <- paste0("new Date(\"", as.character(val), "\")")
   }
   # Interpret NA to null.
   # https://docs.mongodb.com/manual/tutorial/query-for-null-fields/
