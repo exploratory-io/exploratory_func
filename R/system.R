@@ -227,6 +227,7 @@ glue_exploratory <- function(text, .transformer, .envir = parent.frame()) {
   ret
 }
 
+# Get variable's configured default value.
 get_variable_config <- function(variable_name, config_name, envir) {
   code <- paste0("if(is.null(exploratory_env$.config$`", variable_name, "`)){NULL}else{exploratory_env$.config$`", variable_name, "`$`", config_name, "`}")
   ret <- eval(parse(text = code), envir)
@@ -364,6 +365,7 @@ js_glue_transformer <- function(expr, envir) {
   glue::glue_collapse(val, sep=", ")
 }
 
+# Common routine for sql_glue_transformer and bigquery_glue_transformer.
 sql_glue_transformer_internal <- function(expr, envir, bigquery=FALSE) {
   tokens <- stringr::str_split(expr, ',')
   tokens <- tokens[[1]]
