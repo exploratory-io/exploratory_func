@@ -177,9 +177,9 @@ test_that("sql_glue_transformer", {
   res <- glue_exploratory("@{ v }", .transformer=sql_glue_transformer)
   expect_equal(as.character(res), "1, 2, 3")
 
-  exploratory_env$v <- c("a","b","c")
+  exploratory_env$v <- c('a"',"b'","c")
   res <- glue_exploratory("@{ `v` }", .transformer=sql_glue_transformer)
-  expect_equal(as.character(res), "'a', 'b', 'c'") # Not sure if this behavior works for all types of databases.
+  expect_equal(as.character(res), "'a\"', 'b''', 'c'") # Not sure if this behavior works for all types of databases.
 
   exploratory_env$v <- c("a","b","c")
   res <- glue_exploratory("@{`v`, quote=FALSE}", .transformer=sql_glue_transformer)
