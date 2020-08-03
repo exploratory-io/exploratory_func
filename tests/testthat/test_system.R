@@ -185,6 +185,10 @@ test_that("sql_glue_transformer", {
   res <- glue_exploratory("@{`v`, quote=FALSE}", .transformer=sql_glue_transformer)
   expect_equal(as.character(res), "a, b, c") # No quote case.
 
+  exploratory_env$v <- c('a"',"b'","c")
+  res <- glue_exploratory("@{ `v`, quote=\"\", escape=\"'\" }", .transformer=sql_glue_transformer)
+  expect_equal(as.character(res), "a\", b'', c") # No quote but with escape.
+
   exploratory_env$dept_names <- c("Sales","HR","CEO's secretary", "Data Science\\Statistics")
   exploratory_env$empid_above <- 1100
   res <- glue_exploratory("select * from emp where deptname in (@{dept_names}) and empid > @{empid_above}", .transformer=sql_glue_transformer)
