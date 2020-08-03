@@ -252,8 +252,12 @@ js_glue_transformer <- function(expr, envir) {
     names(values) <- names
   }
   if (!is.null(values) && !is.null(values$quote)) {
-    if (values$quote %in% c("FALSE", "F", "false", "NO", "no")) {
+    if (values$quote %in% c("FALSE", "F", "false", "NO", "No", "no")) {
       quote <- ''
+    }
+    if (values$quote %in% c("TRUE", "T", "true", "YES", "Yes", "yes")) {
+      # TRUE means same as default, which is double quote.
+      quote <- '"'
     }
     else if (grepl("^'.+'$", values$quote)) { # Single quoted.
       quote <- sub("^'", "", values$quote)
@@ -264,7 +268,7 @@ js_glue_transformer <- function(expr, envir) {
       quote <- sub('"$', "", quote)
     }
     else { # Double quote by default.
-      quote <- '"'
+      quote <- NULL # Check default config for the parameter.
     }
   }
   else {
@@ -272,8 +276,12 @@ js_glue_transformer <- function(expr, envir) {
   }
 
   if (!is.null(values) && !is.null(values$escape)) {
-    if (values$escape %in% c("FALSE", "F", "false", "NO", "no")) {
+    if (values$escape %in% c("FALSE", "F", "false", "NO", "No", "no")) {
       escape <- ''
+    }
+    if (values$escape %in% c("TRUE", "T", "true", "YES", "Yes", "yes")) {
+      # TRUE means same as default, which is double quote.
+      escape <- '"'
     }
     else if (grepl("^'.+'$", values$escape)) { # Single quoted.
       escape <- sub("^'", "", values$escape)
@@ -283,8 +291,8 @@ js_glue_transformer <- function(expr, envir) {
       escape <- sub('^"', "", values$escape)
       escape <- sub('"$', "", escape)
     }
-    else { # Double quote by default.
-      escape <- '"'
+    else {
+      escape <- NULL # Check default config for the parameter.
     }
   }
   else {
@@ -308,7 +316,12 @@ js_glue_transformer <- function(expr, envir) {
   if (is.null(quote)) {
     quote <- get_variable_config(name, "quote", envir)
     if (is.null(quote)) {
-      quote <- '"' # Double quote by default
+      if (is.numeric(val)) {
+        quote <- '' # No quote by default for numeric.
+      }
+      else {
+        quote <- '"' # Double quote by default
+      }
     }
   }
   if (is.null(escape)) {
@@ -324,6 +337,7 @@ js_glue_transformer <- function(expr, envir) {
   else if (is.numeric(val)) {
     # Do not convert number to scientific notation.
     val <- format(val, scientific = FALSE)
+    val <- paste0(quote, val, quote)
   }
   else if (is.character(val) || is.factor(val)) {
     if (escape == '"') { # Escape for double quote
