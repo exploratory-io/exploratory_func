@@ -236,14 +236,15 @@ get_variable_config <- function(variable_name, config_name, envir) {
 # glue transformer for mongo js query.
 # supports character, factor, logical, Date, POSIXct, POSIXlt, and numeric.
 js_glue_transformer <- function(expr, envir) {
+  # expr is 'param1, quote=FALSE, escape=FALSE' if the whole placeholder is '@{param1, quote=FALSE, escape=FALSE}'
   tokens <- stringr::str_split(expr, ',')
   tokens <- tokens[[1]]
   name <- tokens[1]
   values <- NULL;
 
-  # Parse arguments part. e.g. @{param1, quote=FALSE}
+  # Parse arguments part. e.g. 'quote=FALSE, escape=FALSE'
   if (length(tokens) > 1) {
-    args <- tokens[2:length(tokens)]
+    args <- tokens[2:length(tokens)] # Index 1 that is eliminated is the name of the variable. 
     args <- stringr::str_split(args, '=')
     args <- purrr::map(args, trimws)
     names <- purrr::map(args, function(x){x[1]})
