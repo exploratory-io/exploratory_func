@@ -251,8 +251,21 @@ js_glue_transformer <- function(expr, envir) {
     values <- purrr::map(args, function(x){x[2]})
     names(values) <- names
   }
-  if (!is.null(values) && !is.null(values$quote) && values$quote %in% c("FALSE", "F", "false", "NO", "no")) {
-    quote <- FALSE
+  if (!is.null(values) && !is.null(values$quote)) {
+    if (values$quote %in% c("FALSE", "F", "false", "NO", "no")) {
+      quote <- ''
+    }
+    else if (grepl("^'.+'$", values$quote)) { # Single quoted.
+      quote <- sub("^'", "", values$quote)
+      quote <- sub("'$", "", quote)
+    }
+    else if (grepl('^".+"$', values$quote)) { # Double quoted.
+      quote <- sub('^"', "", values$quote)
+      quote <- sub('"$', "", quote)
+    }
+    else { # Double quote by default.
+      quote <- '"'
+    }
   }
   else {
     quote <- NULL # Check default config for the parameter.
@@ -280,7 +293,7 @@ js_glue_transformer <- function(expr, envir) {
   if (is.null(quote)) {
     quote <- get_variable_config(name, "quote", envir)
     if (is.null(quote)) {
-      quote <- TRUE
+      quote <- '"' # Double quote by default
     }
   }
   if (is.null(escape)) {
@@ -303,9 +316,7 @@ js_glue_transformer <- function(expr, envir) {
       val <- gsub("\\", "\\\\", val, fixed=TRUE)
       val <- gsub("\"", "\\\"", val, fixed=TRUE)
     }
-    if (quote) {
-      val <- paste0('"', val, '"')
-    }
+    val <- paste0(quote, val, quote)
   }
   else if (is.logical(val)) {
     val <- ifelse(val, "true", "false")
