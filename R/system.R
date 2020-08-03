@@ -259,11 +259,11 @@ js_glue_transformer <- function(expr, envir) {
       # TRUE means same as default, which is double quote.
       quote <- '"'
     }
-    else if (grepl("^'.+'$", values$quote)) { # Single quoted.
+    else if (grepl("^'.*'$", values$quote)) { # Single quoted.
       quote <- sub("^'", "", values$quote)
       quote <- sub("'$", "", quote)
     }
-    else if (grepl('^".+"$', values$quote)) { # Double quoted.
+    else if (grepl('^".*"$', values$quote)) { # Double quoted.
       quote <- sub('^"', "", values$quote)
       quote <- sub('"$', "", quote)
     }
@@ -283,11 +283,11 @@ js_glue_transformer <- function(expr, envir) {
       # TRUE means same as default, which is double quote.
       escape <- '"'
     }
-    else if (grepl("^'.+'$", values$escape)) { # Single quoted.
+    else if (grepl("^'.*'$", values$escape)) { # Single quoted.
       escape <- sub("^'", "", values$escape)
       escape <- sub("'$", "", escape)
     }
-    else if (grepl('^".+"$', values$escape)) { # Double quoted.
+    else if (grepl('^".*"$', values$escape)) { # Double quoted.
       escape <- sub('^"', "", values$escape)
       escape <- sub('"$', "", escape)
     }
