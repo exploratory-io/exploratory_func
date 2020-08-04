@@ -227,74 +227,135 @@ glue_exploratory <- function(text, .transformer, .envir = parent.frame()) {
   ret
 }
 
+# Get variable's configured default value.
+get_variable_config <- function(variable_name, config_name, envir) {
+  code <- paste0("if(is.null(exploratory_env$.config$`", variable_name, "`)){NULL}else{exploratory_env$.config$`", variable_name, "`$`", config_name, "`}")
+  ret <- eval(parse(text = code), envir)
+  ret
+}
+
 # glue transformer for mongo js query.
 # supports character, factor, logical, Date, POSIXct, POSIXlt, and numeric.
-js_glue_transformer <- function(code, envir) {
-  tokens <- stringr::str_split(code, ',')
+js_glue_transformer <- function(expr, envir) {
+  # expr is 'param1, quote=FALSE, escape=FALSE' if the whole placeholder is '@{param1, quote=FALSE, escape=FALSE}'
+  tokens <- stringr::str_split(expr, ',')
   tokens <- tokens[[1]]
-  code <- tokens[1]
-  values <- NULL;
+  name <- tokens[1]
+  values <- NULL
 
-  # Parse arguments part. e.g. @{param1, quote=FALSE}
+  # Parse arguments part. e.g. 'quote=FALSE, escape=FALSE'
   if (length(tokens) > 1) {
-    args <- tokens[2:length(tokens)]
+    args <- tokens[2:length(tokens)] # Index 1 that is eliminated is the name of the variable. 
     args <- stringr::str_split(args, '=')
     args <- purrr::map(args, trimws)
     names <- purrr::map(args, function(x){x[1]})
     values <- purrr::map(args, function(x){x[2]})
     names(values) <- names
   }
-  if (!is.null(values) && !is.null(values$quote) && values$quote %in% c("FALSE", "F", "false", "NO", "no")) {
-    quote <- FALSE
+  if (!is.null(values) && !is.null(values$quote)) {
+    if (values$quote %in% c("FALSE", "F", "false", "NO", "No", "no")) {
+      quote <- ''
+    }
+    else if (values$quote %in% c("TRUE", "T", "true", "YES", "Yes", "yes")) {
+      # TRUE means same as default, which is double quote.
+      quote <- '"'
+    }
+    else if (grepl("^'.*'$", values$quote)) { # Single quoted.
+      quote <- sub("^'", "", values$quote)
+      quote <- sub("'$", "", quote)
+    }
+    else if (grepl('^".*"$', values$quote)) { # Double quoted.
+      quote <- sub('^"', "", values$quote)
+      quote <- sub('"$', "", quote)
+    }
+    else {
+      quote <- NULL # Check default config for the parameter.
+    }
   }
   else {
-    quote <- TRUE # Quote string by default.
+    quote <- NULL # Check default config for the parameter.
   }
-  if (!is.null(values) && !is.null(values$escape) && values$escape %in% c("FALSE", "F", "false", "NO", "no")) {
-    escape <- FALSE
+
+  if (!is.null(values) && !is.null(values$escape)) {
+    if (values$escape %in% c("FALSE", "F", "false", "NO", "No", "no")) {
+      escape <- ''
+    }
+    else if (values$escape %in% c("TRUE", "T", "true", "YES", "Yes", "yes")) {
+      # TRUE means same as default, which is double quote.
+      escape <- '"'
+    }
+    else if (grepl("^'.*'$", values$escape)) { # Single quoted.
+      escape <- sub("^'", "", values$escape)
+      escape <- sub("'$", "", escape)
+    }
+    else if (grepl('^".*"$', values$escape)) { # Double quoted.
+      escape <- sub('^"', "", values$escape)
+      escape <- sub('"$', "", escape)
+    }
+    else {
+      escape <- NULL # Check default config for the parameter.
+    }
   }
   else {
-    escape <- TRUE # Escape for single quote by default.
+    escape <- NULL # Check default config for the parameter.
   }
 
   # Trim white spaces.
-  code <- trimws(code)
+  name <- trimws(name)
 
   # Strip quote by ``.
-  should_strip <- grepl("^`.+`$", code)
+  should_strip <- grepl("^`.+`$", name)
   if (should_strip) {
-    code <- sub("^`", "", code)
-    code <- sub("`$", "", code)
+    name <- sub("^`", "", name)
+    name <- sub("`$", "", name)
   }
-  code <- paste0("exploratory_env$`", code, "`")
+  code <- paste0("exploratory_env$`", name, "`")
+
   val <- eval(parse(text = code), envir)
+
+  # Check the default config for the variable.
+  if (is.null(quote)) {
+    quote <- get_variable_config(name, "quote", envir)
+    if (is.null(quote)) {
+      if (is.numeric(val)) {
+        quote <- '' # No quote by default for numeric.
+      }
+      else {
+        quote <- '"' # Double quote by default
+      }
+    }
+  }
+  if (is.null(escape)) {
+    escape <- get_variable_config(name, "escape", envir)
+    if (is.null(escape)) {
+      escape <- quote # Match with quote by default.
+    }
+  }
+
   if (is.null(val)) { # NULL in R is same as empty vector. Print empty string.
     val <- ""
   }
   else if (is.numeric(val)) {
     # Do not convert number to scientific notation.
     val <- format(val, scientific = FALSE)
+    val <- paste0(quote, val, quote)
   }
   else if (is.character(val) || is.factor(val)) {
-    # escape for js
-    if (escape) {
+    if (escape == '"') { # Escape for double quote
       val <- gsub("\\", "\\\\", val, fixed=TRUE)
       val <- gsub("\"", "\\\"", val, fixed=TRUE)
     }
-    if (quote) {
-      val <- paste0('"', val, '"')
+    else if (escape == "'") { # Escape for single quote
+      val <- gsub("\\", "\\\\", val, fixed=TRUE)
+      val <- gsub("'", "\\'", val, fixed=TRUE)
     }
+    val <- paste0(quote, val, quote)
   }
   else if (is.logical(val)) {
     val <- ifelse(val, "true", "false")
   }
   else if (lubridate::is.Date(val) || lubridate::is.POSIXt(val)) {
-    if (quote) {
-      val <- paste0("new Date(\"", as.character(val), "\")")
-    }
-    else {
-      val <- as.character(val)
-    }
+    val <- paste0("new Date(\"", as.character(val), "\")")
   }
   # Interpret NA to null.
   # https://docs.mongodb.com/manual/tutorial/query-for-null-fields/
@@ -304,87 +365,11 @@ js_glue_transformer <- function(code, envir) {
   glue::glue_collapse(val, sep=", ")
 }
 
-sql_glue_transformer <- function(code, envir) {
-  tokens <- stringr::str_split(code, ',')
+# Common routine for sql_glue_transformer and bigquery_glue_transformer.
+sql_glue_transformer_internal <- function(expr, envir, bigquery=FALSE) {
+  tokens <- stringr::str_split(expr, ',')
   tokens <- tokens[[1]]
-  code <- tokens[1]
-  values <- NULL;
-
-  # Parse arguments part. e.g. @{param1, quote=FALSE}
-  if (length(tokens) > 1) {
-    args <- tokens[2:length(tokens)]
-    args <- stringr::str_split(args, '=')
-    args <- purrr::map(args, trimws)
-    names <- purrr::map(args, function(x){x[1]})
-    values <- purrr::map(args, function(x){x[2]})
-    names(values) <- names
-  }
-  if (!is.null(values) && !is.null(values$quote) && values$quote %in% c("FALSE", "F", "false", "NO", "no")) {
-    quote <- FALSE
-  }
-  else {
-    quote <- TRUE # Quote string by default.
-  }
-  if (!is.null(values) && !is.null(values$escape) && values$escape %in% c("FALSE", "F", "false", "NO", "no")) {
-    escape <- FALSE
-  }
-  else {
-    escape <- TRUE # Escape for single quote by default.
-  }
-
-  # Trim white spaces.
-  code <- trimws(code)
-
-  # Strip quote by ``.
-  should_strip <- grepl("^`.+`$", code)
-  if (should_strip) {
-    code <- sub("^`", "", code)
-    code <- sub("`$", "", code)
-  }
-  code <- paste0("exploratory_env$`", code, "`")
-
-  val <- eval(parse(text = code), envir)
-  if (is.null(val)) { # NULL in R is same as empty vector. Print empty string.
-    val <- "NULL" # With PostgreSQL, "IN (NULL)" is valid while "IN ()" is syntax error. TODO: Test other databases.
-  }
-  else if (is.numeric(val)) {
-    # Do not convert number to scientific notation.
-    val <- format(val, scientific = FALSE)
-  }
-  else if (is.character(val) || is.factor(val)) {
-    # escape for SQL
-    # TODO: check if this makes sense for Dremio and Athena
-    if (escape) {
-      val <- gsub("'", "''", val, fixed=TRUE) # both Oracle and SQL Server escapes single quote by doubling them.
-    }
-    if (quote) {
-      val <- paste0("'", val, "'") # both Oracle and SQL Server quotes strings with single quote.
-    }
-  }
-  else if (lubridate::is.Date(val)) {
-    val <- as.character(val)
-    if (quote) {
-      val <- paste0("'", val, "'") # Athena and PostgreSQL quotes date with single quote. e.g. '2019-01-01'
-    }
-  }
-  else if (lubridate::is.POSIXt(val)) {
-    val <- as.character(val)
-    if (quote) {
-      val <- paste0("'", val, "'") # Athena and PostgreSQL quotes timestamp with single quote. e.g. '2019-01-01 00:00:00'
-    }
-  }
-
-  # TODO: How should we handle logical?
-  #       Does expression like 1e+10 work?
-  # TODO: Need to handle NA here. Find out appropriate way.
-  # We always collapse, unlike glue_sql.
-  glue::glue_collapse(val, sep=", ")
-}
-
-bigquery_glue_transformer <- function(code, envir) {
-  tokens <- stringr::str_split(code, ',')
-  tokens <- tokens[[1]]
-  code <- tokens[1]
+  name <- tokens[1]
   values <- NULL
 
   # Parse arguments part. e.g. @{param1, quote=FALSE}
@@ -396,60 +381,129 @@ bigquery_glue_transformer <- function(code, envir) {
     values <- purrr::map(args, function(x){x[2]})
     names(values) <- names
   }
-  if (!is.null(values) && !is.null(values$quote) && values$quote %in% c("FALSE", "F", "false", "NO", "no")) {
-    quote <- FALSE
+  if (!is.null(values) && !is.null(values$quote)) {
+    if (values$quote %in% c("FALSE", "F", "false", "NO", "No", "no")) {
+      quote <- ''
+    }
+    else if (values$quote %in% c("TRUE", "T", "true", "YES", "Yes", "yes")) {
+      # TRUE means same as default, which is single quote.
+      quote <- "'"
+    }
+    else if (grepl("^'.*'$", values$quote)) { # Single quoted.
+      quote <- sub("^'", "", values$quote)
+      quote <- sub("'$", "", quote)
+    }
+    else if (grepl('^".*"$', values$quote)) { # Double quoted.
+      quote <- sub('^"', "", values$quote)
+      quote <- sub('"$', "", quote)
+    }
+    else {
+      quote <- NULL # Check default config for the parameter.
+    }
   }
   else {
-    quote <- TRUE # Quote string by default.
+    quote <- NULL # Check default config for the parameter.
   }
-  if (!is.null(values) && !is.null(values$escape) && values$escape %in% c("FALSE", "F", "false", "NO", "no")) {
-    escape <- FALSE
+
+  if (!is.null(values) && !is.null(values$escape)) {
+    if (values$escape %in% c("FALSE", "F", "false", "NO", "No", "no")) {
+      escape <- ''
+    }
+    else if (values$escape %in% c("TRUE", "T", "true", "YES", "Yes", "yes")) {
+      # TRUE means same as default, which is single quote.
+      escape <- "'"
+    }
+    else if (grepl("^'.*'$", values$escape)) { # Single quoted.
+      escape <- sub("^'", "", values$escape)
+      escape <- sub("'$", "", escape)
+    }
+    else if (grepl('^".*"$', values$escape)) { # Double quoted.
+      escape <- sub('^"', "", values$escape)
+      escape <- sub('"$', "", escape)
+    }
+    else {
+      escape <- NULL # Check default config for the parameter.
+    }
   }
   else {
-    escape <- TRUE # Escape for single quote by default.
+    escape <- NULL # Check default config for the parameter.
   }
 
   # Trim white spaces.
-  code <- trimws(code)
+  name <- trimws(name)
 
   # Strip quote by ``.
-  should_strip <- grepl("^`.+`$", code)
+  should_strip <- grepl("^`.+`$", name)
   if (should_strip) {
-    code <- sub("^`", "", code)
-    code <- sub("`$", "", code)
+    name <- sub("^`", "", name)
+    name <- sub("`$", "", name)
   }
-  code <- paste0("exploratory_env$`", code, "`")
+
+  code <- paste0("exploratory_env$`", name, "`")
 
   val <- eval(parse(text = code), envir)
+
+  # Check the default config for the variable.
+  if (is.null(quote)) {
+    quote <- get_variable_config(name, "quote", envir)
+    if (is.null(quote)) {
+      if (is.numeric(val)) {
+        quote <- '' # No quote by default for numeric.
+      }
+      else {
+        quote <- "'" # Single quote by default
+      }
+    }
+  }
+  if (is.null(escape)) {
+    escape <- get_variable_config(name, "escape", envir)
+    if (is.null(escape)) {
+      escape <- quote # Match with quote by default.
+    }
+  }
+
   if (is.null(val)) { # NULL in R is same as empty vector. Print empty string.
-    val <- "NULL" # With BigQuery, "IN (NULL)" is valid while "IN ()" is syntax error.
+    val <- "NULL" # With PostgreSQL, "IN (NULL)" is valid while "IN ()" is syntax error. TODO: Test other databases.
   }
   else if (is.numeric(val)) {
     # Do not convert number to scientific notation.
     val <- format(val, scientific = FALSE)
+    val <- paste0(quote, val, quote)
   }
   else if (is.character(val) || is.factor(val)) {
-    # escape for Standard SQL for bigquery
-    # https://cloud.google.com/bigquery/docs/reference/standard-sql/lexical
-    if (escape) {
-      val <- gsub("\\", "\\\\", val, fixed=TRUE) # Escape literal backslash
-      val <- gsub("\'", "\\\'", val, fixed=TRUE) # Escape literal single quote
+    if (bigquery) {
+      if (escape == '"') { # Escape for double quote
+        # escape for Standard SQL for bigquery
+        # https://cloud.google.com/bigquery/docs/reference/standard-sql/lexical
+        val <- gsub("\\", "\\\\", val, fixed=TRUE) # Escape literal backslash
+        val <- gsub("\"", "\\\"", val, fixed=TRUE) # Escape literal double quote
+      }
+      else if (escape == "'") { # Escape for single quote
+        # escape for Standard SQL for bigquery
+        # https://cloud.google.com/bigquery/docs/reference/standard-sql/lexical
+        val <- gsub("\\", "\\\\", val, fixed=TRUE) # Escape literal backslash
+        val <- gsub("\'", "\\\'", val, fixed=TRUE) # Escape literal single quote
+      }
     }
-    if (quote) {
-      val <- paste0("'", val, "'")
+    else {
+      # escape for SQL
+      # TODO: check if this makes sense for Dremio and Athena
+      if (escape == '"') { # Escape for double quote (Checked that SQL Server's double quote works this way.)
+        val <- gsub('"', '""', val, fixed=TRUE)
+      }
+      else if (escape == "'") { # Escape for single quote
+        val <- gsub("'", "''", val, fixed=TRUE) # both Oracle and SQL Server escapes single quote by doubling them.
+      }
     }
+    val <- paste0(quote, val, quote)
   }
   else if (lubridate::is.Date(val)) {
     val <- as.character(val)
-    if (quote) {
-      val <- paste0("'", val, "'") # Athena and PostgreSQL quotes date with single quote. e.g. '2019-01-01'
-    }
+    val <- paste0(quote, val, quote) # Athena and PostgreSQL quotes date with single quote. e.g. '2019-01-01'
   }
   else if (lubridate::is.POSIXt(val)) {
     val <- as.character(val)
-    if (quote) {
-      val <- paste0("'", val, "'") # Athena and PostgreSQL quotes timestamp with single quote. e.g. '2019-01-01 00:00:00'
-    }
+    val <- paste0(quote, val, quote) # Athena and PostgreSQL quotes timestamp with single quote. e.g. '2019-01-01 00:00:00'
   }
 
   # TODO: How should we handle logical?
@@ -457,6 +511,14 @@ bigquery_glue_transformer <- function(code, envir) {
   # TODO: Need to handle NA here. Find out appropriate way.
   # We always collapse, unlike glue_sql.
   glue::glue_collapse(val, sep=", ")
+}
+
+sql_glue_transformer <- function(expr, envir) {
+  sql_glue_transformer_internal(expr, envir)
+}
+
+bigquery_glue_transformer <- function(expr, envir) {
+  sql_glue_transformer_internal(expr, envir, bigquery=TRUE)
 }
 
 #' @export

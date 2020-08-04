@@ -1,5 +1,4 @@
 context("test system functions")
-
 test_that("test clean_data_frame",{
   # create df with dupicated columns names and data frame type column
   df <- data.frame(a = 1:5, a = 2:6)
@@ -133,15 +132,23 @@ test_that("countycode", {
   ret2 <- countycode(c("MD", "MD", "MD"),c("Baltimore", "Baltimore City", "City of Baltimore"))
   expect_equal(ret2, c("24005", "24510", "24510"))
 })
-
 test_that("js_glue_transformer", {
   exploratory_env <- new.env()
+  exploratory_env$.config <- new.env()
 
-  exploratory_env$v <- c("a","b","c")
+  exploratory_env$v <- c('a"',"b'","c")
   res <- glue_exploratory("@{ `v` }", .transformer=js_glue_transformer)
-  expect_equal(as.character(res), '"a", "b", "c"') # default quote case.
-  res <- glue_exploratory("@{`v`, quote=FALSE}", .transformer=js_glue_transformer)
-  expect_equal(as.character(res), "a, b, c") # No quote case.
+  expect_equal(as.character(res), '"a\\\"", "b\'", "c"') # default quote case.
+
+  res <- glue_exploratory("@{`v`, quote=''}", .transformer=js_glue_transformer)
+  expect_equal(as.character(res), "a\", b', c") # No quote case.
+
+  exploratory_env$.config$v <- new.env()
+  exploratory_env$.config$v$quote <- "" # Made the default no quote.
+  res <- glue_exploratory("@{`v`}", .transformer=js_glue_transformer)
+  expect_equal(as.character(res), "a\", b', c") # No quote result 
+
+  rm("v", envir=exploratory_env$.config) # clear config.
 
   exploratory_env$v <- c(T,F,NA)
   res <- glue_exploratory("@{v}", .transformer=js_glue_transformer)
@@ -164,16 +171,23 @@ test_that("js_glue_transformer", {
 
 test_that("sql_glue_transformer", {
   exploratory_env <- new.env()
+  exploratory_env$.config <- new.env()
 
   exploratory_env$v <- c(1,2,3)
   res <- glue_exploratory("@{ v }", .transformer=sql_glue_transformer)
   expect_equal(as.character(res), "1, 2, 3")
 
-  exploratory_env$v <- c("a","b","c")
+  exploratory_env$v <- c('a"',"b'","c")
   res <- glue_exploratory("@{ `v` }", .transformer=sql_glue_transformer)
-  expect_equal(as.character(res), "'a', 'b', 'c'") # Not sure if this behavior works for all types of databases.
+  expect_equal(as.character(res), "'a\"', 'b''', 'c'") # Not sure if this behavior works for all types of databases.
+
+  exploratory_env$v <- c("a","b","c")
   res <- glue_exploratory("@{`v`, quote=FALSE}", .transformer=sql_glue_transformer)
   expect_equal(as.character(res), "a, b, c") # No quote case.
+
+  exploratory_env$v <- c('a"',"b'","c")
+  res <- glue_exploratory("@{ `v`, quote=\"\", escape=\"'\" }", .transformer=sql_glue_transformer)
+  expect_equal(as.character(res), "a\", b'', c") # No quote but with escape.
 
   exploratory_env$dept_names <- c("Sales","HR","CEO's secretary", "Data Science\\Statistics")
   exploratory_env$empid_above <- 1100
@@ -191,6 +205,7 @@ test_that("sql_glue_transformer", {
 
 test_that("bigquery_glue_transformer", {
   exploratory_env <- new.env()
+  exploratory_env$.config <- new.env()
 
   exploratory_env$v <- c(1,2,3)
   res <- glue_exploratory("@{ v }", .transformer=bigquery_glue_transformer)
