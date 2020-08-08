@@ -827,81 +827,24 @@ exp_xgboost <- function(df,
         model$prediction_test <- prediction_test
       }
 
-      if (with_boruta) { # Run only either Boruta or ranger::importance.
-        if (importance_measure == "impurity") {
-          getImp <- Boruta::getImpRfGini
-        }
-        else { # default to equivalent of "permutation".
-          getImp <- Boruta::getImpRfZ
-        }
-        model$boruta <- Boruta::Boruta(
-          fml,
-          data = model_df,
-          doTrace = 0,
-          maxRuns = boruta_max_runs + 1, # It seems Boruta stops at maxRuns - 1 iterations. Add 1 to be less confusing.
-          pValue = boruta_p_value,
-          getImp = getImp,
-          # Following parameters are to be relayed to ranger::ranger through Boruta::Boruta, then Boruta::getImpRfZ.
-          num.trees = ntree,
-          min.node.size = nodesize,
-          sample.fraction = sample.fraction,
-          probability = (classification_type == "binary") # build probability tree for AUC only for binary classification.
-        )
-        # These attributes are used in tidy. They are also at ranger level, but we are making Boruta object self-contained.
-        model$boruta$classification_type <- classification_type
-        model$boruta$orig_levels <- orig_levels
-        model$boruta$terms_mapping <- names(name_map)
-        names(model$boruta$terms_mapping) <- name_map
-        class(model$boruta) <- c("Boruta_exploratory", class(model$boruta))
-        imp_vars <- extract_important_variables_from_boruta(model$boruta)
-        if (is.null(max_pd_vars)) {
-          max_pd_vars <- 20 # Number of most important variables to calculate partial dependences on. This used to be 12 but we decided it was a little too small.
-        }
-        # max_pd_vars is not applied by default with Boruta.
-        if (length(imp_vars) > 0) {
-          imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
-        }
+      # return partial dependence
+      if (length(c_cols) > 1) { # Calculate importance only when there are multiple variables.
+        browser()
+        imp <- tidy.xgb.Booster(model)
+
+        imp_df <- imp %>% rename(variable=feature) %>% dplyr::arrange(-importance)
+        model$imp_df <- imp_df
+        imp_vars <- imp_df$variable
       }
       else {
-        # return partial dependence
-        if (length(c_cols) > 1) { # Calculate importance only when there are multiple variables.
-          imp <- ranger::importance(model)
-          imp_df <- tibble::tibble( # Use tibble since data.frame() would make variable factors, which breaks things in following steps.
-            variable = names(imp),
-            importance = imp
-          ) %>% dplyr::arrange(-importance)
-          model$imp_df <- imp_df
-          imp_vars <- imp_df$variable
-        }
-        else {
-          error <- simpleError("Variable importance requires two or more variables.")
-          model$imp_df <- error
-          imp_vars <- c_cols # Just use c_cols as is for imp_vars to calculate partial dependence anyway.
-        }
-        if (is.null(max_pd_vars)) {
-          max_pd_vars <- 20 # Number of most important variables to calculate partial dependences on. This used to be 12 but we decided it was a little too small.
-        }
-        imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
-        # code to separate numeric and categorical. keeping it for now for possibility of design change
-        # imp_vars_tmp <- imp_df$variable
-        # imp_vars <- character(0)
-        # if (var.type == "numeric") {
-        #   # keep only numeric variables from important ones
-        #   for (imp_var in imp_vars_tmp) {
-        #     if (is.numeric(model_df[[imp_var]])) {
-        #       imp_vars <- c(imp_vars, imp_var)
-        #     }
-        #   }
-        # }
-        # else {
-        #   # keep only non-numeric variables from important ones
-        #   for (imp_var in imp_vars_tmp) {
-        #     if (!is.numeric(model_df[[imp_var]])) {
-        #       imp_vars <- c(imp_vars, imp_var)
-        #     }
-        #   }
-        # }
+        error <- simpleError("Variable importance requires two or more variables.")
+        model$imp_df <- error
+        imp_vars <- c_cols # Just use c_cols as is for imp_vars to calculate partial dependence anyway.
       }
+      if (is.null(max_pd_vars)) {
+        max_pd_vars <- 20 # Number of most important variables to calculate partial dependences on. This used to be 12 but we decided it was a little too small.
+      }
+
       imp_vars <- as.character(imp_vars) # for some reason imp_vars is converted to factor at this point. turn it back to character.
       model$imp_vars <- imp_vars
       # Second element of n argument needs to be less than or equal to sample size, to avoid error.
