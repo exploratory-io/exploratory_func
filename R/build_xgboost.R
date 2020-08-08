@@ -636,7 +636,21 @@ predict_xgboost <- function(model, df) {
     model.matrix(model$terms, model.frame(df, na.action = na.pass, xlev = model$xlevels))
   }
 
-  stats::predict(model, mat_data)
+  predicted <- stats::predict(model, mat_data)
+
+  obj <- model$params$objective
+
+  if (obj == "multi:softprob") {
+    # predicted is a vector containing probabilities for each class
+    probs <- matrix(predicted, nrow = length(model$y_levels)) %>% t()
+    # probs <- fill_mat_NA(as.numeric(rownames(mat_data)), probs, nrow(df)) # code from xgboost step.
+    probs <- fill_mat_NA(1:nrow(df), probs, nrow(df)) # Not sure if this is necessary. TODO: check.
+    colnames(probs) <- model$y_levels
+    predicted <- probs %>%
+      as.data.frame() %>%
+      append_colnames(prefix = "predicted_probability_")
+  }
+  predicted
 }
 
 
@@ -775,7 +789,7 @@ exp_xgboost <- function(df,
   grouped_cols <- grouped_by(df)
 
   # Remember if the target column was originally numeric or logical before converting type.
-  is_target_logical_or_numeric <- is.numeric(df[[target_col]]) || is.logical(df[[target_col]])
+  is_target_numeric <- is.numeric(df[[target_col]])
   is_target_logical <- is.logical(df[[target_col]])
 
   orig_levels <- NULL
@@ -847,8 +861,11 @@ exp_xgboost <- function(df,
       if (is_target_logical) {
         model <- xgboost_binary(df, fml) # TODO: Add XGBoost specific parameters.
       }
-      else {
+      else if(is_target_numeric) {
         model <- xgboost_reg(df, fml) # TODO: Add XGBoost specific parameters.
+      }
+      else {
+        model <- xgboost_multi(df, fml) # TODO: Add XGBoost specific parameters.
       }
 
       model$prediction_training <- predict_xgboost(model, df)
@@ -889,7 +906,7 @@ exp_xgboost <- function(df,
       # Second element of n argument needs to be less than or equal to sample size, to avoid error.
       if (length(imp_vars) > 0) {
         model$partial_dependence <- partial_dependence.xgboost(model, vars=imp_vars, data=df, n=c(pd_grid_resolution, min(nrow(df), pd_sample_size)))
-        if (pd_with_bin_means && is_target_logical_or_numeric) {
+        if (pd_with_bin_means && (is_target_logical || is_target_numeric)) {
           # We calculate means of bins only for logical or numeric target to keep the visualization simple.
           model$partial_binning <- calc_partial_binning_data(df, clean_target_col, imp_vars)
         }
