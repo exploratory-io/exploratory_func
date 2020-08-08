@@ -1914,6 +1914,19 @@ extract_important_variables_from_boruta <- function(x) {
   res$variable
 }
 
+# This function should return following 2 columns.
+# - variable - Name of variable
+# - importance - Importance of the variable
+# Rows should be sorted by importance in descending order.
+# Avoid the name importance.ranger since it exists.
+importance_ranger <- function(model) {
+  imp <- ranger::importance(model)
+  imp_df <- tibble::tibble( # Use tibble since data.frame() would make variable factors, which breaks things in following steps.
+    variable = names(imp),
+    importance = imp
+  ) %>% dplyr::arrange(-importance)
+  imp_df
+}
 
 #' Get feature importance for multi class classification using randomForest
 #' @export
@@ -2120,11 +2133,7 @@ calc_feature_imp <- function(df,
       else {
         # return partial dependence
         if (length(c_cols) > 1) { # Calculate importance only when there are multiple variables.
-          imp <- ranger::importance(model)
-          imp_df <- tibble::tibble( # Use tibble since data.frame() would make variable factors, which breaks things in following steps.
-            variable = names(imp),
-            importance = imp
-          ) %>% dplyr::arrange(-importance)
+          imp_df <- importance_ranger(model)
           model$imp_df <- imp_df
           imp_vars <- imp_df$variable
         }
