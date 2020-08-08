@@ -776,6 +776,7 @@ exp_xgboost <- function(df,
 
   # Remember if the target column was originally numeric or logical before converting type.
   is_target_logical_or_numeric <- is.numeric(df[[target_col]]) || is.logical(df[[target_col]])
+  is_target_logical <- is.logical(df[[target_col]])
 
   orig_levels <- NULL
   if (is.factor(df[[target_col]])) {
@@ -843,7 +844,12 @@ exp_xgboost <- function(df,
       rhs <- paste0("`", c_cols, "`", collapse = " + ")
       fml <- as.formula(paste(clean_target_col, " ~ ", rhs))
 
-      model <- xgboost_reg(df, fml) # TODO: Add XGBoost specific parameters.
+      if (is_target_logical) {
+        model <- xgboost_binary(df, fml) # TODO: Add XGBoost specific parameters.
+      }
+      else {
+        model <- xgboost_reg(df, fml) # TODO: Add XGBoost specific parameters.
+      }
 
       model$prediction_training <- predict_xgboost(model, df)
 
