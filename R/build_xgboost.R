@@ -679,6 +679,18 @@ partial_dependence.xgboost <- function(fit, vars = colnames(data),
   attr(pd, "vars") = vars
   pd
 }
+
+# XGBoost prediction function that takes data frame rather than matrix.
+predict_xgboost <- function(model, df) {
+  mat_data <- if(!is.null(model$is_sparse) && model$is_sparse){
+    Matrix::sparse.model.matrix(model$terms, data = model.frame(df, na.action = na.pass, xlev = model$xlevels))
+  } else {
+    model.matrix(model$terms, model.frame(df, na.action = na.pass, xlev = model$xlevels))
+  }
+
+  stats::predict(model, mat_data)
+}
+
 #' Build XGBoost model for Analytics View.
 #' @export
 exp_xgboost <- function(df,
@@ -840,13 +852,7 @@ exp_xgboost <- function(df,
       # Make prediction with training data here and keep it, so that we can use this separate prediction for prediction, evaluation, etc.
       # model$prediction_training <- predict(model, model_df)
 
-      mat_data <- if(!is.null(model$is_sparse) && model$is_sparse){
-        Matrix::sparse.model.matrix(model$terms, data = model.frame(df, na.action = na.pass, xlev = model$xlevels))
-      } else {
-        model.matrix(model$terms, model.frame(df, na.action = na.pass, xlev = model$xlevels))
-      }
-
-      model$prediction_training <- stats::predict(model, mat_data)
+      model$prediction_training <- predict_xgboost(model, df)
 
       if (test_rate > 0) {
         na_row_numbers_test <- ranger.find_na(c_cols, data = df_test)
@@ -864,13 +870,7 @@ exp_xgboost <- function(df,
           df_test_clean[[y_name]] <- rep(0, nrow(df_test_clean))
         }
 
-        mat_data_test <- if(!is.null(model$is_sparse) && model$is_sparse){
-          Matrix::sparse.model.matrix(model$terms, data = model.frame(df_test_clean, na.action = na.pass, xlev = model$xlevels))
-        } else {
-          model.matrix(model$terms, model.frame(df_test_clean, na.action = na.pass, xlev = model$xlevels))
-        }
-
-        prediction_test <- stats::predict(model, mat_data_test)
+        prediction_test <- predict_xgboost(model, df_test_clean)
 
 
         # prediction_test <- predict(model, df_test_clean)
@@ -902,7 +902,6 @@ exp_xgboost <- function(df,
       model$imp_vars <- imp_vars
       # Second element of n argument needs to be less than or equal to sample size, to avoid error.
       if (length(imp_vars) > 0) {
-        browser()
         model$partial_dependence <- partial_dependence.xgboost(model, vars=imp_vars, data=df, n=c(pd_grid_resolution, min(nrow(df), pd_sample_size)))
         if (pd_with_bin_means && is_target_logical_or_numeric) {
           # We calculate means of bins only for logical or numeric target to keep the visualization simple.
