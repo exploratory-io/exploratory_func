@@ -2070,12 +2070,10 @@ calc_feature_imp <- function(df,
       model$prediction_training <- predict(model, model_df)
 
       if (test_rate > 0) {
-        na_row_numbers_test <- ranger.find_na(c_cols, data = df_test)
-        names(c_cols) <- NULL # Clearing names in vector is necessary to make the following select work.
-        df_test_clean <- df_test %>% dplyr::select(!!!rlang::syms(c_cols)) %>% na.omit()
-        unknown_category_rows_index_vector <- get_unknown_category_rows_index_vector(df_test_clean, df %>% dplyr::select(!!!rlang::syms(c_cols)))
-        df_test_clean <- df_test_clean[!unknown_category_rows_index_vector, , drop = FALSE] # 2nd arg must be empty.
-        unknown_category_rows_index <- get_row_numbers_from_index_vector(unknown_category_rows_index_vector)
+        df_test_clean <- cleanup_df_for_test(df_test, df, c_cols)
+        na_row_numbers_test <- attr(df_test_clean, "na_row_numbers")
+        unknown_category_rows_index <- attr(df_test_clean, "unknown_category_rows_index")
+
         prediction_test <- predict(model, df_test_clean)
         # TODO: Following current convention for the name na.action to keep na row index, but we might want to rethink.
         # We do not keep this for training since na.roughfix should fill values and not delete rows.
