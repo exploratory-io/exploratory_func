@@ -221,6 +221,7 @@ xgboost_reg <- function(data, formula, output_type = "linear", eval_metric = "rm
   # by creating eval_metric parameters in params list
   metric_list <- list()
   default_metrics <- c("rmse", "mae")
+  browser()
   if(output_type == "gamma"){
     default_metrics <- c(default_metrics, "gamma-nloglik", "gamma-deviance")
   }
@@ -617,5 +618,362 @@ glance.xgb.Booster <- function(x, pretty.name = FALSE, ...) {
     colnames(ret)[colnames(ret) == "validation_gamma_nloglik"] <- "validation_gamma_negative_log_likelihood"
     colnames(ret)[colnames(ret) == "validation_gamma_deviance"] <- "validation_gamma_deviance"
   }
+  ret
+}
+
+#' Build XGBoost model for Analytics View.
+#' @export
+exp_xgboost <- function(df,
+                        target,
+                        ...,
+                        max_nrow = 50000, # Down from 200000 when we added partial dependence
+                        # max_sample_size = NULL, # Half of max_nrow. down from 100000 when we added partial dependence
+                        # ntree = 20,
+                        # nodesize = 12,
+                        target_n = 20,
+                        predictor_n = 12, # So that at least months can fit in it.
+                        smote = FALSE,
+                        smote_target_minority_perc = 40,
+                        smote_max_synth_perc = 200,
+                        smote_k = 5,
+                        # importance_measure = "permutation", # "permutation" or "impurity".
+                        max_pd_vars = NULL,
+                        # Number of most important variables to calculate partial dependences on. 
+                        # By default, when Boruta is on, all Confirmed/Tentative variables.
+                        # 12 when Boruta is off.
+                        pd_sample_size = 500,
+                        pd_grid_resolution = 20,
+                        pd_with_bin_means = FALSE, # Default is FALSE for backward compatibility on the server
+                        # with_boruta = FALSE,
+                        # boruta_max_runs = 20, # Maximal number of importance source runs.
+                        # boruta_p_value = 0.05, # Boruta recommends using the default 0.01 for P-value, but we are using 0.05 for consistency with other functions of ours.
+                        seed = 1,
+                        test_rate = 0.0,
+                        test_split_type = "random" # "random" or "ordered"
+                        ){
+
+  if(!is.null(seed)){
+    set.seed(seed)
+  }
+
+  if(test_rate < 0 | 1 < test_rate){
+    stop("test_rate must be between 0 and 1")
+  } else if (test_rate == 1){
+    stop("test_rate must be less than 1")
+  }
+
+  # this seems to be the new way of NSE column selection evaluation
+  # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
+  target_col <- tidyselect::vars_select(names(df), !! rlang::enquo(target))
+  # this evaluates select arguments like starts_with
+  selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
+  # Sort predictors so that the result of permutation importance is stable against change of column order.
+  selected_cols <- sort(selected_cols)
+
+  grouped_cols <- grouped_by(df)
+
+  # Remember if the target column was originally numeric or logical before converting type.
+  is_target_logical_or_numeric <- is.numeric(df[[target_col]]) || is.logical(df[[target_col]])
+
+  orig_levels <- NULL
+  if (is.factor(df[[target_col]])) {
+    orig_levels <- levels(df[[target_col]])
+  }
+  else if (is.logical(df[[target_col]])) {
+    orig_levels <- c("TRUE","FALSE")
+  }
+
+  clean_ret <- cleanup_df(df, target_col, selected_cols, grouped_cols, target_n, predictor_n)
+
+  clean_df <- clean_ret$clean_df
+  name_map <- clean_ret$name_map
+  clean_target_col <- clean_ret$clean_target_col
+  clean_cols <- clean_ret$clean_cols
+
+  # if target is numeric, it is regression but
+  # if not, it is classification
+  classification_type <- get_classification_type(clean_df[[clean_target_col]])
+
+  each_func <- function(df) {
+    tryCatch({
+      browser()
+      # If we are to do SMOTE, do not down sample here and let exp_balance handle it so that we do not sample out precious minority data.
+      unique_val <- unique(df[[clean_target_col]])
+      if (smote && length(unique_val[!is.na(unique_val)]) == 2) {
+        sample_size <- NULL
+      }
+      else {
+        sample_size <- max_nrow
+      }
+      # XGBoost can work with NAs in numeric predictors. TODO: verify it.
+      clean_df_ret <- cleanup_df_per_group(df, clean_target_col, sample_size, clean_cols, name_map, predictor_n, filter_numeric_na=FALSE)
+      if (is.null(clean_df_ret)) {
+        return(NULL) # skip this group
+      }
+      df <- clean_df_ret$df
+      c_cols <- clean_df_ret$c_cols
+      if  (length(c_cols) == 0) {
+        # Previous version of message - stop("The selected predictor variables are invalid since they have only one unique values.")
+        stop("Invalid Predictors: Only one unique value.") # Message is made short so that it fits well in the Summary table.
+      }
+      name_map <- clean_df_ret$name_map
+
+      # apply smote if this is binary classification
+      unique_val <- unique(df[[clean_target_col]])
+      if (smote && length(unique_val[!is.na(unique_val)]) == 2) {
+        df <- df %>% exp_balance(clean_target_col, target_size = max_nrow, target_minority_perc = smote_target_minority_perc, max_synth_perc = smote_max_synth_perc, k = smote_k)
+        df <- df %>% dplyr::select(-synthesized) # Remove synthesized column added by exp_balance(). TODO: Handle it better. We might want to show it in resulting data.
+      }
+
+      # split training and test data
+      source_data <- df
+      test_index <- sample_df_index(source_data, rate = test_rate, ordered = (test_split_type == "ordered"))
+      df <- safe_slice(source_data, test_index, remove = TRUE)
+      if (test_rate > 0) {
+        df_test <- safe_slice(source_data, test_index, remove = FALSE)
+      }
+
+      # Restore source_data column name to original column name
+      rev_name_map <- names(name_map)
+      names(rev_name_map) <- name_map
+      colnames(source_data) <- rev_name_map[colnames(source_data)]
+
+
+
+
+
+      # build formula for randomForest
+      rhs <- paste0("`", c_cols, "`", collapse = " + ")
+      fml <- as.formula(paste(clean_target_col, " ~ ", rhs))
+
+      model <- xgboost_reg(df, fml)
+      browser()
+
+
+      # model_df <- model.frame(fml, data = df, na.action = randomForest::na.roughfix)
+
+      # # all or max_sample_size data will be used for randomForest
+      # # to grow a tree
+      # if (is.null(max_sample_size)) { # default to half of max_nrow
+      #   max_sample_size = max_nrow/2
+      # }
+      # sample.fraction <- min(c(max_sample_size / max_nrow, 1))
+
+      # if (with_boruta || # Run only either Boruta or ranger::importance.
+      #     length(c_cols) <= 1) { # Calculate importance only when there are multiple variables.
+      #   ranger_importance_measure <- "none"
+      # }
+      # else {
+      #   # "permutation" or "impurity".
+      #   ranger_importance_measure <- importance_measure
+      # }
+      # model <- ranger::ranger(
+      #   fml,
+      #   data = model_df,
+      #   importance = ranger_importance_measure,
+      #   num.trees = ntree,
+      #   min.node.size = nodesize,
+      #   keep.inbag=TRUE,
+      #   sample.fraction = sample.fraction,
+      #   probability = (classification_type %in% c("multi", "binary"))
+      # )
+
+
+      # prediction result in the ranger model (ret$predictions) is for some reason different from and worse than
+      # the prediction separately done with the same training data.
+      # Make prediction with training data here and keep it, so that we can use this separate prediction for prediction, evaluation, etc.
+      # model$prediction_training <- predict(model, model_df)
+
+      mat_data <- if(!is.null(model$is_sparse) && model$is_sparse){
+        Matrix::sparse.model.matrix(model$terms, data = model.frame(df, na.action = na.pass, xlev = model$xlevels))
+      } else {
+        model.matrix(model$terms, model.frame(df, na.action = na.pass, xlev = model$xlevels))
+      }
+
+      model$prediction_training <- stats::predict(model, mat_data)
+      browser()
+
+      if (test_rate > 0) {
+        na_row_numbers_test <- ranger.find_na(c_cols, data = df_test)
+        names(c_cols) <- NULL # Clearing names in vector is necessary to make the following select work.
+        df_test_clean <- df_test %>% dplyr::select(!!!rlang::syms(c_cols)) %>% na.omit()
+        unknown_category_rows_index_vector <- get_unknown_category_rows_index_vector(df_test_clean, df %>% dplyr::select(!!!rlang::syms(c_cols)))
+        df_test_clean <- df_test_clean[!unknown_category_rows_index_vector, , drop = FALSE] # 2nd arg must be empty.
+        unknown_category_rows_index <- get_row_numbers_from_index_vector(unknown_category_rows_index_vector)
+
+        y_name <- all.vars(model$terms)[[1]]
+        if(is.null(df_test_clean[[y_name]])){
+          # if there is no column in the formula (even if it's response variable),
+          # model.matrix function causes an error
+          # so create the column with 0
+          df_test_clean[[y_name]] <- rep(0, nrow(df_test_clean))
+        }
+
+        mat_data <- if(!is.null(model$is_sparse) && model$is_sparse){
+          Matrix::sparse.model.matrix(model$terms, data = model.frame(df_test_clean, na.action = na.pass, xlev = model$xlevels))
+        } else {
+          model.matrix(model$terms, model.frame(df_test_clean, na.action = na.pass, xlev = model$xlevels))
+        }
+
+        prediction_test <- stats::predict(model, mat_data)
+        browser()
+
+
+        # prediction_test <- predict(model, df_test_clean)
+        # TODO: Following current convention for the name na.action to keep na row index, but we might want to rethink.
+        # We do not keep this for training since na.roughfix should fill values and not delete rows.
+        prediction_test$na.action = na_row_numbers_test
+        prediction_test$unknown_category_rows_index = unknown_category_rows_index
+        model$prediction_test <- prediction_test
+      }
+
+      if (with_boruta) { # Run only either Boruta or ranger::importance.
+        if (importance_measure == "impurity") {
+          getImp <- Boruta::getImpRfGini
+        }
+        else { # default to equivalent of "permutation".
+          getImp <- Boruta::getImpRfZ
+        }
+        model$boruta <- Boruta::Boruta(
+          fml,
+          data = model_df,
+          doTrace = 0,
+          maxRuns = boruta_max_runs + 1, # It seems Boruta stops at maxRuns - 1 iterations. Add 1 to be less confusing.
+          pValue = boruta_p_value,
+          getImp = getImp,
+          # Following parameters are to be relayed to ranger::ranger through Boruta::Boruta, then Boruta::getImpRfZ.
+          num.trees = ntree,
+          min.node.size = nodesize,
+          sample.fraction = sample.fraction,
+          probability = (classification_type == "binary") # build probability tree for AUC only for binary classification.
+        )
+        # These attributes are used in tidy. They are also at ranger level, but we are making Boruta object self-contained.
+        model$boruta$classification_type <- classification_type
+        model$boruta$orig_levels <- orig_levels
+        model$boruta$terms_mapping <- names(name_map)
+        names(model$boruta$terms_mapping) <- name_map
+        class(model$boruta) <- c("Boruta_exploratory", class(model$boruta))
+        imp_vars <- extract_important_variables_from_boruta(model$boruta)
+        if (is.null(max_pd_vars)) {
+          max_pd_vars <- 20 # Number of most important variables to calculate partial dependences on. This used to be 12 but we decided it was a little too small.
+        }
+        # max_pd_vars is not applied by default with Boruta.
+        if (length(imp_vars) > 0) {
+          imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
+        }
+      }
+      else {
+        # return partial dependence
+        if (length(c_cols) > 1) { # Calculate importance only when there are multiple variables.
+          imp <- ranger::importance(model)
+          imp_df <- tibble::tibble( # Use tibble since data.frame() would make variable factors, which breaks things in following steps.
+            variable = names(imp),
+            importance = imp
+          ) %>% dplyr::arrange(-importance)
+          model$imp_df <- imp_df
+          imp_vars <- imp_df$variable
+        }
+        else {
+          error <- simpleError("Variable importance requires two or more variables.")
+          model$imp_df <- error
+          imp_vars <- c_cols # Just use c_cols as is for imp_vars to calculate partial dependence anyway.
+        }
+        if (is.null(max_pd_vars)) {
+          max_pd_vars <- 20 # Number of most important variables to calculate partial dependences on. This used to be 12 but we decided it was a little too small.
+        }
+        imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
+        # code to separate numeric and categorical. keeping it for now for possibility of design change
+        # imp_vars_tmp <- imp_df$variable
+        # imp_vars <- character(0)
+        # if (var.type == "numeric") {
+        #   # keep only numeric variables from important ones
+        #   for (imp_var in imp_vars_tmp) {
+        #     if (is.numeric(model_df[[imp_var]])) {
+        #       imp_vars <- c(imp_vars, imp_var)
+        #     }
+        #   }
+        # }
+        # else {
+        #   # keep only non-numeric variables from important ones
+        #   for (imp_var in imp_vars_tmp) {
+        #     if (!is.numeric(model_df[[imp_var]])) {
+        #       imp_vars <- c(imp_vars, imp_var)
+        #     }
+        #   }
+        # }
+      }
+      imp_vars <- as.character(imp_vars) # for some reason imp_vars is converted to factor at this point. turn it back to character.
+      model$imp_vars <- imp_vars
+      # Second element of n argument needs to be less than or equal to sample size, to avoid error.
+      if (length(imp_vars) > 0) {
+        model$partial_dependence <- partial_dependence.ranger(model, vars=imp_vars, data=model_df, n=c(pd_grid_resolution, min(model$num.samples, pd_sample_size)))
+        if (pd_with_bin_means && is_target_logical_or_numeric) {
+          # We calculate means of bins only for logical or numeric target to keep the visualization simple.
+          model$partial_binning <- calc_partial_binning_data(model_df, clean_target_col, imp_vars)
+        }
+      }
+      else {
+        model$partial_dependence <- NULL
+      }
+
+      # these attributes are used in tidy of randomForest
+      model$classification_type <- classification_type
+      model$orig_levels <- orig_levels
+      model$terms_mapping <- names(name_map)
+      names(model$terms_mapping) <- name_map
+      model$y <- model.response(model_df)
+      model$df <- model_df
+      model$formula_terms <- terms(fml)
+      model$sampled_nrow <- clean_df_ret$sampled_nrow
+      list(model = model, test_index = test_index, source_data = source_data)
+    }, error = function(e){
+      if(length(grouped_cols) > 0) {
+        # In repeat-by case, we report group-specific error in the Summary table,
+        # so that analysis on other groups can go on.
+        class(e) <- c("ranger", class(e))
+        list(model = e, test_index = NULL, source_data = NULL)
+      } else {
+        stop(e)
+      }
+    })
+  }
+
+  model_and_data_col <- "model_and_data"
+  ret <- do_on_each_group(clean_df, each_func, name = model_and_data_col, with_unnest = FALSE)
+
+  # It is necessary to nest in order to retrieve the result stored in model_and_data_col.
+  # If there is a group column, omit the group column from nest, otherwise nest the whole
+  if (length(grouped_cols) > 0) {
+    ret <- ret %>% tidyr::nest(-grouped_cols)
+  } else {
+    ret <- ret %>% tidyr::nest()
+  }
+
+  ret <- ret %>% dplyr::ungroup() # Remove rowwise grouping so that following mutate works as expected.
+  # Retrieve model, test index and source data stored in model_and_data_col column (list) and store them in separate columns
+  ret <- ret %>% dplyr::mutate(model = purrr::map(data, function(df){
+            df[[model_and_data_col]][[1]]$model
+          })) %>%
+          dplyr::mutate(.test_index = purrr::map(data, function(df){
+            df[[model_and_data_col]][[1]]$test_index
+          })) %>%
+          dplyr::mutate(source.data = purrr::map(data, function(df){
+            data <- df[[model_and_data_col]][[1]]$source_data
+            if (length(grouped_cols) > 0 && !is.null(data)) {
+              data %>% dplyr::select(-grouped_cols)
+            } else {
+              data
+            }
+          })) %>%
+          dplyr::select(-data) %>%
+          dplyr::rowwise()
+
+  # If all the groups are errors, it would be hard to handle resulting data frames
+  # at the chart preprocessors. Hence, we instead stop the processing here
+  # and just throw the error from the first group.
+  if (purrr::every(ret$model, function(x) {"error" %in% class(x)})) {
+    stop(ret$model[[1]])
+  }
+
   ret
 }
