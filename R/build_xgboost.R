@@ -689,9 +689,10 @@ partial_dependence.xgboost <- function(fit, vars = colnames(data),
 # This function should return following 2 columns.
 # - variable - Name of variable
 # - importance - Importance of the variable
-importance.xgboost <- function(model) {
+# Rows should be sorted by importance in descending order.
+importance_xgboost <- function(model) {
   imp <- tidy.xgb.Booster(model)
-  ret <- imp %>% rename(variable=feature)
+  ret <- imp %>% rename(variable=feature) %>% dplyr::arrange(-importance)
   ret
 }
 
@@ -864,8 +865,7 @@ exp_xgboost <- function(df,
 
       # return partial dependence
       if (length(c_cols) > 1) { # Calculate importance only when there are multiple variables.
-        imp <- importance.xgboost(model)
-        imp_df <- imp %>% dplyr::arrange(-importance)
+        imp_df <- importance_xgboost(model)
         model$imp_df <- imp_df
         imp_vars <- imp_df$variable
       }
