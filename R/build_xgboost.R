@@ -622,6 +622,14 @@ glance.xgb.Booster <- function(x, pretty.name = FALSE, ...) {
 
 # XGBoost prediction function that takes data frame rather than matrix.
 predict_xgboost <- function(model, df) {
+  y_name <- all.vars(model$terms)[[1]]
+  if(is.null(df[[y_name]])){
+    # if there is no column in the formula (even if it's response variable),
+    # model.matrix function causes an error
+    # so create the column with 0
+    df[[y_name]] <- rep(0, nrow(df))
+  }
+
   mat_data <- if(!is.null(model$is_sparse) && model$is_sparse){
     Matrix::sparse.model.matrix(model$terms, data = model.frame(df, na.action = na.pass, xlev = model$xlevels))
   } else {
@@ -843,14 +851,6 @@ exp_xgboost <- function(df,
         df_test_clean <- cleanup_df_for_test(df_test, df, c_cols)
         na_row_numbers_test <- attr(df_test_clean, "na_row_numbers")
         unknown_category_rows_index <- attr(df_test_clean, "unknown_category_rows_index")
-
-        y_name <- all.vars(model$terms)[[1]]
-        if(is.null(df_test_clean[[y_name]])){
-          # if there is no column in the formula (even if it's response variable),
-          # model.matrix function causes an error
-          # so create the column with 0
-          df_test_clean[[y_name]] <- rep(0, nrow(df_test_clean))
-        }
 
         prediction_test <- predict_xgboost(model, df_test_clean)
 
