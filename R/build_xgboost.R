@@ -221,7 +221,6 @@ xgboost_reg <- function(data, formula, output_type = "linear", eval_metric = "rm
   # by creating eval_metric parameters in params list
   metric_list <- list()
   default_metrics <- c("rmse", "mae")
-  browser()
   if(output_type == "gamma"){
     default_metrics <- c(default_metrics, "gamma-nloglik", "gamma-deviance")
   }
@@ -621,6 +620,65 @@ glance.xgb.Booster <- function(x, pretty.name = FALSE, ...) {
   ret
 }
 
+partial_dependence.xgboost <- function(fit, vars = colnames(data),
+  n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)),
+  interaction = FALSE, uniform = TRUE, data, ...) {
+
+  target = strsplit(strsplit(as.character(fit$call), "formula")[[2]], " ~")[[1]][[1]]
+
+  predict.fun = function(object, newdata) {
+    mat_data <- if(!is.null(object$is_sparse) && object$is_sparse){
+      Matrix::sparse.model.matrix(object$terms, data = model.frame(newdata, na.action = na.pass, xlev = object$xlevels))
+    } else {
+      model.matrix(object$terms, model.frame(newdata, na.action = na.pass, xlev = object$xlevels))
+    }
+
+    #if (object$treetype != "Classification") {
+    if (TRUE) {
+      stats::predict(object, mat_data)
+    } else {
+      t(apply(stats::predict(object, mat_data), 1,
+        function(x) table(factor(x, seq_len(length(unique(newdata[[target]]))),
+          levels(newdata[[target]]))) / length(x)))
+    }
+  }
+
+  args = list(
+    "data" = data,
+    "vars" = vars,
+    "n" = n,
+    "model" = fit,
+    "uniform" = uniform,
+    "predict.fun" = predict.fun,
+    ...
+  )
+  
+  if (length(vars) > 1L & !interaction) {
+    pd = rbindlist(sapply(vars, function(x) {
+      args$vars = x
+      if ("points" %in% names(args))
+        args$points = args$points[x]
+      mp = do.call(mmpf::marginalPrediction, args)
+      #if (fit$treetype == "Regression")
+      if (TRUE)
+        names(mp)[ncol(mp)] = target
+      mp
+    }, simplify = FALSE), fill = TRUE)
+    data.table::setcolorder(pd, c(vars, colnames(pd)[!colnames(pd) %in% vars]))
+  } else {
+    pd = do.call(mmpf::marginalPrediction, args)
+    #if (fit$treetype == "Regression")
+    if (TRUE)
+      names(pd)[ncol(pd)] = target
+  }
+
+  attr(pd, "class") = c("pd", "data.frame")
+  attr(pd, "interaction") = interaction == TRUE
+  #attr(pd, "target") = if (fit$treetype != "Classification") target else levels(fit$predictions)
+  attr(pd, "target") = if (TRUE) target else levels(fit$predictions)
+  attr(pd, "vars") = vars
+  pd
+}
 #' Build XGBoost model for Analytics View.
 #' @export
 exp_xgboost <- function(df,
@@ -696,7 +754,6 @@ exp_xgboost <- function(df,
 
   each_func <- function(df) {
     tryCatch({
-      browser()
       # If we are to do SMOTE, do not down sample here and let exp_balance handle it so that we do not sample out precious minority data.
       unique_val <- unique(df[[clean_target_col]])
       if (smote && length(unique_val[!is.na(unique_val)]) == 2) {
@@ -747,7 +804,6 @@ exp_xgboost <- function(df,
       fml <- as.formula(paste(clean_target_col, " ~ ", rhs))
 
       model <- xgboost_reg(df, fml)
-      browser()
 
 
       # model_df <- model.frame(fml, data = df, na.action = randomForest::na.roughfix)
@@ -791,7 +847,6 @@ exp_xgboost <- function(df,
       }
 
       model$prediction_training <- stats::predict(model, mat_data)
-      browser()
 
       if (test_rate > 0) {
         na_row_numbers_test <- ranger.find_na(c_cols, data = df_test)
@@ -809,14 +864,13 @@ exp_xgboost <- function(df,
           df_test_clean[[y_name]] <- rep(0, nrow(df_test_clean))
         }
 
-        mat_data <- if(!is.null(model$is_sparse) && model$is_sparse){
+        mat_data_test <- if(!is.null(model$is_sparse) && model$is_sparse){
           Matrix::sparse.model.matrix(model$terms, data = model.frame(df_test_clean, na.action = na.pass, xlev = model$xlevels))
         } else {
           model.matrix(model$terms, model.frame(df_test_clean, na.action = na.pass, xlev = model$xlevels))
         }
 
-        prediction_test <- stats::predict(model, mat_data)
-        browser()
+        prediction_test <- stats::predict(model, mat_data_test)
 
 
         # prediction_test <- predict(model, df_test_clean)
@@ -829,7 +883,6 @@ exp_xgboost <- function(df,
 
       # return partial dependence
       if (length(c_cols) > 1) { # Calculate importance only when there are multiple variables.
-        browser()
         imp <- tidy.xgb.Booster(model)
 
         imp_df <- imp %>% rename(variable=feature) %>% dplyr::arrange(-importance)
@@ -849,10 +902,11 @@ exp_xgboost <- function(df,
       model$imp_vars <- imp_vars
       # Second element of n argument needs to be less than or equal to sample size, to avoid error.
       if (length(imp_vars) > 0) {
-        model$partial_dependence <- partial_dependence.ranger(model, vars=imp_vars, data=model_df, n=c(pd_grid_resolution, min(model$num.samples, pd_sample_size)))
+        browser()
+        model$partial_dependence <- partial_dependence.xgboost(model, vars=imp_vars, data=df, n=c(pd_grid_resolution, min(nrow(df), pd_sample_size)))
         if (pd_with_bin_means && is_target_logical_or_numeric) {
           # We calculate means of bins only for logical or numeric target to keep the visualization simple.
-          model$partial_binning <- calc_partial_binning_data(model_df, clean_target_col, imp_vars)
+          model$partial_binning <- calc_partial_binning_data(df, clean_target_col, imp_vars)
         }
       }
       else {
@@ -864,8 +918,8 @@ exp_xgboost <- function(df,
       model$orig_levels <- orig_levels
       model$terms_mapping <- names(name_map)
       names(model$terms_mapping) <- name_map
-      model$y <- model.response(model_df)
-      model$df <- model_df
+      # model$y <- model.response(df) TODO: what was this??
+      model$df <- df
       model$formula_terms <- terms(fml)
       model$sampled_nrow <- clean_df_ret$sampled_nrow
       list(model = model, test_index = test_index, source_data = source_data)
