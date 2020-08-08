@@ -620,6 +620,18 @@ glance.xgb.Booster <- function(x, pretty.name = FALSE, ...) {
   ret
 }
 
+# XGBoost prediction function that takes data frame rather than matrix.
+predict_xgboost <- function(model, df) {
+  mat_data <- if(!is.null(model$is_sparse) && model$is_sparse){
+    Matrix::sparse.model.matrix(model$terms, data = model.frame(df, na.action = na.pass, xlev = model$xlevels))
+  } else {
+    model.matrix(model$terms, model.frame(df, na.action = na.pass, xlev = model$xlevels))
+  }
+
+  stats::predict(model, mat_data)
+}
+
+
 partial_dependence.xgboost <- function(fit, vars = colnames(data),
   n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)),
   interaction = FALSE, uniform = TRUE, data, ...) {
@@ -627,17 +639,11 @@ partial_dependence.xgboost <- function(fit, vars = colnames(data),
   target = strsplit(strsplit(as.character(fit$call), "formula")[[2]], " ~")[[1]][[1]]
 
   predict.fun = function(object, newdata) {
-    mat_data <- if(!is.null(object$is_sparse) && object$is_sparse){
-      Matrix::sparse.model.matrix(object$terms, data = model.frame(newdata, na.action = na.pass, xlev = object$xlevels))
-    } else {
-      model.matrix(object$terms, model.frame(newdata, na.action = na.pass, xlev = object$xlevels))
-    }
-
     #if (object$treetype != "Classification") {
     if (TRUE) {
-      stats::predict(object, mat_data)
+      predict_xgboost(object, newdata)
     } else {
-      t(apply(stats::predict(object, mat_data), 1,
+      t(apply(predict_xgboost(object, mat_data), 1,
         function(x) table(factor(x, seq_len(length(unique(newdata[[target]]))),
           levels(newdata[[target]]))) / length(x)))
     }
@@ -678,17 +684,6 @@ partial_dependence.xgboost <- function(fit, vars = colnames(data),
   attr(pd, "target") = if (TRUE) target else levels(fit$predictions)
   attr(pd, "vars") = vars
   pd
-}
-
-# XGBoost prediction function that takes data frame rather than matrix.
-predict_xgboost <- function(model, df) {
-  mat_data <- if(!is.null(model$is_sparse) && model$is_sparse){
-    Matrix::sparse.model.matrix(model$terms, data = model.frame(df, na.action = na.pass, xlev = model$xlevels))
-  } else {
-    model.matrix(model$terms, model.frame(df, na.action = na.pass, xlev = model$xlevels))
-  }
-
-  stats::predict(model, mat_data)
 }
 
 #' Build XGBoost model for Analytics View.
