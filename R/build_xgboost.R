@@ -686,6 +686,15 @@ partial_dependence.xgboost <- function(fit, vars = colnames(data),
   pd
 }
 
+# This function should return following 2 columns.
+# - variable - Name of variable
+# - importance - Importance of the variable
+importance.xgboost <- function(model) {
+  imp <- tidy.xgb.Booster(model)
+  ret <- imp %>% rename(variable=feature)
+  ret
+}
+
 # Clean up data frame for test
 # Removes NAs in predictors - TODO: Is this necessary given our preprocessing before this?
 # Removes categorical values that do not appear in training data.
@@ -855,9 +864,8 @@ exp_xgboost <- function(df,
 
       # return partial dependence
       if (length(c_cols) > 1) { # Calculate importance only when there are multiple variables.
-        imp <- tidy.xgb.Booster(model)
-
-        imp_df <- imp %>% rename(variable=feature) %>% dplyr::arrange(-importance)
+        imp <- importance.xgboost(model)
+        imp_df <- imp %>% dplyr::arrange(-importance)
         model$imp_df <- imp_df
         imp_vars <- imp_df$variable
       }
