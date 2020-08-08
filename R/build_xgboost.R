@@ -802,50 +802,11 @@ exp_xgboost <- function(df,
       names(rev_name_map) <- name_map
       colnames(source_data) <- rev_name_map[colnames(source_data)]
 
-
-
-
-
       # build formula for randomForest
       rhs <- paste0("`", c_cols, "`", collapse = " + ")
       fml <- as.formula(paste(clean_target_col, " ~ ", rhs))
 
-      model <- xgboost_reg(df, fml)
-
-
-      # model_df <- model.frame(fml, data = df, na.action = randomForest::na.roughfix)
-
-      # # all or max_sample_size data will be used for randomForest
-      # # to grow a tree
-      # if (is.null(max_sample_size)) { # default to half of max_nrow
-      #   max_sample_size = max_nrow/2
-      # }
-      # sample.fraction <- min(c(max_sample_size / max_nrow, 1))
-
-      # if (with_boruta || # Run only either Boruta or ranger::importance.
-      #     length(c_cols) <= 1) { # Calculate importance only when there are multiple variables.
-      #   ranger_importance_measure <- "none"
-      # }
-      # else {
-      #   # "permutation" or "impurity".
-      #   ranger_importance_measure <- importance_measure
-      # }
-      # model <- ranger::ranger(
-      #   fml,
-      #   data = model_df,
-      #   importance = ranger_importance_measure,
-      #   num.trees = ntree,
-      #   min.node.size = nodesize,
-      #   keep.inbag=TRUE,
-      #   sample.fraction = sample.fraction,
-      #   probability = (classification_type %in% c("multi", "binary"))
-      # )
-
-
-      # prediction result in the ranger model (ret$predictions) is for some reason different from and worse than
-      # the prediction separately done with the same training data.
-      # Make prediction with training data here and keep it, so that we can use this separate prediction for prediction, evaluation, etc.
-      # model$prediction_training <- predict(model, model_df)
+      model <- xgboost_reg(df, fml) # TODO: Add XGBoost specific parameters.
 
       model$prediction_training <- predict_xgboost(model, df)
 
