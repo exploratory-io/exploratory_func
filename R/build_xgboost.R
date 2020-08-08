@@ -686,6 +686,25 @@ partial_dependence.xgboost <- function(fit, vars = colnames(data),
   pd
 }
 
+# Clean up data frame for test
+# Removes NAs in predictors - TODO: Is this necessary given our preprocessing before this?
+# Removes categorical values that do not appear in training data.
+# Returns cleaned data frame.
+# attr(ret, "na_row_numbers") - vector of row numbers of NA rows.
+# attr(ret, "unknown_category_rows_index") - logical vector that is index of where the unknown category rows are after removing NA rows.
+cleanup_df_for_test <- function(df_test, df_train, c_cols) {
+  na_row_numbers_test <- ranger.find_na(c_cols, data = df_test)
+  names(c_cols) <- NULL # Clearing names in vector is necessary to make the following select work.
+  df_test_clean <- df_test %>% dplyr::select(!!!rlang::syms(c_cols)) %>% na.omit()
+  unknown_category_rows_index_vector <- get_unknown_category_rows_index_vector(df_test_clean, df_train %>% dplyr::select(!!!rlang::syms(c_cols)))
+  df_test_clean <- df_test_clean[!unknown_category_rows_index_vector, , drop = FALSE] # 2nd arg must be empty.
+  unknown_category_rows_index <- get_row_numbers_from_index_vector(unknown_category_rows_index_vector)
+
+  attr(df_test_clean, "na_row_numbers") <- na_row_numbers_test
+  attr(df_test_clean, "unknown_category_rows_index") <- unknown_category_rows_index
+  df_test_clean
+}
+
 #' Build XGBoost model for Analytics View.
 #' @export
 exp_xgboost <- function(df,
@@ -811,12 +830,9 @@ exp_xgboost <- function(df,
       model$prediction_training <- predict_xgboost(model, df)
 
       if (test_rate > 0) {
-        na_row_numbers_test <- ranger.find_na(c_cols, data = df_test)
-        names(c_cols) <- NULL # Clearing names in vector is necessary to make the following select work.
-        df_test_clean <- df_test %>% dplyr::select(!!!rlang::syms(c_cols)) %>% na.omit()
-        unknown_category_rows_index_vector <- get_unknown_category_rows_index_vector(df_test_clean, df %>% dplyr::select(!!!rlang::syms(c_cols)))
-        df_test_clean <- df_test_clean[!unknown_category_rows_index_vector, , drop = FALSE] # 2nd arg must be empty.
-        unknown_category_rows_index <- get_row_numbers_from_index_vector(unknown_category_rows_index_vector)
+        df_test_clean <- cleanup_df_for_test(df_test, df, c_cols)
+        na_row_numbers_test <- attr(df_test_clean, "na_row_numbers")
+        unknown_category_rows_index <- attr(df_test_clean, "unknown_category_rows_index")
 
         y_name <- all.vars(model$terms)[[1]]
         if(is.null(df_test_clean[[y_name]])){
