@@ -893,7 +893,7 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
         # Restore NAs for removed rows that had unknown categorical predictor values.
         # Note that this is necessary only for test data, and not for training data.
         predicted_label_nona <- restore_na(predicted_label_nona, attr(x$prediction_test, "unknown_category_rows_index"))
-        predicted_value <- restore_na(predicted_label_nona, x$prediction_test$na.action)
+        predicted_value <- restore_na(predicted_label_nona, attr(x$prediction_test, "na.action"))
       })
 
     if(!is.null(x$classification_type) && x$classification_type == "binary"){
@@ -913,7 +913,7 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
           # Keep this logic consistent with get_binary_predicted_value_from_probability
           predicted_prob_nona <- predictions[, 1]
           predicted_prob_nona <- restore_na(predicted_prob_nona, attr(x$prediction_test, "unknown_category_rows_index"))
-          predicted_prob <- restore_na(predicted_prob_nona, x$prediction_test$na.action)
+          predicted_prob <- restore_na(predicted_prob_nona, attr(x$prediction_test, "na.action"))
         })
       data[[predicted_value_col]] <- predicted_value
       data[[predicted_probability_col]] <- predicted_prob
@@ -928,8 +928,8 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
           # Inserting once removed NA rows
           predicted_prob_nona <- apply(x$prediction_test$predictions, 1 , max)
           predicted_prob_nona <- restore_na(predicted_prob_nona, attr(x$prediction_test, "unknown_category_rows_index"))
-          predicted_prob <- restore_na(predicted_prob_nona, x$prediction_test$na.action)
-          data <- ranger.set_multi_predicted_values(data, x$prediction_test$predictions, predicted_value, x$prediction_test$na.action, attr(x$prediction_test, "unknown_category_rows_index"))
+          predicted_prob <- restore_na(predicted_prob_nona, attr(x$prediction_test, "na.action"))
+          data <- ranger.set_multi_predicted_values(data, x$prediction_test$predictions, predicted_value, attr(x$prediction_test, "na.action"), attr(x$prediction_test, "unknown_category_rows_index"))
         })
       data[[predicted_probability_col]] <- predicted_prob
     }
@@ -980,7 +980,7 @@ augment.ranger.regression <- function(x, data = NULL, newdata = NULL, data_type 
         # Inserting once removed NA rows
         predicted_nona <- x$prediction_test$predictions
         predicted_nona <- restore_na(predicted_nona, attr(x$prediction_test, "unknown_category_rows_index"))
-        predicted <- restore_na(predicted_nona, x$prediction_test$na.action)
+        predicted <- restore_na(predicted_nona, attr(x$prediction_test, "na.action"))
         data[[predicted_value_col]] <- predicted
         data
       })
@@ -2090,8 +2090,8 @@ calc_feature_imp <- function(df,
         prediction_test <- predict(model, df_test_clean)
         # TODO: Following current convention for the name na.action to keep na row index, but we might want to rethink.
         # We do not keep this for training since na.roughfix should fill values and not delete rows.
-        prediction_test$na.action = na_row_numbers_test
-        attr(prediction_test, "unknown_category_rows_index") = unknown_category_rows_index
+        attr(prediction_test, "na.action") <- na_row_numbers_test
+        attr(prediction_test, "unknown_category_rows_index") <- unknown_category_rows_index
         model$prediction_test <- prediction_test
       }
 
