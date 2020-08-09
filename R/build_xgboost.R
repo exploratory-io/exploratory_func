@@ -656,13 +656,13 @@ predict_xgboost <- function(model, df) {
 
 partial_dependence.xgboost <- function(fit, vars = colnames(data),
   n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)),
-  interaction = FALSE, uniform = TRUE, data, ...) {
+  classification = FALSE, interaction = FALSE, uniform = TRUE, data, ...) {
 
   target = strsplit(strsplit(as.character(fit$call), "formula")[[2]], " ~")[[1]][[1]]
 
   predict.fun = function(object, newdata) {
     #if (object$treetype != "Classification") {
-    if (FALSE) {
+    if (!classification) {
       predict_xgboost(object, newdata)
     } else {
       t(apply(predict_xgboost(object, newdata), 1,
@@ -688,7 +688,7 @@ partial_dependence.xgboost <- function(fit, vars = colnames(data),
         args$points = args$points[x]
       mp = do.call(mmpf::marginalPrediction, args)
       #if (fit$treetype == "Regression")
-      if (FALSE)
+      if (!classification)
         names(mp)[ncol(mp)] = target
       mp
     }, simplify = FALSE), fill = TRUE)
@@ -696,14 +696,14 @@ partial_dependence.xgboost <- function(fit, vars = colnames(data),
   } else {
     pd = do.call(mmpf::marginalPrediction, args)
     #if (fit$treetype == "Regression")
-    if (FALSE)
+    if (!classification) # TODO: If we give "regression" for binary classification, would it make sense here?
       names(pd)[ncol(pd)] = target
   }
 
   attr(pd, "class") = c("pd", "data.frame")
   attr(pd, "interaction") = interaction == TRUE
   #attr(pd, "target") = if (fit$treetype != "Classification") target else levels(fit$predictions)
-  attr(pd, "target") = if (TRUE) target else levels(fit$predictions)
+  attr(pd, "target") = if (!classification) target else levels(fit$predictions)
   attr(pd, "vars") = vars
   pd
 }
@@ -905,7 +905,9 @@ exp_xgboost <- function(df,
       model$imp_vars <- imp_vars
       # Second element of n argument needs to be less than or equal to sample size, to avoid error.
       if (length(imp_vars) > 0) {
-        model$partial_dependence <- partial_dependence.xgboost(model, vars=imp_vars, data=df, n=c(pd_grid_resolution, min(nrow(df), pd_sample_size)))
+        model$partial_dependence <- partial_dependence.xgboost(model, vars=imp_vars, data=df,
+                                                               n=c(pd_grid_resolution, min(nrow(df), pd_sample_size)),
+                                                               classification=!(is_target_numeric||is_target_logical)) # We treat binary classification as a regression to predict probability here.
         if (pd_with_bin_means && (is_target_logical || is_target_numeric)) {
           # We calculate means of bins only for logical or numeric target to keep the visualization simple.
           model$partial_binning <- calc_partial_binning_data(df, clean_target_col, imp_vars)
