@@ -662,10 +662,10 @@ partial_dependence.xgboost <- function(fit, vars = colnames(data),
 
   predict.fun = function(object, newdata) {
     #if (object$treetype != "Classification") {
-    if (TRUE) {
+    if (FALSE) {
       predict_xgboost(object, newdata)
     } else {
-      t(apply(predict_xgboost(object, mat_data), 1,
+      t(apply(predict_xgboost(object, newdata), 1,
         function(x) table(factor(x, seq_len(length(unique(newdata[[target]]))),
           levels(newdata[[target]]))) / length(x)))
     }
@@ -688,7 +688,7 @@ partial_dependence.xgboost <- function(fit, vars = colnames(data),
         args$points = args$points[x]
       mp = do.call(mmpf::marginalPrediction, args)
       #if (fit$treetype == "Regression")
-      if (TRUE)
+      if (FALSE)
         names(mp)[ncol(mp)] = target
       mp
     }, simplify = FALSE), fill = TRUE)
@@ -696,7 +696,7 @@ partial_dependence.xgboost <- function(fit, vars = colnames(data),
   } else {
     pd = do.call(mmpf::marginalPrediction, args)
     #if (fit$treetype == "Regression")
-    if (TRUE)
+    if (FALSE)
       names(pd)[ncol(pd)] = target
   }
 
@@ -881,8 +881,8 @@ exp_xgboost <- function(df,
         # prediction_test <- predict(model, df_test_clean)
         # TODO: Following current convention for the name na.action to keep na row index, but we might want to rethink.
         # We do not keep this for training since na.roughfix should fill values and not delete rows.
-        prediction_test$na.action = na_row_numbers_test
-        prediction_test$unknown_category_rows_index = unknown_category_rows_index
+        attr(prediction_test, "na.action") <- na_row_numbers_test
+        attr(prediction_test, "unknown_category_rows_index") <- unknown_category_rows_index
         model$prediction_test <- prediction_test
       }
 
