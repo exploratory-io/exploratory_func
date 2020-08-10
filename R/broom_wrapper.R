@@ -26,6 +26,19 @@ augment_lm <- broom::augment
 #' augment for glm
 #' @export
 augment_glm <- broom::augment
+
+# For backward compatibilities for broom's rowwise tidier, which was dropped at broom 0.7.0.
+glance_rowwise <- function(df, model, ...) {
+  summarize(df, broom::glance(!!rlang::enquo(model), ...))
+}
+tidy_rowwise <- function(df, model, ...) {
+  summarize(df, broom::tidy(!!rlang::enquo(model), ...))
+}
+augment_rowwise <- function(df, model, ...) {
+  summarize(df, broom::glance(!!rlang::enquo(model), ...))
+}
+
+
 #' augment for kmeans
 #' @export
 augment_kmeans <- function(df, model, data){
@@ -264,7 +277,7 @@ cluster_info <- function(df){
 kmeans_info <- function(df){
   validate_empty_data(df)
 
-  ret <- broom::glance(df, model)
+  ret <- glance_rowwise(df, model)
   colnames(ret)[colnames(ret) == "totss"] <- "Total Sum of Squares"
   colnames(ret)[colnames(ret) == "tot.withinss"] <- "Total Sum of Squares within Clusters"
   colnames(ret)[colnames(ret) == "betweenss"] <- "Total Sum of Squares between Clusters"
@@ -890,10 +903,10 @@ model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
     } else {
       # broom::tidy uses confint.lm and it uses profile, so "profile" is used in conf_int to swith how to get confint
       profile <- conf_int == "profile"
-      broom::tidy(df, model, conf.int = profile, pretty.name = pretty.name, ...)
+      tidy_rowwise(df, model, conf.int = profile, pretty.name = pretty.name, ...)
     }
   } else {
-    broom::tidy(df, model, pretty.name = pretty.name, ...)
+    tidy_rowwise(df, model, pretty.name = pretty.name, ...)
   }
 
   if ("glm" %in% class(df$model[[1]])) {
@@ -956,7 +969,7 @@ model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
 model_stats <- function(df, pretty.name = FALSE, ...){
   validate_empty_data(df)
 
-  ret <- broom::glance(df, model, pretty.name = pretty.name, ...)
+  ret <- glance_rowwise(df, model, pretty.name = pretty.name, ...)
 
   formula_vars <- if (any(c("multinom", "lm", "glm") %in% class(df$model[[1]]))) {
     # lm, glm (including logistic), multinom has a formula class attribute $terms.
@@ -1257,7 +1270,7 @@ do_survfit <- function(df, time, status, start_time = NULL, end_time = NULL, tim
     fml <- as.formula(paste0("survival::Surv(`", substitute(time), "`,`", substitute(status), "`) ~ 1"))
   }
 
-  ret <- df %>% build_model(model_func = survival::survfit, formula = fml, ...) %>% broom::tidy(model)
+  ret <- df %>% build_model(model_func = survival::survfit, formula = fml, ...) %>% tidy_rowwise(model)
 
   # for better viz, add time=0 row for each group when it is not already there.
   add_time_zero_row_each <- function(df) {
