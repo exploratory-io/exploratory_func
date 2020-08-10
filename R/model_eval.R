@@ -338,7 +338,7 @@ evaluate_multi_ <- function(df, pred_label_col, actual_val_col, pretty.name = FA
 #' @export
 evaluate_binary_training_and_test <- function(df, actual_val, threshold = "f_score", pretty.name = FALSE){
   actual_val_col <- col_name(substitute(actual_val)) # Get name of column as string.
-  training_ret <- df %>% broom::glance(model, binary_classification_threshold = threshold)
+  training_ret <- df %>% glance_rowwise(model, binary_classification_threshold = threshold)
   ret <- training_ret
 
   grouped_col <- colnames(df)[!colnames(df) %in% c("model", ".test_index", "source.data")]
