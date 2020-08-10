@@ -20,36 +20,36 @@ filepath <- if (!testdata_filename %in% list.files(testdata_dir)) {
 test_that("exp_ttest with groups with only single category", {
   flight_by_carrier <- flight %>% dplyr::group_by(`CAR RIER`)
   model_df <- flight_by_carrier %>% filter(!is.na(`is UA or AA`)) %>% exp_ttest(`ARR DELAY`, `is UA or AA`)
-  res <- model_df %>% tidy(model, type="model")
-  res <- model_df %>% tidy(model, type="data")
-  res <- model_df %>% tidy(model, type="data_summary", conf_level=0.95)
+  res <- model_df %>% tidy_rowwise(model, type="model")
+  res <- model_df %>% tidy_rowwise(model, type="data")
+  res <- model_df %>% tidy_rowwise(model, type="data_summary", conf_level=0.95)
   expect_true(is.data.frame(res)) #TODO: better expectation
 })
 
 test_that("exp_anova with groups with only single category", {
   flight_by_carrier <- flight %>% dplyr::group_by(`CAR RIER`)
   model_df <- flight_by_carrier %>% exp_anova(`ARR DELAY`, `is UA or AA`)
-  res <- model_df %>% tidy(model, type="model")
-  res <- model_df %>% tidy(model, type="data")
-  res <- model_df %>% tidy(model, type="data_summary", conf_level=0.95)
+  res <- model_df %>% tidy_rowwise(model, type="model")
+  res <- model_df %>% tidy_rowwise(model, type="data")
+  res <- model_df %>% tidy_rowwise(model, type="data_summary", conf_level=0.95)
   expect_true(is.data.frame(res)) #TODO: better expectation
 })
 
 test_that("exp_wilcox with groups with only single category", {
   flight_by_carrier <- flight %>% dplyr::group_by(`CAR RIER`)
   model_df <- flight_by_carrier %>% filter(!is.na(`is UA or AA`)) %>% exp_wilcox(`ARR DELAY`, `is UA or AA`)
-  res <- model_df %>% tidy(model, type="model")
-  res <- model_df %>% tidy(model, type="data")
-  res <- model_df %>% tidy(model, type="data_summary", conf_level=0.95)
+  res <- model_df %>% tidy_rowwise(model, type="model")
+  res <- model_df %>% tidy_rowwise(model, type="data")
+  res <- model_df %>% tidy_rowwise(model, type="data_summary", conf_level=0.95)
   expect_true(is.data.frame(res)) #TODO: better expectation
 })
 
 test_that("exp_kruskal with groups with only single category", {
   flight_by_carrier <- flight %>% dplyr::group_by(`CAR RIER`)
   model_df <- flight_by_carrier %>% exp_kruskal(`ARR DELAY`, `is UA or AA`)
-  res <- model_df %>% tidy(model, type="model")
-  res <- model_df %>% tidy(model, type="data")
-  res <- model_df %>% tidy(model, type="data_summary", conf_level=0.95)
+  res <- model_df %>% tidy_rowwise(model, type="model")
+  res <- model_df %>% tidy_rowwise(model, type="data")
+  res <- model_df %>% tidy_rowwise(model, type="data_summary", conf_level=0.95)
   expect_true(is.data.frame(res)) #TODO: better expectation
 })
 
