@@ -1,12 +1,38 @@
 # For backward compatibilities for broom's rowwise tidier, which was dropped at broom 0.7.0.
 glance_rowwise <- function(df, model, ...) {
-  summarize(df, broom::glance(!!rlang::enquo(model), ...))
+  # Intended to do the same the following line. 
+  # summarize(df, broom::glance(!!rlang::enquo(model), ...))
+  group_cols <- grouped_by(df)
+  ret <- df %>% dplyr::ungroup() %>% 
+    dplyr::mutate(.res=purrr::map(model, function(x){broom::glance(x, ...)})) %>%
+    dplyr::select(!!!rlang::syms(group_cols), .res) %>%
+    tidyr::unnest(.res)
+  ret
 }
 tidy_rowwise <- function(df, model, ...) {
-  summarize(df, broom::tidy(!!rlang::enquo(model), ...))
+  # summarize(df, broom::tidy(!!rlang::enquo(model), ...))
+  # The above was the originally intended code, but this gave error like below with group_by case.
+  #
+  # x subscript out of bounds
+  # Input `..1` is `broom::tidy(model, ...)`.
+  #
+  # Thus, ending up doing the same with purrr::map. It seems this is more stable as of now.
+  group_cols <- grouped_by(df)
+  ret <- df %>% dplyr::ungroup() %>% 
+    dplyr::mutate(.res=purrr::map(model, function(x){broom::tidy(x, ...)})) %>%
+    dplyr::select(!!!rlang::syms(group_cols), .res) %>%
+    tidyr::unnest(.res)
+  ret
 }
 augment_rowwise <- function(df, model, ...) {
-  summarize(df, broom::glance(!!rlang::enquo(model), ...))
+  # Intended to do the same the following line. 
+  # summarize(df, broom::augment(!!rlang::enquo(model), ...))
+  group_cols <- grouped_by(df)
+  ret <- df %>% dplyr::ungroup() %>% 
+    dplyr::mutate(.res=purrr::map(model, function(x){broom::augment(x, ...)})) %>%
+    dplyr::select(!!!rlang::syms(group_cols), .res) %>%
+    tidyr::unnest(.res)
+  ret
 }
 
 #' glance for lm
@@ -33,10 +59,10 @@ tidy_kmeans <- tidy_rowwise
 
 #' augment for lm
 #' @export
-augment_lm <- broom::augment
+augment_lm <- augment_rowwise
 #' augment for glm
 #' @export
-augment_glm <- broom::augment
+augment_glm <- augment_rowwise
 
 
 #' augment for kmeans
