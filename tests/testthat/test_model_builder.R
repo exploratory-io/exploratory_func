@@ -117,7 +117,7 @@ test_that("test build_glm and broom tidy", {
   if(requireNamespace("broom")){
     result <- test_df %>%
         build_glm(vec1~vec2) %>%
-        broom::tidy(model)
+        tidy_rowwise(model)
     expect_equal(dim(result)[[1]], 2)
   }
 })
@@ -144,7 +144,7 @@ test_that("test build_kmeans.cols and broom::tidy", {
   if(requireNamespace("broom")){
     result <- test_df %>%
       build_kmeans.cols(vec1, vec2, rand, centers=2, augment=FALSE) %>%
-      broom::tidy(model)
+      tidy_rowwise(model)
     expect_equal(dim(result)[[1]], 2)
   }
 })
@@ -200,7 +200,7 @@ test_that("test build_kmeans.cols ignore NA rows with grouped", {
     result <- test_df %>%
       dplyr::group_by(group) %>%
       build_kmeans.cols(vec1, vec2, na, centers=1, keep.source=TRUE, augment=FALSE) %>%
-      broom::tidy(model)
+      tidy_rowwise(model)
     expect_equal(dim(result)[[1]], 2)
   }
 })
@@ -242,7 +242,7 @@ test_that("test build_kmeans.cols ignore NA rows with grouped and keep.source=FA
       test_df
       %>%  dplyr::group_by(group)
       %>%  build_kmeans.cols(vec1, vec2, na, centers=1, keep.source=FALSE, augment=FALSE)
-      %>%  broom::tidy(model))
+      %>%  tidy_rowwise(model))
     expect_equal(dim(result)[[1]], 2)
   }
 })

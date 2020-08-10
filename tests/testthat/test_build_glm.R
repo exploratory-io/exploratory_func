@@ -73,7 +73,7 @@ test_that("test name conflict avoid", {
 
   trial <- suppressWarnings({
     glm_model %>%
-      broom::tidy(model)
+      tidy_rowwise(model)
   })
 
   expect_equal(colnames(trial), c("estimate.group", "model.group", "model.group1",
