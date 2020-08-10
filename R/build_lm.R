@@ -1043,8 +1043,14 @@ build_lm.fast <- function(df,
               data
             }
           })) %>%
-          dplyr::select(-data) %>%
-          dplyr::rowwise()
+          dplyr::select(-data)
+  # Rowwise grouping has to be redone with original grouped_cols, so that summarize(tidy(model)) later can add back the group column.
+  if (length(grouped_cols) > 0) {
+    ret <- ret %>% dplyr::rowwise(grouped_cols)
+  } else {
+    ret <- ret %>% dplyr::rowwise()
+  }
+  ret
 }
 
 #' special version of glance.lm function to use with build_lm.fast.

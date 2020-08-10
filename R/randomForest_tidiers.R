@@ -2933,8 +2933,13 @@ exp_rpart <- function(df,
               data
             }
           })) %>%
-          dplyr::select(-data) %>%
-          dplyr::rowwise()
+          dplyr::select(-data)
+  # Rowwise grouping has to be redone with original grouped_cols, so that summarize(tidy(model)) later can add back the group column.
+  if (length(grouped_cols) > 0) {
+    ret <- ret %>% dplyr::rowwise(grouped_cols)
+  } else {
+    ret <- ret %>% dplyr::rowwise()
+  }
 
   # add special class .model to pass column type validation at viz layer.
   # also add .model.rpart so that a step created by this function is viewable with Exploratory for debugging.
