@@ -24,7 +24,7 @@ test_that("build_lda", {
 
   expect_equal(colnames(tidy_ret), c("topic", "term", "beta"))
 
-  glance_ret <- broom::glance(ret, model)
+  glance_ret <- glance_rowwise(ret, model)
 
   expect_equal(colnames(glance_ret), c("iter", "terms", "alpha"))
 })
@@ -55,7 +55,7 @@ test_that("build_lda by gibbs", {
 
   expect_equal(colnames(tidy_ret), c("topic", "term", "beta"))
 
-  glance_ret <- broom::glance(ret, model)
+  glance_ret <- glance_rowwise(ret, model)
 
   expect_equal(colnames(glance_ret), c("iter", "terms", "alpha"))
 })

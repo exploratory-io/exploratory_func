@@ -25,7 +25,7 @@ test_that("binary prediction with character target column", {
   expect_equal(ret$`Number of Rows for TRUE`, 4) # This ends up to be 4 after doubling
   expect_equal(ret$`Number of Rows for FALSE`, 30) # This ends up to be 30 after doubling and removing NA rows.
   ret <- model_data %>% tidy_rowwise(model)
-  ret <- model_data %>% broom::augment(model)
+  ret <- model_data %>% augment_rowwise(model)
 
   expect_true(nrow(ret) > 0)
 })
@@ -53,7 +53,7 @@ test_that("binary prediction with factor target column", {
   expect_equal(ret$`Number of Rows for TRUE`, 4) # This ends up to be 4 after doubling
   expect_equal(ret$`Number of Rows for FALSE`, 30) # This ends up to be 30 after doubling and removing NA rows.
   ret <- model_data %>% tidy_rowwise(model)
-  ret <- model_data %>% broom::augment(model)
+  ret <- model_data %>% augment_rowwise(model)
 
   expect_true(nrow(ret) > 0)
 })
