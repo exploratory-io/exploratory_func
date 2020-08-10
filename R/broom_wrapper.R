@@ -1,32 +1,3 @@
-#' glance for lm
-#' @export
-glance_lm <- broom::glance
-
-#' glance for glm
-#' @export
-glance_glm <- broom::glance
-
-#' glance for kmeans
-#' @export
-glance_kmeans <- broom::glance
-
-#' tidy for lm
-#' @export
-tidy_lm <- broom::tidy
-#' tidy for glm
-#' @export
-tidy_glm <- broom::tidy
-#' tidy for kmeans
-#' @export
-tidy_kmeans <- broom::tidy
-
-#' augment for lm
-#' @export
-augment_lm <- broom::augment
-#' augment for glm
-#' @export
-augment_glm <- broom::augment
-
 # For backward compatibilities for broom's rowwise tidier, which was dropped at broom 0.7.0.
 glance_rowwise <- function(df, model, ...) {
   summarize(df, broom::glance(!!rlang::enquo(model), ...))
@@ -37,6 +8,35 @@ tidy_rowwise <- function(df, model, ...) {
 augment_rowwise <- function(df, model, ...) {
   summarize(df, broom::glance(!!rlang::enquo(model), ...))
 }
+
+#' glance for lm
+#' @export
+glance_lm <- glance_rowwise
+
+#' glance for glm
+#' @export
+glance_glm <- glance_rowwise
+
+#' glance for kmeans
+#' @export
+glance_kmeans <- glance_rowwise
+
+#' tidy for lm
+#' @export
+tidy_lm <- tidy_rowwise
+#' tidy for glm
+#' @export
+tidy_glm <- tidy_rowwise
+#' tidy for kmeans
+#' @export
+tidy_kmeans <- tidy_rowwise
+
+#' augment for lm
+#' @export
+augment_lm <- broom::augment
+#' augment for glm
+#' @export
+augment_glm <- broom::augment
 
 
 #' augment for kmeans
