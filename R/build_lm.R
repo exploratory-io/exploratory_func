@@ -1029,7 +1029,7 @@ build_lm.fast <- function(df,
     ret <- ret %>% tidyr::nest()
   }
   ret <- ret %>% dplyr::ungroup() # Remove rowwise grouping so that following mutate works as expected.
-  ret %>% dplyr::mutate(model = purrr::map(data, function(df){
+  ret <- ret %>% dplyr::mutate(model = purrr::map(data, function(df){
             df[[model_and_data_col]][[1]]$model
           })) %>%
           dplyr::mutate(.test_index = purrr::map(data, function(df){
@@ -1352,7 +1352,7 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
   }
   switch(type,
     coefficients = {
-      ret <- broom:::tidy.lm(x) # it seems that tidy.lm takes care of glm too
+      ret <- broom:::tidy.glm(x)
       ret <- ret %>% mutate(conf.high=estimate+1.96*std.error, conf.low=estimate-1.96*std.error)
       if (x$family$family == "binomial") { # odds ratio is only for logistic regression
         ret <- ret %>% mutate(odds_ratio=exp(estimate))
@@ -1446,7 +1446,7 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
       }
       ret <- x$permutation_importance
       # Add p.value column.
-      coef_df <- broom:::tidy.lm(x)
+      coef_df <- broom:::tidy.glm(x)
       ret <- ret %>% dplyr::mutate(p.value=purrr::map(term, function(var) {
         get_var_min_pvalue(var, coef_df, x)
       })) %>% dplyr::mutate(p.value=as.numeric(p.value)) # Make list into numeric vector.
