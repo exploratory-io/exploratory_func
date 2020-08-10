@@ -33,7 +33,7 @@ test_that("calc_feature_map(regression) evaluate training and test", {
   # expect_equal(nrow(train_ret), 3500) Fails now, since we filter numeric NA. Revive when we do not need to.
 
   # Test result of boruta.
-  importance_res <- model_df %>% tidy(model, type='boruta') %>% group_by(variable) %>% summarize(importance=mean(importance)) %>% arrange(-importance)
+  importance_res <- model_df %>% tidy_rowwise(model, type='boruta') %>% group_by(variable) %>% summarize(importance=mean(importance)) %>% arrange(-importance)
   expect_equal(as.character(importance_res$variable[[1]]), "DEP DELAY") # Most important should be dep delay.
   expect_equal(as.character(importance_res$variable[[2]]), "CAR RIER") # 2nd most important should be carrier. 
 

@@ -1455,7 +1455,7 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
 #' wrapper for tidy type partial dependence
 #' @export
 lm_partial_dependence <- function(df, ...) { # TODO: write test for this.
-  res <- df %>% broom::tidy(model, type="partial_dependence", ...)
+  res <- df %>% tidy_rowwise(model, type="partial_dependence", ...)
   if (nrow(res) == 0) {
     return(data.frame()) # Skip the rest of processing by returning empty data.frame.
   }
@@ -1553,7 +1553,7 @@ find_data.glm_exploratory <- function(model, env = parent.frame(), ...) {
 # This is written for linear regression analytics view and GLM analytics views that makes numeric prediction.
 evaluate_lm_training_and_test <- function(df, pretty.name = FALSE){
   # Get the summary row for traninng data. Info is retrieved from model by glance()
-  training_ret <- df %>% broom::glance(model, pretty.name = pretty.name)
+  training_ret <- df %>% glance_rowwise(model, pretty.name = pretty.name)
   ret <- training_ret
 
   grouped_col <- colnames(df)[!colnames(df) %in% c("model", ".test_index", "source.data")]
