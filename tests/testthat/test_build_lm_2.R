@@ -19,12 +19,12 @@ test_that("binary prediction with character target column", {
   model_data <- build_lm.fast(test_data, `CANCELLED X`, `Carrier Name`, CARRIER, DISTANCE,
                               normalize_predictors = TRUE,
                               model_type = "glm", smote=FALSE, with_marginal_effects=TRUE, with_marginal_effects_confint=TRUE)
-  ret <- model_data %>% broom::tidy(model, type="vif")
-  ret <- model_data %>% broom::glance(model, pretty.name=TRUE)
+  ret <- model_data %>% tidy_rowwise(model, type="vif")
+  ret <- model_data %>% glance_rowwise(model, pretty.name=TRUE)
   expect_equal(ret$`Number of Rows`, 34)
   expect_equal(ret$`Number of Rows for TRUE`, 4) # This ends up to be 4 after doubling
   expect_equal(ret$`Number of Rows for FALSE`, 30) # This ends up to be 30 after doubling and removing NA rows.
-  ret <- model_data %>% broom::tidy(model)
+  ret <- model_data %>% tidy_rowwise(model)
   ret <- model_data %>% broom::augment(model)
 
   expect_true(nrow(ret) > 0)
@@ -48,11 +48,11 @@ test_that("binary prediction with factor target column", {
   test_data <- dplyr::bind_rows(test_data, test_data)
 
   model_data <- build_lm.fast(test_data, `CANCELLED X`, `Carrier Name`, CARRIER, DISTANCE, model_type = "glm", smote=FALSE, with_marginal_effects=TRUE, with_marginal_effects_confint=FALSE)
-  ret <- model_data %>% broom::glance(model, pretty.name=TRUE)
+  ret <- model_data %>% glance_rowwise(model, pretty.name=TRUE)
   expect_equal(ret$`Number of Rows`, 34)
   expect_equal(ret$`Number of Rows for TRUE`, 4) # This ends up to be 4 after doubling
   expect_equal(ret$`Number of Rows for FALSE`, 30) # This ends up to be 30 after doubling and removing NA rows.
-  ret <- model_data %>% broom::tidy(model)
+  ret <- model_data %>% tidy_rowwise(model)
   ret <- model_data %>% broom::augment(model)
 
   expect_true(nrow(ret) > 0)
@@ -76,13 +76,13 @@ test_that("binary prediction with variable_metric argument", {
   test_data <- dplyr::bind_rows(test_data, test_data)
 
   model_data <- build_lm.fast(test_data, `CANCELLED X`, `Carrier Name`, CARRIER, DISTANCE, model_type = "glm", smote=FALSE, variable_metric="odds_ratio")
-  ret <- model_data %>% broom::tidy(model, variable_metric="odds_ratio")
+  ret <- model_data %>% tidy_rowwise(model, variable_metric="odds_ratio")
 
   model_data <- build_lm.fast(test_data, `CANCELLED X`, `Carrier Name`, CARRIER, DISTANCE, model_type = "glm", smote=FALSE, variable_metric="coefficient")
-  ret <- model_data %>% broom::tidy(model, variable_metric="coefficient")
+  ret <- model_data %>% tidy_rowwise(model, variable_metric="coefficient")
 
   model_data <- build_lm.fast(test_data, `CANCELLED X`, `Carrier Name`, CARRIER, DISTANCE, model_type = "glm", smote=FALSE, variable_metric="ame")
-  ret <- model_data %>% broom::tidy(model, variable_metric="ame")
+  ret <- model_data %>% tidy_rowwise(model, variable_metric="ame")
   expect_true(c("ame") %in% colnames(ret))
 
   expect_true(nrow(ret) > 0)
@@ -113,9 +113,9 @@ test_that("Linear Regression with test rate", {
                                      model_type = "lm",
                                      test_rate = 0.1,
                                      test_split_type = "ordered") # testing ordered split too.
-  res <- ret %>% broom::tidy(model)
+  res <- ret %>% tidy_rowwise(model)
   expect_true("Carrier Name: American Airlines" %in% res$term)
-  res <- ret %>% broom::tidy(model, type="vif")
+  res <- ret %>% tidy_rowwise(model, type="vif")
   expect_true("Carrier Name" %in% res$term)
   expect_equal(colnames(ret), c("model", ".test_index", "source.data"))
   test_rownum <- length(ret$.test_index[[1]])
@@ -134,7 +134,7 @@ test_that("Linear Regression with test rate", {
     expected_cols <- c("Carrier Name", "DISTANCE", "ARR_TIME", "DERAY_TIME", "predicted_value", "standard_error", "conf_low", "conf_high")
     expect_equal(colnames(pred_test), expected_cols)
 
-    res <- ret %>% broom::glance(model, pretty.name=TRUE)
+    res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
     expect_equal(res$`Number of Rows`, 17)
     res <- ret %>% lm_partial_dependence()
    })
@@ -170,7 +170,7 @@ test_that("Linear Regression with outlier filtering", {
     expected_cols <- c("Carrier Name", "DISTANCE", "ARR_TIME", "DERAY_TIME", "predicted_value", "standard_error", "conf_low", "conf_high")
     expect_equal(colnames(pred_test), expected_cols)
 
-    res <- ret %>% broom::glance(model, pretty.name=TRUE)
+    res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
     expect_equal(res$`Number of Rows`, 12)
    })
 })
@@ -204,7 +204,7 @@ test_that("Group Linear Regression with test_rate", {
                        "standard_error", "conf_low", "conf_high")
     expect_equal(colnames(pred_test), expected_cols)
 
-    res <- ret %>% broom::glance(model, pretty.name=TRUE)
+    res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
    })
 })
 
@@ -234,8 +234,8 @@ test_that("GLM - Normal Destribution with test_rate", {
                        "conf_low", "conf_high", "predicted_response")
     expect_equal(colnames(pred_test), expected_cols)
 
-    res <- ret %>% broom::glance(model, pretty.name=TRUE)
-    res <- ret %>% broom::tidy(model, type="permutation_importance")
+    res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
+    res <- ret %>% tidy_rowwise(model, type="permutation_importance")
    })
 })
 
@@ -269,8 +269,8 @@ test_that("Group GLM - Normal Destribution with test_rate", {
                        "standard_error", "conf_low", "conf_high", "predicted_response")
     expect_equal(colnames(pred_test), expected_cols)
 
-    res <- ret %>% broom::glance(model, pretty.name=TRUE)
-    res <- ret %>% broom::tidy(model, type="permutation_importance")
+    res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
+    res <- ret %>% tidy_rowwise(model, type="permutation_importance")
    })
 })
 
@@ -300,7 +300,7 @@ test_that("GLM - Gamma Destribution with test_rate", {
                        "conf_low", "conf_high", "predicted_response")
     expect_equal(colnames(pred_test), expected_cols)
 
-    res <- ret %>% broom::glance(model, pretty.name=TRUE)
+    res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
    })
 })
 
@@ -334,7 +334,7 @@ test_that("Group GLM - Gamma Destribution with test_rate", {
                        "standard_error", "conf_low", "conf_high", "predicted_response")
     expect_equal(colnames(pred_test), expected_cols)
 
-    res <- ret %>% broom::glance(model, pretty.name=TRUE)
+    res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
    })
 })
 
@@ -364,7 +364,7 @@ test_that("GLM - Inverse Gaussian Destribution with test_rate", {
                        "conf_low", "conf_high", "predicted_response")
     expect_equal(colnames(pred_test), expected_cols)
 
-    res <- ret %>% broom::glance(model, pretty.name=TRUE)
+    res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
    })
 })
 
@@ -398,7 +398,7 @@ test_that("Group GLM - Inverse Gaussian Destribution with test_rate", {
                        "standard_error", "conf_low", "conf_high", "predicted_response")
     expect_equal(colnames(pred_test), expected_cols)
 
-    res <- ret %>% broom::glance(model, pretty.name=TRUE)
+    res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
    })
 })
 
@@ -428,8 +428,8 @@ test_that("GLM - poisson Destribution with test_rate", {
                        "conf_low", "conf_high", "predicted_response")
     expect_equal(colnames(pred_test), expected_cols)
 
-    res <- ret %>% broom::glance(model, pretty.name=TRUE)
-    res <- ret %>% broom::tidy(model, type="permutation_importance")
+    res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
+    res <- ret %>% tidy_rowwise(model, type="permutation_importance")
    })
 })
 
@@ -463,8 +463,8 @@ test_that("Group GLM - Poisson Destribution with test_rate", {
                        "standard_error", "conf_low", "conf_high", "predicted_response")
     expect_equal(colnames(pred_test), expected_cols)
 
-    res <- ret %>% broom::glance(model, pretty.name=TRUE)
-    res <- ret %>% broom::tidy(model, type="permutation_importance")
+    res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
+    res <- ret %>% tidy_rowwise(model, type="permutation_importance")
     res <- ret %>% lm_partial_dependence()
    })
 })
@@ -495,8 +495,8 @@ test_that("GLM - Negative Binomial Destribution with test_rate", {
                        "conf_low", "conf_high", "predicted_response")
     expect_equal(colnames(pred_test), expected_cols)
 
-    res <- ret %>% broom::glance(model, pretty.name=TRUE)
-    res <- ret %>% broom::tidy(model, type="permutation_importance")
+    res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
+    res <- ret %>% tidy_rowwise(model, type="permutation_importance")
     res <- ret %>% lm_partial_dependence()
    })
 })
@@ -531,8 +531,8 @@ test_that("Group GLM - Negative Binomial Destribution with test_rate", {
                        "standard_error", "conf_low", "conf_high", "predicted_response")
     expect_equal(colnames(pred_test), expected_cols)
 
-    res <- ret %>% broom::glance(model, pretty.name=TRUE)
-    res <- ret %>% broom::tidy(model, type="permutation_importance")
+    res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
+    res <- ret %>% tidy_rowwise(model, type="permutation_importance")
     res <- ret %>% lm_partial_dependence()
    })
 })
@@ -564,7 +564,7 @@ test_that("Logistic Regression with test_rate", {
     expected_cols <- c("CANCELLED X", "Carrier Name", "ARR_TIME", "DERAY_TIME", "predicted_value", "standard_error",
                        "conf_low", "conf_high", "predicted_response")
     expect_equal(colnames(pred_test), expected_cols)
-    res <- ret %>% broom::glance(model, pretty.name=TRUE)
+    res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
     res <- ret %>% evaluate_binary_training_and_test(`CANCELLED X`, threshold = 0.5, pretty.name=TRUE)
     expect_equal(nrow(res), 2) # 2 for training and test.
     res <- ret %>% lm_partial_dependence()
@@ -602,6 +602,6 @@ test_that("Group Logistic Regression with test_rate", {
                        "standard_error", "conf_low", "conf_high", "predicted_response")
     expect_equal(colnames(pred_test), expected_cols)
 
-    res <- ret %>% broom::glance(model, pretty.name=TRUE)
+    res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
    })
 })

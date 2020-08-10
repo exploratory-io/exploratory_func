@@ -24,7 +24,7 @@ test_that("test relative importance", {
     cat1 = c(rep("A",5),rep("B",5),rep("C",10))
   )
   model_df <- test_df %>% build_lm.fast(num1, num2, num3, num4, cat1, relimp = TRUE, relimp_type = "first")
-  ret <- model_df %>% broom::tidy(model, type="relative_importance")
+  ret <- model_df %>% tidy_rowwise(model, type="relative_importance")
   expect_equal(colnames(ret), c("term", "importance", "importance.high", "importance.low", "p.value"))
 })
 
@@ -93,7 +93,7 @@ test_that("test name conflict avoid", {
 
   trial <- suppressWarnings({
     lm_model %>%
-      broom::tidy(model)
+      tidy_rowwise(model)
   })
 
   expect_equal(colnames(trial), c("estimate.group", "model.group", "model.group1",
@@ -168,15 +168,15 @@ test_that("prediction with target column name with space by build_lm.fast", {
   test_data <- test_data %>% mutate(`Carrier-Name`= factor(`Carrier-Name`, ordered=TRUE)) # test handling of ordered factor
 
   model_data <- build_lm.fast(test_data, `CANCELLED:X`, `logical col`, `Carrier-Name`, DISTANCE, predictor_n = 3, with_marginal_effects=TRUE, with_marginal_effects_confint=TRUE)
-  ret <- model_data %>% broom::glance(model)
+  ret <- model_data %>% glance_rowwise(model)
   # TODO: the returned coefficients does not show all input variables. 
   # most likely due to too few rows. look into it and add check for the values in the returned df. 
-  ret <- model_data %>% broom::tidy(model)
+  ret <- model_data %>% tidy_rowwise(model)
   # Verify that base levels are not NA for `logical col` (testing space in the name) and Carrier-Name (testing - in the name) columns.
   ret2 <- ret %>% dplyr::filter(stringr::str_detect(term,"(logical col|Carrier-Name)")) %>% dplyr::summarize(na_count=sum(is.na(base.level)))
   expect_equal(ret2$na_count, 0)
 
-  ret <- model_data %>% broom::augment(model)
+  ret <- model_data %>% augment_rowwise(model)
 
   expect_true(nrow(ret) > 0)
   expect_equal(colnames(ret), c("CANCELLED:X", "Carrier-Name","DISTANCE","logical col", ".fitted",".se.fit",".resid",".hat",".sigma",".cooksd",".std.resid"))
@@ -200,23 +200,23 @@ test_that("prediction with glm family (binomial) and link (probit) with target c
 
   # should run without error. TODO: verify resulting values.
   model_data <- build_lm.fast(test_data, `CANCELLED X`, `logical col`, `Carrier Name`, CARRIER, DISTANCE, predictor_n = 3, model_type = "glm", family = "poisson", link = "log")
-  ret <- model_data %>% broom::glance(model)
-  ret <- model_data %>% broom::tidy(model)
-  ret <- model_data %>% broom::augment(model)
+  ret <- model_data %>% glance_rowwise(model)
+  ret <- model_data %>% tidy_rowwise(model)
+  ret <- model_data %>% augment_rowwise(model)
 
   # should run without error. TODO: verify resulting values.
   model_data <- build_lm.fast(test_data, `CANCELLED X`, `logical col`, `Carrier Name`, CARRIER, DISTANCE, predictor_n = 3, model_type = "glm", family = "gaussian", link = "identity")
-  ret <- model_data %>% broom::glance(model)
-  ret <- model_data %>% broom::tidy(model)
-  ret <- model_data %>% broom::augment(model)
+  ret <- model_data %>% glance_rowwise(model)
+  ret <- model_data %>% tidy_rowwise(model)
+  ret <- model_data %>% augment_rowwise(model)
 
   # should run without error. TODO: verify resulting values.
   model_data <- build_lm.fast(test_data, `CANCELLED X`, `logical col`, `Carrier Name`, CARRIER, DISTANCE, predictor_n = 3, model_type = "glm", family = "binomial", link = "probit")
-  ret <- model_data %>% broom::glance(model)
+  ret <- model_data %>% glance_rowwise(model)
   # TODO: the returned coefficients does not show all input variables. 
   # most likely due to too few rows. look into it and add check for the values in the returned df. 
-  ret <- model_data %>% broom::tidy(model)
-  ret <- model_data %>% broom::augment(model)
+  ret <- model_data %>% tidy_rowwise(model)
+  ret <- model_data %>% augment_rowwise(model)
 
   expect_true(nrow(ret) > 0)
   expect_true(all(colnames(ret) %in% c("CANCELLED X", "logical col", "Carrier Name","CARRIER","DISTANCE",".fitted",".se.fit",".resid",".hat",".sigma",".cooksd",".std.resid")))
@@ -242,12 +242,12 @@ test_that("prediction with glm family (negativebinomial) with target column name
                               model_type = "glm",
                               link = "log",
                               family="negativebinomial")
-  ret <- model_data %>% broom::glance(model)
+  ret <- model_data %>% glance_rowwise(model)
   expect_equal(colnames(ret),
                c("null.deviance", "df.null", "logLik",
                  "AIC", "BIC", "deviance",
                  "df.residual", "p.value", "n", "theta", "SE.theta"))
-  ret <- model_data %>% broom::tidy(model)
+  ret <- model_data %>% tidy_rowwise(model)
   expect_colnames <- c("term", "estimate", "std.error", "statistic", "p.value",
                        "conf.high", "conf.low", "base.level")
 
@@ -255,7 +255,7 @@ test_that("prediction with glm family (negativebinomial) with target column name
   expect_true(identical(colnames(ret), expect_colnames) ||
                 identical(colnames(ret), c(expect_colnames, "note")))
 
-  ret <- model_data %>% broom::augment(model)
+  ret <- model_data %>% augment_rowwise(model)
   expect_equal(colnames(ret),
                c("CANCELLED X", "logical col", "Carrier Name", "CARRIER", "DISTANCE",
                  ".fitted", ".resid", ".hat", ".sigma", ".cooksd", ".std.resid"))
@@ -279,11 +279,11 @@ if (Sys.info()["sysname"] != "Windows") {
     test_data <- test_data %>% mutate(CARRIER = factor(CARRIER, ordered=TRUE)) # test handling of ordered factor
   
     model_data <- build_lm.fast(test_data, `キャンセル X`, `論理 col`, `航空会社 Name`, CARRIER, DISTANCE, predictor_n = 3, with_marginal_effects=TRUE, with_marginal_effects_confint=TRUE)
-    ret <- model_data %>% broom::glance(model)
+    ret <- model_data %>% glance_rowwise(model)
     # TODO: the returned coefficients does not show all input variables. 
     # most likely due to too few rows. look into it and add check for the values in the returned df. 
-    ret <- model_data %>% broom::tidy(model)
-    ret <- model_data %>% broom::augment(model)
+    ret <- model_data %>% tidy_rowwise(model)
+    ret <- model_data %>% augment_rowwise(model)
   
     expect_true(nrow(ret) > 0)
     expect_true(all(colnames(ret) %in% c("キャンセル X", "論理 col", "航空会社 Name","CARRIER","DISTANCE",".fitted",".se.fit",".resid",".hat",".sigma",".cooksd",".std.resid")))
@@ -307,21 +307,21 @@ test_that("prediction with glm model with SMOTE by build_lm.fast", {
 
   model_data <- build_lm.fast(test_data, `CANCELLED X`, `Carrier Name`, CARRIER, DISTANCE, model_type = "glm", smote=FALSE, with_marginal_effects=TRUE, with_marginal_effects_confint=TRUE)
   ret <- model_data %>% lm_partial_dependence()
-  ret <- model_data %>% broom::glance(model, pretty.name=TRUE)
-  ret <- model_data %>% broom::tidy(model)
-  ret <- model_data %>% broom::augment(model)
+  ret <- model_data %>% glance_rowwise(model, pretty.name=TRUE)
+  ret <- model_data %>% tidy_rowwise(model)
+  ret <- model_data %>% augment_rowwise(model)
 
   model_data <- build_lm.fast(test_data, `CANCELLED X`, `Carrier Name`, CARRIER, DISTANCE, model_type = "glm", smote=TRUE, with_marginal_effects=TRUE, with_marginal_effects_confint=TRUE)
-  ret <- model_data %>% broom::glance(model, pretty.name=TRUE)
-  ret <- model_data %>% broom::tidy(model)
-  ret <- model_data %>% broom::augment(model)
+  ret <- model_data %>% glance_rowwise(model, pretty.name=TRUE)
+  ret <- model_data %>% tidy_rowwise(model)
+  ret <- model_data %>% augment_rowwise(model)
 
   # test for perfect multicollinearity case.
   reduced_test_data <- test_data %>% tail(3)
   model_data <- build_lm.fast(reduced_test_data, `CANCELLED X`, `Carrier Name`, CARRIER, DISTANCE, model_type = "glm", smote=FALSE, with_marginal_effects=TRUE, with_marginal_effects_confint=TRUE)
-  ret <- model_data %>% broom::glance(model, pretty.name=TRUE)
-  ret <- model_data %>% broom::tidy(model, pretty.name=TRUE)
-  ret <- model_data %>% broom::augment(model, pretty.name=TRUE)
+  ret <- model_data %>% glance_rowwise(model, pretty.name=TRUE)
+  ret <- model_data %>% tidy_rowwise(model, pretty.name=TRUE)
+  ret <- model_data %>% augment_rowwise(model, pretty.name=TRUE)
 
   expect_true(nrow(ret) > 0)
 })
@@ -335,12 +335,12 @@ test_that("test GLM (Negative Binomial) summary output", {
   ret <- test_df %>% build_lm.fast(num1, num2, num3,
                             model_type="glm",
                             family="negativebinomial")
-  model_ret <- ret %>% broom::glance(model)
+  model_ret <- ret %>% glance_rowwise(model)
   expect_equal(colnames(model_ret),
                c("null.deviance", "df.null", "logLik",
                  "AIC", "BIC", "deviance", "df.residual",
                  "p.value", "n", "theta", "SE.theta"))
-  model_ret_pretty <- ret %>% broom::glance(model, pretty.name=TRUE)
+  model_ret_pretty <- ret %>% glance_rowwise(model, pretty.name=TRUE)
   expect_equal(colnames(model_ret_pretty),
                c("P Value", "Number of Rows", "Log Likelihood", "AIC",
                  "BIC", "Residual Deviance", "Null Deviance",
@@ -370,12 +370,12 @@ test_that("test GLM (Negative Binomial) with group columns", {
                          model_type = "glm",
                          family = "negativebinomial")
   expect_equal(length(ret[["CARRIER"]]), 8)
-  model_ret <- ret %>% broom::glance(model)
+  model_ret <- ret %>% glance_rowwise(model)
   expect_equal(colnames(model_ret), # Position of Note columns is adjusted on Exploratory-side
                c("CARRIER", "Note", "null.deviance", "df.null", "logLik",
                  "AIC", "BIC", "deviance", "df.residual",
                  "p.value", "n", "theta", "SE.theta"))
-  model_ret_pretty <- ret %>% broom::glance(model, pretty.name=TRUE)
+  model_ret_pretty <- ret %>% glance_rowwise(model, pretty.name=TRUE)
   expect_equal(colnames(model_ret_pretty), # Position of Note columns is adjusted on Exploratory-side
                c("CARRIER", "Note", "P Value", "Number of Rows", "Log Likelihood", "AIC",
                  "BIC", "Residual Deviance", "Null Deviance",
