@@ -7,6 +7,9 @@ glance_rowwise <- function(df, model, ...) {
     dplyr::mutate(.res=purrr::map(model, function(x){broom::glance(x, ...)})) %>%
     dplyr::select(!!!rlang::syms(group_cols), .res) %>%
     tidyr::unnest(.res)
+  if (length(group_cols) > 0) {
+    ret <- ret %>% dplyr::group_by(!!!rlang::syms(group_cols))
+  }
   ret
 }
 tidy_rowwise <- function(df, model, ...) {
@@ -22,6 +25,9 @@ tidy_rowwise <- function(df, model, ...) {
     dplyr::mutate(.res=purrr::map(model, function(x){broom::tidy(x, ...)})) %>%
     dplyr::select(!!!rlang::syms(group_cols), .res) %>%
     tidyr::unnest(.res)
+  if (length(group_cols) > 0) {
+    ret <- ret %>% dplyr::group_by(!!!rlang::syms(group_cols))
+  }
   ret
 }
 augment_rowwise <- function(df, model, ...) {
@@ -32,6 +38,9 @@ augment_rowwise <- function(df, model, ...) {
     dplyr::mutate(.res=purrr::map(model, function(x){broom::augment(x, ...)})) %>%
     dplyr::select(!!!rlang::syms(group_cols), .res) %>%
     tidyr::unnest(.res)
+  if (length(group_cols) > 0) {
+    ret <- ret %>% dplyr::group_by(!!!rlang::syms(group_cols))
+  }
   ret
 }
 
