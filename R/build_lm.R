@@ -976,7 +976,10 @@ build_lm.fast <- function(df,
         # Show only max_pd_vars most significant (ones with the smallest P values) vars.
         # For categorical, pick the smallest P value among all classes of it.
         c_cols_list <- as.list(c_cols)
-        coef_df <- broom::tidy(model)
+        # Since broom:::tidy.lm raises :Error: No tidy method for objects of class lm_exploratory",
+        # always use broom:::tidy.glm which does not have this problem, and seems to return the same result,
+        # even for lm.
+        coef_df <- broom:::tidy.glm(model)
         # str_detect matches with all categorical class terms that belongs to the variable.
         p_values_list <- c_cols_list %>% purrr::map(function(x){(coef_df %>% filter(stringr::str_detect(term, paste0("^`?", x))) %>% summarize(p.value=min(p.value, na.rm=TRUE)))$p.value})
         p_values_df <- tibble(term=c_cols, p.value=purrr::flatten_dbl(p_values_list))
