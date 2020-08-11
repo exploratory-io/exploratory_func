@@ -597,8 +597,9 @@ test_that("Group Logistic Regression with test_rate", {
     expect_equal(pred_test %>% summarize(n=n()) %>% `[[`("n"),
                  test_nrows)
 
+    # Since broom 0.7.0, "residuals" seems to be dropped. TODO: But why only in this case?
     expected_cols <- c("klass", "CANCELLED X", "ARR_TIME", "predicted_value",
-                       "residuals", "standardised_residuals", "hat", "residual_standard_deviation",
+                       "standardised_residuals", "hat", "residual_standard_deviation",
                        "cooks_distance", "predicted_response")
     expect_equal(colnames(pred_training), expected_cols)
 
