@@ -115,7 +115,7 @@ test_that("do_prophet with short data (test for coef)", {
   # verify the last date with forecasted_value
   expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2010-01-23")) 
   # test for glance.
-  ret <- model_df %>% glance(model)
+  ret <- model_df %>% glance_rowwise(model)
   expect_true(all(c("RMSE","MAE","MAPE") %in% names(ret)))
 })
 
