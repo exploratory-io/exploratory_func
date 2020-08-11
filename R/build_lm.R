@@ -1250,7 +1250,10 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
   }
   switch(type,
     coefficients = {
-      ret <- broom:::tidy.lm(x) # it seems that tidy.lm takes care of glm too
+      # Since broom:::tidy.lm raises :Error: No tidy method for objects of class lm_exploratory",
+      # always use broom:::tidy.glm which does not have this problem, and seems to return the same result,
+      # even for lm.
+      ret <- broom:::tidy.glm(x)
       ret <- ret %>% mutate(conf.high=estimate+1.96*std.error, conf.low=estimate-1.96*std.error)
       base_level_table <- xlevels_to_base_level_table(x$xlevels)
       # Convert term from factor to character to remove warning at left_join.
@@ -1288,7 +1291,10 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
         ret <- data.frame(term = term, importance = importance, importance.high = importance.high, importance.low = importance.low)
         # Reorder factor by the value of relative importance (lmg).
         ret <- ret %>% dplyr::mutate(term = forcats::fct_reorder(term, importance, .fun = sum, .desc = TRUE))
-        coef_df <- broom:::tidy.lm(x)
+        # Since broom:::tidy.lm raises :Error: No tidy method for objects of class lm_exploratory",
+        # always use broom:::tidy.glm which does not have this problem, and seems to return the same result,
+        # even for lm.
+        coef_df <- broom:::tidy.glm(x)
         ret <- ret %>% mutate(p.value=purrr::map(term, function(var) {
           get_var_min_pvalue(var, coef_df, x)
         }))
@@ -1330,7 +1336,10 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
       }
       ret <- x$permutation_importance
       # Add p.value column.
-      coef_df <- broom:::tidy.lm(x)
+      # Since broom:::tidy.lm raises :Error: No tidy method for objects of class lm_exploratory",
+      # always use broom:::tidy.glm which does not have this problem, and seems to return the same result,
+      # even for lm.
+      coef_df <- broom:::tidy.glm(x)
       ret <- ret %>% dplyr::mutate(p.value=purrr::map(term, function(var) {
         get_var_min_pvalue(var, coef_df, x)
       })) %>% dplyr::mutate(p.value=as.numeric(p.value)) # Make list into numeric vector.
