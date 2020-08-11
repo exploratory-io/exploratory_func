@@ -1162,6 +1162,9 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
         dplyr::select(`P Value`, `Number of Rows`, `Log Likelihood`, `AIC`, `BIC`, `Residual Deviance`, `Null Deviance`, `DF for Null Model`, everything())
     }
   }
+  if (!is.null(ret$nobs)) { # glance.glm's newly added nobs seems to be same as Number of Rows. Suppressing it for now.
+    ret <- ret %>% dplyr::select(-nobs)
+  }
 
   ret
 }
