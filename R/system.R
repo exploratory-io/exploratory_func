@@ -2346,6 +2346,28 @@ read_rds_file <- function(file, refhook = NULL){
   }
 }
 
+#'Wrapper for read_parquet to support remote file
+#'@export
+read_parquet_file <- function(file, col_select = NULL, as_data_frame = TRUE){
+  loadNamespace("arrow")
+  if (stringr::str_detect(file, "^https://") ||
+      stringr::str_detect(file, "^http://") ||
+      stringr::str_detect(file, "^ftp://")) {
+    
+    # Download the remote parquet file to the local temp file.
+    tf <- tempfile()  
+    utils::download.file(file, tf)
+    # Read the local parquet file.
+    res <- arrow::read_parquet(tf, col_select=col_select, as_data_frame=as_data_frame)
+    # Do not remove temp file right after that because read_parquet 
+    # is async (using threads) and may be still reading the file. 
+    #unlink(tf);
+    res;
+  } else {
+    arrow::read_parquet(file, col_select=col_select, as_data_frame=as_data_frame)
+  }
+}
+
 #'Wrapper for readr::read_lines to support vector to data frame conversion
 #'It seems readr::read_lines uses -1 for n_max to get all the data.
 #'It does not align with the other readr functions that uses Inf for all the data but we have to follow existing read_lines behavior.

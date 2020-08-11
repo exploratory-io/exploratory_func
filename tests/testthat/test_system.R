@@ -265,3 +265,9 @@ test_that("geocode_japan_prefecture", {
   expect_equal(FALSE, any(is.na(res$longitude)))
   expect_equal(FALSE, any(is.na(res$latitude)))
 })
+
+test_that("read_parquet_file", {
+  df <- read_parquet_file("https://www.dropbox.com/s/sjkgk9gj0vemq36/sample.parquet?raw=1")
+  expect_equal(FALSE, is.na(df))
+  expect_equal(TRUE, is.data.frame(df))
+})
