@@ -474,6 +474,18 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
       } else {
         paste0("broom::augment(m, data = df, ", aug_args, ")")
       }
+      # From broom 0.7.0 augment.glm, if data is different from the one inside the model due to, for example, NA rows, error like following is raised.
+      # To avoid it, do not specify data argument. Let's do this only for glm since, for example, ranger needs it to get actual prediction on training data instead of prediction on OOB data.
+      # TODO: Check if this applies to other models. What about lm??
+      #
+      # Assigned data `predict(x, newdata, type = type.predict) %>% unname()` must be compatible with existing data.
+      if (class(df$model[[1]])[[1]] == "glm") {
+        aug_fml <- if(aug_args == ""){
+          "broom::augment(m)"
+        } else {
+          paste0("broom::augment(m, ", aug_args, ")")
+        }
+      }
       augmented <- df %>%
         dplyr::ungroup() %>%
         dplyr::filter(purrr::flatten_lgl(purrr::map(model, function(x){"error" %nin% class(x)}))) %>%  # Since this errors out under rowwise, should be done after ungroup().
