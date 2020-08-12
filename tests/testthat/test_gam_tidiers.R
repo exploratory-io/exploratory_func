@@ -3,7 +3,7 @@
 
 context("test tidiers for gam")
 
-test_that("test glance", {
+test_that("test glance, augment", {
   # TODO: with columns with space, error happens.
   #mtcars2 <- mtcars %>% rename(`cy l`=cyl, `mp g`=mpg)
   #gam_model <- mgcv::gam(data=mtcars2, `cy l`~`mp g`)
@@ -15,4 +15,8 @@ test_that("test glance", {
   expect_equal(class(res$deviance_explained), "numeric")
   expect_equal(class(res$gcv), "numeric")
   expect_equal(class(res$scale_est), "numeric")
+
+  # Test augment too.
+  res <- broom::augment(gam_model, newdata=mtcars)
+  expect_equal(class(res$.fitted[[1]]), "numeric")
 })
