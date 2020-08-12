@@ -23,7 +23,7 @@ iterate_kmeans <- function(df, max_centers = 10,
     ret <- model_df$model[[1]]
     ret
   }))
-  ret %>% rowwise() %>% glance(model)
+  ret %>% rowwise() %>% glance_rowwise(model)
 }
 
 #' analytics function for K-means view

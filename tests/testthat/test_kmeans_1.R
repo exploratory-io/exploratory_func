@@ -1,6 +1,7 @@
 # how to run this test:
 # devtools::test(filter="kmeans")
 context("test kmeans analytics view functions")
+
 test_that("exp_kmeans", {
   df <- mtcars %>% mutate(new_col = c(rep("A", n() - 10), rep("B", 10)))
   model_df <- exp_kmeans(df, cyl, mpg, hp, max_nrow=30)
@@ -40,9 +41,11 @@ test_that("exp_kmeans elbow method mode", {
   model_df <- exp_kmeans(df, cyl, mpg, hp, elbow_method_mode=TRUE)
   model_df %>% tidyr::unnest(model)
 })
-test_that("exp_kmeans elbow method mode with group_by", {
-  df <- mtcars %>% mutate(new_col = c(rep("A", n() - 10), rep("B", 10)))
-  df <- df %>% group_by(new_col)
-  model_df <- exp_kmeans(df, cyl, mpg, hp, elbow_method_mode=TRUE, max_centers=3)
-  model_df %>% tidyr::unnest(model)
-})
+
+# group_by for elbow method is not currently supported. Revive this test when it is.
+#test_that("exp_kmeans elbow method mode with group_by", {
+#  df <- mtcars %>% mutate(new_col = c(rep("A", n() - 10), rep("B", 10)))
+#  df <- df %>% group_by(new_col)
+#  model_df <- exp_kmeans(df, cyl, mpg, hp, elbow_method_mode=TRUE, max_centers=3)
+#  model_df %>% tidyr::unnest(model)
+#})
