@@ -4,7 +4,8 @@ glance_rowwise <- function(df, model, ...) {
   # summarize(df, broom::glance(!!rlang::enquo(model), ...))
   group_cols <- grouped_by(df)
   ret <- df %>% dplyr::ungroup() %>% 
-    dplyr::mutate(.res=purrr::map(model, function(x){broom::glance(x, ...)})) %>%
+    # res[group_cols]<-NULL is a dirty hack to avoid column name conflict at unnest.
+    dplyr::mutate(.res=purrr::map(model, function(x){res<-broom::glance(x, ...);res[group_cols]<-NULL;res})) %>%
     dplyr::select(!!!rlang::syms(group_cols), .res) %>%
     tidyr::unnest(.res)
   if (length(group_cols) > 0) {
@@ -36,7 +37,8 @@ augment_rowwise <- function(df, model, ...) {
   # summarize(df, broom::augment(!!rlang::enquo(model), ...))
   group_cols <- grouped_by(df)
   ret <- df %>% dplyr::ungroup() %>% 
-    dplyr::mutate(.res=purrr::map(model, function(x){broom::augment(x, ...)})) %>%
+    # res[group_cols]<-NULL is a dirty hack to avoid column name conflict at unnest.
+    dplyr::mutate(.res=purrr::map(model, function(x){res<-broom::augment(x, ...);res[group_cols]<-NULL;res})) %>%
     dplyr::select(!!!rlang::syms(group_cols), .res) %>%
     tidyr::unnest(.res)
   if (length(group_cols) > 0) {
