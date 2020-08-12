@@ -2346,10 +2346,26 @@ read_rds_file <- function(file, refhook = NULL){
   }
 }
 
-#'Wrapper for read_parquet to support remote file
+#'Wrapper for read_parquet to support remote file.
 #'@export
-read_parquet_file <- function(file, col_select = NULL, as_data_frame = TRUE){
+read_parquet_file <- function(file){
   loadNamespace("arrow")
+  
+  is.win <- Sys.info()['sysname'] == 'Windows'
+  tf <- NULL
+  
+  # Backup the locale info and set English locale for reading parquet issue
+  # on Windows https://issues.apache.org/jira/browse/ARROW-7288
+  if (is.win) {
+    lc.all<- Sys.getlocale("LC_ALL")
+    lc.collate<- Sys.getlocale("LC_COLLATE")
+    lc.ctype<- Sys.getlocale("LC_CTYPE")
+    lc.monetary<- Sys.getlocale("LC_MONETARY") 
+    lc.numeric<- Sys.getlocale("LC_NUMERIC")
+    
+    Sys.setlocale("LC_ALL", "English")
+  }
+  
   if (stringr::str_detect(file, "^https://") ||
       stringr::str_detect(file, "^http://") ||
       stringr::str_detect(file, "^ftp://")) {
@@ -2358,14 +2374,27 @@ read_parquet_file <- function(file, col_select = NULL, as_data_frame = TRUE){
     tf <- tempfile()  
     utils::download.file(file, tf)
     # Read the local parquet file.
-    res <- arrow::read_parquet(tf, col_select=col_select, as_data_frame=as_data_frame)
-    # Do not remove temp file right after that because read_parquet 
-    # is async (using threads) and may be still reading the file. 
-    #unlink(tf);
-    res;
+    res <- arrow::read_parquet(tf)
+
   } else {
-    arrow::read_parquet(file, col_select=col_select, as_data_frame=as_data_frame)
+    res <- arrow::read_parquet(file)
   }
+
+  # Restore the locale info.
+  if (is.win) {
+    Sys.setlocale("LC_ALL", lc.all)
+    Sys.setlocale("LC_COLLATE", lc.collate)
+    Sys.setlocale("LC_CTYPE", lc.ctype)
+    Sys.setlocale("LC_MONETARY", lc.monetary) 
+    Sys.setlocale("LC_NUMERIC", lc.numeric)
+  }
+  
+  if (!is.null(tf)) {
+    # There was an issue that the res contains 0 row if I remove the temp 
+    # file right after calling read_parquet. I don't see it now though.
+    unlink(tf);
+  }
+  res
 }
 
 #'Wrapper for readr::read_lines to support vector to data frame conversion
