@@ -517,7 +517,7 @@ test_that("test data frame prediction by xgboost with group", {
 })
 
 test_that("test prediction(data='training_and_test') by glm", {
-  test_data <- tibble:tibble(
+  test_data <- tibble::tibble(
         `CANCELLED X` = c("N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "Y", "N", "Y", "N"),
         `Carrier Name` = c("Delta Air Lines", "American Eagle", "American Airlines", "Southwest Airlines", "SkyWest Airlines", "Southwest Airlines", "Southwest Airlines", "Delta Air Lines", "Southwest Airlines", "Atlantic Southeast Airlines", "American Airlines", "Southwest Airlines", "US Airways", "US Airways", "Delta Air Lines", "Atlantic Southeast Airlines", NA, "Atlantic Southeast Airlines", "Delta Air Lines", "Delta Air Lines"),
         CARRIER = factor(c("AA", "MQ", "AA", "DL", "MQ", "AA", "DL", "DL", "MQ", "AA", "AA", "WN", "US", "US", "DL", "EV", "9E", "EV", "DL", "DL")), # test with factor with NA
@@ -536,10 +536,11 @@ test_that("test prediction(data='training_and_test') by glm", {
                                      test_rate = 0.2)
   ret <- model_ret %>% prediction(data='training_and_test')
   expected_cols <- c("Carrier Name", "DISTANCE", "ARR_TIME",
-                     "DERAY_TIME", "predicted_value", "standard_error",
-                     "conf_low", "conf_high", "residuals", "hat",
+                     "DERAY_TIME", "predicted_value",
+                     "standard_error", "conf_low", "conf_high", 
+                     "residuals", "standardised_residuals", "hat",
                      "residual_standard_deviation", "cooks_distance",
-                     "standardised_residuals", "is_test_data")
+                     "is_test_data")
   expect_equal(colnames(ret), expected_cols)
   grp_model_ret <- test_data %>% dplyr::group_by(klass) %>%
                      build_lm.fast(`DISTANCE`,
@@ -554,8 +555,8 @@ test_that("test prediction(data='training_and_test') by glm", {
   expected_cols_1 <- c("klass", "Carrier Name", "DISTANCE",
                      "ARR_TIME", "DERAY_TIME", "predicted_value",
                      "standard_error", "conf_low", "conf_high", "residuals",
-                     "hat", "residual_standard_deviation",
-                     "cooks_distance", "standardised_residuals",
+                     "standardised_residuals", "hat", "residual_standard_deviation",
+                     "cooks_distance",
                      "is_test_data")
   expected_cols_2 <- c("klass", "Carrier Name", "DISTANCE",
                      "ARR_TIME", "DERAY_TIME", "predicted_value",

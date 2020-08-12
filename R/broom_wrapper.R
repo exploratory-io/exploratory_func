@@ -589,6 +589,7 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
     ret[[conf_high_colname]] <- get_confint(ret[[".fitted"]], ret[[".se.fit"]], conf_int = higher)
 
     # move confidece interval columns next to standard error
+    ret <- move_col(ret, '.se.fit', which(colnames(ret) == ".fitted") + 1)
     ret <- move_col(ret, conf_low_colname, which(colnames(ret) == ".se.fit") + 1)
     ret <- move_col(ret, conf_high_colname, which(colnames(ret) == conf_low_colname) + 1)
   }
