@@ -1343,11 +1343,19 @@ do_on_each_group <- function(df, func, params = quote(list()), name = "tmp", wit
   ret <- df %>%
     # UQ and UQ(get_expr()) evaluates those variables
     dplyr::do(UQ(name) := UQ(rlang::get_expr(call)))
-  if(with_unnest){
+  if (with_unnest) {
     ret %>%
       dplyr::ungroup() %>%
       unnest_with_drop(!!rlang::sym(name))
-  }else{
+  } else {
+    # Pass on original group_by columns via rowwise().
+    # tidy_rowwise() etc. expect this info.
+    grouped_cols <- grouped_by(df)
+    if (length(grouped_cols) > 0) {
+      ret <- ret %>% dplyr::rowwise(grouped_cols)
+    } else {
+      ret <- ret %>% dplyr::rowwise()
+    }
     ret
   }
 }
