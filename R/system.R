@@ -2346,8 +2346,8 @@ read_rds_file <- function(file, refhook = NULL){
   }
 }
 
-#'Wrapper for read_parquet to support remote file.
-#'@export
+#' Wrapper for read_parquet to support remote file.
+#' @export
 read_parquet_file <- function(file){
   loadNamespace("arrow")
   
