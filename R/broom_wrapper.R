@@ -47,6 +47,23 @@ augment_rowwise <- function(df, model, ...) {
   ret
 }
 
+# augment_rowwise with data argument.
+# Used only from augment_kmeans for now.
+augment_rowwise_data <- function(df, model, data, ...) {
+  # Intended to do the same the following line. 
+  # summarize(df, broom::augment(!!rlang::enquo(model), ...))
+  group_cols <- grouped_by(df)
+  ret <- df %>% dplyr::ungroup() %>% 
+    # res[group_cols]<-NULL is a dirty hack to avoid column name conflict at unnest.
+    dplyr::mutate(.res=purrr::map2(!!rlang::sym(model), !!rlang::sym(data), function(m, d){res<-broom::augment(m, data=d, ...);res[group_cols]<-NULL;res})) %>%
+    dplyr::select(!!!rlang::syms(group_cols), .res) %>%
+    tidyr::unnest(.res)
+  if (length(group_cols) > 0) {
+    ret <- ret %>% dplyr::group_by(!!!rlang::syms(group_cols))
+  }
+  ret
+}
+
 #' glance for lm
 #' @export
 glance_lm <- glance_rowwise
@@ -91,9 +108,8 @@ augment_kmeans <- function(df, model, data){
     stop(paste(data_col, "is not in column names"), sep=" ")
   }
   if (is.null(attr(df$model[[1]], "subject_colname"))) { # Distinguish between columns case ank skv case.
-    # use do.call to evaluate data_col from a variable
-    augment_func <- get("augment", asNamespace("broom"))
-    ret <- do.call(augment_func, list(df, model_col, data=data_col))
+    # use do.call to evaluate data_col from a variable. # TODO: Does this reason still make sense?
+    ret <- do.call(augment_rowwise_data, list(df, model_col, data=data_col))
     # cluster column is factor labeled "1", "2"..., so convert it to integer to avoid confusion
     ret[[ncol(ret)]] <- ret[[ncol(ret)]]
   }
