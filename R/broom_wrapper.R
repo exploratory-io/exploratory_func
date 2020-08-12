@@ -1107,6 +1107,7 @@ model_stats <- function(df, pretty.name = FALSE, ...){
     # for glm
     colnames(ret)[colnames(ret) == "null.deviance"] <- "Null Deviance"
     colnames(ret)[colnames(ret) == "df.null"] <- "DF for Null Model"
+    colnames(ret)[colnames(ret) == "nobs"] <- "Number of Rows"
     # for multinom
     colnames(ret)[colnames(ret) == "edf"] <- "Effective Number of DF"
     # for coxph
@@ -1144,6 +1145,7 @@ model_stats <- function(df, pretty.name = FALSE, ...){
     # for glm
     colnames(ret)[colnames(ret) == "null.deviance"] <- "null_deviance"
     colnames(ret)[colnames(ret) == "df.null"] <- "df_for_null_model"
+    colnames(ret)[colnames(ret) == "nobs"] <- "n" # Making it consistent with coxph
     # for multinom
     colnames(ret)[colnames(ret) == "edf"] <- "effective_number_of_df"
     # for coxph
@@ -1351,7 +1353,7 @@ do_survfit <- function(df, time, status, start_time = NULL, end_time = NULL, tim
 
 #' tidy after converting model to confint
 #' @export
-model_confint <- function(df, ...){
+model_confint <- function(df, ...){ # TODO: Not used from anywhere, and the output does not look clean since broom 0.7.0. Delete at some point.
   validate_empty_data(df)
 
   caller <- match.call()

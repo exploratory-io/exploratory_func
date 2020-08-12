@@ -1,5 +1,4 @@
 context("test build_glm")
-
 test_that("test build_glm summary output ", {
   test_df = data.frame(
     num1 = seq(20) / 10.0,
@@ -95,16 +94,12 @@ test_that("predict glm with new data", {
 
   stats_ret <- model_data %>% model_stats()
   expect_equal(colnames(stats_ret), c("group", "null_deviance", "df_for_null_model", "log_likelihood",
-                                      "aic", "bic", "deviance", "residual_df"))
+                                      "aic", "bic", "deviance", "residual_df", "n"))
 
   anova_ret <- model_data %>% model_anova()
   expect_equal(colnames(anova_ret), c("group", "term", "df", "deviance", "residual_df",
                                       "residual_deviance"))
-
-  confint_ret <- model_data %>% model_confint(level = 0.99)
-  expect_equal(colnames(confint_ret), c("group", "Term", "Prob 0.5", "Prob 99.5"))
 })
-
 
 test_that("prediction with categorical columns", {
   test_data <- structure(
@@ -170,4 +165,3 @@ test_that("test prediction binary", {
   expect_true("predicted_probability" %in% colnames(prediction_train_ret))
 
 })
-
