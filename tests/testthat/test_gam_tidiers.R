@@ -17,6 +17,7 @@ test_that("test glance, augment", {
   expect_equal(class(res$scale_est), "numeric")
 
   # Test augment too.
-  res <- broom::augment(gam_model, newdata=mtcars)
+  res <- broom::augment(gam_model, newdata=mtcars, se=TRUE)
   expect_equal(class(res$.fitted[[1]]), "numeric")
+  expect_equal(class(res$.se.fit[[1]]), "numeric")
 })
