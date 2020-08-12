@@ -19,6 +19,6 @@ test_that("exp_kmeans result is properly separated out.", {
   model_df <- df %>% build_kmeans.cols(`Adult Film Condom Requirements`, `Ban on Single-use Plastic Bags`, `Carryout Bag Charges`, `Cigarette Tax`, `Corporate Political Spending Advisory Question`, `Criminal Sentences & Juvenile Crime Proceedings`, `Death Penalty Procedure Time Limits`, `English Proficiency. Multilingual Education.`, `Firearms and Ammunition Sales`, `K-12 and Community College Facilities`, `Legislative Procedure Requirements`, `Marijuana Legalization`, `Medi-Cal Hospital Fee Program`, `Repeal of Death Penalty`, `State Prescription Drug Purchase Standards`, `Tax Extension for Education and Healthcare`, `Voter Approval of Revenue Bonds`, centers=2, keep.source=TRUE, augment = FALSE)
   res <- model_df %>% augment_kmeans(model, data=source.data)
   # Verify that on Cigarette.Tax values, 2 cluster means are separated more than the sum of each group's standard deviation.
-  summarized <- res %>% group_by(cluster) %>% summarize(m=mean(Cigarette.Tax),sd=sd(Cigarette.Tax))
+  summarized <- res %>% group_by(cluster) %>% summarize(m=mean(`Cigarette Tax`),sd=sd(`Cigarette Tax`))
   expect_true(abs(summarized$m[[1]] - summarized$m[[2]]) > summarized$sd[[1]] + summarized$sd[[2]])
 })
