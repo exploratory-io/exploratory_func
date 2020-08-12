@@ -1,7 +1,6 @@
 context("tests for wrappers of stats package")
 
 spread_test_df <- data.frame(var1 = c(1, 3, 2, NA), var2 = c(1, 3, 2, 10))
-
 test_that("do_dist with NA results", {
   data <- data.frame(
     x = rep(letters[1:3], 3),
@@ -209,7 +208,7 @@ test_that("test do_cor.cols for grouped df with model output", {
   result_cor <- result %>% tidy_rowwise(model)
   expect_equal(dim(result_cor), c(4, 4))
   result_data <- result %>% tidy_rowwise(model, type = "data")
-  expect_equal(colnames(result_data), c("var1", "var2", "group"))
+  expect_equal(colnames(result_data), c("group", "var1", "var2"))
 })
 
 test_that("test do_cor.kv for duplicated pair", {
@@ -240,7 +239,7 @@ test_that("test do_cor.kv with group_by with model output", {
   expect_equal(result_cor[["cat.y"]], c("cat2", "cat1", "cat2", "cat1"))
   expect_equal(result_cor[["value"]], replicate(4, 1))
   result_data <- result %>% tidy_rowwise(model, type = "data")
-  expect_equal(colnames(result_data), c("cat", "dim", "val", "dim_na", "grp")) # TODO: group column comes as the last column, but it might be easier to understand if it comes first.
+  expect_equal(colnames(result_data), c("grp", "cat", "dim", "val", "dim_na")) # TODO: group column comes as the last column, but it might be easier to understand if it comes first.
 })
 
 test_that("test do_cor.kv for grouped data frame as subject error", {

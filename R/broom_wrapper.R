@@ -22,7 +22,8 @@ tidy_rowwise <- function(df, model, ...) {
   # Thus, ending up doing the same with purrr::map. It seems this is more stable as of now.
   group_cols <- grouped_by(df)
   ret <- df %>% dplyr::ungroup() %>% 
-    dplyr::mutate(.res=purrr::map(model, function(x){broom::tidy(x, ...)})) %>%
+    # res[group_cols]<-NULL is a dirty hack to avoid column name conflict at unnest. Without it, test_stats_wrapper.R fails. TODO: We should fix do_on_each_group instead of this.
+    dplyr::mutate(.res=purrr::map(model, function(x){res<-broom::tidy(x, ...);res[group_cols]<-NULL;res})) %>%
     dplyr::select(!!!rlang::syms(group_cols), .res) %>%
     tidyr::unnest(.res)
   if (length(group_cols) > 0) {
