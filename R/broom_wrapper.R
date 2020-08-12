@@ -2,10 +2,11 @@
 glance_rowwise <- function(df, model, ...) {
   # Intended to do the same the following line. 
   # summarize(df, broom::glance(!!rlang::enquo(model), ...))
+  model_col <- tidyselect::vars_select(names(df), !! rlang::enquo(model))
   group_cols <- grouped_by(df)
   ret <- df %>% dplyr::ungroup() %>% 
     # res[group_cols]<-NULL is a dirty hack to avoid column name conflict at unnest.
-    dplyr::mutate(.res=purrr::map(model, function(x){res<-broom::glance(x, ...);res[group_cols]<-NULL;res})) %>%
+    dplyr::mutate(.res=purrr::map(!!rlang::sym(model_col), function(x){res<-broom::glance(x, ...);res[group_cols]<-NULL;res})) %>%
     dplyr::select(!!!rlang::syms(group_cols), .res) %>%
     tidyr::unnest(.res)
   if (length(group_cols) > 0) {
@@ -21,10 +22,11 @@ tidy_rowwise <- function(df, model, ...) {
   # Input `..1` is `broom::tidy(model, ...)`.
   #
   # Thus, ending up doing the same with purrr::map. It seems this is more stable as of now.
+  model_col <- tidyselect::vars_select(names(df), !! rlang::enquo(model))
   group_cols <- grouped_by(df)
   ret <- df %>% dplyr::ungroup() %>% 
     # res[group_cols]<-NULL is a dirty hack to avoid column name conflict at unnest. Without it, test_stats_wrapper.R fails. TODO: We should fix do_on_each_group instead of this.
-    dplyr::mutate(.res=purrr::map(model, function(x){res<-broom::tidy(x, ...);res[group_cols]<-NULL;res})) %>%
+    dplyr::mutate(.res=purrr::map(!!rlang::sym(model_col), function(x){res<-broom::tidy(x, ...);res[group_cols]<-NULL;res})) %>%
     dplyr::select(!!!rlang::syms(group_cols), .res) %>%
     tidyr::unnest(.res)
   if (length(group_cols) > 0) {
@@ -35,10 +37,11 @@ tidy_rowwise <- function(df, model, ...) {
 augment_rowwise <- function(df, model, ...) {
   # Intended to do the same the following line. 
   # summarize(df, broom::augment(!!rlang::enquo(model), ...))
+  model_col <- tidyselect::vars_select(names(df), !! rlang::enquo(model))
   group_cols <- grouped_by(df)
   ret <- df %>% dplyr::ungroup() %>% 
     # res[group_cols]<-NULL is a dirty hack to avoid column name conflict at unnest.
-    dplyr::mutate(.res=purrr::map(model, function(x){res<-broom::augment(x, ...);res[group_cols]<-NULL;res})) %>%
+    dplyr::mutate(.res=purrr::map(!!rlang::sym(model_col), function(x){res<-broom::augment(x, ...);res[group_cols]<-NULL;res})) %>%
     dplyr::select(!!!rlang::syms(group_cols), .res) %>%
     tidyr::unnest(.res)
   if (length(group_cols) > 0) {
@@ -52,10 +55,12 @@ augment_rowwise <- function(df, model, ...) {
 augment_rowwise_data <- function(df, model, data, ...) {
   # Intended to do the same the following line. 
   # summarize(df, broom::augment(!!rlang::enquo(model), ...))
+  model_col <- tidyselect::vars_select(names(df), !! rlang::enquo(model))
+  data_col <- tidyselect::vars_select(names(df), !! rlang::enquo(data))
   group_cols <- grouped_by(df)
   ret <- df %>% dplyr::ungroup() %>% 
     # res[group_cols]<-NULL is a dirty hack to avoid column name conflict at unnest.
-    dplyr::mutate(.res=purrr::map2(!!rlang::sym(model), !!rlang::sym(data), function(m, d){res<-broom::augment(m, data=d, ...);res[group_cols]<-NULL;res})) %>%
+    dplyr::mutate(.res=purrr::map2(!!rlang::sym(model_col), !!rlang::sym(data_col), function(m, d){res<-broom::augment(m, data=d, ...);res[group_cols]<-NULL;res})) %>%
     dplyr::select(!!!rlang::syms(group_cols), .res) %>%
     tidyr::unnest(.res)
   if (length(group_cols) > 0) {
