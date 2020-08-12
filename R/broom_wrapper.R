@@ -231,6 +231,7 @@ add_prediction <- function(df, model_df, conf_int = 0.95, ...){
   ret <- add_confint(ret, conf_int)
   colnames(ret)[colnames(ret) == ".fitted"] <- avoid_conflict(colnames(ret), "predicted_value")
   colnames(ret)[colnames(ret) == ".se.fit"] <- avoid_conflict(colnames(ret), "standard_error")
+  colnames(ret)[colnames(ret) == ".resid"] <- avoid_conflict(colnames(ret), "residual")
 
   ret
 }

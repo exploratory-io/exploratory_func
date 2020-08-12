@@ -1,6 +1,7 @@
 context("test broom wrappers")
 set.seed(0)
 test_df <- data.frame(vec1 = seq(10), vec2 = seq(10), random = runif(10, min=0, max=10))
+
 test_that("test data frame prediction by xgboost with group", {
   train_data <- structure(list(age = c(66L, 44L, 21L, 78L, 28L, 40L, 61L, 60L,
                                        43L, 49L, 52L, 25L, 58L, 46L, 40L, 32L, 22L, 23L, 17L, 24L),
@@ -131,7 +132,12 @@ test_that("test if tidy_lm arguments work", {
     %>%  tidy_lm(model, conf.int = TRUE, conf.level = 0.5, quick=TRUE)
   )
   expect_true(all(result[["estimate"]] != result_[["estimate"]]))
-  expect_equal(ncol(result_), 2)
+  expect_equal(ncol(result_), 7)
+  # A tibble: 2 x 7
+  #  term        estimate std.error statistic p.value conf.low conf.high
+  #  <chr>          <dbl>     <dbl>     <dbl>   <dbl>    <dbl>     <dbl>
+  #1 (Intercept)     3.09      3.38     0.913   0.388   0.699       5.48
+  #2 log(random)     1.39      1.87     0.746   0.477   0.0739      2.71
 })
 
 test_that("do_kmeans.kv augment", {
@@ -169,7 +175,6 @@ test_that("do_kmeans.kv augment", {
   expect_true(all(result[["cluster"]] == 1))
 })
 
-
 test_that("predict lm with new data", {
   loadNamespace("dplyr")
   fit_df <- data.frame(
@@ -185,10 +190,10 @@ test_that("predict lm with new data", {
 
   model_data <- fit_df %>% dplyr::group_by(model) %>% build_lm(num1 ~ num2, group_cols = "model")
 
-  fit <- add_df %>% dplyr::group_by(group) %>% add_prediction(model_df = model_data)
+  fit <- add_df %>% dplyr::group_by(group) %>% add_prediction(model_df = model_data, se=TRUE)
 
   expect_equal(nrow(fit), 20 * 2)
-  expect_equal(names(fit), c("model.group", "group", "num1", "num2", "predicted_value", "standard_error", "conf_low", "conf_high"))
+  expect_equal(names(fit), c("model.group", "group", "num1", "num2", "predicted_value", "standard_error", "conf_low", "conf_high", "residual"))
 })
 
 test_that("predict lm with new data", {
@@ -207,7 +212,7 @@ test_that("predict lm with new data", {
   stats_ret <- model_data %>% model_stats()
   expect_equal(colnames(stats_ret), c("group", "r_squared", "adj_r_squared", "root_mean_square_error",
                                       "f_ratio", "p_value", "df", "log_likelihood",
-                                      "aic", "bic", "deviance", "residual_df"))
+                                      "aic", "bic", "deviance", "residual_df", "n"))
 
   anova_ret <- model_data %>% model_anova()
   expect_equal(colnames(anova_ret), c("group", "term", "df", "sum_of_squares", "mean_square", "f_ratio", "p_value"))
