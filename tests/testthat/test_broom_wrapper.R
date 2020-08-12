@@ -211,9 +211,6 @@ test_that("predict lm with new data", {
 
   anova_ret <- model_data %>% model_anova()
   expect_equal(colnames(anova_ret), c("group", "term", "df", "sum_of_squares", "mean_square", "f_ratio", "p_value"))
-
-  confint_ret <- model_data %>% model_confint(level = 0.99)
-  expect_equal(colnames(confint_ret), c("group", "Term", "Prob 0.5", "Prob 99.5"))
 })
 
 test_that("assign_cluster", {
