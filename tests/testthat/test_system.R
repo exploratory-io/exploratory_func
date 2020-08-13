@@ -1,5 +1,4 @@
 context("test system functions")
-
 test_that("test clean_data_frame",{
   # create df with dupicated columns names and data frame type column
   df <- data.frame(a = 1:5, a = 2:6)
@@ -268,7 +267,7 @@ test_that("geocode_japan_prefecture", {
 })
 
 test_that("read_parquet_file", {
-  df <- read_parquet_file("https://www.dropbox.com/s/sjkgk9gj0vemq36/sample.parquet?raw=1")
+  df <- read_parquet_file("https://dl.dropbox.com/s/sjkgk9gj0vemq36/sample.parquet")
   expect_equal(FALSE, is.na(df))
   expect_equal(TRUE, is.data.frame(df))
 })
