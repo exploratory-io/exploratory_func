@@ -135,7 +135,9 @@ test_that("test build_glm and broom", {
       # Not sure why since it does not reproduce when the operations for this test is individually run on the docker image.
       # May be the same situation as windows 32 bit is happening.
       # Just making the test pass in such case for now.
-      expect_true(ncol(result) == ncol(test_df)+10 || ncol(result) == ncol(test_df)+8)
+      # expect_true(ncol(result) == ncol(test_df)+10 || ncol(result) == ncol(test_df)+8)
+      # For now, columns in hte original data frame that were not used for the model, and stardard error, confidence intervals are not in the result, since broom 0.7.0.
+      expect_true(ncol(result) == 9)
     }
   }
 })
