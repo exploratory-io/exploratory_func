@@ -111,17 +111,17 @@ test_that("build_lm with evaluation", {
     build_lm(num1 ~ num2, group_cols = c("group"), test_rate = 0.1)
 
   evaluated <- lm_model %>%
-    prediction(data = "test")
+    prediction(data = "test", se = TRUE)
 
-  expect_equal(colnames(evaluated), c("group", "num1", "num2", "predicted_value", "standard_error", "conf_low", "conf_high"))
+  expect_equal(colnames(evaluated), c("group", "num1", "num2", "predicted_value", "standard_error", "conf_low", "conf_high", "residuals"))
 
   test_eval <- lm_model %>%
-    prediction(data = "training")
+    prediction(data = "training", se = TRUE)
 
   expect_equal(colnames(test_eval), c("group", "num1", "num2",
                                       "predicted_value", "standard_error", "conf_low", "conf_high", "residuals",
-                                      "hat", "residual_standard_deviation", "cooks_distance",
-                                      "standardised_residuals"
+                                      "standardised_residuals",
+                                      "hat", "residual_standard_deviation", "cooks_distance"
                                       ))
 
 })
@@ -176,10 +176,10 @@ test_that("prediction with target column name with space by build_lm.fast", {
   ret2 <- ret %>% dplyr::filter(stringr::str_detect(term,"(logical col|Carrier-Name)")) %>% dplyr::summarize(na_count=sum(is.na(base.level)))
   expect_equal(ret2$na_count, 0)
 
-  ret <- model_data %>% augment_rowwise(model)
+  ret <- model_data %>% augment_rowwise(model, se=TRUE)
 
   expect_true(nrow(ret) > 0)
-  expect_equal(colnames(ret), c("CANCELLED:X", "Carrier-Name","DISTANCE","logical col", ".fitted",".se.fit",".resid",".hat",".sigma",".cooksd",".std.resid"))
+  expect_equal(colnames(ret), c("CANCELLED:X", "Carrier-Name","DISTANCE","logical col", ".fitted",".se.fit",".resid",".std.resid",".hat",".sigma",".cooksd"))
 })
 
 test_that("prediction with glm family (binomial) and link (probit) with target column name with space by build_lm.fast", {
@@ -258,7 +258,7 @@ test_that("prediction with glm family (negativebinomial) with target column name
   ret <- model_data %>% augment_rowwise(model)
   expect_equal(colnames(ret),
                c("CANCELLED X", "logical col", "Carrier Name", "CARRIER", "DISTANCE",
-                 ".fitted", ".resid", ".hat", ".sigma", ".cooksd", ".std.resid"))
+                 ".fitted", ".resid", ".std.resid", ".hat", ".sigma", ".cooksd"))
 })
 
 if (Sys.info()["sysname"] != "Windows") {
