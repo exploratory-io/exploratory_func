@@ -1,4 +1,5 @@
 # For backward compatibilities for broom's rowwise tidier, which was dropped at broom 0.7.0.
+#' @export
 glance_rowwise <- function(df, model, ...) {
   # Intended to do the same the following line. 
   # summarize(df, broom::glance(!!rlang::enquo(model), ...))
@@ -14,6 +15,8 @@ glance_rowwise <- function(df, model, ...) {
   }
   ret
 }
+
+#' @export
 tidy_rowwise <- function(df, model, ...) {
   # summarize(df, broom::tidy(!!rlang::enquo(model), ...))
   # The above was the originally intended code, but this gave error like below with group_by case.
@@ -34,6 +37,8 @@ tidy_rowwise <- function(df, model, ...) {
   }
   ret
 }
+
+#' @export
 augment_rowwise <- function(df, model, ...) {
   # Intended to do the same the following line. 
   # summarize(df, broom::augment(!!rlang::enquo(model), ...))
