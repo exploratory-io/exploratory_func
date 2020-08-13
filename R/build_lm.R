@@ -1540,7 +1540,7 @@ augment.lm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "
   }
 
   if(!is.null(newdata)) { # Call broom:::augment.lm as is
-    ret <- broom:::augment.lm(x, data = data, newdata = newdata, ...)
+    ret <- broom:::augment.lm(x, data = data, newdata = newdata, se = TRUE, ...)
   } else if (!is.null(data)) {
     ret <- switch(data_type,
       training = { # Call broom:::augment.lm as is
@@ -1554,7 +1554,7 @@ augment.lm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "
       })
   }
   else {
-    ret <- broom:::augment.lm(x, ...)
+    ret <- broom:::augment.lm(x, se = TRUE, ...)
   }
   # Rename columns back to the original names.
   names(ret) <- coalesce(x$terms_mapping[names(ret)], names(ret))
@@ -1563,6 +1563,8 @@ augment.lm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "
 
 #' @export
 augment.glm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "training", ...) {
+  se <- !("negbin" %in% class(x)) # Avoid standard error calculation for negative binomial, since it most likely gives error.
+
   if ("error" %in% class(x)) {
     ret <- data.frame()
     return(ret)
@@ -1571,11 +1573,11 @@ augment.glm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = 
     # Calling broom:::augment.glm fails with 'NextMethod' called from an anonymous function
     # It seems augment.glm is only calling NextMethod, which is falling back to broom:::augment.lm.
     # So, we are just directly calling augment.lm here.
-    ret <- broom:::augment.lm(x, data = data, newdata = newdata, ...)
+    ret <- broom:::augment.lm(x, data = data, newdata = newdata, se = se, ...)
   } else if (!is.null(data)) {
     ret <- switch(data_type,
       training = { # Call broom:::augment.lm as is
-        broom:::augment.lm(x, data = data, newdata = newdata, ...)
+        broom:::augment.lm(x, data = data, newdata = newdata, se = se, ...)
       },
       test = {
         # Augment data with already predicted result in the model.
@@ -1585,7 +1587,7 @@ augment.glm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = 
       })
   }
   else {
-    ret <- broom:::augment.lm(x, ...)
+    ret <- broom:::augment.lm(x, se = se, ...)
   }
   # Rename columns back to the original names.
   names(ret) <- coalesce(x$terms_mapping[names(ret)], names(ret))

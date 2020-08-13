@@ -175,7 +175,7 @@ test_that("prediction with target column name with space by build_lm.fast", {
   ret2 <- ret %>% dplyr::filter(stringr::str_detect(term,"(logical col|Carrier-Name)")) %>% dplyr::summarize(na_count=sum(is.na(base.level)))
   expect_equal(ret2$na_count, 0)
 
-  ret <- model_data %>% augment_rowwise(model, se=TRUE)
+  ret <- model_data %>% augment_rowwise(model)
 
   expect_true(nrow(ret) > 0)
   expect_equal(colnames(ret), c("CANCELLED:X", "Carrier-Name","DISTANCE","logical col", ".fitted",".se.fit",".resid",".std.resid",".hat",".sigma",".cooksd"))
