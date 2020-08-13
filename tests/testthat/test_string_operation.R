@@ -113,6 +113,17 @@ test_that("do_tokenize with keep_cols = TRUE with sentences", {
   expect_equal(ncol(result), 4)
 })
 
+test_that("do_tokenize_icu with keep_cols = TRUE with sentences", {
+  test_df <- data.frame(
+    input = c("Hello world!", "This is a data frame for test. This is second sentence."),
+    extra_col = seq(2),
+    stringsAsFactors = FALSE)
+  result <- test_df %>%
+    do_tokenize_icu(input, drop=FALSE, token = "word", keep_cols = TRUE)
+  expect_equal(result$token[[1]], "hello")
+  expect_equal(ncol(result), 5)
+})
+
 test_that("do_tokenize with remove_numbers", {
   test_df <- data.frame(
     input = c("12345 aaa", "12aabb33", "123456 34567 88999"),
