@@ -111,12 +111,11 @@ test_that("build_lm with evaluation", {
     build_lm(num1 ~ num2, group_cols = c("group"), test_rate = 0.1)
 
   evaluated <- lm_model %>%
-    prediction(data = "test", se = TRUE)
-
+    prediction(data = "test")
   expect_equal(colnames(evaluated), c("group", "num1", "num2", "predicted_value", "standard_error", "conf_low", "conf_high", "residuals"))
 
   test_eval <- lm_model %>%
-    prediction(data = "training", se = TRUE)
+    prediction(data = "training")
 
   expect_equal(colnames(test_eval), c("group", "num1", "num2",
                                       "predicted_value", "standard_error", "conf_low", "conf_high", "residuals",
@@ -143,7 +142,7 @@ test_that("prediction with categorical columns", {
 
   ret <- prediction(model_data, data = "test", pretty.name = TRUE)
   expect_true(nrow(ret) > 0)
-  expect_equal(colnames(ret), c("CANCELLED", "Carrier.Name", "CARRIER", "DISTANCE", "predicted_value", "standard_error", "conf_low", "conf_high"))
+  expect_equal(colnames(ret), c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE", "predicted_value", "standard_error", "conf_low", "conf_high", "residuals"))
 
   grouped <- test_data %>%
     dplyr::group_by(CARRIER)
