@@ -508,11 +508,14 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
       } else {
         paste0("broom::augment(m, data = df, ", aug_args, ")")
       }
-      # From broom 0.7.0 augment.glm, if data is different from the one inside the model due to, for example, NA rows, error like following is raised.
-      # To avoid it, do not specify data argument. Let's do this only for glm since, for example, ranger needs it to get actual prediction on training data instead of prediction on OOB data.
-      # TODO: Check if this applies to other models. What about lm??
+      # From broom 0.7.0 augment.glm, if data argument is different from the one inside the model due to, for example, NA rows, error like following is raised.
       #
       # Assigned data `predict(x, newdata, type = type.predict) %>% unname()` must be compatible with existing data.
+      #
+      # To avoid it, do not specify data argument. Let's do this only for glm since, for example, ranger needs it to get actual prediction on training data instead of prediction on OOB data.
+      # Another option for workaround was to use newdata argument. But result from it does not have metrics like residuals, standardised_residuals, hat, residual_standard_deviation, or cooks_distance.
+      # Drawback of no argument is, the result misses columns in the original data that are not used for the model.
+      # TODO: Check if this applies to other models. What about lm??
       if (class(df$model[[1]])[[1]] == "glm") {
         aug_fml <- if(aug_args == ""){
           "broom::augment(m)"
