@@ -221,12 +221,12 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
 
   if(keep_cols) {
     # If we need to keep original columns, then bring them back by joining the result data frame with original data frame.
-    result <- df %>%  dplyr::left_join(result, by=c("document_id", "document_id"))
+    result <- df %>%  dplyr::left_join(result, by=c("document_id" = "document_id"))
     if(drop) { # drop the text column
       result <- result %>% dplyr::select(-orig_input_col)
     }
   } else if(!drop) { # Bring back the text column by by joining the result data frame with original data frame and drop unwanted columns.
-    result <- df %>% dplyr::left_join(result, by=c("document_id", "document_id")) %>%
+    result <- df %>% dplyr::left_join(result, by=c("document_id"= "document_id")) %>%
       select(document_id, !!count_col, !!token_col, orig_input_col);
   }
   if(!with_id) { # Drop the document_id column
