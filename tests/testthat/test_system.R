@@ -271,3 +271,4 @@ test_that("read_parquet_file", {
   expect_equal(FALSE, is.na(df))
   expect_equal(TRUE, is.data.frame(df))
 })
+
