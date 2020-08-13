@@ -1544,7 +1544,7 @@ augment.lm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "
   } else if (!is.null(data)) {
     ret <- switch(data_type,
       training = { # Call broom:::augment.lm as is
-        broom:::augment.lm(x, data = data, newdata = newdata, ...)
+        broom:::augment.lm(x, data = data, newdata = newdata, se = TRUE, ...)
       },
       test = {
         # Augment data with already predicted result in the model.
