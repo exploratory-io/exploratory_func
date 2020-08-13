@@ -2108,9 +2108,8 @@ restore_na <- function(value, na_row_numbers){
 #' @param ... - Name-value pairs of summary functions. The name will be the name of the variable in the result. The value should be an expression that returns a single value like min(x), n(), or sum(is.na(y)).
 #' @export
 summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...){
-  library(dplyr)
   ret <- if(length(group_cols) == 0) {
-    .data %>% summarize(...)
+    .data %>% dplyr::summarize(...)
   } else {
     # if group_cols argument is passed, make sure to ungroup first so that it won't throw an error
     # when group_cols conflict with group columns in previous steps.
@@ -2185,7 +2184,7 @@ summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...){
         # make sure to ungroup result
         .data %>% dplyr::group_by(!!!rlang::syms(group_cols)) %>% summarize(...) %>% dplyr::ungroup()
       } else { # In case no group_by columns are provided,skip group_by
-        .data %>% summarize(...)
+        .data %>% dplyr::summarize(...)
       }
     }
   }
