@@ -516,7 +516,7 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
       # Another option for workaround was to use newdata argument. But result from it does not have metrics like residuals, standardised_residuals, hat, residual_standard_deviation, or cooks_distance.
       # Drawback of no argument is, the result misses columns in the original data that are not used for the model.
       # TODO: Check if this applies to other models. What about lm??
-      if (class(df$model[[1]])[[1]] == "glm") {
+      if (class(df$model[[1]])[[1]] %in% c("glm", "glm_exploratory_0")) {
         aug_fml <- if(aug_args == ""){
           "broom::augment(m)"
         } else {

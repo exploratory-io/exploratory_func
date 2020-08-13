@@ -29,7 +29,16 @@ augment.glm_exploratory_0 <- function(x, data = NULL, newdata = NULL, ...) {
       newdata <- newdata %>% dplyr::filter(!!rlang::sym(names(x$xlevels)[[i]]) %in% !!x$xlevels[[i]])
     }
   }
-  broom:::augment.glm(x, data = data, newdata = newdata, ...)
+  if (is.null(data)) { # Giving data argument when it is NULL causes error from augment.glm.
+    ret <- broom:::augment.glm(x, newdata = newdata, se=TRUE, ...)
+    if (!is.null(ret$.rownames)) { # Clean up .rownames column augment.glm adds for some reason.
+      ret$.rownames <- NULL
+    }
+  }
+  else {
+    ret <- broom:::augment.glm(x, data = data, newdata = newdata, se=TRUE, ...)
+  }
+  ret
 }
 
 #' glm wrapper with do
