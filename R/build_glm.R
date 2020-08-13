@@ -24,7 +24,7 @@ build_lr <- function(df, ...) {
 
 # augment function just to filter out unknown categories in predictors to avoid error.
 augment.glm_exploratory_0 <- function(x, data = NULL, newdata = NULL, ...) {
-  if (!is.null(newdata)) {
+  if (!is.null(newdata) && length(x$xlevels) > 0) {
     for (i in 1:length(x$xlevels)) {
       newdata <- newdata %>% dplyr::filter(!!rlang::sym(names(x$xlevels)[[i]]) %in% !!x$xlevels[[i]])
     }

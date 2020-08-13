@@ -190,6 +190,33 @@ calc_vif <- function(model, terms_mapping) {
   })
 }
 
+# augment function just to filter out unknown categories in predictors to avoid error.
+augment.lm_exploratory_0 <- function(x, data = NULL, newdata = NULL, ...) {
+  if (!is.null(newdata) && length(x$xlevels) > 0) {
+    for (i in 1:length(x$xlevels)) {
+      newdata <- newdata %>% dplyr::filter(!!rlang::sym(names(x$xlevels)[[i]]) %in% !!x$xlevels[[i]])
+    }
+  }
+  if (is.null(data)) { # Giving data argument when it is NULL causes error from augment.glm. Do the same for lm just in case.
+    ret <- broom:::augment.lm(x, newdata = newdata, se=TRUE, ...)
+    if (!is.null(ret$.rownames)) { # Clean up .rownames column augment.glm adds for some reason. Do the same for lm just in case.
+      ret$.rownames <- NULL
+    }
+  }
+  else {
+    ret <- broom:::augment.lm(x, data = data, newdata = newdata, se=TRUE, ...)
+  }
+  ret
+}
+
+tidy.lm_exploratory_0 <- function(x, ...) {
+  # tidy.lm raises error when class has more than "lm". Working it around here.
+  orig_class <- class(x)
+  class(x) <- "lm"
+  ret <- broom:::tidy.lm(x, ...)
+  class(x) <- orig_class
+  ret
+}
 
 #' lm wrapper with do
 #' @return deta frame which has lm model
@@ -279,7 +306,9 @@ build_lm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, gr
         data <- safe_slice(df, index, remove = TRUE)
 
         # execute lm with parsed arguments
-        eval(parse(text = paste0("stats::lm(data = data, ", arg_char, ")")))
+        model <- eval(parse(text = paste0("stats::lm(data = data, ", arg_char, ")")))
+        class(model) <- c("lm_exploratory_0", class(model))
+        model
       })) %>%
       dplyr::mutate(.model_metadata = purrr::map(source.data, function(df){
         if(!is.null(formula)){
