@@ -627,7 +627,7 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients'
       ret
     },
     coefficients = {
-      ret <- broom:::tidy.coxph(x) # it seems that tidy.lm takes care of glm too
+      ret <- broom:::tidy.coxph(x, conf.int=TRUE) # conf.int=TRUE is required to get conf.int since broom 0.7.0.
       ret <- ret %>% dplyr::mutate(
         hazard_ratio = exp(estimate)
       )
