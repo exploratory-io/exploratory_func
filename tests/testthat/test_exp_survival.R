@@ -24,7 +24,8 @@ test_that("test exp_survival", {
                                                                          "Spain", "Sri Lanka", "Sweden", "Switzerland", "Taiwan",
                                                                          "Tajikistan", "Thailand", "Trinidad and Tobago", "Turkey",
                                                                          "Ukraine", "United Arab Emirates", "United Kingdom", "United States",
-                                                                         "Uruguay", "Venezuela", "Vietnam", "Zambia"), class = "factor"))
+                                                                         "Uruguay", "Venezuela", "Vietnam", "Zambia"), class = "factor"),
+                         grp = c("A", "B", "A", "B", "A", "B", "A", "B", "A", "B"))
   data <- data %>% mutate(start_date = as.Date("2018-09-15")+lubridate::weeks(weeks_on_service))
   data <- data %>% mutate(end_date = start_date+lubridate::weeks(weeks_on_service))
   data$end_date[[3]] <- NA #set NAs
@@ -81,10 +82,12 @@ test_that("test exp_survival", {
   ret3 <- ret %>% glance_rowwise(model2)
 
   # Make sure group_by column is kept in the outout.
-  data4 <- data %>% group_by(`o s`)
-  ret <- data4 %>% exp_survival(`weeks on service`, `is churned`)
+  data4 <- data %>% group_by(grp)
+  ret <- data4 %>% exp_survival(`weeks on service`, `is churned`, cohort=`o s`)
   ret1 <- ret %>% tidy_rowwise(model1)
-  expect_true("o s" %in% colnames(ret1))
-
-
+  ret2 <- ret %>% tidy_rowwise(model2)
+  ret3 <- ret %>% glance_rowwise(model2)
+  expect_equal(colnames(ret1), c("grp","Cohort","Time","Observations","Events","Censored","Survival Rate","Std Error","Conf High","Conf Low"))
+  expect_true("grp" %in% colnames(ret2))
+  expect_true("grp" %in% colnames(ret3))
 })
