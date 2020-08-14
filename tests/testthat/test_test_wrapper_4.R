@@ -24,6 +24,7 @@ test_that("exp_ttest with groups with only single category", {
   res <- model_df %>% tidy_rowwise(model, type="data")
   res <- model_df %>% tidy_rowwise(model, type="data_summary", conf_level=0.95)
   expect_true(is.data.frame(res)) #TODO: better expectation
+  expect_true("CAR RIER" %in% colnames(res))
 })
 
 test_that("exp_anova with groups with only single category", {
