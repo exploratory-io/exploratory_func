@@ -550,7 +550,6 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, d = NULL, 
       }
     })
   }
-
   do_on_each_group(df, ttest_each, name = "model", with_unnest = FALSE)
 }
 
@@ -716,17 +715,7 @@ exp_wilcox <- function(df, var1, var2, func2 = NULL, ...) {
       }
     })
   }
-
-  # Calculation is executed in each group.
-  # Storing the result in this tmp_col and
-  # unnesting the result.
-  # If the original data frame is grouped by "tmp",
-  # overwriting it should be avoided,
-  # so avoid_conflict is used here.
-  tmp_col <- avoid_conflict(colnames(df), "model")
-  ret <- df %>%
-    dplyr::do_(.dots = setNames(list(~each_func(.)), tmp_col))
-  ret
+  do_on_each_group(df, each_func, name = "model", with_unnest = FALSE)
 }
 
 #' @export
@@ -883,17 +872,7 @@ exp_anova <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, f = NULL, 
       }
     })
   }
-
-  # Calculation is executed in each group.
-  # Storing the result in this tmp_col and
-  # unnesting the result.
-  # If the original data frame is grouped by "tmp",
-  # overwriting it should be avoided,
-  # so avoid_conflict is used here.
-  tmp_col <- avoid_conflict(colnames(df), "model")
-  ret <- df %>%
-    dplyr::do_(.dots = setNames(list(~anova_each(.)), tmp_col))
-  ret
+  do_on_each_group(df, anova_each, name = "model", with_unnest = FALSE)
 }
 
 #' @export
@@ -1046,17 +1025,7 @@ exp_kruskal <- function(df, var1, var2, func2 = NULL, ...) {
       }
     })
   }
-
-  # Calculation is executed in each group.
-  # Storing the result in this tmp_col and
-  # unnesting the result.
-  # If the original data frame is grouped by "tmp",
-  # overwriting it should be avoided,
-  # so avoid_conflict is used here.
-  tmp_col <- avoid_conflict(colnames(df), "model")
-  ret <- df %>%
-    dplyr::do_(.dots = setNames(list(~each_func(.)), tmp_col))
-  ret
+  do_on_each_group(df, each_func, name = "model", with_unnest = FALSE)
 }
 
 tidy.kruskal_exploratory <- function(x, type="model", conf_level=0.95) {
