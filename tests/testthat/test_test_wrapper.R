@@ -243,8 +243,11 @@ test_that("test exp_chisq with integer", {
 test_that("test exp_chisq with group_by", {
   ret <- mtcars %>% group_by(vs) %>% exp_chisq(gear, carb, value=cyl)
   observed <- ret %>% tidy_rowwise(model, type="observed")
+  expect_true("vs" %in% colnames(observed))
   summary <- ret %>% glance_rowwise(model)
+  expect_true("vs" %in% colnames(summary))
   residuals <- ret %>% tidy_rowwise(model, type="residuals")
+  expect_true("vs" %in% colnames(residuals))
 })
 
 test_that("test exp_chisq with group_by with single class category in one of the groups", {

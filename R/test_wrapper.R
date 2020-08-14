@@ -311,17 +311,7 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
     class(model) <- c("chisq_exploratory", class(model))
     model
   }
-
-  # Calculation is executed in each group.
-  # Storing the result in this tmp_col and
-  # unnesting the result.
-  # If the original data frame is grouped by "tmp",
-  # overwriting it should be avoided,
-  # so avoid_conflict is used here.
-  tmp_col <- avoid_conflict(colnames(df), "model") #TODO: Conflict should be an issue only with group_by columns.
-  ret <- df %>%
-    dplyr::do_(.dots = setNames(list(~chisq.test_each(.)), tmp_col))
-  ret
+  do_on_each_group(df, chisq.test_each, name = "model", with_unnest = FALSE)
 }
 
 #' @export
