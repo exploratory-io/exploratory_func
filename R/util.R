@@ -1373,6 +1373,14 @@ do_on_each_group_2 <- function(df, func1, func2, params1 = quote(list()), params
   ret <- df %>%
     # UQ and UQ(get_expr()) evaluates those variables
     dplyr::do(UQ(name1) := UQ(rlang::get_expr(call1)), UQ(name2) := UQ(rlang::get_expr(call2)))
+  # Pass on original group_by columns via rowwise().
+  # tidy_rowwise() etc. expect this info.
+  grouped_cols <- grouped_by(df)
+  if (length(grouped_cols) > 0) {
+    ret <- ret %>% dplyr::rowwise(grouped_cols)
+  } else {
+    ret <- ret %>% dplyr::rowwise()
+  }
   ret
 }
 

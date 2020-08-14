@@ -2,10 +2,10 @@ context("test exp_survival")
 
 test_that("test exp_survival", {
   # log simulation data
-  data <- structure(list(weeks_on_service = c(18, 13, 1, 7, 1, 1, 2, 1,
-                                              1, 1), is_churned = c(TRUE, TRUE, FALSE, TRUE, FALSE, TRUE, TRUE,
-                                                                    TRUE, FALSE, TRUE), os = structure(c(1L, 2L, 1L, 1L, 2L, 2L,
-                                                                                                         2L, 2L, 2L, 1L), .Label = c("Windows", "Mac"), class = "factor"),
+  data <- tibble::tibble(weeks_on_service = c(18, 13, 1, 7, 1, 1, 2, 1, 1, 1),
+                         is_churned = c(TRUE, TRUE, FALSE, TRUE, FALSE, TRUE, TRUE, TRUE, FALSE, TRUE),
+                         os = structure(c(1L, 2L, 1L, 1L, 2L, 2L, 2L, 2L, 2L, 1L),
+                                        .Label = c("Windows", "Mac"), class = "factor"),
                          country = structure(c(13L, 82L, 27L, 82L, 82L, 27L, 13L,
                                                29L, 1L, 82L), .Label = c("Japan", "Afghanistan", "Argentina",
                                                                          "Australia", "Austria", "Belgium", "Benin", "Bermuda", "Bolivia",
@@ -24,8 +24,7 @@ test_that("test exp_survival", {
                                                                          "Spain", "Sri Lanka", "Sweden", "Switzerland", "Taiwan",
                                                                          "Tajikistan", "Thailand", "Trinidad and Tobago", "Turkey",
                                                                          "Ukraine", "United Arab Emirates", "United Kingdom", "United States",
-                                                                         "Uruguay", "Venezuela", "Vietnam", "Zambia"), class = "factor")),
-                    row.names = c(NA,-10L), class = c("tbl_df", "tbl", "data.frame"), .Names = c("weeks_on_service","is_churned", "os", "country"))
+                                                                         "Uruguay", "Venezuela", "Vietnam", "Zambia"), class = "factor"))
   data <- data %>% mutate(start_date = as.Date("2018-09-15")+lubridate::weeks(weeks_on_service))
   data <- data %>% mutate(end_date = start_date+lubridate::weeks(weeks_on_service))
   data$end_date[[3]] <- NA #set NAs
@@ -80,5 +79,12 @@ test_that("test exp_survival", {
   ret1 <- ret %>% tidy_rowwise(model1)
   ret2 <- ret %>% tidy_rowwise(model2)
   ret3 <- ret %>% glance_rowwise(model2)
+
+  # Make sure group_by column is kept in the outout.
+  data4 <- data %>% group_by(`o s`)
+  ret <- data4 %>% exp_survival(`weeks on service`, `is churned`)
+  ret1 <- ret %>% tidy_rowwise(model1)
+  expect_true("o s" %in% colnames(ret1))
+
 
 })
