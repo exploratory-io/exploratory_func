@@ -1124,6 +1124,12 @@ model_stats <- function(df, pretty.name = FALSE, ...){
     }
   }
 
+  # broom::glance.coxph output has both n and nobs which seems to have the same info.
+  # Remove nobs in such cases to avoid duplicate column names as the result of the column name normalization below.
+  if ("n" %in% colnames(ret) && "nobs" %in% colnames(ret)) {
+    ret <- ret %>% dplyr::select(-nobs)
+  }
+
   # adjust column name style
   if(pretty.name){
     colnames(ret)[colnames(ret) == "r.squared"] <- "R Squared"
