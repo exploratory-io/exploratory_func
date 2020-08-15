@@ -1116,6 +1116,9 @@ glance.lm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
     # Note column might not exist. Rename if it is there.
     colnames(ret)[colnames(ret) == "note"] <- "Note"
   }
+  if (!is.null(ret$nobs)) { # glance.glm's newly added nobs seems to be same as Number of Rows. Suppressing it for now.
+    ret <- ret %>% dplyr::select(-nobs)
+  }
   ret
 }
 

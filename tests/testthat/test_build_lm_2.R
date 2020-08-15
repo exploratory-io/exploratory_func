@@ -21,6 +21,10 @@ test_that("binary prediction with character target column", {
                               model_type = "glm", smote=FALSE, with_marginal_effects=TRUE, with_marginal_effects_confint=TRUE)
   ret <- model_data %>% tidy_rowwise(model, type="vif")
   ret <- model_data %>% glance_rowwise(model, pretty.name=TRUE)
+  expect_equal(colnames(ret), c("AUC","F Score","Accuracy Rate","Misclassification Rate","Precision",               
+                                "Recall","P Value","Number of Rows","Number of Rows for TRUE","Number of Rows for FALSE",
+                                "Log Likelihood","AIC","BIC","Residual Deviance","Null Deviance",
+                                "DF for Null Model","Residual DF"))
   expect_equal(ret$`Number of Rows`, 34)
   expect_equal(ret$`Number of Rows for TRUE`, 4) # This ends up to be 4 after doubling
   expect_equal(ret$`Number of Rows for FALSE`, 30) # This ends up to be 30 after doubling and removing NA rows.
