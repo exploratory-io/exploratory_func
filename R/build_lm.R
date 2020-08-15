@@ -1566,18 +1566,27 @@ augment.lm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "
 
 #' @export
 augment.glm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "training", ...) {
-  se <- !("negbin" %in% class(x)) # Avoid standard error calculation for negative binomial, since it most likely gives error.
-
   if ("error" %in% class(x)) {
     ret <- data.frame()
     return(ret)
   }
   if(!is.null(newdata)) {
-    ret <- broom:::augment.glm(x, data = data, newdata = newdata, se = se, ...)
+    ret <- tryCatch({
+      broom:::augment.glm(x, data = data, newdata = newdata, se = TRUE, ...)
+    }, error = function(e){
+      # se=TRUE throws error that looks like "singular matrix 'a' in solve",
+      # in some subset of cases of perfect collinearity.
+      # Try recovering from it by running with se=FALSE.
+      broom:::augment.glm(x, data = data, newdata = newdata, se = FALSE, ...)
+    })
   } else if (!is.null(data)) {
     ret <- switch(data_type,
-      training = { # Call broom:::augment.lm as is
-        broom:::augment.glm(x, data = data, newdata = newdata, se = se, ...)
+      training = {
+        tryCatch({
+          broom:::augment.glm(x, data = data, newdata = newdata, se = TRUE, ...)
+        }, error = function(e){
+          broom:::augment.glm(x, data = data, newdata = newdata, se = FALSE, ...)
+        })
       },
       test = {
         # Augment data with already predicted result in the model.
@@ -1587,7 +1596,11 @@ augment.glm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = 
       })
   }
   else {
-    ret <- broom:::augment.glm(x, se = se, ...)
+    ret <- tryCatch({
+      broom:::augment.glm(x, se = TRUE, ...)
+    }, error = function(e){
+      broom:::augment.glm(x, se = FALSE, ...)
+    })
   }
   # Rename columns back to the original names.
   names(ret) <- coalesce(x$terms_mapping[names(ret)], names(ret))
