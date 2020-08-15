@@ -190,7 +190,7 @@ test_that("predict lm with new data", {
 
   model_data <- fit_df %>% dplyr::group_by(model) %>% build_lm(num1 ~ num2, group_cols = "model")
 
-  fit <- add_df %>% dplyr::group_by(group) %>% add_prediction(model_df = model_data, se=TRUE)
+  fit <- add_df %>% dplyr::group_by(group) %>% add_prediction(model_df = model_data)
 
   expect_equal(nrow(fit), 20 * 2)
   expect_equal(names(fit), c("model.group", "group", "num1", "num2", "predicted_value", "standard_error", "conf_low", "conf_high", "residual"))
