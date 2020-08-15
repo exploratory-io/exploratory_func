@@ -1573,14 +1573,11 @@ augment.glm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = 
     return(ret)
   }
   if(!is.null(newdata)) {
-    # Calling broom:::augment.glm fails with 'NextMethod' called from an anonymous function
-    # It seems augment.glm is only calling NextMethod, which is falling back to broom:::augment.lm.
-    # So, we are just directly calling augment.lm here.
-    ret <- broom:::augment.lm(x, data = data, newdata = newdata, se = se, ...)
+    ret <- broom:::augment.glm(x, data = data, newdata = newdata, se = se, ...)
   } else if (!is.null(data)) {
     ret <- switch(data_type,
       training = { # Call broom:::augment.lm as is
-        broom:::augment.lm(x, data = data, newdata = newdata, se = se, ...)
+        broom:::augment.glm(x, data = data, newdata = newdata, se = se, ...)
       },
       test = {
         # Augment data with already predicted result in the model.
@@ -1590,7 +1587,7 @@ augment.glm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = 
       })
   }
   else {
-    ret <- broom:::augment.lm(x, se = se, ...)
+    ret <- broom:::augment.glm(x, se = se, ...)
   }
   # Rename columns back to the original names.
   names(ret) <- coalesce(x$terms_mapping[names(ret)], names(ret))
