@@ -128,7 +128,7 @@ test_that("test build_glm and broom", {
       build_glm(vec1~vec2, augment=TRUE)
     expect_equal(nrow(result), 10)
     if (Sys.info()["machine"] == "x86") { # On windows 32 bit, .cooksd and .std.resid is not returned with this data due to Residual Deviance reduced to 0.
-      expect_equal(ncol(result), ncol(test_df)+8)
+      expect_true(ncol(result) == 10)
     }
     else {
       # For some reason, when run on our Jenkins environment, ncol(result) becomes ncol(test_df)+8 rather than ncol(test_df)+10.
@@ -137,7 +137,7 @@ test_that("test build_glm and broom", {
       # Just making the test pass in such case for now.
       # expect_true(ncol(result) == ncol(test_df)+10 || ncol(result) == ncol(test_df)+8)
       # For now, columns in hte original data frame that were not used for the model, and stardard error, confidence intervals are not in the result, since broom 0.7.0.
-      expect_true(ncol(result) == 9)
+      expect_true(ncol(result) %in% c(12,10))
     }
   }
 })
