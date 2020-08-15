@@ -510,7 +510,9 @@ test_that("GLM - Negative Binomial Destribution with test_rate", {
     expect_equal(test_rownum, nrow(pred_test))
 
     expected_cols <- c("Carrier Name", "DISTANCE", "ARR_TIME", "DERAY_TIME",
-                       "predicted_value", "residuals", "standardised_residuals", "hat",
+                       "predicted_value",
+                       "standard_error","conf_low","conf_high",
+                       "residuals", "standardised_residuals", "hat",
                        "residual_standard_deviation", "cooks_distance", "predicted_response")
     expect_equal(colnames(pred_training), expected_cols)
     expected_cols <- c("Carrier Name", "DISTANCE", "ARR_TIME", "DERAY_TIME", "predicted_value", "standard_error",
@@ -545,6 +547,7 @@ test_that("Group GLM - Negative Binomial Destribution with test_rate", {
                  test_nrows)
 
     expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "predicted_value",
+                       "standard_error","conf_low","conf_high",
                        "residuals", "standardised_residuals", "hat", "residual_standard_deviation",
                        "cooks_distance", "predicted_response")
     expect_equal(colnames(pred_training), expected_cols)
@@ -582,7 +585,7 @@ test_that("Logistic Regression with test_rate", {
     expected_cols <- c("CANCELLED X", "Carrier Name", "ARR_TIME", "DERAY_TIME",
                        "predicted_value",
                        "standard_error", "conf_low", "conf_high",
-                       "standardised_residuals", "hat",
+                       "residuals", "standardised_residuals", "hat",
                        "residual_standard_deviation", "cooks_distance", "predicted_response")
     expect_equal(colnames(pred_training), expected_cols)
     expected_cols <- c("CANCELLED X", "Carrier Name", "ARR_TIME", "DERAY_TIME", "predicted_value", "standard_error",
@@ -617,10 +620,10 @@ test_that("Group Logistic Regression with test_rate", {
     expect_equal(pred_test %>% summarize(n=n()) %>% `[[`("n"),
                  test_nrows)
 
-    # Since broom 0.7.0, "residuals" seems to be dropped.
+    # Since broom 0.7.0, I sometimes see "residuals" missing here, but not consistently. Will keep watching.
     expected_cols <- c("klass", "CANCELLED X", "ARR_TIME", "predicted_value",
                        "standard_error", "conf_low", "conf_high",
-                       "standardised_residuals", "hat", "residual_standard_deviation",
+                       "residuals", "standardised_residuals", "hat", "residual_standard_deviation",
                        "cooks_distance", "predicted_response")
     expect_equal(colnames(pred_training), expected_cols)
 
