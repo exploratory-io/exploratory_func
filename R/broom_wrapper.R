@@ -1,31 +1,109 @@
+# For backward compatibilities for broom's rowwise tidier, which was dropped at broom 0.7.0.
+#' @export
+glance_rowwise <- function(df, model, ...) {
+  # Intended to do the same the following line. 
+  # summarize(df, broom::glance(!!rlang::enquo(model), ...))
+  model_col <- tidyselect::vars_select(names(df), !! rlang::enquo(model))
+  group_cols <- grouped_by(df)
+  ret <- df %>% dplyr::ungroup() %>% 
+    # res[group_cols]<-NULL is a dirty hack to avoid column name conflict at unnest.
+    dplyr::mutate(.res=purrr::map(!!rlang::sym(model_col), function(x){res<-broom::glance(x, ...);res[group_cols]<-NULL;res})) %>%
+    dplyr::select(!!!rlang::syms(group_cols), .res) %>%
+    tidyr::unnest(.res)
+  if (length(group_cols) > 0) {
+    ret <- ret %>% dplyr::group_by(!!!rlang::syms(group_cols))
+  }
+  ret
+}
+
+#' @export
+tidy_rowwise <- function(df, model, ...) {
+  # summarize(df, broom::tidy(!!rlang::enquo(model), ...))
+  # The above was the originally intended code, but this gave error like below with group_by case.
+  #
+  # x subscript out of bounds
+  # Input `..1` is `broom::tidy(model, ...)`.
+  #
+  # Thus, ending up doing the same with purrr::map. It seems this is more stable as of now.
+  model_col <- tidyselect::vars_select(names(df), !! rlang::enquo(model))
+  group_cols <- grouped_by(df)
+  ret <- df %>% dplyr::ungroup() %>% 
+    # res[group_cols]<-NULL is a dirty hack to avoid column name conflict at unnest. Without it, test_stats_wrapper.R fails. TODO: We should fix do_on_each_group instead of this.
+    dplyr::mutate(.res=purrr::map(!!rlang::sym(model_col), function(x){res<-broom::tidy(x, ...);res[group_cols]<-NULL;res})) %>%
+    dplyr::select(!!!rlang::syms(group_cols), .res) %>%
+    tidyr::unnest(.res)
+  if (length(group_cols) > 0) {
+    ret <- ret %>% dplyr::group_by(!!!rlang::syms(group_cols))
+  }
+  ret
+}
+
+#' @export
+augment_rowwise <- function(df, model, ...) {
+  # Intended to do the same the following line. 
+  # summarize(df, broom::augment(!!rlang::enquo(model), ...))
+  model_col <- tidyselect::vars_select(names(df), !! rlang::enquo(model))
+  group_cols <- grouped_by(df)
+  ret <- df %>% dplyr::ungroup() %>% 
+    # res[group_cols]<-NULL is a dirty hack to avoid column name conflict at unnest.
+    dplyr::mutate(.res=purrr::map(!!rlang::sym(model_col), function(x){res<-broom::augment(x, ...);res[group_cols]<-NULL;res})) %>%
+    dplyr::select(!!!rlang::syms(group_cols), .res) %>%
+    tidyr::unnest(.res)
+  if (length(group_cols) > 0) {
+    ret <- ret %>% dplyr::group_by(!!!rlang::syms(group_cols))
+  }
+  ret
+}
+
+# augment_rowwise with data argument.
+# Used only from augment_kmeans for now.
+augment_rowwise_data <- function(df, model, data, ...) {
+  # Intended to do the same the following line. 
+  # summarize(df, broom::augment(!!rlang::enquo(model), ...))
+  model_col <- tidyselect::vars_select(names(df), !! rlang::enquo(model))
+  data_col <- tidyselect::vars_select(names(df), !! rlang::enquo(data))
+  group_cols <- grouped_by(df)
+  ret <- df %>% dplyr::ungroup() %>% 
+    # res[group_cols]<-NULL is a dirty hack to avoid column name conflict at unnest.
+    dplyr::mutate(.res=purrr::map2(!!rlang::sym(model_col), !!rlang::sym(data_col), function(m, d){res<-broom::augment(m, data=d, ...);res[group_cols]<-NULL;res})) %>%
+    dplyr::select(!!!rlang::syms(group_cols), .res) %>%
+    tidyr::unnest(.res)
+  if (length(group_cols) > 0) {
+    ret <- ret %>% dplyr::group_by(!!!rlang::syms(group_cols))
+  }
+  ret
+}
+
 #' glance for lm
 #' @export
-glance_lm <- broom::glance
+glance_lm <- glance_rowwise
 
 #' glance for glm
 #' @export
-glance_glm <- broom::glance
+glance_glm <- glance_rowwise
 
 #' glance for kmeans
 #' @export
-glance_kmeans <- broom::glance
+glance_kmeans <- glance_rowwise
 
 #' tidy for lm
 #' @export
-tidy_lm <- broom::tidy
+tidy_lm <- tidy_rowwise
 #' tidy for glm
 #' @export
-tidy_glm <- broom::tidy
+tidy_glm <- tidy_rowwise
 #' tidy for kmeans
 #' @export
-tidy_kmeans <- broom::tidy
+tidy_kmeans <- tidy_rowwise
 
 #' augment for lm
 #' @export
-augment_lm <- broom::augment
+augment_lm <- augment_rowwise
 #' augment for glm
 #' @export
-augment_glm <- broom::augment
+augment_glm <- augment_rowwise
+
+
 #' augment for kmeans
 #' @export
 augment_kmeans <- function(df, model, data){
@@ -40,9 +118,8 @@ augment_kmeans <- function(df, model, data){
     stop(paste(data_col, "is not in column names"), sep=" ")
   }
   if (is.null(attr(df$model[[1]], "subject_colname"))) { # Distinguish between columns case ank skv case.
-    # use do.call to evaluate data_col from a variable
-    augment_func <- get("augment", asNamespace("broom"))
-    ret <- do.call(augment_func, list(df, model_col, data=data_col))
+    # use do.call to evaluate data_col from a variable. # TODO: Does this reason still make sense?
+    ret <- do.call(augment_rowwise_data, list(df, model_col, data=data_col))
     # cluster column is factor labeled "1", "2"..., so convert it to integer to avoid confusion
     ret[[ncol(ret)]] <- ret[[ncol(ret)]]
   }
@@ -180,6 +257,7 @@ add_prediction <- function(df, model_df, conf_int = 0.95, ...){
   ret <- add_confint(ret, conf_int)
   colnames(ret)[colnames(ret) == ".fitted"] <- avoid_conflict(colnames(ret), "predicted_value")
   colnames(ret)[colnames(ret) == ".se.fit"] <- avoid_conflict(colnames(ret), "standard_error")
+  colnames(ret)[colnames(ret) == ".resid"] <- avoid_conflict(colnames(ret), "residual")
 
   ret
 }
@@ -264,7 +342,7 @@ cluster_info <- function(df){
 kmeans_info <- function(df){
   validate_empty_data(df)
 
-  ret <- broom::glance(df, model)
+  ret <- glance_rowwise(df, model)
   colnames(ret)[colnames(ret) == "totss"] <- "Total Sum of Squares"
   colnames(ret)[colnames(ret) == "tot.withinss"] <- "Total Sum of Squares within Clusters"
   colnames(ret)[colnames(ret) == "betweenss"] <- "Total Sum of Squares between Clusters"
@@ -435,6 +513,20 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
       } else {
         paste0("broom::augment(m, data = df, ", aug_args, ")")
       }
+      # From broom 0.7.0 augment.lm and augment.glm, if data argument is different from the one inside the model due to, for example, NA rows, error like following is raised.
+      #
+      # Assigned data `predict(x, newdata, type = type.predict) %>% unname()` must be compatible with existing data.
+      #
+      # To avoid it, do not specify data argument. Let's do this only for glm since, for example, ranger needs it to get actual prediction on training data instead of prediction on OOB data.
+      # Another option for workaround was to use newdata argument. But result from it does not have metrics like residuals, standardised_residuals, hat, residual_standard_deviation, or cooks_distance.
+      # Drawback of no argument is, the result misses columns in the original data that are not used for the model.
+      if (class(df$model[[1]])[[1]] %in% c("glm", "glm_exploratory_0", "lm", "lm_exploratory_0")) {
+        aug_fml <- if(aug_args == ""){
+          "broom::augment(m)"
+        } else {
+          paste0("broom::augment(m, ", aug_args, ")")
+        }
+      }
       augmented <- df %>%
         dplyr::ungroup() %>%
         dplyr::filter(purrr::flatten_lgl(purrr::map(model, function(x){"error" %nin% class(x)}))) %>%  # Since this errors out under rowwise, should be done after ungroup().
@@ -526,6 +618,7 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
     ret[[conf_high_colname]] <- get_confint(ret[[".fitted"]], ret[[".se.fit"]], conf_int = higher)
 
     # move confidece interval columns next to standard error
+    ret <- move_col(ret, '.se.fit', which(colnames(ret) == ".fitted") + 1)
     ret <- move_col(ret, conf_low_colname, which(colnames(ret) == ".se.fit") + 1)
     ret <- move_col(ret, conf_high_colname, which(colnames(ret) == conf_low_colname) + 1)
   }
@@ -890,10 +983,10 @@ model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
     } else {
       # broom::tidy uses confint.lm and it uses profile, so "profile" is used in conf_int to swith how to get confint
       profile <- conf_int == "profile"
-      broom::tidy(df, model, conf.int = profile, pretty.name = pretty.name, ...)
+      tidy_rowwise(df, model, conf.int = profile, pretty.name = pretty.name, ...)
     }
   } else {
-    broom::tidy(df, model, pretty.name = pretty.name, ...)
+    tidy_rowwise(df, model, pretty.name = pretty.name, ...)
   }
 
   if ("glm" %in% class(df$model[[1]])) {
@@ -956,7 +1049,7 @@ model_coef <- function(df, pretty.name = FALSE, conf_int = NULL, ...){
 model_stats <- function(df, pretty.name = FALSE, ...){
   validate_empty_data(df)
 
-  ret <- broom::glance(df, model, pretty.name = pretty.name, ...)
+  ret <- glance_rowwise(df, model, pretty.name = pretty.name, ...)
 
   formula_vars <- if (any(c("multinom", "lm", "glm") %in% class(df$model[[1]]))) {
     # lm, glm (including logistic), multinom has a formula class attribute $terms.
@@ -1030,6 +1123,12 @@ model_stats <- function(df, pretty.name = FALSE, ...){
     }
   }
 
+  # broom::glance.coxph output has both n and nobs which seems to have the same info.
+  # Remove nobs in such cases to avoid duplicate column names as the result of the column name normalization below.
+  if ("n" %in% colnames(ret) && "nobs" %in% colnames(ret)) {
+    ret <- ret %>% dplyr::select(-nobs)
+  }
+
   # adjust column name style
   if(pretty.name){
     colnames(ret)[colnames(ret) == "r.squared"] <- "R Squared"
@@ -1044,6 +1143,7 @@ model_stats <- function(df, pretty.name = FALSE, ...){
     # for glm
     colnames(ret)[colnames(ret) == "null.deviance"] <- "Null Deviance"
     colnames(ret)[colnames(ret) == "df.null"] <- "DF for Null Model"
+    colnames(ret)[colnames(ret) == "nobs"] <- "Number of Rows"
     # for multinom
     colnames(ret)[colnames(ret) == "edf"] <- "Effective Number of DF"
     # for coxph
@@ -1081,6 +1181,7 @@ model_stats <- function(df, pretty.name = FALSE, ...){
     # for glm
     colnames(ret)[colnames(ret) == "null.deviance"] <- "null_deviance"
     colnames(ret)[colnames(ret) == "df.null"] <- "df_for_null_model"
+    colnames(ret)[colnames(ret) == "nobs"] <- "n" # Making it consistent with coxph
     # for multinom
     colnames(ret)[colnames(ret) == "edf"] <- "effective_number_of_df"
     # for coxph
@@ -1257,7 +1358,7 @@ do_survfit <- function(df, time, status, start_time = NULL, end_time = NULL, tim
     fml <- as.formula(paste0("survival::Surv(`", substitute(time), "`,`", substitute(status), "`) ~ 1"))
   }
 
-  ret <- df %>% build_model(model_func = survival::survfit, formula = fml, ...) %>% broom::tidy(model)
+  ret <- df %>% build_model(model_func = survival::survfit, formula = fml, ...) %>% tidy_rowwise(model)
 
   # for better viz, add time=0 row for each group when it is not already there.
   add_time_zero_row_each <- function(df) {
@@ -1288,7 +1389,7 @@ do_survfit <- function(df, time, status, start_time = NULL, end_time = NULL, tim
 
 #' tidy after converting model to confint
 #' @export
-model_confint <- function(df, ...){
+model_confint <- function(df, ...){ # TODO: Not used from anywhere, and the output does not look clean since broom 0.7.0. Delete at some point.
   validate_empty_data(df)
 
   caller <- match.call()

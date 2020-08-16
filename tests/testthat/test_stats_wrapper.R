@@ -1,7 +1,6 @@
 context("tests for wrappers of stats package")
 
 spread_test_df <- data.frame(var1 = c(1, 3, 2, NA), var2 = c(1, 3, 2, 10))
-
 test_that("do_dist with NA results", {
   data <- data.frame(
     x = rep(letters[1:3], 3),
@@ -67,7 +66,7 @@ test_that("do_cor with zero correlations", {
   # Steps to produce the output
   df <- data.frame(x=c(1,1,0,0),y=c(1,0,1,0),z=c(T,T,F,F))
   model_df <- df %>% do_cor(`x`, `y`, `z`, method = "pearson", distinct = FALSE, diag = TRUE, return_type = "model")
-  res <- model_df %>% tidy(model, type='cor')
+  res <- model_df %>% tidy_rowwise(model, type='cor')
   expect_equal(nrow(res), 9) # Make sure rows for all 9 combinations are there even though some have 0 correlation values.
 })
 
@@ -75,14 +74,14 @@ test_that("do_cor with only lower triangle", {
   # Steps to produce the output
   df <- data.frame(x=c(1,1,0,0),y=c(1,0,1,0),z=c(T,T,F,F))
   model_df <- df %>% do_cor(`x`, `y`, `z`, method = "pearson", distinct = TRUE, diag = TRUE, return_type = "model")
-  res <- model_df %>% tidy(model, type='cor')
+  res <- model_df %>% tidy_rowwise(model, type='cor')
   expect_equal(nrow(res), 6) # Lower triangle elements with diagonal elements.
 })
 
 test_that("do_cor should skip group with only one row.", {
   df <- data.frame(x=c(1,1,0,0),y=c(1,0,1,0),z=c(T,T,T,F))
   model_df <- df %>% group_by(z) %>% do_cor(`x`, `y`, method = "pearson", distinct = FALSE, diag = TRUE, return_type = "model")
-  res <- model_df %>% tidy(model, type='cor')
+  res <- model_df %>% tidy_rowwise(model, type='cor')
   # verify that the group of z==F is skipped.
   expect_equal(nrow(res %>% filter(z==F)), 0)
 })
@@ -143,7 +142,7 @@ test_that("do_cor with NA values with model output", {
   colnames(melt_mat)[[2]] <- "Var 2"
 
   ret <- do_cor(melt_mat, skv = c("Var 2", "Var1", "value"), diag = TRUE, return_type = "model")
-  ret <- ret %>% tidy(model, type = "cor")
+  ret <- ret %>% tidy_rowwise(model, type = "cor")
 
   cor_ret <- cor(mat, use = "pairwise.complete.obs")
   melt_ret <- reshape2::melt(cor_ret)
@@ -176,9 +175,9 @@ test_that("test do_cor.cols with model output", {
   result <- spread_test_df %>%
     do_cor.cols(dplyr::starts_with("var"), return_type = "model")
   expect_equal(colnames(result), "model")
-  result_cor <- result %>% tidy(model, type = "cor")
+  result_cor <- result %>% tidy_rowwise(model, type = "cor")
   expect_equal(result_cor[["value"]], rep(1, 2))
-  result_data <- result %>% tidy(model, type = "data")
+  result_data <- result %>% tidy_rowwise(model, type = "data")
   expect_equal(colnames(result_data), c("var1", "var2"))
 })
 
@@ -206,10 +205,10 @@ test_that("test do_cor.cols for grouped df with model output", {
     %>%  dplyr::group_by(group)
     %>%  do_cor.cols(dplyr::starts_with("var"), return_type = "model"))
 
-  result_cor <- result %>% tidy(model)
+  result_cor <- result %>% tidy_rowwise(model)
   expect_equal(dim(result_cor), c(4, 4))
-  result_data <- result %>% tidy(model, type = "data")
-  expect_equal(colnames(result_data), c("var1", "var2", "group"))
+  result_data <- result %>% tidy_rowwise(model, type = "data")
+  expect_equal(colnames(result_data), c("group", "var1", "var2"))
 })
 
 test_that("test do_cor.kv for duplicated pair", {
@@ -222,25 +221,25 @@ test_that("test do_cor.kv for duplicated pair", {
 
 test_that("test do_cor.kv with model output", {
   result <- tidy_test_df %>%  do_cor.kv(cat, dim, val, return_type = "model")
-  result_cor <- result %>% tidy(model, type = "cor")
+  result_cor <- result %>% tidy_rowwise(model, type = "cor")
   expect_equal(ncol(result_cor), 3)
   expect_equal(result_cor[["cat.x"]], c("cat1", "cat2"))
   expect_equal(result_cor[["cat.y"]], c("cat2", "cat1"))
   expect_equal(result_cor[["value"]], replicate(2, 1))
-  result_data <- result %>% tidy(model, type = "data")
+  result_data <- result %>% tidy_rowwise(model, type = "data")
   expect_equal(colnames(result_data), c("cat", "dim", "val", "dim_na"))
 })
 
 test_that("test do_cor.kv with group_by with model output", {
   result <- tidy_group_test_df %>% group_by(grp) %>% do_cor.kv(cat, dim, val, return_type = "model")
-  result_cor <- result %>% tidy(model, type = "cor")
+  result_cor <- result %>% tidy_rowwise(model, type = "cor")
   expect_equal(ncol(result_cor), 4)
   expect_equal(result_cor[["grp"]], c("A", "A", "B", "B"))
   expect_equal(result_cor[["cat.x"]], c("cat1", "cat2", "cat1", "cat2"))
   expect_equal(result_cor[["cat.y"]], c("cat2", "cat1", "cat2", "cat1"))
   expect_equal(result_cor[["value"]], replicate(4, 1))
-  result_data <- result %>% tidy(model, type = "data")
-  expect_equal(colnames(result_data), c("cat", "dim", "val", "dim_na", "grp")) # TODO: group column comes as the last column, but it might be easier to understand if it comes first.
+  result_data <- result %>% tidy_rowwise(model, type = "data")
+  expect_equal(colnames(result_data), c("grp", "cat", "dim", "val", "dim_na")) # TODO: group column comes as the last column, but it might be easier to understand if it comes first.
 })
 
 test_that("test do_cor.kv for grouped data frame as subject error", {

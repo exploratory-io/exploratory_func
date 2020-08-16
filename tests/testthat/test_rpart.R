@@ -12,35 +12,35 @@ if (!exists("flight")) {
 
 test_that("exp_rpart regression", {
   model_df <- flight %>% exp_rpart(`ARR DELAY`,`DEP DELAY`)
-  res <- model_df %>% tidy(model, type="importance")
-  res <- model_df %>% tidy(model, type="evaluation", pretty.name=TRUE)
-  res <- model_df %>% tidy(model, type="scatter")
+  res <- model_df %>% tidy_rowwise(model, type="importance")
+  res <- model_df %>% tidy_rowwise(model, type="evaluation", pretty.name=TRUE)
+  res <- model_df %>% tidy_rowwise(model, type="scatter")
 })
 
 test_that("exp_rpart binary classification", {
   flight2 <- flight %>% filter(`ORIGIN STATE ABR` %in% c("CA","NY"))
   model_df <- flight2 %>% exp_rpart(`ORIGIN STATE ABR`,`DEP DELAY`, smote=T)
-  res <- model_df %>% tidy(model, type="importance")
-  res <- model_df %>% tidy(model, type="evaluation", pretty.name=TRUE)
-  res <- model_df %>% tidy(model, type="evaluation_by_class", pretty.name=TRUE)
-  res <- model_df %>% tidy(model, type="conf_mat")
+  res <- model_df %>% tidy_rowwise(model, type="importance")
+  res <- model_df %>% tidy_rowwise(model, type="evaluation", pretty.name=TRUE)
+  res <- model_df %>% tidy_rowwise(model, type="evaluation_by_class", pretty.name=TRUE)
+  res <- model_df %>% tidy_rowwise(model, type="conf_mat")
 })
 
 test_that("exp_rpart binary classification with logical", {
   model_df <- flight %>% exp_rpart(`delay ed`,`DEP DELAY`, smote=T)
-  res <- model_df %>% tidy(model, type="importance")
-  res <- model_df %>% tidy(model, type="evaluation", pretty.name=TRUE)
-  res <- model_df %>% tidy(model, type="evaluation_by_class", pretty.name=TRUE)
-  res <- model_df %>% tidy(model, type="conf_mat")
+  res <- model_df %>% tidy_rowwise(model, type="importance")
+  res <- model_df %>% tidy_rowwise(model, type="evaluation", pretty.name=TRUE)
+  res <- model_df %>% tidy_rowwise(model, type="evaluation_by_class", pretty.name=TRUE)
+  res <- model_df %>% tidy_rowwise(model, type="conf_mat")
 })
 
 test_that("exp_rpart multiclass classification", {
   flight2 <- flight %>% filter(`ORIGIN STATE ABR` %in% c("CA","NY","TX"))
   model_df <- flight2 %>% exp_rpart(`ORIGIN STATE ABR`,`DEP DELAY`)
-  res <- model_df %>% tidy(model, type="importance")
-  res <- model_df %>% tidy(model, type="evaluation", pretty.name=TRUE)
-  res <- model_df %>% tidy(model, type="evaluation_by_class", pretty.name=TRUE)
-  res <- model_df %>% tidy(model, type="conf_mat")
+  res <- model_df %>% tidy_rowwise(model, type="importance")
+  res <- model_df %>% tidy_rowwise(model, type="evaluation", pretty.name=TRUE)
+  res <- model_df %>% tidy_rowwise(model, type="evaluation_by_class", pretty.name=TRUE)
+  res <- model_df %>% tidy_rowwise(model, type="conf_mat")
 })
 
 test_that("exp_rpart regression", {

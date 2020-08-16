@@ -117,7 +117,7 @@ test_that("test build_glm and broom tidy", {
   if(requireNamespace("broom")){
     result <- test_df %>%
         build_glm(vec1~vec2) %>%
-        broom::tidy(model)
+        tidy_rowwise(model)
     expect_equal(dim(result)[[1]], 2)
   }
 })
@@ -128,14 +128,16 @@ test_that("test build_glm and broom", {
       build_glm(vec1~vec2, augment=TRUE)
     expect_equal(nrow(result), 10)
     if (Sys.info()["machine"] == "x86") { # On windows 32 bit, .cooksd and .std.resid is not returned with this data due to Residual Deviance reduced to 0.
-      expect_equal(ncol(result), ncol(test_df)+8)
+      expect_true(ncol(result) == 10)
     }
     else {
       # For some reason, when run on our Jenkins environment, ncol(result) becomes ncol(test_df)+8 rather than ncol(test_df)+10.
       # Not sure why since it does not reproduce when the operations for this test is individually run on the docker image.
       # May be the same situation as windows 32 bit is happening.
       # Just making the test pass in such case for now.
-      expect_true(ncol(result) == ncol(test_df)+10 || ncol(result) == ncol(test_df)+8)
+      # expect_true(ncol(result) == ncol(test_df)+10 || ncol(result) == ncol(test_df)+8)
+      # For now, columns in hte original data frame that were not used for the model, and stardard error, confidence intervals are not in the result, since broom 0.7.0.
+      expect_true(ncol(result) %in% c(12,10))
     }
   }
 })
@@ -144,7 +146,7 @@ test_that("test build_kmeans.cols and broom::tidy", {
   if(requireNamespace("broom")){
     result <- test_df %>%
       build_kmeans.cols(vec1, vec2, rand, centers=2, augment=FALSE) %>%
-      broom::tidy(model)
+      tidy_rowwise(model)
     expect_equal(dim(result)[[1]], 2)
   }
 })
@@ -200,7 +202,7 @@ test_that("test build_kmeans.cols ignore NA rows with grouped", {
     result <- test_df %>%
       dplyr::group_by(group) %>%
       build_kmeans.cols(vec1, vec2, na, centers=1, keep.source=TRUE, augment=FALSE) %>%
-      broom::tidy(model)
+      tidy_rowwise(model)
     expect_equal(dim(result)[[1]], 2)
   }
 })
@@ -242,7 +244,7 @@ test_that("test build_kmeans.cols ignore NA rows with grouped and keep.source=FA
       test_df
       %>%  dplyr::group_by(group)
       %>%  build_kmeans.cols(vec1, vec2, na, centers=1, keep.source=FALSE, augment=FALSE)
-      %>%  broom::tidy(model))
+      %>%  tidy_rowwise(model))
     expect_equal(dim(result)[[1]], 2)
   }
 })

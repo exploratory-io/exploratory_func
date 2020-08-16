@@ -5,10 +5,10 @@ context("test prcomp functions")
 test_that("do_prcomp", {
   df <- mtcars %>% mutate(new_col = c(rep("A", n() - 10), rep("B", 10)))
   model_df <- do_prcomp(df, cyl, mpg, hp, max_nrow=30)
-  model_df %>% tidy(model, type="variances")
-  model_df %>% tidy(model, type="loadings")
-  model_df %>% tidy(model, type="biplot")
-  model_df %>% tidy(model, type="data")
+  model_df %>% tidy_rowwise(model, type="variances")
+  model_df %>% tidy_rowwise(model, type="loadings")
+  model_df %>% tidy_rowwise(model, type="biplot")
+  model_df %>% tidy_rowwise(model, type="data")
 })
 
 test_that("do_prcomp with strange column name", {
@@ -16,8 +16,8 @@ test_that("do_prcomp with strange column name", {
     rename(`Cy l` = cyl) %>%
     mutate(new_col = c(rep("A", n() - 10), rep("B", 10)))
   model_df <- do_prcomp(df, `Cy l`, mpg, hp)
-  model_df %>% tidy(model, type="variances")
-  model_df %>% tidy(model, type="loadings")
-  model_df %>% tidy(model, type="biplot")
-  model_df %>% tidy(model, type="data")
+  model_df %>% tidy_rowwise(model, type="variances")
+  model_df %>% tidy_rowwise(model, type="loadings")
+  model_df %>% tidy_rowwise(model, type="biplot")
+  model_df %>% tidy_rowwise(model, type="data")
 })

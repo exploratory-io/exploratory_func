@@ -1174,13 +1174,13 @@ rename_groups <- function(n) {
 #' wrapper for tidy type importance
 #' @export
 rf_importance <- function(data, ...) {
-  broom::tidy(data, model, type = "importance", ...)
+  tidy_rowwise(data, model, type = "importance", ...)
 }
 
 #' wrapper for tidy type evaluation
 #' @export
 rf_evaluation <- function(data, ...) {
-  ret <- broom::tidy(data, model, type = "evaluation", ...)
+  ret <- tidy_rowwise(data, model, type = "evaluation", ...)
   if (!is.null(ret$Note)) {
     # Bring Note column to the last.
     # It is hard to control the position of Note column inside tidy, and hence we do it here.
@@ -1192,7 +1192,7 @@ rf_evaluation <- function(data, ...) {
 #' wrapper for tidy type evaluation_by_class
 #' @export
 rf_evaluation_by_class <- function(data, ...) {
-  broom::tidy(data, model, type = "evaluation_by_class", ...)
+  tidy_rowwise(data, model, type = "evaluation_by_class", ...)
 }
 
 # Generates Analytics View Summary table for ranger and rpart.
@@ -1216,7 +1216,7 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
     training_ret <- switch(type,
                            evaluation = rf_evaluation(data, pretty.name = pretty.name, ...),
                            evaluation_by_class = rf_evaluation_by_class(data, pretty.name = pretty.name, ...),
-                           conf_mat = data %>% broom::tidy(model, type = "conf_mat", ...))
+                           conf_mat = data %>% tidy_rowwise(model, type = "conf_mat", ...))
     if (length(test_index) > 0 && nrow(training_ret) > 0) {
       training_ret$is_test_data <- FALSE
     }
@@ -1374,7 +1374,7 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
 #' wrapper for tidy type partial dependence
 #' @export
 rf_partial_dependence <- function(df, ...) { # TODO: write test for this.
-  res <- df %>% broom::tidy(model, type="partial_dependence", ...)
+  res <- df %>% tidy_rowwise(model, type="partial_dependence", ...)
   if (nrow(res) == 0) {
     return(data.frame()) # Skip the rest of processing by returning empty data.frame.
   }
@@ -2222,8 +2222,13 @@ calc_feature_imp <- function(df,
               data
             }
           })) %>%
-          dplyr::select(-data) %>%
-          dplyr::rowwise()
+          dplyr::select(-data)
+  # Rowwise grouping has to be redone with original grouped_cols, so that summarize(tidy(model)) later can add back the group column.
+  if (length(grouped_cols) > 0) {
+    ret <- ret %>% dplyr::rowwise(grouped_cols)
+  } else {
+    ret <- ret %>% dplyr::rowwise()
+  }
 
   # If all the groups are errors, it would be hard to handle resulting data frames
   # at the chart preprocessors. Hence, we instead stop the processing here
@@ -2928,8 +2933,13 @@ exp_rpart <- function(df,
               data
             }
           })) %>%
-          dplyr::select(-data) %>%
-          dplyr::rowwise()
+          dplyr::select(-data)
+  # Rowwise grouping has to be redone with original grouped_cols, so that summarize(tidy(model)) later can add back the group column.
+  if (length(grouped_cols) > 0) {
+    ret <- ret %>% dplyr::rowwise(grouped_cols)
+  } else {
+    ret <- ret %>% dplyr::rowwise()
+  }
 
   # add special class .model to pass column type validation at viz layer.
   # also add .model.rpart so that a step created by this function is viewable with Exploratory for debugging.

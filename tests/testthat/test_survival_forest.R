@@ -7,11 +7,11 @@ test_that("test exp_survival_forest", {
   df <- df %>% mutate(ph.ecog = factor(ph.ecog, ordered=TRUE)) # test handling of ordered factor
   df <- df %>% mutate(`se-x` = `se-x`==1) # test handling of logical
   model_df <- df %>% exp_survival_forest(`ti me`, `sta tus`, `a ge`, `se-x`, ph.ecog, ph.karno, pat.karno, meal.cal, wt.loss, predictor_n = 2)
-  ret <- model_df %>% broom::augment(model)
-  ret <- model_df %>% broom::tidy(model, type='partial_dependence_survival_curve')
+  ret <- model_df %>% augment_rowwise(model)
+  ret <- model_df %>% tidy_rowwise(model, type='partial_dependence_survival_curve')
   expect_equal(class(model_df$model[[1]]), c("ranger_survival_exploratory", "ranger"))
-  ret <- model_df %>% broom::tidy(model, type='partial_dependence')
-  ret <- model_df %>% broom::tidy(model, type='importance')
+  ret <- model_df %>% tidy_rowwise(model, type='partial_dependence')
+  ret <- model_df %>% tidy_rowwise(model, type='importance')
 })
 
 test_that("test exp_survival_forest with outtlier filtering", {
@@ -21,11 +21,11 @@ test_that("test exp_survival_forest with outtlier filtering", {
   df <- df %>% mutate(ph.ecog = factor(ph.ecog, ordered=TRUE)) # test handling of ordered factor
   df <- df %>% mutate(`se-x` = `se-x`==1) # test handling of logical
   model_df <- df %>% exp_survival_forest(`ti me`, `sta tus`, `a ge`, `se-x`, ph.ecog, ph.karno, pat.karno, meal.cal, wt.loss, predictor_n = 2, predictor_outlier_filter_type = 'percentile', predictor_outlier_filter_threshold = 0.95)
-  ret <- model_df %>% broom::augment(model)
-  ret <- model_df %>% broom::tidy(model, type='partial_dependence_survival_curve')
+  ret <- model_df %>% augment_rowwise(model)
+  ret <- model_df %>% tidy_rowwise(model, type='partial_dependence_survival_curve')
   expect_equal(class(model_df$model[[1]]), c("ranger_survival_exploratory", "ranger"))
-  ret <- model_df %>% broom::tidy(model, type='partial_dependence')
-  ret <- model_df %>% broom::tidy(model, type='importance')
+  ret <- model_df %>% tidy_rowwise(model, type='partial_dependence')
+  ret <- model_df %>% tidy_rowwise(model, type='importance')
 })
 
 test_that("exp_survival_forest error handling for predictor with single unique value", {

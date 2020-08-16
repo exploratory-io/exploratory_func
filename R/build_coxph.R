@@ -627,7 +627,7 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients'
       ret
     },
     coefficients = {
-      ret <- broom:::tidy.coxph(x) # it seems that tidy.lm takes care of glm too
+      ret <- broom:::tidy.coxph(x, conf.int=TRUE) # conf.int=TRUE is required to get conf.int since broom 0.7.0.
       ret <- ret %>% dplyr::mutate(
         hazard_ratio = exp(estimate)
       )
@@ -682,6 +682,10 @@ glance.coxph_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add t
   }
   ret <- broom:::glance.coxph(x, pretty.name = pretty.name, ...)
 
+  if (!is.null(ret$nobs)) { # glance.coxph's newly added nobs seems to be same as n, which we use as Number of Rows. Suppressing it for now.
+    ret <- ret %>% dplyr::select(-nobs)
+  }
+
   if(pretty.name) {
     colnames(ret)[colnames(ret) == "r.squared"] <- "R Squared"
     colnames(ret)[colnames(ret) == "adj.r.squared"] <- "Adj R Squared"
@@ -701,6 +705,8 @@ glance.coxph_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add t
     colnames(ret)[colnames(ret) == "p.value.sc"] <- "Score Test P Value"
     colnames(ret)[colnames(ret) == "statistic.wald"] <- "Wald Test"
     colnames(ret)[colnames(ret) == "p.value.wald"] <- "Wald Test P Value"
+    colnames(ret)[colnames(ret) == "statistic.robust"] <- "Robust Statistic"
+    colnames(ret)[colnames(ret) == "p.value.robust"] <- "Robust P Value"
     colnames(ret)[colnames(ret) == "r.squared.max"] <- "R Squared Max"
     colnames(ret)[colnames(ret) == "concordance"] <- "Concordance"
     colnames(ret)[colnames(ret) == "std.error.concordance"] <- "Std Error Concordance"
