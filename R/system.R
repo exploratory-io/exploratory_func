@@ -2346,6 +2346,57 @@ read_rds_file <- function(file, refhook = NULL){
   }
 }
 
+#' Wrapper for read_parquet to support remote file.
+#' @export
+read_parquet_file <- function(file){
+  loadNamespace("arrow")
+  
+  is.win <- Sys.info()['sysname'] == 'Windows'
+  tf <- NULL
+  
+  # Backup the locale info and set English locale for reading parquet issue
+  # on Windows https://issues.apache.org/jira/browse/ARROW-7288
+  if (is.win) {
+    lc.all<- Sys.getlocale("LC_ALL")
+    lc.collate<- Sys.getlocale("LC_COLLATE")
+    lc.ctype<- Sys.getlocale("LC_CTYPE")
+    lc.monetary<- Sys.getlocale("LC_MONETARY") 
+    lc.numeric<- Sys.getlocale("LC_NUMERIC")
+    
+    Sys.setlocale("LC_ALL", "English")
+  }
+  
+  if (stringr::str_detect(file, "^https://") ||
+      stringr::str_detect(file, "^http://") ||
+      stringr::str_detect(file, "^ftp://")) {
+    
+    # Download the remote parquet file to the local temp file.
+    tf <- tempfile()  
+    utils::download.file(file, tf)
+    # Read the local parquet file.
+    res <- arrow::read_parquet(tf)
+
+  } else {
+    res <- arrow::read_parquet(file)
+  }
+
+  # Restore the locale info.
+  if (is.win) {
+    Sys.setlocale("LC_ALL", lc.all)
+    Sys.setlocale("LC_COLLATE", lc.collate)
+    Sys.setlocale("LC_CTYPE", lc.ctype)
+    Sys.setlocale("LC_MONETARY", lc.monetary) 
+    Sys.setlocale("LC_NUMERIC", lc.numeric)
+  }
+  
+  if (!is.null(tf)) {
+    # There was an issue that the res contains 0 row if I remove the temp 
+    # file right after calling read_parquet. I don't see it now though.
+    unlink(tf);
+  }
+  res
+}
+
 #'Wrapper for readr::read_lines to support vector to data frame conversion
 #'It seems readr::read_lines uses -1 for n_max to get all the data.
 #'It does not align with the other readr functions that uses Inf for all the data but we have to follow existing read_lines behavior.
