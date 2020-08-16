@@ -18,6 +18,11 @@ test_that("test build_coxph.fast", {
   expect_equal(ret2$na_count, 0)
 
   ret <- model_df %>% glance_rowwise(model, pretty.name=TRUE)
+  expect_equal(colnames(ret),
+               c("Number of Rows","Number of Events","Likelihood Ratio Test","Likelihood Ratio Test P Value",
+                 "Score Test","Score Test P Value","Wald Test","Wald Test P Value",
+                 "R Squared","R Squared Max","Concordance","Std Error Concordance",
+                 "Log Likelihood","AIC","BIC")) 
   ret <- model_df %>% augment_rowwise(model)
 })
 

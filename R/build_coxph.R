@@ -682,6 +682,10 @@ glance.coxph_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add t
   }
   ret <- broom:::glance.coxph(x, pretty.name = pretty.name, ...)
 
+  if (!is.null(ret$nobs)) { # glance.coxph's newly added nobs seems to be same as n, which we use as Number of Rows. Suppressing it for now.
+    ret <- ret %>% dplyr::select(-nobs)
+  }
+
   if(pretty.name) {
     colnames(ret)[colnames(ret) == "r.squared"] <- "R Squared"
     colnames(ret)[colnames(ret) == "adj.r.squared"] <- "Adj R Squared"
