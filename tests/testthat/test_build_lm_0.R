@@ -7,12 +7,17 @@ test_that("test build_lm summary output ", {
     category = rep(letters[1:4], 5),
     with_NA = rep(c(letters[5:6], NA, NA), 5)
   )
-  trial <- test_df %>% build_lm(num1 ~ num2 + category + with_NA, weights = weight)
+  model_df <- test_df %>% build_lm(num1 ~ num2 + category + with_NA, weights = weight)
 
-  expect_equal(colnames(trial), c("source.data", ".test_index", "model", ".model_metadata"))
+  expect_equal(colnames(model_df), c("source.data", ".test_index", "model", ".model_metadata"))
 
-  res <- capture.output(summary(trial$model[[1]]))
+  res <- capture.output(summary(model_df$model[[1]]))
   expect_lt(length(res), 50) # the output of summary should be less than 50 lines
+
+  ret <- model_df %>% tidy_rowwise(model)
+  ret <- model_df %>% glance_rowwise(model)
+  ret <- model_df %>% augment_rowwise(model)
+  ret <- model_df %>% prediction(data = "training") # Test prediction with training data when the training data predictors has NAs.
 })
 
 test_that("test relative importance", {
