@@ -13,6 +13,9 @@ test_that("test build_coxph.fast", {
   ret <- model_df %>% tidy_rowwise(model, type='partial_dependence_survival_curve')
   ret <- model_df %>% tidy_rowwise(model, type='vif')
   ret <- model_df %>% tidy_rowwise(model)
+  expect_equal(colnames(ret),
+               c("term","estimate","std_error","t_ratio",
+                 "p_value","conf_low","conf_high","hazard_ratio","base.level"))
   # Verify that base levels are not NA for `se-x` (testing - in the name) columns.
   ret2 <- ret %>% dplyr::filter(stringr::str_detect(term,"(se-x)")) %>% dplyr::summarize(na_count=sum(is.na(base.level)))
   expect_equal(ret2$na_count, 0)
@@ -20,7 +23,7 @@ test_that("test build_coxph.fast", {
   ret <- model_df %>% glance_rowwise(model, pretty.name=TRUE)
   expect_equal(colnames(ret),
                c("Number of Rows","Number of Events","Likelihood Ratio Test","Likelihood Ratio Test P Value",
-                 "Score Test","Score Test P Value","Wald Test","Wald Test P Value",
+                 "Score Test","Score Test P Value","Wald Test","Wald Test P Value","Robust Statistic","Robust P Value",
                  "R Squared","R Squared Max","Concordance","Std Error Concordance",
                  "Log Likelihood","AIC","BIC")) 
   ret <- model_df %>% augment_rowwise(model)

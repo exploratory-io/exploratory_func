@@ -705,6 +705,8 @@ glance.coxph_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add t
     colnames(ret)[colnames(ret) == "p.value.sc"] <- "Score Test P Value"
     colnames(ret)[colnames(ret) == "statistic.wald"] <- "Wald Test"
     colnames(ret)[colnames(ret) == "p.value.wald"] <- "Wald Test P Value"
+    colnames(ret)[colnames(ret) == "statistic.robust"] <- "Robust Statistic"
+    colnames(ret)[colnames(ret) == "p.value.robust"] <- "Robust P Value"
     colnames(ret)[colnames(ret) == "r.squared.max"] <- "R Squared Max"
     colnames(ret)[colnames(ret) == "concordance"] <- "Concordance"
     colnames(ret)[colnames(ret) == "std.error.concordance"] <- "Std Error Concordance"
