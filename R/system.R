@@ -2155,7 +2155,7 @@ read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL,
       df <- df %>% dplyr::mutate(dplyr::across(is.character, trimws))
     }
     if(col_names == FALSE) {
-      # For backward comatilibity, use X__1, X__2, .. for default column names
+      # For backward compatibility, use X__1, X__2, .. for default column names
       columnNames <- paste("X", 1:ncol(df), sep = "__")
       colnames(df) <- columnNames
     }
@@ -2178,6 +2178,11 @@ read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL,
         # If it's local file without multibyte path, simply call readxl::read_excel
         df <- readxl::read_excel(path, sheet = sheet, col_names = col_names, col_types = col_types, na = na, trim_ws = trim_ws, skip = skip, n_max = n_max)
       }
+    }
+    if(col_names == FALSE) {
+      # For backward compatibility, use X__1, X__2, .. for default column names
+      columnNames <- paste("X", 1:ncol(df), sep = "__")
+      colnames(df) <- columnNames
     }
   }
   if(!is.null(tzone)) { # if timezone is specified, apply the timezeon to POSIXct columns
