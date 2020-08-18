@@ -1149,16 +1149,7 @@ exp_normality<- function(df, ...,
     model
   }
 
-  # Calculation is executed in each group.
-  # Storing the result in this tmp_col and
-  # unnesting the result.
-  # If the original data frame is grouped by "tmp",
-  # overwriting it should be avoided,
-  # so avoid_conflict is used here.
-  tmp_col <- avoid_conflict(colnames(df), "model")
-  ret <- df %>%
-    dplyr::do_(.dots = setNames(list(~shapiro_each(.)), tmp_col))
-  ret
+  do_on_each_group(df, shapiro_each, name = "model", with_unnest = FALSE)
 }
 
 #' @export
