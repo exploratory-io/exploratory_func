@@ -69,7 +69,7 @@ getGoogleSheetList <- function(tokenFileId="", teamDriveId=NULL){
   token = getGoogleTokenForSheet(tokenFileId)
   googlesheets4::sheets_set_token(token)
   googledrive::drive_set_token(token)
-  if(is.null(teamDriveId)) {
+  if(is.null(teamDriveId) && teamDriveId != "") {
     # To improve performance, only get id, name and canEdit for each spreadsheet.
     googledrive::drive_find(type = "spreadsheet", pageSize=1000, fields="files/id, files/name, files/capabilities/canEdit, nextPageToken")
   } else { #if team id is provided search documents within the team.
