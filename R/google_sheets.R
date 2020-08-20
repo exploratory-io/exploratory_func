@@ -62,19 +62,19 @@ getGoogleSheet <- function(title, sheetName, skipNRows = 0, treatTheseAsNA = NUL
 
 #' API to get a list of available google sheets
 #' @export
-getGoogleSheetList <- function(tokenFileId="", teamDriveId=NULL){
+getGoogleSheetList <- function(tokenFileId="", teamDriveId=""){
   if(!requireNamespace("googlesheets4")){stop("package googlesheets4 must be installed.")}
   if(!requireNamespace("googledrive")){stop("package googledrive must be installed.")}
 
   token = getGoogleTokenForSheet(tokenFileId)
   googlesheets4::sheets_set_token(token)
   googledrive::drive_set_token(token)
-  if(is.null(teamDriveId) && teamDriveId != "") {
-    # To improve performance, only get id, name and canEdit for each spreadsheet.
-    googledrive::drive_find(type = "spreadsheet", pageSize=1000, fields="files/id, files/name, files/capabilities/canEdit, nextPageToken")
-  } else { #if team id is provided search documents within the team.
+  if(teamDriveId != "" && !is.null(teamDriveId)) {
     # To improve performance, only get id, name and canEdit for each spreadsheet.
     googledrive::drive_find(type = "spreadsheet", team_drive=googledrive::as_id(teamDriveId) ,pageSize=1000, fields="files/id, files/name, files/capabilities/canEdit, nextPageToken")
+  } else { #if team id is provided search documents within the team.
+    # To improve performance, only get id, name and canEdit for each spreadsheet.
+    googledrive::drive_find(type = "spreadsheet", pageSize=1000, fields="files/id, files/name, files/capabilities/canEdit, nextPageToken")
   }
 }
 
