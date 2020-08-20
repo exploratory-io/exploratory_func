@@ -912,9 +912,9 @@ test_that("get_unknown_category_rows_index", {
   unknown_vector <- exploratory:::get_unknown_category_rows_index_vector(test_df, train_df)
   unknown_index <- exploratory:::get_row_numbers_from_index_vector(unknown_vector)
   expect_equal(unknown_index,c(2,3))
-  restored <- restore_na(c('a','b','c'), c(2,4))
+  restored <- exploratory:::restore_na(c('a','b','c'), c(2,4))
   expect_equal(restored ,c('a',NA,'b',NA,'c'))
-  restored <- restore_na(c('a','b','c'), c(1,3,5,7))
+  restored <- exploratory:::restore_na(c('a','b','c'), c(1,3,5,7))
   expect_equal(restored ,c(NA,'a',NA,'b',NA,'c',NA))
 })
 
