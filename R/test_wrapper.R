@@ -107,7 +107,7 @@ do_var.test <- function(df, value, key, ...){
       switch (name,
               estimate = "variance_ratio",
               num.df = "numerator_degrees_of_freedom",
-              denom.df = "denominator_degrees_of_freedom",
+              den.df = "denominator_degrees_of_freedom",
               statistic = "f.value",
               name
       )
