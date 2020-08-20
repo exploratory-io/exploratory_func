@@ -38,7 +38,7 @@ test_that("check languages", {
 
 test_that("is_digit", {
   test_vec <- c("the", "333", "T est", "1.23", "22_22")
-  result <- is_digit(test_vec)
+  result <- exploratory:::is_digit(test_vec)
   expect_equal(result, c(F, T, F, F, F))
 })
 
@@ -178,7 +178,7 @@ test_that("do_tokenize should work with output", {
 test_that("calc_idf", {
   loadNamespace("dplyr")
   test_df <- data.frame(id=rep(c(1,2), 5), word=c("this", "this", letters[1:8]))
-  result <- calc_idf(test_df$id, test_df$word)
+  result <- exploratory:::calc_idf(test_df$id, test_df$word)
   expect_equal(head(result$.df,2), c(2, 2))
   expect_equal(head(result$.idf,2), c(0, 0))
 })
@@ -186,7 +186,7 @@ test_that("calc_idf", {
 test_that("calc_tf weight binary", {
   loadNamespace("dplyr")
   test_df <- data.frame(id=rep(c(1,2), 5), word=c("this", "this", letters[1:8]))
-  result <- calc_tf(test_df, id,word, weight="binary")
+  result <- exploratory:::calc_tf(test_df, id,word, weight="binary")
   expect_true(is.logical(result$tf))
   expect_equal(colnames(result)[[1]], "id")
   expect_equal(colnames(result)[[2]], "word")
@@ -197,7 +197,7 @@ test_that("calc_tf weight binary", {
 test_that("calc_idf smooth_idf FALSE", {
   loadNamespace("dplyr")
   test_df <- data.frame(id=rep(c(1,2), 5), word=c("this", "this", letters[1:8]))
-  result <- result <- calc_idf(test_df$id, test_df$word)
+  result <- result <- exploratory:::calc_idf(test_df$id, test_df$word)
   expect_equal(head(result$.idf,2), c(0, 0))
 })
 

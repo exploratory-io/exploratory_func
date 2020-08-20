@@ -200,7 +200,7 @@ test_that("test exp_balance with integer numbers as a predictors", {
   )
   res <- exp_balance(sample_data, y, target_size=12)
   expect_true("data.frame" %in% class(res))
-  expect_true(is_integer(res$x))
+  expect_true(exploratory:::is_integer(res$x))
 })
 
 test_that("test exp_balance with logical", {

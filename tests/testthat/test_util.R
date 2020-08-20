@@ -400,7 +400,7 @@ test_that("as_numeric_matrix", {
     date2 = lubridate::ymd("1991:08:11") - seq(10)
   )
   expect_warning({
-    ret <- as_numeric_matrix_(test_df, columns = c("date1", "date2"))
+    ret <- exploratory:::as_numeric_matrix_(test_df, columns = c("date1", "date2"))
     expect_true(all(is.na(ret)))
   })
 })
@@ -410,7 +410,7 @@ test_that("as_numeric_matrix", {
     char1 = as.character(seq(10)),
     char2 = as.character(0 - seq(10))
   )
-  ret <- as_numeric_matrix_(test_df, columns = c("char1", "char2"))
+  ret <- exploratory:::as_numeric_matrix_(test_df, columns = c("char1", "char2"))
   expect_true(all(!is.na(ret)))
 })
 
@@ -422,7 +422,7 @@ test_that("as_numeric_matrix to group", {
   )
   ret <- test_df %>%
     dplyr::group_by(group) %>%
-    as_numeric_matrix_(columns = c("date1", "date2"))
+    exploratory:::as_numeric_matrix_(columns = c("date1", "date2"))
   expect_equal(dim(ret), c(20, 2))
 })
 
@@ -557,7 +557,7 @@ test_that("unixtime_to_datetime", {
 test_that("append_colnames", {
   test_df <- data.frame(col1 = seq(3), col2 = seq(3))
 
-  ret <- append_colnames(test_df, "a.", ".b")
+  ret <- exploratory:::append_colnames(test_df, "a.", ".b")
 
   expect_equal(colnames(ret), c("a.col1.b", "a.col2.b"))
 })
@@ -668,18 +668,18 @@ test_that("test same_type for factor", {
   original <- factor(c("bb", "bb", "aa"), levels = c("bb", "aa"))
 
   to_replace <- c("aa", "aa", "bb")
-  ret <- same_type(to_replace, original)
+  ret <- exploratory:::same_type(to_replace, original)
   expect_equal(ret, factor(c("aa", "aa", "bb"), levels = c("bb", "aa")))
 
   to_replace <- factor(c("aa", "aa", "bb"), levels = c("aa", "bb"))
-  ret <- same_type(to_replace, original)
+  ret <- exploratory:::same_type(to_replace, original)
   expect_equal(ret, factor(c("aa", "aa", "bb"), levels = c("bb", "aa")))
 })
 
 test_that("test fill_mat_NA", {
   test_mat <- matrix(seq(10), nrow = 2)
   indice <- c(2, 5)
-  ret <- fill_mat_NA(indice, test_mat)
+  ret <- exploratory:::fill_mat_NA(indice, test_mat)
   expect_true(any(is.na(ret)))
 })
 
@@ -909,8 +909,8 @@ test_that("get_unknown_category_rows_index", {
                          y=c('a','b','c'))
   test_df <- data.frame(x=c('a','c','d'),
                         y=c('b','e','c'))
-  unknown_vector <- get_unknown_category_rows_index_vector(test_df, train_df)
-  unknown_index <- get_row_numbers_from_index_vector(unknown_vector)
+  unknown_vector <- exploratory:::get_unknown_category_rows_index_vector(test_df, train_df)
+  unknown_index <- exploratory:::get_row_numbers_from_index_vector(unknown_vector)
   expect_equal(unknown_index,c(2,3))
   restored <- restore_na(c('a','b','c'), c(2,4))
   expect_equal(restored ,c('a',NA,'b',NA,'c'))
@@ -936,8 +936,8 @@ test_that("revert_factor_cols_to_logical", {
 })
 
 test_that("is_integer", {
-  expect_true(is_integer(c(0,1,2,3,4,5)))
-  expect_false(is_integer(c(0,1.5,2,3,4,5)))
+  expect_true(exploratory:::is_integer(c(0,1,2,3,4,5)))
+  expect_false(exploratory:::is_integer(c(0,1.5,2,3,4,5)))
 })
 
 test_that("week", {
