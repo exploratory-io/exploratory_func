@@ -1846,7 +1846,9 @@ cleanup_df <- function(df, target_col, selected_cols, grouped_cols, target_n, pr
 
 cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, name_map, predictor_n, revert_logical_levels=TRUE, filter_numeric_na=FALSE) {
   df <- preprocess_regression_data_before_sample(df, clean_target_col, clean_cols,
-                                                 filter_target_na_inf=FALSE,
+                                                 # ranger and rpart works with NA or Inf in the target, but we decided it would build rather meaningless or biased model.
+                                                 # For example, rpart binary classification just replaces NAs with FALSE, which would change the meaning of data inadvertently.
+                                                 filter_target_na_inf=TRUE,
                                                  filter_predictor_numeric_na=filter_numeric_na)
   clean_cols <- attr(df, 'predictors') # predictors are updated (removed) in preprocess_pre_sample. Catch up with it.
   # sample the data because randomForest takes long time
