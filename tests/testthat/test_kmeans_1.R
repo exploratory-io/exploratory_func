@@ -39,7 +39,8 @@ test_that("exp_kmeans with single column name", {
 test_that("exp_kmeans elbow method mode", {
   df <- mtcars %>% mutate(new_col = c(rep("A", n() - 10), rep("B", 10)))
   model_df <- exp_kmeans(df, cyl, mpg, hp, elbow_method_mode=TRUE)
-  model_df %>% tidyr::unnest(model)
+  res <- model_df %>% tidyr::unnest(model)
+  expect_equal(colnames(res), c("center","totss","tot.withinss","betweenss","iter"))
 })
 
 # group_by for elbow method is not currently supported. Revive this test when it is.

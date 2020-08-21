@@ -408,6 +408,16 @@ test_that("test exp_normality", {
   ret
 })
 
+test_that("test exp_normality with group", {
+  df <- mtcars %>% mutate(dummy=c(NA, rep(1,n()-1))) %>% # test for column with always same value, except for NA.
+    group_by(am)
+  ret <- df %>% exp_normality(mpg, gear, dummy, n_sample=20, n_sample_qq=30)
+  qq <- ret %>% tidy_rowwise(model, type="qq")
+  expect_true("am" %in% colnames(qq))
+  model_summary <- ret %>% tidy_rowwise(model, type="model_summary", signif_level=0.1)
+  expect_true("am" %in% colnames(model_summary))
+})
+
 test_that("test exp_normality with column with almost always same value", {
   # test for column with almost always same value, except for NA, to test column prefiltering logic to avoid error.
   df <- mtcars %>% mutate(dummy=c(NA, 0, rep(1,n()-2)))
