@@ -1,5 +1,7 @@
 context("test prophet functions - Holiday Country Names, Repeat By")
 
+set.seed(1)
+
 test_that("do_prophet with holiday country", {
   ts <- seq.Date(as.Date("2010-01-01"), as.Date("2012-01-01"), by="day")
   raw_data <- data.frame(timestamp=ts, data=runif(length(ts)))
