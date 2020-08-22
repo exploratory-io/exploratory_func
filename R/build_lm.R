@@ -366,7 +366,7 @@ map_terms_to_orig <- function(terms, mapping) {
 #' Common preprocessing of regression data to be done BEFORE sampling.
 #' Only common operations to be done, for example, in Summary View too.
 #' @export
-preprocess_regression_data_before_sample <- function(df, target_col, predictor_cols, filter_target_na_inf=TRUE, filter_predictor_numeric_na=TRUE) {
+preprocess_regression_data_before_sample <- function(df, target_col, predictor_cols, filter_predictor_numeric_na=TRUE) {
   # cols will be filtered to remove invalid columns
   cols <- predictor_cols
   for (col in predictor_cols) {
@@ -380,14 +380,15 @@ preprocess_regression_data_before_sample <- function(df, target_col, predictor_c
     stop("No predictor column is left after removing columns with only NA or Inf values.")
   }
 
-  if (filter_target_na_inf){ # For ranger, this is not necessary.
-    df <- df %>%
-      # dplyr::filter(!is.na(!!target_col))  TODO: this was not filtering, and replaced it with the next line. check other similar places.
-      # for numeric cols, filter NA rows, because lm will anyway do this internally, and errors out
-      # if the remaining rows are with single value in any predictor column.
-      # filter Inf/-Inf too to avoid error at lm.
-      dplyr::filter(!is.na(df[[target_col]]) & !is.infinite(df[[target_col]])) # this form does not handle group_by. so moved into each_func from outside.
-  }
+  # ranger and rpart works with NA or Inf in the target, but we decided it would build rather meaningless or biased model.
+  # For example, rpart binary classification just replaces NAs with FALSE, which would change the meaning of data inadvertently.
+  # So, we always filter out NA/Inf from target variable.
+  df <- df %>%
+    # dplyr::filter(!is.na(!!target_col))  TODO: this was not filtering, and replaced it with the next line. check other similar places.
+    # for numeric cols, filter NA rows, because lm will anyway do this internally, and errors out
+    # if the remaining rows are with single value in any predictor column.
+    # filter Inf/-Inf too to avoid error at lm.
+    dplyr::filter(!is.na(df[[target_col]]) & !is.infinite(df[[target_col]])) # this form does not handle group_by. so moved into each_func from outside.
 
   # To avoid unused factor level that causes margins::marginal_effects() to fail, filtering operation has
   # to be done before factor level adjustments.
