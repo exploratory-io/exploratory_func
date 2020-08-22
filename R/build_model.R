@@ -90,7 +90,7 @@ build_model_ <- function(data, model_func, seed = 1, test_rate = 0, group_cols =
     # Filter out NA and Inf from target variable. (For Cox regression, it can be 2 variables.)
     target_cols <- all.vars(lazyeval::f_lhs(lazyeval::lazy_eval(dots$formula)))
     for (target_col in target_cols) {
-      data <- data %>%
+      processed <- processed %>%
         dplyr::filter(!is.na(!!rlang::sym(target_col)) & !is.infinite(!!rlang::sym(target_col)))
     }
   }
