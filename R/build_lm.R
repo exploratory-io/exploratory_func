@@ -382,13 +382,11 @@ preprocess_regression_data_before_sample <- function(df, target_col, predictor_c
 
   # ranger and rpart works with NA or Inf in the target, but we decided it would build rather meaningless or biased model.
   # For example, rpart binary classification just replaces NAs with FALSE, which would change the meaning of data inadvertently.
+  # lm will filter out NAs anyway internally, and errors out if the remaining rows are with single value in any predictor column.
+  # Also, filter Inf/-Inf too to avoid error at lm.
   # So, we always filter out NA/Inf from target variable.
   df <- df %>%
-    # dplyr::filter(!is.na(!!target_col))  TODO: this was not filtering, and replaced it with the next line. check other similar places.
-    # for numeric cols, filter NA rows, because lm will anyway do this internally, and errors out
-    # if the remaining rows are with single value in any predictor column.
-    # filter Inf/-Inf too to avoid error at lm.
-    dplyr::filter(!is.na(df[[target_col]]) & !is.infinite(df[[target_col]])) # this form does not handle group_by. so moved into each_func from outside.
+    dplyr::filter(!is.na(!!rlang::sym(target_col)) & !is.infinite(!!rlang::sym(target_col))) # this form does not handle group_by. so moved into each_func from outside.
 
   # To avoid unused factor level that causes margins::marginal_effects() to fail, filtering operation has
   # to be done before factor level adjustments.
@@ -404,7 +402,7 @@ preprocess_regression_data_before_sample <- function(df, target_col, predictor_c
       # simplistic (e.g. only one split in the tree), especially in Exploratory for some reason, if we let rpart handle the handling of NAs,
       # even though it is supposed to just filter out rows with NAs, which is same as what we are doing here.
       if (filter_predictor_numeric_na) {
-        df <- df %>% dplyr::filter(!is.na(df[[col]]) & !is.infinite(df[[col]]))
+        df <- df %>% dplyr::filter(!is.na(!!rlang::sym(col)) & !is.infinite(!!rlang::sym(col)))
       }
       else {
         # For ranger, removing numeric NA is not necessary.
@@ -412,7 +410,7 @@ preprocess_regression_data_before_sample <- function(df, target_col, predictor_c
         # Error in seq.default(min(x, na.rm = TRUE), max(x, na.rm = TRUE), length.out = length.out) : 'from' must be a finite number
         # TODO: In exp_rpart and calc_feature_imp, we have logic to remember and restore NA rows, but they are probably not made use of
         # if we filter NA rows here.
-        df <- df %>% dplyr::filter(!is.infinite(df[[col]]))
+        df <- df %>% dplyr::filter(!is.na(!!rlang::sym(col)))
       }
     }
   }
