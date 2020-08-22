@@ -21,6 +21,7 @@ if (!testdata_filename %in% list.files(testdata_dir)) {
   write.csv(flight, testdata_file_path) # save sampled-down data for performance.
 }
 test_that("calc_feature_map(regression) evaluate training and test", {
+  set.seed(1) # For stability of result.
   model_df <- flight %>%
                 calc_feature_imp(`ARR DELAY`, `CAR RIER`, `ORI GIN`, `DEP DELAY`, `AIR TIME`,
                                  test_rate = 0.3,
@@ -55,6 +56,7 @@ test_that("calc_feature_map(regression) evaluate training and test", {
 })
 
 test_that("calc_feature_map(binary) evaluate training and test", {
+  set.seed(1) # For stability of result.
   # `is delayed` is not logical for some reason.
   # To test binary prediction, need to cast it into logical.
   model_df <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`)) %>%
@@ -88,6 +90,7 @@ test_that("calc_feature_map(binary) evaluate training and test", {
 })
 
 test_that("calc_feature_map(factor(TRUE, FALSE)) evaluate training and test", { # This case should be treated as multi-class.
+  set.seed(1) # For stability of result.
   # `is delayed` is not logical for some reason.
   # To test binary prediction, need to cast it into logical.
   model_df <- flight %>% dplyr::mutate(is_delayed = factor(as.logical(`is delayed`))) %>% filter(!is.na(is_delayed)) %>%
@@ -119,6 +122,7 @@ test_that("calc_feature_map(factor(TRUE, FALSE)) evaluate training and test", { 
 })
 
 test_that("calc_feature_map(binary(factor(A,B))) evaluate training and test", {
+  set.seed(1) # For stability of result.
   # `is delayed` is not logical for some reason.
   # To test binary prediction, need to cast it into logical.
   model_df <- flight %>% dplyr::mutate(is_delayed = factor(if_else(as.logical(`is delayed`), "A","B"))) %>% filter(!is.na(is_delayed)) %>%
@@ -150,6 +154,7 @@ test_that("calc_feature_map(binary(factor(A,B))) evaluate training and test", {
 })
 
 test_that("calc_feature_map(binary) evaluate training and test with SMOTE", {
+  set.seed(1) # For stability of result.
   # `is delayed` is not logical for some reason.
   # To test binary prediction, need to cast it into logical.
   model_df <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`)) %>%
@@ -183,6 +188,7 @@ test_that("calc_feature_map(binary) evaluate training and test with SMOTE", {
 })
 
 test_that("calc_feature_map(multi) evaluate training and test", {
+  set.seed(1) # For stability of result.
   model_df <- flight %>%
                 calc_feature_imp(`ORI GIN`, `DIS TANCE`, `DEP TIME`, test_rate = 0.3, pd_with_bin_means = TRUE)
 
