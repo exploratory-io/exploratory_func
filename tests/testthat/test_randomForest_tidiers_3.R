@@ -48,7 +48,7 @@ test_that("calc_feature_map(regression) evaluate training and test", {
                 calc_feature_imp(`FL NUM`, `DIS TANCE`, `DEP TIME`, test_rate = 0, pd_with_bin_means = TRUE)
   ret <- model_df %>% prediction(data="training_and_test")
   train_ret <- ret %>% filter(is_test_data==FALSE)
-  expect_equal(nrow(train_ret), 5000)
+  expect_equal(nrow(train_ret), 4949) # Less than 5000 because of NAs in the target variable.
 
   ret <- rf_evaluation_training_and_test(model_df)
   expect_equal(nrow(ret), 1) # 1 for train
@@ -78,7 +78,7 @@ test_that("calc_feature_map(binary) evaluate training and test", {
                 calc_feature_imp(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0, pd_with_bin_means = TRUE)
   ret <- model_df %>% prediction(data="training_and_test")
   train_ret <- ret %>% filter(is_test_data==FALSE)
-  expect_equal(nrow(train_ret), 5000)
+  expect_equal(nrow(train_ret), 4960) # Less than 5000 because of NAs in the target variable.
 
   ret <- rf_evaluation_training_and_test(model_df)
   expect_equal(nrow(ret), 1) # 1 for train
@@ -109,7 +109,7 @@ test_that("calc_feature_map(factor(TRUE, FALSE)) evaluate training and test", { 
                 calc_feature_imp(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0, pd_with_bin_means = TRUE)
   ret <- model_df %>% prediction(data="training_and_test")
   train_ret <- ret %>% filter(is_test_data==FALSE)
-  expect_equal(nrow(train_ret), 5000)
+  expect_equal(nrow(train_ret), 4960) # Less than 5000 because of NAs in the target variable.
 
   ret <- rf_evaluation_training_and_test(model_df)
   expect_equal(nrow(ret), 1) # 1 for train
@@ -140,7 +140,7 @@ test_that("calc_feature_map(binary(factor(A,B))) evaluate training and test", {
                 calc_feature_imp(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0, pd_with_bin_means = TRUE)
   ret <- model_df %>% prediction(data="training_and_test")
   train_ret <- ret %>% filter(is_test_data==FALSE)
-  expect_equal(nrow(train_ret), 5000)
+  expect_equal(nrow(train_ret), 4960) # Less than 5000 because of NAs in the target variable.
 
   ret <- rf_evaluation_training_and_test(model_df)
   expect_equal(nrow(ret), 1) # 1 for train
