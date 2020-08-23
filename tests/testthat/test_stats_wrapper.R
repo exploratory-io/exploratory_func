@@ -255,7 +255,9 @@ test_that("test do_cor.kv for grouped data frame as subject error", {
 })
 
 test_that("test do_cor.kv for empty value", {
-  result <- tidy_test_df %>%  do_cor.kv(cat, dim_na, val)
+  expect_error({
+    result <- tidy_test_df %>%  do_cor.kv(cat, dim_na, val)
+  }, NA)
 })
 
 test_that("test do_cor without val", {

@@ -30,10 +30,12 @@ test_that("check languages", {
     "english_onix"
   )
 
-  for (lang in languages){
-    # this should succeeds without error
-    get_stopwords(lang = lang)
-  }
+  expect_error({
+    for (lang in languages){
+      # this should succeeds without error
+      get_stopwords(lang = lang)
+    }
+  }, NA)
 })
 
 test_that("is_digit", {
