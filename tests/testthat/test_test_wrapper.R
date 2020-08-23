@@ -311,10 +311,14 @@ test_that("test exp_ttest with paired = TRUE", {
 test_that("test exp_ttest with power", {
   mtcars2 <- mtcars
   mtcars2$am[[1]] <- NA # test NA filtering
-  model_df <- exp_ttest(mtcars2, mpg, am, power = 0.8)
+  model_df <- exp_ttest(mtcars2, mpg, am, beta = 0.2)
   ret <- model_df %>% tidy_rowwise(model, type="model")
+  expect_equal(colnames(ret),
+               c("t Ratio","P Value","Degree of Freedom","Difference",
+                 "Conf High","Conf Low","Effect Size (Cohen's d)","Target Power",
+                 "Target Probability of Type 2 Error","Current Sample Size (Each Group)","Required Sample Size (Each Group)","Number of Rows",
+                 "Number of Rows for 0","Number of Rows for 1"))
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
-  # TODO: Shouldn't there be required number of rows??
   expect_equal(colnames(ret),
                c("am","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
                  "Minimum","Maximum"))
@@ -326,7 +330,6 @@ test_that("test exp_ttest with power with paired = TRUE", {
   model_df <- exp_ttest(mtcars2, mpg, am, paired = TRUE, power = 0.8)
   ret <- model_df %>% tidy_rowwise(model, type="model")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
-  # TODO: Shouldn't there be required number of rows??
   expect_equal(colnames(ret),
                c("am","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
                  "Minimum","Maximum"))
@@ -340,7 +343,6 @@ test_that("test exp_ttest with diff_to_detect", {
   model_df <- exp_ttest(mtcars2, mpg, am, diff_to_detect = 0.5, power = 0.8)
   ret <- model_df %>% tidy_rowwise(model, type="model")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
-  # TODO: Shouldn't there be required number of rows??
   expect_equal(colnames(ret),
                c("am","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
                  "Minimum","Maximum"))
@@ -353,7 +355,6 @@ test_that("test exp_ttest with diff_to_detect and common_sd", {
   model_df <- exp_ttest(mtcars2, mpg, am, diff_to_detect = 0.5, common_sd = 1.5, power = 0.8)
   ret <- model_df %>% tidy_rowwise(model, type="model")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
-  # TODO: Shouldn't there be required number of rows??
   expect_equal(colnames(ret),
                c("am","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
                  "Minimum","Maximum"))
