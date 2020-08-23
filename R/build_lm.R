@@ -277,6 +277,13 @@ build_lm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, gr
     data <- dplyr::group_by(data, !!!rlang::syms(colnames(data)[group_col_index]))
   }
 
+  # Filter out NA and Inf from target variable.
+  target_cols <- all.vars(lazyeval::f_lhs(formula))
+  for (target_col in target_cols) {
+    data <- data %>%
+      dplyr::filter(!is.na(!!rlang::sym(target_col)) & !is.infinite(!!rlang::sym(target_col)))
+  }
+
   group_col_names <- grouped_by(data)
 
   # check if grouping columns are in the formula
