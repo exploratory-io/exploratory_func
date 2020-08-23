@@ -44,7 +44,8 @@ build_model_ <- function(data, model_func, seed = 1, test_rate = 0, group_cols =
 
   # use this for preprocess
   # and keep original data unchanged for later use
-  # like getting column names from formula
+  # like getting column names from formula.
+  # Note that data is thrown away after all.
   processed <- data
 
   # avoid name conflict of grouping columns
