@@ -383,7 +383,8 @@ preprocess_regression_data_before_sample <- function(df, target_col, predictor_c
   df <- df %>%
     dplyr::filter(!is.na(!!rlang::sym(target_col)) & !is.infinite(!!rlang::sym(target_col))) # this form does not handle group_by. so moved into each_func from outside.
 
-  # cols will be filtered to remove invalid columns
+  # Remove all-NA-or-Inf columns.
+  # NOTE: This has to be done bofore filtering predictor numeric NAs. Otherwise, all the rows could be filtered out.
   cols <- predictor_cols
   for (col in predictor_cols) {
     if(all(is.na(df[[col]]) | is.infinite(df[[col]]))){
