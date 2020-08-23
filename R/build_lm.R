@@ -277,6 +277,13 @@ build_lm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, gr
     data <- dplyr::group_by(data, !!!rlang::syms(colnames(data)[group_col_index]))
   }
 
+  # Filter out NA and Inf from target variable.
+  target_cols <- all.vars(lazyeval::f_lhs(formula))
+  for (target_col in target_cols) {
+    data <- data %>%
+      dplyr::filter(!is.na(!!rlang::sym(target_col)) & !is.infinite(!!rlang::sym(target_col)))
+  }
+
   group_col_names <- grouped_by(data)
 
   # check if grouping columns are in the formula
@@ -366,8 +373,18 @@ map_terms_to_orig <- function(terms, mapping) {
 #' Common preprocessing of regression data to be done BEFORE sampling.
 #' Only common operations to be done, for example, in Summary View too.
 #' @export
-preprocess_regression_data_before_sample <- function(df, target_col, predictor_cols, filter_target_na_inf=TRUE, filter_predictor_numeric_na=TRUE) {
-  # cols will be filtered to remove invalid columns
+preprocess_regression_data_before_sample <- function(df, target_col, predictor_cols, filter_predictor_numeric_na=TRUE) {
+  # ranger and rpart works with NA or Inf in the target, but we decided it would build rather meaningless or biased model.
+  # For example, rpart binary classification just replaces NAs with FALSE, which would change the meaning of data inadvertently.
+  # lm will filter out NAs anyway internally, and errors out if the remaining rows are with single value in any predictor column.
+  # Also, filter Inf/-Inf too to avoid error at lm.
+  # So, we always filter out NA/Inf from target variable.
+  # NOTE: This has to be done before removing of all-NA predictor columns, since this operation might make new all-NA predictor columns.
+  df <- df %>%
+    dplyr::filter(!is.na(!!rlang::sym(target_col)) & !is.infinite(!!rlang::sym(target_col))) # this form does not handle group_by. so moved into each_func from outside.
+
+  # Remove all-NA-or-Inf columns.
+  # NOTE: This has to be done bofore filtering predictor numeric NAs. Otherwise, all the rows could be filtered out.
   cols <- predictor_cols
   for (col in predictor_cols) {
     if(all(is.na(df[[col]]) | is.infinite(df[[col]]))){
@@ -378,15 +395,6 @@ preprocess_regression_data_before_sample <- function(df, target_col, predictor_c
   }
   if (length(cols) == 0) {
     stop("No predictor column is left after removing columns with only NA or Inf values.")
-  }
-
-  if (filter_target_na_inf){ # For ranger, this is not necessary.
-    df <- df %>%
-      # dplyr::filter(!is.na(!!target_col))  TODO: this was not filtering, and replaced it with the next line. check other similar places.
-      # for numeric cols, filter NA rows, because lm will anyway do this internally, and errors out
-      # if the remaining rows are with single value in any predictor column.
-      # filter Inf/-Inf too to avoid error at lm.
-      dplyr::filter(!is.na(df[[target_col]]) & !is.infinite(df[[target_col]])) # this form does not handle group_by. so moved into each_func from outside.
   }
 
   # To avoid unused factor level that causes margins::marginal_effects() to fail, filtering operation has
@@ -403,7 +411,7 @@ preprocess_regression_data_before_sample <- function(df, target_col, predictor_c
       # simplistic (e.g. only one split in the tree), especially in Exploratory for some reason, if we let rpart handle the handling of NAs,
       # even though it is supposed to just filter out rows with NAs, which is same as what we are doing here.
       if (filter_predictor_numeric_na) {
-        df <- df %>% dplyr::filter(!is.na(df[[col]]) & !is.infinite(df[[col]]))
+        df <- df %>% dplyr::filter(!is.na(!!rlang::sym(col)) & !is.infinite(!!rlang::sym(col)))
       }
       else {
         # For ranger, removing numeric NA is not necessary.
@@ -411,7 +419,7 @@ preprocess_regression_data_before_sample <- function(df, target_col, predictor_c
         # Error in seq.default(min(x, na.rm = TRUE), max(x, na.rm = TRUE), length.out = length.out) : 'from' must be a finite number
         # TODO: In exp_rpart and calc_feature_imp, we have logic to remember and restore NA rows, but they are probably not made use of
         # if we filter NA rows here.
-        df <- df %>% dplyr::filter(!is.infinite(df[[col]]))
+        df <- df %>% dplyr::filter(!is.na(!!rlang::sym(col)))
       }
     }
   }

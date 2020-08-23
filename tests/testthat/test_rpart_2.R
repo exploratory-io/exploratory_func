@@ -53,8 +53,10 @@ test_that("exp_rpart(regression) evaluate training and test", {
 })
 
 test_that("exp_rpart(binary(logical)) evaluate training and test", {
+  set.seed(1)
+  # Keep the test rate high (0.4) so that NA data goes to training part too.
   model_df <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`)) %>%
-                exp_rpart(is_delayed, `DIS TANCE`, `DEP DELAY`, test_rate = 0.3, binary_classification_threshold=0.5)
+                exp_rpart(is_delayed, `DIS TANCE`, `DEP DELAY`, test_rate = 0.4, binary_classification_threshold=0.5)
 
   ret <-  model_df %>% rf_partial_dependence()
 
@@ -66,6 +68,7 @@ test_that("exp_rpart(binary(logical)) evaluate training and test", {
 
   ret <- model_df %>% rf_evaluation_training_and_test()
   expect_equal(nrow(ret), 2) # 2 for train and test
+  expect_equal(is.na(ret$auc), c(F,F)) # 2 for train and test
 
   # Training only case
   model_df <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`)) %>%

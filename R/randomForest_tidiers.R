@@ -1777,20 +1777,8 @@ cleanup_df <- function(df, target_col, selected_cols, grouped_cols, target_n, pr
     stop("Max # of categories for explanatory vars must be at least 2.")
   }
 
-  # remove NA because it's not permitted for randomForest
-  df <- df %>%
-    dplyr::filter(!is.na(!!target_col))
-
   # cols will be filtered to remove invalid columns
   cols <- selected_cols
-
-  for (col in selected_cols) {
-    if(all(is.na(df[[col]]))){
-      # remove columns if they are all NA
-      cols <- setdiff(cols, col)
-      df[[col]] <- NULL # drop the column so that SMOTE will not see it.
-    }
-  }
 
   # randomForest fails if columns are not clean
   clean_df <- df
@@ -1831,9 +1819,9 @@ cleanup_df <- function(df, target_col, selected_cols, grouped_cols, target_n, pr
 
   if (!is.numeric(clean_df[[clean_target_col]]) && !is.logical(clean_df[[clean_target_col]])) {
     # limit the number of levels in factor by fct_lump
-    clean_df[[clean_target_col]] <- forcats::fct_explicit_na(forcats::fct_lump(
+    clean_df[[clean_target_col]] <- forcats::fct_lump(
       as.factor(clean_df[[clean_target_col]]), n = target_n, ties.method="first"
-    ))
+    )
   }
 
   ret <- new.env()
@@ -1846,7 +1834,6 @@ cleanup_df <- function(df, target_col, selected_cols, grouped_cols, target_n, pr
 
 cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, name_map, predictor_n, revert_logical_levels=TRUE, filter_numeric_na=FALSE) {
   df <- preprocess_regression_data_before_sample(df, clean_target_col, clean_cols,
-                                                 filter_target_na_inf=FALSE,
                                                  filter_predictor_numeric_na=filter_numeric_na)
   clean_cols <- attr(df, 'predictors') # predictors are updated (removed) in preprocess_pre_sample. Catch up with it.
   # sample the data because randomForest takes long time
