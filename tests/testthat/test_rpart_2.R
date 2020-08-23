@@ -31,8 +31,12 @@ test_that("exp_rpart(regression) evaluate training and test", {
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
   # expect_equal(nrow(test_ret), 1483) # Not very stable for some reason. Will revisit.
+  expect_lt(nrow(test_ret), 1500)
+  expect_gt(nrow(test_ret), 1400)
   train_ret <- ret %>% filter(is_test_data==FALSE)
   # expect_equal(nrow(train_ret), 3461) # Not very stable for some reason. Will revisit.
+  expect_lt(nrow(train_ret), 3500)
+  expect_gt(nrow(train_ret), 3400)
 
   ret <- rf_evaluation_training_and_test(model_df)
   expect_equal(nrow(ret), 2) # 2 for train and test
@@ -63,8 +67,12 @@ test_that("exp_rpart(binary(logical)) evaluate training and test", {
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
   # expect_equal(nrow(test_ret), 1483) # Not very stable for some reason. Will revisit.
+  expect_lt(nrow(test_ret), 2000)
+  expect_gt(nrow(test_ret), 1900)
   train_ret <- ret %>% filter(is_test_data==FALSE)
   # expect_equal(nrow(train_ret), 3461) # Not very stable for some reason. Will revisit.
+  expect_lt(nrow(train_ret), 3000)
+  expect_gt(nrow(train_ret), 2900)
 
   ret <- model_df %>% rf_evaluation_training_and_test()
   expect_equal(nrow(ret), 2) # 2 for train and test
@@ -90,8 +98,12 @@ test_that("exp_rpart(character(A,B)) evaluate training and test", { # This shoul
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
   # expect_equal(nrow(test_ret), 1483) # Not very stable for some reason. Will revisit.
+  expect_lt(nrow(test_ret), 1500)
+  expect_gt(nrow(test_ret), 1400)
   train_ret <- ret %>% filter(is_test_data==FALSE)
   # expect_equal(nrow(train_ret), 3461) # Not very stable for some reason. Will revisit.
+  expect_lt(nrow(train_ret), 3500)
+  expect_gt(nrow(train_ret), 3400)
 
   ret <- model_df %>% rf_evaluation_training_and_test()
   expect_equal(nrow(ret), 2) # 2 for train and test
@@ -116,8 +128,12 @@ test_that("exp_rpart(character(TRUE,FALSE)) with NAs evaluate training and test"
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
   # expect_equal(nrow(test_ret), 1483) # Not very stable for some reason. Will revisit.
+  expect_lt(nrow(test_ret), 1500)
+  expect_gt(nrow(test_ret), 1400)
   train_ret <- ret %>% filter(is_test_data==FALSE)
   # expect_equal(nrow(train_ret), 3461) # Not very stable for some reason. Will revisit.
+  expect_lt(nrow(train_ret), 3500)
+  expect_gt(nrow(train_ret), 3400)
 
   ret <- model_df %>% rf_evaluation_training_and_test()
   expect_equal(nrow(ret), 2) # 2 for train and test
@@ -143,8 +159,12 @@ test_that("exp_rpart(character(TRUE,FALSE)) without NAs evaluate training and te
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
   # expect_equal(nrow(test_ret), 1483) # Not very stable for some reason. Will revisit.
+  expect_lt(nrow(test_ret), 1500)
+  expect_gt(nrow(test_ret), 1400)
   train_ret <- ret %>% filter(is_test_data==FALSE)
   # expect_equal(nrow(train_ret), 3461) # Not very stable for some reason. Will revisit.
+  expect_lt(nrow(train_ret), 3500)
+  expect_gt(nrow(train_ret), 3400)
 
   ret <- model_df %>% rf_evaluation_training_and_test()
   expect_equal(nrow(ret), 2) # 2 for train and test
@@ -167,8 +187,12 @@ test_that("exp_rpart(binary) evaluate training and test with SMOTE", {
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
   # expect_equal(nrow(test_ret), 1483) # Not very stable for some reason. Will revisit.
+  # expect_lt(nrow(test_ret), 1500) # Not true because of SMOTE
+  expect_gt(nrow(test_ret), 1400)
   train_ret <- ret %>% filter(is_test_data==FALSE)
   # expect_equal(nrow(train_ret), 3461) # Not very stable for some reason. Will revisit.
+  # expect_lt(nrow(train_ret), 3500) # Not true because of SMOTE
+  expect_gt(nrow(train_ret), 3400)
 
   ret <- rf_evaluation_training_and_test(model_df)
   expect_equal(nrow(ret), 2) # 2 for train and test
@@ -193,8 +217,12 @@ test_that("exp_rpart(multi) evaluate training and test", {
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
   # expect_equal(nrow(test_ret), 1483) # Not very stable for some reason. Will revisit.
+  expect_lt(nrow(test_ret), 1500)
+  expect_gt(nrow(test_ret), 1400)
   train_ret <- ret %>% filter(is_test_data==FALSE)
   # expect_equal(nrow(train_ret), 3461) # Not very stable for some reason. Will revisit.
+  expect_lt(nrow(train_ret), 3500)
+  expect_gt(nrow(train_ret), 3400)
 
   ret <- rf_evaluation_training_and_test(model_df)
   expect_equal(nrow(ret), 2) # 2 for train and test
