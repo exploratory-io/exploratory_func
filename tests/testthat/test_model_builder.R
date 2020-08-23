@@ -78,7 +78,10 @@ test_that("test with 2 groups with 3 centers", {
   # test subject column name with a space
   colnames(test_df)[2] <- "gro up"
 
-  test_df %>% dplyr::group_by(`gro up`) %>% build_kmeans(val, col, augment = FALSE)
+  model_df <- test_df %>% dplyr::group_by(`gro up`) %>% build_kmeans(val, col, augment = FALSE)
+  res <- model_df %>% glance_rowwise(model)
+  expect_equal(colnames(res),
+               c("gro up","totss","tot.withinss","betweenss","iter"))
 })
 
 test_that("test with na values", {
