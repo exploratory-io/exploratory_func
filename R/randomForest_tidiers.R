@@ -1779,7 +1779,7 @@ cleanup_df <- function(df, target_col, selected_cols, grouped_cols, target_n, pr
 
   # remove NA because it's not permitted for randomForest
   df <- df %>%
-    dplyr::filter(!is.na(!!target_col))
+    dplyr::filter(!is.na(!!rlang::sym(target_col)))
 
   # cols will be filtered to remove invalid columns
   cols <- selected_cols
