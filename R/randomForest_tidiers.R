@@ -1777,20 +1777,8 @@ cleanup_df <- function(df, target_col, selected_cols, grouped_cols, target_n, pr
     stop("Max # of categories for explanatory vars must be at least 2.")
   }
 
-  # remove NA because it's not permitted for randomForest
-  df <- df %>%
-    dplyr::filter(!is.na(!!rlang::sym(target_col)))
-
   # cols will be filtered to remove invalid columns
   cols <- selected_cols
-
-  for (col in selected_cols) {
-    if(all(is.na(df[[col]]))){
-      # remove columns if they are all NA
-      cols <- setdiff(cols, col)
-      df[[col]] <- NULL # drop the column so that SMOTE will not see it.
-    }
-  }
 
   # randomForest fails if columns are not clean
   clean_df <- df
@@ -1831,9 +1819,9 @@ cleanup_df <- function(df, target_col, selected_cols, grouped_cols, target_n, pr
 
   if (!is.numeric(clean_df[[clean_target_col]]) && !is.logical(clean_df[[clean_target_col]])) {
     # limit the number of levels in factor by fct_lump
-    clean_df[[clean_target_col]] <- forcats::fct_explicit_na(forcats::fct_lump(
+    clean_df[[clean_target_col]] <- forcats::fct_lump(
       as.factor(clean_df[[clean_target_col]]), n = target_n, ties.method="first"
-    ))
+    )
   }
 
   ret <- new.env()
