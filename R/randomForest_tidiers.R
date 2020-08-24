@@ -779,6 +779,7 @@ augment.randomForest <- augment.randomForest.formula
 #' augment for randomForest(ranger) model
 #' @export
 augment.ranger <- function(x, data = NULL, newdata = NULL, ...) {
+  loadNamespace("ranger") # This is necessary for predict() to successfully figure out which function to call internally.
   if ("error" %in% class(x)) {
     ret <- data.frame()
     return(ret)
@@ -990,6 +991,7 @@ augment.ranger.regression <- function(x, data = NULL, newdata = NULL, data_type 
 #' augment for rpart model
 #' @export
 augment.rpart <- function(x, data = NULL, newdata = NULL, ...) {
+  loadNamespace("rpart") # This is necessary for predict() to successfully figure out which function to call internally.
   if ("error" %in% class(x)) {
     ret <- data.frame()
     return(ret)
@@ -3234,4 +3236,3 @@ glance.Boruta_exploratory <- function(x, pretty.name = FALSE, ...) {
   }
   res
 }
-
