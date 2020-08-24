@@ -991,6 +991,7 @@ augment.ranger.regression <- function(x, data = NULL, newdata = NULL, data_type 
 #' augment for rpart model
 #' @export
 augment.rpart <- function(x, data = NULL, newdata = NULL, ...) {
+  loadNamespace("rpart") # This is necessary for predict() to successfully figure out which runction to call internally.
   if ("error" %in% class(x)) {
     ret <- data.frame()
     return(ret)

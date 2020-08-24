@@ -272,6 +272,7 @@ xgboost_reg <- function(data, formula, output_type = "linear", eval_metric = "rm
 #' @param ... Not used for now.
 #' @export
 augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, ...) {
+  loadNamespace("xgboost") # This is necessary for predict() to successfully figure out which runction to call internally.
   class(x) <- class(x)[class(x) != c("xgboost_multi")]
 
   if(!is.null(x$terms)){
@@ -343,6 +344,7 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, ...) {
 #' @param ... Not used for now.
 #' @export
 augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, ...) {
+  loadNamespace("xgboost") # This is necessary for predict() to successfully figure out which runction to call internally.
   class(x) <- class(x)[!class(x) %in% c("xgboost_binary", "xgb.Booster.formula")]
   if(!is.null(x$terms)){
     ret_data <- if(!is.null(newdata)){
@@ -411,6 +413,7 @@ augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, ...) {
 #' @param ... Not used for now.
 #' @export
 augment.xgboost_reg <- function(x, data = NULL, newdata = NULL, ...) {
+  loadNamespace("xgboost") # This is necessary for predict() to successfully figure out which runction to call internally.
   class(x) <- class(x)[class(x) != "xgboost_reg" &
                        class(x) != "xgb.Booster.formula"]
 
@@ -454,6 +457,7 @@ augment.xgboost_reg <- function(x, data = NULL, newdata = NULL, ...) {
 #' @param ... Not used for now.
 #' @export
 augment.xgb.Booster <- function(x, data = NULL, newdata = NULL, ...) {
+  loadNamespace("xgboost") # This is necessary for predict() to successfully figure out which runction to call internally.
   class(x) <- class(x)[class(x) != "xgboost_binary" &
                          class(x) != "xgboost_multi" &
                          class(x) != "xgboost_reg" &
