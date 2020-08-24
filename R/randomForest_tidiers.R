@@ -779,6 +779,7 @@ augment.randomForest <- augment.randomForest.formula
 #' augment for randomForest(ranger) model
 #' @export
 augment.ranger <- function(x, data = NULL, newdata = NULL, ...) {
+  loadNamespace("ranger") # This is necessary for predict() to successfully figure out which runction to call internally.
   if ("error" %in% class(x)) {
     ret <- data.frame()
     return(ret)
