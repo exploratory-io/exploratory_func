@@ -29,7 +29,7 @@ build_multinom <- function(data, formula, ...){
 #' @param newdata Data to predict
 #' @export
 augment.multinom <- function(model, data = NULL, newdata = NULL, ...) {
-  # loadNamespace("nnet") # This is necessary for predict() to successfully figure out which runction to call internally for ranger, etc. But it seems nnet do not need it.
+  # loadNamespace("nnet") # This is necessary for predict() to successfully figure out which function to call internally for ranger, etc. But it seems nnet do not need it.
   predicted_label_col <- avoid_conflict(colnames(data), "predicted_label")
   predicted_prob_col <- avoid_conflict(colnames(data), "predicted_probability")
 
