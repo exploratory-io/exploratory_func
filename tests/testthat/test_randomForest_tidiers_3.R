@@ -30,7 +30,11 @@ test_that("calc_feature_map(regression) evaluate training and test", {
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
   # expect_equal(nrow(test_ret), 1500) Fails now, since we filter numeric NA. Revive when we do not need to.
+  expect_lt(nrow(test_ret), 1500)
+  expect_gt(nrow(test_ret), 1400)
   train_ret <- ret %>% filter(is_test_data==FALSE)
+  expect_lt(nrow(train_ret), 3500)
+  expect_gt(nrow(train_ret), 3400)
   # expect_equal(nrow(train_ret), 3500) Fails now, since we filter numeric NA. Revive when we do not need to.
 
   # Test result of boruta.
@@ -67,8 +71,12 @@ test_that("calc_feature_map(binary) evaluate training and test", {
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
   # expect_equal(nrow(test_ret), 1500) Fails now, since we filter numeric NA. Revive when we do not need to.
+  expect_lt(nrow(test_ret), 1500)
+  expect_gt(nrow(test_ret), 1400)
   train_ret <- ret %>% filter(is_test_data==FALSE)
   # expect_equal(nrow(train_ret), 3500) Fails now, since we filter numeric NA. Revive when we do not need to.
+  expect_lt(nrow(train_ret), 3500)
+  expect_gt(nrow(train_ret), 3400)
 
   ret <- rf_evaluation_training_and_test(model_df)
   expect_equal(nrow(ret), 2) # 2 for train and test
@@ -101,8 +109,12 @@ test_that("calc_feature_map(factor(TRUE, FALSE)) evaluate training and test", { 
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
   # expect_equal(nrow(test_ret), 1500) Fails now, since we filter numeric NA. Revive when we do not need to.
+  expect_lt(nrow(test_ret), 1500)
+  expect_gt(nrow(test_ret), 1400)
   train_ret <- ret %>% filter(is_test_data==FALSE)
   # expect_equal(nrow(train_ret), 3500) Fails now, since we filter numeric NA. Revive when we do not need to.
+  expect_lt(nrow(train_ret), 3500)
+  expect_gt(nrow(train_ret), 3400)
 
   ret <- rf_evaluation_training_and_test(model_df, pretty.name=T, binary_classification_threshold=0.5)
   expect_equal(nrow(ret), 2) # 2 for train and test
@@ -134,8 +146,12 @@ test_that("calc_feature_map(binary(factor(A,B))) evaluate training and test", {
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
   # expect_equal(nrow(test_ret), 1500) Fails now, since we filter numeric NA. Revive when we do not need to.
+  expect_lt(nrow(test_ret), 1500)
+  expect_gt(nrow(test_ret), 1400)
   train_ret <- ret %>% filter(is_test_data==FALSE)
   # expect_equal(nrow(train_ret), 3500) Fails now, since we filter numeric NA. Revive when we do not need to.
+  expect_lt(nrow(train_ret), 3500)
+  expect_gt(nrow(train_ret), 3400)
 
   ret <- rf_evaluation_training_and_test(model_df, pretty.name=T, binary_classification_threshold=0.5)
   expect_equal(nrow(ret), 2) # 2 for train and test
@@ -167,8 +183,12 @@ test_that("calc_feature_map(binary) evaluate training and test with SMOTE", {
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
   # expect_equal(nrow(test_ret), 1500) # Fails with SMOTE, which is expected.
+  # expect_lt(nrow(test_ret), 1500) # Not true because of SMOTE.
+  expect_gt(nrow(test_ret), 1400)
   train_ret <- ret %>% filter(is_test_data==FALSE)
   # expect_equal(nrow(train_ret), 3500) # Fails with SMOTE, which is expected.
+  # expect_lt(nrow(train_ret), 3500) # Not true because of SMOTE.
+  expect_gt(nrow(train_ret), 3400)
 
   ret <- rf_evaluation_training_and_test(model_df)
   expect_equal(nrow(ret), 2) # 2 for train and test
@@ -199,8 +219,12 @@ test_that("calc_feature_map(multi) evaluate training and test", {
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
   # expect_equal(nrow(test_ret), 1500) Fails now, since we filter numeric NA. Revive when we do not need to.
+  expect_lt(nrow(test_ret), 1500)
+  expect_gt(nrow(test_ret), 1400)
   train_ret <- ret %>% filter(is_test_data==FALSE)
   # expect_equal(nrow(train_ret), 3500) Fails now, since we filter numeric NA. Revive when we do not need to.
+  expect_lt(nrow(train_ret), 3500)
+  expect_gt(nrow(train_ret), 3400)
 
   ret <- rf_evaluation_training_and_test(model_df)
   expect_equal(nrow(ret), 2) # 2 for train and test

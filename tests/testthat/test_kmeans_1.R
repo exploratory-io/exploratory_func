@@ -11,6 +11,9 @@ test_that("exp_kmeans", {
   model_df %>% tidy_rowwise(model, type="data")
   res <- model_df %>% tidy_rowwise(model, type="gathered_data")
   res <- model_df %>% tidy_rowwise(model, type="gathered_data", normalize_data=TRUE, n_sample=20)
+  expect_equal(colnames(res),
+               c("disp","drat","wt","qsec","vs","am","gear","carb","new_col","cluster","PC1","PC2","PC3","row_id","key",
+                 "value"))
 })
 
 test_that("exp_kmeans with strange column name", {
@@ -24,6 +27,9 @@ test_that("exp_kmeans with strange column name", {
   model_df %>% tidy_rowwise(model, type="data")
   model_df %>% tidy_rowwise(model, type="gathered_data")
   res <- model_df %>% tidy_rowwise(model, type="gathered_data", normalize_data=TRUE, n_sample=100) # testing n_sample more than nrow()
+  expect_equal(colnames(res),
+               c("disp","drat","wt","qsec","vs","am","gear","carb","new_col","cluster","PC1","PC2","PC3","row_id","key",
+                 "value"))
 })
 
 test_that("exp_kmeans with single column name", {
@@ -34,6 +40,8 @@ test_that("exp_kmeans with single column name", {
   model_df %>% tidy_rowwise(model, type="data")
   model_df %>% tidy_rowwise(model, type="gathered_data")
   res <- model_df %>% tidy_rowwise(model, type="gathered_data", normalize_data=TRUE, n_sample=100) # testing n_sample more than nrow()
+  expect_equal(colnames(res),
+               c("cyl","disp","hp","drat","wt","qsec","vs","am","gear","carb","cluster","PC1","row_id","key","value"))
 })
 
 test_that("exp_kmeans elbow method mode", {

@@ -7,7 +7,9 @@ test_that("test exp_wilcox", {
   model_df <- exp_wilcox(mtcars2, mpg, am)
   ret <- model_df %>% tidy_rowwise(model, type="model")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
-  ret
+  expect_equal(colnames(ret),
+               c("am","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
+                 "Minimum","Maximum"))
 })
 
 test_that("test exp_wilcox with conf.int = TRUE", {
@@ -16,7 +18,9 @@ test_that("test exp_wilcox with conf.int = TRUE", {
   model_df <- exp_wilcox(mtcars2, mpg, am, conf.int=TRUE)
   ret <- model_df %>% tidy_rowwise(model, type="model")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
-  ret
+  expect_equal(colnames(ret),
+               c("am","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
+                 "Minimum","Maximum"))
 })
 
 test_that("test exp_wilcox with paired = TRUE", {
@@ -25,7 +29,9 @@ test_that("test exp_wilcox with paired = TRUE", {
   model_df <- exp_wilcox(mtcars2, mpg, am, paired=TRUE)
   ret <- model_df %>% tidy_rowwise(model, type="model")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
-  ret
+  expect_equal(colnames(ret),
+               c("am","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
+                 "Minimum","Maximum"))
 })
 
 test_that("test exp_wilcox with paired = TRUE, conf.int = TRUE", {
@@ -34,6 +40,8 @@ test_that("test exp_wilcox with paired = TRUE, conf.int = TRUE", {
   model_df <- exp_wilcox(mtcars2, mpg, am, paired=TRUE, conf.int = TRUE)
   ret <- model_df %>% tidy_rowwise(model, type="model")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
-  ret
+  expect_equal(colnames(ret),
+               c("am","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
+                 "Minimum","Maximum"))
 })
 
