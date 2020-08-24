@@ -344,7 +344,7 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, ...) {
 #' @param ... Not used for now.
 #' @export
 augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, ...) {
-  loadNamespace("xgboost") # This is necessary for predict() to successfully figure out which runction to call internally.
+  loadNamespace("xgboost") # This is necessary for predict() to successfully figure out which function to call internally.
   class(x) <- class(x)[!class(x) %in% c("xgboost_binary", "xgb.Booster.formula")]
   if(!is.null(x$terms)){
     ret_data <- if(!is.null(newdata)){
