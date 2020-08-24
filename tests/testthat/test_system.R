@@ -271,3 +271,9 @@ test_that("read_parquet_file", {
   expect_equal(TRUE, is.data.frame(df))
 })
 
+test_that("test filter_cascade",{
+  library(stringr)
+  df <- readRDS(url("https://www.dropbox.com/s/p2vmd79ly1zugh9/airbnb_nyc_filter_7.rds?dl=1"))
+  df <- df %>% filter_cascade(detect_outlier(reviews_per_month, "iqr") == "Normal", cut(reviews_per_month, breaks = 5, dig.lab = 10) %in% c("(0.21,0.31]"))
+  expect_equal(nrow(df), 2661)
+})

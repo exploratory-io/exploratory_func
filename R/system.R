@@ -2413,3 +2413,17 @@ read_raw_lines <- function(file, locale = readr::default_locale(), na = characte
   # use line as column name
   df <- data.frame(line = line, stringsAsFactors = FALSE)
 }
+
+#'Wrapper for dplyr::filter to support successive calls instead of single filter
+#'call with multiple conditions.
+#
+#'@export
+filter_cascade <- function(.data, ...){
+  dots <- dplyr:::check_filter(enquos(...))
+  df <- .data
+  for(i in 1:length(dots)) {
+    expr <- rlang::quo_get_expr(dots[[i]])
+    df <- df %>% dplyr::filter(eval(expr))
+  }
+  df
+}
