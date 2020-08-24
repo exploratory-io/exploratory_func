@@ -280,7 +280,9 @@ test_that("test exp_ttest with var.equal = TRUE", {
   model_df <- exp_ttest(mtcars2, mpg, am, var.equal = TRUE)
   ret <- model_df %>% tidy_rowwise(model, type="model")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
-  ret
+  expect_equal(colnames(ret),
+               c("am","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
+                 "Minimum","Maximum"))
 })
 
 test_that("test exp_ttest with alternative = greater", {
@@ -293,7 +295,6 @@ test_that("test exp_ttest with alternative = greater", {
   expect_equal(colnames(ret),
                c("am","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
                  "Minimum","Maximum"))
-  ret
 })
 
 test_that("test exp_ttest with paired = TRUE", {
