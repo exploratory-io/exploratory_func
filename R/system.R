@@ -2381,18 +2381,16 @@ read_parquet_file <- function(file){
       
       # Download the remote parquet file to the local temp file.
       tf <- tempfile()  
-      utils::download.file(file, tf)
+      # Remove on exit.
+      on.exit(unlink(tf))
+      # mode="wb" for binary download
+      utils::download.file(file, tf, mode = "wb")
       # Read the local parquet file.
       res <- arrow::read_parquet(tf)
 
     } else {
       res <- arrow::read_parquet(file)
     }
-    # There is an issue that the res contains 0 row if I remove the temp 
-    # file right after calling read_parquet.  
-    #if (!is.null(tf)) {
-    #  unlink(tf);
-    #}
   }, error=function(e){
         
   })
