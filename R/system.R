@@ -2362,42 +2362,46 @@ read_parquet_file <- function(file){
   # Backup the locale info and set English locale for reading parquet issue
   # on Windows https://issues.apache.org/jira/browse/ARROW-7288
   if (is.win) {
+    # Backup the current locale info.
     lc.all<- Sys.getlocale("LC_ALL")
     lc.collate<- Sys.getlocale("LC_COLLATE")
     lc.ctype<- Sys.getlocale("LC_CTYPE")
     lc.monetary<- Sys.getlocale("LC_MONETARY") 
     lc.numeric<- Sys.getlocale("LC_NUMERIC")
-    
+    # Set English. 
     Sys.setlocale("LC_ALL", "English")
   }
   
-  if (stringr::str_detect(file, "^https://") ||
-      stringr::str_detect(file, "^http://") ||
-      stringr::str_detect(file, "^ftp://")) {
+  # Catch errors to guarantee restoring the locale info later.
+  tryCatch({
     
-    # Download the remote parquet file to the local temp file.
-    tf <- tempfile()  
-    utils::download.file(file, tf)
-    # Read the local parquet file.
-    res <- arrow::read_parquet(tf)
+    if (stringr::str_detect(file, "^https://") ||
+        stringr::str_detect(file, "^http://") ||
+        stringr::str_detect(file, "^ftp://")) {
+      
+      # Download the remote parquet file to the local temp file.
+      tf <- tempfile()  
+      # Remove on exit.
+      on.exit(unlink(tf))
+      # mode="wb" for binary download
+      utils::download.file(file, tf, mode = "wb")
+      # Read the local parquet file.
+      res <- arrow::read_parquet(tf)
 
-  } else {
-    res <- arrow::read_parquet(file)
-  }
+    } else {
+      res <- arrow::read_parquet(file)
+    }
+  }, error=function(e){
+        
+  })
 
-  # Restore the locale info.
+  # Restore the original locale info.
   if (is.win) {
     Sys.setlocale("LC_ALL", lc.all)
     Sys.setlocale("LC_COLLATE", lc.collate)
     Sys.setlocale("LC_CTYPE", lc.ctype)
     Sys.setlocale("LC_MONETARY", lc.monetary) 
     Sys.setlocale("LC_NUMERIC", lc.numeric)
-  }
-  
-  if (!is.null(tf)) {
-    # There was an issue that the res contains 0 row if I remove the temp 
-    # file right after calling read_parquet. I don't see it now though.
-    unlink(tf);
   }
   res
 }
