@@ -24,7 +24,7 @@ updateGoogleSheet <- function(filepath, id, overwrite = FALSE){
   token <- getGoogleTokenForSheet("")
   googlesheets4::sheets_set_token(token)
   googledrive::drive_set_token(token)
-  sheet <- googledrive::drive_update(file = googledrive::as_id(id), media = filepath, verbose=TRUE)
+  sheet <- googledrive::drive_update(file = googledrive::as_id(id), media = filepath)
 }
 
 #' API to get google sheet data
