@@ -1180,6 +1180,9 @@ create_model_meta <- function(df, formula){
   tryCatch({
     md_frame <- model.frame(formula, data = df)
     ret$terms <- terms(md_frame, formula)
+    # To avoid saving a huge environment when caching with RDS.
+    attr(ret$terms, ".Environment") <- NULL
+
     pred_cnames <- all.vars(ret$terms)[-1]
 
     # capture column data types info
