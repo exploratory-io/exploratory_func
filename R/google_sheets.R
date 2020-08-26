@@ -13,6 +13,20 @@ uploadGoogleSheet <- function(filepath, title, overwrite = FALSE){
   sheet <- googledrive::drive_upload(filepath, title, type = "spreadsheet", overwrite = overwrite)
 }
 
+#' API to update existing Google Sheet with the local CSV file.
+#' @export
+#' @param filepath path of source CSV file that you want to update with
+#' @param id id of the existing sheet on Google Sheets.
+updateGoogleSheet <- function(filepath, id, overwrite = FALSE){
+  if(!requireNamespace("googlesheets4")){stop("package googlesheets4 must be installed.")}
+  if(!requireNamespace("googledrive")){stop("package googledrive must be installed.")}
+
+  token <- getGoogleTokenForSheet("")
+  googlesheets4::sheets_set_token(token)
+  googledrive::drive_set_token(token)
+  sheet <- googledrive::drive_update(file = googledrive::as_id(id), media = filepath)
+}
+
 #' API to get google sheet data
 #' @export
 #' @param title name of a sheet on Google Sheets.
@@ -57,6 +71,9 @@ getGoogleSheet <- function(title, sheetName, skipNRows = 0, treatTheseAsNA = NUL
   if(!is.null(tzone)) { # if timezone is specified, apply the timezeon to POSIXct columns
     df <- df %>% dplyr::mutate_if(lubridate::is.POSIXct, funs(lubridate::force_tz(., tzone=tzone)))
   }
+  # For list columns, change the data type to characters
+  df <- df %>% dplyr::mutate_if(is.list, funs(as.character))
+
   df
 }
 
