@@ -758,10 +758,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
     ret
   }
   else {
-    tmp_col <- avoid_conflict(colnames(df), "model") #TODO: Conflict should be an issue only with group_by columns.
-    ret <- df %>%
-      dplyr::do_(.dots=setNames(list(~do_prophet_each(.)), tmp_col))
-    ret
+    do_on_each_group(df, do_prophet_each, name = "model", with_unnest = FALSE)
   }
 }
 

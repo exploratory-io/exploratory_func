@@ -190,6 +190,33 @@ calc_vif <- function(model, terms_mapping) {
   })
 }
 
+# augment function just to filter out unknown categories in predictors to avoid error.
+augment.lm_exploratory_0 <- function(x, data = NULL, newdata = NULL, ...) {
+  if (!is.null(newdata) && length(x$xlevels) > 0) {
+    for (i in 1:length(x$xlevels)) {
+      newdata <- newdata %>% dplyr::filter(!!rlang::sym(names(x$xlevels)[[i]]) %in% !!x$xlevels[[i]])
+    }
+  }
+  if (is.null(data)) { # Giving data argument when it is NULL causes error from augment.glm. Do the same for lm just in case.
+    ret <- broom:::augment.lm(x, newdata = newdata, se=TRUE, ...)
+    if (!is.null(ret$.rownames)) { # Clean up .rownames column augment.glm adds for some reason. Do the same for lm just in case.
+      ret$.rownames <- NULL
+    }
+  }
+  else {
+    ret <- broom:::augment.lm(x, data = data, newdata = newdata, se=TRUE, ...)
+  }
+  ret
+}
+
+tidy.lm_exploratory_0 <- function(x, ...) {
+  # tidy.lm raises error when class has more than "lm". Working it around here.
+  orig_class <- class(x)
+  class(x) <- "lm"
+  ret <- broom:::tidy.lm(x, ...)
+  class(x) <- orig_class
+  ret
+}
 
 #' lm wrapper with do
 #' @return deta frame which has lm model
@@ -250,6 +277,13 @@ build_lm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, gr
     data <- dplyr::group_by(data, !!!rlang::syms(colnames(data)[group_col_index]))
   }
 
+  # Filter out NA and Inf from target variable.
+  target_cols <- all.vars(lazyeval::f_lhs(formula))
+  for (target_col in target_cols) {
+    data <- data %>%
+      dplyr::filter(!is.na(!!rlang::sym(target_col)) & !is.infinite(!!rlang::sym(target_col)))
+  }
+
   group_col_names <- grouped_by(data)
 
   # check if grouping columns are in the formula
@@ -279,7 +313,9 @@ build_lm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, gr
         data <- safe_slice(df, index, remove = TRUE)
 
         # execute lm with parsed arguments
-        eval(parse(text = paste0("stats::lm(data = data, ", arg_char, ")")))
+        model <- eval(parse(text = paste0("stats::lm(data = data, ", arg_char, ")")))
+        class(model) <- c("lm_exploratory_0", class(model))
+        model
       })) %>%
       dplyr::mutate(.model_metadata = purrr::map(source.data, function(df){
         if(!is.null(formula)){
@@ -337,8 +373,18 @@ map_terms_to_orig <- function(terms, mapping) {
 #' Common preprocessing of regression data to be done BEFORE sampling.
 #' Only common operations to be done, for example, in Summary View too.
 #' @export
-preprocess_regression_data_before_sample <- function(df, target_col, predictor_cols, filter_target_na_inf=TRUE, filter_predictor_numeric_na=TRUE) {
-  # cols will be filtered to remove invalid columns
+preprocess_regression_data_before_sample <- function(df, target_col, predictor_cols, filter_predictor_numeric_na=TRUE) {
+  # ranger and rpart works with NA or Inf in the target, but we decided it would build rather meaningless or biased model.
+  # For example, rpart binary classification just replaces NAs with FALSE, which would change the meaning of data inadvertently.
+  # lm will filter out NAs anyway internally, and errors out if the remaining rows are with single value in any predictor column.
+  # Also, filter Inf/-Inf too to avoid error at lm.
+  # So, we always filter out NA/Inf from target variable.
+  # NOTE: This has to be done before removing of all-NA predictor columns, since this operation might make new all-NA predictor columns.
+  df <- df %>%
+    dplyr::filter(!is.na(!!rlang::sym(target_col)) & !is.infinite(!!rlang::sym(target_col))) # this form does not handle group_by. so moved into each_func from outside.
+
+  # Remove all-NA-or-Inf columns.
+  # NOTE: This has to be done bofore filtering predictor numeric NAs. Otherwise, all the rows could be filtered out.
   cols <- predictor_cols
   for (col in predictor_cols) {
     if(all(is.na(df[[col]]) | is.infinite(df[[col]]))){
@@ -349,15 +395,6 @@ preprocess_regression_data_before_sample <- function(df, target_col, predictor_c
   }
   if (length(cols) == 0) {
     stop("No predictor column is left after removing columns with only NA or Inf values.")
-  }
-
-  if (filter_target_na_inf){ # For ranger, this is not necessary.
-    df <- df %>%
-      # dplyr::filter(!is.na(!!target_col))  TODO: this was not filtering, and replaced it with the next line. check other similar places.
-      # for numeric cols, filter NA rows, because lm will anyway do this internally, and errors out
-      # if the remaining rows are with single value in any predictor column.
-      # filter Inf/-Inf too to avoid error at lm.
-      dplyr::filter(!is.na(df[[target_col]]) & !is.infinite(df[[target_col]])) # this form does not handle group_by. so moved into each_func from outside.
   }
 
   # To avoid unused factor level that causes margins::marginal_effects() to fail, filtering operation has
@@ -374,7 +411,7 @@ preprocess_regression_data_before_sample <- function(df, target_col, predictor_c
       # simplistic (e.g. only one split in the tree), especially in Exploratory for some reason, if we let rpart handle the handling of NAs,
       # even though it is supposed to just filter out rows with NAs, which is same as what we are doing here.
       if (filter_predictor_numeric_na) {
-        df <- df %>% dplyr::filter(!is.na(df[[col]]) & !is.infinite(df[[col]]))
+        df <- df %>% dplyr::filter(!is.na(!!rlang::sym(col)) & !is.infinite(!!rlang::sym(col)))
       }
       else {
         # For ranger, removing numeric NA is not necessary.
@@ -382,7 +419,7 @@ preprocess_regression_data_before_sample <- function(df, target_col, predictor_c
         # Error in seq.default(min(x, na.rm = TRUE), max(x, na.rm = TRUE), length.out = length.out) : 'from' must be a finite number
         # TODO: In exp_rpart and calc_feature_imp, we have logic to remember and restore NA rows, but they are probably not made use of
         # if we filter NA rows here.
-        df <- df %>% dplyr::filter(!is.infinite(df[[col]]))
+        df <- df %>% dplyr::filter(!is.na(!!rlang::sym(col)))
       }
     }
   }
@@ -976,7 +1013,10 @@ build_lm.fast <- function(df,
         # Show only max_pd_vars most significant (ones with the smallest P values) vars.
         # For categorical, pick the smallest P value among all classes of it.
         c_cols_list <- as.list(c_cols)
-        coef_df <- broom::tidy(model)
+        # Since broom:::tidy.lm raises :Error: No tidy method for objects of class lm_exploratory",
+        # always use broom:::tidy.glm which does not have this problem, and seems to return the same result,
+        # even for lm.
+        coef_df <- broom:::tidy.glm(model)
         # str_detect matches with all categorical class terms that belongs to the variable.
         p_values_list <- c_cols_list %>% purrr::map(function(x){(coef_df %>% filter(stringr::str_detect(term, paste0("^`?", x))) %>% summarize(p.value=min(p.value, na.rm=TRUE)))$p.value})
         p_values_df <- tibble(term=c_cols, p.value=purrr::flatten_dbl(p_values_list))
@@ -1029,7 +1069,7 @@ build_lm.fast <- function(df,
     ret <- ret %>% tidyr::nest()
   }
   ret <- ret %>% dplyr::ungroup() # Remove rowwise grouping so that following mutate works as expected.
-  ret %>% dplyr::mutate(model = purrr::map(data, function(df){
+  ret <- ret %>% dplyr::mutate(model = purrr::map(data, function(df){
             df[[model_and_data_col]][[1]]$model
           })) %>%
           dplyr::mutate(.test_index = purrr::map(data, function(df){
@@ -1043,8 +1083,14 @@ build_lm.fast <- function(df,
               data
             }
           })) %>%
-          dplyr::select(-data) %>%
-          dplyr::rowwise()
+          dplyr::select(-data)
+  # Rowwise grouping has to be redone with original grouped_cols, so that summarize(tidy(model)) later can add back the group column.
+  if (length(grouped_cols) > 0) {
+    ret <- ret %>% dplyr::rowwise(grouped_cols)
+  } else {
+    ret <- ret %>% dplyr::rowwise()
+  }
+  ret
 }
 
 #' special version of glance.lm function to use with build_lm.fast.
@@ -1077,6 +1123,9 @@ glance.lm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
     ret <- ret %>% dplyr::rename(`R Squared`=r.squared, `Adj R Squared`=adj.r.squared, `RMSE`=rmse, `F Ratio`=statistic, `P Value`=p.value, `Degree of Freedom`=df, `Log Likelihood`=logLik, `Residual Deviance`=deviance, `Residual DF`=df.residual, `Number of Rows`=n)
     # Note column might not exist. Rename if it is there.
     colnames(ret)[colnames(ret) == "note"] <- "Note"
+  }
+  if (!is.null(ret$nobs)) { # glance.glm's newly added nobs seems to be same as Number of Rows. Suppressing it for now.
+    ret <- ret %>% dplyr::select(-nobs)
   }
   ret
 }
@@ -1155,6 +1204,9 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
       ret <- ret %>% dplyr::rename(`Null Deviance`=null.deviance, `DF for Null Model`=df.null, `Log Likelihood`=logLik, `Residual Deviance`=deviance, `Residual DF`=df.residual) %>%
         dplyr::select(`P Value`, `Number of Rows`, `Log Likelihood`, `AIC`, `BIC`, `Residual Deviance`, `Null Deviance`, `DF for Null Model`, everything())
     }
+  }
+  if (!is.null(ret$nobs)) { # glance.glm's newly added nobs seems to be same as Number of Rows. Suppressing it for now.
+    ret <- ret %>% dplyr::select(-nobs)
   }
 
   ret
@@ -1238,7 +1290,10 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
   }
   switch(type,
     coefficients = {
-      ret <- broom:::tidy.lm(x) # it seems that tidy.lm takes care of glm too
+      # Since broom:::tidy.lm raises :Error: No tidy method for objects of class lm_exploratory",
+      # always use broom:::tidy.glm which does not have this problem, and seems to return the same result,
+      # even for lm.
+      ret <- broom:::tidy.glm(x)
       ret <- ret %>% mutate(conf.high=estimate+1.96*std.error, conf.low=estimate-1.96*std.error)
       base_level_table <- xlevels_to_base_level_table(x$xlevels)
       # Convert term from factor to character to remove warning at left_join.
@@ -1276,7 +1331,10 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
         ret <- data.frame(term = term, importance = importance, importance.high = importance.high, importance.low = importance.low)
         # Reorder factor by the value of relative importance (lmg).
         ret <- ret %>% dplyr::mutate(term = forcats::fct_reorder(term, importance, .fun = sum, .desc = TRUE))
-        coef_df <- broom:::tidy.lm(x)
+        # Since broom:::tidy.lm raises :Error: No tidy method for objects of class lm_exploratory",
+        # always use broom:::tidy.glm which does not have this problem, and seems to return the same result,
+        # even for lm.
+        coef_df <- broom:::tidy.glm(x)
         ret <- ret %>% mutate(p.value=purrr::map(term, function(var) {
           get_var_min_pvalue(var, coef_df, x)
         }))
@@ -1318,7 +1376,10 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
       }
       ret <- x$permutation_importance
       # Add p.value column.
-      coef_df <- broom:::tidy.lm(x)
+      # Since broom:::tidy.lm raises :Error: No tidy method for objects of class lm_exploratory",
+      # always use broom:::tidy.glm which does not have this problem, and seems to return the same result,
+      # even for lm.
+      coef_df <- broom:::tidy.glm(x)
       ret <- ret %>% dplyr::mutate(p.value=purrr::map(term, function(var) {
         get_var_min_pvalue(var, coef_df, x)
       })) %>% dplyr::mutate(p.value=as.numeric(p.value)) # Make list into numeric vector.
@@ -1346,7 +1407,7 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
   }
   switch(type,
     coefficients = {
-      ret <- broom:::tidy.lm(x) # it seems that tidy.lm takes care of glm too
+      ret <- broom:::tidy.glm(x)
       ret <- ret %>% mutate(conf.high=estimate+1.96*std.error, conf.low=estimate-1.96*std.error)
       if (x$family$family == "binomial") { # odds ratio is only for logistic regression
         ret <- ret %>% mutate(odds_ratio=exp(estimate))
@@ -1440,7 +1501,7 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
       }
       ret <- x$permutation_importance
       # Add p.value column.
-      coef_df <- broom:::tidy.lm(x)
+      coef_df <- broom:::tidy.glm(x)
       ret <- ret %>% dplyr::mutate(p.value=purrr::map(term, function(var) {
         get_var_min_pvalue(var, coef_df, x)
       })) %>% dplyr::mutate(p.value=as.numeric(p.value)) # Make list into numeric vector.
@@ -1455,7 +1516,7 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
 #' wrapper for tidy type partial dependence
 #' @export
 lm_partial_dependence <- function(df, ...) { # TODO: write test for this.
-  res <- df %>% broom::tidy(model, type="partial_dependence", ...)
+  res <- df %>% tidy_rowwise(model, type="partial_dependence", ...)
   if (nrow(res) == 0) {
     return(data.frame()) # Skip the rest of processing by returning empty data.frame.
   }
@@ -1490,11 +1551,11 @@ augment.lm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "
   }
 
   if(!is.null(newdata)) { # Call broom:::augment.lm as is
-    ret <- broom:::augment.lm(x, data = data, newdata = newdata, ...)
+    ret <- broom:::augment.lm(x, data = data, newdata = newdata, se = TRUE, ...)
   } else if (!is.null(data)) {
     ret <- switch(data_type,
       training = { # Call broom:::augment.lm as is
-        broom:::augment.lm(x, data = data, newdata = newdata, ...)
+        broom:::augment.lm(x, data = data, newdata = newdata, se = TRUE, ...)
       },
       test = {
         # Augment data with already predicted result in the model.
@@ -1504,7 +1565,7 @@ augment.lm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "
       })
   }
   else {
-    ret <- broom:::augment.lm(x, ...)
+    ret <- broom:::augment.lm(x, se = TRUE, ...)
   }
   # Rename columns back to the original names.
   names(ret) <- coalesce(x$terms_mapping[names(ret)], names(ret))
@@ -1518,14 +1579,22 @@ augment.glm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = 
     return(ret)
   }
   if(!is.null(newdata)) {
-    # Calling broom:::augment.glm fails with 'NextMethod' called from an anonymous function
-    # It seems augment.glm is only calling NextMethod, which is falling back to broom:::augment.lm.
-    # So, we are just directly calling augment.lm here.
-    ret <- broom:::augment.lm(x, data = data, newdata = newdata, ...)
+    ret <- tryCatch({
+      broom:::augment.glm(x, data = data, newdata = newdata, se = TRUE, ...)
+    }, error = function(e){
+      # se=TRUE throws error that looks like "singular matrix 'a' in solve",
+      # in some subset of cases of perfect collinearity.
+      # Try recovering from it by running with se=FALSE.
+      broom:::augment.glm(x, data = data, newdata = newdata, se = FALSE, ...)
+    })
   } else if (!is.null(data)) {
     ret <- switch(data_type,
-      training = { # Call broom:::augment.lm as is
-        broom:::augment.lm(x, data = data, newdata = newdata, ...)
+      training = {
+        tryCatch({
+          broom:::augment.glm(x, data = data, newdata = newdata, se = TRUE, ...)
+        }, error = function(e){
+          broom:::augment.glm(x, data = data, newdata = newdata, se = FALSE, ...)
+        })
       },
       test = {
         # Augment data with already predicted result in the model.
@@ -1535,7 +1604,11 @@ augment.glm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = 
       })
   }
   else {
-    ret <- broom:::augment.lm(x, ...)
+    ret <- tryCatch({
+      broom:::augment.glm(x, se = TRUE, ...)
+    }, error = function(e){
+      broom:::augment.glm(x, se = FALSE, ...)
+    })
   }
   # Rename columns back to the original names.
   names(ret) <- coalesce(x$terms_mapping[names(ret)], names(ret))
@@ -1553,7 +1626,7 @@ find_data.glm_exploratory <- function(model, env = parent.frame(), ...) {
 # This is written for linear regression analytics view and GLM analytics views that makes numeric prediction.
 evaluate_lm_training_and_test <- function(df, pretty.name = FALSE){
   # Get the summary row for traninng data. Info is retrieved from model by glance()
-  training_ret <- df %>% broom::glance(model, pretty.name = pretty.name)
+  training_ret <- df %>% glance_rowwise(model, pretty.name = pretty.name)
   ret <- training_ret
 
   grouped_col <- colnames(df)[!colnames(df) %in% c("model", ".test_index", "source.data")]

@@ -35,14 +35,14 @@ test_that("build_lm.fast (linear regression) evaluate training and test", {
   expect_equal(nrow(ret), 2) # 2 for train and test
 
   # Check order of variable importance result.
-  ret <- model_df %>% broom::tidy(model, type="permutation_importance")
+  ret <- model_df %>% tidy_rowwise(model, type="permutation_importance")
   # unname() is necessary for the result to be equal to the expectation.
   expect_equal(unname((ret %>% arrange(-importance))$term), c("DEP DELAY", "CAR RIER", "DIS TANCE"))
 
   # Test univariate case handling
   model_df <- flight %>%
                 build_lm.fast(`ARR DELAY`, `DIS TANCE`, relimp = TRUE, relimp_type = "first", test_rate = 0.3, seed=1)
-  ret <- model_df %>% broom::tidy(model, type="permutation_importance")
+  ret <- model_df %>% tidy_rowwise(model, type="permutation_importance")
   expect_equal(nrow(ret), 0)
 })
 

@@ -15,22 +15,22 @@ test_that("do_prophet with aggregation", {
   # test for test mode.
   raw_data$`cou nt`[[length(raw_data$`cou nt`) - 2]] <- NA # inject NA near the end to test #9211
   ret <- raw_data %>%
-    do_prophet(`time stamp`, `cou nt`, 2, time_unit = "day", test_mode=TRUE, output="model") %>% tidy(model)
+    do_prophet(`time stamp`, `cou nt`, 2, time_unit = "day", test_mode=TRUE, output="model") %>% tidy_rowwise(model)
   # verify that the last forecasted_value is not NA to test #9211
   expect_true(!is.na(ret$forecasted_value[[length(ret$forecasted_value)]]))
 
   ret <- raw_data %>%
-    do_prophet(`time stamp`, `cou nt`, 2, time_unit = "hour", test_mode=TRUE, output="model") %>% tidy(model)
+    do_prophet(`time stamp`, `cou nt`, 2, time_unit = "hour", test_mode=TRUE, output="model") %>% tidy_rowwise(model)
   # verify that the last forecasted_value is not NA to test #9211
   expect_true(!is.na(ret$forecasted_value[[length(ret$forecasted_value)]]))
 
   ret <- raw_data %>% tail(100) %>%
-    do_prophet(`time stamp`, `cou nt`, 2, time_unit = "minute", test_mode=TRUE, output="model") %>% tidy(model)
+    do_prophet(`time stamp`, `cou nt`, 2, time_unit = "minute", test_mode=TRUE, output="model") %>% tidy_rowwise(model)
   # verify that the last forecasted_value is not NA to test #9211
   expect_true(!is.na(ret$forecasted_value[[length(ret$forecasted_value)]]))
 
   ret <- raw_data %>% tail(100) %>%
-    do_prophet(`time stamp`, `cou nt`, 2, time_unit = "second", test_mode=TRUE, output="model") %>% tidy(model)
+    do_prophet(`time stamp`, `cou nt`, 2, time_unit = "second", test_mode=TRUE, output="model") %>% tidy_rowwise(model)
   # verify that the last forecasted_value is not NA to test #9211
   expect_true(!is.na(ret$forecasted_value[[length(ret$forecasted_value)]]))
 })
@@ -109,13 +109,13 @@ test_that("do_prophet with short data (test for coef)", {
   raw_data <- data.frame(timestamp=ts, data=runif(length(ts)))
   model_df <- raw_data %>%
     do_prophet(timestamp, data, 10, time_unit = "day", funs.aggregate.regressors = c(mean), yearly.seasonality = "auto", weekly.seasonality = "auto", output="model")
-  coef_df <- model_df %>% tidy(model, type="coef")
+  coef_df <- model_df %>% tidy_rowwise(model, type="coef")
   expect_equal(length(names(coef_df)), 0)
-  ret <- model_df %>% tidy(model)
+  ret <- model_df %>% tidy_rowwise(model)
   # verify the last date with forecasted_value
   expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2010-01-23")) 
   # test for glance.
-  ret <- model_df %>% glance(model)
+  ret <- model_df %>% glance_rowwise(model)
   expect_true(all(c("RMSE","MAE","MAPE") %in% names(ret)))
 })
 
@@ -127,9 +127,9 @@ test_that("do_prophet with extra regressors", {
   combined_data <- raw_data %>% full_join(regressor_data, by=c("timestamp"="timestamp"))
   model_df <- combined_data %>%
     do_prophet(timestamp, data, 10, time_unit = "day", regressors = c("regressor1","regressor2"), funs.aggregate.regressors = c(mean), output="model")
-  coef_df <- model_df %>% tidy(model, type="coef")
+  coef_df <- model_df %>% tidy_rowwise(model, type="coef")
   expect_equal(names(coef_df), c("Variable","Importance"))
-  ret <- model_df %>% tidy(model)
+  ret <- model_df %>% tidy_rowwise(model)
   # verify the last date with forecasted_value
   expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2012-01-11")) 
   # verify the last date in the data is the end of regressor data
@@ -144,9 +144,9 @@ test_that("do_prophet with extra regressor with holiday column", {
   combined_data <- raw_data %>% full_join(regressor_data, by=c("timestamp"="timestamp"))
   model_df <- combined_data %>%
     do_prophet(timestamp, data, 10, time_unit = "day", regressors = c("regressor"), funs.aggregate.regressors = c(mean), holiday=holiday, output="model")
-  coef_df <- model_df %>% tidy(model, type="coef")
+  coef_df <- model_df %>% tidy_rowwise(model, type="coef")
   expect_equal(names(coef_df), c("Variable","Importance"))
-  ret <- model_df %>% tidy(model)
+  ret <- model_df %>% tidy_rowwise(model)
   # verify the last date with forecasted_value
   expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2012-01-11")) 
   # verify the last date in the data is the end of regressor data

@@ -1346,11 +1346,19 @@ do_on_each_group <- function(df, func, params = quote(list()), name = "tmp", wit
   ret <- df %>%
     # UQ and UQ(get_expr()) evaluates those variables
     dplyr::do(UQ(name) := UQ(rlang::get_expr(call)))
-  if(with_unnest){
+  if (with_unnest) {
     ret %>%
       dplyr::ungroup() %>%
       unnest_with_drop(!!rlang::sym(name))
-  }else{
+  } else {
+    # Pass on original group_by columns via rowwise().
+    # tidy_rowwise() etc. expect this info.
+    grouped_cols <- grouped_by(df)
+    if (length(grouped_cols) > 0) {
+      ret <- ret %>% dplyr::rowwise(grouped_cols)
+    } else {
+      ret <- ret %>% dplyr::rowwise()
+    }
     ret
   }
 }
@@ -1368,6 +1376,14 @@ do_on_each_group_2 <- function(df, func1, func2, params1 = quote(list()), params
   ret <- df %>%
     # UQ and UQ(get_expr()) evaluates those variables
     dplyr::do(UQ(name1) := UQ(rlang::get_expr(call1)), UQ(name2) := UQ(rlang::get_expr(call2)))
+  # Pass on original group_by columns via rowwise().
+  # tidy_rowwise() etc. expect this info.
+  grouped_cols <- grouped_by(df)
+  if (length(grouped_cols) > 0) {
+    ret <- ret %>% dplyr::rowwise(grouped_cols)
+  } else {
+    ret <- ret %>% dplyr::rowwise()
+  }
   ret
 }
 
@@ -2103,9 +2119,8 @@ restore_na <- function(value, na_row_numbers){
 #' @param ... - Name-value pairs of summary functions. The name will be the name of the variable in the result. The value should be an expression that returns a single value like min(x), n(), or sum(is.na(y)).
 #' @export
 summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...){
-  library(dplyr)
   ret <- if(length(group_cols) == 0) {
-    .data %>% summarize(...)
+    .data %>% dplyr::summarize(...)
   } else {
     # if group_cols argument is passed, make sure to ungroup first so that it won't throw an error
     # when group_cols conflict with group columns in previous steps.
@@ -2180,7 +2195,7 @@ summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...){
         # make sure to ungroup result
         .data %>% dplyr::group_by(!!!rlang::syms(group_cols)) %>% summarize(...) %>% dplyr::ungroup()
       } else { # In case no group_by columns are provided,skip group_by
-        .data %>% summarize(...)
+        .data %>% dplyr::summarize(...)
       }
     }
   }

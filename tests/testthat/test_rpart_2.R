@@ -31,14 +31,19 @@ test_that("exp_rpart(regression) evaluate training and test", {
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
   # expect_equal(nrow(test_ret), 1483) # Not very stable for some reason. Will revisit.
+  expect_lt(nrow(test_ret), 1500)
+  expect_gt(nrow(test_ret), 1400)
   train_ret <- ret %>% filter(is_test_data==FALSE)
   # expect_equal(nrow(train_ret), 3461) # Not very stable for some reason. Will revisit.
+  expect_lt(nrow(train_ret), 3500)
+  expect_gt(nrow(train_ret), 3400)
 
   ret <- rf_evaluation_training_and_test(model_df)
   expect_equal(nrow(ret), 2) # 2 for train and test
 
   # Check order of result of variable importance.
-  expect_equal(as.character((model_df %>% tidy(model, type="importance") %>% arrange(-importance))$variable), c("DIS TANCE", "DEP TIME"))
+  ret <- model_df %>% tidy_rowwise(model, type="importance") %>% arrange(-importance)
+  expect_equal(as.character(ret$variable), c("DIS TANCE", "DEP TIME"))
 
   # Training only case
   model_df <- flight %>%
@@ -52,19 +57,26 @@ test_that("exp_rpart(regression) evaluate training and test", {
 })
 
 test_that("exp_rpart(binary(logical)) evaluate training and test", {
+  set.seed(1)
+  # Keep the test rate high (0.4) so that NA data goes to training part too.
   model_df <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`)) %>%
-                exp_rpart(is_delayed, `DIS TANCE`, `DEP DELAY`, test_rate = 0.3, binary_classification_threshold=0.5)
+                exp_rpart(is_delayed, `DIS TANCE`, `DEP DELAY`, test_rate = 0.4, binary_classification_threshold=0.5)
 
   ret <-  model_df %>% rf_partial_dependence()
 
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
   # expect_equal(nrow(test_ret), 1483) # Not very stable for some reason. Will revisit.
+  expect_lt(nrow(test_ret), 2000)
+  expect_gt(nrow(test_ret), 1900)
   train_ret <- ret %>% filter(is_test_data==FALSE)
   # expect_equal(nrow(train_ret), 3461) # Not very stable for some reason. Will revisit.
+  expect_lt(nrow(train_ret), 3000)
+  expect_gt(nrow(train_ret), 2900)
 
   ret <- model_df %>% rf_evaluation_training_and_test()
   expect_equal(nrow(ret), 2) # 2 for train and test
+  expect_equal(is.na(ret$auc), c(F,F)) # 2 for train and test
 
   # Training only case
   model_df <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`)) %>%
@@ -86,8 +98,12 @@ test_that("exp_rpart(character(A,B)) evaluate training and test", { # This shoul
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
   # expect_equal(nrow(test_ret), 1483) # Not very stable for some reason. Will revisit.
+  expect_lt(nrow(test_ret), 1500)
+  expect_gt(nrow(test_ret), 1400)
   train_ret <- ret %>% filter(is_test_data==FALSE)
   # expect_equal(nrow(train_ret), 3461) # Not very stable for some reason. Will revisit.
+  expect_lt(nrow(train_ret), 3500)
+  expect_gt(nrow(train_ret), 3400)
 
   ret <- model_df %>% rf_evaluation_training_and_test()
   expect_equal(nrow(ret), 2) # 2 for train and test
@@ -112,8 +128,12 @@ test_that("exp_rpart(character(TRUE,FALSE)) with NAs evaluate training and test"
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
   # expect_equal(nrow(test_ret), 1483) # Not very stable for some reason. Will revisit.
+  expect_lt(nrow(test_ret), 1500)
+  expect_gt(nrow(test_ret), 1400)
   train_ret <- ret %>% filter(is_test_data==FALSE)
   # expect_equal(nrow(train_ret), 3461) # Not very stable for some reason. Will revisit.
+  expect_lt(nrow(train_ret), 3500)
+  expect_gt(nrow(train_ret), 3400)
 
   ret <- model_df %>% rf_evaluation_training_and_test()
   expect_equal(nrow(ret), 2) # 2 for train and test
@@ -139,8 +159,12 @@ test_that("exp_rpart(character(TRUE,FALSE)) without NAs evaluate training and te
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
   # expect_equal(nrow(test_ret), 1483) # Not very stable for some reason. Will revisit.
+  expect_lt(nrow(test_ret), 1500)
+  expect_gt(nrow(test_ret), 1400)
   train_ret <- ret %>% filter(is_test_data==FALSE)
   # expect_equal(nrow(train_ret), 3461) # Not very stable for some reason. Will revisit.
+  expect_lt(nrow(train_ret), 3500)
+  expect_gt(nrow(train_ret), 3400)
 
   ret <- model_df %>% rf_evaluation_training_and_test()
   expect_equal(nrow(ret), 2) # 2 for train and test
@@ -163,8 +187,12 @@ test_that("exp_rpart(binary) evaluate training and test with SMOTE", {
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
   # expect_equal(nrow(test_ret), 1483) # Not very stable for some reason. Will revisit.
+  # expect_lt(nrow(test_ret), 1500) # Not true because of SMOTE
+  expect_gt(nrow(test_ret), 1400)
   train_ret <- ret %>% filter(is_test_data==FALSE)
   # expect_equal(nrow(train_ret), 3461) # Not very stable for some reason. Will revisit.
+  # expect_lt(nrow(train_ret), 3500) # Not true because of SMOTE
+  expect_gt(nrow(train_ret), 3400)
 
   ret <- rf_evaluation_training_and_test(model_df)
   expect_equal(nrow(ret), 2) # 2 for train and test
@@ -189,8 +217,12 @@ test_that("exp_rpart(multi) evaluate training and test", {
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
   # expect_equal(nrow(test_ret), 1483) # Not very stable for some reason. Will revisit.
+  expect_lt(nrow(test_ret), 1500)
+  expect_gt(nrow(test_ret), 1400)
   train_ret <- ret %>% filter(is_test_data==FALSE)
   # expect_equal(nrow(train_ret), 3461) # Not very stable for some reason. Will revisit.
+  expect_lt(nrow(train_ret), 3500)
+  expect_gt(nrow(train_ret), 3400)
 
   ret <- rf_evaluation_training_and_test(model_df)
   expect_equal(nrow(ret), 2) # 2 for train and test

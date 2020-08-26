@@ -5,35 +5,43 @@ test_that("test exp_wilcox", {
   mtcars2 <- mtcars
   mtcars2$am[[1]] <- NA # test NA filtering
   model_df <- exp_wilcox(mtcars2, mpg, am)
-  ret <- model_df %>% tidy(model, type="model")
-  ret <- model_df %>% tidy(model, type="data_summary")
-  ret
+  ret <- model_df %>% tidy_rowwise(model, type="model")
+  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
+  expect_equal(colnames(ret),
+               c("am","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
+                 "Minimum","Maximum"))
 })
 
 test_that("test exp_wilcox with conf.int = TRUE", {
   mtcars2 <- mtcars
   mtcars2$am[[1]] <- NA # test NA filtering
   model_df <- exp_wilcox(mtcars2, mpg, am, conf.int=TRUE)
-  ret <- model_df %>% tidy(model, type="model")
-  ret <- model_df %>% tidy(model, type="data_summary")
-  ret
+  ret <- model_df %>% tidy_rowwise(model, type="model")
+  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
+  expect_equal(colnames(ret),
+               c("am","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
+                 "Minimum","Maximum"))
 })
 
 test_that("test exp_wilcox with paired = TRUE", {
   # Make sample size equal between groups for paired t-test.
   mtcars2 <- mtcars %>% group_by(am) %>% slice_sample(n=6) %>% ungroup()
   model_df <- exp_wilcox(mtcars2, mpg, am, paired=TRUE)
-  ret <- model_df %>% tidy(model, type="model")
-  ret <- model_df %>% tidy(model, type="data_summary")
-  ret
+  ret <- model_df %>% tidy_rowwise(model, type="model")
+  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
+  expect_equal(colnames(ret),
+               c("am","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
+                 "Minimum","Maximum"))
 })
 
 test_that("test exp_wilcox with paired = TRUE, conf.int = TRUE", {
   # Make sample size equal between groups for paired t-test.
   mtcars2 <- mtcars %>% group_by(am) %>% slice_sample(n=6) %>% ungroup()
   model_df <- exp_wilcox(mtcars2, mpg, am, paired=TRUE, conf.int = TRUE)
-  ret <- model_df %>% tidy(model, type="model")
-  ret <- model_df %>% tidy(model, type="data_summary")
-  ret
+  ret <- model_df %>% tidy_rowwise(model, type="model")
+  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
+  expect_equal(colnames(ret),
+               c("am","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
+                 "Minimum","Maximum"))
 })
 

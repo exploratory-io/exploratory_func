@@ -282,11 +282,11 @@ test_that("ranger.find_na", {
   )
   expected_na_at <- 1
   df[expected_na_at, 1] <- NA
-  expect_equal(ranger.find_na("x", df), expected_na_at)
+  expect_equal(exploratory:::ranger.find_na("x", df), expected_na_at)
 
   expected_na_at <- c(1, 2, 5, 10)
   df[expected_na_at, 1] <- NA
-  expect_equal(ranger.find_na("x", df), expected_na_at)
+  expect_equal(exploratory:::ranger.find_na("x", df), expected_na_at)
 })
 
 
@@ -300,7 +300,7 @@ test_that("ranger.predict_value_from_prob", {
   m_b <- build_model(df, model_func = rangerBinary, formula = y ~ x)$model[[1]]
   expected_values <- rep(TRUE, 10)
   expect_equal(
-    ranger.predict_value_from_prob(m_b$forest$levels, m_b$predictions, df[["y"]]),
+    exploratory:::ranger.predict_value_from_prob(m_b$forest$levels, m_b$predictions, df[["y"]]),
     expected_values
   )
 
@@ -308,7 +308,7 @@ test_that("ranger.predict_value_from_prob", {
   m_m <- build_model(df, model_func = rangerMulti, formula = z ~ x + y)$model[[1]]
 
   expected_values <- c("D", "A", "A", "A", "A", "A", "A", "A", "D", "A")
-  res <- ranger.predict_value_from_prob(m_m$forest$levels, m_m$predictions, df[["z"]])
+  res <- exploratory:::ranger.predict_value_from_prob(m_m$forest$levels, m_m$predictions, df[["z"]])
   expect_equal(typeof(res), typeof(df$z))
   expect_equal(length(res), length(df$z))
 })
@@ -321,12 +321,12 @@ test_that("ranger.set_multi_predicted_values", {
   )
   df[1, "x"] <- NA
   m_m <- build_model(df, model_func = rangerMulti, formula = z ~ x + y)$model[[1]]
-  predicted_value_nona <- ranger.predict_value_from_prob(m_m$forest$levels,
+  predicted_value_nona <- exploratory:::ranger.predict_value_from_prob(m_m$forest$levels,
                                                          m_m$predictions,
                                                          df[["z"]])
-  na_at <- ranger.find_na(c("x", "y"), df) 
-  predicted_value <- restore_na(predicted_value_nona, na_at)
-  ret <- ranger.set_multi_predicted_values(df, m_m$predictions, predicted_value, na_at)
+  na_at <- exploratory:::ranger.find_na(c("x", "y"), df) 
+  predicted_value <- exploratory:::restore_na(predicted_value_nona, na_at)
+  ret <- exploratory:::ranger.set_multi_predicted_values(df, m_m$predictions, predicted_value, na_at)
   expected_colnames <-  c("x", "y", "z",
                           "predicted_probability_A", "predicted_probability_D", "predicted_probability_E",
                           "predicted_probability_B", "predicted_probability_C", "predicted_probability_F", "predicted_value")
@@ -385,7 +385,7 @@ test_that("calc imp negative test", { #TODO: What was this case for?
   expect_equal(colnames(res_partial_dependence), c("x_name", "X-Axis", "y_name", "ARR DELAY", "chart_type", "x_type"))
   res_evaluation <- model_df %>% rf_evaluation(pretty.name = TRUE)
   expect_equal(colnames(res_evaluation), c("RMSE", "R Squared", "Number of Rows"))
-  res_tidy <- model_df %>% tidy(model, type = "scatter") %>% rename(Actual=expected_value, Predicted=predicted_value) %>% mutate(`Perfect Fit`=Predicted)
+  res_tidy <- model_df %>% tidy_rowwise(model, type = "scatter") %>% rename(Actual=expected_value, Predicted=predicted_value) %>% mutate(`Perfect Fit`=Predicted)
   expect_equal(colnames(res_tidy), c("Actual", "Predicted", "Perfect Fit"))
 })
 

@@ -23,7 +23,7 @@ iterate_kmeans <- function(df, max_centers = 10,
     ret <- model_df$model[[1]]
     ret
   }))
-  ret %>% rowwise() %>% glance(model)
+  ret %>% rowwise(center) %>% glance_rowwise(model)
 }
 
 #' analytics function for K-means view
@@ -40,6 +40,7 @@ exp_kmeans <- function(df, ...,
                        elbow_method_mode=FALSE,
                        max_centers = 10
                        ) {
+  grouped_cols <- grouped_by(df)
 
   # Set seed just once.
   if(!is.null(seed)) { # Set seed before starting to call sample_n.
@@ -69,6 +70,7 @@ exp_kmeans <- function(df, ...,
     # Check that and pass that info to do_prcomp() as allow_single_column.
     allow_single_column <- length(rlang::quos(...)) == 1
     ret <- do_prcomp(df, normalize_data = normalize_data, allow_single_column = allow_single_column, seed = NULL, ...)
+    ret <- dplyr::ungroup(ret) # ungroup once so that the following mutate with purrr::map2 works.
     ret <- ret %>% dplyr::mutate(model = purrr::map2(model, !!kmeans_model_df$model, function(x, y) {
       x$kmeans <- y # Might need to be more careful on guaranteeing x and y are from same group, but we are not supporting group_by on UI at this point.
       x$sampled_nrow <- sampled_nrow
@@ -87,5 +89,11 @@ exp_kmeans <- function(df, ...,
                           seed=NULL) # Seed is already done in do_prcomp. Skip it.
     ret <- data.frame(model = I(list(ret))) # Follow current output format for now. I() is to avoid unwanted expansion of list at creation of data frame. TODO: Revisit and support group_by.
   }
-  ret %>% rowwise()
+  # Rowwise grouping has to be redone with original grouped_cols, so that summarize(tidy(model)) later can add back the group column.
+  if (length(grouped_cols) > 0) {
+    ret <- ret %>% dplyr::rowwise(grouped_cols)
+  } else {
+    ret <- ret %>% dplyr::rowwise()
+  }
+  ret
 }

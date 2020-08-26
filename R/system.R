@@ -2155,7 +2155,7 @@ read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL,
       df <- df %>% dplyr::mutate(dplyr::across(is.character, trimws))
     }
     if(col_names == FALSE) {
-      # For backward comatilibity, use X__1, X__2, .. for default column names
+      # For backward compatibility, use X__1, X__2, .. for default column names
       columnNames <- paste("X", 1:ncol(df), sep = "__")
       colnames(df) <- columnNames
     }
@@ -2178,6 +2178,11 @@ read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL,
         # If it's local file without multibyte path, simply call readxl::read_excel
         df <- readxl::read_excel(path, sheet = sheet, col_names = col_names, col_types = col_types, na = na, trim_ws = trim_ws, skip = skip, n_max = n_max)
       }
+    }
+    if(col_names == FALSE) {
+      # For backward compatibility, use X__1, X__2, .. for default column names
+      columnNames <- paste("X", 1:ncol(df), sep = "__")
+      colnames(df) <- columnNames
     }
   }
   if(!is.null(tzone)) { # if timezone is specified, apply the timezeon to POSIXct columns
@@ -2346,6 +2351,61 @@ read_rds_file <- function(file, refhook = NULL){
   }
 }
 
+#' Wrapper for read_parquet to support remote file.
+#' @export
+read_parquet_file <- function(file){
+  loadNamespace("arrow")
+  
+  is.win <- Sys.info()['sysname'] == 'Windows'
+  tf <- NULL
+  
+  # Backup the locale info and set English locale for reading parquet issue
+  # on Windows https://issues.apache.org/jira/browse/ARROW-7288
+  if (is.win) {
+    # Backup the current locale info.
+    lc.all<- Sys.getlocale("LC_ALL")
+    lc.collate<- Sys.getlocale("LC_COLLATE")
+    lc.ctype<- Sys.getlocale("LC_CTYPE")
+    lc.monetary<- Sys.getlocale("LC_MONETARY") 
+    lc.numeric<- Sys.getlocale("LC_NUMERIC")
+    # Set English. 
+    Sys.setlocale("LC_ALL", "English")
+  }
+  
+  # Catch errors to guarantee restoring the locale info later.
+  tryCatch({
+    
+    if (stringr::str_detect(file, "^https://") ||
+        stringr::str_detect(file, "^http://") ||
+        stringr::str_detect(file, "^ftp://")) {
+      
+      # Download the remote parquet file to the local temp file.
+      tf <- tempfile()  
+      # Remove on exit.
+      on.exit(unlink(tf))
+      # mode="wb" for binary download
+      utils::download.file(file, tf, mode = "wb")
+      # Read the local parquet file.
+      res <- arrow::read_parquet(tf)
+
+    } else {
+      res <- arrow::read_parquet(file)
+    }
+  }, error=function(e){
+        
+  })
+
+  # Restore the original locale info.
+  if (is.win) {
+    Sys.setlocale("LC_ALL", lc.all)
+    Sys.setlocale("LC_COLLATE", lc.collate)
+    Sys.setlocale("LC_CTYPE", lc.ctype)
+    Sys.setlocale("LC_MONETARY", lc.monetary) 
+    Sys.setlocale("LC_NUMERIC", lc.numeric)
+  }
+  res
+}
+
 #'Wrapper for readr::read_lines to support vector to data frame conversion
 #'It seems readr::read_lines uses -1 for n_max to get all the data.
 #'It does not align with the other readr functions that uses Inf for all the data but we have to follow existing read_lines behavior.
@@ -2356,4 +2416,18 @@ read_raw_lines <- function(file, locale = readr::default_locale(), na = characte
   line <- readr::read_lines(file, locale = locale, na = na, skip = skip, n_max = n_max, progress = progress)
   # use line as column name
   df <- data.frame(line = line, stringsAsFactors = FALSE)
+}
+
+#'Wrapper for dplyr::filter to support successive calls instead of single filter
+#'call with multiple conditions.
+#
+#'@export
+filter_cascade <- function(.data, ...){
+  dots <- dplyr:::check_filter(enquos(...))
+  df <- .data
+  for(i in 1:length(dots)) {
+    expr <- rlang::quo_get_expr(dots[[i]])
+    df <- df %>% dplyr::filter(eval(expr))
+  }
+  df
 }

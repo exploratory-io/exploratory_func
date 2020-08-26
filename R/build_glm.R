@@ -22,6 +22,39 @@ build_lr <- function(df, ...) {
   do.call("build_glm", list(data, ..., family = "binomial"))
 }
 
+# augment function just to filter out unknown categories in predictors to avoid error.
+augment.glm_exploratory_0 <- function(x, data = NULL, newdata = NULL, ...) {
+  if (!is.null(newdata) && length(x$xlevels) > 0) {
+    for (i in 1:length(x$xlevels)) {
+      newdata <- newdata %>% dplyr::filter(!!rlang::sym(names(x$xlevels)[[i]]) %in% !!x$xlevels[[i]])
+    }
+  }
+  if (is.null(data)) { # Giving data argument when it is NULL causes error from augment.glm.
+    ret <- tryCatch({
+      broom:::augment.glm(x, newdata = newdata, se = TRUE, ...)
+    }, error = function(e){
+      # se=TRUE throws error that looks like "singular matrix 'a' in solve",
+      # in some subset of cases of perfect collinearity.
+      # Try recovering from it by running with se=FALSE.
+      broom:::augment.glm(x, newdata = newdata, se = FALSE, ...)
+    })
+    if (!is.null(ret$.rownames)) { # Clean up .rownames column augment.glm adds for some reason.
+      ret$.rownames <- NULL
+    }
+  }
+  else {
+    ret <- tryCatch({
+      broom:::augment.glm(x, data = data, newdata = newdata, se = TRUE, ...)
+    }, error = function(e){
+      # se=TRUE throws error that looks like "singular matrix 'a' in solve",
+      # in some subset of cases of perfect collinearity.
+      # Try recovering from it by running with se=FALSE.
+      broom:::augment.glm(x, data = data, newdata = newdata, se = FALSE, ...)
+    })
+  }
+  ret
+}
+
 #' glm wrapper with do
 #' @return deta frame which has glm model
 #' @param data Data frame to be used as data
@@ -79,6 +112,13 @@ build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, g
     data <- dplyr::group_by(data, !!!rlang::syms(colnames(data)[group_col_index]))
   }
 
+  # Filter out NA and Inf from target variable.
+  target_cols <- all.vars(lazyeval::f_lhs(formula))
+  for (target_col in target_cols) {
+    data <- data %>%
+      dplyr::filter(!is.na(!!rlang::sym(target_col)) & !is.infinite(!!rlang::sym(target_col)))
+  }
+
   group_col_names <- grouped_by(data)
 
   model_col <- "model"
@@ -114,6 +154,7 @@ build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, g
   } else {
     arg_char <- expand_args(caller, exclude = exclude_arg_names)
     glm_func_name = "stats::glm"
+    model_class_name = "glm_exploratory_0"
   }
 
   ret <- tryCatch({
@@ -127,7 +168,11 @@ build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, g
       dplyr::mutate(model = purrr::map2(source.data, .test_index, function(df, index){
         data <- safe_slice(df, index, remove = TRUE)
         # execute glm with parsed arguments
-        eval(parse(text = paste0(glm_func_name, "(data = data, ", arg_char, ")")))
+        model <- eval(parse(text = paste0(glm_func_name, "(data = data, ", arg_char, ")")))
+        if (!is.null(model_class_name)) {
+          class(model) <- c(model_class_name, class(model))
+        }
+        model
       })) %>%
       dplyr::mutate(.model_metadata = purrr::map(source.data, function(df){
         if(!is.null(formula)){

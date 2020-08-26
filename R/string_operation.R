@@ -201,32 +201,32 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
     quanteda::dfm()
   # Now convert result dfm to a data frame
   resultTemp <- quanteda::convert(dfm, to = "data.frame")
-  # The first column name returned by quanteda::convert is always "document" so rename it to avoid it conflicts with other tokens
+  # The first column name returned by quanteda::convert is always "doc_id" so rename it to avoid it conflicts with other tokens
   docCol <- resultTemp[c(1)]
-  # Exclude the "document" column
+  # Exclude the "doc_id" column
   result <- resultTemp[c(-1)]
-  # Then bring the column back as internal document column
-  result$document.exp.token.col <- docCol$document
+  # Then bring the column back as internal doc_id column
+  result$document.exp.token.col <- docCol$doc_id
 
   # Convert the data frame from "wide" to "long" format by tidyr::gather.
   result <- result %>% tidyr::gather(key = !!token_col, value = !!count_col, which(sapply(., is.numeric)), na.rm = TRUE, convert = TRUE) %>%
     # Exclude unused tokens for the document.
     dplyr::filter(!!as.name(count_col) > 0) %>%
-    # The internal document column value looks like "text100". Remove text part to make it numeric.
+    # The internal doc_id column value looks like "text100". Remove text part to make it numeric.
     dplyr::mutate(document_id = as.numeric(stringr::str_remove(document.exp.token.col, "text"))) %>%
-    # Drop document internal document column
+    # Drop internal doc_id column
     dplyr::select(-document.exp.token.col) %>%
     # Sort result by document_id to align with original data frame's order.
     dplyr::arrange(document_id)
 
   if(keep_cols) {
     # If we need to keep original columns, then bring them back by joining the result data frame with original data frame.
-    result <- df %>%  dplyr::left_join(result, by=c("document_id", "document_id"))
+    result <- df %>%  dplyr::left_join(result, by=c("document_id" = "document_id"))
     if(drop) { # drop the text column
       result <- result %>% dplyr::select(-orig_input_col)
     }
   } else if(!drop) { # Bring back the text column by by joining the result data frame with original data frame and drop unwanted columns.
-    result <- df %>% dplyr::left_join(result, by=c("document_id", "document_id")) %>%
+    result <- df %>% dplyr::left_join(result, by=c("document_id"= "document_id")) %>%
       select(document_id, !!count_col, !!token_col, orig_input_col);
   }
   if(!with_id) { # Drop the document_id column
