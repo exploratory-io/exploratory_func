@@ -71,6 +71,9 @@ getGoogleSheet <- function(title, sheetName, skipNRows = 0, treatTheseAsNA = NUL
   if(!is.null(tzone)) { # if timezone is specified, apply the timezeon to POSIXct columns
     df <- df %>% dplyr::mutate_if(lubridate::is.POSIXct, funs(lubridate::force_tz(., tzone=tzone)))
   }
+  # For list columns, change the data type to characters
+  df <- df %>% dplyr::mutate_if(is.list, funs(as.character))
+
   df
 }
 
