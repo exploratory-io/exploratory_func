@@ -257,6 +257,8 @@ rangerCore <- function(data, formula, na.action = na.omit,
     }
     stop(e)
   })
+  # To avoid saving a huge environment when caching with RDS.
+  attr(ret$formula_terms,".Environment") <- NULL
 
   # prediction result in the ranger model (ret$predictions) is for some reason different from and worse than
   # the prediction separately done with the same training data.
