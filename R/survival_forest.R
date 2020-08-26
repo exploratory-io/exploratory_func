@@ -2,10 +2,25 @@
 calc_survival_curves_with_strata <- function(df, time_col, status_col, vars) {
   # Create map from variable name to chart type. TODO: Eliminate duplicated code.
   chart_type_map <- c()
+  x_type_map <-c()
   for(col in colnames(df)) {
-    chart_type_map <- c(chart_type_map, is.numeric(df[[col]]))
+    if (is.numeric(df[[col]])) {
+      x_type <- "numeric"
+      chart_type <- "line"
+    }
+    # Since we turn logical into factor in preprocess_regression_data_after_sample(), detect them accordingly.
+    else if (is.factor(df[[col]]) && all(levels(df[[col]]) %in% c("TRUE", "FALSE", "(Missing)"))) {
+      x_type <- "logical"
+      chart_type <- "scatter"
+    }
+    else {
+      x_type <- "character" # Since we turn charactors into factor in preprocessing (fct_lump) and cannot distinguish the original type at this point, for now, we treat both factors and characters as "characters" here.
+      chart_type <- "scatter"
+    }
+    x_type_map <- c(x_type_map, x_type)
+    chart_type_map <- c(chart_type_map, chart_type)
   }
-  chart_type_map <- ifelse(chart_type_map, "line", "scatter")
+  names(x_type_map) <- colnames(df)
   names(chart_type_map) <- colnames(df)
 
   vars_list <- as.list(vars)
@@ -22,6 +37,7 @@ calc_survival_curves_with_strata <- function(df, time_col, status_col, vars) {
   ret <- data.table::rbindlist(curve_dfs_list)
   ret <- ret %>% tidyr::separate(strata, into = c('variable','value'), sep='=') %>% rename(survival=estimate, period=time)
   ret <- ret %>% dplyr::mutate(chart_type = chart_type_map[variable])
+  ret <- ret %>% dplyr::mutate(x_type = x_type_map[variable])
   ret
 }
 
@@ -114,7 +130,8 @@ partial_dependence.ranger_survival_exploratory <- function(fit, time_col, vars =
   chart_type_map <- ifelse(chart_type_map, "line", "scatter")
   names(chart_type_map) <- colnames(ret)
 
-  ret <- ret %>% tidyr::pivot_longer(c(-period, -survival) ,names_to = 'variable', values_to = 'value', values_ptype = list(value=character()), values_drop_na=TRUE)
+  # To avoid "Error: Can't convert <double> to <character>." from pivot_longer we need to use values_transform rather than values_ptype. https://github.com/tidyverse/tidyr/issues/980
+  ret <- ret %>% tidyr::pivot_longer(c(-period, -survival) ,names_to = 'variable', values_to = 'value', values_transform = list(value=as.character), values_drop_na=TRUE)
   # Format of ret looks like this:
   #   period survival variable value
   #   <chr>     <dbl> <chr>    <dbl>
@@ -158,10 +175,12 @@ exp_survival_forest <- function(df,
   # using the new way of NSE column selection evaluation
   # ref: http://dplyr.tidyverse.org/articles/programming.html
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
-  time_col <- dplyr::select_var(names(df), !! rlang::enquo(time))
-  status_col <- dplyr::select_var(names(df), !! rlang::enquo(status))
+  time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(time))
+  status_col <- tidyselect::vars_select(names(df), !! rlang::enquo(status))
   # this evaluates select arguments like starts_with
-  selected_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
+  selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
+  # Sort predictors so that the result of permutation importance is stable against change of column order.
+  selected_cols <- sort(selected_cols)
 
   grouped_cols <- grouped_by(df)
 
@@ -187,16 +206,8 @@ exp_survival_forest <- function(df,
   }
 
   # check status_col.
-  if (!is.numeric(df[[status_col]]) && !is.logical(df[[status_col]])) {
-    stop(paste0("Status column (", status_col, ")  must be logical or numeric with values of 1 (dead) or 0 (alive)."))
-  }
-  if (is.numeric(df[[status_col]])) {
-    unique_val <- unique(df[[status_col]])
-    sorted_unique_val <- sort(unique_val[!is.na(unique_val)])
-    if (!all(sorted_unique_val == c(0,1)) & !all(sorted_unique_val == c(1,2))) {
-      # we allow 1,2 too since survivial works with it, but we are not promoting it for simplicity.
-      stop(paste0("Status column (", status_col, ")  must be logical or numeric with values of 1 (dead) or 0 (alive)."))
-    }
+  if (!is.logical(df[[status_col]])) {
+    stop(paste0("Status column (", status_col, ")  must be logical."))
   }
 
   # check time_col
@@ -204,8 +215,12 @@ exp_survival_forest <- function(df,
     stop(paste0("Time column (", time_col, ") must be numeric"))
   }
 
-  if (is.null(pred_survival_time)) { # By default, use median.
-    pred_survival_time <- median(df[[time_col]], na.rm=TRUE)
+  if (is.null(pred_survival_time)) {
+    # By default, use mean of observations with event.
+    # median gave a point where survival rate was still predicted 100% in one of our test case.
+    pred_survival_time <- mean((df %>% dplyr::filter(!!rlang::sym(status_col)))[[time_col]], na.rm=TRUE)
+    # Pick maximum of existing values equal or less than the actual mean.
+    pred_survival_time <- max((df %>% dplyr::filter(!!rlang::sym(time_col) <= !!pred_survival_time))[[time_col]], na.rm=TRUE)
   }
 
   # cols will be filtered to remove invalid columns
@@ -423,6 +438,7 @@ tidy.ranger_survival_exploratory <- function(x, type = 'importance', ...) { #TOD
       # set order to ret and turn it back to character, so that the order is kept when groups are bound.
       # if it were kept as factor, when groups are bound, only the factor order from the first group would be respected.
       ret <- ret %>% dplyr::arrange(variable) %>% dplyr::mutate(variable = as.character(variable))
+      ret <- ret %>% survival_pdp_sort_categorical()
       ret <- ret %>% dplyr::mutate(variable = x$terms_mapping[variable]) # map variable names to original.
       ret
     })

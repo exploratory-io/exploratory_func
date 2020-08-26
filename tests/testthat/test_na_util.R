@@ -1,5 +1,4 @@
 context("test na_util")
-
 test_that("test impute_na with factor", {
   input <- factor(c(letters[1:5], NA_character_, letters[1:5], NA_character_))
 
@@ -139,7 +138,8 @@ test_that("test impute_na with a column", {
   ret <- test_data %>%
     dplyr::mutate(filled_na = impute_na(`col 1`, type = "value", val = `col-2`))
 
-  expect_equal(ret[["filled_na"]], as.factor(c("2013-01-01", "2014-01-01", "2015-01-01", "2015-01-01", "2016-01-01")))
+  # Before dplyr 1.0, dplyr::coallesce, which is called from impute_na, seems to have returned factor, but now it returns character.
+  expect_equal(ret[["filled_na"]], c("2013-01-01", "2014-01-01", "2015-01-01", "2015-01-01", "2016-01-01"))
 })
 
 test_that("test impute_na with undefined type", {

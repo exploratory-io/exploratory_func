@@ -227,32 +227,129 @@ glue_exploratory <- function(text, .transformer, .envir = parent.frame()) {
   ret
 }
 
+# Get variable's configured default value.
+get_variable_config <- function(variable_name, config_name, envir) {
+  code <- paste0("if(is.null(exploratory_env$.config$`", variable_name, "`)){NULL}else{exploratory_env$.config$`", variable_name, "`$`", config_name, "`}")
+  ret <- eval(parse(text = code), envir)
+  ret
+}
+
 # glue transformer for mongo js query.
 # supports character, factor, logical, Date, POSIXct, POSIXlt, and numeric.
-js_glue_transformer <- function(code, envir) {
+js_glue_transformer <- function(expr, envir) {
+  # expr is 'param1, quote=FALSE, escape=FALSE' if the whole placeholder is '@{param1, quote=FALSE, escape=FALSE}'
+  tokens <- stringr::str_split(expr, ',')
+  tokens <- tokens[[1]]
+  name <- tokens[1]
+  values <- NULL
+
+  # Parse arguments part. e.g. 'quote=FALSE, escape=FALSE'
+  if (length(tokens) > 1) {
+    args <- tokens[2:length(tokens)] # Index 1 that is eliminated is the name of the variable. 
+    args <- stringr::str_split(args, '=')
+    args <- purrr::map(args, trimws)
+    names <- purrr::map(args, function(x){x[1]})
+    values <- purrr::map(args, function(x){x[2]})
+    names(values) <- names
+  }
+  if (!is.null(values) && !is.null(values$quote)) {
+    if (values$quote %in% c("FALSE", "F", "false", "NO", "No", "no")) {
+      quote <- ''
+    }
+    else if (values$quote %in% c("TRUE", "T", "true", "YES", "Yes", "yes")) {
+      # TRUE means same as default, which is double quote.
+      quote <- '"'
+    }
+    else if (grepl("^'.*'$", values$quote)) { # Single quoted.
+      quote <- sub("^'", "", values$quote)
+      quote <- sub("'$", "", quote)
+    }
+    else if (grepl('^".*"$', values$quote)) { # Double quoted.
+      quote <- sub('^"', "", values$quote)
+      quote <- sub('"$', "", quote)
+    }
+    else {
+      quote <- NULL # Check default config for the parameter.
+    }
+  }
+  else {
+    quote <- NULL # Check default config for the parameter.
+  }
+
+  if (!is.null(values) && !is.null(values$escape)) {
+    if (values$escape %in% c("FALSE", "F", "false", "NO", "No", "no")) {
+      escape <- ''
+    }
+    else if (values$escape %in% c("TRUE", "T", "true", "YES", "Yes", "yes")) {
+      # TRUE means same as default, which is double quote.
+      escape <- '"'
+    }
+    else if (grepl("^'.*'$", values$escape)) { # Single quoted.
+      escape <- sub("^'", "", values$escape)
+      escape <- sub("'$", "", escape)
+    }
+    else if (grepl('^".*"$', values$escape)) { # Double quoted.
+      escape <- sub('^"', "", values$escape)
+      escape <- sub('"$', "", escape)
+    }
+    else {
+      escape <- NULL # Check default config for the parameter.
+    }
+  }
+  else {
+    escape <- NULL # Check default config for the parameter.
+  }
+
   # Trim white spaces.
-  code <- trimws(code)
+  name <- trimws(name)
 
   # Strip quote by ``.
-  should_strip <- grepl("^`.+`$", code)
+  should_strip <- grepl("^`.+`$", name)
   if (should_strip) {
-    code <- sub("^`", "", code)
-    code <- sub("`$", "", code)
+    name <- sub("^`", "", name)
+    name <- sub("`$", "", name)
   }
-  code <- paste0("exploratory_env$`", code, "`")
+  code <- paste0("exploratory_env$`", name, "`")
+
   val <- eval(parse(text = code), envir)
+
+  # Check the default config for the variable.
+  if (is.null(quote)) {
+    quote <- get_variable_config(name, "quote", envir)
+    if (is.null(quote)) {
+      if (is.numeric(val)) {
+        quote <- '' # No quote by default for numeric.
+      }
+      else {
+        quote <- '"' # Double quote by default
+      }
+    }
+  }
+  if (is.null(escape)) {
+    escape <- get_variable_config(name, "escape", envir)
+    if (is.null(escape)) {
+      escape <- quote # Match with quote by default.
+    }
+  }
+
   if (is.null(val)) { # NULL in R is same as empty vector. Print empty string.
     val <- ""
   }
   else if (is.numeric(val)) {
     # Do not convert number to scientific notation.
     val <- format(val, scientific = FALSE)
+    val <- paste0(quote, val, quote)
   }
   else if (is.character(val) || is.factor(val)) {
-    # escape for js
-    val <- gsub("\\", "\\\\", val, fixed=TRUE)
-    val <- gsub("\"", "\\\"", val, fixed=TRUE)
-    val <- paste0('"', val, '"')
+    if (escape == '"') { # Escape for double quote
+      val <- gsub("\\", "\\\\", val, fixed=TRUE)
+      val <- gsub("\"", "\\\"", val, fixed=TRUE)
+    }
+    else if (escape == "'") { # Escape for single quote
+      val <- gsub("\\", "\\\\", val, fixed=TRUE)
+      val <- gsub("'", "\\'", val, fixed=TRUE)
+    }
+    val <- paste0(quote, val, quote)
   }
   else if (is.logical(val)) {
     val <- ifelse(val, "true", "false")
@@ -268,39 +365,145 @@ js_glue_transformer <- function(code, envir) {
   glue::glue_collapse(val, sep=", ")
 }
 
-sql_glue_transformer <- function(code, envir) {
+# Common routine for sql_glue_transformer and bigquery_glue_transformer.
+sql_glue_transformer_internal <- function(expr, envir, bigquery=FALSE) {
+  tokens <- stringr::str_split(expr, ',')
+  tokens <- tokens[[1]]
+  name <- tokens[1]
+  values <- NULL
+
+  # Parse arguments part. e.g. @{param1, quote=FALSE}
+  if (length(tokens) > 1) {
+    args <- tokens[2:length(tokens)]
+    args <- stringr::str_split(args, '=')
+    args <- purrr::map(args, trimws)
+    names <- purrr::map(args, function(x){x[1]})
+    values <- purrr::map(args, function(x){x[2]})
+    names(values) <- names
+  }
+  if (!is.null(values) && !is.null(values$quote)) {
+    if (values$quote %in% c("FALSE", "F", "false", "NO", "No", "no")) {
+      quote <- ''
+    }
+    else if (values$quote %in% c("TRUE", "T", "true", "YES", "Yes", "yes")) {
+      # TRUE means same as default, which is single quote.
+      quote <- "'"
+    }
+    else if (grepl("^'.*'$", values$quote)) { # Single quoted.
+      quote <- sub("^'", "", values$quote)
+      quote <- sub("'$", "", quote)
+    }
+    else if (grepl('^".*"$', values$quote)) { # Double quoted.
+      quote <- sub('^"', "", values$quote)
+      quote <- sub('"$', "", quote)
+    }
+    else {
+      quote <- NULL # Check default config for the parameter.
+    }
+  }
+  else {
+    quote <- NULL # Check default config for the parameter.
+  }
+
+  if (!is.null(values) && !is.null(values$escape)) {
+    if (values$escape %in% c("FALSE", "F", "false", "NO", "No", "no")) {
+      escape <- ''
+    }
+    else if (values$escape %in% c("TRUE", "T", "true", "YES", "Yes", "yes")) {
+      # TRUE means same as default, which is single quote.
+      escape <- "'"
+    }
+    else if (grepl("^'.*'$", values$escape)) { # Single quoted.
+      escape <- sub("^'", "", values$escape)
+      escape <- sub("'$", "", escape)
+    }
+    else if (grepl('^".*"$', values$escape)) { # Double quoted.
+      escape <- sub('^"', "", values$escape)
+      escape <- sub('"$', "", escape)
+    }
+    else {
+      escape <- NULL # Check default config for the parameter.
+    }
+  }
+  else {
+    escape <- NULL # Check default config for the parameter.
+  }
+
   # Trim white spaces.
-  code <- trimws(code)
+  name <- trimws(name)
 
   # Strip quote by ``.
-  should_strip <- grepl("^`.+`$", code)
+  should_strip <- grepl("^`.+`$", name)
   if (should_strip) {
-    code <- sub("^`", "", code)
-    code <- sub("`$", "", code)
+    name <- sub("^`", "", name)
+    name <- sub("`$", "", name)
   }
-  code <- paste0("exploratory_env$`", code, "`")
+
+  code <- paste0("exploratory_env$`", name, "`")
 
   val <- eval(parse(text = code), envir)
+
+  # Check the default config for the variable.
+  if (is.null(quote)) {
+    quote <- get_variable_config(name, "quote", envir)
+    if (is.null(quote)) {
+      if (is.numeric(val)) {
+        quote <- '' # No quote by default for numeric.
+      }
+      else {
+        quote <- "'" # Single quote by default
+      }
+    }
+  }
+  if (is.null(escape)) {
+    escape <- get_variable_config(name, "escape", envir)
+    if (is.null(escape)) {
+      escape <- quote # Match with quote by default.
+    }
+  }
+
   if (is.null(val)) { # NULL in R is same as empty vector. Print empty string.
     val <- "NULL" # With PostgreSQL, "IN (NULL)" is valid while "IN ()" is syntax error. TODO: Test other databases.
   }
   else if (is.numeric(val)) {
     # Do not convert number to scientific notation.
     val <- format(val, scientific = FALSE)
+    val <- paste0(quote, val, quote)
   }
   else if (is.character(val) || is.factor(val)) {
-    # escape for SQL
-    # TODO: check if this makes sense for Dremio and Athena
-    val <- gsub("'", "''", val, fixed=TRUE) # both Oracle and SQL Server escapes single quote by doubling them.
-    val <- paste0("'", val, "'") # both Oracle and SQL Server quotes strings with single quote.
+    if (bigquery) {
+      if (escape == '"') { # Escape for double quote
+        # escape for Standard SQL for bigquery
+        # https://cloud.google.com/bigquery/docs/reference/standard-sql/lexical
+        val <- gsub("\\", "\\\\", val, fixed=TRUE) # Escape literal backslash
+        val <- gsub("\"", "\\\"", val, fixed=TRUE) # Escape literal double quote
+      }
+      else if (escape == "'") { # Escape for single quote
+        # escape for Standard SQL for bigquery
+        # https://cloud.google.com/bigquery/docs/reference/standard-sql/lexical
+        val <- gsub("\\", "\\\\", val, fixed=TRUE) # Escape literal backslash
+        val <- gsub("\'", "\\\'", val, fixed=TRUE) # Escape literal single quote
+      }
+    }
+    else {
+      # escape for SQL
+      # TODO: check if this makes sense for Dremio and Athena
+      if (escape == '"') { # Escape for double quote (Checked that SQL Server's double quote works this way.)
+        val <- gsub('"', '""', val, fixed=TRUE)
+      }
+      else if (escape == "'") { # Escape for single quote
+        val <- gsub("'", "''", val, fixed=TRUE) # both Oracle and SQL Server escapes single quote by doubling them.
+      }
+    }
+    val <- paste0(quote, val, quote)
   }
   else if (lubridate::is.Date(val)) {
     val <- as.character(val)
-    val <- paste0("'", val, "'") # Athena and PostgreSQL quotes date with single quote. e.g. '2019-01-01'
+    val <- paste0(quote, val, quote) # Athena and PostgreSQL quotes date with single quote. e.g. '2019-01-01'
   }
   else if (lubridate::is.POSIXt(val)) {
     val <- as.character(val)
-    val <- paste0("'", val, "'") # Athena and PostgreSQL quotes timestamp with single quote. e.g. '2019-01-01 00:00:00'
+    val <- paste0(quote, val, quote) # Athena and PostgreSQL quotes timestamp with single quote. e.g. '2019-01-01 00:00:00'
   }
 
   # TODO: How should we handle logical?
@@ -310,47 +513,12 @@ sql_glue_transformer <- function(code, envir) {
   glue::glue_collapse(val, sep=", ")
 }
 
-bigquery_glue_transformer <- function(code, envir) {
-  # Trim white spaces.
-  code <- trimws(code)
+sql_glue_transformer <- function(expr, envir) {
+  sql_glue_transformer_internal(expr, envir)
+}
 
-  # Strip quote by ``.
-  should_strip <- grepl("^`.+`$", code)
-  if (should_strip) {
-    code <- sub("^`", "", code)
-    code <- sub("`$", "", code)
-  }
-  code <- paste0("exploratory_env$`", code, "`")
-
-  val <- eval(parse(text = code), envir)
-  if (is.null(val)) { # NULL in R is same as empty vector. Print empty string.
-    val <- "NULL" # With BigQuery, "IN (NULL)" is valid while "IN ()" is syntax error.
-  }
-  else if (is.numeric(val)) {
-    # Do not convert number to scientific notation.
-    val <- format(val, scientific = FALSE)
-  }
-  else if (is.character(val) || is.factor(val)) {
-    # escape for Standard SQL for bigquery
-    # https://cloud.google.com/bigquery/docs/reference/standard-sql/lexical
-    val <- gsub("\\", "\\\\", val, fixed=TRUE) # Escape literal backslash
-    val <- gsub("\'", "\\\'", val, fixed=TRUE) # Escape literal single quote
-    val <- paste0("'", val, "'")
-  }
-  else if (lubridate::is.Date(val)) {
-    val <- as.character(val)
-    val <- paste0("'", val, "'") # Athena and PostgreSQL quotes date with single quote. e.g. '2019-01-01'
-  }
-  else if (lubridate::is.POSIXt(val)) {
-    val <- as.character(val)
-    val <- paste0("'", val, "'") # Athena and PostgreSQL quotes timestamp with single quote. e.g. '2019-01-01 00:00:00'
-  }
-
-  # TODO: How should we handle logical?
-  #       Does expression like 1e+10 work?
-  # TODO: Need to handle NA here. Find out appropriate way.
-  # We always collapse, unlike glue_sql.
-  glue::glue_collapse(val, sep=", ")
+bigquery_glue_transformer <- function(expr, envir) {
+  sql_glue_transformer_internal(expr, envir, bigquery=TRUE)
 }
 
 #' @export
@@ -573,8 +741,9 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     }
     # if the connection is null or the connection is invalid, create a new one.
     if (is.null(conn) || !DBI::dbIsValid(conn)) {
+      # To avoid integer64 handling issues in charts, etc., use numeric as the R type to receive bigint data rather than default integer64 by specifying bigint argument.
       conn = RMariaDB::dbConnect(RMariaDB::MariaDB(), dbname = databaseName, username = username,
-                               password = password, host = host, port = port)
+                               password = password, host = host, port = port, bigint = "numeric")
       connection_pool[[key]] <- conn
     }
   } else if (type == "postgres" || type == "redshift" || type == "vertica") {
@@ -611,7 +780,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     if (is.null(conn) || !DBI::dbIsValid(conn)) {
       drv <- RPostgres::Postgres()
       conn <- RPostgres::dbConnect(drv, dbname=databaseName, user = username,
-                                     password = password, host = host, port = port)
+                                     password = password, host = host, port = port, bigint = "numeric")
       connection_pool[[key]] <- conn
     }
   } else if (type == "presto" || type == "treasuredata") {
@@ -763,7 +932,8 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
                              Database = databaseName,
                              UID = username,
                              PWD = password,
-                             Port = port)
+                             Port = port,
+                             bigint = "numeric")
       connection_pool[[key]] <- conn
     }
   }
@@ -1189,10 +1359,20 @@ submitGoogleBigQueryJob <- function(project, sqlquery, destination_table, write_
 #' @export
 getDataFromGoogleBigQueryTable <- function(project, dataset, table, page_size = 10000, max_page, tokenFileId, max_connections = 8){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
-  token <- getGoogleTokenForBigQuery(tokenFileId)
-  bigrquery::set_access_cred(token)
-  tb <- bigrquery::bq_table(project = project, dataset = dataset, table = table)
-  bigrquery::bq_table_download(tb,  page_size = page_size, max_results = max_page, quiet = TRUE, max_connections = max_connections)
+  # Remember original scipen
+  original_scipen = getOption("scipen")
+  tryCatch({
+    # Workaround ref: https://github.com/r-dbi/bigrquery/issues/395
+    # Temporary override it with 20 to workaround: Invalid value at 'start_index' (TYPE_UINT64), "1e+05" [invalid] error
+    options(scipen = 20)
+    token <- getGoogleTokenForBigQuery(tokenFileId)
+    bigrquery::set_access_cred(token)
+    tb <- bigrquery::bq_table(project = project, dataset = dataset, table = table)
+    bigrquery::bq_table_download(tb,  page_size = page_size, max_results = max_page, quiet = TRUE, max_connections = max_connections)
+  }, finally = {
+    # Set original scipen
+    options(scipen = original_scipen)
+  })
 }
 
 #' API to extract data from google BigQuery table to Google Cloud Storage
@@ -1292,46 +1472,54 @@ getDataFromGoogleBigQueryTableViaCloudStorage <- function(bucketProjectId, dataS
 executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 100000, maxPage = 10, writeDisposition = "WRITE_TRUNCATE", tokenFileId, bqProjectId, csBucket=NULL, bucketFolder=NULL, max_connections = 8, useStandardSQL = FALSE, ...){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
   if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
-
   token <- getGoogleTokenForBigQuery(tokenFileId)
+  # Remember original scipen
+  original_scipen = getOption("scipen")
+  tryCatch({
+    # Workaround ref: https://github.com/r-dbi/bigrquery/issues/395
+    # Temporary override it with 20 to workaround: Invalid value at 'start_index' (TYPE_UINT64), "1e+05" [invalid] error
+    options(scipen = 20)
+    df <- NULL
+    # if bucket is set, use Google Cloud Storage for extract and download
+    if(!is.null(csBucket) && !is.na(csBucket) && csBucket != "" && !is.null(bucketFolder) && !is.na(bucketFolder) && bucketFolder != ""){
+      # destination_table looks like 'exploratory-bigquery-project:exploratory_dataset.exploratory_bq_preview_table'
+      dataSetTable = stringr::str_split(stringr::str_replace(destinationTable, stringr::str_c(bqProjectId,":"),""),"\\.")
+      dataSet = dataSetTable[[1]][1]
+      table = dataSetTable[[1]][2]
+      bqtable <- NULL
+      # submit a query to get a result (for refresh data frame case)
+      # convertUserInputToUtf8 API call for query is taken care of by exploratory::submitGoogleBigQueryJob
+      # so just pass query as is.
+      result <- exploratory::submitGoogleBigQueryJob(project = bqProjectId, sqlquery = query, tokenFieldId =  tokenFileId, useStandardSQL = useStandardSQL);
+      # extranct result from Google BigQuery to Google Cloud Storage and import
+      # Since Google might assign new tableId and datasetId, always get datasetId and tableId from the job result (result is a data frame).
+      # To get the only one value for datasetId and tableId, use dplyr::first.
+      df <- getDataFromGoogleBigQueryTableViaCloudStorage(bqProjectId, as.character(dplyr::first(result$datasetId)), as.character(dplyr::first(result$tableId)), csBucket, bucketFolder, tokenFileId)
+    } else {
+      # direct import case (for refresh data frame case)
 
-  df <- NULL
-  # if bucket is set, use Google Cloud Storage for extract and download
-  if(!is.null(csBucket) && !is.na(csBucket) && csBucket != "" && !is.null(bucketFolder) && !is.na(bucketFolder) && bucketFolder != ""){
-    # destination_table looks like 'exploratory-bigquery-project:exploratory_dataset.exploratory_bq_preview_table'
-    dataSetTable = stringr::str_split(stringr::str_replace(destinationTable, stringr::str_c(bqProjectId,":"),""),"\\.")
-    dataSet = dataSetTable[[1]][1]
-    table = dataSetTable[[1]][2]
-    bqtable <- NULL
-    # submit a query to get a result (for refresh data frame case)
-    # convertUserInputToUtf8 API call for query is taken care of by exploratory::submitGoogleBigQueryJob
-    # so just pass query as is.
-    result <- exploratory::submitGoogleBigQueryJob(project = bqProjectId, sqlquery = query, tokenFieldId =  tokenFileId, useStandardSQL = useStandardSQL);
-    # extranct result from Google BigQuery to Google Cloud Storage and import
-    # Since Google might assign new tableId and datasetId, always get datasetId and tableId from the job result (result is a data frame).
-    # To get the only one value for datasetId and tableId, use dplyr::first.
-    df <- getDataFromGoogleBigQueryTableViaCloudStorage(bqProjectId, as.character(dplyr::first(result$datasetId)), as.character(dplyr::first(result$tableId)), csBucket, bucketFolder, tokenFileId)
-  } else {
-    # direct import case (for refresh data frame case)
-
-    # bigquery::set_access_cred is deprecated, however, switching to bigquery::bq_auth forces the oauth token refresh
-    # inside of it. We don't want this since Exploratory Desktop always sends a valid oauth token and use it without refreshing it.
-    # so for now, stick to bigrquery::set_access_cred
-    bigrquery::set_access_cred(token)
-    # check if the query contains special key word for standardSQL
-    # If we do not pass the useLegaySql argument, bigrquery set TRUE for it, so we need to expliclity set it to make standard SQL work.
-    isStandardSQL <- stringr::str_detect(query, "#standardSQL")
-    if(!isStandardSQL && useStandardSQL) { # honor value provided by parameter
-      isStandardSQL = TRUE;
+      # bigquery::set_access_cred is deprecated, however, switching to bigquery::bq_auth forces the oauth token refresh
+      # inside of it. We don't want this since Exploratory Desktop always sends a valid oauth token and use it without refreshing it.
+      # so for now, stick to bigrquery::set_access_cred
+      bigrquery::set_access_cred(token)
+      # check if the query contains special key word for standardSQL
+      # If we do not pass the useLegaySql argument, bigrquery set TRUE for it, so we need to expliclity set it to make standard SQL work.
+      isStandardSQL <- stringr::str_detect(query, "#standardSQL")
+      if(!isStandardSQL && useStandardSQL) { # honor value provided by parameter
+        isStandardSQL = TRUE;
+      }
+      # make sure to convert query to UTF8
+      query <- convertUserInputToUtf8(query)
+      # set envir = parent.frame() to get variables from users environment, not papckage environment
+      query <- glue_exploratory(query, .transformer=bigquery_glue_transformer, .envir = parent.frame())
+      tb <- bigrquery::bq_project_query(x = project, query = query, quiet = TRUE, use_legacy_sql = !isStandardSQL)
+      df <- bigrquery::bq_table_download(x = tb, max_results = Inf, page_size = pageSize, max_connections = max_connections, quiet = TRUE)
     }
-    # make sure to convert query to UTF8
-    query <- convertUserInputToUtf8(query)
-    # set envir = parent.frame() to get variables from users environment, not papckage environment
-    query <- glue_exploratory(query, .transformer=bigquery_glue_transformer, .envir = parent.frame())
-    tb <- bigrquery::bq_project_query(x = project, query = query, quiet = TRUE, use_legacy_sql = !isStandardSQL)
-    df <- bigrquery::bq_table_download(x = tb, max_results = Inf, page_size = pageSize, max_connections = max_connections, quiet = TRUE)
-  }
-  df
+    df
+  }, finally = {
+    # Set original scipen
+    options(scipen = original_scipen)
+  })
 }
 
 #' API to get projects for current oauth token
@@ -1355,7 +1543,8 @@ getGoogleBigQueryDataSets <- function(project, tokenFileId=""){
   tryCatch({
     token <- getGoogleTokenForBigQuery(tokenFileId);
     bigrquery::set_access_cred(token)
-    resultdatasets <- bigrquery::bq_project_datasets(project);
+    # make sure to pass max_pages as Inf to get all the datasets
+    resultdatasets <- bigrquery::bq_project_datasets(project, page_size=1000, max_pages=Inf);
     lapply(resultdatasets, function(x){x$dataset})
   }, error = function(err){
      c("")
@@ -1936,18 +2125,35 @@ read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL,
   df <- NULL
   # for .xlsx file extension
   if(stringr::str_detect(path, '\\.xlsx') & use_readxl == FALSE) {
-    if(n_max != Inf) {
-      df <- openxlsx::read.xlsx(xlsxFile = path, rows=(skip+1):n_max, sheet = sheet, colNames = col_names, na.strings = na, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols , check.names = check.names, detectDates = detectDates)
-    } else {
-      df <- openxlsx::read.xlsx(xlsxFile = path, sheet = sheet, colNames = col_names, startRow = skip+1, na.strings = na, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols, check.names = check.names, detectDates = detectDates)
+    # On Windows, if the path has multibyte chars, work around error from readxl::read_excel by copying the file to temp directory.
+    if (Sys.info()[["sysname"]] == "Windows" && grepl("[^ -~]", path)) {
+      new_path <- tempfile(fileext = stringr::str_c(".", tools::file_ext(path)))
+      file.copy(path, new_path)
+      if (n_max != Inf) {
+        df <- openxlsx::read.xlsx(xlsxFile = new_path, rows=(skip+1):n_max, sheet = sheet, colNames = col_names, na.strings = na, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols , check.names = check.names, detectDates = detectDates)
+      } else {
+        df <- openxlsx::read.xlsx(xlsxFile = new_path, sheet = sheet, colNames = col_names, startRow = skip+1, na.strings = na, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols, check.names = check.names, detectDates = detectDates)
+      }
+      # Preserve original column name for backward comaptibility (ref: https://github.com/awalker89/openxlsx/issues/102)
+      # Calling read.xlsx again looks inefficient, but it seems this is the only solution suggested in the above issue page.
+      colnames(df) <- openxlsx::read.xlsx(xlsxFile = new_path, sheet = sheet, rows = (skip+1), check.names = FALSE, colNames = FALSE) %>% as.character()
+      file.remove(new_path)
+    }
+    else {
+      if (n_max != Inf) {
+        df <- openxlsx::read.xlsx(xlsxFile = path, rows=(skip+1):n_max, sheet = sheet, colNames = col_names, na.strings = na, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols , check.names = check.names, detectDates = detectDates)
+      } else {
+        df <- openxlsx::read.xlsx(xlsxFile = path, sheet = sheet, colNames = col_names, startRow = skip+1, na.strings = na, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols, check.names = check.names, detectDates = detectDates)
+      }
+      # Preserve original column name for backward comaptibility (ref: https://github.com/awalker89/openxlsx/issues/102)
+      # Calling read.xlsx again looks inefficient, but it seems this is the only solution suggested in the above issue page.
+      colnames(df) <- openxlsx::read.xlsx(xlsxFile = path, sheet = sheet, rows = (skip+1), check.names = FALSE, colNames = FALSE) %>% as.character()
     }
     # trim white space needs to be done first since it cleans column names
     if(trim_ws == TRUE) {
       # use trimws from base to remove ending and trailing white space for character columns
-      df <- data.frame(lapply(df, function(x) if(class(x)=="character") trimws(x) else(x)), stringsAsFactors=F)
+      df <- df %>% dplyr::mutate(dplyr::across(is.character, trimws))
     }
-    # preserve original column name for backward comaptibility (ref: https://github.com/awalker89/openxlsx/issues/102)
-    colnames(df) <- openxlsx::read.xlsx(xlsxFile = path, sheet = sheet, rows = (skip+1), check.names = FALSE, colNames = FALSE) %>% as.character()
     if(col_names == FALSE) {
       # For backward comatilibity, use X__1, X__2, .. for default column names
       columnNames <- paste("X", 1:ncol(df), sep = "__")
@@ -1961,8 +2167,17 @@ read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL,
       tmp <- download_data_file(path, "excel")
       df <- readxl::read_excel(tmp, sheet = sheet, col_names = col_names, col_types = col_types, na = na, trim_ws = trim_ws, skip = skip, n_max = n_max)
     } else {
-      # if it's local file simply call readxl::read_excel
-      df <- readxl::read_excel(path, sheet = sheet, col_names = col_names, col_types = col_types, na = na, trim_ws = trim_ws, skip = skip, n_max = n_max)
+      # On Windows, if the path has multibyte chars, work around error from readxl::read_excel by copying the file to temp directory.
+      if (Sys.info()[["sysname"]] == "Windows" && grepl("[^ -~]", path)) {
+        new_path <- tempfile(fileext = stringr::str_c(".", tools::file_ext(path)))
+        file.copy(path, new_path)
+        df <- readxl::read_excel(new_path, sheet = sheet, col_names = col_names, col_types = col_types, na = na, trim_ws = trim_ws, skip = skip, n_max = n_max)
+        file.remove(new_path)
+      }
+      else {
+        # If it's local file without multibyte path, simply call readxl::read_excel
+        df <- readxl::read_excel(path, sheet = sheet, col_names = col_names, col_types = col_types, na = na, trim_ws = trim_ws, skip = skip, n_max = n_max)
+      }
     }
   }
   if(!is.null(tzone)) { # if timezone is specified, apply the timezeon to POSIXct columns
@@ -1982,8 +2197,18 @@ get_excel_sheets <- function(path){
     tmp <- download_data_file(path, "excel")
     readxl::excel_sheets(tmp)
   } else {
-    # if it's local file simply call readxl::read_excel
-    readxl::excel_sheets(path)
+    # On Windows, if the path has multibyte chars, work around error from readxl::excel_sheets by copying the file to temp directory.
+    if (Sys.info()[["sysname"]] == "Windows" && grepl("[^ -~]", path)) {
+      new_path <- tempfile(fileext = stringr::str_c(".", tools::file_ext(path)))
+      file.copy(path, new_path)
+      ret <- readxl::excel_sheets(new_path)
+      file.remove(new_path)
+      ret
+    }
+    else {
+      # If it's local file without multibyte path, simply call readxl::read_sheets.
+      readxl::excel_sheets(path)
+    }
   }
 }
 

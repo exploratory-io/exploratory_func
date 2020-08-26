@@ -17,7 +17,7 @@ flight <- exploratory::read_delim_file(filepath, ",", quote = "\"", skip = 0 , c
 
 if (!testdata_filename %in% list.files(testdata_dir)) {
   set.seed(1) # Trying setting seed before sampling to make boruta importance test result stable on our Mac test machine.
-  flight <- flight %>% sample_n(5000)
+  flight <- flight %>% slice_sample(n=5000)
   write.csv(flight, testdata_file_path) # save sampled-down data for performance.
 }
 test_that("calc_feature_map(regression) evaluate training and test", {

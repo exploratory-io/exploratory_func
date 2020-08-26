@@ -334,7 +334,10 @@ mat_to_df <- function(mat, cnames=NULL, na.rm=TRUE, zero.rm = TRUE, diag=TRUE){
 
 #' match the type of two vector
 same_type <- function(vector, original){
-  if(is.factor(original)){
+  if(is.null(original)){
+    vector
+  }
+  else if(is.factor(original)){
     if(all(vector[!is.na(vector)] %in% levels(original))){
       # if original is factor and vector has all values,
       # should return factor with same levels
@@ -436,9 +439,9 @@ list_extract <- function(column, position = 1, rownum = 1){
 list_to_text <- function(column, sep = ", "){
   loadNamespace("stringr")
   ret <- sapply(column, function(x) {
-    ret <- stringr::str_c(x, collapse = sep)
+    ret <- stringr::str_c(stringr::str_replace_na(x), collapse = sep)
     if(identical(ret, character(0))){
-      # if it's character(0)
+      # if it's character(0). Not too sure if this would still happen now that we do str_replace_na first.
       NA
     } else {
       ret
@@ -489,7 +492,7 @@ sample_rows <- function(df, size, seed = NULL, ...) {
 
   ret <- nested %>% dplyr::mutate(.temp.data = purrr::map(.temp.data, function(df){
     if (!is.null(size) && nrow(df) > size) {
-      dplyr::sample_n(df, size, ...)
+      slice_sample(df, n = size, ...)
     }
     else {
       df
@@ -853,27 +856,30 @@ get_confint <- function(val, se, conf_int = 0.95) {
   val + critval * se
 }
 
-#' NSE version of pivot_
+#' SE version of pivot. For backward compatibility.
 #' @export
-pivot <- function(df, row_cols, col_cols, row_funs = NULL, col_funs = NULL, value = NULL, ...) {
-  value_col <- col_name(substitute(value))
-  pivot_(df, row_cols = row_cols, col_cols = col_cols, row_funs = row_funs, col_funs = col_funs, value_col = value_col, ...)
+pivot_ <- function(df, row_cols, col_cols, row_funs = NULL, col_funs = NULL, value_col = NULL, ...) {
+  pivot(df, row_cols = row_cols, col_cols = col_cols, row_funs = row_funs, col_funs = col_funs, value = value_col, ...)
 }
 
-#' pivot columns based on formula
+#' Calculate a pivot table.
 #' @param df Data frame to pivot
 #' @param row_cols - Columns to be the rows of the resulting pivot table.
 #' @param col_cols - Columns to be the columns of the resulting pivot table.
 #' @param row_funs - Functions to be applied on row_cols before grouping.
 #' @param col_funs - Functions to be applied on col_cols before grouping.
-#' @param value_col - Column name for value. If null, values are count
+#' @param value - Column name for value. If null, values are count
 #' @param fun.aggregate - Function to aggregate duplicated columns
 #' @param fill - Value to be filled for missing values
 #' @param na.rm - If na should be removed from values
 #' @param cols_sep - If na should be removed from values
 #' @export
-pivot_ <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_funs = NULL, value_col = NULL, fun.aggregate = mean, fill = NA, na.rm = TRUE, cols_sep = "_") {
+pivot <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_funs = NULL, value = NULL, fun.aggregate = mean, fill = NA, na.rm = TRUE, cols_sep = "_") {
   validate_empty_data(df)
+
+  value_col <- if(!missing(value)){
+    tidyselect::vars_select(names(df), !! rlang::enquo(value))
+  }
 
   # Output row column names can be specified as names of row_cols. Extract them.
   if (!is.null(names(row_cols))) {
@@ -927,9 +933,9 @@ pivot_ <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fu
   }
 
   pivot_each <- function(df) {
-    casted <- if(is.null(value_col)) {
+    res <- if(is.null(value_col)) {
       # make a count matrix if value_col is NULL
-      df %>% summarize_group(group_cols = group_cols_arg, group_funs = all_funs, value=dplyr::n()) %>% tidyr::pivot_wider(names_from = !!new_col_cols, values_from=value, values_fill=list(value=!!fill), names_sep=cols_sep)
+      df %>% summarize_group(group_cols = group_cols_arg, group_funs = all_funs, value=dplyr::n())
     } else {
       if(na.rm &&
          !identical(na_ratio, fun.aggregate) &&
@@ -939,11 +945,14 @@ pivot_ <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fu
          !identical(na_count, fun.aggregate) &&
          !identical(non_na_count, fun.aggregate)){
         # remove NA, unless fun.aggregate function is one of the above NA related ones.
-        df <- df[!is.na(df[[value_col]]),]
+        df <- df %>% dplyr::filter(!is.na(!!rlang::sym(value_col)))
       }
-      df %>% summarize_group(group_cols = group_cols_arg, group_funs = all_funs, value=fun.aggregate(!!rlang::sym(value_col))) %>% tidyr::pivot_wider(names_from = !!new_col_cols, values_from=value, values_fill=list(value=!!fill), names_sep=cols_sep)
+      df %>% summarize_group(group_cols = group_cols_arg, group_funs = all_funs, value=fun.aggregate(!!rlang::sym(value_col)))
     }
-    casted
+    res <- res %>% dplyr::arrange(!!!rlang::syms(new_col_cols)) # arrange before pivot_wider, so that the create columns are sorted.
+    res <- res %>% tidyr::pivot_wider(names_from = !!new_col_cols, values_from=value, values_fill=list(value=!!fill), names_sep=cols_sep)
+    res <- res %>% dplyr::arrange(!!!rlang::syms(new_row_cols)) # arrange grouping rows.
+    res
   }
 
   grouped_col <- grouped_by(df)
@@ -1726,8 +1735,22 @@ bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_da
   # To workaround this issue, set a name to the first data frame with the value specified by fistLabel argument as a pre-process
   # then pass the updated list to dplyr::bind_rows.
   dataframes_updated <- list()
-  # with dplyr:::flatten_bindable API, create a list of data frames from arguments passed to bind_rows.
-  dataframes <- dplyr:::flatten_bindable(rlang::dots_values(...))
+  # Create a list of data frames from arguments passed to bind_rows.
+  dataframes <- list()
+  # In order to avoid unexpected data structure change by flattening, 
+  # we call dots_values here instead of dots_list. 
+  # Since return from dots_values can be a nested list, let's flatten it here.
+  purrr::map(rlang::dots_values(...), function(x) {
+    if ('data.frame' %in% class(x)) {
+      # If x is a data frame, need to enclose it with list() to add to a list. https://stackoverflow.com/questions/33177118/append-a-data-frame-to-a-list
+      dataframes <<- c(dataframes, list(x))
+    }
+    else {
+      # Here we assume that x is a list of data frames. 
+      dataframes <<- c(dataframes, x)
+    }
+  })
+
   if(force_data_type || stringr::str_length(current_df_name) >0) {
     index <- 1;
     # for the case where a user passes a list that contains key (data frame name) and value (data frame) pair.
@@ -2177,6 +2200,7 @@ is_integer <- function(x) {
 }
 
 # Wrapper function for sample_n
+# obsoleted. use slice_sample instead.
 sample_n <- function(..., seed = NULL) {
   if(!is.null(seed)) {
     set.seed(seed)
@@ -2184,7 +2208,16 @@ sample_n <- function(..., seed = NULL) {
   dplyr::sample_n(...);
 }
 
+# Wrapper function for slice_sample
+slice_sample <- function(..., seed = NULL) {
+  if(!is.null(seed)) {
+    set.seed(seed)
+  }
+  dplyr::slice_sample(...);
+}
+
 # Wrapper function for sample_frac
+# obsoleted. use sample_slie instead.
 sample_frac <- function(..., seed = NULL){
   if(!is.null(seed)) {
     set.seed(seed)

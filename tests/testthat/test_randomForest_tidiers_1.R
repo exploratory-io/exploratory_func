@@ -16,7 +16,7 @@ filepath <- if (!testdata_filename %in% list.files(testdata_dir)) {
 flight <- exploratory::read_delim_file(filepath, ",", quote = "\"", skip = 0 , col_names = TRUE , na = c("","NA") , locale=readr::locale(encoding = "UTF-8", decimal_mark = "."), trim_ws = FALSE , progress = FALSE) %>% exploratory::clean_data_frame()
 
 filepath <- if (!testdata_filename %in% list.files(testdata_dir)) {
-  flight <- flight %>% sample_n(5000)
+  flight <- flight %>% slice_sample(n=5000)
   write.csv(flight, testdata_file_path) # save sampled-down data for performance.
 }
 
@@ -199,7 +199,7 @@ test_that("test calc_feature_imp predicting logical", {
   conf_mat <- model_df %>% broom::tidy(model, type = "conf_mat", pretty.name = TRUE)
 
   # test get_binary_predicted_value_from_probability
-  model <- model_df %>% filter(!is.null(model)) %>% `[[`(1, "model", 1)
+  model <- (model_df %>% filter(!is.null(model)))$model[[1]]
   predicted_values <- get_binary_predicted_value_from_probability(model)
   expect_equal(levels(predicted_values), c("TRUE","FALSE"))
 
@@ -261,7 +261,7 @@ test_that("test randomForest with multinomial classification", {
   model_stats <- model_stats(model_ret, pretty.name = TRUE)
   pred_train_ret <- prediction(model_ret, data = "training")
   pred_test_ret <- prediction(model_ret, data = "test")
-  pred_test_ret <- prediction(model_ret, data = "newdata", data_frame = test_data)
+  pred_test_ret <- prediction(model_ret, data = "newdata", data_frame = test_data %>% select(-CARRIER))
 })
 
 test_that("test randomForest with binary classification", {

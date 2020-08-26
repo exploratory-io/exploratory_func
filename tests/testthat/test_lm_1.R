@@ -17,7 +17,7 @@ flight <- exploratory::read_delim_file(filepath, ",", quote = "\"", skip = 0 , c
 
 if (!testdata_filename %in% list.files(testdata_dir)) {
   set.seed(1)
-  flight <- flight %>% sample_n(5000)
+  flight <- flight %>% slice_sample(n=5000)
   write.csv(flight, testdata_file_path) # save sampled-down data for performance.
 }
 
@@ -36,7 +36,8 @@ test_that("build_lm.fast (linear regression) evaluate training and test", {
 
   # Check order of variable importance result.
   ret <- model_df %>% broom::tidy(model, type="permutation_importance")
-  expect_equal((ret %>% arrange(-importance))$term, c("DEP DELAY", "CAR RIER", "DIS TANCE"))
+  # unname() is necessary for the result to be equal to the expectation.
+  expect_equal(unname((ret %>% arrange(-importance))$term), c("DEP DELAY", "CAR RIER", "DIS TANCE"))
 
   # Test univariate case handling
   model_df <- flight %>%

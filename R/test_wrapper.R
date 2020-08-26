@@ -1143,7 +1143,7 @@ exp_normality<- function(df, ...,
   if (!is.null(seed)) {
     set.seed(seed)
   }
-  selected_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
+  selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
   
   shapiro_each <- function(df) {
     df.qq <- data.frame()

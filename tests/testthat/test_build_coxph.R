@@ -2,6 +2,7 @@ context("test build_coxph")
 
 test_that("test build_coxph.fast", {
   df <- survival::lung # this data has NAs.
+  df <- df %>% mutate(status = status==2)
   df <- df %>% rename(`ti me`=time, `sta tus`=status, `a ge`=age, `se-x`=sex)
   df <- df %>% mutate(ph.ecog = factor(ph.ecog, ordered=TRUE)) # test handling of ordered factor
   df <- df %>% mutate(`se-x` = `se-x`==1) # test handling of logical
@@ -22,6 +23,7 @@ test_that("test build_coxph.fast", {
 
 test_that("test build_coxph.fast with outlier filtering", {
   df <- survival::lung # this data has NAs.
+  df <- df %>% mutate(status = status==2)
   df <- df %>% rename(`ti me`=time, `sta tus`=status, `a ge`=age, `se-x`=sex)
   df <- df %>% mutate(ph.ecog = factor(ph.ecog, ordered=TRUE)) # test handling of ordered factor
   df <- df %>% mutate(`se-x` = `se-x`==1) # test handling of logical
@@ -43,12 +45,26 @@ test_that("test build_coxph.fast with outlier filtering", {
 test_that("build_coxpy.fast() error handling for predictor with single unique value", {
   expect_error({
     df <- survival::lung # this data has NAs.
+    df <- df %>% mutate(status = status==2)
     df <- df %>% mutate(age = 50) # Test for single unique value error handling.
     df <- df %>% rename(`ti me`=time, `sta tus`=status, `a ge`=age, `se-x`=sex)
     df <- df %>% mutate(ph.ecog = factor(ph.ecog, ordered=TRUE)) # test handling of ordered factor
     df <- df %>% mutate(`se-x` = `se-x`==1) # test handling of logical
     model_df <- df %>% build_coxph.fast(`ti me`, `sta tus`, `a ge`, predictor_n = 2)
   }, "Invalid Predictors: Only one unique value.")
+})
+
+test_that("build_coxph()", {
+  df <- survival::lung # this data has NAs.
+  df <- df %>% mutate(status = status==2)
+  df <- df %>% rename(`ti me`=time, `sta tus`=status, `a ge`=age, `se-x`=sex)
+  df <- df %>% mutate(`se-x` = `se-x`==1) # test handling of logical
+  model_df <- df %>% build_coxph(survival::Surv(`ti me`, `sta tus`) ~ `a ge` + `se-x`, test_rate=0.3)
+  res <- model_df %>% model_stats()
+  res <- model_df %>% model_coef(conf_int = "default", conf.level = 0.95)
+  res <- model_df %>% model_anova()
+  res <- model_df %>% prediction_coxph(data = "training", type.predict = "lp", type.residuals = "martingale")
+  res <- model_df %>% prediction_survfit(newdata = expand.grid(`a ge` = c(40, 50) , `se-x` = c(1,2)))
 })
 
 # Note: we used to have Japanese column name test, but removed since

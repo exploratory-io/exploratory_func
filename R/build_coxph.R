@@ -200,13 +200,29 @@ partial_dependence.coxph_exploratory <- function(fit, time_col, vars = colnames(
   ret <- ret %>% dplyr::rename(survival=V, conf.high=H, conf.low=L)
 
   chart_type_map <- c()
+  x_type_map <-c()
   for(col in colnames(ret)) {
-    chart_type_map <- c(chart_type_map, is.numeric(ret[[col]]))
+    if (is.numeric(ret[[col]])) {
+      x_type <- "numeric"
+      chart_type <- "line"
+    }
+    # Since we turn logical into factor in preprocess_regression_data_after_sample(), detect them accordingly.
+    else if (is.factor(ret[[col]]) && all(levels(ret[[col]]) %in% c("TRUE", "FALSE", "(Missing)"))) {
+      x_type <- "logical"
+      chart_type <- "scatter"
+    }
+    else {
+      x_type <- "character" # Since we turn charactors into factor in preprocessing (fct_lump) and cannot distinguish the original type at this point, for now, we treat both factors and characters as "characters" here.
+      chart_type <- "scatter"
+    }
+    x_type_map <- c(x_type_map, x_type)
+    chart_type_map <- c(chart_type_map, chart_type)
   }
-  chart_type_map <- ifelse(chart_type_map, "line", "scatter")
+  names(x_type_map) <- colnames(ret)
   names(chart_type_map) <- colnames(ret)
 
-  ret <- ret %>% tidyr::pivot_longer(c(-period, -survival, -conf.high, -conf.low) ,names_to = 'variable', values_to = 'value', values_ptype = list(value=character()), values_drop_na=TRUE)
+  # To avoid "Error: Can't convert <double> to <character>." from pivot_longer we need to use values_transform rather than values_ptype. https://github.com/tidyverse/tidyr/issues/980
+  ret <- ret %>% tidyr::pivot_longer(c(-period, -survival, -conf.high, -conf.low) ,names_to = 'variable', values_to = 'value', values_transform = list(value=as.character), values_drop_na=TRUE)
   # Format of ret looks like this:
   #   period survival variable value
   #   <chr>     <dbl> <chr>    <dbl>
@@ -220,8 +236,9 @@ partial_dependence.coxph_exploratory <- function(fit, time_col, vars = colnames(
   # 8 8         0.920 trt          1
   # 9 9         0.902 trt          1
   #10 10        0.896 trt          1
-  ret <- ret %>%  dplyr::mutate(period = (!!times)[period]) # Map back period from index to actual time.
-  ret <- ret %>%  dplyr::mutate(chart_type = chart_type_map[variable])
+  ret <- ret %>% dplyr::mutate(period = (!!times)[period]) # Map back period from index to actual time.
+  ret <- ret %>% dplyr::mutate(chart_type = chart_type_map[variable])
+  ret <- ret %>% dplyr::mutate(x_type = x_type_map[variable])
   ret
 }
 
@@ -301,10 +318,12 @@ build_coxph.fast <- function(df,
   # using the new way of NSE column selection evaluation
   # ref: http://dplyr.tidyverse.org/articles/programming.html
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
-  time_col <- dplyr::select_var(names(df), !! rlang::enquo(time))
-  status_col <- dplyr::select_var(names(df), !! rlang::enquo(status))
+  time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(time))
+  status_col <- tidyselect::vars_select(names(df), !! rlang::enquo(status))
   # this evaluates select arguments like starts_with
-  selected_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
+  selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
+  # Sort predictors so that the result of permutation importance is stable against change of column order.
+  selected_cols <- sort(selected_cols)
 
   grouped_cols <- grouped_by(df)
 
@@ -330,16 +349,8 @@ build_coxph.fast <- function(df,
   }
 
   # check status_col.
-  if (!is.numeric(df[[status_col]]) && !is.logical(df[[status_col]])) {
-    stop(paste0("Status column (", status_col, ")  must be logical or numeric with values of 1 (dead) or 0 (alive)."))
-  }
-  if (is.numeric(df[[status_col]])) {
-    unique_val <- unique(df[[status_col]])
-    sorted_unique_val <- sort(unique_val[!is.na(unique_val)])
-    if (!all(sorted_unique_val == c(0,1)) & !all(sorted_unique_val == c(1,2))) {
-      # we allow 1,2 too since survivial works with it, but we are not promoting it for simplicity.
-      stop(paste0("Status column (", status_col, ")  must be logical or numeric with values of 1 (dead) or 0 (alive)."))
-    }
+  if (!is.logical(df[[status_col]])) {
+    stop(paste0("Status column (", status_col, ")  must be logical."))
   }
 
   # check time_col
@@ -347,8 +358,12 @@ build_coxph.fast <- function(df,
     stop(paste0("Time column (", time_col, ") must be numeric"))
   }
 
-  if (is.null(pred_survival_time)) { # By default, use median.
-    pred_survival_time <- median(df[[time_col]], na.rm=TRUE)
+  if (is.null(pred_survival_time)) {
+    # By default, use mean of observations with event.
+    # median gave a point where survival rate was still predicted 100% in one of our test case.
+    pred_survival_time <- mean((df %>% dplyr::filter(!!rlang::sym(status_col)))[[time_col]], na.rm=TRUE)
+    # Pick maximum of existing values equal or less than the actual mean.
+    pred_survival_time <- max((df %>% dplyr::filter(!!rlang::sym(time_col) <= !!pred_survival_time))[[time_col]], na.rm=TRUE)
   }
 
   # cols will be filtered to remove invalid columns
@@ -495,6 +510,39 @@ build_coxph.fast <- function(df,
   do_on_each_group(clean_df, each_func, name = "model", with_unnest = FALSE)
 }
 
+survival_pdp_sort_categorical <- function(ret) {
+  # TODO: Modularize this part of the code, which is common for all the partial dependence code.
+  # Sort the rows for scatter plots for categorical predictor variables, by Predicted values.
+  nested <- ret %>% dplyr::group_by(variable) %>% tidyr::nest(.temp.data=c(-variable)) #TODO: avoid possibility of column name conflict between .temp.data and group_by columns.
+  nested <- nested %>% dplyr::mutate(.temp.data = purrr::map(.temp.data, function(df){
+    # We do the sorting only for scatter chart with Predicted values. This eliminates line charts or multiclass classifications.
+    if (df$x_type[[1]]=="character" && "Prediction" %in% unique(df$type)) {
+      # Set value factor level order first for the sorting at the next step.
+      df <- df %>% dplyr::mutate(value = forcats::fct_reorder2(value, type, survival, function(name, value) {
+        if ("Prediction" %in% name) {
+          -first(value[name=="Prediction"]) # Since we want to eventually display event occurrence rate instead of survival, adding -.
+        }
+        else { # This should not happen but giving reasonable default just in case.
+          -first(value)
+        }
+      }))
+      df <- df %>% dplyr::arrange(value)
+      df %>% dplyr::mutate(value = as.character(value)) # After sorting, change it back to character, so that it does not mess up the chart.
+    }
+    else if (df$x_type[[1]]=="logical" && "Prediction" %in% unique(df$type)) {
+      # Set factor label order for sorting. There may be unused level, but should not matter since we change it back to character after sort.
+      df <- df %>% dplyr::mutate(value = factor(value, levels=c("TRUE","FALSE","(Missing)")))
+      df <- df %>% dplyr::arrange(value)
+      df %>% dplyr::mutate(value = as.character(value)) # After sorting, change it back to character, so that it does not mess up the chart.
+    }
+    else {
+      df
+    }
+  }))
+  ret <- nested %>% tidyr::unnest(cols=.temp.data) %>% dplyr::ungroup()
+  ret
+}
+
 #' special version of tidy.coxph function to use with build_coxph.fast.
 #' @export
 tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients', ...) { #TODO: add test
@@ -574,6 +622,7 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients'
       # set order to ret and turn it back to character, so that the order is kept when groups are bound.
       # if it were kept as factor, when groups are bound, only the factor order from the first group would be respected.
       ret <- ret %>% dplyr::arrange(variable) %>% dplyr::mutate(variable = as.character(variable))
+      ret <- ret %>% survival_pdp_sort_categorical()
       ret <- ret %>% dplyr::mutate(variable = x$terms_mapping[variable]) # map variable names to original.
       ret
     },

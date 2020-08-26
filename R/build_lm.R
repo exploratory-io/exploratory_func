@@ -584,8 +584,8 @@ build_lm.fast <- function(df,
                     test_rate = 0.0,
                     test_split_type = "random" # "random" or "ordered"
                     ){
-  target_col <- dplyr::select_var(names(df), !! rlang::enquo(target))
-  selected_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
+  target_col <- tidyselect::vars_select(names(df), !! rlang::enquo(target))
+  selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
 
   grouped_cols <- grouped_by(df)
 
@@ -603,6 +603,12 @@ build_lm.fast <- function(df,
       # numeric still works, but our official guidance will be to use logical.
       stop("Target variable for logistic regression must be a logical.")
     }
+  }
+
+  # If we do permutation importance, sort predictors so that the result of it is stable against change of column order.
+  # Otherwise, avoid sorting so that user has control over the order of variables on partial dependence plot.
+  if (model_type == "lm" || family %in% c("binomial", "gaussian") || (family == "poisson" && (is.null(link) || link == "log"))) {
+    selected_cols <- sort(selected_cols)
   }
 
   if(test_rate < 0 | 1 < test_rate){
@@ -854,7 +860,7 @@ build_lm.fast <- function(df,
           if (family == "binomial") {
             model$permutation_importance <- calc_permutation_importance_binomial(model, clean_target_col, c_cols, df)
           }
-          else if (family == "poisson" && (is.null(link) || link == "log")) { # Currently we have permutation importance only for logistic regression.
+          else if (family == "poisson" && (is.null(link) || link == "log")) {
             model$permutation_importance <- calc_permutation_importance_poisson(model, clean_target_col, c_cols, df)
           }
           else if (family == "gaussian") {
@@ -1022,6 +1028,7 @@ build_lm.fast <- function(df,
   } else {
     ret <- ret %>% tidyr::nest()
   }
+  ret <- ret %>% dplyr::ungroup() # Remove rowwise grouping so that following mutate works as expected.
   ret %>% dplyr::mutate(model = purrr::map(data, function(df){
             df[[model_and_data_col]][[1]]$model
           })) %>%
@@ -1218,7 +1225,8 @@ get_var_min_pvalue <- function(var, coef_df, x) {
   else { # We assume it is lm or glm here.
     terms <- var_to_possible_terms_lm(as.character(var), x)
   }
-  min(coef_df$p.value[coef_df$term %in% terms])
+  # na.rm is necessary to handle the case where part of categorical variables are dropped due to perfect collinearity.
+  min(coef_df$p.value[coef_df$term %in% terms], na.rm=TRUE)
 }
 
 #' special version of tidy.lm function to use with build_lm.fast.
@@ -1240,7 +1248,7 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
         # put it back to show them.
         # reference: https://stats.stackexchange.com/questions/25804/why-would-r-return-na-as-a-lm-coefficient
         removed_coef_df <- data.frame(term=names(x$coefficients[is.na(x$coefficients)]), note="Dropped most likely due to perfect multicollinearity.")
-        ret <- ret %>% bind_rows(removed_coef_df)
+        ret <- ret %>% dplyr::bind_rows(removed_coef_df)
         if (pretty.name) {
           ret <- ret %>% rename(Note=note)
         }
@@ -1359,7 +1367,7 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
         # put it back to show them.
         # reference: https://stats.stackexchange.com/questions/25804/why-would-r-return-na-as-a-lm-coefficient
         removed_coef_df <- data.frame(term=names(x$coefficients[is.na(x$coefficients)]), note="Dropped most likely due to perfect multicollinearity.")
-        ret <- ret %>% bind_rows(removed_coef_df)
+        ret <- ret %>% dplyr::bind_rows(removed_coef_df)
         if (pretty.name) {
           ret <- ret %>% rename(Note=note)
         }
@@ -1565,7 +1573,7 @@ evaluate_lm_training_and_test <- function(df, pretty.name = FALSE){
       tryCatch({
         test_pred_ret <- prediction(df, data = "test")
         ## get Model Object
-        m <- df %>% filter(!is.null(model)) %>% `[[`(1, "model", 1)
+        m <- (df %>% filter(!is.null(model)))$model[[1]]
         actual_val_col <- all.vars(df$model[[1]]$terms)[[1]]
         # Get original target column name.
         actual_val_col_orig <- df$model[[1]]$terms_mapping[[actual_val_col]]

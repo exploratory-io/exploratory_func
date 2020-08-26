@@ -1,5 +1,4 @@
 context("check util functions")
-
 test_that("bind_rows", {
   library(dplyr)
   res <- mtcars %>% exploratory::bind_rows(list(acars = mtcars, bcars = mtcars), id_column_name="dataf", current_df_name="firstMtcars")
@@ -462,7 +461,7 @@ test_that("list_to_text should return NA", {
   test_df[["test_list"]] <- test_list
   ret <- dplyr::mutate(test_df, text = list_to_text(test_list) )
 
-  expect_equal(ret[["text"]], c(rep(NA, 3), rep("b, b, b, b, b", 7)))
+  expect_equal(ret[["text"]], c("NA", "", "NA, b", rep("b, b, b, b, b", 7)))
 })
 
 test_that("list_concat", {
@@ -622,7 +621,7 @@ test_that("test pivot with Date funcs", {
 
   pivoted <- pivot(test_df, row_cols=c(dt_wday="dt"), row_funs=c("wday"), col_cols=c("dt"), col_funs=c("week"), value = val)
   expect_true(all(pivoted$dt_wday %in% c("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")))
-  expect_equal(colnames(pivoted), c("dt_wday","3", "52", "2"))
+  expect_equal(colnames(pivoted), c("dt_wday","2", "3", "52"))
 })
 
 test_that("test pivot with Date funcs with fill", { # There was a case where error happened with this case with fill (commit 0745f491).
@@ -634,7 +633,7 @@ test_that("test pivot with Date funcs with fill", { # There was a case where err
 
   pivoted <- pivot(test_df, row_cols=c(dt_wday="dt"), row_funs=c("wday"), col_cols=c("dt"), col_funs=c("week"), value = val, fill=0)
   expect_true(all(pivoted$dt_wday %in% c("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")))
-  expect_equal(colnames(pivoted), c("dt_wday","3", "52", "2"))
+  expect_equal(colnames(pivoted), c("dt_wday","2", "3", "52"))
 })
 
 test_that("test pivot with POSIXct", {
@@ -827,7 +826,8 @@ test_that("test unnest_without_empty", {
   # not sure what was the case unnest_without_empty was required at this point.
   # maybe we don't need unnest_without_empty anymore??
   ret <- df %>% unnest_without_empty(y)
-  expect_equal(ret, data.frame(x=c(1,3,3),y=c(1,1,1)))
+  expect_equal(ret$x, c(1,3,3))
+  expect_equal(ret$y, c(1,1,1))
 
   # create empty row in y
   df$y <- lapply(c(1,0,2),function(x){data.frame(z=rep(1,x), w=rep(2,x))})
@@ -835,7 +835,9 @@ test_that("test unnest_without_empty", {
   # not sure what was the case unnest_without_empty was required at this point.
   # maybe we don't need unnest_without_empty anymore??
   ret <- df %>% unnest_without_empty(y)
-  expect_equal(ret, data.frame(x=c(1,3,3),z=c(1,1,1),w=c(2,2,2)))
+  expect_equal(ret$x, c(1,3,3))
+  expect_equal(ret$z, c(1,1,1))
+  expect_equal(ret$w, c(2,2,2))
 })
 
 test_that("r_squared", {
