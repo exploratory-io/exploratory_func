@@ -2260,7 +2260,7 @@ read_delim_file <- function(file, delim, quote = '"',
           stop(stringr::str_c("The encoding of the file may not be ", locale$encoding, ". Select other encoding and try again."));
         }
       } else if (stringr::str_detect(stringr::str_to_lower(e$message), "does not exist")) { #for the case Error: Error : '/tmp/RtmpVAk1Jf/filed3636522650.csv' does not exist.
-        stop(stringr::str_c(file, " does not exist.")); # Show the original URL name in the error message.
+        stop(stringr::str_c("Could not read data from ", file)); # Show the original URL name in the error message.
       } else {
         stop(e);
       }
