@@ -2249,7 +2249,7 @@ read_delim_file <- function(file, delim, quote = '"',
                         locale = locale, na = na, quoted_na = quoted_na, comment = comment, trim_ws = trim_ws, skip = skip, n_max = n_max, guess_max = guess_max, progress = progress)
     }, error = function(e) {
       # For the case it's running on Linux (Collaboration Server), show more user friendly message.
-      # For Exploraotry Desktkop, it's already taken care of by Desktop so just show the error message as is.
+      # For Exploratory Desktop, it's already taken care of by Desktop so just show the error message as is.
       # When an incorrect encoding is used, "Error in make.names(x) : invalid multibyte string 1" error message is returned.
       if(Sys.info()["sysname"]=="Linux" && stringr::str_detect(stringr::str_to_lower(e$message), "invalid multibyte")) {
         if(locale$encoding == "Shift_JIS") {
@@ -2259,6 +2259,8 @@ read_delim_file <- function(file, delim, quote = '"',
         } else {
           stop(stringr::str_c("The encoding of the file may not be ", locale$encoding, ". Select other encoding and try again."));
         }
+      } else if (stringr::str_detect(stringr::str_to_lower(e$message), "does not exist")) { #for the case Error: Error : '/tmp/RtmpVAk1Jf/filed3636522650.csv' does not exist.
+        stop(stringr::str_c("Could not read data from ", file)); # Show the original URL name in the error message.
       } else {
         stop(e);
       }
