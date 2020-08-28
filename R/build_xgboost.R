@@ -210,6 +210,8 @@ xgboost_multi <- function(data, formula, output_type = "softprob", eval_metric =
   # add class to control S3 methods
   class(ret) <- c("xgboost_multi", class(ret))
   ret$fml <- formula
+  # To avoid saving a huge environment when caching with RDS.
+  attr(ret$fml,".Environment") <- NULL
   ret$y_levels <- label_levels
   ret
 }
@@ -264,6 +266,8 @@ xgboost_reg <- function(data, formula, output_type = "linear", eval_metric = "rm
   # add class to control S3 methods
   class(ret) <- c("xgboost_reg", class(ret))
   ret$fml <- formula
+  # To avoid saving a huge environment when caching with RDS.
+  attr(ret$fml,".Environment") <- NULL
   ret
 }
 
