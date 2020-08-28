@@ -78,6 +78,8 @@ fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_ra
       xgboost::xgboost(data = md_mat, label = y, weight = weight, nrounds = nrounds, ...)
     }
     ret$terms <- term
+    # To avoid saving a huge environment when caching with RDS.
+    attr(ret$terms,".Environment") <- NULL
     ret$x_names <- colnames(md_mat)
     ret$is_sparse <- sparse
     pred_cnames <- all.vars(term)[-1]

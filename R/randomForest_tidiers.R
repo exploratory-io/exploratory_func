@@ -279,6 +279,9 @@ rangerCore <- function(data, formula, na.action = na.omit,
   # use this attributes at augment.ranger. ranger object already have an attribute named temrs, which has just only column names
   ret$formula_terms <- terms(formula)
 
+  # To avoid saving a huge environment when caching with RDS.
+  attr(ret$formula_terms,".Environment") <- NULL
+
   # store actual values of target column
   ret$y <- data %>% dplyr::pull(target_col)
 
