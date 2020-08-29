@@ -314,6 +314,15 @@ build_lm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, gr
 
         # execute lm with parsed arguments
         model <- eval(parse(text = paste0("stats::lm(data = data, ", arg_char, ")")))
+
+        # Strip environments to save rds size when cached.
+        if (!is.null(model$terms)) {
+          attr(model$terms,".Environment")<-NULL
+        }
+        if (!is.null(model$model) && !is.null(attr(model$model,"terms"))) {
+          attr(attr(model$model,"terms"),".Environment") <- NULL
+        }
+
         class(model) <- c("lm_exploratory_0", class(model))
         model
       })) %>%
