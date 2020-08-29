@@ -169,6 +169,18 @@ build_glm <- function(data, formula, ..., keep.source = TRUE, augment = FALSE, g
         data <- safe_slice(df, index, remove = TRUE)
         # execute glm with parsed arguments
         model <- eval(parse(text = paste0(glm_func_name, "(data = data, ", arg_char, ")")))
+
+        # Strip environments to save rds size when cached.
+        if (!is.null(model$terms)) {
+          attr(model$terms,".Environment")<-NULL
+        }
+        if (!is.null(model$formula)) {
+          attr(model$formula,".Environment")<-NULL
+        }
+        if (!is.null(model$model) && !is.null(attr(model$model,"terms"))) {
+          attr(attr(model$model,"terms"),".Environment") <- NULL
+        }
+
         if (!is.null(model_class_name)) {
           class(model) <- c(model_class_name, class(model))
         }
