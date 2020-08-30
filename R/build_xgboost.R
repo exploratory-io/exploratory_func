@@ -359,26 +359,7 @@ augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, ...) {
       data
     }
 
-    # copy ret_data to add response_col if it doesn't exist.
-    # it's needed for model.matrix function
-    df_for_model_matrix <- ret_data
-    response_col <- as.character(lazyeval::f_lhs(x$terms))
-    if (!response_col %in% colnames(df_for_model_matrix)) {
-      df_for_model_matrix[[response_col]] <- rep(NA, nrow(ret_data))
-    }
-
-    mat <- if(!is.null(x$is_sparse) && x$is_sparse){
-      Matrix::sparse.model.matrix(x$terms, model.frame(df_for_model_matrix, na.action = na.pass, xlev = x$xlevels))
-    } else {
-      model.matrix(x$terms, model.frame(df_for_model_matrix, na.action = na.pass, xlev = x$xlevels))
-    }
-
-    # this is to find omitted indice for NA
-    row_index <- as.numeric(rownames(mat))
-    predicted <- fill_vec_NA(row_index, stats::predict(x, mat), max_index = nrow(ret_data))
-
-    vars <- all.vars(x$terms)
-    y_name <- vars[[1]]
+    predicted <- predict_xgboost(x, ret_data)
 
     # create predicted labels for classification
     # based on factor levels and it's indice
@@ -643,7 +624,7 @@ predict_xgboost <- function(model, df) {
       as.data.frame() %>%
       append_colnames(prefix = "predicted_probability_")
   }
-  else if (obj == "reg:linear") { # TODO: Does this cover all xgboost_reg cases?
+  else { # TODO: Here we assume all other cases returns vector prediction result.
     # model.matrix removes rows with NA and stats::predict returns a matrix
     # whose number of rows is the same with its size,
     # so the result should be filled by NA
