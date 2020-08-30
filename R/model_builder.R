@@ -249,6 +249,13 @@ build_kmeans.cols <- function(df, ...,
       dplyr::ungroup() %>%
       unnest_with_drop(!!rlang::sym(model_column))
   } else {
+    # Pass on original group_by columns via rowwise().
+    # tidy_rowwise() etc. expect this info.
+    if (length(grouped_column) > 0) {
+      output <- output %>% dplyr::rowwise(grouped_column)
+    } else {
+      output <- output %>% dplyr::rowwise()
+    }
     # Add a class for Exploratyry to recognize the type of .model
     class(output[[model_column]]) <- c("list", ".model", ".model.kmeans")
   }

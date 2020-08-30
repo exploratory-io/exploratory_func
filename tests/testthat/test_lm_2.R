@@ -31,12 +31,16 @@ test_that("build_lm.fast (linear regression) evaluate training and test", {
   model_df <- flight %>%
                 build_lm.fast(`ARR DELAY`, `DIS TANCE`, `DEP DELAY`, `CAR RIER`, test_rate = 0.3, seed=1)
 
-  ret <- model_df %>% broom::tidy(model, type="permutation_importance")
+  ret <- model_df %>% tidy_rowwise(model, type="permutation_importance")
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
   # expect_equal(nrow(test_ret), 1475) # Not very stable for some reason. Will revisit.
+  expect_lt(nrow(test_ret), 1500)
+  expect_gt(nrow(test_ret), 1400)
   train_ret <- ret %>% filter(is_test_data==FALSE)
   # expect_equal(nrow(train_ret), 3444) # Not very stable for some reason. Will revisit.
+  expect_lt(nrow(train_ret), 3500)
+  expect_gt(nrow(train_ret), 3400)
   ret <- model_df %>% evaluate_lm_training_and_test(pretty.name=TRUE)
   expect_equal(nrow(ret %>% filter(`CAR RIER`=="DUMMY")), 1) # Row for the group with error.
   expect_equal(nrow(ret %>% filter(`CAR RIER`=="DUMMY" & !is.na(Note))), 1) # Row for the group with error should have message in Note column. 
@@ -47,13 +51,17 @@ test_that("build_lm.fast (logistic regression) evaluate training and test", {
   model_df <- flight %>%
                 build_lm.fast(`is delayed`, `DIS TANCE`, `DEP TIME`, model_type = "glm", test_rate = 0.3)
 
-  ret <- model_df %>% broom::tidy(model, type="permutation_importance")
-  ret <- model_df %>% broom::tidy(model, converged_only=TRUE) # Test converged_only
+  ret <- model_df %>% tidy_rowwise(model, type="permutation_importance")
+  ret <- model_df %>% tidy_rowwise(model, converged_only=TRUE) # Test converged_only
   ret <- model_df %>% prediction_binary(data="training_and_test", threshold = 0.5)
   test_ret <- ret %>% filter(is_test_data==TRUE)
   # expect_equal(nrow(test_ret), 1480) # Not very stable for some reason. Will revisit
+  expect_lt(nrow(test_ret), 1500)
+  expect_gt(nrow(test_ret), 1400)
   train_ret <- ret %>% filter(is_test_data==FALSE)
   # expect_equal(nrow(train_ret), 3454) # Not very stable for some reason. Will revisit
+  expect_lt(nrow(train_ret), 3500)
+  expect_gt(nrow(train_ret), 3400)
   ret <- model_df %>% evaluate_binary_training_and_test("is delayed", pretty.name=TRUE)
   expect_equal(nrow(ret %>% filter(`CAR RIER`=="DUMMY")), 1) # Row for the group with error.
   expect_equal(nrow(ret %>% filter(`CAR RIER`=="DUMMY" & !is.na(Note))), 1) # Row for the group with error should have message in Note column. 
@@ -69,8 +77,12 @@ test_that("build_lm.fast (logistic regression) evaluate training and test with S
   ret <- model_df %>% prediction_binary(data="training_and_test", threshold = 0.5)
   test_ret <- ret %>% filter(is_test_data==TRUE)
   # expect_equal(nrow(test_ret), 1480) # Not very stable for some reason. Will revisit
+  # expect_lt(nrow(test_ret), 1500) # Not true because of SMOTE.
+  expect_gt(nrow(test_ret), 1400)
   train_ret <- ret %>% filter(is_test_data==FALSE)
   # expect_equal(nrow(train_ret), 3454) # Not very stable for some reason. Will revisit
+  # expect_lt(nrow(train_ret), 3500) # Not true because of SMOTE.
+  expect_gt(nrow(train_ret), 3400)
   ret <- model_df %>% evaluate_binary_training_and_test("is delayed", pretty.name=TRUE)
   expect_equal(nrow(ret %>% filter(`CAR RIER`=="DUMMY")), 1) # Row for the group with error.
   expect_equal(nrow(ret %>% filter(`CAR RIER`=="DUMMY" & !is.na(Note))), 1) # Row for the group with error should have message in Note column. 
@@ -84,8 +96,12 @@ test_that("build_lm.fast (logistic regression) evaluate training and test with S
   ret <- model_df %>% prediction_binary(data="training_and_test", threshold = 0.5)
   test_ret <- ret %>% filter(is_test_data==TRUE)
   # expect_equal(nrow(test_ret), 1480) # Not very stable for some reason. Will revisit
+  expect_lt(nrow(test_ret), 1500)
+  # expect_gt(nrow(test_ret), 1400) # Not true because of SMOTE
   train_ret <- ret %>% filter(is_test_data==FALSE)
   # expect_equal(nrow(train_ret), 3454) # Not very stable for some reason. Will revisit
+  # expect_lt(nrow(train_ret), 3500) # Not true because of SMOTE
+  expect_gt(nrow(train_ret), 3400)
   ret <- model_df %>% evaluate_binary_training_and_test("is delayed", pretty.name=TRUE)
   expect_equal(nrow(ret %>% filter(`CAR RIER`=="DUMMY")), 1) # Row for the group with error.
   expect_equal(nrow(ret %>% filter(`CAR RIER`=="DUMMY" & !is.na(Note))), 1) # Row for the group with error should have message in Note column. 
@@ -100,8 +116,12 @@ test_that("build_lm.fast (gaussian regression) evaluate training and test", {
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
   # expect_equal(nrow(test_ret), 1475) # Not very stable for some reason. Will revisit
+  expect_lt(nrow(test_ret), 1500)
+  expect_gt(nrow(test_ret), 1400)
   train_ret <- ret %>% filter(is_test_data==FALSE)
   # expect_equal(nrow(train_ret), 3444) # Not very stable for some reason. Will revisit
+  expect_lt(nrow(train_ret), 3500)
+  expect_gt(nrow(train_ret), 3400)
   ret <- model_df %>% evaluate_lm_training_and_test(pretty.name=TRUE)
   expect_equal(nrow(ret %>% filter(`CAR RIER`=="DUMMY")), 1) # Row for the group with error.
   expect_equal(nrow(ret %>% filter(`CAR RIER`=="DUMMY" & !is.na(Note))), 1) # Row for the group with error should have message in Note column. 
@@ -115,8 +135,12 @@ test_that("build_lm.fast (binomial regression) evaluate training and test", {
   ret <- model_df %>% prediction_binary(data="training_and_test", threshold = 0.5)
   test_ret <- ret %>% filter(is_test_data==TRUE)
   # expect_equal(nrow(test_ret), 1480) # Not very stable for some reason. Will revisit
+  expect_lt(nrow(test_ret), 1500)
+  expect_gt(nrow(test_ret), 1400)
   train_ret <- ret %>% filter(is_test_data==FALSE)
   # expect_equal(nrow(train_ret), 3454) # Not very stable for some reason. Will revisit
+  expect_lt(nrow(train_ret), 3500)
+  expect_gt(nrow(train_ret), 3400)
   ret <- model_df %>% evaluate_binary_training_and_test("is delayed", pretty.name=TRUE)
   expect_equal(nrow(ret %>% filter(`CAR RIER`=="DUMMY")), 1) # Row for the group with error.
   expect_equal(nrow(ret %>% filter(`CAR RIER`=="DUMMY" & !is.na(Note))), 1) # Row for the group with error should have message in Note column. 

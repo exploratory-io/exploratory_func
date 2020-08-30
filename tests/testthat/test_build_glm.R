@@ -1,5 +1,4 @@
 context("test build_glm")
-
 test_that("test build_glm summary output ", {
   test_df = data.frame(
     num1 = seq(20) / 10.0,
@@ -73,7 +72,7 @@ test_that("test name conflict avoid", {
 
   trial <- suppressWarnings({
     glm_model %>%
-      broom::tidy(model)
+      tidy_rowwise(model)
   })
 
   expect_equal(colnames(trial), c("estimate.group", "model.group", "model.group1",
@@ -95,16 +94,12 @@ test_that("predict glm with new data", {
 
   stats_ret <- model_data %>% model_stats()
   expect_equal(colnames(stats_ret), c("group", "null_deviance", "df_for_null_model", "log_likelihood",
-                                      "aic", "bic", "deviance", "residual_df"))
+                                      "aic", "bic", "deviance", "residual_df", "n"))
 
   anova_ret <- model_data %>% model_anova()
   expect_equal(colnames(anova_ret), c("group", "term", "df", "deviance", "residual_df",
                                       "residual_deviance"))
-
-  confint_ret <- model_data %>% model_confint(level = 0.99)
-  expect_equal(colnames(confint_ret), c("group", "Term", "Prob 0.5", "Prob 99.5"))
 })
-
 
 test_that("prediction with categorical columns", {
   test_data <- structure(
@@ -127,15 +122,15 @@ test_that("prediction with categorical columns", {
 
   expect_true(nrow(ret) > 0)
   expect_true(all(ret["predicted_value"] >= 0 & ret["predicted_value"] <= 1))
-  expect_equal(colnames(ret), c("CANCELLED", "Carrier.Name", "CARRIER", "DISTANCE", "predicted_value", "standard_error", "conf_low", "conf_high"))
+  expect_equal(colnames(ret), c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE", "predicted_value", "standard_error", "conf_low", "conf_high"))
 
   expect_true(all(both_ret["predicted_response"] >= 0 & both_ret["predicted_response"] <= 1))
-  expect_equal(colnames(both_ret), c("CANCELLED", "Carrier.Name", "CARRIER", "DISTANCE", "predicted_value", "standard_error", "conf_low", "conf_high", "predicted_response"))
+  expect_equal(colnames(both_ret), c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE", "predicted_value", "standard_error", "conf_low", "conf_high", "predicted_response"))
 
   expect_true(all(train_ret["predicted_response"] >= 0 & train_ret["predicted_response"] <= 1))
-  expect_equal(colnames(train_ret), c("CANCELLED", "Carrier.Name", "CARRIER", "DISTANCE", "predicted_value",
-                                      "standard_error", "conf_low", "conf_high", "residuals", "hat", "residual_standard_deviation",
-                                      "cooks_distance", "standardised_residuals", "predicted_response"))
+  expect_equal(colnames(train_ret), c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE", "predicted_value",
+                                      "standard_error", "conf_low", "conf_high", "residuals", "standardised_residuals", "hat", "residual_standard_deviation",
+                                      "cooks_distance", "predicted_response"))
 
   add_prediction_ret <- test_data %>% add_prediction(model_data, type.predict = "response")
   expect_true(all(add_prediction_ret["predicted_value"] >= 0 & add_prediction_ret["predicted_value"] <= 1))
@@ -170,4 +165,3 @@ test_that("test prediction binary", {
   expect_true("predicted_probability" %in% colnames(prediction_train_ret))
 
 })
-

@@ -44,7 +44,8 @@ build_model_ <- function(data, model_func, seed = 1, test_rate = 0, group_cols =
 
   # use this for preprocess
   # and keep original data unchanged for later use
-  # like getting column names from formula
+  # like getting column names from formula.
+  # Note that data is thrown away after all.
   processed <- data
 
   # avoid name conflict of grouping columns
@@ -85,6 +86,13 @@ build_model_ <- function(data, model_func, seed = 1, test_rate = 0, group_cols =
           processed[[var]] <- forcats::fct_infreq(processed[[var]])
         }
       }
+    }
+
+    # Filter out NA and Inf from target variable. (For Cox regression, it can be 2 variables.)
+    target_cols <- all.vars(lazyeval::f_lhs(lazyeval::lazy_eval(dots$formula)))
+    for (target_col in target_cols) {
+      processed <- processed %>%
+        dplyr::filter(!is.na(!!rlang::sym(target_col)) & !is.infinite(!!rlang::sym(target_col)))
     }
   }
   model_col <- "model"

@@ -21,7 +21,7 @@ filepath <- if (!testdata_filename %in% list.files(testdata_dir)) {
 
 test_that("build_coxph.fast() samples down input to 50000 rows", {
   model_df <- flight %>% build_coxph.fast(`ARR DELAY`, `delay ed`, `DEP DELAY`, `CAR RIER`)
-  ret <- model_df %>% glance(model)
+  ret <- model_df %>% glance_rowwise(model)
   expect_lte(ret$n, 50000) # should be less than or equal 50000 after sampling.
 })
 

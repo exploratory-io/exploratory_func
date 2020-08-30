@@ -13,6 +13,20 @@ uploadGoogleSheet <- function(filepath, title, overwrite = FALSE){
   sheet <- googledrive::drive_upload(filepath, title, type = "spreadsheet", overwrite = overwrite)
 }
 
+#' API to update existing Google Sheet with the local CSV file.
+#' @export
+#' @param filepath path of source CSV file that you want to update with
+#' @param id id of the existing sheet on Google Sheets.
+updateGoogleSheet <- function(filepath, id, overwrite = FALSE){
+  if(!requireNamespace("googlesheets4")){stop("package googlesheets4 must be installed.")}
+  if(!requireNamespace("googledrive")){stop("package googledrive must be installed.")}
+
+  token <- getGoogleTokenForSheet("")
+  googlesheets4::sheets_set_token(token)
+  googledrive::drive_set_token(token)
+  sheet <- googledrive::drive_update(file = googledrive::as_id(id), media = filepath)
+}
+
 #' API to get google sheet data
 #' @export
 #' @param title name of a sheet on Google Sheets.
@@ -57,20 +71,28 @@ getGoogleSheet <- function(title, sheetName, skipNRows = 0, treatTheseAsNA = NUL
   if(!is.null(tzone)) { # if timezone is specified, apply the timezeon to POSIXct columns
     df <- df %>% dplyr::mutate_if(lubridate::is.POSIXct, funs(lubridate::force_tz(., tzone=tzone)))
   }
+  # For list columns, change the data type to characters
+  df <- df %>% dplyr::mutate_if(is.list, funs(as.character))
+
   df
 }
 
 #' API to get a list of available google sheets
 #' @export
-getGoogleSheetList <- function(tokenFileId=""){
+getGoogleSheetList <- function(tokenFileId="", teamDriveId=""){
   if(!requireNamespace("googlesheets4")){stop("package googlesheets4 must be installed.")}
   if(!requireNamespace("googledrive")){stop("package googledrive must be installed.")}
 
   token = getGoogleTokenForSheet(tokenFileId)
   googlesheets4::sheets_set_token(token)
   googledrive::drive_set_token(token)
-  # To improve peformance, only get id, name and canEdit for each spreadsheet.
-  googledrive::drive_find(type = "spreadsheet", pageSize=1000, fields="files/id, files/name, files/capabilities/canEdit, nextPageToken")
+  if(teamDriveId != "" && !is.null(teamDriveId)) {
+    # To improve performance, only get id, name and canEdit for each spreadsheet.
+    googledrive::drive_find(type = "spreadsheet", team_drive=googledrive::as_id(teamDriveId) ,pageSize=1000, fields="files/id, files/name, files/capabilities/canEdit, nextPageToken")
+  } else { #if team id is provided search documents within the team.
+    # To improve performance, only get id, name and canEdit for each spreadsheet.
+    googledrive::drive_find(type = "spreadsheet", pageSize=1000, fields="files/id, files/name, files/capabilities/canEdit, nextPageToken")
+  }
 }
 
 #' API to get a list of available google sheets
@@ -95,4 +117,11 @@ getGoogleSheetWorkSheetList <- function(tokenFileId = "", title, id = NULL){
     sheet <- googledrive::drive_get(title)
   }
   googlesheets4::sheets_sheets(sheet)
+}
+
+getTeamDrives <- function(tokenFileId = ""){
+  if(!requireNamespace("googledrive")){stop("package googledrive must be installed.")}
+  token = getGoogleTokenForSheet(tokenFileId)
+  googledrive::drive_set_token(token)
+  googledrive::team_drive_find()
 }

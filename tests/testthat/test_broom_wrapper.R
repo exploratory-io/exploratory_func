@@ -1,6 +1,7 @@
 context("test broom wrappers")
 set.seed(0)
 test_df <- data.frame(vec1 = seq(10), vec2 = seq(10), random = runif(10, min=0, max=10))
+
 test_that("test data frame prediction by xgboost with group", {
   train_data <- structure(list(age = c(66L, 44L, 21L, 78L, 28L, 40L, 61L, 60L,
                                        43L, 49L, 52L, 25L, 58L, 46L, 40L, 32L, 22L, 23L, 17L, 24L),
@@ -131,7 +132,12 @@ test_that("test if tidy_lm arguments work", {
     %>%  tidy_lm(model, conf.int = TRUE, conf.level = 0.5, quick=TRUE)
   )
   expect_true(all(result[["estimate"]] != result_[["estimate"]]))
-  expect_equal(ncol(result_), 2)
+  expect_equal(ncol(result_), 7)
+  # A tibble: 2 x 7
+  #  term        estimate std.error statistic p.value conf.low conf.high
+  #  <chr>          <dbl>     <dbl>     <dbl>   <dbl>    <dbl>     <dbl>
+  #1 (Intercept)     3.09      3.38     0.913   0.388   0.699       5.48
+  #2 log(random)     1.39      1.87     0.746   0.477   0.0739      2.71
 })
 
 test_that("do_kmeans.kv augment", {
@@ -169,7 +175,6 @@ test_that("do_kmeans.kv augment", {
   expect_true(all(result[["cluster"]] == 1))
 })
 
-
 test_that("predict lm with new data", {
   loadNamespace("dplyr")
   fit_df <- data.frame(
@@ -188,7 +193,7 @@ test_that("predict lm with new data", {
   fit <- add_df %>% dplyr::group_by(group) %>% add_prediction(model_df = model_data)
 
   expect_equal(nrow(fit), 20 * 2)
-  expect_equal(names(fit), c("model.group", "group", "num1", "num2", "predicted_value", "standard_error", "conf_low", "conf_high"))
+  expect_equal(names(fit), c("model.group", "group", "num1", "num2", "predicted_value", "standard_error", "conf_low", "conf_high", "residual"))
 })
 
 test_that("predict lm with new data", {
@@ -207,13 +212,10 @@ test_that("predict lm with new data", {
   stats_ret <- model_data %>% model_stats()
   expect_equal(colnames(stats_ret), c("group", "r_squared", "adj_r_squared", "root_mean_square_error",
                                       "f_ratio", "p_value", "df", "log_likelihood",
-                                      "aic", "bic", "deviance", "residual_df"))
+                                      "aic", "bic", "deviance", "residual_df", "n"))
 
   anova_ret <- model_data %>% model_anova()
   expect_equal(colnames(anova_ret), c("group", "term", "df", "sum_of_squares", "mean_square", "f_ratio", "p_value"))
-
-  confint_ret <- model_data %>% model_confint(level = 0.99)
-  expect_equal(colnames(confint_ret), c("group", "Term", "Prob 0.5", "Prob 99.5"))
 })
 
 test_that("assign_cluster", {
@@ -350,52 +352,6 @@ test_that("test prediction binary", {
 
 })
 
-test_that("test loess", {
-  test_data <- structure(
-    list(
-      CANCELLED = c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0),
-      `Carrier Name` = c("Delta Air Lines", "American Eagle", "American Airlines", "Southwest Airlines", "SkyWest Airlines", "Southwest Airlines", "Southwest Airlines", "Delta Air Lines", "Southwest Airlines", "Atlantic Southeast Airlines", "American Airlines", "Southwest Airlines", "US Airways", "US Airways", "Delta Air Lines", "Atlantic Southeast Airlines", NA, "Atlantic Southeast Airlines", "Delta Air Lines", "Delta Air Lines"),
-      CARRIER = c("DL", "MQ", "AA", "DL", "MQ", "AA", "DL", "DL", "MQ", "AA", "AA", "WN", "US", "US", "DL", "EV", "9E", "EV", "DL", "DL"),
-      DISTANCE = c(1587, 173, 646, 187, 273, 1062, 583, 240, 1123, 851, 852, 862, 361, 507, 1020, 1092, 342, 489, 1184, 545)), row.names = c(NA, -20L),
-    class = c("tbl_df", "tbl", "data.frame"), .Names = c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE"))
-
-  test_data[["rand"]] <- runif(nrow(test_data), min=-5, max = 5)
-
-  for (i in seq(5)){
-    test_data <- dplyr::bind_rows(test_data, test_data)
-  }
-
-  model_data <- build_model(test_data, model_func = loess, formula = rand ~ DISTANCE, test_rate = 0.2)
-
-  prediction_ret <- prediction(model_data)
-
-  expect_true(any(colnames(prediction_ret) %in% "conf_low"))
-  expect_true(any(colnames(prediction_ret) %in% "conf_high"))
-})
-
-test_that("test gam", {
-  test_data <- structure(
-    list(
-      CANCELLED = c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0),
-      `Carrier Name` = c("Delta Air Lines", "American Eagle", "American Airlines", "Southwest Airlines", "SkyWest Airlines", "Southwest Airlines", "Southwest Airlines", "Delta Air Lines", "Southwest Airlines", "Atlantic Southeast Airlines", "American Airlines", "Southwest Airlines", "US Airways", "US Airways", "Delta Air Lines", "Atlantic Southeast Airlines", NA, "Atlantic Southeast Airlines", "Delta Air Lines", "Delta Air Lines"),
-      CARRIER = c("DL", "MQ", "AA", "DL", "MQ", "AA", "DL", "DL", "MQ", "AA", "AA", "WN", "US", "US", "DL", "EV", "9E", "EV", "DL", "DL"),
-      DISTANCE = c(1587, 173, 646, 187, 273, 1062, 583, 240, 1123, 851, 852, 862, 361, 507, 1020, 1092, 342, 489, 1184, 545)), row.names = c(NA, -20L),
-    class = c("tbl_df", "tbl", "data.frame"), .Names = c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE"))
-
-  for (i in seq(5)){
-    test_data <- dplyr::bind_rows(test_data, test_data)
-  }
-
-  test_data[["rand"]] <- runif(nrow(test_data), min=-5, max = 5)
-
-  model_data <- build_model(test_data, model_func = mgcv::gam, formula = rand ~ s(DISTANCE), test_rate = 0.2)
-
-  prediction_ret <- prediction(model_data)
-
-  expect_true(any(colnames(prediction_ret) %in% "conf_low"))
-  expect_true(any(colnames(prediction_ret) %in% "conf_high"))
-})
-
 test_that("test data frame prediction by xgboost with group", {
   train_data <- structure(list(age = c(66L, 44L, 21L, 78L, 28L, 40L, 61L, 60L,
                                        43L, 49L, 52L, 25L, 58L, 46L, 40L, 32L, 22L, 23L, 17L, 24L),
@@ -520,17 +476,15 @@ test_that("test data frame prediction by xgboost with group", {
 })
 
 test_that("test prediction(data='training_and_test') by glm", {
-  test_data <- structure(
-      list(
+  test_data <- tibble::tibble(
         `CANCELLED X` = c("N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "Y", "N", "Y", "N"),
         `Carrier Name` = c("Delta Air Lines", "American Eagle", "American Airlines", "Southwest Airlines", "SkyWest Airlines", "Southwest Airlines", "Southwest Airlines", "Delta Air Lines", "Southwest Airlines", "Atlantic Southeast Airlines", "American Airlines", "Southwest Airlines", "US Airways", "US Airways", "Delta Air Lines", "Atlantic Southeast Airlines", NA, "Atlantic Southeast Airlines", "Delta Air Lines", "Delta Air Lines"),
         CARRIER = factor(c("AA", "MQ", "AA", "DL", "MQ", "AA", "DL", "DL", "MQ", "AA", "AA", "WN", "US", "US", "DL", "EV", "9E", "EV", "DL", "DL")), # test with factor with NA
         # testing filtering of Inf, -Inf, NA here.
         DISTANCE = c(10, 12, 12, 187, 273, 1062, 583, 240, 1123, 851, 852, 862, 361, 507, 1020, 1092, 342, 489, 1184, 545),
         ARR_TIME = c(10, 32, 321, 342, 123, 98, 10, 21, 80, 211, 121, 87, 821, 213, 213, 923, 121, 76, 34, 50),
-        DERAY_TIME = c(12, 42, 321, 31, 3, 43, 342, 764, 123, 43, 50, 12, 876, 12, 34, 45, 84, 25, 87, 352, 10)
-        ), row.names = c(NA, -20L),
-      class = c("tbl_df", "tbl", "data.frame"), .Names = c("CANCELLED X", "Carrier Name", "CARRIER", "DISTANCE", "ARR_TIME", "DERAY_TIME"))
+        DERAY_TIME = c(12, 42, 321, 31, 3, 43, 342, 764, 123, 43, 50, 12, 876, 12, 34, 45, 84, 25, 87, 352)
+        )
   
   test_data$klass <- c(rep("A", 10), rep("B", 10))
   model_ret <- test_data %>% build_lm.fast(`DISTANCE`,
@@ -541,10 +495,11 @@ test_that("test prediction(data='training_and_test') by glm", {
                                      test_rate = 0.2)
   ret <- model_ret %>% prediction(data='training_and_test')
   expected_cols <- c("Carrier Name", "DISTANCE", "ARR_TIME",
-                     "DERAY_TIME", "predicted_value", "standard_error",
-                     "conf_low", "conf_high", "residuals", "hat",
+                     "DERAY_TIME", "predicted_value",
+                     "standard_error", "conf_low", "conf_high", 
+                     "residuals", "standardised_residuals", "hat",
                      "residual_standard_deviation", "cooks_distance",
-                     "standardised_residuals", "is_test_data")
+                     "is_test_data")
   expect_equal(colnames(ret), expected_cols)
   grp_model_ret <- test_data %>% dplyr::group_by(klass) %>%
                      build_lm.fast(`DISTANCE`,
@@ -559,8 +514,8 @@ test_that("test prediction(data='training_and_test') by glm", {
   expected_cols_1 <- c("klass", "Carrier Name", "DISTANCE",
                      "ARR_TIME", "DERAY_TIME", "predicted_value",
                      "standard_error", "conf_low", "conf_high", "residuals",
-                     "hat", "residual_standard_deviation",
-                     "cooks_distance", "standardised_residuals",
+                     "standardised_residuals", "hat", "residual_standard_deviation",
+                     "cooks_distance",
                      "is_test_data")
   expected_cols_2 <- c("klass", "Carrier Name", "DISTANCE",
                      "ARR_TIME", "DERAY_TIME", "predicted_value",
@@ -571,17 +526,14 @@ test_that("test prediction(data='training_and_test') by glm", {
 })
 
 test_that("test prediction_training_and_test by glm", {
-  test_data <- structure(
-      list(
+  test_data <- tibble::tibble(
         `CANCELLED X` = c("N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "Y", "N", "Y", "N"),
         `Carrier Name` = c("Delta Air Lines", "American Eagle", "American Airlines", "Southwest Airlines", "SkyWest Airlines", "Southwest Airlines", "Southwest Airlines", "Delta Air Lines", "Southwest Airlines", "Atlantic Southeast Airlines", "American Airlines", "Southwest Airlines", "US Airways", "US Airways", "Delta Air Lines", "Atlantic Southeast Airlines", NA, "Atlantic Southeast Airlines", "Delta Air Lines", "Delta Air Lines"),
         CARRIER = factor(c("AA", "MQ", "AA", "DL", "MQ", "AA", "DL", "DL", "MQ", "AA", "AA", "WN", "US", "US", "DL", "EV", "9E", "EV", "DL", "DL")), # test with factor with NA
         # testing filtering of Inf, -Inf, NA here.
         DISTANCE = c(10, 12, 12, 187, 273, 1062, 583, 240, 1123, 851, 852, 862, 361, 507, 1020, 1092, 342, 489, 1184, 545),
         ARR_TIME = c(10, 32, 321, 342, 123, 98, 10, 21, 80, 211, 121, 87, 821, 213, 213, 923, 121, 76, 34, 50),
-        DERAY_TIME = c(12, 42, 321, 31, 3, 43, 342, 764, 123, 43, 50, 12, 876, 12, 34, 45, 84, 25, 87, 352, 10)
-        ), row.names = c(NA, -20L),
-      class = c("tbl_df", "tbl", "data.frame"), .Names = c("CANCELLED X", "Carrier Name", "CARRIER", "DISTANCE", "ARR_TIME", "DERAY_TIME"))
+        DERAY_TIME = c(12, 42, 321, 31, 3, 43, 342, 764, 123, 43, 50, 12, 876, 12, 34, 45, 84, 25, 87, 352))
   
   test_data$klass <- c(rep("A", 10), rep("B", 10))
   # Make target variable logical. (Considering supporting only logical)

@@ -200,112 +200,140 @@ test_that("test exp_chisq", {
   mtcars2$cyl[[3]] <- NA
   ret <- exp_chisq(mtcars2 %>% mutate(gear=factor(gear)), gear, carb) # factor order should be kept in the model
   ret <- exp_chisq(mtcars2, gear, carb, value=cyl, fun.aggregate=sum)
-  observed <- ret %>% broom::tidy(model, type="observed")
-  summary <- ret %>% broom::glance(model)
-  residuals <- ret %>% broom::tidy(model, type="residuals")
-  ret
+  observed <- ret %>% tidy_rowwise(model, type="observed")
+  summary <- ret %>% glance_rowwise(model)
+  residuals <- ret %>% tidy_rowwise(model, type="residuals")
+  expect_equal(colnames(summary),
+               c("Chi-Square","Degree of Freedom","P Value","Effect Size (Cohen's w)","Power",
+                 "Probability of Type 2 Error","Number of Rows"))
 })
 
 test_that("test exp_chisq with power", {
   model_df <- exp_chisq(mtcars %>% mutate(gear=factor(gear)), gear, carb, power = 0.8) # factor order should be kept in the model
-  ret <- model_df %>% glance(model)
+  ret <- model_df %>% glance_rowwise(model)
   model_df <- exp_chisq(mtcars, gear, carb, value=cyl, power = 0.8)
-  ret <- model_df %>% glance(model)
-  ret
+  ret <- model_df %>% glance_rowwise(model)
+  expect_equal(colnames(ret),
+               c("Chi-Square","Degree of Freedom","P Value","Effect Size (Cohen's w)",
+                 "Target Power","Target Probability of Type 2 Error","Current Sample Size","Required Sample Size"))
 })
 
 test_that("test exp_chisq with grouping functions", {
-  ret <- exp_chisq(mtcars, disp, drat, func1="asintby10", func2="asint", value=mpg)
-  ret
+  model_df <- exp_chisq(mtcars, disp, drat, func1="asintby10", func2="asint", value=mpg)
+  ret <- model_df %>% glance_rowwise(model)
+  expect_equal(colnames(ret),
+               c("Chi-Square","Degree of Freedom","P Value","Effect Size (Cohen's w)","Power",
+                 "Probability of Type 2 Error","Number of Rows"))
 })
 
 test_that("test exp_chisq with logical", {
   model_df <- exp_chisq(mtcars %>% mutate(gear=gear>3, carb=carb>3), gear, carb) # logical type should be kept in the model
-  ret <- model_df %>% tidy(model, type="residuals")
+  ret <- model_df %>% tidy_rowwise(model, type="residuals")
   expect_equal(class(ret$gear), "logical")
   expect_equal(class(ret$carb), "logical")
 })
 
 test_that("test exp_chisq with numeric", {
   model_df <- exp_chisq(mtcars , gear, carb) # numeric type should be kept in the model
-  ret <- model_df %>% tidy(model, type="residuals")
+  ret <- model_df %>% tidy_rowwise(model, type="residuals")
   expect_equal(class(ret$gear), "numeric")
   expect_equal(class(ret$carb), "numeric")
 })
 
 test_that("test exp_chisq with integer", {
   model_df <- exp_chisq(mtcars %>% mutate(gear=as.integer(gear), carb=as.integer(carb)), gear, carb) # integer type should be kept in the model
-  ret <- model_df %>% tidy(model, type="residuals")
+  ret <- model_df %>% tidy_rowwise(model, type="residuals")
   expect_equal(class(ret$gear), "integer")
   expect_equal(class(ret$carb), "integer")
 })
 
 test_that("test exp_chisq with group_by", {
   ret <- mtcars %>% group_by(vs) %>% exp_chisq(gear, carb, value=cyl)
-  observed <- ret %>% broom::tidy(model, type="observed")
-  summary <- ret %>% broom::glance(model)
-  residuals <- ret %>% broom::tidy(model, type="residuals")
+  observed <- ret %>% tidy_rowwise(model, type="observed")
+  expect_true("vs" %in% colnames(observed))
+  summary <- ret %>% glance_rowwise(model)
+  expect_true("vs" %in% colnames(summary))
+  residuals <- ret %>% tidy_rowwise(model, type="residuals")
+  expect_true("vs" %in% colnames(residuals))
 })
 
 test_that("test exp_chisq with group_by with single class category in one of the groups", {
   ret <- mtcars %>% filter(vs!=1 | gear==4) %>% group_by(vs) %>% exp_chisq(gear, carb, value=cyl)
-  observed <- ret %>% broom::tidy(model, type="observed")
-  summary <- ret %>% broom::glance(model)
+  observed <- ret %>% tidy_rowwise(model, type="observed")
+  summary <- ret %>% glance_rowwise(model)
   expect_equal(nrow(summary), 1) # summary for only one group should be shown.
-  residuals <- ret %>% broom::tidy(model, type="residuals")
+  residuals <- ret %>% tidy_rowwise(model, type="residuals")
 })
 
 test_that("test exp_ttest", {
   mtcars2 <- mtcars
   mtcars2$am[[1]] <- NA # test NA filtering
   model_df <- exp_ttest(mtcars2, mpg, am)
-  ret <- model_df %>% tidy(model, type="model")
+  ret <- model_df %>% tidy_rowwise(model, type="model")
   expect_true("Number of Rows" %in% colnames(ret))
-  model_df %>% tidy(model, type="data_summary")
+  model_df %>% tidy_rowwise(model, type="data_summary")
 })
 
 test_that("test exp_ttest with var.equal = TRUE", {
   mtcars2 <- mtcars
   mtcars2$am[[1]] <- NA # test NA filtering
-  ret <- exp_ttest(mtcars2, mpg, am, var.equal = TRUE)
-  ret %>% tidy(model, type="model")
-  ret %>% tidy(model, type="data_summary")
-  ret
+  model_df <- exp_ttest(mtcars2, mpg, am, var.equal = TRUE)
+  ret <- model_df %>% tidy_rowwise(model, type="model")
+  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
+  expect_equal(colnames(ret),
+               c("am","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
+                 "Minimum","Maximum"))
 })
 
 test_that("test exp_ttest with alternative = greater", {
   mtcars2 <- mtcars
   mtcars2$am[[1]] <- NA # test NA filtering
-  ret <- exp_ttest(mtcars2, mpg, am, alternative = "greater")
-  ret %>% tidy(model, type="model")
-  ret %>% tidy(model, type="data_summary")
-  ret
+  model_df <- exp_ttest(mtcars2, mpg, am, alternative = "greater")
+  ret <- model_df %>% tidy_rowwise(model, type="model")
+  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
+  colnames(ret)
+  expect_equal(colnames(ret),
+               c("am","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
+                 "Minimum","Maximum"))
 })
 
 test_that("test exp_ttest with paired = TRUE", {
   # Make sample size equal between groups for paired t-test.
   mtcars2 <- mtcars %>% group_by(am) %>% slice_sample(n=6) %>% ungroup()
-  ret <- exp_ttest(mtcars2, mpg, am, paired = TRUE)
-  ret %>% tidy(model, type="model")
-  ret %>% tidy(model, type="data_summary")
+  model_df <- exp_ttest(mtcars2, mpg, am, paired = TRUE)
+  ret <- model_df %>% tidy_rowwise(model, type="model")
+  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
+  expect_equal(colnames(ret),
+               c("am","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
+                 "Minimum","Maximum"))
   ret
 })
 
 test_that("test exp_ttest with power", {
   mtcars2 <- mtcars
   mtcars2$am[[1]] <- NA # test NA filtering
-  ret <- exp_ttest(mtcars2, mpg, am, power = 0.8)
-  ret %>% tidy(model, type="model")
-  ret %>% tidy(model, type="data_summary")
-  ret
+  model_df <- exp_ttest(mtcars2, mpg, am, beta = 0.2)
+  ret <- model_df %>% tidy_rowwise(model, type="model")
+  expect_equal(colnames(ret),
+               c("t Ratio","P Value","Degree of Freedom","Difference",
+                 "Conf High","Conf Low","Effect Size (Cohen's d)","Target Power",
+                 "Target Probability of Type 2 Error","Current Sample Size (Each Group)","Required Sample Size (Each Group)","Number of Rows",
+                 "Number of Rows for 0","Number of Rows for 1"))
+  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
+  expect_equal(colnames(ret),
+               c("am","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
+                 "Minimum","Maximum"))
 })
 
 test_that("test exp_ttest with power with paired = TRUE", {
   # Make sample size equal between groups for paired t-test.
   mtcars2 <- mtcars %>% group_by(am) %>% slice_sample(n=6) %>% ungroup()
-  ret <- exp_ttest(mtcars2, mpg, am, paired = TRUE, power = 0.8)
-  ret %>% tidy(model, type="model")
-  ret %>% tidy(model, type="data_summary")
+  model_df <- exp_ttest(mtcars2, mpg, am, paired = TRUE, power = 0.8)
+  ret <- model_df %>% tidy_rowwise(model, type="model")
+  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
+  expect_equal(colnames(ret),
+               c("am","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
+                 "Minimum","Maximum"))
   ret
 })
 
@@ -313,103 +341,137 @@ test_that("test exp_ttest with power with paired = TRUE", {
 test_that("test exp_ttest with diff_to_detect", {
   mtcars2 <- mtcars
   mtcars2$am[[1]] <- NA # test NA filtering
-  ret <- exp_ttest(mtcars2, mpg, am, diff_to_detect = 0.5, power = 0.8)
-  ret %>% tidy(model, type="model")
-  ret %>% tidy(model, type="data_summary")
+  model_df <- exp_ttest(mtcars2, mpg, am, diff_to_detect = 0.5, power = 0.8)
+  ret <- model_df %>% tidy_rowwise(model, type="model")
+  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
+  expect_equal(colnames(ret),
+               c("am","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
+                 "Minimum","Maximum"))
   ret
 })
 
 test_that("test exp_ttest with diff_to_detect and common_sd", {
   mtcars2 <- mtcars
   mtcars2$am[[1]] <- NA # test NA filtering
-  ret <- exp_ttest(mtcars2, mpg, am, diff_to_detect = 0.5, common_sd = 1.5, power = 0.8)
-  ret %>% tidy(model, type="model")
-  ret %>% tidy(model, type="data_summary")
-  ret
+  model_df <- exp_ttest(mtcars2, mpg, am, diff_to_detect = 0.5, common_sd = 1.5, power = 0.8)
+  ret <- model_df %>% tidy_rowwise(model, type="model")
+  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
+  expect_equal(colnames(ret),
+               c("am","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
+                 "Minimum","Maximum"))
 })
 
 
 test_that("test exp_ttest with asint grouping", {
   mtcars2 <- mtcars
   mtcars2$am[[1]] <- NA # test NA filtering
-  ret <- exp_ttest(mtcars2, mpg, am, func2 = "asint")
-  ret %>% tidy(model, type="model")
-  ret %>% tidy(model, type="data_summary")
-  ret
+  model_df <- exp_ttest(mtcars2, mpg, am, func2 = "asint")
+  ret <- model_df %>% tidy_rowwise(model, type="model")
+  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
+  expect_equal(colnames(ret),
+               c("am","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
+                 "Minimum","Maximum"))
 })
 
 test_that("test exp_ttest with group_by", {
-  ret <- mtcars %>% group_by(vs) %>% exp_ttest(mpg, am)
-  ret %>% tidy(model, type="model")
-  ret %>% tidy(model, type="data_summary")
+  model_df <- mtcars %>% group_by(vs) %>% exp_ttest(mpg, am)
+  ret <- model_df %>% tidy_rowwise(model, type="model")
+  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
+  expect_equal(colnames(ret),
+               c("vs","am","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
+                 "Minimum","Maximum"))
   ret
 })
 
 test_that("test exp_ttest with outlier filter", {
-  ret <- mtcars %>% group_by(vs) %>% exp_ttest(mpg, am, outlier_filter_type="percentile", outlier_filter_threshold=0.9)
-  ret %>% tidy(model, type="model")
-  ret %>% tidy(model, type="data_summary")
-  ret
+  model_df <- mtcars %>% group_by(vs) %>% exp_ttest(mpg, am, outlier_filter_type="percentile", outlier_filter_threshold=0.9)
+  ret <- model_df %>% tidy_rowwise(model, type="model")
+  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
+  expect_equal(colnames(ret),
+               c("vs","am","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
+                 "Minimum","Maximum"))
 })
 
 test_that("test exp_anova", {
-  ret <- exp_anova(mtcars, mpg, am)
-  ret %>% tidy(model, type="model")
-  ret %>% tidy(model, type="data_summary")
-  ret <- exp_anova(mtcars, mpg, gear)
-  ret %>% tidy(model, type="model")
-  ret %>% tidy(model, type="data_summary")
-  ret
+  model_df <- exp_anova(mtcars, mpg, am)
+  ret <- model_df %>% tidy_rowwise(model, type="model")
+  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
+  model_df <- exp_anova(mtcars, mpg, gear)
+  ret <- model_df %>% tidy_rowwise(model, type="model")
+  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
+  expect_equal(colnames(ret),
+               c("gear","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",   
+                 "Minimum","Maximum"))
 })
 
 test_that("test exp_anova with outlier filter", {
-  ret <- exp_anova(mtcars, mpg, am, outlier_filter_type="percentile", outlier_filter_threshold=0.9)
-  ret %>% tidy(model, type="model")
-  ret %>% tidy(model, type="data_summary")
-  ret <- exp_anova(mtcars, mpg, gear, outlier_filter_type="percentile", outlier_filter_threshold=0.9)
-  ret %>% tidy(model, type="model")
-  ret %>% tidy(model, type="data_summary")
-  ret
+  model_df <- exp_anova(mtcars, mpg, am, outlier_filter_type="percentile", outlier_filter_threshold=0.9)
+  ret <- model_df %>% tidy_rowwise(model, type="model")
+  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
+  model_df <- exp_anova(mtcars, mpg, gear, outlier_filter_type="percentile", outlier_filter_threshold=0.9)
+  ret <- model_df %>% tidy_rowwise(model, type="model")
+  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
+  expect_equal(colnames(ret),
+               c("gear","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",   
+                 "Minimum","Maximum"))
 })
 
 test_that("test exp_anova with required power", {
-  ret <- exp_anova(mtcars, mpg, am, power=0.8)
-  ret %>% tidy(model, type="model")
-  ret %>% tidy(model, type="data_summary")
-  ret <- exp_anova(mtcars, mpg, gear, power=0.8)
-  ret %>% tidy(model, type="model")
-  ret %>% tidy(model, type="data_summary")
-  ret
+  model_df <- exp_anova(mtcars, mpg, am, power=0.8)
+  ret <- model_df %>% tidy_rowwise(model, type="model")
+  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
+  model_df <- exp_anova(mtcars, mpg, gear, power=0.8)
+  ret <- model_df %>% tidy_rowwise(model, type="model")
+  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
+  expect_equal(colnames(ret),
+               c("gear","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",   
+                 "Minimum","Maximum"))
 })
 
 test_that("test exp_anova with grouping functions", {
-  ret <- exp_anova(mtcars, mpg, disp, func2="asintby10")
-  ret %>% tidy(model, type="data_summary")
-  ret
+  model_df <- exp_anova(mtcars, mpg, disp, func2="asintby10")
+  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
+  expect_equal(colnames(ret),
+               c("disp","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",   
+                 "Minimum","Maximum"))
 })
 
 
 test_that("test exp_anova with group_by", {
-  ret <- mtcars %>% group_by(vs) %>% exp_anova(mpg, am)
-  ret %>% tidy(model, type="data_summary")
-  ret <- mtcars %>% group_by(vs) %>% exp_anova(mpg, gear)
-  ret %>% tidy(model, type="data_summary")
-  ret
+  model_df <- mtcars %>% group_by(vs) %>% exp_anova(mpg, am)
+  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
+  model_df <- mtcars %>% group_by(vs) %>% exp_anova(mpg, gear)
+  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
+  expect_equal(colnames(ret),
+               c("vs","gear","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean",
+                 "Std Deviation","Minimum","Maximum"))
 })
 
 test_that("test exp_normality", {
   df <- mtcars %>% mutate(dummy=c(NA, rep(1,n()-1))) # test for column with always same value, except for NA.
   ret <- df %>% exp_normality(mpg, gear, dummy, n_sample=20, n_sample_qq=30)
-  qq <- ret %>% tidy(model, type="qq")
-  model_summary <- ret %>% tidy(model, type="model_summary", signif_level=0.1)
-  ret
+  qq <- ret %>% tidy_rowwise(model, type="qq")
+  model_summary <- ret %>% tidy_rowwise(model, type="model_summary", signif_level=0.1)
+  expect_equal(colnames(model_summary),
+               c("Column","W Statistic","P Value","Sample Size","Normal Distribution"))
+})
+
+test_that("test exp_normality with group", {
+  df <- mtcars %>% mutate(dummy=c(NA, rep(1,n()-1))) %>% # test for column with always same value, except for NA.
+    group_by(am)
+  ret <- df %>% exp_normality(mpg, gear, dummy, n_sample=20, n_sample_qq=30)
+  qq <- ret %>% tidy_rowwise(model, type="qq")
+  expect_true("am" %in% colnames(qq))
+  model_summary <- ret %>% tidy_rowwise(model, type="model_summary", signif_level=0.1)
+  expect_true("am" %in% colnames(model_summary))
 })
 
 test_that("test exp_normality with column with almost always same value", {
   # test for column with almost always same value, except for NA, to test column prefiltering logic to avoid error.
   df <- mtcars %>% mutate(dummy=c(NA, 0, rep(1,n()-2)))
   ret <- df %>% exp_normality(mpg, gear, dummy, n_sample=6, n_sample_qq=30)
-  qq <- ret %>% tidy(model, type="qq")
-  model_summary <- ret %>% tidy(model, type="model_summary", signif_level=0.1)
-  ret
+  qq <- ret %>% tidy_rowwise(model, type="qq")
+  model_summary <- ret %>% tidy_rowwise(model, type="model_summary", signif_level=0.1)
+  expect_equal(colnames(model_summary),
+               c("Column","W Statistic","P Value","Sample Size","Normal Distribution"))
 })

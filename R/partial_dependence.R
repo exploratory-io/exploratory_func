@@ -191,8 +191,8 @@ handle_partial_dependence <- function(x) {
   }))
   ret <- nested %>% tidyr::unnest(cols=.temp.data) %>% dplyr::ungroup()
 
-  if ("lm" %in% class(x)) { # For linear regression, join coefficient and P value for numeric predictors.
-    ret2 <- broom:::tidy.lm(x)
+  if (("lm" %in% class(x)) || ("glm" %in% class(x))) { # For linear regression, join coefficient and P value for numeric predictors.
+    ret2 <- broom:::tidy.glm(x) # Use tidy.glm() even for lm, since tidy.lm raises error if class other than "lm" is added.
     # Coefficient/P value info is joined only for predicted numeric variables. 
     ret <- ret %>% mutate(key=case_when(y_name=='Actual'~NA_character_,chart_type=='line'~x_name, TRUE~NA_character_)) %>% left_join(ret2, by = c(key="term"))
     ret <- ret %>% select(-key)

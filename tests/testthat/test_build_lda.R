@@ -20,11 +20,11 @@ test_that("build_lda", {
   input_df <- input_df %>% rename(`Lesson Id`=LessonId)
   tokenized <- input_df %>% do_tokenize(Lesson, keep_cols = TRUE)
   ret <- build_lda(tokenized, `Lesson Id`, token, n_topics=3)
-  tidy_ret <- tidy(ret, model)
+  tidy_ret <- tidy_rowwise(ret, model)
 
   expect_equal(colnames(tidy_ret), c("topic", "term", "beta"))
 
-  glance_ret <- broom::glance(ret, model)
+  glance_ret <- glance_rowwise(ret, model)
 
   expect_equal(colnames(glance_ret), c("iter", "terms", "alpha"))
 })
@@ -51,11 +51,11 @@ test_that("build_lda by gibbs", {
     dplyr::group_by(LessonId, token) %>%
     dplyr::summarise(count = n())
   ret <- build_lda(tokenized, LessonId, token, count, n_topics=3, method = "Gibbs")
-  tidy_ret <- tidy(ret, model)
+  tidy_ret <- tidy_rowwise(ret, model)
 
   expect_equal(colnames(tidy_ret), c("topic", "term", "beta"))
 
-  glance_ret <- broom::glance(ret, model)
+  glance_ret <- glance_rowwise(ret, model)
 
   expect_equal(colnames(glance_ret), c("iter", "terms", "alpha"))
 })

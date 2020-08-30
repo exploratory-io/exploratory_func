@@ -157,7 +157,7 @@ exp_bayes_ab <- function(df, converted, a_b_identifier, count = NULL, prior_mean
       dplyr::ungroup() %>%
       unnest_with_drop(model)
   } else {
-    tidy(ret, model, type = type, ...)
+    tidy_rowwise(ret, model, type = type, ...)
   }
 }
 
@@ -297,7 +297,7 @@ do_bayes_ab <- function(df, a_b_identifier, total_count, conversion_rate, prior_
       dplyr::ungroup() %>%
       unnest_with_drop(model)
   } else {
-    tidy(ret, model, type = type, ...)
+    tidy_rowwise(ret, model, type = type, ...)
   }
 }
 

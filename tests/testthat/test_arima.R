@@ -1,6 +1,7 @@
 context("test do_arima")
 
 test_that("do_arima with aggregation", {
+  skip("Skip ARIMA test")
 # Test is disabled till we got the test server ready.
 #  data("raw_data", package = "AnomalyDetection")
 #  raw_data$timestamp <- as.POSIXct(raw_data$timestamp)
