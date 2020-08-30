@@ -668,7 +668,7 @@ partial_dependence.xgboost <- function(fit, vars = colnames(data),
   n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)),
   classification = FALSE, interaction = FALSE, uniform = TRUE, data, ...) {
 
-  target = strsplit(strsplit(as.character(fit$call), "formula")[[2]], " ~")[[1]][[1]]
+  target = as.character(fit$fml)[[2]]
 
   predict.fun = function(object, newdata) {
     #if (object$treetype != "Classification") {
@@ -724,7 +724,11 @@ partial_dependence.xgboost <- function(fit, vars = colnames(data),
 # Rows should be sorted by importance in descending order.
 importance_xgboost <- function(model) {
   imp <- tidy.xgb.Booster(model)
-  ret <- imp %>% rename(variable=feature) %>% dplyr::arrange(-importance)
+  ret <- imp %>% dplyr::rename(variable=feature)
+  ret <- ret %>% dplyr::mutate(variable = str_extract(variable,'c\\d+_')) %>%
+    dplyr::group_by(variable) %>%
+    dplyr::summarize(importance = sum(importance, na.rm=TRUE)) #TODO: Does sum make sense to aggregate this importance?
+  ret <- ret %>% dplyr::arrange(-importance)
   ret
 }
 
