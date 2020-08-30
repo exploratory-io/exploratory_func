@@ -430,26 +430,9 @@ augment.xgboost_reg <- function(x, data = NULL, newdata = NULL, ...) {
       data
     }
 
-    y_name <- all.vars(x$terms)[[1]]
-    if(is.null(ret_data[[y_name]])){
-      # if there is no column in the formula (even if it's response variable),
-      # model.matrix function causes an error
-      # so create the column with 0
-      ret_data[[y_name]] <- rep(0, nrow(ret_data))
-    }
-
-    mat_data <- if(!is.null(x$is_sparse) && x$is_sparse){
-      Matrix::sparse.model.matrix(x$terms, data = model.frame(ret_data, na.action = na.pass, xlev = x$xlevels))
-    } else {
-      model.matrix(x$terms, model.frame(ret_data, na.action = na.pass, xlev = x$xlevels))
-    }
-
-    predicted <- stats::predict(x, mat_data)
+    predicted <- predict_xgboost(x, data)
     predicted_value_col <- avoid_conflict(colnames(ret_data), "predicted_value")
-    # model.matrix removes rows with NA and stats::predict returns a matrix
-    # whose number of rows is the same with its size,
-    # so the result should be filled by NA
-    ret_data[[predicted_value_col]] <- fill_vec_NA(as.integer(rownames(mat_data)), predicted, nrow(ret_data))
+    ret_data[[predicted_value_col]] <- predicted
     ret_data
   } else {
     augment(x, data = data, newdata = newdata)
@@ -659,6 +642,12 @@ predict_xgboost <- function(model, df) {
     predicted <- probs %>%
       as.data.frame() %>%
       append_colnames(prefix = "predicted_probability_")
+  }
+  else if (obj == "reg:linear") { # TODO: Does this cover all xgboost_reg cases?
+    # model.matrix removes rows with NA and stats::predict returns a matrix
+    # whose number of rows is the same with its size,
+    # so the result should be filled by NA
+    predicted <- fill_vec_NA(as.integer(rownames(mat_data)), predicted, nrow(df))
   }
   predicted
 }
