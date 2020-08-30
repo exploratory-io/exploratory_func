@@ -289,50 +289,28 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, ...) {
       data
     }
 
-    if(!is.null(x$is_sparse) && x$is_sparse){
-      # Set na.action to na.pass.
-      # Since XGBoost can predict with NAs in predictors, creation of sparse matrix should not remove NA rows.
-      # https://stackoverflow.com/questions/29732720/sparse-model-matrix-loses-rows-in-r
-      mat <- Matrix::sparse.model.matrix(x$terms, model.frame(ret_data, na.action = na.pass, xlev = x$xlevels))
-    } else {
-      mat <- model.matrix(x$terms, model.frame(ret_data, na.action = na.pass, xlev = x$xlevels))
-    }
+    predicted <- predict_xgboost(x, ret_data)
 
-    predicted <- stats::predict(x, mat)
-
-    vars <- all.vars(x$terms)
-    y_name <- vars[[1]]
-
-    # create predicted labels for classification
-    # based on factor levels and it's indice
-    find_label <- function(ids, levels, original_data) {
-      levels[ids]
-    }
     obj <- x$params$objective
     if (obj == "multi:softmax") {
       predicted_label_col <- avoid_conflict(colnames(ret_data), "predicted_label")
-      predicted <- x$y_levels[predicted+1]
       # fill rows with NA
-      ret_data[[predicted_label_col]] <- fill_vec_NA(as.integer(rownames(mat)), predicted, max_index = nrow(ret_data))
+      ret_data[[predicted_label_col]] <- predicted
     } else if (obj == "multi:softprob") {
       predicted_label_col <- avoid_conflict(colnames(ret_data), "predicted_label")
       predicted_prob_col <- avoid_conflict(colnames(ret_data), "predicted_probability")
 
-      # predicted is a vector containing probabilities for each class
-      probs <- matrix(predicted, nrow = length(x$y_levels)) %>% t()
-      probs <- fill_mat_NA(as.numeric(rownames(mat)), probs, nrow(ret_data))
-      colnames(probs) <- x$y_levels
-      predicted <- probs %>%
+      colmax <- max.col(predicted)
+
+      # get max probabilities from each row
+      max_prob <- predicted[(colmax - 1) * nrow(predicted) + seq(nrow(predicted))]
+      predicted_label <- x$y_levels[colmax]
+
+      predicted_df <- predicted %>%
         as.data.frame() %>%
         append_colnames(prefix = "predicted_probability_")
 
-      ret_data <- cbind(ret_data, predicted)
-
-      colmax <- max.col(probs)
-
-      # get max probabilities from each row
-      max_prob <- probs[(colmax - 1) * nrow(probs) + seq(nrow(probs))]
-      predicted_label <- x$y_levels[colmax]
+      ret_data <- cbind(ret_data, predicted_df)
       # predicted_prob_col is a column for probabilities of chosen values
       ret_data[[predicted_prob_col]] <- max_prob
       ret_data[[predicted_label_col]] <- predicted_label
@@ -620,9 +598,14 @@ predict_xgboost <- function(model, df) {
     # probs <- fill_mat_NA(as.numeric(rownames(mat_data)), probs, nrow(df)) # code from xgboost step.
     probs <- fill_mat_NA(1:nrow(df), probs, nrow(df)) # Not sure if this is necessary. TODO: check.
     colnames(probs) <- model$y_levels
-    predicted <- probs %>%
-      as.data.frame() %>%
-      append_colnames(prefix = "predicted_probability_")
+    predicted <- probs
+    # We return matrix in this case.
+    # Converting it to data.frame is the caller's responsibility.
+  }
+  else if (obj == "multi:softmax") {
+    predicted <- model$y_levels[predicted+1]
+    # fill rows with NA
+    predicted <- fill_vec_NA(as.integer(rownames(mat_data)), predicted, nrow(df))
   }
   else { # TODO: Here we assume all other cases returns vector prediction result.
     # model.matrix removes rows with NA and stats::predict returns a matrix
