@@ -314,27 +314,35 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, ...) {
     data
   }
 
-  na_row_numbers <- ranger.find_na(predictor_variables, original_data)
-
-  cleaned_data <- original_data %>% dplyr::select(predictor_variables) %>% na.omit()
+  # NA handling - temporary off. Might not be necessary for xgboost.
+  # na_row_numbers <- ranger.find_na(predictor_variables, original_data)
+  #
+  # cleaned_data <- original_data %>% dplyr::select(predictor_variables) %>% na.omit()
 
   # Rename columns to the normalized ones used while learning.
-  colnames(cleaned_data) <- all.vars(x$terms)[-1] # TODO: Make it more model agnostic.
+  cleaned_data <- original_data
+  # Convert column names to the ones with which the training was done. 
+  for (i in 1:length(x$terms_mapping)) {
+    converted <- names(x$terms_mapping)[i]
+    original <- x$terms_mapping[i]
+    colnames(cleaned_data)[colnames(cleaned_data) == original] <- converted
+  }
 
   # Run prediction.
-  predicted_val <- predict_xgboost(x, cleaned_data)
+  predicted <- predict_xgboost(x, cleaned_data)
 
+  # NA handling - temporary off. Might not be necessary for xgboost.
   # Inserting once removed NA rows
-  predicted <- restore_na(predicted_val, na_row_numbers)
+  # predicted <- restore_na(predicted_val, na_row_numbers)
 
   obj <- x$params$objective
   if (obj == "multi:softmax") {
-    predicted_label_col <- avoid_conflict(colnames(original_data), "predicted_label")
+    predicted_label_col <- avoid_conflict(colnames(cleaned_data), "predicted_label")
     # fill rows with NA
-    original_data[[predicted_label_col]] <- predicted
+    cleaned_data[[predicted_label_col]] <- predicted
   } else if (obj == "multi:softprob") {
-    predicted_label_col <- avoid_conflict(colnames(original_data), "predicted_label")
-    predicted_prob_col <- avoid_conflict(colnames(original_data), "predicted_probability")
+    predicted_label_col <- avoid_conflict(colnames(cleaned_data), "predicted_label")
+    predicted_prob_col <- avoid_conflict(colnames(cleaned_data), "predicted_probability")
 
     colmax <- max.col(predicted)
 
@@ -346,12 +354,19 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, ...) {
       as.data.frame() %>%
       append_colnames(prefix = "predicted_probability_")
 
-    original_data <- cbind(original_data, predicted_df)
+    cleaned_data <- cbind(cleaned_data, predicted_df)
     # predicted_prob_col is a column for probabilities of chosen values
-    original_data[[predicted_prob_col]] <- max_prob
-    original_data[[predicted_label_col]] <- predicted_label
+    cleaned_data[[predicted_prob_col]] <- max_prob
+    cleaned_data[[predicted_label_col]] <- predicted_label
   }
-  original_data
+
+  # Convert column names back to the original.
+  for (i in 1:length(x$terms_mapping)) {
+    converted <- names(x$terms_mapping)[i]
+    original <- x$terms_mapping[i]
+    colnames(cleaned_data)[colnames(cleaned_data) == converted] <- original
+  }
+  cleaned_data
 }
 
 #' Augment predicted values for binary task
