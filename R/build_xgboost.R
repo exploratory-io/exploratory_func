@@ -1042,6 +1042,26 @@ exp_xgboost <- function(df,
   ret
 }
 
+extract_actual.xgboost <- function(x, type = "training") {
+  if (type == "training") {
+    actual <- x$df[[all.vars(x$terms)[[1]]]]
+  }
+  else {
+    stop("Implement it!!")
+  }
+  actual
+}
+
+extract_predicted.xgboost <- function(x, type = "training") {
+  if (type == "training") {
+    predicted <- x$prediction_training
+  }
+  else {
+    predicted <- x$prediction_test
+  }
+  predicted
+}
+
 extract_predicted_binary_labels.xgboost <- function(x, threshold = 0.5, type = "training") {
   if (type == "training") {
     predicted <- x$prediction_training > threshold
@@ -1122,14 +1142,13 @@ tidy.xgboost_exp <- function(x, type = "importance", pretty.name = FALSE, binary
         return(glance(x, pretty.name = pretty.name, ...))
       }
       # get evaluation scores from training data
-      actual <- x$y
+      actual <- extract_actual.xgboost(x)
       if(is.numeric(actual)){
         glance(x, pretty.name = pretty.name, ...)
       } else {
         if (x$classification_type == "binary") {
-          browser()
           predicted <- extract_predicted_binary_labels.xgboost(x, threshold = binary_classification_threshold)
-          predicted_probability <- x$prediction_training$predictions[,1]
+          predicted_probability <- extract_predicted.xgboost(x)
           ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = pretty.name)
         }
         else {
