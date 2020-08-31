@@ -153,6 +153,16 @@ xgboost_binary <- function(data, formula, output_type = "logistic", eval_metric 
   # add class to control S3 methods
   class(ret) <- c("xgboost_binary", class(ret))
   ret$y_levels <- label_levels
+
+  ret$fml <- formula
+  # To avoid saving a huge environment when caching with RDS.
+  attr(ret$fml,".Environment") <- NULL
+
+  original_colnames <- colnames(data)
+  # this attribute will be used to get back original column names
+  terms_mapping <- original_colnames
+  names(terms_mapping) <- original_colnames # No column name change. Just to work with the rest of the code.
+  ret$terms_mapping <- terms_mapping
   ret
 }
 
@@ -213,6 +223,12 @@ xgboost_multi <- function(data, formula, output_type = "softprob", eval_metric =
   # To avoid saving a huge environment when caching with RDS.
   attr(ret$fml,".Environment") <- NULL
   ret$y_levels <- label_levels
+
+  original_colnames <- colnames(data)
+  # this attribute will be used to get back original column names
+  terms_mapping <- original_colnames
+  names(terms_mapping) <- original_colnames # No column name change. Just to work with the rest of the code.
+  ret$terms_mapping <- terms_mapping
   ret
 }
 
@@ -286,7 +302,7 @@ xgboost_reg <- function(data, formula, output_type = "linear", eval_metric = "rm
 augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, ...) {
   loadNamespace("xgboost") # This is necessary for predict() to successfully figure out which function to call internally.
 
-  predictor_variables <- all.vars(x$fml)[-1]
+  predictor_variables <- all.vars(x$terms)[-1]
   predictor_variables <- x$terms_mapping[predictor_variables]
 
   class(x) <- class(x)[class(x) != c("xgboost_multi")]
@@ -303,7 +319,7 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, ...) {
   cleaned_data <- original_data %>% dplyr::select(predictor_variables) %>% na.omit()
 
   # Rename columns to the normalized ones used while learning.
-  colnames(cleaned_data) <- all.vars(x$fml)[-1] # TODO: Make it more model agnostic.
+  colnames(cleaned_data) <- all.vars(x$terms)[-1] # TODO: Make it more model agnostic.
 
   # Run prediction.
   predicted_val <- predict_xgboost(x, cleaned_data)
@@ -313,12 +329,12 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, ...) {
 
   obj <- x$params$objective
   if (obj == "multi:softmax") {
-    predicted_label_col <- avoid_conflict(colnames(ret_data), "predicted_label")
+    predicted_label_col <- avoid_conflict(colnames(original_data), "predicted_label")
     # fill rows with NA
-    ret_data[[predicted_label_col]] <- predicted
+    original_data[[predicted_label_col]] <- predicted
   } else if (obj == "multi:softprob") {
-    predicted_label_col <- avoid_conflict(colnames(ret_data), "predicted_label")
-    predicted_prob_col <- avoid_conflict(colnames(ret_data), "predicted_probability")
+    predicted_label_col <- avoid_conflict(colnames(original_data), "predicted_label")
+    predicted_prob_col <- avoid_conflict(colnames(original_data), "predicted_probability")
 
     colmax <- max.col(predicted)
 
@@ -330,12 +346,12 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, ...) {
       as.data.frame() %>%
       append_colnames(prefix = "predicted_probability_")
 
-    ret_data <- cbind(ret_data, predicted_df)
+    original_data <- cbind(original_data, predicted_df)
     # predicted_prob_col is a column for probabilities of chosen values
-    ret_data[[predicted_prob_col]] <- max_prob
-    ret_data[[predicted_label_col]] <- predicted_label
+    original_data[[predicted_prob_col]] <- max_prob
+    original_data[[predicted_label_col]] <- predicted_label
   }
-  ret_data
+  original_data
 }
 
 #' Augment predicted values for binary task
@@ -346,51 +362,51 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, ...) {
 #' @export
 augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, ...) {
   loadNamespace("xgboost") # This is necessary for predict() to successfully figure out which function to call internally.
-
-  predictor_variables <- all.vars(x$fml)[-1]
+  
+  predictor_variables <- all.vars(x$terms)[-1]
   predictor_variables <- x$terms_mapping[predictor_variables]
-
+  
   # create clean name data frame because the model learned by those names
   original_data <- if(!is.null(newdata)){
     newdata
   } else {
     data
   }
-
+  
   na_row_numbers <- ranger.find_na(predictor_variables, original_data)
-
+  
   cleaned_data <- original_data %>% dplyr::select(predictor_variables) %>% na.omit()
-
+  
   # Rename columns to the normalized ones used while learning.
-  colnames(cleaned_data) <- all.vars(x$fml)[-1] # TODO: Make it more model agnostic.
-
+  colnames(cleaned_data) <- all.vars(x$terms)[-1] # TODO: Make it more model agnostic.
+  
   # Run prediction.
   predicted_val <- predict_xgboost(x, cleaned_data)
-
+  
   # Inserting once removed NA rows
   predicted <- restore_na(predicted_val, na_row_numbers)
-
+  
   obj <- x$params$objective
-  predicted_label_col <- avoid_conflict(colnames(ret_data), "predicted_label")
-  predicted_prob_col <- avoid_conflict(colnames(ret_data), "predicted_probability")
+  predicted_label_col <- avoid_conflict(colnames(original_data), "predicted_label")
+  predicted_prob_col <- avoid_conflict(colnames(original_data), "predicted_probability")
   prob <- if (obj == "binary:logistic") {
-    predicted_prob_col <- avoid_conflict(colnames(ret_data), "predicted_probability")
-    ret_data[[predicted_prob_col]] <- predicted
+    predicted_prob_col <- avoid_conflict(colnames(original_data), "predicted_probability")
+    original_data[[predicted_prob_col]] <- predicted
     predicted
   } else if (obj == "binary:logitraw") {
-    predicted_val_col <- avoid_conflict(colnames(ret_data), "predicted_value")
-
+    predicted_val_col <- avoid_conflict(colnames(original_data), "predicted_value")
+  
     # binary:logitraw returns logit values
     prob <- boot::inv.logit(predicted)
-
-    ret_data[[predicted_val_col]] <- predicted
-    ret_data[[predicted_prob_col]] <- prob
+  
+    original_data[[predicted_val_col]] <- predicted
+    original_data[[predicted_prob_col]] <- prob
     prob
   } else {
     stop(paste0("object type ", obj, " is not supported"))
   }
-
-  ret_data
+  
+  original_data
 }
 
 #' Augment predicted values
@@ -403,7 +419,7 @@ augment.xgboost_reg <- function(x, data = NULL, newdata = NULL, data_type = "tra
   loadNamespace("xgboost") # This is necessary for predict() to successfully figure out which function to call internally.
 
   predicted_value_col <- avoid_conflict(colnames(newdata), "predicted_value")
-  predictor_variables <- all.vars(x$fml)[-1]
+  predictor_variables <- all.vars(x$terms)[-1]
   predictor_variables <- x$terms_mapping[predictor_variables]
 
   if(!is.null(newdata)  || !is.null(data)) { # Unlike ranger case, there is no prediction result kept in the model in case of xgboost.
@@ -419,7 +435,7 @@ augment.xgboost_reg <- function(x, data = NULL, newdata = NULL, data_type = "tra
     cleaned_data <- original_data %>% dplyr::select(predictor_variables) %>% na.omit()
 
     # Rename columns to the normalized ones used while learning.
-    colnames(cleaned_data) <- all.vars(x$fml)[-1] # TODO: Make it more model agnostic.
+    colnames(cleaned_data) <- all.vars(x$terms)[-1] # TODO: Make it more model agnostic.
 
     # Run prediction.
     predicted_val <- predict_xgboost(x, cleaned_data)
