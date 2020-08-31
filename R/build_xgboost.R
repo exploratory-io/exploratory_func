@@ -1041,3 +1041,78 @@ exp_xgboost <- function(df,
 
   ret
 }
+
+#' @export
+#' @param type "importance", "evaluation" or "conf_mat". Feature importance, evaluated scores or confusion matrix of training data.
+tidy.xgboost_exp <- function(x, type = "importance", pretty.name = FALSE, binary_classification_threshold = 0.5, ...) {
+  if ("error" %in% class(x) && type != "evaluation") {
+    ret <- data.frame()
+    return(ret)
+  }
+  switch(
+    type,
+    importance = {
+      if ("error" %in% class(x$imp_df)) {
+        # Permutation importance is not supported for the family and link function, or skipped because there is only one variable.
+        # Return empty data.frame to avoid error.
+        ret <- data.frame()
+        return(ret)
+      }
+      ret <- x$imp_df
+      ret <- ret %>% dplyr::mutate(variable = x$terms_mapping[variable]) # map variable names to original.
+      ret
+    },
+    evaluation = {
+      # Delegate showing error for failed models to grance().
+      if ("error" %in% class(x)) {
+        return(glance(x, pretty.name = pretty.name, ...))
+      }
+      # get evaluation scores from training data
+      actual <- x$y
+      if(is.numeric(actual)){
+        glance(x, pretty.name = pretty.name, ...)
+      } else {
+        if (x$classification_type == "binary") {
+          predicted <- get_binary_predicted_value_from_probability(x, threshold = binary_classification_threshold)
+          predicted_probability <- x$prediction_training$predictions[,1]
+          ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = pretty.name)
+        }
+        else {
+          predicted <- ranger.predict_value_from_prob(x$forest$levels, x$prediction_training$predictions, x$y)
+          ret <- evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
+        }
+        ret
+      }
+    },
+    conf_mat = {
+      # return confusion matrix
+      if (x$classification_type == "binary") {
+        predicted <- get_binary_predicted_value_from_probability(x, threshold = binary_classification_threshold)
+      }
+      else {
+        predicted <- ranger.predict_value_from_prob(x$forest$levels, x$prediction_training$predictions, x$y)
+      }
+
+      ret <- data.frame(
+        actual_value = x$y,
+        predicted_value = predicted
+      ) %>%
+        dplyr::filter(!is.na(predicted_value))
+
+      # get count if it's classification
+      ret <- ret %>%
+        dplyr::group_by(actual_value, predicted_value) %>%
+        dplyr::summarize(count = n()) %>%
+        dplyr::ungroup()
+
+      ret
+    },
+    partial_dependence = {
+      ret <- handle_partial_dependence(x)
+      ret
+    },
+    {
+      stop(paste0("type ", type, " is not defined"))
+    })
+}
+
