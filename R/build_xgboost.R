@@ -285,6 +285,10 @@ xgboost_reg <- function(data, formula, output_type = "linear", eval_metric = "rm
 #' @export
 augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, ...) {
   loadNamespace("xgboost") # This is necessary for predict() to successfully figure out which function to call internally.
+
+  predictor_variables <- all.vars(x$fml)[-1]
+  predictor_variables <- x$terms_mapping[predictor_variables]
+
   class(x) <- class(x)[class(x) != c("xgboost_multi")]
 
   # create clean name data frame because the model learned by those names
@@ -342,6 +346,9 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, ...) {
 #' @export
 augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, ...) {
   loadNamespace("xgboost") # This is necessary for predict() to successfully figure out which function to call internally.
+
+  predictor_variables <- all.vars(x$fml)[-1]
+  predictor_variables <- x$terms_mapping[predictor_variables]
 
   # create clean name data frame because the model learned by those names
   original_data <- if(!is.null(newdata)){
