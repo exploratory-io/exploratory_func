@@ -268,6 +268,12 @@ xgboost_reg <- function(data, formula, output_type = "linear", eval_metric = "rm
   ret$fml <- formula
   # To avoid saving a huge environment when caching with RDS.
   attr(ret$fml,".Environment") <- NULL
+
+  original_colnames <- colnames(data)
+  # this attribute will be used to get back original column names
+  terms_mapping <- original_colnames
+  names(terms_mapping) <- original_colnames # No column name change. Just to work with the rest of the code.
+  ret$terms_mapping <- terms_mapping
   ret
 }
 
@@ -377,24 +383,53 @@ augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, ...) {
 #' @param newdata New data frame to predict
 #' @param ... Not used for now.
 #' @export
-augment.xgboost_reg <- function(x, data = NULL, newdata = NULL, ...) {
+augment.xgboost_reg <- function(x, data = NULL, newdata = NULL, data_type = "training", ...) {
   loadNamespace("xgboost") # This is necessary for predict() to successfully figure out which function to call internally.
-  class(x) <- class(x)[class(x) != "xgboost_reg" &
-                       class(x) != "xgb.Booster.formula"]
 
-  if(!is.null(x$terms)){
-    ret_data <- if(!is.null(newdata)){
-      data <- newdata
+  predicted_value_col <- avoid_conflict(colnames(newdata), "predicted_value")
+  predictor_variables <- all.vars(x$fml)[-1]
+  predictor_variables <- x$terms_mapping[predictor_variables]
+
+  if(!is.null(newdata)  || !is.null(data)) { # Unlike ranger case, there is no prediction result kept in the model in case of xgboost.
+    # create clean name data frame because the model learned by those names
+    original_data <- if(!is.null(newdata)){
+      newdata
     } else {
       data
     }
 
-    predicted <- predict_xgboost(x, data)
-    predicted_value_col <- avoid_conflict(colnames(ret_data), "predicted_value")
-    ret_data[[predicted_value_col]] <- predicted
-    ret_data
-  } else {
-    augment(x, data = data, newdata = newdata)
+    na_row_numbers <- ranger.find_na(predictor_variables, original_data)
+
+    cleaned_data <- original_data %>% dplyr::select(predictor_variables) %>% na.omit()
+
+    # Rename columns to the normalized ones used while learning.
+    colnames(cleaned_data) <- all.vars(x$fml)[-1] # TODO: Make it more model agnostic.
+
+    # Run prediction.
+    predicted_val <- predict_xgboost(x, cleaned_data)
+
+    # Inserting once removed NA rows
+    original_data[[predicted_value_col]] <- restore_na(predicted_val, na_row_numbers)
+
+    original_data
+  } else if (!is.null(data)) { #TODO: For Analytics View. Copiled from code for ranger. Adjust for xgboost.
+    switch(data_type,
+      training = {
+        predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
+        # Inserting once removed NA rows
+        predicted <- restore_na(x$prediction_training$predictions, x$na.action)
+        data[[predicted_value_col]] <- predicted
+        data
+      },
+      test = {
+        predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
+        # Inserting once removed NA rows
+        predicted_nona <- x$prediction_test$predictions
+        predicted_nona <- restore_na(predicted_nona, attr(x$prediction_test, "unknown_category_rows_index"))
+        predicted <- restore_na(predicted_nona, attr(x$prediction_test, "na.action"))
+        data[[predicted_value_col]] <- predicted
+        data
+      })
   }
 }
 
