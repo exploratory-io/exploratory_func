@@ -1042,8 +1042,13 @@ exp_xgboost <- function(df,
   ret
 }
 
-xgboost.get_binary_predicted_value_from_probability <- function(x, threshold = 0.5) {
-  predicted <- x$prediction_training > threshold
+extract_predicted_binary_labels.xgboost <- function(x, threshold = 0.5, type = "training") {
+  if (type == "training") {
+    predicted <- x$prediction_training > threshold
+  }
+  else {
+    predicted <- x$prediction_test > threshold
+  }
   predicted
 }
 
@@ -1122,7 +1127,8 @@ tidy.xgboost_exp <- function(x, type = "importance", pretty.name = FALSE, binary
         glance(x, pretty.name = pretty.name, ...)
       } else {
         if (x$classification_type == "binary") {
-          predicted <- get_binary_predicted_value_from_probability(x, threshold = binary_classification_threshold)
+          browser()
+          predicted <- extract_predicted_binary_labels.xgboost(x, threshold = binary_classification_threshold)
           predicted_probability <- x$prediction_training$predictions[,1]
           ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = pretty.name)
         }
@@ -1136,7 +1142,7 @@ tidy.xgboost_exp <- function(x, type = "importance", pretty.name = FALSE, binary
     conf_mat = {
       # return confusion matrix
       if (x$classification_type == "binary") {
-        predicted <- xgboost.get_binary_predicted_value_from_probability(x, threshold = binary_classification_threshold)
+        predicted <- extract_predicted_binary_labels.xgboost(x, threshold = binary_classification_threshold)
       }
       else {
         predicted <- ranger.predict_value_from_prob(x$forest$levels, x$prediction_training$predictions, x$y)
