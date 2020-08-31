@@ -1042,6 +1042,11 @@ exp_xgboost <- function(df,
   ret
 }
 
+xgboost.get_binary_predicted_value_from_probability <- function(x, threshold = 0.5) {
+  predicted <- x$prediction_training > threshold
+  predicted
+}
+
 #' @export
 #' @param type "importance", "evaluation" or "conf_mat". Feature importance, evaluated scores or confusion matrix of training data.
 tidy.xgboost_exp <- function(x, type = "importance", pretty.name = FALSE, binary_classification_threshold = 0.5, ...) {
@@ -1087,7 +1092,7 @@ tidy.xgboost_exp <- function(x, type = "importance", pretty.name = FALSE, binary
     conf_mat = {
       # return confusion matrix
       if (x$classification_type == "binary") {
-        predicted <- get_binary_predicted_value_from_probability(x, threshold = binary_classification_threshold)
+        predicted <- xgboost.get_binary_predicted_value_from_probability(x, threshold = binary_classification_threshold)
       }
       else {
         predicted <- ranger.predict_value_from_prob(x$forest$levels, x$prediction_training$predictions, x$y)
