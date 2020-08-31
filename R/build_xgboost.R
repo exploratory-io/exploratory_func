@@ -760,7 +760,7 @@ partial_dependence.xgboost <- function(fit, vars = colnames(data),
 importance_xgboost <- function(model) {
   imp <- tidy.xgb.Booster(model)
   ret <- imp %>% dplyr::rename(variable=feature)
-  ret <- ret %>% dplyr::mutate(variable = str_extract(variable,'c\\d+_')) %>%
+  ret <- ret %>% dplyr::mutate(variable = stringr::str_extract(variable,'c\\d+_')) %>%
     dplyr::group_by(variable) %>%
     dplyr::summarize(importance = sum(importance, na.rm=TRUE)) #TODO: Does sum make sense to aggregate this importance?
   ret <- ret %>% dplyr::arrange(-importance)
