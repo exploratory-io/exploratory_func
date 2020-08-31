@@ -1057,10 +1057,9 @@ glance.xgboost_exp <- function(x, pretty.name = FALSE, ...) {
   if ("xgboost_reg" %in% class(x)) {
     glance.ranger.method <- glance.xgboost_exp.regression
   }
-  else if ("xgboost_binary" %in% class(x) || "xgboost_multi" %in% class(x)) {
-    glance.ranger.method <- glance.xgboost_exp.classification
+  else {
+    stop("glance.xgboost_exp should not be called for classification")
   }
-
   ret <- glance.ranger.method(x, pretty.name = pretty.name, ...)
   ret
 }
@@ -1090,61 +1089,6 @@ glance.xgboost_exp.regression <- function(x, pretty.name, ...) {
       dplyr::rename(!!!map)
   }
   ret
-}
-
-
-# This is used only for step, and not for Analytics View. TODO: We might want to unify the code.
-#' @export
-glance.xgboost_exp.classification <- function(x, pretty.name, ...) {
-  # Both actual and predicted have no NA values.
-  actual <- x$df[[all.vars(x$terms)[[1]]]] # Adjusted for xgboost.
-  predicted <- ranger.predict_value_from_prob(x$forest$levels, x$prediction_training$predictions, x$y)
-  levels(predicted) <- levels(actual)
-
-  # Composes data.frame of binary classification evaluation summary.
-  single_stat <- function(act, pred) {
-    #       predicted
-    #actual   TRUE FALSE
-    #  TRUE    tp    fn
-    #  FALSE   fp    tn
-
-    conf_mat <- table(act, pred)
-    tp <- conf_mat[1]
-    tn <- conf_mat[4]
-    fn <- conf_mat[3]
-    fp <- conf_mat[2]
-    precision <- tp / (tp + fp)
-    recall <- tp / (tp + fn)
-    accuracy <- (tp + tn) / (tp + tn + fp + fn)
-    f_score <- 2 * ((precision * recall) / (precision + recall))
-
-    ret <- data.frame(f_score, accuracy, 1 - accuracy, precision, recall)
-    names(ret) <- if (pretty.name) {
-      c("F Score", "Accuracy Rate", "Misclassification Rate", "Precision", "Recall")
-    } else {
-      c("f_score", "accuracy_rate", "misclassification_rate", "precision", "recall")
-    }
-    ret
-
-  }
-
-  if (x$classification_type == "binary") {
-    ret <- single_stat(actual, predicted)
-    pred_prob <- x$prediction_training$predictions[,levels(actual)[1]]
-    actual_val <- actual == levels(actual)[1] # Make it a logical
-    # calculate AUC
-    auc <- auroc(pred_prob, actual_val)
-    auc_ret <- data.frame(auc)
-    if (pretty.name) {
-      auc_ret <- auc_ret %>% dplyr::rename(AUC=auc)
-    }
-    ret <- cbind(auc_ret, ret)
-    ret
-
-  } else {
-    # Multiclass classification metrics
-    evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
-  }
 }
 
 #' @export
