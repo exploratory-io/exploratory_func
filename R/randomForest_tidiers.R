@@ -787,15 +787,6 @@ augment.ranger <- function(x, data = NULL, newdata = NULL, ...) {
     ret <- data.frame()
     return(ret)
   }
-  # Extract data from model
-  # This is from https://github.com/mdlincoln/broom/blob/e3cdf5f3363ab9514e5b61a56c6277cb0d9899fd/R/rf_tidiers.R
-  if (is.null(data)) {
-    if (is.null(x$call$data)) {
-      list <- lapply(all.vars(x$call), as.name)
-      data <- eval(as.call(list(quote(data.frame),list)), parent.frame())
-    }
-  }
-
   augment.ranger.method <- switch(x$treetype,
                                   "Classification" = augment.ranger.classification,
                                   "Probability estimation" = augment.ranger.classification,
