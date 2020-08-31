@@ -480,6 +480,19 @@ augment.xgboost_reg <- function(x, data = NULL, newdata = NULL, data_type = "tra
   }
 }
 
+#' @export
+augment.xgboost_exp <- function(x, data = NULL, newdata = NULL, ...) {
+  if ("xgboost_reg" %in% class(x)) {
+    augment.xgboost_reg(x, data, newdata, ...)
+  }
+  else if ("xgboost_binary" %in% class(x)) {
+    augment.xgboost_binary(x, data, newdata, ...)
+  }
+  else if ("xgboost_multi" %in% class(x)) {
+    augment.xgboost_multi(x, data, newdata, ...)
+  }
+}
+
 #' Augment predicted values
 #' @param x xgb.Booster model
 #' @param data Data frame used to train xgb.Booster
@@ -916,6 +929,7 @@ exp_xgboost <- function(df,
       else {
         model <- xgboost_multi(df, fml) # TODO: Add XGBoost specific parameters.
       }
+      class(model) <- c("xgboost_exp", class(model))
 
       model$prediction_training <- predict_xgboost(model, df)
 
@@ -980,7 +994,7 @@ exp_xgboost <- function(df,
       if(length(grouped_cols) > 0) {
         # In repeat-by case, we report group-specific error in the Summary table,
         # so that analysis on other groups can go on.
-        class(e) <- c("ranger", class(e))
+        class(e) <- c("xgboost_exp", class(e))
         list(model = e, test_index = NULL, source_data = NULL)
       } else {
         stop(e)
