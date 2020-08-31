@@ -335,46 +335,48 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, ...) {
 #' @export
 augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, ...) {
   loadNamespace("xgboost") # This is necessary for predict() to successfully figure out which function to call internally.
-  class(x) <- class(x)[!class(x) %in% c("xgboost_binary", "xgb.Booster.formula")]
-  if(!is.null(x$terms)){
-    ret_data <- if(!is.null(newdata)){
-      newdata
-    } else {
-      data
-    }
 
-    predicted <- predict_xgboost(x, ret_data)
-
-    # create predicted labels for classification
-    # based on factor levels and it's indice
-    find_label <- function(ids, levels, original_data) {
-      levels[ids]
-    }
-
-    obj <- x$params$objective
-    predicted_label_col <- avoid_conflict(colnames(ret_data), "predicted_label")
-    predicted_prob_col <- avoid_conflict(colnames(ret_data), "predicted_probability")
-    prob <- if (obj == "binary:logistic") {
-      predicted_prob_col <- avoid_conflict(colnames(ret_data), "predicted_probability")
-      ret_data[[predicted_prob_col]] <- predicted
-      predicted
-    } else if (obj == "binary:logitraw") {
-      predicted_val_col <- avoid_conflict(colnames(ret_data), "predicted_value")
-
-      # binary:logitraw returns logit values
-      prob <- boot::inv.logit(predicted)
-
-      ret_data[[predicted_val_col]] <- predicted
-      ret_data[[predicted_prob_col]] <- prob
-      prob
-    } else {
-      stop(paste0("object type ", obj, " is not supported"))
-    }
-
-    ret_data
+  # create clean name data frame because the model learned by those names
+  original_data <- if(!is.null(newdata)){
+    newdata
   } else {
-    augment(x, data = data, newdata = newdata)
+    data
   }
+
+  na_row_numbers <- ranger.find_na(predictor_variables, original_data)
+
+  cleaned_data <- original_data %>% dplyr::select(predictor_variables) %>% na.omit()
+
+  # Rename columns to the normalized ones used while learning.
+  colnames(cleaned_data) <- all.vars(x$fml)[-1] # TODO: Make it more model agnostic.
+
+  # Run prediction.
+  predicted_val <- predict_xgboost(x, cleaned_data)
+
+  # Inserting once removed NA rows
+  predicted <- restore_na(predicted_val, na_row_numbers)
+
+  obj <- x$params$objective
+  predicted_label_col <- avoid_conflict(colnames(ret_data), "predicted_label")
+  predicted_prob_col <- avoid_conflict(colnames(ret_data), "predicted_probability")
+  prob <- if (obj == "binary:logistic") {
+    predicted_prob_col <- avoid_conflict(colnames(ret_data), "predicted_probability")
+    ret_data[[predicted_prob_col]] <- predicted
+    predicted
+  } else if (obj == "binary:logitraw") {
+    predicted_val_col <- avoid_conflict(colnames(ret_data), "predicted_value")
+
+    # binary:logitraw returns logit values
+    prob <- boot::inv.logit(predicted)
+
+    ret_data[[predicted_val_col]] <- predicted
+    ret_data[[predicted_prob_col]] <- prob
+    prob
+  } else {
+    stop(paste0("object type ", obj, " is not supported"))
+  }
+
+  ret_data
 }
 
 #' Augment predicted values
