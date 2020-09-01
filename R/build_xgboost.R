@@ -1180,6 +1180,7 @@ tidy.xgboost_exp <- function(x, type = "importance", pretty.name = FALSE, binary
     },
     conf_mat = {
       # return confusion matrix
+      actual <- extract_actual.xgboost(x)
       if (x$classification_type == "binary") {
         predicted <- extract_predicted_binary_labels.xgboost(x, threshold = binary_classification_threshold)
       }
@@ -1188,7 +1189,7 @@ tidy.xgboost_exp <- function(x, type = "importance", pretty.name = FALSE, binary
       }
 
       ret <- data.frame(
-        actual_value = x$y,
+        actual_value = actual,
         predicted_value = predicted
       ) %>%
         dplyr::filter(!is.na(predicted_value))
