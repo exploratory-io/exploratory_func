@@ -947,6 +947,7 @@ exp_xgboost <- function(df,
         attr(prediction_test, "na.action") <- na_row_numbers_test
         attr(prediction_test, "unknown_category_rows_index") <- unknown_category_rows_index
         model$prediction_test <- prediction_test
+        model$df_test <- df_test_clean
       }
 
       # return partial dependence
@@ -1047,7 +1048,7 @@ extract_actual.xgboost <- function(x, type = "training") {
     actual <- x$df[[all.vars(x$terms)[[1]]]]
   }
   else {
-    stop("Implement it!!")
+    actual <- x$df_test[[all.vars(x$terms)[[1]]]]
   }
   actual
 }
