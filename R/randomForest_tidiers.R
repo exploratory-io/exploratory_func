@@ -1318,7 +1318,12 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
           conf_mat = {
             model_object <- df$model[[1]]
             if ("xgboost_exp" %in% class(model_object)) {
-              predicted <- extract_predicted_binary_labels.xgboost(model_object, type = "test", ...) # If threshold is specified in ..., take it.
+              if (model_object$classification_type == "binary") { #TODO: Make it more model-agnostic.
+                predicted <- extract_predicted_binary_labels.xgboost(model_object, type = "test", ...) # If threshold is specified in ..., take it.
+              }
+              else {
+                predicted <- extract_predicted_multiclass_labels.xgboost(model_object, type = "test")
+              }
             }
             else {
               predicted <- test_pred_ret$predicted_label

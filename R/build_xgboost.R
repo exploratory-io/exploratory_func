@@ -1175,7 +1175,7 @@ tidy.xgboost_exp <- function(x, type = "importance", pretty.name = FALSE, binary
         predicted <- extract_predicted_binary_labels.xgboost(x, threshold = binary_classification_threshold)
       }
       else {
-        predicted <- ranger.predict_value_from_prob(x$forest$levels, x$prediction_training$predictions, x$y)
+        predicted <- extract_predicted_multiclass_labels.xgboost(x)
       }
 
       ret <- data.frame(
