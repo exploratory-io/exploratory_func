@@ -1251,7 +1251,12 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
           evaluation = {
             model_object <- df$model[[1]]
             if (is.numeric(actual)) {
-              predicted <- test_pred_ret$predicted_value
+              if ("xgboost_exp" %in% class(model_object)) {
+                predicted <- extract_predicted.xgboost(model_object, type = "test")
+              }
+              else {
+                predicted <- test_pred_ret$predicted_value
+              }
               root_mean_square_error <- rmse(actual, predicted)
               test_n <- sum(!is.na(predicted)) # Sample size for test.
 
