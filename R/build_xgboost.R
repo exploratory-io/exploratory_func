@@ -1037,8 +1037,14 @@ exp_xgboost <- function(df,
               data
             }
           })) %>%
-          dplyr::select(-data) %>%
-          dplyr::rowwise()
+          dplyr::select(-data)
+
+  # Rowwise grouping has to be redone with original grouped_cols, so that summarize(tidy(model)) later can add back the group column.
+  if (length(grouped_cols) > 0) {
+    ret <- ret %>% dplyr::rowwise(grouped_cols)
+  } else {
+    ret <- ret %>% dplyr::rowwise()
+  }
 
   # If all the groups are errors, it would be hard to handle resulting data frames
   # at the chart preprocessors. Hence, we instead stop the processing here
