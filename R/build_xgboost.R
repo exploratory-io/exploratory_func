@@ -838,7 +838,6 @@ exp_xgboost <- function(df,
                         test_rate = 0.0,
                         test_split_type = "random" # "random" or "ordered"
                         ){
-
   if(!is.null(seed)){
     set.seed(seed)
   }
@@ -893,7 +892,8 @@ exp_xgboost <- function(df,
         sample_size <- max_nrow
       }
       # XGBoost can work with NAs in numeric predictors. TODO: verify it.
-      clean_df_ret <- cleanup_df_per_group(df, clean_target_col, sample_size, clean_cols, name_map, predictor_n, filter_numeric_na=FALSE)
+      # Also, no need to convert logical to factor unlike ranger.
+      clean_df_ret <- cleanup_df_per_group(df, clean_target_col, sample_size, clean_cols, name_map, predictor_n, filter_numeric_na=FALSE, convert_logical=FALSE)
       if (is.null(clean_df_ret)) {
         return(NULL) # skip this group
       }

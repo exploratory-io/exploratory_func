@@ -1850,7 +1850,7 @@ cleanup_df <- function(df, target_col, selected_cols, grouped_cols, target_n, pr
   ret
 }
 
-cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, name_map, predictor_n, revert_logical_levels=TRUE, filter_numeric_na=FALSE) {
+cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, name_map, predictor_n, revert_logical_levels=TRUE, filter_numeric_na=FALSE, convert_logical=TRUE) {
   df <- preprocess_regression_data_before_sample(df, clean_target_col, clean_cols,
                                                  filter_predictor_numeric_na=filter_numeric_na)
   clean_cols <- attr(df, 'predictors') # predictors are updated (removed) in preprocess_pre_sample. Catch up with it.
@@ -1863,7 +1863,7 @@ cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, nam
     df <- df %>% sample_rows(max_nrow)
   }
 
-  if (is.logical(df[[clean_target_col]])) {
+  if (convert_logical && is.logical(df[[clean_target_col]])) {
     # we need to convert logical to factor since na.roughfix only works for numeric or factor.
     # for logical set TRUE, FALSE level order for better visualization. but only do it when
     # the target column actually has both TRUE and FALSE, since edarf::partial_dependence errors out if target
