@@ -321,6 +321,9 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, ...) {
 
   # Rename columns to the normalized ones used while learning.
   cleaned_data <- original_data
+  if (nrow(cleaned_data) == 0) {
+    return(data.frame())
+  }
   # Convert column names to the ones with which the training was done. 
   for (i in 1:length(x$terms_mapping)) {
     converted <- names(x$terms_mapping)[i]
@@ -391,6 +394,9 @@ augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, ...) {
   na_row_numbers <- ranger.find_na(predictor_variables, original_data)
   
   cleaned_data <- original_data %>% dplyr::select(predictor_variables) %>% na.omit()
+  if (nrow(cleaned_data) == 0) {
+    return(data.frame())
+  }
   
   # Rename columns to the normalized ones used while learning.
   colnames(cleaned_data) <- all.vars(x$terms)[-1] # TODO: Make it more model agnostic.
@@ -448,6 +454,9 @@ augment.xgboost_reg <- function(x, data = NULL, newdata = NULL, data_type = "tra
     na_row_numbers <- ranger.find_na(predictor_variables, original_data)
 
     cleaned_data <- original_data %>% dplyr::select(predictor_variables) %>% na.omit()
+    if (nrow(cleaned_data) == 0) {
+      return(data.frame())
+    }
 
     # Rename columns to the normalized ones used while learning.
     colnames(cleaned_data) <- all.vars(x$terms)[-1] # TODO: Make it more model agnostic.
