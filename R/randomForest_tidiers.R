@@ -1316,7 +1316,13 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
             dplyr::bind_rows(lapply(levels(actual), per_level))
           },
           conf_mat = {
-            predicted <- test_pred_ret$predicted_label
+            model_object <- df$model[[1]]
+            if ("xgboost_exp" %in% class(model_object)) {
+              predicted <- extract_predicted_binary_labels.xgboost(model_object, type = "test", ...) # If threshold is specified in ..., take it.
+            }
+            else {
+              predicted <- test_pred_ret$predicted_label
+            }
             ret <- data.frame(
                               actual_value = actual,
                               predicted_value = predicted
