@@ -1282,9 +1282,15 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
               ret
             } else {
               predicted <- NULL # Just declaring variable.
-              if (model$classification_type == "binary") {
-                predicted <- test_pred_ret$predicted_label
-                predicted_probability <- test_pred_ret$predicted_probability
+              if (model_object$classification_type == "binary") {
+                if ("xgboost_exp" %in% class(model_object)) {
+                  predicted <- extract_predicted_binary_labels.xgboost(model_object, type = "test", ...) # If threshold is specified in ..., take it.
+                  predicted_probability <- extract_predicted.xgboost(model_object, type = "test") # If threshold is specified in ..., take it.
+                }
+                else {
+                  predicted <- test_pred_ret$predicted_label
+                  predicted_probability <- test_pred_ret$predicted_probability
+                }
                 is_rpart <- "rpart" %in% class(model_object)
                 ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = pretty.name, is_rpart = is_rpart)
               }
