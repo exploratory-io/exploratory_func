@@ -728,13 +728,11 @@ partial_dependence.xgboost <- function(fit, vars = colnames(data),
   target = as.character(fit$fml)[[2]]
 
   predict.fun = function(object, newdata) {
-    #if (object$treetype != "Classification") {
     if (!classification) {
       predict_xgboost(object, newdata)
     } else {
-      t(apply(predict_xgboost(object, newdata), 1,
-        function(x) table(factor(x, seq_len(length(unique(newdata[[target]]))),
-          levels(newdata[[target]]))) / length(x)))
+      # Returned prediction probability matrix works here as is.
+      predict_xgboost(object, newdata)
     }
   }
 
