@@ -1194,7 +1194,7 @@ rf_evaluation_by_class <- function(data, ...) {
 # Generates Analytics View Summary table for ranger and rpart.
 #' wrapper for tidy type evaluation
 #' @export
-rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.name = FALSE, ...) {
+rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.name = FALSE, binary_classification_threshold = 0.5, ...) {
   # Filter out the rows from failed models.
   # This is working depending on rowwise grouping. (Note for when we move out of it.)
   filtered <- data %>% dplyr::filter(!is.null(model) & !"error" %in% class(model))
@@ -1210,9 +1210,9 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
   # so that we can report the error on the Note column of Summary table.
   if (!is.null(model)) {
     training_ret <- switch(type,
-                           evaluation = rf_evaluation(data, pretty.name = pretty.name, ...),
-                           evaluation_by_class = rf_evaluation_by_class(data, pretty.name = pretty.name, ...),
-                           conf_mat = data %>% tidy_rowwise(model, type = "conf_mat", ...))
+                           evaluation = rf_evaluation(data, pretty.name = pretty.name, binary_classification_threshold = binary_classification_threshold, ...),
+                           evaluation_by_class = rf_evaluation_by_class(data, pretty.name = pretty.name, binary_classification_threshold = binary_classification_threshold, ...),
+                           conf_mat = data %>% tidy_rowwise(model, type = "conf_mat", binary_classification_threshold = binary_classification_threshold, ...))
     if (length(test_index) > 0 && nrow(training_ret) > 0) {
       training_ret$is_test_data <- FALSE
     }
@@ -1289,8 +1289,8 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
               predicted <- NULL # Just declaring variable.
               if (model_object$classification_type == "binary") {
                 if ("xgboost_exp" %in% class(model_object)) {
-                  predicted <- extract_predicted_binary_labels.xgboost(model_object, type = "test", ...) # If threshold is specified in ..., take it.
-                  predicted_probability <- extract_predicted.xgboost(model_object, type = "test") # If threshold is specified in ..., take it.
+                  predicted <- extract_predicted_binary_labels.xgboost(model_object, type = "test", threshold = binary_classification_threshold) # If threshold is specified in ..., take it.
+                  predicted_probability <- extract_predicted.xgboost(model_object, type = "test")
                 }
                 else {
                   predicted <- test_pred_ret$predicted_label
@@ -1319,7 +1319,7 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
             model_object <- df$model[[1]]
             if ("xgboost_exp" %in% class(model_object)) {
               if (model_object$classification_type == "binary") { #TODO: Make it more model-agnostic.
-                predicted <- extract_predicted_binary_labels.xgboost(model_object, type = "test", ...) # If threshold is specified in ..., take it.
+                predicted <- extract_predicted_binary_labels.xgboost(model_object, type = "test", binary_classification_threshold = binary_classification_threshold)
               }
               else {
                 predicted <- extract_predicted_multiclass_labels.xgboost(model_object, type = "test")
