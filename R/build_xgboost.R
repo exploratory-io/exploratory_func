@@ -1102,8 +1102,8 @@ glance.xgboost_exp <- function(x, pretty.name = FALSE, ...) {
 
 #' @export
 glance.xgboost_exp.regression <- function(x, pretty.name, ...) {
-  predicted <- x$prediction_training$predictions
-  actual <- x$y
+  predicted <- extract_predicted.xgboost(x)
+  actual <- extract_actual.xgboost(x)
   root_mean_square_error <- rmse(predicted, actual)
   rsq <- r_squared(actual, predicted)
   n <- length(actual)
