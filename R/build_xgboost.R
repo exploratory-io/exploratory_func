@@ -1073,6 +1073,16 @@ extract_predicted_binary_labels.xgboost <- function(x, threshold = 0.5, type = "
   predicted
 }
 
+extract_predicted_multiclass_labels.xgboost <- function(x, type = "training") {
+  if (type == "training") {
+    predicted <- x$y_levels[apply(x$prediction_training, 1, which.max)]
+  }
+  else {
+    predicted <- x$y_levels[apply(x$prediction_test, 1, which.max)]
+  }
+  predicted
+}
+
 # This is used from Analytics View only when classification type is regression.
 #' @export
 glance.xgboost_exp <- function(x, pretty.name = FALSE, ...) {
@@ -1153,7 +1163,7 @@ tidy.xgboost_exp <- function(x, type = "importance", pretty.name = FALSE, binary
           ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = pretty.name)
         }
         else {
-          predicted <- ranger.predict_value_from_prob(x$forest$levels, x$prediction_training$predictions, x$y)
+          predicted <- extract_predicted_multiclass_labels.xgboost(x)
           ret <- evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
         }
         ret
