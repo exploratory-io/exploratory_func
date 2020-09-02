@@ -20,6 +20,7 @@ if (!testdata_filename %in% list.files(testdata_dir)) {
   flight <- flight %>% slice_sample(n=5000)
   write.csv(flight, testdata_file_path) # save sampled-down data for performance.
 }
+
 test_that("exp_xgboost(regression) evaluate training and test", {
   set.seed(1) # For stability of result.
   model_df <- flight %>%
@@ -37,10 +38,9 @@ test_that("exp_xgboost(regression) evaluate training and test", {
   expect_gt(nrow(train_ret), 3400)
   # expect_equal(nrow(train_ret), 3500) Fails now, since we filter numeric NA. Revive when we do not need to.
 
-  # Test result of boruta.
-  importance_res <- model_df %>% tidy_rowwise(model, type='boruta') %>% group_by(variable) %>% summarize(importance=mean(importance)) %>% arrange(-importance)
-  expect_equal(as.character(importance_res$variable[[1]]), "DEP DELAY") # Most important should be dep delay.
-  expect_equal(as.character(importance_res$variable[[2]]), "CAR RIER") # 2nd most important should be carrier. 
+  # Check result of variable importance 
+  ret <- model_df %>% tidy_rowwise(model, type="importance")
+  expect_equal(as.character(ret$variable[[1]]), "DEP DELAY") # Most important should be dep delay.
 
   ret <- rf_evaluation_training_and_test(model_df, pretty.name = TRUE)
   expect_equal(nrow(ret), 2) # 2 for train and test
@@ -67,6 +67,15 @@ test_that("exp_xgboost(binary) evaluate training and test", {
   model_df <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`)) %>%
                 exp_xgboost(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0.3, pd_with_bin_means = TRUE)
 
+  ret <- rf_evaluation_training_and_test(model_df, binary_classification_threshold = 0.5)
+  expect_equal(nrow(ret), 2) # 2 for train and test
+  expect_gt(ret$auc[[1]], 0.5) # If this is not true, TRUE/FALSE may be reverted.
+
+  #ret <- model_df %>% glance_rowwise(model)
+  ret <- model_df %>% tidy_rowwise(model, type="conf_mat")
+  ret <- model_df %>% tidy_rowwise(model, type="partial_dependence")
+  ret <- model_df %>% tidy_rowwise(model, type="importance")
+
   res_partial_dependence <- model_df %>% rf_partial_dependence()
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
@@ -77,12 +86,6 @@ test_that("exp_xgboost(binary) evaluate training and test", {
   # expect_equal(nrow(train_ret), 3500) Fails now, since we filter numeric NA. Revive when we do not need to.
   expect_lt(nrow(train_ret), 3500)
   expect_gt(nrow(train_ret), 3400)
-
-  ret <- rf_evaluation_training_and_test(model_df)
-  expect_equal(nrow(ret), 2) # 2 for train and test
-
-  ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class")
-  expect_equal(nrow(ret), 4) # 4 for train/test times TRUE/FALSE
 
   ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
   model_df <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`)) %>%
@@ -95,7 +98,7 @@ test_that("exp_xgboost(binary) evaluate training and test", {
   ret <- rf_evaluation_training_and_test(model_df)
   expect_equal(nrow(ret), 1) # 1 for train
 
-  ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class")
+  # ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class") # Not implemented.
   ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
 })
 
@@ -118,8 +121,8 @@ test_that("exp_xgboost(factor(TRUE, FALSE)) evaluate training and test", { # Thi
 
   ret <- rf_evaluation_training_and_test(model_df, pretty.name=T, binary_classification_threshold=0.5)
   expect_equal(nrow(ret), 2) # 2 for train and test
-  ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class")
-  expect_equal(nrow(ret), 4) # 4 for train/test times TRUE/FALSE
+  #ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class") # Not implemented.
+  #expect_equal(nrow(ret), 4) # 4 for train/test times TRUE/FALSE
 
   ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
   model_df <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`)) %>%
@@ -132,9 +135,21 @@ test_that("exp_xgboost(factor(TRUE, FALSE)) evaluate training and test", { # Thi
   ret <- rf_evaluation_training_and_test(model_df)
   expect_equal(nrow(ret), 1) # 1 for train
 
-  ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class")
+  #ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class") # Not implemented.
   ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
 })
+
+test_that("exp_xgboost(binary(factor(A,B))) evaluate training and test with group_by", {
+  set.seed(1) # For stability of result.
+  # `is delayed` is not logical for some reason.
+  # To test binary prediction, need to cast it into logical.
+  flight <- flight %>% group_by(`is UA or AA`)
+  model_df <- flight %>% dplyr::mutate(is_delayed = factor(if_else(as.logical(`is delayed`), "A","B"))) %>% filter(!is.na(is_delayed)) %>%
+                exp_xgboost(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0.3, pd_with_bin_means = TRUE)
+  ret <- rf_evaluation_training_and_test(model_df, pretty.name=T, binary_classification_threshold=0.5)
+  expect_true(all(ret$`Data Type` == rep(c("Training", "Test"),3)))
+})
+
 
 test_that("exp_xgboost(binary(factor(A,B))) evaluate training and test", {
   set.seed(1) # For stability of result.
@@ -155,10 +170,11 @@ test_that("exp_xgboost(binary(factor(A,B))) evaluate training and test", {
 
   ret <- rf_evaluation_training_and_test(model_df, pretty.name=T, binary_classification_threshold=0.5)
   expect_equal(nrow(ret), 2) # 2 for train and test
-  ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class")
-  expect_equal(nrow(ret), 4) # 4 for train/test times TRUE/FALSE
+  #ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class") # Not implemented.
+  #expect_equal(nrow(ret), 4) # 4 for train/test times TRUE/FALSE
 
   ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
+  ret <- model_df %>% rf_partial_dependence()
   model_df <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`)) %>%
                 exp_xgboost(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0, pd_with_bin_means = TRUE)
   ret <- model_df %>% prediction(data="training_and_test")
@@ -169,7 +185,7 @@ test_that("exp_xgboost(binary(factor(A,B))) evaluate training and test", {
   ret <- rf_evaluation_training_and_test(model_df)
   expect_equal(nrow(ret), 1) # 1 for train
 
-  ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class")
+  #ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class") # Not implemented.
   ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
 })
 
@@ -193,8 +209,8 @@ test_that("exp_xgboost(binary) evaluate training and test with SMOTE", {
   ret <- rf_evaluation_training_and_test(model_df)
   expect_equal(nrow(ret), 2) # 2 for train and test
 
-  ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class")
-  expect_equal(nrow(ret), 4) # 4 for train/test times TRUE/FALSE
+  #ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class") # Not implemented.
+  #expect_equal(nrow(ret), 4) # 4 for train/test times TRUE/FALSE
 
   ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
 
@@ -207,7 +223,7 @@ test_that("exp_xgboost(binary) evaluate training and test with SMOTE", {
   ret <- rf_evaluation_training_and_test(model_df)
   expect_equal(nrow(ret), 1) # 1 for train
 
-  ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class")
+  #ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class") # Not implemented.
   ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
 })
 
@@ -229,7 +245,7 @@ test_that("exp_xgboost(multi) evaluate training and test", {
   ret <- rf_evaluation_training_and_test(model_df)
   expect_equal(nrow(ret), 2) # 2 for train and test
 
-  ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class")
+  #ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class") # Not implemented.
   ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
 
   model_df <- flight %>%
