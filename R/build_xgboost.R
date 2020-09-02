@@ -815,6 +815,7 @@ exp_xgboost <- function(df,
                         # max_sample_size = NULL, # Half of max_nrow. down from 100000 when we added partial dependence
                         # ntree = 20,
                         # nodesize = 12,
+                        nrounds = 10,
                         target_n = 20,
                         predictor_n = 12, # So that at least months can fit in it.
                         smote = FALSE,
@@ -928,13 +929,13 @@ exp_xgboost <- function(df,
       fml <- as.formula(paste(clean_target_col, " ~ ", rhs))
 
       if (is_target_logical) {
-        model <- xgboost_binary(df, fml) # TODO: Add XGBoost specific parameters.
+        model <- xgboost_binary(df, fml, nrounds=nrounds) # TODO: Add XGBoost specific parameters.
       }
       else if(is_target_numeric) {
-        model <- xgboost_reg(df, fml) # TODO: Add XGBoost specific parameters.
+        model <- xgboost_reg(df, fml, nrounds=nrounds) # TODO: Add XGBoost specific parameters.
       }
       else {
-        model <- xgboost_multi(df, fml) # TODO: Add XGBoost specific parameters.
+        model <- xgboost_multi(df, fml, nrounds=nrounds) # TODO: Add XGBoost specific parameters.
       }
       class(model) <- c("xgboost_exp", class(model))
 
