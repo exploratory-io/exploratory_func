@@ -787,6 +787,47 @@ importance_xgboost <- function(model) {
   ret
 }
 
+extract_actual.xgboost <- function(x, type = "training") {
+  if (type == "training") {
+    actual <- x$df[[all.vars(x$terms)[[1]]]]
+  }
+  else {
+    actual <- x$df_test[[all.vars(x$terms)[[1]]]]
+  }
+  actual
+}
+
+extract_predicted.xgboost <- function(x, type = "training") {
+  if (type == "training") {
+    predicted <- x$prediction_training
+  }
+  else {
+    predicted <- x$prediction_test
+  }
+  predicted
+}
+
+extract_predicted_binary_labels.xgboost <- function(x, threshold = 0.5, type = "training") {
+  if (type == "training") {
+    predicted <- x$prediction_training > threshold
+  }
+  else {
+    predicted <- x$prediction_test > threshold
+  }
+  predicted
+}
+
+extract_predicted_multiclass_labels.xgboost <- function(x, type = "training") {
+  if (type == "training") {
+    predicted <- x$y_levels[apply(x$prediction_training, 1, which.max)]
+  }
+  else {
+    predicted <- x$y_levels[apply(x$prediction_test, 1, which.max)]
+  }
+  predicted
+}
+
+
 # Clean up data frame for test
 # Removes NAs in predictors - TODO: Is this necessary given our preprocessing before this?
 # Removes categorical values that do not appear in training data.
@@ -1055,46 +1096,6 @@ exp_xgboost <- function(df,
   }
 
   ret
-}
-
-extract_actual.xgboost <- function(x, type = "training") {
-  if (type == "training") {
-    actual <- x$df[[all.vars(x$terms)[[1]]]]
-  }
-  else {
-    actual <- x$df_test[[all.vars(x$terms)[[1]]]]
-  }
-  actual
-}
-
-extract_predicted.xgboost <- function(x, type = "training") {
-  if (type == "training") {
-    predicted <- x$prediction_training
-  }
-  else {
-    predicted <- x$prediction_test
-  }
-  predicted
-}
-
-extract_predicted_binary_labels.xgboost <- function(x, threshold = 0.5, type = "training") {
-  if (type == "training") {
-    predicted <- x$prediction_training > threshold
-  }
-  else {
-    predicted <- x$prediction_test > threshold
-  }
-  predicted
-}
-
-extract_predicted_multiclass_labels.xgboost <- function(x, type = "training") {
-  if (type == "training") {
-    predicted <- x$y_levels[apply(x$prediction_training, 1, which.max)]
-  }
-  else {
-    predicted <- x$y_levels[apply(x$prediction_test, 1, which.max)]
-  }
-  predicted
 }
 
 # This is used from Analytics View only when classification type is regression.
