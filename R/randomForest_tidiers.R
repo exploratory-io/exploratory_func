@@ -1191,6 +1191,8 @@ rf_evaluation_by_class <- function(data, ...) {
   tidy_rowwise(data, model, type = "evaluation_by_class", ...)
 }
 
+# Returns Analytics View model summary table for ranger, rpart, and xgboost.
+# TODO: This function should be promoted to a generic model evaluation function.
 # Generates Analytics View Summary table for ranger and rpart.
 #' wrapper for tidy type evaluation
 #' @export
@@ -1208,6 +1210,8 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
   # Get evaluation for training part. Just passing down to rf_evaluation does it, since it is done off of data embeded in the model.
   # Here we use data with failed model too (data) as opposed to the one without them (filtered),
   # so that we can report the error on the Note column of Summary table.
+  # Generally speaking, for training data part, we rely on model's glance/tidy function, expecting it to give model specific metrics,
+  # though for conf_map, we might want to write one implementation here, to avoid having to write the same thing for each model. TODO: Do it.
   if (!is.null(model)) {
     training_ret <- switch(type,
                            evaluation = rf_evaluation(data, pretty.name = pretty.name, binary_classification_threshold = binary_classification_threshold, ...),
@@ -1225,8 +1229,6 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
   grouped_col <- colnames(data)[!colnames(data) %in% c("model", ".test_index", "source.data")]
 
   # Execute evaluation if there is test data
-  # TODO: This part of the code needs to be kept in sync with broom::tidy with type evaluation/evaluation_by_class.
-  # Would it be possible to consolidate those code?
   if (length(test_index) > 0) {
 
     each_func <- function(df) {
@@ -1290,7 +1292,7 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
               ret
             } else {
               predicted <- NULL # Just declaring variable.
-              if (model_object$classification_type == "binary") {
+              if (model_object$classification_type == "binary") { # Make it model agnostic.
                 if ("xgboost_exp" %in% class(model_object)) {
                   predicted <- extract_predicted_binary_labels.xgboost(model_object, type = "test", threshold = binary_classification_threshold) # If threshold is specified in ..., take it.
                   predicted_probability <- extract_predicted.xgboost(model_object, type = "test")
