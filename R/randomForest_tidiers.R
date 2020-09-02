@@ -1261,7 +1261,10 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
               test_n <- sum(!is.na(predicted)) # Sample size for test.
 
               # null_model_mean is mean of training data.
-              if ("rpart" %in% class(model_object)) { # rpart case
+              if ("xgboost_exp" %in% class(model_object)) {
+                null_model_mean <- mean(extract_actual.xgboost(model_object, type = "test"), na.rm=TRUE)
+              }
+              else if ("rpart" %in% class(model_object)) { # rpart case
                 null_model_mean <- mean(model_object$y, na.rm=TRUE)
               }
               else { # ranger case
