@@ -827,6 +827,19 @@ extract_predicted_multiclass_labels.xgboost <- function(x, type = "training") {
   predicted
 }
 
+get_prediction_type.xgboost <- function(x) {
+  if ("xgboost_reg" %in% class(x)) {
+    ret <- "regression"
+  }
+  if (x$classification_type == "binary") {
+    ret <- "binary"
+  }
+  else {
+    ret <- "multiclass"
+  }
+  ret
+}
+
 
 # Clean up data frame for test
 # Removes NAs in predictors - TODO: Is this necessary given our preprocessing before this?
