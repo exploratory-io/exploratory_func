@@ -154,10 +154,6 @@ xgboost_binary <- function(data, formula, output_type = "logistic", eval_metric 
   class(ret) <- c("xgboost_binary", class(ret))
   ret$y_levels <- label_levels
 
-  ret$fml <- formula
-  # To avoid saving a huge environment when caching with RDS.
-  attr(ret$fml,".Environment") <- NULL
-
   original_colnames <- colnames(data)
   # this attribute will be used to get back original column names
   terms_mapping <- original_colnames
@@ -219,9 +215,6 @@ xgboost_multi <- function(data, formula, output_type = "softprob", eval_metric =
                      ...)
   # add class to control S3 methods
   class(ret) <- c("xgboost_multi", class(ret))
-  ret$fml <- formula
-  # To avoid saving a huge environment when caching with RDS.
-  attr(ret$fml,".Environment") <- NULL
   ret$y_levels <- label_levels
 
   original_colnames <- colnames(data)
@@ -281,9 +274,6 @@ xgboost_reg <- function(data, formula, output_type = "linear", eval_metric = "rm
                      ...)
   # add class to control S3 methods
   class(ret) <- c("xgboost_reg", class(ret))
-  ret$fml <- formula
-  # To avoid saving a huge environment when caching with RDS.
-  attr(ret$fml,".Environment") <- NULL
 
   original_colnames <- colnames(data)
   # this attribute will be used to get back original column names
@@ -725,7 +715,7 @@ partial_dependence.xgboost <- function(fit, vars = colnames(data),
   n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)),
   classification = FALSE, interaction = FALSE, uniform = TRUE, data, ...) {
 
-  target = as.character(fit$fml)[[2]]
+  target = all.vars(fit$terms)[[1]]
 
   predict.fun = function(object, newdata) {
     if (!classification) {
