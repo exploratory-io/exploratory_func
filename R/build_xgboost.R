@@ -845,8 +845,11 @@ get_prediction_type.xgboost <- function(x) {
 # attr(ret, "unknown_category_rows_index") - logical vector that is index of where the unknown category rows are after removing NA rows.
 cleanup_df_for_test <- function(df_test, df_train, c_cols) {
   na_row_numbers_test <- ranger.find_na(c_cols, data = df_test)
-  names(c_cols) <- NULL # Clearing names in vector is necessary to make the following select work.
-  df_test_clean <- df_test %>% dplyr::select(!!!rlang::syms(c_cols)) %>% na.omit()
+  df_test_clean <- df_test
+  if (length(na_row_numbers_test) > 0) {
+    df_test_clean <- df_test_clean[-na_row_numbers_test,]
+  }
+
   unknown_category_rows_index_vector <- get_unknown_category_rows_index_vector(df_test_clean, df_train %>% dplyr::select(!!!rlang::syms(c_cols)))
   df_test_clean <- df_test_clean[!unknown_category_rows_index_vector, , drop = FALSE] # 2nd arg must be empty.
   unknown_category_rows_index <- get_row_numbers_from_index_vector(unknown_category_rows_index_vector)
