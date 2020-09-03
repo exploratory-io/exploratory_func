@@ -447,21 +447,21 @@ augment.xgboost_reg <- function(x, data = NULL, newdata = NULL, data_type = "tra
       data
     }
 
-  cleaned_data <- original_data
+    cleaned_data <- original_data
 
-  cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables_orig)
-  # Rename columns to the normalized ones used while learning.
-  colnames(cleaned_data) <- predictor_variables
+    cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables_orig)
+    # Rename columns to the normalized ones used while learning.
+    colnames(cleaned_data) <- predictor_variables
 
-  # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
-  cleaned_data <- align_predictor_factor_levels(cleaned_data, x$df, predictor_variables)
+    # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
+    cleaned_data <- align_predictor_factor_levels(cleaned_data, x$df, predictor_variables)
 
-  na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
-  cleaned_data <- cleaned_data[-na_row_numbers,]
+    na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
+    cleaned_data <- cleaned_data[-na_row_numbers,]
 
-  if (nrow(cleaned_data) == 0) {
-    return(data.frame())
-  }
+    if (nrow(cleaned_data) == 0) {
+      return(data.frame())
+    }
 
     # Run prediction.
     predicted_val <- predict_xgboost(x, cleaned_data)
