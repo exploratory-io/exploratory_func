@@ -372,7 +372,7 @@ augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, ...) {
   loadNamespace("xgboost") # This is necessary for predict() to successfully figure out which function to call internally.
   
   predictor_variables <- all.vars(x$terms)[-1]
-  predictor_variables <- x$terms_mapping[predictor_variables]
+  predictor_variables_orig <- x$terms_mapping[predictor_variables]
   
   # create clean name data frame because the model learned by those names
   original_data <- if(!is.null(newdata)){
@@ -381,22 +381,28 @@ augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, ...) {
     data
   }
   
-  na_row_numbers <- ranger.find_na(predictor_variables, original_data)
-  
-  cleaned_data <- original_data %>% dplyr::select(predictor_variables) %>% na.omit()
+  cleaned_data <- original_data
+
+  cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables_orig)
+  # Rename columns to the normalized ones used while learning.
+  colnames(cleaned_data) <- predictor_variables
+
+  # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
+  cleaned_data <- align_predictor_factor_levels(cleaned_data, x$df, predictor_variables)
+
+  na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
+  cleaned_data <- cleaned_data[-na_row_numbers,]
+
   if (nrow(cleaned_data) == 0) {
     return(data.frame())
   }
-  
-  # Rename columns to the normalized ones used while learning.
-  colnames(cleaned_data) <- all.vars(x$terms)[-1] # TODO: Make it more model agnostic.
-  
+
   # Run prediction.
   predicted_val <- predict_xgboost(x, cleaned_data)
   
   # Inserting once removed NA rows
   predicted <- restore_na(predicted_val, na_row_numbers)
-  
+
   obj <- x$params$objective
   predicted_label_col <- avoid_conflict(colnames(original_data), "predicted_label")
   predicted_prob_col <- avoid_conflict(colnames(original_data), "predicted_probability")
