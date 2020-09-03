@@ -815,7 +815,7 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
 
   # Get names of original predictor columns by reverse-mapping the names in formula.
   predictor_variables <- all.vars(x$formula_terms)[-1]
-  predictor_variables <- x$terms_mapping[predictor_variables]
+  predictor_variables_orig <- x$terms_mapping[predictor_variables]
 
   threshold <- NULL
   if (x$classification_type == "binary") {
