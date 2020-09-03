@@ -850,6 +850,7 @@ cleanup_df_for_test <- function(df_test, df_train, c_cols) {
     df_test_clean <- df_test_clean[-na_row_numbers_test,]
   }
 
+  names(c_cols) <- NULL # This is necessary to make select in the following line work.
   unknown_category_rows_index_vector <- get_unknown_category_rows_index_vector(df_test_clean, df_train %>% dplyr::select(!!!rlang::syms(c_cols)))
   df_test_clean <- df_test_clean[!unknown_category_rows_index_vector, , drop = FALSE] # 2nd arg must be empty.
   unknown_category_rows_index <- get_row_numbers_from_index_vector(unknown_category_rows_index_vector)
