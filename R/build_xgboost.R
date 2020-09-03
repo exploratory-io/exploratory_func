@@ -437,7 +437,7 @@ augment.xgboost_reg <- function(x, data = NULL, newdata = NULL, data_type = "tra
 
   predicted_value_col <- avoid_conflict(colnames(newdata), "predicted_value")
   predictor_variables <- all.vars(x$terms)[-1]
-  predictor_variables <- x$terms_mapping[predictor_variables]
+  predictor_variables_orig <- x$terms_mapping[predictor_variables]
 
   if(!is.null(newdata)  || !is.null(data)) { # Unlike ranger case, there is no prediction result kept in the model in case of xgboost.
     # create clean name data frame because the model learned by those names
@@ -447,15 +447,21 @@ augment.xgboost_reg <- function(x, data = NULL, newdata = NULL, data_type = "tra
       data
     }
 
-    na_row_numbers <- ranger.find_na(predictor_variables, original_data)
+  cleaned_data <- original_data
 
-    cleaned_data <- original_data %>% dplyr::select(predictor_variables) %>% na.omit()
-    if (nrow(cleaned_data) == 0) {
-      return(data.frame())
-    }
+  cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables_orig)
+  # Rename columns to the normalized ones used while learning.
+  colnames(cleaned_data) <- predictor_variables
 
-    # Rename columns to the normalized ones used while learning.
-    colnames(cleaned_data) <- all.vars(x$terms)[-1] # TODO: Make it more model agnostic.
+  # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
+  cleaned_data <- align_predictor_factor_levels(cleaned_data, x$df, predictor_variables)
+
+  na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
+  cleaned_data <- cleaned_data[-na_row_numbers,]
+
+  if (nrow(cleaned_data) == 0) {
+    return(data.frame())
+  }
 
     # Run prediction.
     predicted_val <- predict_xgboost(x, cleaned_data)
