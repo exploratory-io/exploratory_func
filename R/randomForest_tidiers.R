@@ -941,18 +941,27 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
 augment.ranger.regression <- function(x, data = NULL, newdata = NULL, data_type = "training", ...){
   predicted_value_col <- avoid_conflict(colnames(newdata), "predicted_value")
   predictor_variables <- all.vars(x$formula_terms)[-1]
-  predictor_variables <- x$terms_mapping[predictor_variables]
+  predictor_variables_orig <- x$terms_mapping[predictor_variables]
 
   if(!is.null(newdata)) {
     # create clean name data frame because the model learned by those names
     cleaned_data <- newdata
 
-    na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
-
-    cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables) %>% na.omit()
-
+    cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables_orig)
     # Rename columns to the normalized ones used while learning.
-    colnames(cleaned_data) <- all.vars(x$formula_terms)[-1]
+    colnames(cleaned_data) <- predictor_variables
+
+    # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
+    for (i in 1:length(predictor_variables)) {
+      predictor_col <- predictor_variables[i]
+      training_predictor <- x$df[[predictor_col]]
+      if (is.factor(x$df[[predictor_col]])) {
+        cleaned_data[[predictor_col]] <- fct_explicit_na(fct_other(cleaned_data[[predictor_col]], keep=levels(training_predictor)))
+      }
+    }
+
+    na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
+    cleaned_data <- cleaned_data %>% na.omit() #TODO: Take care of Inf too.
 
     # Run prediction.
     predicted_val <- predict(x, cleaned_data)$predictions
