@@ -1272,12 +1272,17 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
       test_pred_ret <- df %>% prediction(data = "test", ...)
 
       tryCatch({
-        actual_col <- model$terms_mapping[all.vars(model$formula_terms)[1]]
-        actual <- test_pred_ret[[actual_col]]
+        model_object <- df$model[[1]]
+        if ("xgboost_exp" %in% class(model_object)) {
+          actual <- extract_actual.xgboost(model_object, type = "test")
+        }
+        else {
+          actual_col <- model$terms_mapping[all.vars(model$formula_terms)[1]]
+          actual <- test_pred_ret[[actual_col]]
+        }
 
         test_ret <- switch(type,
           evaluation = {
-            model_object <- df$model[[1]]
             if (is.numeric(actual)) {
               if ("xgboost_exp" %in% class(model_object)) {
                 predicted <- extract_predicted.xgboost(model_object, type = "test")
@@ -1290,7 +1295,7 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
 
               # null_model_mean is mean of training data.
               if ("xgboost_exp" %in% class(model_object)) {
-                null_model_mean <- mean(extract_actual.xgboost(model_object, type = "test"), na.rm=TRUE)
+                null_model_mean <- mean(extract_actual.xgboost(model_object, type = "trainig"), na.rm=TRUE)
               }
               else if ("rpart" %in% class(model_object)) { # rpart case
                 null_model_mean <- mean(model_object$y, na.rm=TRUE)
