@@ -837,7 +837,9 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
     cleaned_data <- align_predictor_factor_levels(cleaned_data, x$df, predictor_variables)
 
     na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
-    cleaned_data <- cleaned_data[-na_row_numbers,]
+    if (length(na_row_numbers) > 0) {
+      cleaned_data <- cleaned_data[-na_row_numbers,]
+    }
 
     # Run prediction.
     pred_res <- predict(x, cleaned_data)
@@ -972,7 +974,9 @@ augment.ranger.regression <- function(x, data = NULL, newdata = NULL, data_type 
     cleaned_data <- align_predictor_factor_levels(cleaned_data, x$df, predictor_variables)
 
     na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
-    cleaned_data <- cleaned_data[-na_row_numbers,]
+    if (length(na_row_numbers) > 0) {
+      cleaned_data <- cleaned_data[-na_row_numbers,]
+    }
 
     # Run prediction.
     predicted_val <- predict(x, cleaned_data)$predictions

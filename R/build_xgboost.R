@@ -314,7 +314,9 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, ...) {
   cleaned_data <- align_predictor_factor_levels(cleaned_data, x$df, predictor_variables)
 
   na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
-  cleaned_data <- cleaned_data[-na_row_numbers,]
+  if (length(na_row_numbers) > 0) {
+    cleaned_data <- cleaned_data[-na_row_numbers,]
+  }
 
   # Run prediction.
   predicted <- predict_xgboost(x, cleaned_data)
@@ -375,7 +377,9 @@ augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, ...) {
   cleaned_data <- align_predictor_factor_levels(cleaned_data, x$df, predictor_variables)
 
   na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
-  cleaned_data <- cleaned_data[-na_row_numbers,]
+  if (length(na_row_numbers) > 0) {
+    cleaned_data <- cleaned_data[-na_row_numbers,]
+  }
 
   if (nrow(cleaned_data) == 0) {
     return(data.frame())
@@ -441,7 +445,9 @@ augment.xgboost_reg <- function(x, data = NULL, newdata = NULL, data_type = "tra
     cleaned_data <- align_predictor_factor_levels(cleaned_data, x$df, predictor_variables)
 
     na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
-    cleaned_data <- cleaned_data[-na_row_numbers,]
+    if (length(na_row_numbers) > 0) {
+      cleaned_data <- cleaned_data[-na_row_numbers,]
+    }
 
     if (nrow(cleaned_data) == 0) {
       return(data.frame())
