@@ -1156,7 +1156,9 @@ ranger.find_na <- function(variables, data, na_index = NULL){
 #' @param variables - column name to use for prediction (determine if any of this column contains NA)
 #' @param data - data to predict
 ranger.find_na_index <- function(variables, data) {
-  data %>% dplyr::select(variables) %>% is.na() %>% apply(1, any)
+  data <- data %>% dplyr::select(variables)
+  ret <- purrr::reduce(data, function(x,y){x|is.infinite(y)|is.na(y)},.init=rep(FALSE,nrow(data)))
+  ret
 }
 
 #' Return the highest probability label from the matrix of predicted probabilities
