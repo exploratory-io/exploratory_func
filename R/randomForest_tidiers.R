@@ -794,6 +794,19 @@ augment.ranger <- function(x, data = NULL, newdata = NULL, ...) {
   augment.ranger.method(x, data, newdata, ...)
 }
 
+align_predictor_factor_levels <- function(newdata, model_df, predictor_cols) {
+  cleaned_data <- newdata
+  # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
+  for (i in 1:length(predictor_cols)) {
+    predictor_col <- predictor_cols[i]
+    training_predictor <- model_df[[predictor_col]]
+    if (is.factor(model_df[[predictor_col]])) {
+      cleaned_data[[predictor_col]] <- fct_explicit_na(fct_other(cleaned_data[[predictor_col]], keep=levels(training_predictor)))
+    }
+  }
+  cleaned_data
+}
+
 #' augment for randomForest model
 #' @export
 augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_type = "training", binary_classification_threshold = 0.5, ...) {
@@ -814,16 +827,15 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
     cleaned_data <- newdata
     y_value <- cleaned_data[[y_name]]
 
-    predicted_value_col <- avoid_conflict(colnames(newdata), "predicted_value")
-    predicted_probability_col <- avoid_conflict(colnames(newdata), "predicted_probability")
-
-    na_row_numbers <- ranger.find_na(predictor_variables, data = cleaned_data)
-
-    # ranger can't predict when the data have na row in predictor columns.
-    cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables) %>% na.omit()
-
+    cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables_orig)
     # Rename columns to the normalized ones used while learning.
-    colnames(cleaned_data) <- all.vars(x$formula_terms)[-1]
+    colnames(cleaned_data) <- predictor_variables
+
+    # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
+    cleaned_data <- align_predictor_factor_levels(cleaned_data, x$df, predictor_variables)
+
+    na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
+    cleaned_data <- cleaned_data %>% na.omit() #TODO: Take care of Inf too.
 
     # Run prediction.
     pred_res <- predict(x, cleaned_data)
@@ -833,6 +845,9 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
                                                            y_value, threshold = threshold)
     # Inserting once removed NA rows
     predicted_value <- restore_na(predicted_label_nona, na_row_numbers)
+
+    predicted_value_col <- avoid_conflict(colnames(newdata), "predicted_value")
+    predicted_probability_col <- avoid_conflict(colnames(newdata), "predicted_probability")
 
     if(is.null(x$classification_type)){
       # just append predicted labels
@@ -934,19 +949,6 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
   } else {
     stop("data or newdata have to be indicated.")
   }
-}
-
-align_predictor_factor_levels <- function(newdata, model_df, predictor_cols) {
-  cleaned_data <- newdata
-  # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
-  for (i in 1:length(predictor_cols)) {
-    predictor_col <- predictor_cols[i]
-    training_predictor <- model_df[[predictor_col]]
-    if (is.factor(model_df[[predictor_col]])) {
-      cleaned_data[[predictor_col]] <- fct_explicit_na(fct_other(cleaned_data[[predictor_col]], keep=levels(training_predictor)))
-    }
-  }
-  cleaned_data
 }
 
 #' @param data_type - "training" or "test", Which type of prediction result included inside the model to augment the data.
