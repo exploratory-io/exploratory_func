@@ -1331,7 +1331,12 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
                 ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = pretty.name, is_rpart = is_rpart)
               }
               else {
-                predicted <- test_pred_ret$predicted_label
+                if ("xgboost_exp" %in% class(model_object)) {
+                  predicted <- extract_predicted_multiclass_labels.xgboost(model_object, type = "test")
+                }
+                else {
+                  predicted <- test_pred_ret$predicted_label
+                }
                 ret <- evaluate_multi_(data.frame(predicted = predicted, actual = actual),
                                        "predicted", "actual", pretty.name = pretty.name)
               }
