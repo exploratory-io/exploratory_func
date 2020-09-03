@@ -293,7 +293,7 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, ...) {
   loadNamespace("xgboost") # This is necessary for predict() to successfully figure out which function to call internally.
 
   predictor_variables <- all.vars(x$terms)[-1]
-  predictor_variables <- x$terms_mapping[predictor_variables]
+  predictor_variables_orig <- x$terms_mapping[predictor_variables]
 
   class(x) <- class(x)[class(x) != c("xgboost_multi")]
 
@@ -304,62 +304,46 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, ...) {
     data
   }
 
-  # NA handling - temporary off. Might not be necessary for xgboost.
-  # na_row_numbers <- ranger.find_na(predictor_variables, original_data)
-  #
-  # cleaned_data <- original_data %>% dplyr::select(predictor_variables) %>% na.omit()
-
-  # Rename columns to the normalized ones used while learning.
   cleaned_data <- original_data
-  if (nrow(cleaned_data) == 0) {
-    return(data.frame())
-  }
-  # Convert column names to the ones with which the training was done. 
-  for (i in 1:length(x$terms_mapping)) {
-    converted <- names(x$terms_mapping)[i]
-    original <- x$terms_mapping[i]
-    colnames(cleaned_data)[colnames(cleaned_data) == original] <- converted
-  }
+
+  cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables_orig)
+  # Rename columns to the normalized ones used while learning.
+  colnames(cleaned_data) <- predictor_variables
+
+  # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
+  cleaned_data <- align_predictor_factor_levels(cleaned_data, x$df, predictor_variables)
+
+  na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
+  cleaned_data <- cleaned_data[-na_row_numbers,]
 
   # Run prediction.
   predicted <- predict_xgboost(x, cleaned_data)
 
-  # NA handling - temporary off. Might not be necessary for xgboost.
-  # Inserting once removed NA rows
-  # predicted <- restore_na(predicted_val, na_row_numbers)
 
   obj <- x$params$objective
   if (obj == "multi:softmax") {
-    predicted_label_col <- avoid_conflict(colnames(cleaned_data), "predicted_label")
+    predicted_label_col <- avoid_conflict(colnames(original_data), "predicted_label")
     # fill rows with NA
-    cleaned_data[[predicted_label_col]] <- predicted
+    original_data[[predicted_label_col]] <- predicted
   } else if (obj == "multi:softprob") {
-    predicted_label_col <- avoid_conflict(colnames(cleaned_data), "predicted_label")
-    predicted_prob_col <- avoid_conflict(colnames(cleaned_data), "predicted_probability")
+    predicted_label_col <- avoid_conflict(colnames(original_data), "predicted_label")
+    predicted_prob_col <- avoid_conflict(colnames(original_data), "predicted_probability")
 
     colmax <- max.col(predicted)
 
     # get max probabilities from each row
     max_prob <- predicted[(colmax - 1) * nrow(predicted) + seq(nrow(predicted))]
+    max_prob <- restore_na(max_prob, na_row_numbers)
     predicted_label <- x$y_levels[colmax]
+    predicted_label <- restore_na(predicted_label, na_row_numbers)
 
-    predicted_df <- predicted %>%
-      as.data.frame() %>%
-      append_colnames(prefix = "predicted_probability_")
+    original_data <- ranger.set_multi_predicted_values(original_data, as.data.frame(predicted), predicted_label, na_row_numbers)
 
-    cleaned_data <- cbind(cleaned_data, predicted_df)
     # predicted_prob_col is a column for probabilities of chosen values
-    cleaned_data[[predicted_prob_col]] <- max_prob
-    cleaned_data[[predicted_label_col]] <- predicted_label
+    original_data[[predicted_prob_col]] <- max_prob
   }
 
-  # Convert column names back to the original.
-  for (i in 1:length(x$terms_mapping)) {
-    converted <- names(x$terms_mapping)[i]
-    original <- x$terms_mapping[i]
-    colnames(cleaned_data)[colnames(cleaned_data) == converted] <- original
-  }
-  cleaned_data
+  original_data
 }
 
 #' Augment predicted values for binary task
