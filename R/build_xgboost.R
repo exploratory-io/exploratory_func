@@ -318,6 +318,10 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, ...) {
     cleaned_data <- cleaned_data[-na_row_numbers,]
   }
 
+  if (nrow(cleaned_data) == 0) {
+    return(data.frame())
+  }
+
   # Run prediction.
   predicted <- predict_xgboost(x, cleaned_data)
 
