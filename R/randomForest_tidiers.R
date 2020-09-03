@@ -936,6 +936,19 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
   }
 }
 
+align_predictor_factor_levels <- function(newdata, model_df, predictor_cols) {
+  cleaned_data <- newdata
+  # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
+  for (i in 1:length(predictor_cols)) {
+    predictor_col <- predictor_cols[i]
+    training_predictor <- model_df[[predictor_col]]
+    if (is.factor(model_df[[predictor_col]])) {
+      cleaned_data[[predictor_col]] <- fct_explicit_na(fct_other(cleaned_data[[predictor_col]], keep=levels(training_predictor)))
+    }
+  }
+  cleaned_data
+}
+
 #' @param data_type - "training" or "test", Which type of prediction result included inside the model to augment the data.
 #' @export
 augment.ranger.regression <- function(x, data = NULL, newdata = NULL, data_type = "training", ...){
@@ -952,13 +965,7 @@ augment.ranger.regression <- function(x, data = NULL, newdata = NULL, data_type 
     colnames(cleaned_data) <- predictor_variables
 
     # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
-    for (i in 1:length(predictor_variables)) {
-      predictor_col <- predictor_variables[i]
-      training_predictor <- x$df[[predictor_col]]
-      if (is.factor(x$df[[predictor_col]])) {
-        cleaned_data[[predictor_col]] <- fct_explicit_na(fct_other(cleaned_data[[predictor_col]], keep=levels(training_predictor)))
-      }
-    }
+    cleaned_data <- align_predictor_factor_levels(cleaned_data, x$df, predictor_variables)
 
     na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
     cleaned_data <- cleaned_data %>% na.omit() #TODO: Take care of Inf too.
