@@ -289,67 +289,101 @@ xgboost_reg <- function(data, formula, output_type = "linear", eval_metric = "rm
 #' @param newdata New data frame to predict
 #' @param ... Not used for now.
 #' @export
-augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, ...) {
+augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, data_type = "training", ...) {
   loadNamespace("xgboost") # This is necessary for predict() to successfully figure out which function to call internally.
 
   predictor_variables <- all.vars(x$terms)[-1]
   predictor_variables_orig <- x$terms_mapping[predictor_variables]
 
-  class(x) <- class(x)[class(x) != c("xgboost_multi")]
+  if(!is.null(newdata)) { # Unlike ranger case, there is no prediction result kept in the model in case of xgboost.
+    class(x) <- class(x)[class(x) != c("xgboost_multi")]
 
-  # create clean name data frame because the model learned by those names
-  original_data <- if(!is.null(newdata)){
-    newdata
-  } else {
-    data
+    # create clean name data frame because the model learned by those names
+    original_data <- if(!is.null(newdata)){
+      newdata
+    } else {
+      data
+    }
+
+    cleaned_data <- original_data
+
+    cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables_orig)
+    # Rename columns to the normalized ones used while learning.
+    colnames(cleaned_data) <- predictor_variables
+
+    # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
+    cleaned_data <- align_predictor_factor_levels(cleaned_data, x$df, predictor_variables)
+
+    na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
+    if (length(na_row_numbers) > 0) {
+      cleaned_data <- cleaned_data[-na_row_numbers,]
+    }
+
+    if (nrow(cleaned_data) == 0) {
+      return(data.frame())
+    }
+
+    # Run prediction.
+    predicted <- predict_xgboost(x, cleaned_data)
+
+
+    obj <- x$params$objective
+    if (obj == "multi:softmax") {
+      predicted_label_col <- avoid_conflict(colnames(original_data), "predicted_label")
+      # fill rows with NA
+      original_data[[predicted_label_col]] <- predicted
+    } else if (obj == "multi:softprob") {
+      predicted_prob_col <- avoid_conflict(colnames(original_data), "predicted_probability")
+
+      colmax <- max.col(predicted)
+
+      # get max probabilities from each row
+      max_prob <- predicted[(colmax - 1) * nrow(predicted) + seq(nrow(predicted))]
+      max_prob <- restore_na(max_prob, na_row_numbers)
+      predicted_label <- x$y_levels[colmax]
+      predicted_label <- restore_na(predicted_label, na_row_numbers)
+
+      original_data <- ranger.set_multi_predicted_values(original_data, as.data.frame(predicted), predicted_label, na_row_numbers)
+
+      # predicted_prob_col is a column for probabilities of chosen values
+      original_data[[predicted_prob_col]] <- max_prob
+    }
+    original_data
+  } else if (!is.null(data)) { # For Analytics View.
+    predicted_prob_col <- avoid_conflict(colnames(data), "predicted_probability")
+    switch(data_type,
+      training = {
+        # Inserting removed NA rows should not be necessary since we don't remove NA rows after test/training split.
+        predicted_value <- extract_predicted_multiclass_labels.xgboost(x, type="training") #TODO: Get right threshold
+
+        predicted <- extract_predicted.xgboost(x, type="training")
+
+        # predicted_prob_col is a column for probabilities of chosen values
+        colmax <- max.col(predicted)
+        max_prob <- predicted[(colmax - 1) * nrow(predicted) + seq(nrow(predicted))]
+
+        data <- ranger.set_multi_predicted_values(data, as.data.frame(predicted), predicted_value, c())
+        data[[predicted_prob_col]] <- max_prob
+        data
+      },
+      test = {
+        predicted_value_nona <- extract_predicted_multiclass_labels.xgboost(x, type="test") #TODO: Get right threshold
+        predicted_value_nona <- restore_na(predicted_value_nona, attr(x$prediction_test, "unknown_category_rows_index"))
+        predicted_value <- restore_na(predicted_value_nona, attr(x$prediction_test, "na.action"))
+
+        predicted <- extract_predicted.xgboost(x, type="test")
+
+        # predicted_prob_col is a column for probabilities of chosen values
+        colmax <- max.col(predicted)
+        max_prob_nona <- predicted[(colmax - 1) * nrow(predicted) + seq(nrow(predicted))]
+        max_prob_nona <- restore_na(max_prob_nona, attr(x$prediction_test, "unknown_category_rows_index"))
+        max_prob <- restore_na(max_prob_nona, attr(x$prediction_test, "na.action"))
+
+        data <- ranger.set_multi_predicted_values(data, as.data.frame(predicted), predicted_value, attr(x$prediction_test, "na.action"), attr(x$prediction_test, "unknown_category_rows_index"))
+        data[[predicted_prob_col]] <- max_prob
+        data
+      })
   }
-
-  cleaned_data <- original_data
-
-  cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables_orig)
-  # Rename columns to the normalized ones used while learning.
-  colnames(cleaned_data) <- predictor_variables
-
-  # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
-  cleaned_data <- align_predictor_factor_levels(cleaned_data, x$df, predictor_variables)
-
-  na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
-  if (length(na_row_numbers) > 0) {
-    cleaned_data <- cleaned_data[-na_row_numbers,]
-  }
-
-  if (nrow(cleaned_data) == 0) {
-    return(data.frame())
-  }
-
-  # Run prediction.
-  predicted <- predict_xgboost(x, cleaned_data)
-
-
-  obj <- x$params$objective
-  if (obj == "multi:softmax") {
-    predicted_label_col <- avoid_conflict(colnames(original_data), "predicted_label")
-    # fill rows with NA
-    original_data[[predicted_label_col]] <- predicted
-  } else if (obj == "multi:softprob") {
-    predicted_label_col <- avoid_conflict(colnames(original_data), "predicted_label")
-    predicted_prob_col <- avoid_conflict(colnames(original_data), "predicted_probability")
-
-    colmax <- max.col(predicted)
-
-    # get max probabilities from each row
-    max_prob <- predicted[(colmax - 1) * nrow(predicted) + seq(nrow(predicted))]
-    max_prob <- restore_na(max_prob, na_row_numbers)
-    predicted_label <- x$y_levels[colmax]
-    predicted_label <- restore_na(predicted_label, na_row_numbers)
-
-    original_data <- ranger.set_multi_predicted_values(original_data, as.data.frame(predicted), predicted_label, na_row_numbers)
-
-    # predicted_prob_col is a column for probabilities of chosen values
-    original_data[[predicted_prob_col]] <- max_prob
-  }
-
-  original_data
 }
 
 #' Augment predicted values for binary task
