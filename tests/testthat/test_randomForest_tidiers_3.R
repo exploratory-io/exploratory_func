@@ -20,6 +20,7 @@ if (!testdata_filename %in% list.files(testdata_dir)) {
   flight <- flight %>% slice_sample(n=5000)
   write.csv(flight, testdata_file_path) # save sampled-down data for performance.
 }
+
 test_that("calc_feature_map(regression) evaluate training and test", {
   set.seed(1) # For stability of result.
   model_df <- flight %>%
@@ -27,6 +28,7 @@ test_that("calc_feature_map(regression) evaluate training and test", {
                                  test_rate = 0.3,
                                  test_split_type = "ordered", with_boruta = TRUE, pd_with_bin_means = TRUE) # testing ordered split too.
 
+  ret <- model_df %>% prediction(data="newdata", data_frame=flight)
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
   # expect_equal(nrow(test_ret), 1500) Fails now, since we filter numeric NA. Revive when we do not need to.
@@ -142,6 +144,8 @@ test_that("calc_feature_map(binary(factor(A,B))) evaluate training and test", {
   # To test binary prediction, need to cast it into logical.
   model_df <- flight %>% dplyr::mutate(is_delayed = factor(if_else(as.logical(`is delayed`), "A","B"))) %>% filter(!is.na(is_delayed)) %>%
                 calc_feature_imp(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0.3, pd_with_bin_means = TRUE)
+
+  ret <- model_df %>% prediction(data="newdata", data_frame=flight)
 
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
