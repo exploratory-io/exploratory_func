@@ -314,7 +314,9 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, data_type = "t
     # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
     cleaned_data <- align_predictor_factor_levels(cleaned_data, x$df, predictor_variables)
 
-    na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
+    # For new data prediction, xgboost can predict with NAs in the predictors. Disable NA filtering for now.
+    # na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
+    na_row_numbers <- c()
     if (length(na_row_numbers) > 0) {
       cleaned_data <- cleaned_data[-na_row_numbers,]
     }
@@ -414,7 +416,9 @@ augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, data_type = "
     # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
     cleaned_data <- align_predictor_factor_levels(cleaned_data, x$df, predictor_variables)
 
-    na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
+    # For new data prediction, xgboost can predict with NAs in the predictors. Disable NA filtering for now.
+    # na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
+    na_row_numbers <- c()
     if (length(na_row_numbers) > 0) {
       cleaned_data <- cleaned_data[-na_row_numbers,]
     }
@@ -507,7 +511,9 @@ augment.xgboost_reg <- function(x, data = NULL, newdata = NULL, data_type = "tra
     # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
     cleaned_data <- align_predictor_factor_levels(cleaned_data, x$df, predictor_variables)
 
-    na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
+    # For new data prediction, xgboost can predict with NAs in the predictors. Disable NA filtering for now.
+    # na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
+    na_row_numbers <- c()
     if (length(na_row_numbers) > 0) {
       cleaned_data <- cleaned_data[-na_row_numbers,]
     }
