@@ -350,6 +350,9 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, data_type = "t
     }
     original_data
   } else if (!is.null(data)) { # For Analytics View.
+    if (nrow(data) == 0) { #TODO: better place to do this check?
+      return(data.frame())
+    }
     predicted_prob_col <- avoid_conflict(colnames(data), "predicted_probability")
     switch(data_type,
       training = {
@@ -447,6 +450,9 @@ augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, data_type = "
     
     original_data
   } else if (!is.null(data)) { # For Analytics View.
+    if (nrow(data) == 0) { #TODO: better place to do this check?
+      return(data.frame())
+    }
     predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
     predicted_probability_col <- avoid_conflict(colnames(data), "predicted_probability")
     switch(data_type,
@@ -518,6 +524,9 @@ augment.xgboost_reg <- function(x, data = NULL, newdata = NULL, data_type = "tra
 
     original_data
   } else if (!is.null(data)) { #TODO: For Analytics View. Copiled from code for ranger. Adjust for xgboost.
+    if (nrow(data) == 0) { #TODO: better place to do this check?
+      return(data.frame())
+    }
     switch(data_type,
       training = {
         predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
