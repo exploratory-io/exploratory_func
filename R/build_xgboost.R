@@ -358,64 +358,83 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, ...) {
 #' @param newdata New data frame to predict
 #' @param ... Not used for now.
 #' @export
-augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, ...) {
+augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, data_type = "training", ...) {
   loadNamespace("xgboost") # This is necessary for predict() to successfully figure out which function to call internally.
   
   predictor_variables <- all.vars(x$terms)[-1]
   predictor_variables_orig <- x$terms_mapping[predictor_variables]
   
   # create clean name data frame because the model learned by those names
-  original_data <- if(!is.null(newdata)){
-    newdata
-  } else {
+  if(!is.null(newdata)) { # Unlike ranger case, there is no prediction result kept in the model in case of xgboost.
+    original_data <- newdata
+  
+    cleaned_data <- original_data
+
+    cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables_orig)
+    # Rename columns to the normalized ones used while learning.
+    colnames(cleaned_data) <- predictor_variables
+
+    # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
+    cleaned_data <- align_predictor_factor_levels(cleaned_data, x$df, predictor_variables)
+
+    na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
+    if (length(na_row_numbers) > 0) {
+      cleaned_data <- cleaned_data[-na_row_numbers,]
+    }
+
+    if (nrow(cleaned_data) == 0) {
+      return(data.frame())
+    }
+
+    # Run prediction.
+    predicted_val <- predict_xgboost(x, cleaned_data)
+    
+    # Inserting once removed NA rows
+    predicted <- restore_na(predicted_val, na_row_numbers)
+    obj <- x$params$objective
+    predicted_label_col <- avoid_conflict(colnames(original_data), "predicted_label")
+    predicted_prob_col <- avoid_conflict(colnames(original_data), "predicted_probability")
+    prob <- if (obj == "binary:logistic") {
+      predicted_prob_col <- avoid_conflict(colnames(original_data), "predicted_probability")
+      original_data[[predicted_prob_col]] <- predicted
+      predicted
+    } else if (obj == "binary:logitraw") {
+      predicted_val_col <- avoid_conflict(colnames(original_data), "predicted_value")
+    
+      # binary:logitraw returns logit values
+      prob <- boot::inv.logit(predicted)
+    
+      original_data[[predicted_val_col]] <- predicted
+      original_data[[predicted_prob_col]] <- prob
+      prob
+    } else {
+      stop(paste0("object type ", obj, " is not supported"))
+    }
+    
+    original_data
+  } else if (!is.null(data)) { # For Analytics View.
+    predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
+    predicted_probability_col <- avoid_conflict(colnames(data), "predicted_probability")
+    switch(data_type,
+      training = {
+        # Inserting removed NA rows should not be necessary since we don't remove NA rows after test/training split.
+        predicted_prob <- extract_predicted.xgboost(x)
+        predicted_value <- extract_predicted_binary_labels.xgboost(x, threshold=0.5) #TODO: Get right threshold
+      },
+      test = {
+        predicted_prob_nona <- extract_predicted.xgboost(x, type="test")
+        predicted_value_nona <- extract_predicted_binary_labels.xgboost(x, type="test", threshold=0.5) #TODO: Get right threshold
+
+        predicted_prob_nona <- restore_na(predicted_prob_nona, attr(x$prediction_test, "unknown_category_rows_index"))
+        predicted_value_nona <- restore_na(predicted_value_nona, attr(x$prediction_test, "unknown_category_rows_index"))
+
+        predicted_prob <- restore_na(predicted_prob_nona, attr(x$prediction_test, "na.action"))
+        predicted_value <- restore_na(predicted_value_nona, attr(x$prediction_test, "na.action"))
+      })
+    data[[predicted_value_col]] <- predicted_value
+    data[[predicted_probability_col]] <- predicted_prob
     data
   }
-  
-  cleaned_data <- original_data
-
-  cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables_orig)
-  # Rename columns to the normalized ones used while learning.
-  colnames(cleaned_data) <- predictor_variables
-
-  # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
-  cleaned_data <- align_predictor_factor_levels(cleaned_data, x$df, predictor_variables)
-
-  na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
-  if (length(na_row_numbers) > 0) {
-    cleaned_data <- cleaned_data[-na_row_numbers,]
-  }
-
-  if (nrow(cleaned_data) == 0) {
-    return(data.frame())
-  }
-
-  # Run prediction.
-  predicted_val <- predict_xgboost(x, cleaned_data)
-  
-  # Inserting once removed NA rows
-  predicted <- restore_na(predicted_val, na_row_numbers)
-
-  obj <- x$params$objective
-  predicted_label_col <- avoid_conflict(colnames(original_data), "predicted_label")
-  predicted_prob_col <- avoid_conflict(colnames(original_data), "predicted_probability")
-  prob <- if (obj == "binary:logistic") {
-    predicted_prob_col <- avoid_conflict(colnames(original_data), "predicted_probability")
-    original_data[[predicted_prob_col]] <- predicted
-    predicted
-  } else if (obj == "binary:logitraw") {
-    predicted_val_col <- avoid_conflict(colnames(original_data), "predicted_value")
-  
-    # binary:logitraw returns logit values
-    prob <- boot::inv.logit(predicted)
-  
-    original_data[[predicted_val_col]] <- predicted
-    original_data[[predicted_prob_col]] <- prob
-    prob
-  } else {
-    stop(paste0("object type ", obj, " is not supported"))
-  }
-  
-  original_data
 }
 
 #' Augment predicted values
