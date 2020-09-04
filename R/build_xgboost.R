@@ -431,7 +431,7 @@ augment.xgboost_reg <- function(x, data = NULL, newdata = NULL, data_type = "tra
   predictor_variables <- all.vars(x$terms)[-1]
   predictor_variables_orig <- x$terms_mapping[predictor_variables]
 
-  if(!is.null(newdata)  || !is.null(data)) { # Unlike ranger case, there is no prediction result kept in the model in case of xgboost.
+  if(!is.null(newdata)) { # Unlike ranger case, there is no prediction result kept in the model in case of xgboost.
     # create clean name data frame because the model learned by those names
     original_data <- if(!is.null(newdata)){
       newdata
@@ -468,15 +468,15 @@ augment.xgboost_reg <- function(x, data = NULL, newdata = NULL, data_type = "tra
     switch(data_type,
       training = {
         predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
-        # Inserting once removed NA rows
-        predicted <- restore_na(x$prediction_training$predictions, x$na.action)
+        # Inserting removed NA rows should not be necessary since we don't remove NA rows after test/training split.
+        predicted <- extract_predicted.xgboost(x)
         data[[predicted_value_col]] <- predicted
         data
       },
       test = {
         predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
-        # Inserting once removed NA rows
-        predicted_nona <- x$prediction_test$predictions
+        # Inserting removed NA rows
+        predicted_nona <- extract_predicted.xgboost(x, type="test")
         predicted_nona <- restore_na(predicted_nona, attr(x$prediction_test, "unknown_category_rows_index"))
         predicted <- restore_na(predicted_nona, attr(x$prediction_test, "na.action"))
         data[[predicted_value_col]] <- predicted
@@ -1002,10 +1002,6 @@ exp_xgboost <- function(df,
 
         prediction_test <- predict_xgboost(model, df_test_clean)
 
-
-        # prediction_test <- predict(model, df_test_clean)
-        # TODO: Following current convention for the name na.action to keep na row index, but we might want to rethink.
-        # We do not keep this for training since na.roughfix should fill values and not delete rows.
         attr(prediction_test, "na.action") <- na_row_numbers_test
         attr(prediction_test, "unknown_category_rows_index") <- unknown_category_rows_index
         model$prediction_test <- prediction_test

@@ -393,7 +393,7 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
                        any(lapply(df$model, function(s) { !is.null(s$family$linkinv) }))
 
     ret <- if(data == "test"){
-      if (!is.null(df$model[[1]]$prediction_test)) { # Check if model already has test prediction result.
+      if (!is.null(df$model[[1]]$prediction_test)) { # Check if model already has test prediction result. # TODO: Make this model agnostic.
                                                      # This is typically the case for Analytics Views.
         # Augment test part of data with prediction embedded in the model.
         # This is typically for Summary tab of Analytics View on Test Mode.
@@ -508,10 +508,19 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
 
       # Use formula to support expanded aug_args (especially for type.predict for logistic regression)
       # because ... can't be passed to a function inside mutate directly.
-      aug_fml <- if(aug_args == ""){
-        "broom::augment(m, data = df)"
-      } else {
-        paste0("broom::augment(m, data = df, ", aug_args, ")")
+      if (!is.null(df$model[[1]]$prediction_training)) { # Check if model already has training prediction result. # TODO: Make this model agnostic.
+        aug_fml <- if(aug_args == ""){
+          "broom::augment(m, data = df)"
+        } else {
+          paste0("broom::augment(m, data = df, ", aug_args, ")")
+        }
+      }
+      else { # If not, predict as a new data.
+        aug_fml <- if(aug_args == ""){
+          "broom::augment(m, newdata = df)"
+        } else {
+          paste0("broom::augment(m, newdata = df, ", aug_args, ")")
+        }
       }
       # From broom 0.7.0 augment.lm and augment.glm, if data argument is different from the one inside the model due to, for example, NA rows, error like following is raised.
       #
