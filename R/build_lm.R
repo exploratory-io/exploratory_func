@@ -973,11 +973,11 @@ build_lm.fast <- function(df,
         # Remove rows with categorical values which does not appear in training data and unknown to the model.
         # Record where it was in unknown_category_rows_index, and keep it with model, so that prediction that
         # matches with original data can be generated later.
-        unknown_category_rows_index_vector <- get_unknown_category_rows_index_vector(df_test, df)
-        df_test <- df_test[!unknown_category_rows_index_vector, , drop = FALSE] # 2nd arg must be empty.
-        unknown_category_rows_index <- get_row_numbers_from_index_vector(unknown_category_rows_index_vector)
+        df_test_clean <- cleanup_df_for_test(df_test, df, c_cols)
+        unknown_category_rows_index <- attr(df_test_clean, "unknown_category_rows_index")
+
         # Note: Do not pass df_test like data=df_test. This for some reason ends up predict returning training data prediction.
-        model$prediction_test <- predict(model, df_test, se.fit = TRUE)
+        model$prediction_test <- predict(model, df_test_clean, se.fit = TRUE)
         model$prediction_test$unknown_category_rows_index <- unknown_category_rows_index
       }
       # these attributes are used in tidy of randomForest TODO: is this good for lm too?
