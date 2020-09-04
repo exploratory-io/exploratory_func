@@ -206,11 +206,14 @@ add_prediction <- function(df, model_df, conf_int = 0.95, ...){
       ret
     }
 
+    # This causes more harm than good, because if the output column names of this function are changed,
+    # it can cause errors in the processing after this. Removing for now.
+    #
     # add .group to column names with conflict.
-    duped <- colnames(ret) %in% colnames(df)
-    if(any(duped)){
-      colnames(ret)[duped] <- avoid_conflict(colnames(df), colnames(ret)[duped], ".group")
-    }
+    # duped <- colnames(ret) %in% colnames(df)
+    # if(any(duped)){
+    #   colnames(ret)[duped] <- avoid_conflict(colnames(df), colnames(ret)[duped], ".group")
+    # }
 
     ret <- ret %>%
       unnest_with_drop(.test_index)
@@ -378,6 +381,7 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
     if(is.null(data_frame)) {
       stop("Please indicate data_frame")
     }
+    data_frame <- data_frame %>% dplyr::ungroup() # Ignore grouping on the new data to run prediction on.
     add_prediction(data_frame, df, conf_int = conf_int, ...)
   } else {
     # parsing arguments of prediction and getting optional arguemnt for augment in ...
