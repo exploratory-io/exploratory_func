@@ -312,7 +312,9 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, data_type = "t
     colnames(cleaned_data) <- predictor_variables
 
     # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
-    cleaned_data <- align_predictor_factor_levels(cleaned_data, x$df, predictor_variables)
+    if (!is.null(x$df)) { # Model on Analytics Step does not have x$df.
+      cleaned_data <- align_predictor_factor_levels(cleaned_data, x$df, predictor_variables)
+    }
 
     # For new data prediction, xgboost can predict with NAs in the predictors. Disable NA filtering for now.
     # na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
@@ -414,7 +416,9 @@ augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, data_type = "
     colnames(cleaned_data) <- predictor_variables
 
     # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
-    cleaned_data <- align_predictor_factor_levels(cleaned_data, x$df, predictor_variables)
+    if (!is.null(x$df)) { # Model on Analytics Step does not have x$df.
+      cleaned_data <- align_predictor_factor_levels(cleaned_data, x$df, predictor_variables)
+    }
 
     # For new data prediction, xgboost can predict with NAs in the predictors. Disable NA filtering for now.
     # na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
@@ -509,7 +513,9 @@ augment.xgboost_reg <- function(x, data = NULL, newdata = NULL, data_type = "tra
     colnames(cleaned_data) <- predictor_variables
 
     # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
-    cleaned_data <- align_predictor_factor_levels(cleaned_data, x$df, predictor_variables)
+    if (!is.null(x$df)) { # Model on Analytics Step does not have x$df.
+      cleaned_data <- align_predictor_factor_levels(cleaned_data, x$df, predictor_variables)
+    }
 
     # For new data prediction, xgboost can predict with NAs in the predictors. Disable NA filtering for now.
     # na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
