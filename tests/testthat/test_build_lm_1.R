@@ -55,6 +55,7 @@ test_that("binary prediction with factor target column", {
   test_data <- dplyr::bind_rows(test_data, test_data)
 
   model_data <- build_lm.fast(test_data, `CANCELLED X`, `Carrier Name`, CARRIER, DISTANCE, model_type = "glm", smote=FALSE, with_marginal_effects=TRUE, with_marginal_effects_confint=FALSE)
+  ret <- model_data %>% prediction(data="newdata", data_frame=test_data)
   ret <- model_data %>% glance_rowwise(model, pretty.name=TRUE)
   expect_equal(ret$`Number of Rows`, 34)
   expect_equal(ret$`Number of Rows for TRUE`, 4) # This ends up to be 4 after doubling
@@ -164,6 +165,7 @@ test_that("Linear Regression with outlier filtering", {
   training_rownum <- nrow(ret$source.data[[1]]) - test_rownum
 
   suppressWarnings({
+    pred_new <- ret %>% prediction(data="newdata", data_frame=test_data)
     pred_training <- prediction(ret, data = "training")
     pred_test <- prediction(ret, data = "test")
     expect_equal(training_rownum, nrow(pred_training))
@@ -196,6 +198,7 @@ test_that("Group Linear Regression with test_rate", {
   training_nrows <- group_nrows - test_nrows
 
   suppressWarnings({
+    pred_new <- ret %>% prediction(data="newdata", data_frame=group_data)
     pred_training <- prediction(ret, data = "training")
     pred_test <- prediction(ret, data = "test")
     expect_equal(pred_training %>% summarize(n=n()) %>% `[[`("n"),
@@ -231,6 +234,7 @@ test_that("GLM - Normal Destribution with test_rate", {
   training_rownum <- nrow(test_data) - test_rownum
 
   suppressWarnings({
+    pred_new <- prediction(ret, data = "newdata", data_frame=test_data)
     pred_training <- prediction(ret, data = "training")
     pred_test <- prediction(ret, data = "test")
     expect_equal(training_rownum, nrow(pred_training))
@@ -266,6 +270,7 @@ test_that("Group GLM - Normal Destribution with test_rate", {
   training_nrows <- group_nrows - test_nrows
 
   suppressWarnings({
+    pred_new <- prediction(ret, data = "newdata", data_frame=group_data)
     pred_training <- prediction(ret, data = "training")
     pred_test <- prediction(ret, data = "test")
     expect_equal(pred_training %>% summarize(n=n()) %>% `[[`("n"),
@@ -303,6 +308,7 @@ test_that("GLM - Gamma Destribution with test_rate", {
   training_rownum <- nrow(test_data) - test_rownum
 
   suppressWarnings({
+    pred_new <- prediction(ret, data = "newdata", data_frame=test_data)
     pred_training <- prediction(ret, data = "training")
     pred_test <- prediction(ret, data = "test")
     expect_equal(training_rownum, nrow(pred_training))
@@ -336,6 +342,7 @@ test_that("Group GLM - Gamma Destribution with test_rate", {
   training_nrows <- group_nrows - test_nrows
 
   suppressWarnings({
+    pred_new <- prediction(ret, data = "newdata", data_frame=group_data)
     pred_training <- prediction(ret, data = "training")
     pred_test <- prediction(ret, data = "test")
     expect_equal(pred_training %>% summarize(n=n()) %>% `[[`("n"),
@@ -370,6 +377,7 @@ test_that("GLM - Inverse Gaussian Destribution with test_rate", {
   training_rownum <- nrow(test_data) - test_rownum
 
   suppressWarnings({
+    pred_new <- prediction(ret, data = "newdata", data_frame=test_data)
     pred_training <- prediction(ret, data = "training")
     pred_test <- prediction(ret, data = "test")
     expect_equal(training_rownum, nrow(pred_training))
@@ -403,6 +411,7 @@ test_that("Group GLM - Inverse Gaussian Destribution with test_rate", {
   training_nrows <- group_nrows - test_nrows
 
   suppressWarnings({
+    pred_new <- prediction(ret, data = "newdata", data_frame=group_data)
     pred_training <- prediction(ret, data = "training")
     pred_test <- prediction(ret, data = "test")
     expect_equal(pred_training %>% summarize(n=n()) %>% `[[`("n"),
@@ -437,6 +446,7 @@ test_that("GLM - poisson Destribution with test_rate", {
   training_rownum <- nrow(test_data) - test_rownum
 
   suppressWarnings({
+    pred_new <- prediction(ret, data = "newdata", data_frame=test_data)
     pred_training <- prediction(ret, data = "training")
     pred_test <- prediction(ret, data = "test")
     expect_equal(training_rownum, nrow(pred_training))
@@ -471,6 +481,7 @@ test_that("Group GLM - Poisson Destribution with test_rate", {
   training_nrows <- group_nrows - test_nrows
 
   suppressWarnings({
+    pred_new <- prediction(ret, data = "newdata", data_frame=group_data)
     pred_training <- prediction(ret, data = "training")
     pred_test <- prediction(ret, data = "test")
     expect_equal(pred_training %>% summarize(n=n()) %>% `[[`("n"),
@@ -507,6 +518,7 @@ test_that("GLM - Negative Binomial Destribution with test_rate", {
   training_rownum <- nrow(test_data) - test_rownum
 
   suppressWarnings({
+    pred_new <- prediction(ret, data = "newdata", data_frame=test_data)
     pred_training <- prediction(ret, data = "training")
     pred_test <- prediction(ret, data = "test")
     expect_equal(training_rownum, nrow(pred_training))
@@ -542,6 +554,7 @@ test_that("Group GLM - Negative Binomial Destribution with test_rate", {
   training_nrows <- group_nrows - test_nrows
 
   suppressWarnings({
+    pred_new <- prediction(ret, data = "newdata", data_frame=group_data)
     pred_training <- prediction(ret, data = "training")
     pred_test <- prediction(ret, data = "test")
     expect_equal(pred_training %>% summarize(n=n()) %>% `[[`("n"),
@@ -578,6 +591,7 @@ test_that("Logistic Regression with test_rate", {
   training_rownum <- nrow(test_data) - test_rownum
 
   suppressWarnings({
+    pred_new <- prediction(ret, data = "newdata", data_frame=test_data)
     pred_training_and_test <- ret %>% prediction_binary(data = 'training_and_test', threshold = 0.5)
     pred_training_and_test_conf_mat <- ret %>% prediction_training_and_test(prediction_type = 'conf_mat', threshold = 0.5)
     pred_training <- prediction(ret, data = "training")
@@ -616,6 +630,7 @@ test_that("Group Logistic Regression with test_rate", {
   training_nrows <- group_nrows - test_nrows
 
   suppressWarnings({
+    pred_new <- prediction(ret, data = "newdata", data_frame=group_data)
     pred_training <- prediction(ret, data = "training")
     pred_test <- prediction(ret, data = "test")
     expect_equal(pred_training %>% summarize(n=n()) %>% `[[`("n"),
