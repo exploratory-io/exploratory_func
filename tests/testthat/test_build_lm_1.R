@@ -19,6 +19,9 @@ test_that("binary prediction with character target column", {
   model_data <- build_lm.fast(test_data, `CANCELLED X`, `Carrier Name`, CARRIER, DISTANCE,
                               normalize_predictors = TRUE,
                               model_type = "glm", smote=FALSE, with_marginal_effects=TRUE, with_marginal_effects_confint=TRUE)
+
+  ret <- model_data %>% prediction(data="newdata", data_frame=test_data)
+
   ret <- model_data %>% tidy_rowwise(model, type="vif")
   ret <- model_data %>% glance_rowwise(model, pretty.name=TRUE)
   expect_equal(colnames(ret), c("AUC","F Score","Accuracy Rate","Misclassification Rate","Precision",               

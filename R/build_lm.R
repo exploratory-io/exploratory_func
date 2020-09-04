@@ -1556,8 +1556,22 @@ augment.lm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "
     return(ret)
   }
 
-  if(!is.null(newdata)) { # Call broom:::augment.lm as is
-    ret <- broom:::augment.lm(x, data = data, newdata = newdata, se = TRUE, ...)
+  if(!is.null(newdata)) {
+    predictor_variables <- all.vars(x$terms)[-1]
+    predictor_variables_orig <- x$terms_mapping[predictor_variables]
+
+    cleaned_data <- newdata %>% dplyr::select(predictor_variables_orig)
+    # Rename columns to the normalized ones used while learning.
+    colnames(cleaned_data) <- predictor_variables
+
+    # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
+    cleaned_data <- align_predictor_factor_levels(cleaned_data, x$xlevels, predictor_variables)
+
+    na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
+    if (length(na_row_numbers) > 0) {
+      cleaned_data <- cleaned_data[-na_row_numbers,]
+    }
+    ret <- broom:::augment.lm(x, data = NULL, newdata = cleaned_data, se = TRUE, ...)
   } else if (!is.null(data)) {
     ret <- switch(data_type,
       training = { # Call broom:::augment.lm as is
@@ -1585,13 +1599,28 @@ augment.glm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = 
     return(ret)
   }
   if(!is.null(newdata)) {
+    predictor_variables <- all.vars(x$terms)[-1]
+    predictor_variables_orig <- x$terms_mapping[predictor_variables]
+
+    cleaned_data <- newdata %>% dplyr::select(predictor_variables_orig)
+    # Rename columns to the normalized ones used while learning.
+    colnames(cleaned_data) <- predictor_variables
+
+    # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
+    cleaned_data <- align_predictor_factor_levels(cleaned_data, x$xlevels, predictor_variables)
+
+    na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
+    if (length(na_row_numbers) > 0) {
+      cleaned_data <- cleaned_data[-na_row_numbers,]
+    }
+
     ret <- tryCatch({
-      broom:::augment.glm(x, data = data, newdata = newdata, se = TRUE, ...)
+      broom:::augment.glm(x, data = NULL, newdata = cleaned_data, se = TRUE, ...)
     }, error = function(e){
       # se=TRUE throws error that looks like "singular matrix 'a' in solve",
       # in some subset of cases of perfect collinearity.
       # Try recovering from it by running with se=FALSE.
-      broom:::augment.glm(x, data = data, newdata = newdata, se = FALSE, ...)
+      broom:::augment.glm(x, data = NULL, newdata = cleaned_data, se = FALSE, ...)
     })
   } else if (!is.null(data)) {
     ret <- switch(data_type,
