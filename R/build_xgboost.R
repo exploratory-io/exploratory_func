@@ -399,7 +399,7 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, data_type = "t
 #' @param newdata New data frame to predict
 #' @param ... Not used for now.
 #' @export
-augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, data_type = "training", ...) {
+augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, data_type = "training", binary_classification_threshold = 0.5, ...) {
   loadNamespace("xgboost") # This is necessary for predict() to successfully figure out which function to call internally.
   
   predictor_variables <- all.vars(x$terms)[-1]
@@ -467,11 +467,11 @@ augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, data_type = "
       training = {
         # Inserting removed NA rows should not be necessary since we don't remove NA rows after test/training split.
         predicted_prob <- extract_predicted.xgboost(x)
-        predicted_value <- extract_predicted_binary_labels.xgboost(x, threshold=0.5) #TODO: Get right threshold
+        predicted_value <- extract_predicted_binary_labels.xgboost(x, threshold = binary_classification_threshold)
       },
       test = {
         predicted_prob_nona <- extract_predicted.xgboost(x, type="test")
-        predicted_value_nona <- extract_predicted_binary_labels.xgboost(x, type="test", threshold=0.5) #TODO: Get right threshold
+        predicted_value_nona <- extract_predicted_binary_labels.xgboost(x, type="test", threshold = binary_classification_threshold)
 
         predicted_prob_nona <- restore_na(predicted_prob_nona, attr(x$prediction_test, "unknown_category_rows_index"))
         predicted_value_nona <- restore_na(predicted_value_nona, attr(x$prediction_test, "unknown_category_rows_index"))
