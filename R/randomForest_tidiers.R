@@ -805,6 +805,11 @@ align_predictor_factor_levels <- function(newdata, model_df, predictor_cols) {
       # In case model does not know (Missing) level, do fct_other again. (Missing) will be absorbed in Other.
       cleaned_data[[predictor_col]] <- fct_other(ret, keep=levels(training_predictor))
     }
+    else if (is.character(model_df[[predictor_col]])) {
+      ret <- fct_explicit_na(fct_other(cleaned_data[[predictor_col]], keep=unique(training_predictor)))
+      # In case model does not know (Missing) level, do fct_other again. (Missing) will be absorbed in Other.
+      cleaned_data[[predictor_col]] <- fct_other(ret, keep=unique(training_predictor))
+    }
   }
   cleaned_data
 }
