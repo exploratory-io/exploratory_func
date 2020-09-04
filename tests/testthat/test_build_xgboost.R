@@ -393,7 +393,7 @@ test_that("test build_xgboost with multi softprob", {
   prediction_ret <- prediction(model_ret)
   prob <- prediction_ret$predicted_probability
   expect_true(all(prob[!is.na(prob)] > 0))
-  expect_true(length(unique(prediction_ret$predicted_label)) > 1)
+  expect_true(length(unique(prediction_ret$predicted_value)) > 1)
 })
 
 test_that("test build_xgboost with linear booster", {
