@@ -832,12 +832,6 @@ build_lm.fast <- function(df,
         if (test_rate > 0) {
           # Test mode. Make prediction with test data here, rather than repeating it in Analytics View preprocessors.
           df_test <- safe_slice(source_data, test_index, remove = FALSE)
-          # Remove rows with categorical values which does not appear in training data and unknown to the model.
-          # Record where it was in unknown_category_rows_index, and keep it with model, so that prediction that
-          # matches with original data can be generated later.
-          unknown_category_rows_index_vector <- get_unknown_category_rows_index_vector(df_test, df)
-          df_test <- df_test[!unknown_category_rows_index_vector, , drop = FALSE] # 2nd arg must be empty.
-          unknown_category_rows_index <- get_row_numbers_from_index_vector(unknown_category_rows_index_vector)
         }
 
         # when family is negativebinomial, use MASS::glm.nb
@@ -925,9 +919,6 @@ build_lm.fast <- function(df,
         df <- safe_slice(source_data, test_index, remove = TRUE)
         if (test_rate > 0) {
           df_test <- safe_slice(source_data, test_index, remove = FALSE)
-          unknown_category_rows_index_vector <- get_unknown_category_rows_index_vector(df_test, df)
-          df_test <- df_test[!unknown_category_rows_index_vector, , drop = FALSE] # 2nd arg must be empty.
-          unknown_category_rows_index <- get_row_numbers_from_index_vector(unknown_category_rows_index_vector)
         }
 
         model <- stats::lm(fml, data = df) 
@@ -979,6 +970,12 @@ build_lm.fast <- function(df,
       })
 
       if (test_rate > 0) {
+        # Remove rows with categorical values which does not appear in training data and unknown to the model.
+        # Record where it was in unknown_category_rows_index, and keep it with model, so that prediction that
+        # matches with original data can be generated later.
+        unknown_category_rows_index_vector <- get_unknown_category_rows_index_vector(df_test, df)
+        df_test <- df_test[!unknown_category_rows_index_vector, , drop = FALSE] # 2nd arg must be empty.
+        unknown_category_rows_index <- get_row_numbers_from_index_vector(unknown_category_rows_index_vector)
         # Note: Do not pass df_test like data=df_test. This for some reason ends up predict returning training data prediction.
         model$prediction_test <- predict(model, df_test, se.fit = TRUE)
         model$prediction_test$unknown_category_rows_index <- unknown_category_rows_index
