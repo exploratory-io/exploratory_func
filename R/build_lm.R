@@ -1572,6 +1572,7 @@ augment.lm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "
       cleaned_data <- cleaned_data[-na_row_numbers,]
     }
     ret <- broom:::augment.lm(x, data = NULL, newdata = cleaned_data, se = TRUE, ...)
+    # TODO: Restore removed rows.
   } else if (!is.null(data)) {
     ret <- switch(data_type,
       training = { # Call broom:::augment.lm as is
