@@ -953,10 +953,25 @@ exp_xgboost <- function(df,
                         target,
                         ...,
                         max_nrow = 50000, # Down from 200000 when we added partial dependence
-                        # max_sample_size = NULL, # Half of max_nrow. down from 100000 when we added partial dependence
-                        # ntree = 20,
-                        # nodesize = 12,
+                        # XGBoost-specific parameters
                         nrounds = 10,
+                        watchlist_rate = 0,
+                        sparse = FALSE, #??
+                        booster = "gbtree",
+                        early_stopping_rounds = 0,
+                        max_depth = 6,
+                        min_child_weight = 1,
+                        gamma = 1,
+                        subsample = 1,
+                        colsample_bytree = 1,
+                        learning_rate = 0.3,
+                        output_type_regression = "linear",
+                        eval_metric_regression = "rmse",
+                        output_type_binary = "logistic",
+                        eval_metric_binary = "auc",
+                        output_type_multiclass = "softprob",
+                        eval_metric_multiclass = "merror",
+                        # Model agnostic parameters
                         target_n = 20,
                         predictor_n = 12, # So that at least months can fit in it.
                         smote = FALSE,
@@ -1070,13 +1085,52 @@ exp_xgboost <- function(df,
       fml <- as.formula(paste(clean_target_col, " ~ ", rhs))
 
       if (is_target_logical) {
-        model <- xgboost_binary(df, fml, nrounds=nrounds) # TODO: Add XGBoost specific parameters.
+        model <- xgboost_binary(df, fml,
+                        nrounds = nrounds,
+                        watchlist_rate = watchlist_rate,
+                        sparse = sparse,
+                        booster = booster,
+                        early_stopping_rounds = early_stopping_rounds,
+                        max_depth = max_depth,
+                        min_child_weight = min_child_weight,
+                        gamma = gamma,
+                        subsample = subsample,
+                        colsample_bytree = colsample_bytree,
+                        learning_rate = learning_rate,
+                        output_type = output_type_binary, 
+                        eval_metric = eval_metric_binary)
       }
       else if(is_target_numeric) {
-        model <- xgboost_reg(df, fml, nrounds=nrounds) # TODO: Add XGBoost specific parameters.
+        model <- xgboost_reg(df, fml,
+                        nrounds = nrounds,
+                        watchlist_rate = watchlist_rate,
+                        sparse = sparse,
+                        booster = booster,
+                        early_stopping_rounds = early_stopping_rounds,
+                        max_depth = max_depth,
+                        min_child_weight = min_child_weight,
+                        gamma = gamma,
+                        subsample = subsample,
+                        colsample_bytree = colsample_bytree,
+                        learning_rate = learning_rate,
+                        output_type = output_type_regression, 
+                        eval_metric = eval_metric_regression)
       }
       else {
-        model <- xgboost_multi(df, fml, nrounds=nrounds) # TODO: Add XGBoost specific parameters.
+        model <- xgboost_multi(df, fml,
+                        nrounds = nrounds,
+                        watchlist_rate = watchlist_rate,
+                        sparse = sparse,
+                        booster = booster,
+                        early_stopping_rounds = early_stopping_rounds,
+                        max_depth = max_depth,
+                        min_child_weight = min_child_weight,
+                        gamma = gamma,
+                        subsample = subsample,
+                        colsample_bytree = colsample_bytree,
+                        learning_rate = learning_rate,
+                        output_type = output_type_multiclass, 
+                        eval_metric = eval_metric_multiclass)
       }
       class(model) <- c("xgboost_exp", class(model))
 
