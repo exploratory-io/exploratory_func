@@ -361,7 +361,7 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, data_type = "t
     switch(data_type,
       training = {
         # Inserting removed NA rows should not be necessary since we don't remove NA rows after test/training split.
-        predicted_value <- extract_predicted_multiclass_labels.xgboost(x, type="training") #TODO: Get right threshold
+        predicted_value <- extract_predicted_multiclass_labels(x, type="training") #TODO: Get right threshold
 
         predicted <- extract_predicted(x, type="training")
 
@@ -374,7 +374,7 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, data_type = "t
         data
       },
       test = {
-        predicted_value_nona <- extract_predicted_multiclass_labels.xgboost(x, type="test") #TODO: Get right threshold
+        predicted_value_nona <- extract_predicted_multiclass_labels(x, type="test") #TODO: Get right threshold
         predicted_value_nona <- restore_na(predicted_value_nona, attr(x$prediction_test, "unknown_category_rows_index"))
         predicted_value <- restore_na(predicted_value_nona, attr(x$prediction_test, "na.action"))
 
@@ -467,11 +467,11 @@ augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, data_type = "
       training = {
         # Inserting removed NA rows should not be necessary since we don't remove NA rows after test/training split.
         predicted_prob <- extract_predicted(x)
-        predicted_value <- extract_predicted_binary_labels.xgboost(x, threshold = binary_classification_threshold)
+        predicted_value <- extract_predicted_binary_labels(x, threshold = binary_classification_threshold)
       },
       test = {
         predicted_prob_nona <- extract_predicted(x, type="test")
-        predicted_value_nona <- extract_predicted_binary_labels.xgboost(x, type="test", threshold = binary_classification_threshold)
+        predicted_value_nona <- extract_predicted_binary_labels(x, type="test", threshold = binary_classification_threshold)
 
         predicted_prob_nona <- restore_na(predicted_prob_nona, attr(x$prediction_test, "unknown_category_rows_index"))
         predicted_value_nona <- restore_na(predicted_value_nona, attr(x$prediction_test, "unknown_category_rows_index"))
@@ -859,6 +859,9 @@ importance_xgboost <- function(model) {
 
 extract_actual <- function(x, ...) {UseMethod("extract_actual", x)}
 extract_predicted <- function(x, ...) {UseMethod("extract_predicted", x)}
+extract_predicted_binary_labels <- function(x, ...) {UseMethod("extract_predicted_binary_labels", x)}
+extract_predicted_multiclass_labels <- function(x, ...) {UseMethod("extract_predicted_multiclass_labels", x)}
+get_prediction_type <- function(x, ...) {UseMethod("get_prediction_type", x)}
 
 extract_actual.xgboost_exp <- function(x, type = "training") {
   if (type == "training") {
@@ -879,13 +882,12 @@ extract_predicted.xgboost_exp <- function(x, type = "training") {
   }
   predicted
 }
-
 extract_predicted.xgboost_reg <- extract_predicted.xgboost_exp
 extract_predicted.xgboost_binary <- extract_predicted.xgboost_exp
 extract_predicted.xgboost_multi <- extract_predicted.xgboost_exp
 
 
-extract_predicted_binary_labels.xgboost <- function(x, threshold = 0.5, type = "training") {
+extract_predicted_binary_labels.xgboost_exp <- function(x, threshold = 0.5, type = "training") {
   if (type == "training") {
     predicted <- x$prediction_training > threshold
   }
@@ -894,8 +896,9 @@ extract_predicted_binary_labels.xgboost <- function(x, threshold = 0.5, type = "
   }
   predicted
 }
+extract_predicted_binary_labels.xgboost_binary <- extract_predicted_binary_labels.xgboost_exp
 
-extract_predicted_multiclass_labels.xgboost <- function(x, type = "training") {
+extract_predicted_multiclass_labels.xgboost_exp <- function(x, type = "training") {
   if (type == "training") {
     predicted <- x$y_levels[apply(x$prediction_training, 1, which.max)]
   }
@@ -904,8 +907,9 @@ extract_predicted_multiclass_labels.xgboost <- function(x, type = "training") {
   }
   predicted
 }
+extract_predicted_multiclass_labels.xgboost_multi <- extract_predicted_multiclass_labels.xgboost_exp
 
-get_prediction_type.xgboost <- function(x) {
+get_prediction_type.xgboost_exp <- function(x) {
   if ("xgboost_reg" %in% class(x)) {
     ret <- "regression"
   }
@@ -1264,12 +1268,12 @@ tidy.xgboost_exp <- function(x, type = "importance", pretty.name = FALSE, binary
         glance(x, pretty.name = pretty.name, ...)
       } else {
         if (x$classification_type == "binary") {
-          predicted <- extract_predicted_binary_labels.xgboost(x, threshold = binary_classification_threshold)
+          predicted <- extract_predicted_binary_labels(x, threshold = binary_classification_threshold)
           predicted_probability <- extract_predicted(x)
           ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = pretty.name)
         }
         else {
-          predicted <- extract_predicted_multiclass_labels.xgboost(x)
+          predicted <- extract_predicted_multiclass_labels(x)
           ret <- evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
         }
         ret
@@ -1279,10 +1283,10 @@ tidy.xgboost_exp <- function(x, type = "importance", pretty.name = FALSE, binary
       # return confusion matrix
       actual <- extract_actual(x)
       if (x$classification_type == "binary") {
-        predicted <- extract_predicted_binary_labels.xgboost(x, threshold = binary_classification_threshold)
+        predicted <- extract_predicted_binary_labels(x, threshold = binary_classification_threshold)
       }
       else {
-        predicted <- extract_predicted_multiclass_labels.xgboost(x)
+        predicted <- extract_predicted_multiclass_labels(x)
       }
 
       ret <- data.frame(

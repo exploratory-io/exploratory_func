@@ -1407,7 +1407,7 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
               predicted <- NULL # Just declaring variable.
               if (model_object$classification_type == "binary") { # Make it model agnostic.
                 if ("xgboost_exp" %in% class(model_object)) {
-                  predicted <- extract_predicted_binary_labels.xgboost(model_object, type = "test", threshold = binary_classification_threshold) # If threshold is specified in ..., take it.
+                  predicted <- extract_predicted_binary_labels(model_object, type = "test", threshold = binary_classification_threshold) # If threshold is specified in ..., take it.
                   predicted_probability <- extract_predicted(model_object, type = "test")
                 }
                 else {
@@ -1419,7 +1419,7 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
               }
               else {
                 if ("xgboost_exp" %in% class(model_object)) {
-                  predicted <- extract_predicted_multiclass_labels.xgboost(model_object, type = "test")
+                  predicted <- extract_predicted_multiclass_labels(model_object, type = "test")
                 }
                 else {
                   predicted <- test_pred_ret$predicted_label
@@ -1441,11 +1441,11 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
           conf_mat = {
             model_object <- df$model[[1]]
             if ("xgboost_exp" %in% class(model_object)) {
-              if (get_prediction_type.xgboost(model_object) == "binary") {
-                predicted <- extract_predicted_binary_labels.xgboost(model_object, type = "test", binary_classification_threshold = binary_classification_threshold)
+              if (get_prediction_type(model_object) == "binary") {
+                predicted <- extract_predicted_binary_labels(model_object, type = "test", binary_classification_threshold = binary_classification_threshold)
               }
               else {
-                predicted <- extract_predicted_multiclass_labels.xgboost(model_object, type = "test")
+                predicted <- extract_predicted_multiclass_labels(model_object, type = "test")
               }
             }
             else {
