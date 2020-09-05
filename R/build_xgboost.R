@@ -363,7 +363,7 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, data_type = "t
         # Inserting removed NA rows should not be necessary since we don't remove NA rows after test/training split.
         predicted_value <- extract_predicted_multiclass_labels.xgboost(x, type="training") #TODO: Get right threshold
 
-        predicted <- extract_predicted.xgboost(x, type="training")
+        predicted <- extract_predicted(x, type="training")
 
         # predicted_prob_col is a column for probabilities of chosen values
         colmax <- max.col(predicted)
@@ -378,7 +378,7 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, data_type = "t
         predicted_value_nona <- restore_na(predicted_value_nona, attr(x$prediction_test, "unknown_category_rows_index"))
         predicted_value <- restore_na(predicted_value_nona, attr(x$prediction_test, "na.action"))
 
-        predicted <- extract_predicted.xgboost(x, type="test")
+        predicted <- extract_predicted(x, type="test")
 
         # predicted_prob_col is a column for probabilities of chosen values
         colmax <- max.col(predicted)
@@ -466,11 +466,11 @@ augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, data_type = "
     switch(data_type,
       training = {
         # Inserting removed NA rows should not be necessary since we don't remove NA rows after test/training split.
-        predicted_prob <- extract_predicted.xgboost(x)
+        predicted_prob <- extract_predicted(x)
         predicted_value <- extract_predicted_binary_labels.xgboost(x, threshold = binary_classification_threshold)
       },
       test = {
-        predicted_prob_nona <- extract_predicted.xgboost(x, type="test")
+        predicted_prob_nona <- extract_predicted(x, type="test")
         predicted_value_nona <- extract_predicted_binary_labels.xgboost(x, type="test", threshold = binary_classification_threshold)
 
         predicted_prob_nona <- restore_na(predicted_prob_nona, attr(x$prediction_test, "unknown_category_rows_index"))
@@ -543,14 +543,14 @@ augment.xgboost_reg <- function(x, data = NULL, newdata = NULL, data_type = "tra
       training = {
         predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
         # Inserting removed NA rows should not be necessary since we don't remove NA rows after test/training split.
-        predicted <- extract_predicted.xgboost(x)
+        predicted <- extract_predicted(x)
         data[[predicted_value_col]] <- predicted
         data
       },
       test = {
         predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
         # Inserting removed NA rows
-        predicted_nona <- extract_predicted.xgboost(x, type="test")
+        predicted_nona <- extract_predicted(x, type="test")
         predicted_nona <- restore_na(predicted_nona, attr(x$prediction_test, "unknown_category_rows_index"))
         predicted <- restore_na(predicted_nona, attr(x$prediction_test, "na.action"))
         data[[predicted_value_col]] <- predicted
@@ -858,6 +858,7 @@ importance_xgboost <- function(model) {
 }
 
 extract_actual <- function(x, ...) {UseMethod("extract_actual", x)}
+extract_predicted <- function(x, ...) {UseMethod("extract_predicted", x)}
 
 extract_actual.xgboost_exp <- function(x, type = "training") {
   if (type == "training") {
@@ -869,7 +870,7 @@ extract_actual.xgboost_exp <- function(x, type = "training") {
   actual
 }
 
-extract_predicted.xgboost <- function(x, type = "training") {
+extract_predicted.xgboost_exp <- function(x, type = "training") {
   if (type == "training") {
     predicted <- x$prediction_training
   }
@@ -878,6 +879,11 @@ extract_predicted.xgboost <- function(x, type = "training") {
   }
   predicted
 }
+
+extract_predicted.xgboost_reg <- extract_predicted.xgboost_exp
+extract_predicted.xgboost_binary <- extract_predicted.xgboost_exp
+extract_predicted.xgboost_multi <- extract_predicted.xgboost_exp
+
 
 extract_predicted_binary_labels.xgboost <- function(x, threshold = 0.5, type = "training") {
   if (type == "training") {
@@ -1202,7 +1208,7 @@ glance.xgboost_exp <- function(x, pretty.name = FALSE, ...) {
 
 #' @export
 glance.xgboost_exp.regression <- function(x, pretty.name, ...) {
-  predicted <- extract_predicted.xgboost(x)
+  predicted <- extract_predicted(x)
   actual <- extract_actual(x)
   root_mean_square_error <- rmse(predicted, actual)
   rsq <- r_squared(actual, predicted)
@@ -1259,7 +1265,7 @@ tidy.xgboost_exp <- function(x, type = "importance", pretty.name = FALSE, binary
       } else {
         if (x$classification_type == "binary") {
           predicted <- extract_predicted_binary_labels.xgboost(x, threshold = binary_classification_threshold)
-          predicted_probability <- extract_predicted.xgboost(x)
+          predicted_probability <- extract_predicted(x)
           ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = pretty.name)
         }
         else {

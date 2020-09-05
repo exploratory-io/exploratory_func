@@ -1367,7 +1367,7 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
           evaluation = {
             if (is.numeric(actual)) {
               if ("xgboost_exp" %in% class(model_object)) {
-                predicted <- extract_predicted.xgboost(model_object, type = "test")
+                predicted <- extract_predicted(model_object, type = "test")
               }
               else {
                 predicted <- test_pred_ret$predicted_value
@@ -1408,7 +1408,7 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
               if (model_object$classification_type == "binary") { # Make it model agnostic.
                 if ("xgboost_exp" %in% class(model_object)) {
                   predicted <- extract_predicted_binary_labels.xgboost(model_object, type = "test", threshold = binary_classification_threshold) # If threshold is specified in ..., take it.
-                  predicted_probability <- extract_predicted.xgboost(model_object, type = "test")
+                  predicted_probability <- extract_predicted(model_object, type = "test")
                 }
                 else {
                   predicted <- test_pred_ret$predicted_label
