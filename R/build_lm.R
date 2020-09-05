@@ -1623,6 +1623,7 @@ augment.glm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = 
       # Try recovering from it by running with se=FALSE.
       broom:::augment.glm(x, data = NULL, newdata = cleaned_data, se = FALSE, ...)
     })
+    # TODO: Restore removed rows.
   } else if (!is.null(data)) {
     ret <- switch(data_type,
       training = {
