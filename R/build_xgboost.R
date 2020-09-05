@@ -956,7 +956,7 @@ exp_xgboost <- function(df,
                         # XGBoost-specific parameters
                         nrounds = 10,
                         watchlist_rate = 0,
-                        sparse = FALSE, #??
+                        sparse = FALSE,
                         booster = "gbtree",
                         early_stopping_rounds = 0,
                         max_depth = 6,
