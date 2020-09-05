@@ -964,7 +964,9 @@ exp_xgboost <- function(df,
                         gamma = 1,
                         subsample = 1,
                         colsample_bytree = 1,
-                        learning_rate = 0.3,
+                        eta = 0.3, # We used to set learning_rate parameter here for Analytics Step. Corrected it while 6.2 development.
+                                   # Either xgboost package changed parameter name at some point,
+                                   # or we might have been wrong about the parameter name in the first place.
                         output_type_regression = "linear",
                         eval_metric_regression = "rmse",
                         output_type_binary = "logistic",
@@ -1096,7 +1098,7 @@ exp_xgboost <- function(df,
                         gamma = gamma,
                         subsample = subsample,
                         colsample_bytree = colsample_bytree,
-                        learning_rate = learning_rate,
+                        eta = eta,
                         output_type = output_type_binary, 
                         eval_metric = eval_metric_binary)
       }
@@ -1112,7 +1114,7 @@ exp_xgboost <- function(df,
                         gamma = gamma,
                         subsample = subsample,
                         colsample_bytree = colsample_bytree,
-                        learning_rate = learning_rate,
+                        eta = eta,
                         output_type = output_type_regression, 
                         eval_metric = eval_metric_regression)
       }
@@ -1128,7 +1130,7 @@ exp_xgboost <- function(df,
                         gamma = gamma,
                         subsample = subsample,
                         colsample_bytree = colsample_bytree,
-                        learning_rate = learning_rate,
+                        eta = eta,
                         output_type = output_type_multiclass, 
                         eval_metric = eval_metric_multiclass)
       }
