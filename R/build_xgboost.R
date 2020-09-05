@@ -857,6 +857,7 @@ importance_xgboost <- function(model) {
   ret
 }
 
+# Model specific S3 functions.
 extract_actual <- function(x, ...) {UseMethod("extract_actual", x)}
 extract_predicted <- function(x, ...) {UseMethod("extract_predicted", x)}
 extract_predicted_binary_labels <- function(x, ...) {UseMethod("extract_predicted_binary_labels", x)}
