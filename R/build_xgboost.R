@@ -857,7 +857,9 @@ importance_xgboost <- function(model) {
   ret
 }
 
-extract_actual.xgboost <- function(x, type = "training") {
+extract_actual <- function(x, ...) {UseMethod("extract_actual", x)}
+
+extract_actual.xgboost_exp <- function(x, type = "training") {
   if (type == "training") {
     actual <- x$df[[all.vars(x$terms)[[1]]]]
   }
@@ -1201,7 +1203,7 @@ glance.xgboost_exp <- function(x, pretty.name = FALSE, ...) {
 #' @export
 glance.xgboost_exp.regression <- function(x, pretty.name, ...) {
   predicted <- extract_predicted.xgboost(x)
-  actual <- extract_actual.xgboost(x)
+  actual <- extract_actual(x)
   root_mean_square_error <- rmse(predicted, actual)
   rsq <- r_squared(actual, predicted)
   n <- length(actual)
@@ -1251,7 +1253,7 @@ tidy.xgboost_exp <- function(x, type = "importance", pretty.name = FALSE, binary
         return(glance(x, pretty.name = pretty.name, ...))
       }
       # get evaluation scores from training data
-      actual <- extract_actual.xgboost(x)
+      actual <- extract_actual(x)
       if(is.numeric(actual)){
         glance(x, pretty.name = pretty.name, ...)
       } else {
@@ -1269,7 +1271,7 @@ tidy.xgboost_exp <- function(x, type = "importance", pretty.name = FALSE, binary
     },
     conf_mat = {
       # return confusion matrix
-      actual <- extract_actual.xgboost(x)
+      actual <- extract_actual(x)
       if (x$classification_type == "binary") {
         predicted <- extract_predicted_binary_labels.xgboost(x, threshold = binary_classification_threshold)
       }
