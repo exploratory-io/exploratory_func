@@ -1041,18 +1041,70 @@ augment.rpart <- function(x, data = NULL, newdata = NULL, ...) {
   augment.rpart.method(x, data, newdata, ...)
 }
 
-augment.rpart.classification <- function(x, data = NULL, newdata = NULL, data_type = "training", ...) {
+augment.rpart.classification <- function(x, data = NULL, newdata = NULL, data_type = "training", binary_classification_threshold = 0.5, ...) {
   # For rpart, terms_mapping is turned off in exp_rpart, so that we can display original column names in tree image.
   predictor_variables <- all.vars(x$terms)[-1]
+  y_name <- x$terms_mapping[all.vars(x$terms)[[1]]]
+
+  # Get names of original predictor columns by reverse-mapping the names in formula.
+  predictor_variables <- all.vars(x$terms)[-1]
+  predictor_variables_orig <- x$terms_mapping[predictor_variables]
+
+  threshold <- NULL
+  if (x$classification_type == "binary") {
+    threshold <- binary_classification_threshold
+  }
 
   if (!is.null(newdata)) {
-    predicted_value <- get_multiclass_predicted_value_from_probability_rpart(x, newdata)
+    # create clean name data frame because the model learned by those names
+    cleaned_data <- newdata
+    y_value <- cleaned_data[[y_name]]
+
+    cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables_orig)
+    # Rename columns to the normalized ones used while learning.
+    colnames(cleaned_data) <- predictor_variables
+
+    # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
+    cleaned_data <- align_predictor_factor_levels(cleaned_data, attr(x,"xlevels"), predictor_variables)
+
+    na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
+    if (length(na_row_numbers) > 0) {
+      cleaned_data <- cleaned_data[-na_row_numbers,]
+    }
+
+    # Run prediction.
+    pred_res <- predict(x, cleaned_data)
+
+    predicted_label_nona <- ranger.predict_value_from_prob(attr(x, "ylevels"),
+                                                           pred_res,
+                                                           y_value, threshold = threshold)
+
+    # Inserting once removed NA rows
+    predicted_value <- restore_na(predicted_label_nona, na_row_numbers)
+
     predicted_value_col <- avoid_conflict(colnames(newdata), "predicted_value")
     predicted_probability_col <- avoid_conflict(colnames(newdata), "predicted_probability")
-    newdata[predicted_value_col] <- predicted_value
-    newdata[predicted_probability_col] <- apply(predict(x, newdata), 1, max)
-    newdata %>% dplyr::rename(predicted_label = predicted_value_col) %>%
-                dplyr::select(-predicted_label, everything(), predicted_label)
+
+    if (x$classification_type == "binary") {
+      newdata[[predicted_value_col]] <- predicted_value
+
+      # With ranger, 2nd category always is the one to be considered "TRUE",
+      predicted_prob <- pred_res[, 2]
+      # Inserting once removed NA rows
+      predicted_prob <- restore_na(predicted_prob, na_row_numbers)
+      newdata[[predicted_probability_col]] <- predicted_prob
+      newdata
+    } else if (x$classification_type == "multi") {
+      # append predicted probability for each class, max and labels at max values
+      # Inserting once removed NA rows
+      predicted_prob <- restore_na(apply(pred_res, 1 , max), na_row_numbers)
+      newdata <- ranger.set_multi_predicted_values(newdata, pred_res, predicted_value, na_row_numbers)
+      newdata[[predicted_probability_col]] <- predicted_prob
+      newdata
+    }
+    newdata <- newdata %>% dplyr::rename(predicted_label = predicted_value_col) %>%
+                  dplyr::select(-predicted_label, everything(), predicted_label)
+    newdata
   } else if (!is.null(data)) {
     if (nrow(data) == 0) {
       # Handle the case where, for example, test_rate is 0 here,
@@ -1096,11 +1148,30 @@ augment.rpart.classification <- function(x, data = NULL, newdata = NULL, data_ty
 augment.rpart.regression <- function(x, data = NULL, newdata = NULL, data_type = "training", ...) {
   # For rpart, terms_mapping is turned off in exp_rpart, so that we can display original column names in tree image.
   predicted_value_col <- avoid_conflict(colnames(newdata), "predicted_value")
+  predictor_variables <- all.vars(x$formula_terms)[-1]
+  predictor_variables_orig <- x$terms_mapping[predictor_variables]
 
   if(!is.null(newdata)) {
     # create clean name data frame because the model learned by those names
-    predicted_val <- predict(x, newdata)
-    newdata[[predicted_value_col]] <- predicted_val
+    cleaned_data <- newdata
+
+    cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables_orig)
+    # Rename columns to the normalized ones used while learning.
+    colnames(cleaned_data) <- predictor_variables
+
+    # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
+    cleaned_data <- align_predictor_factor_levels(cleaned_data, x$df, predictor_variables)
+
+    na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
+    if (length(na_row_numbers) > 0) {
+      cleaned_data <- cleaned_data[-na_row_numbers,]
+    }
+
+    # Run prediction.
+    predicted_val <- predict(x, cleaned_data)
+
+    # Inserting once removed NA rows
+    newdata[[predicted_value_col]] <- restore_na(predicted_val, na_row_numbers)
 
     newdata
   } else if (!is.null(data)) {
