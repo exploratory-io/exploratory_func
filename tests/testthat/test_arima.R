@@ -12,13 +12,13 @@ test_that("do_arima with aggregation", {
   raw_data$pre_col2 <- runif(nrow(raw_data))
 
   ret <- raw_data %>%
-    do_arima(`time stamp`, valueColumn=`cou nt`, periods=10, time_unit = "day", test_mode=F)
+    do_arima(`time stamp`, valueColumn=`cou nt`, periods=10, time_unit = "day", na_fill_type="value", test_mode=F)
   # No valueColumn (row number) case.
   ret <- raw_data %>%
-    do_arima(`time stamp`, ,periods=10, time_unit = "day", test_mode=F)
+    do_arima(`time stamp`, ,periods=10, time_unit = "day", na_fill_type="value", test_mode=F)
   # With more parameters
   ret <- raw_data %>%
-    do_arima(`time stamp`, `pre_col1`, `pre_col2`, time_unit = "day", periods = 2, valueColumn = `cou nt`, fun.aggregate = sum, test_mode =TRUE, d = NA, D = NA, max.p = 5, max.q = 5, max.P = 2, max.Q = 2, max.order = 5, max.d = 2, max.D = 1, start.p = 2, start.q = 2, start.P = 1, start.Q = 1, stationary = FALSE, seasonal = TRUE, ic = "aic", allowdrift = TRUE, allowmean = TRUE, lambda = NULL, biasadj = FALSE, test = "kpss", seasonal.test = "ocsb", parallel = FALSE, num.cores = 2)
+    do_arima(`time stamp`, `pre_col1`, `pre_col2`, time_unit = "day", periods = 2, valueColumn = `cou nt`, fun.aggregate = sum, na_fill_type="value", test_mode =TRUE, d = NA, D = NA, max.p = 5, max.q = 5, max.P = 2, max.Q = 2, max.order = 5, max.d = 2, max.D = 1, start.p = 2, start.q = 2, start.P = 1, start.Q = 1, stationary = FALSE, seasonal = TRUE, ic = "aic", allowdrift = TRUE, allowmean = TRUE, lambda = NULL, biasadj = FALSE, test = "kpss", seasonal.test = "ocsb", parallel = FALSE, num.cores = 2)
 
   expect_true(!is.null(ret$model))
 
