@@ -352,6 +352,7 @@ do_arima <- function(df, time,
     # Add residual ACF
     residuals_df <- model_df %>% residuals()
     residual_acf <- residuals_df %>% feasts::ACF(.resid)
+    residual_acf <- as.data.frame(residual_acf %>% mutate(lag = as.numeric(lag))) # as.data.frame is to avoid error from unnest() later.
     ret <- ret %>% mutate(residual_acf = list(!!residual_acf))
 
     # Add residual
