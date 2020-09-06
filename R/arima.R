@@ -217,7 +217,9 @@ do_arima <- function(df, time,
                                            ic = ic,
                                            stepwise=stepwise,
                                            ))
-    forecasted_df <- model_df %>% fabletools::forecast(h=periods) %>% fabletools::hilo(level = c(80, 95))
+    forecasted_df <- model_df %>% fabletools::forecast(h=periods)
+    forecasted_df <- forecasted_df %>% mutate(`80%`=fabletools:::hilo(.distribution, level=80))
+    forecasted_df <- forecasted_df %>% mutate(`95%`=fabletools:::hilo(.distribution, level=95))
 
     # Old code with forecast::auto.arima kept for reference while moving to fable::ARIMA.
     #
