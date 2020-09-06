@@ -361,7 +361,7 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, data_type = "t
     switch(data_type,
       training = {
         # Inserting removed NA rows should not be necessary since we don't remove NA rows after test/training split.
-        predicted_value <- extract_predicted_multiclass_labels(x, type="training") #TODO: Get right threshold
+        predicted_value <- extract_predicted_multiclass_labels(x, type="training")
 
         predicted <- extract_predicted(x, type="training")
 
@@ -374,7 +374,7 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, data_type = "t
         data
       },
       test = {
-        predicted_value_nona <- extract_predicted_multiclass_labels(x, type="test") #TODO: Get right threshold
+        predicted_value_nona <- extract_predicted_multiclass_labels(x, type="test")
         predicted_value_nona <- restore_na(predicted_value_nona, attr(x$prediction_test, "unknown_category_rows_index"))
         predicted_value <- restore_na(predicted_value_nona, attr(x$prediction_test, "na.action"))
 
