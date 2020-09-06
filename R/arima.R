@@ -356,6 +356,7 @@ do_arima <- function(df, time,
     ret <- ret %>% mutate(residual_acf = list(!!residual_acf))
 
     # Add residual
+    residuals_df <- as.data.frame(residuals_df) # as.data.frame is to avoid error from unnest() later.
     colnames(residuals_df)[colnames(residuals_df) == "ds"] <- time_col
     colnames(residuals_df)[colnames(residuals_df) == ".resid"] <- value_col
     ret <- ret %>% mutate(residuals= list(!!residuals_df))

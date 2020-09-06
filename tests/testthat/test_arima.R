@@ -14,7 +14,8 @@ test_that("do_arima with aggregation", {
   model_df <- raw_data %>%
     do_arima(`time stamp`, valueColumn=`cou nt`, periods=10, time_unit = "day", na_fill_type="value", test_mode=F)
 
-  model_df %>% dplyr::select(residual_acf) %>% tidyr::unnest() %>% rename(Lag=lag, ACF=acf)
+  ret <- model_df %>% dplyr::select(residuals) %>% tidyr::unnest(residuals)
+  ret <- model_df %>% dplyr::select(residual_acf) %>% tidyr::unnest() %>% rename(Lag=lag, ACF=acf)
   # No valueColumn (row number) case.
   model_df <- raw_data %>%
     do_arima(`time stamp`, ,periods=10, time_unit = "day", na_fill_type="value", test_mode=F)
