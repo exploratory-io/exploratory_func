@@ -170,6 +170,8 @@ add_prediction <- function(df, model_df, conf_int = 0.95, ...){
 
   # validate data frame based on meta info
   model_meta <- model_df[[".model_metadata"]]
+  # This is only for Analytics Step.
+  # Analytics View does not add .model_metadata column. The logic here is too rough for redoing Analytics View's preprocessing.
   if(!is.null(model_meta)){
     types <- model_meta[[1]]$types
     if(!is.null(types)){
