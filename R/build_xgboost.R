@@ -535,7 +535,7 @@ augment.xgboost_reg <- function(x, data = NULL, newdata = NULL, data_type = "tra
     original_data[[predicted_value_col]] <- restore_na(predicted_val, na_row_numbers)
 
     original_data
-  } else if (!is.null(data)) { #TODO: For Analytics View. Copiled from code for ranger. Adjust for xgboost.
+  } else if (!is.null(data)) { # For Analytics View.
     if (nrow(data) == 0) { #TODO: better place to do this check?
       return(data.frame())
     }
