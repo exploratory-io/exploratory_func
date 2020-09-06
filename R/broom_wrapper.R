@@ -206,17 +206,15 @@ add_prediction <- function(df, model_df, conf_int = 0.95, ...){
       ret
     }
 
-    # This causes more harm than good, because if the output column names of this function are changed,
-    # it can cause errors in the processing after this. Removing for now.
-    #
-    # add .group to column names with conflict.
-    # duped <- colnames(ret) %in% colnames(df)
-    # if(any(duped)){
-    #   colnames(ret)[duped] <- avoid_conflict(colnames(df), colnames(ret)[duped], ".group")
-    # }
-
-    ret <- ret %>%
-      unnest_with_drop(.test_index)
+    # Avoid name conflict error between group column and columns inside .test_index at unnest.
+    # We used to add .group to the group column, but that caused error at a caller dealing with this function's output.
+    # So, we are using tidyr_legacy function that changes the column inside .test_index rather than the group column
+    # in case of conflict for now.
+    ret$source.data <- NULL
+    ret$model <- NULL
+    ret$.model_metadata <- NULL
+    ret <- ret %>% tidyr::unnest(.test_index, names_repair=tidyr::tidyr_legacy) 
+    ret
   }
 
   # if type.predict argument is not indicated in this function
