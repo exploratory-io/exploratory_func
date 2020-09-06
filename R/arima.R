@@ -17,8 +17,8 @@
 #' @param ... - extra values to be passed to prophet::prophet. listed below.
 #' @export
 do_arima <- function(df, time,
-                     ...,
                      valueColumn = NULL,
+                     ...,
                      time_unit = "day",
                      periods = 10,
                      fun.aggregate = sum,
