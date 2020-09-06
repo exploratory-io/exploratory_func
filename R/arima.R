@@ -17,6 +17,7 @@
 #' @param ... - extra values to be passed to prophet::prophet. listed below.
 #' @export
 do_arima <- function(df, time,
+                     ...,
                      valueColumn = NULL,
                      time_unit = "day",
                      periods = 10,
@@ -53,8 +54,7 @@ do_arima <- function(df, time,
                      regressors = NULL,
                      funs.aggregate.regressors = NULL,
                      regressors_na_fill_type = NULL,
-                     regressors_na_fill_value = 0,
-                     ...
+                     regressors_na_fill_value = 0
                      ){
   validate_empty_data(df)
 
