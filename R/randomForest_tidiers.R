@@ -1088,8 +1088,8 @@ augment.rpart.classification <- function(x, data = NULL, newdata = NULL, data_ty
     if (x$classification_type == "binary") {
       newdata[[predicted_value_col]] <- predicted_value
 
-      # With ranger, 2nd category always is the one to be considered "TRUE",
-      predicted_prob <- pred_res[, 2]
+      # Since now we consider only logical column as the tarted for binary classification, the label for "TRUE" class should be always "TRUE".
+      predicted_prob <- pred_res[, "TRUE"]
       # Inserting once removed NA rows
       predicted_prob <- restore_na(predicted_prob, na_row_numbers)
       newdata[[predicted_probability_col]] <- predicted_prob
