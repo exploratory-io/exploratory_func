@@ -1375,7 +1375,8 @@ tidy.xgboost_exp <- function(x, type = "importance", pretty.name = FALSE, binary
       # number of iteration
       # with chosen evaluation metrics
       ret <- x$evaluation_log %>% as.data.frame()
-      ret <- prettify_xgboost_evaluation_log(ret, pretty.name=pretty.name)
+      ret <- ret %>% pivot_longer(cols = c(-iter))
+      ret <- ret %>% separate(col = "name", into=c("type","name"))
       ret
     },
     {

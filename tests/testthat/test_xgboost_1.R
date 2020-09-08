@@ -26,8 +26,9 @@ test_that("exp_xgboost(regression) evaluate training and test", {
   model_df <- flight %>%
                 exp_xgboost(`ARR DELAY`, `CAR RIER`, `ORI GIN`, `DEP DELAY`, `AIR TIME`,
                                  test_rate = 0.3,
-                                 test_split_type = "ordered", pd_with_bin_means = TRUE) # testing ordered split too.
-  #ret <- model_df %>% prediction(data="newdata", data_frame=flight)
+                                 test_split_type = "ordered", pd_with_bin_means = TRUE, # testing ordered split too.
+                                 watchlist_rate = 0.1)
+  ret <- model_df %>% prediction(data="newdata", data_frame=flight)
 
   ret <- model_df %>% tidy_rowwise(model, type="evaluation_log")
   ret <- model_df %>% prediction(data="training_and_test")
