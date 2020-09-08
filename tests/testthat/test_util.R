@@ -907,8 +907,8 @@ test_that("get_mode", {
 test_that("get_unknown_category_rows_index", {
   train_df <- data.frame(x=c('a','b','c'),
                          y=c('a','b','c'))
-  test_df <- data.frame(x=c('a','c','d'),
-                        y=c('b','e','c'))
+  test_df <- data.frame(y=c('b','e','c'), # Intentionally switched column order to test case where orders do not match.
+                        x=c('a','c','d'))
   unknown_vector <- exploratory:::get_unknown_category_rows_index_vector(test_df, train_df)
   unknown_index <- exploratory:::get_row_numbers_from_index_vector(unknown_vector)
   expect_equal(unknown_index,c(2,3))

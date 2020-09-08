@@ -832,12 +832,6 @@ build_lm.fast <- function(df,
         if (test_rate > 0) {
           # Test mode. Make prediction with test data here, rather than repeating it in Analytics View preprocessors.
           df_test <- safe_slice(source_data, test_index, remove = FALSE)
-          # Remove rows with categorical values which does not appear in training data and unknown to the model.
-          # Record where it was in unknown_category_rows_index, and keep it with model, so that prediction that
-          # matches with original data can be generated later.
-          unknown_category_rows_index_vector <- get_unknown_category_rows_index_vector(df_test, df)
-          df_test <- df_test[!unknown_category_rows_index_vector, , drop = FALSE] # 2nd arg must be empty.
-          unknown_category_rows_index <- get_row_numbers_from_index_vector(unknown_category_rows_index_vector)
         }
 
         # when family is negativebinomial, use MASS::glm.nb
@@ -925,9 +919,6 @@ build_lm.fast <- function(df,
         df <- safe_slice(source_data, test_index, remove = TRUE)
         if (test_rate > 0) {
           df_test <- safe_slice(source_data, test_index, remove = FALSE)
-          unknown_category_rows_index_vector <- get_unknown_category_rows_index_vector(df_test, df)
-          df_test <- df_test[!unknown_category_rows_index_vector, , drop = FALSE] # 2nd arg must be empty.
-          unknown_category_rows_index <- get_row_numbers_from_index_vector(unknown_category_rows_index_vector)
         }
 
         model <- stats::lm(fml, data = df) 
@@ -979,8 +970,14 @@ build_lm.fast <- function(df,
       })
 
       if (test_rate > 0) {
+        # Remove rows with categorical values which does not appear in training data and unknown to the model.
+        # Record where it was in unknown_category_rows_index, and keep it with model, so that prediction that
+        # matches with original data can be generated later.
+        df_test_clean <- cleanup_df_for_test(df_test, df, c_cols)
+        unknown_category_rows_index <- attr(df_test_clean, "unknown_category_rows_index")
+
         # Note: Do not pass df_test like data=df_test. This for some reason ends up predict returning training data prediction.
-        model$prediction_test <- predict(model, df_test, se.fit = TRUE)
+        model$prediction_test <- predict(model, df_test_clean, se.fit = TRUE)
         model$prediction_test$unknown_category_rows_index <- unknown_category_rows_index
       }
       # these attributes are used in tidy of randomForest TODO: is this good for lm too?
@@ -1559,8 +1556,23 @@ augment.lm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "
     return(ret)
   }
 
-  if(!is.null(newdata)) { # Call broom:::augment.lm as is
-    ret <- broom:::augment.lm(x, data = data, newdata = newdata, se = TRUE, ...)
+  if(!is.null(newdata)) {
+    predictor_variables <- all.vars(x$terms)[-1]
+    predictor_variables_orig <- x$terms_mapping[predictor_variables]
+
+    cleaned_data <- newdata %>% dplyr::select(predictor_variables_orig)
+    # Rename columns to the normalized ones used while learning.
+    colnames(cleaned_data) <- predictor_variables
+
+    # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
+    cleaned_data <- align_predictor_factor_levels(cleaned_data, x$xlevels, predictor_variables)
+
+    na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
+    if (length(na_row_numbers) > 0) {
+      cleaned_data <- cleaned_data[-na_row_numbers,]
+    }
+    ret <- broom:::augment.lm(x, data = NULL, newdata = cleaned_data, se = TRUE, ...)
+    # TODO: Restore removed rows.
   } else if (!is.null(data)) {
     ret <- switch(data_type,
       training = { # Call broom:::augment.lm as is
@@ -1588,14 +1600,30 @@ augment.glm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = 
     return(ret)
   }
   if(!is.null(newdata)) {
+    predictor_variables <- all.vars(x$terms)[-1]
+    predictor_variables_orig <- x$terms_mapping[predictor_variables]
+
+    cleaned_data <- newdata %>% dplyr::select(predictor_variables_orig)
+    # Rename columns to the normalized ones used while learning.
+    colnames(cleaned_data) <- predictor_variables
+
+    # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
+    cleaned_data <- align_predictor_factor_levels(cleaned_data, x$xlevels, predictor_variables)
+
+    na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
+    if (length(na_row_numbers) > 0) {
+      cleaned_data <- cleaned_data[-na_row_numbers,]
+    }
+
     ret <- tryCatch({
-      broom:::augment.glm(x, data = data, newdata = newdata, se = TRUE, ...)
+      broom:::augment.glm(x, data = NULL, newdata = cleaned_data, se = TRUE, ...)
     }, error = function(e){
       # se=TRUE throws error that looks like "singular matrix 'a' in solve",
       # in some subset of cases of perfect collinearity.
       # Try recovering from it by running with se=FALSE.
-      broom:::augment.glm(x, data = data, newdata = newdata, se = FALSE, ...)
+      broom:::augment.glm(x, data = NULL, newdata = cleaned_data, se = FALSE, ...)
     })
+    # TODO: Restore removed rows.
   } else if (!is.null(data)) {
     ret <- switch(data_type,
       training = {

@@ -1,5 +1,4 @@
 context("test build_xgboost")
-
 test_that("test build_xgboost with na.omit", {
   test_data <- structure(
     list(
@@ -86,7 +85,7 @@ test_that("test xgboost_binary with not clean names", {
     )
   prediction_ret <- prediction(model_ret)
   expect_true(class(prediction_ret$predicted_probability) == "numeric")
-  expect_true(all(between(prediction_ret$predicted_probability, 0,1)))
+  expect_true(all(between(prediction_ret$predicted_probability, 0,1), na.rm=TRUE))
 })
 
 if (Sys.info()["sysname"] != "Windows") {
@@ -106,7 +105,7 @@ if (Sys.info()["sysname"] != "Windows") {
       )
     prediction_ret <- prediction(model_ret)
     expect_true(class(prediction_ret$predicted_probability) == "numeric")
-    expect_true(all(between(prediction_ret$predicted_probability, 0,1)))
+    expect_true(all(between(prediction_ret$predicted_probability, 0,1), na.rm=TRUE))
   })
 }
 
@@ -394,7 +393,7 @@ test_that("test build_xgboost with multi softprob", {
   prediction_ret <- prediction(model_ret)
   prob <- prediction_ret$predicted_probability
   expect_true(all(prob[!is.na(prob)] > 0))
-  expect_true(length(unique(prediction_ret$predicted_label)) > 1)
+  expect_true(length(unique(prediction_ret$predicted_value)) > 1)
 })
 
 test_that("test build_xgboost with linear booster", {
@@ -560,7 +559,7 @@ test_that("new data prediction without response column", {
   prediction_ret <- model_ret %>%
     prediction_binary(data = "newdata", data_frame = test_data, threshold = 0.4)
 
-  expect_true(all(dplyr::between(prediction_ret$predicted_probability,0,1)))
+  expect_true(all(dplyr::between(prediction_ret$predicted_probability,0,1), na.rm=TRUE))
   expect_true(any(prediction_ret$predicted_label) && any(!prediction_ret$predicted_label))
 
   # there should be an error because no actual column

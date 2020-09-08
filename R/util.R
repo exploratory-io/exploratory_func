@@ -2064,12 +2064,12 @@ get_unknown_category_rows_index_vector <- function(df, training_df) {
 
   # list of vectors each of which is logical vector indicating location of unknown values.
   # TRUE means unknown value at the row position.
-  unknown_indexes <- purrr::map2(uniq_index, seq(length(uniq_index)), function(unique_values, col_index) {
+  unknown_indexes <- purrr::map2(uniq_index, names(uniq_index), function(unique_values, col_name) {
     if (is.null(unique_values)) {
       FALSE
     }
     else {
-      df[[col_index]] %nin% unique_values
+      df[[col_name]] %nin% unique_values
     }
   })
 

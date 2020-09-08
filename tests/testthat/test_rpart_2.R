@@ -26,6 +26,7 @@ test_that("exp_rpart(regression) evaluate training and test", {
                           test_rate = 0.3,
                           test_split_type = "ordered") # testing ordered split too.
 
+  ret <- model_df %>% prediction(data="newdata", data_frame = flight)
   ret <-  model_df %>% rf_partial_dependence()
 
   ret <- model_df %>% prediction(data="training_and_test")
@@ -48,6 +49,7 @@ test_that("exp_rpart(regression) evaluate training and test", {
   # Training only case
   model_df <- flight %>%
                 exp_rpart(`FL NUM`, `DIS TANCE`, `DEP TIME`, test_rate = 0)
+  ret <- model_df %>% prediction(data="newdata", data_frame = flight)
   ret <- model_df %>% prediction(data="training_and_test")
   train_ret <- ret %>% filter(is_test_data==FALSE)
   # expect_equal(nrow(train_ret), 4944) # Not very stable for some reason. Will revisit.
@@ -60,8 +62,9 @@ test_that("exp_rpart(binary(logical)) evaluate training and test", {
   set.seed(1)
   # Keep the test rate high (0.4) so that NA data goes to training part too.
   model_df <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`)) %>%
-                exp_rpart(is_delayed, `DIS TANCE`, `DEP DELAY`, test_rate = 0.4, binary_classification_threshold=0.5)
+                exp_rpart(is_delayed, `DIS TANCE`, `DEP DELAY`, `ORI GIN`, test_rate = 0.4, binary_classification_threshold=0.5)
 
+  ret <- model_df %>% prediction(data="newdata", data_frame = flight)
   ret <-  model_df %>% rf_partial_dependence()
 
   ret <- model_df %>% prediction(data="training_and_test")
@@ -93,6 +96,7 @@ test_that("exp_rpart(character(A,B)) evaluate training and test", { # This shoul
   model_df <- flight %>% dplyr::mutate(is_delayed = if_else(as.logical(`is delayed`), "A", "B")) %>%
                 exp_rpart(is_delayed, `DIS TANCE`, `DEP DELAY`, test_rate = 0.3, binary_classification_threshold=0.5)
 
+  ret <- model_df %>% prediction(data="newdata", data_frame = flight)
   ret <-  model_df %>% rf_partial_dependence()
 
   ret <- model_df %>% prediction(data="training_and_test")
@@ -123,6 +127,7 @@ test_that("exp_rpart(character(TRUE,FALSE)) with NAs evaluate training and test"
   model_df <- flight %>% dplyr::mutate(is_delayed = if_else(as.logical(`is delayed`), "TRUE", "FALSE")) %>%
                 exp_rpart(is_delayed, `DIS TANCE`, `DEP DELAY`, pd_with_bin_means = TRUE, test_rate = 0.3, binary_classification_threshold=0.5)
 
+  ret <- model_df %>% prediction(data="newdata", data_frame = flight)
   ret <-  model_df %>% rf_partial_dependence()
 
   ret <- model_df %>% prediction(data="training_and_test")
@@ -154,6 +159,7 @@ test_that("exp_rpart(character(TRUE,FALSE)) without NAs evaluate training and te
                 filter(!is.na(is_delayed)) %>%
                 exp_rpart(is_delayed, `DIS TANCE`, `DEP DELAY`, pd_with_bin_means = TRUE, test_rate = 0.3, binary_classification_threshold=0.5)
 
+  ret <- model_df %>% prediction(data="newdata", data_frame = flight)
   ret <-  model_df %>% rf_partial_dependence()
 
   ret <- model_df %>% prediction(data="training_and_test")
@@ -184,6 +190,7 @@ test_that("exp_rpart(binary) evaluate training and test with SMOTE", {
   model_df <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`)) %>%
                 exp_rpart(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0.3, smote = T)
 
+  ret <- model_df %>% prediction(data="newdata", data_frame = flight)
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
   # expect_equal(nrow(test_ret), 1483) # Not very stable for some reason. Will revisit.
@@ -212,6 +219,7 @@ test_that("exp_rpart(multi) evaluate training and test", {
   model_df <- flight %>%
                 exp_rpart(`ORI GIN`, `DIS TANCE`, `DEP TIME`, test_rate = 0.3)
 
+  ret <- model_df %>% prediction(data="newdata", data_frame = flight)
   ret <-  model_df %>% rf_partial_dependence()
 
   ret <- model_df %>% prediction(data="training_and_test")

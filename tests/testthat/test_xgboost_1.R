@@ -21,14 +21,14 @@ if (!testdata_filename %in% list.files(testdata_dir)) {
   write.csv(flight, testdata_file_path) # save sampled-down data for performance.
 }
 
-test_that("calc_feature_map(regression) evaluate training and test", {
+test_that("exp_xgboost(regression) evaluate training and test", {
   set.seed(1) # For stability of result.
   model_df <- flight %>%
-                calc_feature_imp(`ARR DELAY`, `CAR RIER`, `ORI GIN`, `DEP DELAY`, `AIR TIME`,
+                exp_xgboost(`ARR DELAY`, `CAR RIER`, `ORI GIN`, `DEP DELAY`, `AIR TIME`,
                                  test_rate = 0.3,
-                                 test_split_type = "ordered", with_boruta = TRUE, pd_with_bin_means = TRUE) # testing ordered split too.
+                                 test_split_type = "ordered", pd_with_bin_means = TRUE) # testing ordered split too.
+  #ret <- model_df %>% prediction(data="newdata", data_frame=flight)
 
-  ret <- model_df %>% prediction(data="newdata", data_frame=flight)
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
   # expect_equal(nrow(test_ret), 1500) Fails now, since we filter numeric NA. Revive when we do not need to.
@@ -39,10 +39,9 @@ test_that("calc_feature_map(regression) evaluate training and test", {
   expect_gt(nrow(train_ret), 3400)
   # expect_equal(nrow(train_ret), 3500) Fails now, since we filter numeric NA. Revive when we do not need to.
 
-  # Test result of boruta.
-  importance_res <- model_df %>% tidy_rowwise(model, type='boruta') %>% group_by(variable) %>% summarize(importance=mean(importance)) %>% arrange(-importance)
-  expect_equal(as.character(importance_res$variable[[1]]), "DEP DELAY") # Most important should be dep delay.
-  expect_equal(as.character(importance_res$variable[[2]]), "CAR RIER") # 2nd most important should be carrier. 
+  # Check result of variable importance 
+  ret <- model_df %>% tidy_rowwise(model, type="importance")
+  expect_equal(as.character(ret$variable[[1]]), "DEP DELAY") # Most important should be dep delay.
 
   ret <- rf_evaluation_training_and_test(model_df, pretty.name = TRUE)
   expect_equal(nrow(ret), 2) # 2 for train and test
@@ -52,7 +51,7 @@ test_that("calc_feature_map(regression) evaluate training and test", {
   expect_equal(class(ret$conf_high), "numeric") # make sure that it is with conf int for actual binning data.
 
   model_df <- flight %>%
-                calc_feature_imp(`FL NUM`, `DIS TANCE`, `DEP TIME`, test_rate = 0, pd_with_bin_means = TRUE)
+                exp_xgboost(`FL NUM`, `DIS TANCE`, `DEP TIME`, test_rate = 0, pd_with_bin_means = TRUE)
   ret <- model_df %>% prediction(data="training_and_test")
   train_ret <- ret %>% filter(is_test_data==FALSE)
   #expect_equal(nrow(train_ret), 4894) # Less than 5000 because of NAs in the target variable. Linux seems to have different result. Work around for now.
@@ -62,12 +61,23 @@ test_that("calc_feature_map(regression) evaluate training and test", {
   expect_equal(nrow(ret), 1) # 1 for train
 })
 
-test_that("calc_feature_map(binary) evaluate training and test", {
+test_that("exp_xgboost(binary) evaluate training and test", {
   set.seed(1) # For stability of result.
   # `is delayed` is not logical for some reason.
   # To test binary prediction, need to cast it into logical.
   model_df <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`)) %>%
-                calc_feature_imp(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0.3, pd_with_bin_means = TRUE)
+                exp_xgboost(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0.3, pd_with_bin_means = TRUE)
+
+  ret <- model_df %>% prediction(data="newdata", data_frame=flight)
+
+  ret <- rf_evaluation_training_and_test(model_df, binary_classification_threshold = 0.5)
+  expect_equal(nrow(ret), 2) # 2 for train and test
+  expect_gt(ret$auc[[1]], 0.5) # If this is not true, TRUE/FALSE may be reverted.
+
+  #ret <- model_df %>% glance_rowwise(model)
+  ret <- model_df %>% tidy_rowwise(model, type="conf_mat")
+  ret <- model_df %>% tidy_rowwise(model, type="partial_dependence")
+  ret <- model_df %>% tidy_rowwise(model, type="importance")
 
   res_partial_dependence <- model_df %>% rf_partial_dependence()
   ret <- model_df %>% prediction(data="training_and_test")
@@ -80,15 +90,9 @@ test_that("calc_feature_map(binary) evaluate training and test", {
   expect_lt(nrow(train_ret), 3500)
   expect_gt(nrow(train_ret), 3400)
 
-  ret <- rf_evaluation_training_and_test(model_df)
-  expect_equal(nrow(ret), 2) # 2 for train and test
-
-  ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class")
-  expect_equal(nrow(ret), 4) # 4 for train/test times TRUE/FALSE
-
   ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
   model_df <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`)) %>%
-                calc_feature_imp(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0, pd_with_bin_means = TRUE)
+                exp_xgboost(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0, pd_with_bin_means = TRUE)
   ret <- model_df %>% prediction(data="training_and_test")
   train_ret <- ret %>% filter(is_test_data==FALSE)
   #expect_equal(nrow(train_ret), 4905) # Less than 5000 because of NAs in the target variable. Linux seems to have different result. Work around for now.
@@ -97,16 +101,16 @@ test_that("calc_feature_map(binary) evaluate training and test", {
   ret <- rf_evaluation_training_and_test(model_df)
   expect_equal(nrow(ret), 1) # 1 for train
 
-  ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class")
+  # ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class") # Not implemented.
   ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
 })
 
-test_that("calc_feature_map(factor(TRUE, FALSE)) evaluate training and test", { # This case should be treated as multi-class.
+test_that("exp_xgboost(factor(TRUE, FALSE)) evaluate training and test", { # This case should be treated as multi-class.
   set.seed(1) # For stability of result.
   # `is delayed` is not logical for some reason.
   # To test binary prediction, need to cast it into logical.
   model_df <- flight %>% dplyr::mutate(is_delayed = factor(as.logical(`is delayed`))) %>% filter(!is.na(is_delayed)) %>%
-                calc_feature_imp(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0.3, pd_with_bin_means = TRUE)
+                exp_xgboost(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0.3, pd_with_bin_means = TRUE)
 
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
@@ -120,12 +124,12 @@ test_that("calc_feature_map(factor(TRUE, FALSE)) evaluate training and test", { 
 
   ret <- rf_evaluation_training_and_test(model_df, pretty.name=T, binary_classification_threshold=0.5)
   expect_equal(nrow(ret), 2) # 2 for train and test
-  ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class")
-  expect_equal(nrow(ret), 4) # 4 for train/test times TRUE/FALSE
+  #ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class") # Not implemented.
+  #expect_equal(nrow(ret), 4) # 4 for train/test times TRUE/FALSE
 
   ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
   model_df <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`)) %>%
-                calc_feature_imp(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0, pd_with_bin_means = TRUE)
+                exp_xgboost(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0, pd_with_bin_means = TRUE)
   ret <- model_df %>% prediction(data="training_and_test")
   train_ret <- ret %>% filter(is_test_data==FALSE)
   #expect_equal(nrow(train_ret), 4905) # Less than 5000 because of NAs in the target variable. Linux seems to have different result. Work around for now.
@@ -134,16 +138,27 @@ test_that("calc_feature_map(factor(TRUE, FALSE)) evaluate training and test", { 
   ret <- rf_evaluation_training_and_test(model_df)
   expect_equal(nrow(ret), 1) # 1 for train
 
-  ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class")
+  #ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class") # Not implemented.
   ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
 })
 
-test_that("calc_feature_map(binary(factor(A,B))) evaluate training and test", {
+test_that("exp_xgboost(binary(factor(A,B))) evaluate training and test with group_by", {
+  set.seed(1) # For stability of result.
+  # `is delayed` is not logical for some reason.
+  # To test binary prediction, need to cast it into logical.
+  flight <- flight %>% group_by(`is UA or AA`)
+  model_df <- flight %>% dplyr::mutate(is_delayed = factor(if_else(as.logical(`is delayed`), "A","B"))) %>% filter(!is.na(is_delayed)) %>%
+                exp_xgboost(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0.3, pd_with_bin_means = TRUE)
+  ret <- rf_evaluation_training_and_test(model_df, pretty.name=T, binary_classification_threshold=0.5)
+  expect_true(all(ret$`Data Type` == rep(c("Training", "Test"),3)))
+})
+
+test_that("exp_xgboost(binary(factor(A,B))) evaluate training and test", {
   set.seed(1) # For stability of result.
   # `is delayed` is not logical for some reason.
   # To test binary prediction, need to cast it into logical.
   model_df <- flight %>% dplyr::mutate(is_delayed = factor(if_else(as.logical(`is delayed`), "A","B"))) %>% filter(!is.na(is_delayed)) %>%
-                calc_feature_imp(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0.3, pd_with_bin_means = TRUE)
+                exp_xgboost(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0.3, pd_with_bin_means = TRUE)
 
   ret <- model_df %>% prediction(data="newdata", data_frame=flight)
 
@@ -159,12 +174,13 @@ test_that("calc_feature_map(binary(factor(A,B))) evaluate training and test", {
 
   ret <- rf_evaluation_training_and_test(model_df, pretty.name=T, binary_classification_threshold=0.5)
   expect_equal(nrow(ret), 2) # 2 for train and test
-  ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class")
-  expect_equal(nrow(ret), 4) # 4 for train/test times TRUE/FALSE
+  #ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class") # Not implemented.
+  #expect_equal(nrow(ret), 4) # 4 for train/test times TRUE/FALSE
 
   ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
+  ret <- model_df %>% rf_partial_dependence()
   model_df <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`)) %>%
-                calc_feature_imp(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0, pd_with_bin_means = TRUE)
+                exp_xgboost(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0, pd_with_bin_means = TRUE)
   ret <- model_df %>% prediction(data="training_and_test")
   train_ret <- ret %>% filter(is_test_data==FALSE)
   #expect_equal(nrow(train_ret), 4905) # Less than 5000 because of NAs in the target variable. Linux seems to have different result. Work around for now.
@@ -173,16 +189,16 @@ test_that("calc_feature_map(binary(factor(A,B))) evaluate training and test", {
   ret <- rf_evaluation_training_and_test(model_df)
   expect_equal(nrow(ret), 1) # 1 for train
 
-  ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class")
+  #ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class") # Not implemented.
   ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
 })
 
-test_that("calc_feature_map(binary) evaluate training and test with SMOTE", {
+test_that("exp_xgboost(binary) evaluate training and test with SMOTE", {
   set.seed(1) # For stability of result.
   # `is delayed` is not logical for some reason.
   # To test binary prediction, need to cast it into logical.
   model_df <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`)) %>%
-                calc_feature_imp(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0.3, smote=TRUE, pd_with_bin_means = TRUE)
+                exp_xgboost(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0.3, smote=TRUE, pd_with_bin_means = TRUE)
 
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
@@ -197,13 +213,13 @@ test_that("calc_feature_map(binary) evaluate training and test with SMOTE", {
   ret <- rf_evaluation_training_and_test(model_df)
   expect_equal(nrow(ret), 2) # 2 for train and test
 
-  ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class")
-  expect_equal(nrow(ret), 4) # 4 for train/test times TRUE/FALSE
+  #ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class") # Not implemented.
+  #expect_equal(nrow(ret), 4) # 4 for train/test times TRUE/FALSE
 
   ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
 
   model_df <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`)) %>%
-                calc_feature_imp(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0, smote=TRUE, pd_with_bin_means = TRUE)
+                exp_xgboost(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0, smote=TRUE, pd_with_bin_means = TRUE)
   ret <- model_df %>% prediction(data="training_and_test")
   train_ret <- ret %>% filter(is_test_data==FALSE)
   # expect_equal(nrow(train_ret), 5000) # Fails with SMOTE, which is expected.
@@ -211,14 +227,14 @@ test_that("calc_feature_map(binary) evaluate training and test with SMOTE", {
   ret <- rf_evaluation_training_and_test(model_df)
   expect_equal(nrow(ret), 1) # 1 for train
 
-  ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class")
+  #ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class") # Not implemented.
   ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
 })
 
-test_that("calc_feature_map(multi) evaluate training and test", {
+test_that("exp_xgboost(multi) evaluate training and test", {
   set.seed(1) # For stability of result.
   model_df <- flight %>%
-                calc_feature_imp(`ORI GIN`, `DIS TANCE`, `DEP TIME`, test_rate = 0.3, pd_with_bin_means = TRUE)
+                exp_xgboost(`ORI GIN`, `DIS TANCE`, `DEP TIME`, test_rate = 0.3, pd_with_bin_means = TRUE)
 
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
@@ -233,11 +249,11 @@ test_that("calc_feature_map(multi) evaluate training and test", {
   ret <- rf_evaluation_training_and_test(model_df)
   expect_equal(nrow(ret), 2) # 2 for train and test
 
-  ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class")
+  #ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class") # Not implemented.
   ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
 
   model_df <- flight %>%
-                calc_feature_imp(`ORI GIN`, `DIS TANCE`, `DEP TIME`, test_rate = 0, pd_with_bin_means = TRUE)
+                exp_xgboost(`ORI GIN`, `DIS TANCE`, `DEP TIME`, test_rate = 0, pd_with_bin_means = TRUE)
   ret <- model_df %>% prediction(data="training_and_test")
   train_ret <- ret %>% filter(is_test_data==FALSE)
   #expect_equal(nrow(train_ret), 4944) # Linux seems to have different result. Work around for now.

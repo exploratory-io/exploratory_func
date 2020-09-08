@@ -787,20 +787,37 @@ augment.ranger <- function(x, data = NULL, newdata = NULL, ...) {
     ret <- data.frame()
     return(ret)
   }
-  # Extract data from model
-  # This is from https://github.com/mdlincoln/broom/blob/e3cdf5f3363ab9514e5b61a56c6277cb0d9899fd/R/rf_tidiers.R
-  if (is.null(data)) {
-    if (is.null(x$call$data)) {
-      list <- lapply(all.vars(x$call), as.name)
-      data <- eval(as.call(list(quote(data.frame),list)), parent.frame())
-    }
-  }
-
   augment.ranger.method <- switch(x$treetype,
                                   "Classification" = augment.ranger.classification,
                                   "Probability estimation" = augment.ranger.classification,
                                   "Regression" = augment.ranger.regression)
   augment.ranger.method(x, data, newdata, ...)
+}
+
+align_predictor_factor_levels <- function(newdata, model_df, predictor_cols) {
+  cleaned_data <- newdata
+  # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
+  for (i in 1:length(predictor_cols)) {
+    predictor_col <- predictor_cols[i]
+    training_predictor <- model_df[[predictor_col]]
+    if (is.factor(training_predictor) || is.character(training_predictor)) {
+      if (is.factor(training_predictor)) {
+        training_predictor_levels <- levels(training_predictor)
+      }
+      else if (is.character(training_predictor)) {
+        training_predictor_levels <- unique(training_predictor)
+      }
+      ret <- forcats::fct_explicit_na(forcats::fct_other(cleaned_data[[predictor_col]], keep=training_predictor_levels))
+      # In case model does not know (Missing) level, do fct_other again. (Missing) will be absorbed in Other.
+      ret <- forcats::fct_other(ret, keep=training_predictor_levels)
+      # If "Other" is not included in the model levels, replace them with NA. They will be handled as NA rows.
+      if ("Other" %nin% training_predictor_levels) {
+        ret <- dplyr::na_if(ret, "Other")
+      }
+      cleaned_data[[predictor_col]] <- ret
+    }
+  }
+  cleaned_data
 }
 
 #' augment for randomForest model
@@ -811,7 +828,7 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
 
   # Get names of original predictor columns by reverse-mapping the names in formula.
   predictor_variables <- all.vars(x$formula_terms)[-1]
-  predictor_variables <- x$terms_mapping[predictor_variables]
+  predictor_variables_orig <- x$terms_mapping[predictor_variables]
 
   threshold <- NULL
   if (x$classification_type == "binary") {
@@ -823,16 +840,17 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
     cleaned_data <- newdata
     y_value <- cleaned_data[[y_name]]
 
-    predicted_value_col <- avoid_conflict(colnames(newdata), "predicted_value")
-    predicted_probability_col <- avoid_conflict(colnames(newdata), "predicted_probability")
-
-    na_row_numbers <- ranger.find_na(predictor_variables, data = cleaned_data)
-
-    # ranger can't predict when the data have na row in predictor columns.
-    cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables) %>% na.omit()
-
+    cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables_orig)
     # Rename columns to the normalized ones used while learning.
-    colnames(cleaned_data) <- all.vars(x$formula_terms)[-1]
+    colnames(cleaned_data) <- predictor_variables
+
+    # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
+    cleaned_data <- align_predictor_factor_levels(cleaned_data, x$df, predictor_variables)
+
+    na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
+    if (length(na_row_numbers) > 0) {
+      cleaned_data <- cleaned_data[-na_row_numbers,]
+    }
 
     # Run prediction.
     pred_res <- predict(x, cleaned_data)
@@ -842,6 +860,9 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
                                                            y_value, threshold = threshold)
     # Inserting once removed NA rows
     predicted_value <- restore_na(predicted_label_nona, na_row_numbers)
+
+    predicted_value_col <- avoid_conflict(colnames(newdata), "predicted_value")
+    predicted_probability_col <- avoid_conflict(colnames(newdata), "predicted_probability")
 
     if(is.null(x$classification_type)){
       # just append predicted labels
@@ -896,8 +917,8 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
                                                                y_value, threshold = threshold)
         # Restore NAs for removed rows that had unknown categorical predictor values.
         # Note that this is necessary only for test data, and not for training data.
-        predicted_label_nona <- restore_na(predicted_label_nona, x$prediction_test$unknown_category_rows_index)
-        predicted_value <- restore_na(predicted_label_nona, x$prediction_test$na.action)
+        predicted_label_nona <- restore_na(predicted_label_nona, attr(x$prediction_test, "unknown_category_rows_index"))
+        predicted_value <- restore_na(predicted_label_nona, attr(x$prediction_test, "na.action"))
       })
 
     if(!is.null(x$classification_type) && x$classification_type == "binary"){
@@ -916,8 +937,8 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
           # and the probability for it is the probability for the binary classification.
           # Keep this logic consistent with get_binary_predicted_value_from_probability
           predicted_prob_nona <- predictions[, 1]
-          predicted_prob_nona <- restore_na(predicted_prob_nona, x$prediction_test$unknown_category_rows_index)
-          predicted_prob <- restore_na(predicted_prob_nona, x$prediction_test$na.action)
+          predicted_prob_nona <- restore_na(predicted_prob_nona, attr(x$prediction_test, "unknown_category_rows_index"))
+          predicted_prob <- restore_na(predicted_prob_nona, attr(x$prediction_test, "na.action"))
         })
       data[[predicted_value_col]] <- predicted_value
       data[[predicted_probability_col]] <- predicted_prob
@@ -931,9 +952,9 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
         test = {
           # Inserting once removed NA rows
           predicted_prob_nona <- apply(x$prediction_test$predictions, 1 , max)
-          predicted_prob_nona <- restore_na(predicted_prob_nona, x$prediction_test$unknown_category_rows_index)
-          predicted_prob <- restore_na(predicted_prob_nona, x$prediction_test$na.action)
-          data <- ranger.set_multi_predicted_values(data, x$prediction_test$predictions, predicted_value, x$prediction_test$na.action, x$prediction_test$unknown_category_rows_index)
+          predicted_prob_nona <- restore_na(predicted_prob_nona, attr(x$prediction_test, "unknown_category_rows_index"))
+          predicted_prob <- restore_na(predicted_prob_nona, attr(x$prediction_test, "na.action"))
+          data <- ranger.set_multi_predicted_values(data, x$prediction_test$predictions, predicted_value, attr(x$prediction_test, "na.action"), attr(x$prediction_test, "unknown_category_rows_index"))
         })
       data[[predicted_probability_col]] <- predicted_prob
     }
@@ -950,18 +971,23 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
 augment.ranger.regression <- function(x, data = NULL, newdata = NULL, data_type = "training", ...){
   predicted_value_col <- avoid_conflict(colnames(newdata), "predicted_value")
   predictor_variables <- all.vars(x$formula_terms)[-1]
-  predictor_variables <- x$terms_mapping[predictor_variables]
+  predictor_variables_orig <- x$terms_mapping[predictor_variables]
 
   if(!is.null(newdata)) {
     # create clean name data frame because the model learned by those names
     cleaned_data <- newdata
 
-    na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
-
-    cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables) %>% na.omit()
-
+    cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables_orig)
     # Rename columns to the normalized ones used while learning.
-    colnames(cleaned_data) <- all.vars(x$formula_terms)[-1]
+    colnames(cleaned_data) <- predictor_variables
+
+    # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
+    cleaned_data <- align_predictor_factor_levels(cleaned_data, x$df, predictor_variables)
+
+    na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
+    if (length(na_row_numbers) > 0) {
+      cleaned_data <- cleaned_data[-na_row_numbers,]
+    }
 
     # Run prediction.
     predicted_val <- predict(x, cleaned_data)$predictions
@@ -983,8 +1009,8 @@ augment.ranger.regression <- function(x, data = NULL, newdata = NULL, data_type 
         predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
         # Inserting once removed NA rows
         predicted_nona <- x$prediction_test$predictions
-        predicted_nona <- restore_na(predicted_nona, x$prediction_test$unknown_category_rows_index)
-        predicted <- restore_na(predicted_nona, x$prediction_test$na.action)
+        predicted_nona <- restore_na(predicted_nona, attr(x$prediction_test, "unknown_category_rows_index"))
+        predicted <- restore_na(predicted_nona, attr(x$prediction_test, "na.action"))
         data[[predicted_value_col]] <- predicted
         data
       })
@@ -1015,18 +1041,70 @@ augment.rpart <- function(x, data = NULL, newdata = NULL, ...) {
   augment.rpart.method(x, data, newdata, ...)
 }
 
-augment.rpart.classification <- function(x, data = NULL, newdata = NULL, data_type = "training", ...) {
+augment.rpart.classification <- function(x, data = NULL, newdata = NULL, data_type = "training", binary_classification_threshold = 0.5, ...) {
   # For rpart, terms_mapping is turned off in exp_rpart, so that we can display original column names in tree image.
   predictor_variables <- all.vars(x$terms)[-1]
+  y_name <- x$terms_mapping[all.vars(x$terms)[[1]]]
+
+  # Get names of original predictor columns by reverse-mapping the names in formula.
+  predictor_variables <- all.vars(x$terms)[-1]
+  predictor_variables_orig <- x$terms_mapping[predictor_variables]
+
+  threshold <- NULL
+  if (x$classification_type == "binary") {
+    threshold <- binary_classification_threshold
+  }
 
   if (!is.null(newdata)) {
-    predicted_value <- get_multiclass_predicted_value_from_probability_rpart(x, newdata)
+    # create clean name data frame because the model learned by those names
+    cleaned_data <- newdata
+    y_value <- cleaned_data[[y_name]]
+
+    cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables_orig)
+    # Rename columns to the normalized ones used while learning.
+    colnames(cleaned_data) <- predictor_variables
+
+    # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
+    cleaned_data <- align_predictor_factor_levels(cleaned_data, attr(x, "xlevels"), predictor_variables)
+
+    na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
+    if (length(na_row_numbers) > 0) {
+      cleaned_data <- cleaned_data[-na_row_numbers,]
+    }
+
+    # Run prediction.
+    pred_res <- predict(x, cleaned_data)
+
+    predicted_label_nona <- ranger.predict_value_from_prob(attr(x, "ylevels"),
+                                                           pred_res,
+                                                           y_value, threshold = threshold)
+
+    # Inserting once removed NA rows
+    predicted_value <- restore_na(predicted_label_nona, na_row_numbers)
+
     predicted_value_col <- avoid_conflict(colnames(newdata), "predicted_value")
     predicted_probability_col <- avoid_conflict(colnames(newdata), "predicted_probability")
-    newdata[predicted_value_col] <- predicted_value
-    newdata[predicted_probability_col] <- apply(predict(x, newdata), 1, max)
-    newdata %>% dplyr::rename(predicted_label = predicted_value_col) %>%
-                dplyr::select(-predicted_label, everything(), predicted_label)
+
+    if (x$classification_type == "binary") {
+      newdata[[predicted_value_col]] <- predicted_value
+
+      # Since now we consider only logical column as the tarted for binary classification, the label for "TRUE" class should be always "TRUE".
+      predicted_prob <- pred_res[, "TRUE"]
+      # Inserting once removed NA rows
+      predicted_prob <- restore_na(predicted_prob, na_row_numbers)
+      newdata[[predicted_probability_col]] <- predicted_prob
+      newdata
+    } else if (x$classification_type == "multi") {
+      # append predicted probability for each class, max and labels at max values
+      # Inserting once removed NA rows
+      predicted_prob <- restore_na(apply(pred_res, 1 , max), na_row_numbers)
+      newdata <- ranger.set_multi_predicted_values(newdata, pred_res, predicted_value, na_row_numbers)
+      newdata[[predicted_probability_col]] <- predicted_prob
+      newdata
+    }
+    newdata <- newdata %>% dplyr::rename(predicted_label = predicted_value_col) %>%
+                  dplyr::select(-predicted_label, everything(), predicted_label)
+    newdata
   } else if (!is.null(data)) {
     if (nrow(data) == 0) {
       # Handle the case where, for example, test_rate is 0 here,
@@ -1070,11 +1148,30 @@ augment.rpart.classification <- function(x, data = NULL, newdata = NULL, data_ty
 augment.rpart.regression <- function(x, data = NULL, newdata = NULL, data_type = "training", ...) {
   # For rpart, terms_mapping is turned off in exp_rpart, so that we can display original column names in tree image.
   predicted_value_col <- avoid_conflict(colnames(newdata), "predicted_value")
+  predictor_variables <- all.vars(x$formula_terms)[-1]
+  predictor_variables_orig <- x$terms_mapping[predictor_variables]
 
   if(!is.null(newdata)) {
     # create clean name data frame because the model learned by those names
-    predicted_val <- predict(x, newdata)
-    newdata[[predicted_value_col]] <- predicted_val
+    cleaned_data <- newdata
+
+    cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables_orig)
+    # Rename columns to the normalized ones used while learning.
+    colnames(cleaned_data) <- predictor_variables
+
+    # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
+    cleaned_data <- align_predictor_factor_levels(cleaned_data, attr(x, "xlevels"), predictor_variables)
+
+    na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
+    if (length(na_row_numbers) > 0) {
+      cleaned_data <- cleaned_data[-na_row_numbers,]
+    }
+
+    # Run prediction.
+    predicted_val <- predict(x, cleaned_data)
+
+    # Inserting once removed NA rows
+    newdata[[predicted_value_col]] <- restore_na(predicted_val, na_row_numbers)
 
     newdata
   } else if (!is.null(data)) {
@@ -1147,7 +1244,9 @@ ranger.find_na <- function(variables, data, na_index = NULL){
 #' @param variables - column name to use for prediction (determine if any of this column contains NA)
 #' @param data - data to predict
 ranger.find_na_index <- function(variables, data) {
-  data %>% dplyr::select(variables) %>% is.na() %>% apply(1, any)
+  data <- data %>% dplyr::select(variables)
+  ret <- purrr::reduce(data, function(x,y){x|is.infinite(y)|is.na(y)},.init=rep(FALSE,nrow(data)))
+  ret
 }
 
 #' Return the highest probability label from the matrix of predicted probabilities
@@ -1200,10 +1299,12 @@ rf_evaluation_by_class <- function(data, ...) {
   tidy_rowwise(data, model, type = "evaluation_by_class", ...)
 }
 
+# Returns Analytics View model summary table for ranger, rpart, and xgboost.
+# TODO: This function should be promoted to a generic model evaluation function.
 # Generates Analytics View Summary table for ranger and rpart.
 #' wrapper for tidy type evaluation
 #' @export
-rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.name = FALSE, ...) {
+rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.name = FALSE, binary_classification_threshold = 0.5, ...) {
   # Filter out the rows from failed models.
   # This is working depending on rowwise grouping. (Note for when we move out of it.)
   filtered <- data %>% dplyr::filter(!is.null(model) & !"error" %in% class(model))
@@ -1217,11 +1318,13 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
   # Get evaluation for training part. Just passing down to rf_evaluation does it, since it is done off of data embeded in the model.
   # Here we use data with failed model too (data) as opposed to the one without them (filtered),
   # so that we can report the error on the Note column of Summary table.
+  # Generally speaking, for training data part, we rely on model's glance/tidy function, expecting it to give model specific metrics,
+  # though for conf_map, we might want to write one implementation here, to avoid having to write the same thing for each model. TODO: Do it.
   if (!is.null(model)) {
     training_ret <- switch(type,
-                           evaluation = rf_evaluation(data, pretty.name = pretty.name, ...),
-                           evaluation_by_class = rf_evaluation_by_class(data, pretty.name = pretty.name, ...),
-                           conf_mat = data %>% tidy_rowwise(model, type = "conf_mat", ...))
+                           evaluation = rf_evaluation(data, pretty.name = pretty.name, binary_classification_threshold = binary_classification_threshold, ...),
+                           evaluation_by_class = rf_evaluation_by_class(data, pretty.name = pretty.name, binary_classification_threshold = binary_classification_threshold, ...),
+                           conf_mat = data %>% tidy_rowwise(model, type = "conf_mat", binary_classification_threshold = binary_classification_threshold, ...))
     if (length(test_index) > 0 && nrow(training_ret) > 0) {
       training_ret$is_test_data <- FALSE
     }
@@ -1234,8 +1337,6 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
   grouped_col <- colnames(data)[!colnames(data) %in% c("model", ".test_index", "source.data")]
 
   # Execute evaluation if there is test data
-  # TODO: This part of the code needs to be kept in sync with broom::tidy with type evaluation/evaluation_by_class.
-  # Would it be possible to consolidate those code?
   if (length(test_index) > 0) {
 
     each_func <- function(df) {
@@ -1253,19 +1354,32 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
       test_pred_ret <- df %>% prediction(data = "test", ...)
 
       tryCatch({
-        actual_col <- model$terms_mapping[all.vars(model$formula_terms)[1]]
-        actual <- test_pred_ret[[actual_col]]
+        model_object <- df$model[[1]]
+        if ("xgboost_exp" %in% class(model_object)) {
+          actual <- extract_actual(model_object, type = "test")
+        }
+        else {
+          actual_col <- model$terms_mapping[all.vars(model$formula_terms)[1]]
+          actual <- test_pred_ret[[actual_col]]
+        }
 
         test_ret <- switch(type,
           evaluation = {
-            model_object <- df$model[[1]]
             if (is.numeric(actual)) {
-              predicted <- test_pred_ret$predicted_value
+              if ("xgboost_exp" %in% class(model_object)) {
+                predicted <- extract_predicted(model_object, type = "test")
+              }
+              else {
+                predicted <- test_pred_ret$predicted_value
+              }
               root_mean_square_error <- rmse(actual, predicted)
               test_n <- sum(!is.na(predicted)) # Sample size for test.
 
               # null_model_mean is mean of training data.
-              if ("rpart" %in% class(model_object)) { # rpart case
+              if ("xgboost_exp" %in% class(model_object)) {
+                null_model_mean <- mean(extract_actual(model_object, type = "trainig"), na.rm=TRUE)
+              }
+              else if ("rpart" %in% class(model_object)) { # rpart case
                 null_model_mean <- mean(model_object$y, na.rm=TRUE)
               }
               else { # ranger case
@@ -1291,14 +1405,25 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
               ret
             } else {
               predicted <- NULL # Just declaring variable.
-              if (model$classification_type == "binary") {
-                predicted <- test_pred_ret$predicted_label
-                predicted_probability <- test_pred_ret$predicted_probability
+              if (model_object$classification_type == "binary") { # Make it model agnostic.
+                if ("xgboost_exp" %in% class(model_object)) {
+                  predicted <- extract_predicted_binary_labels(model_object, type = "test", threshold = binary_classification_threshold) # If threshold is specified in ..., take it.
+                  predicted_probability <- extract_predicted(model_object, type = "test")
+                }
+                else {
+                  predicted <- test_pred_ret$predicted_label
+                  predicted_probability <- test_pred_ret$predicted_probability
+                }
                 is_rpart <- "rpart" %in% class(model_object)
                 ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = pretty.name, is_rpart = is_rpart)
               }
               else {
-                predicted <- test_pred_ret$predicted_label
+                if ("xgboost_exp" %in% class(model_object)) {
+                  predicted <- extract_predicted_multiclass_labels(model_object, type = "test")
+                }
+                else {
+                  predicted <- test_pred_ret$predicted_label
+                }
                 ret <- evaluate_multi_(data.frame(predicted = predicted, actual = actual),
                                        "predicted", "actual", pretty.name = pretty.name)
               }
@@ -1314,7 +1439,18 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
             dplyr::bind_rows(lapply(levels(actual), per_level))
           },
           conf_mat = {
-            predicted <- test_pred_ret$predicted_label
+            model_object <- df$model[[1]]
+            if ("xgboost_exp" %in% class(model_object)) {
+              if (get_prediction_type(model_object) == "binary") {
+                predicted <- extract_predicted_binary_labels(model_object, type = "test", binary_classification_threshold = binary_classification_threshold)
+              }
+              else {
+                predicted <- extract_predicted_multiclass_labels(model_object, type = "test")
+              }
+            }
+            else {
+              predicted <- test_pred_ret$predicted_label
+            }
             ret <- data.frame(
                               actual_value = actual,
                               predicted_value = predicted
@@ -1794,7 +1930,7 @@ cleanup_df <- function(df, target_col, selected_cols, grouped_cols, target_n, pr
     # since we are setting the names back anyway,
     # we can use names like c1, c2 which is guaranteed to be safe
     # regardless of original column names.
-    name_map <- paste0("c",1:length(colnames(df)))
+    name_map <- paste0("c", 1:length(colnames(df)), "_")
   }
   else {
     # Do only mapping with minimum name changes to avoid error, which is explained below.
@@ -1837,7 +1973,7 @@ cleanup_df <- function(df, target_col, selected_cols, grouped_cols, target_n, pr
   ret
 }
 
-cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, name_map, predictor_n, revert_logical_levels=TRUE, filter_numeric_na=FALSE) {
+cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, name_map, predictor_n, revert_logical_levels=TRUE, filter_numeric_na=FALSE, convert_logical=TRUE) {
   df <- preprocess_regression_data_before_sample(df, clean_target_col, clean_cols,
                                                  filter_predictor_numeric_na=filter_numeric_na)
   clean_cols <- attr(df, 'predictors') # predictors are updated (removed) in preprocess_pre_sample. Catch up with it.
@@ -1850,7 +1986,7 @@ cleanup_df_per_group <- function(df, clean_target_col, max_nrow, clean_cols, nam
     df <- df %>% sample_rows(max_nrow)
   }
 
-  if (is.logical(df[[clean_target_col]])) {
+  if (convert_logical && is.logical(df[[clean_target_col]])) {
     # we need to convert logical to factor since na.roughfix only works for numeric or factor.
     # for logical set TRUE, FALSE level order for better visualization. but only do it when
     # the target column actually has both TRUE and FALSE, since edarf::partial_dependence errors out if target
@@ -1906,6 +2042,19 @@ extract_important_variables_from_boruta <- function(x) {
   res$variable
 }
 
+# This function should return following 2 columns.
+# - variable - Name of variable
+# - importance - Importance of the variable
+# Rows should be sorted by importance in descending order.
+# Avoid the name importance.ranger since it exists.
+importance_ranger <- function(model) {
+  imp <- ranger::importance(model)
+  imp_df <- tibble::tibble( # Use tibble since data.frame() would make variable factors, which breaks things in following steps.
+    variable = names(imp),
+    importance = imp
+  ) %>% dplyr::arrange(-importance)
+  imp_df
+}
 
 #' Get feature importance for multi class classification using randomForest
 #' @export
@@ -2062,17 +2211,15 @@ calc_feature_imp <- function(df,
       model$prediction_training <- predict(model, model_df)
 
       if (test_rate > 0) {
-        na_row_numbers_test <- ranger.find_na(c_cols, data = df_test)
-        names(c_cols) <- NULL # Clearing names in vector is necessary to make the following select work.
-        df_test_clean <- df_test %>% dplyr::select(!!!rlang::syms(c_cols)) %>% na.omit()
-        unknown_category_rows_index_vector <- get_unknown_category_rows_index_vector(df_test_clean, df %>% dplyr::select(!!!rlang::syms(c_cols)))
-        df_test_clean <- df_test_clean[!unknown_category_rows_index_vector, , drop = FALSE] # 2nd arg must be empty.
-        unknown_category_rows_index <- get_row_numbers_from_index_vector(unknown_category_rows_index_vector)
+        df_test_clean <- cleanup_df_for_test(df_test, df, c_cols)
+        na_row_numbers_test <- attr(df_test_clean, "na_row_numbers")
+        unknown_category_rows_index <- attr(df_test_clean, "unknown_category_rows_index")
+
         prediction_test <- predict(model, df_test_clean)
         # TODO: Following current convention for the name na.action to keep na row index, but we might want to rethink.
         # We do not keep this for training since na.roughfix should fill values and not delete rows.
-        prediction_test$na.action = na_row_numbers_test
-        prediction_test$unknown_category_rows_index = unknown_category_rows_index
+        attr(prediction_test, "na.action") <- na_row_numbers_test
+        attr(prediction_test, "unknown_category_rows_index") <- unknown_category_rows_index
         model$prediction_test <- prediction_test
       }
 
@@ -2114,11 +2261,7 @@ calc_feature_imp <- function(df,
       else {
         # return partial dependence
         if (length(c_cols) > 1) { # Calculate importance only when there are multiple variables.
-          imp <- ranger::importance(model)
-          imp_df <- tibble::tibble( # Use tibble since data.frame() would make variable factors, which breaks things in following steps.
-            variable = names(imp),
-            importance = imp
-          ) %>% dplyr::arrange(-importance)
+          imp_df <- importance_ranger(model)
           model$imp_df <- imp_df
           imp_vars <- imp_df$variable
         }
@@ -2869,12 +3012,10 @@ exp_rpart <- function(df,
       if (test_rate > 0) {
         # Handle NA rows for test. For training, rpart seems to automatically handle it, and row numbers of
         # removed rows are stored in model$na.action.
-        na_row_numbers_test <- ranger.find_na(c_cols, data = df_test)
-        names(c_cols) <- NULL # Clearing names in vector is necessary to make the following select work.
-        df_test_clean <- df_test %>% dplyr::select(!!!rlang::syms(c_cols)) %>% na.omit()
-        unknown_category_rows_index_vector <- get_unknown_category_rows_index_vector(df_test_clean, df %>% dplyr::select(!!!rlang::syms(c_cols)))
-        df_test_clean <- df_test_clean[!unknown_category_rows_index_vector, , drop = FALSE] # 2nd arg must be empty.
-        unknown_category_rows_index <- get_row_numbers_from_index_vector(unknown_category_rows_index_vector)
+        df_test_clean <- cleanup_df_for_test(df_test, df, c_cols)
+        na_row_numbers_test <- attr(df_test_clean, "na_row_numbers")
+        unknown_category_rows_index <- attr(df_test_clean, "unknown_category_rows_index")
+
         model$prediction_test <- predict(model, df_test_clean)
         model$na_row_numbers_test <- na_row_numbers_test
         model$unknown_category_rows_index_test <- unknown_category_rows_index

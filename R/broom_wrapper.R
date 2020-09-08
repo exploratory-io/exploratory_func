@@ -170,6 +170,8 @@ add_prediction <- function(df, model_df, conf_int = 0.95, ...){
 
   # validate data frame based on meta info
   model_meta <- model_df[[".model_metadata"]]
+  # This is only for Analytics Step.
+  # Analytics View does not add .model_metadata column. The logic here is too rough for redoing Analytics View's preprocessing.
   if(!is.null(model_meta)){
     types <- model_meta[[1]]$types
     if(!is.null(types)){
@@ -206,14 +208,15 @@ add_prediction <- function(df, model_df, conf_int = 0.95, ...){
       ret
     }
 
-    # add .group to overwrapped column names
-    duped <- colnames(ret) %in% colnames(df)
-    if(any(duped)){
-      colnames(ret)[duped] <- avoid_conflict(colnames(df), colnames(ret)[duped], ".group")
-    }
-
-    ret <- ret %>%
-      unnest_with_drop(.test_index)
+    # Avoid name conflict error between group column and columns inside .test_index at unnest.
+    # We used to add .group to the group column, but that caused error at a caller dealing with this function's output.
+    # So, we are using tidyr_legacy function that changes the column inside .test_index rather than the group column
+    # in case of conflict for now.
+    ret$source.data <- NULL
+    ret$model <- NULL
+    ret$.model_metadata <- NULL
+    ret <- ret %>% tidyr::unnest(.test_index, names_repair=tidyr::tidyr_legacy) 
+    ret
   }
 
   # if type.predict argument is not indicated in this function
@@ -378,6 +381,7 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
     if(is.null(data_frame)) {
       stop("Please indicate data_frame")
     }
+    data_frame <- data_frame %>% dplyr::ungroup() # Ignore grouping on the new data to run prediction on.
     add_prediction(data_frame, df, conf_int = conf_int, ...)
   } else {
     # parsing arguments of prediction and getting optional arguemnt for augment in ...
@@ -393,7 +397,7 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
                        any(lapply(df$model, function(s) { !is.null(s$family$linkinv) }))
 
     ret <- if(data == "test"){
-      if (!is.null(df$model[[1]]$prediction_test)) { # Check if model already has test prediction result.
+      if (!is.null(df$model[[1]]$prediction_test)) { # Check if model already has test prediction result. # TODO: Make this model agnostic.
                                                      # This is typically the case for Analytics Views.
         # Augment test part of data with prediction embedded in the model.
         # This is typically for Summary tab of Analytics View on Test Mode.
@@ -508,10 +512,20 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
 
       # Use formula to support expanded aug_args (especially for type.predict for logistic regression)
       # because ... can't be passed to a function inside mutate directly.
-      aug_fml <- if(aug_args == ""){
-        "broom::augment(m, data = df)"
-      } else {
-        paste0("broom::augment(m, data = df, ", aug_args, ")")
+      if (!is.null(df$model[[1]]$prediction_training) || # Check if model already has training prediction result. # TODO: Make this model agnostic.
+          class(df$model[[1]])[[1]] %in% c("lm_exploratory", "glm_exploratory")) { # For lm/glm, we retrieve training prediction inside vanilla lm/glm model.
+        aug_fml <- if(aug_args == ""){
+          "broom::augment(m, data = df)"
+        } else {
+          paste0("broom::augment(m, data = df, ", aug_args, ")")
+        }
+      }
+      else { # If not, predict as a new data.
+        aug_fml <- if(aug_args == ""){
+          "broom::augment(m, newdata = df)"
+        } else {
+          paste0("broom::augment(m, newdata = df, ", aug_args, ")")
+        }
       }
       # From broom 0.7.0 augment.lm and augment.glm, if data argument is different from the one inside the model due to, for example, NA rows, error like following is raised.
       #

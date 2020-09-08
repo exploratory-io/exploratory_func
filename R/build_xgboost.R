@@ -153,6 +153,12 @@ xgboost_binary <- function(data, formula, output_type = "logistic", eval_metric 
   # add class to control S3 methods
   class(ret) <- c("xgboost_binary", class(ret))
   ret$y_levels <- label_levels
+
+  original_colnames <- colnames(data)
+  # this attribute will be used to get back original column names
+  terms_mapping <- original_colnames
+  names(terms_mapping) <- original_colnames # No column name change. Just to work with the rest of the code.
+  ret$terms_mapping <- terms_mapping
   ret
 }
 
@@ -209,10 +215,13 @@ xgboost_multi <- function(data, formula, output_type = "softprob", eval_metric =
                      ...)
   # add class to control S3 methods
   class(ret) <- c("xgboost_multi", class(ret))
-  ret$fml <- formula
-  # To avoid saving a huge environment when caching with RDS.
-  attr(ret$fml,".Environment") <- NULL
   ret$y_levels <- label_levels
+
+  original_colnames <- colnames(data)
+  # this attribute will be used to get back original column names
+  terms_mapping <- original_colnames
+  names(terms_mapping) <- original_colnames # No column name change. Just to work with the rest of the code.
+  ret$terms_mapping <- terms_mapping
   ret
 }
 
@@ -265,9 +274,12 @@ xgboost_reg <- function(data, formula, output_type = "linear", eval_metric = "rm
                      ...)
   # add class to control S3 methods
   class(ret) <- c("xgboost_reg", class(ret))
-  ret$fml <- formula
-  # To avoid saving a huge environment when caching with RDS.
-  attr(ret$fml,".Environment") <- NULL
+
+  original_colnames <- colnames(data)
+  # this attribute will be used to get back original column names
+  terms_mapping <- original_colnames
+  names(terms_mapping) <- original_colnames # No column name change. Just to work with the rest of the code.
+  ret$terms_mapping <- terms_mapping
   ret
 }
 
@@ -277,69 +289,107 @@ xgboost_reg <- function(data, formula, output_type = "linear", eval_metric = "rm
 #' @param newdata New data frame to predict
 #' @param ... Not used for now.
 #' @export
-augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, ...) {
+augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, data_type = "training", ...) {
   loadNamespace("xgboost") # This is necessary for predict() to successfully figure out which function to call internally.
-  class(x) <- class(x)[class(x) != c("xgboost_multi")]
 
-  if(!is.null(x$terms)){
+  predictor_variables <- all.vars(x$terms)[-1]
+  predictor_variables_orig <- x$terms_mapping[predictor_variables]
 
-    ret_data <- if(!is.null(newdata)){
+  if(!is.null(newdata)) { # Unlike ranger case, there is no prediction result kept in the model in case of xgboost.
+    class(x) <- class(x)[class(x) != c("xgboost_multi")]
+
+    # create clean name data frame because the model learned by those names
+    original_data <- if(!is.null(newdata)){
       newdata
     } else {
       data
     }
 
-    if(!is.null(x$is_sparse) && x$is_sparse){
-      # Set na.action to na.pass.
-      # Since XGBoost can predict with NAs in predictors, creation of sparse matrix should not remove NA rows.
-      # https://stackoverflow.com/questions/29732720/sparse-model-matrix-loses-rows-in-r
-      mat <- Matrix::sparse.model.matrix(x$terms, model.frame(ret_data, na.action = na.pass, xlev = x$xlevels))
-    } else {
-      mat <- model.matrix(x$terms, model.frame(ret_data, na.action = na.pass, xlev = x$xlevels))
+    cleaned_data <- original_data
+
+    cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables_orig)
+    # Rename columns to the normalized ones used while learning.
+    colnames(cleaned_data) <- predictor_variables
+
+    # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
+    if (!is.null(x$df)) { # Model on Analytics Step does not have x$df.
+      cleaned_data <- align_predictor_factor_levels(cleaned_data, x$df, predictor_variables)
     }
 
-    predicted <- stats::predict(x, mat)
-
-    vars <- all.vars(x$terms)
-    y_name <- vars[[1]]
-
-    # create predicted labels for classification
-    # based on factor levels and it's indice
-    find_label <- function(ids, levels, original_data) {
-      levels[ids]
+    # For new data prediction, xgboost can predict with NAs in the predictors. Disable NA filtering for now.
+    # na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
+    na_row_numbers <- c()
+    if (length(na_row_numbers) > 0) {
+      cleaned_data <- cleaned_data[-na_row_numbers,]
     }
+
+    if (nrow(cleaned_data) == 0) {
+      return(data.frame())
+    }
+
+    # Run prediction.
+    predicted <- predict_xgboost(x, cleaned_data)
+
+
     obj <- x$params$objective
     if (obj == "multi:softmax") {
-      predicted_label_col <- avoid_conflict(colnames(ret_data), "predicted_label")
-      predicted <- x$y_levels[predicted+1]
+      predicted_label_col <- avoid_conflict(colnames(original_data), "predicted_label")
       # fill rows with NA
-      ret_data[[predicted_label_col]] <- fill_vec_NA(as.integer(rownames(mat)), predicted, max_index = nrow(ret_data))
+      original_data[[predicted_label_col]] <- predicted
     } else if (obj == "multi:softprob") {
-      predicted_label_col <- avoid_conflict(colnames(ret_data), "predicted_label")
-      predicted_prob_col <- avoid_conflict(colnames(ret_data), "predicted_probability")
+      predicted_prob_col <- avoid_conflict(colnames(original_data), "predicted_probability")
 
-      # predicted is a vector containing probabilities for each class
-      probs <- matrix(predicted, nrow = length(x$y_levels)) %>% t()
-      probs <- fill_mat_NA(as.numeric(rownames(mat)), probs, nrow(ret_data))
-      colnames(probs) <- x$y_levels
-      predicted <- probs %>%
-        as.data.frame() %>%
-        append_colnames(prefix = "predicted_probability_")
-
-      ret_data <- cbind(ret_data, predicted)
-
-      colmax <- max.col(probs)
+      colmax <- max.col(predicted)
 
       # get max probabilities from each row
-      max_prob <- probs[(colmax - 1) * nrow(probs) + seq(nrow(probs))]
+      max_prob <- predicted[(colmax - 1) * nrow(predicted) + seq(nrow(predicted))]
+      max_prob <- restore_na(max_prob, na_row_numbers)
       predicted_label <- x$y_levels[colmax]
+      predicted_label <- restore_na(predicted_label, na_row_numbers)
+
+      original_data <- ranger.set_multi_predicted_values(original_data, as.data.frame(predicted), predicted_label, na_row_numbers)
+
       # predicted_prob_col is a column for probabilities of chosen values
-      ret_data[[predicted_prob_col]] <- max_prob
-      ret_data[[predicted_label_col]] <- predicted_label
+      original_data[[predicted_prob_col]] <- max_prob
     }
-    ret_data
-  } else {
-    augment(x, data = data, newdata = newdata, ...)
+    original_data
+  } else if (!is.null(data)) { # For Analytics View.
+    if (nrow(data) == 0) { #TODO: better place to do this check?
+      return(data.frame())
+    }
+    predicted_prob_col <- avoid_conflict(colnames(data), "predicted_probability")
+    switch(data_type,
+      training = {
+        # Inserting removed NA rows should not be necessary since we don't remove NA rows after test/training split.
+        predicted_value <- extract_predicted_multiclass_labels(x, type="training")
+
+        predicted <- extract_predicted(x, type="training")
+
+        # predicted_prob_col is a column for probabilities of chosen values
+        colmax <- max.col(predicted)
+        max_prob <- predicted[(colmax - 1) * nrow(predicted) + seq(nrow(predicted))]
+
+        data <- ranger.set_multi_predicted_values(data, as.data.frame(predicted), predicted_value, c())
+        data[[predicted_prob_col]] <- max_prob
+        data
+      },
+      test = {
+        predicted_value_nona <- extract_predicted_multiclass_labels(x, type="test")
+        predicted_value_nona <- restore_na(predicted_value_nona, attr(x$prediction_test, "unknown_category_rows_index"))
+        predicted_value <- restore_na(predicted_value_nona, attr(x$prediction_test, "na.action"))
+
+        predicted <- extract_predicted(x, type="test")
+
+        # predicted_prob_col is a column for probabilities of chosen values
+        colmax <- max.col(predicted)
+        max_prob_nona <- predicted[(colmax - 1) * nrow(predicted) + seq(nrow(predicted))]
+        max_prob_nona <- restore_na(max_prob_nona, attr(x$prediction_test, "unknown_category_rows_index"))
+        max_prob <- restore_na(max_prob_nona, attr(x$prediction_test, "na.action"))
+
+        data <- ranger.set_multi_predicted_values(data, as.data.frame(predicted), predicted_value, attr(x$prediction_test, "na.action"), attr(x$prediction_test, "unknown_category_rows_index"))
+        data[[predicted_prob_col]] <- max_prob
+        data
+      })
   }
 }
 
@@ -349,66 +399,89 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, ...) {
 #' @param newdata New data frame to predict
 #' @param ... Not used for now.
 #' @export
-augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, ...) {
+augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, data_type = "training", binary_classification_threshold = 0.5, ...) {
   loadNamespace("xgboost") # This is necessary for predict() to successfully figure out which function to call internally.
-  class(x) <- class(x)[!class(x) %in% c("xgboost_binary", "xgb.Booster.formula")]
-  if(!is.null(x$terms)){
-    ret_data <- if(!is.null(newdata)){
-      newdata
-    } else {
-      data
+  
+  predictor_variables <- all.vars(x$terms)[-1]
+  predictor_variables_orig <- x$terms_mapping[predictor_variables]
+  
+  # create clean name data frame because the model learned by those names
+  if(!is.null(newdata)) { # Unlike ranger case, there is no prediction result kept in the model in case of xgboost.
+    original_data <- newdata
+  
+    cleaned_data <- original_data
+
+    cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables_orig)
+    # Rename columns to the normalized ones used while learning.
+    colnames(cleaned_data) <- predictor_variables
+
+    # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
+    if (!is.null(x$df)) { # Model on Analytics Step does not have x$df.
+      cleaned_data <- align_predictor_factor_levels(cleaned_data, x$df, predictor_variables)
     }
 
-    # copy ret_data to add response_col if it doesn't exist.
-    # it's needed for model.matrix function
-    df_for_model_matrix <- ret_data
-    response_col <- as.character(lazyeval::f_lhs(x$terms))
-    if (!response_col %in% colnames(df_for_model_matrix)) {
-      df_for_model_matrix[[response_col]] <- rep(NA, nrow(ret_data))
+    # For new data prediction, xgboost can predict with NAs in the predictors. Disable NA filtering for now.
+    # na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
+    na_row_numbers <- c()
+    if (length(na_row_numbers) > 0) {
+      cleaned_data <- cleaned_data[-na_row_numbers,]
     }
 
-    mat <- if(!is.null(x$is_sparse) && x$is_sparse){
-      Matrix::sparse.model.matrix(x$terms, model.frame(df_for_model_matrix, na.action = na.pass, xlev = x$xlevels))
-    } else {
-      model.matrix(x$terms, model.frame(df_for_model_matrix, na.action = na.pass, xlev = x$xlevels))
+    if (nrow(cleaned_data) == 0) {
+      return(data.frame())
     }
 
-    # this is to find omitted indice for NA
-    row_index <- as.numeric(rownames(mat))
-    predicted <- fill_vec_NA(row_index, stats::predict(x, mat), max_index = nrow(ret_data))
-
-    vars <- all.vars(x$terms)
-    y_name <- vars[[1]]
-
-    # create predicted labels for classification
-    # based on factor levels and it's indice
-    find_label <- function(ids, levels, original_data) {
-      levels[ids]
-    }
-
+    # Run prediction.
+    predicted_val <- predict_xgboost(x, cleaned_data)
+    
+    # Inserting once removed NA rows
+    predicted <- restore_na(predicted_val, na_row_numbers)
     obj <- x$params$objective
-    predicted_label_col <- avoid_conflict(colnames(ret_data), "predicted_label")
-    predicted_prob_col <- avoid_conflict(colnames(ret_data), "predicted_probability")
+    predicted_label_col <- avoid_conflict(colnames(original_data), "predicted_label")
+    predicted_prob_col <- avoid_conflict(colnames(original_data), "predicted_probability")
     prob <- if (obj == "binary:logistic") {
-      predicted_prob_col <- avoid_conflict(colnames(ret_data), "predicted_probability")
-      ret_data[[predicted_prob_col]] <- predicted
+      predicted_prob_col <- avoid_conflict(colnames(original_data), "predicted_probability")
+      original_data[[predicted_prob_col]] <- predicted
       predicted
     } else if (obj == "binary:logitraw") {
-      predicted_val_col <- avoid_conflict(colnames(ret_data), "predicted_value")
-
+      predicted_val_col <- avoid_conflict(colnames(original_data), "predicted_value")
+    
       # binary:logitraw returns logit values
       prob <- boot::inv.logit(predicted)
-
-      ret_data[[predicted_val_col]] <- predicted
-      ret_data[[predicted_prob_col]] <- prob
+    
+      original_data[[predicted_val_col]] <- predicted
+      original_data[[predicted_prob_col]] <- prob
       prob
     } else {
       stop(paste0("object type ", obj, " is not supported"))
     }
+    
+    original_data
+  } else if (!is.null(data)) { # For Analytics View.
+    if (nrow(data) == 0) { #TODO: better place to do this check?
+      return(data.frame())
+    }
+    predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
+    predicted_probability_col <- avoid_conflict(colnames(data), "predicted_probability")
+    switch(data_type,
+      training = {
+        # Inserting removed NA rows should not be necessary since we don't remove NA rows after test/training split.
+        predicted_prob <- extract_predicted(x)
+        predicted_value <- extract_predicted_binary_labels(x, threshold = binary_classification_threshold)
+      },
+      test = {
+        predicted_prob_nona <- extract_predicted(x, type="test")
+        predicted_value_nona <- extract_predicted_binary_labels(x, type="test", threshold = binary_classification_threshold)
 
-    ret_data
-  } else {
-    augment(x, data = data, newdata = newdata)
+        predicted_prob_nona <- restore_na(predicted_prob_nona, attr(x$prediction_test, "unknown_category_rows_index"))
+        predicted_value_nona <- restore_na(predicted_value_nona, attr(x$prediction_test, "unknown_category_rows_index"))
+
+        predicted_prob <- restore_na(predicted_prob_nona, attr(x$prediction_test, "na.action"))
+        predicted_value <- restore_na(predicted_value_nona, attr(x$prediction_test, "na.action"))
+      })
+    data[[predicted_value_col]] <- predicted_value
+    data[[predicted_probability_col]] <- predicted_prob
+    data
   }
 }
 
@@ -418,41 +491,84 @@ augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, ...) {
 #' @param newdata New data frame to predict
 #' @param ... Not used for now.
 #' @export
-augment.xgboost_reg <- function(x, data = NULL, newdata = NULL, ...) {
+augment.xgboost_reg <- function(x, data = NULL, newdata = NULL, data_type = "training", ...) {
   loadNamespace("xgboost") # This is necessary for predict() to successfully figure out which function to call internally.
-  class(x) <- class(x)[class(x) != "xgboost_reg" &
-                       class(x) != "xgb.Booster.formula"]
 
-  if(!is.null(x$terms)){
-    ret_data <- if(!is.null(newdata)){
-      data <- newdata
+  predicted_value_col <- avoid_conflict(colnames(newdata), "predicted_value")
+  predictor_variables <- all.vars(x$terms)[-1]
+  predictor_variables_orig <- x$terms_mapping[predictor_variables]
+
+  if(!is.null(newdata)) { # Unlike ranger case, there is no prediction result kept in the model in case of xgboost.
+    # create clean name data frame because the model learned by those names
+    original_data <- if(!is.null(newdata)){
+      newdata
     } else {
       data
     }
 
-    y_name <- all.vars(x$terms)[[1]]
-    if(is.null(ret_data[[y_name]])){
-      # if there is no column in the formula (even if it's response variable),
-      # model.matrix function causes an error
-      # so create the column with 0
-      ret_data[[y_name]] <- rep(0, nrow(ret_data))
+    cleaned_data <- original_data
+
+    cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables_orig)
+    # Rename columns to the normalized ones used while learning.
+    colnames(cleaned_data) <- predictor_variables
+
+    # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
+    if (!is.null(x$df)) { # Model on Analytics Step does not have x$df.
+      cleaned_data <- align_predictor_factor_levels(cleaned_data, x$df, predictor_variables)
     }
 
-    mat_data <- if(!is.null(x$is_sparse) && x$is_sparse){
-      Matrix::sparse.model.matrix(x$terms, data = model.frame(ret_data, na.action = na.pass, xlev = x$xlevels))
-    } else {
-      model.matrix(x$terms, model.frame(ret_data, na.action = na.pass, xlev = x$xlevels))
+    # For new data prediction, xgboost can predict with NAs in the predictors. Disable NA filtering for now.
+    # na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
+    na_row_numbers <- c()
+    if (length(na_row_numbers) > 0) {
+      cleaned_data <- cleaned_data[-na_row_numbers,]
     }
 
-    predicted <- stats::predict(x, mat_data)
-    predicted_value_col <- avoid_conflict(colnames(ret_data), "predicted_value")
-    # model.matrix removes rows with NA and stats::predict returns a matrix
-    # whose number of rows is the same with its size,
-    # so the result should be filled by NA
-    ret_data[[predicted_value_col]] <- fill_vec_NA(as.integer(rownames(mat_data)), predicted, nrow(ret_data))
-    ret_data
-  } else {
-    augment(x, data = data, newdata = newdata)
+    if (nrow(cleaned_data) == 0) {
+      return(data.frame())
+    }
+
+    # Run prediction.
+    predicted_val <- predict_xgboost(x, cleaned_data)
+
+    # Inserting once removed NA rows
+    original_data[[predicted_value_col]] <- restore_na(predicted_val, na_row_numbers)
+
+    original_data
+  } else if (!is.null(data)) { # For Analytics View.
+    if (nrow(data) == 0) { #TODO: better place to do this check?
+      return(data.frame())
+    }
+    switch(data_type,
+      training = {
+        predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
+        # Inserting removed NA rows should not be necessary since we don't remove NA rows after test/training split.
+        predicted <- extract_predicted(x)
+        data[[predicted_value_col]] <- predicted
+        data
+      },
+      test = {
+        predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
+        # Inserting removed NA rows
+        predicted_nona <- extract_predicted(x, type="test")
+        predicted_nona <- restore_na(predicted_nona, attr(x$prediction_test, "unknown_category_rows_index"))
+        predicted <- restore_na(predicted_nona, attr(x$prediction_test, "na.action"))
+        data[[predicted_value_col]] <- predicted
+        data
+      })
+  }
+}
+
+#' @export
+augment.xgboost_exp <- function(x, data = NULL, newdata = NULL, ...) {
+  if ("xgboost_reg" %in% class(x)) {
+    augment.xgboost_reg(x, data, newdata, ...)
+  }
+  else if ("xgboost_binary" %in% class(x)) {
+    augment.xgboost_binary(x, data, newdata, ...)
+  }
+  else if ("xgboost_multi" %in% class(x)) {
+    augment.xgboost_multi(x, data, newdata, ...)
   }
 }
 
@@ -629,3 +745,627 @@ glance.xgb.Booster <- function(x, pretty.name = FALSE, ...) {
   }
   ret
 }
+
+# XGBoost prediction function that takes data frame rather than matrix.
+predict_xgboost <- function(model, df) {
+  y_name <- all.vars(model$terms)[[1]]
+  if(is.null(df[[y_name]])){
+    # if there is no column in the formula (even if it's response variable),
+    # model.matrix function causes an error
+    # so create the column with 0
+    df[[y_name]] <- rep(0, nrow(df))
+  }
+
+  mat_data <- if(!is.null(model$is_sparse) && model$is_sparse){
+    Matrix::sparse.model.matrix(model$terms, data = model.frame(df, na.action = na.pass, xlev = model$xlevels))
+  } else {
+    model.matrix(model$terms, model.frame(df, na.action = na.pass, xlev = model$xlevels))
+  }
+
+  predicted <- stats::predict(model, mat_data)
+
+  obj <- model$params$objective
+
+  if (obj == "multi:softprob") {
+    # predicted is a vector containing probabilities for each class
+    probs <- matrix(predicted, nrow = length(model$y_levels)) %>% t()
+    # probs <- fill_mat_NA(as.numeric(rownames(mat_data)), probs, nrow(df)) # code from xgboost step.
+    probs <- fill_mat_NA(1:nrow(df), probs, nrow(df)) # Not sure if this is necessary. TODO: check.
+    colnames(probs) <- model$y_levels
+    predicted <- probs
+    # We return matrix in this case.
+    # Converting it to data.frame is the caller's responsibility.
+  }
+  else if (obj == "multi:softmax") {
+    predicted <- model$y_levels[predicted+1]
+    # fill rows with NA
+    predicted <- fill_vec_NA(as.integer(rownames(mat_data)), predicted, nrow(df))
+  }
+  else { # TODO: Here we assume all other cases returns vector prediction result.
+    # model.matrix removes rows with NA and stats::predict returns a matrix
+    # whose number of rows is the same with its size,
+    # so the result should be filled by NA
+    predicted <- fill_vec_NA(as.integer(rownames(mat_data)), predicted, nrow(df))
+  }
+  predicted
+}
+
+
+partial_dependence.xgboost <- function(fit, vars = colnames(data),
+  n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)),
+  classification = FALSE, interaction = FALSE, uniform = TRUE, data, ...) {
+
+  target = all.vars(fit$terms)[[1]]
+
+  predict.fun = function(object, newdata) {
+    if (!classification) {
+      predict_xgboost(object, newdata)
+    } else {
+      # Returned prediction probability matrix works here as is.
+      predict_xgboost(object, newdata)
+    }
+  }
+
+  args = list(
+    "data" = data,
+    "vars" = vars,
+    "n" = n,
+    "model" = fit,
+    "uniform" = uniform,
+    "predict.fun" = predict.fun,
+    ...
+  )
+  
+  if (length(vars) > 1L & !interaction) {
+    pd = rbindlist(sapply(vars, function(x) {
+      args$vars = x
+      if ("points" %in% names(args))
+        args$points = args$points[x]
+      mp = do.call(mmpf::marginalPrediction, args)
+      #if (fit$treetype == "Regression")
+      if (!classification)
+        names(mp)[ncol(mp)] = target
+      mp
+    }, simplify = FALSE), fill = TRUE)
+    data.table::setcolorder(pd, c(vars, colnames(pd)[!colnames(pd) %in% vars]))
+  } else {
+    pd = do.call(mmpf::marginalPrediction, args)
+    #if (fit$treetype == "Regression")
+    if (!classification) # TODO: If we give "regression" for binary classification, would it make sense here?
+      names(pd)[ncol(pd)] = target
+  }
+
+  attr(pd, "class") = c("pd", "data.frame")
+  attr(pd, "interaction") = interaction == TRUE
+  #attr(pd, "target") = if (fit$treetype != "Classification") target else levels(fit$predictions)
+  attr(pd, "target") = if (!classification) target else levels(fit$predictions)
+  attr(pd, "vars") = vars
+  pd
+}
+
+# This function should return following 2 columns.
+# - variable - Name of variable
+# - importance - Importance of the variable
+# Rows should be sorted by importance in descending order.
+importance_xgboost <- function(model) {
+  imp <- tidy.xgb.Booster(model)
+  ret <- imp %>% dplyr::rename(variable=feature)
+  ret <- ret %>% dplyr::mutate(variable = stringr::str_extract(variable,'c\\d+_')) %>%
+    dplyr::group_by(variable) %>%
+    dplyr::summarize(importance = sum(importance, na.rm=TRUE)) #TODO: Does sum make sense to aggregate this importance?
+  ret <- ret %>% dplyr::arrange(-importance)
+  ret
+}
+
+# Model specific S3 functions.
+extract_actual <- function(x, ...) {UseMethod("extract_actual", x)}
+extract_predicted <- function(x, ...) {UseMethod("extract_predicted", x)}
+extract_predicted_binary_labels <- function(x, ...) {UseMethod("extract_predicted_binary_labels", x)}
+extract_predicted_multiclass_labels <- function(x, ...) {UseMethod("extract_predicted_multiclass_labels", x)}
+get_prediction_type <- function(x, ...) {UseMethod("get_prediction_type", x)}
+
+extract_actual.xgboost_exp <- function(x, type = "training") {
+  if (type == "training") {
+    actual <- x$df[[all.vars(x$terms)[[1]]]]
+  }
+  else {
+    actual <- x$df_test[[all.vars(x$terms)[[1]]]]
+  }
+  actual
+}
+
+extract_predicted.xgboost_exp <- function(x, type = "training") {
+  if (type == "training") {
+    predicted <- x$prediction_training
+  }
+  else {
+    predicted <- x$prediction_test
+  }
+  predicted
+}
+extract_predicted.xgboost_reg <- extract_predicted.xgboost_exp
+extract_predicted.xgboost_binary <- extract_predicted.xgboost_exp
+extract_predicted.xgboost_multi <- extract_predicted.xgboost_exp
+
+
+extract_predicted_binary_labels.xgboost_exp <- function(x, threshold = 0.5, type = "training") {
+  if (type == "training") {
+    predicted <- x$prediction_training > threshold
+  }
+  else {
+    predicted <- x$prediction_test > threshold
+  }
+  predicted
+}
+extract_predicted_binary_labels.xgboost_binary <- extract_predicted_binary_labels.xgboost_exp
+
+extract_predicted_multiclass_labels.xgboost_exp <- function(x, type = "training") {
+  if (type == "training") {
+    predicted <- x$y_levels[apply(x$prediction_training, 1, which.max)]
+  }
+  else {
+    predicted <- x$y_levels[apply(x$prediction_test, 1, which.max)]
+  }
+  predicted
+}
+extract_predicted_multiclass_labels.xgboost_multi <- extract_predicted_multiclass_labels.xgboost_exp
+
+get_prediction_type.xgboost_exp <- function(x) {
+  if ("xgboost_reg" %in% class(x)) {
+    ret <- "regression"
+  }
+  if (x$classification_type == "binary") {
+    ret <- "binary"
+  }
+  else {
+    ret <- "multiclass"
+  }
+  ret
+}
+
+
+# Clean up data frame for test
+# Removes NAs in predictors - TODO: Is this necessary given our preprocessing before this?
+# Removes categorical values that do not appear in training data.
+# Returns cleaned data frame.
+# attr(ret, "na_row_numbers") - vector of row numbers of NA rows.
+# attr(ret, "unknown_category_rows_index") - logical vector that is index of where the unknown category rows are after removing NA rows.
+cleanup_df_for_test <- function(df_test, df_train, c_cols) {
+  na_row_numbers_test <- ranger.find_na(c_cols, data = df_test)
+  df_test_clean <- df_test
+  if (length(na_row_numbers_test) > 0) {
+    df_test_clean <- df_test_clean[-na_row_numbers_test,]
+  }
+
+  names(c_cols) <- NULL # This is necessary to make select in the following line work.
+  unknown_category_rows_index_vector <- get_unknown_category_rows_index_vector(df_test_clean, df_train %>% dplyr::select(!!!rlang::syms(c_cols)))
+  df_test_clean <- df_test_clean[!unknown_category_rows_index_vector, , drop = FALSE] # 2nd arg must be empty.
+  unknown_category_rows_index <- get_row_numbers_from_index_vector(unknown_category_rows_index_vector)
+
+  attr(df_test_clean, "na_row_numbers") <- na_row_numbers_test
+  attr(df_test_clean, "unknown_category_rows_index") <- unknown_category_rows_index
+  df_test_clean
+}
+
+#' Build XGBoost model for Analytics View.
+#' @export
+exp_xgboost <- function(df,
+                        target,
+                        ...,
+                        max_nrow = 50000, # Down from 200000 when we added partial dependence
+                        # XGBoost-specific parameters
+                        nrounds = 10,
+                        watchlist_rate = 0,
+                        sparse = FALSE,
+                        booster = "gbtree",
+                        early_stopping_rounds = 0,
+                        max_depth = 6,
+                        min_child_weight = 1,
+                        gamma = 1,
+                        subsample = 1,
+                        colsample_bytree = 1,
+                        eta = 0.3, # We used to set learning_rate parameter here for Analytics Step. Corrected it while 6.2 development.
+                                   # Either xgboost package changed parameter name at some point,
+                                   # or we might have been wrong about the parameter name in the first place.
+                        output_type_regression = "linear",
+                        eval_metric_regression = "rmse",
+                        output_type_binary = "logistic",
+                        eval_metric_binary = "auc",
+                        output_type_multiclass = "softprob",
+                        eval_metric_multiclass = "merror",
+                        # Model agnostic parameters
+                        target_n = 20,
+                        predictor_n = 12, # So that at least months can fit in it.
+                        smote = FALSE,
+                        smote_target_minority_perc = 40,
+                        smote_max_synth_perc = 200,
+                        smote_k = 5,
+                        # importance_measure = "permutation", # "permutation" or "impurity".
+                        max_pd_vars = NULL,
+                        # Number of most important variables to calculate partial dependences on. 
+                        # By default, when Boruta is on, all Confirmed/Tentative variables.
+                        # 12 when Boruta is off.
+                        pd_sample_size = 500,
+                        pd_grid_resolution = 20,
+                        pd_with_bin_means = FALSE, # Default is FALSE for backward compatibility on the server
+                        # with_boruta = FALSE,
+                        # boruta_max_runs = 20, # Maximal number of importance source runs.
+                        # boruta_p_value = 0.05, # Boruta recommends using the default 0.01 for P-value, but we are using 0.05 for consistency with other functions of ours.
+                        seed = 1,
+                        test_rate = 0.0,
+                        test_split_type = "random" # "random" or "ordered"
+                        ){
+  if(!is.null(seed)){
+    set.seed(seed)
+  }
+
+  if(test_rate < 0 | 1 < test_rate){
+    stop("test_rate must be between 0 and 1")
+  } else if (test_rate == 1){
+    stop("test_rate must be less than 1")
+  }
+
+  # this seems to be the new way of NSE column selection evaluation
+  # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
+  target_col <- tidyselect::vars_select(names(df), !! rlang::enquo(target))
+  # this evaluates select arguments like starts_with
+  selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
+  # Sort predictors so that the result of permutation importance is stable against change of column order.
+  selected_cols <- sort(selected_cols)
+
+  grouped_cols <- grouped_by(df)
+
+  # Remember if the target column was originally numeric or logical before converting type.
+  is_target_numeric <- is.numeric(df[[target_col]])
+  is_target_logical <- is.logical(df[[target_col]])
+
+  orig_levels <- NULL
+  if (is.factor(df[[target_col]])) {
+    orig_levels <- levels(df[[target_col]])
+  }
+  else if (is.logical(df[[target_col]])) {
+    orig_levels <- c("TRUE","FALSE")
+  }
+
+  clean_ret <- cleanup_df(df, target_col, selected_cols, grouped_cols, target_n, predictor_n)
+
+  clean_df <- clean_ret$clean_df
+  name_map <- clean_ret$name_map
+  clean_target_col <- clean_ret$clean_target_col
+  clean_cols <- clean_ret$clean_cols
+
+  # if target is numeric, it is regression but
+  # if not, it is classification
+  classification_type <- get_classification_type(clean_df[[clean_target_col]])
+
+  each_func <- function(df) {
+    tryCatch({
+      # If we are to do SMOTE, do not down sample here and let exp_balance handle it so that we do not sample out precious minority data.
+      unique_val <- unique(df[[clean_target_col]])
+      if (smote && length(unique_val[!is.na(unique_val)]) == 2) {
+        sample_size <- NULL
+      }
+      else {
+        sample_size <- max_nrow
+      }
+      # XGBoost can work with NAs in numeric predictors. TODO: verify it.
+      # Also, no need to convert logical to factor unlike ranger.
+      clean_df_ret <- cleanup_df_per_group(df, clean_target_col, sample_size, clean_cols, name_map, predictor_n, filter_numeric_na=FALSE, convert_logical=FALSE)
+      if (is.null(clean_df_ret)) {
+        return(NULL) # skip this group
+      }
+      df <- clean_df_ret$df
+      c_cols <- clean_df_ret$c_cols
+      if  (length(c_cols) == 0) {
+        # Previous version of message - stop("The selected predictor variables are invalid since they have only one unique values.")
+        stop("Invalid Predictors: Only one unique value.") # Message is made short so that it fits well in the Summary table.
+      }
+      name_map <- clean_df_ret$name_map
+
+      # apply smote if this is binary classification
+      unique_val <- unique(df[[clean_target_col]])
+      if (smote && length(unique_val[!is.na(unique_val)]) == 2) {
+        df <- df %>% exp_balance(clean_target_col, target_size = max_nrow, target_minority_perc = smote_target_minority_perc, max_synth_perc = smote_max_synth_perc, k = smote_k)
+        df <- df %>% dplyr::select(-synthesized) # Remove synthesized column added by exp_balance(). TODO: Handle it better. We might want to show it in resulting data.
+      }
+
+      # split training and test data
+      source_data <- df
+      test_index <- sample_df_index(source_data, rate = test_rate, ordered = (test_split_type == "ordered"))
+      df <- safe_slice(source_data, test_index, remove = TRUE)
+      if (test_rate > 0) {
+        df_test <- safe_slice(source_data, test_index, remove = FALSE)
+      }
+
+      # Restore source_data column name to original column name
+      rev_name_map <- names(name_map)
+      names(rev_name_map) <- name_map
+      colnames(source_data) <- rev_name_map[colnames(source_data)]
+
+      # build formula for randomForest
+      rhs <- paste0("`", c_cols, "`", collapse = " + ")
+      fml <- as.formula(paste(clean_target_col, " ~ ", rhs))
+
+      if (is_target_logical) {
+        model <- xgboost_binary(df, fml,
+                        nrounds = nrounds,
+                        watchlist_rate = watchlist_rate,
+                        sparse = sparse,
+                        booster = booster,
+                        early_stopping_rounds = early_stopping_rounds,
+                        max_depth = max_depth,
+                        min_child_weight = min_child_weight,
+                        gamma = gamma,
+                        subsample = subsample,
+                        colsample_bytree = colsample_bytree,
+                        eta = eta,
+                        output_type = output_type_binary, 
+                        eval_metric = eval_metric_binary)
+      }
+      else if(is_target_numeric) {
+        model <- xgboost_reg(df, fml,
+                        nrounds = nrounds,
+                        watchlist_rate = watchlist_rate,
+                        sparse = sparse,
+                        booster = booster,
+                        early_stopping_rounds = early_stopping_rounds,
+                        max_depth = max_depth,
+                        min_child_weight = min_child_weight,
+                        gamma = gamma,
+                        subsample = subsample,
+                        colsample_bytree = colsample_bytree,
+                        eta = eta,
+                        output_type = output_type_regression, 
+                        eval_metric = eval_metric_regression)
+      }
+      else {
+        model <- xgboost_multi(df, fml,
+                        nrounds = nrounds,
+                        watchlist_rate = watchlist_rate,
+                        sparse = sparse,
+                        booster = booster,
+                        early_stopping_rounds = early_stopping_rounds,
+                        max_depth = max_depth,
+                        min_child_weight = min_child_weight,
+                        gamma = gamma,
+                        subsample = subsample,
+                        colsample_bytree = colsample_bytree,
+                        eta = eta,
+                        output_type = output_type_multiclass, 
+                        eval_metric = eval_metric_multiclass)
+      }
+      class(model) <- c("xgboost_exp", class(model))
+
+      model$prediction_training <- predict_xgboost(model, df)
+
+      if (test_rate > 0) {
+        df_test_clean <- cleanup_df_for_test(df_test, df, c_cols)
+        na_row_numbers_test <- attr(df_test_clean, "na_row_numbers")
+        unknown_category_rows_index <- attr(df_test_clean, "unknown_category_rows_index")
+
+        prediction_test <- predict_xgboost(model, df_test_clean)
+
+        attr(prediction_test, "na.action") <- na_row_numbers_test
+        attr(prediction_test, "unknown_category_rows_index") <- unknown_category_rows_index
+        model$prediction_test <- prediction_test
+        model$df_test <- df_test_clean
+      }
+
+      # return partial dependence
+      if (length(c_cols) > 1) { # Calculate importance only when there are multiple variables.
+        imp_df <- importance_xgboost(model)
+        model$imp_df <- imp_df
+        imp_vars <- imp_df$variable
+      }
+      else {
+        error <- simpleError("Variable importance requires two or more variables.")
+        model$imp_df <- error
+        imp_vars <- c_cols # Just use c_cols as is for imp_vars to calculate partial dependence anyway.
+      }
+      if (is.null(max_pd_vars)) {
+        max_pd_vars <- 20 # Number of most important variables to calculate partial dependences on. This used to be 12 but we decided it was a little too small.
+      }
+
+      imp_vars <- as.character(imp_vars) # for some reason imp_vars is converted to factor at this point. turn it back to character.
+      model$imp_vars <- imp_vars
+      # Second element of n argument needs to be less than or equal to sample size, to avoid error.
+      if (length(imp_vars) > 0) {
+        model$partial_dependence <- partial_dependence.xgboost(model, vars=imp_vars, data=df,
+                                                               n=c(pd_grid_resolution, min(nrow(df), pd_sample_size)),
+                                                               classification=!(is_target_numeric||is_target_logical)) # We treat binary classification as a regression to predict probability here.
+        if (pd_with_bin_means && (is_target_logical || is_target_numeric)) {
+          # We calculate means of bins only for logical or numeric target to keep the visualization simple.
+          model$partial_binning <- calc_partial_binning_data(df, clean_target_col, imp_vars)
+        }
+      }
+      else {
+        model$partial_dependence <- NULL
+      }
+
+      # these attributes are used in tidy of randomForest
+      model$classification_type <- classification_type
+      model$orig_levels <- orig_levels
+      model$terms_mapping <- names(name_map)
+      names(model$terms_mapping) <- name_map
+      # model$y <- model.response(df) TODO: what was this??
+      model$df <- df
+      model$formula_terms <- terms(fml)
+      model$sampled_nrow <- clean_df_ret$sampled_nrow
+      list(model = model, test_index = test_index, source_data = source_data)
+    }, error = function(e){
+      if(length(grouped_cols) > 0) {
+        # In repeat-by case, we report group-specific error in the Summary table,
+        # so that analysis on other groups can go on.
+        class(e) <- c("xgboost_exp", class(e))
+        list(model = e, test_index = NULL, source_data = NULL)
+      } else {
+        stop(e)
+      }
+    })
+  }
+
+  model_and_data_col <- "model_and_data"
+  ret <- do_on_each_group(clean_df, each_func, name = model_and_data_col, with_unnest = FALSE)
+
+  # It is necessary to nest in order to retrieve the result stored in model_and_data_col.
+  # If there is a group column, omit the group column from nest, otherwise nest the whole
+  if (length(grouped_cols) > 0) {
+    ret <- ret %>% tidyr::nest(-grouped_cols)
+  } else {
+    ret <- ret %>% tidyr::nest()
+  }
+
+  ret <- ret %>% dplyr::ungroup() # Remove rowwise grouping so that following mutate works as expected.
+  # Retrieve model, test index and source data stored in model_and_data_col column (list) and store them in separate columns
+  ret <- ret %>% dplyr::mutate(model = purrr::map(data, function(df){
+            df[[model_and_data_col]][[1]]$model
+          })) %>%
+          dplyr::mutate(.test_index = purrr::map(data, function(df){
+            df[[model_and_data_col]][[1]]$test_index
+          })) %>%
+          dplyr::mutate(source.data = purrr::map(data, function(df){
+            data <- df[[model_and_data_col]][[1]]$source_data
+            if (length(grouped_cols) > 0 && !is.null(data)) {
+              data %>% dplyr::select(-grouped_cols)
+            } else {
+              data
+            }
+          })) %>%
+          dplyr::select(-data)
+
+  # Rowwise grouping has to be redone with original grouped_cols, so that summarize(tidy(model)) later can add back the group column.
+  if (length(grouped_cols) > 0) {
+    ret <- ret %>% dplyr::rowwise(grouped_cols)
+  } else {
+    ret <- ret %>% dplyr::rowwise()
+  }
+
+  # If all the groups are errors, it would be hard to handle resulting data frames
+  # at the chart preprocessors. Hence, we instead stop the processing here
+  # and just throw the error from the first group.
+  if (purrr::every(ret$model, function(x) {"error" %in% class(x)})) {
+    stop(ret$model[[1]])
+  }
+
+  ret
+}
+
+# This is used from Analytics View only when classification type is regression.
+#' @export
+glance.xgboost_exp <- function(x, pretty.name = FALSE, ...) {
+  if ("error" %in% class(x)) {
+    ret <- data.frame(Note = x$message)
+    return(ret)
+  }
+  if ("xgboost_reg" %in% class(x)) {
+    glance.ranger.method <- glance.xgboost_exp.regression
+  }
+  else {
+    stop("glance.xgboost_exp should not be called for classification")
+  }
+  ret <- glance.ranger.method(x, pretty.name = pretty.name, ...)
+  ret
+}
+
+#' @export
+glance.xgboost_exp.regression <- function(x, pretty.name, ...) {
+  predicted <- extract_predicted(x)
+  actual <- extract_actual(x)
+  root_mean_square_error <- rmse(predicted, actual)
+  rsq <- r_squared(actual, predicted)
+  n <- length(actual)
+  ret <- data.frame(
+    # root_mean_square_error = sqrt(x$prediction.error),
+    # r_squared = x$r.squared
+    root_mean_square_error = root_mean_square_error,
+    r_squared = rsq,
+    n = n
+  )
+
+  if(pretty.name){
+    map = list(
+      `RMSE` = as.symbol("root_mean_square_error"),
+      `R Squared` = as.symbol("r_squared"),
+      `Number of Rows` = as.symbol("n")
+    )
+    ret <- ret %>%
+      dplyr::rename(!!!map)
+  }
+  ret
+}
+
+#' @export
+#' @param type "importance", "evaluation" or "conf_mat". Feature importance, evaluated scores or confusion matrix of training data.
+tidy.xgboost_exp <- function(x, type = "importance", pretty.name = FALSE, binary_classification_threshold = 0.5, ...) {
+  if ("error" %in% class(x) && type != "evaluation") {
+    ret <- data.frame()
+    return(ret)
+  }
+  switch(
+    type,
+    importance = {
+      if ("error" %in% class(x$imp_df)) {
+        # Permutation importance is not supported for the family and link function, or skipped because there is only one variable.
+        # Return empty data.frame to avoid error.
+        ret <- data.frame()
+        return(ret)
+      }
+      ret <- x$imp_df
+      ret <- ret %>% dplyr::mutate(variable = x$terms_mapping[variable]) # map variable names to original.
+      ret
+    },
+    evaluation = {
+      # Delegate showing error for failed models to grance().
+      if ("error" %in% class(x)) {
+        return(glance(x, pretty.name = pretty.name, ...))
+      }
+      # get evaluation scores from training data
+      actual <- extract_actual(x)
+      if(is.numeric(actual)){
+        glance(x, pretty.name = pretty.name, ...)
+      } else {
+        if (x$classification_type == "binary") {
+          predicted <- extract_predicted_binary_labels(x, threshold = binary_classification_threshold)
+          predicted_probability <- extract_predicted(x)
+          ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = pretty.name)
+        }
+        else {
+          predicted <- extract_predicted_multiclass_labels(x)
+          ret <- evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
+        }
+        ret
+      }
+    },
+    conf_mat = {
+      # return confusion matrix
+      actual <- extract_actual(x)
+      if (x$classification_type == "binary") {
+        predicted <- extract_predicted_binary_labels(x, threshold = binary_classification_threshold)
+      }
+      else {
+        predicted <- extract_predicted_multiclass_labels(x)
+      }
+
+      ret <- data.frame(
+        actual_value = actual,
+        predicted_value = predicted
+      ) %>%
+        dplyr::filter(!is.na(predicted_value))
+
+      # get count if it's classification
+      ret <- ret %>%
+        dplyr::group_by(actual_value, predicted_value) %>%
+        dplyr::summarize(count = n()) %>%
+        dplyr::ungroup()
+
+      ret
+    },
+    partial_dependence = {
+      ret <- handle_partial_dependence(x)
+      ret
+    },
+    {
+      stop(paste0("type ", type, " is not defined"))
+    })
+}
+

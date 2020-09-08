@@ -1,636 +1,139 @@
-context("test build_lm part 2")
-test_that("binary prediction with character target column", {
-  test_data <- structure(
-    list(
-      `CANCELLED X` = c("N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "Y", "N", "Y", "N"),
-      `Carrier Name` = c("Delta Air Lines", "American Eagle", "American Airlines", "Southwest Airlines", "SkyWest Airlines", "Southwest Airlines", "Southwest Airlines", "Delta Air Lines", "Southwest Airlines", "Atlantic Southeast Airlines", "American Airlines", "Southwest Airlines", "US Airways", "US Airways", "Delta Air Lines", "Atlantic Southeast Airlines", NA, "Atlantic Southeast Airlines", "Delta Air Lines", "Delta Air Lines"),
-      CARRIER = factor(c(NA, "MQ", "AA", "DL", "MQ", "AA", "DL", "DL", "MQ", "AA", "AA", "WN", "US", "US", "DL", "EV", "9E", "EV", "DL", "DL")), # test with factor with NA
-      # testing filtering of Inf, -Inf, NA here.
-      DISTANCE = c(Inf, -Inf, NA, 187, 273, 1062, 583, 240, 1123, 851, 852, 862, 361, 507, 1020, 1092, 342, 489, 1184, 545)), row.names = c(NA, -20L),
-    class = c("tbl_df", "tbl", "data.frame"), .Names = c("CANCELLED X", "Carrier Name", "CARRIER", "DISTANCE"))
+# how to run this test:
+# devtools::test(filter="lm_1")
 
-  # Make target variable logical. (We will support only logical as logistic regression target.)
-  test_data <- test_data %>% dplyr::mutate(`CANCELLED X` = `CANCELLED X` == 'Y')
+context("test lm/glm prediction with training/test data")
 
-  # duplicate rows to make some predictable data
-  # otherwise, the number of rows of the result of prediction becomes 0
-  test_data <- dplyr::bind_rows(test_data, test_data)
+testdata_dir <- "~/.exploratory/"
+testdata_filename <- "airline_2013_10_tricky_v3_5k.csv" 
+testdata_file_path <- paste0(testdata_dir, testdata_filename)
 
-  model_data <- build_lm.fast(test_data, `CANCELLED X`, `Carrier Name`, CARRIER, DISTANCE,
-                              normalize_predictors = TRUE,
-                              model_type = "glm", smote=FALSE, with_marginal_effects=TRUE, with_marginal_effects_confint=TRUE)
-  ret <- model_data %>% tidy_rowwise(model, type="vif")
-  ret <- model_data %>% glance_rowwise(model, pretty.name=TRUE)
-  expect_equal(colnames(ret), c("AUC","F Score","Accuracy Rate","Misclassification Rate","Precision",               
-                                "Recall","P Value","Number of Rows","Number of Rows for TRUE","Number of Rows for FALSE",
-                                "Log Likelihood","AIC","BIC","Residual Deviance","Null Deviance",
-                                "DF for Null Model","Residual DF"))
-  expect_equal(ret$`Number of Rows`, 34)
-  expect_equal(ret$`Number of Rows for TRUE`, 4) # This ends up to be 4 after doubling
-  expect_equal(ret$`Number of Rows for FALSE`, 30) # This ends up to be 30 after doubling and removing NA rows.
-  ret <- model_data %>% tidy_rowwise(model)
-  ret <- model_data %>% augment_rowwise(model)
+filepath <- if (!testdata_filename %in% list.files(testdata_dir)) {
+  "https://www.dropbox.com/s/f47baw5f3v0xoll/airline_2013_10_tricky_v3.csv?dl=1"
+} else {
+  testdata_file_path
+}
 
-  expect_true(nrow(ret) > 0)
+flight <- exploratory::read_delim_file(filepath, ",", quote = "\"", skip = 0 , col_names = TRUE , na = c("","NA") , locale=readr::locale(encoding = "UTF-8", decimal_mark = "."), trim_ws = FALSE , progress = FALSE) %>% exploratory::clean_data_frame()
+
+if (!testdata_filename %in% list.files(testdata_dir)) {
+  set.seed(1)
+  flight <- flight %>% slice_sample(n=5000)
+  write.csv(flight, testdata_file_path) # save sampled-down data for performance.
+}
+
+
+test_that("build_lm.fast (linear regression) evaluate training and test", {
+  model_df <- flight %>%
+                build_lm.fast(`ARR DELAY`, `DIS TANCE`, `DEP DELAY`, `CAR RIER`, test_rate = 0.3, seed=1)
+
+  ret <- model_df %>% prediction(data="training_and_test")
+  test_ret <- ret %>% filter(is_test_data==TRUE)
+  # expect_equal(nrow(test_ret), 1475) # Not very stable for some reason. Will revisit.
+  train_ret <- ret %>% filter(is_test_data==FALSE)
+  # expect_equal(nrow(train_ret), 3444) # Not very stable for some reason. Will revisit.
+  ret <- model_df %>% evaluate_lm_training_and_test(pretty.name=TRUE)
+  expect_equal(nrow(ret), 2) # 2 for train and test
+
+  # Check order of variable importance result.
+  ret <- model_df %>% tidy_rowwise(model, type="permutation_importance")
+  # unname() is necessary for the result to be equal to the expectation.
+  expect_equal(unname((ret %>% arrange(-importance))$term), c("DEP DELAY", "CAR RIER", "DIS TANCE"))
+
+  # Test univariate case handling
+  model_df <- flight %>%
+                build_lm.fast(`ARR DELAY`, `DIS TANCE`, relimp = TRUE, relimp_type = "first", test_rate = 0.3, seed=1)
+  ret <- model_df %>% tidy_rowwise(model, type="permutation_importance")
+  expect_equal(nrow(ret), 0)
 })
 
-test_that("binary prediction with factor target column", {
-  test_data <- structure(
-    list(
-      `CANCELLED X` = factor(c("N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "Y", "N", "Y", "N"), levels=c("A","N","Y","B")),
-      `Carrier Name` = c("Delta Air Lines", "American Eagle", "American Airlines", "Southwest Airlines", "SkyWest Airlines", "Southwest Airlines", "Southwest Airlines", "Delta Air Lines", "Southwest Airlines", "Atlantic Southeast Airlines", "American Airlines", "Southwest Airlines", "US Airways", "US Airways", "Delta Air Lines", "Atlantic Southeast Airlines", NA, "Atlantic Southeast Airlines", "Delta Air Lines", "Delta Air Lines"),
-      CARRIER = factor(c(NA, "MQ", "AA", "DL", "MQ", "AA", "DL", "DL", "MQ", "AA", "AA", "WN", "US", "US", "DL", "EV", "9E", "EV", "DL", "DL")), # test with factor with NA
-      # testing filtering of Inf, -Inf, NA here.
-      DISTANCE = c(Inf, -Inf, NA, 187, 273, 1062, 583, 240, 1123, 851, 852, 862, 361, 507, 1020, 1092, 342, 489, 1184, 545)), row.names = c(NA, -20L),
-    class = c("tbl_df", "tbl", "data.frame"), .Names = c("CANCELLED X", "Carrier Name", "CARRIER", "DISTANCE"))
+test_that("build_lm.fast (logistic regression(numeric)) evaluate training and test", {
+  model_df <- flight %>%
+                build_lm.fast(`is delayed`, `DIS TANCE`, `DEP TIME`, model_type = "glm", test_rate = 0.3)
 
-  # Make target variable logical. (We will support only logical as logistic regression target.)
-  test_data <- test_data %>% dplyr::mutate(`CANCELLED X` = `CANCELLED X` == 'Y')
-
-  # duplicate rows to make some predictable data
-  # otherwise, the number of rows of the result of prediction becomes 0
-  test_data <- dplyr::bind_rows(test_data, test_data)
-
-  model_data <- build_lm.fast(test_data, `CANCELLED X`, `Carrier Name`, CARRIER, DISTANCE, model_type = "glm", smote=FALSE, with_marginal_effects=TRUE, with_marginal_effects_confint=FALSE)
-  ret <- model_data %>% glance_rowwise(model, pretty.name=TRUE)
-  expect_equal(ret$`Number of Rows`, 34)
-  expect_equal(ret$`Number of Rows for TRUE`, 4) # This ends up to be 4 after doubling
-  expect_equal(ret$`Number of Rows for FALSE`, 30) # This ends up to be 30 after doubling and removing NA rows.
-  ret <- model_data %>% tidy_rowwise(model)
-  ret <- model_data %>% augment_rowwise(model)
-
-  expect_true(nrow(ret) > 0)
+  ret <- model_df %>% prediction_binary(data="training_and_test", threshold = 0.5)
+  test_ret <- ret %>% filter(is_test_data==TRUE)
+  # expect_equal(nrow(test_ret), 1480) # Not very stable for some reason. Will revisit
+  train_ret <- ret %>% filter(is_test_data==FALSE)
+  # expect_equal(nrow(train_ret), 3454) # Not very stable for some reason. Will revisit
+  ret <- model_df %>% evaluate_binary_training_and_test("is delayed", pretty.name=TRUE, threshold=0.1)
+  expect_gt(ret$Recall[[1]], 0.8) # Expect Recall to be ok since threshold is as low as 0.1.
+  expect_equal(nrow(ret), 2) # 2 for train and test
+  ret <- model_df %>% prediction_training_and_test(prediction_type = 'conf_mat', threshold = 0.5)
 })
 
-test_that("binary prediction with variable_metric argument", {
-  test_data <- structure(
-    list(
-      `CANCELLED X` = factor(c("N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "Y", "N", "Y", "N"), levels=c("A","N","Y","B")),
-      `Carrier Name` = c("Delta Air Lines", "American Eagle", "American Airlines", "Southwest Airlines", "SkyWest Airlines", "Southwest Airlines", "Southwest Airlines", "Delta Air Lines", "Southwest Airlines", "Atlantic Southeast Airlines", "American Airlines", "Southwest Airlines", "US Airways", "US Airways", "Delta Air Lines", "Atlantic Southeast Airlines", NA, "Atlantic Southeast Airlines", "Delta Air Lines", "Delta Air Lines"),
-      CARRIER = factor(c(NA, "MQ", "AA", "DL", "MQ", "AA", "DL", "DL", "MQ", "AA", "AA", "WN", "US", "US", "DL", "EV", "9E", "EV", "DL", "DL")), # test with factor with NA
-      # testing filtering of Inf, -Inf, NA here.
-      DISTANCE = c(Inf, -Inf, NA, 187, 273, 1062, 583, 240, 1123, 851, 852, 862, 361, 507, 1020, 1092, 342, 489, 1184, 545)), row.names = c(NA, -20L),
-    class = c("tbl_df", "tbl", "data.frame"), .Names = c("CANCELLED X", "Carrier Name", "CARRIER", "DISTANCE"))
+test_that("build_lm.fast (logistic regression(logical)) evaluate training and test", {
+  model_df <- flight %>% mutate(`is delayed`=as.logical(`is delayed`)) %>%
+                build_lm.fast(`is delayed`, `DIS TANCE`, `DEP TIME`, model_type = "glm", test_rate = 0.3)
 
-  # Make target variable logical. (We will support only logical as logistic regression target.)
-  test_data <- test_data %>% dplyr::mutate(`CANCELLED X` = `CANCELLED X` == 'Y')
-
-  # duplicate rows to make some predictable data
-  # otherwise, the number of rows of the result of prediction becomes 0
-  test_data <- dplyr::bind_rows(test_data, test_data)
-
-  model_data <- build_lm.fast(test_data, `CANCELLED X`, `Carrier Name`, CARRIER, DISTANCE, model_type = "glm", smote=FALSE, variable_metric="odds_ratio")
-  ret <- model_data %>% tidy_rowwise(model, variable_metric="odds_ratio")
-
-  model_data <- build_lm.fast(test_data, `CANCELLED X`, `Carrier Name`, CARRIER, DISTANCE, model_type = "glm", smote=FALSE, variable_metric="coefficient")
-  ret <- model_data %>% tidy_rowwise(model, variable_metric="coefficient")
-
-  model_data <- build_lm.fast(test_data, `CANCELLED X`, `Carrier Name`, CARRIER, DISTANCE, model_type = "glm", smote=FALSE, variable_metric="ame")
-  ret <- model_data %>% tidy_rowwise(model, variable_metric="ame")
-  expect_true(c("ame") %in% colnames(ret))
-
-  expect_true(nrow(ret) > 0)
+  ret <- model_df %>% prediction_binary(data="training_and_test", threshold = 0.5)
+  test_ret <- ret %>% filter(is_test_data==TRUE)
+  # expect_equal(nrow(test_ret), 1480) # Not very stable for some reason. Will revisit
+  train_ret <- ret %>% filter(is_test_data==FALSE)
+  # expect_equal(nrow(train_ret), 3454) # Not very stable for some reason. Will revisit
+  ret <- model_df %>% evaluate_binary_training_and_test("is delayed", pretty.name=TRUE, threshold=0.1)
+  expect_gt(ret$Recall[[1]], 0.8) # Expect Recall to be ok since threshold is as low as 0.1.
+  expect_equal(nrow(ret), 2) # 2 for train and test
+  ret <- model_df %>% prediction_training_and_test(prediction_type = 'conf_mat', threshold = 0.5)
 })
 
-test_data <- tibble::tibble(
-      `CANCELLED X` = c("N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "N", "Y", "N", "Y", "N"),
-      `Carrier Name` = c("Delta Air Lines", "American Eagle", "American Airlines", "Southwest Airlines", "SkyWest Airlines", "Southwest Airlines", "Southwest Airlines", "Delta Air Lines", "Southwest Airlines", "Atlantic Southeast Airlines", "American Airlines", "Southwest Airlines", "US Airways", "US Airways", "Delta Air Lines", "Atlantic Southeast Airlines", NA, "Atlantic Southeast Airlines", "Delta Air Lines", "Delta Air Lines"),
-      CARRIER = factor(c("AA", "MQ", "AA", "DL", "MQ", "AA", "DL", "DL", "MQ", "AA", "AA", "WN", "US", "US", "DL", "EV", "9E", "EV", "DL", "DL")), # test with factor with NA
-      # testing filtering of Inf, -Inf, NA here.
-      DISTANCE = c(10, 12, 12, 187, 273, 1062, 583, 240, 1123, 851, 852, 862, 361, 507, 1020, 1092, 342, 489, 1184, 545),
-      ARR_TIME = c(10, 32, 321, 342, 123, 98, 10, 21, 80, 211, 121, 87, 821, 213, 213, 923, 121, 76, 34, 50),
-      DERAY_TIME = c(12, 42, 321, 31, 3, 43, 342, 764, 123, 43, 50, 12, 876, 12, 34, 45, 84, 25, 87, 352))
-
-# Make target variable logical. (We will support only logical as logistic regression target.)
-test_data <- test_data %>% dplyr::mutate(`CANCELLED X` = `CANCELLED X` == 'Y')
-
-test_data$klass <- c(rep("A", 10), rep("B", 10))
-
-test_that("Linear Regression with test rate", {
-  ret <- test_data %>% build_lm.fast(`DISTANCE`,
-                                     `ARR_TIME`,
-                                     `DERAY_TIME`,
-                                     `Carrier Name`,
-                                     model_type = "lm",
-                                     test_rate = 0.1,
-                                     test_split_type = "ordered") # testing ordered split too.
-  res <- ret %>% tidy_rowwise(model)
-  expect_true("Carrier Name: American Airlines" %in% res$term)
-  res <- ret %>% tidy_rowwise(model, type="vif")
-  expect_true("Carrier Name" %in% res$term)
-  expect_equal(colnames(ret), c("model", ".test_index", "source.data"))
-  test_rownum <- length(ret$.test_index[[1]])
-  training_rownum <- nrow(test_data) - test_rownum
-
-  suppressWarnings({
-    pred_training <- prediction(ret, data = "training")
-    pred_test <- prediction(ret, data = "test")
-    expect_equal(training_rownum, nrow(pred_training))
-    expect_equal(test_rownum, nrow(pred_test))
-
-    expected_cols <- c("Carrier Name", "DISTANCE", "ARR_TIME", "DERAY_TIME",
-                       "predicted_value",
-                       "standard_error", "conf_low", "conf_high",
-                       "residuals", "standardised_residuals", "hat",
-                       "residual_standard_deviation", "cooks_distance")
-    expect_equal(colnames(pred_training), expected_cols)
-    expected_cols <- c("Carrier Name", "DISTANCE", "ARR_TIME", "DERAY_TIME", "predicted_value", "standard_error", "conf_low", "conf_high")
-    expect_equal(colnames(pred_test), expected_cols)
-
-    res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
-    expect_equal(res$`Number of Rows`, 17)
-    res <- ret %>% lm_partial_dependence()
-   })
+test_that("build_lm.fast (logistic regression(character)) evaluate training and test", {
+  expect_error({
+    model_df <- flight %>% mutate(`is delayed`=if_else(as.logical(`is delayed`), "A", "B")) %>%
+      build_lm.fast(`is delayed`, `DIS TANCE`, `DEP TIME`, model_type = "glm", test_rate = 0.3)
+  }, "Target variable for logistic regression must be a logical.")
 })
 
+test_that("build_lm.fast (logistic regression) evaluate training and test with SMOTE", {
+  # test mode case
+  model_df <- flight %>%
+                build_lm.fast(`is delayed`, `DIS TANCE`, `DEP TIME`, model_type = "glm", test_rate = 0.3, smote=T)
 
-test_that("Linear Regression with outlier filtering", {
-  ret <- test_data %>% build_lm.fast(`DISTANCE`,
-                                     `ARR_TIME`,
-                                     `DERAY_TIME`,
-                                     `Carrier Name`,
-                                     model_type = "lm",
-                                     test_rate = 0.3,
-                                     normalize_predictors = TRUE, # testing target normalization too.
-                                     target_outlier_filter_type="percentile",
-                                     target_outlier_filter_threshold=0.9) # testing outlier filter too.
+  ret <- model_df %>% prediction_binary(data="training_and_test", threshold = 0.5)
+  test_ret <- ret %>% filter(is_test_data==TRUE)
+  # expect_equal(nrow(test_ret), 1480) # Not very stable for some reason. Will revisit
+  train_ret <- ret %>% filter(is_test_data==FALSE)
+  # expect_equal(nrow(train_ret), 3454) # Not very stable for some reason. Will revisit
+  ret <- model_df %>% evaluate_binary_training_and_test("is delayed", pretty.name=TRUE)
+  expect_equal(nrow(ret), 2) # 2 for train and test
+  ret <- model_df %>% prediction_training_and_test(prediction_type = 'conf_mat', threshold = 0.5)
 
-  expect_equal(colnames(ret), c("model", ".test_index", "source.data"))
-  test_rownum <- length(ret$.test_index[[1]])
-  #training_rownum <- nrow(test_data) - test_rownum
-  training_rownum <- nrow(ret$source.data[[1]]) - test_rownum
+  # training only case
+  model_df <- flight %>%
+                build_lm.fast(`is delayed`, `DIS TANCE`, `DEP TIME`, model_type = "glm", test_rate = 0, smote=T)
 
-  suppressWarnings({
-    pred_training <- prediction(ret, data = "training")
-    pred_test <- prediction(ret, data = "test")
-    expect_equal(training_rownum, nrow(pred_training))
-    expect_equal(test_rownum, nrow(pred_test))
-
-    expected_cols <- c("Carrier Name", "DISTANCE", "ARR_TIME", "DERAY_TIME",
-                       "predicted_value", 
-                       "standard_error", "conf_low", "conf_high",
-                       "residuals", "standardised_residuals", "hat",
-                       "residual_standard_deviation", "cooks_distance")
-    expect_equal(colnames(pred_training), expected_cols)
-    expected_cols <- c("Carrier Name", "DISTANCE", "ARR_TIME", "DERAY_TIME", "predicted_value", "standard_error", "conf_low", "conf_high")
-    expect_equal(colnames(pred_test), expected_cols)
-
-    res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
-    expect_equal(res$`Number of Rows`, 12)
-   })
+  ret <- model_df %>% prediction_binary(data="training_and_test", threshold = 0.5)
+  test_ret <- ret %>% filter(is_test_data==TRUE)
+  # expect_equal(nrow(test_ret), 1480) # Not very stable for some reason. Will revisit
+  train_ret <- ret %>% filter(is_test_data==FALSE)
+  # expect_equal(nrow(train_ret), 3454) # Not very stable for some reason. Will revisit
+  ret <- model_df %>% evaluate_binary_training_and_test("is delayed", pretty.name=TRUE)
+  expect_equal(nrow(ret), 1) # 1 for train
+  ret <- model_df %>% prediction_training_and_test(prediction_type = 'conf_mat', threshold = 0.5)
 })
 
-test_that("Group Linear Regression with test_rate", {
-  group_data <- test_data %>% group_by(klass)
-  ret <- group_data %>%
-           build_lm.fast(`DISTANCE`,
-                        `ARR_TIME`,
-                        model_type = "lm",
-                        test_rate = 0.1)
-  expect_equal(colnames(ret), c("klass", "model", ".test_index", "source.data"))
-  group_nrows <- group_data %>% summarize(n=n()) %>% `[[`("n")
-  test_nrows <- sapply(ret$.test_index, length, simplify=TRUE)
-  training_nrows <- group_nrows - test_nrows
+test_that("build_lm.fast (gaussian regression) evaluate training and test", {
+  model_df <- flight %>%
+                build_lm.fast(`FL NUM`, `DIS TANCE`, `DEP TIME`, model_type = "glm", family = "gaussian", test_rate = 0.3)
 
-  suppressWarnings({
-    pred_training <- prediction(ret, data = "training")
-    pred_test <- prediction(ret, data = "test")
-    expect_equal(pred_training %>% summarize(n=n()) %>% `[[`("n"),
-                 training_nrows)
-    expect_equal(pred_test %>% summarize(n=n()) %>% `[[`("n"),
-                 test_nrows)
-
-    expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "predicted_value",
-                       "standard_error", "conf_low", "conf_high",
-                       "residuals", "standardised_residuals", "hat", "residual_standard_deviation",
-                       "cooks_distance")
-    expect_equal(colnames(pred_training), expected_cols)
-
-    expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "predicted_value",
-                       "standard_error", "conf_low", "conf_high"
-                       )
-    expect_equal(colnames(pred_test), expected_cols)
-
-    res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
-   })
+  ret <- model_df %>% prediction(data="training_and_test")
+  test_ret <- ret %>% filter(is_test_data==TRUE)
+  # expect_equal(nrow(test_ret), 1475) # Not very stable for some reason. Will revisit
+  train_ret <- ret %>% filter(is_test_data==FALSE)
+  # expect_equal(nrow(train_ret), 3444) # Not very stable for some reason. Will revisit
+  ret <- model_df %>% evaluate_lm_training_and_test(pretty.name=TRUE)
+  expect_equal(nrow(ret), 2) # 2 for train and test
 })
 
-test_that("GLM - Normal Destribution with test_rate", {
-  ret <- test_data %>% build_lm.fast(`DISTANCE`,
-                                     `ARR_TIME`,
-                                     `DERAY_TIME`,
-                                     `Carrier Name`,
-                                     model_type = "glm",
-                                     family = "gaussian",
-                                     test_rate = 0.1)
-  expect_equal(colnames(ret), c("model", ".test_index", "source.data"))
-  test_rownum <- length(ret$.test_index[[1]])
-  training_rownum <- nrow(test_data) - test_rownum
+test_that("build_lm.fast (binomial regression) evaluate training and test", {
+  model_df <- flight %>%
+                build_lm.fast(`is delayed`, `DIS TANCE`, `DEP TIME`, model_type = "glm", family = "binomial", test_rate = 0.3)
 
-  suppressWarnings({
-    pred_training <- prediction(ret, data = "training")
-    pred_test <- prediction(ret, data = "test")
-    expect_equal(training_rownum, nrow(pred_training))
-    expect_equal(test_rownum, nrow(pred_test))
-
-    expected_cols <- c("Carrier Name", "DISTANCE", "ARR_TIME", "DERAY_TIME",
-                       "predicted_value",
-                       "standard_error", "conf_low", "conf_high",
-                       "residuals", "standardised_residuals", "hat",
-                       "residual_standard_deviation", "cooks_distance", "predicted_response")
-    expect_equal(colnames(pred_training), expected_cols)
-    expected_cols <- c("Carrier Name", "DISTANCE", "ARR_TIME", "DERAY_TIME", "predicted_value",
-                       "standard_error", "conf_low", "conf_high",
-                       "predicted_response")
-    expect_equal(colnames(pred_test), expected_cols)
-
-    res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
-    res <- ret %>% tidy_rowwise(model, type="permutation_importance")
-   })
-})
-
-test_that("Group GLM - Normal Destribution with test_rate", {
-  group_data <- test_data %>% group_by(klass)
-  ret <- group_data %>%
-           build_lm.fast(`DISTANCE`,
-                        `ARR_TIME`,
-                        model_type = "glm",
-                        family = "gaussian",
-                        test_rate = 0.1)
-  expect_equal(colnames(ret), c("klass", "model", ".test_index", "source.data"))
-  group_nrows <- group_data %>% summarize(n=n()) %>% `[[`("n")
-  test_nrows <- sapply(ret$.test_index, length, simplify=TRUE)
-  training_nrows <- group_nrows - test_nrows
-
-  suppressWarnings({
-    pred_training <- prediction(ret, data = "training")
-    pred_test <- prediction(ret, data = "test")
-    expect_equal(pred_training %>% summarize(n=n()) %>% `[[`("n"),
-                 training_nrows)
-    expect_equal(pred_test %>% summarize(n=n()) %>% `[[`("n"),
-                 test_nrows)
-
-    expected_cols <- c("klass", "DISTANCE", "ARR_TIME",
-                       "predicted_value",
-                       "standard_error", "conf_low", "conf_high",
-                       "residuals", "standardised_residuals", "hat", "residual_standard_deviation",
-                       "cooks_distance", "predicted_response")
-    expect_equal(colnames(pred_training), expected_cols)
-
-    expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "predicted_value",
-                       "standard_error", "conf_low", "conf_high",
-                       "predicted_response")
-    expect_equal(colnames(pred_test), expected_cols)
-
-    res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
-    res <- ret %>% tidy_rowwise(model, type="permutation_importance")
-   })
-})
-
-test_that("GLM - Gamma Destribution with test_rate", {
-  ret <- test_data %>% build_lm.fast(`DISTANCE`,
-                                     `ARR_TIME`,
-                                     `DERAY_TIME`,
-                                     `Carrier Name`,
-                                     model_type = "glm",
-                                     family = "Gamma",
-                                     test_rate = 0.1)
-  expect_equal(colnames(ret), c("model", ".test_index", "source.data"))
-  test_rownum <- length(ret$.test_index[[1]])
-  training_rownum <- nrow(test_data) - test_rownum
-
-  suppressWarnings({
-    pred_training <- prediction(ret, data = "training")
-    pred_test <- prediction(ret, data = "test")
-    expect_equal(training_rownum, nrow(pred_training))
-    expect_equal(test_rownum, nrow(pred_test))
-
-    expected_cols <- c("Carrier Name", "DISTANCE", "ARR_TIME", "DERAY_TIME",
-                       "predicted_value",
-                       "standard_error", "conf_low", "conf_high",
-                       "residuals", "standardised_residuals", "hat",
-                       "residual_standard_deviation", "cooks_distance", "predicted_response")
-    expect_equal(colnames(pred_training), expected_cols)
-    expected_cols <- c("Carrier Name", "DISTANCE", "ARR_TIME", "DERAY_TIME", "predicted_value", "standard_error",
-                       "conf_low", "conf_high", "predicted_response")
-    expect_equal(colnames(pred_test), expected_cols)
-
-    res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
-   })
-})
-
-test_that("Group GLM - Gamma Destribution with test_rate", {
-  group_data <- test_data %>% group_by(klass)
-  ret <- group_data %>%
-           build_lm.fast(`DISTANCE`,
-                        `ARR_TIME`,
-                        model_type = "glm",
-                        family = "Gamma",
-                        test_rate = 0.1)
-  expect_equal(colnames(ret), c("klass", "model", ".test_index", "source.data"))
-  group_nrows <- group_data %>% summarize(n=n()) %>% `[[`("n")
-  test_nrows <- sapply(ret$.test_index, length, simplify=TRUE)
-  training_nrows <- group_nrows - test_nrows
-
-  suppressWarnings({
-    pred_training <- prediction(ret, data = "training")
-    pred_test <- prediction(ret, data = "test")
-    expect_equal(pred_training %>% summarize(n=n()) %>% `[[`("n"),
-                 training_nrows)
-    expect_equal(pred_test %>% summarize(n=n()) %>% `[[`("n"),
-                 test_nrows)
-
-    expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "predicted_value",
-                       "standard_error", "conf_low", "conf_high",
-                       "residuals", "standardised_residuals", "hat", "residual_standard_deviation",
-                       "cooks_distance", "predicted_response")
-    expect_equal(colnames(pred_training), expected_cols)
-
-    expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "predicted_value",
-                       "standard_error", "conf_low", "conf_high", "predicted_response")
-    expect_equal(colnames(pred_test), expected_cols)
-
-    res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
-   })
-})
-
-test_that("GLM - Inverse Gaussian Destribution with test_rate", {
-  ret <- test_data %>% build_lm.fast(`DISTANCE`,
-                                     `ARR_TIME`,
-                                     `DERAY_TIME`,
-                                     `Carrier Name`,
-                                     model_type = "glm",
-                                     family = "inverse.gaussian",
-                                     test_rate = 0.1)
-  expect_equal(colnames(ret), c("model", ".test_index", "source.data"))
-  test_rownum <- length(ret$.test_index[[1]])
-  training_rownum <- nrow(test_data) - test_rownum
-
-  suppressWarnings({
-    pred_training <- prediction(ret, data = "training")
-    pred_test <- prediction(ret, data = "test")
-    expect_equal(training_rownum, nrow(pred_training))
-    expect_equal(test_rownum, nrow(pred_test))
-
-    expected_cols <- c("Carrier Name", "DISTANCE", "ARR_TIME", "DERAY_TIME",
-                       "predicted_value",
-                       "standard_error", "conf_low", "conf_high",
-                       "residuals", "standardised_residuals", "hat",
-                       "residual_standard_deviation", "cooks_distance", "predicted_response")
-    expect_equal(colnames(pred_training), expected_cols)
-    expected_cols <- c("Carrier Name", "DISTANCE", "ARR_TIME", "DERAY_TIME", "predicted_value", "standard_error",
-                       "conf_low", "conf_high", "predicted_response")
-    expect_equal(colnames(pred_test), expected_cols)
-
-    res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
-   })
-})
-
-test_that("Group GLM - Inverse Gaussian Destribution with test_rate", {
-  group_data <- test_data %>% group_by(klass)
-  ret <- group_data %>%
-           build_lm.fast(`DISTANCE`,
-                        `ARR_TIME`,
-                        model_type = "glm",
-                        family = "inverse.gaussian",
-                        test_rate = 0.1)
-  expect_equal(colnames(ret), c("klass", "model", ".test_index", "source.data"))
-  group_nrows <- group_data %>% summarize(n=n()) %>% `[[`("n")
-  test_nrows <- sapply(ret$.test_index, length, simplify=TRUE)
-  training_nrows <- group_nrows - test_nrows
-
-  suppressWarnings({
-    pred_training <- prediction(ret, data = "training")
-    pred_test <- prediction(ret, data = "test")
-    expect_equal(pred_training %>% summarize(n=n()) %>% `[[`("n"),
-                 training_nrows)
-    expect_equal(pred_test %>% summarize(n=n()) %>% `[[`("n"),
-                 test_nrows)
-
-    expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "predicted_value",
-                       "standard_error", "conf_low", "conf_high",
-                       "residuals", "standardised_residuals", "hat", "residual_standard_deviation",
-                       "cooks_distance", "predicted_response")
-    expect_equal(colnames(pred_training), expected_cols)
-
-    expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "predicted_value",
-                       "standard_error", "conf_low", "conf_high", "predicted_response")
-    expect_equal(colnames(pred_test), expected_cols)
-
-    res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
-   })
-})
-
-test_that("GLM - poisson Destribution with test_rate", {
-  ret <- test_data %>% build_lm.fast(`DISTANCE`,
-                                     `ARR_TIME`,
-                                     `DERAY_TIME`,
-                                     `Carrier Name`,
-                                     model_type = "glm",
-                                     family = "poisson",
-                                     test_rate = 0.1)
-  expect_equal(colnames(ret), c("model", ".test_index", "source.data"))
-  test_rownum <- length(ret$.test_index[[1]])
-  training_rownum <- nrow(test_data) - test_rownum
-
-  suppressWarnings({
-    pred_training <- prediction(ret, data = "training")
-    pred_test <- prediction(ret, data = "test")
-    expect_equal(training_rownum, nrow(pred_training))
-    expect_equal(test_rownum, nrow(pred_test))
-
-    expected_cols <- c("Carrier Name", "DISTANCE", "ARR_TIME", "DERAY_TIME",
-                       "predicted_value",
-                       "standard_error", "conf_low", "conf_high",
-                       "residuals", "standardised_residuals", "hat",
-                       "residual_standard_deviation", "cooks_distance", "predicted_response")
-    expect_equal(colnames(pred_training), expected_cols)
-    expected_cols <- c("Carrier Name", "DISTANCE", "ARR_TIME", "DERAY_TIME", "predicted_value", "standard_error",
-                       "conf_low", "conf_high", "predicted_response")
-    expect_equal(colnames(pred_test), expected_cols)
-
-    res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
-    res <- ret %>% tidy_rowwise(model, type="permutation_importance")
-   })
-})
-
-test_that("Group GLM - Poisson Destribution with test_rate", {
-  group_data <- test_data %>% group_by(klass)
-  ret <- group_data %>%
-           build_lm.fast(`DISTANCE`,
-                        `ARR_TIME`,
-                        model_type = "glm",
-                        family = "poisson",
-                        test_rate = 0.3)
-  expect_equal(colnames(ret), c("klass", "model", ".test_index", "source.data"))
-  group_nrows <- group_data %>% summarize(n=n()) %>% `[[`("n")
-  test_nrows <- sapply(ret$.test_index, length, simplify=TRUE)
-  training_nrows <- group_nrows - test_nrows
-
-  suppressWarnings({
-    pred_training <- prediction(ret, data = "training")
-    pred_test <- prediction(ret, data = "test")
-    expect_equal(pred_training %>% summarize(n=n()) %>% `[[`("n"),
-                 training_nrows)
-    expect_equal(pred_test %>% summarize(n=n()) %>% `[[`("n"),
-                 test_nrows)
-
-    expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "predicted_value",
-                       "standard_error", "conf_low", "conf_high",
-                       "residuals", "standardised_residuals", "hat", "residual_standard_deviation",
-                       "cooks_distance", "predicted_response")
-    expect_equal(colnames(pred_training), expected_cols)
-
-    expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "predicted_value",
-                       "standard_error", "conf_low", "conf_high", "predicted_response")
-    expect_equal(colnames(pred_test), expected_cols)
-
-    res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
-    res <- ret %>% tidy_rowwise(model, type="permutation_importance")
-    res <- ret %>% lm_partial_dependence()
-   })
-})
-
-test_that("GLM - Negative Binomial Destribution with test_rate", {
-  ret <- test_data %>% build_lm.fast(`DISTANCE`,
-                                     `ARR_TIME`,
-                                     `DERAY_TIME`,
-                                     `Carrier Name`,
-                                     model_type = "glm",
-                                     family = "negativebinomial",
-                                     test_rate = 0.1)
-  expect_equal(colnames(ret), c("model", ".test_index", "source.data"))
-  test_rownum <- length(ret$.test_index[[1]])
-  training_rownum <- nrow(test_data) - test_rownum
-
-  suppressWarnings({
-    pred_training <- prediction(ret, data = "training")
-    pred_test <- prediction(ret, data = "test")
-    expect_equal(training_rownum, nrow(pred_training))
-    expect_equal(test_rownum, nrow(pred_test))
-
-    expected_cols <- c("Carrier Name", "DISTANCE", "ARR_TIME", "DERAY_TIME",
-                       "predicted_value",
-                       "standard_error","conf_low","conf_high",
-                       "residuals", "standardised_residuals", "hat",
-                       "residual_standard_deviation", "cooks_distance", "predicted_response")
-    expect_equal(colnames(pred_training), expected_cols)
-    expected_cols <- c("Carrier Name", "DISTANCE", "ARR_TIME", "DERAY_TIME", "predicted_value", "standard_error",
-                       "conf_low", "conf_high", "predicted_response")
-    expect_equal(colnames(pred_test), expected_cols)
-
-    res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
-    res <- ret %>% tidy_rowwise(model, type="permutation_importance")
-    res <- ret %>% lm_partial_dependence()
-   })
-})
-
-test_that("Group GLM - Negative Binomial Destribution with test_rate", {
-  group_data <- test_data %>% group_by(klass)
-  ret <- group_data %>%
-           build_lm.fast(`DISTANCE`,
-                        `ARR_TIME`,
-                        model_type = "glm",
-                        family = "negativebinomial",
-                        test_rate = 0.1)
-  expect_equal(colnames(ret), c("klass", "model", ".test_index", "source.data"))
-  group_nrows <- group_data %>% summarize(n=n()) %>% `[[`("n")
-  test_nrows <- sapply(ret$.test_index, length, simplify=TRUE)
-  training_nrows <- group_nrows - test_nrows
-
-  suppressWarnings({
-    pred_training <- prediction(ret, data = "training")
-    pred_test <- prediction(ret, data = "test")
-    expect_equal(pred_training %>% summarize(n=n()) %>% `[[`("n"),
-                 training_nrows)
-    expect_equal(pred_test %>% summarize(n=n()) %>% `[[`("n"),
-                 test_nrows)
-
-    expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "predicted_value",
-                       "standard_error","conf_low","conf_high",
-                       "residuals", "standardised_residuals", "hat", "residual_standard_deviation",
-                       "cooks_distance", "predicted_response")
-    expect_equal(colnames(pred_training), expected_cols)
-
-    expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "predicted_value",
-                       "standard_error", "conf_low", "conf_high", "predicted_response")
-    expect_equal(colnames(pred_test), expected_cols)
-
-    res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
-    res <- ret %>% tidy_rowwise(model, type="permutation_importance")
-    res <- ret %>% lm_partial_dependence()
-   })
-})
-
-test_that("Logistic Regression with test_rate", {
-  ret <- test_data %>% build_lm.fast(`CANCELLED X`,
-                                     `ARR_TIME`,
-                                     `DERAY_TIME`,
-                                     `Carrier Name`,
-                                     family = "binomial",
-                                     model_type = "glm",
-                                     test_rate = 0.1)
-  expect_equal(colnames(ret), c("model", ".test_index", "source.data"))
-  test_rownum <- length(ret$.test_index[[1]])
-  training_rownum <- nrow(test_data) - test_rownum
-
-  suppressWarnings({
-    pred_training_and_test <- ret %>% prediction_binary(data = 'training_and_test', threshold = 0.5)
-    pred_training_and_test_conf_mat <- ret %>% prediction_training_and_test(prediction_type = 'conf_mat', threshold = 0.5)
-    pred_training <- prediction(ret, data = "training")
-    pred_test <- prediction(ret, data = "test")
-    expect_equal(training_rownum, nrow(pred_training))
-    expect_equal(test_rownum, nrow(pred_test))
-
-    expected_cols <- c("CANCELLED X", "Carrier Name", "ARR_TIME", "DERAY_TIME",
-                       "predicted_value",
-                       "standard_error", "conf_low", "conf_high",
-                       "residuals", "standardised_residuals", "hat",
-                       "residual_standard_deviation", "cooks_distance", "predicted_response")
-    expect_equal(colnames(pred_training), expected_cols)
-    expected_cols <- c("CANCELLED X", "Carrier Name", "ARR_TIME", "DERAY_TIME", "predicted_value", "standard_error",
-                       "conf_low", "conf_high", "predicted_response")
-    expect_equal(colnames(pred_test), expected_cols)
-    res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
-    res <- ret %>% evaluate_binary_training_and_test(`CANCELLED X`, threshold = 0.5, pretty.name=TRUE)
-    expect_equal(nrow(res), 2) # 2 for training and test.
-    res <- ret %>% lm_partial_dependence()
-   })
-})
-
-test_that("Group Logistic Regression with test_rate", {
-  group_data <- test_data %>% group_by(klass)
-  ret <- group_data %>%
-           build_lm.fast(`CANCELLED X`,
-                        `ARR_TIME`,
-                        model_type = "glm",
-                        family = "binomial",
-                        link = "logit",
-                        test_rate = 0.1)
-  expect_equal(colnames(ret), c("klass", "model", ".test_index", "source.data"))
-  group_nrows <- group_data %>% summarize(n=n()) %>% `[[`("n")
-  test_nrows <- sapply(ret$.test_index, length, simplify=TRUE)
-  training_nrows <- group_nrows - test_nrows
-
-  suppressWarnings({
-    pred_training <- prediction(ret, data = "training")
-    pred_test <- prediction(ret, data = "test")
-    expect_equal(pred_training %>% summarize(n=n()) %>% `[[`("n"),
-                 training_nrows)
-    expect_equal(pred_test %>% summarize(n=n()) %>% `[[`("n"),
-                 test_nrows)
-
-    # Since broom 0.7.0, I sometimes see "residuals" missing here, but not consistently. Will keep watching.
-    expected_cols <- c("klass", "CANCELLED X", "ARR_TIME", "predicted_value",
-                       "standard_error", "conf_low", "conf_high",
-                       "residuals", "standardised_residuals", "hat", "residual_standard_deviation",
-                       "cooks_distance", "predicted_response")
-    expect_equal(colnames(pred_training), expected_cols)
-
-    expected_cols <- c("klass", "CANCELLED X", "ARR_TIME", "predicted_value",
-                       "standard_error", "conf_low", "conf_high", "predicted_response")
-    expect_equal(colnames(pred_test), expected_cols)
-
-    res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
-   })
+  ret <- model_df %>% prediction_binary(data="training_and_test", threshold = 0.5)
+  test_ret <- ret %>% filter(is_test_data==TRUE)
+  # expect_equal(nrow(test_ret), 1480) # Not very stable for some reason. Will revisit
+  train_ret <- ret %>% filter(is_test_data==FALSE)
+  # expect_equal(nrow(train_ret), 3454) # Not very stable for some reason. Will revisit
+  ret <- model_df %>% evaluate_binary_training_and_test("is delayed", pretty.name=TRUE)
+  expect_equal(nrow(ret), 2) # 2 for train and test
+  ret <- model_df %>% prediction_training_and_test(prediction_type = 'conf_mat', threshold = 0.5)
 })

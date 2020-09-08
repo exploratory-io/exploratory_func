@@ -46,6 +46,7 @@ calc_partial_binning_data <- function(df, target_col, var_cols) {
 
 # Common utility function called for tidy with type "partial_dependence".
 # Used for ranger, rpart, lm, and glm.
+# TODO: Almost there, but make it completely model agnostic.
 handle_partial_dependence <- function(x) {
   if (is.null(x$partial_dependence)) {
     return(data.frame()) # Skip by returning empty data.frame.
@@ -129,15 +130,15 @@ handle_partial_dependence <- function(x) {
   if ("ranger" %in% class(x)) {
     df <- x$df
   }
-  else if ("rpart" %in% class(x)) {
-    # use partial_dependence itself for determining chart_type. Maybe this works for other models too?
-    df <- x$partial_dependence
-  }
   else if (!is.null(x$data)) {  # For glm case.
     df <- x$data
   }
-  else { # For lm case
+  else if ("lm" %in% class(x)) { # For lm case
     df <- x$model
+  }
+  else { # rpart, xgboost
+    # use partial_dependence itself for determining chart_type. Maybe this works for other models too?
+    df <- x$partial_dependence
   }
   for(col in colnames(df)) {
     if (is.numeric(df[[col]])) {
