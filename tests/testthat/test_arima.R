@@ -11,6 +11,11 @@ test_that("do_arima with aggregation", {
   raw_data$pre_col1 <- runif(nrow(raw_data))
   raw_data$pre_col2 <- runif(nrow(raw_data))
 
+  browser()
+  model_df <- raw_data %>%
+    do_arima(`time stamp`, valueColumn=`cou nt`, periods=10, time_unit = "week", na_fill_type="value", test_mode=F)
+  browser()
+
   model_df <- raw_data %>%
     do_arima(`time stamp`, valueColumn=`cou nt`, periods=10, time_unit = "day", na_fill_type="value", test_mode=F)
 
