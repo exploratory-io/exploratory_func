@@ -345,6 +345,13 @@ do_arima <- function(df, time,
     else {
       diff_res <- training_tsibble$y
     }
+    seasonality_differences <- model_df$arima[[1]]$fit$spec$D
+    seasonality_lag <- model_df$arima[[1]]$fit$spec$period
+
+    if (!is.null(seasonality_differences) && seasonality_differences > 0) {
+      diff_res <- diff(diff_res, differences = seasonality_differences, lag = seasonality_lag)
+    }
+
     acf_res <- acf(diff_res, plot=FALSE)
     difference_acf <- data.frame(lag = acf_res$lag, acf = acf_res$acf)
     ret <- ret %>% mutate(difference_acf = list(!!difference_acf))
