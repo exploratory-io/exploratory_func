@@ -22,8 +22,13 @@ do_arima <- function(df, time,
                      periods = 10,
                      fun.aggregate = sum,
                      test_mode = FALSE,
+                     auto = TRUE,
+                     p = NA,
                      d = NA,
+                     q = NA,
+                     P = NA,
                      D = NA,
+                     Q = NA,
                      max.p = 5,
                      max.q = 5,
                      max.P = 2,
@@ -212,8 +217,27 @@ do_arima <- function(df, time,
     ret <- NULL
 
     training_tsibble <- tsibble::tsibble(ds = training_data$ds, y = training_data$y)
+
+    if (seasonal) {
+      if (auto) {
+        formula_str <- "y ~ 0"
+      }
+      else {
+        formula_str <- paste0("y ~ pdq(", p, ",", d, ",", q, ")")
+      }
+    }
+    else {
+      if (auto) {
+        formula_str <- "y ~ PDQ(0,0,0)"
+      }
+      else {
+        formula_str <- paste0("y ~ pdq(", p, ",", d, ",", q, ") + PDQ(0,0,0)")
+      }
+    }
+    fml <- as.formula(formula_str)
+
     model_df <- training_tsibble %>%
-      fabletools::model(arima=fable::ARIMA(y,
+      fabletools::model(arima=fable::ARIMA(fml,
                                            ic = ic,
                                            stepwise=stepwise,
                                            ))
