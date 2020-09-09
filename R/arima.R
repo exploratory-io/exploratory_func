@@ -18,7 +18,6 @@
 #' @export
 do_arima <- function(df, time,
                      valueColumn = NULL,
-                     ...,
                      time_unit = "day",
                      periods = 10,
                      fun.aggregate = sum,
@@ -54,7 +53,8 @@ do_arima <- function(df, time,
                      regressors = NULL,
                      funs.aggregate.regressors = NULL,
                      regressors_na_fill_type = NULL,
-                     regressors_na_fill_value = 0
+                     regressors_na_fill_value = 0,
+                     ...
                      ){
   validate_empty_data(df)
 
@@ -337,7 +337,7 @@ do_arima <- function(df, time,
     acf_df <- data.frame(lag = acf_res$lag, acf = acf_res$acf)
     ret <- ret %>% mutate(acf = list(!!acf_df))
 
-    # Add difference ACF.
+    # Add difference ACF/PACF.
     differences <- model_df$arima[[1]]$fit$spec$d
     if (differences > 0) {
       diff_res <- diff(training_tsibble$y, differences = differences)
@@ -348,6 +348,9 @@ do_arima <- function(df, time,
     acf_res <- acf(diff_res, plot=FALSE)
     difference_acf <- data.frame(lag = acf_res$lag, acf = acf_res$acf)
     ret <- ret %>% mutate(difference_acf = list(!!difference_acf))
+    pacf_res <- pacf(diff_res, plot=FALSE)
+    difference_pacf <- data.frame(lag = pacf_res$lag, acf = pacf_res$acf)
+    ret <- ret %>% mutate(difference_pacf = list(!!difference_pacf))
 
     # Add residual ACF
     residuals_df <- model_df %>% residuals()
