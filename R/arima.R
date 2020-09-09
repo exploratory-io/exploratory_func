@@ -384,9 +384,13 @@ do_arima <- function(df, time,
 
     runTests <- function(x, test) {
       tryCatch({
-        suppressWarnings(diff <- switch(test, kpss = kpss_wrap(x, type = c("mu", "tau")[type]),
-                                        adf = urca::ur.df(x, type = c("drift", "trend")[type]), 
-                                        pp = urca::ur.pp(x, type = "Z-tau", model = c("constant", "trend")[type]),
+        suppressWarnings(diff <- switch(test,
+                                        #kpss = kpss_wrap(x, type = c("mu", "tau")[type]),
+                                        kpss = tseries::kpss.test(x),
+                                        #adf = urca::ur.df(x, type = c("drift", "trend")[type]), 
+                                        adf = tseries::adf.test(x),
+                                        #pp = urca::ur.pp(x, type = "Z-tau", model = c("constant", "trend")[type]),
+                                        pp = tseries::pp.test(x),
                                         stop("This shouldn't happen")))
         diff
       }, error = function(e) {
@@ -396,7 +400,7 @@ do_arima <- function(df, time,
     }
 
     unit_root_test_res <- runTests(diff_res, test)
-    unit_root_test_res <- data.frame(unit_root_test_res@cval, teststat = unit_root_test_res@teststat)
+    #unit_root_test_res <- data.frame(unit_root_test_res@cval, teststat = unit_root_test_res@teststat)
     ret <- ret %>% mutate(unit_root_test = list(!!unit_root_test_res))
 
     m <- model_df$arima[[1]]$fit$model # model of "Arima" class. Q: is this from stats package?
