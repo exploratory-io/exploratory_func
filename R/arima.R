@@ -373,7 +373,7 @@ do_arima <- function(df, time,
     acf_df <- data.frame(lag = acf_res$lag, acf = acf_res$acf)
     ret <- ret %>% mutate(acf = list(!!acf_df))
 
-    # Add difference ACF/PACF.
+    # Data after differentiations
     differences <- model_df$arima[[1]]$fit$spec$d
     if (!is.null(differences) && differences > 0) {
       diff_res <- diff(training_tsibble$y, differences = differences)
@@ -393,6 +393,7 @@ do_arima <- function(df, time,
     colnames(diff_df)[colnames(diff_df) == "diff"] <- value_col
     ret <- ret %>% mutate(difference = list(!!diff_df))
 
+    # Add difference ACF/PACF.
     acf_res <- acf(diff_res, plot=FALSE)
     difference_acf <- data.frame(lag = acf_res$lag, acf = acf_res$acf)
     ret <- ret %>% mutate(difference_acf = list(!!difference_acf))
@@ -412,25 +413,11 @@ do_arima <- function(df, time,
     colnames(residuals_df)[colnames(residuals_df) == ".resid"] <- value_col
     ret <- ret %>% mutate(residuals= list(!!residuals_df))
 
-    # Add unit root test result
-    type <- 1 # 1 menas "level". TODO: check if this is correct.
-    urca_pval <- function(urca_test) {
-      approx(urca_test@cval[1, ], as.numeric(sub("pct", "", 
-                                                 colnames(urca_test@cval)))/100, xout = urca_test@teststat[1], 
-             rule = 2)$y
-    }
-    kpss_wrap <- function(x, ..., use.lag = trunc(3 * sqrt(length(x))/13)) {
-      urca::ur.kpss(x, ..., use.lag = use.lag)
-    }
-
     runTests <- function(x, test) {
       tryCatch({
         suppressWarnings(diff <- switch(test,
-                                        #kpss = kpss_wrap(x, type = c("mu", "tau")[type]),
                                         kpss = tseries::kpss.test(x),
-                                        #adf = urca::ur.df(x, type = c("drift", "trend")[type]), 
                                         adf = tseries::adf.test(x),
-                                        #pp = urca::ur.pp(x, type = "Z-tau", model = c("constant", "trend")[type]),
                                         pp = tseries::pp.test(x),
                                         stop("This shouldn't happen")))
         diff
