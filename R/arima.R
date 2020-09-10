@@ -624,6 +624,9 @@ glance.ARIMA_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add t
   }
 
   df <- data.frame(AIC=m$aic, BIC=m$bic, AICc=m$aicc, as.list(order))
+  residual_test <-attr(x,"residual_test") 
+  df$`Ljung-Box Test Statistic` <- residual_test$statistic
+  df$`Ljung-Box Test P Value` <- residual_test$p.value
 
   if(F) { # Skipped for now. TODO: Revive it.
     if(length(ar_stationarity) > 0){
