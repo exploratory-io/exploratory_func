@@ -835,6 +835,22 @@ confint_radius <- function(x, level=0.95) {
   error
 }
 
+#' Calculate the confidence interval range (half-width of confidence interval)
+#' of a given vector.
+#' A synonym to confint_radius.
+get_mean_confint_range <- confint_radius
+
+#' Calculate the confidence interval range (half-width of confidence interval)
+#' from a sample size and an sd values of a group. 
+#' See the confint_radius for the implementation detail.
+#' 
+#` @param n - sample size of the group.
+#` @param sd - standard deviation of the group.
+get_mean_confint_range_from_aggregated_values <- function (n, sd, level=0.95) {
+  error <- qt((level+1)/2, df=n-1)*sd/sqrt(n)
+  error
+}
+
 #' Returns half-width of confidence interval of population proportion of the given logical vector. NAs are skipped and not counted.
 #' This is useful when used in dplyr::summarize().
 #' Reference: http://www.r-tutor.com/elementary-statistics/interval-estimation/interval-estimate-population-proportion
@@ -844,6 +860,23 @@ prop_confint_radius <- function(x, level=0.95) {
   t <- sum(x, na.rm = TRUE)
   p <- t/n
   error <- qnorm((level+1)/2)*sqrt(p*(1-p)/n)
+  error
+}
+
+
+#' Calculate the confidence interval range (half-width of confidence interval)
+#' of a population proportion of a given vector.
+#' A synonym to prop_confint_radius.
+get_ratio_confint_range <- prop_confint_radius
+
+#' Calculate the confidence interval range (half-width of confidence interval)
+#' of a population proportion from a size and a target ratio of a group. 
+#' See the prop_confint_radius for the implementation detail.
+#' 
+#` @param n - sample size of the group.
+#` @param ratio - target ratio (0-1) of the group.
+get_ratio_confint_range_from_aggregated_values <- function (n, ratio, level=0.95) {
+  error <- qnorm((level+1)/2)*sqrt(ratio*(1-ratio)/n)
   error
 }
 
