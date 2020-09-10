@@ -348,6 +348,7 @@ do_arima <- function(df, time,
     if (test_mode) {
       ret_df <- ret_df %>% dplyr::select(-is_test_data, is_test_data)
     }
+    attr(ret_df, "value_col") <- value_col # We need this into to read it later to evaluate it.
 
     class(model_df$arima[[1]]$fit) <- c("ARIMA_exploratory", class(model_df$arima[[1]]$fit))
     # Note that model column is mable, rather than model object.
@@ -637,4 +638,20 @@ glance.ARIMA_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add t
   #    <dbl>   <dbl> <dbl> <dbl> <dbl>
   # 1 0.0293    499. -995. -995. -984.
 
+}
+
+#' Model agnostic function to get common time series metric and model specific glance info.
+#' @export
+glance_with_ts_metric <- function(df) {
+  ret1 <- df %>% glance_rowwise(model)
+  ret2 <- df %>% dplyr::select(data) %>% tidyr::unnest(data)
+  value_col <- attr(df$data[[1]], "value_col")
+  if (any(ret2$is_test_data)) {
+    ret2 <- ret2 %>% dplyr::summarize(RMSE=exploratory::rmse(!!rlang::sym(value_col), forecasted_value, is_test_data), MAE=exploratory::mae(!!rlang::sym(value_col), forecasted_value, is_test_data), MAPE=exploratory::mape(!!rlang::sym(value_col), forecasted_value, is_test_data), MASE=exploratory::mase(!!rlang::sym(value_col), forecasted_value, is_test_data), `Number of Rows for Training`=sum(!is_test_data), `Number of Rows for Test`=sum(is_test_data))
+  }
+  else {
+    ret2 <- ret2 %>% dplyr::summarize(RMSE=exploratory::rmse(!!rlang::sym(value_col), forecasted_value, !is.na(!!rlang::sym(value_col))), MAE=exploratory::mae(!!rlang::sym(value_col), forecasted_value, !is.na(!!rlang::sym(value_col))), MAPE=exploratory::mape(!!rlang::sym(value_col), forecasted_value, !is.na(!!rlang::sym(value_col))), `Number of Rows`=sum(!is.na(!!rlang::sym(value_col))))
+  }
+  ret <- dplyr::bind_cols(ret1, ret2)
+  ret
 }
