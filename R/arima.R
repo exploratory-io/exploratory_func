@@ -363,10 +363,10 @@ do_arima <- function(df, time,
       stl_res <- stl(stl_ts, "periodic")
       stl_df <- as.data.frame(stl_res$time.series)
       stl_df[[time_col]] <- ret_df[[time_col]]
-      stl_seasonal_df[[time_col]] <- stl_df %>$ head(seasonal_periods) # To display only one seasonal cycle
+      stl_seasonal_df[[time_col]] <- stl_df %>% head(seasonal_periods) # To display only one seasonal cycle
       ret <- ret %>% mutate(stl = list(!!stl_df), stl_seasonal = list(!!stl_seasonal_df))
-    }, error = function(d) { # This can fail depending on the data.
-      stop(e)
+    }, error = function(e) { # This can fail depending on the data.
+      # Let it go for now.
     })
 
     # Add ACF.
@@ -449,8 +449,9 @@ do_arima <- function(df, time,
     lag <- min(lag, round(length(residuals)/5))
     lag <- max(degree_of_freedom + 3, lag)
     residual_test <- feasts::ljung_box(residuals, lag=lag, dof=degree_of_freedom)
-    residual_test <- tibble(statistic=residual_test[[1]], p.value=residual_test[[2]], lag=lag, dof=degree_of_freedom)
-    ret <- ret %>% mutate(residual_test = list(!!residual_test))
+    residual_test <- tibble::tibble(statistic=residual_test[[1]], p.value=residual_test[[2]], lag=lag, dof=degree_of_freedom)
+    # ret <- ret %>% mutate(residual_test = list(!!residual_test))
+    attr(ret$model[[1]]$arima[[1]]$fit, "residual_test") <- residual_test
 
     if(F){
     ret <- ret %>% dplyr::mutate(test_results = purrr::map(model, function(m) {
@@ -591,6 +592,8 @@ create_ts_seq <- function(ds, start_func, to_func, time_unit, start_add=0, to_ad
 
 #' @export
 glance.ARIMA_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
+  # Note that, because of fable, x here is actually from model_df$model[1]$arima[[1]]$fit
+
   m <- x$model # x$model is the model object of Arima class.
 
   ar_terms <- m$coef %>% names() %>% .[stringr::str_detect(., "^s?ar[0-9]*")]
