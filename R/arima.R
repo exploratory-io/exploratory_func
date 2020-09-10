@@ -48,7 +48,7 @@ do_arima <- function(df, time,
                      allowmean = TRUE,
                      lambda = NULL,
                      biasadj = FALSE,
-                     test = "kpss",
+                     unit_root_test = "kpss",
                      seasonal.test = "ocsb",
                      stepwise=FALSE,
                      parallel = FALSE,
@@ -406,7 +406,7 @@ do_arima <- function(df, time,
       })
     }
 
-    unit_root_test_res <- runTests(diff_res, test)
+    unit_root_test_res <- runTests(diff_res, unit_root_test)
     #unit_root_test_res <- data.frame(unit_root_test_res@cval, teststat = unit_root_test_res@teststat)
     ret <- ret %>% mutate(unit_root_test = list(!!unit_root_test_res))
 
