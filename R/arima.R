@@ -42,6 +42,7 @@ do_arima <- function(df, time,
                      start.Q = 1,
                      stationary = FALSE,
                      seasonal = TRUE,
+                     seasonal_periods = 7, #TODO: Adjust default by time_unit
                      ic = "aic",
                      allowdrift = TRUE,
                      allowmean = TRUE,
@@ -237,7 +238,7 @@ do_arima <- function(df, time,
     fml <- as.formula(formula_str)
 
     model_df <- training_tsibble %>%
-      fabletools::model(arima=fable::ARIMA(fml,
+      fabletools::model(arima=fable::ARIMA(!!fml,
                                            ic = ic,
                                            stepwise=stepwise,
                                            ))
@@ -357,6 +358,16 @@ do_arima <- function(df, time,
     # Reference: https://github.com/tidyverts/fable/issues/91
     ret <- tibble(data = list(ret_df), model = list(model_df))
 
+    tryCatch({
+      stl_ts <- ts(ret_df[[value_col]], frequency=seasonal_periods)
+      stl_res <- stl(stl_ts, "periodic")
+      stl_df <- as.data.frame(stl_res$time.series)
+      stl_df[[time_col]] <- ret_df[[time_col]]
+      ret <- ret %>% mutate(stl = list(!!stl_df))
+    }, error = function(d) { # This can fail depending on the data.
+      stop(e)
+    })
+
     # Add ACF.
     acf_res <- acf(training_tsibble$y, plot=FALSE)
     acf_df <- data.frame(lag = acf_res$lag, acf = acf_res$acf)
@@ -364,7 +375,7 @@ do_arima <- function(df, time,
 
     # Add difference ACF/PACF.
     differences <- model_df$arima[[1]]$fit$spec$d
-    if (differences > 0) {
+    if (!is.null(differences) && differences > 0) {
       diff_res <- diff(training_tsibble$y, differences = differences)
     }
     else {
