@@ -947,26 +947,26 @@ test_that("week", {
   expect_equal(exploratory::week(dates, unit="month"), c(1,1,2,5,1,1,2,1,1,2,5,1,1,2,5))
 })
 
-test_that("get_mean_confint_range", {
+test_that("summarize_confint_mean", {
   # confint_radius is the reference implementation.
   v <- 1:100
-  expect_equal(exploratory::confint_radius(v), exploratory::get_mean_confint_range(v))
+  expect_equal(exploratory::confint_radius(v), exploratory::summarize_confint_mean(v))
 })
 
-test_that("get_mean_confint_range_from_aggregated_values", {
+test_that("calc_confint_mean", {
   # confint_radius is the reference implementation.
   v <- 1:100
-  expect_equal(exploratory::confint_radius(v), exploratory::get_mean_confint_range_from_aggregated_values(length(v), sd(v)))
+  expect_equal(exploratory::confint_radius(v), exploratory::calc_confint_mean(length(v), sd(v)))
 })
 
-test_that("get_ratio_confint_range", {
+test_that("summarize_confint_ratio", {
   # prop_confint_radius is the reference implementation.
   v <- 1:100 %% 3 ==0
-  expect_equal(exploratory::prop_confint_radius(v), exploratory::get_ratio_confint_range(v))
+  expect_equal(exploratory::prop_confint_radius(v), exploratory::summarize_confint_ratio(v))
 })
 
-test_that("get_ratio_confint_range_from_aggregated_values", {
+test_that("calc_confint_ratio", {
   # prop_confint_radius is the reference implementation.
   v <- 1:100 %% 3 ==0
-  expect_equal(exploratory::prop_confint_radius(v), exploratory::get_ratio_confint_range_from_aggregated_values(length(v),  sum(v)/length(v)))
+  expect_equal(exploratory::prop_confint_radius(v), exploratory::calc_confint_ratio(length(v),  sum(v)/length(v)))
 })
