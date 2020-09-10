@@ -363,7 +363,8 @@ do_arima <- function(df, time,
       stl_res <- stl(stl_ts, "periodic")
       stl_df <- as.data.frame(stl_res$time.series)
       stl_df[[time_col]] <- ret_df[[time_col]]
-      ret <- ret %>% mutate(stl = list(!!stl_df))
+      stl_seasonal_df[[time_col]] <- stl_df %>$ head(seasonal_periods) # To display only one seasonal cycle
+      ret <- ret %>% mutate(stl = list(!!stl_df), stl_seasonal = list(!!stl_seasonal_df))
     }, error = function(d) { # This can fail depending on the data.
       stop(e)
     })
@@ -389,30 +390,8 @@ do_arima <- function(df, time,
     }
     diff_df <- tibble::tibble(ds=training_data$ds[(length(training_data$ds)-length(diff_res)+1):length(training_data$ds)],
                               diff=diff_res)
-    colnames(diff_df)[colnames(diff_df) == "ds"] <- time_col
-    colnames(diff_df)[colnames(diff_df) == "diff"] <- value_col
-    ret <- ret %>% mutate(difference = list(!!diff_df))
 
-    # Add difference ACF/PACF.
-    acf_res <- acf(diff_res, plot=FALSE)
-    difference_acf <- data.frame(lag = acf_res$lag, acf = acf_res$acf)
-    ret <- ret %>% mutate(difference_acf = list(!!difference_acf))
-    pacf_res <- pacf(diff_res, plot=FALSE)
-    difference_pacf <- data.frame(lag = pacf_res$lag, acf = pacf_res$acf)
-    ret <- ret %>% mutate(difference_pacf = list(!!difference_pacf))
-
-    # Add residual ACF
-    residuals_df <- model_df %>% residuals()
-    residual_acf <- residuals_df %>% feasts::ACF(.resid)
-    residual_acf <- as.data.frame(residual_acf %>% mutate(lag = as.numeric(lag))) # as.data.frame is to avoid error from unnest() later.
-    ret <- ret %>% mutate(residual_acf = list(!!residual_acf))
-
-    # Add residual
-    residuals_df <- as.data.frame(residuals_df) # as.data.frame is to avoid error from unnest() later.
-    colnames(residuals_df)[colnames(residuals_df) == "ds"] <- time_col
-    colnames(residuals_df)[colnames(residuals_df) == ".resid"] <- value_col
-    ret <- ret %>% mutate(residuals= list(!!residuals_df))
-
+    # Run unit root test on the differentiated data.
     runTests <- function(x, test) {
       tryCatch({
         suppressWarnings(diff <- switch(test,
@@ -430,6 +409,36 @@ do_arima <- function(df, time,
     unit_root_test_res <- runTests(diff_res, test)
     #unit_root_test_res <- data.frame(unit_root_test_res@cval, teststat = unit_root_test_res@teststat)
     ret <- ret %>% mutate(unit_root_test = list(!!unit_root_test_res))
+
+    unit_root_test_pvalue <- unit_root_test_res$p.value
+
+    diff_df$p_value <- unit_root_test_pvalue
+    colnames(diff_df)[colnames(diff_df) == "ds"] <- time_col
+    colnames(diff_df)[colnames(diff_df) == "diff"] <- value_col
+    ret <- ret %>% mutate(difference = list(!!diff_df))
+
+    # Add difference ACF/PACF.
+    acf_res <- acf(diff_res, plot=FALSE)
+    difference_acf <- data.frame(lag = acf_res$lag, acf = acf_res$acf)
+    ret <- ret %>% mutate(difference_acf = list(!!difference_acf))
+    pacf_res <- pacf(diff_res, plot=FALSE)
+    difference_pacf <- data.frame(lag = pacf_res$lag, acf = pacf_res$acf)
+    ret <- ret %>% mutate(difference_pacf = list(!!difference_pacf))
+
+    # Add residual ACF/PACF
+    residuals_df <- model_df %>% residuals()
+    residual_acf <- residuals_df %>% feasts::ACF(.resid)
+    residual_acf <- as.data.frame(residual_acf %>% mutate(lag = as.numeric(lag))) # as.data.frame is to avoid error from unnest() later.
+    ret <- ret %>% mutate(residual_acf = list(!!residual_acf))
+    residual_pacf <- residuals_df %>% feasts::PACF(.resid)
+    residual_pacf <- as.data.frame(residual_pacf %>% mutate(lag = as.numeric(lag))) # as.data.frame is to avoid error from unnest() later.
+    ret <- ret %>% mutate(residual_pacf = list(!!residual_pacf))
+
+    # Add residual
+    residuals_df <- as.data.frame(residuals_df) # as.data.frame is to avoid error from unnest() later.
+    colnames(residuals_df)[colnames(residuals_df) == "ds"] <- time_col
+    colnames(residuals_df)[colnames(residuals_df) == ".resid"] <- value_col
+    ret <- ret %>% mutate(residuals= list(!!residuals_df))
 
     m <- model_df$arima[[1]]$fit$model # model of "Arima" class. Q: is this from stats package?
     residuals <- residuals(m) # residual has to be extracted from above model to get freq at the next line.
