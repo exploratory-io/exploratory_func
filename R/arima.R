@@ -433,8 +433,20 @@ do_arima <- function(df, time,
     difference_pacf <- data.frame(lag = pacf_res$lag, acf = pacf_res$acf)
     ret <- ret %>% mutate(difference_pacf = list(!!difference_pacf))
 
+    model_d <- model_df$arima[[1]]$fit$spec$d
+    model_D <- model_df$arima[[1]]$fit$spec$D
+    model_period <- model_df$arima[[1]]$fit$spec$period
+
+    total_diffs <- model_d
+    if (model_D > 0) {
+      total_diffs <- total_diffs + model_D * model_period
+    }
+
     # Add residual ACF/PACF
     residuals_df <- model_df %>% residuals()
+    if (model_d > 0 || model_D > 0) {
+      residuals_df <- residuals_df %>% dplyr::slice((1 + total_diffs):n()) # cut off the beginning of the residual data which is not really residual.
+    }
     residual_acf <- residuals_df %>% feasts::ACF(.resid)
     residual_acf <- as.data.frame(residual_acf %>% mutate(lag = as.numeric(lag))) # as.data.frame is to avoid error from unnest() later.
     ret <- ret %>% mutate(residual_acf = list(!!residual_acf))
