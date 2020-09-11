@@ -217,7 +217,7 @@ do_arima <- function(df, time,
     # So, if trace value is needed, the output must be captured.
     ret <- NULL
 
-    if (time_unit %in% c("month", "year")) { #TODO: Take care of other time units too.
+    if (time_unit %in% c("month", "year", "quarter")) { #TODO: Take care of other time units too.
       training_tsibble <- tsibble::tsibble(ds = tsibble::yearmonth(training_data$ds), y = training_data$y)
     }
     else {
