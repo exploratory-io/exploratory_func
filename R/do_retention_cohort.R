@@ -9,9 +9,9 @@
 do_cohort <- function(df, time, value, cohort, time_unit = "month", fun.aggregate = n_distinct){
   # this seems to be the new way of NSE column selection evaluation
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
-  time_col <- dplyr::select_var(names(df), !! rlang::enquo(time))
-  value_col <- dplyr::select_var(names(df), !! rlang::enquo(value))
-  cohort_col <- dplyr::select_var(names(df), !! rlang::enquo(cohort))
+  time_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(time))
+  value_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(value))
+  cohort_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(cohort))
 
   if (cohort_col == time_col) {
     stop("cohort column must be different from time column.")
