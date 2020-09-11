@@ -67,8 +67,6 @@ test_that("do_arima test mode with minute as time units", {
     do_arima(`time stamp`, `da ta`, 10, time_unit = "minute", test_mode=TRUE)
   # verify that the last forecasted_value is not NA to test #9211
   expect_true(!is.na(ret$data[[1]]$forecasted_value[[length(ret$data[[1]]$forecasted_value)]]))
-  # verify that daily, weekly is enabled to test #9361.
-  expect_equal(c("daily","weekly") %in% colnames(ret),c(T,T))
 })
 
 test_that("do_arima test mode with hour as time units", {
@@ -79,8 +77,6 @@ test_that("do_arima test mode with hour as time units", {
     do_arima(`time stamp`, `da ta`, 10, time_unit = "hour", test_mode=TRUE)
   # verify that the last forecasted_value is not NA to test #9211
   expect_true(!is.na(ret$data[[1]]$forecasted_value[[length(ret$data[[1]]$forecasted_value)]]))
-  # verify that daily, weekly is enabled to test #9361.
-  expect_equal(c("daily","weekly") %in% colnames(ret),c(T,T))
 })
 
 test_that("do_arima test mode with month as time units", {

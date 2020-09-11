@@ -584,17 +584,16 @@ create_ts_seq <- function(ds, start_func, to_func, time_unit, start_add=0, to_ad
   # Create periodical sequence of time to fill missing date/time
   if (time_unit %in% c("hour", "minute", "second")) { # Use seq.POSIXt for unit smaller than day.
     ts <- seq.POSIXt(as.POSIXct(start_func(ds) + start_add), as.POSIXct(to_func(ds) + to_add), by=time_unit_for_seq)
-    if (lubridate::is.Date(aggregated_data$ds)) {
-      ts <- as.Date(ts)
+    if (!lubridate::is.POSIXct(ts)) {
+      ts <- as.POSIXct(ts)
     }
   }
   else { # Use seq.Date for unit of day or larger. Using seq.POSIXct for month does not always give first day of month.
     ts <- seq.Date(as.Date(start_func(ds) + start_add), as.Date(to_func(ds) + to_add), by=time_unit_for_seq)
     if (!lubridate::is.Date(ds)) {
-      ts <- as.POSIXct(ts)
+      ts <- as.Date(ts)
     }
   }
-
   ts
  }
 
