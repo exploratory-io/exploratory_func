@@ -379,10 +379,11 @@ do_arima <- function(df, time,
     ret <- tibble(data = list(ret_df), model = list(model_df))
 
     tryCatch({
-      stl_ts <- ts(ret_df[[value_col]], frequency=seasonal_periods)
+      #stl_ts <- ts(ret_df[[value_col]], frequency=seasonal_periods)
+      stl_ts <-ts(training_data$y, frequency=seasonal_periods)
       stl_res <- stl(stl_ts, "periodic")
       stl_df <- as.data.frame(stl_res$time.series)
-      stl_df[[time_col]] <- ret_df[[time_col]]
+      stl_df[[time_col]] <- training_data$ds
       stl_seasonal_df <- stl_df %>% dplyr::slice(1:seasonal_periods) # To display only one seasonal cycle
       ret <- ret %>% mutate(stl = list(!!stl_df), stl_seasonal = list(!!stl_seasonal_df))
     }, error = function(e) { # This can fail depending on the data.

@@ -83,6 +83,7 @@ test_that("do_arima test mode with month as time units", {
   raw_data$`da ta`[[length(ts) - 2]] <- NA # inject NA near the end to test #9211
   ret <- raw_data %>%
     do_arima(`time stamp`, `da ta`, 10, time_unit = "month", test_mode=TRUE)
+  expect_gt(nrow(ret$stl[[1]]), 0)
   # verify that the last forecasted_value is not NA to test #9211
   expect_true(!is.na(ret$data[[1]]$forecasted_value[[length(ret$data[[1]]$forecasted_value)]]))
 })
