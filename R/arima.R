@@ -16,10 +16,9 @@
 #' @param na_fill_value - Value to fill NA when na_fill_type is "value"
 #' @param ... - extra values to be passed to prophet::prophet. listed below.
 #' @export
-do_arima <- function(df, time,
-                     valueColumn = NULL,
-                     time_unit = "day",
+do_arima <- function(df, time, valueColumn,
                      periods = 10,
+                     time_unit = "day",
                      fun.aggregate = sum,
                      test_mode = FALSE,
                      auto = TRUE,
@@ -68,7 +67,7 @@ do_arima <- function(df, time,
 
   # if valueColumns is not set (value is NULL by default)
   # dplyr::select_var occurs Error
-  value_col <- if(!missing(valueColumn)){
+  value_col <- if(!missing(valueColumn) && !is.null(valueColumn)){
     tidyselect::vars_pull(names(df), !! rlang::enquo(valueColumn))
   }
   # xreg_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))

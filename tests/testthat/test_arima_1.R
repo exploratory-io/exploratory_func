@@ -310,5 +310,7 @@ test_that("do_arima without value_col", {
   data("raw_data", package = "AnomalyDetection")
   raw_data$timestamp <- as.POSIXct(raw_data$timestamp)
   ret <- raw_data %>%
-    do_arima(timestamp, NULL, 10)
+    do_arima(timestamp, , 10)
+  # verify that the last forecasted_value is not NA to test #9211
+  expect_true(!is.na(ret$data[[1]]$forecasted_value[[length(ret$data[[1]]$forecasted_value)]]))
 })
