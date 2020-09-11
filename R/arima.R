@@ -224,7 +224,7 @@ do_arima <- function(df, time,
         formula_str <- paste0("y ~ 0 + PDQ(period=", seasonal_periods , ")")
       }
       else {
-        formula_str <- paste0("y ~ pdq(", p, ",", d, ",", q, " + PDQ(period=", seasonal_periods , ")")
+        formula_str <- paste0("y ~ pdq(", p, ",", d, ",", q, ") + PDQ(period=", seasonal_periods , ")")
       }
     }
     else {
@@ -242,6 +242,9 @@ do_arima <- function(df, time,
                                            ic = ic,
                                            stepwise=stepwise,
                                            ))
+    if (class(model_df$arima[[1]]$fit) == "null_mdl") {
+      stop("Null model was selected.") # Error, because it cannot produce forecast. https://github.com/tidyverts/fable/issues/304
+    }
     forecasted_df <- model_df %>% fabletools::forecast(h=periods)
     forecasted_df <- forecasted_df %>% mutate(`80%`=fabletools:::hilo(.distribution, level=80))
     forecasted_df <- forecasted_df %>% mutate(`95%`=fabletools:::hilo(.distribution, level=95))
