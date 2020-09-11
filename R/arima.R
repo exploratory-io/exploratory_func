@@ -221,10 +221,10 @@ do_arima <- function(df, time,
 
     if (seasonal) {
       if (auto) {
-        formula_str <- "y ~ 0"
+        formula_str <- paste0("y ~ 0 + PDQ(period=", seasonal_periods , ")")
       }
       else {
-        formula_str <- paste0("y ~ pdq(", p, ",", d, ",", q, ")")
+        formula_str <- paste0("y ~ pdq(", p, ",", d, ",", q, " + PDQ(period=", seasonal_periods , ")")
       }
     }
     else {
