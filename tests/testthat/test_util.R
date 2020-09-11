@@ -948,25 +948,25 @@ test_that("week", {
 })
 
 test_that("summarize_confint_mean", {
-  # confint_radius is the reference implementation.
+  # confint_radius is the base implementation.
   v <- 1:100
   expect_equal(exploratory::confint_radius(v), exploratory::summarize_confint_mean(v))
 })
 
 test_that("calc_confint_mean", {
-  # confint_radius is the reference implementation.
+  # confint_radius is the base implementation.
   v <- 1:100
   expect_equal(exploratory::confint_radius(v), exploratory::calc_confint_mean(length(v), sd(v)))
 })
 
 test_that("summarize_confint_ratio", {
-  # prop_confint_radius is the reference implementation.
+  # prop_confint_radius is the base implementation.
   v <- 1:100 %% 3 ==0
   expect_equal(exploratory::prop_confint_radius(v), exploratory::summarize_confint_ratio(v))
 })
 
 test_that("calc_confint_ratio", {
-  # prop_confint_radius is the reference implementation.
+  # prop_confint_radius is the base implementation.
   v <- 1:100 %% 3 ==0
   expect_equal(exploratory::prop_confint_radius(v), exploratory::calc_confint_ratio(length(v),  sum(v)/length(v)))
 })
