@@ -371,10 +371,11 @@ do_arima <- function(df, time,
       stl_res <- stl(stl_ts, "periodic")
       stl_df <- as.data.frame(stl_res$time.series)
       stl_df[[time_col]] <- ret_df[[time_col]]
-      stl_seasonal_df <- stl_df %>% head(seasonal_periods) # To display only one seasonal cycle
+      stl_seasonal_df <- stl_df %>% dplyr::slice(1:seasonal_periods) # To display only one seasonal cycle
       ret <- ret %>% mutate(stl = list(!!stl_df), stl_seasonal = list(!!stl_seasonal_df))
     }, error = function(e) { # This can fail depending on the data.
-      # Let it go for now.
+      # At least, create stl, stl_seasonal columns to avoid error.
+      ret <<- ret %>% mutate(stl = list(data.frame()), stl_seasonal = list(data.frame()))
     })
 
     # Add ACF.
