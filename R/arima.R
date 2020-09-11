@@ -67,7 +67,7 @@ do_arima <- function(df, time, valueColumn,
 
   # if valueColumns is not set (value is NULL by default)
   # dplyr::select_var occurs Error
-  value_col <- if(!missing(valueColumn) && !is.null(valueColumn)){
+  value_col <- if(!missing(valueColumn)) { # is.null(valueColumn) gives error for some reason.
     tidyselect::vars_pull(names(df), !! rlang::enquo(valueColumn))
   }
   # xreg_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))

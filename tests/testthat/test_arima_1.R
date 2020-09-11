@@ -108,19 +108,17 @@ test_that("do_arima test mode with year as time units", {
   expect_true(!is.na(ret$data[[1]]$forecasted_value[[length(ret$data[[1]]$forecasted_value)]]))
 })
 
-test_that("do_arima with short data (test for coef)", {
+test_that("do_arima with short data", {
   ts <- seq.Date(as.Date("2010-01-01"), as.Date("2010-01-13"), by="day")
-  raw_data <- data.frame(timestamp=ts, data=runif(length(ts)))
+  raw_data <- data.frame(timestamp=ts, data=runif(length(ts))) %>% dplyr::rename(`time stamp`=timestamp, `da ta`=data)
   model_df <- raw_data %>%
-    do_arima(timestamp, data, 10, time_unit = "day", funs.aggregate.regressors = c(mean), yearly.seasonality = "auto", weekly.seasonality = "auto", output="model")
-  coef_df <- model_df %>% tidy_rowwise(model, type="coef")
-  expect_equal(length(names(coef_df)), 0)
-  ret <- model_df %>% tidy_rowwise(model)
-  # verify the last date with forecasted_value
-  expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2010-01-23")) 
+    do_arima(`time stamp`, `da ta`, 10, time_unit = "day", funs.aggregate.regressors = c(mean), yearly.seasonality = "auto", weekly.seasonality = "auto", output="model")
+
+  expect_equal(last(model_df$data[[1]]$`time stamp`), as.Date("2010-01-23")) 
   # test for glance.
-  ret <- model_df %>% glance_rowwise(model)
+  ret <- model_df %>% glance_with_ts_metric()
   expect_true(all(c("RMSE","MAE","MAPE") %in% names(ret)))
+  expect_true(!is.na(model_df$data[[1]]$forecasted_value[[length(model_df$data[[1]]$forecasted_value)]]))
 })
 
 test_that("do_arima with extra regressors", {
