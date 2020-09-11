@@ -64,12 +64,12 @@ do_arima <- function(df, time,
                      ){
   validate_empty_data(df)
 
-  time_col <- dplyr::select_var(names(df), !! rlang::enquo(time))
+  time_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(time))
 
   # if valueColumns is not set (value is NULL by default)
   # dplyr::select_var occurs Error
   value_col <- if(!missing(valueColumn)){
-    dplyr::select_var(names(df), !! rlang::enquo(valueColumn))
+    tidyselect::vars_pull(names(df), !! rlang::enquo(valueColumn))
   }
   # xreg_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
 
