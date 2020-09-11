@@ -457,6 +457,9 @@ do_arima <- function(df, time,
 
     # Add residual
     residuals_df <- as.data.frame(residuals_df) # as.data.frame is to avoid error from unnest() later.
+    if (tsibble::is_yearmonth(residuals_df$ds)) { # Convert yearmonth to Date, so that the chart can plot it.
+      residuals_df <- residuals_df %>% mutate(ds = as.Date(ds))
+    }
     colnames(residuals_df)[colnames(residuals_df) == "ds"] <- time_col
     colnames(residuals_df)[colnames(residuals_df) == ".resid"] <- value_col
     ret <- ret %>% mutate(residuals= list(!!residuals_df))
