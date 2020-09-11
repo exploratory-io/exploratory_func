@@ -26,22 +26,22 @@ test_that("do_arima with aggregation", {
     do_arima(`time stamp`, `cou nt`, 2, time_unit = "day", test_mode=TRUE)
   ret <- model_df %>% tidy_rowwise(model)
   # verify that the last forecasted_value is not NA to test #9211
-  expect_true(!is.na(ret$forecasted_value[[length(ret$forecasted_value)]]))
+  expect_true(!is.na(ret$data[[1]]$forecasted_value[[length(ret$data[[1]]$forecasted_value)]]))
 
   ret <- raw_data %>%
     do_arima(`time stamp`, `cou nt`, 2, time_unit = "hour", test_mode=TRUE) %>% tidy_rowwise(model)
   # verify that the last forecasted_value is not NA to test #9211
-  expect_true(!is.na(ret$forecasted_value[[length(ret$forecasted_value)]]))
+  expect_true(!is.na(ret$data[[1]]$forecasted_value[[length(ret$data[[1]]$forecasted_value)]]))
 
   ret <- raw_data %>% tail(100) %>%
     do_arima(`time stamp`, `cou nt`, 2, time_unit = "minute", test_mode=TRUE, output="model") %>% tidy_rowwise(model)
   # verify that the last forecasted_value is not NA to test #9211
-  expect_true(!is.na(ret$forecasted_value[[length(ret$forecasted_value)]]))
+  expect_true(!is.na(ret$data[[1]]$forecasted_value[[length(ret$data[[1]]$forecasted_value)]]))
 
   ret <- raw_data %>% tail(100) %>%
     do_arima(`time stamp`, `cou nt`, 2, time_unit = "second", test_mode=TRUE, output="model") %>% tidy_rowwise(model)
   # verify that the last forecasted_value is not NA to test #9211
-  expect_true(!is.na(ret$forecasted_value[[length(ret$forecasted_value)]]))
+  expect_true(!is.na(ret$data[[1]]$forecasted_value[[length(ret$data[[1]]$forecasted_value)]]))
 })
 
 # This test is too slow. TODO: make it faster and enable.
@@ -66,7 +66,7 @@ test_that("do_arima test mode with minute as time units", {
   ret <- raw_data %>%
     do_arima(`time stamp`, `da ta`, 10, time_unit = "minute", test_mode=TRUE)
   # verify that the last forecasted_value is not NA to test #9211
-  expect_true(!is.na(ret$forecasted_value[[length(ret$forecasted_value)]]))
+  expect_true(!is.na(ret$data[[1]]$forecasted_value[[length(ret$data[[1]]$forecasted_value)]]))
   # verify that daily, weekly is enabled to test #9361.
   expect_equal(c("daily","weekly") %in% colnames(ret),c(T,T))
 })
@@ -78,7 +78,7 @@ test_that("do_arima test mode with hour as time units", {
   ret <- raw_data %>%
     do_arima(`time stamp`, `da ta`, 10, time_unit = "hour", test_mode=TRUE)
   # verify that the last forecasted_value is not NA to test #9211
-  expect_true(!is.na(ret$forecasted_value[[length(ret$forecasted_value)]]))
+  expect_true(!is.na(ret$data[[1]]$forecasted_value[[length(ret$data[[1]]$forecasted_value)]]))
   # verify that daily, weekly is enabled to test #9361.
   expect_equal(c("daily","weekly") %in% colnames(ret),c(T,T))
 })
@@ -100,7 +100,7 @@ test_that("do_arima test mode with quarter as time units", {
   ret <- raw_data %>%
     do_arima(`time stamp`, `da ta`, 10, time_unit = "quarter", test_mode=TRUE)
   # verify that the last forecasted_value is not NA to test #9211
-  expect_true(!is.na(ret$forecasted_value[[length(ret$forecasted_value)]]))
+  expect_true(!is.na(ret$data[[1]]$forecasted_value[[length(ret$data[[1]]$forecasted_value)]]))
 })
 
 test_that("do_arima test mode with year as time units", {
@@ -110,7 +110,7 @@ test_that("do_arima test mode with year as time units", {
   ret <- raw_data %>%
     do_arima(`time stamp`, `da ta`, 10, time_unit = "year", test_mode=TRUE)
   # verify that the last forecasted_value is not NA to test #9211
-  expect_true(!is.na(ret$forecasted_value[[length(ret$forecasted_value)]]))
+  expect_true(!is.na(ret$data[[1]]$forecasted_value[[length(ret$data[[1]]$forecasted_value)]]))
 })
 
 test_that("do_arima with short data (test for coef)", {
