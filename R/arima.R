@@ -439,6 +439,9 @@ do_arima <- function(df, time, valueColumn,
     ret <- ret %>% mutate(difference = list(!!diff_df))
 
     # Add difference ACF/PACF.
+    if (length(diff_res) < 2) {
+      stop("The data is too short for the required differences.")
+    }
     acf_res <- acf(diff_res, plot=FALSE)
     difference_acf <- data.frame(lag = acf_res$lag, acf = acf_res$acf)
     ret <- ret %>% mutate(difference_acf = list(!!difference_acf))

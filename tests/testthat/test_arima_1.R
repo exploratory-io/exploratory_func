@@ -3,6 +3,7 @@ test_that("do_arima with aggregation", {
   data("raw_data", package = "AnomalyDetection")
   raw_data$timestamp <- as.POSIXct(raw_data$timestamp)
   raw_data <- raw_data %>% rename(`time stamp`=timestamp, `cou nt`=count)
+
   model_df <- raw_data %>%
     do_arima(`time stamp`, `cou nt`, 2, time_unit = "day", seasonal=F, test_mode=T) # With seasolal=T, the data would be too short.
   ret <- model_df %>% glance_with_ts_metric()
@@ -21,25 +22,29 @@ test_that("do_arima with aggregation", {
     do_arima(`time stamp`, `cou nt`, 10, time_unit = "second")
 
   # test for test mode.
-  raw_data$`cou nt`[[length(raw_data$`cou nt`) - 2]] <- NA # inject NA near the end to test #9211
-  model_df <- raw_data %>%
-    do_arima(`time stamp`, `cou nt`, 2, time_unit = "day", test_mode=TRUE)
-  ret <- model_df %>% tidy_rowwise(model)
-  # verify that the last forecasted_value is not NA to test #9211
-  expect_true(!is.na(ret$data[[1]]$forecasted_value[[length(ret$data[[1]]$forecasted_value)]]))
+  expect_error({
+    raw_data$`cou nt`[[length(raw_data$`cou nt`) - 2]] <- NA # inject NA near the end to test #9211
+    model_df <- raw_data %>%
+      do_arima(`time stamp`, `cou nt`, 2, time_unit = "day", test_mode=TRUE)
+    ret <- model_df %>% tidy_rowwise(model)
+    # verify that the last forecasted_value is not NA to test #9211
+    expect_true(!is.na(ret$data[[1]]$forecasted_value[[length(ret$data[[1]]$forecasted_value)]]))
+  }, "The data is too short for the required differences.")
 
   ret <- raw_data %>%
-    do_arima(`time stamp`, `cou nt`, 2, time_unit = "hour", test_mode=TRUE) %>% tidy_rowwise(model)
+    do_arima(`time stamp`, `cou nt`, 2, time_unit = "hour", test_mode=TRUE)
+
   # verify that the last forecasted_value is not NA to test #9211
   expect_true(!is.na(ret$data[[1]]$forecasted_value[[length(ret$data[[1]]$forecasted_value)]]))
+})
+
+test_that("do_arima with minutes", {
+  data("raw_data", package = "AnomalyDetection")
+  raw_data$timestamp <- as.POSIXct(raw_data$timestamp)
+  raw_data <- raw_data %>% rename(`time stamp`=timestamp, `cou nt`=count)
 
   ret <- raw_data %>% tail(100) %>%
-    do_arima(`time stamp`, `cou nt`, 2, time_unit = "minute", test_mode=TRUE, output="model") %>% tidy_rowwise(model)
-  # verify that the last forecasted_value is not NA to test #9211
-  expect_true(!is.na(ret$data[[1]]$forecasted_value[[length(ret$data[[1]]$forecasted_value)]]))
-
-  ret <- raw_data %>% tail(100) %>%
-    do_arima(`time stamp`, `cou nt`, 2, time_unit = "second", test_mode=TRUE, output="model") %>% tidy_rowwise(model)
+    do_arima(`time stamp`, `cou nt`, 2, time_unit = "minute", test_mode=TRUE)
   # verify that the last forecasted_value is not NA to test #9211
   expect_true(!is.na(ret$data[[1]]$forecasted_value[[length(ret$data[[1]]$forecasted_value)]]))
 })
