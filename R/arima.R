@@ -42,7 +42,7 @@ do_arima <- function(df, time,
                      start.Q = 1,
                      stationary = FALSE,
                      seasonal = TRUE,
-                     seasonal_periods = 7, #TODO: Adjust default by time_unit
+                     seasonal_periods = NULL,
                      ic = "aic",
                      allowdrift = TRUE,
                      allowmean = TRUE,
@@ -98,6 +98,18 @@ do_arima <- function(df, time,
     if(value_col %in% grouped_col){
       stop(paste0(value_col, " is grouped. Please ungroup it."))
     }
+  }
+
+  if (is.null(seasonal_periods)) {
+    seasonal_periods <- switch(time_unit,
+                               year = NULL,
+                               quarter = 4,
+                               month = 12,
+                               week = 52,
+                               day = 7,
+                               hour = 24,
+                               minute = NULL,
+                               second = NULL)
   }
 
   # Compose arguments to pass to dplyr::summarise.
@@ -224,7 +236,7 @@ do_arima <- function(df, time,
       training_tsibble <- tsibble::tsibble(ds = training_data$ds, y = training_data$y)
     }
 
-    if (seasonal) {
+    if (seasonal && !is.null(seasonal_periods)) {
       if (auto) {
         formula_str <- paste0("y ~ 0 + PDQ(period=", seasonal_periods , ")")
       }
