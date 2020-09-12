@@ -262,8 +262,6 @@ exp_arima <- function(df, time, valueColumn,
       stop("Null model was selected.") # Error, because it cannot produce forecast. https://github.com/tidyverts/fable/issues/304
     }
     forecasted_df <- model_df %>% fabletools::forecast(h=periods)
-    forecasted_df <- forecasted_df %>% mutate(`80%`=fabletools:::hilo(.distribution, level=80))
-    forecasted_df <- forecasted_df %>% mutate(`95%`=fabletools:::hilo(.distribution, level=95))
 
     # Old code with forecast::auto.arima kept for reference while moving to fable::ARIMA.
     #
@@ -332,9 +330,9 @@ exp_arima <- function(df, time, valueColumn,
     # }))
 
     forecast_rows <- tibble(ds=forecasted_df$ds,
-                            forecasted_value=forecasted_df$y,
-                            forecasted_value_high=purrr::flatten_dbl(purrr::map(forecasted_df$`80%`,function(x){x$.upper})),
-                            forecasted_value_low=purrr::flatten_dbl(purrr::map(forecasted_df$`80%`,function(x){x$.lower})))
+                            forecasted_value=mean(forecasted_df$y), # Note that y is a distribution object.
+                            forecasted_value_high=quantile(forecasted_df$y, 0.8),
+                            forecasted_value_low=quantile(forecasted_df$y, 0.2))
 
     if (test_mode){
       fitted_training_df$is_test_data <- FALSE
