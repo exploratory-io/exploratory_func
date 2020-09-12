@@ -645,15 +645,8 @@ tidy.xgb.Booster <- function(x, type="weight", pretty.name = FALSE, ...){
   ret
 }
 
-#' Glance for xgb.Booster model
-#' @param x xgb.Booster model
-#' @param ... Not used for now.
-#' @export
-glance.xgb.Booster <- function(x, pretty.name = FALSE, ...) {
-  # data frame with
-  # number of iteration
-  # with chosen evaluation metrics
-  ret <- x$evaluation_log %>% as.data.frame()
+prettify_xgboost_evaluation_log <- function(df, pretty.name=FALSE) {
+  ret <- df
   if(pretty.name){
     colnames(ret)[colnames(ret) == "iter"] <- "Number of Iteration"
     colnames(ret)[colnames(ret) == "train_rmse"] <- "RMSE"
@@ -743,6 +736,19 @@ glance.xgb.Booster <- function(x, pretty.name = FALSE, ...) {
     colnames(ret)[colnames(ret) == "validation_gamma_nloglik"] <- "validation_gamma_negative_log_likelihood"
     colnames(ret)[colnames(ret) == "validation_gamma_deviance"] <- "validation_gamma_deviance"
   }
+  ret
+}
+
+#' Glance for xgb.Booster model
+#' @param x xgb.Booster model
+#' @param ... Not used for now.
+#' @export
+glance.xgb.Booster <- function(x, pretty.name = FALSE, ...) {
+  # data frame with
+  # number of iteration
+  # with chosen evaluation metrics
+  ret <- x$evaluation_log %>% as.data.frame()
+  ret <- prettify_xgboost_evaluation_log(ret, pretty.name=TRUE)
   ret
 }
 
@@ -1362,6 +1368,15 @@ tidy.xgboost_exp <- function(x, type = "importance", pretty.name = FALSE, binary
     },
     partial_dependence = {
       ret <- handle_partial_dependence(x)
+      ret
+    },
+    evaluation_log = {
+      # data frame with
+      # number of iteration
+      # with chosen evaluation metrics
+      ret <- x$evaluation_log %>% as.data.frame()
+      ret <- ret %>% tidyr::pivot_longer(cols = c(-iter))
+      ret <- ret %>% tidyr::separate(col = "name", into=c("type","name"))
       ret
     },
     {

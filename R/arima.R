@@ -16,51 +16,51 @@
 #' @param na_fill_value - Value to fill NA when na_fill_type is "value"
 #' @param ... - extra values to be passed to prophet::prophet. listed below.
 #' @export
-do_arima <- function(df, time, valueColumn,
-                     periods = 10,
-                     time_unit = "day",
-                     fun.aggregate = sum,
-                     test_mode = FALSE,
-                     auto = TRUE,
-                     p = 0,
-                     d = 0,
-                     q = 0,
-                     P = 0,
-                     D = 0,
-                     Q = 0,
-                     max.p = 5,
-                     max.q = 5,
-                     max.P = 2,
-                     max.Q = 2,
-                     max.order = 5,
-                     max.d = 2,
-                     max.D = 1,
-                     start.p = 2,
-                     start.q = 2,
-                     start.P = 1,
-                     start.Q = 1,
-                     stationary = FALSE,
-                     seasonal = TRUE,
-                     seasonal_periods = NULL,
-                     ic = "aic",
-                     allowdrift = TRUE,
-                     allowmean = TRUE,
-                     lambda = NULL,
-                     biasadj = FALSE,
-                     unit_root_test = "kpss",
-                     seasonal.test = "ocsb",
-                     stepwise=FALSE,
-                     parallel = FALSE,
-                     num.cores = 2,
-                     na_fill_type = NULL,
-                     na_fill_value = 0,
-                     trace = TRUE,
-                     regressors = NULL,
-                     funs.aggregate.regressors = NULL,
-                     regressors_na_fill_type = NULL,
-                     regressors_na_fill_value = 0,
-                     ...
-                     ){
+exp_arima <- function(df, time, valueColumn,
+                      periods = 10,
+                      time_unit = "day",
+                      fun.aggregate = sum,
+                      test_mode = FALSE,
+                      auto = TRUE,
+                      p = 0,
+                      d = 0,
+                      q = 0,
+                      P = 0,
+                      D = 0,
+                      Q = 0,
+                      max.p = 5,
+                      max.q = 5,
+                      max.P = 2,
+                      max.Q = 2,
+                      max.order = 5,
+                      max.d = 2,
+                      max.D = 1,
+                      start.p = 2,
+                      start.q = 2,
+                      start.P = 1,
+                      start.Q = 1,
+                      stationary = FALSE,
+                      seasonal = TRUE,
+                      seasonal_periods = NULL,
+                      ic = "aic",
+                      allowdrift = TRUE,
+                      allowmean = TRUE,
+                      lambda = NULL,
+                      biasadj = FALSE,
+                      unit_root_test = "kpss",
+                      seasonal.test = "ocsb",
+                      stepwise=FALSE,
+                      parallel = FALSE,
+                      num.cores = 2,
+                      na_fill_type = NULL,
+                      na_fill_value = 0,
+                      trace = TRUE,
+                      regressors = NULL,
+                      funs.aggregate.regressors = NULL,
+                      regressors_na_fill_type = NULL,
+                      regressors_na_fill_value = 0,
+                      ...
+                      ){
   validate_empty_data(df)
 
   time_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(time))
@@ -262,8 +262,6 @@ do_arima <- function(df, time, valueColumn,
       stop("Null model was selected.") # Error, because it cannot produce forecast. https://github.com/tidyverts/fable/issues/304
     }
     forecasted_df <- model_df %>% fabletools::forecast(h=periods)
-    forecasted_df <- forecasted_df %>% mutate(`80%`=fabletools:::hilo(.distribution, level=80))
-    forecasted_df <- forecasted_df %>% mutate(`95%`=fabletools:::hilo(.distribution, level=95))
 
     # Old code with forecast::auto.arima kept for reference while moving to fable::ARIMA.
     #
@@ -332,9 +330,9 @@ do_arima <- function(df, time, valueColumn,
     # }))
 
     forecast_rows <- tibble(ds=forecasted_df$ds,
-                            forecasted_value=forecasted_df$y,
-                            forecasted_value_high=purrr::flatten_dbl(purrr::map(forecasted_df$`80%`,function(x){x$.upper})),
-                            forecasted_value_low=purrr::flatten_dbl(purrr::map(forecasted_df$`80%`,function(x){x$.lower})))
+                            forecasted_value=mean(forecasted_df$y), # Note that y is a distribution object.
+                            forecasted_value_high=quantile(forecasted_df$y, 0.8),
+                            forecasted_value_low=quantile(forecasted_df$y, 0.2))
 
     if (test_mode){
       fitted_training_df$is_test_data <- FALSE
