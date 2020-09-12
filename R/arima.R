@@ -436,7 +436,6 @@ do_arima <- function(df, time, valueColumn,
     }
 
     unit_root_test_res <- runTests(diff_res, unit_root_test)
-    #unit_root_test_res <- data.frame(unit_root_test_res@cval, teststat = unit_root_test_res@teststat)
     ret <- ret %>% mutate(unit_root_test = list(!!unit_root_test_res))
 
     unit_root_test_pvalue <- unit_root_test_res$p.value
@@ -500,7 +499,7 @@ do_arima <- function(df, time, valueColumn,
     # ret <- ret %>% mutate(residual_test = list(!!residual_test))
     attr(ret$model[[1]]$arima[[1]]$fit, "residual_test") <- residual_test
 
-    if(F){
+    if(F){ # Old code using forecast package. Will remove later.
     ret <- ret %>% dplyr::mutate(test_results = purrr::map(model, function(m) {
       # Repeat test for each lag.
       residuals <- residuals(m)
