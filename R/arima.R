@@ -387,6 +387,7 @@ do_arima <- function(df, time, valueColumn,
       cpt_res <- changepoint::cpt.var(training_data$y, method="PELT")
       cpt_vec <- rep(0, length(training_data$ds))
       cpt_vec[cpt_res@cpts] <- 1
+      cpt_vec[length(cpt_vec)] <- 0 # Last data point sometimes is reported as a change point, but this is not useful for our purpose.
       stl_df$change_point <- cpt_vec
 
       stl_seasonal_df <- stl_df %>% dplyr::slice(1:seasonal_periods) # To display only one seasonal cycle
