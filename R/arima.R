@@ -16,40 +16,45 @@
 #' @param na_fill_value - Value to fill NA when na_fill_type is "value"
 #' @param ... - extra values to be passed to prophet::prophet. listed below.
 #' @export
-do_arima <- function(df, time,
-                     valueColumn = NULL,
-                     time_unit = "day",
+do_arima <- function(df, time, valueColumn,
                      periods = 10,
+                     time_unit = "day",
                      fun.aggregate = sum,
                      test_mode = FALSE,
-                     # d = NA,
-                     # D = NA,
-                     # max.p = 5,
-                     # max.q = 5,
-                     # max.P = 2,
-                     # max.Q = 2,
-                     # max.order = 5,
-                     # max.d = 2,
-                     # max.D = 1,
-                     # start.p = 2,
-                     # start.q = 2,
-                     # start.P = 1,
-                     # start.Q = 1,
-                     # stationary = FALSE,
-                     # seasonal = TRUE,
+                     auto = TRUE,
+                     p = 0,
+                     d = 0,
+                     q = 0,
+                     P = 0,
+                     D = 0,
+                     Q = 0,
+                     max.p = 5,
+                     max.q = 5,
+                     max.P = 2,
+                     max.Q = 2,
+                     max.order = 5,
+                     max.d = 2,
+                     max.D = 1,
+                     start.p = 2,
+                     start.q = 2,
+                     start.P = 1,
+                     start.Q = 1,
+                     stationary = FALSE,
+                     seasonal = TRUE,
+                     seasonal_periods = NULL,
                      ic = "aic",
-                     # allowdrift = TRUE,
-                     # allowmean = TRUE,
-                     # lambda = NULL,
-                     # biasadj = FALSE,
-                     test = "kpss",
-                     # seasonal.test = "ocsb",
+                     allowdrift = TRUE,
+                     allowmean = TRUE,
+                     lambda = NULL,
+                     biasadj = FALSE,
+                     unit_root_test = "kpss",
+                     seasonal.test = "ocsb",
                      stepwise=FALSE,
-                     # parallel = FALSE,
-                     # num.cores = 2,
+                     parallel = FALSE,
+                     num.cores = 2,
                      na_fill_type = NULL,
                      na_fill_value = 0,
-                     # trace = TRUE,
+                     trace = TRUE,
                      regressors = NULL,
                      funs.aggregate.regressors = NULL,
                      regressors_na_fill_type = NULL,
@@ -58,12 +63,12 @@ do_arima <- function(df, time,
                      ){
   validate_empty_data(df)
 
-  time_col <- dplyr::select_var(names(df), !! rlang::enquo(time))
+  time_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(time))
 
   # if valueColumns is not set (value is NULL by default)
   # dplyr::select_var occurs Error
-  value_col <- if(!missing(valueColumn)){
-    dplyr::select_var(names(df), !! rlang::enquo(valueColumn))
+  value_col <- if(!missing(valueColumn)) { # is.null(valueColumn) gives error for some reason.
+    tidyselect::vars_pull(names(df), !! rlang::enquo(valueColumn))
   }
   # xreg_cols <- dplyr::select_vars(names(df), !!! rlang::quos(...))
 
@@ -92,6 +97,18 @@ do_arima <- function(df, time,
     if(value_col %in% grouped_col){
       stop(paste0(value_col, " is grouped. Please ungroup it."))
     }
+  }
+
+  if (is.null(seasonal_periods)) {
+    seasonal_periods <- switch(time_unit,
+                               year = NULL,
+                               quarter = 4,
+                               month = 12,
+                               week = 52,
+                               day = 7,
+                               hour = 24,
+                               minute = NULL,
+                               second = NULL)
   }
 
   # Compose arguments to pass to dplyr::summarise.
@@ -211,13 +228,42 @@ do_arima <- function(df, time,
     # So, if trace value is needed, the output must be captured.
     ret <- NULL
 
-    training_tsibble <- tsibble::tsibble(ds = training_data$ds, y = training_data$y)
+    if (time_unit %in% c("month", "year", "quarter")) { #TODO: Take care of other time units too.
+      training_tsibble <- tsibble::tsibble(ds = tsibble::yearmonth(training_data$ds), y = training_data$y)
+    }
+    else {
+      training_tsibble <- tsibble::tsibble(ds = training_data$ds, y = training_data$y)
+    }
+
+    if (seasonal && !is.null(seasonal_periods)) {
+      if (auto) {
+        formula_str <- paste0("y ~ 0 + PDQ(period=", seasonal_periods , ")")
+      }
+      else {
+        formula_str <- paste0("y ~ pdq(", p, ",", d, ",", q, ") + PDQ(period=", seasonal_periods , ")")
+      }
+    }
+    else {
+      if (auto) {
+        formula_str <- "y ~ PDQ(0,0,0)"
+      }
+      else {
+        formula_str <- paste0("y ~ pdq(", p, ",", d, ",", q, ") + PDQ(0,0,0)")
+      }
+    }
+    fml <- as.formula(formula_str)
+
     model_df <- training_tsibble %>%
-      fabletools::model(arima=fable::ARIMA(y,
+      fabletools::model(arima=fable::ARIMA(!!fml,
                                            ic = ic,
                                            stepwise=stepwise,
                                            ))
-    forecasted_df <- model_df %>% fabletools::forecast(h=periods) %>% fabletools::hilo(level = c(80, 95))
+    if (class(model_df$arima[[1]]$fit) == "null_mdl") {
+      stop("Null model was selected.") # Error, because it cannot produce forecast. https://github.com/tidyverts/fable/issues/304
+    }
+    forecasted_df <- model_df %>% fabletools::forecast(h=periods)
+    forecasted_df <- forecasted_df %>% mutate(`80%`=fabletools:::hilo(.distribution, level=80))
+    forecasted_df <- forecasted_df %>% mutate(`95%`=fabletools:::hilo(.distribution, level=95))
 
     # Old code with forecast::auto.arima kept for reference while moving to fable::ARIMA.
     #
@@ -322,6 +368,7 @@ do_arima <- function(df, time,
     if (test_mode) {
       ret_df <- ret_df %>% dplyr::select(-is_test_data, is_test_data)
     }
+    attr(ret_df, "value_col") <- value_col # We need this into to read it later to evaluate it.
 
     class(model_df$arima[[1]]$fit) <- c("ARIMA_exploratory", class(model_df$arima[[1]]$fit))
     # Note that model column is mable, rather than model object.
@@ -330,49 +377,56 @@ do_arima <- function(df, time,
     # Reference: https://github.com/tidyverts/fable/issues/91
     ret <- tibble(data = list(ret_df), model = list(model_df))
 
+    tryCatch({
+      stl_ts <-ts(training_data$y, frequency=seasonal_periods)
+      stl_res <- stl(stl_ts, "periodic")
+      stl_df <- as.data.frame(stl_res$time.series)
+      stl_df[[time_col]] <- training_data$ds
+
+      # Detect change points
+      cpt_res <- changepoint::cpt.var(training_data$y, method="PELT")
+      cpt_vec <- rep(0, length(training_data$ds))
+      cpt_vec[cpt_res@cpts] <- 1
+      cpt_vec[length(cpt_vec)] <- 0 # Last data point sometimes is reported as a change point, but this is not useful for our purpose.
+      stl_df$change_point <- cpt_vec
+      stl_df$y <- training_data$y
+
+      stl_seasonal_df <- stl_df %>% dplyr::slice(1:seasonal_periods) # To display only one seasonal cycle
+      ret <- ret %>% mutate(stl = list(!!stl_df), stl_seasonal = list(!!stl_seasonal_df))
+    }, error = function(e) { # This can fail depending on the data.
+      # At least, create stl, stl_seasonal columns to avoid error.
+      ret <<- ret %>% mutate(stl = list(data.frame()), stl_seasonal = list(data.frame()))
+    })
+
     # Add ACF.
     acf_res <- acf(training_tsibble$y, plot=FALSE)
     acf_df <- data.frame(lag = acf_res$lag, acf = acf_res$acf)
     ret <- ret %>% mutate(acf = list(!!acf_df))
 
-    # Add difference ACF.
+    # Data after differentiations
     differences <- model_df$arima[[1]]$fit$spec$d
-    if (differences > 0) {
+    if (!is.null(differences) && differences > 0) {
       diff_res <- diff(training_tsibble$y, differences = differences)
     }
     else {
       diff_res <- training_tsibble$y
     }
-    acf_res <- acf(diff_res, plot=FALSE)
-    difference_acf <- data.frame(lag = acf_res$lag, acf = acf_res$acf)
-    ret <- ret %>% mutate(difference_acf = list(!!difference_acf))
+    seasonality_differences <- model_df$arima[[1]]$fit$spec$D
+    seasonality_lag <- model_df$arima[[1]]$fit$spec$period
 
-    # Add residual ACF
-    residuals_df <- model_df %>% residuals()
-    residual_acf <- residuals_df %>% feasts::ACF(.resid)
-    ret <- ret %>% mutate(residual_acf = list(!!residual_acf))
-
-    # Add residual
-    colnames(residuals_df)[colnames(residuals_df) == "ds"] <- time_col
-    colnames(residuals_df)[colnames(residuals_df) == ".resid"] <- value_col
-    ret <- ret %>% mutate(residuals= list(!!residuals_df))
-
-    # Add unit root test result
-    type <- 1 # 1 menas "level". TODO: check if this is correct.
-    urca_pval <- function(urca_test) {
-      approx(urca_test@cval[1, ], as.numeric(sub("pct", "", 
-                                                 colnames(urca_test@cval)))/100, xout = urca_test@teststat[1], 
-             rule = 2)$y
+    if (!is.null(seasonality_differences) && seasonality_differences > 0) {
+      diff_res <- diff(diff_res, differences = seasonality_differences, lag = seasonality_lag)
     }
-    kpss_wrap <- function(x, ..., use.lag = trunc(3 * sqrt(length(x))/13)) {
-      urca::ur.kpss(x, ..., use.lag = use.lag)
-    }
+    diff_df <- tibble::tibble(ds=training_data$ds[(length(training_data$ds)-length(diff_res)+1):length(training_data$ds)],
+                              diff=diff_res)
 
+    # Run unit root test on the differentiated data.
     runTests <- function(x, test) {
       tryCatch({
-        suppressWarnings(diff <- switch(test, kpss = kpss_wrap(x, type = c("mu", "tau")[type]),
-                                        adf = urca::ur.df(x, type = c("drift", "trend")[type]), 
-                                        pp = urca::ur.pp(x, type = "Z-tau", model = c("constant", "trend")[type]),
+        suppressWarnings(diff <- switch(test,
+                                        kpss = tseries::kpss.test(x),
+                                        adf = tseries::adf.test(x),
+                                        pp = tseries::pp.test(x),
                                         stop("This shouldn't happen")))
         diff
       }, error = function(e) {
@@ -381,9 +435,56 @@ do_arima <- function(df, time,
       })
     }
 
-    unit_root_test_res <- runTests(diff_res, test)
-    unit_root_test_res <- data.frame(unit_root_test_res@cval, teststat = unit_root_test_res@teststat)
+    unit_root_test_res <- runTests(diff_res, unit_root_test)
     ret <- ret %>% mutate(unit_root_test = list(!!unit_root_test_res))
+
+    unit_root_test_pvalue <- unit_root_test_res$p.value
+
+    diff_df$p_value <- unit_root_test_pvalue
+    colnames(diff_df)[colnames(diff_df) == "ds"] <- time_col
+    colnames(diff_df)[colnames(diff_df) == "diff"] <- value_col
+    ret <- ret %>% mutate(difference = list(!!diff_df))
+
+    # Add difference ACF/PACF.
+    if (length(diff_res) < 2) {
+      stop("The data is too short for the required differences.")
+    }
+    acf_res <- acf(diff_res, plot=FALSE)
+    difference_acf <- data.frame(lag = acf_res$lag, acf = acf_res$acf)
+    ret <- ret %>% mutate(difference_acf = list(!!difference_acf))
+    pacf_res <- pacf(diff_res, plot=FALSE)
+    difference_pacf <- data.frame(lag = pacf_res$lag, acf = pacf_res$acf)
+    ret <- ret %>% mutate(difference_pacf = list(!!difference_pacf))
+
+    model_d <- model_df$arima[[1]]$fit$spec$d
+    model_D <- model_df$arima[[1]]$fit$spec$D
+    model_period <- model_df$arima[[1]]$fit$spec$period
+
+    total_diffs <- model_d
+    if (model_D > 0) {
+      total_diffs <- total_diffs + model_D * model_period
+    }
+
+    # Add residual ACF/PACF
+    residuals_df <- model_df %>% residuals()
+    if (model_d > 0 || model_D > 0) {
+      residuals_df <- residuals_df %>% dplyr::slice((1 + total_diffs):n()) # cut off the beginning of the residual data which is not really residual.
+    }
+    residual_acf <- residuals_df %>% feasts::ACF(.resid)
+    residual_acf <- as.data.frame(residual_acf %>% mutate(lag = as.numeric(lag))) # as.data.frame is to avoid error from unnest() later.
+    ret <- ret %>% mutate(residual_acf = list(!!residual_acf))
+    residual_pacf <- residuals_df %>% feasts::PACF(.resid)
+    residual_pacf <- as.data.frame(residual_pacf %>% mutate(lag = as.numeric(lag))) # as.data.frame is to avoid error from unnest() later.
+    ret <- ret %>% mutate(residual_pacf = list(!!residual_pacf))
+
+    # Add residual
+    residuals_df <- as.data.frame(residuals_df) # as.data.frame is to avoid error from unnest() later.
+    if (tsibble::is_yearmonth(residuals_df$ds)) { # Convert yearmonth to Date, so that the chart can plot it.
+      residuals_df <- residuals_df %>% mutate(ds = as.Date(ds))
+    }
+    colnames(residuals_df)[colnames(residuals_df) == "ds"] <- time_col
+    colnames(residuals_df)[colnames(residuals_df) == ".resid"] <- value_col
+    ret <- ret %>% mutate(residuals= list(!!residuals_df))
 
     m <- model_df$arima[[1]]$fit$model # model of "Arima" class. Q: is this from stats package?
     residuals <- residuals(m) # residual has to be extracted from above model to get freq at the next line.
@@ -394,10 +495,11 @@ do_arima <- function(df, time,
     lag <- min(lag, round(length(residuals)/5))
     lag <- max(degree_of_freedom + 3, lag)
     residual_test <- feasts::ljung_box(residuals, lag=lag, dof=degree_of_freedom)
-    residual_test <- tibble(statistic=residual_test[[1]], p.value=residual_test[[2]], lag=lag, dof=degree_of_freedom)
-    ret <- ret %>% mutate(residual_test = list(!!residual_test))
+    residual_test <- tibble::tibble(statistic=residual_test[[1]], p.value=residual_test[[2]], lag=lag, dof=degree_of_freedom)
+    # ret <- ret %>% mutate(residual_test = list(!!residual_test))
+    attr(ret$model[[1]]$arima[[1]]$fit, "residual_test") <- residual_test
 
-    if(F){
+    if(F){ # Old code using forecast package. Will remove later.
     ret <- ret %>% dplyr::mutate(test_results = purrr::map(model, function(m) {
       # Repeat test for each lag.
       residuals <- residuals(m)
@@ -520,22 +622,23 @@ create_ts_seq <- function(ds, start_func, to_func, time_unit, start_add=0, to_ad
   # Create periodical sequence of time to fill missing date/time
   if (time_unit %in% c("hour", "minute", "second")) { # Use seq.POSIXt for unit smaller than day.
     ts <- seq.POSIXt(as.POSIXct(start_func(ds) + start_add), as.POSIXct(to_func(ds) + to_add), by=time_unit_for_seq)
-    if (lubridate::is.Date(aggregated_data$ds)) {
-      ts <- as.Date(ts)
+    if (!lubridate::is.POSIXct(ts)) {
+      ts <- as.POSIXct(ts)
     }
   }
   else { # Use seq.Date for unit of day or larger. Using seq.POSIXct for month does not always give first day of month.
     ts <- seq.Date(as.Date(start_func(ds) + start_add), as.Date(to_func(ds) + to_add), by=time_unit_for_seq)
     if (!lubridate::is.Date(ds)) {
-      ts <- as.POSIXct(ts)
+      ts <- as.Date(ts)
     }
   }
-
   ts
  }
 
 #' @export
 glance.ARIMA_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
+  # Note that, because of fable, x here is actually from model_df$model[1]$arima[[1]]$fit
+
   m <- x$model # x$model is the model object of Arima class.
 
   ar_terms <- m$coef %>% names() %>% .[stringr::str_detect(., "^s?ar[0-9]*")]
@@ -566,6 +669,9 @@ glance.ARIMA_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add t
   }
 
   df <- data.frame(AIC=m$aic, BIC=m$bic, AICc=m$aicc, as.list(order))
+  residual_test <-attr(x,"residual_test") 
+  df$`Ljung-Box Test Statistic` <- residual_test$statistic
+  df$`Ljung-Box Test P Value` <- residual_test$p.value
 
   if(F) { # Skipped for now. TODO: Revive it.
     if(length(ar_stationarity) > 0){
@@ -590,4 +696,29 @@ glance.ARIMA_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add t
   #    <dbl>   <dbl> <dbl> <dbl> <dbl>
   # 1 0.0293    499. -995. -995. -984.
 
+}
+
+#' Model agnostic function to get common time series metric and model specific glance info.
+#' @export
+glance_with_ts_metric <- function(df) {
+  ret1 <- df %>% glance_rowwise(model)
+  ret2 <- df %>% dplyr::select(data) %>% tidyr::unnest(data)
+  value_col <- attr(df$data[[1]], "value_col")
+  if (any(ret2$is_test_data)) {
+    ret2 <- ret2 %>% dplyr::summarize(RMSE=exploratory::rmse(!!rlang::sym(value_col), forecasted_value, is_test_data), MAE=exploratory::mae(!!rlang::sym(value_col), forecasted_value, is_test_data), MAPE=exploratory::mape(!!rlang::sym(value_col), forecasted_value, is_test_data), MASE=exploratory::mase(!!rlang::sym(value_col), forecasted_value, is_test_data), `Number of Rows for Training`=sum(!is_test_data), `Number of Rows for Test`=sum(is_test_data))
+  }
+  else {
+    ret2 <- ret2 %>% dplyr::summarize(RMSE=exploratory::rmse(!!rlang::sym(value_col), forecasted_value, !is.na(!!rlang::sym(value_col))), MAE=exploratory::mae(!!rlang::sym(value_col), forecasted_value, !is.na(!!rlang::sym(value_col))), MAPE=exploratory::mape(!!rlang::sym(value_col), forecasted_value, !is.na(!!rlang::sym(value_col))), `Number of Rows`=sum(!is.na(!!rlang::sym(value_col))))
+  }
+  ret <- dplyr::bind_cols(ret2, ret1) # We show the model agnostic metrics first.
+  if ("Number of Rows" %in% colnames(ret)) {
+    ret <- ret %>% dplyr::select(-`Number of Rows`, everything(), `Number of Rows`)
+  }
+  if ("Number of Rows for Training" %in% colnames(ret)) {
+    ret <- ret %>% dplyr::select(-`Number of Rows for Training`, everything(), `Number of Rows for Training`)
+  }
+  if ("Number of Rows for Test" %in% colnames(ret)) {
+    ret <- ret %>% dplyr::select(-`Number of Rows for Test`, everything(), `Number of Rows for Test`)
+  }
+  ret
 }

@@ -19,12 +19,12 @@
 exp_bayes_ab <- function(df, converted, a_b_identifier, count = NULL, prior_mean = NULL, prior_sd = NULL, type = "model", revert_ab = FALSE, seed = 1, ...){
   # this seems to be the new way of NSE column selection evaluation
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
-  a_b_identifier_col <- dplyr::select_var(names(df), !! rlang::enquo(a_b_identifier))
-  converted_col <- dplyr::select_var(names(df), !! rlang::enquo(converted))
+  a_b_identifier_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(a_b_identifier))
+  converted_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(converted))
 
   if (!is.null(substitute(count))) {
     # The following new way cannot handle the case where count is not specified. Using old substitute().
-    # count_col <- dplyr::select_var(names(df), !! rlang::enquo(count))
+    # count_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(count))
     count_col <- col_name(substitute(count))
   }
   else {
@@ -181,9 +181,9 @@ exp_bayes_ab <- function(df, converted, a_b_identifier, count = NULL, prior_mean
 do_bayes_ab <- function(df, a_b_identifier, total_count, conversion_rate, prior_mean = NULL, prior_sd = NULL, type = "model", seed = 1, ...){
   # this seems to be the new way of NSE column selection evaluation
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
-  a_b_identifier_col <- dplyr::select_var(names(df), !! rlang::enquo(a_b_identifier))
-  total_count_col <- dplyr::select_var(names(df), !! rlang::enquo(total_count))
-  conversion_rate_col <- dplyr::select_var(names(df), !! rlang::enquo(conversion_rate))
+  a_b_identifier_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(a_b_identifier))
+  total_count_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(total_count))
+  conversion_rate_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(conversion_rate))
 
   df <- df %>%
     dplyr::filter(!is.na(!!rlang::sym(a_b_identifier_col)) &
