@@ -1,5 +1,5 @@
 context("test do_arima")
-
+if(F){
 test_that("do_arima with aggregation", {
   data("raw_data", package = "AnomalyDetection")
   raw_data$timestamp <- as.POSIXct(raw_data$timestamp)
@@ -40,4 +40,4 @@ test_that("do_arima with aggregation", {
   # # valueColumn is not set
   # df %>%  dplyr::ungroup() %>% do_arima(`FL DATE`, `DEP_DELAY`, time_unit = "day", periods = 10, valueColumn=`FL_NUM`, test_mode = FALSE, d = NA, D = NA, max.p = 5, max.q = 5, max.P = 2, max.Q = 2, max.order = 5, max.d = 2, max.D = 1, start.p = 2, start.q = 2, start.P = 1, start.Q = 1, stationary = FALSE, seasonal = TRUE, ic = "aic", allowdrift = TRUE, allowmean = TRUE, lambda = NULL, biasadj = FALSE, test = "kpss", seasonal.test = "ocsb", parallel = FALSE, num.cores = 2)
 })
-
+}
