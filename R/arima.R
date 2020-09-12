@@ -710,6 +710,6 @@ glance_with_ts_metric <- function(df) {
   else {
     ret2 <- ret2 %>% dplyr::summarize(RMSE=exploratory::rmse(!!rlang::sym(value_col), forecasted_value, !is.na(!!rlang::sym(value_col))), MAE=exploratory::mae(!!rlang::sym(value_col), forecasted_value, !is.na(!!rlang::sym(value_col))), MAPE=exploratory::mape(!!rlang::sym(value_col), forecasted_value, !is.na(!!rlang::sym(value_col))), `Number of Rows`=sum(!is.na(!!rlang::sym(value_col))))
   }
-  ret <- dplyr::bind_cols(ret1, ret2)
+  ret <- dplyr::bind_cols(ret2, ret1) # We show the model agnostic metrics first.
   ret
 }
