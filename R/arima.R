@@ -378,11 +378,17 @@ do_arima <- function(df, time, valueColumn,
     ret <- tibble(data = list(ret_df), model = list(model_df))
 
     tryCatch({
-      #stl_ts <- ts(ret_df[[value_col]], frequency=seasonal_periods)
       stl_ts <-ts(training_data$y, frequency=seasonal_periods)
       stl_res <- stl(stl_ts, "periodic")
       stl_df <- as.data.frame(stl_res$time.series)
       stl_df[[time_col]] <- training_data$ds
+
+      # Detect change points
+      cpt_res <- changepoint::cpt.var(training_data$y, method="PELT")
+      cpt_vec <- rep(0, length(training_data$ds))
+      cpt_vec[cpt_res@cpts] <- 1
+      stl_df$change_point <- cpt_vec
+
       stl_seasonal_df <- stl_df %>% dplyr::slice(1:seasonal_periods) # To display only one seasonal cycle
       ret <- ret %>% mutate(stl = list(!!stl_df), stl_seasonal = list(!!stl_seasonal_df))
     }, error = function(e) { # This can fail depending on the data.
