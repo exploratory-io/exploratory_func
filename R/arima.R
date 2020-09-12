@@ -389,6 +389,7 @@ do_arima <- function(df, time, valueColumn,
       cpt_vec[cpt_res@cpts] <- 1
       cpt_vec[length(cpt_vec)] <- 0 # Last data point sometimes is reported as a change point, but this is not useful for our purpose.
       stl_df$change_point <- cpt_vec
+      stl_df$y <- training_data$y
 
       stl_seasonal_df <- stl_df %>% dplyr::slice(1:seasonal_periods) # To display only one seasonal cycle
       ret <- ret %>% mutate(stl = list(!!stl_df), stl_seasonal = list(!!stl_seasonal_df))
@@ -711,5 +712,14 @@ glance_with_ts_metric <- function(df) {
     ret2 <- ret2 %>% dplyr::summarize(RMSE=exploratory::rmse(!!rlang::sym(value_col), forecasted_value, !is.na(!!rlang::sym(value_col))), MAE=exploratory::mae(!!rlang::sym(value_col), forecasted_value, !is.na(!!rlang::sym(value_col))), MAPE=exploratory::mape(!!rlang::sym(value_col), forecasted_value, !is.na(!!rlang::sym(value_col))), `Number of Rows`=sum(!is.na(!!rlang::sym(value_col))))
   }
   ret <- dplyr::bind_cols(ret2, ret1) # We show the model agnostic metrics first.
+  if ("Number of Rows" %in% colnames(ret)) {
+    ret <- ret %>% dplyr::select(-`Number of Rows`, everything(), `Number of Rows`)
+  }
+  if ("Number of Rows for Training" %in% colnames(ret)) {
+    ret <- ret %>% dplyr::select(-`Number of Rows for Training`, everything(), `Number of Rows for Training`)
+  }
+  if ("Number of Rows for Test" %in% colnames(ret)) {
+    ret <- ret %>% dplyr::select(-`Number of Rows for Test`, everything(), `Number of Rows for Test`)
+  }
   ret
 }
