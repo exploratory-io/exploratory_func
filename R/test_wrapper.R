@@ -458,6 +458,7 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, d = NULL, 
   var2_col <- col_name(substitute(var2))
   grouped_cols <- grouped_by(df)
 
+  # Apply func2 to var2.
   if (!is.null(func2)) {
     if (lubridate::is.Date(df[[var2_col]]) || lubridate::is.POSIXct(df[[var2_col]])) {
       df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_date(!!rlang::sym(var2_col), type=!!func2))
@@ -465,6 +466,12 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, d = NULL, 
     else if (is.numeric(df[[var2_col]])) {
       df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_numeric(!!rlang::sym(var2_col), type=!!func2))
     }
+  }
+
+  # For logical explanatory variable, make it a factor and adjust label order so that
+  # the calculated difference it TRUE case - FALSE case, which intuitively makes better sense.
+  if (is.logical(df[[var2_col]])) {
+    df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := factor(!!rlang::sym(var2_col), levels=c("TRUE", "FALSE")))
   }
   
   n_distinct_res <- n_distinct(df[[var2_col]]) # save n_distinct result to avoid repeating the relatively expensive call.
