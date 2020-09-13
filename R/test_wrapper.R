@@ -681,6 +681,12 @@ exp_wilcox <- function(df, var1, var2, func2 = NULL, ...) {
       df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := extract_from_numeric(!!rlang::sym(var2_col), type=!!func2))
     }
   }
+
+  # For logical explanatory variable, make it a factor and adjust label order so that
+  # the calculated difference it TRUE case - FALSE case, which intuitively makes better sense.
+  if (is.logical(df[[var2_col]])) {
+    df <- df %>% dplyr::mutate(!!rlang::sym(var2_col) := factor(!!rlang::sym(var2_col), levels=c("TRUE", "FALSE")))
+  }
   
   n_distinct_res <- n_distinct(df[[var2_col]]) # save n_distinct result to avoid repeating the relatively expensive call.
   if (n_distinct_res != 2) {
