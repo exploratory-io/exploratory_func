@@ -73,6 +73,7 @@ test_that("exp_xgboost(binary) evaluate training and test", {
   ret <- model_df %>% prediction(data="newdata", data_frame=flight)
 
   ret <- rf_evaluation_training_and_test(model_df, binary_classification_threshold = 0.5)
+  expect_true(all(c("auc", "f_score", "accuracy_rate", "misclassification_rate", "precision", "recall") %in% colnames(ret)))
   expect_equal(nrow(ret), 2) # 2 for train and test
   expect_gt(ret$auc[[1]], 0.5) # If this is not true, TRUE/FALSE may be reverted.
 
