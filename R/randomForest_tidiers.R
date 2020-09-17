@@ -2472,7 +2472,11 @@ evaluate_binary_classification <- function(actual, predicted, predicted_probabil
   }
   auc <- auroc(predicted_probability, actual_for_roc)
 
-  if (is.factor(actual) && "TRUE" %in% levels(actual)) { # target was logical and converted to factor.
+  if (is.logical(actual)) { # For xgboost, where logical works as is, convert it to a factor so that the logic originally implemented for ranger works for it.
+    actual <- factor(actual, levels=c("TRUE", "FALSE"))
+  }
+
+  if ((is.factor(actual) && "TRUE" %in% levels(actual))) { # target was logical and converted to factor.
     if (is_rpart) {
       # For rpart, level for "TRUE" is 2, and that does not work with the logic in else clause.
       true_class <- "TRUE"
