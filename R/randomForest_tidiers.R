@@ -2472,8 +2472,8 @@ evaluate_binary_classification <- function(actual, predicted, predicted_probabil
   }
   auc <- auroc(predicted_probability, actual_for_roc)
 
-  if (is.logical(actual)) { # For xgboost.
-    actual <- factor(actual, levels=c("TRUE","FALSE"))
+  if (is.logical(actual)) { # For xgboost, where logical works as is.
+    actual <- factor(actual, levels=c("TRUE", "FALSE"))
   }
 
   if (is.logical(actual) || (is.factor(actual) && "TRUE" %in% levels(actual))) { # target was logical and converted to factor.
