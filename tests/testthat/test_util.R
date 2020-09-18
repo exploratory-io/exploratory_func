@@ -956,7 +956,7 @@ test_that("summarize_confint_mean", {
 test_that("calc_confint_mean", {
   # confint_radius is the base implementation.
   v <- 1:100
-  expect_equal(exploratory::confint_radius(v), exploratory::calc_confint_mean(length(v), sd(v)))
+  expect_equal(exploratory::confint_radius(v), exploratory::calc_confint_mean(sd(v), length(v)))
 })
 
 test_that("summarize_confint_ratio", {
@@ -968,5 +968,5 @@ test_that("summarize_confint_ratio", {
 test_that("calc_confint_ratio", {
   # prop_confint_radius is the base implementation.
   v <- 1:100 %% 3 ==0
-  expect_equal(exploratory::prop_confint_radius(v), exploratory::calc_confint_ratio(length(v),  sum(v)/length(v)))
+  expect_equal(exploratory::prop_confint_radius(v), exploratory::calc_confint_ratio(sum(v)/length(v), length(v)))
 })
