@@ -1,5 +1,4 @@
 context("test ARIMA functions")
-if(F){
 test_that("exp_arima with aggregation", {
   data("raw_data", package = "AnomalyDetection")
   raw_data$timestamp <- as.POSIXct(raw_data$timestamp)
@@ -318,4 +317,3 @@ test_that("exp_arima without value_col", {
   # verify that the last forecasted_value is not NA to test #9211
   expect_true(!is.na(ret$data[[1]]$forecasted_value[[length(ret$data[[1]]$forecasted_value)]]))
 })
-}
