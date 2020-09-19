@@ -59,6 +59,7 @@ exp_arima <- function(df, time, valueColumn,
                       funs.aggregate.regressors = NULL,
                       regressors_na_fill_type = NULL,
                       regressors_na_fill_value = 0,
+                      conf_level = 0.8,
                       ...
                       ){
   validate_empty_data(df)
@@ -331,8 +332,8 @@ exp_arima <- function(df, time, valueColumn,
 
     forecast_rows <- tibble(ds=forecasted_df$ds,
                             forecasted_value=mean(forecasted_df$y), # Note that y is a distribution object.
-                            forecasted_value_high=quantile(forecasted_df$y, 0.8),
-                            forecasted_value_low=quantile(forecasted_df$y, 0.2))
+                            forecasted_value_high=quantile(forecasted_df$y, conf_level),
+                            forecasted_value_low=quantile(forecasted_df$y, 1 - conf_level))
 
     if (test_mode){
       fitted_training_df$is_test_data <- FALSE
