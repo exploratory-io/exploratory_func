@@ -229,34 +229,28 @@ xgboost_multi <- function(data, formula, output_type = "softprob", eval_metric =
 #' @param output_type Type of output. Can be "linear", "logistic", "gamma" or "tweedie"
 #' The explanation is in https://www.r-bloggers.com/with-our-powers-combined-xgboost-and-pipelearner/
 #' @export
-xgboost_reg <- function(data, formula, output_type = "linear", eval_metric = "rmse", params = list(), tweedie_variance_power = 1.5, ...) {
-  # there can be more than 2 eval_metric
-  # by creating eval_metric parameters in params list
-  metric_list <- list()
-  default_metrics <- c("rmse", "mae")
-  if(output_type == "gamma"){
-    default_metrics <- c(default_metrics, "gamma-nloglik", "gamma-deviance")
-  }
-  if(output_type == "tweedie"){
-    tvp <- if(!is.null(params$tweedie_variance_power)){
-      params$tweedie_variance_power
-    } else {
-      params$tweedie_variance_power <- tweedie_variance_power
-      tweedie_variance_power
+xgboost_reg <- function(data, formula, output_type = "linear", eval_metric = NULL, params = list(), tweedie_variance_power = 1.5, ...) {
+  # There can be more than 2 eval_metric
+  # by creating eval_metric parameters in params list,
+  # but specify only one so that it is clear what is used for early stopping.
+  if (is.null(eval_metric)) {
+    if(output_type == "gamma"){
+      eval_metric <- "gamma-nloglik"
     }
-    default_metrics <- c(default_metrics, paste0("tweedie-nloglik@", tvp))
-  }
-  for (metric in default_metrics) {
-    if (eval_metric == metric) {
-      # indicated metric is first
-      metric_list <- append(list(eval_metric = metric), metric_list)
-    } else {
-      metric_list <- append(metric_list, list(eval_metric = metric))
+    else if(output_type == "tweedie"){
+      tvp <- if(!is.null(params$tweedie_variance_power)){
+        params$tweedie_variance_power
+      } else {
+        params$tweedie_variance_power <- tweedie_variance_power
+        tweedie_variance_power
+      }
+      eval_metric <- paste0("tweedie-nloglik@", tvp)
+    }
+    else {
+      eval_metric <- "rmse"
     }
   }
-  if (!eval_metric %in% default_metrics) {
-    metric_list <- append(list(eval_metric = eval_metric), metric_list)
-  }
+  metric_list <- list(eval_metric = eval_metric)
   params <- append(metric_list, params)
 
   vars <- all.vars(formula)
@@ -968,7 +962,7 @@ exp_xgboost <- function(df,
                         watchlist_rate = 0,
                         sparse = FALSE,
                         booster = "gbtree",
-                        early_stopping_rounds = 0,
+                        early_stopping_rounds = NULL, # No early stop.
                         max_depth = 6,
                         min_child_weight = 1,
                         gamma = 1,
