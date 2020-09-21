@@ -96,22 +96,10 @@ fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_ra
 #' The explanation is in https://www.r-bloggers.com/with-our-powers-combined-xgboost-and-pipelearner/
 #' @export
 xgboost_binary <- function(data, formula, output_type = "logistic", eval_metric = "auc", params = list(), ...) {
-
   # there can be more than 2 eval_metric
   # by creating eval_metric parameters in params list
-  metric_list <- list()
-  default_metrics <- c("auc", "error", "logloss")
-  for (metric in default_metrics) {
-    if (eval_metric == metric) {
-      # indicated metric is first
-      metric_list <- append(list(eval_metric = metric), metric_list)
-    } else {
-      metric_list <- append(metric_list, list(eval_metric = metric))
-    }
-  }
-  if (!eval_metric %in% default_metrics) {
-    metric_list <- append(list(eval_metric = eval_metric), metric_list)
-  }
+  # but specify only one so that it is clear what is used for early stopping.
+  metric_list <- list(eval_metric = eval_metric)
   params <- append(metric_list, params)
 
   vars <- all.vars(formula)
@@ -169,19 +157,8 @@ xgboost_binary <- function(data, formula, output_type = "logistic", eval_metric 
 xgboost_multi <- function(data, formula, output_type = "softprob", eval_metric = "merror", params = list(), ...) {
   # there can be more than 2 eval_metric
   # by creating eval_metric parameters in params list
-  metric_list <- list()
-  default_metrics <- c("merror", "mlogloss")
-  for (metric in default_metrics) {
-    if (eval_metric == metric) {
-      # indicated metric is first
-      metric_list <- append(list(eval_metric = metric), metric_list)
-    } else {
-      metric_list <- append(metric_list, list(eval_metric = metric))
-    }
-  }
-  if (!eval_metric %in% default_metrics) {
-    metric_list <- append(list(eval_metric = eval_metric), metric_list)
-  }
+  # but specify only one so that it is clear what is used for early stopping.
+  metric_list <- list(eval_metric = eval_metric)
   params <- append(metric_list, params)
 
   vars <- all.vars(formula)
