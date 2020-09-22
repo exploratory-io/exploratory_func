@@ -797,6 +797,19 @@ calc_permutation_importance_xgboost_binary <- function(fit, target, vars, data) 
   importances_df
 }
 
+calc_permutation_importance_xgboost_multiclass <- function(fit, target, vars, data) {
+  var_list <- as.list(vars)
+  importances <- purrr::map(var_list, function(var) {
+    mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
+                                predict.fun = function(object,newdata){predict_xgboost(object, newdata)},
+                                loss.fun = function(x,y){1-sum(colnames(x)[max.col(x)]==y[[1]], na.rm=TRUE)/length(y[[1]])}) # misclassification rate
+  })
+  importances <- purrr::flatten_dbl(importances)
+  importances_df <- tibble(variable=vars, importance=importances)
+  importances_df <- importances_df %>% dplyr::arrange(-importance)
+  importances_df
+}
+
 
 partial_dependence.xgboost <- function(fit, vars = colnames(data),
   n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)),
@@ -1171,7 +1184,8 @@ exp_xgboost <- function(df,
           imp_df <- calc_permutation_importance_xgboost_regression(model, clean_target_col, c_cols, df)
         }
         else {
-          imp_df <- importance_xgboost(model)
+          imp_df <- calc_permutation_importance_xgboost_multiclass(model, clean_target_col, c_cols, df)
+          #imp_df <- importance_xgboost(model)
         }
         model$imp_df <- imp_df
         if ("error" %in% class(imp_df)) {
