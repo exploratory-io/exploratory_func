@@ -2,12 +2,12 @@ context("xgboost negative test case")
 
 df <- exploratory::read_excel_file( "https://www.dropbox.com/s/y08x4y7dlavwp9g/Global_Sales.xlsx?dl=1", sheet = "Sheet 1", na = c('','NA'), skip=0, col_names=TRUE, trim_ws=TRUE, tzone='America/Los_Angeles') %>%
   readr::type_convert() %>%
-  exploratory::clean_data_frame() %>%
-  sample_rows(1000)
+  exploratory::clean_data_frame()
 
 test_that("exp_xgboost - Failed variable importance for a group", {
   # For Africa, variable importance throws error. This test tests how it is handled.
   set.seed(1)
+  df <- df %>% sample_rows(1000)
   
   df <- df %>% dplyr::mutate(`Market` = forcats::fct_lump(factor(`Market`), n=20, other_level = "Others", ties.method ="first")) %>% 
     dplyr::group_by(`Market`)
