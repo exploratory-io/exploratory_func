@@ -239,7 +239,12 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
     result <- result %>%
       dplyr::filter(!stringr::str_detect(!!rlang::sym(token_col), stringr::str_c("^[\\\u3040-\\\u309f]{1,", hiragana_word_length_to_remove, "}$", sep = "")) )
   }
-  result
+  # result column order should be document_id, <token_col>, <count_col> ...
+  if(!with_id) {
+    result %>% select(!!token_col, !!count_col, dplyr::everything())
+  } else {
+    result %>% select(document_id, !!token_col, !!count_col, dplyr::everything())
+  }
 }
 
 #' Tokenize text and unnest
