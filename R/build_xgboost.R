@@ -787,9 +787,9 @@ calc_permutation_importance_xgboost_binary <- function(fit, target, vars, data) 
   importances <- purrr::map(var_list, function(var) {
     mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
                                 predict.fun = function(object,newdata){predict_xgboost(object, newdata)},
-                                # Negative log likelihood-based los function:
-                                # loss.fun = function(x,y){-sum(log(1- abs(x - y)),na.rm = TRUE)})
-                                loss.fun = function(x,y){-auroc(x,y[[1]])}) # y is actually a single column data.frame rather than a vector. TODO: Fix it in permutationImportance() to make it a vector.
+                                loss.fun = function(x,y){-sum(log(1- abs(x - y[[1]])),na.rm = TRUE)} # Negative-log-likelihood-based loss function.
+                                # loss.fun = function(x,y){-auroc(x,y[[1]])} # AUC based. y is actually a single column data.frame rather than a vector. TODO: Fix it in permutationImportance() to make it a vector.
+                                )
   })
   importances <- purrr::flatten_dbl(importances)
   importances_df <- tibble(variable=vars, importance=importances)
