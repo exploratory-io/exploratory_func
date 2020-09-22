@@ -769,8 +769,6 @@ predict_xgboost <- function(model, df) {
 
 
 calc_permutation_importance_xgboost_binary <- function(fit, target, vars, data) {
-  names(target) <- NULL
-  names(vars) <- NULL
   var_list <- as.list(vars)
   importances <- purrr::map(var_list, function(var) {
     mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
