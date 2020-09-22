@@ -768,6 +768,24 @@ predict_xgboost <- function(model, df) {
 }
 
 
+calc_permutation_importance_xgboost_binary <- function(fit, target, vars, data) {
+  names(target) <- NULL
+  names(vars) <- NULL
+  var_list <- as.list(vars)
+  importances <- purrr::map(var_list, function(var) {
+    mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
+                                predict.fun = function(object,newdata){predict_xgboost(object, newdata)},
+                                # Negative log likelihood-based los function:
+                                # loss.fun = function(x,y){-sum(log(1- abs(x - y)),na.rm = TRUE)})
+                                loss.fun = function(x,y){-auroc(x,y[[1]])}) # y is actually a single column data.frame rather than a vector. TODO: Fix it in permutationImportance() to make it a vector.
+  })
+  importances <- purrr::flatten_dbl(importances)
+  importances_df <- tibble(variable=vars, importance=importances)
+  importances_df <- importances_df %>% dplyr::arrange(-importance)
+  importances_df
+}
+
+
 partial_dependence.xgboost <- function(fit, vars = colnames(data),
   n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)),
   classification = FALSE, interaction = FALSE, uniform = TRUE, data, ...) {
@@ -1134,7 +1152,12 @@ exp_xgboost <- function(df,
 
       # return partial dependence
       if (length(c_cols) > 1) { # Calculate importance only when there are multiple variables.
-        imp_df <- importance_xgboost(model)
+        if (is_target_logical) {
+          imp_df <- calc_permutation_importance_xgboost_binary(model, clean_target_col, c_cols, df)
+        }
+        else {
+          imp_df <- importance_xgboost(model)
+        }
         model$imp_df <- imp_df
         if ("error" %in% class(imp_df)) {
           imp_vars <- c_cols # Just use c_cols as is for imp_vars to calculate partial dependence anyway.
