@@ -767,6 +767,20 @@ predict_xgboost <- function(model, df) {
   predicted
 }
 
+# Calculates permutation importance for regression by xgboost.
+calc_permutation_importance_xgboost_regression <- function(fit, target, vars, data) {
+  var_list <- as.list(vars)
+  importances <- purrr::map(var_list, function(var) {
+    mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
+                                predict.fun = function(object,newdata){predict_xgboost(object, newdata)},
+                                # For some reason, default loss.fun, which is mean((x - y)^2) returns NA, even with na.rm=TRUE. Rewrote it with sum() to avoid the issue.
+                                loss.fun = function(x,y){sum((x - y)^2, na.rm = TRUE)/length(x)})
+  })
+  importances <- purrr::flatten_dbl(importances)
+  importances_df <- tibble(variable=vars, importance=importances)
+  importances_df <- importances_df %>% dplyr::arrange(-importance)
+  importances_df
+}
 
 calc_permutation_importance_xgboost_binary <- function(fit, target, vars, data) {
   var_list <- as.list(vars)
@@ -1152,6 +1166,9 @@ exp_xgboost <- function(df,
       if (length(c_cols) > 1) { # Calculate importance only when there are multiple variables.
         if (is_target_logical) {
           imp_df <- calc_permutation_importance_xgboost_binary(model, clean_target_col, c_cols, df)
+        }
+        else if (is_target_numeric) {
+          imp_df <- calc_permutation_importance_xgboost_regression(model, clean_target_col, c_cols, df)
         }
         else {
           imp_df <- importance_xgboost(model)
