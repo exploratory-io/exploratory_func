@@ -144,6 +144,7 @@ test_that("Linear Regression with test rate", {
     res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
     expect_equal(res$`Number of Rows`, 17)
     res <- ret %>% lm_partial_dependence()
+    expect_true(all(c("conf_high", "conf_low", "bin_sample_size") %in% colnames(res)))
    })
 })
 
