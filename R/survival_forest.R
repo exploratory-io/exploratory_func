@@ -161,6 +161,7 @@ exp_survival_forest <- function(df,
                     ntree = 20,
                     nodesize = 12,
                     predictor_n = 12, # so that at least months can fit in it.
+                    importance_measure = "permutation", # "permutation" or "impurity".
                     max_pd_vars = NULL,
                     pd_sample_size = 500,
                     pred_survival_time = NULL,
@@ -306,7 +307,7 @@ exp_survival_forest <- function(df,
         max_sample_size = max_nrow/2
       }
       sample.fraction <- min(c(max_sample_size / max_nrow, 1))
-      rf <- ranger::ranger(fml, data = df, importance = 'impurity',
+      rf <- ranger::ranger(fml, data = df, importance = importance_measure,
         num.trees = ntree,
         min.node.size = nodesize,
         keep.inbag=TRUE,

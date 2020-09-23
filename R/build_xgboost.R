@@ -767,6 +767,51 @@ predict_xgboost <- function(model, df) {
   predicted
 }
 
+# Calculates permutation importance for regression by xgboost.
+calc_permutation_importance_xgboost_regression <- function(fit, target, vars, data) {
+  var_list <- as.list(vars)
+  importances <- purrr::map(var_list, function(var) {
+    mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
+                                predict.fun = function(object,newdata){predict_xgboost(object, newdata)},
+                                # For some reason, default loss.fun, which is mean((x - y)^2) returns NA, even with na.rm=TRUE. Rewrote it with sum() to avoid the issue.
+                                loss.fun = function(x,y){sum((x - y)^2, na.rm = TRUE)/length(x)})
+  })
+  importances <- purrr::flatten_dbl(importances)
+  importances_df <- tibble(variable=vars, importance=importances)
+  importances_df <- importances_df %>% dplyr::arrange(-importance)
+  importances_df
+}
+
+calc_permutation_importance_xgboost_binary <- function(fit, target, vars, data) {
+  var_list <- as.list(vars)
+  importances <- purrr::map(var_list, function(var) {
+    mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
+                                predict.fun = function(object,newdata){predict_xgboost(object, newdata)},
+                                loss.fun = function(x,y){-sum(log(1- abs(x - y[[1]])),na.rm = TRUE)} # Negative-log-likelihood-based loss function.
+                                # loss.fun = function(x,y){-auroc(x,y[[1]])} # AUC based. y is actually a single column data.frame rather than a vector. TODO: Fix it in permutationImportance() to make it a vector.
+                                )
+  })
+  importances <- purrr::flatten_dbl(importances)
+  importances_df <- tibble(variable=vars, importance=importances)
+  importances_df <- importances_df %>% dplyr::arrange(-importance)
+  importances_df
+}
+
+calc_permutation_importance_xgboost_multiclass <- function(fit, target, vars, data) {
+  var_list <- as.list(vars)
+  importances <- purrr::map(var_list, function(var) {
+    mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
+                                predict.fun = function(object,newdata){predict_xgboost(object, newdata)},
+                                # loss.fun = function(x,y){browser();1-sum(colnames(x)[max.col(x)]==y[[1]], na.rm=TRUE)/length(y[[1]])} # misclassification rate
+                                loss.fun = function(x,y){sum(-log(x[match(y[[1]][row(x)], colnames(x))==col(x)]))} # Negative log likelihood. https://ljvmiranda921.github.io/notebook/2017/08/13/softmax-and-the-negative-log-likelihood/
+                                )
+  })
+  importances <- purrr::flatten_dbl(importances)
+  importances_df <- tibble(variable=vars, importance=importances)
+  importances_df <- importances_df %>% dplyr::arrange(-importance)
+  importances_df
+}
+
 
 partial_dependence.xgboost <- function(fit, vars = colnames(data),
   n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)),
@@ -961,7 +1006,7 @@ exp_xgboost <- function(df,
                         smote_target_minority_perc = 40,
                         smote_max_synth_perc = 200,
                         smote_k = 5,
-                        # importance_measure = "permutation", # "permutation" or "impurity".
+                        importance_measure = "permutation", # "permutation" or "impurity".
                         max_pd_vars = NULL,
                         # Number of most important variables to calculate partial dependences on. 
                         # By default, when Boruta is on, all Confirmed/Tentative variables.
@@ -1134,7 +1179,20 @@ exp_xgboost <- function(df,
 
       # return partial dependence
       if (length(c_cols) > 1) { # Calculate importance only when there are multiple variables.
-        imp_df <- importance_xgboost(model)
+        if (importance_measure == "permutation") {
+          if (is_target_logical) {
+            imp_df <- calc_permutation_importance_xgboost_binary(model, clean_target_col, c_cols, df)
+          }
+          else if (is_target_numeric) {
+            imp_df <- calc_permutation_importance_xgboost_regression(model, clean_target_col, c_cols, df)
+          }
+          else {
+            imp_df <- calc_permutation_importance_xgboost_multiclass(model, clean_target_col, c_cols, df)
+          }
+        }
+        else { # "impurity". Use the importance from the xgboost package.
+          imp_df <- importance_xgboost(model)
+        }
         model$imp_df <- imp_df
         if ("error" %in% class(imp_df)) {
           imp_vars <- c_cols # Just use c_cols as is for imp_vars to calculate partial dependence anyway.
