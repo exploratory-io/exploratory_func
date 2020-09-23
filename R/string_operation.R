@@ -241,7 +241,7 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
   }
   # result column order should be document_id, <token_col>, <count_col> ...
   if(!with_id) {
-    result %>% select(!!token_col, !!count_col, dplyr::everything())
+    result %>% select(!!rlang::sym(token_col), !!rlang::sym(count_col), dplyr::everything())
   } else {
     result %>% select(document_id, !!token_col, !!count_col, dplyr::everything())
   }
