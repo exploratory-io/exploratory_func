@@ -2,7 +2,7 @@
 calc_permutation_importance_ranger_survival <- function(fit, time_col, status_col, vars, data) {
   var_list <- as.list(vars)
   importances <- purrr::map(var_list, function(var) {
-    mmpf::permutationImportance(data, vars=var, y=time_col, model=fit, nperm=1,
+    mmpf::permutationImportance(data, vars=var, y=time_col, model=fit, nperm=5, # Since the result seems too unstable with nperm=1, where we use elsewhere, here we use 5.
                                 predict.fun = function(object, newdata) {
                                   # Use the sum of predicted survival probability as predicted survival time. TODO: Adding weight to adjust for different intervals.
                                   tibble::tibble(x=rowSums(predict(object,data=newdata)$survival, na.rm=TRUE),status=newdata[[status_col]])
