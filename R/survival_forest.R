@@ -1,3 +1,24 @@
+
+
+calc_permutation_importance_ranger_survival <- function(fit, time_col, status_col, vars, data) {
+  var_list <- as.list(vars)
+  importances <- purrr::map(var_list, function(var) {
+    mmpf::permutationImportance(data, vars=var, y=time_col, model=fit, nperm=1,
+                                predict.fun = function(object, newdata) {
+                                  tibble::tibble(x=rowSums(predict(object,data=newdata)$survival, na.rm=TRUE),status=newdata[[status_col]])
+                                },
+                                # Use minus log likelyhood (Efron) as loss function, since it is what Cox regression tried to optimise. 
+                                loss.fun = function(x,y){
+                                  df <- x %>% dplyr::mutate(time=!!y)
+                                  1 - survival::concordance(survival::Surv(time, status)~x,data=df)$concordance
+                                })
+  })
+  importances <- purrr::flatten_dbl(importances)
+  importances_df <- tibble::tibble(variable=vars, importance=importances)
+  importances_df <- importances_df %>% dplyr::arrange(-importance)
+  importances_df
+}
+
 # Calculates survival curves with Kaplan-Meier with strata specified by vars argument.
 calc_survival_curves_with_strata <- function(df, time_col, status_col, vars) {
   # Create map from variable name to chart type. TODO: Eliminate duplicated code.
@@ -319,11 +340,14 @@ exp_survival_forest <- function(df,
 
       if (length(c_cols) > 1) { # Show importance only when there are multiple variables.
         # get importance to decide variables for partial dependence
+        if (F) {
         imp <- ranger::importance(rf)
         imp_df <- tibble::tibble( # Use tibble since data.frame() would make variable factors, which breaks things in following steps.
           variable = names(imp),
           importance = imp
         ) %>% dplyr::arrange(-importance)
+        }
+        imp_df <- calc_permutation_importance_ranger_survival(rf, clean_time_col, clean_status_col, c_cols, df)
         rf$imp_df <- imp_df
         imp_vars <- imp_df$variable
       }
