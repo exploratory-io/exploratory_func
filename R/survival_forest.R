@@ -1,3 +1,23 @@
+# Permutation importance. The one from ranger seems too unstable for our use. Maybe it's based on OOB prediction?
+calc_permutation_importance_ranger_survival <- function(fit, time_col, status_col, vars, data) {
+  var_list <- as.list(vars)
+  importances <- purrr::map(var_list, function(var) {
+    mmpf::permutationImportance(data, vars=var, y=time_col, model=fit, nperm=1,
+                                predict.fun = function(object, newdata) {
+                                  # Use the sum of predicted survival probability as predicted survival time. TODO: Adding weight to adjust for different intervals.
+                                  tibble::tibble(x=rowSums(predict(object,data=newdata)$survival, na.rm=TRUE),status=newdata[[status_col]])
+                                },
+                                loss.fun = function(x,y){ # Use 1 - concordance as loss function.
+                                  df <- x %>% dplyr::mutate(time=!!y[[1]])
+                                  1 - survival::concordance(survival::Surv(time, status)~x,data=df)$concordance
+                                })
+  })
+  importances <- purrr::flatten_dbl(importances)
+  importances_df <- tibble::tibble(variable=vars, importance=importances)
+  importances_df <- importances_df %>% dplyr::arrange(-importance)
+  importances_df
+}
+
 # Calculates survival curves with Kaplan-Meier with strata specified by vars argument.
 calc_survival_curves_with_strata <- function(df, time_col, status_col, vars) {
   # Create map from variable name to chart type. TODO: Eliminate duplicated code.
@@ -173,6 +193,13 @@ exp_survival_forest <- function(df,
                     ){
   # TODO: cleanup code only aplicable to randomForest. this func was started from copy of calc_feature_imp, and still adjusting for lm. 
 
+  if (importance_measure == "permutation") { # For permutation importance, we turn off ranger's importance calculation adn use our own implementation.
+    importance_measure_ranger <- "none"
+  }
+  else {
+    importance_measure_ranger <- importance_measure
+  }
+
   # using the new way of NSE column selection evaluation
   # ref: http://dplyr.tidyverse.org/articles/programming.html
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
@@ -307,7 +334,7 @@ exp_survival_forest <- function(df,
         max_sample_size = max_nrow/2
       }
       sample.fraction <- min(c(max_sample_size / max_nrow, 1))
-      rf <- ranger::ranger(fml, data = df, importance = importance_measure,
+      rf <- ranger::ranger(fml, data = df, importance = importance_measure_ranger,
         num.trees = ntree,
         min.node.size = nodesize,
         keep.inbag=TRUE,
@@ -319,11 +346,16 @@ exp_survival_forest <- function(df,
 
       if (length(c_cols) > 1) { # Show importance only when there are multiple variables.
         # get importance to decide variables for partial dependence
-        imp <- ranger::importance(rf)
-        imp_df <- tibble::tibble( # Use tibble since data.frame() would make variable factors, which breaks things in following steps.
-          variable = names(imp),
-          importance = imp
-        ) %>% dplyr::arrange(-importance)
+        if (importance_measure != "permutation") {
+          imp <- ranger::importance(rf)
+          imp_df <- tibble::tibble( # Use tibble since data.frame() would make variable factors, which breaks things in following steps.
+            variable = names(imp),
+            importance = imp
+            ) %>% dplyr::arrange(-importance)
+        }
+        else { # For permutation, we use our own implementation. The one from ranger seems too unstable for our use. Maybe it's based on OOB prediction?
+          imp_df <- calc_permutation_importance_ranger_survival(rf, clean_time_col, clean_status_col, c_cols, df)
+        }
         rf$imp_df <- imp_df
         imp_vars <- imp_df$variable
       }
