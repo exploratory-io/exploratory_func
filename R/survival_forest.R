@@ -1,14 +1,13 @@
-
-
+# Permutation importance. The one from ranger seems too unstable for our use. Maybe it's based on OOB prediction?
 calc_permutation_importance_ranger_survival <- function(fit, time_col, status_col, vars, data) {
   var_list <- as.list(vars)
   importances <- purrr::map(var_list, function(var) {
     mmpf::permutationImportance(data, vars=var, y=time_col, model=fit, nperm=1,
                                 predict.fun = function(object, newdata) {
+                                  # Use the sum of predicted survival probability as predicted survival time. TODO: Adding weight to adjust for different intervals.
                                   tibble::tibble(x=rowSums(predict(object,data=newdata)$survival, na.rm=TRUE),status=newdata[[status_col]])
                                 },
-                                # Use minus log likelyhood (Efron) as loss function, since it is what Cox regression tried to optimise. 
-                                loss.fun = function(x,y){
+                                loss.fun = function(x,y){ # Use 1 - concordance as loss function.
                                   df <- x %>% dplyr::mutate(time=!!y[[1]])
                                   1 - survival::concordance(survival::Surv(time, status)~x,data=df)$concordance
                                 })
