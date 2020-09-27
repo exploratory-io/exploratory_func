@@ -9,7 +9,7 @@ calc_permutation_importance_ranger_survival <- function(fit, time_col, status_co
                                 },
                                 # Use minus log likelyhood (Efron) as loss function, since it is what Cox regression tried to optimise. 
                                 loss.fun = function(x,y){
-                                  df <- x %>% dplyr::mutate(time=!!y)
+                                  df <- x %>% dplyr::mutate(time=!!y[[1]])
                                   1 - survival::concordance(survival::Surv(time, status)~x,data=df)$concordance
                                 })
   })
