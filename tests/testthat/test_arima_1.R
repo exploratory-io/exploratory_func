@@ -1,12 +1,11 @@
 context("test ARIMA functions")
-if(F){
 test_that("exp_arima with aggregation", {
   data("raw_data", package = "AnomalyDetection")
   raw_data$timestamp <- as.POSIXct(raw_data$timestamp)
   raw_data <- raw_data %>% rename(`time stamp`=timestamp, `cou nt`=count)
 
   model_df <- raw_data %>%
-    exp_arima(`time stamp`, `cou nt`, 2, time_unit = "day", seasonal=F, test_mode=T) # With seasolal=T, the data would be too short.
+    exp_arima(`time stamp`, `cou nt`, 2, time_unit = "day", seasonal=F, test_mode=T) # With seasonal=T, the data would be too short.
   ret <- model_df %>% glance_with_ts_metric()
   model_df %>% glance_rowwise(model)
   ret <- raw_data %>%
@@ -318,4 +317,3 @@ test_that("exp_arima without value_col", {
   # verify that the last forecasted_value is not NA to test #9211
   expect_true(!is.na(ret$data[[1]]$forecasted_value[[length(ret$data[[1]]$forecasted_value)]]))
 })
-}

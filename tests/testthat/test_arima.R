@@ -1,5 +1,4 @@
 context("test exp_arima")
-if(F){
 test_that("exp_arima with aggregation", {
   data("raw_data", package = "AnomalyDetection")
   raw_data$timestamp <- as.POSIXct(raw_data$timestamp)
@@ -11,11 +10,6 @@ test_that("exp_arima with aggregation", {
   raw_data$pre_col1 <- runif(nrow(raw_data))
   raw_data$pre_col2 <- runif(nrow(raw_data))
 
-  browser()
-  model_df <- raw_data %>%
-    exp_arima(`time stamp`, valueColumn=`cou nt`, periods=10, time_unit = "week", na_fill_type="value", test_mode=F)
-  browser()
-
   model_df <- raw_data %>%
     exp_arima(`time stamp`, valueColumn=`cou nt`, periods=10, time_unit = "day", na_fill_type="value", test_mode=F)
 
@@ -24,20 +18,9 @@ test_that("exp_arima with aggregation", {
   # No valueColumn (row number) case.
   model_df <- raw_data %>%
     exp_arima(`time stamp`, ,periods=10, time_unit = "day", na_fill_type="value", test_mode=F)
-  # With more parameters
-  model_df <- raw_data %>%
-    exp_arima(`time stamp`, `pre_col1`, `pre_col2`, time_unit = "day", periods = 2, valueColumn = `cou nt`, fun.aggregate = sum, na_fill_type="value", test_mode =TRUE, d = NA, D = NA, max.p = 5, max.q = 5, max.P = 2, max.Q = 2, max.order = 5, max.d = 2, max.D = 1, start.p = 2, start.q = 2, start.P = 1, start.Q = 1, stationary = FALSE, seasonal = TRUE, ic = "aic", allowdrift = TRUE, allowmean = TRUE, lambda = NULL, biasadj = FALSE, test = "kpss", seasonal.test = "ocsb", parallel = FALSE, num.cores = 2)
+  # With more parameters. Revive this test when we support ARIMAX.
+  # model_df <- raw_data %>%
+  #   exp_arima(`time stamp`, `pre_col1`, `pre_col2`, time_unit = "day", periods = 2, valueColumn = `cou nt`, fun.aggregate = sum, na_fill_type="value", test_mode =TRUE, d = NA, D = NA, max.p = 5, max.q = 5, max.P = 2, max.Q = 2, max.order = 5, max.d = 2, max.D = 1, start.p = 2, start.q = 2, start.P = 1, start.Q = 1, stationary = FALSE, seasonal = TRUE, ic = "aic", allowdrift = TRUE, allowmean = TRUE, lambda = NULL, biasadj = FALSE, test = "kpss", seasonal.test = "ocsb", parallel = FALSE, num.cores = 2)
 
   expect_true(!is.null(model_df$model))
-
-
-  # df <- exploratory::read_delim_file("/Users/htamakos/Downloads/airline_2013_10_tricky_v2_1k_for_testcase_dev_only.csv" , ",", quote = "\"", skip = 0 , col_names = TRUE , na = c('','NA') , locale=readr::locale(encoding = "UTF-8", decimal_mark = "."), trim_ws = TRUE , progress = FALSE) %>%
-  # # readr::type_convert() %>%
-  #   exploratory::clean_data_frame()
-
-  # df %>%  dplyr::ungroup() %>% exp_arima(`FL DATE`, `FL_NUM`, `DEP_DELAY`, time_unit = "day", periods = 10, test_mode = TRUE, d = 1, D = NA, max.p = 5, max.q = 5, max.P = 2, max.Q = 2, max.order = 5, max.d = 2, max.D = 1, start.p = 2, start.q = 2, start.P = 1, start.Q = 1, stationary = FALSE, seasonal = TRUE, ic = "aic", allowdrift = TRUE, allowmean = TRUE, lambda = NULL, biasadj = FALSE, test = "kpss", seasonal.test = "ocsb", parallel = FALSE, num.cores = 2)
-
-  # # valueColumn is not set
-  # df %>%  dplyr::ungroup() %>% exp_arima(`FL DATE`, `DEP_DELAY`, time_unit = "day", periods = 10, valueColumn=`FL_NUM`, test_mode = FALSE, d = NA, D = NA, max.p = 5, max.q = 5, max.P = 2, max.Q = 2, max.order = 5, max.d = 2, max.D = 1, start.p = 2, start.q = 2, start.P = 1, start.Q = 1, stationary = FALSE, seasonal = TRUE, ic = "aic", allowdrift = TRUE, allowmean = TRUE, lambda = NULL, biasadj = FALSE, test = "kpss", seasonal.test = "ocsb", parallel = FALSE, num.cores = 2)
 })
-}
