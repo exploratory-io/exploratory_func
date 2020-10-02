@@ -5,7 +5,7 @@ test_that("exp_arima with aggregation", {
   raw_data <- raw_data %>% rename(`time stamp`=timestamp, `cou nt`=count)
 
   model_df <- raw_data %>%
-    exp_arima(`time stamp`, `cou nt`, 2, time_unit = "day", seasonal=F, test_mode=T) # With seasolal=T, the data would be too short.
+    exp_arima(`time stamp`, `cou nt`, 2, time_unit = "day", seasonal=F, test_mode=T) # With seasonal=T, the data would be too short.
   ret <- model_df %>% glance_with_ts_metric()
   model_df %>% glance_rowwise(model)
   ret <- raw_data %>%
