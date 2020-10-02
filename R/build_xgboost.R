@@ -96,22 +96,10 @@ fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_ra
 #' The explanation is in https://www.r-bloggers.com/with-our-powers-combined-xgboost-and-pipelearner/
 #' @export
 xgboost_binary <- function(data, formula, output_type = "logistic", eval_metric = "auc", params = list(), ...) {
-
   # there can be more than 2 eval_metric
   # by creating eval_metric parameters in params list
-  metric_list <- list()
-  default_metrics <- c("auc", "error", "logloss")
-  for (metric in default_metrics) {
-    if (eval_metric == metric) {
-      # indicated metric is first
-      metric_list <- append(list(eval_metric = metric), metric_list)
-    } else {
-      metric_list <- append(metric_list, list(eval_metric = metric))
-    }
-  }
-  if (!eval_metric %in% default_metrics) {
-    metric_list <- append(list(eval_metric = eval_metric), metric_list)
-  }
+  # but specify only one so that it is clear what is used for early stopping.
+  metric_list <- list(eval_metric = eval_metric)
   params <- append(metric_list, params)
 
   vars <- all.vars(formula)
@@ -169,19 +157,8 @@ xgboost_binary <- function(data, formula, output_type = "logistic", eval_metric 
 xgboost_multi <- function(data, formula, output_type = "softprob", eval_metric = "merror", params = list(), ...) {
   # there can be more than 2 eval_metric
   # by creating eval_metric parameters in params list
-  metric_list <- list()
-  default_metrics <- c("merror", "mlogloss")
-  for (metric in default_metrics) {
-    if (eval_metric == metric) {
-      # indicated metric is first
-      metric_list <- append(list(eval_metric = metric), metric_list)
-    } else {
-      metric_list <- append(metric_list, list(eval_metric = metric))
-    }
-  }
-  if (!eval_metric %in% default_metrics) {
-    metric_list <- append(list(eval_metric = eval_metric), metric_list)
-  }
+  # but specify only one so that it is clear what is used for early stopping.
+  metric_list <- list(eval_metric = eval_metric)
   params <- append(metric_list, params)
 
   vars <- all.vars(formula)
@@ -229,34 +206,28 @@ xgboost_multi <- function(data, formula, output_type = "softprob", eval_metric =
 #' @param output_type Type of output. Can be "linear", "logistic", "gamma" or "tweedie"
 #' The explanation is in https://www.r-bloggers.com/with-our-powers-combined-xgboost-and-pipelearner/
 #' @export
-xgboost_reg <- function(data, formula, output_type = "linear", eval_metric = "rmse", params = list(), tweedie_variance_power = 1.5, ...) {
-  # there can be more than 2 eval_metric
-  # by creating eval_metric parameters in params list
-  metric_list <- list()
-  default_metrics <- c("rmse", "mae")
-  if(output_type == "gamma"){
-    default_metrics <- c(default_metrics, "gamma-nloglik", "gamma-deviance")
-  }
-  if(output_type == "tweedie"){
-    tvp <- if(!is.null(params$tweedie_variance_power)){
-      params$tweedie_variance_power
-    } else {
-      params$tweedie_variance_power <- tweedie_variance_power
-      tweedie_variance_power
+xgboost_reg <- function(data, formula, output_type = "linear", eval_metric = NULL, params = list(), tweedie_variance_power = 1.5, ...) {
+  # There can be more than 2 eval_metric
+  # by creating eval_metric parameters in params list,
+  # but specify only one so that it is clear what is used for early stopping.
+  if (is.null(eval_metric)) {
+    if(output_type == "gamma"){
+      eval_metric <- "gamma-nloglik"
     }
-    default_metrics <- c(default_metrics, paste0("tweedie-nloglik@", tvp))
-  }
-  for (metric in default_metrics) {
-    if (eval_metric == metric) {
-      # indicated metric is first
-      metric_list <- append(list(eval_metric = metric), metric_list)
-    } else {
-      metric_list <- append(metric_list, list(eval_metric = metric))
+    else if(output_type == "tweedie"){
+      tvp <- if(!is.null(params$tweedie_variance_power)){
+        params$tweedie_variance_power
+      } else {
+        params$tweedie_variance_power <- tweedie_variance_power
+        tweedie_variance_power
+      }
+      eval_metric <- paste0("tweedie-nloglik@", tvp)
+    }
+    else {
+      eval_metric <- "rmse"
     }
   }
-  if (!eval_metric %in% default_metrics) {
-    metric_list <- append(list(eval_metric = eval_metric), metric_list)
-  }
+  metric_list <- list(eval_metric = eval_metric)
   params <- append(metric_list, params)
 
   vars <- all.vars(formula)
@@ -796,6 +767,51 @@ predict_xgboost <- function(model, df) {
   predicted
 }
 
+# Calculates permutation importance for regression by xgboost.
+calc_permutation_importance_xgboost_regression <- function(fit, target, vars, data) {
+  var_list <- as.list(vars)
+  importances <- purrr::map(var_list, function(var) {
+    mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
+                                predict.fun = function(object,newdata){predict_xgboost(object, newdata)},
+                                # For some reason, default loss.fun, which is mean((x - y)^2) returns NA, even with na.rm=TRUE. Rewrote it with sum() to avoid the issue.
+                                loss.fun = function(x,y){sum((x - y)^2, na.rm = TRUE)/length(x)})
+  })
+  importances <- purrr::flatten_dbl(importances)
+  importances_df <- tibble(variable=vars, importance=importances)
+  importances_df <- importances_df %>% dplyr::arrange(-importance)
+  importances_df
+}
+
+calc_permutation_importance_xgboost_binary <- function(fit, target, vars, data) {
+  var_list <- as.list(vars)
+  importances <- purrr::map(var_list, function(var) {
+    mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
+                                predict.fun = function(object,newdata){predict_xgboost(object, newdata)},
+                                loss.fun = function(x,y){-sum(log(1- abs(x - y[[1]])),na.rm = TRUE)} # Negative-log-likelihood-based loss function.
+                                # loss.fun = function(x,y){-auroc(x,y[[1]])} # AUC based. y is actually a single column data.frame rather than a vector. TODO: Fix it in permutationImportance() to make it a vector.
+                                )
+  })
+  importances <- purrr::flatten_dbl(importances)
+  importances_df <- tibble(variable=vars, importance=importances)
+  importances_df <- importances_df %>% dplyr::arrange(-importance)
+  importances_df
+}
+
+calc_permutation_importance_xgboost_multiclass <- function(fit, target, vars, data) {
+  var_list <- as.list(vars)
+  importances <- purrr::map(var_list, function(var) {
+    mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
+                                predict.fun = function(object,newdata){predict_xgboost(object, newdata)},
+                                # loss.fun = function(x,y){browser();1-sum(colnames(x)[max.col(x)]==y[[1]], na.rm=TRUE)/length(y[[1]])} # misclassification rate
+                                loss.fun = function(x,y){sum(-log(x[match(y[[1]][row(x)], colnames(x))==col(x)]))} # Negative log likelihood. https://ljvmiranda921.github.io/notebook/2017/08/13/softmax-and-the-negative-log-likelihood/
+                                )
+  })
+  importances <- purrr::flatten_dbl(importances)
+  importances_df <- tibble(variable=vars, importance=importances)
+  importances_df <- importances_df %>% dplyr::arrange(-importance)
+  importances_df
+}
+
 
 partial_dependence.xgboost <- function(fit, vars = colnames(data),
   n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)),
@@ -855,6 +871,10 @@ partial_dependence.xgboost <- function(fit, vars = colnames(data),
 # Rows should be sorted by importance in descending order.
 importance_xgboost <- function(model) {
   imp <- tidy.xgb.Booster(model)
+  if ("Error" %in% colnames(imp)) { # In case of Error, return error object to report this error without giving up on the entire model.
+    ret <- simpleError(imp$Error)
+    return(ret)
+  }
   ret <- imp %>% dplyr::rename(variable=feature)
   ret <- ret %>% dplyr::mutate(variable = stringr::str_extract(variable,'c\\d+_')) %>%
     dplyr::group_by(variable) %>%
@@ -964,7 +984,7 @@ exp_xgboost <- function(df,
                         watchlist_rate = 0,
                         sparse = FALSE,
                         booster = "gbtree",
-                        early_stopping_rounds = 0,
+                        early_stopping_rounds = NULL, # No early stop.
                         max_depth = 6,
                         min_child_weight = 1,
                         gamma = 1,
@@ -986,7 +1006,7 @@ exp_xgboost <- function(df,
                         smote_target_minority_perc = 40,
                         smote_max_synth_perc = 200,
                         smote_k = 5,
-                        # importance_measure = "permutation", # "permutation" or "impurity".
+                        importance_measure = "permutation", # "permutation" or "impurity".
                         max_pd_vars = NULL,
                         # Number of most important variables to calculate partial dependences on. 
                         # By default, when Boruta is on, all Confirmed/Tentative variables.
@@ -1159,9 +1179,27 @@ exp_xgboost <- function(df,
 
       # return partial dependence
       if (length(c_cols) > 1) { # Calculate importance only when there are multiple variables.
-        imp_df <- importance_xgboost(model)
+        if (importance_measure == "permutation") {
+          if (is_target_logical) {
+            imp_df <- calc_permutation_importance_xgboost_binary(model, clean_target_col, c_cols, df)
+          }
+          else if (is_target_numeric) {
+            imp_df <- calc_permutation_importance_xgboost_regression(model, clean_target_col, c_cols, df)
+          }
+          else {
+            imp_df <- calc_permutation_importance_xgboost_multiclass(model, clean_target_col, c_cols, df)
+          }
+        }
+        else { # "impurity". Use the importance from the xgboost package.
+          imp_df <- importance_xgboost(model)
+        }
         model$imp_df <- imp_df
-        imp_vars <- imp_df$variable
+        if ("error" %in% class(imp_df)) {
+          imp_vars <- c_cols # Just use c_cols as is for imp_vars to calculate partial dependence anyway.
+        }
+        else {
+          imp_vars <- imp_df$variable
+        }
       }
       else {
         error <- simpleError("Variable importance requires two or more variables.")

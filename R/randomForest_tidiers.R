@@ -1353,7 +1353,7 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
       # Extract test prediction result embedded in the model.
       test_pred_ret <- df %>% prediction(data = "test", ...)
 
-      tryCatch({
+      tryCatch({ #TODO: Not too sure why this tryCatch is needed. It could hide errors that should be properly reported.
         model_object <- df$model[[1]]
         if ("xgboost_exp" %in% class(model_object)) {
           actual <- extract_actual(model_object, type = "test")
@@ -1442,7 +1442,7 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
             model_object <- df$model[[1]]
             if ("xgboost_exp" %in% class(model_object)) {
               if (get_prediction_type(model_object) == "binary") {
-                predicted <- extract_predicted_binary_labels(model_object, type = "test", binary_classification_threshold = binary_classification_threshold)
+                predicted <- extract_predicted_binary_labels(model_object, type = "test", threshold = binary_classification_threshold)
               }
               else {
                 predicted <- extract_predicted_multiclass_labels(model_object, type = "test")
