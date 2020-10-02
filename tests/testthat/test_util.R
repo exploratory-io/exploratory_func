@@ -947,10 +947,10 @@ test_that("week", {
   expect_equal(exploratory::week(dates, unit="month"), c(1,1,2,5,1,1,2,1,1,2,5,1,1,2,5))
 })
 
-test_that("summarize_confint_mean", {
+test_that("confint_mean", {
   # confint_radius is the base implementation.
   v <- 1:100
-  expect_equal(exploratory::confint_radius(v), exploratory::summarize_confint_mean(v))
+  expect_equal(exploratory::confint_radius(v), exploratory::confint_mean(v))
 })
 
 test_that("calc_confint_mean", {
@@ -959,10 +959,10 @@ test_that("calc_confint_mean", {
   expect_equal(exploratory::confint_radius(v), exploratory::calc_confint_mean(sd(v), length(v)))
 })
 
-test_that("summarize_confint_ratio", {
+test_that("confint_ratio", {
   # prop_confint_radius is the base implementation.
   v <- 1:100 %% 3 ==0
-  expect_equal(exploratory::prop_confint_radius(v), exploratory::summarize_confint_ratio(v))
+  expect_equal(exploratory::prop_confint_radius(v), exploratory::confint_ratio(v))
 })
 
 test_that("calc_confint_ratio", {

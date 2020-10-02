@@ -838,7 +838,7 @@ confint_radius <- function(x, level=0.95) {
 #' Calculate the confidence interval range (half-width of confidence interval)
 #' of a given vector.
 #' A synonym to confint_radius.
-summarize_confint_mean <- confint_radius
+confint_mean <- confint_radius
 
 #' Calculate the confidence interval range (half-width of confidence interval)
 #' from a sample size and an sd values of a group. 
@@ -867,7 +867,7 @@ prop_confint_radius <- function(x, level=0.95) {
 #' Calculate the confidence interval range (half-width of confidence interval)
 #' of a population proportion of a given vector.
 #' A synonym to prop_confint_radius.
-summarize_confint_ratio <- prop_confint_radius
+confint_ratio <- prop_confint_radius
 
 #' Calculate the confidence interval range (half-width of confidence interval)
 #' of a population proportion from a size and a target ratio of a group. 
