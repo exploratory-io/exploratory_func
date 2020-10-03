@@ -745,7 +745,6 @@ augment.coxph_exploratory <- function(x, ...) {
   colnames(ret)[colnames(ret) == ".fitted"] <- "Linear Predictor"
   colnames(ret)[colnames(ret) == ".se.fit"] <- "Std Error"
   colnames(ret)[colnames(ret) == ".resid"] <- "Residual"
-  colnames(ret)[colnames(ret) == ".resid"] <- "Residual"
   colnames(ret)[colnames(ret) == "time_for_prediction"] <- "Survival Time for Prediction"
   colnames(ret)[colnames(ret) == "predicted_probability"] <- "Predicted Survival Rate"
 
