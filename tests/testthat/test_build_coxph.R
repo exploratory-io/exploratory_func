@@ -73,6 +73,7 @@ test_that("build_coxph()", {
   res <- model_df %>% model_coef(conf_int = "default", conf.level = 0.95)
   res <- model_df %>% model_anova()
   res <- model_df %>% prediction_coxph(data = "training", type.predict = "lp", type.residuals = "martingale")
+  expect_true("residuals" %in% colnames(res)) # Make sure residuals column is there. For newdata, it is not there in the output from broom::augment, but this is with training data.
   res <- model_df %>% prediction_survfit(newdata = expand.grid(`a ge` = c(40, 50) , `se-x` = c(1,2)))
 })
 
