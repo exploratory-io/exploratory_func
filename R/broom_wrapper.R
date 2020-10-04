@@ -512,7 +512,8 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
 
       # Use formula to support expanded aug_args (especially for type.predict for logistic regression)
       # because ... can't be passed to a function inside mutate directly.
-      if (!is.null(df$model[[1]]$prediction_training) || # Check if model already has training prediction result. # TODO: Make this model agnostic.
+      if ("coxph" %in% class(df$model[[1]]) || # For cox model, prediction results are always included.
+          !is.null(df$model[[1]]$prediction_training) || # Check if model already has training prediction result. # TODO: Make this model agnostic.
           class(df$model[[1]])[[1]] %in% c("lm_exploratory", "glm_exploratory")) { # For lm/glm, we retrieve training prediction inside vanilla lm/glm model.
         aug_fml <- if(aug_args == ""){
           "broom::augment(m, data = df)"
