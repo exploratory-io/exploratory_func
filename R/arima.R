@@ -244,6 +244,9 @@ exp_arima <- function(df, time, valueColumn,
       else if (seasonal_auto) { # p, d, q are set manually. For P, D, Q, automatically search them.
         formula_str <- paste0("y ~ pdq(", p, ",", d, ",", q, ") + PDQ(period=", seasonal_periods, ")")
       }
+      else if (auto) { # p, d, q are automatically searched, while P, D, Q are manually specified.
+        formula_str <- paste0("y ~ PDQ(", P, ",", D, ",", Q, ", period=", seasonal_periods, ")")
+      }
       else { # p, d, q, P, D, Q are all set manually.
         formula_str <- paste0("y ~ pdq(", p, ",", d, ",", q, ") + PDQ(", P, ",", D, ",", Q, ", period=", seasonal_periods, ")")
       }
