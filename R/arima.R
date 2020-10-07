@@ -25,9 +25,9 @@ exp_arima <- function(df, time, valueColumn,
                       p = 0,
                       d = 0,
                       q = 0,
-                      P = NULL,
-                      D = NULL,
-                      Q = NULL,
+                      P = 0,
+                      D = 0,
+                      Q = 0,
                       max.p = 5,
                       max.q = 5,
                       max.P = 2,
@@ -41,6 +41,7 @@ exp_arima <- function(df, time, valueColumn,
                       start.Q = 1,
                       stationary = FALSE,
                       seasonal = TRUE,
+                      seasonal_auto = TRUE,
                       seasonal_periods = NULL,
                       ic = "aic",
                       allowdrift = TRUE,
@@ -237,14 +238,14 @@ exp_arima <- function(df, time, valueColumn,
     }
 
     if (seasonal && !is.null(seasonal_periods)) {
-      if (auto) {
+      if (auto && seasonal_auto) {
         formula_str <- paste0("y ~ 0 + PDQ(period=", seasonal_periods, ")")
       }
-      else if (!is.null(P) && !is.null(D) && !is.null(Q)) { # p, d, q are supposed to be set manually. If All of P, D, Q are specified, use them.
-        formula_str <- paste0("y ~ pdq(", p, ",", d, ",", q, ") + PDQ(", P, ",", D, ",", Q, ", period=", seasonal_periods, ")")
-      }
-      else { # p, d, q are supposed to be set manually. Since P, D, Q are not specified, automatically search them, even though auto is not set TRUE.
+      else if (seasonal_auto) { # p, d, q are set manually. For P, D, Q, automatically search them.
         formula_str <- paste0("y ~ pdq(", p, ",", d, ",", q, ") + PDQ(period=", seasonal_periods, ")")
+      }
+      else { # p, d, q, P, D, Q are all set manually.
+        formula_str <- paste0("y ~ pdq(", p, ",", d, ",", q, ") + PDQ(", P, ",", D, ",", Q, ", period=", seasonal_periods, ")")
       }
     }
     else {
