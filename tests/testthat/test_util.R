@@ -741,6 +741,8 @@ test_that("test %in_or_all%", {
   expect_equal(ret, c(TRUE, TRUE, TRUE))
   ret <- c(1,2,3) %in_or_all% c()
   expect_equal(ret, c(TRUE, TRUE, TRUE))
+  ret <- c('a','b','c') %in_or_all% stringr::str_to_lower(c()) # Test for our case-insensitive filter condition.
+  expect_equal(ret, c(TRUE, TRUE, TRUE))
 })
 
 test_that("test mase", {
