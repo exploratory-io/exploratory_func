@@ -1719,7 +1719,7 @@ mase <- function(actual, predicted, is_test_data, period = 1) {
 #' skipped when the variable is empty or NULL.
 #' @export
 `%in_or_all%` <- function(x,y) {
-  if (is.null(y)) {
+  if (length(y) == 0) {
     return(!(x %in% y))
   }
   else {
