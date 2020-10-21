@@ -22,7 +22,10 @@ test_that("exp_survival_forest with test mode", {
   df <- df %>% mutate(ph.ecog = factor(ph.ecog, ordered=TRUE)) # test handling of ordered factor
   df <- df %>% mutate(`se-x` = `se-x`==1) # test handling of logical
   model_df <- df %>% exp_survival_forest(`ti me`, `sta tus`, `a ge`, `se-x`, ph.ecog, ph.karno, pat.karno, meal.cal, wt.loss, predictor_n = 2, test_rate=0.3)
-  #ret <- model_df %>% prediction(data="training_and_test")
+  browser()
+  ret <- model_df %>% evaluation()
+  browser()
+  ret <- model_df %>% prediction2(data="training_and_test")
   ret <- model_df %>% augment_rowwise(model, data_type="training")
   ret <- model_df %>% augment_rowwise(model, data_type="test")
   ret <- model_df %>% glance_rowwise(model)
