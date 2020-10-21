@@ -379,6 +379,16 @@ exp_survival_forest <- function(df,
         # Note: Do not pass df_test like data=df_test. This for some reason ends up predict returning training data prediction.
         # rf$prediction_test <- predict(rf, df_test, se.fit = TRUE)
         # rf$unknown_category_rows_index <- unknown_category_rows_index
+        df_test_clean <- cleanup_df_for_test(df_test, df, c_cols)
+        na_row_numbers_test <- attr(df_test_clean, "na_row_numbers")
+        unknown_category_rows_index <- attr(df_test_clean, "unknown_category_rows_index")
+
+        prediction_test <- predict(rf, data=df_test_clean)
+        # TODO: Following current convention for the name na.action to keep na row index, but we might want to rethink.
+        # We do not keep this for training since na.roughfix should fill values and not delete rows. TODO: Is this comment valid here for survival forest?
+        attr(prediction_test, "na.action") <- na_row_numbers_test
+        attr(prediction_test, "unknown_category_rows_index") <- unknown_category_rows_index
+        rf$prediction_test <- prediction_test
       }
       rf$test_index <- test_index
       rf$source_data <- source_data

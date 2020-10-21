@@ -1,6 +1,6 @@
 context("test exp_survival_forest")
 
-test_that("test exp_survival_forest", {
+test_that("exp_survival_forest basic", {
   df <- survival::lung # this data has NAs.
   df <- df %>% mutate(status = status==2)
   df <- df %>% rename(`ti me`=time, `sta tus`=status, `a ge`=age, `se-x`=sex)
@@ -15,7 +15,22 @@ test_that("test exp_survival_forest", {
   ret <- model_df %>% tidy_rowwise(model, type='importance')
 })
 
-test_that("test exp_survival_forest with outtlier filtering", {
+test_that("exp_survival_forest with test mode", {
+  df <- survival::lung # this data has NAs.
+  df <- df %>% mutate(status = status==2)
+  df <- df %>% rename(`ti me`=time, `sta tus`=status, `a ge`=age, `se-x`=sex)
+  df <- df %>% mutate(ph.ecog = factor(ph.ecog, ordered=TRUE)) # test handling of ordered factor
+  df <- df %>% mutate(`se-x` = `se-x`==1) # test handling of logical
+  model_df <- df %>% exp_survival_forest(`ti me`, `sta tus`, `a ge`, `se-x`, ph.ecog, ph.karno, pat.karno, meal.cal, wt.loss, predictor_n = 2, test_rate=0.3)
+  ret <- model_df %>% glance_rowwise(model)
+  ret <- model_df %>% augment_rowwise(model)
+  ret <- model_df %>% tidy_rowwise(model, type='partial_dependence_survival_curve')
+  expect_equal(class(model_df$model[[1]]), c("ranger_survival_exploratory", "ranger"))
+  ret <- model_df %>% tidy_rowwise(model, type='partial_dependence')
+  ret <- model_df %>% tidy_rowwise(model, type='importance')
+})
+
+test_that("exp_survival_forest with outtlier filtering", {
   df <- survival::lung # this data has NAs.
   df <- df %>% mutate(status = status==2)
   df <- df %>% rename(`ti me`=time, `sta tus`=status, `a ge`=age, `se-x`=sex)
