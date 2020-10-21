@@ -375,10 +375,6 @@ exp_survival_forest <- function(df,
       rf$survival_curves <- calc_survival_curves_with_strata(df, clean_time_col, clean_status_col, imp_vars)
 
       if (test_rate > 0) {
-        # TODO: Adjust the following code from build_lm.fast for this function.
-        # Note: Do not pass df_test like data=df_test. This for some reason ends up predict returning training data prediction.
-        # rf$prediction_test <- predict(rf, df_test, se.fit = TRUE)
-        # rf$unknown_category_rows_index <- unknown_category_rows_index
         df_test_clean <- cleanup_df_for_test(df_test, df, c_cols)
         na_row_numbers_test <- attr(df_test_clean, "na_row_numbers")
         unknown_category_rows_index <- attr(df_test_clean, "unknown_category_rows_index")
@@ -389,9 +385,9 @@ exp_survival_forest <- function(df,
         attr(prediction_test, "na.action") <- na_row_numbers_test
         attr(prediction_test, "unknown_category_rows_index") <- unknown_category_rows_index
         rf$prediction_test <- prediction_test
+        rf$df_test <- df_test_clean
       }
-      rf$test_index <- test_index
-      rf$source_data <- source_data
+      rf$df <- df
 
       # Calculate concordance.
       concordance_df <- tibble::tibble(x=rowSums(rf$survival), time=df[[clean_time_col]], status=df[[clean_status_col]])
@@ -497,13 +493,19 @@ glance.ranger_survival_exploratory <- function(x, ...) {
 }
 
 #' @export
-augment.ranger_survival_exploratory <- function(x, ...) {
+augment.ranger_survival_exploratory <- function(x, data_type = "training", ...) {
   if ("error" %in% class(x)) {
     ret <- data.frame(Note = x$message)
     return(ret)
   }
-  data <- x$source_data
-  pred <- predict(x, data=data)
+  if (data_type == "training") {
+    data <- x$df
+    pred <- predict(x, data=data)
+  }
+  else { # data_type == "test"
+    data <- x$df_test
+    pred <- x$prediction_test
+  }
 
   pred_survival_time <- x$pred_survival_time
   unique_death_times <- x$forest$unique.death.times
