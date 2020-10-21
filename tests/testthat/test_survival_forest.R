@@ -7,6 +7,7 @@ test_that("test exp_survival_forest", {
   df <- df %>% mutate(ph.ecog = factor(ph.ecog, ordered=TRUE)) # test handling of ordered factor
   df <- df %>% mutate(`se-x` = `se-x`==1) # test handling of logical
   model_df <- df %>% exp_survival_forest(`ti me`, `sta tus`, `a ge`, `se-x`, ph.ecog, ph.karno, pat.karno, meal.cal, wt.loss, predictor_n = 2)
+  ret <- model_df %>% glance_rowwise(model)
   ret <- model_df %>% augment_rowwise(model)
   ret <- model_df %>% tidy_rowwise(model, type='partial_dependence_survival_curve')
   expect_equal(class(model_df$model[[1]]), c("ranger_survival_exploratory", "ranger"))

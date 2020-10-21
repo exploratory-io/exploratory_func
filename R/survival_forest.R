@@ -383,6 +383,10 @@ exp_survival_forest <- function(df,
       rf$test_index <- test_index
       rf$source_data <- source_data
 
+      # Calculate concordance.
+      concordance_df <- tibble::tibble(x=rowSums(rf$survival), time=df[[clean_time_col]], status=df[[clean_status_col]])
+      rf$concordance <- survival::concordance(survival::Surv(time, status)~x,data=concordance_df)$concordance
+
       # add special lm_coxph class for adding extra info at glance().
       class(rf) <- c("ranger_survival_exploratory", class(rf))
       rf
@@ -475,6 +479,10 @@ tidy.ranger_survival_exploratory <- function(x, type = 'importance', ...) { #TOD
       ret <- ret %>% dplyr::mutate(variable = x$terms_mapping[variable]) # map variable names to original.
       ret
     })
+}
+
+glance.ranger_survival_exploratory <- function(x, ...) {
+  tibble::tibble(concordance=x$concordance)
 }
 
 #' @export
