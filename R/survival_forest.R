@@ -374,6 +374,11 @@ exp_survival_forest <- function(df,
       rf$pred_survival_time <- pred_survival_time
       rf$survival_curves <- calc_survival_curves_with_strata(df, clean_time_col, clean_status_col, imp_vars)
 
+      # Calculate concordance.
+      concordance_df <- tibble::tibble(x=rowSums(rf$survival), time=df[[clean_time_col]], status=df[[clean_status_col]])
+      # The concordance is (d+1)/2, where d is Somers' d. https://cran.r-project.org/web/packages/survival/vignettes/concordance.pdf
+      rf$concordance <- survival::concordance(survival::Surv(time, status)~x,data=concordance_df)
+
       if (test_rate > 0) {
         df_test_clean <- cleanup_df_for_test(df_test, df, c_cols)
         na_row_numbers_test <- attr(df_test_clean, "na_row_numbers")
@@ -386,13 +391,13 @@ exp_survival_forest <- function(df,
         attr(prediction_test, "unknown_category_rows_index") <- unknown_category_rows_index
         rf$prediction_test <- prediction_test
         rf$df_test <- df_test_clean
+
+        # Calculate concordance.
+        concordance_df_test <- tibble::tibble(x=rowSums(prediction_test$survival), time=df_test_clean[[clean_time_col]], status=df_test_clean[[clean_status_col]])
+        # The concordance is (d+1)/2, where d is Somers' d. https://cran.r-project.org/web/packages/survival/vignettes/concordance.pdf
+        rf$concordance_test <- survival::concordance(survival::Surv(time, status)~x,data=concordance_df_test)
       }
       rf$df <- df
-
-      # Calculate concordance.
-      concordance_df <- tibble::tibble(x=rowSums(rf$survival), time=df[[clean_time_col]], status=df[[clean_status_col]])
-      # The concordance is (d+1)/2, where d is Somers' d. https://cran.r-project.org/web/packages/survival/vignettes/concordance.pdf
-      rf$concordance <- survival::concordance(survival::Surv(time, status)~x,data=concordance_df)
 
       # add special lm_coxph class for adding extra info at glance().
       class(rf) <- c("ranger_survival_exploratory", class(rf))
@@ -488,8 +493,13 @@ tidy.ranger_survival_exploratory <- function(x, type = 'importance', ...) { #TOD
     })
 }
 
-glance.ranger_survival_exploratory <- function(x, ...) {
-  tibble::tibble(Concordance=x$concordance$concordance, `Std Error Concordance`=sqrt(x$concordance$var))
+glance.ranger_survival_exploratory <- function(x, data_type = "training", ...) {
+  if (data_type == "training") {
+    tibble::tibble(Concordance=x$concordance$concordance, `Std Error Concordance`=sqrt(x$concordance$var))
+  }
+  else { # data_type == "test"
+    tibble::tibble(Concordance=x$concordance_test$concordance, `Std Error Concordance`=sqrt(x$concordance_test$var))
+  }
 }
 
 #' @export
