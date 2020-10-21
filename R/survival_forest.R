@@ -385,6 +385,7 @@ exp_survival_forest <- function(df,
 
       # Calculate concordance.
       concordance_df <- tibble::tibble(x=rowSums(rf$survival), time=df[[clean_time_col]], status=df[[clean_status_col]])
+      # The concordance is (d+1)/2, where d is Somers' d. https://cran.r-project.org/web/packages/survival/vignettes/concordance.pdf
       rf$concordance <- survival::concordance(survival::Surv(time, status)~x,data=concordance_df)
 
       # add special lm_coxph class for adding extra info at glance().
@@ -482,7 +483,7 @@ tidy.ranger_survival_exploratory <- function(x, type = 'importance', ...) { #TOD
 }
 
 glance.ranger_survival_exploratory <- function(x, ...) {
-  tibble::tibble(Concordance=x$concordance$concordance, `Std Error`=sqrt(x$concordance$var))
+  tibble::tibble(Concordance=x$concordance$concordance, `Std Error Concordance`=sqrt(x$concordance$var))
 }
 
 #' @export
