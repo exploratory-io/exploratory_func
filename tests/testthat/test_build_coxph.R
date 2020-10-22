@@ -8,7 +8,7 @@ test_that("build_coxph.fast basic", {
   df <- df %>% mutate(`se-x` = `se-x`==1) # test handling of logical
   model_df <- df %>% build_coxph.fast(`ti me`, `sta tus`, `a ge`, `se-x`, ph.ecog, ph.karno, pat.karno, meal.cal, wt.loss, predictor_n = 2)
   expect_equal(class(model_df$model[[1]]), c("coxph_exploratory","coxph"))
-  ret <- model_df %>% prediction2(data="training_and_test")
+  ret <- model_df %>% prediction2()
   ret <- model_df %>% evaluation()
   ret <- model_df %>% tidy_rowwise(model, type='permutation_importance')
   ret <- model_df %>% tidy_rowwise(model, type='partial_dependence')
@@ -40,7 +40,7 @@ test_that("test build_coxph.fast with test mode", {
   df <- df %>% mutate(`se-x` = `se-x`==1) # test handling of logical
   model_df <- df %>% build_coxph.fast(`ti me`, `sta tus`, `a ge`, `se-x`, ph.ecog, ph.karno, pat.karno, meal.cal, wt.loss, predictor_n = 2, test_rate=0.3)
   expect_equal(class(model_df$model[[1]]), c("coxph_exploratory","coxph"))
-  ret <- model_df %>% prediction2(data="training_and_test")
+  ret <- model_df %>% prediction2()
   ret <- model_df %>% evaluation()
   ret <- model_df %>% tidy_rowwise(model, type='permutation_importance')
   ret <- model_df %>% tidy_rowwise(model, type='partial_dependence')
