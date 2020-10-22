@@ -499,6 +499,7 @@ build_coxph.fast <- function(df,
         attr(prediction_test, "unknown_category_rows_index") <- unknown_category_rows_index
         model$prediction_test <- prediction_test
         model$test_data <- df_test_clean # Note: The usual df_test conflicts with df (degree of freedom) and disrupts broom:::glance.coxph. For some reason, only the beginning of the attribute name still seems points to the set value. Thus, using name "test_data".
+        model$test_nevent <- sum(df_test_clean[[clean_status_col]], na.rm=TRUE)
 
         # Calculate concordance.
         concordance_df_test <- tibble::tibble(x=prediction_test, time=df_test_clean[[clean_time_col]], status=df_test_clean[[clean_status_col]])
@@ -712,7 +713,7 @@ glance.coxph_exploratory <- function(x, data_type = "training", pretty.name = FA
     if (is.null(x$test_data)) {
       return(data.frame())
     }
-    ret <- tibble::tibble(n=nrow(x$test_data), concordance=x$concordance_test$concordance, `std.error.concordance`=sqrt(x$concordance_test$var))
+    ret <- tibble::tibble(n=nrow(x$test_data), nevent=x$test_nevent, concordance=x$concordance_test$concordance, `std.error.concordance`=sqrt(x$concordance_test$var))
   }
 
   if(pretty.name) {
