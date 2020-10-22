@@ -709,7 +709,6 @@ glance.coxph_exploratory <- function(x, data_type = "training", pretty.name = FA
     }
   }
   else { # data_type == "test"
-    browser()
     ret <- tibble::tibble(n=nrow(x$test_data), concordance=x$concordance_test$concordance, `std.error.concordance`=sqrt(x$concordance_test$var))
   }
 
