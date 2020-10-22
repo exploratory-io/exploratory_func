@@ -396,8 +396,10 @@ exp_survival_forest <- function(df,
         concordance_df_test <- tibble::tibble(x=rowSums(prediction_test$survival), time=df_test_clean[[clean_time_col]], status=df_test_clean[[clean_status_col]])
         # The concordance is (d+1)/2, where d is Somers' d. https://cran.r-project.org/web/packages/survival/vignettes/concordance.pdf
         rf$concordance_test <- survival::concordance(survival::Surv(time, status)~x,data=concordance_df_test)
+        rf$test_nevent <- sum(df_test_clean[[clean_status_col]], na.rm=TRUE)
       }
       rf$df <- df
+      rf$nevent <- sum(df[[clean_status_col]], na.rm=TRUE)
 
       # add special lm_coxph class for adding extra info at glance().
       class(rf) <- c("ranger_survival_exploratory", class(rf))
@@ -496,7 +498,7 @@ tidy.ranger_survival_exploratory <- function(x, type = 'importance', ...) { #TOD
 glance.ranger_survival_exploratory <- function(x, data_type = "training", ...) {
   if (data_type == "training") {
     if (!is.null(x$concordance)) {
-      tibble::tibble(Concordance=x$concordance$concordance, `Std Error Concordance`=sqrt(x$concordance$var))
+      tibble::tibble(Concordance=x$concordance$concordance, `Std Error Concordance`=sqrt(x$concordance$var), `Number of Rows`=nrow(x$df), `Number of Events`=x$nevent)
     }
     else {
       data.frame()
@@ -504,7 +506,7 @@ glance.ranger_survival_exploratory <- function(x, data_type = "training", ...) {
   }
   else { # data_type == "test"
     if (!is.null(x$concordance_test)) {
-      tibble::tibble(Concordance=x$concordance_test$concordance, `Std Error Concordance`=sqrt(x$concordance_test$var))
+      tibble::tibble(Concordance=x$concordance_test$concordance, `Std Error Concordance`=sqrt(x$concordance_test$var), `Number of Rows`=nrow(x$df_test), `Number of Events`=x$test_nevent)
     }
     else {
       data.frame()

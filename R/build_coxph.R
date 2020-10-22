@@ -708,12 +708,15 @@ glance.coxph_exploratory <- function(x, data_type = "training", pretty.name = FA
     if (!is.null(ret$p.value.robust)) { # The value shows up as NA for some reason. Hide for now.
       ret <- ret %>% dplyr::select(-p.value.robust)
     }
+    if (!is.null(ret$n) && !is.null(ret$nevent)) {
+      ret <- ret %>% dplyr::select(-n, -nevent, everything(), n, nevent) # Bring n and nevent to the last.
+    }
   }
   else { # data_type == "test"
     if (is.null(x$test_data)) {
       return(data.frame())
     }
-    ret <- tibble::tibble(n=nrow(x$test_data), nevent=x$test_nevent, concordance=x$concordance_test$concordance, `std.error.concordance`=sqrt(x$concordance_test$var))
+    ret <- tibble::tibble(concordance=x$concordance_test$concordance, `std.error.concordance`=sqrt(x$concordance_test$var), n=nrow(x$test_data), nevent=x$test_nevent)
   }
 
   if(pretty.name) {
