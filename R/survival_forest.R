@@ -495,10 +495,20 @@ tidy.ranger_survival_exploratory <- function(x, type = 'importance', ...) { #TOD
 
 glance.ranger_survival_exploratory <- function(x, data_type = "training", ...) {
   if (data_type == "training") {
-    tibble::tibble(Concordance=x$concordance$concordance, `Std Error Concordance`=sqrt(x$concordance$var))
+    if (!is.null(x$concordance)) {
+      tibble::tibble(Concordance=x$concordance$concordance, `Std Error Concordance`=sqrt(x$concordance$var))
+    }
+    else {
+      data.frame()
+    }
   }
   else { # data_type == "test"
-    tibble::tibble(Concordance=x$concordance_test$concordance, `Std Error Concordance`=sqrt(x$concordance_test$var))
+    if (!is.null(x$concordance_test)) {
+      tibble::tibble(Concordance=x$concordance_test$concordance, `Std Error Concordance`=sqrt(x$concordance_test$var))
+    }
+    else {
+      data.frame()
+    }
   }
 }
 
@@ -513,8 +523,13 @@ augment.ranger_survival_exploratory <- function(x, data_type = "training", ...) 
     pred <- predict(x, data=data)
   }
   else { # data_type == "test"
-    data <- x$df_test
-    pred <- x$prediction_test
+    if (!is.null(x$df_test)) {
+      data <- x$df_test
+      pred <- x$prediction_test
+    }
+    else {
+      return(data.frame())
+    }
   }
 
   pred_survival_time <- x$pred_survival_time
