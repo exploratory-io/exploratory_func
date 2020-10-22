@@ -781,9 +781,14 @@ evaluation <- function(df, ...){
   df <- df %>%
     dplyr::ungroup() %>% # ungroup is necessary here to get expected df1, df2 value in the next line.
     dplyr::mutate(source.data = purrr::map2(source.data.training, source.data.test, function(df1, df2){
-      df1 <- df1 %>% dplyr::mutate(is_test_data=FALSE)
-      df2 <- df2 %>% dplyr::mutate(is_test_data=TRUE)
-      dplyr::bind_rows(df1, df2)
+      if (nrow(df2) > 0) {
+        df1 <- df1 %>% dplyr::mutate(is_test_data=FALSE)
+        df2 <- df2 %>% dplyr::mutate(is_test_data=TRUE)
+        dplyr::bind_rows(df1, df2)
+      }
+      else {
+        df1
+      }
     })) %>%
     dplyr::select(-source.data.training, -source.data.test) %>%
     dplyr::ungroup()
@@ -792,14 +797,17 @@ evaluation <- function(df, ...){
     dplyr::select(-model) %>%
     unnest_with_drop(source.data)
 
-  # Since is_test_data can go to strange position if there are columns that exists only in certain groups,
-  # move it to the last explicitly.
-  ret <- df %>% select(-is_test_data, everything(), is_test_data)
-
   if (length(grouping_cols) > 0) {
-    ret <- dplyr::group_by(ret, !!!rlang::syms(grouping_cols))
+    df <- dplyr::group_by(df, !!!rlang::syms(grouping_cols))
   }
-  ret
+
+  # Prettify is_test_data column. Do this after the above arrange calls, since it looks at is_test_data column.
+  if (!is.null(df$is_test_data)) {
+    df <- df %>% dplyr::select(is_test_data, everything()) %>%
+      dplyr::mutate(is_test_data = dplyr::if_else(is_test_data, "Test", "Training")) %>%
+      dplyr::rename(`Data Type` = is_test_data)
+  }
+  df
 }
 
 #' prediction wrapper for both training and test data

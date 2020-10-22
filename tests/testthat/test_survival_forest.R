@@ -8,6 +8,7 @@ test_that("exp_survival_forest basic", {
   df <- df %>% mutate(`se-x` = `se-x`==1) # test handling of logical
   model_df <- df %>% exp_survival_forest(`ti me`, `sta tus`, `a ge`, `se-x`, ph.ecog, ph.karno, pat.karno, meal.cal, wt.loss, predictor_n = 2)
   ret <- model_df %>% evaluation()
+  expect_false("Data Type" %in% colnames(ret))
   ret <- model_df %>% prediction2()
   ret <- model_df %>% glance_rowwise(model)
   ret <- model_df %>% augment_rowwise(model)
@@ -25,6 +26,7 @@ test_that("exp_survival_forest with test mode", {
   df <- df %>% mutate(`se-x` = `se-x`==1) # test handling of logical
   model_df <- df %>% exp_survival_forest(`ti me`, `sta tus`, `a ge`, `se-x`, ph.ecog, ph.karno, pat.karno, meal.cal, wt.loss, predictor_n = 2, test_rate=0.3)
   ret <- model_df %>% evaluation()
+  expect_true("Data Type" %in% colnames(ret))
   ret <- model_df %>% prediction2()
   ret <- model_df %>% augment_rowwise(model, data_type="training")
   ret <- model_df %>% augment_rowwise(model, data_type="test")
