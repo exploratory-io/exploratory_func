@@ -1,6 +1,6 @@
 context("test build_coxph")
 
-test_that("test build_coxph.fast", {
+test_that("build_coxph.fast basic", {
   df <- survival::lung # this data has NAs.
   df <- df %>% mutate(status = status==2)
   df <- df %>% rename(`ti me`=time, `sta tus`=status, `a ge`=age, `se-x`=sex)

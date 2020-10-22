@@ -709,6 +709,9 @@ glance.coxph_exploratory <- function(x, data_type = "training", pretty.name = FA
     }
   }
   else { # data_type == "test"
+    if (is.null(x$test_data)) {
+      return(data.frame())
+    }
     ret <- tibble::tibble(n=nrow(x$test_data), concordance=x$concordance_test$concordance, `std.error.concordance`=sqrt(x$concordance_test$var))
   }
 
@@ -752,6 +755,9 @@ augment.coxph_exploratory <- function(x, data_type = "training", ...) {
     ret <- broom:::augment.coxph(x, data = data, ...)
   }
   else {
+    if (is.null(x$test_data)) {
+      return(data.frame())
+    }
     data <- x$test_data
     ret <- broom:::augment.coxph(x, newdata = data, ...)
   }

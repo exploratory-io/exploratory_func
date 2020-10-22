@@ -737,7 +737,10 @@ prediction2 <- function(df, data_frame = NULL, conf_int = 0.95, ...){
   colnames(ret)[colnames(ret) == ".cooksd"] <- avoid_conflict(colnames(ret), "cooks_distance")
   colnames(ret)[colnames(ret) == ".std.resid"] <- avoid_conflict(colnames(ret), "standardised_residuals")
 
-  dplyr::group_by(ret, !!!rlang::syms(grouping_cols))
+  if (length(grouping_cols) > 0) {
+    ret <- dplyr::group_by(ret, !!!rlang::syms(grouping_cols))
+  }
+  ret
 }
 
 evaluation <- function(df, ...){
@@ -793,7 +796,10 @@ evaluation <- function(df, ...){
   # move it to the last explicitly.
   ret <- df %>% select(-is_test_data, everything(), is_test_data)
 
-  dplyr::group_by(ret, !!!rlang::syms(grouping_cols))
+  if (length(grouping_cols) > 0) {
+    ret <- dplyr::group_by(ret, !!!rlang::syms(grouping_cols))
+  }
+  ret
 }
 
 #' prediction wrapper for both training and test data
