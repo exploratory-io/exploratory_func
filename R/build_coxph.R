@@ -504,7 +504,8 @@ build_coxph.fast <- function(df,
         # Calculate concordance.
         concordance_df_test <- tibble::tibble(x=prediction_test, time=df_test_clean[[clean_time_col]], status=df_test_clean[[clean_status_col]])
         # The concordance is (d+1)/2, where d is Somers' d. https://cran.r-project.org/web/packages/survival/vignettes/concordance.pdf
-        model$concordance_test <- survival::concordance(survival::Surv(time, status)~x,data=concordance_df_test)
+        # reverse=TRUE because larger hazard ratio means shorter survival.
+        model$concordance_test <- survival::concordance(survival::Surv(time, status)~x,data=concordance_df_test, reverse=TRUE)
       }
       model$training_data <- df
 
