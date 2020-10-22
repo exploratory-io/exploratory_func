@@ -505,8 +505,7 @@ build_coxph.fast <- function(df,
         # The concordance is (d+1)/2, where d is Somers' d. https://cran.r-project.org/web/packages/survival/vignettes/concordance.pdf
         model$concordance_test <- survival::concordance(survival::Surv(time, status)~x,data=concordance_df_test)
       }
-      model$test_index <- test_index
-      model$source_data <- source_data
+      model$training_data <- df
 
       # add special lm_coxph class for adding extra info at glance().
       class(model) <- c("coxph_exploratory", class(model))
@@ -743,14 +742,20 @@ glance.coxph_exploratory <- function(x, data_type = "training", pretty.name = FA
 }
 
 #' @export
-augment.coxph_exploratory <- function(x, ...) {
+augment.coxph_exploratory <- function(x, data_type = "training", ...) {
   if ("error" %in% class(x)) {
     ret <- data.frame(Note = x$message)
     return(ret)
   }
   # TODO: handle training/test split.
-  data <- x$source_data
-  ret <- broom:::augment.coxph(x, data = data, ...)
+  if (data_type == "training") {
+    data <- x$training_data
+    ret <- broom:::augment.coxph(x, data = data, ...)
+  }
+  else {
+    data <- x$test_data
+    ret <- broom:::augment.coxph(x, newdata = data, ...)
+  }
 
   time <- x$pred_survival_time
   # basehaz returns base cumulative hazard.
