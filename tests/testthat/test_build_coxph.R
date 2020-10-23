@@ -33,6 +33,37 @@ test_that("build_coxph.fast basic", {
   ret <- model_df %>% augment_rowwise(model)
 })
 
+test_that("build_coxph.fast basic with group-by", {
+  df <- survival::lung # this data has NAs.
+  df <- df %>% mutate(status = status==2)
+  df <- df %>% rename(`ti me`=time, `sta tus`=status, `a ge`=age, `se-x`=sex)
+  df <- df %>% mutate(ph.ecog = factor(ph.ecog, ordered=TRUE)) # test handling of ordered factor
+  df <- df %>% mutate(`se-x` = `se-x`==1) # test handling of logical
+  df <- df %>% group_by(`se-x`)
+  model_df <- df %>% build_coxph.fast(`ti me`, `sta tus`, `a ge`, ph.ecog, ph.karno, pat.karno, meal.cal, wt.loss, predictor_n = 2)
+  expect_equal(class(model_df$model[[1]]), c("coxph_exploratory","coxph"))
+  ret <- model_df %>% prediction2()
+  ret <- model_df %>% evaluation(pretty.name=TRUE)
+  expect_false("Data Type" %in% colnames(ret))
+  ret <- model_df %>% tidy_rowwise(model, type='permutation_importance')
+  ret <- model_df %>% tidy_rowwise(model, type='partial_dependence')
+  ret <- model_df %>% tidy_rowwise(model, type='partial_dependence_survival_curve')
+  ret <- model_df %>% tidy_rowwise(model, type='vif')
+  ret <- model_df %>% tidy_rowwise(model)
+  expect_equal(colnames(ret),
+               c("se-x","term","estimate","std_error","t_ratio",
+                 "p_value","conf_low","conf_high","hazard_ratio","base.level"))
+
+  ret <- model_df %>% glance_rowwise(model, pretty.name=TRUE)
+  expect_equal(colnames(ret),
+               c("se-x","Likelihood Ratio Test","Likelihood Ratio Test P Value",
+                 "Score Test","Score Test P Value","Wald Test","Wald Test P Value",
+                 # "Robust Statistic","Robust P Value", # These columns are hidden for now.
+                 "R Squared","R Squared Max","Concordance","Std Error Concordance",
+                 "Log Likelihood","AIC","BIC","Number of Rows","Number of Events")) 
+  ret <- model_df %>% augment_rowwise(model)
+})
+
 test_that("test build_coxph.fast with test mode", {
   df <- survival::lung # this data has NAs.
   df <- df %>% mutate(status = status==2)
@@ -59,6 +90,36 @@ test_that("test build_coxph.fast with test mode", {
   ret <- model_df %>% glance_rowwise(model, pretty.name=TRUE)
   expect_equal(colnames(ret),
                c("Likelihood Ratio Test","Likelihood Ratio Test P Value",
+                 "Score Test","Score Test P Value","Wald Test","Wald Test P Value",
+                 # "Robust Statistic","Robust P Value", # These columns are hidden for now.
+                 "R Squared","R Squared Max","Concordance","Std Error Concordance",
+                 "Log Likelihood","AIC","BIC","Number of Rows","Number of Events")) 
+  ret <- model_df %>% augment_rowwise(model)
+})
+
+test_that("test build_coxph.fast with test mode with group-by", {
+  df <- survival::lung # this data has NAs.
+  df <- df %>% mutate(status = status==2)
+  df <- df %>% rename(`ti me`=time, `sta tus`=status, `a ge`=age, `se-x`=sex)
+  df <- df %>% mutate(ph.ecog = factor(ph.ecog, ordered=TRUE)) # test handling of ordered factor
+  df <- df %>% mutate(`se-x` = `se-x`==1) # test handling of logical
+  df <- df %>% group_by(`se-x`)
+  model_df <- df %>% build_coxph.fast(`ti me`, `sta tus`, `a ge`, ph.ecog, ph.karno, pat.karno, meal.cal, wt.loss, predictor_n = 2, test_rate=0.3)
+  expect_equal(class(model_df$model[[1]]), c("coxph_exploratory","coxph"))
+  ret <- model_df %>% prediction2()
+  ret <- model_df %>% evaluation(pretty.name=TRUE)
+  expect_true("Data Type" %in% colnames(ret))
+  ret <- model_df %>% tidy_rowwise(model, type='permutation_importance')
+  ret <- model_df %>% tidy_rowwise(model, type='partial_dependence')
+  ret <- model_df %>% tidy_rowwise(model, type='partial_dependence_survival_curve')
+  ret <- model_df %>% tidy_rowwise(model, type='vif')
+  ret <- model_df %>% tidy_rowwise(model)
+  expect_equal(colnames(ret),
+               c("se-x", "term","estimate","std_error","t_ratio",
+                 "p_value","conf_low","conf_high","hazard_ratio","base.level"))
+  ret <- model_df %>% glance_rowwise(model, pretty.name=TRUE)
+  expect_equal(colnames(ret),
+               c("se-x","Likelihood Ratio Test","Likelihood Ratio Test P Value",
                  "Score Test","Score Test P Value","Wald Test","Wald Test P Value",
                  # "Robust Statistic","Robust P Value", # These columns are hidden for now.
                  "R Squared","R Squared Max","Concordance","Std Error Concordance",
