@@ -1,11 +1,21 @@
+calc_mean_survival <- function(survival, unique_death_times) {
+  # Calculate mean survival time from predicted survival curve. If the survival rate at the last unique death time is not 0,
+  # we assume that the survivers lived one more term, just so that we can calculate the finite mean.
+  # Thus the unique.death.times is appended with max(unique.death.times)+1.
+  ret <- -matrixStats::rowDiffs(cbind(1,survival,0)) %*% c(unique_death_times, max(unique_death_times)+1)
+  ret
+}
+
 # Permutation importance. The one from ranger seems too unstable for our use. Maybe it's based on OOB prediction?
 calc_permutation_importance_ranger_survival <- function(fit, time_col, status_col, vars, data) {
   var_list <- as.list(vars)
   importances <- purrr::map(var_list, function(var) {
     mmpf::permutationImportance(data, vars=var, y=time_col, model=fit, nperm=5, # Since the result seems too unstable with nperm=1, where we use elsewhere, here we use 5.
                                 predict.fun = function(object, newdata) {
+                                  predicted <- predict(object,data=newdata)
+                                  mean_survival <- calc_mean_survival(predicted$survival, predicted$unique.death.times)
                                   # Use the sum of predicted survival probability as predicted survival time. TODO: Adding weight to adjust for different intervals.
-                                  tibble::tibble(x=rowSums(predict(object,data=newdata)$survival, na.rm=TRUE),status=newdata[[status_col]])
+                                  tibble::tibble(x=mean_survival,status=newdata[[status_col]])
                                 },
                                 loss.fun = function(x,y){ # Use 1 - concordance as loss function.
                                   df <- x %>% dplyr::mutate(time=!!y[[1]])
@@ -375,7 +385,7 @@ exp_survival_forest <- function(df,
       rf$survival_curves <- calc_survival_curves_with_strata(df, clean_time_col, clean_status_col, imp_vars)
 
       # Calculate concordance.
-      concordance_df <- tibble::tibble(x=rowSums(rf$survival), time=df[[clean_time_col]], status=df[[clean_status_col]])
+      concordance_df <- tibble::tibble(x=calc_mean_survival(rf$survival, rf$forest$unique.death.times), time=df[[clean_time_col]], status=df[[clean_status_col]])
       # The concordance is (d+1)/2, where d is Somers' d. https://cran.r-project.org/web/packages/survival/vignettes/concordance.pdf
       rf$concordance <- survival::concordance(survival::Surv(time, status)~x,data=concordance_df)
 
@@ -393,7 +403,7 @@ exp_survival_forest <- function(df,
         rf$df_test <- df_test_clean
 
         # Calculate concordance.
-        concordance_df_test <- tibble::tibble(x=rowSums(prediction_test$survival), time=df_test_clean[[clean_time_col]], status=df_test_clean[[clean_status_col]])
+        concordance_df_test <- tibble::tibble(x=calc_mean_survival(prediction_test$survival, prediction_test$unique.death.times), time=df_test_clean[[clean_time_col]], status=df_test_clean[[clean_status_col]])
         # The concordance is (d+1)/2, where d is Somers' d. https://cran.r-project.org/web/packages/survival/vignettes/concordance.pdf
         rf$concordance_test <- survival::concordance(survival::Surv(time, status)~x,data=concordance_df_test)
         rf$test_nevent <- sum(df_test_clean[[clean_status_col]], na.rm=TRUE)
