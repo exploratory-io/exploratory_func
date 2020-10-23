@@ -385,7 +385,10 @@ exp_survival_forest <- function(df,
       rf$survival_curves <- calc_survival_curves_with_strata(df, clean_time_col, clean_status_col, imp_vars)
 
       # Calculate concordance.
-      concordance_df <- tibble::tibble(x=calc_mean_survival(rf$survival, rf$forest$unique.death.times), time=df[[clean_time_col]], status=df[[clean_status_col]])
+      # Concordance by rf$survival is too bad, most likely because it is out-of-bag prediction. We explictly predict with training data to calculate training concordance.
+      prediction_training <- predict(rf, data=df)
+      concordance_df <- tibble::tibble(x=calc_mean_survival(prediction_training$survival, prediction_training$unique.death.times), time=df[[clean_time_col]], status=df[[clean_status_col]])
+
       # The concordance is (d+1)/2, where d is Somers' d. https://cran.r-project.org/web/packages/survival/vignettes/concordance.pdf
       rf$concordance <- survival::concordance(survival::Surv(time, status)~x,data=concordance_df)
 
