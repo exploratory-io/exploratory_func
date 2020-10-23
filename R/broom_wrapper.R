@@ -650,12 +650,13 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
 }
 
 # Simplified prediction() that works only with new Analytics View model df. This should be kept model-agnostic.
+# This one does not use .test_index and source.data columns.
 prediction2 <- function(df, data_frame = NULL, conf_int = 0.95, ...){
   validate_empty_data(df)
 
   df_cnames <- colnames(df)
 
-  # columns other than "source.data", ".test_index" and "model" should be regarded as grouping columns
+  # columns other than "model" should be regarded as grouping columns
   # this should be kept after running prediction
   grouping_cols <- df_cnames[!df_cnames %in% c("model")]
 
@@ -745,6 +746,9 @@ prediction2 <- function(df, data_frame = NULL, conf_int = 0.95, ...){
   ret
 }
 
+
+# Simplified, model agnostic version of rf_evaluation_training_and_test.
+# Currently used only by cox regression and survival forest, but planning to migrate others to this one.
 evaluation <- function(df, ...){
   validate_empty_data(df)
 
