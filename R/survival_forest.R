@@ -387,6 +387,7 @@ exp_survival_forest <- function(df,
       # Calculate concordance.
       # Concordance by rf$survival is too bad, most likely because it is out-of-bag prediction. We explictly predict with training data to calculate training concordance.
       prediction_training <- predict(rf, data=df)
+      rf$prediction_training <- prediction_training
       concordance_df <- tibble::tibble(x=calc_mean_survival(prediction_training$survival, prediction_training$unique.death.times), time=df[[clean_time_col]], status=df[[clean_status_col]])
 
       # The concordance is (d+1)/2, where d is Somers' d. https://cran.r-project.org/web/packages/survival/vignettes/concordance.pdf
@@ -535,7 +536,7 @@ augment.ranger_survival_exploratory <- function(x, data_type = "training", ...) 
   }
   if (data_type == "training") {
     data <- x$df
-    pred <- predict(x, data=data)
+    pred <- x$prediction_training
   }
   else { # data_type == "test"
     if (!is.null(x$df_test)) {
