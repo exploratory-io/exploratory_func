@@ -37,7 +37,7 @@ test_that("calc_feature_map(regression) evaluate training and test", {
   expect_equal(nrow(ret %>% filter(`CAR RIER`=="DUMMY")), 1) # Row for the group with error.
   expect_equal(nrow(ret %>% filter(`CAR RIER`=="DUMMY" & !is.na(Note))), 1) # Row for the group with error should have message in Note column. 
 
-  ret <- model_df %>% prediction_training_and_test()
+  ret <- model_df %>% prediction(data='training_and_test')
   test_ret <- ret %>% filter(is_test_data==TRUE)
   # expect_equal(nrow(test_ret), 1500) # Fails for now
   train_ret <- ret %>% filter(is_test_data==FALSE)
@@ -45,7 +45,7 @@ test_that("calc_feature_map(regression) evaluate training and test", {
 
   model_df <- flight %>%
                 calc_feature_imp(`FL NUM`, `DIS TANCE`, `DEP TIME`, test_rate = 0)
-  ret <- model_df %>% prediction_training_and_test()
+  ret <- model_df %>% prediction(data='training_and_test')
   train_ret <- ret %>% filter(is_test_data==FALSE)
   #expect_equal(nrow(train_ret), 4894) # Less than 5000 because of NAs in the target variable. Linux seems to have different result. Work around for now.
   expect_lt(nrow(train_ret), 5000)

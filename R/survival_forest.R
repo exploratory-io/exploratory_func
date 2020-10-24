@@ -1,11 +1,21 @@
+calc_mean_survival <- function(survival, unique_death_times) {
+  # Calculate mean survival time from predicted survival curve. If the survival rate at the last unique death time is not 0,
+  # we assume that the survivers lived one more term, just so that we can calculate the finite mean.
+  # Thus the unique.death.times is appended with max(unique.death.times)+1.
+  ret <- -matrixStats::rowDiffs(cbind(1,survival,0)) %*% c(unique_death_times, max(unique_death_times)+1)
+  ret
+}
+
 # Permutation importance. The one from ranger seems too unstable for our use. Maybe it's based on OOB prediction?
 calc_permutation_importance_ranger_survival <- function(fit, time_col, status_col, vars, data) {
   var_list <- as.list(vars)
   importances <- purrr::map(var_list, function(var) {
     mmpf::permutationImportance(data, vars=var, y=time_col, model=fit, nperm=5, # Since the result seems too unstable with nperm=1, where we use elsewhere, here we use 5.
                                 predict.fun = function(object, newdata) {
+                                  predicted <- predict(object,data=newdata)
+                                  mean_survival <- calc_mean_survival(predicted$survival, predicted$unique.death.times)
                                   # Use the sum of predicted survival probability as predicted survival time. TODO: Adding weight to adjust for different intervals.
-                                  tibble::tibble(x=rowSums(predict(object,data=newdata)$survival, na.rm=TRUE),status=newdata[[status_col]])
+                                  tibble::tibble(x=mean_survival,status=newdata[[status_col]])
                                 },
                                 loss.fun = function(x,y){ # Use 1 - concordance as loss function.
                                   df <- x %>% dplyr::mutate(time=!!y[[1]])
@@ -374,14 +384,36 @@ exp_survival_forest <- function(df,
       rf$pred_survival_time <- pred_survival_time
       rf$survival_curves <- calc_survival_curves_with_strata(df, clean_time_col, clean_status_col, imp_vars)
 
+      # Calculate concordance.
+      # Concordance by rf$survival is too bad, most likely because it is out-of-bag prediction. We explictly predict with training data to calculate training concordance.
+      prediction_training <- predict(rf, data=df)
+      rf$prediction_training <- prediction_training
+      concordance_df <- tibble::tibble(x=calc_mean_survival(prediction_training$survival, prediction_training$unique.death.times), time=df[[clean_time_col]], status=df[[clean_status_col]])
+
+      # The concordance is (d+1)/2, where d is Somers' d. https://cran.r-project.org/web/packages/survival/vignettes/concordance.pdf
+      rf$concordance <- survival::concordance(survival::Surv(time, status)~x,data=concordance_df)
+
       if (test_rate > 0) {
-        # TODO: Adjust the following code from build_lm.fast for this function.
-        # Note: Do not pass df_test like data=df_test. This for some reason ends up predict returning training data prediction.
-        # rf$prediction_test <- predict(rf, df_test, se.fit = TRUE)
-        # rf$unknown_category_rows_index <- unknown_category_rows_index
+        df_test_clean <- cleanup_df_for_test(df_test, df, c_cols)
+        na_row_numbers_test <- attr(df_test_clean, "na_row_numbers")
+        unknown_category_rows_index <- attr(df_test_clean, "unknown_category_rows_index")
+
+        prediction_test <- predict(rf, data=df_test_clean)
+        # TODO: Following current convention for the name na.action to keep na row index, but we might want to rethink.
+        # We do not keep this for training since na.roughfix should fill values and not delete rows. TODO: Is this comment valid here for survival forest?
+        attr(prediction_test, "na.action") <- na_row_numbers_test
+        attr(prediction_test, "unknown_category_rows_index") <- unknown_category_rows_index
+        rf$prediction_test <- prediction_test
+        rf$df_test <- df_test_clean
+
+        # Calculate concordance.
+        concordance_df_test <- tibble::tibble(x=calc_mean_survival(prediction_test$survival, prediction_test$unique.death.times), time=df_test_clean[[clean_time_col]], status=df_test_clean[[clean_status_col]])
+        # The concordance is (d+1)/2, where d is Somers' d. https://cran.r-project.org/web/packages/survival/vignettes/concordance.pdf
+        rf$concordance_test <- survival::concordance(survival::Surv(time, status)~x,data=concordance_df_test)
+        rf$test_nevent <- sum(df_test_clean[[clean_status_col]], na.rm=TRUE)
       }
-      rf$test_index <- test_index
-      rf$source_data <- source_data
+      rf$df <- df
+      rf$nevent <- sum(df[[clean_status_col]], na.rm=TRUE)
 
       # add special lm_coxph class for adding extra info at glance().
       class(rf) <- c("ranger_survival_exploratory", class(rf))
@@ -477,14 +509,44 @@ tidy.ranger_survival_exploratory <- function(x, type = 'importance', ...) { #TOD
     })
 }
 
+glance.ranger_survival_exploratory <- function(x, data_type = "training", ...) {
+  if (data_type == "training") {
+    if (!is.null(x$concordance)) {
+      tibble::tibble(Concordance=x$concordance$concordance, `Std Error Concordance`=sqrt(x$concordance$var), `Number of Rows`=nrow(x$df), `Number of Events`=x$nevent)
+    }
+    else {
+      data.frame()
+    }
+  }
+  else { # data_type == "test"
+    if (!is.null(x$concordance_test)) {
+      tibble::tibble(Concordance=x$concordance_test$concordance, `Std Error Concordance`=sqrt(x$concordance_test$var), `Number of Rows`=nrow(x$df_test), `Number of Events`=x$test_nevent)
+    }
+    else {
+      data.frame()
+    }
+  }
+}
+
 #' @export
-augment.ranger_survival_exploratory <- function(x, ...) {
+augment.ranger_survival_exploratory <- function(x, data_type = "training", ...) {
   if ("error" %in% class(x)) {
     ret <- data.frame(Note = x$message)
     return(ret)
   }
-  data <- x$source_data
-  pred <- predict(x, data=data)
+  if (data_type == "training") {
+    data <- x$df
+    pred <- x$prediction_training
+  }
+  else { # data_type == "test"
+    if (!is.null(x$df_test)) {
+      data <- x$df_test
+      pred <- x$prediction_test
+    }
+    else {
+      return(data.frame())
+    }
+  }
 
   pred_survival_time <- x$pred_survival_time
   unique_death_times <- x$forest$unique.death.times

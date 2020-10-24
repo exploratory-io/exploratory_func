@@ -120,7 +120,7 @@ partial_dependence.coxph_exploratory <- function(fit, time_col, vars = colnames(
     "aggregate.fun" = aggregate.fun,
     ...
   )
-  
+
   if (length(vars) > 1L & !interaction) { # More than one variables are there. Iterate calling mmpf::marginalPrediction.
     pd = data.table::rbindlist(sapply(vars, function(x) {
       args$vars = x
@@ -164,7 +164,7 @@ partial_dependence.coxph_exploratory <- function(fit, time_col, vars = colnames(
   attr(pd, "interaction") = interaction == TRUE
   attr(pd, "vars") = vars
   # Format of pd looks like this:
-  #        trt age        V1        V2        V3        V4        V5           H1        H2           L1        L2        L3 
+  #        trt age        V1        V2        V3        V4        V5           H1        H2           L1        L2        L3
   # 1 1.000000  NA 0.9984156 0.9971480 0.9867692 0.9843847 0.9631721... 0.9357729 0.9165525... 0.8988693 0.8679139 0.8532433
   # 2 1.111111  NA 0.9984156 0.9971480 0.9867692 0.9843847 0.9631721... 0.9357729 0.9165525... 0.8988693 0.8679139 0.8532433
   # 3 1.222222  NA 0.9984156 0.9971480 0.9867692 0.9843847 0.9631721... 0.9357729 0.9165525... 0.8988693 0.8679139 0.8532433
@@ -180,7 +180,7 @@ partial_dependence.coxph_exploratory <- function(fit, time_col, vars = colnames(
   # ...
   #     1    NA     L1    0.984
   #     1    NA     L2    0.981
-  ret <- ret %>% tidyr::separate(period, sep=1, into=c("type","period"), remove=TRUE) 
+  ret <- ret %>% tidyr::separate(period, sep=1, into=c("type","period"), remove=TRUE)
   ret <- ret %>% dplyr::mutate(period = as.numeric(period))
   # Format of ret looks like this:
   #     trt   age period survival
@@ -248,7 +248,7 @@ partial_dependence.coxph_exploratory <- function(fit, time_col, vars = colnames(
 # http://www.math.ucsd.edu/~rxu/math284/slect5.pdf
 # https://bydmitry.github.io/efron-tensorflow.html
 # https://en.wikipedia.org/wiki/Proportional_hazards_model
-# 
+#
 # lp - Linear predictor
 calc_efron_log_likelihood <- function(lp, time, status) { # TODO: Add a test to validate the outcome of this function.
   if (is.data.frame(time)) { # Since mmpf::permutationImportance passes down time as tibble, convert it to vector. TODO: Do this at more appropriate place.
@@ -288,7 +288,7 @@ calc_permutation_importance_coxph <- function(fit, time_col, status_col, vars, d
    importances <- purrr::map(var_list, function(var) {
     mmpf::permutationImportance(data, vars=var, y=time_col, model=fit, nperm=1,
                                 predict.fun = function(object,newdata){as.matrix(tibble(lp=predict(object,newdata=newdata),status=newdata[[status_col]]))},
-                                # Use minus log likelyhood (Efron) as loss function, since it is what Cox regression tried to optimise. 
+                                # Use minus log likelyhood (Efron) as loss function, since it is what Cox regression tried to optimise.
                                 loss.fun = function(x,y){-calc_efron_log_likelihood(x[,1], y, x[,2])})
   })
   importances <- purrr::flatten_dbl(importances)
@@ -313,7 +313,7 @@ build_coxph.fast <- function(df,
                     test_rate = 0.0,
                     test_split_type = "random" # "random" or "ordered"
                     ){
-  # TODO: cleanup code only aplicable to randomForest. this func was started from copy of calc_feature_imp, and still adjusting for lm. 
+  # TODO: cleanup code only aplicable to randomForest. this func was started from copy of calc_feature_imp, and still adjusting for lm.
 
   # using the new way of NSE column selection evaluation
   # ref: http://dplyr.tidyverse.org/articles/programming.html
@@ -373,7 +373,7 @@ build_coxph.fast <- function(df,
     if(all(is.na(df[[col]]))){
       # remove columns if they are all NA
       cols <- setdiff(cols, col)
-      df[[col]] <- NULL # drop the column so that SMOTE will not see it. 
+      df[[col]] <- NULL # drop the column so that SMOTE will not see it.
     }
   }
 
@@ -488,9 +488,26 @@ build_coxph.fast <- function(df,
         # Note: Do not pass df_test like data=df_test. This for some reason ends up predict returning training data prediction.
         # model$prediction_test <- predict(model, df_test, se.fit = TRUE)
         # model$unknown_category_rows_index <- unknown_category_rows_index
+        df_test_clean <- cleanup_df_for_test(df_test, df, c_cols)
+        na_row_numbers_test <- attr(df_test_clean, "na_row_numbers")
+        unknown_category_rows_index <- attr(df_test_clean, "unknown_category_rows_index")
+
+        prediction_test <- predict(model, newdata=df_test_clean)
+        # TODO: Following current convention for the name na.action to keep na row index, but we might want to rethink.
+        # We do not keep this for training since na.roughfix should fill values and not delete rows. TODO: Is this comment valid here for survival forest?
+        attr(prediction_test, "na.action") <- na_row_numbers_test
+        attr(prediction_test, "unknown_category_rows_index") <- unknown_category_rows_index
+        model$prediction_test <- prediction_test
+        model$test_data <- df_test_clean # Note: The usual df_test conflicts with df (degree of freedom) and disrupts broom:::glance.coxph. For some reason, only the beginning of the attribute name still seems points to the set value. Thus, using name "test_data".
+        model$test_nevent <- sum(df_test_clean[[clean_status_col]], na.rm=TRUE)
+
+        # Calculate concordance.
+        concordance_df_test <- tibble::tibble(x=prediction_test, time=df_test_clean[[clean_time_col]], status=df_test_clean[[clean_status_col]])
+        # The concordance is (d+1)/2, where d is Somers' d. https://cran.r-project.org/web/packages/survival/vignettes/concordance.pdf
+        # reverse=TRUE because larger hazard ratio means shorter survival.
+        model$concordance_test <- survival::concordance(survival::Surv(time, status)~x,data=concordance_df_test, reverse=TRUE)
       }
-      model$test_index <- test_index
-      model$source_data <- source_data
+      model$training_data <- df
 
       # add special lm_coxph class for adding extra info at glance().
       class(model) <- c("coxph_exploratory", class(model))
@@ -608,7 +625,7 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients'
     partial_dependence = {
       ret <- x$partial_dependence
       pred_survival_time <- x$pred_survival_time
-      ret <- ret %>% 
+      ret <- ret %>%
         filter(period <= !!pred_survival_time) %>% # Extract the latest period that does not exceed pred_survival_time
         group_by(variable, value) %>% filter(period == max(period)) %>% ungroup() %>%
         select(-conf.high, -conf.low) %>% # Temporarily remove confidence interval to be uniform with other Analytics Views.
@@ -675,21 +692,32 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients'
 
 #' special version of glance.coxph function to use with build_coxph.fast.
 #' @export
-glance.coxph_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
+glance.coxph_exploratory <- function(x, data_type = "training", pretty.name = FALSE, ...) { #TODO: add test
   if ("error" %in% class(x)) {
     ret <- data.frame(Note = x$message)
     return(ret)
   }
-  ret <- broom:::glance.coxph(x, pretty.name = pretty.name, ...)
 
-  if (!is.null(ret$nobs)) { # glance.coxph's newly added nobs seems to be same as n, which we use as Number of Rows. Suppressing it for now.
-    ret <- ret %>% dplyr::select(-nobs)
+  if (data_type == "training") {
+    ret <- broom:::glance.coxph(x, pretty.name = pretty.name, ...)
+    if (!is.null(ret$nobs)) { # glance.coxph's newly added nobs seems to be same as n, which we use as Number of Rows. Suppressing it for now.
+      ret <- ret %>% dplyr::select(-nobs)
+    }
+    if (!is.null(ret$statistic.robust)) { # The value shows up as NA for some reason. Hide for now.
+      ret <- ret %>% dplyr::select(-statistic.robust)
+    }
+    if (!is.null(ret$p.value.robust)) { # The value shows up as NA for some reason. Hide for now.
+      ret <- ret %>% dplyr::select(-p.value.robust)
+    }
+    if (!is.null(ret$n) && !is.null(ret$nevent)) {
+      ret <- ret %>% dplyr::select(-n, -nevent, everything(), n, nevent) # Bring n and nevent to the last.
+    }
   }
-  if (!is.null(ret$statistic.robust)) { # The value shows up as NA for some reason. Hide for now.
-    ret <- ret %>% dplyr::select(-statistic.robust)
-  }
-  if (!is.null(ret$p.value.robust)) { # The value shows up as NA for some reason. Hide for now.
-    ret <- ret %>% dplyr::select(-p.value.robust)
+  else { # data_type == "test"
+    if (is.null(x$test_data)) {
+      return(data.frame())
+    }
+    ret <- tibble::tibble(concordance=x$concordance_test$concordance, `std.error.concordance`=sqrt(x$concordance_test$var), n=nrow(x$test_data), nevent=x$test_nevent)
   }
 
   if(pretty.name) {
@@ -721,14 +749,23 @@ glance.coxph_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add t
 }
 
 #' @export
-augment.coxph_exploratory <- function(x, ...) {
+augment.coxph_exploratory <- function(x, data_type = "training", ...) {
   if ("error" %in% class(x)) {
     ret <- data.frame(Note = x$message)
     return(ret)
   }
   # TODO: handle training/test split.
-  data <- x$source_data
-  ret <- broom:::augment.coxph(x, data = data, ...)
+  if (data_type == "training") {
+    data <- x$training_data
+    ret <- broom:::augment.coxph(x, data = data, ...)
+  }
+  else {
+    if (is.null(x$test_data)) {
+      return(data.frame())
+    }
+    data <- x$test_data
+    ret <- broom:::augment.coxph(x, newdata = data, ...)
+  }
 
   time <- x$pred_survival_time
   # basehaz returns base cumulative hazard.

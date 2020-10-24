@@ -649,6 +649,165 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
   dplyr::group_by(ret, !!!rlang::syms(grouping_cols))
 }
 
+# Simplified prediction() that works only with new Analytics View model df. This should be kept model-agnostic.
+# This one does not use .test_index and source.data columns.
+prediction2 <- function(df, data_frame = NULL, conf_int = 0.95, ...){
+  validate_empty_data(df)
+
+  df_cnames <- colnames(df)
+
+  # columns other than "model" should be regarded as grouping columns
+  # this should be kept after running prediction
+  grouping_cols <- df_cnames[!df_cnames %in% c("model")]
+
+  # parsing arguments of prediction and getting optional arguemnt for augment in ...
+  cll <- match.call()
+  aug_args <- expand_args(cll, exclude = c("df", "data", "data_frame", "conf_int"))
+
+  # Augment data that includes both training part and test part of data with predictions embedded in the model.
+  # This is for Analytics View on Test Mode.
+
+  # Use formula to support expanded aug_args (especially for type.predict for logistic regression)
+  # because ... can't be passed to a function inside mutate directly.
+  # If test is FALSE, this uses data as an argument and if not, uses newdata as an argument.
+  aug_fml_training <- if(aug_args == ""){
+    "broom::augment(m)"
+  } else {
+    paste0("broom::augment(m, ", aug_args, ")")
+  }
+  aug_fml_test <- if(aug_args == ""){
+    "broom::augment(m, data_type = 'test')"
+  } else {
+    paste0("broom::augment(m, data_type = 'test', ", aug_args, ")")
+  }
+  augmented <- df %>%
+    dplyr::ungroup() %>%
+    dplyr::filter(purrr::flatten_lgl(purrr::map(model, function(x){"error" %nin% class(x)}))) %>%  # Since this errors out under rowwise, should be done after ungroup().
+    # evaluate the formula of augment and "data" column will have it
+    dplyr::mutate(source.data.training = purrr::map(model, function(m){eval(parse(text=aug_fml_training))}),
+                  source.data.test = purrr::map(model, function(m){eval(parse(text=aug_fml_test))}))
+  augmented <- augmented %>%
+    dplyr::ungroup() %>% # ungroup is necessary here to get expected df1, df2 value in the next line.
+    dplyr::mutate(source.data = purrr::map2(source.data.training, source.data.test, function(df1, df2){
+      df1 <- df1 %>% dplyr::mutate(is_test_data=FALSE)
+      df2 <- df2 %>% dplyr::mutate(is_test_data=TRUE)
+      res <- dplyr::bind_rows(df1, df2)
+      res[grouping_cols]<-NULL # A dirty hack to avoid column name conflict at unnest. TODO: Maybe group column should not be there inside do_on_each_group in the first place.
+      res
+    })) %>%
+    dplyr::select(-source.data.training, -source.data.test) %>%
+    dplyr::ungroup()
+
+  augmented <- augmented %>%
+    dplyr::select(-model) %>%
+    unnest_with_drop(source.data)
+
+  # Since is_test_data can go to strange position if there are columns that exists only in certain groups,
+  # move it to the last explicitly.
+  ret <- augmented %>% select(-is_test_data, everything(), is_test_data)
+
+  # add confidence interval if conf_int is not null and there are .fitted and .se.fit
+  if (!is.null(conf_int) & ".se.fit" %in% colnames(ret) & ".fitted" %in% colnames(ret)) {
+    if (conf_int < 0 | conf_int > 1){
+      stop("conf_int must be between 0 and 1")
+    }
+    conf_low_colname <- avoid_conflict(colnames(ret), "conf_low")
+    conf_high_colname <- avoid_conflict(colnames(ret), "conf_high")
+    lower <- (1-conf_int)/2
+    higher <- 1-lower
+    ret[[conf_low_colname]] <- get_confint(ret[[".fitted"]], ret[[".se.fit"]], conf_int = lower)
+    ret[[conf_high_colname]] <- get_confint(ret[[".fitted"]], ret[[".se.fit"]], conf_int = higher)
+
+    # move confidece interval columns next to standard error
+    ret <- move_col(ret, '.se.fit', which(colnames(ret) == ".fitted") + 1)
+    ret <- move_col(ret, conf_low_colname, which(colnames(ret) == ".se.fit") + 1)
+    ret <- move_col(ret, conf_high_colname, which(colnames(ret) == conf_low_colname) + 1)
+  }
+
+  colnames(ret)[colnames(ret) == ".fitted"] <- avoid_conflict(colnames(ret), "predicted_value")
+  colnames(ret)[colnames(ret) == ".se.fit"] <- avoid_conflict(colnames(ret), "standard_error")
+  colnames(ret)[colnames(ret) == ".resid"] <- avoid_conflict(colnames(ret), "residuals")
+  colnames(ret)[colnames(ret) == ".hat"] <- avoid_conflict(colnames(ret), "hat")
+  colnames(ret)[colnames(ret) == ".sigma"] <- avoid_conflict(colnames(ret), "residual_standard_deviation")
+  colnames(ret)[colnames(ret) == ".cooksd"] <- avoid_conflict(colnames(ret), "cooks_distance")
+  colnames(ret)[colnames(ret) == ".std.resid"] <- avoid_conflict(colnames(ret), "standardised_residuals")
+
+  if (length(grouping_cols) > 0) {
+    ret <- dplyr::group_by(ret, !!!rlang::syms(grouping_cols))
+  }
+  ret
+}
+
+
+# Simplified, model agnostic version of rf_evaluation_training_and_test.
+# Currently used only by cox regression and survival forest, but planning to migrate others to this one.
+evaluation <- function(df, ...){
+  validate_empty_data(df)
+
+  df_cnames <- colnames(df)
+
+  # columns other than "source.data", ".test_index" and "model" should be regarded as grouping columns
+  # this should be kept after running prediction
+  grouping_cols <- df_cnames[!df_cnames %in% c("model")]
+
+  # parsing arguments of prediction and getting optional arguemnt for augment in ...
+  cll <- match.call()
+  glance_args <- expand_args(cll, exclude = c("df"))
+
+  # Augment data that includes both training part and test part of data with predictions embedded in the model.
+  # This is for Analytics View on Test Mode.
+
+  # Use formula to support expanded glance_args (especially for type.predict for logistic regression)
+  # because ... can't be passed to a function inside mutate directly.
+  # If test is FALSE, this uses data as an argument and if not, uses newdata as an argument.
+  aug_fml_training <- if(glance_args == ""){
+    "broom::glance(m)"
+  } else {
+    paste0("broom::glance(m, ", glance_args, ")")
+  }
+  aug_fml_test <- if(glance_args == ""){
+    "broom::glance(m, data_type = 'test')"
+  } else {
+    paste0("broom::glance(m, data_type = 'test', ", glance_args, ")")
+  }
+  df <- df %>%
+    dplyr::ungroup() %>%
+    dplyr::filter(purrr::flatten_lgl(purrr::map(model, function(x){"error" %nin% class(x)}))) %>%  # Since this errors out under rowwise, should be done after ungroup().
+    # evaluate the formula of augment and "data" column will have it
+    dplyr::mutate(source.data.training = purrr::map(model, function(m){eval(parse(text=aug_fml_training))}),
+                  source.data.test = purrr::map(model, function(m){eval(parse(text=aug_fml_test))}))
+  df <- df %>%
+    dplyr::ungroup() %>% # ungroup is necessary here to get expected df1, df2 value in the next line.
+    dplyr::mutate(source.data = purrr::map2(source.data.training, source.data.test, function(df1, df2){
+      if (nrow(df2) > 0) {
+        df1 <- df1 %>% dplyr::mutate(is_test_data=FALSE)
+        df2 <- df2 %>% dplyr::mutate(is_test_data=TRUE)
+        dplyr::bind_rows(df1, df2)
+      }
+      else {
+        df1
+      }
+    })) %>%
+    dplyr::select(-source.data.training, -source.data.test) %>%
+    dplyr::ungroup()
+
+  df <- df %>%
+    dplyr::select(-model) %>%
+    unnest_with_drop(source.data)
+
+  if (length(grouping_cols) > 0) {
+    df <- dplyr::group_by(df, !!!rlang::syms(grouping_cols))
+  }
+
+  # Prettify is_test_data column. Do this after the above arrange calls, since it looks at is_test_data column.
+  if (!is.null(df$is_test_data)) {
+    df <- df %>% dplyr::select(is_test_data, everything()) %>%
+      dplyr::mutate(is_test_data = dplyr::if_else(is_test_data, "Test", "Training")) %>%
+      dplyr::rename(`Data Type` = is_test_data)
+  }
+  df
+}
+
 #' prediction wrapper for both training and test data
 #' There are not much reason to call this function any more, since you can call prediction(data='training_and_test')
 #' directly. Only remaining case we need to call this is for confusion matrix.
