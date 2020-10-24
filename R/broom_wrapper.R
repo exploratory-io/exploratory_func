@@ -664,14 +664,6 @@ prediction2 <- function(df, data_frame = NULL, conf_int = 0.95, ...){
   cll <- match.call()
   aug_args <- expand_args(cll, exclude = c("df", "data", "data_frame", "conf_int"))
 
-  # if type.predict argument is not indicated in this function
-  # and models have $family$linkinv (basically, glm models have it),
-  # both fitted link value column and response value column should appear in the result
-
-  with_response <- !("type.predict" %in% names(cll)) &&
-                     any(lapply(df$model, function(s) { "family" %in% names(s) })) &&
-                     any(lapply(df$model, function(s) { !is.null(s$family$linkinv) }))
-
   # Augment data that includes both training part and test part of data with predictions embedded in the model.
   # This is for Analytics View on Test Mode.
 
