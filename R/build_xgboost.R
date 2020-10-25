@@ -1402,6 +1402,13 @@ tidy.xgboost_exp <- function(x, type = "importance", pretty.name = FALSE, binary
         dplyr::summarize(count = n()) %>%
         dplyr::ungroup()
 
+      if (is.logical(ret$actual_value) && is.logical(ret$predicted_value)) { # For logical, make them factors to fill with 0.
+        ret <- ret %>%
+          dplyr::mutate(actual_value=factor(actual_value,levels=c("TRUE","FALSE")), predicted_value=factor(predicted_value,levels=c("TRUE","FALSE")))
+      }
+      ret <- ret %>%
+        tidyr::complete(actual_value, predicted_value, fill=list(count=0)) # Fill with 0.
+
       ret
     },
     partial_dependence = {

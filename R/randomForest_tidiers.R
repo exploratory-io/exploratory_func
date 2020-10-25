@@ -1462,6 +1462,12 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
               dplyr::group_by(actual_value, predicted_value) %>%
               dplyr::summarize(count = n()) %>%
               dplyr::ungroup()
+            if (is.logical(ret$actual_value) && is.logical(ret$predicted_value)) { # For logical, make them factors to fill with 0. (xgboost falls in this case.)
+              ret <- ret %>%
+                dplyr::mutate(actual_value=factor(actual_value,levels=c("TRUE","FALSE")), predicted_value=factor(predicted_value,levels=c("TRUE","FALSE")))
+            }
+            ret <- ret %>%
+              tidyr::complete(actual_value, predicted_value, fill=list(count=0))
             ret
           })
       }, error = function(e) {
@@ -2600,6 +2606,9 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, binary_clas
         dplyr::summarize(count = n()) %>%
         dplyr::ungroup()
 
+      ret <- ret %>%
+        tidyr::complete(actual_value, predicted_value, fill=list(count=0))
+
       ret
     },
     scatter = {
@@ -3344,6 +3353,8 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
         dplyr::group_by(actual_value, predicted_value) %>%
         dplyr::summarize(count = n()) %>%
         dplyr::ungroup()
+      ret <- ret %>%
+        tidyr::complete(actual_value, predicted_value, fill=list(count=0))
 
       ret
     },

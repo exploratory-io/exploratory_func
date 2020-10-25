@@ -94,6 +94,7 @@ test_that("exp_xgboost(binary) evaluate training and test", {
   expect_gt(nrow(train_ret), 3400)
 
   ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
+  expect_equal(nrow(ret), 8) # 8 for training/test * actual(TRUE/FALSE) * predicted(TRUE/FALSE)
   expect_equal(n_distinct(ret$is_test_data), 2) # There should be both training and test.
 
   model_df <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`)) %>%

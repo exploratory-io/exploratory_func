@@ -855,6 +855,12 @@ prediction_training_and_test <- function(df, prediction_type="default", threshol
         dplyr::summarize(count = n()) %>%
         dplyr::ungroup()
 
+      if (is.logical(df$actual_value) && is.logical(df$predicted_value)) { # For logical, make them factors to fill with 0.
+        df <- df %>%
+          dplyr::mutate(actual_value=factor(actual_value,levels=c("TRUE","FALSE")), predicted_value=factor(predicted_value,levels=c("TRUE","FALSE")))
+      }
+      df <- df %>%
+        tidyr::complete(actual_value, predicted_value, fill=list(count=0))
       df
     }
 
