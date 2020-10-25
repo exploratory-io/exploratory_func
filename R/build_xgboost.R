@@ -1390,25 +1390,7 @@ tidy.xgboost_exp <- function(x, type = "importance", pretty.name = FALSE, binary
         predicted <- extract_predicted_multiclass_labels(x)
       }
 
-      ret <- data.frame(
-        actual_value = actual,
-        predicted_value = predicted
-      ) %>%
-        dplyr::filter(!is.na(predicted_value))
-
-      # get count if it's classification
-      ret <- ret %>%
-        dplyr::group_by(actual_value, predicted_value) %>%
-        dplyr::summarize(count = n()) %>%
-        dplyr::ungroup()
-
-      if (is.logical(ret$actual_value) && is.logical(ret$predicted_value)) { # For logical, make them factors to fill with 0.
-        ret <- ret %>%
-          dplyr::mutate(actual_value=factor(actual_value,levels=c("TRUE","FALSE")), predicted_value=factor(predicted_value,levels=c("TRUE","FALSE")))
-      }
-      ret <- ret %>%
-        tidyr::complete(actual_value, predicted_value, fill=list(count=0)) # Fill with 0.
-
+      ret <- calc_conf_mat(actual, predicted)
       ret
     },
     partial_dependence = {

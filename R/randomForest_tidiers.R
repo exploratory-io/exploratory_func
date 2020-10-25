@@ -1451,23 +1451,7 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
             else {
               predicted <- test_pred_ret$predicted_label
             }
-            ret <- data.frame(
-                              actual_value = actual,
-                              predicted_value = predicted
-                              ) %>%
-              dplyr::filter(!is.na(predicted_value))
-
-            # get count if it's classification
-            ret <- ret %>%
-              dplyr::group_by(actual_value, predicted_value) %>%
-              dplyr::summarize(count = n()) %>%
-              dplyr::ungroup()
-            if (is.logical(ret$actual_value) && is.logical(ret$predicted_value)) { # For logical, make them factors to fill with 0. (xgboost falls in this case.)
-              ret <- ret %>%
-                dplyr::mutate(actual_value=factor(actual_value,levels=c("TRUE","FALSE")), predicted_value=factor(predicted_value,levels=c("TRUE","FALSE")))
-            }
-            ret <- ret %>%
-              tidyr::complete(actual_value, predicted_value, fill=list(count=0))
+            ret <- calc_conf_mat(actual, predicted)
             ret
           })
       }, error = function(e) {
@@ -2594,21 +2578,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, binary_clas
         predicted <- ranger.predict_value_from_prob(x$forest$levels, x$prediction_training$predictions, x$y)
       }
 
-      ret <- data.frame(
-        actual_value = x$y,
-        predicted_value = predicted
-      ) %>%
-        dplyr::filter(!is.na(predicted_value))
-
-      # get count if it's classification
-      ret <- ret %>%
-        dplyr::group_by(actual_value, predicted_value) %>%
-        dplyr::summarize(count = n()) %>%
-        dplyr::ungroup()
-
-      ret <- ret %>%
-        tidyr::complete(actual_value, predicted_value, fill=list(count=0))
-
+      ret <- calc_conf_mat(x$y, predicted)
       ret
     },
     scatter = {
@@ -3342,20 +3312,7 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
         predicted <- forcats::fct_rev(predicted)
       }
 
-      ret <- data.frame(
-        actual_value = actual,
-        predicted_value = predicted
-      ) %>%
-        dplyr::filter(!is.na(predicted_value))
-
-      # get count if it's classification
-      ret <- ret %>%
-        dplyr::group_by(actual_value, predicted_value) %>%
-        dplyr::summarize(count = n()) %>%
-        dplyr::ungroup()
-      ret <- ret %>%
-        tidyr::complete(actual_value, predicted_value, fill=list(count=0))
-
+      ret <- calc_conf_mat(actual, predicted)
       ret
     },
     scatter = { # we assume this is called only for regression.
