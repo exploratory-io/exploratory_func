@@ -62,7 +62,7 @@ test_that("calc_feature_map(regression) evaluate training and test", {
   expect_equal(nrow(ret), 1) # 1 for train
 })
 
-test_that("calc_feature_map(binary) evaluate training and test", {
+test_that("calc_feature_imp(binary) evaluate training and test", {
   set.seed(1) # For stability of result.
   # `is delayed` is not logical for some reason.
   # To test binary prediction, need to cast it into logical.
@@ -87,6 +87,8 @@ test_that("calc_feature_map(binary) evaluate training and test", {
   expect_equal(nrow(ret), 4) # 4 for train/test times TRUE/FALSE
 
   ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
+  expect_equal(nrow(ret), 8) # 8 for train/test times predicted TRUE/FALSE times actual TRUE/FALSE
+
   model_df <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`)) %>%
                 calc_feature_imp(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0, pd_with_bin_means = TRUE)
   ret <- model_df %>% prediction(data="training_and_test")

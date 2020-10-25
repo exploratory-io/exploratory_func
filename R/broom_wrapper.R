@@ -1,3 +1,26 @@
+
+calc_conf_mat <- function(actual, predicted) {
+  df <- data.frame(
+    actual_value = actual,
+    predicted_value = predicted
+  ) %>%
+    dplyr::filter(!is.na(predicted_value))
+
+  # get count if it's classification
+  df <- df %>%
+    dplyr::group_by(actual_value, predicted_value) %>%
+    dplyr::summarize(count = n()) %>%
+    dplyr::ungroup()
+
+  if (is.logical(df$actual_value) && is.logical(df$predicted_value)) { # For logical, make them factors to fill with 0.
+    df <- df %>%
+      dplyr::mutate(actual_value=factor(actual_value,levels=c("TRUE","FALSE")), predicted_value=factor(predicted_value,levels=c("TRUE","FALSE")))
+  }
+  df <- df %>%
+    tidyr::complete(actual_value, predicted_value, fill=list(count=0))
+  df
+}
+
 # For backward compatibilities for broom's rowwise tidier, which was dropped at broom 0.7.0.
 #' @export
 glance_rowwise <- function(df, model, ...) {
@@ -843,18 +866,7 @@ prediction_training_and_test <- function(df, prediction_type="default", threshol
       actual_val <- df[[target_col_orig]]
       predicted <- df$predicted_label
 
-      df <- data.frame(
-        actual_value = actual_val,
-        predicted_value = predicted
-      ) %>%
-        dplyr::filter(!is.na(predicted_value))
-
-      # get count if it's classification
-      df <- df %>%
-        dplyr::group_by(actual_value, predicted_value) %>%
-        dplyr::summarize(count = n()) %>%
-        dplyr::ungroup()
-
+      df <- calc_conf_mat(actual_val, predicted)
       df
     }
 
