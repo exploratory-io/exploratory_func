@@ -1431,7 +1431,12 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
             }
           },
           evaluation_by_class = {
-            predicted <- test_pred_ret$predicted_label
+            if ("xgboost_exp" %in% class(model_object)) {
+              predicted <- extract_predicted(model_object, type = "test")
+            }
+            else {
+              predicted <- test_pred_ret$predicted_value
+            }
             per_level <- function(klass) {
               ret <- evaluate_classification(actual, predicted, klass, pretty.name = pretty.name)
             }
