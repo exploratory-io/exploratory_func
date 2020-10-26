@@ -1380,6 +1380,21 @@ tidy.xgboost_exp <- function(x, type = "importance", pretty.name = FALSE, binary
         ret
       }
     },
+    evaluation_by_class = { # We assume this is called only for multiclass classification.
+      # Delegate showing error for failed models to grance().
+      if ("error" %in% class(x)) {
+        return(glance(x, pretty.name = pretty.name, ...))
+      }
+      # get evaluation scores from training data
+      actual <- extract_actual(x)
+      predicted <- extract_predicted_multiclass_labels(x)
+
+      per_level <- function(class) {
+        ret <- evaluate_classification(actual, predicted, class, pretty.name = pretty.name)
+        ret
+      }
+      dplyr::bind_rows(lapply(levels(actual), per_level))
+    },
     conf_mat = {
       # return confusion matrix
       actual <- extract_actual(x)
