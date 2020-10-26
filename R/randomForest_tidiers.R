@@ -2375,6 +2375,9 @@ calc_feature_imp <- function(df,
 #' @export
 #' @param multi_class - TRUE when we need class and size, which we show for multiclass classification case.
 evaluate_classification <- function(actual, predicted, class, multi_class = TRUE, pretty.name = FALSE) { #TODO user better name for class not to confuse with class()
+  if (length(actual) != length(predicted)) {
+    stop("Assertion: actual and predicted have different length in evaluate_classification.")
+  }
   tp <- sum(actual == class & predicted == class, na.rm = TRUE)
   tn <- sum(actual != class & predicted != class, na.rm = TRUE)
   fp <- sum(actual != class & predicted == class, na.rm = TRUE)
