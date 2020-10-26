@@ -1430,12 +1430,12 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
               ret
             }
           },
-          evaluation_by_class = {
+          evaluation_by_class = { # We assume this is called only for multiclass classification.
             if ("xgboost_exp" %in% class(model_object)) {
               predicted <- extract_predicted_multiclass_labels(model_object, type = "test")
             }
             else {
-              predicted <- test_pred_ret$predicted_value
+              predicted <- test_pred_ret$predicted_label
             }
             per_level <- function(klass) {
               ret <- evaluate_classification(actual, predicted, klass, pretty.name = pretty.name)
