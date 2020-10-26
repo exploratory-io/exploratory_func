@@ -1432,7 +1432,7 @@ rf_evaluation_training_and_test <- function(data, type = "evaluation", pretty.na
           },
           evaluation_by_class = {
             if ("xgboost_exp" %in% class(model_object)) {
-              predicted <- extract_predicted(model_object, type = "test")
+              predicted <- extract_predicted_multiclass_labels(model_object, type = "test")
             }
             else {
               predicted <- test_pred_ret$predicted_value
