@@ -132,7 +132,7 @@ exp_survival <- function(df, time, status, start_time, end_time, end_time_fill =
 tidy.survfit_exploratory <- function(x, type = "survival_curve", survival_time = NULL, ...) {
   ret <- broom:::tidy.survfit(x, ...)
   if (is.null(survival_time)) {
-    survival_time <- attr(ret, "default_survival_time")
+    survival_time <- attr(x, "default_survival_time")
   }
 
   # for line chart and pivot table, add time=0 row when it is not already there, and rows for other missing times for each group.
