@@ -3,15 +3,19 @@
 #' It does survfit and survdiff.
 #' @param end_time_fill - "max", "today", or actual value or string expresion of Date.
 #' @export
-exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, end_time_fill = "max", time_unit = "day", cohort = NULL, cohort_func = NULL, ...){
+exp_survival <- function(df, time, status, start_time, end_time, end_time_fill = "max", time_unit = "day", cohort = NULL, cohort_func = NULL, ...){
   validate_empty_data(df)
 
   grouped_col <- grouped_by(df)
+  status_col <- tidyselect::vars_select(names(df), !! rlang::enquo(status))
+  orig_cohort_col <- tidyselect::vars_select(names(df), !! rlang::enquo(cohort))
+  start_time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(start_time))
+  end_time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(end_time))
+  time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(time))
 
   orig_levels <- NULL
 
-  if (!is.null(substitute(cohort))) {
-    orig_cohort_col <- col_name(substitute(cohort))
+  if (length(orig_cohort_col) > 0) { # TODO: Better way to check if column is specified or not?
     # rename cohort column to workaround the case where the column name has space in it.
     # https://github.com/therneau/survival/issues/41
     colnames(df)[colnames(df) == orig_cohort_col] <- ".cohort" #TODO avoid conflict, and adjust cohort output value from survfit.
@@ -36,14 +40,9 @@ exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, e
     quoted_cohort_col <- "1" # no need to quote column name since it is not column.
   }
 
-  # substitute is needed because time can be
-  # NSE (non-standard evaluation) column name and it throws an evaluation error
-  # without it
-  if (is.null(substitute(time))) {
-    start_time_col <- col_name(substitute(start_time))
+  if (length(time_col) == 0) {
     df[[start_time_col]] <- as.Date(df[[start_time_col]]) # convert to Date in case it is POSIXct.
-    if (!is.null(substitute(end_time))) { # if end_time exists, fill NA with the way specified by end_time_fill.
-      end_time_col <- col_name(substitute(end_time))
+    if (length(end_time_col) > 0) { # if end_time exists, fill NA with the way specified by end_time_fill.
       df[[end_time_col]] <- as.Date(df[[end_time_col]]) # convert to Date in case it is POSIXct.
       # set value to fill NAs of end time
       if (is.character(end_time_fill) && end_time_fill == "max") { # type check before comparison is necessary to avoid error.
@@ -74,13 +73,13 @@ exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, e
                                 "1")
     # we are ceiling survival time to make it integer in the specified time unit.
     # this is to make resulting survival curve to have integer data point in the specified time unit.
-    fml <- as.formula(paste0("survival::Surv(ceiling(as.numeric(`", end_time_col, "`-`", start_time_col, "`, units = \"days\")/", time_unit_days_str, "), `", substitute(status), "`) ~ ", quoted_cohort_col))
+    fml <- as.formula(paste0("survival::Surv(ceiling(as.numeric(`", end_time_col, "`-`", start_time_col, "`, units = \"days\")/", time_unit_days_str, "), `", status_col, "`) ~ ", quoted_cohort_col))
   }
   else {
     # need to compose formula with non-standard evaluation.
     # simply using time and status in formula here results in a formula that literally looks at
     # "time" columun and "status" column, which is not what we want.
-    fml <- as.formula(paste0("survival::Surv(`", substitute(time), "`,`", substitute(status), "`) ~ ", quoted_cohort_col))
+    fml <- as.formula(paste0("survival::Surv(`", time_col, "`,`", status_col, "`) ~ ", quoted_cohort_col))
   }
 
   # calls survfit for each group.
