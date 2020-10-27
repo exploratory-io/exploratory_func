@@ -72,17 +72,14 @@ exp_survival <- function(df, time, status, start_time, end_time, end_time_fill =
                             year = 365.25,
                             1)
 
-    df <- df %>% dplyr::mutate(.time = ceiling(as.numeric(!!rlang::sym(end_time_col) - !!rlang::sym(start_time_col), units = "days") / time_unit_days))
+    time_col <- avoid_conflict(colnames(df), ".time")
+
     # we are ceiling survival time to make it integer in the specified time unit.
     # this is to make resulting survival curve to have integer data point in the specified time unit.
-    fml <- as.formula(paste0("survival::Surv(.time, `", status_col, "`) ~ ", quoted_cohort_col))
+    df <- df %>% dplyr::mutate(!!rlang::sym(time_col) := ceiling(as.numeric(!!rlang::sym(end_time_col) - !!rlang::sym(start_time_col), units = "days") / time_unit_days))
   }
-  else {
-    # need to compose formula with non-standard evaluation.
-    # simply using time and status in formula here results in a formula that literally looks at
-    # "time" columun and "status" column, which is not what we want.
-    fml <- as.formula(paste0("survival::Surv(`", time_col, "`,`", status_col, "`) ~ ", quoted_cohort_col))
-  }
+
+  fml <- as.formula(paste0("survival::Surv(`", time_col, "`, `", status_col, "`) ~ ", quoted_cohort_col))
 
   # calls survfit for each group.
   each_func1 <- function(df) {
