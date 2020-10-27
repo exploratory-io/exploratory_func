@@ -164,11 +164,16 @@ tidy.survfit_exploratory <- function(x, type = "survival_curve", survival_time =
     }
   }
   else { # type == "survival_rate"
-    # First, filter out groups whose surivial curve ends too short for the survival time in question.
-    ret <- ret %>% dplyr::group_by(strata) %>% dplyr::filter(max(time) >= !!survival_time)
-    ret <- ret %>% dplyr::filter(time <= !!survival_time) %>% dplyr::filter(time==max(time)) %>% ungroup()
-    # remove ".cohort=" part from strata values.
-    ret <- ret %>% dplyr::mutate(strata = stringr::str_remove(strata,"^\\.cohort\\="))
+    if ("strata" %in% colnames(ret)) {
+      # First, filter out groups whose surivial curve ends too short for the survival time in question.
+      ret <- ret %>% dplyr::group_by(strata) %>% dplyr::filter(max(time) >= !!survival_time)
+      ret <- ret %>% dplyr::filter(time <= !!survival_time) %>% dplyr::filter(time==max(time)) %>% ungroup()
+      # remove ".cohort=" part from strata values.
+      ret <- ret %>% dplyr::mutate(strata = stringr::str_remove(strata,"^\\.cohort\\="))
+    }
+    else {
+      ret <- ret %>% dplyr::filter(time <= !!survival_time) %>% dplyr::filter(time==max(time))
+    }
   }
 
   colnames(ret)[colnames(ret) == "time"] <- "Time"
