@@ -64,16 +64,18 @@ exp_survival <- function(df, time, status, start_time, end_time, end_time_fill =
     # as.numeric() does not support all units.
     # also support of units are different between Date and POSIXct.
     # let's do it ourselves.
-    time_unit_days_str = switch(time_unit,
-                                day = "1",
-                                week = "7",
-                                month = "(365.25/12)",
-                                quarter = "(365.25/4)",
-                                year = "365.25",
-                                "1")
+    time_unit_days = switch(time_unit,
+                            day = 1,
+                            week = 7,
+                            month = 365.25/12,
+                            quarter = 365.25/4,
+                            year = 365.25,
+                            1)
+
+    df <- df %>% dplyr::mutate(.time = ceiling(as.numeric(!!rlang::sym(end_time_col) - !!rlang::sym(start_time_col), units = "days") / time_unit_days))
     # we are ceiling survival time to make it integer in the specified time unit.
     # this is to make resulting survival curve to have integer data point in the specified time unit.
-    fml <- as.formula(paste0("survival::Surv(ceiling(as.numeric(`", end_time_col, "`-`", start_time_col, "`, units = \"days\")/", time_unit_days_str, "), `", status_col, "`) ~ ", quoted_cohort_col))
+    fml <- as.formula(paste0("survival::Surv(.time, `", status_col, "`) ~ ", quoted_cohort_col))
   }
   else {
     # need to compose formula with non-standard evaluation.
