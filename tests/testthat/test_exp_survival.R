@@ -37,7 +37,10 @@ test_that("test exp_survival", {
   ret1 <- ret %>% tidy_rowwise(model1)
   ret2 <- ret %>% tidy_rowwise(model2)
   ret3 <- ret %>% glance_rowwise(model2)
+
+  # No cohort case
   ret <- data %>% exp_survival(`weeks on service`, `is churned`)
+  ret1 <- ret %>% tidy_rowwise(model1, type="survival_rate")
   ret1 <- ret %>% tidy_rowwise(model1)
   ret2 <- ret %>% tidy_rowwise(model2)
   ret3 <- ret %>% glance_rowwise(model2)
