@@ -124,7 +124,7 @@ exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, e
 }
 
 #' @export
-tidy.survfit_exploratory <- function(x, ...) {
+tidy.survfit_exploratory <- function(x, type = "survival_curve", survival_time = 10, ...) {
   ret <- broom:::tidy.survfit(x, ...)
 
   # for line chart and pivot table, add time=0 row when it is not already there, and rows for other missing times for each group.
@@ -141,25 +141,34 @@ tidy.survfit_exploratory <- function(x, ...) {
     df
   }
 
-  if ("strata" %in% colnames(ret)) {
-    nested <- ret %>% dplyr::group_by(strata) %>% tidyr::nest()
-    nested <- nested %>% dplyr::mutate(data=purrr::map(data,~complete_times_each(.)))
-    ret <- nested %>% tidyr::unnest(data) %>% dplyr::ungroup()
-    # remove ".cohort=" part from strata values.
-    ret <- ret %>% dplyr::mutate(strata = stringr::str_remove(strata,"^\\.cohort\\="))
-    # Set original factor level back so that legend order is correct on the chart.
-    # In case of logical, c("TRUE","FALSE") is stored in orig_level, so that we can
-    # use it here either way.
-    if (!is.null(x$orig_levels)) {
-      ret <- ret %>%  dplyr::mutate(strata = factor(strata, levels=x$orig_levels))
+  if (type == "survival_curve") {
+    if ("strata" %in% colnames(ret)) {
+      nested <- ret %>% dplyr::group_by(strata) %>% tidyr::nest()
+      nested <- nested %>% dplyr::mutate(data=purrr::map(data,~complete_times_each(.)))
+      ret <- nested %>% tidyr::unnest(data) %>% dplyr::ungroup()
+      # remove ".cohort=" part from strata values.
+      ret <- ret %>% dplyr::mutate(strata = stringr::str_remove(strata,"^\\.cohort\\="))
+      # Set original factor level back so that legend order is correct on the chart.
+      # In case of logical, c("TRUE","FALSE") is stored in orig_level, so that we can
+      # use it here either way.
+      if (!is.null(x$orig_levels)) {
+        ret <- ret %>%  dplyr::mutate(strata = factor(strata, levels=x$orig_levels))
+      }
+    }
+    else if (!is.null(x$single_strata_value)) { # put back single strata value ignored by survfit.
+      ret <- complete_times_each(ret)
+      ret <- ret %>% dplyr::mutate(strata = as.character(x$single_strata_value))
+    }
+    else {
+      ret <- complete_times_each(ret)
     }
   }
-  else if (!is.null(x$single_strata_value)) { # put back single strata value ignored by survfit.
-    ret <- complete_times_each(ret)
-    ret <- ret %>% dplyr::mutate(strata = as.character(x$single_strata_value))
-  }
-  else {
-    ret <- complete_times_each(ret)
+  else { # type == "survival_rate"
+    # First, filter out groups whose surivial curve ends too short for the survival time in question.
+    ret <- ret %>% dplyr::group_by(strata) %>% dplyr::filter(max(time) >= !!survival_time)
+    ret <- ret %>% dplyr::filter(time <= !!survival_time) %>% dplyr::filter(time==max(time)) %>% ungroup()
+    # remove ".cohort=" part from strata values.
+    ret <- ret %>% dplyr::mutate(strata = stringr::str_remove(strata,"^\\.cohort\\="))
   }
 
   colnames(ret)[colnames(ret) == "time"] <- "Time"
