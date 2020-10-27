@@ -81,6 +81,12 @@ exp_survival <- function(df, time, status, start_time, end_time, end_time_fill =
 
   fml <- as.formula(paste0("survival::Surv(`", time_col, "`, `", status_col, "`) ~ ", quoted_cohort_col))
 
+  # By default, use mean of observations with event.
+  # median gave a point where survival rate was still predicted 100% in one of our test case.
+  default_survival_time <- mean((df %>% dplyr::filter(!!rlang::sym(status_col)))[[time_col]], na.rm=TRUE)
+  # Pick maximum of existing values equal or less than the actual mean.
+  default_survival_time <- max((df %>% dplyr::filter(!!rlang::sym(time_col) <= !!default_survival_time))[[time_col]], na.rm=TRUE)
+
   # calls survfit for each group.
   each_func1 <- function(df) {
     ret <- survival::survfit(fml, data = df)
@@ -90,6 +96,7 @@ exp_survival <- function(df, time, status, start_time, end_time, end_time_fill =
       ret$single_strata_value = df[[cohort_col]][[1]]
     }
     ret$orig_levels <- orig_levels
+    attr(ret, "default_survival_time") <- default_survival_time
     class(ret) <- c("survfit_exploratory", class(ret))
     ret
   }
@@ -122,8 +129,11 @@ exp_survival <- function(df, time, status, start_time, end_time, end_time_fill =
 }
 
 #' @export
-tidy.survfit_exploratory <- function(x, type = "survival_curve", survival_time = 10, ...) {
+tidy.survfit_exploratory <- function(x, type = "survival_curve", survival_time = NULL, ...) {
   ret <- broom:::tidy.survfit(x, ...)
+  if (is.null(survival_time)) {
+    survival_time <- attr(ret, "default_survival_time")
+  }
 
   # for line chart and pivot table, add time=0 row when it is not already there, and rows for other missing times for each group.
   complete_times_each <- function(df) {
