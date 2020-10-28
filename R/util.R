@@ -2306,3 +2306,9 @@ auroc <- function(score, bool) {
   U  <- sum(rank(score)[!bool]) - n1 * (n1 + 1) / 2
   return(1 - U / n1 / n2)
 }
+
+survival_auroc <- function(score, time, status, at) {
+  df <- tibble::tibble(score=score, time=time, status=status)
+  df <- df %>% filter(!(time < !!at & !status)) %>% mutate(dead = time < !!at | (time == !!at & status))
+  auroc(df$score, df$dead)
+}
