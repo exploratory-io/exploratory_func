@@ -394,8 +394,8 @@ tidy.randomForest.classification <- function(x, pretty.name = FALSE, type = "imp
     actual <- x[["y"]]
     predicted <- x[["predicted"]]
 
-    per_level <- function(class) {
-      ret <- evaluate_classification(actual, predicted, class, pretty.name = pretty.name)
+    per_level <- function(level) {
+      ret <- evaluate_classification(actual, predicted, level, pretty.name = pretty.name)
       ret
     }
 
@@ -504,12 +504,12 @@ glance.randomForest.classification <- function(x, pretty.name = FALSE,  ...) {
   actual <- x[["y"]]
   predicted <- x[["predicted"]]
 
-  per_level <- function(class) {
-    # calculate evaluation scores for each class
-    tp <- sum(actual == class & predicted == class)
-    tn <- sum(actual != class & predicted != class)
-    fp <- sum(actual != class & predicted == class)
-    fn <- sum(actual == class & predicted != class)
+  per_level <- function(level) {
+    # calculate evaluation scores for each level
+    tp <- sum(actual == level & predicted == level)
+    tn <- sum(actual != level & predicted != level)
+    fp <- sum(actual != level & predicted == level)
+    fn <- sum(actual == level & predicted != level)
 
     precision <- tp / (tp + fp)
     recall <- tp / (tp + fn)
@@ -525,9 +525,9 @@ glance.randomForest.classification <- function(x, pretty.name = FALSE,  ...) {
     )
 
     names(ret) <- if(pretty.name){
-      paste(class, c("F Score", "Accuracy", "Misclassification Rate", "Precision", "Recall"), sep = " ")
+      paste(level, c("F Score", "Accuracy", "Misclassification Rate", "Precision", "Recall"), sep = " ")
     } else {
-      paste(class, c("f_score", "accuracy", "misclassification_rate", "precision", "recall"), sep = "_")
+      paste(level, c("f_score", "accuracy", "misclassification_rate", "precision", "recall"), sep = "_")
     }
     ret
   }
@@ -2571,8 +2571,8 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, binary_clas
         predicted <- ranger.predict_value_from_prob(x$forest$levels, x$prediction_training$predictions, x$y)
       }
 
-      per_level <- function(class) {
-        ret <- evaluate_classification(actual, predicted, class, pretty.name = pretty.name)
+      per_level <- function(level) {
+        ret <- evaluate_classification(actual, predicted, level, pretty.name = pretty.name)
         ret
       }
       dplyr::bind_rows(lapply(levels(actual), per_level))
@@ -3295,8 +3295,8 @@ tidy.rpart <- function(x, type = "importance", pretty.name = FALSE, ...) {
       predicted <- x$predicted_class
       ylevels <- get_class_levels_rpart(x)
 
-      per_level <- function(class) {
-        ret <- evaluate_classification(actual, predicted, class, pretty.name = pretty.name)
+      per_level <- function(level) {
+        ret <- evaluate_classification(actual, predicted, level, pretty.name = pretty.name)
         ret
       }
       # for rpart, factor levels for logical case is kept in FALSE, TRUE order not to mess up rpart.plot.
