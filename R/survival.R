@@ -3,15 +3,19 @@
 #' It does survfit and survdiff.
 #' @param end_time_fill - "max", "today", or actual value or string expresion of Date.
 #' @export
-exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, end_time_fill = "max", time_unit = "day", cohort = NULL, cohort_func = NULL, ...){
+exp_survival <- function(df, time, status, start_time, end_time, end_time_fill = "max", time_unit = "day", cohort = NULL, cohort_func = NULL, ...){
   validate_empty_data(df)
 
   grouped_col <- grouped_by(df)
+  status_col <- tidyselect::vars_select(names(df), !! rlang::enquo(status))
+  orig_cohort_col <- tidyselect::vars_select(names(df), !! rlang::enquo(cohort))
+  start_time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(start_time))
+  end_time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(end_time))
+  time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(time))
 
   orig_levels <- NULL
 
-  if (!is.null(substitute(cohort))) {
-    orig_cohort_col <- col_name(substitute(cohort))
+  if (length(orig_cohort_col) > 0) { # TODO: Better way to check if column is specified or not?
     # rename cohort column to workaround the case where the column name has space in it.
     # https://github.com/therneau/survival/issues/41
     colnames(df)[colnames(df) == orig_cohort_col] <- ".cohort" #TODO avoid conflict, and adjust cohort output value from survfit.
@@ -36,14 +40,9 @@ exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, e
     quoted_cohort_col <- "1" # no need to quote column name since it is not column.
   }
 
-  # substitute is needed because time can be
-  # NSE (non-standard evaluation) column name and it throws an evaluation error
-  # without it
-  if (is.null(substitute(time))) {
-    start_time_col <- col_name(substitute(start_time))
+  if (length(time_col) == 0) {
     df[[start_time_col]] <- as.Date(df[[start_time_col]]) # convert to Date in case it is POSIXct.
-    if (!is.null(substitute(end_time))) { # if end_time exists, fill NA with the way specified by end_time_fill.
-      end_time_col <- col_name(substitute(end_time))
+    if (length(end_time_col) > 0) { # if end_time exists, fill NA with the way specified by end_time_fill.
       df[[end_time_col]] <- as.Date(df[[end_time_col]]) # convert to Date in case it is POSIXct.
       # set value to fill NAs of end time
       if (is.character(end_time_fill) && end_time_fill == "max") { # type check before comparison is necessary to avoid error.
@@ -65,23 +64,28 @@ exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, e
     # as.numeric() does not support all units.
     # also support of units are different between Date and POSIXct.
     # let's do it ourselves.
-    time_unit_days_str = switch(time_unit,
-                                day = "1",
-                                week = "7",
-                                month = "(365.25/12)",
-                                quarter = "(365.25/4)",
-                                year = "365.25",
-                                "1")
+    time_unit_days = switch(time_unit,
+                            day = 1,
+                            week = 7,
+                            month = 365.25/12,
+                            quarter = 365.25/4,
+                            year = 365.25,
+                            1)
+
+    time_col <- avoid_conflict(colnames(df), ".time")
+
     # we are ceiling survival time to make it integer in the specified time unit.
     # this is to make resulting survival curve to have integer data point in the specified time unit.
-    fml <- as.formula(paste0("survival::Surv(ceiling(as.numeric(`", end_time_col, "`-`", start_time_col, "`, units = \"days\")/", time_unit_days_str, "), `", substitute(status), "`) ~ ", quoted_cohort_col))
+    df <- df %>% dplyr::mutate(!!rlang::sym(time_col) := ceiling(as.numeric(!!rlang::sym(end_time_col) - !!rlang::sym(start_time_col), units = "days") / time_unit_days))
   }
-  else {
-    # need to compose formula with non-standard evaluation.
-    # simply using time and status in formula here results in a formula that literally looks at
-    # "time" columun and "status" column, which is not what we want.
-    fml <- as.formula(paste0("survival::Surv(`", substitute(time), "`,`", substitute(status), "`) ~ ", quoted_cohort_col))
-  }
+
+  fml <- as.formula(paste0("survival::Surv(`", time_col, "`, `", status_col, "`) ~ ", quoted_cohort_col))
+
+  # By default, use mean of observations with event.
+  # median gave a point where survival rate was still predicted 100% in one of our test case.
+  default_survival_time <- mean((df %>% dplyr::filter(!!rlang::sym(status_col)))[[time_col]], na.rm=TRUE)
+  # Pick maximum of existing values equal or less than the actual mean.
+  default_survival_time <- max((df %>% dplyr::filter(!!rlang::sym(time_col) <= !!default_survival_time))[[time_col]], na.rm=TRUE)
 
   # calls survfit for each group.
   each_func1 <- function(df) {
@@ -92,6 +96,7 @@ exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, e
       ret$single_strata_value = df[[cohort_col]][[1]]
     }
     ret$orig_levels <- orig_levels
+    attr(ret, "default_survival_time") <- default_survival_time
     class(ret) <- c("survfit_exploratory", class(ret))
     ret
   }
@@ -124,8 +129,11 @@ exp_survival <- function(df, time, status, start_time = NULL, end_time = NULL, e
 }
 
 #' @export
-tidy.survfit_exploratory <- function(x, ...) {
+tidy.survfit_exploratory <- function(x, type = "survival_curve", survival_time = NULL, ...) {
   ret <- broom:::tidy.survfit(x, ...)
+  if (is.null(survival_time)) {
+    survival_time <- attr(x, "default_survival_time")
+  }
 
   # for line chart and pivot table, add time=0 row when it is not already there, and rows for other missing times for each group.
   complete_times_each <- function(df) {
@@ -141,25 +149,39 @@ tidy.survfit_exploratory <- function(x, ...) {
     df
   }
 
-  if ("strata" %in% colnames(ret)) {
-    nested <- ret %>% dplyr::group_by(strata) %>% tidyr::nest()
-    nested <- nested %>% dplyr::mutate(data=purrr::map(data,~complete_times_each(.)))
-    ret <- nested %>% tidyr::unnest(data) %>% dplyr::ungroup()
-    # remove ".cohort=" part from strata values.
-    ret <- ret %>% dplyr::mutate(strata = stringr::str_remove(strata,"^\\.cohort\\="))
-    # Set original factor level back so that legend order is correct on the chart.
-    # In case of logical, c("TRUE","FALSE") is stored in orig_level, so that we can
-    # use it here either way.
-    if (!is.null(x$orig_levels)) {
-      ret <- ret %>%  dplyr::mutate(strata = factor(strata, levels=x$orig_levels))
+  if (type == "survival_curve") {
+    if ("strata" %in% colnames(ret)) {
+      nested <- ret %>% dplyr::group_by(strata) %>% tidyr::nest()
+      nested <- nested %>% dplyr::mutate(data=purrr::map(data,~complete_times_each(.)))
+      ret <- nested %>% tidyr::unnest(data) %>% dplyr::ungroup()
+      # remove ".cohort=" part from strata values.
+      ret <- ret %>% dplyr::mutate(strata = stringr::str_remove(strata,"^\\.cohort\\="))
+      # Set original factor level back so that legend order is correct on the chart.
+      # In case of logical, c("TRUE","FALSE") is stored in orig_level, so that we can
+      # use it here either way.
+      if (!is.null(x$orig_levels)) {
+        ret <- ret %>%  dplyr::mutate(strata = factor(strata, levels=x$orig_levels))
+      }
+    }
+    else if (!is.null(x$single_strata_value)) { # put back single strata value ignored by survfit.
+      ret <- complete_times_each(ret)
+      ret <- ret %>% dplyr::mutate(strata = as.character(x$single_strata_value))
+    }
+    else {
+      ret <- complete_times_each(ret)
     }
   }
-  else if (!is.null(x$single_strata_value)) { # put back single strata value ignored by survfit.
-    ret <- complete_times_each(ret)
-    ret <- ret %>% dplyr::mutate(strata = as.character(x$single_strata_value))
-  }
-  else {
-    ret <- complete_times_each(ret)
+  else { # type == "survival_rate"
+    if ("strata" %in% colnames(ret)) {
+      # First, filter out groups whose surivial curve ends too short for the survival time in question.
+      ret <- ret %>% dplyr::group_by(strata) %>% dplyr::filter(max(time) >= !!survival_time)
+      ret <- ret %>% dplyr::filter(time <= !!survival_time) %>% dplyr::filter(time==max(time)) %>% ungroup()
+      # remove ".cohort=" part from strata values.
+      ret <- ret %>% dplyr::mutate(strata = stringr::str_remove(strata,"^\\.cohort\\="))
+    }
+    else {
+      ret <- ret %>% dplyr::filter(time <= !!survival_time) %>% dplyr::filter(time==max(time))
+    }
   }
 
   colnames(ret)[colnames(ret) == "time"] <- "Time"
