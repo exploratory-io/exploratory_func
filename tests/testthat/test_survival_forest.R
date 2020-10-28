@@ -12,6 +12,8 @@ test_that("exp_survival_forest basic", {
   ret <- model_df %>% prediction2()
   ret <- model_df %>% glance_rowwise(model)
   ret <- model_df %>% augment_rowwise(model)
+  ret2 <- ret %>% do_survival_roc_("Predicted Survival Rate","ti me","sta tus", at=150, grid=10, revert=TRUE)
+
   ret <- model_df %>% tidy_rowwise(model, type='partial_dependence_survival_curve')
   expect_equal(class(model_df$model[[1]]), c("ranger_survival_exploratory", "ranger"))
   ret <- model_df %>% tidy_rowwise(model, type='partial_dependence')

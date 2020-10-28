@@ -29,8 +29,9 @@ test_that("build_coxph.fast basic", {
                  "Score Test","Score Test P Value","Wald Test","Wald Test P Value",
                  # "Robust Statistic","Robust P Value", # These columns are hidden for now.
                  "R Squared","R Squared Max","Concordance","Std Error Concordance",
-                 "Log Likelihood","AIC","BIC","Number of Rows","Number of Events")) 
+                 "Log Likelihood","AIC","BIC","Time-dependent AUC", "Number of Rows","Number of Events")) 
   ret <- model_df %>% augment_rowwise(model)
+  ret2 <- ret %>% do_survival_roc_("Predicted Survival Rate","ti me","sta tus", at=150, grid=10, revert=TRUE)
 })
 
 test_that("build_coxph.fast basic with group-by", {
@@ -60,7 +61,7 @@ test_that("build_coxph.fast basic with group-by", {
                  "Score Test","Score Test P Value","Wald Test","Wald Test P Value",
                  # "Robust Statistic","Robust P Value", # These columns are hidden for now.
                  "R Squared","R Squared Max","Concordance","Std Error Concordance",
-                 "Log Likelihood","AIC","BIC","Number of Rows","Number of Events")) 
+                 "Log Likelihood","AIC","BIC","Time-dependent AUC", "Number of Rows","Number of Events")) 
   ret <- model_df %>% augment_rowwise(model)
 })
 
@@ -93,7 +94,7 @@ test_that("test build_coxph.fast with test mode", {
                  "Score Test","Score Test P Value","Wald Test","Wald Test P Value",
                  # "Robust Statistic","Robust P Value", # These columns are hidden for now.
                  "R Squared","R Squared Max","Concordance","Std Error Concordance",
-                 "Log Likelihood","AIC","BIC","Number of Rows","Number of Events")) 
+                 "Log Likelihood","AIC","BIC", "Time-dependent AUC", "Number of Rows","Number of Events")) 
   ret <- model_df %>% augment_rowwise(model)
 })
 
@@ -123,7 +124,7 @@ test_that("test build_coxph.fast with test mode with group-by", {
                  "Score Test","Score Test P Value","Wald Test","Wald Test P Value",
                  # "Robust Statistic","Robust P Value", # These columns are hidden for now.
                  "R Squared","R Squared Max","Concordance","Std Error Concordance",
-                 "Log Likelihood","AIC","BIC","Number of Rows","Number of Events")) 
+                 "Log Likelihood","AIC","BIC","Time-dependent AUC", "Number of Rows","Number of Events")) 
   ret <- model_df %>% augment_rowwise(model)
 })
 
