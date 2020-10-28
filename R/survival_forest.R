@@ -1,3 +1,8 @@
+extract_survival_rate_at <- function(survival, unique_death_times, at) {
+  index <- sum(unique_death_times <= at)
+  survival[, index]
+}
+
 calc_mean_survival <- function(survival, unique_death_times) {
   # Calculate mean survival time from predicted survival curve. If the survival rate at the last unique death time is not 0,
   # we assume that the survivers lived one more term, just so that we can calculate the finite mean.
@@ -393,6 +398,9 @@ exp_survival_forest <- function(df,
       # The concordance is (d+1)/2, where d is Somers' d. https://cran.r-project.org/web/packages/survival/vignettes/concordance.pdf
       rf$concordance <- survival::concordance(survival::Surv(time, status)~x,data=concordance_df)
 
+      rf$auc <- survival_auroc(-extract_survival_rate_at(prediction_training$survival, prediction_training$unique.death.times, pred_survival_time),
+                               df[[clean_time_col]], df[[clean_status_col]], pred_survival_time)
+
       if (test_rate > 0) {
         df_test_clean <- cleanup_df_for_test(df_test, df, c_cols)
         na_row_numbers_test <- attr(df_test_clean, "na_row_numbers")
@@ -410,6 +418,10 @@ exp_survival_forest <- function(df,
         concordance_df_test <- tibble::tibble(x=calc_mean_survival(prediction_test$survival, prediction_test$unique.death.times), time=df_test_clean[[clean_time_col]], status=df_test_clean[[clean_status_col]])
         # The concordance is (d+1)/2, where d is Somers' d. https://cran.r-project.org/web/packages/survival/vignettes/concordance.pdf
         rf$concordance_test <- survival::concordance(survival::Surv(time, status)~x,data=concordance_df_test)
+
+        rf$auc_test <- survival_auroc(-extract_survival_rate_at(prediction_test$survival, prediction_test$unique.death.times, pred_survival_time),
+                                      df_test_clean[[clean_time_col]], df_test_clean[[clean_status_col]], pred_survival_time)
+
         rf$test_nevent <- sum(df_test_clean[[clean_status_col]], na.rm=TRUE)
       }
       rf$df <- df
