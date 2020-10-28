@@ -704,6 +704,7 @@ glance.coxph_exploratory <- function(x, data_type = "training", pretty.name = FA
 
   if (data_type == "training") {
     ret <- broom:::glance.coxph(x, pretty.name = pretty.name, ...)
+    ret <- ret %>% dplyr::mutate(auc = x$auc)
     if (!is.null(ret$nobs)) { # glance.coxph's newly added nobs seems to be same as n, which we use as Number of Rows. Suppressing it for now.
       ret <- ret %>% dplyr::select(-nobs)
     }
@@ -721,7 +722,7 @@ glance.coxph_exploratory <- function(x, data_type = "training", pretty.name = FA
     if (is.null(x$test_data)) {
       return(data.frame())
     }
-    ret <- tibble::tibble(concordance=x$concordance_test$concordance, `std.error.concordance`=sqrt(x$concordance_test$var), n=nrow(x$test_data), nevent=x$test_nevent)
+    ret <- tibble::tibble(concordance=x$concordance_test$concordance, `std.error.concordance`=sqrt(x$concordance_test$var), auc=x$auc_test, n=nrow(x$test_data), nevent=x$test_nevent)
   }
 
   if(pretty.name) {
@@ -748,6 +749,7 @@ glance.coxph_exploratory <- function(x, data_type = "training", pretty.name = FA
     colnames(ret)[colnames(ret) == "r.squared.max"] <- "R Squared Max"
     colnames(ret)[colnames(ret) == "concordance"] <- "Concordance"
     colnames(ret)[colnames(ret) == "std.error.concordance"] <- "Std Error Concordance"
+    colnames(ret)[colnames(ret) == "auc"] <- "Time-dependent AUC"
   }
   ret
 }
