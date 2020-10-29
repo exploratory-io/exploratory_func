@@ -1390,7 +1390,7 @@ tidy.xgboost_exp <- function(x, type = "importance", pretty.name = FALSE, binary
       predicted <- extract_predicted_multiclass_labels(x)
 
       per_level <- function(level) {
-        ret <- evaluate_classification(actual, predicted, class, pretty.name = pretty.name)
+        ret <- evaluate_classification(actual, predicted, level, pretty.name = pretty.name)
         ret
       }
       dplyr::bind_rows(lapply(levels(actual), per_level))
