@@ -1389,7 +1389,7 @@ tidy.xgboost_exp <- function(x, type = "importance", pretty.name = FALSE, binary
       actual <- extract_actual(x)
       predicted <- extract_predicted_multiclass_labels(x)
 
-      per_level <- function(class) {
+      per_level <- function(level) {
         ret <- evaluate_classification(actual, predicted, class, pretty.name = pretty.name)
         ret
       }
@@ -1425,4 +1425,3 @@ tidy.xgboost_exp <- function(x, type = "importance", pretty.name = FALSE, binary
       stop(paste0("type ", type, " is not defined"))
     })
 }
-
