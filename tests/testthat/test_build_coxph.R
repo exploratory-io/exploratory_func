@@ -9,7 +9,7 @@ test_that("build_coxph.fast basic", {
   model_df <- df %>% build_coxph.fast(`ti me`, `sta tus`, `a ge`, `se-x`, ph.ecog, ph.karno, pat.karno, meal.cal, wt.loss, predictor_n = 2)
   expect_equal(class(model_df$model[[1]]), c("coxph_exploratory","coxph"))
   ret <- model_df %>% prediction2()
-  ret2 <- ret %>% do_survival_roc_("Predicted Survival Rate","ti me","sta tus", at=150, grid=10, revert=TRUE)
+  ret2 <- ret %>% do_survival_roc_("Predicted Survival Rate","ti me","sta tus", at=NULL, grid=10, revert=TRUE)
   ret <- model_df %>% evaluation(pretty.name=TRUE)
   expect_false("Data Type" %in% colnames(ret))
   ret <- model_df %>% tidy_rowwise(model, type='permutation_importance')
