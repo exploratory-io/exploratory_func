@@ -716,6 +716,7 @@ glance.coxph_exploratory <- function(x, data_type = "training", pretty.name = FA
     if (!is.null(ret$p.value.robust)) { # The value shows up as NA for some reason. Hide for now.
       ret <- ret %>% dplyr::select(-p.value.robust)
     }
+    ret <- ret %>% dplyr::select(concordance, `std.error.concordance`, auc, everything()) # Bring common metrics upfront.
     if (!is.null(ret$n) && !is.null(ret$nevent)) {
       ret <- ret %>% dplyr::select(-n, -nevent, everything(), n, nevent) # Bring n and nevent to the last.
     }
