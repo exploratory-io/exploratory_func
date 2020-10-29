@@ -323,7 +323,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
           # data frames that succeed
           if(is.null(grouped_col) || length(grouped_col) == 0) {
             # Terminology is not consistent here, but we are calling extra regressor "external predictor" on the UI.
-            stop("External predictors require future data, or to be run in Test Mode.")
+            stop("In order to use the External Predictors, you need future data or switch to Test Mode in the Property dialog.")
           }
         }
   

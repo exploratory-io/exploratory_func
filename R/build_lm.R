@@ -1175,6 +1175,9 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
     } else {
       get_optimized_score(x$y, x$fitted.value, threshold = binary_classification_threshold)$threshold
     }
+    if (is.null(threshold_value)) { # Could not get optimized value. To avoid error, it has to have some numeric value.
+      threshold_value <- 0.5
+    }
     predicted <- ifelse(x$fitted.value > threshold_value, 1, 0) #TODO make threshold adjustable
     ret2 <- evaluate_classification(x$y, predicted, 1, pretty.name = pretty.name)
     ret2 <- ret2[, 2:6]

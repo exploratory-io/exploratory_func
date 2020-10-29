@@ -111,6 +111,8 @@ test_that("exp_rpart(character(A,B)) evaluate training and test", { # This shoul
 
   ret <- model_df %>% rf_evaluation_training_and_test()
   expect_equal(nrow(ret), 2) # 2 for train and test
+  ret <- model_df %>% rf_evaluation_training_and_test(type="evaluation_by_class")
+  expect_equal(nrow(ret), 4) # 2 for train and test times A/B.
 
   # Training only case
   model_df <- flight %>% dplyr::mutate(is_delayed = if_else(as.logical(`is delayed`), "A", "B")) %>%

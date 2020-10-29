@@ -180,8 +180,8 @@ test_that("exp_xgboost(binary(factor(A,B))) evaluate training and test", {
 
   ret <- rf_evaluation_training_and_test(model_df, pretty.name=T, binary_classification_threshold=0.5)
   expect_equal(nrow(ret), 2) # 2 for train and test
-  #ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class") # Not implemented.
-  #expect_equal(nrow(ret), 4) # 4 for train/test times TRUE/FALSE
+  ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class")
+  expect_equal(nrow(ret), 4) # 4 for train/test times TRUE/FALSE
 
   ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
   ret <- model_df %>% rf_partial_dependence()
