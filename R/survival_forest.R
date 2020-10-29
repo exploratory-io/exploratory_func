@@ -442,7 +442,9 @@ exp_survival_forest <- function(df,
     })
   }
 
-  do_on_each_group(clean_df, each_func, name = "model", with_unnest = FALSE)
+  ret <- do_on_each_group(clean_df, each_func, name = "model", with_unnest = FALSE)
+  attr(ret, "pred_survival_time") <- pred_survival_time
+  ret
 }
 
 #' special version of tidy.coxph function to use with build_coxph.fast.

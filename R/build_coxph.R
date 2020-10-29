@@ -528,7 +528,9 @@ build_coxph.fast <- function(df,
     })
   }
 
-  do_on_each_group(clean_df, each_func, name = "model", with_unnest = FALSE)
+  ret <- do_on_each_group(clean_df, each_func, name = "model", with_unnest = FALSE)
+  attr(ret, "pred_survival_time") <- pred_survival_time
+  ret
 }
 
 survival_pdp_sort_categorical <- function(ret) {

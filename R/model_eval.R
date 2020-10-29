@@ -95,6 +95,9 @@ do_roc_ <- function(df, pred_prob_col, actual_val_col, grid = NULL, with_auc = F
 }
 
 do_survival_roc_ <- function(df, score_col, time_col, status_col, at = NULL, grid = NULL, with_auc = FALSE, revert = FALSE){
+  if (is.null(at)) {
+    at <- attr(df, "pred_survival_time")
+  }
   df <- df %>% filter(!(!!rlang::sym(time_col) < !!at & !(!!rlang::sym(status_col)))) %>% # Filter out censored rows with shorter survival time.
     mutate(dead = !!rlang::sym(time_col) < !!at | (!!rlang::sym(time_col) == !!at & !!rlang::sym(status_col))) # Add dead column that indicates if it was dead at the specified time.
   if (revert) {

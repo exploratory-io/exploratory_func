@@ -677,6 +677,8 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
 prediction2 <- function(df, data_frame = NULL, conf_int = 0.95, ...){
   validate_empty_data(df)
 
+  pred_survival_time <- attr(df, "pred_survival_time")
+
   df_cnames <- colnames(df)
 
   # columns other than "model" should be regarded as grouping columns
@@ -757,6 +759,10 @@ prediction2 <- function(df, data_frame = NULL, conf_int = 0.95, ...){
 
   if (length(grouping_cols) > 0) {
     ret <- dplyr::group_by(ret, !!!rlang::syms(grouping_cols))
+  }
+
+  if (!is.null(pred_survival_time)) {
+    attr(ret, "pred_survival_time") <- pred_survival_time
   }
   ret
 }
