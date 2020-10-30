@@ -1,10 +1,15 @@
+# Extracts survival rates at specific time from survival curves.
+# survival - Matrix of survival curves. Rows represents observations and columns represents points of time.
+# unique_death_times - Numeric vector of unique death times.
+# at - Time at which the survival rates should be extracted from survival curves.
 extract_survival_rate_at <- function(survival, unique_death_times, at) {
   index <- sum(unique_death_times <= at)
   survival[, index]
 }
 
+# Calculate mean survival time from predicted survival curve. 
 calc_mean_survival <- function(survival, unique_death_times) {
-  # Calculate mean survival time from predicted survival curve. If the survival rate at the last unique death time is not 0,
+  # If the survival rate at the last unique death time is not 0,
   # we assume that the survivers lived one more term, just so that we can calculate the finite mean.
   # Thus the unique.death.times is appended with max(unique.death.times)+1.
   ret <- -matrixStats::rowDiffs(cbind(1,survival,0)) %*% c(unique_death_times, max(unique_death_times)+1)
