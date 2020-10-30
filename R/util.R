@@ -2306,3 +2306,17 @@ auroc <- function(score, bool) {
   U  <- sum(rank(score)[!bool]) - n1 * (n1 + 1) / 2
   return(1 - U / n1 / n2)
 }
+
+#' Calculates time-dependent AUC for survival prediction.
+#' score - Vector of predicted risk of event
+#' time - Vector of survival time
+#' status - logical vector of event status. TRUE: event, FALSE: censor.
+#' at - The time at which the time-dependent AUC is calculated.
+survival_auroc <- function(score, time, status, at, revert=FALSE) {
+  if (revert) {
+    score <- -score
+  }
+  df <- tibble::tibble(score=score, time=time, status=status)
+  df <- df %>% filter(!(time < !!at & !status)) %>% mutate(dead = time < !!at | (time == !!at & status))
+  auroc(df$score, df$dead)
+}

@@ -9,6 +9,7 @@ test_that("build_coxph.fast basic", {
   model_df <- df %>% build_coxph.fast(`ti me`, `sta tus`, `a ge`, `se-x`, ph.ecog, ph.karno, pat.karno, meal.cal, wt.loss, predictor_n = 2)
   expect_equal(class(model_df$model[[1]]), c("coxph_exploratory","coxph"))
   ret <- model_df %>% prediction2()
+  ret2 <- ret %>% do_survival_roc_("Predicted Survival Rate","ti me","sta tus", at=NULL, grid=10, revert=TRUE)
   ret <- model_df %>% evaluation(pretty.name=TRUE)
   expect_false("Data Type" %in% colnames(ret))
   ret <- model_df %>% tidy_rowwise(model, type='permutation_importance')
@@ -25,11 +26,14 @@ test_that("build_coxph.fast basic", {
 
   ret <- model_df %>% glance_rowwise(model, pretty.name=TRUE)
   expect_equal(colnames(ret),
-               c("Likelihood Ratio Test","Likelihood Ratio Test P Value",
+               c("Concordance","Std Error Concordance",
+                 "Time-dependent AUC",
+                 "Likelihood Ratio Test","Likelihood Ratio Test P Value",
                  "Score Test","Score Test P Value","Wald Test","Wald Test P Value",
                  # "Robust Statistic","Robust P Value", # These columns are hidden for now.
-                 "R Squared","R Squared Max","Concordance","Std Error Concordance",
-                 "Log Likelihood","AIC","BIC","Number of Rows","Number of Events")) 
+                 "R Squared","R Squared Max",
+                 "Log Likelihood","AIC","BIC",
+                 "Number of Rows","Number of Events")) 
   ret <- model_df %>% augment_rowwise(model)
 })
 
@@ -56,11 +60,15 @@ test_that("build_coxph.fast basic with group-by", {
 
   ret <- model_df %>% glance_rowwise(model, pretty.name=TRUE)
   expect_equal(colnames(ret),
-               c("se-x","Likelihood Ratio Test","Likelihood Ratio Test P Value",
+               c("se-x",
+                 "Concordance","Std Error Concordance",
+                 "Time-dependent AUC",
+                 "Likelihood Ratio Test","Likelihood Ratio Test P Value",
                  "Score Test","Score Test P Value","Wald Test","Wald Test P Value",
                  # "Robust Statistic","Robust P Value", # These columns are hidden for now.
-                 "R Squared","R Squared Max","Concordance","Std Error Concordance",
-                 "Log Likelihood","AIC","BIC","Number of Rows","Number of Events")) 
+                 "R Squared","R Squared Max",
+                 "Log Likelihood","AIC","BIC",
+                 "Number of Rows","Number of Events")) 
   ret <- model_df %>% augment_rowwise(model)
 })
 
@@ -89,11 +97,14 @@ test_that("test build_coxph.fast with test mode", {
 
   ret <- model_df %>% glance_rowwise(model, pretty.name=TRUE)
   expect_equal(colnames(ret),
-               c("Likelihood Ratio Test","Likelihood Ratio Test P Value",
+               c("Concordance","Std Error Concordance",
+                 "Time-dependent AUC",
+                 "Likelihood Ratio Test","Likelihood Ratio Test P Value",
                  "Score Test","Score Test P Value","Wald Test","Wald Test P Value",
                  # "Robust Statistic","Robust P Value", # These columns are hidden for now.
-                 "R Squared","R Squared Max","Concordance","Std Error Concordance",
-                 "Log Likelihood","AIC","BIC","Number of Rows","Number of Events")) 
+                 "R Squared","R Squared Max",
+                 "Log Likelihood","AIC","BIC",
+                 "Number of Rows","Number of Events")) 
   ret <- model_df %>% augment_rowwise(model)
 })
 
@@ -119,11 +130,15 @@ test_that("test build_coxph.fast with test mode with group-by", {
                  "p_value","conf_low","conf_high","hazard_ratio","base.level"))
   ret <- model_df %>% glance_rowwise(model, pretty.name=TRUE)
   expect_equal(colnames(ret),
-               c("se-x","Likelihood Ratio Test","Likelihood Ratio Test P Value",
+               c("se-x",
+                 "Concordance","Std Error Concordance",
+                 "Time-dependent AUC",
+                 "Likelihood Ratio Test","Likelihood Ratio Test P Value",
                  "Score Test","Score Test P Value","Wald Test","Wald Test P Value",
                  # "Robust Statistic","Robust P Value", # These columns are hidden for now.
-                 "R Squared","R Squared Max","Concordance","Std Error Concordance",
-                 "Log Likelihood","AIC","BIC","Number of Rows","Number of Events")) 
+                 "R Squared","R Squared Max",
+                 "Log Likelihood","AIC","BIC",
+                 "Number of Rows","Number of Events")) 
   ret <- model_df %>% augment_rowwise(model)
 })
 

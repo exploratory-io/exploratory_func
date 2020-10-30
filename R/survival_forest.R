@@ -1,5 +1,15 @@
+# Extracts survival rates at specific time from survival curves.
+# survival - Matrix of survival curves. Rows represents observations and columns represents points of time.
+# unique_death_times - Numeric vector of unique death times.
+# at - Time at which the survival rates should be extracted from survival curves.
+extract_survival_rate_at <- function(survival, unique_death_times, at) {
+  index <- sum(unique_death_times <= at)
+  survival[, index]
+}
+
+# Calculate mean survival time from predicted survival curve. 
 calc_mean_survival <- function(survival, unique_death_times) {
-  # Calculate mean survival time from predicted survival curve. If the survival rate at the last unique death time is not 0,
+  # If the survival rate at the last unique death time is not 0,
   # we assume that the survivers lived one more term, just so that we can calculate the finite mean.
   # Thus the unique.death.times is appended with max(unique.death.times)+1.
   ret <- -matrixStats::rowDiffs(cbind(1,survival,0)) %*% c(unique_death_times, max(unique_death_times)+1)
@@ -393,6 +403,10 @@ exp_survival_forest <- function(df,
       # The concordance is (d+1)/2, where d is Somers' d. https://cran.r-project.org/web/packages/survival/vignettes/concordance.pdf
       rf$concordance <- survival::concordance(survival::Surv(time, status)~x,data=concordance_df)
 
+      rf$auc <- survival_auroc(extract_survival_rate_at(prediction_training$survival, prediction_training$unique.death.times, pred_survival_time),
+                               df[[clean_time_col]], df[[clean_status_col]], pred_survival_time,
+                               revert=TRUE)
+
       if (test_rate > 0) {
         df_test_clean <- cleanup_df_for_test(df_test, df, c_cols)
         na_row_numbers_test <- attr(df_test_clean, "na_row_numbers")
@@ -410,6 +424,11 @@ exp_survival_forest <- function(df,
         concordance_df_test <- tibble::tibble(x=calc_mean_survival(prediction_test$survival, prediction_test$unique.death.times), time=df_test_clean[[clean_time_col]], status=df_test_clean[[clean_status_col]])
         # The concordance is (d+1)/2, where d is Somers' d. https://cran.r-project.org/web/packages/survival/vignettes/concordance.pdf
         rf$concordance_test <- survival::concordance(survival::Surv(time, status)~x,data=concordance_df_test)
+
+        rf$auc_test <- survival_auroc(extract_survival_rate_at(prediction_test$survival, prediction_test$unique.death.times, pred_survival_time),
+                                      df_test_clean[[clean_time_col]], df_test_clean[[clean_status_col]], pred_survival_time,
+                                      revert=TRUE)
+
         rf$test_nevent <- sum(df_test_clean[[clean_status_col]], na.rm=TRUE)
       }
       rf$df <- df
@@ -430,7 +449,10 @@ exp_survival_forest <- function(df,
     })
   }
 
-  do_on_each_group(clean_df, each_func, name = "model", with_unnest = FALSE)
+  ret <- do_on_each_group(clean_df, each_func, name = "model", with_unnest = FALSE)
+  # Pass down survival time used for prediction. This is for the post-processing for time-dependent ROC.
+  attr(ret, "pred_survival_time") <- pred_survival_time
+  ret
 }
 
 #' special version of tidy.coxph function to use with build_coxph.fast.
@@ -512,7 +534,7 @@ tidy.ranger_survival_exploratory <- function(x, type = 'importance', ...) { #TOD
 glance.ranger_survival_exploratory <- function(x, data_type = "training", ...) {
   if (data_type == "training") {
     if (!is.null(x$concordance)) {
-      tibble::tibble(Concordance=x$concordance$concordance, `Std Error Concordance`=sqrt(x$concordance$var), `Number of Rows`=nrow(x$df), `Number of Events`=x$nevent)
+      tibble::tibble(Concordance=x$concordance$concordance, `Std Error Concordance`=sqrt(x$concordance$var), `Time-dependent AUC`=x$auc, `Number of Rows`=nrow(x$df), `Number of Events`=x$nevent)
     }
     else {
       data.frame()
@@ -520,7 +542,7 @@ glance.ranger_survival_exploratory <- function(x, data_type = "training", ...) {
   }
   else { # data_type == "test"
     if (!is.null(x$concordance_test)) {
-      tibble::tibble(Concordance=x$concordance_test$concordance, `Std Error Concordance`=sqrt(x$concordance_test$var), `Number of Rows`=nrow(x$df_test), `Number of Events`=x$test_nevent)
+      tibble::tibble(Concordance=x$concordance_test$concordance, `Std Error Concordance`=sqrt(x$concordance_test$var), `Time-dependent AUC`=x$auc_test, `Number of Rows`=nrow(x$df_test), `Number of Events`=x$test_nevent)
     }
     else {
       data.frame()

@@ -94,6 +94,28 @@ do_roc_ <- function(df, pred_prob_col, actual_val_col, grid = NULL, with_auc = F
   ret
 }
 
+#' Returns cordinations for time-dependent ROC curve for survival prediction.
+#' @param df - Data frame
+#' @param score_col - Column name for predicted event risk.
+#' @param time_col - Column name for actual survival time.
+#' @param status_col - Column name for actual event status. 
+#' @param at - The time at which the time-dependent ROC is calculated.
+#' @param grid - Grid size to reduce data size for drawing chart.
+#' @param with_auc - When set to TRUE, AUC is calculated and added as a column of the output.
+#' @param revert - If TRUE, the higher the score is, the lower the risk of event is.
+#' @export
+do_survival_roc_ <- function(df, score_col, time_col, status_col, at = NULL, grid = NULL, with_auc = FALSE, revert = FALSE){
+  if (is.null(at)) {
+    at <- attr(df, "pred_survival_time")
+  }
+  df <- df %>% filter(!(!!rlang::sym(time_col) < !!at & !(!!rlang::sym(status_col)))) %>% # Filter out censored rows with shorter survival time.
+    mutate(dead = !!rlang::sym(time_col) < !!at | (!!rlang::sym(time_col) == !!at & !!rlang::sym(status_col))) # Add dead column that indicates if it was dead at the specified time.
+  if (revert) {
+    df <- df %>% dplyr::mutate(!!rlang::sym(score_col) := -!!rlang::sym(score_col))
+  }
+  do_roc_(df, score_col, "dead", grid = grid, with_auc = with_auc)
+}
+
 #' Non standard evaluation version of evaluate_binary_
 #' @param df Model data frame that can work prediction
 #' @param pred_prob Column name for probability
