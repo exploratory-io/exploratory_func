@@ -403,8 +403,9 @@ exp_survival_forest <- function(df,
       # The concordance is (d+1)/2, where d is Somers' d. https://cran.r-project.org/web/packages/survival/vignettes/concordance.pdf
       rf$concordance <- survival::concordance(survival::Surv(time, status)~x,data=concordance_df)
 
-      rf$auc <- survival_auroc(-extract_survival_rate_at(prediction_training$survival, prediction_training$unique.death.times, pred_survival_time),
-                               df[[clean_time_col]], df[[clean_status_col]], pred_survival_time)
+      rf$auc <- survival_auroc(extract_survival_rate_at(prediction_training$survival, prediction_training$unique.death.times, pred_survival_time),
+                               df[[clean_time_col]], df[[clean_status_col]], pred_survival_time,
+                               revert=TRUE)
 
       if (test_rate > 0) {
         df_test_clean <- cleanup_df_for_test(df_test, df, c_cols)
@@ -424,8 +425,9 @@ exp_survival_forest <- function(df,
         # The concordance is (d+1)/2, where d is Somers' d. https://cran.r-project.org/web/packages/survival/vignettes/concordance.pdf
         rf$concordance_test <- survival::concordance(survival::Surv(time, status)~x,data=concordance_df_test)
 
-        rf$auc_test <- survival_auroc(-extract_survival_rate_at(prediction_test$survival, prediction_test$unique.death.times, pred_survival_time),
-                                      df_test_clean[[clean_time_col]], df_test_clean[[clean_status_col]], pred_survival_time)
+        rf$auc_test <- survival_auroc(extract_survival_rate_at(prediction_test$survival, prediction_test$unique.death.times, pred_survival_time),
+                                      df_test_clean[[clean_time_col]], df_test_clean[[clean_status_col]], pred_survival_time,
+                                      revert=TRUE)
 
         rf$test_nevent <- sum(df_test_clean[[clean_status_col]], na.rm=TRUE)
       }
