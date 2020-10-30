@@ -442,6 +442,7 @@ exp_survival_forest <- function(df,
     })
   }
 
+  # Pass down survival time used for prediction. This is for the post-processing for time-dependent ROC.
   ret <- do_on_each_group(clean_df, each_func, name = "model", with_unnest = FALSE)
   attr(ret, "pred_survival_time") <- pred_survival_time
   ret

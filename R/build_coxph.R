@@ -529,6 +529,7 @@ build_coxph.fast <- function(df,
   }
 
   ret <- do_on_each_group(clean_df, each_func, name = "model", with_unnest = FALSE)
+  # Pass down survival time used for prediction. This is for the post-processing for time-dependent ROC.
   attr(ret, "pred_survival_time") <- pred_survival_time
   ret
 }

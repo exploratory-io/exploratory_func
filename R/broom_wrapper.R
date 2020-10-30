@@ -761,6 +761,7 @@ prediction2 <- function(df, data_frame = NULL, conf_int = 0.95, ...){
     ret <- dplyr::group_by(ret, !!!rlang::syms(grouping_cols))
   }
 
+  # Pass down survival time used for prediction. This is for the post-processing for time-dependent ROC.
   if (!is.null(pred_survival_time)) {
     attr(ret, "pred_survival_time") <- pred_survival_time
   }
