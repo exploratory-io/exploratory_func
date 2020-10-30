@@ -26,11 +26,14 @@ test_that("build_coxph.fast basic", {
 
   ret <- model_df %>% glance_rowwise(model, pretty.name=TRUE)
   expect_equal(colnames(ret),
-               c("Likelihood Ratio Test","Likelihood Ratio Test P Value",
+               c("Concordance","Std Error Concordance",
+                 "Time-dependent AUC",
+                 "Likelihood Ratio Test","Likelihood Ratio Test P Value",
                  "Score Test","Score Test P Value","Wald Test","Wald Test P Value",
                  # "Robust Statistic","Robust P Value", # These columns are hidden for now.
-                 "R Squared","R Squared Max","Concordance","Std Error Concordance",
-                 "Log Likelihood","AIC","BIC","Time-dependent AUC", "Number of Rows","Number of Events")) 
+                 "R Squared","R Squared Max",
+                 "Log Likelihood","AIC","BIC",
+                 "Number of Rows","Number of Events")) 
   ret <- model_df %>% augment_rowwise(model)
 })
 
@@ -57,11 +60,15 @@ test_that("build_coxph.fast basic with group-by", {
 
   ret <- model_df %>% glance_rowwise(model, pretty.name=TRUE)
   expect_equal(colnames(ret),
-               c("se-x","Likelihood Ratio Test","Likelihood Ratio Test P Value",
+               c("se-x",
+                 "Concordance","Std Error Concordance",
+                 "Time-dependent AUC",
+                 "Likelihood Ratio Test","Likelihood Ratio Test P Value",
                  "Score Test","Score Test P Value","Wald Test","Wald Test P Value",
                  # "Robust Statistic","Robust P Value", # These columns are hidden for now.
-                 "R Squared","R Squared Max","Concordance","Std Error Concordance",
-                 "Log Likelihood","AIC","BIC","Time-dependent AUC", "Number of Rows","Number of Events")) 
+                 "R Squared","R Squared Max",
+                 "Log Likelihood","AIC","BIC",
+                 "Number of Rows","Number of Events")) 
   ret <- model_df %>% augment_rowwise(model)
 })
 
@@ -90,11 +97,14 @@ test_that("test build_coxph.fast with test mode", {
 
   ret <- model_df %>% glance_rowwise(model, pretty.name=TRUE)
   expect_equal(colnames(ret),
-               c("Likelihood Ratio Test","Likelihood Ratio Test P Value",
+               c("Concordance","Std Error Concordance",
+                 "Time-dependent AUC",
+                 "Likelihood Ratio Test","Likelihood Ratio Test P Value",
                  "Score Test","Score Test P Value","Wald Test","Wald Test P Value",
                  # "Robust Statistic","Robust P Value", # These columns are hidden for now.
-                 "R Squared","R Squared Max","Concordance","Std Error Concordance",
-                 "Log Likelihood","AIC","BIC", "Time-dependent AUC", "Number of Rows","Number of Events")) 
+                 "R Squared","R Squared Max",
+                 "Log Likelihood","AIC","BIC",
+                 "Number of Rows","Number of Events")) 
   ret <- model_df %>% augment_rowwise(model)
 })
 
@@ -120,11 +130,15 @@ test_that("test build_coxph.fast with test mode with group-by", {
                  "p_value","conf_low","conf_high","hazard_ratio","base.level"))
   ret <- model_df %>% glance_rowwise(model, pretty.name=TRUE)
   expect_equal(colnames(ret),
-               c("se-x","Likelihood Ratio Test","Likelihood Ratio Test P Value",
+               c("se-x",
+                 "Concordance","Std Error Concordance",
+                 "Time-dependent AUC",
+                 "Likelihood Ratio Test","Likelihood Ratio Test P Value",
                  "Score Test","Score Test P Value","Wald Test","Wald Test P Value",
                  # "Robust Statistic","Robust P Value", # These columns are hidden for now.
-                 "R Squared","R Squared Max","Concordance","Std Error Concordance",
-                 "Log Likelihood","AIC","BIC","Time-dependent AUC", "Number of Rows","Number of Events")) 
+                 "R Squared","R Squared Max",
+                 "Log Likelihood","AIC","BIC",
+                 "Number of Rows","Number of Events")) 
   ret <- model_df %>% augment_rowwise(model)
 })
 
