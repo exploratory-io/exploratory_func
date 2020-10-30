@@ -151,6 +151,7 @@ tidy.survfit_exploratory <- function(x, type = "survival_curve", survival_time =
 
   if (type == "survival_curve") {
     if ("strata" %in% colnames(ret)) {
+      # Add missing time=0.
       nested <- ret %>% dplyr::group_by(strata) %>% tidyr::nest()
       nested <- nested %>% dplyr::mutate(data=purrr::map(data,~complete_times_each(.)))
       ret <- nested %>% tidyr::unnest(data) %>% dplyr::ungroup()
@@ -173,6 +174,10 @@ tidy.survfit_exploratory <- function(x, type = "survival_curve", survival_time =
   }
   else { # type == "survival_rate"
     if ("strata" %in% colnames(ret)) {
+      # Add missing time=0.
+      nested <- ret %>% dplyr::group_by(strata) %>% tidyr::nest()
+      nested <- nested %>% dplyr::mutate(data=purrr::map(data,~complete_times_each(.)))
+      ret <- nested %>% tidyr::unnest(data) %>% dplyr::ungroup()
       # First, filter out groups whose surivial curve ends too short for the survival time in question.
       ret <- ret %>% dplyr::group_by(strata) %>% dplyr::filter(max(time) >= !!survival_time)
       ret <- ret %>% dplyr::filter(time <= !!survival_time) %>% dplyr::filter(time==max(time)) %>% ungroup()
@@ -180,6 +185,8 @@ tidy.survfit_exploratory <- function(x, type = "survival_curve", survival_time =
       ret <- ret %>% dplyr::mutate(strata = stringr::str_remove(strata,"^\\.cohort\\="))
     }
     else {
+      # Add missing time=0.
+      ret <- complete_times_each(ret)
       ret <- ret %>% dplyr::filter(time <= !!survival_time) %>% dplyr::filter(time==max(time))
     }
   }
