@@ -421,6 +421,68 @@ test_that("str_extract_inside", {
 
 })
 
+test_that("str_remove_inside", {
+  # bracket ()
+  ret <- exploratory::str_remove_inside("abc(defgh)ijk", begin = "(", end =")")
+  expect_equal(ret, c("abcijk"))
+  # curly bracket {}
+  ret <- exploratory::str_remove_inside("abc(defgh)ijk", begin = "{", end ="}")
+  expect_equal(ret,c("abc(defgh)ijk"))
+  # curly bracket {}
+  ret <- exploratory::str_remove_inside("abc{123456}ijk", begin = "{", end ="}")
+  expect_equal(ret, "abcijk")
+  # curly bracket []
+  ret <- exploratory::str_remove_inside("abc[123456]ijk", begin = "[", end ="]")
+  expect_equal(ret, "abcijk")
+  # double quote ""
+  ret <- exploratory::str_remove_inside('abc"123456"ijk', begin = '"', end = '"')
+  expect_equal(ret, "abcijk")
+  # single quote ''
+  ret <- exploratory::str_remove_inside("abc'123456'ijk", begin = "'", end = "'")
+  expect_equal(ret, "abcijk")
+  # percent %
+  ret <- exploratory::str_remove_inside("abc%123456%ijk", begin = "%", end = "%")
+  expect_equal(ret, "abcijk")
+  # percent $
+  ret <- exploratory::str_remove_inside("abc$123456$ijk", begin = "$", end = "$")
+  expect_equal(ret, "abcijk")
+  # percent * $
+  ret <- exploratory::str_remove_inside("abc*123456$ijk", begin = "*", end = "$")
+  expect_equal(ret, "abcijk")
+
+  ret <- exploratory::str_remove_inside("abc(123)4(56$ij)k", begin = "(", end = ")", all = TRUE)
+  expect_equal(ret, "abc4k")
+
+  ret <- exploratory::str_remove_inside("abc(123(456)$ij)k", begin = "(", end = ")", all = TRUE)
+  expect_equal(ret, "abck")
+
+  tryCatch({
+    ret <- exploratory::str_remove_inside("abc*123456$ijk", begin = "{{", end = "}")
+  }, error = function(e){
+    expect_equal(e$message, "The begin argument must be one character.")
+  })
+
+  tryCatch({
+    ret <- exploratory::str_remove_inside("abc*123456$ijk", begin = "n", end = "}")
+  }, error = function(e){
+    expect_equal(e$message, "The begin argument must be symbol such as (, {, [.")
+  })
+
+  tryCatch({
+    ret <- exploratory::str_remove_inside("abc*123456$ijk", begin = "{", end = "}}")
+  }, error = function(e){
+    expect_equal(e$message, "The end argument must be one character.")
+  })
+
+  tryCatch({
+    ret <- exploratory::str_remove_inside("abc*123456$ijk", begin = "{", end = "z")
+  }, error = function(e){
+    expect_equal(e$message, "The end argument must be symbol such as ), }, ].")
+  })
+
+
+})
+
 test_that("str_logical", {
   ret <- exploratory::str_logical(c("yes", "yEs", "yeS", " YEs", "YeS ", "yES", "YES","no", "No", "nO", "NO ", NA))
   expect_equal(ret, c(TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, FALSE, NA))

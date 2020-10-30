@@ -618,6 +618,27 @@ str_extract_inside <- function(column, begin = "(", end = ")") {
   stringr::str_extract(column, exp)
 }
 
+str_remove_inside <- function(column, begin = "(", end = ")", all = FALSE){
+  if(stringr::str_length(begin) > 1) {
+    stop("The begin argument must be one character.")
+  }
+  if(stringr::str_length(end) > 1) {
+    stop("The end argument must be one character.")
+  }
+  if(grepl("[A-Za-z]", begin)) {
+    stop("The begin argument must be symbol such as (, {, [.")
+  }
+  if(grepl("[A-Za-z]", end)) {
+    stop("The end argument must be symbol such as ), }, ].")
+  }
+  exp = stringr::str_c("\\", begin, "[^()]*\\", end)
+  if(all) {
+    stringr::str_remove_all(column, exp)
+  } else {
+    stringr::str_remove(column, exp)
+  }
+}
+
 #'Function to extract logical value from the specified column.
 #'If true_value is provided, use it to decide TRUE or FALSE.
 #'If true_value is not provided, "true", "yes", "1", and 1 are treated as TRUE.
