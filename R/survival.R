@@ -223,7 +223,7 @@ glance.survdiff_exploratory <- function(x, ...) {
     ret <- ret %>% dplyr::mutate(n = !!sum(x$n, rm.na=TRUE), nevent = !!sum(x$obs, rm.na=TRUE))
     colnames(ret)[colnames(ret) == "statistic"] <- "Chi-Square"
     colnames(ret)[colnames(ret) == "df"] <- "Degree of Freedom"
-    colnames(ret)[colnames(ret) == "p.value"] <- "P Value"
+    colnames(ret)[colnames(ret) == "p.value"] <- "Log-Rank Test P Value"
     colnames(ret)[colnames(ret) == "n"] <- "Number of Rows"
     colnames(ret)[colnames(ret) == "nevent"] <- "Number of Events"
   }
