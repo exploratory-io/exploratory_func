@@ -454,6 +454,7 @@ test_that("str_remove_inside", {
   expect_equal(ret, "abc4k")
 
   ret <- exploratory::str_remove_inside("abc(123(456)$ij)k", begin = "(", end = ")", all = TRUE)
+  ret <- exploratory::str_remove_inside(ret)
   expect_equal(ret, "abck")
 
   tryCatch({
