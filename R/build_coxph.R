@@ -483,6 +483,8 @@ build_coxph.fast <- function(df,
         model$vif <<- e
       })
 
+      model$auc <- survival_auroc(model$linear.predictors, df[[clean_time_col]], df[[clean_status_col]],pred_survival_time)
+
       if (test_rate > 0) {
         # TODO: Adjust the following code from build_lm.fast for this function.
         # Note: Do not pass df_test like data=df_test. This for some reason ends up predict returning training data prediction.
@@ -506,6 +508,8 @@ build_coxph.fast <- function(df,
         # The concordance is (d+1)/2, where d is Somers' d. https://cran.r-project.org/web/packages/survival/vignettes/concordance.pdf
         # reverse=TRUE because larger hazard ratio means shorter survival.
         model$concordance_test <- survival::concordance(survival::Surv(time, status)~x,data=concordance_df_test, reverse=TRUE)
+
+        model$auc_test <- survival_auroc(prediction_test, df_test_clean[[clean_time_col]], df_test_clean[[clean_status_col]], pred_survival_time)
       }
       model$training_data <- df
 
@@ -524,7 +528,10 @@ build_coxph.fast <- function(df,
     })
   }
 
-  do_on_each_group(clean_df, each_func, name = "model", with_unnest = FALSE)
+  ret <- do_on_each_group(clean_df, each_func, name = "model", with_unnest = FALSE)
+  # Pass down survival time used for prediction. This is for the post-processing for time-dependent ROC.
+  attr(ret, "pred_survival_time") <- pred_survival_time
+  ret
 }
 
 survival_pdp_sort_categorical <- function(ret) {
@@ -700,6 +707,7 @@ glance.coxph_exploratory <- function(x, data_type = "training", pretty.name = FA
 
   if (data_type == "training") {
     ret <- broom:::glance.coxph(x, pretty.name = pretty.name, ...)
+    ret <- ret %>% dplyr::mutate(auc = x$auc)
     if (!is.null(ret$nobs)) { # glance.coxph's newly added nobs seems to be same as n, which we use as Number of Rows. Suppressing it for now.
       ret <- ret %>% dplyr::select(-nobs)
     }
@@ -709,6 +717,7 @@ glance.coxph_exploratory <- function(x, data_type = "training", pretty.name = FA
     if (!is.null(ret$p.value.robust)) { # The value shows up as NA for some reason. Hide for now.
       ret <- ret %>% dplyr::select(-p.value.robust)
     }
+    ret <- ret %>% dplyr::select(concordance, `std.error.concordance`, auc, everything()) # Bring common metrics upfront.
     if (!is.null(ret$n) && !is.null(ret$nevent)) {
       ret <- ret %>% dplyr::select(-n, -nevent, everything(), n, nevent) # Bring n and nevent to the last.
     }
@@ -717,7 +726,7 @@ glance.coxph_exploratory <- function(x, data_type = "training", pretty.name = FA
     if (is.null(x$test_data)) {
       return(data.frame())
     }
-    ret <- tibble::tibble(concordance=x$concordance_test$concordance, `std.error.concordance`=sqrt(x$concordance_test$var), n=nrow(x$test_data), nevent=x$test_nevent)
+    ret <- tibble::tibble(concordance=x$concordance_test$concordance, `std.error.concordance`=sqrt(x$concordance_test$var), auc=x$auc_test, n=nrow(x$test_data), nevent=x$test_nevent)
   }
 
   if(pretty.name) {
@@ -744,6 +753,7 @@ glance.coxph_exploratory <- function(x, data_type = "training", pretty.name = FA
     colnames(ret)[colnames(ret) == "r.squared.max"] <- "R Squared Max"
     colnames(ret)[colnames(ret) == "concordance"] <- "Concordance"
     colnames(ret)[colnames(ret) == "std.error.concordance"] <- "Std Error Concordance"
+    colnames(ret)[colnames(ret) == "auc"] <- "Time-dependent AUC"
   }
   ret
 }
