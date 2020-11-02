@@ -591,7 +591,7 @@ parse_logical <- function(text, ...){
 
 #'Function to extract text inside the characters like bracket.
 #'@export
-str_extract_inside <- function(column, begin = "(", end = ")") {
+str_extract_inside <- function(column, begin = "(", end = ")", all = FALSE) {
   # Ref https://stackoverflow.com/questions/3926451/how-to-match-but-not-capture-part-of-a-regex
   # Below logic creates a Regular Expression that uses lookbehind and lookahead to extract string
   # between them.
@@ -614,8 +614,59 @@ str_extract_inside <- function(column, begin = "(", end = ")") {
   if(grepl("[A-Za-z]", end)) {
     stop("The end argument must be symbol such as ), }, ].")
   }
-  exp = stringr::str_c("(?<=\\", begin, ").*?(?=\\", end, ")")
-  stringr::str_extract(column, exp)
+  exp <- stringr::str_c("(?<=\\", begin, ").*?(?=\\", end, ")")
+  if(all) {
+    stringr::str_extract_all(column, exp)
+  } else {
+    stringr::str_extract(column, exp)
+  }
+}
+
+#'Function to remove text inside the characters like bracket.
+#'@export
+str_remove_inside <- function(column, begin = "(", end = ")", all = FALSE){
+  if(stringr::str_length(begin) > 1) {
+    stop("The begin argument must be one character.")
+  }
+  if(stringr::str_length(end) > 1) {
+    stop("The end argument must be one character.")
+  }
+  if(grepl("[A-Za-z]", begin)) {
+    stop("The begin argument must be symbol such as (, {, [.")
+  }
+  if(grepl("[A-Za-z]", end)) {
+    stop("The end argument must be symbol such as ), }, ].")
+  }
+  exp <- stringr::str_c("\\", begin, "[^\\" , begin, "\\", end, "]*\\", end)
+  if(all) {
+    stringr::str_remove_all(column, exp)
+  } else {
+    stringr::str_remove(column, exp)
+  }
+}
+
+#'Function to remove emoji from a list of characters.
+str_remove_emoji <- function(column, position = "any"){
+ regexp = "\\p{EMOJI}|\\p{EMOJI_PRESENTATION}|\\p{EMOJI_MODIFIER_BASE}|\\p{EMOJI_MODIFIER}\\p{EMOJI_COMPONENT}";
+ # it seems above condition does not cover all emojis.
+ # So we will manually add below emojis. (ref: https://github.com/gagolews/stringi/issues/279)
+ regexp = stringr::str_c(regexp, "|\U0001f970|\U0001f975|\U0001f976|\U0001f973|\U0001f974|\U0001f97a|\U0001f9b8|\U0001f9b9|\U0001f9b5|\U0001f9b6|\U0001f9b0|\U0001f9b1|\U0001f9b2", sep = "")
+ regexp = stringr::str_c(regexp, "|\U0001f9b3|\U0001f9b4|\U0001f9b7|\U0001f97d|\U0001f97c|\U0001f97e|\U0001f97f|\U0001f99d|\U0001f999|\U0001f99b|\U0001f998|\U0001f9a1|\U0001f9a2", sep = "")
+ regexp = stringr::str_c(regexp, "|\U0001f99a|\U0001f99c|\U0001f99e|\U0001f99f|\U0001f9a0|\U0001f96d|\U0001f96c|\U0001f96f|\U0001f9c2|\U0001f96e|\U0001f9c1|\U0001f9ed|\U0001f9f1", sep = "")
+ regexp = stringr::str_c(regexp, "|\U0001f6f9|\U0001f9f3|\U0001f9e8|\U0001f9e7|\U0001f94e|\U0001f94f|\U0001f94d|\U0001f9ff|\U0001f9e9|\U0001f9f8|\U0001f9f5|\U0001f9f6|\U0001f9ee", sep = "")
+ regexp = stringr::str_c(regexp, "|\U0001f9fe|\U0001f9f0|\U0001f9f2|\U0001f9ea|\U0001f9eb|\U0001f9ec|\U0001f9f4|\U0001f9f7|\U0001f9f9|\U0001f9fa|\U0001f9fb|\U0001f9fc|\U0001f9fd", sep = "")
+ regexp = stringr::str_c(regexp, "|\U0001f9ef|\u267e",  sep = "")
+
+ if(position == "any") {
+   regexp = stringr::str_c("(", regexp, ")", sep = "")
+ } else if(position == "start") {
+   regexp = stringr::str_c("^(", regexp, ")", sep = "")
+ } else if (position == "end") {
+   regexp = stringr::str_c("(", regexp, ")$", sep = "")
+ }
+ lapply(column, function(text){
+  stringi::stri_replace_all(text, regex = regexp, "")
+ })
 }
 
 #'Function to extract logical value from the specified column.
