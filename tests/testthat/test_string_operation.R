@@ -484,6 +484,13 @@ test_that("str_remove_inside", {
 
 })
 
+test_that("str_remove_emoji", {
+  # Smile Face and Thumbs Up.
+  text = c("\uD83D\uDE00", "\uD83D\uDC4D")
+  ret <- exploratory::str_remove_emoji(text)
+  expect_equal(ret, list("",""))
+})
+
 test_that("str_logical", {
   ret <- exploratory::str_logical(c("yes", "yEs", "yeS", " YEs", "YeS ", "yES", "YES","no", "No", "nO", "NO ", NA))
   expect_equal(ret, c(TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, FALSE, NA))
