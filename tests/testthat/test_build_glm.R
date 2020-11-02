@@ -122,14 +122,21 @@ test_that("prediction with categorical columns", {
 
   expect_true(nrow(ret) > 0)
   expect_true(all(ret["predicted_value"] >= 0 & ret["predicted_value"] <= 1))
-  expect_equal(colnames(ret), c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE", "predicted_value", "standard_error", "conf_low", "conf_high"))
+  expect_equal(colnames(ret), c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE", "predicted_value",
+                                "conf_low", "conf_high",
+                                "standard_error"))
 
   expect_true(all(both_ret["predicted_response"] >= 0 & both_ret["predicted_response"] <= 1))
-  expect_equal(colnames(both_ret), c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE", "predicted_value", "standard_error", "conf_low", "conf_high", "predicted_response"))
+  expect_equal(colnames(both_ret), c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE", "predicted_value",
+                                     "conf_low", "conf_high",
+                                     "standard_error",
+                                     "predicted_response"))
 
   expect_true(all(train_ret["predicted_response"] >= 0 & train_ret["predicted_response"] <= 1))
   expect_equal(colnames(train_ret), c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE", "predicted_value",
-                                      "standard_error", "conf_low", "conf_high", "residuals", "standardised_residuals", "hat", "residual_standard_deviation",
+                                      "conf_low", "conf_high",
+                                      "standard_error",
+                                      "residuals", "standardised_residuals", "hat", "residual_standard_deviation",
                                       "cooks_distance", "predicted_response"))
 
   add_prediction_ret <- test_data %>% add_prediction(model_data, type.predict = "response")
