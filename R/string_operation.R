@@ -614,7 +614,7 @@ str_extract_inside <- function(column, begin = "(", end = ")", all = FALSE) {
   if(grepl("[A-Za-z]", end)) {
     stop("The end argument must be symbol such as ), }, ].")
   }
-  exp = stringr::str_c("(?<=\\", begin, ").*?(?=\\", end, ")")
+  exp <- stringr::str_c("(?<=\\", begin, ").*?(?=\\", end, ")")
   if(all) {
     stringr::str_extract_all(column, exp)
   } else {
