@@ -134,11 +134,14 @@ test_that("Linear Regression with test rate", {
 
     expected_cols <- c("Carrier Name", "DISTANCE", "ARR_TIME", "DERAY_TIME",
                        "predicted_value",
-                       "standard_error", "conf_low", "conf_high",
+                       "conf_low", "conf_high",
+                       "standard_error",
                        "residuals", "standardised_residuals", "hat",
                        "residual_standard_deviation", "cooks_distance")
     expect_equal(colnames(pred_training), expected_cols)
-    expected_cols <- c("Carrier Name", "DISTANCE", "ARR_TIME", "DERAY_TIME", "predicted_value", "standard_error", "conf_low", "conf_high")
+    expected_cols <- c("Carrier Name", "DISTANCE", "ARR_TIME", "DERAY_TIME", "predicted_value",
+                       "conf_low", "conf_high",
+                       "standard_error")
     expect_equal(colnames(pred_test), expected_cols)
 
     res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
@@ -174,11 +177,14 @@ test_that("Linear Regression with outlier filtering", {
 
     expected_cols <- c("Carrier Name", "DISTANCE", "ARR_TIME", "DERAY_TIME",
                        "predicted_value", 
-                       "standard_error", "conf_low", "conf_high",
+                       "conf_low", "conf_high",
+                       "standard_error",
                        "residuals", "standardised_residuals", "hat",
                        "residual_standard_deviation", "cooks_distance")
     expect_equal(colnames(pred_training), expected_cols)
-    expected_cols <- c("Carrier Name", "DISTANCE", "ARR_TIME", "DERAY_TIME", "predicted_value", "standard_error", "conf_low", "conf_high")
+    expected_cols <- c("Carrier Name", "DISTANCE", "ARR_TIME", "DERAY_TIME", "predicted_value",
+                       "conf_low", "conf_high",
+                       "standard_error")
     expect_equal(colnames(pred_test), expected_cols)
 
     res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
@@ -208,14 +214,15 @@ test_that("Group Linear Regression with test_rate", {
                  test_nrows)
 
     expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "predicted_value",
-                       "standard_error", "conf_low", "conf_high",
+                       "conf_low", "conf_high",
+                       "standard_error",
                        "residuals", "standardised_residuals", "hat", "residual_standard_deviation",
                        "cooks_distance")
     expect_equal(colnames(pred_training), expected_cols)
 
     expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "predicted_value",
-                       "standard_error", "conf_low", "conf_high"
-                       )
+                       "conf_low", "conf_high",
+                       "standard_error")
     expect_equal(colnames(pred_test), expected_cols)
 
     res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
@@ -243,12 +250,14 @@ test_that("GLM - Normal Destribution with test_rate", {
 
     expected_cols <- c("Carrier Name", "DISTANCE", "ARR_TIME", "DERAY_TIME",
                        "predicted_value",
-                       "standard_error", "conf_low", "conf_high",
+                       "conf_low", "conf_high",
+                       "standard_error",
                        "residuals", "standardised_residuals", "hat",
                        "residual_standard_deviation", "cooks_distance", "predicted_response")
     expect_equal(colnames(pred_training), expected_cols)
     expected_cols <- c("Carrier Name", "DISTANCE", "ARR_TIME", "DERAY_TIME", "predicted_value",
-                       "standard_error", "conf_low", "conf_high",
+                       "conf_low", "conf_high",
+                       "standard_error",
                        "predicted_response")
     expect_equal(colnames(pred_test), expected_cols)
 
@@ -281,13 +290,15 @@ test_that("Group GLM - Normal Destribution with test_rate", {
 
     expected_cols <- c("klass", "DISTANCE", "ARR_TIME",
                        "predicted_value",
-                       "standard_error", "conf_low", "conf_high",
+                       "conf_low", "conf_high",
+                       "standard_error",
                        "residuals", "standardised_residuals", "hat", "residual_standard_deviation",
                        "cooks_distance", "predicted_response")
     expect_equal(colnames(pred_training), expected_cols)
 
     expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "predicted_value",
-                       "standard_error", "conf_low", "conf_high",
+                       "conf_low", "conf_high",
+                       "standard_error",
                        "predicted_response")
     expect_equal(colnames(pred_test), expected_cols)
 
@@ -317,12 +328,15 @@ test_that("GLM - Gamma Destribution with test_rate", {
 
     expected_cols <- c("Carrier Name", "DISTANCE", "ARR_TIME", "DERAY_TIME",
                        "predicted_value",
-                       "standard_error", "conf_low", "conf_high",
+                       "conf_low", "conf_high",
+                       "standard_error",
                        "residuals", "standardised_residuals", "hat",
                        "residual_standard_deviation", "cooks_distance", "predicted_response")
     expect_equal(colnames(pred_training), expected_cols)
-    expected_cols <- c("Carrier Name", "DISTANCE", "ARR_TIME", "DERAY_TIME", "predicted_value", "standard_error",
-                       "conf_low", "conf_high", "predicted_response")
+    expected_cols <- c("Carrier Name", "DISTANCE", "ARR_TIME", "DERAY_TIME", "predicted_value",
+                       "conf_low", "conf_high",
+                       "standard_error",
+                       "predicted_response")
     expect_equal(colnames(pred_test), expected_cols)
 
     res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
@@ -352,13 +366,16 @@ test_that("Group GLM - Gamma Destribution with test_rate", {
                  test_nrows)
 
     expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "predicted_value",
-                       "standard_error", "conf_low", "conf_high",
+                       "conf_low", "conf_high",
+                       "standard_error",
                        "residuals", "standardised_residuals", "hat", "residual_standard_deviation",
                        "cooks_distance", "predicted_response")
     expect_equal(colnames(pred_training), expected_cols)
 
     expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "predicted_value",
-                       "standard_error", "conf_low", "conf_high", "predicted_response")
+                       "conf_low", "conf_high",
+                       "standard_error",
+                       "predicted_response")
     expect_equal(colnames(pred_test), expected_cols)
 
     res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
@@ -386,12 +403,15 @@ test_that("GLM - Inverse Gaussian Destribution with test_rate", {
 
     expected_cols <- c("Carrier Name", "DISTANCE", "ARR_TIME", "DERAY_TIME",
                        "predicted_value",
-                       "standard_error", "conf_low", "conf_high",
+                       "conf_low", "conf_high",
+                       "standard_error",
                        "residuals", "standardised_residuals", "hat",
                        "residual_standard_deviation", "cooks_distance", "predicted_response")
     expect_equal(colnames(pred_training), expected_cols)
-    expected_cols <- c("Carrier Name", "DISTANCE", "ARR_TIME", "DERAY_TIME", "predicted_value", "standard_error",
-                       "conf_low", "conf_high", "predicted_response")
+    expected_cols <- c("Carrier Name", "DISTANCE", "ARR_TIME", "DERAY_TIME", "predicted_value",
+                       "conf_low", "conf_high",
+                       "standard_error",
+                       "predicted_response")
     expect_equal(colnames(pred_test), expected_cols)
 
     res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
@@ -421,13 +441,16 @@ test_that("Group GLM - Inverse Gaussian Destribution with test_rate", {
                  test_nrows)
 
     expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "predicted_value",
-                       "standard_error", "conf_low", "conf_high",
+                       "conf_low", "conf_high",
+                       "standard_error",
                        "residuals", "standardised_residuals", "hat", "residual_standard_deviation",
                        "cooks_distance", "predicted_response")
     expect_equal(colnames(pred_training), expected_cols)
 
     expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "predicted_value",
-                       "standard_error", "conf_low", "conf_high", "predicted_response")
+                       "conf_low", "conf_high",
+                       "standard_error",
+                       "predicted_response")
     expect_equal(colnames(pred_test), expected_cols)
 
     res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
@@ -455,12 +478,15 @@ test_that("GLM - poisson Destribution with test_rate", {
 
     expected_cols <- c("Carrier Name", "DISTANCE", "ARR_TIME", "DERAY_TIME",
                        "predicted_value",
-                       "standard_error", "conf_low", "conf_high",
+                       "conf_low", "conf_high",
+                       "standard_error",
                        "residuals", "standardised_residuals", "hat",
                        "residual_standard_deviation", "cooks_distance", "predicted_response")
     expect_equal(colnames(pred_training), expected_cols)
-    expected_cols <- c("Carrier Name", "DISTANCE", "ARR_TIME", "DERAY_TIME", "predicted_value", "standard_error",
-                       "conf_low", "conf_high", "predicted_response")
+    expected_cols <- c("Carrier Name", "DISTANCE", "ARR_TIME", "DERAY_TIME", "predicted_value",
+                       "conf_low", "conf_high",
+                       "standard_error",
+                       "predicted_response")
     expect_equal(colnames(pred_test), expected_cols)
 
     res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
@@ -491,13 +517,16 @@ test_that("Group GLM - Poisson Destribution with test_rate", {
                  test_nrows)
 
     expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "predicted_value",
-                       "standard_error", "conf_low", "conf_high",
+                       "conf_low", "conf_high",
+                       "standard_error",
                        "residuals", "standardised_residuals", "hat", "residual_standard_deviation",
                        "cooks_distance", "predicted_response")
     expect_equal(colnames(pred_training), expected_cols)
 
     expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "predicted_value",
-                       "standard_error", "conf_low", "conf_high", "predicted_response")
+                       "conf_low", "conf_high",
+                       "standard_error",
+                       "predicted_response")
     expect_equal(colnames(pred_test), expected_cols)
 
     res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
@@ -527,12 +556,15 @@ test_that("GLM - Negative Binomial Destribution with test_rate", {
 
     expected_cols <- c("Carrier Name", "DISTANCE", "ARR_TIME", "DERAY_TIME",
                        "predicted_value",
-                       "standard_error","conf_low","conf_high",
+                       "conf_low","conf_high",
+                       "standard_error",
                        "residuals", "standardised_residuals", "hat",
                        "residual_standard_deviation", "cooks_distance", "predicted_response")
     expect_equal(colnames(pred_training), expected_cols)
-    expected_cols <- c("Carrier Name", "DISTANCE", "ARR_TIME", "DERAY_TIME", "predicted_value", "standard_error",
-                       "conf_low", "conf_high", "predicted_response")
+    expected_cols <- c("Carrier Name", "DISTANCE", "ARR_TIME", "DERAY_TIME", "predicted_value",
+                       "conf_low", "conf_high",
+                       "standard_error",
+                       "predicted_response")
     expect_equal(colnames(pred_test), expected_cols)
 
     res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
@@ -564,13 +596,16 @@ test_that("Group GLM - Negative Binomial Destribution with test_rate", {
                  test_nrows)
 
     expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "predicted_value",
-                       "standard_error","conf_low","conf_high",
+                       "conf_low","conf_high",
+                       "standard_error",
                        "residuals", "standardised_residuals", "hat", "residual_standard_deviation",
                        "cooks_distance", "predicted_response")
     expect_equal(colnames(pred_training), expected_cols)
 
     expected_cols <- c("klass", "DISTANCE", "ARR_TIME", "predicted_value",
-                       "standard_error", "conf_low", "conf_high", "predicted_response")
+                       "conf_low", "conf_high",
+                       "standard_error",
+                       "predicted_response")
     expect_equal(colnames(pred_test), expected_cols)
 
     res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
@@ -602,12 +637,15 @@ test_that("Logistic Regression with test_rate", {
 
     expected_cols <- c("CANCELLED X", "Carrier Name", "ARR_TIME", "DERAY_TIME",
                        "predicted_value",
-                       "standard_error", "conf_low", "conf_high",
+                       "conf_low", "conf_high",
+                       "standard_error",
                        "residuals", "standardised_residuals", "hat",
                        "residual_standard_deviation", "cooks_distance", "predicted_response")
     expect_equal(colnames(pred_training), expected_cols)
-    expected_cols <- c("CANCELLED X", "Carrier Name", "ARR_TIME", "DERAY_TIME", "predicted_value", "standard_error",
-                       "conf_low", "conf_high", "predicted_response")
+    expected_cols <- c("CANCELLED X", "Carrier Name", "ARR_TIME", "DERAY_TIME", "predicted_value",
+                       "conf_low", "conf_high",
+                       "standard_error",
+                       "predicted_response")
     expect_equal(colnames(pred_test), expected_cols)
     res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
     res <- ret %>% evaluate_binary_training_and_test(`CANCELLED X`, threshold = 0.5, pretty.name=TRUE)
@@ -641,13 +679,16 @@ test_that("Group Logistic Regression with test_rate", {
 
     # Since broom 0.7.0, I sometimes see "residuals" missing here, but not consistently. Will keep watching.
     expected_cols <- c("klass", "CANCELLED X", "ARR_TIME", "predicted_value",
-                       "standard_error", "conf_low", "conf_high",
+                       "conf_low", "conf_high",
+                       "standard_error",
                        "residuals", "standardised_residuals", "hat", "residual_standard_deviation",
                        "cooks_distance", "predicted_response")
     expect_equal(colnames(pred_training), expected_cols)
 
     expected_cols <- c("klass", "CANCELLED X", "ARR_TIME", "predicted_value",
-                       "standard_error", "conf_low", "conf_high", "predicted_response")
+                       "conf_low", "conf_high",
+                       "standard_error",
+                       "predicted_response")
     expect_equal(colnames(pred_test), expected_cols)
 
     res <- ret %>% glance_rowwise(model, pretty.name=TRUE)

@@ -496,7 +496,8 @@ test_that("test prediction(data='training_and_test') by glm", {
   ret <- model_ret %>% prediction(data='training_and_test')
   expected_cols <- c("Carrier Name", "DISTANCE", "ARR_TIME",
                      "DERAY_TIME", "predicted_value",
-                     "standard_error", "conf_low", "conf_high", 
+                     "conf_low", "conf_high", 
+                     "standard_error", 
                      "residuals", "standardised_residuals", "hat",
                      "residual_standard_deviation", "cooks_distance",
                      "is_test_data")
@@ -513,13 +514,17 @@ test_that("test prediction(data='training_and_test') by glm", {
   # Working it around now, but look into it.
   expected_cols_1 <- c("klass", "Carrier Name", "DISTANCE",
                      "ARR_TIME", "DERAY_TIME", "predicted_value",
-                     "standard_error", "conf_low", "conf_high", "residuals",
+                     "conf_low", "conf_high",
+                     "standard_error",
+                     "residuals",
                      "standardised_residuals", "hat", "residual_standard_deviation",
                      "cooks_distance",
                      "is_test_data")
   expected_cols_2 <- c("klass", "Carrier Name", "DISTANCE",
                      "ARR_TIME", "DERAY_TIME", "predicted_value",
-                     "standard_error", "conf_low", "conf_high", "residuals",
+                     "conf_low", "conf_high",
+                     "standard_error",
+                     "residuals",
                      "hat", "residual_standard_deviation",
                      "is_test_data")
   expect_true(all(colnames(grp_ret) == expected_cols_1) || all(colnames(grp_ret) == expected_cols_2))

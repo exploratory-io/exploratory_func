@@ -788,6 +788,11 @@ augment.coxph_exploratory <- function(x, data_type = "training", ...) {
   ret <- ret %>% dplyr::mutate(time_for_prediction = time,
                                predicted_probability = 1 - exp(-cumhaz_base * exp(.fitted)))
 
+
+  if (!is.null(ret$.fitted)) {
+    # Bring those columns as the first of the prediction result related additional columns.
+    ret <- ret %>% dplyr::relocate(any_of(c("time_for_prediction", "predicted_probability")), .before=.fitted)
+  }
   # Prettify names.
   colnames(ret)[colnames(ret) == ".fitted"] <- "Linear Predictor"
   colnames(ret)[colnames(ret) == ".se.fit"] <- "Std Error"

@@ -655,10 +655,8 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
     ret[[conf_low_colname]] <- get_confint(ret[[".fitted"]], ret[[".se.fit"]], conf_int = lower)
     ret[[conf_high_colname]] <- get_confint(ret[[".fitted"]], ret[[".se.fit"]], conf_int = higher)
 
-    # move confidece interval columns next to standard error
-    ret <- move_col(ret, '.se.fit', which(colnames(ret) == ".fitted") + 1)
-    ret <- move_col(ret, conf_low_colname, which(colnames(ret) == ".se.fit") + 1)
-    ret <- move_col(ret, conf_high_colname, which(colnames(ret) == conf_low_colname) + 1)
+    # Bring conf_low and conf_high right after predicted_value, instead of .se.fit column.
+    ret <- ret %>% dplyr::relocate(any_of(c(!!conf_low_colname, !!conf_high_colname, ".se.fit")), .after=.fitted)
   }
 
   colnames(ret)[colnames(ret) == ".fitted"] <- avoid_conflict(colnames(ret), "predicted_value")
@@ -1031,9 +1029,14 @@ prediction_binary <- function(df, threshold = 0.5, ...){
 
   colnames(ret)[colnames(ret) == prob_col_name] <- "predicted_probability"
 
+  if (!is.null(ret$predicted_value)) {
+    # Bring those columns as the first of the prediction result related additional columns.
+    ret <- ret %>% dplyr::relocate(any_of(c("predicted_probability", "conf_low", "conf_high", "predicted_label")), .before=predicted_value)
+  }
+
   # Move is_test_data to the last again, since new columns were added to the last in this function.
   if (!is.null(ret$is_test_data)) {
-    ret <- ret %>% select(-is_test_data, everything(), is_test_data)
+    ret <- ret %>% dplyr::select(-is_test_data, everything(), is_test_data)
   }
   ret
 }
