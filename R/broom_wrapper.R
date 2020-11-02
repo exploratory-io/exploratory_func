@@ -1031,9 +1031,14 @@ prediction_binary <- function(df, threshold = 0.5, ...){
 
   colnames(ret)[colnames(ret) == prob_col_name] <- "predicted_probability"
 
+  if (!is.null(ret$predicted_value)) {
+    # Bring those columns as the first of the prediction result related additional columns.
+    ret <- ret %>% dplyr::relocate(any_of(c("predicted_probability", "conf_low", "conf_high", "predicted_label")), .before=predicted_value)
+  }
+
   # Move is_test_data to the last again, since new columns were added to the last in this function.
   if (!is.null(ret$is_test_data)) {
-    ret <- ret %>% select(-is_test_data, everything(), is_test_data)
+    ret <- ret %>% dplyr::select(-is_test_data, everything(), is_test_data)
   }
   ret
 }
