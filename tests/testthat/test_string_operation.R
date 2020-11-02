@@ -453,6 +453,12 @@ test_that("str_remove_inside", {
   ret <- exploratory::str_remove_inside("abc(123)4(56$ij)k", begin = "(", end = ")", all = TRUE)
   expect_equal(ret, "abc4k")
 
+  ret <- exploratory::str_remove_inside("abc[12(34)56]ijk", begin = "[", end = "]", all = TRUE)
+  expect_equal(ret, "abcijk")
+
+  ret <- exploratory::str_remove_inside("abc[12(34)56]ijk", begin = "(", end = ")", all = TRUE)
+  expect_equal(ret, "abc[1256]ijk")
+
   ret <- exploratory::str_remove_inside("abc(123(456)$ij)k", begin = "(", end = ")", all = TRUE)
   ret <- exploratory::str_remove_inside(ret)
   expect_equal(ret, "abck")
