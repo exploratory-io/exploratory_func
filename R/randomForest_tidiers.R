@@ -796,7 +796,7 @@ augment.ranger <- function(x, data = NULL, newdata = NULL, ...) {
 
 align_predictor_factor_levels <- function(newdata, model_df, predictor_cols) {
   cleaned_data <- newdata
-  # Align factor levels including Others and (Missing) to the model.
+  # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
   for (i in 1:length(predictor_cols)) {
     predictor_col <- predictor_cols[i]
     training_predictor <- model_df[[predictor_col]]
@@ -813,12 +813,6 @@ align_predictor_factor_levels <- function(newdata, model_df, predictor_cols) {
       # If "Other" is not included in the model levels, replace them with NA. They will be handled as NA rows.
       if ("Other" %nin% training_predictor_levels) {
         ret <- dplyr::na_if(ret, "Other")
-      }
-      if (is.factor(training_predictor)) { # Set the same levels as the training data including the level order.
-        ret <- factor(ret, levels=training_predictor_levels)
-      }
-      else { # Cast it back to character, just like the training data.
-        ret <- as.character(ret)
       }
       cleaned_data[[predictor_col]] <- ret
     }
