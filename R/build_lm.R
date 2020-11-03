@@ -678,10 +678,6 @@ build_lm.fast <- function(df,
     stop("Max # of categories for explanatory vars must be at least 2.")
   }
 
-  if(!is.null(seed)){
-    set.seed(seed)
-  }
-
   orig_levels <- NULL # For recording original factor levels for binary classification, to show data size for each class in Summary View.
   if (!is.null(model_type) && model_type == "glm" && family %in% c("binomial", "quasibinomial")) {
     # binomial case.
@@ -743,6 +739,10 @@ build_lm.fast <- function(df,
 
   each_func <- function(df) {
     tryCatch({
+      if(!is.null(seed)){
+        set.seed(seed)
+      }
+
       df_test <- NULL # declare variable for test data
 
       df <- preprocess_regression_data_before_sample(df, clean_target_col, clean_cols)
