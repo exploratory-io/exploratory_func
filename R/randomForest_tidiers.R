@@ -2082,10 +2082,6 @@ calc_feature_imp <- function(df,
                              test_split_type = "random" # "random" or "ordered"
                              ){
 
-  if(!is.null(seed)){
-    set.seed(seed)
-  }
-
   if(test_rate < 0 | 1 < test_rate){
     stop("test_rate must be between 0 and 1")
   } else if (test_rate == 1){
@@ -2126,6 +2122,10 @@ calc_feature_imp <- function(df,
 
   each_func <- function(df) {
     tryCatch({
+      if(!is.null(seed)){
+        set.seed(seed)
+      }
+
       # If we are to do SMOTE, do not down sample here and let exp_balance handle it so that we do not sample out precious minority data.
       unique_val <- unique(df[[clean_target_col]])
       if (smote && length(unique_val[!is.na(unique_val)]) == 2) {
@@ -2876,10 +2876,6 @@ exp_rpart <- function(df,
                       test_rate = 0.0,
                       test_split_type = "random" # "random" or "ordered"
                       ) {
-  if(!is.null(seed)){
-    set.seed(seed)
-  }
-
   if(test_rate < 0 | 1 < test_rate){
     stop("test_rate must be between 0 and 1")
   } else if (test_rate == 1){
@@ -2910,6 +2906,10 @@ exp_rpart <- function(df,
 
   each_func <- function(df) {
     tryCatch({
+      if(!is.null(seed)){
+        set.seed(seed)
+      }
+
       # If we are to do SMOTE, do not down sample here and let exp_balance handle it so that we do not sample out precious minority data.
       unique_val <- unique(df[[clean_target_col]])
       if (smote && length(unique_val[!is.na(unique_val)]) == 2) {

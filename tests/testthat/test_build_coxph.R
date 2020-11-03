@@ -125,9 +125,9 @@ test_that("test build_coxph.fast with test mode with group-by", {
   ret <- model_df %>% tidy_rowwise(model, type='partial_dependence_survival_curve')
   ret <- model_df %>% tidy_rowwise(model, type='vif')
   ret <- model_df %>% tidy_rowwise(model)
-  expect_equal(colnames(ret),
+  expect_true(all(colnames(ret) %in%
                c("se-x", "term","estimate","std_error","t_ratio",
-                 "p_value","conf_low","conf_high","hazard_ratio","base.level"))
+                 "p_value","conf_low","conf_high","hazard_ratio","base.level", "note")))
   ret <- model_df %>% glance_rowwise(model, pretty.name=TRUE)
   expect_equal(colnames(ret),
                c("se-x",

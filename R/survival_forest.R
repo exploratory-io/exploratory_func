@@ -249,10 +249,6 @@ exp_survival_forest <- function(df,
     stop("Max # of categories for explanatory vars must be at least 2.")
   }
 
-  if(!is.null(seed)){
-    set.seed(seed)
-  }
-
   # check status_col.
   if (!is.logical(df[[status_col]])) {
     stop(paste0("Status column (", status_col, ")  must be logical."))
@@ -307,6 +303,10 @@ exp_survival_forest <- function(df,
 
   each_func <- function(df) {
     tryCatch({
+      if(!is.null(seed)){
+        set.seed(seed)
+      }
+
       df <- df %>%
         dplyr::filter(!is.na(df[[clean_status_col]])) # this form does not handle group_by. so moved into each_func from outside.
 
