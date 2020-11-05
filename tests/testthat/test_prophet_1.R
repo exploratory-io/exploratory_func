@@ -136,6 +136,23 @@ test_that("do_prophet with extra regressors", {
   expect_equal(ret$timestamp[[length(ret$timestamp)]], as.Date("2013-01-01"))
 })
 
+test_that("do_prophet with extra regressors with no future data", {
+  ts <- seq.Date(as.Date("2010-01-01"), as.Date("2012-01-01"), by="day")
+  raw_data <- data.frame(timestamp=ts, data=runif(length(ts)))
+  ts2 <- seq.Date(as.Date("2010-01-01"), as.Date("2012-01-01"), by="day") # No future data.
+  regressor_data <- data.frame(timestamp=ts2, regressor1=runif(length(ts2)), regressor2=runif(length(ts2)))
+  combined_data <- raw_data %>% full_join(regressor_data, by=c("timestamp"="timestamp"))
+  model_df <- combined_data %>%
+    do_prophet(timestamp, data, 10, time_unit = "day", regressors = c("regressor1","regressor2"), funs.aggregate.regressors = c(mean), output="model")
+  coef_df <- model_df %>% tidy_rowwise(model, type="coef")
+  expect_equal(names(coef_df), c("Variable","Importance"))
+  ret <- model_df %>% tidy_rowwise(model)
+  # verify the last date with forecasted_value
+  expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2012-01-01")) 
+  # verify the last date in the data is the end of regressor data
+  expect_equal(ret$timestamp[[length(ret$timestamp)]], as.Date("2012-01-01"))
+})
+
 test_that("do_prophet with extra regressor with holiday column", {
   ts <- seq.Date(as.Date("2010-01-01"), as.Date("2012-01-01"), by="day")
   raw_data <- data.frame(timestamp=ts, data=runif(length(ts)))
