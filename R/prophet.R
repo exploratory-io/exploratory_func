@@ -315,32 +315,34 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
         future_df <- future_df %>% dplyr::filter(UQ(rlang::sym(time_col)) > max_floored_date)
   
         # No future external regressor data is provided. For test mode, this is fine, but when it is not, this is a problem.
-        if(nrow(future_df) == 0 && !test_mode) {
-          # ignore the error if
-          # it is caused by subset of
-          # grouped data frame
-          # to show result of
-          # data frames that succeed
-          if(is.null(grouped_col) || length(grouped_col) == 0) {
-            # Terminology is not consistent here, but we are calling extra regressor "external predictor" on the UI.
-            stop("In order to use the External Predictors, you need future data or switch to Test Mode in the Property dialog.")
-          }
-        }
+        #if(nrow(future_df) == 0 && !test_mode) {
+        #  # ignore the error if
+        #  # it is caused by subset of
+        #  # grouped data frame
+        #  # to show result of
+        #  # data frames that succeed
+        #  if(is.null(grouped_col) || length(grouped_col) == 0) {
+        #    # Terminology is not consistent here, but we are calling extra regressor "external predictor" on the UI.
+        #    stop("In order to use the External Predictors, you need future data or switch to Test Mode in the Property dialog.")
+        #  }
+        #}
   
-        # TODO: in test mode, this is not really necessary. optimize.
-        aggregated_future_data <- future_df %>%
-          dplyr::transmute( # Keep only time column and regressor columns in future data frame.
-            ds = UQ(rlang::sym(time_col)),
-            !!!rlang::syms(unname(regressors)) # unname is necessary to avoid error when regressors is named vector.
-          ) %>%
-          dplyr::group_by(ds) %>%
-          dplyr::summarise(!!!summarise_args)
+        if (nrow(future_df) > 0) {
+          # TODO: in test mode, this is not really necessary. optimize.
+          aggregated_future_data <- future_df %>%
+            dplyr::transmute( # Keep only time column and regressor columns in future data frame.
+              ds = UQ(rlang::sym(time_col)),
+              !!!rlang::syms(unname(regressors)) # unname is necessary to avoid error when regressors is named vector.
+            ) %>%
+            dplyr::group_by(ds) %>%
+            dplyr::summarise(!!!summarise_args)
 
-        # It seems prophet internally removes the rows with NA regressor values for future data, unlike for history data, but to avoid being dependent on that behavior,
-        # let's remove them here for future data too.
-        if (!is.null(regressor_output_cols)) {
-          for (regressor_col in regressor_output_cols) {
-            aggregated_future_data <- aggregated_future_data %>% dplyr::filter(!is.na(!!sym(regressor_col)))
+          # It seems prophet internally removes the rows with NA regressor values for future data, unlike for history data, but to avoid being dependent on that behavior,
+          # let's remove them here for future data too.
+          if (!is.null(regressor_output_cols)) {
+            for (regressor_col in regressor_output_cols) {
+              aggregated_future_data <- aggregated_future_data %>% dplyr::filter(!is.na(!!sym(regressor_col)))
+            }
           }
         }
       }
