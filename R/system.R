@@ -28,7 +28,7 @@ setConnectionPoolMode <- function(val) {
     # clear odbc pooled connections when turning off connection pooling mode
     keys <- ls(connection_pool)
     lapply(keys, function(key) {
-      if (startsWith(key, "RODBC")) {
+      if (startsWith(key, "rodbc")) {
         tryCatch({ # try to close connection and ignore error
           conn <- connection_pool[[key]]
           RODBC::odbcClose(conn)
@@ -832,7 +832,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
                                password = password, host = host, port = port, schema = schema, catalog = catalog, session.timezone = Sys.timezone(location = TRUE))
       connection_pool[[key]] <- conn
     }
-  } else if (type == "RODBC") {
+  } else if (type == "rodbc") {
     # do those package loading only when we need to use odbc in this if statement,
     # so that we will not have error at our server environemnt where RODBC is not there.
     if(!requireNamespace("RODBC")){stop("package RODBC must be installed.")}
@@ -1035,7 +1035,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
 #' @export
 clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, username, catalog = "", schema = "", dsn="", additionalParams = "",
                               collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, connectionString = NULL) {
-  if (type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora", "RODBC")) { #TODO: implement for other types too
+  if (type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora", "rodbc")) { #TODO: implement for other types too
     if (type %in% c("mongodb")) {
       if(!is.na(connectionString) && connectionString != '') {
         # make sure to include collection as a key since connection varies per collection.
@@ -1086,8 +1086,8 @@ clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, user
         })
       }
     }
-    else if(type %in% c("odbc","RODBC")) { # odbc
-      key <- paste("RODBC", dsn, username, additionalParams, sep = ":")
+    else if(type %in% c("odbc","rodbc")) { # odbc
+      key <- paste("rodbc", dsn, username, additionalParams, sep = ":")
       if(type == "odbc") {
         key <- paste("odbc", dsn, username, additionalParams, sep = ":")
       }
@@ -1109,7 +1109,7 @@ clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, user
 }
 
 isConnecitonPoolEnabbled <- function(type){
-  type %in% c("odbc", "RODBC", "postgres", "redshift", "vertica", "mysql", "aurora", "presto", "treasuredata", "mssqlserver")
+  type %in% c("odbc", "rodbc", "postgres", "redshift", "vertica", "mysql", "aurora", "presto", "treasuredata", "mssqlserver")
 }
 
 #' @export
@@ -1340,7 +1340,7 @@ queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows
       if(!requireNamespace("odbc")){stop("package odbc must be installed.")}
       resultSet <- DBI::dbSendQuery(conn, query)
       df <- DBI::dbFetch(resultSet, n = numOfRows)
-    } else if(type == "RODBC") { # For RODBC based ODBC Data Soruces, use RODBC API.
+    } else if(type == "rodbc") { # For RODBC based ODBC Data Soruces, use RODBC API.
       if(!requireNamespace("odbc")){stop("package odbc must be installed.")}
       df <- RODBC::sqlQuery(conn, query, as.is = as.is, max = numOfRows, stringsAsFactors=stringsAsFactors)
     }
@@ -1354,7 +1354,7 @@ queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows
     if (!user_env$pool_connection) {
       # close connection if not pooling.
       tryCatch({ # try to close connection and ignore error
-        if(type == "RODBC") {
+        if(type == "rodbc") {
           RODBC::odbcClose(conn)
         } else {
           DBI::dbDisconnect(conn)
