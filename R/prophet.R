@@ -549,7 +549,21 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
         else {
           time_unit_for_future_dataframe = time_unit
         }
-        future <- prophet::make_future_dataframe(m, periods = periods, freq = time_unit_for_future_dataframe, include_history = include_history) #includes past dates
+
+        # make_future_dataframe can't handle periods=0. Work it around.
+        if (periods == 0) {
+          periods_ <- 1
+        }
+        else {
+          periods_ <- periods
+        }
+
+        future <- prophet::make_future_dataframe(m, periods = periods_, freq = time_unit_for_future_dataframe, include_history = include_history) #includes past dates
+
+        if (periods == 0) { # Remove the last extra row in case we passed period 1 instead of 0.
+          future <- head(future, -1)
+        }
+
         if (!is.null(regressor_output_cols)) {
           regressor_data <- aggregated_data %>%
             dplyr::select(-y) %>%
