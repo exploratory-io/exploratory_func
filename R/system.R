@@ -969,7 +969,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         })
       }
     }
-    if (is.null(conn)) {
+    if (is.null(conn) || !DBI::dbIsValid(conn)) {
       conn <- connect()
       if (user_env$pool_connection) { # pool connection if connection pooling is on.
         connection_pool[[key]] <- conn
