@@ -314,19 +314,6 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
         max_floored_date <- max(df[[time_col]])
         future_df <- future_df %>% dplyr::filter(UQ(rlang::sym(time_col)) > max_floored_date)
   
-        # No future external regressor data is provided. For test mode, this is fine, but when it is not, this is a problem.
-        #if(nrow(future_df) == 0 && !test_mode) {
-        #  # ignore the error if
-        #  # it is caused by subset of
-        #  # grouped data frame
-        #  # to show result of
-        #  # data frames that succeed
-        #  if(is.null(grouped_col) || length(grouped_col) == 0) {
-        #    # Terminology is not consistent here, but we are calling extra regressor "external predictor" on the UI.
-        #    stop("In order to use the External Predictors, you need future data or switch to Test Mode in the Property dialog.")
-        #  }
-        #}
-  
         if (nrow(future_df) > 0) {
           # TODO: in test mode, this is not really necessary. optimize.
           aggregated_future_data <- future_df %>%
