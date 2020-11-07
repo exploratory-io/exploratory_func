@@ -895,7 +895,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     }
   } else if (type == "odbc") {
     # do those package loading only when we need to use odbc in this if statement,
-    # so that we will not have error at our server environment where RODBC is not there.
+    # so that we will not have error at our server environment where odbc is not there.
     if(!requireNamespace("odbc")){stop("package odbc must be installed.")}
 
     loadNamespace("odbc")
@@ -1334,7 +1334,7 @@ queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows
       resultSet <- DBI::dbSendQuery(conn, query)
       df <- DBI::dbFetch(resultSet, n = numOfRows)
     } else if(type == "rodbc") { # For RODBC based ODBC Data Soruces, use RODBC API.
-      if(!requireNamespace("odbc")){stop("package odbc must be installed.")}
+      if(!requireNamespace("RODBC")){stop("package odbc must be installed.")}
       df <- RODBC::sqlQuery(conn, query, as.is = as.is, max = numOfRows, stringsAsFactors=stringsAsFactors)
     }
 
