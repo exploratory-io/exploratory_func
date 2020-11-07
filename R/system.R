@@ -28,7 +28,7 @@ setConnectionPoolMode <- function(val) {
     # clear odbc pooled connections when turning off connection pooling mode
     keys <- ls(connection_pool)
     lapply(keys, function(key) {
-      if (startsWith(key, "RODBC")) {
+      if (startsWith(key, "rodbc")) {
         tryCatch({ # try to close connection and ignore error
           conn <- connection_pool[[key]]
           RODBC::odbcClose(conn)
@@ -832,7 +832,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
                                password = password, host = host, port = port, schema = schema, catalog = catalog, session.timezone = Sys.timezone(location = TRUE))
       connection_pool[[key]] <- conn
     }
-  } else if (type == "RODBC") {
+  } else if (type == "rodbc") {
     # do those package loading only when we need to use odbc in this if statement,
     # so that we will not have error at our server environemnt where RODBC is not there.
     if(!requireNamespace("RODBC")){stop("package RODBC must be installed.")}
@@ -895,10 +895,47 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     }
   } else if (type == "odbc") {
     # do those package loading only when we need to use odbc in this if statement,
-    # so that we will not have error at our server environment where RODBC is not there.
+    # so that we will not have error at our server environment where odbc is not there.
     if(!requireNamespace("odbc")){stop("package odbc must be installed.")}
 
     loadNamespace("odbc")
+    hoststr = ""
+    if(!is.null(host)) {
+      hoststr = host;
+    }
+    key <- paste(type, dsn, hoststr, username, additionalParams, driver, sep = ":")
+    conn <- connection_pool[[key]]
+    conn <- NULL
+    if (!is.null(conn)){
+      tryCatch({
+        # test connection
+        result <- DBI::dbGetQuery(conn,"select 1")
+        if (!is.data.frame(result)) { # it can fail by returning NULL rather than throwing error.
+          tryCatch({ # try to close connection and ignore error
+            DBI::dbDisconnect(conn)
+          }, warning = function(w) {
+          }, error = function(e) {
+          })
+          conn <- NULL
+          # fall through to getting new connection.
+        } else if (!DBI::dbIsValid(conn)) {
+          tryCatch({ # try to close connection and ignore error
+            DBI::dbDisconnect(conn)
+          }, warning = function(w) {
+          }, error = function(e) {
+          })
+          conn <- NULL
+        }
+      }, error = function(err) {
+        tryCatch({ # try to close connection and ignore error
+          DBI::dbDisconnect(conn)
+        }, warning = function(w) {
+        }, error = function(e) {
+        })
+        conn <- NULL
+        # fall through to getting new connection.
+      })
+    }
     connect <- function() {
       if(dsn != ""){ #
         connstr <- stringr::str_c("DBI::dbConnect(odbc::odbc(), dsn = '", dsn , "'")
@@ -914,15 +951,8 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
           connstr <- stringr::str_c(connstr, ",", additionalParams, ")")
         }
         conn <- eval(parse(text=connstr))
-      } else if (host != "") { # for dremio direct access
-        # Until Dremio ODBC Driver 1.3.14.1043 for Mac, Dremio ODBC driver's name was
-        # "Dremio ODBC Driver" on Mac, but it changed to "Dremio Connector", which is same as the Window version
-        # of their ODBC driver, at this version.
-        # So we no longer need to switch ODBC driver name by OS.
-        # We handled this change at v4.1.0.4 by releasing Mac only patch.
-        connstr <- "DRIVER=Dremio Connector"
-        connstr <- stringr::str_c(connstr, ";HOST=", host, ";ConnectionType=Direct;AuthenticationType=Plain;Catalog=DREMIO;PORT=", port, ";UID=", username, ";PWD=", password)
-        conn <- DBI::dbConnect(odbc::odbc(), .connection_string = constr, bigint = "numeric")
+      } else if (host != "") {
+        # TODO: Implement direct connect
       }
       if (is.null(conn)) {
         # capture warning and throw error with the message.
@@ -930,44 +960,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         # TODO capture.output() might cause error on windows with multibyte chars.
         stop(paste("ODBC connection failed.", capture.output(warnings())))
       }
-
-      # For some reason, calling RODBC::sqlTables() works around Actual Oracle Driver for Mac issue
-      # that it always returns 0 rows.
-      # Since we want this to be done without sacrificing performance,
-      # we are adding dummy catalog/schema condition to make it return nothing.
-      # Since it does not have performance impact, we are just calling it
-      # unconditionally rather than first checking which ODBC driver is used for the connection.
-      #RODBC::sqlTables(conn, catalog = "dummy", schema = "dummy")
       conn
-    }
-    # Check pool only when connection pooling is on. To avoid getting error from timed-out connection,
-    # we use connection pooling for ODBC only while data source dialog is open.
-    if (user_env$pool_connection) {
-      key <- paste(type, dsn, host, username, additionalParams, driver, sep = ":")
-      conn <- connection_pool[[key]]
-      if (!is.null(conn)){
-        tryCatch({
-          # test connection
-          result <- DBI::dbGetQuery(conn,"select 1")
-          if (!is.data.frame(result)) { # it can fail by returning NULL rather than throwing error.
-            tryCatch({ # try to close connection and ignore error
-              DBI::dbDisconnect(conn)
-            }, warning = function(w) {
-            }, error = function(e) {
-            })
-            conn <- NULL
-            # fall through to getting new connection.
-          }
-        }, error = function(err) {
-          tryCatch({ # try to close connection and ignore error
-            DBI::dbDisconnect(conn)
-          }, warning = function(w) {
-          }, error = function(e) {
-          })
-          conn <- NULL
-          # fall through to getting new connection.
-        })
-      }
     }
     if (is.null(conn)) {
       conn <- connect()
@@ -1035,7 +1028,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
 #' @export
 clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, username, catalog = "", schema = "", dsn="", additionalParams = "",
                               collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, connectionString = NULL) {
-  if (type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora", "RODBC")) { #TODO: implement for other types too
+  if (type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora", "rodbc")) { #TODO: implement for other types too
     if (type %in% c("mongodb")) {
       if(!is.na(connectionString) && connectionString != '') {
         # make sure to include collection as a key since connection varies per collection.
@@ -1086,8 +1079,8 @@ clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, user
         })
       }
     }
-    else if(type %in% c("odbc","RODBC")) { # odbc
-      key <- paste("RODBC", dsn, username, additionalParams, sep = ":")
+    else if(type %in% c("odbc","rodbc")) { # odbc
+      key <- paste("rodbc", dsn, username, additionalParams, sep = ":")
       if(type == "odbc") {
         key <- paste("odbc", dsn, username, additionalParams, sep = ":")
       }
@@ -1109,7 +1102,7 @@ clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, user
 }
 
 isConnecitonPoolEnabbled <- function(type){
-  type %in% c("odbc", "RODBC", "postgres", "redshift", "vertica", "mysql", "aurora", "presto", "treasuredata", "mssqlserver")
+  type %in% c("odbc", "rodbc", "postgres", "redshift", "vertica", "mysql", "aurora", "presto", "treasuredata", "mssqlserver")
 }
 
 #' @export
@@ -1340,8 +1333,8 @@ queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows
       if(!requireNamespace("odbc")){stop("package odbc must be installed.")}
       resultSet <- DBI::dbSendQuery(conn, query)
       df <- DBI::dbFetch(resultSet, n = numOfRows)
-    } else if(type == "RODBC") { # For RODBC based ODBC Data Soruces, use RODBC API.
-      if(!requireNamespace("odbc")){stop("package odbc must be installed.")}
+    } else if(type == "rodbc") { # For RODBC based ODBC Data Soruces, use RODBC API.
+      if(!requireNamespace("RODBC")){stop("package odbc must be installed.")}
       df <- RODBC::sqlQuery(conn, query, as.is = as.is, max = numOfRows, stringsAsFactors=stringsAsFactors)
     }
 
@@ -1354,7 +1347,7 @@ queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows
     if (!user_env$pool_connection) {
       # close connection if not pooling.
       tryCatch({ # try to close connection and ignore error
-        if(type == "RODBC") {
+        if(type == "rodbc") {
           RODBC::odbcClose(conn)
         } else {
           DBI::dbDisconnect(conn)
