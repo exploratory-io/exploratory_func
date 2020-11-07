@@ -899,8 +899,13 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     if(!requireNamespace("odbc")){stop("package odbc must be installed.")}
 
     loadNamespace("odbc")
-    key <- paste(type, dsn, host, username, additionalParams, driver, sep = ":")
+    hoststr = ""
+    if(!is.null(host)) {
+      hoststr = host;
+    }
+    key <- paste(type, dsn, hoststr, username, additionalParams, driver, sep = ":")
     conn <- connection_pool[[key]]
+    conn <- NULL
     if (!is.null(conn)){
       tryCatch({
         # test connection
@@ -913,6 +918,13 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
           })
           conn <- NULL
           # fall through to getting new connection.
+        } else if (!DBI::dbIsValid(conn)) {
+          tryCatch({ # try to close connection and ignore error
+            DBI::dbDisconnect(conn)
+          }, warning = function(w) {
+          }, error = function(e) {
+          })
+          conn <- NULL
         }
       }, error = function(err) {
         tryCatch({ # try to close connection and ignore error
@@ -948,14 +960,6 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         # TODO capture.output() might cause error on windows with multibyte chars.
         stop(paste("ODBC connection failed.", capture.output(warnings())))
       }
-
-      # For some reason, calling RODBC::sqlTables() works around Actual Oracle Driver for Mac issue
-      # that it always returns 0 rows.
-      # Since we want this to be done without sacrificing performance,
-      # we are adding dummy catalog/schema condition to make it return nothing.
-      # Since it does not have performance impact, we are just calling it
-      # unconditionally rather than first checking which ODBC driver is used for the connection.
-      #RODBC::sqlTables(conn, catalog = "dummy", schema = "dummy")
       conn
     }
     if (is.null(conn)) {
