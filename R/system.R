@@ -899,6 +899,31 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     if(!requireNamespace("odbc")){stop("package odbc must be installed.")}
 
     loadNamespace("odbc")
+    key <- paste(type, dsn, host, username, additionalParams, driver, sep = ":")
+    conn <- connection_pool[[key]]
+    if (!is.null(conn)){
+      tryCatch({
+        # test connection
+        result <- DBI::dbGetQuery(conn,"select 1")
+        if (!is.data.frame(result)) { # it can fail by returning NULL rather than throwing error.
+          tryCatch({ # try to close connection and ignore error
+            DBI::dbDisconnect(conn)
+          }, warning = function(w) {
+          }, error = function(e) {
+          })
+          conn <- NULL
+          # fall through to getting new connection.
+        }
+      }, error = function(err) {
+        tryCatch({ # try to close connection and ignore error
+          DBI::dbDisconnect(conn)
+        }, warning = function(w) {
+        }, error = function(e) {
+        })
+        conn <- NULL
+        # fall through to getting new connection.
+      })
+    }
     connect <- function() {
       if(dsn != ""){ #
         connstr <- stringr::str_c("DBI::dbConnect(odbc::odbc(), dsn = '", dsn , "'")
@@ -914,15 +939,8 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
           connstr <- stringr::str_c(connstr, ",", additionalParams, ")")
         }
         conn <- eval(parse(text=connstr))
-      } else if (host != "") { # for dremio direct access
-        # Until Dremio ODBC Driver 1.3.14.1043 for Mac, Dremio ODBC driver's name was
-        # "Dremio ODBC Driver" on Mac, but it changed to "Dremio Connector", which is same as the Window version
-        # of their ODBC driver, at this version.
-        # So we no longer need to switch ODBC driver name by OS.
-        # We handled this change at v4.1.0.4 by releasing Mac only patch.
-        connstr <- "DRIVER=Dremio Connector"
-        connstr <- stringr::str_c(connstr, ";HOST=", host, ";ConnectionType=Direct;AuthenticationType=Plain;Catalog=DREMIO;PORT=", port, ";UID=", username, ";PWD=", password)
-        conn <- DBI::dbConnect(odbc::odbc(), .connection_string = constr, bigint = "numeric")
+      } else if (host != "") {
+        # TODO: Implement direct connect
       }
       if (is.null(conn)) {
         # capture warning and throw error with the message.
@@ -940,36 +958,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       #RODBC::sqlTables(conn, catalog = "dummy", schema = "dummy")
       conn
     }
-    # Check pool only when connection pooling is on. To avoid getting error from timed-out connection,
-    # we use connection pooling for ODBC only while data source dialog is open.
-    if (user_env$pool_connection) {
-      key <- paste(type, dsn, host, username, additionalParams, driver, sep = ":")
-      conn <- connection_pool[[key]]
-      if (!is.null(conn)){
-        tryCatch({
-          # test connection
-          result <- DBI::dbGetQuery(conn,"select 1")
-          if (!is.data.frame(result)) { # it can fail by returning NULL rather than throwing error.
-            tryCatch({ # try to close connection and ignore error
-              DBI::dbDisconnect(conn)
-            }, warning = function(w) {
-            }, error = function(e) {
-            })
-            conn <- NULL
-            # fall through to getting new connection.
-          }
-        }, error = function(err) {
-          tryCatch({ # try to close connection and ignore error
-            DBI::dbDisconnect(conn)
-          }, warning = function(w) {
-          }, error = function(e) {
-          })
-          conn <- NULL
-          # fall through to getting new connection.
-        })
-      }
-    }
-    if (is.null(conn) || !DBI::dbIsValid(conn)) {
+    if (is.null(conn)) {
       conn <- connect()
       if (user_env$pool_connection) { # pool connection if connection pooling is on.
         connection_pool[[key]] <- conn
