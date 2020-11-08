@@ -972,3 +972,9 @@ test_that("calc_confint_ratio", {
   v <- 1:100 %% 3 ==0
   expect_equal(exploratory::prop_confint_radius(v), exploratory::calc_confint_ratio(sum(v)/length(v), length(v)))
 })
+
+test_that("mutate_predictors", {
+  df <- tibble::tibble(x=1, t=as.Date("2020-01-01"))
+  res <- df %>% mutate_predictors(c("x", "t"), list(x="log", t_mon="mon"))
+  #res <- df %>% mutate_predictors(c("x", "t"), list(x="log", list(t_mon="mon", t_wday="wday")))
+})

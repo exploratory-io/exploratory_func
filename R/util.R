@@ -2235,6 +2235,65 @@ summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...){
   ret
 }
 
+column_mutate_quosure <- function(func, cname) {
+  if(is.na(func) || length(func)==0 || func == "none"){
+    NULL
+  } else if (func %in% c("fltoyear","rtoyear",
+      "fltohalfyear",
+      "rtohalfyear",
+      "fltoquarter",
+      "rtoq",
+      "fltobimonth",
+      "rtobimon",
+      "fltomonth",
+      "rtomon",
+      "fltoweek",
+      "rtoweek",
+      "fltoday",
+      "rtoday",
+      "rtohour",
+      "rtomin",
+      "rtosec",
+      "year",
+      "halfyear",
+      "quarter",
+      "bimonth",
+      "bimon",
+      "month",
+      "mon",
+      "monthname",
+      "monname",
+      "monthnamelong",
+      "monnamelong",
+      "week",
+      "week_of_month",
+      "dayofyear",
+      "dayofquarter",
+      "dayofweek",
+      "day",
+      "wday",
+      "wdaylong",
+      "weekend",
+      "hour",
+      "minute",
+      "second")) {
+    # For date column, call extract_from_date
+    rlang::quo(extract_from_date(UQ(rlang::sym(cname)), type = UQ(func)))
+  } else if (func %in% c("asnum","asint","asintby10","aschar")) {
+    # For numeric column, call categorize_numeric
+    rlang::quo(categorize_numeric(UQ(rlang::sym(cname)), type = UQ(func)))
+  } else { # For non-numeric and non-date related function case.
+    rlang::quo(UQ(func)(UQ(rlang::sym(cname))))
+  }
+}
+
+# mutate_predictors(df, cols = c("col1","col2"), funs=list("col1"="log", list("col2_day"="day", "col2_mon"="month")))
+mutate_predictors <- function(df, cols, funs) {
+  mutate_args <- purrr::map2(funs, cols, column_mutate_quosure)
+  mutate_args <- unlist(mutate_args)
+  df %>% dplyr::mutate(!!!mutate_args)
+}
+
 #' calc_feature_imp (Random Forest) or exp_rpart (Decision Tree) converts logical columns into factor
 #' with level of "TRUE" and "FALSE". This function reverts such columns back to logical.
 #' @export
