@@ -2289,7 +2289,16 @@ column_mutate_quosure <- function(func, cname) {
 
 # mutate_predictors(df, cols = c("col1","col2"), funs=list("col1"="log", list("col2_day"="day", "col2_mon"="month")))
 mutate_predictors <- function(df, cols, funs) {
-  mutate_args <- purrr::map2(funs, cols, column_mutate_quosure)
+  mutate_args <- purrr::map2(funs, cols, function(func, cname) {
+    if (is.list(func)) {
+      purrr::map(func, function(func) {
+        column_mutate_quosure(func, cname)
+      })
+    }
+    else {
+      column_mutate_quosure(func, cname)
+    }
+  })
   mutate_args <- unlist(mutate_args)
   df %>% dplyr::mutate(!!!mutate_args)
 }

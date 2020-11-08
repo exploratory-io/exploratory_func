@@ -974,7 +974,7 @@ test_that("calc_confint_ratio", {
 })
 
 test_that("mutate_predictors", {
-  df <- tibble::tibble(x=1, t=as.Date("2020-01-01"))
-  res <- df %>% mutate_predictors(c("x", "t"), list(x="log", t_mon="mon"))
-  #res <- df %>% mutate_predictors(c("x", "t"), list(x="log", list(t_mon="mon", t_wday="wday")))
+  df <- tibble::tibble(x=1, t=as.Date("2020-01-01"), y=4)
+  res <- df %>% mutate_predictors(c("x", "t", "y"), list(x="log", list(t_mon="mon", t_wday="wday"), y="log2"))
+  expect_true(all(c("x","y","t_mon","t_wday") %in% colnames(res)))
 })
