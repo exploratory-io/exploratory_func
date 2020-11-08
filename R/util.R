@@ -2145,6 +2145,7 @@ restore_na <- function(value, na_row_numbers){
   }
 }
 
+# Returns a quosure that can be used as right-hand-side of arguments of mutate. Used in mutate_predictors and group_by arguments for summarize_group.
 column_mutate_quosure <- function(func, cname) {
   if(is.na(func) || length(func)==0 || func == "none"){
     rlang::quo((UQ(rlang::sym(cname))))
@@ -2238,7 +2239,8 @@ summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...){
 }
 
 
-# mutate_predictors(df, cols = c("col1","col2"), funs=list("col1"="log", list("col2_day"="day", "col2_mon"="month")))
+# Mutate predictor columns for preprocessing before feeding to a model. Functions are expressed by tokens we use in our JSON metadata.
+# e.g. mutate_predictors(df, cols = c("col1","col2"), funs=list("col1"="log", list("col2_day"="day", "col2_mon"="month")))
 mutate_predictors <- function(df, cols, funs) {
   mutate_args <- purrr::map2(funs, cols, function(func, cname) {
     if (is.list(func)) {
