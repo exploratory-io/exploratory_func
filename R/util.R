@@ -2145,99 +2145,9 @@ restore_na <- function(value, na_row_numbers){
   }
 }
 
-# Wrapper function that takes care of dplyr::group_by and dplyr::summarize as a single step.
-#' @param .data - data frame
-#' @param group_cols - Columns to group_by
-#' @param group_funs - Functions to apply to group_by columns
-#' @param ... - Name-value pairs of summary functions. The name will be the name of the variable in the result. The value should be an expression that returns a single value like min(x), n(), or sum(is.na(y)).
-#' @export
-summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...){
-  ret <- if(length(group_cols) == 0) {
-    .data %>% dplyr::summarize(...)
-  } else {
-    # if group_cols argument is passed, make sure to ungroup first so that it won't throw an error
-    # when group_cols conflict with group columns in previous steps.
-    .data <- .data %>% dplyr::ungroup()
-    groupby_args <- list() # default empty list
-    name_list <- list()
-    name_index = 1
-    # If group_by columns and associated categorizing functionts are provided,
-    # quote the columns/functions with rlang::quo so that dplyr can understand them.
-    if (!is.null(group_cols) && !is.null(group_funs)) {
-      groupby_args <- purrr::map2(group_funs, group_cols, function(func, cname) {
-        if(is.na(func) || length(func)==0 || func == "none"){
-          rlang::quo((UQ(rlang::sym(cname))))
-        } else if (func %in% c("fltoyear","rtoyear",
-            "fltohalfyear",
-            "rtohalfyear",
-            "fltoquarter",
-            "rtoq",
-            "fltobimonth",
-            "rtobimon",
-            "fltomonth",
-            "rtomon",
-            "fltoweek",
-            "rtoweek",
-            "fltoday",
-            "rtoday",
-            "rtohour",
-            "rtomin",
-            "rtosec",
-            "year",
-            "halfyear",
-            "quarter",
-            "bimonth",
-            "bimon",
-            "month",
-            "mon",
-            "monthname",
-            "monname",
-            "monthnamelong",
-            "monnamelong",
-            "week",
-            "week_of_month",
-            "dayofyear",
-            "dayofquarter",
-            "dayofweek",
-            "day",
-            "wday",
-            "wdaylong",
-            "weekend",
-            "hour",
-            "minute",
-            "second")) {
-          # For date column, call extract_from_date
-          rlang::quo(extract_from_date(UQ(rlang::sym(cname)), type = UQ(func)))
-        } else if (func %in% c("asnum","asint","asintby10","aschar")) {
-          # For numeric column, call categorize_numeric
-          rlang::quo(categorize_numeric(UQ(rlang::sym(cname)), type = UQ(func)))
-        } else { # For non-numeric and non-date related function case.
-          rlang::quo(UQ(func)(UQ(rlang::sym(cname))))
-        }
-      })
-      # Set names of group_by columns in the output.
-      name_list <- names(group_cols) # If names are specified in group_cols, use them for output.
-      if (is.null(name_list)) { # If name is not specified, use original column names.
-        name_list <- group_cols
-      }
-      names(groupby_args) <- name_list
-      # make sure to ungroup result
-      .data %>% dplyr::group_by(!!!groupby_args) %>% summarize(...) %>% dplyr::ungroup()
-    } else {
-      if(!is.null(group_cols)) { # In case only group_by columns are provied, group_by with the columns
-        # make sure to ungroup result
-        .data %>% dplyr::group_by(!!!rlang::syms(group_cols)) %>% summarize(...) %>% dplyr::ungroup()
-      } else { # In case no group_by columns are provided,skip group_by
-        .data %>% dplyr::summarize(...)
-      }
-    }
-  }
-  ret
-}
-
 column_mutate_quosure <- function(func, cname) {
   if(is.na(func) || length(func)==0 || func == "none"){
-    NULL
+    rlang::quo((UQ(rlang::sym(cname))))
   } else if (func %in% c("fltoyear","rtoyear",
       "fltohalfyear",
       "rtohalfyear",
@@ -2286,6 +2196,47 @@ column_mutate_quosure <- function(func, cname) {
     rlang::quo(UQ(func)(UQ(rlang::sym(cname))))
   }
 }
+
+# Wrapper function that takes care of dplyr::group_by and dplyr::summarize as a single step.
+#' @param .data - data frame
+#' @param group_cols - Columns to group_by
+#' @param group_funs - Functions to apply to group_by columns
+#' @param ... - Name-value pairs of summary functions. The name will be the name of the variable in the result. The value should be an expression that returns a single value like min(x), n(), or sum(is.na(y)).
+#' @export
+summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...){
+  ret <- if(length(group_cols) == 0) {
+    .data %>% dplyr::summarize(...)
+  } else {
+    # if group_cols argument is passed, make sure to ungroup first so that it won't throw an error
+    # when group_cols conflict with group columns in previous steps.
+    .data <- .data %>% dplyr::ungroup()
+    groupby_args <- list() # default empty list
+    name_list <- list()
+    name_index = 1
+    # If group_by columns and associated categorizing functionts are provided,
+    # quote the columns/functions with rlang::quo so that dplyr can understand them.
+    if (!is.null(group_cols) && !is.null(group_funs)) {
+      groupby_args <- purrr::map2(group_funs, group_cols, column_mutate_quosure)
+      # Set names of group_by columns in the output.
+      name_list <- names(group_cols) # If names are specified in group_cols, use them for output.
+      if (is.null(name_list)) { # If name is not specified, use original column names.
+        name_list <- group_cols
+      }
+      names(groupby_args) <- name_list
+      # make sure to ungroup result
+      .data %>% dplyr::group_by(!!!groupby_args) %>% summarize(...) %>% dplyr::ungroup()
+    } else {
+      if(!is.null(group_cols)) { # In case only group_by columns are provied, group_by with the columns
+        # make sure to ungroup result
+        .data %>% dplyr::group_by(!!!rlang::syms(group_cols)) %>% summarize(...) %>% dplyr::ungroup()
+      } else { # In case no group_by columns are provided,skip group_by
+        .data %>% dplyr::summarize(...)
+      }
+    }
+  }
+  ret
+}
+
 
 # mutate_predictors(df, cols = c("col1","col2"), funs=list("col1"="log", list("col2_day"="day", "col2_mon"="month")))
 mutate_predictors <- function(df, cols, funs) {
