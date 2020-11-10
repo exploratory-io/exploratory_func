@@ -678,6 +678,8 @@ str_remove_word <- function(string, start = 1L, end = start, sep = fixed(" ")) {
 #'@export
 str_replace_word <- function(string, start = 1L, end = start, sep = fixed(" "), rep = "") {
   sep_ = sep
+  # Below is the list of predefined separators passed from Exploratory Desktop in a regular expression format.
+  # Changed it back to the original separator.
   if(sep == "\\s*\\,\\s*") {
     sep_ <- ", "
   } else if (sep == "\\s+") {
