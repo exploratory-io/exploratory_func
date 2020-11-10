@@ -109,6 +109,16 @@ test_data <- test_data %>% dplyr::mutate(`CANCELLED X` = `CANCELLED X` == 'Y')
 
 test_data$klass <- c(rep("A", 10), rep("B", 10))
 
+test_that("add_prediction with linear regression", {
+  model_df <- test_data %>% build_lm.fast(`DISTANCE`,
+                                     `ARR_TIME`,
+                                     `DERAY_TIME`,
+                                     `Carrier Name`,
+                                     predictor_funs=list(ARR_TIME="log", DELAY_TIME="none", "Carrier Name"="none"),
+                                     model_type = "lm")
+  ret <- test_data %>% add_prediction(model_df=model_df)
+})
+
 test_that("Linear Regression with test rate", {
   ret <- test_data %>% build_lm.fast(`DISTANCE`,
                                      `ARR_TIME`,
