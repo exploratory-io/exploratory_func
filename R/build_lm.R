@@ -1573,6 +1573,11 @@ augment.lm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "
   }
 
   if(!is.null(newdata)) {
+    # Replay the mutations on predictors.
+    if(!is.null(x$predictor_funs)) {
+      newdata <- newdata %>% mutate_predictors(x$orig_predictor_cols, x$predictor_funs)
+    }
+
     predictor_variables <- all.vars(x$terms)[-1]
     predictor_variables_orig <- x$terms_mapping[predictor_variables]
 
