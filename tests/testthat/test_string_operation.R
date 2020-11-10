@@ -497,6 +497,21 @@ test_that("str_remove_emoji", {
   expect_equal(ret, list("",""))
 })
 
+test_that("str_remove_word", {
+  ret <- exploratory::str_remove_word("Sequoia Capital China, Qiming Venture Partners, Tencent Holdings", -1, sep = "\\s*\\,\\s*")
+  expect_equal(ret, c("Sequoia Capital China, Qiming Venture Partners"))
+  ret <- exploratory::str_remove_word("Sequoia Capital China, Qiming Venture Partners, Tencent Holdings", 1, sep = "\\s*\\,\\s*")
+  expect_equal(ret, c("Qiming Venture Partners, Tencent Holdings"))
+})
+
+test_that("str_replace_word", {
+  ret <- exploratory::str_replace_word("Sequoia Capital China, Qiming Venture Partners, Tencent Holdings", -1, sep = "\\s*\\,\\s*", rep = "Last One")
+  expect_equal(ret, c("Sequoia Capital China, Qiming Venture Partners,Last One"))
+  ret <- exploratory::str_replace_word("Sequoia Capital China, Qiming Venture Partners, Tencent Holdings", 1, sep = "\\s*\\,\\s*", rep = "First One")
+  expect_equal(ret, c("First One,Qiming Venture Partners, Tencent Holdings"))
+})
+
+
 test_that("str_logical", {
   ret <- exploratory::str_logical(c("yes", "yEs", "yeS", " YEs", "YeS ", "yES", "YES","no", "No", "nO", "NO ", NA))
   expect_equal(ret, c(TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, FALSE, NA))

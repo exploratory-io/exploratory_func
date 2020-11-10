@@ -645,6 +645,53 @@ str_remove_inside <- function(column, begin = "(", end = ")", all = FALSE){
   }
 }
 
+#'Function to remove word from text.
+#'@export
+str_remove_word <- function(string, start = 1L, end = start, sep = fixed(" ")) {
+  str_replace_word(string, start, end, sep, rep = "")
+}
+
+#'Function to remove word from text.
+#'@export
+str_replace_word <- function(string, start = 1L, end = start, sep = fixed(" "), rep = "") {
+  sep_ = sep
+  if(sep == "\\s*\\,\\s*") {
+    sep_ <- ", "
+  } else if (sep == "\\s+") {
+    sep_ <- " "
+  } else if (sep == "\\s*\\;\\s*") {
+    sep_ <- ";"
+  } else if (sep == "\\s*\\:\\s*") {
+    sep_ <- ":"
+  } else if (sep == "\\s*\\/\\s*") {
+    sep_ <- "/"
+  } else if (sep ==  "\\s*\\-\\s*") {
+    sep_ <- "-"
+  } else if (sep == "\\s*\\_\\s*") {
+    sep_ <- "_"
+  } else if (sep == "\\s*\\.\\s*") {
+    sep_ <- "."
+  } else if (sep == "\\s*\\@\\s*") {
+    sep_ <- "@"
+  }
+  if(end == 1) {
+    ret <- stringr::word(string, start = start, end = end, sep = sep)
+    if(rep != "") {
+      rep = stringr::str_c(rep, sep_, sep="")
+    }
+    stringr::str_replace(string, stringr::str_c("^", ret, sep, ""), rep)
+  } else if (end == -1){
+    ret <- stringr::word(string, start = start, end = end, sep = sep)
+    if(rep != "") {
+      rep = stringr::str_c(sep_, rep, sep="")
+    }
+    stringr::str_replace(string, stringr::str_c(sep, ret, "$"), rep)
+  } else {
+    ## TODO: Implement other cases
+    string
+  }
+}
+
 #'Function to remove emoji from a list of characters.
 str_remove_emoji <- function(column, position = "any"){
  regexp = "\\p{EMOJI}|\\p{EMOJI_PRESENTATION}|\\p{EMOJI_MODIFIER_BASE}|\\p{EMOJI_MODIFIER}\\p{EMOJI_COMPONENT}";
