@@ -677,7 +677,7 @@ str_remove_word <- function(string, start = 1L, end = start, sep = fixed(" ")) {
 #'Function to remove word from text.
 #'@export
 str_replace_word <- function(string, start = 1L, end = start, sep = fixed(" "), rep = "") {
-  sep_ = sep
+  sep_ <- sep
   # Below is the list of predefined separators passed from Exploratory Desktop in a regular expression format.
   # Changed it back to the original separator.
   if(sep == "\\s*\\,\\s*") {
@@ -702,13 +702,13 @@ str_replace_word <- function(string, start = 1L, end = start, sep = fixed(" "), 
   if(end == 1) {
     ret <- stringr::word(string, start = start, end = end, sep = sep)
     if(rep != "") {
-      rep = stringr::str_c(rep, sep_, sep="")
+      rep <- stringr::str_c(rep, sep_, sep="")
     }
     stringr::str_replace(string, stringr::str_c("^", ret, sep, ""), rep)
   } else if (end == -1){
     ret <- stringr::word(string, start = start, end = end, sep = sep)
     if(rep != "") {
-      rep = stringr::str_c(sep_, rep, sep="")
+      rep <- stringr::str_c(sep_, rep, sep="")
     }
     stringr::str_replace(string, stringr::str_c(sep, ret, "$"), rep)
   } else {
