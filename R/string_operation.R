@@ -645,6 +645,29 @@ str_remove_inside <- function(column, begin = "(", end = ")", all = FALSE){
   }
 }
 
+#'Function to replace text inside the characters like bracket.
+#'@export
+str_replace_inside <- function(column, begin = "(", end = ")", rep = "", all = FALSE){
+  if(stringr::str_length(begin) > 1) {
+    stop("The begin argument must be one character.")
+  }
+  if(stringr::str_length(end) > 1) {
+    stop("The end argument must be one character.")
+  }
+  if(grepl("[A-Za-z]", begin)) {
+    stop("The begin argument must be symbol such as (, {, [.")
+  }
+  if(grepl("[A-Za-z]", end)) {
+    stop("The end argument must be symbol such as ), }, ].")
+  }
+  exp <- stringr::str_c("\\", begin, "[^\\" , begin, "\\", end, "]*\\", end)
+  if(all) {
+    stringr::str_replace_all(column, exp, rep)
+  } else {
+    stringr::str_replace(column, exp, rep)
+  }
+}
+
 #'Function to remove word from text.
 #'@export
 str_remove_word <- function(string, start = 1L, end = start, sep = fixed(" ")) {
