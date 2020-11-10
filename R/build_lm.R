@@ -634,6 +634,14 @@ build_lm.fast <- function(df,
   target_col <- tidyselect::vars_select(names(df), !! rlang::enquo(target))
   orig_selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
 
+  if (!is.null(predictor_funs)) {
+    df <- df %>% mutate_predictors(orig_selected_cols, predictor_funs)
+    selected_cols <- names(unlist(predictor_funs))
+  }
+  else {
+    selected_cols <- orig_selected_cols
+  }
+
   grouped_cols <- grouped_by(df)
 
   if (!is.null(variable_metric)  && variable_metric == "ame") { # Special argument for integration with Analytics View.
@@ -655,10 +663,7 @@ build_lm.fast <- function(df,
   # If we do permutation importance, sort predictors so that the result of it is stable against change of column order.
   # Otherwise, avoid sorting so that user has control over the order of variables on partial dependence plot.
   if (model_type == "lm" || family %in% c("binomial", "gaussian") || (family == "poisson" && (is.null(link) || link == "log"))) {
-    selected_cols <- sort(orig_selected_cols)
-  }
-  else {
-    selected_cols <- orig_selected_cols
+    selected_cols <- sort(selected_cols)
   }
 
   if(test_rate < 0 | 1 < test_rate){
