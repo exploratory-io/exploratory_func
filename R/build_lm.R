@@ -598,6 +598,7 @@ remove_outliers_for_regression_data <- function(df, target_col, predictor_cols,
 build_lm.fast <- function(df,
                     target,
                     ...,
+                    predictor_funs = NULL,
                     model_type = "lm",
                     family = NULL,
                     link = NULL,
@@ -631,7 +632,7 @@ build_lm.fast <- function(df,
                     test_split_type = "random" # "random" or "ordered"
                     ){
   target_col <- tidyselect::vars_select(names(df), !! rlang::enquo(target))
-  selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
+  orig_selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
 
   grouped_cols <- grouped_by(df)
 
@@ -654,7 +655,10 @@ build_lm.fast <- function(df,
   # If we do permutation importance, sort predictors so that the result of it is stable against change of column order.
   # Otherwise, avoid sorting so that user has control over the order of variables on partial dependence plot.
   if (model_type == "lm" || family %in% c("binomial", "gaussian") || (family == "poisson" && (is.null(link) || link == "log"))) {
-    selected_cols <- sort(selected_cols)
+    selected_cols <- sort(orig_selected_cols)
+  }
+  else {
+    selected_cols <- orig_selected_cols
   }
 
   if(test_rate < 0 | 1 < test_rate){
@@ -1048,8 +1052,12 @@ build_lm.fast <- function(df,
         model$partial_dependence <- NULL
       }
 
-      list(model = model, test_index = test_index, source_data = source_data)
+      if (!is.null(predictor_funs)) {
+        model$orig_predictor_cols <- orig_selected_cols
+        model$predictor_funs <- predictor_funs
+      }
 
+      list(model = model, test_index = test_index, source_data = source_data)
     }, error = function(e){
       if(length(grouped_cols) > 0) {
         # In repeat-by case, we report group-specific error in the Summary table,
