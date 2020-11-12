@@ -676,6 +676,33 @@ str_replace_inside <- function(column, begin = "(", end = ")", rep = "", all = F
     stringr::str_replace(column, exp, rep)
   }
 }
+#'Function to remove URL from the text
+#'@export
+str_remove_url <- function(text, position = "any"){
+  reg <- "http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+"
+  if(position == "start") {
+    reg <- stringr::str_c("^", reg, sep = "")
+  } else if (position == "end") {
+    reg <- stringr::str_c(reg, "$", sep = "")
+  }
+  str_remove_all(text, regex(reg, ignore_case = TRUE))
+}
+#'Function to replace URL from the text
+#'@export
+str_replace_url <- function(text, rep = ""){
+  str_replace_all(text, regex("http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+", ignore_case = TRUE), rep)
+}
+#'Function to extract URL from the text
+#'@export
+str_extract_url <- function(text, position = "any"){
+  reg <- "http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+"
+  if(position == "start") {
+    reg <- stringr::str_c("^", reg, sep = "")
+  } else if (position == "end") {
+    reg <- stringr::str_c(reg, "$", sep = "")
+  }
+  str_extract_all(text, regex(reg, ignore_case = TRUE))
+}
 
 #'Function to remove word from text.
 #'@export
