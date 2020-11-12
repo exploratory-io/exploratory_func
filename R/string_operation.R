@@ -591,7 +591,7 @@ parse_logical <- function(text, ...){
 
 #'Function to extract text inside the characters like bracket.
 #'@export
-str_extract_inside <- function(column, begin = "(", end = ")", all = FALSE, includeSpecialChars = TRUE) {
+str_extract_inside <- function(column, begin = "(", end = ")", all = FALSE, include_special_chars = TRUE) {
   # Ref https://stackoverflow.com/questions/3926451/how-to-match-but-not-capture-part-of-a-regex
   # Below logic creates a Regular Expression that uses lookbehind and lookahead to extract string
   # between them.
@@ -615,7 +615,7 @@ str_extract_inside <- function(column, begin = "(", end = ")", all = FALSE, incl
     stop("The end argument must be symbol such as ), }, ].")
   }
   exp <- stringr::str_c("\\", begin, "[^\\" , begin, "\\", end, "]*\\", end)
-  if(!includeSpecialChars) {
+  if(!include_special_chars) {
     exp <- stringr::str_c("(?<=\\", begin,  ").*?(?=\\", end,  ")");
   }
   if(all) {
@@ -627,7 +627,7 @@ str_extract_inside <- function(column, begin = "(", end = ")", all = FALSE, incl
 
 #'Function to remove text inside the characters like bracket.
 #'@export
-str_remove_inside <- function(column, begin = "(", end = ")", all = FALSE, includeSpecialChars = TRUE){
+str_remove_inside <- function(column, begin = "(", end = ")", all = FALSE, include_special_chars = TRUE){
   if(stringr::str_length(begin) > 1) {
     stop("The begin argument must be one character.")
   }
@@ -641,7 +641,7 @@ str_remove_inside <- function(column, begin = "(", end = ")", all = FALSE, inclu
     stop("The end argument must be symbol such as ), }, ].")
   }
   exp <- stringr::str_c("\\", begin, "[^\\" , begin, "\\", end, "]*\\", end)
-  if(!includeSpecialChars) {
+  if(!include_special_chars) {
     exp <- stringr::str_c("(?<=\\", begin,  ").*?(?=\\", end,  ")");
   }
   if(all) {
@@ -653,7 +653,7 @@ str_remove_inside <- function(column, begin = "(", end = ")", all = FALSE, inclu
 
 #'Function to replace text inside the characters like bracket.
 #'@export
-str_replace_inside <- function(column, begin = "(", end = ")", rep = "", all = FALSE, includeSpecialChars = TRUE){
+str_replace_inside <- function(column, begin = "(", end = ")", rep = "", all = FALSE, include_special_chars = TRUE){
   if(stringr::str_length(begin) > 1) {
     stop("The begin argument must be one character.")
   }
@@ -667,7 +667,7 @@ str_replace_inside <- function(column, begin = "(", end = ")", rep = "", all = F
     stop("The end argument must be symbol such as ), }, ].")
   }
   exp <- stringr::str_c("\\", begin, "[^\\" , begin, "\\", end, "]*\\", end)
-  if(!includeSpecialChars) {
+  if(!include_special_chars) {
     exp <- stringr::str_c("(?<=\\", begin,  ").*?(?=\\", end,  ")");
   }
   if(all) {
@@ -685,12 +685,12 @@ str_remove_url <- function(text, position = "any"){
   } else if (position == "end") {
     reg <- stringr::str_c(reg, "$", sep = "")
   }
-  str_remove_all(text, regex(reg, ignore_case = TRUE))
+  stringr::str_replace_all(text, stringr::regex(reg, ignore_case = TRUE), "")
 }
 #'Function to replace URL from the text
 #'@export
 str_replace_url <- function(text, rep = ""){
-  str_replace_all(text, regex("http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+", ignore_case = TRUE), rep)
+  stringr::str_replace_all(text, stringr::regex("http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+", ignore_case = TRUE), rep)
 }
 #'Function to extract URL from the text
 #'@export
@@ -701,7 +701,7 @@ str_extract_url <- function(text, position = "any"){
   } else if (position == "end") {
     reg <- stringr::str_c(reg, "$", sep = "")
   }
-  str_extract_all(text, regex(reg, ignore_case = TRUE))
+  stringr::str_extract_all(text, stringr::regex(reg, ignore_case = TRUE))
 }
 
 #'Function to remove word from text.

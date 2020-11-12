@@ -367,31 +367,31 @@ test_that("parse_logical", {
 
 test_that("str_extract_inside", {
   # bracket ()
-  ret <- exploratory::str_extract_inside("abc(defgh)ijk", begin = "(", end =")")
+  ret <- exploratory::str_extract_inside("abc(defgh)ijk", begin = "(", end =")", include_special_chars = FALSE)
   expect_equal(ret, c("defgh"))
   # curly bracket {}
-  ret <- exploratory::str_extract_inside("abc(defgh)ijk", begin = "{", end ="}")
+  ret <- exploratory::str_extract_inside("abc(defgh)ijk", begin = "{", end ="}", include_special_chars = FALSE)
   expect_equal(ret, NA_character_)
   # curly bracket {}
-  ret <- exploratory::str_extract_inside("abc{123456}ijk", begin = "{", end ="}")
+  ret <- exploratory::str_extract_inside("abc{123456}ijk", begin = "{", end ="}", include_special_chars = FALSE)
   expect_equal(ret, "123456")
   # curly bracket []
-  ret <- exploratory::str_extract_inside("abc[123456]ijk", begin = "[", end ="]")
+  ret <- exploratory::str_extract_inside("abc[123456]ijk", begin = "[", end ="]", include_special_chars = FALSE)
   expect_equal(ret, "123456")
   # double quote ""
-  ret <- exploratory::str_extract_inside('abc"123456"ijk', begin = '"', end = '"')
+  ret <- exploratory::str_extract_inside('abc"123456"ijk', begin = '"', end = '"', include_special_chars = FALSE)
   expect_equal(ret, "123456")
   # single quote ''
-  ret <- exploratory::str_extract_inside("abc'123456'ijk", begin = "'", end = "'")
+  ret <- exploratory::str_extract_inside("abc'123456'ijk", begin = "'", end = "'", include_special_chars = FALSE)
   expect_equal(ret, "123456")
   # percent %
-  ret <- exploratory::str_extract_inside("abc%123456%ijk", begin = "%", end = "%")
+  ret <- exploratory::str_extract_inside("abc%123456%ijk", begin = "%", end = "%", include_special_chars = FALSE)
   expect_equal(ret, "123456")
   # percent $
-  ret <- exploratory::str_extract_inside("abc$123456$ijk", begin = "$", end = "$")
+  ret <- exploratory::str_extract_inside("abc$123456$ijk", begin = "$", end = "$", include_special_chars = FALSE)
   expect_equal(ret, "123456")
   # percent * $
-  ret <- exploratory::str_extract_inside("abc*123456$ijk", begin = "*", end = "$")
+  ret <- exploratory::str_extract_inside("abc*123456$ijk", begin = "*", end = "$", include_special_chars = FALSE)
   expect_equal(ret, "123456")
 
   tryCatch({
@@ -579,6 +579,20 @@ test_that("str_replace_word", {
   expect_equal(ret, c("First One, Qiming Venture Partners, Tencent Holdings"))
 })
 
+test_that("str_replace_url", {
+  ret <- exploratory::str_replace_url("Check out what I just added to my closet on Poshmark: Uniqlo Girls Uniform Pants. https://t.co/tMfGP512D2 via @poshmarkapp #shopmycloset", "New York")
+  expect_equal(ret, c("Check out what I just added to my closet on Poshmark: Uniqlo Girls Uniform Pants. New York via @poshmarkapp #shopmycloset"))
+})
+
+test_that("str_remove_url", {
+  ret <- exploratory::str_remove_url("Check out what I just added to my closet on Poshmark: Uniqlo Girls Uniform Pants. https://t.co/tMfGP512D2 via @poshmarkapp #shopmycloset", "New York")
+  expect_equal(ret, "Check out what I just added to my closet on Poshmark: Uniqlo Girls Uniform Pants.  via @poshmarkapp #shopmycloset")
+})
+
+test_that("str_extract_url", {
+  ret <- exploratory::str_extract_url("Check out what I just added to my closet on Poshmark: Uniqlo Girls Uniform Pants. https://t.co/tMfGP512D2 via @poshmarkapp #shopmycloset", "New York")
+  expect_equal(ret, list("https://t.co/tMfGP512D2"))
+})
 
 test_that("str_logical", {
   ret <- exploratory::str_logical(c("yes", "yEs", "yeS", " YEs", "YeS ", "yES", "YES","no", "No", "nO", "NO ", NA))
