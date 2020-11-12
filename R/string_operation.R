@@ -591,7 +591,7 @@ parse_logical <- function(text, ...){
 
 #'Function to extract text inside the characters like bracket.
 #'@export
-str_extract_inside <- function(column, begin = "(", end = ")", all = FALSE) {
+str_extract_inside <- function(column, begin = "(", end = ")", all = FALSE, includeSpecialChars = TRUE) {
   # Ref https://stackoverflow.com/questions/3926451/how-to-match-but-not-capture-part-of-a-regex
   # Below logic creates a Regular Expression that uses lookbehind and lookahead to extract string
   # between them.
@@ -614,7 +614,10 @@ str_extract_inside <- function(column, begin = "(", end = ")", all = FALSE) {
   if(grepl("[A-Za-z]", end)) {
     stop("The end argument must be symbol such as ), }, ].")
   }
-  exp <- stringr::str_c("(?<=\\", begin, ").*?(?=\\", end, ")")
+  exp <- stringr::str_c("\\", begin, "[^\\" , begin, "\\", end, "]*\\", end)
+  if(!includeSpecialChars) {
+    exp <- stringr::str_c("(?<=\\", begin,  ").*?(?=\\", end,  ")");
+  }
   if(all) {
     stringr::str_extract_all(column, exp)
   } else {
@@ -624,7 +627,7 @@ str_extract_inside <- function(column, begin = "(", end = ")", all = FALSE) {
 
 #'Function to remove text inside the characters like bracket.
 #'@export
-str_remove_inside <- function(column, begin = "(", end = ")", all = FALSE){
+str_remove_inside <- function(column, begin = "(", end = ")", all = FALSE, includeSpecialChars = TRUE){
   if(stringr::str_length(begin) > 1) {
     stop("The begin argument must be one character.")
   }
@@ -638,6 +641,9 @@ str_remove_inside <- function(column, begin = "(", end = ")", all = FALSE){
     stop("The end argument must be symbol such as ), }, ].")
   }
   exp <- stringr::str_c("\\", begin, "[^\\" , begin, "\\", end, "]*\\", end)
+  if(!includeSpecialChars) {
+    exp <- stringr::str_c("(?<=\\", begin,  ").*?(?=\\", end,  ")");
+  }
   if(all) {
     stringr::str_remove_all(column, exp)
   } else {
@@ -647,7 +653,7 @@ str_remove_inside <- function(column, begin = "(", end = ")", all = FALSE){
 
 #'Function to replace text inside the characters like bracket.
 #'@export
-str_replace_inside <- function(column, begin = "(", end = ")", rep = "", all = FALSE){
+str_replace_inside <- function(column, begin = "(", end = ")", rep = "", all = FALSE, includeSpecialChars = TRUE){
   if(stringr::str_length(begin) > 1) {
     stop("The begin argument must be one character.")
   }
@@ -661,6 +667,9 @@ str_replace_inside <- function(column, begin = "(", end = ")", rep = "", all = F
     stop("The end argument must be symbol such as ), }, ].")
   }
   exp <- stringr::str_c("\\", begin, "[^\\" , begin, "\\", end, "]*\\", end)
+  if(!includeSpecialChars) {
+    exp <- stringr::str_c("(?<=\\", begin,  ").*?(?=\\", end,  ")");
+  }
   if(all) {
     stringr::str_replace_all(column, exp, rep)
   } else {
