@@ -1635,10 +1635,21 @@ augment.glm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = 
     return(ret)
   }
   if(!is.null(newdata)) {
+    # Replay the mutations on predictors.
+    if(!is.null(x$target_funs)) {
+      newdata <- newdata %>% mutate_predictors(x$orig_target_col, x$target_funs)
+    }
+    if(!is.null(x$predictor_funs)) {
+      newdata <- newdata %>% mutate_predictors(x$orig_predictor_cols, x$predictor_funs)
+    }
+
     predictor_variables <- all.vars(x$terms)[-1]
     predictor_variables_orig <- x$terms_mapping[predictor_variables]
 
-    cleaned_data <- newdata %>% dplyr::select(predictor_variables_orig)
+    # This select() also renames columns since predictor_variables_orig is a named vector.
+    # everything() is to keep the other columns in the output. #TODO: What if names of the other columns conflicts with our temporary name, c1_, c2_...?
+    cleaned_data <- newdata %>% dplyr::select(predictor_variables_orig, everything())
+
     # Rename columns to the normalized ones used while learning.
     colnames(cleaned_data) <- predictor_variables
 
