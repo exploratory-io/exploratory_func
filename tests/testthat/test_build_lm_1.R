@@ -624,6 +624,16 @@ test_that("Group GLM - Negative Binomial Destribution with test_rate", {
    })
 })
 
+test_that("add_prediction with logistic regression", {
+  model_df <- test_data %>% build_lm.fast(`CANCELLED X`,
+                                     `ARR_TIME`,
+                                     `DERAY_TIME`,
+                                     `Carrier Name`,
+                                     predictor_funs=list(ARR_TIME="log", DELAY_TIME="none", "Carrier Name"="none"),
+                                     model_type = "glm")
+  ret <- test_data %>% add_prediction(model_df=model_df)
+})
+
 test_that("Logistic Regression with test_rate", {
   ret <- test_data %>% build_lm.fast(`CANCELLED X`,
                                      `ARR_TIME`,
