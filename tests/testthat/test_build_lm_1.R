@@ -114,6 +114,7 @@ test_that("add_prediction with linear regression", {
                                      `ARR_TIME`,
                                      `DERAY_TIME`,
                                      `Carrier Name`,
+                                     target_fun="log",
                                      predictor_funs=list(ARR_TIME="log", DELAY_TIME="none", "Carrier Name"="none"),
                                      model_type = "lm")
   ret <- test_data %>% add_prediction(model_df=model_df)

@@ -598,6 +598,7 @@ remove_outliers_for_regression_data <- function(df, target_col, predictor_cols,
 build_lm.fast <- function(df,
                     target,
                     ...,
+                    target_fun = NULL,
                     predictor_funs = NULL,
                     model_type = "lm",
                     family = NULL,
@@ -633,6 +634,12 @@ build_lm.fast <- function(df,
                     ){
   target_col <- tidyselect::vars_select(names(df), !! rlang::enquo(target))
   orig_selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
+
+  if (!is.null(target_fun)) {
+    target_funs <- list(target_fun)
+    names(target_funs) <- target_col
+    df <- df %>% mutate_predictors(target_col, target_funs)
+  }
 
   if (!is.null(predictor_funs)) {
     df <- df %>% mutate_predictors(orig_selected_cols, predictor_funs)
@@ -1057,6 +1064,10 @@ build_lm.fast <- function(df,
         model$partial_dependence <- NULL
       }
 
+      if (!is.null(target_funs)) {
+        model$orig_target_col <- target_col
+        model$target_funs <- target_funs
+      }
       if (!is.null(predictor_funs)) {
         model$orig_predictor_cols <- orig_selected_cols
         model$predictor_funs <- predictor_funs
@@ -1574,6 +1585,9 @@ augment.lm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "
 
   if(!is.null(newdata)) {
     # Replay the mutations on predictors.
+    if(!is.null(x$target_funs)) {
+      newdata <- newdata %>% mutate_predictors(x$orig_target_col, x$target_funs)
+    }
     if(!is.null(x$predictor_funs)) {
       newdata <- newdata %>% mutate_predictors(x$orig_predictor_cols, x$predictor_funs)
     }
