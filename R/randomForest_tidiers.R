@@ -842,13 +842,21 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
   }
 
   if(!is.null(newdata)){
+    # Replay the mutations on target/predictors.
+    if(!is.null(x$target_funs)) {
+      newdata <- newdata %>% mutate_predictors(x$orig_target_col, x$target_funs)
+    }
+    if(!is.null(x$predictor_funs)) {
+      newdata <- newdata %>% mutate_predictors(x$orig_predictor_cols, x$predictor_funs)
+    }
+
     # create clean name data frame because the model learned by those names
     cleaned_data <- newdata
     y_value <- cleaned_data[[y_name]]
 
-    cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables_orig)
-    # Rename columns to the normalized ones used while learning.
-    colnames(cleaned_data) <- predictor_variables
+    # This select() also renames columns since predictor_variables_orig is a named vector.
+    # everything() is to keep the other columns in the output. #TODO: What if names of the other columns conflicts with our temporary name, c1_, c2_...?
+    cleaned_data <- newdata %>% dplyr::select(predictor_variables_orig, everything())
 
     # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
     cleaned_data <- align_predictor_factor_levels(cleaned_data, x$df, predictor_variables)
@@ -1062,13 +1070,21 @@ augment.rpart.classification <- function(x, data = NULL, newdata = NULL, data_ty
   }
 
   if (!is.null(newdata)) {
+    # Replay the mutations on target/predictors.
+    if(!is.null(x$target_funs)) {
+      newdata <- newdata %>% mutate_predictors(x$orig_target_col, x$target_funs)
+    }
+    if(!is.null(x$predictor_funs)) {
+      newdata <- newdata %>% mutate_predictors(x$orig_predictor_cols, x$predictor_funs)
+    }
+
     # create clean name data frame because the model learned by those names
     cleaned_data <- newdata
-    y_value <- cleaned_data[[y_name]]
+    y_value <- cleaned_data[[y_name]] # TODO: Does this make sense for newdata case, where target variable values are generally unknown??
 
-    cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables_orig)
-    # Rename columns to the normalized ones used while learning.
-    colnames(cleaned_data) <- predictor_variables
+    # This select() also renames columns since predictor_variables_orig is a named vector.
+    # everything() is to keep the other columns in the output. #TODO: What if names of the other columns conflicts with our temporary name, c1_, c2_...?
+    cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables_orig, everything())
 
     # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
     cleaned_data <- align_predictor_factor_levels(cleaned_data, attr(x, "xlevels"), predictor_variables)
@@ -2062,6 +2078,8 @@ importance_ranger <- function(model) {
 calc_feature_imp <- function(df,
                              target,
                              ...,
+                             target_fun = NULL,
+                             predictor_funs = NULL,
                              max_nrow = 50000, # Down from 200000 when we added partial dependence
                              max_sample_size = NULL, # Half of max_nrow. down from 100000 when we added partial dependence
                              ntree = 20,
@@ -2098,11 +2116,27 @@ calc_feature_imp <- function(df,
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
   target_col <- tidyselect::vars_select(names(df), !! rlang::enquo(target))
   # this evaluates select arguments like starts_with
-  selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
-  # Sort predictors so that the result of permutation importance is stable against change of column order.
-  selected_cols <- sort(selected_cols)
+  orig_selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
+
+  target_funs <- NULL
+  if (!is.null(target_fun)) {
+    target_funs <- list(target_fun)
+    names(target_funs) <- target_col
+    df <- df %>% mutate_predictors(target_col, target_funs)
+  }
+
+  if (!is.null(predictor_funs)) {
+    df <- df %>% mutate_predictors(orig_selected_cols, predictor_funs)
+    selected_cols <- names(unlist(predictor_funs))
+  }
+  else {
+    selected_cols <- orig_selected_cols
+  }
 
   grouped_cols <- grouped_by(df)
+
+  # Sort predictors so that the result of permutation importance is stable against change of column order.
+  selected_cols <- sort(selected_cols)
 
   # Remember if the target column was originally numeric or logical before converting type.
   is_target_logical_or_numeric <- is.numeric(df[[target_col]]) || is.logical(df[[target_col]])
@@ -2318,6 +2352,16 @@ calc_feature_imp <- function(df,
       model$df <- model_df
       model$formula_terms <- terms(fml)
       model$sampled_nrow <- clean_df_ret$sampled_nrow
+
+      if (!is.null(target_funs)) {
+        model$orig_target_col <- target_col
+        model$target_funs <- target_funs
+      }
+      if (!is.null(predictor_funs)) {
+        model$orig_predictor_cols <- orig_selected_cols
+        model$predictor_funs <- predictor_funs
+      }
+
       list(model = model, test_index = test_index, source_data = source_data)
     }, error = function(e){
       if(length(grouped_cols) > 0) {

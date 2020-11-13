@@ -467,6 +467,17 @@ test_that("Group GLM - Inverse Gaussian Destribution with test_rate", {
    })
 })
 
+test_that("add_prediction with poisson regression", {
+  model_df <- test_data %>% build_lm.fast(`DISTANCE`,
+                                     `ARR_TIME`,
+                                     `DERAY_TIME`,
+                                     `Carrier Name`,
+                                     predictor_funs=list(ARR_TIME="log", DELAY_TIME="none", "Carrier Name"="none"),
+                                     model_type = "glm",
+                                     family = "poisson")
+  ret <- test_data %>% add_prediction(model_df=model_df)
+})
+
 test_that("GLM - poisson Destribution with test_rate", {
   ret <- test_data %>% build_lm.fast(`DISTANCE`,
                                      `ARR_TIME`,
