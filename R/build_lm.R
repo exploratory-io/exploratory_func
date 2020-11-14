@@ -1585,7 +1585,7 @@ augment.lm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "
   }
 
   if(!is.null(newdata)) {
-    # Replay the mutations on predictors.
+    # Replay the mutations on target/predictors.
     if(!is.null(x$target_funs)) {
       newdata <- newdata %>% mutate_predictors(x$orig_target_col, x$target_funs)
     }
