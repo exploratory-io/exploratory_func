@@ -26,6 +26,7 @@ test_that("exp_rpart(regression) evaluate training and test", {
                           test_rate = 0.3,
                           test_split_type = "ordered") # testing ordered split too.
 
+  ret <- flight %>% add_prediction(model_df=model_df)
   ret <- model_df %>% prediction(data="newdata", data_frame = flight)
   ret <-  model_df %>% rf_partial_dependence()
 
@@ -64,6 +65,7 @@ test_that("exp_rpart(binary(logical)) evaluate training and test", {
   model_df <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`)) %>%
                 exp_rpart(is_delayed, `DIS TANCE`, `DEP DELAY`, `ORI GIN`, test_rate = 0.4, binary_classification_threshold=0.5)
 
+  ret <- flight %>% add_prediction(model_df=model_df)
   ret <- model_df %>% prediction(data="newdata", data_frame = flight)
   ret <-  model_df %>% rf_partial_dependence()
 
@@ -96,6 +98,7 @@ test_that("exp_rpart(character(A,B)) evaluate training and test", { # This shoul
   model_df <- flight %>% dplyr::mutate(is_delayed = if_else(as.logical(`is delayed`), "A", "B")) %>%
                 exp_rpart(is_delayed, `DIS TANCE`, `DEP DELAY`, test_rate = 0.3, binary_classification_threshold=0.5)
 
+  ret <- flight %>% add_prediction(model_df=model_df)
   ret <- model_df %>% prediction(data="newdata", data_frame = flight)
   ret <-  model_df %>% rf_partial_dependence()
 

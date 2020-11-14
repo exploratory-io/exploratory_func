@@ -1176,12 +1176,17 @@ augment.rpart.regression <- function(x, data = NULL, newdata = NULL, data_type =
   predictor_variables_orig <- x$terms_mapping[predictor_variables]
 
   if(!is.null(newdata)) {
-    # create clean name data frame because the model learned by those names
-    cleaned_data <- newdata
+    # Replay the mutations on target/predictors.
+    if(!is.null(x$target_funs)) {
+      newdata <- newdata %>% mutate_predictors(x$orig_target_col, x$target_funs)
+    }
+    if(!is.null(x$predictor_funs)) {
+      newdata <- newdata %>% mutate_predictors(x$orig_predictor_cols, x$predictor_funs)
+    }
 
-    cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables_orig)
-    # Rename columns to the normalized ones used while learning.
-    colnames(cleaned_data) <- predictor_variables
+    # create clean name data frame because the model learned by those names
+    # This select() also renames columns since predictor_variables_orig is a named vector.
+    cleaned_data <- newdata %>% dplyr::select(predictor_variables_orig)
 
     # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
     cleaned_data <- align_predictor_factor_levels(cleaned_data, attr(x, "xlevels"), predictor_variables)
@@ -2908,6 +2913,8 @@ partial_dependence.rpart = function(fit, target, vars = colnames(data),
 exp_rpart <- function(df,
                       target,
                       ...,
+                      target_fun = NULL,
+                      predictor_funs = NULL,
                       max_nrow = 50000, # down from 200000 when we added partial dependence
                       target_n = 20,
                       predictor_n = 12, # so that at least months can fit in it.
@@ -2938,11 +2945,27 @@ exp_rpart <- function(df,
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
   target_col <- tidyselect::vars_select(names(df), !! rlang::enquo(target))
   # this evaluates select arguments like starts_with
-  selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
-  # Sort predictors so that the result of permutation importance is stable against change of column order.
-  selected_cols <- sort(selected_cols)
+  orig_selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
+
+  target_funs <- NULL
+  if (!is.null(target_fun)) {
+    target_funs <- list(target_fun)
+    names(target_funs) <- target_col
+    df <- df %>% mutate_predictors(target_col, target_funs)
+  }
+
+  if (!is.null(predictor_funs)) {
+    df <- df %>% mutate_predictors(orig_selected_cols, predictor_funs)
+    selected_cols <- names(unlist(predictor_funs))
+  }
+  else {
+    selected_cols <- orig_selected_cols
+  }
 
   grouped_cols <- grouped_by(df)
+
+  # Sort predictors so that the result of permutation importance is stable against change of column order.
+  selected_cols <- sort(selected_cols)
 
   # Remember if the target column was originally numeric or logical before converting type.
   is_target_logical_or_numeric <- is.numeric(df[[target_col]]) || is.logical(df[[target_col]])
@@ -3066,6 +3089,15 @@ exp_rpart <- function(df,
           model$predicted_class_test <- get_predicted_class_rpart(model, data_type = "test",
                                                                   binary_classification_threshold = binary_classification_threshold)
         }
+      }
+
+      if (!is.null(target_funs)) {
+        model$orig_target_col <- target_col
+        model$target_funs <- target_funs
+      }
+      if (!is.null(predictor_funs)) {
+        model$orig_predictor_cols <- orig_selected_cols
+        model$predictor_funs <- predictor_funs
       }
 
       list(model = model, test_index = test_index, source_data = source_data)
