@@ -267,6 +267,14 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, data_type = "t
   predictor_variables_orig <- x$terms_mapping[predictor_variables]
 
   if(!is.null(newdata)) { # Unlike ranger case, there is no prediction result kept in the model in case of xgboost.
+    # Replay the mutations on target/predictors.
+    if(!is.null(x$target_funs)) {
+      newdata <- newdata %>% mutate_predictors(x$orig_target_col, x$target_funs)
+    }
+    if(!is.null(x$predictor_funs)) {
+      newdata <- newdata %>% mutate_predictors(x$orig_predictor_cols, x$predictor_funs)
+    }
+
     class(x) <- class(x)[class(x) != c("xgboost_multi")]
 
     # create clean name data frame because the model learned by those names
@@ -276,9 +284,7 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, data_type = "t
       data
     }
 
-    cleaned_data <- original_data
-
-    cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables_orig)
+    cleaned_data <- original_data %>% dplyr::select(predictor_variables_orig)
     # Rename columns to the normalized ones used while learning.
     colnames(cleaned_data) <- predictor_variables
 
@@ -378,11 +384,17 @@ augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, data_type = "
   
   # create clean name data frame because the model learned by those names
   if(!is.null(newdata)) { # Unlike ranger case, there is no prediction result kept in the model in case of xgboost.
+    # Replay the mutations on target/predictors.
+    if(!is.null(x$target_funs)) {
+      newdata <- newdata %>% mutate_predictors(x$orig_target_col, x$target_funs)
+    }
+    if(!is.null(x$predictor_funs)) {
+      newdata <- newdata %>% mutate_predictors(x$orig_predictor_cols, x$predictor_funs)
+    }
+
     original_data <- newdata
   
-    cleaned_data <- original_data
-
-    cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables_orig)
+    cleaned_data <- original_data %>% dplyr::select(predictor_variables_orig)
     # Rename columns to the normalized ones used while learning.
     colnames(cleaned_data) <- predictor_variables
 
@@ -470,6 +482,14 @@ augment.xgboost_reg <- function(x, data = NULL, newdata = NULL, data_type = "tra
   predictor_variables_orig <- x$terms_mapping[predictor_variables]
 
   if(!is.null(newdata)) { # Unlike ranger case, there is no prediction result kept in the model in case of xgboost.
+    # Replay the mutations on target/predictors.
+    if(!is.null(x$target_funs)) {
+      newdata <- newdata %>% mutate_predictors(x$orig_target_col, x$target_funs)
+    }
+    if(!is.null(x$predictor_funs)) {
+      newdata <- newdata %>% mutate_predictors(x$orig_predictor_cols, x$predictor_funs)
+    }
+
     # create clean name data frame because the model learned by those names
     original_data <- if(!is.null(newdata)){
       newdata
@@ -477,9 +497,7 @@ augment.xgboost_reg <- function(x, data = NULL, newdata = NULL, data_type = "tra
       data
     }
 
-    cleaned_data <- original_data
-
-    cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables_orig)
+    cleaned_data <- original_data %>% dplyr::select(predictor_variables_orig)
     # Rename columns to the normalized ones used while learning.
     colnames(cleaned_data) <- predictor_variables
 
@@ -978,6 +996,8 @@ cleanup_df_for_test <- function(df_test, df_train, c_cols) {
 exp_xgboost <- function(df,
                         target,
                         ...,
+                        target_fun = NULL,
+                        predictor_funs = NULL,
                         max_nrow = 50000, # Down from 200000 when we added partial dependence
                         # XGBoost-specific parameters
                         nrounds = 10,
@@ -1031,11 +1051,27 @@ exp_xgboost <- function(df,
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
   target_col <- tidyselect::vars_select(names(df), !! rlang::enquo(target))
   # this evaluates select arguments like starts_with
-  selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
-  # Sort predictors so that the result of permutation importance is stable against change of column order.
-  selected_cols <- sort(selected_cols)
+  orig_selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
+
+  target_funs <- NULL
+  if (!is.null(target_fun)) {
+    target_funs <- list(target_fun)
+    names(target_funs) <- target_col
+    df <- df %>% mutate_predictors(target_col, target_funs)
+  }
+
+  if (!is.null(predictor_funs)) {
+    df <- df %>% mutate_predictors(orig_selected_cols, predictor_funs)
+    selected_cols <- names(unlist(predictor_funs))
+  }
+  else {
+    selected_cols <- orig_selected_cols
+  }
 
   grouped_cols <- grouped_by(df)
+
+  # Sort predictors so that the result of permutation importance is stable against change of column order.
+  selected_cols <- sort(selected_cols)
 
   # Remember if the target column was originally numeric or logical before converting type.
   is_target_numeric <- is.numeric(df[[target_col]])
@@ -1235,6 +1271,16 @@ exp_xgboost <- function(df,
       model$df <- df
       model$formula_terms <- terms(fml)
       model$sampled_nrow <- clean_df_ret$sampled_nrow
+
+      if (!is.null(target_funs)) {
+        model$orig_target_col <- target_col
+        model$target_funs <- target_funs
+      }
+      if (!is.null(predictor_funs)) {
+        model$orig_predictor_cols <- orig_selected_cols
+        model$predictor_funs <- predictor_funs
+      }
+
       list(model = model, test_index = test_index, source_data = source_data)
     }, error = function(e){
       if(length(grouped_cols) > 0) {
