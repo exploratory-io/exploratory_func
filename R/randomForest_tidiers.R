@@ -850,13 +850,11 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
       newdata <- newdata %>% mutate_predictors(x$orig_predictor_cols, x$predictor_funs)
     }
 
-    # create clean name data frame because the model learned by those names
-    cleaned_data <- newdata
-    y_value <- cleaned_data[[y_name]]
+    y_value <- newdata[[y_name]] # TODO: Does this make sense for newdata case, where target variable values are generally unknown??
 
+    # create clean name data frame because the model learned by those names
     # This select() also renames columns since predictor_variables_orig is a named vector.
-    # everything() is to keep the other columns in the output. #TODO: What if names of the other columns conflicts with our temporary name, c1_, c2_...?
-    cleaned_data <- newdata %>% dplyr::select(predictor_variables_orig, everything())
+    cleaned_data <- newdata %>% dplyr::select(predictor_variables_orig)
 
     # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
     cleaned_data <- align_predictor_factor_levels(cleaned_data, x$df, predictor_variables)
@@ -988,12 +986,16 @@ augment.ranger.regression <- function(x, data = NULL, newdata = NULL, data_type 
   predictor_variables_orig <- x$terms_mapping[predictor_variables]
 
   if(!is.null(newdata)) {
-    # create clean name data frame because the model learned by those names
-    cleaned_data <- newdata
+    # Replay the mutations on target/predictors.
+    if(!is.null(x$target_funs)) {
+      newdata <- newdata %>% mutate_predictors(x$orig_target_col, x$target_funs)
+    }
+    if(!is.null(x$predictor_funs)) {
+      newdata <- newdata %>% mutate_predictors(x$orig_predictor_cols, x$predictor_funs)
+    }
 
-    cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables_orig)
-    # Rename columns to the normalized ones used while learning.
-    colnames(cleaned_data) <- predictor_variables
+    # This select() also renames columns since predictor_variables_orig is a named vector.
+    cleaned_data <- newdata %>% dplyr::select(predictor_variables_orig)
 
     # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
     cleaned_data <- align_predictor_factor_levels(cleaned_data, x$df, predictor_variables)
