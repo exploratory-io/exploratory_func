@@ -29,7 +29,7 @@ test_that("exp_xgboost(regression) evaluate training and test", {
                                  test_rate = 0.3,
                                  test_split_type = "ordered", pd_with_bin_means = TRUE, # testing ordered split too.
                                  watchlist_rate = 0.1)
-  ret <- flight %>% add_prediction(model_df=model_df)
+  ret <- flight %>% select(-`ARR DELAY`) %>% add_prediction(model_df=model_df)
   ret <- model_df %>% prediction(data="newdata", data_frame=flight)
 
   ret <- model_df %>% tidy_rowwise(model, type="evaluation_log")
@@ -74,7 +74,7 @@ test_that("exp_xgboost(binary) evaluate training and test", {
                             predictor_funs=list(`DIS TANCE`="none", `DEP TIME`="none"),
                             test_rate = 0.3, pd_with_bin_means = TRUE)
 
-  ret <- flight %>% add_prediction(model_df=model_df)
+  ret <- flight %>% select(-is_delayed) %>% add_prediction(model_df=model_df)
   ret <- model_df %>% prediction(data="newdata", data_frame=flight)
 
   ret <- rf_evaluation_training_and_test(model_df, binary_classification_threshold = 0.5)
@@ -123,7 +123,7 @@ test_that("exp_xgboost(factor(TRUE, FALSE)) evaluate training and test", { # Thi
   model_df <- flight %>% dplyr::mutate(is_delayed = factor(as.logical(`is delayed`))) %>% filter(!is.na(is_delayed)) %>%
                 exp_xgboost(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0.3, pd_with_bin_means = TRUE)
 
-  ret <- flight %>% add_prediction(model_df=model_df)
+  ret <- flight %>% select(-is_delayed) %>% add_prediction(model_df=model_df)
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
   # expect_equal(nrow(test_ret), 1500) Fails now, since we filter numeric NA. Revive when we do not need to.
