@@ -1286,16 +1286,22 @@ ranger.find_na_index <- function(variables, data) {
 #' @param y_value - Actual value to be predicted
 ranger.predict_value_from_prob <- function(levels_var, pred, y_value, threshold = NULL) {
   # We assume threshold is given only for binary case.
-  if (is.null(threshold)) { # multiclass case
+  if (is.null(threshold)) { # multiclass case. Return the value with maximum probability.
     to_same_type(levels_var[apply(pred, 1, which.max)], y_value)
   }
   else { # binary case
+    true_index <- match("TRUE",colnames(pred)) # Find which index is TRUE
     predicted <- factor(levels_var[apply(pred, 1, function(x){
       if(is.na(x[2])){ # take care of the case where pred has only 1 column. possible when there are only one value in training data.
         1
       }
       else {
-        if(x[1]>threshold) 1 else 2
+        if (true_index == 1) {
+          if(x[1]>threshold) 1 else 2
+        }
+        else { # true_incex == 2
+          if(x[2]>threshold) 2 else 1
+        }
       }
     })], levels=levels_var)
     predicted

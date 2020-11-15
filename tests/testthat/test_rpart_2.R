@@ -59,13 +59,16 @@ test_that("exp_rpart(regression) evaluate training and test", {
   expect_equal(nrow(ret), 1) # 1 for train
 })
 
-test_that("exp_rpart(binary(logical)) evaluate training and test", {
+test_that("exp_rpart evaluate training and test - logical", {
   set.seed(1)
   # Keep the test rate high (0.4) so that NA data goes to training part too.
   data <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`))
   model_df <- data %>% exp_rpart(is_delayed, `DIS TANCE`, `DEP DELAY`, `ORI GIN`, test_rate = 0.4, binary_classification_threshold=0.5)
 
-  ret <- data %>% select(-is_delayed) %>% add_prediction(model_df=model_df)
+  ret1 <- data %>% select(-is_delayed) %>% add_prediction(model_df=model_df, binary_classification_threshold=0.5)
+  ret2 <- data %>% select(-is_delayed) %>% add_prediction(model_df=model_df, binary_classification_threshold=0.01)
+  expect_gt(sum(ret2$predicted_label=="TRUE",na.rm=TRUE), sum(ret1$predicted_label=="TRUE",na.rm=TRUE)) # Change of threshold should make difference.
+
   ret <- model_df %>% prediction(data="newdata", data_frame = flight)
   ret <-  model_df %>% rf_partial_dependence()
 
