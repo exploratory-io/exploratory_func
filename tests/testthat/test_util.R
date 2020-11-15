@@ -664,15 +664,15 @@ test_that("test pivot with group_by and dirty colum names", {
   expect_equal("group", grouped_by(grouped_pivoted))
 })
 
-test_that("test same_type for factor", {
+test_that("test to_same_type for factor", {
   original <- factor(c("bb", "bb", "aa"), levels = c("bb", "aa"))
 
   to_replace <- c("aa", "aa", "bb")
-  ret <- exploratory:::same_type(to_replace, original)
+  ret <- exploratory:::to_same_type(to_replace, original)
   expect_equal(ret, factor(c("aa", "aa", "bb"), levels = c("bb", "aa")))
 
   to_replace <- factor(c("aa", "aa", "bb"), levels = c("aa", "bb"))
-  ret <- exploratory:::same_type(to_replace, original)
+  ret <- exploratory:::to_same_type(to_replace, original)
   expect_equal(ret, factor(c("aa", "aa", "bb"), levels = c("bb", "aa")))
 })
 

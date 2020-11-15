@@ -638,7 +638,7 @@ augment.randomForest.classification <- function(x, data = NULL, newdata = NULL, 
 
     predicted <- rep(NA, times = n_data)
     predicted[!na_at] <- x[["predicted"]]
-    predicted <- same_type(levels(x[["y"]])[predicted], cleaned_data[[y_name]])
+    predicted <- to_same_type(levels(x[["y"]])[predicted], cleaned_data[[y_name]])
 
     votes <- x[["votes"]]
     full_votes <- matrix(data = NA, nrow = n_data, ncol = ncol(votes))
@@ -1287,7 +1287,7 @@ ranger.find_na_index <- function(variables, data) {
 ranger.predict_value_from_prob <- function(levels_var, pred, y_value, threshold = NULL) {
   # We assume threshold is given only for binary case.
   if (is.null(threshold)) { # multiclass case
-    same_type(levels_var[apply(pred, 1, which.max)], y_value)
+    to_same_type(levels_var[apply(pred, 1, which.max)], y_value)
   }
   else { # binary case
     predicted <- factor(levels_var[apply(pred, 1, function(x){

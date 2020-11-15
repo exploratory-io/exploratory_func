@@ -116,7 +116,7 @@ xgboost_binary <- function(data, formula, output_type = "logistic", eval_metric 
   } else if (!all(y_vals[!is.na(y_vals)] %in% c(0, 1))){
     # there are values that are not 0 or 1, so should be mapped as factor
     factored <- as.factor(data[[y_name]])
-    label_levels <- same_type(levels(factored), data[[y_name]])
+    label_levels <- to_same_type(levels(factored), data[[y_name]])
     if(length(label_levels) != 2){
       stop("target variable must have 2 unique values")
     }
@@ -178,7 +178,7 @@ xgboost_multi <- function(data, formula, output_type = "softprob", eval_metric =
   } else {
     factored <- as.factor(data[[y_name]])
     y_vals <- as.numeric(factored) - 1
-    same_type(levels(factored), data[[y_name]])
+    to_same_type(levels(factored), data[[y_name]])
   }
 
   data[[y_name]] <- y_vals

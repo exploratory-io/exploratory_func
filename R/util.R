@@ -332,8 +332,8 @@ mat_to_df <- function(mat, cnames=NULL, na.rm=TRUE, zero.rm = TRUE, diag=TRUE){
   df
 }
 
-#' match the type of two vector
-same_type <- function(vector, original){
+#' Cast the vector to the same type as the original.
+to_same_type <- function(vector, original){
   if(is.null(original)){
     vector
   }
@@ -1069,7 +1069,7 @@ quantifiable_cols <- function(data){
 get_multi_predicted_values <- function(prob_mat, actual_vals = NULL){
   prob_label <- colnames(prob_mat)[max.col(prob_mat)]
   if(!is.null(actual_vals)){
-    prob_label <- same_type(prob_label, actual_vals)
+    prob_label <- to_same_type(prob_label, actual_vals)
   }
 
   # get max values from each row
@@ -1086,7 +1086,7 @@ get_multi_predicted_values <- function(prob_mat, actual_vals = NULL){
 #' @param values Vector to be filled with NA.
 #' @param max_index The size of output vector
 fill_vec_NA <- function(indice, values, max_index = max(indice, na.rm = TRUE)){
-  ret <- same_type(rep(NA, max_index), values)
+  ret <- to_same_type(rep(NA, max_index), values)
   ret[indice] <- values
   ret
 }
@@ -1099,7 +1099,7 @@ fill_mat_NA <- function(indice, mat, max_index = max(indice, na.rm = TRUE)){
   if(nrow(mat) != length(indice)) {
     stop("matrix must have the same length of indice")
   }
-  na_val <- same_type(NA, as.vector(mat))
+  na_val <- to_same_type(NA, as.vector(mat))
   ret <- matrix(na_val, nrow = max_index, ncol = ncol(mat))
   colnames(ret) <- colnames(mat)
   ret[indice, ] <- mat
