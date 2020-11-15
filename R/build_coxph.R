@@ -781,9 +781,6 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
   }
   if(!is.null(newdata)) {
     # Replay the mutations on predictors.
-    if(!is.null(x$target_funs)) {
-      newdata <- newdata %>% mutate_predictors(x$orig_target_col, x$target_funs)
-    }
     if(!is.null(x$predictor_funs)) {
       newdata <- newdata %>% mutate_predictors(x$orig_predictor_cols, x$predictor_funs)
     }
