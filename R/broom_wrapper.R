@@ -182,6 +182,10 @@ augment_kmeans <- function(df, model, data){
 #' @param ... Additional argument to be passed to broom::augment
 #' @export
 add_prediction <- function(df, model_df, conf_int = 0.95, ...){
+  if (class(model_df$model[[1]]) %in% c("coxph_exploratory")) { # For now this is only for Cox regression Analytics View model.
+    return(add_prediction2(df, model_df, conf_int = conf_int, ...))
+  }
+
   validate_empty_data(df)
 
   # parsing arguments of add_prediction and getting optional arguemnt for augment in ...
@@ -766,6 +770,11 @@ prediction2 <- function(df, data_frame = NULL, conf_int = 0.95, ...){
   ret
 }
 
+add_prediction2 <- function(df, model_df, conf_int = 0.95, ...){
+  # Only data frames with single model (no group_by) are supported for now.
+  ret <- broom::augment(model_df$model[[1]], newdata=df, ...)
+  ret
+}
 
 # Simplified, model agnostic version of rf_evaluation_training_and_test.
 # Currently used only by cox regression and survival forest, but planning to migrate others to this one.

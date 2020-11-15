@@ -759,17 +759,51 @@ glance.coxph_exploratory <- function(x, data_type = "training", pretty.name = FA
 }
 
 #' @export
-augment.coxph_exploratory <- function(x, data_type = "training", ...) {
+augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training", ...) {
   if ("error" %in% class(x)) {
     ret <- data.frame(Note = x$message)
     return(ret)
   }
-  # TODO: handle training/test split.
-  if (data_type == "training") {
+  if(!is.null(newdata)) {
+    # Replay the mutations on predictors.
+    if(!is.null(x$target_funs)) {
+      newdata <- newdata %>% mutate_predictors(x$orig_target_col, x$target_funs)
+    }
+    if(!is.null(x$predictor_funs)) {
+      newdata <- newdata %>% mutate_predictors(x$orig_predictor_cols, x$predictor_funs)
+    }
+
+    predictor_variables <- all.vars(x$terms)[-1]
+    predictor_variables_orig <- x$terms_mapping[predictor_variables]
+
+    # This select() also renames columns since predictor_variables_orig is a named vector.
+    # everything() is to keep the other columns in the output. #TODO: What if names of the other columns conflicts with our temporary name, c1_, c2_...?
+    cleaned_data <- newdata %>% dplyr::select(predictor_variables_orig, everything())
+
+    # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
+    cleaned_data <- align_predictor_factor_levels(cleaned_data, x$xlevels, predictor_variables, convert_logical=FALSE)
+
+    na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
+    if (length(na_row_numbers) > 0) {
+      cleaned_data <- cleaned_data[-na_row_numbers,]
+    }
+
+    ret <- tryCatch({
+      broom:::augment.coxph(x, data = NULL, newdata = cleaned_data, se = TRUE, ...)
+    }, error = function(e){
+      # TODO: This is copied from the code for glm, but check if this is useful for coxph.
+      # se=TRUE throws error that looks like "singular matrix 'a' in solve",
+      # in some subset of cases of perfect collinearity.
+      # Try recovering from it by running with se=FALSE.
+      broom:::augment.coxph(x, data = NULL, newdata = cleaned_data, se = FALSE, ...)
+    })
+    # TODO: Restore removed rows.
+  }
+  else if (data_type == "training") {
     data <- x$training_data
     ret <- broom:::augment.coxph(x, data = data, ...)
   }
-  else {
+  else { # data_type == "test"
     if (is.null(x$test_data)) {
       return(data.frame())
     }
