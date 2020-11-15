@@ -20,7 +20,7 @@ test_that("binary prediction with character target column", {
                               normalize_predictors = TRUE,
                               model_type = "glm", smote=FALSE, with_marginal_effects=TRUE, with_marginal_effects_confint=TRUE)
 
-  ret <- test_data %>% add_prediction(model_df=model_data)
+  ret <- test_data %>% select(-`CANCELLED X`) %>% add_prediction(model_df=model_data)
   ret <- model_data %>% prediction(data="newdata", data_frame=test_data)
 
   ret <- model_data %>% tidy_rowwise(model, type="vif")
@@ -117,7 +117,7 @@ test_that("add_prediction with linear regression", {
                                      target_fun="log",
                                      predictor_funs=list(ARR_TIME="log", DELAY_TIME="none", "Carrier Name"="none"),
                                      model_type = "lm")
-  ret <- test_data %>% add_prediction(model_df=model_df)
+  ret <- test_data %>% select(-DISTANCE) %>% add_prediction(model_df=model_df)
 })
 
 test_that("Linear Regression with test rate", {
@@ -475,7 +475,7 @@ test_that("add_prediction with poisson regression", {
                                      predictor_funs=list(ARR_TIME="log", DELAY_TIME="none", "Carrier Name"="none"),
                                      model_type = "glm",
                                      family = "poisson")
-  ret <- test_data %>% add_prediction(model_df=model_df)
+  ret <- test_data %>% select(-DISTANCE) %>% add_prediction(model_df=model_df)
 })
 
 test_that("GLM - poisson Destribution with test_rate", {
@@ -642,7 +642,7 @@ test_that("add_prediction with logistic regression", {
                                      `Carrier Name`,
                                      predictor_funs=list(ARR_TIME="log", DELAY_TIME="none", "Carrier Name"="none"),
                                      model_type = "glm")
-  ret <- test_data %>% add_prediction(model_df=model_df)
+  ret <- test_data %>% select(-`CANCELLED X`) %>% add_prediction(model_df=model_df)
 })
 
 test_that("Logistic Regression with test_rate", {

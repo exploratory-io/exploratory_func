@@ -28,7 +28,7 @@ test_that("calc_feature_imp(regression) evaluate training and test", {
                                  test_rate = 0.3,
                                  test_split_type = "ordered", with_boruta = TRUE, pd_with_bin_means = TRUE) # testing ordered split too.
 
-  ret <- flight %>% add_prediction(model_df=model_df)
+  ret <- flight %>% select(-`ARR DELAY`) %>% add_prediction(model_df=model_df)
   ret <- model_df %>% prediction(data="newdata", data_frame=flight)
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
