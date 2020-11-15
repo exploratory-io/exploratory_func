@@ -785,7 +785,7 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
       newdata <- newdata %>% mutate_predictors(x$orig_predictor_cols, x$predictor_funs)
     }
 
-    predictor_variables <- all.vars(x$terms)[-1]
+    predictor_variables <- all.vars(x$terms)[c(-1,-2)] # c(-1,-2) to skip time and status columns.
     predictor_variables_orig <- x$terms_mapping[predictor_variables]
 
     # This select() also renames columns since predictor_variables_orig is a named vector.
