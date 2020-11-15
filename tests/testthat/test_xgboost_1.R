@@ -124,6 +124,7 @@ test_that("exp_xgboost(factor(TRUE, FALSE)) evaluate training and test", { # Thi
   model_df <- data %>% exp_xgboost(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0.3, pd_with_bin_means = TRUE)
 
   ret <- data %>% select(-is_delayed) %>% add_prediction(model_df=model_df)
+  expect_true(all(c("predicted_probability_FALSE","predicted_probability_TRUE","predicted_value","predicted_probability") %in% colnames(ret)))
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
   # expect_equal(nrow(test_ret), 1500) Fails now, since we filter numeric NA. Revive when we do not need to.
