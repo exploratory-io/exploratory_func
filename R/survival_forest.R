@@ -196,6 +196,7 @@ exp_survival_forest <- function(df,
                     time,
                     status,
                     ...,
+                    predictor_funs = NULL,
                     max_nrow = 50000, # With 50000 rows, taking 6 to 7 seconds on late-2016 Macbook Pro.
                     max_sample_size = NULL, # Half of max_nrow.
                     ntree = 20,
@@ -226,7 +227,15 @@ exp_survival_forest <- function(df,
   time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(time))
   status_col <- tidyselect::vars_select(names(df), !! rlang::enquo(status))
   # this evaluates select arguments like starts_with
-  selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
+  orig_selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
+
+  if (!is.null(predictor_funs)) {
+    df <- df %>% mutate_predictors(orig_selected_cols, predictor_funs)
+    selected_cols <- names(unlist(predictor_funs))
+  }
+  else {
+    selected_cols <- orig_selected_cols
+  }
   # Sort predictors so that the result of permutation importance is stable against change of column order.
   selected_cols <- sort(selected_cols)
 
@@ -433,6 +442,11 @@ exp_survival_forest <- function(df,
       }
       rf$df <- df
       rf$nevent <- sum(df[[clean_status_col]], na.rm=TRUE)
+
+      if (!is.null(predictor_funs)) {
+        model$orig_predictor_cols <- orig_selected_cols
+        model$predictor_funs <- predictor_funs
+      }
 
       # add special lm_coxph class for adding extra info at glance().
       class(rf) <- c("ranger_survival_exploratory", class(rf))
