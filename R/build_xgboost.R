@@ -420,20 +420,19 @@ augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, data_type = "
     # Inserting once removed NA rows
     predicted <- restore_na(predicted_val, na_row_numbers)
     obj <- x$params$objective
-    predicted_label_col <- avoid_conflict(colnames(original_data), "predicted_label")
+    predicted_val_col <- avoid_conflict(colnames(original_data), "predicted_value")
     predicted_prob_col <- avoid_conflict(colnames(original_data), "predicted_probability")
     prob <- if (obj == "binary:logistic") {
-      predicted_prob_col <- avoid_conflict(colnames(original_data), "predicted_probability")
       original_data[[predicted_prob_col]] <- predicted
+      original_data[[predicted_val_col]] <- predicted > binary_classification_threshold
       predicted
     } else if (obj == "binary:logitraw") {
-      predicted_val_col <- avoid_conflict(colnames(original_data), "predicted_value")
     
       # binary:logitraw returns logit values
       prob <- boot::inv.logit(predicted)
     
-      original_data[[predicted_val_col]] <- predicted
       original_data[[predicted_prob_col]] <- prob
+      original_data[[predicted_val_col]] <- predicted
       prob
     } else {
       stop(paste0("object type ", obj, " is not supported"))
