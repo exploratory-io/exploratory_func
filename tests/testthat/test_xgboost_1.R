@@ -25,6 +25,7 @@ test_that("exp_xgboost(regression) evaluate training and test", {
   set.seed(1) # For stability of result.
   model_df <- flight %>%
                 exp_xgboost(`ARR DELAY`, `CAR RIER`, `ORI GIN`, `DEP DELAY`, `AIR TIME`,
+                            predictor_funs=list(`CAR RIER`="none", `ORI GIN`="none", `DEP DELAY`="none", `AIR TIME`="none"),
                                  test_rate = 0.3,
                                  test_split_type = "ordered", pd_with_bin_means = TRUE, # testing ordered split too.
                                  watchlist_rate = 0.1)
@@ -69,7 +70,9 @@ test_that("exp_xgboost(binary) evaluate training and test", {
   # `is delayed` is not logical for some reason.
   # To test binary prediction, need to cast it into logical.
   model_df <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`)) %>%
-                exp_xgboost(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0.3, pd_with_bin_means = TRUE)
+                exp_xgboost(is_delayed, `DIS TANCE`, `DEP TIME`,
+                            predictor_funs=list(`DIS TANCE`="none", `DEP TIME`="none"),
+                            test_rate = 0.3, pd_with_bin_means = TRUE)
 
   ret <- flight %>% add_prediction(model_df=model_df)
   ret <- model_df %>% prediction(data="newdata", data_frame=flight)
