@@ -302,6 +302,7 @@ build_coxph.fast <- function(df,
                     time,
                     status,
                     ...,
+                    predictor_funs = NULL,
                     max_nrow = 50000, # With 50000 rows, taking 6 to 7 seconds on late-2016 Macbook Pro.
                     predictor_n = 12, # so that at least months can fit in it.
                     max_pd_vars = NULL,
@@ -321,7 +322,16 @@ build_coxph.fast <- function(df,
   time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(time))
   status_col <- tidyselect::vars_select(names(df), !! rlang::enquo(status))
   # this evaluates select arguments like starts_with
-  selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
+  orig_selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
+
+  if (!is.null(predictor_funs)) {
+    df <- df %>% mutate_predictors(orig_selected_cols, predictor_funs)
+    selected_cols <- names(unlist(predictor_funs))
+  }
+  else {
+    selected_cols <- orig_selected_cols
+  }
+
   # Sort predictors so that the result of permutation importance is stable against change of column order.
   selected_cols <- sort(selected_cols)
 
@@ -512,6 +522,11 @@ build_coxph.fast <- function(df,
         model$auc_test <- survival_auroc(prediction_test, df_test_clean[[clean_time_col]], df_test_clean[[clean_status_col]], pred_survival_time)
       }
       model$training_data <- df
+
+      if (!is.null(predictor_funs)) {
+        model$orig_predictor_cols <- orig_selected_cols
+        model$predictor_funs <- predictor_funs
+      }
 
       # add special lm_coxph class for adding extra info at glance().
       class(model) <- c("coxph_exploratory", class(model))
