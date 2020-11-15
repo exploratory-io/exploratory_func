@@ -24,8 +24,8 @@ if (!testdata_filename %in% list.files(testdata_dir)) {
 test_that("exp_xgboost(regression) evaluate training and test", {
   set.seed(1) # For stability of result.
   model_df <- flight %>%
-                exp_xgboost(`ARR DELAY`, `CAR RIER`, `ORI GIN`, `DEP DELAY`, `AIR TIME`,
-                            predictor_funs=list(`CAR RIER`="none", `ORI GIN`="none", `DEP DELAY`="none", `AIR TIME`="none"),
+                exp_xgboost(`ARR DELAY`, `CAR RIER`, `ORI GIN`, `DEP DELAY`, `AIR TIME`, `FL DATE`,
+                            predictor_funs=list(`CAR RIER`="none", `ORI GIN`="none", `DEP DELAY`="none", `AIR TIME`="none", list(`FL DATE_y`="year", `FL DATE_m`="monname", `FL DATE_dom`="day", `FL DATE_dow`="wday")),
                                  test_rate = 0.3,
                                  test_split_type = "ordered", pd_with_bin_means = TRUE, # testing ordered split too.
                                  watchlist_rate = 0.1)
