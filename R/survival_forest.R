@@ -551,12 +551,35 @@ glance.ranger_survival_exploratory <- function(x, data_type = "training", ...) {
 }
 
 #' @export
-augment.ranger_survival_exploratory <- function(x, data_type = "training", ...) {
+augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "training", ...) {
   if ("error" %in% class(x)) {
     ret <- data.frame(Note = x$message)
     return(ret)
   }
-  if (data_type == "training") {
+  if(!is.null(newdata)) {
+    # Replay the mutations on predictors.
+    if(!is.null(x$predictor_funs)) {
+      newdata <- newdata %>% mutate_predictors(x$orig_predictor_cols, x$predictor_funs)
+    }
+
+    predictor_variables <- attr(x$df,"predictors")
+    predictor_variables_orig <- x$terms_mapping[predictor_variables]
+
+    # This select() also renames columns since predictor_variables_orig is a named vector.
+    # everything() is to keep the other columns in the output. #TODO: What if names of the other columns conflicts with our temporary name, c1_, c2_...?
+    cleaned_data <- newdata %>% dplyr::select(predictor_variables_orig, everything())
+
+    # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
+    cleaned_data <- align_predictor_factor_levels(cleaned_data, x$xlevels, predictor_variables)
+
+    na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
+    if (length(na_row_numbers) > 0) {
+      cleaned_data <- cleaned_data[-na_row_numbers,]
+    }
+    data <- cleaned_data
+    pred <- predict(x, data=data)
+  }
+  else if (data_type == "training") {
     data <- x$df
     pred <- x$prediction_training
   }
