@@ -1084,7 +1084,6 @@ augment.rpart.classification <- function(x, data = NULL, newdata = NULL, data_ty
 
     # create clean name data frame because the model learned by those names
     cleaned_data <- newdata
-    y_value <- cleaned_data[[y_name]] # TODO: Does this make sense for newdata case, where target variable values are generally unknown??
 
     # This select() also renames columns since predictor_variables_orig is a named vector.
     # everything() is to keep the other columns in the output. #TODO: What if names of the other columns conflicts with our temporary name, c1_, c2_...?
@@ -1103,7 +1102,8 @@ augment.rpart.classification <- function(x, data = NULL, newdata = NULL, data_ty
 
     predicted_label_nona <- ranger.predict_value_from_prob(attr(x, "ylevels"),
                                                            pred_res,
-                                                           y_value, threshold = threshold)
+                                                           NULL, # y_value
+                                                           threshold = threshold)
 
     # Inserting once removed NA rows
     predicted_value <- restore_na(predicted_label_nona, na_row_numbers)
