@@ -248,7 +248,7 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
     }
     if(sort_by == "count") {
       result <- result %>% arrange(desc(!!rlang::sym(count_col)))
-    } else {
+    } else if (sort_by == "token"){
       result <- result %>% arrange(!!rlang::sym(token_col))
     }
     result
