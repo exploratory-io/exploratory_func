@@ -1558,7 +1558,10 @@ extract_from_date <- function(x, type = "fltoyear") {
       ret <- lubridate::week(x)
     },
     week_of_month = {
-      ret <- exploratory::get_week_of_month(x)
+      ret <- exploratory::week(x, unit="month")
+    },
+    week_of_quarter = {
+      ret <- exploratory::week(x, unit="quarter")
     },
     day = {
       ret <- lubridate::day(x)
@@ -2178,6 +2181,7 @@ column_mutate_quosure <- function(func, cname) {
       "monnamelong",
       "week",
       "week_of_month",
+      "week_of_quarter",
       "dayofyear",
       "dayofquarter",
       "dayofweek",
