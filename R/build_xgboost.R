@@ -392,7 +392,7 @@ augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, data_type = "
     # Rename columns to the normalized ones used while learning.
     colnames(cleaned_data) <- predictor_variables
 
-    # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
+    # Align factor levels including Others and (Missing) to the model.
     if (!is.null(x$df)) { # Model on Analytics Step does not have x$df.
       cleaned_data <- align_predictor_factor_levels(cleaned_data, x$df, predictor_variables)
     }
@@ -491,7 +491,7 @@ augment.xgboost_reg <- function(x, data = NULL, newdata = NULL, data_type = "tra
     # Rename columns to the normalized ones used while learning.
     colnames(cleaned_data) <- predictor_variables
 
-    # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
+    # Align factor levels including Others and (Missing) to the model.
     if (!is.null(x$df)) { # Model on Analytics Step does not have x$df.
       cleaned_data <- align_predictor_factor_levels(cleaned_data, x$df, predictor_variables)
     }

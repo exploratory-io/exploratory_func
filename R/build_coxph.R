@@ -792,8 +792,8 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
     # everything() is to keep the other columns in the output. #TODO: What if names of the other columns conflicts with our temporary name, c1_, c2_...?
     cleaned_data <- newdata %>% dplyr::select(predictor_variables_orig, everything())
 
-    # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
-    cleaned_data <- align_predictor_factor_levels(cleaned_data, x$xlevels, predictor_variables, convert_logical=FALSE)
+    # Align factor levels including Others and (Missing) to the model.
+    cleaned_data <- align_predictor_factor_levels(cleaned_data, x$xlevels, predictor_variables)
 
     na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
     if (length(na_row_numbers) > 0) {

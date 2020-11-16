@@ -794,14 +794,13 @@ augment.ranger <- function(x, data = NULL, newdata = NULL, ...) {
   augment.ranger.method(x, data, newdata, ...)
 }
 
-align_predictor_factor_levels <- function(newdata, model_df, predictor_cols, convert_logical = TRUE) {
+align_predictor_factor_levels <- function(newdata, model_df, predictor_cols) {
   cleaned_data <- newdata
   # Align factor levels including Others and (Missing) to the model.
   for (i in 1:length(predictor_cols)) {
     predictor_col <- predictor_cols[i]
     training_predictor <- model_df[[predictor_col]]
-    if ((is.factor(training_predictor) || is.character(training_predictor)) &&
-        !(!convert_logical && is.logical(cleaned_data[[predictor_col]]))) { # If we don't convert logical to factor for the model, skip this for logical columns.
+    if ((is.factor(training_predictor) || is.character(training_predictor))) {
       if (is.factor(training_predictor)) {
         training_predictor_levels <- levels(training_predictor)
       }
