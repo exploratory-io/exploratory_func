@@ -212,7 +212,7 @@ add_prediction <- function(df, model_df, conf_int = 0.95, ...){
     }
   }
 
-  get_result <- function(model_df, df, aug_args, with_respose){
+  get_result <- function(model_df, df, aug_args, with_response){
     # Use formula to support expanded aug_args (especially for type.predict for logistic regression)
     # because ... can't be passed to a function inside mutate directly.
     aug_fml <- if(aug_args == ""){
@@ -225,7 +225,7 @@ add_prediction <- function(df, model_df, conf_int = 0.95, ...){
       # .test_index is used because model_df has it and won't be used here
       dplyr::mutate(.test_index=purrr::map(model, function(m){eval(parse(text=aug_fml))})) 
 
-    ret <- if(with_respose) {
+    ret <- if(with_response) {
       ret %>%
         dplyr::mutate(.test_index = purrr::map2(.test_index, model, function(d, m){
           # add predicted_response to the result data frame
@@ -251,7 +251,9 @@ add_prediction <- function(df, model_df, conf_int = 0.95, ...){
   # both fitted link value column and response value column should appear in the result
   with_response <- !("type.predict" %in% names(cll)) &&
                    any(lapply(model_df$model, function(s) {
-                     "family" %in% names(s) && !is.null(s$family$linkinv)
+                     # For Analytics View (glm_exploratory), response is added inside augment, to keep this code model-agnostic.
+                     # This piece of model-specific code here should go away, if we migrate from model steps to analytics view models.
+                     "glm_exploratory" %nin% class(s) && "family" %in% names(s) && !is.null(s$family$linkinv)
                    }))
 
   ret <- tryCatch({

@@ -1585,10 +1585,7 @@ augment.lm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "
   }
 
   if(!is.null(newdata)) {
-    # Replay the mutations on target/predictors.
-    if(!is.null(x$target_funs)) {
-      newdata <- newdata %>% mutate_predictors(x$orig_target_col, x$target_funs)
-    }
+    # Replay the mutations on predictors.
     if(!is.null(x$predictor_funs)) {
       newdata <- newdata %>% mutate_predictors(x$orig_predictor_cols, x$predictor_funs)
     }
@@ -1667,7 +1664,6 @@ augment.glm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = 
       # Try recovering from it by running with se=FALSE.
       broom:::augment.glm(x, data = NULL, newdata = cleaned_data, se = FALSE, ...)
     })
-    # TODO: Restore removed rows.
   } else if (!is.null(data)) {
     ret <- switch(data_type,
       training = {
@@ -1691,6 +1687,7 @@ augment.glm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = 
       broom:::augment.glm(x, se = FALSE, ...)
     })
   }
+  ret <- add_response(ret, x, "predicted_response")
   # Rename columns back to the original names.
   names(ret) <- coalesce(x$terms_mapping[names(ret)], names(ret))
   ret
