@@ -844,10 +844,7 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
   }
 
   if(!is.null(newdata)){
-    # Replay the mutations on target/predictors.
-    if(!is.null(x$target_funs)) {
-      newdata <- newdata %>% mutate_predictors(x$orig_target_col, x$target_funs)
-    }
+    # Replay the mutations on predictors.
     if(!is.null(x$predictor_funs)) {
       newdata <- newdata %>% mutate_predictors(x$orig_predictor_cols, x$predictor_funs)
     }
@@ -988,10 +985,7 @@ augment.ranger.regression <- function(x, data = NULL, newdata = NULL, data_type 
   predictor_variables_orig <- x$terms_mapping[predictor_variables]
 
   if(!is.null(newdata)) {
-    # Replay the mutations on target/predictors.
-    if(!is.null(x$target_funs)) {
-      newdata <- newdata %>% mutate_predictors(x$orig_target_col, x$target_funs)
-    }
+    # Replay the mutations on predictors.
     if(!is.null(x$predictor_funs)) {
       newdata <- newdata %>% mutate_predictors(x$orig_predictor_cols, x$predictor_funs)
     }
@@ -1074,10 +1068,7 @@ augment.rpart.classification <- function(x, data = NULL, newdata = NULL, data_ty
   }
 
   if (!is.null(newdata)) {
-    # Replay the mutations on target/predictors.
-    if(!is.null(x$target_funs)) {
-      newdata <- newdata %>% mutate_predictors(x$orig_target_col, x$target_funs)
-    }
+    # Replay the mutations on predictors.
     if(!is.null(x$predictor_funs)) {
       newdata <- newdata %>% mutate_predictors(x$orig_predictor_cols, x$predictor_funs)
     }
@@ -1178,10 +1169,7 @@ augment.rpart.regression <- function(x, data = NULL, newdata = NULL, data_type =
   predictor_variables_orig <- x$terms_mapping[predictor_variables]
 
   if(!is.null(newdata)) {
-    # Replay the mutations on target/predictors.
-    if(!is.null(x$target_funs)) {
-      newdata <- newdata %>% mutate_predictors(x$orig_target_col, x$target_funs)
-    }
+    # Replay the mutations on predictors.
     if(!is.null(x$predictor_funs)) {
       newdata <- newdata %>% mutate_predictors(x$orig_predictor_cols, x$predictor_funs)
     }

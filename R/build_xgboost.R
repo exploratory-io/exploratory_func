@@ -267,10 +267,7 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, data_type = "t
   predictor_variables_orig <- x$terms_mapping[predictor_variables]
 
   if(!is.null(newdata)) { # Unlike ranger case, there is no prediction result kept in the model in case of xgboost.
-    # Replay the mutations on target/predictors.
-    if(!is.null(x$target_funs)) {
-      newdata <- newdata %>% mutate_predictors(x$orig_target_col, x$target_funs)
-    }
+    # Replay the mutations on predictors.
     if(!is.null(x$predictor_funs)) {
       newdata <- newdata %>% mutate_predictors(x$orig_predictor_cols, x$predictor_funs)
     }
@@ -384,10 +381,7 @@ augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, data_type = "
   
   # create clean name data frame because the model learned by those names
   if(!is.null(newdata)) { # Unlike ranger case, there is no prediction result kept in the model in case of xgboost.
-    # Replay the mutations on target/predictors.
-    if(!is.null(x$target_funs)) {
-      newdata <- newdata %>% mutate_predictors(x$orig_target_col, x$target_funs)
-    }
+    # Replay the mutations on predictors.
     if(!is.null(x$predictor_funs)) {
       newdata <- newdata %>% mutate_predictors(x$orig_predictor_cols, x$predictor_funs)
     }
@@ -481,10 +475,7 @@ augment.xgboost_reg <- function(x, data = NULL, newdata = NULL, data_type = "tra
   predictor_variables_orig <- x$terms_mapping[predictor_variables]
 
   if(!is.null(newdata)) { # Unlike ranger case, there is no prediction result kept in the model in case of xgboost.
-    # Replay the mutations on target/predictors.
-    if(!is.null(x$target_funs)) {
-      newdata <- newdata %>% mutate_predictors(x$orig_target_col, x$target_funs)
-    }
+    # Replay the mutations on predictors.
     if(!is.null(x$predictor_funs)) {
       newdata <- newdata %>% mutate_predictors(x$orig_predictor_cols, x$predictor_funs)
     }
