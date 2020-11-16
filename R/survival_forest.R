@@ -565,7 +565,7 @@ glance.ranger_survival_exploratory <- function(x, data_type = "training", ...) {
 }
 
 #' @export
-augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "training", ...) {
+augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "training", pred_survival_time = NULL, ...) {
   if ("error" %in% class(x)) {
     ret <- data.frame(Note = x$message)
     return(ret)
@@ -607,7 +607,9 @@ augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "
     }
   }
 
-  pred_survival_time <- x$pred_survival_time
+  if (is.null(pred_survival_time)) {
+    pred_survival_time <- x$pred_survival_time
+  }
   unique_death_times <- x$forest$unique.death.times
   survival_time <- max(unique_death_times[unique_death_times <= pred_survival_time])
   survival_time_index <- match(survival_time, unique_death_times)

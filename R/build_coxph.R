@@ -774,7 +774,7 @@ glance.coxph_exploratory <- function(x, data_type = "training", pretty.name = FA
 }
 
 #' @export
-augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training", ...) {
+augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training", pred_survival_time = NULL, ...) {
   if ("error" %in% class(x)) {
     ret <- data.frame(Note = x$message)
     return(ret)
@@ -823,28 +823,29 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
     ret <- broom:::augment.coxph(x, newdata = data, ...)
   }
 
-  time <- x$pred_survival_time
+  if (is.null(pred_survival_time)) {
+    pred_survival_time <- x$pred_survival_time
+  }
+
   # basehaz returns base cumulative hazard.
   bh <- survival::basehaz(x)
   # create a function to interpolate function that returns cumulative hazard.
   bh_fun <- approxfun(bh$time, bh$hazard)
-  cumhaz_base = bh_fun(time)
-  # transform linear predictor (.fitted) into predicted_probability.
-  # predicted_probability is 1 - (y of survival curve).
-  ret <- ret %>% dplyr::mutate(time_for_prediction = time,
-                               predicted_probability = 1 - exp(-cumhaz_base * exp(.fitted)))
-
+  cumhaz_base = bh_fun(pred_survival_time)
+  # transform linear predictor (.fitted) into predicted_survival.
+  ret <- ret %>% dplyr::mutate(time_for_prediction = pred_survival_time,
+                               predicted_survival = exp(-cumhaz_base * exp(.fitted)))
 
   if (!is.null(ret$.fitted)) {
     # Bring those columns as the first of the prediction result related additional columns.
-    ret <- ret %>% dplyr::relocate(any_of(c("time_for_prediction", "predicted_probability")), .before=.fitted)
+    ret <- ret %>% dplyr::relocate(any_of(c("time_for_prediction", "predicted_survival")), .before=.fitted)
   }
   # Prettify names.
   colnames(ret)[colnames(ret) == ".fitted"] <- "Linear Predictor"
   colnames(ret)[colnames(ret) == ".se.fit"] <- "Std Error"
   colnames(ret)[colnames(ret) == ".resid"] <- "Residual"
   colnames(ret)[colnames(ret) == "time_for_prediction"] <- "Survival Time for Prediction"
-  colnames(ret)[colnames(ret) == "predicted_probability"] <- "Predicted Survival Rate"
+  colnames(ret)[colnames(ret) == "predicted_survival"] <- "Predicted Survival Rate"
 
   # Convert column names back to the original.
   for (i in 1:length(x$terms_mapping)) {
