@@ -2246,10 +2246,11 @@ summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...){
 # Mutate predictor columns for preprocessing before feeding to a model. Functions are expressed by tokens we use in our JSON metadata.
 # e.g. mutate_predictors(df, cols = c("col1","col2"), funs=list("col1"="log", list("col2_day"="day", "col2_mon"="month")))
 mutate_predictors <- function(df, cols, funs) {
+  missing_cols <- cols[cols %nin% colnames(df)]
+  if (length(missing_cols) > 0) {
+    stop(paste0("Column(s) ", paste0(missing_cols, collapse=", "), " is required for the model, but does not exist."))
+  }
   mutate_args <- purrr::map2(funs, cols, function(func, cname) {
-    if (cname %nin% colnames(df)) {
-      stop(paste0("Column `", cname, "` is required for the model, but does not exist."))
-    }
     if (is.list(func)) {
       purrr::map(func, function(func) {
         column_mutate_quosure(func, cname)
