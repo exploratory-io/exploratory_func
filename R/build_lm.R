@@ -1627,7 +1627,7 @@ augment.lm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "
 }
 
 #' @export
-augment.glm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "training", ...) {
+augment.glm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "training", binary_classification_threshold = 0.5, ...) {
   if ("error" %in% class(x)) {
     ret <- data.frame()
     return(ret)
@@ -1684,7 +1684,12 @@ augment.glm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = 
       broom:::augment.glm(x, se = FALSE, ...)
     })
   }
-  ret <- add_response(ret, x, "predicted_response")
+
+  ret <- add_response(ret, x, "predicted_response") # Add response.
+
+  if (x$family$family == "binomial") { # Add predicted label in case of binomial (including logistic regression).
+    ret$predicted_label <- ret$predicted_response > binary_classification_threshold
+  }
   # Rename columns back to the original names.
   names(ret) <- coalesce(x$terms_mapping[names(ret)], names(ret))
   ret
