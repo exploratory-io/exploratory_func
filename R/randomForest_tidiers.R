@@ -800,7 +800,7 @@ align_predictor_factor_levels <- function(newdata, model_df, predictor_cols) {
   for (i in 1:length(predictor_cols)) {
     predictor_col <- predictor_cols[i]
     training_predictor <- model_df[[predictor_col]]
-    if ((is.factor(training_predictor) || is.character(training_predictor))) {
+    if (is.factor(training_predictor) || is.character(training_predictor)) {
       if (is.factor(training_predictor)) {
         training_predictor_levels <- levels(training_predictor)
       }
@@ -1289,7 +1289,7 @@ ranger.predict_value_from_prob <- function(levels_var, pred, y_value, threshold 
         if (true_index == 1) {
           if(x[1]>threshold) 1 else 2
         }
-        else { # true_incex == 2
+        else { # true_index == 2
           if(x[2]>threshold) 2 else 1
         }
       }

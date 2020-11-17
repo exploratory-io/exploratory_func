@@ -809,7 +809,6 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
       # Try recovering from it by running with se=FALSE.
       broom:::augment.coxph(x, data = NULL, newdata = cleaned_data, se = FALSE, ...)
     })
-    # TODO: Restore removed rows.
   }
   else if (data_type == "training") {
     data <- x$training_data
