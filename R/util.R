@@ -2248,7 +2248,7 @@ summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...){
 mutate_predictors <- function(df, cols, funs) {
   missing_cols <- cols[cols %nin% colnames(df)]
   if (length(missing_cols) > 0) {
-    stop(paste0("Column(s) ", paste0(missing_cols, collapse=", "), " is required for the model, but does not exist."))
+    stop(paste0("EXP-ANA-1 :: ", jsonlite::toJSON(paste0(missing_cols, collapse=", ")), " :: Columns are required for the model, but do not exist."))
   }
   mutate_args <- purrr::map2(funs, cols, function(func, cname) {
     if (is.list(func)) {
