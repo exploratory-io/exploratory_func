@@ -367,31 +367,31 @@ test_that("parse_logical", {
 
 test_that("str_extract_inside", {
   # bracket ()
-  ret <- exploratory::str_extract_inside("abc(defgh)ijk", begin = "(", end =")")
+  ret <- exploratory::str_extract_inside("abc(defgh)ijk", begin = "(", end =")", include_special_chars = FALSE)
   expect_equal(ret, c("defgh"))
   # curly bracket {}
-  ret <- exploratory::str_extract_inside("abc(defgh)ijk", begin = "{", end ="}")
+  ret <- exploratory::str_extract_inside("abc(defgh)ijk", begin = "{", end ="}", include_special_chars = FALSE)
   expect_equal(ret, NA_character_)
   # curly bracket {}
-  ret <- exploratory::str_extract_inside("abc{123456}ijk", begin = "{", end ="}")
+  ret <- exploratory::str_extract_inside("abc{123456}ijk", begin = "{", end ="}", include_special_chars = FALSE)
   expect_equal(ret, "123456")
   # curly bracket []
-  ret <- exploratory::str_extract_inside("abc[123456]ijk", begin = "[", end ="]")
+  ret <- exploratory::str_extract_inside("abc[123456]ijk", begin = "[", end ="]", include_special_chars = FALSE)
   expect_equal(ret, "123456")
   # double quote ""
-  ret <- exploratory::str_extract_inside('abc"123456"ijk', begin = '"', end = '"')
+  ret <- exploratory::str_extract_inside('abc"123456"ijk', begin = '"', end = '"', include_special_chars = FALSE)
   expect_equal(ret, "123456")
   # single quote ''
-  ret <- exploratory::str_extract_inside("abc'123456'ijk", begin = "'", end = "'")
+  ret <- exploratory::str_extract_inside("abc'123456'ijk", begin = "'", end = "'", include_special_chars = FALSE)
   expect_equal(ret, "123456")
   # percent %
-  ret <- exploratory::str_extract_inside("abc%123456%ijk", begin = "%", end = "%")
+  ret <- exploratory::str_extract_inside("abc%123456%ijk", begin = "%", end = "%", include_special_chars = FALSE)
   expect_equal(ret, "123456")
   # percent $
-  ret <- exploratory::str_extract_inside("abc$123456$ijk", begin = "$", end = "$")
+  ret <- exploratory::str_extract_inside("abc$123456$ijk", begin = "$", end = "$", include_special_chars = FALSE)
   expect_equal(ret, "123456")
   # percent * $
-  ret <- exploratory::str_extract_inside("abc*123456$ijk", begin = "*", end = "$")
+  ret <- exploratory::str_extract_inside("abc*123456$ijk", begin = "*", end = "$", include_special_chars = FALSE)
   expect_equal(ret, "123456")
 
   tryCatch({
@@ -490,11 +490,108 @@ test_that("str_remove_inside", {
 
 })
 
+test_that("str_replace_inside", {
+  # bracket ()
+  ret <- exploratory::str_replace_inside("abc(defgh)ijk", begin = "(", end =")", rep = "AA")
+  expect_equal(ret, c("abcAAijk"))
+  # curly bracket {}
+  ret <- exploratory::str_replace_inside("abc(defgh)ijk", begin = "{", end ="}", rep = "BB")
+  expect_equal(ret,c("abc(defgh)ijk"))
+  # curly bracket {}
+  ret <- exploratory::str_replace_inside("abc{123456}ijk", begin = "{", end ="}", rep = "CC")
+  expect_equal(ret, "abcCCijk")
+  # curly bracket []
+  ret <- exploratory::str_replace_inside("abc[123456]ijk", begin = "[", end ="]", rep = "DD")
+  expect_equal(ret, "abcDDijk")
+  # double quote ""
+  ret <- exploratory::str_replace_inside('abc"123456"ijk', begin = '"', end = '"', rep = "EE")
+  expect_equal(ret, "abcEEijk")
+  # single quote ''
+  ret <- exploratory::str_replace_inside("abc'123456'ijk", begin = "'", end = "'", rep = "FF")
+  expect_equal(ret, "abcFFijk")
+  # percent %
+  ret <- exploratory::str_replace_inside("abc%123456%ijk", begin = "%", end = "%", rep = "GG")
+  expect_equal(ret, "abcGGijk")
+  # percent $
+  ret <- exploratory::str_replace_inside("abc$123456$ijk", begin = "$", end = "$", rep = "HH")
+  expect_equal(ret, "abcHHijk")
+  # percent * $
+  ret <- exploratory::str_replace_inside("abc*123456$ijk", begin = "*", end = "$", rep = "II")
+  expect_equal(ret, "abcIIijk")
+
+  ret <- exploratory::str_replace_inside("abc(123)4(56$ij)k", begin = "(", end = ")", all = TRUE, rep = "JJ")
+  expect_equal(ret, "abcJJ4JJk")
+
+  ret <- exploratory::str_replace_inside("abc[12(34)56]ijk", begin = "[", end = "]", all = TRUE, rep = "KK")
+  expect_equal(ret, "abcKKijk")
+
+  ret <- exploratory::str_replace_inside("abc[12(34)56]ijk", begin = "(", end = ")", all = TRUE, rep = "LL")
+  expect_equal(ret, "abc[12LL56]ijk")
+
+  ret <- exploratory::str_replace_inside("abc(123(456)$ij)k", begin = "(", end = ")", all = TRUE, rep = "MM")
+  ret <- exploratory::str_replace_inside(ret, begin = "(", end = ")", rep = "MM")
+  expect_equal(ret, "abcMMk")
+
+  tryCatch({
+    ret <- exploratory::str_remove_inside("abc*123456$ijk", begin = "{{", end = "}")
+  }, error = function(e){
+    expect_equal(e$message, "The begin argument must be one character.")
+  })
+
+  tryCatch({
+    ret <- exploratory::str_remove_inside("abc*123456$ijk", begin = "n", end = "}")
+  }, error = function(e){
+    expect_equal(e$message, "The begin argument must be symbol such as (, {, [.")
+  })
+
+  tryCatch({
+    ret <- exploratory::str_remove_inside("abc*123456$ijk", begin = "{", end = "}}")
+  }, error = function(e){
+    expect_equal(e$message, "The end argument must be one character.")
+  })
+
+  tryCatch({
+    ret <- exploratory::str_remove_inside("abc*123456$ijk", begin = "{", end = "z")
+  }, error = function(e){
+    expect_equal(e$message, "The end argument must be symbol such as ), }, ].")
+  })
+
+})
+
 test_that("str_remove_emoji", {
   # Smile Face and Thumbs Up.
   text = c("\uD83D\uDE00", "\uD83D\uDC4D")
   ret <- exploratory::str_remove_emoji(text)
   expect_equal(ret, list("",""))
+})
+
+test_that("str_remove_word", {
+  ret <- exploratory::str_remove_word("Sequoia Capital China, Qiming Venture Partners, Tencent Holdings", -1, sep = "\\s*\\,\\s*")
+  expect_equal(ret, c("Sequoia Capital China, Qiming Venture Partners"))
+  ret <- exploratory::str_remove_word("Sequoia Capital China, Qiming Venture Partners, Tencent Holdings", 1, sep = "\\s*\\,\\s*")
+  expect_equal(ret, c("Qiming Venture Partners, Tencent Holdings"))
+})
+
+test_that("str_replace_word", {
+  ret <- exploratory::str_replace_word("Sequoia Capital China, Qiming Venture Partners, Tencent Holdings", -1, sep = "\\s*\\,\\s*", rep = "Last One")
+  expect_equal(ret, c("Sequoia Capital China, Qiming Venture Partners, Last One"))
+  ret <- exploratory::str_replace_word("Sequoia Capital China, Qiming Venture Partners, Tencent Holdings", 1, sep = "\\s*\\,\\s*", rep = "First One")
+  expect_equal(ret, c("First One, Qiming Venture Partners, Tencent Holdings"))
+})
+
+test_that("str_replace_url", {
+  ret <- exploratory::str_replace_url("Check out what I just added to my closet on Poshmark: Uniqlo Girls Uniform Pants. https://t.co/tMfGP512D2 via @poshmarkapp #shopmycloset", "New York")
+  expect_equal(ret, c("Check out what I just added to my closet on Poshmark: Uniqlo Girls Uniform Pants. New York via @poshmarkapp #shopmycloset"))
+})
+
+test_that("str_remove_url", {
+  ret <- exploratory::str_remove_url("Check out what I just added to my closet on Poshmark: Uniqlo Girls Uniform Pants. https://t.co/tMfGP512D2 via @poshmarkapp #shopmycloset", "New York")
+  expect_equal(ret, "Check out what I just added to my closet on Poshmark: Uniqlo Girls Uniform Pants.  via @poshmarkapp #shopmycloset")
+})
+
+test_that("str_extract_url", {
+  ret <- exploratory::str_extract_url("Check out what I just added to my closet on Poshmark: Uniqlo Girls Uniform Pants. https://t.co/tMfGP512D2 via @poshmarkapp #shopmycloset", "New York")
+  expect_equal(ret, list("https://t.co/tMfGP512D2"))
 })
 
 test_that("str_logical", {
