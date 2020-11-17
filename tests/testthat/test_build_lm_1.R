@@ -120,7 +120,7 @@ test_that("add_prediction with linear regression", {
   ret <- test_data %>% select(-DISTANCE) %>% add_prediction(model_df=model_df)
   expect_error({
     ret <- test_data %>% select(-DISTANCE, -ARR_TIME) %>% add_prediction(model_df=model_df)
-  }, regexp=".*Column\\(s\\) ARR_TIME is required for the model, but does not exist.*")
+  }, regexp=".*ARR_TIME.*Columns are required for the model, but do not exist.*")
 })
 
 test_that("Linear Regression with test rate", {
@@ -675,12 +675,12 @@ test_that("Logistic Regression with test_rate", {
                        "conf_low", "conf_high",
                        "standard_error",
                        "residuals", "standardised_residuals", "hat",
-                       "residual_standard_deviation", "cooks_distance", "predicted_response")
+                       "residual_standard_deviation", "cooks_distance", "predicted_response", "predicted_label")
     expect_equal(colnames(pred_training), expected_cols)
     expected_cols <- c("CANCELLED X", "Carrier Name", "ARR_TIME", "DERAY_TIME", "predicted_value",
                        "conf_low", "conf_high",
                        "standard_error",
-                       "predicted_response")
+                       "predicted_response", "predicted_label")
     expect_equal(colnames(pred_test), expected_cols)
     res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
     res <- ret %>% evaluate_binary_training_and_test(`CANCELLED X`, threshold = 0.5, pretty.name=TRUE)
@@ -717,13 +717,13 @@ test_that("Group Logistic Regression with test_rate", {
                        "conf_low", "conf_high",
                        "standard_error",
                        "residuals", "standardised_residuals", "hat", "residual_standard_deviation",
-                       "cooks_distance", "predicted_response")
+                       "cooks_distance", "predicted_response", "predicted_label")
     expect_equal(colnames(pred_training), expected_cols)
 
     expected_cols <- c("klass", "CANCELLED X", "ARR_TIME", "predicted_value",
                        "conf_low", "conf_high",
                        "standard_error",
-                       "predicted_response")
+                       "predicted_response", "predicted_label")
     expect_equal(colnames(pred_test), expected_cols)
 
     res <- ret %>% glance_rowwise(model, pretty.name=TRUE)

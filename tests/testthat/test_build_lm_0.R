@@ -232,7 +232,8 @@ test_that("prediction with glm family (binomial) and link (probit) with target c
   ret <- model_data %>% augment_rowwise(model)
 
   expect_true(nrow(ret) > 0)
-  expect_true(all(colnames(ret) %in% c("CANCELLED X", "logical col", "Carrier Name","CARRIER","DISTANCE",".fitted",".se.fit",".resid",".hat",".sigma",".cooksd",".std.resid")))
+  expect_true(all(c("CANCELLED X", "logical col", "Carrier Name","CARRIER","DISTANCE",".fitted",".se.fit",".resid",".hat",".sigma",".cooksd",".std.resid", "predicted_response", "predicted_label")
+                  %in% colnames(ret)))
 })
 
 test_that("prediction with glm family (negativebinomial) with target column name with space by build_lm.fast", {
@@ -271,7 +272,7 @@ test_that("prediction with glm family (negativebinomial) with target column name
   ret <- model_data %>% augment_rowwise(model)
   expect_equal(colnames(ret),
                c("CANCELLED X", "logical col", "Carrier Name", "CARRIER", "DISTANCE",
-                 ".fitted", ".resid", ".std.resid", ".hat", ".sigma", ".cooksd"))
+                 ".fitted", ".resid", ".std.resid", ".hat", ".sigma", ".cooksd", "predicted_response"))
 })
 
 if (Sys.info()["sysname"] != "Windows") {
