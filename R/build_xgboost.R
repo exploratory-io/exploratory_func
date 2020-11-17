@@ -414,7 +414,7 @@ augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, data_type = "
     # Inserting once removed NA rows
     predicted <- restore_na(predicted_val, na_row_numbers)
     obj <- x$params$objective
-    predicted_val_col <- avoid_conflict(colnames(original_data), "predicted_value")
+    predicted_val_col <- avoid_conflict(colnames(original_data), "predicted_label")
     predicted_prob_col <- avoid_conflict(colnames(original_data), "predicted_probability")
     prob <- if (obj == "binary:logistic") {
       original_data[[predicted_prob_col]] <- predicted
@@ -437,7 +437,7 @@ augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, data_type = "
     if (nrow(data) == 0) { #TODO: better place to do this check?
       return(data.frame())
     }
-    predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
+    predicted_value_col <- avoid_conflict(colnames(data), "predicted_label")
     predicted_probability_col <- avoid_conflict(colnames(data), "predicted_probability")
     switch(data_type,
       training = {
