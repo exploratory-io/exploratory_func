@@ -1278,6 +1278,9 @@ ranger.predict_value_from_prob <- function(levels_var, pred, y_value, threshold 
   }
   else { # binary case
     true_index <- match("TRUE",colnames(pred)) # Find which index is TRUE
+    if (is.na(true_index)) { # For old analytics step that can take non-logical column for binary classification.
+      true_index <- 1
+    }
     predicted <- factor(levels_var[apply(pred, 1, function(x){
       if(is.na(x[2])){ # take care of the case where pred has only 1 column. possible when there are only one value in training data.
         1
