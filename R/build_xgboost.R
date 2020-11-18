@@ -116,7 +116,7 @@ xgboost_binary <- function(data, formula, output_type = "logistic", eval_metric 
   } else if (!all(y_vals[!is.na(y_vals)] %in% c(0, 1))){
     # there are values that are not 0 or 1, so should be mapped as factor
     factored <- as.factor(data[[y_name]])
-    label_levels <- same_type(levels(factored), data[[y_name]])
+    label_levels <- to_same_type(levels(factored), data[[y_name]])
     if(length(label_levels) != 2){
       stop("target variable must have 2 unique values")
     }
@@ -178,7 +178,7 @@ xgboost_multi <- function(data, formula, output_type = "softprob", eval_metric =
   } else {
     factored <- as.factor(data[[y_name]])
     y_vals <- as.numeric(factored) - 1
-    same_type(levels(factored), data[[y_name]])
+    to_same_type(levels(factored), data[[y_name]])
   }
 
   data[[y_name]] <- y_vals
@@ -267,6 +267,11 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, data_type = "t
   predictor_variables_orig <- x$terms_mapping[predictor_variables]
 
   if(!is.null(newdata)) { # Unlike ranger case, there is no prediction result kept in the model in case of xgboost.
+    # Replay the mutations on predictors.
+    if(!is.null(x$predictor_funs)) {
+      newdata <- newdata %>% mutate_predictors(x$orig_predictor_cols, x$predictor_funs)
+    }
+
     class(x) <- class(x)[class(x) != c("xgboost_multi")]
 
     # create clean name data frame because the model learned by those names
@@ -276,9 +281,7 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, data_type = "t
       data
     }
 
-    cleaned_data <- original_data
-
-    cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables_orig)
+    cleaned_data <- original_data %>% dplyr::select(predictor_variables_orig)
     # Rename columns to the normalized ones used while learning.
     colnames(cleaned_data) <- predictor_variables
 
@@ -378,15 +381,18 @@ augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, data_type = "
   
   # create clean name data frame because the model learned by those names
   if(!is.null(newdata)) { # Unlike ranger case, there is no prediction result kept in the model in case of xgboost.
+    # Replay the mutations on predictors.
+    if(!is.null(x$predictor_funs)) {
+      newdata <- newdata %>% mutate_predictors(x$orig_predictor_cols, x$predictor_funs)
+    }
+
     original_data <- newdata
   
-    cleaned_data <- original_data
-
-    cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables_orig)
+    cleaned_data <- original_data %>% dplyr::select(predictor_variables_orig)
     # Rename columns to the normalized ones used while learning.
     colnames(cleaned_data) <- predictor_variables
 
-    # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
+    # Align factor levels including Others and (Missing) to the model.
     if (!is.null(x$df)) { # Model on Analytics Step does not have x$df.
       cleaned_data <- align_predictor_factor_levels(cleaned_data, x$df, predictor_variables)
     }
@@ -408,20 +414,19 @@ augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, data_type = "
     # Inserting once removed NA rows
     predicted <- restore_na(predicted_val, na_row_numbers)
     obj <- x$params$objective
-    predicted_label_col <- avoid_conflict(colnames(original_data), "predicted_label")
+    predicted_val_col <- avoid_conflict(colnames(original_data), "predicted_label")
     predicted_prob_col <- avoid_conflict(colnames(original_data), "predicted_probability")
     prob <- if (obj == "binary:logistic") {
-      predicted_prob_col <- avoid_conflict(colnames(original_data), "predicted_probability")
       original_data[[predicted_prob_col]] <- predicted
+      original_data[[predicted_val_col]] <- predicted > binary_classification_threshold
       predicted
     } else if (obj == "binary:logitraw") {
-      predicted_val_col <- avoid_conflict(colnames(original_data), "predicted_value")
     
       # binary:logitraw returns logit values
       prob <- boot::inv.logit(predicted)
     
-      original_data[[predicted_val_col]] <- predicted
       original_data[[predicted_prob_col]] <- prob
+      original_data[[predicted_val_col]] <- predicted
       prob
     } else {
       stop(paste0("object type ", obj, " is not supported"))
@@ -432,7 +437,7 @@ augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, data_type = "
     if (nrow(data) == 0) { #TODO: better place to do this check?
       return(data.frame())
     }
-    predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
+    predicted_value_col <- avoid_conflict(colnames(data), "predicted_label")
     predicted_probability_col <- avoid_conflict(colnames(data), "predicted_probability")
     switch(data_type,
       training = {
@@ -470,6 +475,11 @@ augment.xgboost_reg <- function(x, data = NULL, newdata = NULL, data_type = "tra
   predictor_variables_orig <- x$terms_mapping[predictor_variables]
 
   if(!is.null(newdata)) { # Unlike ranger case, there is no prediction result kept in the model in case of xgboost.
+    # Replay the mutations on predictors.
+    if(!is.null(x$predictor_funs)) {
+      newdata <- newdata %>% mutate_predictors(x$orig_predictor_cols, x$predictor_funs)
+    }
+
     # create clean name data frame because the model learned by those names
     original_data <- if(!is.null(newdata)){
       newdata
@@ -477,13 +487,11 @@ augment.xgboost_reg <- function(x, data = NULL, newdata = NULL, data_type = "tra
       data
     }
 
-    cleaned_data <- original_data
-
-    cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables_orig)
+    cleaned_data <- original_data %>% dplyr::select(predictor_variables_orig)
     # Rename columns to the normalized ones used while learning.
     colnames(cleaned_data) <- predictor_variables
 
-    # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
+    # Align factor levels including Others and (Missing) to the model.
     if (!is.null(x$df)) { # Model on Analytics Step does not have x$df.
       cleaned_data <- align_predictor_factor_levels(cleaned_data, x$df, predictor_variables)
     }
@@ -802,7 +810,7 @@ calc_permutation_importance_xgboost_multiclass <- function(fit, target, vars, da
   importances <- purrr::map(var_list, function(var) {
     mmpf::permutationImportance(data, var, target, fit, nperm = 1, # By default, it creates 100 permuted data sets. We do just 1 for performance.
                                 predict.fun = function(object,newdata){predict_xgboost(object, newdata)},
-                                # loss.fun = function(x,y){browser();1-sum(colnames(x)[max.col(x)]==y[[1]], na.rm=TRUE)/length(y[[1]])} # misclassification rate
+                                # loss.fun = function(x,y){1-sum(colnames(x)[max.col(x)]==y[[1]], na.rm=TRUE)/length(y[[1]])} # misclassification rate
                                 loss.fun = function(x,y){sum(-log(x[match(y[[1]][row(x)], colnames(x))==col(x)]))} # Negative log likelihood. https://ljvmiranda921.github.io/notebook/2017/08/13/softmax-and-the-negative-log-likelihood/
                                 )
   })
@@ -978,6 +986,8 @@ cleanup_df_for_test <- function(df_test, df_train, c_cols) {
 exp_xgboost <- function(df,
                         target,
                         ...,
+                        target_fun = NULL,
+                        predictor_funs = NULL,
                         max_nrow = 50000, # Down from 200000 when we added partial dependence
                         # XGBoost-specific parameters
                         nrounds = 10,
@@ -1031,11 +1041,27 @@ exp_xgboost <- function(df,
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
   target_col <- tidyselect::vars_select(names(df), !! rlang::enquo(target))
   # this evaluates select arguments like starts_with
-  selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
-  # Sort predictors so that the result of permutation importance is stable against change of column order.
-  selected_cols <- sort(selected_cols)
+  orig_selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
+
+  target_funs <- NULL
+  if (!is.null(target_fun)) {
+    target_funs <- list(target_fun)
+    names(target_funs) <- target_col
+    df <- df %>% mutate_predictors(target_col, target_funs)
+  }
+
+  if (!is.null(predictor_funs)) {
+    df <- df %>% mutate_predictors(orig_selected_cols, predictor_funs)
+    selected_cols <- names(unlist(predictor_funs))
+  }
+  else {
+    selected_cols <- orig_selected_cols
+  }
 
   grouped_cols <- grouped_by(df)
+
+  # Sort predictors so that the result of permutation importance is stable against change of column order.
+  selected_cols <- sort(selected_cols)
 
   # Remember if the target column was originally numeric or logical before converting type.
   is_target_numeric <- is.numeric(df[[target_col]])
@@ -1235,6 +1261,16 @@ exp_xgboost <- function(df,
       model$df <- df
       model$formula_terms <- terms(fml)
       model$sampled_nrow <- clean_df_ret$sampled_nrow
+
+      if (!is.null(target_funs)) {
+        model$orig_target_col <- target_col
+        model$target_funs <- target_funs
+      }
+      if (!is.null(predictor_funs)) {
+        model$orig_predictor_cols <- orig_selected_cols
+        model$predictor_funs <- predictor_funs
+      }
+
       list(model = model, test_index = test_index, source_data = source_data)
     }, error = function(e){
       if(length(grouped_cols) > 0) {

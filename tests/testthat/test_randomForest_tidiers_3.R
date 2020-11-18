@@ -21,13 +21,14 @@ if (!testdata_filename %in% list.files(testdata_dir)) {
   write.csv(flight, testdata_file_path) # save sampled-down data for performance.
 }
 
-test_that("calc_feature_map(regression) evaluate training and test", {
+test_that("calc_feature_imp(regression) evaluate training and test", {
   set.seed(1) # For stability of result.
   model_df <- flight %>%
                 calc_feature_imp(`ARR DELAY`, `CAR RIER`, `ORI GIN`, `DEP DELAY`, `AIR TIME`,
                                  test_rate = 0.3,
                                  test_split_type = "ordered", with_boruta = TRUE, pd_with_bin_means = TRUE) # testing ordered split too.
 
+  ret <- flight %>% select(-`ARR DELAY`) %>% add_prediction(model_df=model_df)
   ret <- model_df %>% prediction(data="newdata", data_frame=flight)
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
@@ -69,6 +70,7 @@ test_that("calc_feature_imp(binary) evaluate training and test", {
   model_df <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`)) %>%
                 calc_feature_imp(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0.3, pd_with_bin_means = TRUE)
 
+  ret <- flight %>% add_prediction(model_df=model_df)
   res_partial_dependence <- model_df %>% rf_partial_dependence()
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)

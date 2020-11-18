@@ -598,6 +598,8 @@ remove_outliers_for_regression_data <- function(df, target_col, predictor_cols,
 build_lm.fast <- function(df,
                     target,
                     ...,
+                    target_fun = NULL,
+                    predictor_funs = NULL,
                     model_type = "lm",
                     family = NULL,
                     link = NULL,
@@ -631,7 +633,22 @@ build_lm.fast <- function(df,
                     test_split_type = "random" # "random" or "ordered"
                     ){
   target_col <- tidyselect::vars_select(names(df), !! rlang::enquo(target))
-  selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
+  orig_selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
+
+  target_funs <- NULL
+  if (!is.null(target_fun)) {
+    target_funs <- list(target_fun)
+    names(target_funs) <- target_col
+    df <- df %>% mutate_predictors(target_col, target_funs)
+  }
+
+  if (!is.null(predictor_funs)) {
+    df <- df %>% mutate_predictors(orig_selected_cols, predictor_funs)
+    selected_cols <- names(unlist(predictor_funs))
+  }
+  else {
+    selected_cols <- orig_selected_cols
+  }
 
   grouped_cols <- grouped_by(df)
 
@@ -1048,8 +1065,16 @@ build_lm.fast <- function(df,
         model$partial_dependence <- NULL
       }
 
-      list(model = model, test_index = test_index, source_data = source_data)
+      if (!is.null(target_funs)) {
+        model$orig_target_col <- target_col
+        model$target_funs <- target_funs
+      }
+      if (!is.null(predictor_funs)) {
+        model$orig_predictor_cols <- orig_selected_cols
+        model$predictor_funs <- predictor_funs
+      }
 
+      list(model = model, test_index = test_index, source_data = source_data)
     }, error = function(e){
       if(length(grouped_cols) > 0) {
         # In repeat-by case, we report group-specific error in the Summary table,
@@ -1560,12 +1585,17 @@ augment.lm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "
   }
 
   if(!is.null(newdata)) {
+    # Replay the mutations on predictors.
+    if(!is.null(x$predictor_funs)) {
+      newdata <- newdata %>% mutate_predictors(x$orig_predictor_cols, x$predictor_funs)
+    }
+
     predictor_variables <- all.vars(x$terms)[-1]
     predictor_variables_orig <- x$terms_mapping[predictor_variables]
 
-    cleaned_data <- newdata %>% dplyr::select(predictor_variables_orig)
-    # Rename columns to the normalized ones used while learning.
-    colnames(cleaned_data) <- predictor_variables
+    # This select() also renames columns since predictor_variables_orig is a named vector.
+    # everything() is to keep the other columns in the output. #TODO: What if names of the other columns conflicts with our temporary name, c1_, c2_...?
+    cleaned_data <- newdata %>% dplyr::select(predictor_variables_orig, everything())
 
     # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
     cleaned_data <- align_predictor_factor_levels(cleaned_data, x$xlevels, predictor_variables)
@@ -1597,18 +1627,23 @@ augment.lm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "
 }
 
 #' @export
-augment.glm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "training", ...) {
+augment.glm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "training", binary_classification_threshold = 0.5, ...) {
   if ("error" %in% class(x)) {
     ret <- data.frame()
     return(ret)
   }
   if(!is.null(newdata)) {
+    # Replay the mutations on predictors.
+    if(!is.null(x$predictor_funs)) {
+      newdata <- newdata %>% mutate_predictors(x$orig_predictor_cols, x$predictor_funs)
+    }
+
     predictor_variables <- all.vars(x$terms)[-1]
     predictor_variables_orig <- x$terms_mapping[predictor_variables]
 
-    cleaned_data <- newdata %>% dplyr::select(predictor_variables_orig)
-    # Rename columns to the normalized ones used while learning.
-    colnames(cleaned_data) <- predictor_variables
+    # This select() also renames columns since predictor_variables_orig is a named vector.
+    # everything() is to keep the other columns in the output. #TODO: What if names of the other columns conflicts with our temporary name, c1_, c2_...?
+    cleaned_data <- newdata %>% dplyr::select(predictor_variables_orig, everything())
 
     # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
     cleaned_data <- align_predictor_factor_levels(cleaned_data, x$xlevels, predictor_variables)
@@ -1626,7 +1661,6 @@ augment.glm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = 
       # Try recovering from it by running with se=FALSE.
       broom:::augment.glm(x, data = NULL, newdata = cleaned_data, se = FALSE, ...)
     })
-    # TODO: Restore removed rows.
   } else if (!is.null(data)) {
     ret <- switch(data_type,
       training = {
@@ -1649,6 +1683,12 @@ augment.glm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = 
     }, error = function(e){
       broom:::augment.glm(x, se = FALSE, ...)
     })
+  }
+
+  ret <- add_response(ret, x, "predicted_response") # Add response.
+
+  if (x$family$family == "binomial") { # Add predicted label in case of binomial (including logistic regression).
+    ret$predicted_label <- ret$predicted_response > binary_classification_threshold
   }
   # Rename columns back to the original names.
   names(ret) <- coalesce(x$terms_mapping[names(ret)], names(ret))
