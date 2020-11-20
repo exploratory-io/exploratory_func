@@ -195,6 +195,9 @@ add_prediction <- function(df, model_df, conf_int = 0.95, ...){
   # model_df should not be rowwise grouped here. TODO: Should this be done here, or should we do this when model_df is created, for example in build_model?
   model_df <- model_df %>% dplyr::ungroup()
 
+  # For now predict only with the first model even if the model_df has multiple rows.
+  model_df <- model_df %>% dplyr::slice(1:1)
+
   # validate data frame based on meta info
   model_meta <- model_df[[".model_metadata"]]
   # This is only for Analytics Step.

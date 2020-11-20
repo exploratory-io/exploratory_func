@@ -671,7 +671,7 @@ build_lm.fast <- function(df,
   # If we do permutation importance, sort predictors so that the result of it is stable against change of column order.
   # Otherwise, avoid sorting so that user has control over the order of variables on partial dependence plot.
   if (model_type == "lm" || family %in% c("binomial", "gaussian") || (family == "poisson" && (is.null(link) || link == "log"))) {
-    selected_cols <- sort(selected_cols)
+    selected_cols <- stringr::str_sort(selected_cols)
   }
 
   if(test_rate < 0 | 1 < test_rate){

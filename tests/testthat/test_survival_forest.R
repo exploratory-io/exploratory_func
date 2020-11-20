@@ -13,6 +13,9 @@ test_that("exp_survival_forest basic", {
   expect_false("Data Type" %in% colnames(ret))
   ret <- model_df %>% prediction2()
   ret2 <- ret %>% do_survival_roc_("Predicted Survival Rate","ti me","sta tus", at=NULL, grid=10, revert=TRUE, with_auc=TRUE)
+  # Most of the time, true positive rate should be larger than false positive rate. If this is 
+  expect_true(sum((ret2 %>% mutate(positive=true_positive_rate >= false_positive_rate))$positive) > 0.8 * nrow(ret2))
+
   ret <- model_df %>% glance_rowwise(model)
   ret <- model_df %>% augment_rowwise(model)
 
