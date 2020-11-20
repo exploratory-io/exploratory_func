@@ -196,6 +196,7 @@ exp_survival_forest <- function(df,
                     time,
                     status,
                     ...,
+                    predictor_funs = NULL,
                     max_nrow = 50000, # With 50000 rows, taking 6 to 7 seconds on late-2016 Macbook Pro.
                     max_sample_size = NULL, # Half of max_nrow.
                     ntree = 20,
@@ -226,9 +227,17 @@ exp_survival_forest <- function(df,
   time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(time))
   status_col <- tidyselect::vars_select(names(df), !! rlang::enquo(status))
   # this evaluates select arguments like starts_with
-  selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
+  orig_selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
+
+  if (!is.null(predictor_funs)) {
+    df <- df %>% mutate_predictors(orig_selected_cols, predictor_funs)
+    selected_cols <- names(unlist(predictor_funs))
+  }
+  else {
+    selected_cols <- orig_selected_cols
+  }
   # Sort predictors so that the result of permutation importance is stable against change of column order.
-  selected_cols <- sort(selected_cols)
+  selected_cols <- stringr::str_sort(selected_cols)
 
   grouped_cols <- grouped_by(df)
 
@@ -354,34 +363,34 @@ exp_survival_forest <- function(df,
         max_sample_size = max_nrow/2
       }
       sample.fraction <- min(c(max_sample_size / max_nrow, 1))
-      rf <- ranger::ranger(fml, data = df, importance = importance_measure_ranger,
+      model <- ranger::ranger(fml, data = df, importance = importance_measure_ranger,
         num.trees = ntree,
         min.node.size = nodesize,
         keep.inbag=TRUE,
         sample.fraction = sample.fraction)
       # these attributes are used in tidy of randomForest TODO: is this good for lm too?
-      rf$terms_mapping <- names(name_map)
-      names(rf$terms_mapping) <- name_map
-      rf$sampled_nrow <- sampled_nrow
+      model$terms_mapping <- names(name_map)
+      names(model$terms_mapping) <- name_map
+      model$sampled_nrow <- sampled_nrow
 
       if (length(c_cols) > 1) { # Show importance only when there are multiple variables.
         # get importance to decide variables for partial dependence
         if (importance_measure != "permutation") {
-          imp <- ranger::importance(rf)
+          imp <- ranger::importance(model)
           imp_df <- tibble::tibble( # Use tibble since data.frame() would make variable factors, which breaks things in following steps.
             variable = names(imp),
             importance = imp
             ) %>% dplyr::arrange(-importance)
         }
         else { # For permutation, we use our own implementation. The one from ranger seems too unstable for our use. Maybe it's based on OOB prediction?
-          imp_df <- calc_permutation_importance_ranger_survival(rf, clean_time_col, clean_status_col, c_cols, df)
+          imp_df <- calc_permutation_importance_ranger_survival(model, clean_time_col, clean_status_col, c_cols, df)
         }
-        rf$imp_df <- imp_df
+        model$imp_df <- imp_df
         imp_vars <- imp_df$variable
       }
       else {
         error <- simpleError("Variable importance requires two or more variables.")
-        rf$imp_df <- error
+        model$imp_df <- error
         imp_vars <- c_cols
       }
 
@@ -389,21 +398,21 @@ exp_survival_forest <- function(df,
         max_pd_vars <- 20 # Number of most important variables to calculate partial dependences on. This used to be 12 but we decided it was a little too small.
       }
       imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
-      rf$imp_vars <- imp_vars
-      rf$partial_dependence <- partial_dependence.ranger_survival_exploratory(rf, clean_time_col, vars = imp_vars, n = c(9, min(nrow(df), pd_sample_size)), data = df) # grid of 9 is convenient for both PDP and survival curves.
-      rf$pred_survival_time <- pred_survival_time
-      rf$survival_curves <- calc_survival_curves_with_strata(df, clean_time_col, clean_status_col, imp_vars)
+      model$imp_vars <- imp_vars
+      model$partial_dependence <- partial_dependence.ranger_survival_exploratory(model, clean_time_col, vars = imp_vars, n = c(9, min(nrow(df), pd_sample_size)), data = df) # grid of 9 is convenient for both PDP and survival curves.
+      model$pred_survival_time <- pred_survival_time
+      model$survival_curves <- calc_survival_curves_with_strata(df, clean_time_col, clean_status_col, imp_vars)
 
       # Calculate concordance.
-      # Concordance by rf$survival is too bad, most likely because it is out-of-bag prediction. We explictly predict with training data to calculate training concordance.
-      prediction_training <- predict(rf, data=df)
-      rf$prediction_training <- prediction_training
+      # Concordance by model$survival is too bad, most likely because it is out-of-bag prediction. We explictly predict with training data to calculate training concordance.
+      prediction_training <- predict(model, data=df)
+      model$prediction_training <- prediction_training
       concordance_df <- tibble::tibble(x=calc_mean_survival(prediction_training$survival, prediction_training$unique.death.times), time=df[[clean_time_col]], status=df[[clean_status_col]])
 
       # The concordance is (d+1)/2, where d is Somers' d. https://cran.r-project.org/web/packages/survival/vignettes/concordance.pdf
-      rf$concordance <- survival::concordance(survival::Surv(time, status)~x,data=concordance_df)
+      model$concordance <- survival::concordance(survival::Surv(time, status)~x,data=concordance_df)
 
-      rf$auc <- survival_auroc(extract_survival_rate_at(prediction_training$survival, prediction_training$unique.death.times, pred_survival_time),
+      model$auc <- survival_auroc(extract_survival_rate_at(prediction_training$survival, prediction_training$unique.death.times, pred_survival_time),
                                df[[clean_time_col]], df[[clean_status_col]], pred_survival_time,
                                revert=TRUE)
 
@@ -412,31 +421,36 @@ exp_survival_forest <- function(df,
         na_row_numbers_test <- attr(df_test_clean, "na_row_numbers")
         unknown_category_rows_index <- attr(df_test_clean, "unknown_category_rows_index")
 
-        prediction_test <- predict(rf, data=df_test_clean)
+        prediction_test <- predict(model, data=df_test_clean)
         # TODO: Following current convention for the name na.action to keep na row index, but we might want to rethink.
         # We do not keep this for training since na.roughfix should fill values and not delete rows. TODO: Is this comment valid here for survival forest?
         attr(prediction_test, "na.action") <- na_row_numbers_test
         attr(prediction_test, "unknown_category_rows_index") <- unknown_category_rows_index
-        rf$prediction_test <- prediction_test
-        rf$df_test <- df_test_clean
+        model$prediction_test <- prediction_test
+        model$df_test <- df_test_clean
 
         # Calculate concordance.
         concordance_df_test <- tibble::tibble(x=calc_mean_survival(prediction_test$survival, prediction_test$unique.death.times), time=df_test_clean[[clean_time_col]], status=df_test_clean[[clean_status_col]])
         # The concordance is (d+1)/2, where d is Somers' d. https://cran.r-project.org/web/packages/survival/vignettes/concordance.pdf
-        rf$concordance_test <- survival::concordance(survival::Surv(time, status)~x,data=concordance_df_test)
+        model$concordance_test <- survival::concordance(survival::Surv(time, status)~x,data=concordance_df_test)
 
-        rf$auc_test <- survival_auroc(extract_survival_rate_at(prediction_test$survival, prediction_test$unique.death.times, pred_survival_time),
+        model$auc_test <- survival_auroc(extract_survival_rate_at(prediction_test$survival, prediction_test$unique.death.times, pred_survival_time),
                                       df_test_clean[[clean_time_col]], df_test_clean[[clean_status_col]], pred_survival_time,
                                       revert=TRUE)
 
-        rf$test_nevent <- sum(df_test_clean[[clean_status_col]], na.rm=TRUE)
+        model$test_nevent <- sum(df_test_clean[[clean_status_col]], na.rm=TRUE)
       }
-      rf$df <- df
-      rf$nevent <- sum(df[[clean_status_col]], na.rm=TRUE)
+      model$df <- df
+      model$nevent <- sum(df[[clean_status_col]], na.rm=TRUE)
+
+      if (!is.null(predictor_funs)) {
+        model$orig_predictor_cols <- orig_selected_cols
+        model$predictor_funs <- predictor_funs
+      }
 
       # add special lm_coxph class for adding extra info at glance().
-      class(rf) <- c("ranger_survival_exploratory", class(rf))
-      rf
+      class(model) <- c("ranger_survival_exploratory", class(model))
+      model
     }, error = function(e){
       if(length(grouped_cols) > 0) {
         # In repeat-by case, we report group-specific error in the Summary table,
@@ -551,12 +565,35 @@ glance.ranger_survival_exploratory <- function(x, data_type = "training", ...) {
 }
 
 #' @export
-augment.ranger_survival_exploratory <- function(x, data_type = "training", ...) {
+augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "training", pred_survival_time = NULL, ...) {
   if ("error" %in% class(x)) {
     ret <- data.frame(Note = x$message)
     return(ret)
   }
-  if (data_type == "training") {
+  if(!is.null(newdata)) {
+    # Replay the mutations on predictors.
+    if(!is.null(x$predictor_funs)) {
+      newdata <- newdata %>% mutate_predictors(x$orig_predictor_cols, x$predictor_funs)
+    }
+
+    predictor_variables <- attr(x$df,"predictors")
+    predictor_variables_orig <- x$terms_mapping[predictor_variables]
+
+    # This select() also renames columns since predictor_variables_orig is a named vector.
+    # everything() is to keep the other columns in the output. #TODO: What if names of the other columns conflicts with our temporary name, c1_, c2_...?
+    cleaned_data <- newdata %>% dplyr::select(predictor_variables_orig, everything())
+
+    # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
+    cleaned_data <- align_predictor_factor_levels(cleaned_data, x$xlevels, predictor_variables)
+
+    na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
+    if (length(na_row_numbers) > 0) {
+      cleaned_data <- cleaned_data[-na_row_numbers,]
+    }
+    data <- cleaned_data
+    pred <- predict(x, data=data)
+  }
+  else if (data_type == "training") {
     data <- x$df
     pred <- x$prediction_training
   }
@@ -570,7 +607,9 @@ augment.ranger_survival_exploratory <- function(x, data_type = "training", ...) 
     }
   }
 
-  pred_survival_time <- x$pred_survival_time
+  if (is.null(pred_survival_time)) {
+    pred_survival_time <- x$pred_survival_time
+  }
   unique_death_times <- x$forest$unique.death.times
   survival_time <- max(unique_death_times[unique_death_times <= pred_survival_time])
   survival_time_index <- match(survival_time, unique_death_times)

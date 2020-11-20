@@ -332,8 +332,8 @@ mat_to_df <- function(mat, cnames=NULL, na.rm=TRUE, zero.rm = TRUE, diag=TRUE){
   df
 }
 
-#' match the type of two vector
-same_type <- function(vector, original){
+#' Cast the vector to the same type as the original.
+to_same_type <- function(vector, original){
   if(is.null(original)){
     vector
   }
@@ -1069,7 +1069,7 @@ quantifiable_cols <- function(data){
 get_multi_predicted_values <- function(prob_mat, actual_vals = NULL){
   prob_label <- colnames(prob_mat)[max.col(prob_mat)]
   if(!is.null(actual_vals)){
-    prob_label <- same_type(prob_label, actual_vals)
+    prob_label <- to_same_type(prob_label, actual_vals)
   }
 
   # get max values from each row
@@ -1086,7 +1086,7 @@ get_multi_predicted_values <- function(prob_mat, actual_vals = NULL){
 #' @param values Vector to be filled with NA.
 #' @param max_index The size of output vector
 fill_vec_NA <- function(indice, values, max_index = max(indice, na.rm = TRUE)){
-  ret <- same_type(rep(NA, max_index), values)
+  ret <- to_same_type(rep(NA, max_index), values)
   ret[indice] <- values
   ret
 }
@@ -1099,7 +1099,7 @@ fill_mat_NA <- function(indice, mat, max_index = max(indice, na.rm = TRUE)){
   if(nrow(mat) != length(indice)) {
     stop("matrix must have the same length of indice")
   }
-  na_val <- same_type(NA, as.vector(mat))
+  na_val <- to_same_type(NA, as.vector(mat))
   ret <- matrix(na_val, nrow = max_index, ncol = ncol(mat))
   colnames(ret) <- colnames(mat)
   ret[indice, ] <- mat
@@ -1558,7 +1558,10 @@ extract_from_date <- function(x, type = "fltoyear") {
       ret <- lubridate::week(x)
     },
     week_of_month = {
-      ret <- exploratory::get_week_of_month(x)
+      ret <- exploratory::week(x, unit="month")
+    },
+    week_of_quarter = {
+      ret <- exploratory::week(x, unit="quarter")
     },
     day = {
       ret <- lubridate::day(x)
@@ -2145,6 +2148,60 @@ restore_na <- function(value, na_row_numbers){
   }
 }
 
+# Returns a quosure that can be used as right-hand-side of arguments of mutate. Used in mutate_predictors and group_by arguments for summarize_group.
+column_mutate_quosure <- function(func, cname) {
+  if(is.na(func) || length(func)==0 || func == "none"){
+    rlang::quo((UQ(rlang::sym(cname))))
+  } else if (func %in% c("fltoyear","rtoyear",
+      "fltohalfyear",
+      "rtohalfyear",
+      "fltoquarter",
+      "rtoq",
+      "fltobimonth",
+      "rtobimon",
+      "fltomonth",
+      "rtomon",
+      "fltoweek",
+      "rtoweek",
+      "fltoday",
+      "rtoday",
+      "rtohour",
+      "rtomin",
+      "rtosec",
+      "year",
+      "halfyear",
+      "quarter",
+      "bimonth",
+      "bimon",
+      "month",
+      "mon",
+      "monthname",
+      "monname",
+      "monthnamelong",
+      "monnamelong",
+      "week",
+      "week_of_month",
+      "week_of_quarter",
+      "dayofyear",
+      "dayofquarter",
+      "dayofweek",
+      "day",
+      "wday",
+      "wdaylong",
+      "weekend",
+      "hour",
+      "minute",
+      "second")) {
+    # For date column, call extract_from_date
+    rlang::quo(extract_from_date(UQ(rlang::sym(cname)), type = UQ(func)))
+  } else if (func %in% c("asnum","asint","asintby10","aschar")) {
+    # For numeric column, call categorize_numeric
+    rlang::quo(categorize_numeric(UQ(rlang::sym(cname)), type = UQ(func)))
+  } else { # For non-numeric and non-date related function case.
+    rlang::quo(UQ(func)(UQ(rlang::sym(cname))))
+  }
+}
+
 # Wrapper function that takes care of dplyr::group_by and dplyr::summarize as a single step.
 #' @param .data - data frame
 #' @param group_cols - Columns to group_by
@@ -2164,57 +2221,7 @@ summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...){
     # If group_by columns and associated categorizing functionts are provided,
     # quote the columns/functions with rlang::quo so that dplyr can understand them.
     if (!is.null(group_cols) && !is.null(group_funs)) {
-      groupby_args <- purrr::map2(group_funs, group_cols, function(func, cname) {
-        if(is.na(func) || length(func)==0 || func == "none"){
-          rlang::quo((UQ(rlang::sym(cname))))
-        } else if (func %in% c("fltoyear","rtoyear",
-            "fltohalfyear",
-            "rtohalfyear",
-            "fltoquarter",
-            "rtoq",
-            "fltobimonth",
-            "rtobimon",
-            "fltomonth",
-            "rtomon",
-            "fltoweek",
-            "rtoweek",
-            "fltoday",
-            "rtoday",
-            "rtohour",
-            "rtomin",
-            "rtosec",
-            "year",
-            "halfyear",
-            "quarter",
-            "bimonth",
-            "bimon",
-            "month",
-            "mon",
-            "monthname",
-            "monname",
-            "monthnamelong",
-            "monnamelong",
-            "week",
-            "week_of_month",
-            "dayofyear",
-            "dayofquarter",
-            "dayofweek",
-            "day",
-            "wday",
-            "wdaylong",
-            "weekend",
-            "hour",
-            "minute",
-            "second")) {
-          # For date column, call extract_from_date
-          rlang::quo(extract_from_date(UQ(rlang::sym(cname)), type = UQ(func)))
-        } else if (func %in% c("asnum","asint","asintby10","aschar")) {
-          # For numeric column, call categorize_numeric
-          rlang::quo(categorize_numeric(UQ(rlang::sym(cname)), type = UQ(func)))
-        } else { # For non-numeric and non-date related function case.
-          rlang::quo(UQ(func)(UQ(rlang::sym(cname))))
-        }
-      })
+      groupby_args <- purrr::map2(group_funs, group_cols, column_mutate_quosure)
       # Set names of group_by columns in the output.
       name_list <- names(group_cols) # If names are specified in group_cols, use them for output.
       if (is.null(name_list)) { # If name is not specified, use original column names.
@@ -2233,6 +2240,28 @@ summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...){
     }
   }
   ret
+}
+
+
+# Mutate predictor columns for preprocessing before feeding to a model. Functions are expressed by tokens we use in our JSON metadata.
+# e.g. mutate_predictors(df, cols = c("col1","col2"), funs=list("col1"="log", list("col2_day"="day", "col2_mon"="month")))
+mutate_predictors <- function(df, cols, funs) {
+  missing_cols <- cols[cols %nin% colnames(df)]
+  if (length(missing_cols) > 0) {
+    stop(paste0("EXP-ANA-1 :: ", jsonlite::toJSON(paste0(missing_cols, collapse=", ")), " :: Columns are required for the model, but do not exist."))
+  }
+  mutate_args <- purrr::map2(funs, cols, function(func, cname) {
+    if (is.list(func)) {
+      purrr::map(func, function(func) {
+        column_mutate_quosure(func, cname)
+      })
+    }
+    else {
+      column_mutate_quosure(func, cname)
+    }
+  })
+  mutate_args <- unlist(mutate_args)
+  df %>% dplyr::mutate(!!!mutate_args)
 }
 
 #' calc_feature_imp (Random Forest) or exp_rpart (Decision Tree) converts logical columns into factor

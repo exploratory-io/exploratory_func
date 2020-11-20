@@ -182,6 +182,10 @@ augment_kmeans <- function(df, model, data){
 #' @param ... Additional argument to be passed to broom::augment
 #' @export
 add_prediction <- function(df, model_df, conf_int = 0.95, ...){
+  if (class(model_df$model[[1]]) %in% c("coxph_exploratory", "ranger_survival_exploratory")) { # For now this is only for Cox regression Analytics View model.
+    return(add_prediction2(df, model_df, conf_int = conf_int, ...))
+  }
+
   validate_empty_data(df)
 
   # parsing arguments of add_prediction and getting optional arguemnt for augment in ...
@@ -190,6 +194,9 @@ add_prediction <- function(df, model_df, conf_int = 0.95, ...){
 
   # model_df should not be rowwise grouped here. TODO: Should this be done here, or should we do this when model_df is created, for example in build_model?
   model_df <- model_df %>% dplyr::ungroup()
+
+  # For now predict only with the first model even if the model_df has multiple rows.
+  model_df <- model_df %>% dplyr::slice(1:1)
 
   # validate data frame based on meta info
   model_meta <- model_df[[".model_metadata"]]
@@ -208,7 +215,7 @@ add_prediction <- function(df, model_df, conf_int = 0.95, ...){
     }
   }
 
-  get_result <- function(model_df, df, aug_args, with_respose){
+  get_result <- function(model_df, df, aug_args, with_response){
     # Use formula to support expanded aug_args (especially for type.predict for logistic regression)
     # because ... can't be passed to a function inside mutate directly.
     aug_fml <- if(aug_args == ""){
@@ -221,7 +228,7 @@ add_prediction <- function(df, model_df, conf_int = 0.95, ...){
       # .test_index is used because model_df has it and won't be used here
       dplyr::mutate(.test_index=purrr::map(model, function(m){eval(parse(text=aug_fml))})) 
 
-    ret <- if(with_respose) {
+    ret <- if(with_response) {
       ret %>%
         dplyr::mutate(.test_index = purrr::map2(.test_index, model, function(d, m){
           # add predicted_response to the result data frame
@@ -247,7 +254,9 @@ add_prediction <- function(df, model_df, conf_int = 0.95, ...){
   # both fitted link value column and response value column should appear in the result
   with_response <- !("type.predict" %in% names(cll)) &&
                    any(lapply(model_df$model, function(s) {
-                     "family" %in% names(s) && !is.null(s$family$linkinv)
+                     # For Analytics View (glm_exploratory), response is added inside augment, to keep this code model-agnostic.
+                     # This piece of model-specific code here should go away, if we migrate from model steps to analytics view models.
+                     "glm_exploratory" %nin% class(s) && "family" %in% names(s) && !is.null(s$family$linkinv)
                    }))
 
   ret <- tryCatch({
@@ -766,6 +775,11 @@ prediction2 <- function(df, data_frame = NULL, conf_int = 0.95, ...){
   ret
 }
 
+add_prediction2 <- function(df, model_df, conf_int = 0.95, ...){
+  # Only data frames with single model (no group_by) are supported for now.
+  ret <- broom::augment(model_df$model[[1]], newdata=df, ...)
+  ret
+}
 
 # Simplified, model agnostic version of rf_evaluation_training_and_test.
 # Currently used only by cox regression and survival forest, but planning to migrate others to this one.

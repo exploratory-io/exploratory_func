@@ -302,6 +302,7 @@ build_coxph.fast <- function(df,
                     time,
                     status,
                     ...,
+                    predictor_funs = NULL,
                     max_nrow = 50000, # With 50000 rows, taking 6 to 7 seconds on late-2016 Macbook Pro.
                     predictor_n = 12, # so that at least months can fit in it.
                     max_pd_vars = NULL,
@@ -321,9 +322,18 @@ build_coxph.fast <- function(df,
   time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(time))
   status_col <- tidyselect::vars_select(names(df), !! rlang::enquo(status))
   # this evaluates select arguments like starts_with
-  selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
+  orig_selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
+
+  if (!is.null(predictor_funs)) {
+    df <- df %>% mutate_predictors(orig_selected_cols, predictor_funs)
+    selected_cols <- names(unlist(predictor_funs))
+  }
+  else {
+    selected_cols <- orig_selected_cols
+  }
+
   # Sort predictors so that the result of permutation importance is stable against change of column order.
-  selected_cols <- sort(selected_cols)
+  selected_cols <- stringr::str_sort(selected_cols)
 
   grouped_cols <- grouped_by(df)
 
@@ -512,6 +522,11 @@ build_coxph.fast <- function(df,
         model$auc_test <- survival_auroc(prediction_test, df_test_clean[[clean_time_col]], df_test_clean[[clean_status_col]], pred_survival_time)
       }
       model$training_data <- df
+
+      if (!is.null(predictor_funs)) {
+        model$orig_predictor_cols <- orig_selected_cols
+        model$predictor_funs <- predictor_funs
+      }
 
       # add special lm_coxph class for adding extra info at glance().
       class(model) <- c("coxph_exploratory", class(model))
@@ -759,17 +774,47 @@ glance.coxph_exploratory <- function(x, data_type = "training", pretty.name = FA
 }
 
 #' @export
-augment.coxph_exploratory <- function(x, data_type = "training", ...) {
+augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training", pred_survival_time = NULL, ...) {
   if ("error" %in% class(x)) {
     ret <- data.frame(Note = x$message)
     return(ret)
   }
-  # TODO: handle training/test split.
-  if (data_type == "training") {
+  if(!is.null(newdata)) {
+    # Replay the mutations on predictors.
+    if(!is.null(x$predictor_funs)) {
+      newdata <- newdata %>% mutate_predictors(x$orig_predictor_cols, x$predictor_funs)
+    }
+
+    predictor_variables <- all.vars(x$terms)[c(-1,-2)] # c(-1,-2) to skip time and status columns.
+    predictor_variables_orig <- x$terms_mapping[predictor_variables]
+
+    # This select() also renames columns since predictor_variables_orig is a named vector.
+    # everything() is to keep the other columns in the output. #TODO: What if names of the other columns conflicts with our temporary name, c1_, c2_...?
+    cleaned_data <- newdata %>% dplyr::select(predictor_variables_orig, everything())
+
+    # Align factor levels including Others and (Missing) to the model.
+    cleaned_data <- align_predictor_factor_levels(cleaned_data, x$xlevels, predictor_variables)
+
+    na_row_numbers <- ranger.find_na(predictor_variables, cleaned_data)
+    if (length(na_row_numbers) > 0) {
+      cleaned_data <- cleaned_data[-na_row_numbers,]
+    }
+
+    ret <- tryCatch({
+      broom:::augment.coxph(x, data = NULL, newdata = cleaned_data, se = TRUE, ...)
+    }, error = function(e){
+      # TODO: This is copied from the code for glm, but check if this is useful for coxph.
+      # se=TRUE throws error that looks like "singular matrix 'a' in solve",
+      # in some subset of cases of perfect collinearity.
+      # Try recovering from it by running with se=FALSE.
+      broom:::augment.coxph(x, data = NULL, newdata = cleaned_data, se = FALSE, ...)
+    })
+  }
+  else if (data_type == "training") {
     data <- x$training_data
     ret <- broom:::augment.coxph(x, data = data, ...)
   }
-  else {
+  else { # data_type == "test"
     if (is.null(x$test_data)) {
       return(data.frame())
     }
@@ -777,28 +822,29 @@ augment.coxph_exploratory <- function(x, data_type = "training", ...) {
     ret <- broom:::augment.coxph(x, newdata = data, ...)
   }
 
-  time <- x$pred_survival_time
+  if (is.null(pred_survival_time)) {
+    pred_survival_time <- x$pred_survival_time
+  }
+
   # basehaz returns base cumulative hazard.
   bh <- survival::basehaz(x)
   # create a function to interpolate function that returns cumulative hazard.
   bh_fun <- approxfun(bh$time, bh$hazard)
-  cumhaz_base = bh_fun(time)
-  # transform linear predictor (.fitted) into predicted_probability.
-  # predicted_probability is 1 - (y of survival curve).
-  ret <- ret %>% dplyr::mutate(time_for_prediction = time,
-                               predicted_probability = 1 - exp(-cumhaz_base * exp(.fitted)))
-
+  cumhaz_base = bh_fun(pred_survival_time)
+  # transform linear predictor (.fitted) into predicted_survival.
+  ret <- ret %>% dplyr::mutate(time_for_prediction = pred_survival_time,
+                               predicted_survival = exp(-cumhaz_base * exp(.fitted)))
 
   if (!is.null(ret$.fitted)) {
     # Bring those columns as the first of the prediction result related additional columns.
-    ret <- ret %>% dplyr::relocate(any_of(c("time_for_prediction", "predicted_probability")), .before=.fitted)
+    ret <- ret %>% dplyr::relocate(any_of(c("time_for_prediction", "predicted_survival")), .before=.fitted)
   }
   # Prettify names.
   colnames(ret)[colnames(ret) == ".fitted"] <- "Linear Predictor"
   colnames(ret)[colnames(ret) == ".se.fit"] <- "Std Error"
   colnames(ret)[colnames(ret) == ".resid"] <- "Residual"
   colnames(ret)[colnames(ret) == "time_for_prediction"] <- "Survival Time for Prediction"
-  colnames(ret)[colnames(ret) == "predicted_probability"] <- "Predicted Survival Rate"
+  colnames(ret)[colnames(ret) == "predicted_survival"] <- "Predicted Survival Rate"
 
   # Convert column names back to the original.
   for (i in 1:length(x$terms_mapping)) {
