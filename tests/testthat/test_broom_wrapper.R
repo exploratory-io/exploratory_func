@@ -192,7 +192,7 @@ test_that("predict lm with new data", {
 
   fit <- add_df %>% dplyr::group_by(group) %>% add_prediction(model_df = model_data)
 
-  expect_equal(nrow(fit), 20 * 2)
+  expect_equal(nrow(fit), 20) # For now, only the first model in model_df is used for prediction, even if the model_df has multiple rows (models).
   expect_equal(names(fit), c("model.group", "group", "num1", "num2", "predicted_value", "standard_error", "conf_low", "conf_high", "residual"))
 })
 
