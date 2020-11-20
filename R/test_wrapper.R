@@ -893,8 +893,8 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
   if (type == "model") {
     note <- NULL
     ret <- broom:::tidy.aov(x)
-    ret1 <- ret %>% slice(1:1)
-    ret2 <- ret %>% slice(2:2)
+    ret1 <- ret %>% dplyr::slice(1:1)
+    ret2 <- ret %>% dplyr::slice(2:2)
     ret <- ret1 %>% mutate(resid.df=!!ret2$df, resid.sumsq=!!ret2$sumsq, resid.meansq=!!ret2$meansq)
 
     # Get number of groups (k) , and the minimum sample size amoung those groups (min_n_rows).
