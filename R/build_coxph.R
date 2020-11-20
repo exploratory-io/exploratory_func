@@ -333,7 +333,7 @@ build_coxph.fast <- function(df,
   }
 
   # Sort predictors so that the result of permutation importance is stable against change of column order.
-  selected_cols <- sort(selected_cols)
+  selected_cols <- stringr::str_sort(selected_cols)
 
   grouped_cols <- grouped_by(df)
 

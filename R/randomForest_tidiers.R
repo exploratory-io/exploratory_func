@@ -2141,7 +2141,7 @@ calc_feature_imp <- function(df,
   grouped_cols <- grouped_by(df)
 
   # Sort predictors so that the result of permutation importance is stable against change of column order.
-  selected_cols <- sort(selected_cols)
+  selected_cols <- stringr::str_sort(selected_cols)
 
   # Remember if the target column was originally numeric or logical before converting type.
   is_target_logical_or_numeric <- is.numeric(df[[target_col]]) || is.logical(df[[target_col]])
@@ -2963,7 +2963,7 @@ exp_rpart <- function(df,
   grouped_cols <- grouped_by(df)
 
   # Sort predictors so that the result of permutation importance is stable against change of column order.
-  selected_cols <- sort(selected_cols)
+  selected_cols <- stringr::str_sort(selected_cols)
 
   # Remember if the target column was originally numeric or logical before converting type.
   is_target_logical_or_numeric <- is.numeric(df[[target_col]]) || is.logical(df[[target_col]])
