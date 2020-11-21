@@ -1,3 +1,21 @@
+
+generate_ttest_prob_dist_data <- function(t, df, sig.level = 0.05) {
+  l <- max(5, abs(t)*1.1) # limit of x for the data we generate here.
+  sig.level <- 0.05
+  tt <- qt(1-sig.level/2, df=df) # Threshold t for critical section.
+
+  x <- seq(from=-l,to=l,by=l/500 )
+  ret <- tibble::tibble(x=x, y=dt(x, df=df))
+
+  ret2 <- tibble::tibble(x=t, y=dt(x, df=df), statistic=TRUE)
+  ret <- bind_rows(ret, ret2)
+
+  ret <- ret %>% mutate(critical=(x>=tt|x<=-tt))
+  ret
+}
+
+
+
 #' wrapper for t.test, which compares means
 #' @export
 do_t.test <- function(df, value, key=NULL, ...){
