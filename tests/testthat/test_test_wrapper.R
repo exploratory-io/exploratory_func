@@ -271,7 +271,8 @@ test_that("test exp_ttest", {
   model_df <- exp_ttest(mtcars2, mpg, am)
   ret <- model_df %>% tidy_rowwise(model, type="model")
   expect_true("Number of Rows" %in% colnames(ret))
-  model_df %>% tidy_rowwise(model, type="data_summary")
+  ret <- model_df %>% tidy_rowwise(model, type="data_summary")
+  ret <- model_df %>% tidy_rowwise(model, type="density")
 })
 
 test_that("test exp_ttest with logical explanatory variable", {

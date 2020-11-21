@@ -1,5 +1,5 @@
 
-generate_ttest_prob_dist_data <- function(t, df, sig.level = 0.05) {
+generate_ttest_density_data <- function(t, df, sig.level = 0.05) {
   l <- max(5, abs(t)*1.1) # limit of x for the data we generate here.
   sig.level <- 0.05
   tt <- qt(1-sig.level/2, df=df) # Threshold t for critical section.
@@ -675,6 +675,10 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
                     `Std Deviation`,
                     `Minimum`,
                     `Maximum`)
+  }
+  else if (type == "density") {
+    ret <- generate_ttest_density_data(x$statistic, x$parameter, x$sig.level)
+    ret
   }
   else { # type == "data"
     ret <- x$data
