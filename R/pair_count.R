@@ -9,7 +9,7 @@ pair_count <- function (df,
                         unite = FALSE){
   group_col <- col_name(substitute(group))
   value_col <- col_name(substitute(value))
-  result <- pair_count_(df,
+  pair_count_(df,
               group_col,
               value_col,
               distinct = distinct,
