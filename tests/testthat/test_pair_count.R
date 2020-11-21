@@ -38,4 +38,8 @@ test_that("pair_count", {
   expect_equal(ret2[[1]], c("a", "a", "d", "d", "a", "c", "c", "c", "d", "a", "a", "b", "b", "c", "d", NA, "b", NA, "d", NA, NA))
   expect_equal(ret2[[2]], c("a", "d", "d", "a", "c", "c", "d", "a", "c", "b", NA, "b", "d", NA, NA, NA, "a", "a", "b", "c", "d"))
   expect_equal(ret2[[3]], c(3, 3, 3, 3, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1))
+
+  ret3 <- pair_count(test_df, group, chars, diag = TRUE, sort = TRUE, distinct = FALSE, unite = TRUE)
+  expect_equal(ret3[[1]], c("a_a","a_d","d_d", "d_a", "a_c","c_c","c_d","c_a","d_c","a_b","a_NA", "b_b","b_d","c_NA","d_NA","NA_NA","b_a","NA_a","d_b","NA_c","NA_d" ))
+
 })
