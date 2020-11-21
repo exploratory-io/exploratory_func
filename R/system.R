@@ -1621,6 +1621,7 @@ scrape_html_table <- function(url, index, heading, encoding = NULL) {
     .htmltables <- parse_html_tables(url, encoding)
     if (Sys.info()["sysname"] == "Windows") {
       # For Windows, temporary change LC_CTYPE to C to workaround the "invalid multibyte string" error raised from rvest.
+      # please see https://github.com/r-lib/devtools/issues/544 for locale "C" workround for invalid multibyte string.
       Sys.setlocale(category="LC_CTYPE", locale="C");
     }
     res <- tibble::repair_names(rvest::html_table(.htmltables[[index]], fill=TRUE ,header=heading))
