@@ -5,15 +5,17 @@ pair_count <- function (df,
                         value,
                         distinct = TRUE,
                         diag = FALSE,
-                        sort = TRUE){
+                        sort = TRUE,
+                        unite = FALSE){
   group_col <- col_name(substitute(group))
   value_col <- col_name(substitute(value))
-  pair_count_(df,
+  result <- pair_count_(df,
               group_col,
               value_col,
               distinct = distinct,
               diag = diag,
-              sort = sort)
+              sort = sort,
+              unite = unite)
 }
 
 #' Clone implementation of now deprecated tidytext::pair_count_ for backward compatibility in Exploratory.
@@ -23,7 +25,8 @@ pair_count_ <- function (df,
                          value_col,
                          distinct = FALSE,
                          diag = FALSE,
-                         sort = FALSE){
+                         sort = FALSE,
+                         unite = FALSE){
   validate_empty_data(df)
 
   loadNamespace("Matrix")
@@ -35,6 +38,7 @@ pair_count_ <- function (df,
 
   # gather the matrix
   cnames <- c(stringr::str_c(value_col, c(".x", ".y")), "value")
+  cnames_wihtout_value <- c(stringr::str_c(value_col, c(".x", ".y")))
   ret <- upper_gather(count_mat, diag = diag, cnames = cnames)
   ret <- ret[ret[[3]] > 0, ]
 
@@ -49,6 +53,9 @@ pair_count_ <- function (df,
   if (sort) {
     # sort based on the last column
     ret <- ret[sort.list(ret[, ncol(ret)], decreasing=TRUE),]
+  }
+  if (unite) {
+    ret <- ret %>% tidyr::unite(col = !!rlang::sym(value_col), cnames_wihtout_value)
   }
   # reset row names because binding and sorting mess up them
   rownames(ret) <- NULL
