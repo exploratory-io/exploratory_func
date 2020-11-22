@@ -235,8 +235,11 @@ do_chisq.test_ <- function(df,
 }
 
 #' Chi-Square test wrapper for Analytics View
+#' @param sig_level - Significance level for the t-test ifself.
+#' @param sig.level - Significance level for power analysis.
 #' @export
-exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, fun.aggregate = sum, correct = FALSE, sig.level = 0.05, w = NULL, power = NULL, beta = NULL, ...) {
+exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, fun.aggregate = sum, correct = FALSE,
+                      sig_level = 0.05, sig.level = 0.05, w = NULL, power = NULL, beta = NULL, ...) {
   if (!is.null(power) && !is.null(beta) && (power + beta != 1.0)) {
     stop("Specify only one of Power or Probability of Type 2 Error, or they must add up to 1.0.")
   }
@@ -345,6 +348,7 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
     model$var2_class <- var2_class
     model$var1_levels <- var1_levels
     model$var2_levels <- var2_levels
+    model$sig_level <- sig_level
     model$sig.level <- sig.level
     model$cohens_w <- cohens_w
     model$cohens_w_to_detect <- cohens_w_to_detect
@@ -421,7 +425,7 @@ tidy.chisq_exploratory <- function(x, type = "observed") {
     }
   }
   else { # type == "density"
-    ret <- generate_chisq_density_data(x$statistic, x$parameter, sig.level=x$sig.level)
+    ret <- generate_chisq_density_data(x$statistic, x$parameter, sig_level=x$sig_level)
     ret
   }
   ret
