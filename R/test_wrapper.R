@@ -24,7 +24,8 @@ generate_ttest_density_data <- function(t, df, sig_level = 0.05, alternative = "
 }
 
 generate_chisq_density_data <- function(stat, df, sig_level = 0.05) {
-  l <- max(df*3, 6, stat*1.1)
+  tx <- qchisq(1-sig_level, df=df) # The chisq value that corresponds to the significance level.
+  l <- max(df*3, stat*1.1, tx*1.1) # Making sure stat and tx are in the displayed range.
 
   x <- seq(from=0, to=l, by=l/1000 )
   ret <- tibble::tibble(x=x, y=dchisq(x, df=df))
@@ -32,7 +33,6 @@ generate_chisq_density_data <- function(stat, df, sig_level = 0.05) {
   ret2 <- tibble::tibble(x=stat, y=dchisq(x, df=df), statistic=TRUE)
   ret <- bind_rows(ret, ret2)
 
-  tx <- qchisq(1-sig_level, df=df)
   ret <- ret %>% mutate(critical=x>=tx)
   ret
 }
