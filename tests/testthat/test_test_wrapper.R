@@ -269,7 +269,7 @@ test_that("test exp_chisq with group_by with single class category in one of the
 test_that("test exp_ttest", {
   mtcars2 <- mtcars
   mtcars2$am[[1]] <- NA # test NA filtering
-  model_df <- exp_ttest(mtcars2, mpg, am, sig_level=0.05)
+  model_df <- exp_ttest(mtcars2, mpg, am, test_sig_level=0.05)
   ret <- model_df %>% tidy_rowwise(model, type="model")
   expect_true("Number of Rows" %in% colnames(ret))
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")

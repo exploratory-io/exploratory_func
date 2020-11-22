@@ -235,11 +235,11 @@ do_chisq.test_ <- function(df,
 }
 
 #' Chi-Square test wrapper for Analytics View
-#' @param sig_level - Significance level for the t-test ifself.
+#' @param test_sig_level - Significance level for the t-test ifself.
 #' @param sig.level - Significance level for power analysis.
 #' @export
 exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, fun.aggregate = sum, correct = FALSE,
-                      sig_level = 0.05, sig.level = 0.05, w = NULL, power = NULL, beta = NULL, ...) {
+                      test_sig_level = 0.05, sig.level = 0.05, w = NULL, power = NULL, beta = NULL, ...) {
   if (!is.null(power) && !is.null(beta) && (power + beta != 1.0)) {
     stop("Specify only one of Power or Probability of Type 2 Error, or they must add up to 1.0.")
   }
@@ -348,7 +348,7 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
     model$var2_class <- var2_class
     model$var1_levels <- var1_levels
     model$var2_levels <- var2_levels
-    model$sig_level <- sig_level
+    model$test_sig_level <- test_sig_level
     model$sig.level <- sig.level
     model$cohens_w <- cohens_w
     model$cohens_w_to_detect <- cohens_w_to_detect
@@ -425,7 +425,7 @@ tidy.chisq_exploratory <- function(x, type = "observed") {
     }
   }
   else { # type == "density"
-    ret <- generate_chisq_density_data(x$statistic, x$parameter, sig_level=x$sig_level)
+    ret <- generate_chisq_density_data(x$statistic, x$parameter, sig_level=x$test_sig_level)
     ret
   }
   ret
@@ -493,9 +493,9 @@ glance.chisq_exploratory <- function(x) {
 #' t-test wrapper for Analytics View
 #' @export
 #' @param conf.level - Level of confidence for confidence interval. Passed to t.test as part of ...
-#' @param sig_level - Significance level for the t-test ifself.
+#' @param test_sig_level - Significance level for the t-test ifself.
 #' @param sig.level - Significance level for power analysis.
-exp_ttest <- function(df, var1, var2, func2 = NULL, sig_level = 0.05,
+exp_ttest <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
                       sig.level = 0.05, d = NULL, common_sd = NULL, diff_to_detect = NULL, power = NULL, beta = NULL,
                       outlier_filter_type = NULL, outlier_filter_threshold = NULL,
                       ...) {
@@ -583,7 +583,7 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, sig_level = 0.05,
       model$var1 <- var1_col
       model$var2 <- var2_col
       model$data <- df
-      model$sig_level <- sig_level
+      model$test_sig_level <- test_sig_level
       model$sig.level <- sig.level
       model$cohens_d <- cohens_d # model$d seems to be already used for something.
       model$cohens_d_to_detect <- cohens_d_to_detect
@@ -711,7 +711,7 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
                     `Maximum`)
   }
   else if (type == "density") {
-    ret <- generate_ttest_density_data(x$statistic, x$parameter, sig_level=x$sig_level, alternative=x$alternative)
+    ret <- generate_ttest_density_data(x$statistic, x$parameter, sig_level=x$test_sig_level, alternative=x$alternative)
     ret
   }
   else { # type == "data"
