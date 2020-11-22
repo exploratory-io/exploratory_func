@@ -1,8 +1,6 @@
 
-generate_ttest_density_data <- function(t, df, sig.level = 0.05) {
+generate_ttest_density_data <- function(t, df, sig.level = 0.05, alternative = "two.sided") {
   l <- max(5, abs(t)*1.1) # limit of x for the data we generate here.
-  sig.level <- 0.05
-  tt <- qt(1-sig.level/2, df=df) # Threshold t for critical section.
 
   x <- seq(from=-l,to=l,by=l/500 )
   ret <- tibble::tibble(x=x, y=dt(x, df=df))
@@ -10,7 +8,18 @@ generate_ttest_density_data <- function(t, df, sig.level = 0.05) {
   ret2 <- tibble::tibble(x=t, y=dt(x, df=df), statistic=TRUE)
   ret <- bind_rows(ret, ret2)
 
-  ret <- ret %>% mutate(critical=(x>=tt|x<=-tt))
+  if (alternative == "two.sided") {
+    tt <- qt(1-sig.level/2, df=df) # Threshold t for critical section.
+    ret <- ret %>% mutate(critical=(x>=tt|x<=-tt))
+  }
+  else if (alternative == "greater") {
+    tt <- qt(1-sig.level, df=df) # Threshold t for critical section.
+    ret <- ret %>% mutate(critical=(x>=tt))
+  }
+  else { # alternative == "less"
+    tt <- qt(sig.level, df=df) # Threshold t for critical section.
+    ret <- ret %>% mutate(critical=(x<=tt))
+  }
   ret
 }
 
@@ -677,7 +686,7 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
                     `Maximum`)
   }
   else if (type == "density") {
-    ret <- generate_ttest_density_data(x$statistic, x$parameter, x$sig.level)
+    ret <- generate_ttest_density_data(x$statistic, x$parameter, sig.level=x$sig.level, alternative=x$alternative)
     ret
   }
   else { # type == "data"
