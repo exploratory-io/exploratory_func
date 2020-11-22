@@ -23,6 +23,20 @@ generate_ttest_density_data <- function(t, df, sig.level = 0.05, alternative = "
   ret
 }
 
+generate_chisq_density_data <- function(stat, df, sig.level = 0.05) {
+  l <- max(df*3, stat*1.1)
+
+  x <- seq(from=0, to=l, by=l/1000 )
+  ret <- tibble::tibble(x=x, y=dchisq(x, df=df))
+
+  ret2 <- tibble::tibble(x=stat, y=dchisq(x, df=df), statistic=TRUE)
+  ret <- bind_rows(ret, ret2)
+
+  tx <- qchisq(1-sig.level, df=df)
+  ret <- ret %>% mutate(critical=x>=tx)
+  ret
+}
+
 
 
 #' wrapper for t.test, which compares means
