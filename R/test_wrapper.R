@@ -1,5 +1,5 @@
 
-generate_ttest_density_data <- function(t, df, sig.level = 0.05, alternative = "two.sided") {
+generate_ttest_density_data <- function(t, df, sig_level = 0.05, alternative = "two.sided") {
   l <- max(5, abs(t)*1.1) # limit of x for the data we generate here.
 
   x <- seq(from=-l,to=l,by=l/500 )
@@ -9,21 +9,21 @@ generate_ttest_density_data <- function(t, df, sig.level = 0.05, alternative = "
   ret <- bind_rows(ret, ret2)
 
   if (alternative == "two.sided") {
-    tt <- qt(1-sig.level/2, df=df) # Threshold t for critical section.
+    tt <- qt(1-sig_level/2, df=df) # Threshold t for critical section.
     ret <- ret %>% mutate(critical=(x>=tt|x<=-tt))
   }
   else if (alternative == "greater") {
-    tt <- qt(1-sig.level, df=df) # Threshold t for critical section.
+    tt <- qt(1-sig_level, df=df) # Threshold t for critical section.
     ret <- ret %>% mutate(critical=(x>=tt))
   }
   else { # alternative == "less"
-    tt <- qt(sig.level, df=df) # Threshold t for critical section.
+    tt <- qt(sig_level, df=df) # Threshold t for critical section.
     ret <- ret %>% mutate(critical=(x<=tt))
   }
   ret
 }
 
-generate_chisq_density_data <- function(stat, df, sig.level = 0.05) {
+generate_chisq_density_data <- function(stat, df, sig_level = 0.05) {
   l <- max(df*3, 6, stat*1.1)
 
   x <- seq(from=0, to=l, by=l/1000 )
@@ -32,7 +32,7 @@ generate_chisq_density_data <- function(stat, df, sig.level = 0.05) {
   ret2 <- tibble::tibble(x=stat, y=dchisq(x, df=df), statistic=TRUE)
   ret <- bind_rows(ret, ret2)
 
-  tx <- qchisq(1-sig.level, df=df)
+  tx <- qchisq(1-sig_level, df=df)
   ret <- ret %>% mutate(critical=x>=tx)
   ret
 }
