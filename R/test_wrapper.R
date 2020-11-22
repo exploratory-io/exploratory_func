@@ -24,7 +24,7 @@ generate_ttest_density_data <- function(t, df, sig.level = 0.05, alternative = "
 }
 
 generate_chisq_density_data <- function(stat, df, sig.level = 0.05) {
-  l <- max(df*3, stat*1.1)
+  l <- max(df*3, 6, stat*1.1)
 
   x <- seq(from=0, to=l, by=l/1000 )
   ret <- tibble::tibble(x=x, y=dchisq(x, df=df))
