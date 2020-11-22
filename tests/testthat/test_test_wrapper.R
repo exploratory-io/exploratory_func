@@ -206,6 +206,7 @@ test_that("test exp_chisq", {
   expect_equal(colnames(summary),
                c("Chi-Square","Degree of Freedom","P Value","Effect Size (Cohen's w)","Power",
                  "Probability of Type 2 Error","Number of Rows"))
+  density <- ret %>% tidy_rowwise(model, type="density")
 })
 
 test_that("test exp_chisq with power", {

@@ -361,7 +361,7 @@ tidy.chisq_exploratory <- function(x, type = "observed") {
     ret <- as.data.frame(x$observed)
     ret <- ret %>% tibble::rownames_to_column(var = x$var1)
   }
-  if (type == "residuals") {
+  else if (type == "residuals") {
     obs_df <- as.data.frame(x$observed)
     obs_df <- obs_df %>% tibble::rownames_to_column(var = x$var1)
     obs_df <- obs_df %>% tidyr::gather(!!rlang::sym(x$var2), "observed", -!!rlang::sym(x$var1))
@@ -419,6 +419,10 @@ tidy.chisq_exploratory <- function(x, type = "observed") {
     else if ("numeric" %in% x$var2_class) {
       ret[[x$var2]] <- as.numeric(ret[[x$var2]])
     }
+  }
+  else { # type == "density"
+    ret <- generate_chisq_density_data(x$statistic, x$parameter, sig.level=x$sig.level)
+    ret
   }
   ret
 }
