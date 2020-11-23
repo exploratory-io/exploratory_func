@@ -37,7 +37,19 @@ generate_chisq_density_data <- function(stat, df, sig_level = 0.05) {
   ret
 }
 
+generate_ftest_density_data <- function(stat, df1, df2, sig_level = 0.05) {
+  tx <- qf(1-sig_level, df1=df1, df2=df2) # The chisq value that corresponds to the significance level.
+  l <- max(df1/df2*3, stat*1.1, tx*1.1) # Making sure stat and tx are in the displayed range.
 
+  x <- seq(from=0,to=l,by=l/1000 )
+  ret <- tibble::tibble(x=x, y=df(x, df1=df1, df2=df2))
+
+  ret2 <- tibble::tibble(x=stat, y=df(x, df1=df1, df2=df2), statistic=TRUE)
+  ret <- bind_rows(ret, ret2)
+
+  ret <- ret %>% mutate(critical=x>=tx)
+  ret
+}
 
 #' wrapper for t.test, which compares means
 #' @export
@@ -946,6 +958,7 @@ glance.anova_exploratory <- function(x) {
 
 #' @export
 tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
+  browser()
   if (type == "model") {
     note <- NULL
     ret <- broom:::tidy.aov(x)
