@@ -206,7 +206,7 @@ test_that("test exp_chisq", {
   expect_equal(colnames(summary),
                c("Chi-Square","Degree of Freedom","P Value","Effect Size (Cohen's w)","Power",
                  "Probability of Type 2 Error","Number of Rows"))
-  density <- ret %>% tidy_rowwise(model, type="density")
+  prob_dist <- ret %>% tidy_rowwise(model, type="prob_dist")
 })
 
 test_that("test exp_chisq with power", {
@@ -273,7 +273,7 @@ test_that("test exp_ttest", {
   ret <- model_df %>% tidy_rowwise(model, type="model")
   expect_true("Number of Rows" %in% colnames(ret))
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
-  ret <- model_df %>% tidy_rowwise(model, type="density")
+  ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
 })
 
 test_that("test exp_ttest with logical explanatory variable", {
@@ -328,7 +328,7 @@ test_that("test exp_ttest with power", {
   model_df <- exp_ttest(mtcars2, mpg, am, beta = 0.2)
   ret <- model_df %>% tidy_rowwise(model, type="model")
   expect_equal(colnames(ret),
-               c("t Ratio","P Value","Degree of Freedom","Difference",
+               c("t Value","P Value","Degree of Freedom","Difference",
                  "Conf High","Conf Low","Effect Size (Cohen's d)","Target Power",
                  "Target Probability of Type 2 Error","Current Sample Size (Each Group)","Required Sample Size (Each Group)","Number of Rows",
                  "Number of Rows for 0","Number of Rows for 1"))
@@ -409,14 +409,14 @@ test_that("test exp_anova", {
   model_df <- exp_anova(mtcars, mpg, am)
   ret <- model_df %>% tidy_rowwise(model, type="model")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
-  ret <- model_df %>% tidy_rowwise(model, type="density")
+  ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
   model_df <- exp_anova(mtcars, mpg, gear)
   ret <- model_df %>% tidy_rowwise(model, type="model")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   expect_equal(colnames(ret),
                c("gear","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",   
                  "Minimum","Maximum"))
-  ret <- model_df %>% tidy_rowwise(model, type="density")
+  ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
 })
 
 test_that("test exp_anova with outlier filter", {

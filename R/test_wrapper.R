@@ -439,7 +439,7 @@ tidy.chisq_exploratory <- function(x, type = "observed") {
       ret[[x$var2]] <- as.numeric(ret[[x$var2]])
     }
   }
-  else { # type == "density"
+  else { # type == "prob_dist"
     ret <- generate_chisq_density_data(x$statistic, x$parameter, sig_level=x$test_sig_level)
     ret
   }
@@ -725,7 +725,7 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
                     `Minimum`,
                     `Maximum`)
   }
-  else if (type == "density") {
+  else if (type == "prob_dist") {
     ret <- generate_ttest_density_data(x$statistic, x$parameter, sig_level=x$test_sig_level, alternative=x$alternative)
     ret
   }
@@ -1058,7 +1058,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
                     `Minimum`,
                     `Maximum`)
   }
-  else if (type == "density") {
+  else if (type == "prob_dist") {
     ret0 <- broom:::tidy.aov(x)
     ret <- generate_ftest_density_data(ret0$statistic[[1]], df1=ret0$df[[1]], df2=ret0$df[[2]], sig_level=x$test_sig_level)
     ret
