@@ -409,12 +409,14 @@ test_that("test exp_anova", {
   model_df <- exp_anova(mtcars, mpg, am)
   ret <- model_df %>% tidy_rowwise(model, type="model")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
+  ret <- model_df %>% tidy_rowwise(model, type="density")
   model_df <- exp_anova(mtcars, mpg, gear)
   ret <- model_df %>% tidy_rowwise(model, type="model")
   ret <- model_df %>% tidy_rowwise(model, type="data_summary")
   expect_equal(colnames(ret),
                c("gear","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",   
                  "Minimum","Maximum"))
+  ret <- model_df %>% tidy_rowwise(model, type="density")
 })
 
 test_that("test exp_anova with outlier filter", {

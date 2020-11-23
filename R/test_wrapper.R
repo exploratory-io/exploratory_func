@@ -868,7 +868,10 @@ tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
 
 #' ANOVA wrapper for Analytics View
 #' @export
-exp_anova <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, f = NULL, power = NULL, beta = NULL,
+#' @param test_sig_level - Significance level for the t-test ifself.
+#' @param sig.level - Significance level for power analysis.
+exp_anova <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
+                      sig.level = 0.05, f = NULL, power = NULL, beta = NULL,
                       outlier_filter_type = NULL, outlier_filter_threshold = NULL,
                       ...) {
   if (!is.null(power) && !is.null(beta) && (power + beta != 1.0)) {
@@ -930,6 +933,7 @@ exp_anova <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, f = NULL, 
       model$var1 <- var1_col
       model$var2 <- var2_col
       model$data <- df
+      model$test_sig_level <- test_sig_level
       model$sig.level <- sig.level
       model$power <- power
       model
@@ -958,7 +962,6 @@ glance.anova_exploratory <- function(x) {
 
 #' @export
 tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
-  browser()
   if (type == "model") {
     note <- NULL
     ret <- broom:::tidy.aov(x)
@@ -1051,6 +1054,11 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
                     `Std Deviation`,
                     `Minimum`,
                     `Maximum`)
+  }
+  else if (type == "density") {
+    ret0 <- broom:::tidy.aov(x)
+    ret <- generate_ftest_density_data(ret0$statistic[[1]], df1=ret0$df[[1]], df2=ret0$df[[2]], sig_level=x$test_sig_level)
+    ret
   }
   else { # type == "data"
     ret <- x$data
