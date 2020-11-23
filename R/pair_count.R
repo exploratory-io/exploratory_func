@@ -6,21 +6,64 @@ pair_count <- function (df,
                         distinct = TRUE,
                         diag = FALSE,
                         sort = TRUE,
-                        unite = FALSE){
+                        unite = FALSE,
+                        group_by = NULL){
+  if(!is.null(group_by)) {
+    df <- df %>% dplyr::group_by(!!!rlang::sym(group_by))
+  }
   group_col <- col_name(substitute(group))
   value_col <- col_name(substitute(value))
-  pair_count_(df,
+
+  ret <- pair_count_(df,
               group_col,
               value_col,
               distinct = distinct,
               diag = diag,
               sort = sort,
               unite = unite)
+ if(!is.null(group_by)) {
+   ret %>% dplyr::ungroup();
+ } else {
+   ret
+ }
+}
+
+pair_count_ <- function(df,
+                         group_col,
+                         value_col,
+                         distinct = FALSE,
+                         diag = FALSE,
+                         sort = FALSE,
+                         unite = FALSE) {
+  validate_empty_data(df)
+  grouped_col <- exploratory::grouped_by(df)
+  if(!is.null(grouped_col) && length(grouped_col) > 0){
+    if(group_col %in% grouped_col){
+      stop(paste0(group_col, " is grouped. Please ungroup it."))
+    }
+    dplyr::group_modify(df, .f = function(.x, ...){
+      pair_count__(.x,
+                   group_col,
+                   value_col,
+                   distinct = distinct,
+                   diag = diag,
+                   sort = sort,
+                   unite = unite)
+    }, .keep = TRUE)
+  } else {
+    pair_count__(df,
+                 group_col,
+                 value_col,
+                 distinct = distinct,
+                 diag = diag,
+                 sort = sort,
+                 unite = unite)
+  }
 }
 
 #' Clone implementation of now deprecated tidytext::pair_count_ for backward compatibility in Exploratory.
 #' @export
-pair_count_ <- function (df,
+pair_count__ <- function (df,
                          group_col,
                          value_col,
                          distinct = FALSE,
