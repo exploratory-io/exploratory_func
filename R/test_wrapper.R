@@ -659,7 +659,7 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
 
       ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
         dplyr::mutate(d=!!(x$cohens_d), power=!!power_val, beta=1.0-!!power_val) %>%
-        dplyr::rename(`t Ratio`=statistic,
+        dplyr::rename(`t Value`=statistic,
                       `P Value`=p.value,
                       `Degree of Freedom`=parameter,
                       Difference=estimate,
@@ -682,7 +682,7 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
       ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
         dplyr::mutate(d=!!(x$cohens_d), power=!!(x$power), beta=1.0-!!(x$power)) %>%
         dplyr::mutate(current_sample_size=min(!!n1,!!n2), required_sample_size=required_sample_size) %>%
-        dplyr::rename(`t Ratio`=statistic,
+        dplyr::rename(`t Value`=statistic,
                       `P Value`=p.value,
                       `Degree of Freedom`=parameter,
                       Difference=estimate,
@@ -992,7 +992,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
       })
       ret <- ret %>% dplyr::select(statistic, p.value, df, resid.df, sumsq, resid.sumsq, meansq, resid.meansq) %>%
         dplyr::mutate(f=c(!!(x$cohens_f)), power=c(!!power_val), beta=c(1.0-!!power_val)) %>%
-        dplyr::rename(`F Ratio`=statistic,
+        dplyr::rename(`F Value`=statistic,
                       `P Value`=p.value,
                       `Degree of Freedom`=df,
                       `Residual DF`=resid.df,
@@ -1016,7 +1016,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
       ret <- ret %>% dplyr::select(statistic, p.value, df, resid.df, sumsq, resid.sumsq, meansq, resid.meansq) %>%
         dplyr::mutate(f=c(!!(x$cohens_f)), power=c(!!(x$power)), beta=c(1.0-!!(x$power))) %>%
         dplyr::mutate(current_sample_size=!!min_n_rows, required_sample_size=c(!!required_sample_size)) %>%
-        dplyr::rename(`F Ratio`=statistic,
+        dplyr::rename(`F Value`=statistic,
                       `P Value`=p.value,
                       `Degree of Freedom`=df,
                       `Residual DF`=resid.df,
