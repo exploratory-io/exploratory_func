@@ -20,6 +20,7 @@ generate_ttest_density_data <- function(t, df, sig_level = 0.05, alternative = "
     tt <- qt(sig_level, df=df) # Threshold t for critical section.
     ret <- ret %>% mutate(critical=(x<=tt))
   }
+  ret <- ret %>% mutate(df=df)
   ret
 }
 
@@ -34,6 +35,7 @@ generate_chisq_density_data <- function(stat, df, sig_level = 0.05) {
   ret <- bind_rows(ret, ret2)
 
   ret <- ret %>% mutate(critical=x>=tx)
+  ret <- ret %>% mutate(df=df)
   ret
 }
 
@@ -48,6 +50,7 @@ generate_ftest_density_data <- function(stat, df1, df2, sig_level = 0.05) {
   ret <- bind_rows(ret, ret2)
 
   ret <- ret %>% mutate(critical=x>=tx)
+  ret <- ret %>% mutate(df1=df1, df2=df2)
   ret
 }
 
