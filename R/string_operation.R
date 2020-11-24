@@ -245,19 +245,20 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
   # result column order should be document_id, <token_col>, <count_col> ...
   if(!with_id) {
     result <- result %>% select(!!rlang::sym(token_col), !!rlang::sym(count_col), dplyr::everything())
-    if(summary_level == "all") { # if the summary_level is "all", summarize it by token.
-      result <- result %>% dplyr::group_by(!!rlang::sym(token_col)) %>% dplyr::summarise(!!rlang::sym(count_col) := n())
-    }
-    # Sort handling. if count is specified, sort by count descending.
-    if(sort_by == "count") {
-      result <- result %>% arrange(desc(!!rlang::sym(count_col)))
-    } else if (sort_by == "token"){ #if token is specified, sort by token alphabetically.
-      result <- result %>% arrange(!!rlang::sym(token_col))
-    }
-    result
   } else {
-    result %>% select(document_id, !!rlang::sym(token_col), !!rlang::sym(count_col), dplyr::everything())
+    result <- result %>% select(document_id, !!rlang::sym(token_col), !!rlang::sym(count_col), dplyr::everything())
   }
+  # if the summary_level is "all", summarize it by token.
+  if(summary_level == "all") {
+    result <- result %>% dplyr::group_by(!!rlang::sym(token_col)) %>% dplyr::summarise(!!rlang::sym(count_col) := n())
+  }
+  # Sort handling. if count is specified, sort by count descending.
+  if(sort_by == "count") {
+    result <- result %>% arrange(desc(!!rlang::sym(count_col)))
+  } else if (sort_by == "token"){ #if token is specified, sort by token alphabetically.
+    result <- result %>% arrange(!!rlang::sym(token_col))
+  }
+  result
 }
 
 #' Tokenize text and unnest
