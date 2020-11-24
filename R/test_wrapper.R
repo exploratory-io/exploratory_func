@@ -1,4 +1,6 @@
 
+# Generates data for t distribution probability density with critical section and statistic
+# to depict a result of a t-test.
 generate_ttest_density_data <- function(t, df, sig_level = 0.05, alternative = "two.sided") {
   l <- max(5, abs(t)*1.1) # limit of x for the data we generate here.
 
@@ -24,6 +26,8 @@ generate_ttest_density_data <- function(t, df, sig_level = 0.05, alternative = "
   ret
 }
 
+# Generates data for chi-square distribution probability density with critical section and statistic
+# to depict a result of a chi-square test.
 generate_chisq_density_data <- function(stat, df, sig_level = 0.05) {
   tx <- qchisq(1-sig_level, df=df) # The chisq value that corresponds to the significance level.
   l <- max(df*3, stat*1.1, tx*1.1) # Making sure stat and tx are in the displayed range.
@@ -39,6 +43,8 @@ generate_chisq_density_data <- function(stat, df, sig_level = 0.05) {
   ret
 }
 
+# Generates data for F distribution probability density with critical section and statistic
+# to depict a result of a F test like one-way ANOVA.
 generate_ftest_density_data <- function(stat, df1, df2, sig_level = 0.05) {
   tx <- qf(1-sig_level, df1=df1, df2=df2) # The chisq value that corresponds to the significance level.
   l <- max(df1/df2*3, stat*1.1, tx*1.1) # Making sure stat and tx are in the displayed range.
