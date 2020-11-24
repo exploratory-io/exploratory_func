@@ -162,7 +162,7 @@ word_to_sentiment <- function(words, lexicon="bing"){
 #' @param remove_url Whether it should remove URL starts with http(s).
 #' @param stopwords_lang Language for the stopwords that need to be excluded from the result.
 #' @param hiragana_word_length_to_remove Length of a Hiragana word that needs to be excluded from the result.
-#' @param summary_level Either "document" or "token". If this is "token" and with_id is FALSE, it summarizes the result by token.
+#' @param summary_level Either "row" or "all". If this is "all", it ignores document and summarizes the result by token.
 #' @param sort_by Either "count" or "name"
 #' @return Data frame with tokenized column.
 #' @export
@@ -173,7 +173,7 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
                                  remove_symbols = TRUE, remove_twitter = TRUE,
                                  remove_url = TRUE, stopwords_lang = NULL,
                                  hiragana_word_length_to_remove = 2,
-                                 summary_level = "document", sort_by = "count", ...){
+                                 summary_level = "row", sort_by = "count", ...){
 
   if(!requireNamespace("quanteda")){stop("package quanteda must be installed.")}
   if(!requireNamespace("dplyr")){stop("package dplyr must be installed.")}
@@ -244,13 +244,14 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
   }
   # result column order should be document_id, <token_col>, <count_col> ...
   if(!with_id) {
-    result <-result %>% select(!!rlang::sym(token_col), !!rlang::sym(count_col), dplyr::everything())
-    if(drop && !keep_cols && summary_level == "token") { # if the summary_level is token and resulting columns are only token and count, summarize it by token.
+    result <- result %>% select(!!rlang::sym(token_col), !!rlang::sym(count_col), dplyr::everything())
+    if(summary_level == "all") { # if the summary_level is "all", summarize it by token.
       result <- result %>% dplyr::group_by(!!rlang::sym(token_col)) %>% dplyr::summarise(!!rlang::sym(count_col) := n())
     }
+    # Sort handling. if count is specified, sort by count descending.
     if(sort_by == "count") {
       result <- result %>% arrange(desc(!!rlang::sym(count_col)))
-    } else if (sort_by == "token"){
+    } else if (sort_by == "token"){ #if token is specified, sort by token alphabetically.
       result <- result %>% arrange(!!rlang::sym(token_col))
     }
     result
