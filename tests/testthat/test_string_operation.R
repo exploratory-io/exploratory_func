@@ -132,20 +132,20 @@ test_that("do_tokenize_icu with summary_level = all", {
     extra_col = seq(2),
     stringsAsFactors = FALSE)
   result <- test_df %>%
-    do_tokenize_icu(input, drop=TRUE, token = "word", keep_cols = FALSE, summary_level = "all", with_id = FALSE)
+    do_tokenize_icu(input, drop=TRUE, token = "word", keep_cols = FALSE, summary_level = "all", with_id = FALSE, sort_by = "count")
   #  token   count
   #  <chr>   <int>
-  #  1 hello       2
-  #  2 a           1
-  #  3 data        1
-  #  4 for         1
-  #  5 frame       1
-  #  6 is          1
-  #  7 second      1
-  #  8 sentenc     1
-  #  9 test        1
-  #  10 this       1
-  #  11 world      1
+  #1 hello       3
+  #2 is          2
+  #3 this        2
+  #4 a           1
+  #5 data        1
+  #6 for         1
+  #7 frame       1
+  #8 second      1
+  #9 sentenc     1
+  #10 test       1
+  #11 world      1
   expect_equal(result$token[[1]], "hello")
   expect_equal(nrow(result), 11)
 })

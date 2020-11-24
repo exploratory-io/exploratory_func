@@ -173,7 +173,7 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
                                  remove_symbols = TRUE, remove_twitter = TRUE,
                                  remove_url = TRUE, stopwords_lang = NULL,
                                  hiragana_word_length_to_remove = 2,
-                                 summary_level = "row", sort_by = "count", ...){
+                                 summary_level = "row", sort_by = "", ...){
 
   if(!requireNamespace("quanteda")){stop("package quanteda must be installed.")}
   if(!requireNamespace("dplyr")){stop("package dplyr must be installed.")}
