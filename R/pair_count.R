@@ -41,6 +41,7 @@ pair_count_ <- function(df,
     if(group_col %in% grouped_col){
       stop(paste0(group_col, " is grouped. Please ungroup it."))
     }
+    # If the data frame is grouped, perform the pair_count for each group.
     dplyr::group_modify(df, .f = function(.x, ...){
       pair_count__(.x,
                    group_col,
