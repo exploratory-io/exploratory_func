@@ -2075,6 +2075,7 @@ importance_ranger <- function(model) {
     variable = names(imp),
     importance = imp
   ) %>% dplyr::arrange(-importance)
+  imp_df <- imp_df %>% dplyr::mutate(importance = pmax(importance, 0)) # Show 0 for negative importance, which can be caused by chance in case of permutation importance.
   imp_df
 }
 
