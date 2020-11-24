@@ -52,7 +52,7 @@ test_that("pair_count", {
     ),
     stringsAsFactors = FALSE
   )
-  ret4 <- pair_count(test_group_df, group, chars, distinct = TRUE, sort = FALSE, group_by = "gender", unite = TRUE)
+  ret4 <- test_group_df %>% pair_count(group, chars, distinct = TRUE, sort = FALSE, unite = TRUE, group_by = gender)
   # gender chars value
   # <chr>  <chr> <dbl>
   # 1 F      a_c       1
