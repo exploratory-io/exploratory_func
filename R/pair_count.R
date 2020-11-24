@@ -22,7 +22,7 @@ pair_count <- function (df,
               unite = unite,
               group_by_col = group_by_col)
 }
-
+#' Clone implementation of now deprecated tidytext::pair_count_ for backward compatibility in Exploratory.
 pair_count_ <- function(df,
                          group_col,
                          value_col,
