@@ -126,13 +126,13 @@ test_that("do_tokenize_icu with keep_cols = TRUE with sentences", {
   expect_equal(ncol(result), 5)
 })
 
-test_that("do_tokenize_icu with summary_level = token", {
+test_that("do_tokenize_icu with summary_level = all", {
   test_df <- data.frame(
     input = c("Hello world!", "This is a data frame for test. This is second sentence. Hello Hello!"),
     extra_col = seq(2),
     stringsAsFactors = FALSE)
   result <- test_df %>%
-    do_tokenize_icu(input, drop=TRUE, token = "word", keep_cols = FALSE, summary_level = "token", with_id = FALSE)
+    do_tokenize_icu(input, drop=TRUE, token = "word", keep_cols = FALSE, summary_level = "all", with_id = FALSE)
   #  token   count
   #  <chr>   <int>
   #  1 hello       2
