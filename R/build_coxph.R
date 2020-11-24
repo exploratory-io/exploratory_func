@@ -722,6 +722,14 @@ glance.coxph_exploratory <- function(x, data_type = "training", pretty.name = FA
 
   if (data_type == "training") {
     ret <- broom:::glance.coxph(x, pretty.name = pretty.name, ...)
+    # Add VIF Max if VIF is available.
+    if (!is.null(x$vif) && "error" %nin% class(x$vif)) {
+      vif_df <- vif_to_dataframe(x)
+      if (nrow(vif_df) > 0 ) {
+        max_vif <- max(vif_df$VIF, na.rm=TRUE)
+        ret <- ret %>% dplyr::mutate(`VIF Max`=!!max_vif)
+      }
+    }
     ret <- ret %>% dplyr::mutate(auc = x$auc)
     if (!is.null(ret$nobs)) { # glance.coxph's newly added nobs seems to be same as n, which we use as Number of Rows. Suppressing it for now.
       ret <- ret %>% dplyr::select(-nobs)
