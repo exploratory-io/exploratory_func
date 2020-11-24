@@ -32,15 +32,9 @@ pair_count_ <- function(df,
                          unite = FALSE,
                          group_by_col = NULL) {
   validate_empty_data(df)
-  # if group_by_col is provided, do group_by first.
+  # if group_by_col is provided, ungroup the data frame then do group_by.
   if(!is.null(group_by_col)) {
-    df <- df %>% dplyr::group_by(!!rlang::sym(group_by_col))
-  }
-  grouped_col <- exploratory::grouped_by(df)
-  if(!is.null(grouped_col) && length(grouped_col) > 0){
-    if(group_col %in% grouped_col){
-      stop(paste0(group_col, " is grouped. Please ungroup it."))
-    }
+    df <- df %>% dplyr::ungroup() %>% dplyr::group_by(!!rlang::sym(group_by_col))
   }
   # If the data frame is grouped, perform the pair_count for each group.
   # NOTE: dplyr::group_modify works even if the data frame is not grouped.
