@@ -37,6 +37,7 @@ test_that("build_coxph.fast basic", {
                  # "Robust Statistic","Robust P Value", # These columns are hidden for now.
                  "R Squared","R Squared Max",
                  "Log Likelihood","AIC","BIC",
+                 "VIF Max",
                  "Number of Rows","Number of Events")) 
   ret <- model_df %>% augment_rowwise(model)
 })
@@ -72,6 +73,7 @@ test_that("build_coxph.fast basic with group-by", {
                  # "Robust Statistic","Robust P Value", # These columns are hidden for now.
                  "R Squared","R Squared Max",
                  "Log Likelihood","AIC","BIC",
+                 "VIF Max",
                  "Number of Rows","Number of Events")) 
   ret <- model_df %>% augment_rowwise(model)
 })
@@ -108,6 +110,7 @@ test_that("test build_coxph.fast with test mode", {
                  # "Robust Statistic","Robust P Value", # These columns are hidden for now.
                  "R Squared","R Squared Max",
                  "Log Likelihood","AIC","BIC",
+                 "VIF Max",
                  "Number of Rows","Number of Events")) 
   ret <- model_df %>% augment_rowwise(model)
 })
@@ -142,6 +145,7 @@ test_that("test build_coxph.fast with test mode with group-by", {
                  # "Robust Statistic","Robust P Value", # These columns are hidden for now.
                  "R Squared","R Squared Max",
                  "Log Likelihood","AIC","BIC",
+                 "VIF Max",
                  "Number of Rows","Number of Events")) 
   ret <- model_df %>% augment_rowwise(model)
 })

@@ -256,11 +256,10 @@ test_that("prediction with glm family (negativebinomial) with target column name
                               model_type = "glm",
                               link = "log",
                               family="negativebinomial")
-  ret <- model_data %>% glance_rowwise(model)
+  ret <- model_data %>% glance_rowwise(model, pretty.name=TRUE)
   expect_equal(colnames(ret),
-               c("null.deviance", "df.null", "logLik",
-                 "AIC", "BIC", "deviance",
-                 "df.residual", "p.value", "n", "theta", "SE.theta"))
+               c("P Value", "Number of Rows", "Log Likelihood", "AIC", "BIC", "Residual Deviance", "Null Deviance", "DF for Null Model",
+                 "Residual DF", "Theta", "SE Theta", "VIF Max"))
   ret <- model_data %>% tidy_rowwise(model)
   expect_colnames <- c("term", "estimate", "std.error", "statistic", "p.value",
                        "conf.high", "conf.low", "base.level")

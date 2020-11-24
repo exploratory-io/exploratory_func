@@ -1133,6 +1133,15 @@ glance.lm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
   }
   ret <- broom:::glance.lm(x)
 
+  # Add VIF Max if VIF is available.
+  if (!is.null(x$vif) && "error" %nin% class(x$vif)) {
+    vif_df <- vif_to_dataframe(x)
+    if (nrow(vif_df) > 0 ) {
+      max_vif <- max(vif_df$VIF, na.rm=TRUE)
+      ret <- ret %>% dplyr::mutate(`VIF Max`=!!max_vif)
+    }
+  }
+
   # Adjust the subtle difference between sigma (Residual Standard Error) and RMSE.
   # In RMSE, division is done by observation size, while it is by residual degree of freedom in sigma.
   # https://www.rdocumentation.org/packages/sjstats/versions/0.17.4/topics/cv
@@ -1213,6 +1222,15 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
     # Show number of rows for positive case and negative case, especially so that result of SMOTE is visible.
     ret$positives <- sum(x$y == 1, na.rm = TRUE)
     ret$negatives <- sum(x$y != 1, na.rm = TRUE)
+  }
+
+  # Add VIF Max if VIF is available.
+  if (!is.null(x$vif) && "error" %nin% class(x$vif)) {
+    vif_df <- vif_to_dataframe(x)
+    if (nrow(vif_df) > 0 ) {
+      max_vif <- max(vif_df$VIF, na.rm=TRUE)
+      ret <- ret %>% dplyr::mutate(`VIF Max`=!!max_vif)
+    }
   }
 
   if(pretty.name) {
