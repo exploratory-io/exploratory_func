@@ -147,6 +147,7 @@ test_that("do_tokenize_icu with summary_level = all", {
   #10 test       1
   #11 world      1
   expect_equal(result$token[[1]], "hello")
+  expect_equal(result$count[[1]], 3)
   expect_equal(nrow(result), 11)
 })
 
