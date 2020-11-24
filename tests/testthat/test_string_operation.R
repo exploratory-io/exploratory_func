@@ -126,6 +126,30 @@ test_that("do_tokenize_icu with keep_cols = TRUE with sentences", {
   expect_equal(ncol(result), 5)
 })
 
+test_that("do_tokenize_icu with summary_level = token", {
+  test_df <- data.frame(
+    input = c("Hello world!", "This is a data frame for test. This is second sentence. Hello Hello!"),
+    extra_col = seq(2),
+    stringsAsFactors = FALSE)
+  result <- test_df %>%
+    do_tokenize_icu(input, drop=TRUE, token = "word", keep_cols = FALSE, summary_level = "token", with_id = FALSE)
+  #  token   count
+  #  <chr>   <int>
+  #  1 hello       2
+  #  2 a           1
+  #  3 data        1
+  #  4 for         1
+  #  5 frame       1
+  #  6 is          1
+  #  7 second      1
+  #  8 sentenc     1
+  #  9 test        1
+  #  10 this       1
+  #  11 world      1
+  expect_equal(result$token[[1]], "hello")
+  expect_equal(nrow(result), 11)
+})
+
 test_that("do_tokenize with remove_numbers", {
   test_df <- data.frame(
     input = c("12345 aaa", "12aabb33", "123456 34567 88999"),
