@@ -161,7 +161,9 @@ word_to_sentiment <- function(words, lexicon="bing"){
 #' @param remove_twitter Whether it should remove remove Twitter characters @ and #.
 #' @param remove_url Whether it should remove URL starts with http(s).
 #' @param stopwords_lang Language for the stopwords that need to be excluded from the result.
-#' @param hiragana_word_length_to_remove Legnth of a Hiragana word that needs to be excluded from the result.
+#' @param hiragana_word_length_to_remove Length of a Hiragana word that needs to be excluded from the result.
+#' @param summary_level Either "row" or "all". If this is "all", it ignores document and summarizes the result by token.
+#' @param sort_by Either "count" or "name"
 #' @return Data frame with tokenized column.
 #' @export
 do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
@@ -170,7 +172,8 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
                                  remove_hyphens = FALSE, remove_separators = TRUE,
                                  remove_symbols = TRUE, remove_twitter = TRUE,
                                  remove_url = TRUE, stopwords_lang = NULL,
-                                 hiragana_word_length_to_remove = 2, ...){
+                                 hiragana_word_length_to_remove = 2,
+                                 summary_level = "row", sort_by = "", ...){
 
   if(!requireNamespace("quanteda")){stop("package quanteda must be installed.")}
   if(!requireNamespace("dplyr")){stop("package dplyr must be installed.")}
@@ -241,10 +244,21 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
   }
   # result column order should be document_id, <token_col>, <count_col> ...
   if(!with_id) {
-    result %>% select(!!rlang::sym(token_col), !!rlang::sym(count_col), dplyr::everything())
+    result <- result %>% select(!!rlang::sym(token_col), !!rlang::sym(count_col), dplyr::everything())
   } else {
-    result %>% select(document_id, !!rlang::sym(token_col), !!rlang::sym(count_col), dplyr::everything())
+    result <- result %>% select(document_id, !!rlang::sym(token_col), !!rlang::sym(count_col), dplyr::everything())
   }
+  # if the summary_level is "all", summarize it by token.
+  if(summary_level == "all") {
+    result <- result %>% dplyr::group_by(!!rlang::sym(token_col)) %>% dplyr::summarise(!!rlang::sym(count_col) := sum(!!rlang::sym(count_col)), na.rm = TRUE)
+  }
+  # Sort handling. if count is specified, sort by count descending.
+  if(sort_by == "count") {
+    result <- result %>% arrange(desc(!!rlang::sym(count_col)))
+  } else if (sort_by == "token"){ #if token is specified, sort by token alphabetically.
+    result <- result %>% arrange(!!rlang::sym(token_col))
+  }
+  result
 }
 
 #' Tokenize text and unnest
@@ -332,7 +346,7 @@ do_tokenize <- function(df, input, token = "words", keep_cols = FALSE,  drop = T
     ret <- ret %>% dplyr::filter(!is_stopword(!!rlang::sym(output_col), lang = stopwords_lang))
   }
   if(remove_numbers) {
-    # remoe if the token is all number characters.
+    # remove if the token is all number characters.
     ret <- ret %>% dplyr::filter(!stringr::str_detect(!!rlang::sym(output_col), '^[:digit:]+$'))
   }
   ret
