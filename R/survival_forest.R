@@ -33,7 +33,7 @@ calc_permutation_importance_ranger_survival <- function(fit, time_col, status_co
                                 })
   })
   importances <- purrr::flatten_dbl(importances)
-  importances_df <- tibble::tibble(variable=vars, importance=importances)
+  importances_df <- tibble::tibble(variable=vars, importance=pmax(importances, 0)) # Show 0 for negative importance, which can be caused by chance in case of permutation importance.
   importances_df <- importances_df %>% dplyr::arrange(-importance)
   importances_df
 }

@@ -292,7 +292,7 @@ calc_permutation_importance_coxph <- function(fit, time_col, status_col, vars, d
                                 loss.fun = function(x,y){-calc_efron_log_likelihood(x[,1], y, x[,2])})
   })
   importances <- purrr::flatten_dbl(importances)
-  importances_df <- tibble(term=vars, importance=importances)
+  importances_df <- tibble::tibble(term=vars, importance=pmax(importances, 0)) # Show 0 for negative importance, which can be caused by chance in case of permutation importance.
   importances_df
 }
 

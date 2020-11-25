@@ -785,7 +785,7 @@ calc_permutation_importance_xgboost_regression <- function(fit, target, vars, da
                                 loss.fun = function(x,y){sum((x - y)^2, na.rm = TRUE)/length(x)})
   })
   importances <- purrr::flatten_dbl(importances)
-  importances_df <- tibble(variable=vars, importance=importances)
+  importances_df <- tibble::tibble(variable=vars, importance=pmax(importances, 0)) # Show 0 for negative importance, which can be caused by chance in case of permutation importance.
   importances_df <- importances_df %>% dplyr::arrange(-importance)
   importances_df
 }
@@ -800,7 +800,7 @@ calc_permutation_importance_xgboost_binary <- function(fit, target, vars, data) 
                                 )
   })
   importances <- purrr::flatten_dbl(importances)
-  importances_df <- tibble(variable=vars, importance=importances)
+  importances_df <- tibble(variable=vars, importance=pmax(importances, 0)) # Show 0 for negative importance, which can be caused by chance in case of permutation importance.
   importances_df <- importances_df %>% dplyr::arrange(-importance)
   importances_df
 }
@@ -815,7 +815,7 @@ calc_permutation_importance_xgboost_multiclass <- function(fit, target, vars, da
                                 )
   })
   importances <- purrr::flatten_dbl(importances)
-  importances_df <- tibble(variable=vars, importance=importances)
+  importances_df <- tibble(variable=vars, importance=pmax(importances, 0)) # Show 0 for negative importance, which can be caused by chance in case of permutation importance.
   importances_df <- importances_df %>% dplyr::arrange(-importance)
   importances_df
 }

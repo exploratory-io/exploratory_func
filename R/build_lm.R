@@ -8,7 +8,7 @@ calc_permutation_importance_binomial <- function(fit, target, vars, data) {
                                 loss.fun = function(x,y){-sum(log(1- abs(x - y)),na.rm = TRUE)})
   })
   importances <- purrr::flatten_dbl(importances)
-  importances_df <- tibble(term=vars, importance=importances)
+  importances_df <- tibble::tibble(term=vars, importance=pmax(importances, 0))
   importances_df
 }
 
@@ -22,7 +22,7 @@ calc_permutation_importance_linear <- function(fit, target, vars, data) {
                                 loss.fun = function(x,y){sum((x - y)^2, na.rm = TRUE)/length(x)})
   })
   importances <- purrr::flatten_dbl(importances)
-  importances_df <- tibble(term=vars, importance=importances)
+  importances_df <- tibble::tibble(term=vars, importance=pmax(importances, 0))
   importances_df
 }
 
@@ -37,7 +37,7 @@ calc_permutation_importance_gaussian <- function(fit, target, vars, data) {
                                 loss.fun = function(x,y){sum((x - y)^2, na.rm = TRUE)/length(x)})
   })
   importances <- purrr::flatten_dbl(importances)
-  importances_df <- tibble(term=vars, importance=importances)
+  importances_df <- tibble::tibble(term=vars, importance=pmax(importances, 0))
   importances_df
 }
 
@@ -54,7 +54,7 @@ calc_permutation_importance_poisson <- function(fit, target, vars, data) {
                                 loss.fun = function(x,y){-sum(y*x-exp(x), na.rm = TRUE)})
   })
   importances <- purrr::flatten_dbl(importances)
-  importances_df <- tibble(term=vars, importance=importances)
+  importances_df <- tibble::tibble(term=vars, importance=pmax(importances, 0))
   importances_df
 }
 
@@ -1042,7 +1042,7 @@ build_lm.fast <- function(df,
         coef_df <- broom:::tidy.glm(model)
         # str_detect matches with all categorical class terms that belongs to the variable.
         p_values_list <- c_cols_list %>% purrr::map(function(x){(coef_df %>% filter(stringr::str_detect(term, paste0("^`?", x))) %>% summarize(p.value=min(p.value, na.rm=TRUE)))$p.value})
-        p_values_df <- tibble(term=c_cols, p.value=purrr::flatten_dbl(p_values_list))
+        p_values_df <- tibble::tibble(term=c_cols, p.value=purrr::flatten_dbl(p_values_list))
         imp_vars <- (p_values_df %>% dplyr::arrange(p.value))$term
         imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # Keep only max_pd_vars most important variables
 
