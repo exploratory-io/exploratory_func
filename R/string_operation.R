@@ -250,7 +250,7 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
   }
   # if the summary_level is "all", summarize it by token.
   if(summary_level == "all") {
-    result <- result %>% dplyr::group_by(!!rlang::sym(token_col)) %>% dplyr::summarise(!!rlang::sym(count_col) := sum(!!rlang::sym(count_col)), na.rm = TRUE)
+    result <- result %>% dplyr::group_by(!!rlang::sym(token_col)) %>% dplyr::summarise(!!rlang::sym(count_col) := sum(!!rlang::sym(count_col), na.rm = TRUE))
   }
   # Sort handling. if count is specified, sort by count descending.
   if(sort_by == "count") {
