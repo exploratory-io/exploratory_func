@@ -917,7 +917,7 @@ prediction_training_and_test <- function(df, prediction_type="default", threshol
 #' @param df Data frame to predict. This should have model column.
 #' @param threshold Threshold value for predicted probability or what to optimize. It can be "f_score", "accuracy", "precision", "sensitivity" or "specificity" to optimize.
 #' @export
-prediction_binary <- function(df, threshold = 0.5, ...){
+prediction_binary <- function(df, threshold = 0.5, pretty.name = FALSE, ...){
   # ungroup() is necessary to avoid error under rowwise(). Putting rowwise at the end to put it back to rowwise again. TODO: Is it possible that the input is not under rowwise and our adding rowwise affect processing that follows?
   df <- df %>% ungroup() %>% dplyr::filter(purrr::flatten_lgl(purrr::map(model, function(x){!is.null(x) & "error" %nin% class(x)}))) %>% dplyr::rowwise()
 
@@ -1066,6 +1066,22 @@ prediction_binary <- function(df, threshold = 0.5, ...){
   # Move is_test_data to the last again, since new columns were added to the last in this function.
   if (!is.null(ret$is_test_data)) {
     ret <- ret %>% dplyr::select(-is_test_data, everything(), is_test_data)
+  }
+
+  if (pretty.name) {
+    colnames(ret)[colnames(ret) == "predicted_value"] <- avoid_conflict(colnames(ret), "Predicted Value")
+    colnames(ret)[colnames(ret) == "predicted_label"] <- avoid_conflict(colnames(ret), "Predicted Label")
+    colnames(ret)[colnames(ret) == "predicted_response"] <- avoid_conflict(colnames(ret), "Predicted Response")
+    colnames(ret)[colnames(ret) == "predicted_probability"] <- avoid_conflict(colnames(ret), "Predicted Probability")
+    colnames(ret)[colnames(ret) == "standard_error"] <- avoid_conflict(colnames(ret), "Standard Error")
+    colnames(ret)[colnames(ret) == "residuals"] <- avoid_conflict(colnames(ret), "Residuals")
+    colnames(ret)[colnames(ret) == "hat"] <- avoid_conflict(colnames(ret), "Hat")
+    colnames(ret)[colnames(ret) == "residual_standard_deviation"] <- avoid_conflict(colnames(ret), "Residual Standard Deviation")
+    colnames(ret)[colnames(ret) == "cooks_distance"] <- avoid_conflict(colnames(ret), "Cook's Distance")
+    colnames(ret)[colnames(ret) == "standardised_residuals"] <- avoid_conflict(colnames(ret), "Standardised Residuals")
+    colnames(ret)[colnames(ret) == "conf_low"] <- avoid_conflict(colnames(ret), "Conf Low")
+    colnames(ret)[colnames(ret) == "conf_high"] <- avoid_conflict(colnames(ret), "Conf High")
+    colnames(ret)[colnames(ret) == "is_test_data"] <- avoid_conflict(colnames(ret), "Test Data")
   }
   ret
 }
