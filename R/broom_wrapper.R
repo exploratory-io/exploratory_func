@@ -390,7 +390,7 @@ kmeans_info <- function(df){
 #' @param data "training" or "test" or "newdata". Which source data should be used.
 #' @param ... Additional argument to be passed to broom::augment
 #' @export
-prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95, ...){
+prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95, pretty.name = FALSE, ...){
   validate_empty_data(df)
 
   df_cnames <- colnames(df)
@@ -675,6 +675,21 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
   colnames(ret)[colnames(ret) == ".sigma"] <- avoid_conflict(colnames(ret), "residual_standard_deviation")
   colnames(ret)[colnames(ret) == ".cooksd"] <- avoid_conflict(colnames(ret), "cooks_distance")
   colnames(ret)[colnames(ret) == ".std.resid"] <- avoid_conflict(colnames(ret), "standardised_residuals")
+
+  if (pretty.name) {
+    colnames(ret)[colnames(ret) == "predicted_value"] <- avoid_conflict(colnames(ret), "Predicted Value")
+    colnames(ret)[colnames(ret) == "predicted_label"] <- avoid_conflict(colnames(ret), "Predicted Label")
+    colnames(ret)[colnames(ret) == "predicted_response"] <- avoid_conflict(colnames(ret), "Predicted Response")
+    colnames(ret)[colnames(ret) == "standard_error"] <- avoid_conflict(colnames(ret), "Standard Error")
+    colnames(ret)[colnames(ret) == "residuals"] <- avoid_conflict(colnames(ret), "Residuals")
+    colnames(ret)[colnames(ret) == "hat"] <- avoid_conflict(colnames(ret), "Hat")
+    colnames(ret)[colnames(ret) == "residual_standard_deviation"] <- avoid_conflict(colnames(ret), "Residual Standard Deviation")
+    colnames(ret)[colnames(ret) == "cooks_distance"] <- avoid_conflict(colnames(ret), "Cook's Distance")
+    colnames(ret)[colnames(ret) == "standardised_residuals"] <- avoid_conflict(colnames(ret), "Standardised Residuals")
+    colnames(ret)[colnames(ret) == "conf_low"] <- avoid_conflict(colnames(ret), "Conf Low")
+    colnames(ret)[colnames(ret) == "conf_high"] <- avoid_conflict(colnames(ret), "Conf High")
+    colnames(ret)[colnames(ret) == "is_test_data"] <- avoid_conflict(colnames(ret), "Test Data")
+  }
 
   dplyr::group_by(ret, !!!rlang::syms(grouping_cols))
 }
