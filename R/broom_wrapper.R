@@ -687,6 +687,7 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
       colnames(ret)[colnames(ret) == "predicted_response"] <- avoid_conflict(colnames(ret), "Predicted Value")
     }
     colnames(ret)[colnames(ret) == "predicted_label"] <- avoid_conflict(colnames(ret), "Predicted Label")
+    colnames(ret)[colnames(ret) == "predicted_probability"] <- avoid_conflict(colnames(ret), "Predicted Probability") # For ranger etc. we handle classifications with this function, as opposed to in prediction_binary().
     colnames(ret)[colnames(ret) == "standard_error"] <- avoid_conflict(colnames(ret), "Standard Error")
     colnames(ret)[colnames(ret) == "residuals"] <- avoid_conflict(colnames(ret), "Residuals")
     colnames(ret)[colnames(ret) == "hat"] <- avoid_conflict(colnames(ret), "Hat")
@@ -696,6 +697,7 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
     colnames(ret)[colnames(ret) == "conf_low"] <- avoid_conflict(colnames(ret), "Conf Low")
     colnames(ret)[colnames(ret) == "conf_high"] <- avoid_conflict(colnames(ret), "Conf High")
     colnames(ret)[colnames(ret) == "is_test_data"] <- avoid_conflict(colnames(ret), "Test Data")
+    ret <- ret %>% dplyr::rename_with(function(x){gsub("predicted_probability_","Predicted Probability for ", x)}, starts_with("predicted_probability_")) # For multiclass classification.
   }
 
   dplyr::group_by(ret, !!!rlang::syms(grouping_cols))
