@@ -705,7 +705,7 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
 
 # Simplified prediction() that works only with new Analytics View model df. This should be kept model-agnostic.
 # This one does not use .test_index and source.data columns.
-prediction2 <- function(df, data_frame = NULL, conf_int = 0.95, ...){
+prediction2 <- function(df, data_frame = NULL, conf_int = 0.95, pretty.name=FALSE, ...){
   validate_empty_data(df)
 
   pred_survival_time <- attr(df, "pred_survival_time")
@@ -787,6 +787,10 @@ prediction2 <- function(df, data_frame = NULL, conf_int = 0.95, ...){
   colnames(ret)[colnames(ret) == ".sigma"] <- avoid_conflict(colnames(ret), "residual_standard_deviation")
   colnames(ret)[colnames(ret) == ".cooksd"] <- avoid_conflict(colnames(ret), "cooks_distance")
   colnames(ret)[colnames(ret) == ".std.resid"] <- avoid_conflict(colnames(ret), "standardised_residuals")
+
+  if (pretty.name) {
+    colnames(ret)[colnames(ret) == "is_test_data"] <- avoid_conflict(colnames(ret), "Test Data")
+  }
 
   if (length(grouping_cols) > 0) {
     ret <- dplyr::group_by(ret, !!!rlang::syms(grouping_cols))
