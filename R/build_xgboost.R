@@ -321,10 +321,7 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, data_type = "t
       predicted_label <- x$y_levels[colmax]
       predicted_label <- restore_na(predicted_label, na_row_numbers)
 
-      original_data <- ranger.set_multi_predicted_values(original_data, as.data.frame(predicted), predicted_label, na_row_numbers)
-
-      # predicted_prob_col is a column for probabilities of chosen values
-      original_data[[predicted_prob_col]] <- max_prob
+      original_data <- ranger.set_multi_predicted_values(original_data, as.data.frame(predicted), predicted_label, max_prob, na_row_numbers)
     }
     original_data
   } else if (!is.null(data)) { # For Analytics View.
@@ -344,8 +341,7 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, data_type = "t
         colmax <- max.col(predicted)
         max_prob <- predicted[(colmax - 1) * nrow(predicted) + seq(nrow(predicted))]
 
-        data <- ranger.set_multi_predicted_values(data, as.data.frame(predicted), predicted_value, c())
-        data[[predicted_prob_col]] <- max_prob
+        data <- ranger.set_multi_predicted_values(data, as.data.frame(predicted), predicted_value, max_prob, c())
         data
       },
       test = {
@@ -361,8 +357,7 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, data_type = "t
         max_prob_nona <- restore_na(max_prob_nona, attr(x$prediction_test, "unknown_category_rows_index"))
         max_prob <- restore_na(max_prob_nona, attr(x$prediction_test, "na.action"))
 
-        data <- ranger.set_multi_predicted_values(data, as.data.frame(predicted), predicted_value, attr(x$prediction_test, "na.action"), attr(x$prediction_test, "unknown_category_rows_index"))
-        data[[predicted_prob_col]] <- max_prob
+        data <- ranger.set_multi_predicted_values(data, as.data.frame(predicted), predicted_value, max_prob, attr(x$prediction_test, "na.action"), attr(x$prediction_test, "unknown_category_rows_index"))
         data
       })
   }
