@@ -1683,7 +1683,9 @@ augment.glm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = 
       broom:::augment.glm(x, data = NULL, newdata = cleaned_data, se = FALSE, ...)
     })
   } else if (!is.null(data)) {
-    data <- data %>% dplyr::relocate(!!rlang::sym(x$target_col), .after = last_col()) # Bring the target column to the last so that it is next to the predicted value in the output.
+    # Bring the target column to the last so that it is next to the predicted value in the output.
+    # Note that source.data of lm/glm model df has mapped column names, unlike that of ranger.
+    data <- data %>% dplyr::relocate(!!rlang::sym(x$target_col), .after = last_col())
     ret <- switch(data_type,
       training = {
         tryCatch({
