@@ -677,9 +677,16 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
   colnames(ret)[colnames(ret) == ".std.resid"] <- avoid_conflict(colnames(ret), "standardised_residuals")
 
   if (pretty.name) {
-    colnames(ret)[colnames(ret) == "predicted_value"] <- avoid_conflict(colnames(ret), "Predicted Value")
+    if (!is.null(ret$predicted_response) && !is.null(ret$predicted_value)) {
+      # If there are both predicted_response and predicted_value, predicted_value there most likely is linear predictor from glm.
+      colnames(ret)[colnames(ret) == "predicted_value"] <- avoid_conflict(colnames(ret), "Linear Predictor")
+      colnames(ret)[colnames(ret) == "predicted_response"] <- avoid_conflict(colnames(ret), "Predicted Value")
+    }
+    else { # If not, whichever that exists should become Predicted Value
+      colnames(ret)[colnames(ret) == "predicted_value"] <- avoid_conflict(colnames(ret), "Predicted Value")
+      colnames(ret)[colnames(ret) == "predicted_response"] <- avoid_conflict(colnames(ret), "Predicted Value")
+    }
     colnames(ret)[colnames(ret) == "predicted_label"] <- avoid_conflict(colnames(ret), "Predicted Label")
-    colnames(ret)[colnames(ret) == "predicted_response"] <- avoid_conflict(colnames(ret), "Predicted Response")
     colnames(ret)[colnames(ret) == "standard_error"] <- avoid_conflict(colnames(ret), "Standard Error")
     colnames(ret)[colnames(ret) == "residuals"] <- avoid_conflict(colnames(ret), "Residuals")
     colnames(ret)[colnames(ret) == "hat"] <- avoid_conflict(colnames(ret), "Hat")
@@ -1069,7 +1076,13 @@ prediction_binary <- function(df, threshold = 0.5, pretty.name = FALSE, ...){
   }
 
   if (pretty.name) {
-    colnames(ret)[colnames(ret) == "predicted_value"] <- avoid_conflict(colnames(ret), "Predicted Value")
+    if (!is.null(ret$predicted_probability) && !is.null(ret$predicted_value)) {
+      # If there is predicted_probability, predicted_value there most likely is linear predictor from glm.
+      colnames(ret)[colnames(ret) == "predicted_value"] <- avoid_conflict(colnames(ret), "Linear Predictor")
+    }
+    else { # Not too sure if there is actual case for this case.
+      colnames(ret)[colnames(ret) == "predicted_value"] <- avoid_conflict(colnames(ret), "Predicted Value")
+    }
     colnames(ret)[colnames(ret) == "predicted_label"] <- avoid_conflict(colnames(ret), "Predicted Label")
     colnames(ret)[colnames(ret) == "predicted_response"] <- avoid_conflict(colnames(ret), "Predicted Response")
     colnames(ret)[colnames(ret) == "predicted_probability"] <- avoid_conflict(colnames(ret), "Predicted Probability")
