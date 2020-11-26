@@ -871,15 +871,14 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
     # Inserting once removed NA rows
     predicted_value <- restore_na(predicted_label_nona, na_row_numbers)
 
-    predicted_value_col <- avoid_conflict(colnames(newdata), "predicted_value")
+    predicted_label_col <- avoid_conflict(colnames(newdata), "predicted_label")
     predicted_probability_col <- avoid_conflict(colnames(newdata), "predicted_probability")
 
     if(is.null(x$classification_type)){
       # just append predicted labels
-      newdata[[predicted_value_col]] <- predicted_value
-      newdata
+      newdata[[predicted_label_col]] <- predicted_value
     } else if (x$classification_type == "binary") {
-      newdata[[predicted_value_col]] <- predicted_value
+      newdata[[predicted_label_col]] <- predicted_value
       predictions <- pred_res$predictions
 
       # With ranger, 1st category always is the one to be considered "TRUE",
@@ -890,18 +889,14 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
       # Inserting once removed NA rows
       predicted_prob <- restore_na(predicted_prob, na_row_numbers)
       newdata[[predicted_probability_col]] <- predicted_prob
-      newdata
     } else if (x$classification_type == "multi") {
       # append predicted probability for each class, max and labels at max values
       # Inserting once removed NA rows
       predicted_prob <- restore_na(apply(pred_res$predictions, 1 , max), na_row_numbers)
       newdata <- ranger.set_multi_predicted_values(newdata, pred_res$predictions, predicted_value, na_row_numbers)
       newdata[[predicted_probability_col]] <- predicted_prob
-      newdata
     }
-    newdata <- newdata %>% dplyr::rename(predicted_label = predicted_value_col) %>%
-                  dplyr::select(-predicted_label, everything(), predicted_label)
-
+    newdata
   } else if (!is.null(data)) {
     if (nrow(data) == 0) {
       # Handle the case where, for example, test_rate is 0 here,
@@ -911,7 +906,7 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
     # create clean name data frame because the model learned by those names
     cleaned_data <- data
     y_value <- cleaned_data[[y_name]]
-    predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
+    predicted_label_col <- avoid_conflict(colnames(data), "predicted_label")
     predicted_probability_col <- avoid_conflict(colnames(data), "predicted_probability")
 
     switch(data_type,
@@ -950,8 +945,9 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
           predicted_prob_nona <- restore_na(predicted_prob_nona, attr(x$prediction_test, "unknown_category_rows_index"))
           predicted_prob <- restore_na(predicted_prob_nona, attr(x$prediction_test, "na.action"))
         })
-      data[[predicted_value_col]] <- predicted_value
+      data[[predicted_label_col]] <- predicted_value
       data[[predicted_probability_col]] <- predicted_prob
+      data
     } else if (x$classification_type == "multi"){
       switch(data_type,
         training = {
@@ -967,10 +963,8 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
           data <- ranger.set_multi_predicted_values(data, x$prediction_test$predictions, predicted_value, attr(x$prediction_test, "na.action"), attr(x$prediction_test, "unknown_category_rows_index"))
         })
       data[[predicted_probability_col]] <- predicted_prob
+      data
     }
-    data %>% dplyr::rename(predicted_label = predicted_value_col) %>%
-             dplyr::select(-predicted_label, everything(), predicted_label)
-
   } else {
     stop("data or newdata have to be indicated.")
   }
@@ -1224,7 +1218,7 @@ ranger.set_multi_predicted_values <- function(data, predictions,
                                               na_row_numbers,
                                               unknown_category_row_numbers=NULL,
                                               pred_plob_col="predicted_probability",
-                                              pred_value_col="predicted_value") {
+                                              pred_value_col="predicted_label") {
   ret <- predictions
   for (i in 1:length(colnames(ret))) { # for each column
     # this is basically bind_cols with na_at taken into account.
