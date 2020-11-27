@@ -327,10 +327,15 @@ test_that("ranger.set_multi_predicted_values", {
                                                          df[["z"]])
   na_at <- exploratory:::ranger.find_na(c("x", "y"), df) 
   predicted_value <- exploratory:::restore_na(predicted_value_nona, na_at)
-  ret <- exploratory:::ranger.set_multi_predicted_values(df, m_m$predictions, predicted_value, na_at)
+  predicted_prob_nona <- rep(0.5, length(predicted_value_nona)) # Dummy probability just to pass this test.
+  predicted_prob <- restore_na(predicted_prob_nona, na_at)
+  ret <- exploratory:::ranger.set_multi_predicted_values(df, m_m$predictions, predicted_value, predicted_prob, na_at)
   expected_colnames <-  c("x", "y", "z",
+                          "predicted_label",
+                          "predicted_probability",
                           "predicted_probability_A", "predicted_probability_D", "predicted_probability_E",
-                          "predicted_probability_B", "predicted_probability_C", "predicted_probability_F", "predicted_value")
+                          "predicted_probability_B", "predicted_probability_C", "predicted_probability_F"
+                          )
   expect_equal(colnames(ret), expected_colnames)
 })
 
