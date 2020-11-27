@@ -343,8 +343,12 @@ exp_survival_forest <- function(df,
       c_cols <- attr(df, 'predictors') # predictors are updated (added and/or removed) in preprocess_post_sample. Catch up with it.
       name_map <- attr(df, 'name_map')
 
+      # Temporarily remove unused columns for uniformity. TODO: Revive them when we do that across the product.
+      c_cols_without_names <- c_cols
+      names(c_cols_without_names) <- NULL
+      source_data <- df %>% dplyr::select(!!!rlang::syms(c_cols_without_names), !!rlang::sym(clean_status_col), rlang::sym(clean_time_col))
+
       # split training and test data
-      source_data <- df
       test_index <- sample_df_index(source_data, rate = test_rate, ordered = (test_split_type == "ordered"))
       df <- safe_slice(source_data, test_index, remove = TRUE)
       if (test_rate > 0) {
