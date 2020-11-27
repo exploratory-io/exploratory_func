@@ -341,7 +341,7 @@ exp_survival_forest <- function(df,
 
       # Temporarily remove unused columns for uniformity. TODO: Revive them when we do that across the product.
       clean_cols_without_names <- clean_cols
-      names(clean_cols_without_names) <- NULL
+      names(clean_cols_without_names) <- NULL # remove names to eliminate renaming effect of select.
       df <- df %>% dplyr::select(!!!rlang::syms(clean_cols_without_names), !!rlang::sym(clean_time_col), rlang::sym(clean_status_col))
 
       df <- preprocess_regression_data_after_sample(df, clean_time_col, clean_cols, predictor_n = predictor_n, name_map = name_map)

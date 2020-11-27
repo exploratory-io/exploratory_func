@@ -897,7 +897,9 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
     }
     newdata
   } else if (!is.null(data)) {
-    data <- data %>% dplyr::relocate(!!rlang::sym(x$orig_target_col), .after = last_col()) # Bring the target column to the last so that it is next to the predicted value in the output.
+    if (!is.null(x$orig_target_col)) { # This is only for Analytics View.
+      data <- data %>% dplyr::relocate(!!rlang::sym(x$orig_target_col), .after = last_col()) # Bring the target column to the last so that it is next to the predicted value in the output.
+    }
     if (nrow(data) == 0) {
       # Handle the case where, for example, test_rate is 0 here,
       # rather than trying to make it pass through following code, which can be complex.
@@ -1001,7 +1003,9 @@ augment.ranger.regression <- function(x, data = NULL, newdata = NULL, data_type 
 
     newdata
   } else if (!is.null(data)) {
-    data <- data %>% dplyr::relocate(!!rlang::sym(x$orig_target_col), .after = last_col()) # Bring the target column to the last so that it is next to the predicted value in the output.
+    if (!is.null(x$orig_target_col)) { # This is only for Analytics View.
+      data <- data %>% dplyr::relocate(!!rlang::sym(x$orig_target_col), .after = last_col()) # Bring the target column to the last so that it is next to the predicted value in the output.
+    }
     switch(data_type,
       training = {
         predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
