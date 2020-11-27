@@ -29,6 +29,8 @@ test_that("exp_xgboost(regression) evaluate training and test", {
                                  test_rate = 0.3,
                                  test_split_type = "ordered", pd_with_bin_means = TRUE, # testing ordered split too.
                                  watchlist_rate = 0.1)
+  ret <- model_df %>% prediction(data="training_and_test", pretty.name=TRUE)
+
   ret <- flight %>% select(-`ARR DELAY`) %>% add_prediction(model_df=model_df)
   ret <- model_df %>% prediction(data="newdata", data_frame=flight)
 
@@ -118,15 +120,17 @@ test_that("exp_xgboost evaluate training and test - binary", {
   ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
 })
 
-test_that("exp_xgboost(factor(TRUE, FALSE)) evaluate training and test", { # This case should be treated as multi-class.
+test_that("exp_xgboost - factor of TRUE/FALSE - evaluate training and test", { # This case should be treated as multi-class.
   set.seed(1) # For stability of result.
   # `is delayed` is not logical for some reason.
   # To test binary prediction, need to cast it into logical.
   data <- flight %>% dplyr::mutate(is_delayed = factor(as.logical(`is delayed`))) %>% filter(!is.na(is_delayed))
   model_df <- data %>% exp_xgboost(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0.3, pd_with_bin_means = TRUE)
 
+  ret <- model_df %>% prediction(data="training_and_test", pretty.name=TRUE)
+
   ret <- data %>% select(-is_delayed) %>% add_prediction(model_df=model_df)
-  expect_true(all(c("predicted_probability_FALSE","predicted_probability_TRUE","predicted_value","predicted_probability") %in% colnames(ret)))
+  expect_true(all(c("predicted_probability_FALSE","predicted_probability_TRUE","predicted_label","predicted_probability") %in% colnames(ret)))
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
   # expect_equal(nrow(test_ret), 1500) Fails now, since we filter numeric NA. Revive when we do not need to.

@@ -333,6 +333,7 @@ test_that("GLM - Gamma Destribution with test_rate", {
   training_rownum <- nrow(test_data) - test_rownum
 
   suppressWarnings({
+    res <- prediction(ret, data = "training_and_test", pretty.name=TRUE)
     pred_new <- prediction(ret, data = "newdata", data_frame=test_data)
     pred_training <- prediction(ret, data = "training")
     pred_test <- prediction(ret, data = "test")
