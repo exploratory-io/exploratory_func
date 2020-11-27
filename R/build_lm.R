@@ -1074,6 +1074,8 @@ build_lm.fast <- function(df,
         model$predictor_funs <- predictor_funs
       }
 
+      model$target_col <- clean_target_col # We use target column info to bring the column next to the predicted value in the prediction() output.
+
       list(model = model, test_index = test_index, source_data = source_data)
     }, error = function(e){
       if(length(grouped_cols) > 0) {
@@ -1625,6 +1627,7 @@ augment.lm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "
     ret <- broom:::augment.lm(x, data = NULL, newdata = cleaned_data, se = TRUE, ...)
     # TODO: Restore removed rows.
   } else if (!is.null(data)) {
+    data <- data %>% dplyr::relocate(!!rlang::sym(x$target_col), .after = last_col()) # Bring the target column to the last so that it is next to the predicted value in the output.
     ret <- switch(data_type,
       training = { # Call broom:::augment.lm as is
         broom:::augment.lm(x, data = data, newdata = newdata, se = TRUE, ...)
@@ -1680,6 +1683,9 @@ augment.glm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = 
       broom:::augment.glm(x, data = NULL, newdata = cleaned_data, se = FALSE, ...)
     })
   } else if (!is.null(data)) {
+    # Bring the target column to the last so that it is next to the predicted value in the output.
+    # Note that source.data of lm/glm model df has mapped column names, unlike that of ranger.
+    data <- data %>% dplyr::relocate(!!rlang::sym(x$target_col), .after = last_col())
     ret <- switch(data_type,
       training = {
         tryCatch({
@@ -1704,6 +1710,10 @@ augment.glm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = 
   }
 
   ret <- add_response(ret, x, "predicted_response") # Add response.
+  if (!is.null(ret$.fitted)) {
+    # Bring predicted_response column as the first of the prediction result related additional columns, so that it comes next to the actual values.
+    ret <- ret %>% dplyr::relocate(any_of(c("predicted_response")), .before=.fitted)
+  }
 
   if (x$family$family == "binomial") { # Add predicted label in case of binomial (including logistic regression).
     ret$predicted_label <- ret$predicted_response > binary_classification_threshold

@@ -149,6 +149,7 @@ test_that("calc_feature_map(binary(factor(A,B))) evaluate training and test", {
   model_df <- flight %>% dplyr::mutate(is_delayed = factor(if_else(as.logical(`is delayed`), "A","B"))) %>% filter(!is.na(is_delayed)) %>%
                 calc_feature_imp(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0.3, pd_with_bin_means = TRUE)
 
+  ret <- model_df %>% prediction(data="training_and_test", pretty.name=TRUE)
   ret <- model_df %>% prediction(data="newdata", data_frame=flight)
 
   ret <- model_df %>% prediction(data="training_and_test")

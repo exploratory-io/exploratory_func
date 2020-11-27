@@ -25,7 +25,7 @@ test_that("exp_rpart(regression) evaluate training and test", {
                 exp_rpart(`FL NUM`, `DIS TANCE`, `DEP TIME`,
                           test_rate = 0.3,
                           test_split_type = "ordered") # testing ordered split too.
-
+  ret <- model_df %>% prediction(data="training_and_test", pretty.name=TRUE)
   ret <- flight %>% select(-`FL NUM`) %>% add_prediction(model_df=model_df)
   ret <- model_df %>% prediction(data="newdata", data_frame = flight)
   ret <-  model_df %>% rf_partial_dependence()
@@ -65,6 +65,8 @@ test_that("exp_rpart evaluate training and test - logical", {
   data <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`))
   model_df <- data %>% exp_rpart(is_delayed, `DIS TANCE`, `DEP DELAY`, `ORI GIN`, test_rate = 0.4, binary_classification_threshold=0.5)
 
+  ret <- model_df %>% prediction(data="training_and_test", pretty.name=TRUE)
+
   ret1 <- data %>% select(-is_delayed) %>% add_prediction(model_df=model_df, binary_classification_threshold=0.5)
   ret2 <- data %>% select(-is_delayed) %>% add_prediction(model_df=model_df, binary_classification_threshold=0.01)
   expect_gt(sum(ret2$predicted_label=="TRUE",na.rm=TRUE), sum(ret1$predicted_label=="TRUE",na.rm=TRUE)) # Change of threshold should make difference.
@@ -100,6 +102,8 @@ test_that("exp_rpart evaluate training and test - logical", {
 test_that("exp_rpart(character(A,B)) evaluate training and test", { # This should be treated as multi-class
   data <- flight %>% dplyr::mutate(is_delayed = if_else(as.logical(`is delayed`), "A", "B"))
   model_df <- data %>% exp_rpart(is_delayed, `DIS TANCE`, `DEP DELAY`, test_rate = 0.3, binary_classification_threshold=0.5)
+
+  ret <- model_df %>% prediction(data="training_and_test", pretty.name=TRUE)
 
   ret <- data %>% select(-is_delayed) %>% add_prediction(model_df=model_df)
   ret <- model_df %>% prediction(data="newdata", data_frame = flight)

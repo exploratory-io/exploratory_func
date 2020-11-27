@@ -151,12 +151,14 @@ test_that("prediction with categorical columns", {
 
   model_data <- build_lm(test_data, CANCELLED ~ `Carrier Name` + CARRIER + DISTANCE, test_rate = 0.6)
 
-  ret <- prediction(model_data, data = "test", pretty.name = TRUE)
+  ret <- prediction(model_data, data = "test")
   expect_true(nrow(ret) > 0)
-  expect_equal(colnames(ret), c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE", "predicted_value",
-                                "conf_low", "conf_high",
-                                "standard_error",
-                                "residuals"))
+  expect_true(all(c("CANCELLED", 
+                    "Carrier Name", "CARRIER", "DISTANCE",
+                    "predicted_value",
+                    "conf_low", "conf_high",
+                    "standard_error",
+                    "residuals") %in% colnames(ret)))
 
   grouped <- test_data %>%
     dplyr::group_by(CARRIER)
@@ -269,9 +271,10 @@ test_that("prediction with glm family (negativebinomial) with target column name
                 identical(colnames(ret), c(expect_colnames, "note")))
 
   ret <- model_data %>% augment_rowwise(model)
-  expect_equal(colnames(ret),
-               c("CANCELLED X", "logical col", "Carrier Name", "CARRIER", "DISTANCE",
-                 ".fitted", ".resid", ".std.resid", ".hat", ".sigma", ".cooksd", "predicted_response"))
+  expect_true(all(colnames(ret) %in%
+                  c("CANCELLED X", 
+                    "logical col", "Carrier Name", "CARRIER", "DISTANCE",
+                    ".fitted", ".resid", ".std.resid", ".hat", ".sigma", ".cooksd", "predicted_response")))
 })
 
 if (Sys.info()["sysname"] != "Windows") {

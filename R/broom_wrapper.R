@@ -390,7 +390,7 @@ kmeans_info <- function(df){
 #' @param data "training" or "test" or "newdata". Which source data should be used.
 #' @param ... Additional argument to be passed to broom::augment
 #' @export
-prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95, ...){
+prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95, pretty.name = FALSE, ...){
   validate_empty_data(df)
 
   df_cnames <- colnames(df)
@@ -676,12 +676,36 @@ prediction <- function(df, data = "training", data_frame = NULL, conf_int = 0.95
   colnames(ret)[colnames(ret) == ".cooksd"] <- avoid_conflict(colnames(ret), "cooks_distance")
   colnames(ret)[colnames(ret) == ".std.resid"] <- avoid_conflict(colnames(ret), "standardised_residuals")
 
+  if (pretty.name) {
+    if (!is.null(ret$predicted_response) && !is.null(ret$predicted_value)) {
+      # If there are both predicted_response and predicted_value, predicted_value there most likely is linear predictor from glm.
+      colnames(ret)[colnames(ret) == "predicted_value"] <- avoid_conflict(colnames(ret), "Linear Predictor")
+      colnames(ret)[colnames(ret) == "predicted_response"] <- avoid_conflict(colnames(ret), "Predicted Value")
+    }
+    else { # If not, whichever that exists should become Predicted Value
+      colnames(ret)[colnames(ret) == "predicted_value"] <- avoid_conflict(colnames(ret), "Predicted Value")
+      colnames(ret)[colnames(ret) == "predicted_response"] <- avoid_conflict(colnames(ret), "Predicted Value")
+    }
+    colnames(ret)[colnames(ret) == "predicted_label"] <- avoid_conflict(colnames(ret), "Predicted Label")
+    colnames(ret)[colnames(ret) == "predicted_probability"] <- avoid_conflict(colnames(ret), "Predicted Probability") # For ranger etc. we handle classifications with this function, as opposed to in prediction_binary().
+    colnames(ret)[colnames(ret) == "standard_error"] <- avoid_conflict(colnames(ret), "Standard Error")
+    colnames(ret)[colnames(ret) == "residuals"] <- avoid_conflict(colnames(ret), "Residuals")
+    colnames(ret)[colnames(ret) == "hat"] <- avoid_conflict(colnames(ret), "Hat")
+    colnames(ret)[colnames(ret) == "residual_standard_deviation"] <- avoid_conflict(colnames(ret), "Residual Standard Deviation")
+    colnames(ret)[colnames(ret) == "cooks_distance"] <- avoid_conflict(colnames(ret), "Cook's Distance")
+    colnames(ret)[colnames(ret) == "standardised_residuals"] <- avoid_conflict(colnames(ret), "Standardised Residuals")
+    colnames(ret)[colnames(ret) == "conf_low"] <- avoid_conflict(colnames(ret), "Conf Low")
+    colnames(ret)[colnames(ret) == "conf_high"] <- avoid_conflict(colnames(ret), "Conf High")
+    colnames(ret)[colnames(ret) == "is_test_data"] <- avoid_conflict(colnames(ret), "Test Data")
+    ret <- ret %>% dplyr::rename_with(function(x){gsub("predicted_probability_","Predicted Probability for ", x)}, starts_with("predicted_probability_")) # For multiclass classification.
+  }
+
   dplyr::group_by(ret, !!!rlang::syms(grouping_cols))
 }
 
 # Simplified prediction() that works only with new Analytics View model df. This should be kept model-agnostic.
 # This one does not use .test_index and source.data columns.
-prediction2 <- function(df, data_frame = NULL, conf_int = 0.95, ...){
+prediction2 <- function(df, data_frame = NULL, conf_int = 0.95, pretty.name=FALSE, ...){
   validate_empty_data(df)
 
   pred_survival_time <- attr(df, "pred_survival_time")
@@ -763,6 +787,10 @@ prediction2 <- function(df, data_frame = NULL, conf_int = 0.95, ...){
   colnames(ret)[colnames(ret) == ".sigma"] <- avoid_conflict(colnames(ret), "residual_standard_deviation")
   colnames(ret)[colnames(ret) == ".cooksd"] <- avoid_conflict(colnames(ret), "cooks_distance")
   colnames(ret)[colnames(ret) == ".std.resid"] <- avoid_conflict(colnames(ret), "standardised_residuals")
+
+  if (pretty.name) {
+    colnames(ret)[colnames(ret) == "is_test_data"] <- avoid_conflict(colnames(ret), "Test Data")
+  }
 
   if (length(grouping_cols) > 0) {
     ret <- dplyr::group_by(ret, !!!rlang::syms(grouping_cols))
@@ -902,7 +930,7 @@ prediction_training_and_test <- function(df, prediction_type="default", threshol
 #' @param df Data frame to predict. This should have model column.
 #' @param threshold Threshold value for predicted probability or what to optimize. It can be "f_score", "accuracy", "precision", "sensitivity" or "specificity" to optimize.
 #' @export
-prediction_binary <- function(df, threshold = 0.5, ...){
+prediction_binary <- function(df, threshold = 0.5, pretty.name = FALSE, ...){
   # ungroup() is necessary to avoid error under rowwise(). Putting rowwise at the end to put it back to rowwise again. TODO: Is it possible that the input is not under rowwise and our adding rowwise affect processing that follows?
   df <- df %>% ungroup() %>% dplyr::filter(purrr::flatten_lgl(purrr::map(model, function(x){!is.null(x) & "error" %nin% class(x)}))) %>% dplyr::rowwise()
 
@@ -1045,12 +1073,34 @@ prediction_binary <- function(df, threshold = 0.5, ...){
 
   if (!is.null(ret$predicted_value)) {
     # Bring those columns as the first of the prediction result related additional columns.
-    ret <- ret %>% dplyr::relocate(any_of(c("predicted_probability", "conf_low", "conf_high", "predicted_label")), .before=predicted_value)
+    ret <- ret %>% dplyr::relocate(any_of(c("predicted_label", "predicted_probability", "conf_low", "conf_high")), .before=predicted_value)
   }
 
   # Move is_test_data to the last again, since new columns were added to the last in this function.
   if (!is.null(ret$is_test_data)) {
     ret <- ret %>% dplyr::select(-is_test_data, everything(), is_test_data)
+  }
+
+  if (pretty.name) {
+    if (!is.null(ret$predicted_probability) && !is.null(ret$predicted_value)) {
+      # If there is predicted_probability, predicted_value there most likely is linear predictor from glm.
+      colnames(ret)[colnames(ret) == "predicted_value"] <- avoid_conflict(colnames(ret), "Linear Predictor")
+    }
+    else { # Not too sure if there is actual case for this case.
+      colnames(ret)[colnames(ret) == "predicted_value"] <- avoid_conflict(colnames(ret), "Predicted Value")
+    }
+    colnames(ret)[colnames(ret) == "predicted_label"] <- avoid_conflict(colnames(ret), "Predicted Label")
+    colnames(ret)[colnames(ret) == "predicted_response"] <- avoid_conflict(colnames(ret), "Predicted Response")
+    colnames(ret)[colnames(ret) == "predicted_probability"] <- avoid_conflict(colnames(ret), "Predicted Probability")
+    colnames(ret)[colnames(ret) == "standard_error"] <- avoid_conflict(colnames(ret), "Standard Error")
+    colnames(ret)[colnames(ret) == "residuals"] <- avoid_conflict(colnames(ret), "Residuals")
+    colnames(ret)[colnames(ret) == "hat"] <- avoid_conflict(colnames(ret), "Hat")
+    colnames(ret)[colnames(ret) == "residual_standard_deviation"] <- avoid_conflict(colnames(ret), "Residual Standard Deviation")
+    colnames(ret)[colnames(ret) == "cooks_distance"] <- avoid_conflict(colnames(ret), "Cook's Distance")
+    colnames(ret)[colnames(ret) == "standardised_residuals"] <- avoid_conflict(colnames(ret), "Standardised Residuals")
+    colnames(ret)[colnames(ret) == "conf_low"] <- avoid_conflict(colnames(ret), "Conf Low")
+    colnames(ret)[colnames(ret) == "conf_high"] <- avoid_conflict(colnames(ret), "Conf High")
+    colnames(ret)[colnames(ret) == "is_test_data"] <- avoid_conflict(colnames(ret), "Test Data")
   }
   ret
 }

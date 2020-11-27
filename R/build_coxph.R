@@ -439,6 +439,11 @@ build_coxph.fast <- function(df,
       c_cols <- attr(df, 'predictors') # predictors are updated (added and/or removed) in preprocess_post_sample. Catch up with it.
       name_map <- attr(df, 'name_map')
 
+      # Temporarily remove unused columns for uniformity. TODO: Revive them when we do that across the product.
+      c_cols_without_names <- c_cols
+      names(c_cols_without_names) <- NULL # remove names to eliminate renaming effect of select.
+      df <- df %>% dplyr::select(!!!rlang::syms(c_cols_without_names), !!rlang::sym(clean_time_col), rlang::sym(clean_status_col))
+
       df <- remove_outliers_for_regression_data(df, clean_time_col, c_cols,
                                                 NULL, #target_outlier_filter_type
                                                 NULL, #target_outlier_filter_threshold

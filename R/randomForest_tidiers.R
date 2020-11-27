@@ -871,15 +871,14 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
     # Inserting once removed NA rows
     predicted_value <- restore_na(predicted_label_nona, na_row_numbers)
 
-    predicted_value_col <- avoid_conflict(colnames(newdata), "predicted_value")
+    predicted_label_col <- avoid_conflict(colnames(newdata), "predicted_label")
     predicted_probability_col <- avoid_conflict(colnames(newdata), "predicted_probability")
 
     if(is.null(x$classification_type)){
       # just append predicted labels
-      newdata[[predicted_value_col]] <- predicted_value
-      newdata
+      newdata[[predicted_label_col]] <- predicted_value
     } else if (x$classification_type == "binary") {
-      newdata[[predicted_value_col]] <- predicted_value
+      newdata[[predicted_label_col]] <- predicted_value
       predictions <- pred_res$predictions
 
       # With ranger, 1st category always is the one to be considered "TRUE",
@@ -890,19 +889,17 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
       # Inserting once removed NA rows
       predicted_prob <- restore_na(predicted_prob, na_row_numbers)
       newdata[[predicted_probability_col]] <- predicted_prob
-      newdata
     } else if (x$classification_type == "multi") {
       # append predicted probability for each class, max and labels at max values
       # Inserting once removed NA rows
       predicted_prob <- restore_na(apply(pred_res$predictions, 1 , max), na_row_numbers)
-      newdata <- ranger.set_multi_predicted_values(newdata, pred_res$predictions, predicted_value, na_row_numbers)
-      newdata[[predicted_probability_col]] <- predicted_prob
-      newdata
+      newdata <- ranger.set_multi_predicted_values(newdata, pred_res$predictions, predicted_value, predicted_prob, na_row_numbers)
     }
-    newdata <- newdata %>% dplyr::rename(predicted_label = predicted_value_col) %>%
-                  dplyr::select(-predicted_label, everything(), predicted_label)
-
+    newdata
   } else if (!is.null(data)) {
+    if (!is.null(x$orig_target_col)) { # This is only for Analytics View.
+      data <- data %>% dplyr::relocate(!!rlang::sym(x$orig_target_col), .after = last_col()) # Bring the target column to the last so that it is next to the predicted value in the output.
+    }
     if (nrow(data) == 0) {
       # Handle the case where, for example, test_rate is 0 here,
       # rather than trying to make it pass through following code, which can be complex.
@@ -911,7 +908,7 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
     # create clean name data frame because the model learned by those names
     cleaned_data <- data
     y_value <- cleaned_data[[y_name]]
-    predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
+    predicted_label_col <- avoid_conflict(colnames(data), "predicted_label")
     predicted_probability_col <- avoid_conflict(colnames(data), "predicted_probability")
 
     switch(data_type,
@@ -950,27 +947,25 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
           predicted_prob_nona <- restore_na(predicted_prob_nona, attr(x$prediction_test, "unknown_category_rows_index"))
           predicted_prob <- restore_na(predicted_prob_nona, attr(x$prediction_test, "na.action"))
         })
-      data[[predicted_value_col]] <- predicted_value
+      data[[predicted_label_col]] <- predicted_value
       data[[predicted_probability_col]] <- predicted_prob
+      data
     } else if (x$classification_type == "multi"){
       switch(data_type,
         training = {
           # Inserting once removed NA rows
           predicted_prob <- restore_na(apply(x$prediction_training$predictions, 1 , max), x$na.action)
-          data <- ranger.set_multi_predicted_values(data, x$prediction_training$predictions, predicted_value, x$na.action)
+          data <- ranger.set_multi_predicted_values(data, x$prediction_training$predictions, predicted_value, predicted_prob, x$na.action)
         },
         test = {
           # Inserting once removed NA rows
           predicted_prob_nona <- apply(x$prediction_test$predictions, 1 , max)
           predicted_prob_nona <- restore_na(predicted_prob_nona, attr(x$prediction_test, "unknown_category_rows_index"))
           predicted_prob <- restore_na(predicted_prob_nona, attr(x$prediction_test, "na.action"))
-          data <- ranger.set_multi_predicted_values(data, x$prediction_test$predictions, predicted_value, attr(x$prediction_test, "na.action"), attr(x$prediction_test, "unknown_category_rows_index"))
+          data <- ranger.set_multi_predicted_values(data, x$prediction_test$predictions, predicted_value, predicted_prob, attr(x$prediction_test, "na.action"), attr(x$prediction_test, "unknown_category_rows_index"))
         })
-      data[[predicted_probability_col]] <- predicted_prob
+      data
     }
-    data %>% dplyr::rename(predicted_label = predicted_value_col) %>%
-             dplyr::select(-predicted_label, everything(), predicted_label)
-
   } else {
     stop("data or newdata have to be indicated.")
   }
@@ -1008,6 +1003,9 @@ augment.ranger.regression <- function(x, data = NULL, newdata = NULL, data_type 
 
     newdata
   } else if (!is.null(data)) {
+    if (!is.null(x$orig_target_col)) { # This is only for Analytics View.
+      data <- data %>% dplyr::relocate(!!rlang::sym(x$orig_target_col), .after = last_col()) # Bring the target column to the last so that it is next to the predicted value in the output.
+    }
     switch(data_type,
       training = {
         predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
@@ -1098,11 +1096,11 @@ augment.rpart.classification <- function(x, data = NULL, newdata = NULL, data_ty
     # Inserting once removed NA rows
     predicted_value <- restore_na(predicted_label_nona, na_row_numbers)
 
-    predicted_value_col <- avoid_conflict(colnames(newdata), "predicted_value")
+    predicted_label_col <- avoid_conflict(colnames(newdata), "predicted_label")
     predicted_probability_col <- avoid_conflict(colnames(newdata), "predicted_probability")
 
     if (x$classification_type == "binary") {
-      newdata[[predicted_value_col]] <- predicted_value
+      newdata[[predicted_label_col]] <- predicted_value
 
       # Since now we consider only logical column as the tarted for binary classification, the label for "TRUE" class should be always "TRUE".
       predicted_prob <- pred_res[, "TRUE"]
@@ -1114,21 +1112,19 @@ augment.rpart.classification <- function(x, data = NULL, newdata = NULL, data_ty
       # append predicted probability for each class, max and labels at max values
       # Inserting once removed NA rows
       predicted_prob <- restore_na(apply(pred_res, 1 , max), na_row_numbers)
-      newdata <- ranger.set_multi_predicted_values(newdata, pred_res, predicted_value, na_row_numbers)
-      newdata[[predicted_probability_col]] <- predicted_prob
+      newdata <- ranger.set_multi_predicted_values(newdata, pred_res, predicted_value, predicted_prob, na_row_numbers)
       newdata
     }
-    newdata <- newdata %>% dplyr::rename(predicted_label = predicted_value_col) %>%
-                  dplyr::select(-predicted_label, everything(), predicted_label)
     newdata
   } else if (!is.null(data)) {
+    data <- data %>% dplyr::relocate(!!rlang::sym(x$orig_target_col), .after = last_col()) # Bring the target column to the last so that it is next to the predicted value in the output.
     if (nrow(data) == 0) {
       # Handle the case where, for example, test_rate is 0 here,
       # rather than trying to make it pass through following code, which can be complex.
       return (data)
     }
     y_value <- attributes(x)$ylevels[x$y]
-    predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
+    predicted_label_col <- avoid_conflict(colnames(data), "predicted_label")
     predicted_probability_col <- avoid_conflict(colnames(data), "predicted_probability")
     switch(data_type,
       training = {
@@ -1148,12 +1144,8 @@ augment.rpart.classification <- function(x, data = NULL, newdata = NULL, data_ty
         predicted_probability <- restore_na(predicted_probability_nona, x$na_row_numbers_test)
       })
 
-    data[[predicted_value_col]] <- predicted_value
+    data[[predicted_label_col]] <- predicted_value
     data[[predicted_probability_col]] <- predicted_probability
-    if (!is.null(data[[predicted_value_col]])) { # Avoid error in case data_type is 'test' and there is no test data.
-      data <- data %>% dplyr::rename(predicted_label = predicted_value_col) %>%
-             dplyr::select(-predicted_label, everything(), predicted_label)
-    }
     data
 
   } else {
@@ -1193,6 +1185,7 @@ augment.rpart.regression <- function(x, data = NULL, newdata = NULL, data_type =
 
     newdata
   } else if (!is.null(data)) {
+    data <- data %>% dplyr::relocate(!!rlang::sym(x$orig_target_col), .after = last_col()) # Bring the target column to the last so that it is next to the predicted value in the output.
     switch(data_type,
       training = {
         predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
@@ -1219,16 +1212,20 @@ augment.rpart.regression <- function(x, data = NULL, newdata = NULL, data_type =
 #' @param na_row_numbers - Numeric vector of which row of data has NA
 #' @param pred_prob_col - Column name suffix of predicted probability column for each class name
 #' @param pred_value_col - Column name for storing prediction class of multiclass classification
-ranger.set_multi_predicted_values <- function(data, predictions,
+ranger.set_multi_predicted_values <- function(data,
+                                              predictions,
                                               predicted_value,
+                                              predicted_prob,
                                               na_row_numbers,
                                               unknown_category_row_numbers=NULL,
-                                              pred_plob_col="predicted_probability",
-                                              pred_value_col="predicted_value") {
+                                              pred_prob_col="predicted_probability",
+                                              pred_value_col="predicted_label") {
+  data[[pred_value_col]] <- predicted_value
+  data[[pred_prob_col]] <- predicted_prob
   ret <- predictions
   for (i in 1:length(colnames(ret))) { # for each column
     # this is basically bind_cols with na_at taken into account.
-    colname <- stringr::str_c(pred_plob_col, colnames(ret)[i], sep="_")
+    colname <- stringr::str_c(pred_prob_col, colnames(ret)[i], sep="_")
 
     # Inserting once removed NA rows
     prob_data_bycol_nona <- ret[, i] # Do not add drop=FALSE since we want vector here.
@@ -1238,8 +1235,6 @@ ranger.set_multi_predicted_values <- function(data, predictions,
     prob_data_bycol <- restore_na(prob_data_bycol_nona, na_row_numbers)
     data[[colname]] <- prob_data_bycol
   }
-  data[[pred_value_col]] <- predicted_value
-
   data
 }
 
@@ -2359,8 +2354,8 @@ calc_feature_imp <- function(df,
       model$formula_terms <- terms(fml)
       model$sampled_nrow <- clean_df_ret$sampled_nrow
 
+      model$orig_target_col <- target_col # Used for relocating columns as well as for applying function.
       if (!is.null(target_funs)) {
-        model$orig_target_col <- target_col
         model$target_funs <- target_funs
       }
       if (!is.null(predictor_funs)) {
@@ -3090,8 +3085,8 @@ exp_rpart <- function(df,
         }
       }
 
+      model$orig_target_col <- target_col # Used for relocating columns as well as for applying function.
       if (!is.null(target_funs)) {
-        model$orig_target_col <- target_col
         model$target_funs <- target_funs
       }
       if (!is.null(predictor_funs)) {

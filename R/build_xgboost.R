@@ -321,16 +321,14 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, data_type = "t
       predicted_label <- x$y_levels[colmax]
       predicted_label <- restore_na(predicted_label, na_row_numbers)
 
-      original_data <- ranger.set_multi_predicted_values(original_data, as.data.frame(predicted), predicted_label, na_row_numbers)
-
-      # predicted_prob_col is a column for probabilities of chosen values
-      original_data[[predicted_prob_col]] <- max_prob
+      original_data <- ranger.set_multi_predicted_values(original_data, as.data.frame(predicted), predicted_label, max_prob, na_row_numbers)
     }
     original_data
   } else if (!is.null(data)) { # For Analytics View.
     if (nrow(data) == 0) { #TODO: better place to do this check?
       return(data.frame())
     }
+    data <- data %>% dplyr::relocate(!!rlang::sym(x$orig_target_col), .after = last_col()) # Bring the target column to the last so that it is next to the predicted value in the output.
     predicted_prob_col <- avoid_conflict(colnames(data), "predicted_probability")
     switch(data_type,
       training = {
@@ -343,8 +341,7 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, data_type = "t
         colmax <- max.col(predicted)
         max_prob <- predicted[(colmax - 1) * nrow(predicted) + seq(nrow(predicted))]
 
-        data <- ranger.set_multi_predicted_values(data, as.data.frame(predicted), predicted_value, c())
-        data[[predicted_prob_col]] <- max_prob
+        data <- ranger.set_multi_predicted_values(data, as.data.frame(predicted), predicted_value, max_prob, c())
         data
       },
       test = {
@@ -360,8 +357,7 @@ augment.xgboost_multi <- function(x, data = NULL, newdata = NULL, data_type = "t
         max_prob_nona <- restore_na(max_prob_nona, attr(x$prediction_test, "unknown_category_rows_index"))
         max_prob <- restore_na(max_prob_nona, attr(x$prediction_test, "na.action"))
 
-        data <- ranger.set_multi_predicted_values(data, as.data.frame(predicted), predicted_value, attr(x$prediction_test, "na.action"), attr(x$prediction_test, "unknown_category_rows_index"))
-        data[[predicted_prob_col]] <- max_prob
+        data <- ranger.set_multi_predicted_values(data, as.data.frame(predicted), predicted_value, max_prob, attr(x$prediction_test, "na.action"), attr(x$prediction_test, "unknown_category_rows_index"))
         data
       })
   }
@@ -437,6 +433,7 @@ augment.xgboost_binary <- function(x, data = NULL, newdata = NULL, data_type = "
     if (nrow(data) == 0) { #TODO: better place to do this check?
       return(data.frame())
     }
+    data <- data %>% dplyr::relocate(!!rlang::sym(x$orig_target_col), .after = last_col()) # Bring the target column to the last so that it is next to the predicted value in the output.
     predicted_value_col <- avoid_conflict(colnames(data), "predicted_label")
     predicted_probability_col <- avoid_conflict(colnames(data), "predicted_probability")
     switch(data_type,
@@ -518,6 +515,7 @@ augment.xgboost_reg <- function(x, data = NULL, newdata = NULL, data_type = "tra
     if (nrow(data) == 0) { #TODO: better place to do this check?
       return(data.frame())
     }
+    data <- data %>% dplyr::relocate(!!rlang::sym(x$orig_target_col), .after = last_col()) # Bring the target column to the last so that it is next to the predicted value in the output.
     switch(data_type,
       training = {
         predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
@@ -1262,8 +1260,8 @@ exp_xgboost <- function(df,
       model$formula_terms <- terms(fml)
       model$sampled_nrow <- clean_df_ret$sampled_nrow
 
+      model$orig_target_col <- target_col # Used for relocating columns as well as for applying function.
       if (!is.null(target_funs)) {
-        model$orig_target_col <- target_col
         model$target_funs <- target_funs
       }
       if (!is.null(predictor_funs)) {
