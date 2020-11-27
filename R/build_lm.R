@@ -1710,6 +1710,10 @@ augment.glm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = 
   }
 
   ret <- add_response(ret, x, "predicted_response") # Add response.
+  if (!is.null(ret$.fitted)) {
+    # Bring predicted_response column as the first of the prediction result related additional columns, so that it comes next to the actual values.
+    ret <- ret %>% dplyr::relocate(any_of(c("predicted_response")), .before=.fitted)
+  }
 
   if (x$family$family == "binomial") { # Add predicted label in case of binomial (including logistic regression).
     ret$predicted_label <- ret$predicted_response > binary_classification_threshold
