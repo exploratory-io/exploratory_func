@@ -339,14 +339,16 @@ exp_survival_forest <- function(df,
                                                 predictor_outlier_filter_type,
                                                 predictor_outlier_filter_threshold)
 
+      # Temporarily remove unused columns for uniformity. TODO: Revive them when we do that across the product.
+      clean_cols_without_names <- clean_cols
+      names(clean_cols_without_names) <- NULL
+      df <- df %>% dplyr::select(!!!rlang::syms(clean_cols_without_names), !!rlang::sym(clean_time_col), rlang::sym(clean_status_col))
+
       df <- preprocess_regression_data_after_sample(df, clean_time_col, clean_cols, predictor_n = predictor_n, name_map = name_map)
       c_cols <- attr(df, 'predictors') # predictors are updated (added and/or removed) in preprocess_post_sample. Catch up with it.
       name_map <- attr(df, 'name_map')
 
-      # Temporarily remove unused columns for uniformity. TODO: Revive them when we do that across the product.
-      c_cols_without_names <- c_cols
-      names(c_cols_without_names) <- NULL
-      source_data <- df %>% dplyr::select(!!!rlang::syms(c_cols_without_names), !!rlang::sym(clean_status_col), rlang::sym(clean_time_col))
+      source_data <- df
 
       # split training and test data
       test_index <- sample_df_index(source_data, rate = test_rate, ordered = (test_split_type == "ordered"))
