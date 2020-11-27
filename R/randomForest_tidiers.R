@@ -1096,11 +1096,11 @@ augment.rpart.classification <- function(x, data = NULL, newdata = NULL, data_ty
     # Inserting once removed NA rows
     predicted_value <- restore_na(predicted_label_nona, na_row_numbers)
 
-    predicted_value_col <- avoid_conflict(colnames(newdata), "predicted_value")
+    predicted_label_col <- avoid_conflict(colnames(newdata), "predicted_label")
     predicted_probability_col <- avoid_conflict(colnames(newdata), "predicted_probability")
 
     if (x$classification_type == "binary") {
-      newdata[[predicted_value_col]] <- predicted_value
+      newdata[[predicted_label_col]] <- predicted_value
 
       # Since now we consider only logical column as the tarted for binary classification, the label for "TRUE" class should be always "TRUE".
       predicted_prob <- pred_res[, "TRUE"]
