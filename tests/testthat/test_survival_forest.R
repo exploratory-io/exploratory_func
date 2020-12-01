@@ -4,7 +4,7 @@ test_that("exp_survival_forest basic", {
   df <- survival::lung # this data has NAs.
   df <- df %>% mutate(status = status==2)
   df <- df %>% rename(`ti me`=time, `sta tus`=status, `a ge`=age, `se-x`=sex)
-  df <- df %>% mutate(ph.ecog = factor(ph.ecog)) # test handling of ordered factor
+  df <- df %>% mutate(ph.ecog = factor(ph.ecog))
   df <- df %>% mutate(`se-x` = `se-x`==1) # test handling of logical
   model_df <- df %>% exp_survival_forest(`ti me`, `sta tus`, `a ge`, `se-x`, ph.ecog, ph.karno, pat.karno, meal.cal, wt.loss,
                                          predictor_funs=list(`a ge`="none", `se-x`="none", ph.ecog=rlang::expr(forcats::fct_relevel(.,"1")), ph.karno="none", pat.karno="none", meal.cal="none", wt.loss="none"), predictor_n = 2)
