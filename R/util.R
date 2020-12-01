@@ -2150,7 +2150,8 @@ restore_na <- function(value, na_row_numbers){
 
 # Returns a quosure that can be used as right-hand-side of arguments of mutate. Used in mutate_predictors and group_by arguments for summarize_group.
 column_mutate_quosure <- function(func, cname) {
-  if(rlang::is_expression(func)) { # func is an expression with . representing the column to be mutated. e.g. expr(log(., base=2))
+  if("call" %in% class(func)) { # TODO: better way to detect expr. Note that rlang::is_expression() returns TRUE for any expression not limited to output from rlang::expr().
+    # func is an expression with . representing the column to be mutated. e.g. rlang::expr(log(., base=2))
     rlang::quo(eval(func, envir=list(.=UQ(rlang::sym(cname)))))
   } else if(is.function(func)) { # func is already a function. Use it as is.
     rlang::quo(UQ(func)(UQ(rlang::sym(cname))))
