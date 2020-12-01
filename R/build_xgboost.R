@@ -1258,6 +1258,8 @@ exp_xgboost <- function(df,
       # model$y <- model.response(df) TODO: what was this??
       model$df <- df
       model$formula_terms <- terms(fml)
+      # To avoid saving a huge environment when caching with RDS.
+      attr(model$formula_terms,".Environment")<-NULL
       model$sampled_nrow <- clean_df_ret$sampled_nrow
 
       model$orig_target_col <- target_col # Used for relocating columns as well as for applying function.
