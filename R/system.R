@@ -1028,7 +1028,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
 #' @export
 clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, username, catalog = "", schema = "", dsn="", additionalParams = "",
                               collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, connectionString = NULL) {
-  if (type %in% c("dbiodbc", "postgres", "redshift", "vertica", "mysql", "aurora", "odbc")) { #TODO: implement for other types too
+  if (type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora", "dbiodbc")) { #TODO: implement for other types too
     if (type %in% c("mongodb")) {
       if(!is.na(connectionString) && connectionString != '') {
         # make sure to include collection as a key since connection varies per collection.
@@ -1366,7 +1366,7 @@ queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows
   # and it gets result set with DBI package.
   # So make sure to clear the result set.
   # For RDOBC based case, it does not use result set.
-  if(type == "mssqlserver" || type == "odbc") {
+  if(type == "mssqlserver" || type == "dbiodbc") {
     DBI::dbClearResult(resultSet)
   }
   df
