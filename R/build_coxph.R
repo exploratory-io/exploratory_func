@@ -793,6 +793,7 @@ glance.coxph_exploratory <- function(x, data_type = "training", pretty.name = FA
 
 #' @export
 augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training", pred_survival_time = NULL, ...) {
+  browser()
   if ("error" %in% class(x)) {
     ret <- data.frame(Note = x$message)
     return(ret)
@@ -845,6 +846,9 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
   }
 
   # basehaz returns base cumulative hazard.
+  browser()
+  attr(x$formula,".Environment") <- environment() 
+  attr(x$terms,".Environment") <- environment()
   bh <- survival::basehaz(x)
   # create a function to interpolate function that returns cumulative hazard.
   bh_fun <- approxfun(bh$time, bh$hazard)
