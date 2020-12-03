@@ -1334,7 +1334,7 @@ queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows
       resultSet <- DBI::dbSendQuery(conn, query)
       df <- DBI::dbFetch(resultSet, n = numOfRows)
     } else if(type == "odbc") { # For RODBC based ODBC Data Soruces, use RODBC API.
-      if(!requireNamespace("RODBC")){stop("package odbc must be installed.")}
+      if(!requireNamespace("RODBC")){stop("package RODBC must be installed.")}
       df <- RODBC::sqlQuery(conn, query, as.is = as.is, max = numOfRows, stringsAsFactors=stringsAsFactors)
     }
 
