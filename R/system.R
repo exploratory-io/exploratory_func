@@ -1330,7 +1330,7 @@ queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows
     # now odbc package is used for MS SQL Server Data Source so use DBI APIs.
     # The type sqlserver is already used for RODBC based one so "mssqlserver" is passed from Exploratory Desktop.
     if(type == "mssqlserver" || type == "dbiodbc") {
-      if(!requireNamespace("dbiodbc")){stop("package odbc must be installed.")}
+      if(!requireNamespace("odbc")){stop("package odbc must be installed.")}
       resultSet <- DBI::dbSendQuery(conn, query)
       df <- DBI::dbFetch(resultSet, n = numOfRows)
     } else if(type == "odbc") { # For RODBC based ODBC Data Soruces, use RODBC API.
