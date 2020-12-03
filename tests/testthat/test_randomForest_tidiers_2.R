@@ -94,27 +94,28 @@ test_that("test ranger with binary classification with logical column", {
   )
   expect_colnames <- c("CANCELLED", "Carrier Name", "CARRIER",
                        "DISTANCE", "FNUMBER", "IS AA", "predicted_probability", "predicted_label")
-  expect_equal(colnames(pred_train_ret), expect_colnames)
+  expect_true(all(expect_colnames %in% colnames(pred_train_ret)))
 
   pred_train_ret2 <- suppressWarnings(
     prediction(model_ret, data = "training", threshold = "f_score")
   )
-  expect_equal(colnames(pred_train_ret2), expect_colnames)
+  expect_true(all(expect_colnames %in% colnames(pred_train_ret2)))
 
   pred_test_ret <- suppressWarnings(prediction_binary(model_ret, data = "test"))
-  expect_equal(colnames(pred_test_ret), expect_colnames)
+  expect_true(all(expect_colnames %in% colnames(pred_test_ret)))
 
   pred_test_ret2 <- suppressWarnings(prediction(model_ret, data = "test"))
-  expect_equal(colnames(pred_test_ret2), expect_colnames)
+  expect_true(all(expect_colnames %in% colnames(pred_test_ret2)))
 
   expect_colnames <- c("CANCELLED", "Carrier Name", "CARRIER",
                        "DISTANCE", "FNUMBER", "predicted_probability", "predicted_label")
   pred_test_newdata_ret <- suppressWarnings(prediction_binary(model_ret, data = "newdata", data_frame = test_data %>% select(-`IS AA`)))
-  expect_equal(colnames(pred_test_newdata_ret), expect_colnames)
+  expect_true(all(expect_colnames %in% colnames(pred_test_newdata_ret)))
 
   pred_test_newdata_ret2 <- suppressWarnings(prediction_binary(model_ret, data = "newdata", data_frame = test_data %>% select(-`IS AA`)))
-  expect_equal(colnames(pred_test_newdata_ret2), expect_colnames)
+  expect_true(all(expect_colnames %in% colnames(pred_test_newdata_ret2)))
 })
+
 test_that("test ranger with binary classification with factor", {
   test_data[["IS AA"]] <- if_else(test_data$CARRIER == "AA", "AA", "Not AA") # test target column name with space
   test_data[1, "IS AA"] <- NA
@@ -140,26 +141,26 @@ test_that("test ranger with binary classification with factor", {
   )
   expect_colnames <- c("CANCELLED", "Carrier Name", "CARRIER",
                        "DISTANCE", "FNUMBER", "IS AA", "predicted_probability", "predicted_label")
-  expect_equal(colnames(pred_train_ret), expect_colnames)
+  expect_true(all(expect_colnames %in% colnames(pred_train_ret)))
 
   pred_train_ret2 <- suppressWarnings(
     prediction(model_ret, data = "training", threshold = "f_score")
   )
-  expect_equal(colnames(pred_train_ret2), expect_colnames)
+  expect_true(all(expect_colnames %in% colnames(pred_train_ret2)))
 
   pred_test_ret <- suppressWarnings(prediction_binary(model_ret, data = "test"))
-  expect_equal(colnames(pred_test_ret), expect_colnames)
+  expect_true(all(expect_colnames %in% colnames(pred_test_ret)))
 
   pred_test_ret2 <- suppressWarnings(prediction(model_ret, data = "test"))
-  expect_equal(colnames(pred_test_ret2), expect_colnames)
+  expect_true(all(expect_colnames %in% colnames(pred_test_ret2)))
 
   expect_colnames <- c("CANCELLED", "Carrier Name", "CARRIER",
                        "DISTANCE", "FNUMBER", "predicted_probability", "predicted_label")
   pred_test_newdata_ret <- suppressWarnings(prediction_binary(model_ret, data = "newdata", data_frame = test_data %>% select(-`IS AA`)))
-  expect_equal(colnames(pred_test_newdata_ret), expect_colnames)
+  expect_true(all(expect_colnames %in% colnames(pred_test_newdata_ret)))
 
   pred_test_newdata_ret2 <- suppressWarnings(prediction_binary(model_ret, data = "newdata", data_frame = test_data %>% select(-`IS AA`)))
-  expect_equal(colnames(pred_test_newdata_ret2), expect_colnames)
+  expect_true(all(expect_colnames %in% colnames(pred_test_newdata_ret2)))
 })
 
 test_that("test ranger with binary classification (all predictor_varials)", {
@@ -184,25 +185,25 @@ test_that("test ranger with binary classification (all predictor_varials)", {
   )
   expect_colnames <- c("CANCELLED", "Carrier Name", "CARRIER",
                        "DISTANCE", "FNUMBER", "IS AA", "predicted_probability", "predicted_label")
-  expect_equal(colnames(pred_train_ret), expect_colnames)
+  expect_true(all(expect_colnames %in% colnames(pred_train_ret)))
 
   pred_train_ret2 <- suppressWarnings(
     prediction(model_ret, data = "training", threshold = "f_score")
   )
-  expect_equal(colnames(pred_train_ret2), expect_colnames)
+  expect_true(all(expect_colnames %in% colnames(pred_train_ret2)))
 
   pred_test_ret <- suppressWarnings(prediction_binary(model_ret, data = "test"))
-  expect_equal(colnames(pred_test_ret), expect_colnames)
+  expect_true(all(expect_colnames %in% colnames(pred_test_ret)))
   pred_test_ret2 <- suppressWarnings(prediction(model_ret, data = "test"))
-  expect_equal(colnames(pred_test_ret2), expect_colnames)
+  expect_true(all(expect_colnames %in% colnames(pred_test_ret2)))
 
   expect_colnames <- c("CANCELLED", "Carrier Name", "CARRIER",
                        "DISTANCE", "FNUMBER", "predicted_probability", "predicted_label")
   pred_test_newdata_ret <- suppressWarnings(prediction_binary(model_ret, data = "newdata", data_frame = test_data %>% select(-`IS AA`)))
-  expect_equal(colnames(pred_test_newdata_ret), expect_colnames)
+  expect_true(all(expect_colnames %in% colnames(pred_test_newdata_ret)))
 
   pred_test_newdata_ret2 <- suppressWarnings(prediction(model_ret, data = "newdata", data_frame = test_data %>% select(-`IS AA`)))
-  expect_equal(colnames(pred_test_newdata_ret2), expect_colnames)
+  expect_true(all(expect_colnames %in% colnames(pred_test_newdata_ret2)))
 })
 
 test_that("test ranger with multinomial classification", {
@@ -220,23 +221,23 @@ test_that("test ranger with multinomial classification", {
                        "Number of Rows")
   expect_equal(colnames(model_stats), expect_colnames)
 
-  expected_colnames <- c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE", "FNUMBER",
+  expect_colnames <- c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE", "FNUMBER",
                          "IS_AA", "predicted_probability_DL", "predicted_probability_AA",
                          "predicted_probability_MQ", "predicted_probability_EV", "predicted_probability_US",
                          "predicted_probability_9E", "predicted_probability", "predicted_label")
 
   pred_train_ret <- suppressWarnings(prediction(model_ret, data = "training"))
-  expect_equal(colnames(pred_train_ret), expected_colnames)
+  expect_true(all(expect_colnames %in% colnames(pred_train_ret)))
 
   pred_test_ret <- suppressWarnings(prediction(model_ret, data = "test"))
-  expect_equal(colnames(pred_test_ret), expected_colnames)
+  expect_true(all(expect_colnames %in% colnames(pred_test_ret)))
 
-  expected_colnames <- c("CANCELLED", "Carrier Name", "DISTANCE", "FNUMBER",
+  expect_colnames <- c("CANCELLED", "Carrier Name", "DISTANCE", "FNUMBER",
                          "IS_AA", "predicted_probability_DL", "predicted_probability_AA",
                          "predicted_probability_MQ", "predicted_probability_EV", "predicted_probability_US",
                          "predicted_probability_9E", "predicted_probability", "predicted_label")
   pred_test_newdata_ret <- suppressWarnings(prediction(model_ret, data = "newdata", data_frame = test_data %>% select(-CARRIER)))
-  expect_equal(colnames(pred_test_newdata_ret), expected_colnames)
+  expect_true(all(expect_colnames %in% colnames(pred_test_newdata_ret)))
 })
 
 test_that("test ranger with multinomial classification", {
@@ -254,23 +255,23 @@ test_that("test ranger with multinomial classification", {
                        "Number of Rows")
   expect_equal(colnames(model_stats), expect_colnames)
 
-  expected_colnames <- c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE", "FNUMBER",
+  expect_colnames <- c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE", "FNUMBER",
                          "IS_AA", "predicted_probability_DL", "predicted_probability_AA",
                          "predicted_probability_MQ", "predicted_probability_EV", "predicted_probability_US",
                          "predicted_probability", "predicted_label")
 
   pred_train_ret <- suppressWarnings(prediction(model_ret, data = "training"))
-  expect_equal(colnames(pred_train_ret), expected_colnames)
+  expect_true(all(expect_colnames %in% colnames(pred_train_ret)))
 
   pred_test_ret <- suppressWarnings(prediction(model_ret, data = "test"))
-  expect_equal(colnames(pred_test_ret), expected_colnames)
+  expect_true(all(expect_colnames %in% colnames(pred_test_ret)))
 
-  expected_colnames <- c("CANCELLED", "Carrier Name", "DISTANCE", "FNUMBER",
+  expect_colnames <- c("CANCELLED", "Carrier Name", "DISTANCE", "FNUMBER",
                          "IS_AA", "predicted_probability_DL", "predicted_probability_AA",
                          "predicted_probability_MQ", "predicted_probability_EV", "predicted_probability_US",
                          "predicted_probability", "predicted_label")
   pred_test_newdata_ret <- suppressWarnings(prediction(model_ret, data = "newdata", data_frame = test_data %>% select(-CARRIER)))
-  expect_equal(colnames(pred_test_newdata_ret), expected_colnames)
+  expect_true(all(expect_colnames %in% colnames(pred_test_newdata_ret)))
 })
 
 
@@ -326,10 +327,15 @@ test_that("ranger.set_multi_predicted_values", {
                                                          df[["z"]])
   na_at <- exploratory:::ranger.find_na(c("x", "y"), df) 
   predicted_value <- exploratory:::restore_na(predicted_value_nona, na_at)
-  ret <- exploratory:::ranger.set_multi_predicted_values(df, m_m$predictions, predicted_value, na_at)
+  predicted_prob_nona <- rep(0.5, length(predicted_value_nona)) # Dummy probability just to pass this test.
+  predicted_prob <- restore_na(predicted_prob_nona, na_at)
+  ret <- exploratory:::ranger.set_multi_predicted_values(df, m_m$predictions, predicted_value, predicted_prob, na_at)
   expected_colnames <-  c("x", "y", "z",
+                          "predicted_label",
+                          "predicted_probability",
                           "predicted_probability_A", "predicted_probability_D", "predicted_probability_E",
-                          "predicted_probability_B", "predicted_probability_C", "predicted_probability_F", "predicted_value")
+                          "predicted_probability_B", "predicted_probability_C", "predicted_probability_F"
+                          )
   expect_equal(colnames(ret), expected_colnames)
 })
 

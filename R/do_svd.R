@@ -138,7 +138,7 @@ do_svd.kv_ <- function(df,
         # but rownames are always character,
         # so its type should be reverted to the same type
         # with subject column
-        rnames <- same_type(rownames(matrix), df[[subject_col]])
+        rnames <- to_same_type(rownames(matrix), df[[subject_col]])
         # create a column for subject values
         df <- setNames(data.frame(rnames, stringsAsFactors = FALSE), subject_col)
         ret <- cbind(df, ret)
@@ -169,7 +169,7 @@ do_svd.kv_ <- function(df,
         # in the original dimension
         ret <- as.data.frame(mat)
         colnames(ret) <- avoid_conflict(c(grouped_col, dimension_col), paste("axis", seq(ncol(mat)), sep=""))
-        rnames <- same_type(rownames(mat), df[[dimension_col]])
+        rnames <- to_same_type(rownames(mat), df[[dimension_col]])
         df <- setNames(data.frame(rnames, stringsAsFactors = FALSE), dimension_col)
         ret <- cbind(df, ret)
       } else if (output=="long") {

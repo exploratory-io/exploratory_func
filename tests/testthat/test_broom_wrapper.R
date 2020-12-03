@@ -192,7 +192,7 @@ test_that("predict lm with new data", {
 
   fit <- add_df %>% dplyr::group_by(group) %>% add_prediction(model_df = model_data)
 
-  expect_equal(nrow(fit), 20 * 2)
+  expect_equal(nrow(fit), 20) # For now, only the first model in model_df is used for prediction, even if the model_df has multiple rows (models).
   expect_equal(names(fit), c("model.group", "group", "num1", "num2", "predicted_value", "standard_error", "conf_low", "conf_high", "residual"))
 })
 
@@ -494,8 +494,10 @@ test_that("test prediction(data='training_and_test') by glm", {
                                      model_type = "lm",
                                      test_rate = 0.2)
   ret <- model_ret %>% prediction(data='training_and_test')
-  expected_cols <- c("Carrier Name", "DISTANCE", "ARR_TIME",
-                     "DERAY_TIME", "predicted_value",
+  expected_cols <- c("Carrier Name",
+                     "ARR_TIME", "DERAY_TIME",
+                     "DISTANCE",
+                     "predicted_value",
                      "conf_low", "conf_high", 
                      "standard_error", 
                      "residuals", "standardised_residuals", "hat",
@@ -512,16 +514,20 @@ test_that("test prediction(data='training_and_test') by glm", {
   grp_ret <- grp_model_ret %>% prediction(data='training_and_test')
   # For some reason, cooks_distance and standardised_residuals does not show up with change in https://github.com/exploratory-io/exploratory_func/pull/656
   # Working it around now, but look into it.
-  expected_cols_1 <- c("klass", "Carrier Name", "DISTANCE",
-                     "ARR_TIME", "DERAY_TIME", "predicted_value",
+  expected_cols_1 <- c("klass", "Carrier Name",
+                     "ARR_TIME", "DERAY_TIME",
+                     "DISTANCE",
+                     "predicted_value",
                      "conf_low", "conf_high",
                      "standard_error",
                      "residuals",
                      "standardised_residuals", "hat", "residual_standard_deviation",
                      "cooks_distance",
                      "is_test_data")
-  expected_cols_2 <- c("klass", "Carrier Name", "DISTANCE",
-                     "ARR_TIME", "DERAY_TIME", "predicted_value",
+  expected_cols_2 <- c("klass", "Carrier Name",
+                     "ARR_TIME", "DERAY_TIME",
+                     "DISTANCE",
+                     "predicted_value",
                      "conf_low", "conf_high",
                      "standard_error",
                      "residuals",

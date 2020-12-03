@@ -8,7 +8,7 @@ calc_permutation_importance_binomial <- function(fit, target, vars, data) {
                                 loss.fun = function(x,y){-sum(log(1- abs(x - y)),na.rm = TRUE)})
   })
   importances <- purrr::flatten_dbl(importances)
-  importances_df <- tibble(term=vars, importance=importances)
+  importances_df <- tibble::tibble(term=vars, importance=pmax(importances, 0))
   importances_df
 }
 
@@ -22,7 +22,7 @@ calc_permutation_importance_linear <- function(fit, target, vars, data) {
                                 loss.fun = function(x,y){sum((x - y)^2, na.rm = TRUE)/length(x)})
   })
   importances <- purrr::flatten_dbl(importances)
-  importances_df <- tibble(term=vars, importance=importances)
+  importances_df <- tibble::tibble(term=vars, importance=pmax(importances, 0))
   importances_df
 }
 
@@ -37,7 +37,7 @@ calc_permutation_importance_gaussian <- function(fit, target, vars, data) {
                                 loss.fun = function(x,y){sum((x - y)^2, na.rm = TRUE)/length(x)})
   })
   importances <- purrr::flatten_dbl(importances)
-  importances_df <- tibble(term=vars, importance=importances)
+  importances_df <- tibble::tibble(term=vars, importance=pmax(importances, 0))
   importances_df
 }
 
@@ -54,7 +54,7 @@ calc_permutation_importance_poisson <- function(fit, target, vars, data) {
                                 loss.fun = function(x,y){-sum(y*x-exp(x), na.rm = TRUE)})
   })
   importances <- purrr::flatten_dbl(importances)
-  importances_df <- tibble(term=vars, importance=importances)
+  importances_df <- tibble::tibble(term=vars, importance=pmax(importances, 0))
   importances_df
 }
 
@@ -598,6 +598,8 @@ remove_outliers_for_regression_data <- function(df, target_col, predictor_cols,
 build_lm.fast <- function(df,
                     target,
                     ...,
+                    target_fun = NULL,
+                    predictor_funs = NULL,
                     model_type = "lm",
                     family = NULL,
                     link = NULL,
@@ -631,7 +633,22 @@ build_lm.fast <- function(df,
                     test_split_type = "random" # "random" or "ordered"
                     ){
   target_col <- tidyselect::vars_select(names(df), !! rlang::enquo(target))
-  selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
+  orig_selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
+
+  target_funs <- NULL
+  if (!is.null(target_fun)) {
+    target_funs <- list(target_fun)
+    names(target_funs) <- target_col
+    df <- df %>% mutate_predictors(target_col, target_funs)
+  }
+
+  if (!is.null(predictor_funs)) {
+    df <- df %>% mutate_predictors(orig_selected_cols, predictor_funs)
+    selected_cols <- names(unlist(predictor_funs))
+  }
+  else {
+    selected_cols <- orig_selected_cols
+  }
 
   grouped_cols <- grouped_by(df)
 
@@ -654,7 +671,7 @@ build_lm.fast <- function(df,
   # If we do permutation importance, sort predictors so that the result of it is stable against change of column order.
   # Otherwise, avoid sorting so that user has control over the order of variables on partial dependence plot.
   if (model_type == "lm" || family %in% c("binomial", "gaussian") || (family == "poisson" && (is.null(link) || link == "log"))) {
-    selected_cols <- sort(selected_cols)
+    selected_cols <- stringr::str_sort(selected_cols)
   }
 
   if(test_rate < 0 | 1 < test_rate){
@@ -1025,7 +1042,7 @@ build_lm.fast <- function(df,
         coef_df <- broom:::tidy.glm(model)
         # str_detect matches with all categorical class terms that belongs to the variable.
         p_values_list <- c_cols_list %>% purrr::map(function(x){(coef_df %>% filter(stringr::str_detect(term, paste0("^`?", x))) %>% summarize(p.value=min(p.value, na.rm=TRUE)))$p.value})
-        p_values_df <- tibble(term=c_cols, p.value=purrr::flatten_dbl(p_values_list))
+        p_values_df <- tibble::tibble(term=c_cols, p.value=purrr::flatten_dbl(p_values_list))
         imp_vars <- (p_values_df %>% dplyr::arrange(p.value))$term
         imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # Keep only max_pd_vars most important variables
 
@@ -1048,8 +1065,18 @@ build_lm.fast <- function(df,
         model$partial_dependence <- NULL
       }
 
-      list(model = model, test_index = test_index, source_data = source_data)
+      if (!is.null(target_funs)) {
+        model$orig_target_col <- target_col
+        model$target_funs <- target_funs
+      }
+      if (!is.null(predictor_funs)) {
+        model$orig_predictor_cols <- orig_selected_cols
+        model$predictor_funs <- predictor_funs
+      }
 
+      model$target_col <- clean_target_col # We use target column info to bring the column next to the predicted value in the prediction() output.
+
+      list(model = model, test_index = test_index, source_data = source_data)
     }, error = function(e){
       if(length(grouped_cols) > 0) {
         # In repeat-by case, we report group-specific error in the Summary table,
@@ -1107,6 +1134,15 @@ glance.lm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
     return(ret)
   }
   ret <- broom:::glance.lm(x)
+
+  # Add VIF Max if VIF is available.
+  if (!is.null(x$vif) && "error" %nin% class(x$vif)) {
+    vif_df <- vif_to_dataframe(x)
+    if (nrow(vif_df) > 0 ) {
+      max_vif <- max(vif_df$VIF, na.rm=TRUE)
+      ret <- ret %>% dplyr::mutate(`VIF Max`=!!max_vif)
+    }
+  }
 
   # Adjust the subtle difference between sigma (Residual Standard Error) and RMSE.
   # In RMSE, division is done by observation size, while it is by residual degree of freedom in sigma.
@@ -1188,6 +1224,15 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
     # Show number of rows for positive case and negative case, especially so that result of SMOTE is visible.
     ret$positives <- sum(x$y == 1, na.rm = TRUE)
     ret$negatives <- sum(x$y != 1, na.rm = TRUE)
+  }
+
+  # Add VIF Max if VIF is available.
+  if (!is.null(x$vif) && "error" %nin% class(x$vif)) {
+    vif_df <- vif_to_dataframe(x)
+    if (nrow(vif_df) > 0 ) {
+      max_vif <- max(vif_df$VIF, na.rm=TRUE)
+      ret <- ret %>% dplyr::mutate(`VIF Max`=!!max_vif)
+    }
   }
 
   if(pretty.name) {
@@ -1560,12 +1605,17 @@ augment.lm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "
   }
 
   if(!is.null(newdata)) {
+    # Replay the mutations on predictors.
+    if(!is.null(x$predictor_funs)) {
+      newdata <- newdata %>% mutate_predictors(x$orig_predictor_cols, x$predictor_funs)
+    }
+
     predictor_variables <- all.vars(x$terms)[-1]
     predictor_variables_orig <- x$terms_mapping[predictor_variables]
 
-    cleaned_data <- newdata %>% dplyr::select(predictor_variables_orig)
-    # Rename columns to the normalized ones used while learning.
-    colnames(cleaned_data) <- predictor_variables
+    # This select() also renames columns since predictor_variables_orig is a named vector.
+    # everything() is to keep the other columns in the output. #TODO: What if names of the other columns conflicts with our temporary name, c1_, c2_...?
+    cleaned_data <- newdata %>% dplyr::select(predictor_variables_orig, everything())
 
     # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
     cleaned_data <- align_predictor_factor_levels(cleaned_data, x$xlevels, predictor_variables)
@@ -1577,6 +1627,7 @@ augment.lm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "
     ret <- broom:::augment.lm(x, data = NULL, newdata = cleaned_data, se = TRUE, ...)
     # TODO: Restore removed rows.
   } else if (!is.null(data)) {
+    data <- data %>% dplyr::relocate(!!rlang::sym(x$target_col), .after = last_col()) # Bring the target column to the last so that it is next to the predicted value in the output.
     ret <- switch(data_type,
       training = { # Call broom:::augment.lm as is
         broom:::augment.lm(x, data = data, newdata = newdata, se = TRUE, ...)
@@ -1597,18 +1648,23 @@ augment.lm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "
 }
 
 #' @export
-augment.glm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "training", ...) {
+augment.glm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "training", binary_classification_threshold = 0.5, ...) {
   if ("error" %in% class(x)) {
     ret <- data.frame()
     return(ret)
   }
   if(!is.null(newdata)) {
+    # Replay the mutations on predictors.
+    if(!is.null(x$predictor_funs)) {
+      newdata <- newdata %>% mutate_predictors(x$orig_predictor_cols, x$predictor_funs)
+    }
+
     predictor_variables <- all.vars(x$terms)[-1]
     predictor_variables_orig <- x$terms_mapping[predictor_variables]
 
-    cleaned_data <- newdata %>% dplyr::select(predictor_variables_orig)
-    # Rename columns to the normalized ones used while learning.
-    colnames(cleaned_data) <- predictor_variables
+    # This select() also renames columns since predictor_variables_orig is a named vector.
+    # everything() is to keep the other columns in the output. #TODO: What if names of the other columns conflicts with our temporary name, c1_, c2_...?
+    cleaned_data <- newdata %>% dplyr::select(predictor_variables_orig, everything())
 
     # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
     cleaned_data <- align_predictor_factor_levels(cleaned_data, x$xlevels, predictor_variables)
@@ -1626,8 +1682,10 @@ augment.glm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = 
       # Try recovering from it by running with se=FALSE.
       broom:::augment.glm(x, data = NULL, newdata = cleaned_data, se = FALSE, ...)
     })
-    # TODO: Restore removed rows.
   } else if (!is.null(data)) {
+    # Bring the target column to the last so that it is next to the predicted value in the output.
+    # Note that source.data of lm/glm model df has mapped column names, unlike that of ranger.
+    data <- data %>% dplyr::relocate(!!rlang::sym(x$target_col), .after = last_col())
     ret <- switch(data_type,
       training = {
         tryCatch({
@@ -1649,6 +1707,16 @@ augment.glm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = 
     }, error = function(e){
       broom:::augment.glm(x, se = FALSE, ...)
     })
+  }
+
+  ret <- add_response(ret, x, "predicted_response") # Add response.
+  if (!is.null(ret$.fitted)) {
+    # Bring predicted_response column as the first of the prediction result related additional columns, so that it comes next to the actual values.
+    ret <- ret %>% dplyr::relocate(any_of(c("predicted_response")), .before=.fitted)
+  }
+
+  if (x$family$family == "binomial") { # Add predicted label in case of binomial (including logistic regression).
+    ret$predicted_label <- ret$predicted_response > binary_classification_threshold
   }
   # Rename columns back to the original names.
   names(ret) <- coalesce(x$terms_mapping[names(ret)], names(ret))

@@ -161,7 +161,9 @@ word_to_sentiment <- function(words, lexicon="bing"){
 #' @param remove_twitter Whether it should remove remove Twitter characters @ and #.
 #' @param remove_url Whether it should remove URL starts with http(s).
 #' @param stopwords_lang Language for the stopwords that need to be excluded from the result.
-#' @param hiragana_word_length_to_remove Legnth of a Hiragana word that needs to be excluded from the result.
+#' @param hiragana_word_length_to_remove Length of a Hiragana word that needs to be excluded from the result.
+#' @param summary_level Either "row" or "all". If this is "all", it ignores document and summarizes the result by token.
+#' @param sort_by Either "count" or "name"
 #' @return Data frame with tokenized column.
 #' @export
 do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
@@ -170,7 +172,8 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
                                  remove_hyphens = FALSE, remove_separators = TRUE,
                                  remove_symbols = TRUE, remove_twitter = TRUE,
                                  remove_url = TRUE, stopwords_lang = NULL,
-                                 hiragana_word_length_to_remove = 2, ...){
+                                 hiragana_word_length_to_remove = 2,
+                                 summary_level = "row", sort_by = "", ...){
 
   if(!requireNamespace("quanteda")){stop("package quanteda must be installed.")}
   if(!requireNamespace("dplyr")){stop("package dplyr must be installed.")}
@@ -241,10 +244,21 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
   }
   # result column order should be document_id, <token_col>, <count_col> ...
   if(!with_id) {
-    result %>% select(!!rlang::sym(token_col), !!rlang::sym(count_col), dplyr::everything())
+    result <- result %>% select(!!rlang::sym(token_col), !!rlang::sym(count_col), dplyr::everything())
   } else {
-    result %>% select(document_id, !!rlang::sym(token_col), !!rlang::sym(count_col), dplyr::everything())
+    result <- result %>% select(document_id, !!rlang::sym(token_col), !!rlang::sym(count_col), dplyr::everything())
   }
+  # if the summary_level is "all", summarize it by token.
+  if(summary_level == "all") {
+    result <- result %>% dplyr::group_by(!!rlang::sym(token_col)) %>% dplyr::summarise(!!rlang::sym(count_col) := sum(!!rlang::sym(count_col), na.rm = TRUE))
+  }
+  # Sort handling. if count is specified, sort by count descending.
+  if(sort_by == "count") {
+    result <- result %>% arrange(desc(!!rlang::sym(count_col)))
+  } else if (sort_by == "token"){ #if token is specified, sort by token alphabetically.
+    result <- result %>% arrange(!!rlang::sym(token_col))
+  }
+  result
 }
 
 #' Tokenize text and unnest
@@ -332,7 +346,7 @@ do_tokenize <- function(df, input, token = "words", keep_cols = FALSE,  drop = T
     ret <- ret %>% dplyr::filter(!is_stopword(!!rlang::sym(output_col), lang = stopwords_lang))
   }
   if(remove_numbers) {
-    # remoe if the token is all number characters.
+    # remove if the token is all number characters.
     ret <- ret %>% dplyr::filter(!stringr::str_detect(!!rlang::sym(output_col), '^[:digit:]+$'))
   }
   ret
@@ -591,7 +605,7 @@ parse_logical <- function(text, ...){
 
 #'Function to extract text inside the characters like bracket.
 #'@export
-str_extract_inside <- function(column, begin = "(", end = ")", all = FALSE) {
+str_extract_inside <- function(column, begin = "(", end = ")", all = FALSE, include_special_chars = TRUE) {
   # Ref https://stackoverflow.com/questions/3926451/how-to-match-but-not-capture-part-of-a-regex
   # Below logic creates a Regular Expression that uses lookbehind and lookahead to extract string
   # between them.
@@ -614,7 +628,10 @@ str_extract_inside <- function(column, begin = "(", end = ")", all = FALSE) {
   if(grepl("[A-Za-z]", end)) {
     stop("The end argument must be symbol such as ), }, ].")
   }
-  exp <- stringr::str_c("(?<=\\", begin, ").*?(?=\\", end, ")")
+  exp <- stringr::str_c("\\", begin, "[^\\" , begin, "\\", end, "]*\\", end)
+  if(!include_special_chars) {
+    exp <- stringr::str_c("(?<=\\", begin,  ").*?(?=\\", end,  ")");
+  }
   if(all) {
     stringr::str_extract_all(column, exp)
   } else {
@@ -624,7 +641,7 @@ str_extract_inside <- function(column, begin = "(", end = ")", all = FALSE) {
 
 #'Function to remove text inside the characters like bracket.
 #'@export
-str_remove_inside <- function(column, begin = "(", end = ")", all = FALSE){
+str_remove_inside <- function(column, begin = "(", end = ")", all = FALSE, include_special_chars = TRUE){
   if(stringr::str_length(begin) > 1) {
     stop("The begin argument must be one character.")
   }
@@ -638,10 +655,115 @@ str_remove_inside <- function(column, begin = "(", end = ")", all = FALSE){
     stop("The end argument must be symbol such as ), }, ].")
   }
   exp <- stringr::str_c("\\", begin, "[^\\" , begin, "\\", end, "]*\\", end)
+  if(!include_special_chars) {
+    exp <- stringr::str_c("(?<=\\", begin,  ").*?(?=\\", end,  ")");
+  }
   if(all) {
     stringr::str_remove_all(column, exp)
   } else {
     stringr::str_remove(column, exp)
+  }
+}
+
+#'Function to replace text inside the characters like bracket.
+#'@export
+str_replace_inside <- function(column, begin = "(", end = ")", rep = "", all = FALSE, include_special_chars = TRUE){
+  if(stringr::str_length(begin) > 1) {
+    stop("The begin argument must be one character.")
+  }
+  if(stringr::str_length(end) > 1) {
+    stop("The end argument must be one character.")
+  }
+  if(grepl("[A-Za-z]", begin)) {
+    stop("The begin argument must be symbol such as (, {, [.")
+  }
+  if(grepl("[A-Za-z]", end)) {
+    stop("The end argument must be symbol such as ), }, ].")
+  }
+  exp <- stringr::str_c("\\", begin, "[^\\" , begin, "\\", end, "]*\\", end)
+  if(!include_special_chars) {
+    exp <- stringr::str_c("(?<=\\", begin,  ").*?(?=\\", end,  ")");
+  }
+  if(all) {
+    stringr::str_replace_all(column, exp, rep)
+  } else {
+    stringr::str_replace(column, exp, rep)
+  }
+}
+#'Function to remove URL from the text
+#'@export
+str_remove_url <- function(text, position = "any"){
+  reg <- "http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+"
+  if(position == "start") {
+    reg <- stringr::str_c("^", reg, sep = "")
+  } else if (position == "end") {
+    reg <- stringr::str_c(reg, "$", sep = "")
+  }
+  stringr::str_replace_all(text, stringr::regex(reg, ignore_case = TRUE), "")
+}
+#'Function to replace URL from the text
+#'@export
+str_replace_url <- function(text, rep = ""){
+  stringr::str_replace_all(text, stringr::regex("http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+", ignore_case = TRUE), rep)
+}
+#'Function to extract URL from the text
+#'@export
+str_extract_url <- function(text, position = "any"){
+  reg <- "http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+"
+  if(position == "start") {
+    reg <- stringr::str_c("^", reg, sep = "")
+  } else if (position == "end") {
+    reg <- stringr::str_c(reg, "$", sep = "")
+  }
+  stringr::str_extract_all(text, stringr::regex(reg, ignore_case = TRUE))
+}
+
+#'Function to remove word from text.
+#'@export
+str_remove_word <- function(string, start = 1L, end = start, sep = fixed(" ")) {
+  str_replace_word(string, start, end, sep, rep = "")
+}
+
+#'Function to remove word from text.
+#'@export
+str_replace_word <- function(string, start = 1L, end = start, sep = fixed(" "), rep = "") {
+  sep_ <- sep
+  # Below is the list of predefined separators passed from Exploratory Desktop in a regular expression format.
+  # Changed it back to the original separator.
+  if(sep == "\\s*\\,\\s*") {
+    sep_ <- ", "
+  } else if (sep == "\\s+") {
+    sep_ <- " "
+  } else if (sep == "\\s*\\;\\s*") {
+    sep_ <- ";"
+  } else if (sep == "\\s*\\:\\s*") {
+    sep_ <- ":"
+  } else if (sep == "\\s*\\/\\s*") {
+    sep_ <- "/"
+  } else if (sep ==  "\\s*\\-\\s*") {
+    sep_ <- "-"
+  } else if (sep == "\\s*\\_\\s*") {
+    sep_ <- "_"
+  } else if (sep == "\\s*\\.\\s*") {
+    sep_ <- "."
+  } else if (sep == "\\s*\\@\\s*") {
+    sep_ <- "@"
+  }
+  if(end == 1) {
+    ret <- stringr::word(string, start = start, end = end, sep = sep)
+    if(rep != "") {
+      rep <- stringr::str_c(rep, sep_, sep="")
+    }
+    stringr::str_replace(string, stringr::str_c("^", ret, sep, ""), rep)
+  } else if (end == -1){
+    ret <- stringr::word(string, start = start, end = end, sep = sep)
+    if(rep != "") {
+      rep <- stringr::str_c(sep_, rep, sep="")
+    }
+    stringr::str_replace(string, stringr::str_c(sep, ret, "$"), rep)
+  } else {
+    ## TODO: Implement other cases
+    string
   }
 }
 

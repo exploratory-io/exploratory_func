@@ -638,7 +638,7 @@ augment.randomForest.classification <- function(x, data = NULL, newdata = NULL, 
 
     predicted <- rep(NA, times = n_data)
     predicted[!na_at] <- x[["predicted"]]
-    predicted <- same_type(levels(x[["y"]])[predicted], cleaned_data[[y_name]])
+    predicted <- to_same_type(levels(x[["y"]])[predicted], cleaned_data[[y_name]])
 
     votes <- x[["votes"]]
     full_votes <- matrix(data = NA, nrow = n_data, ncol = ncol(votes))
@@ -796,7 +796,7 @@ augment.ranger <- function(x, data = NULL, newdata = NULL, ...) {
 
 align_predictor_factor_levels <- function(newdata, model_df, predictor_cols) {
   cleaned_data <- newdata
-  # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
+  # Align factor levels including Others and (Missing) to the model.
   for (i in 1:length(predictor_cols)) {
     predictor_col <- predictor_cols[i]
     training_predictor <- model_df[[predictor_col]]
@@ -807,12 +807,19 @@ align_predictor_factor_levels <- function(newdata, model_df, predictor_cols) {
       else if (is.character(training_predictor)) {
         training_predictor_levels <- unique(training_predictor)
       }
-      ret <- forcats::fct_explicit_na(forcats::fct_other(cleaned_data[[predictor_col]], keep=training_predictor_levels))
+      # ordered factor here causes error in xgboost. Make it not ordered.
+      ret <- forcats::fct_explicit_na(forcats::fct_other(factor(cleaned_data[[predictor_col]], ordered=FALSE), keep=training_predictor_levels))
       # In case model does not know (Missing) level, do fct_other again. (Missing) will be absorbed in Other.
       ret <- forcats::fct_other(ret, keep=training_predictor_levels)
       # If "Other" is not included in the model levels, replace them with NA. They will be handled as NA rows.
       if ("Other" %nin% training_predictor_levels) {
         ret <- dplyr::na_if(ret, "Other")
+      }
+      if (is.factor(training_predictor)) { # Set the same levels as the training data including the level order.
+        ret <- factor(ret, levels=training_predictor_levels)
+      }
+      else { # Cast it back to character, just like the training data.
+        ret <- as.character(ret)
       }
       cleaned_data[[predictor_col]] <- ret
     }
@@ -836,13 +843,16 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
   }
 
   if(!is.null(newdata)){
-    # create clean name data frame because the model learned by those names
-    cleaned_data <- newdata
-    y_value <- cleaned_data[[y_name]]
+    # Replay the mutations on predictors.
+    if(!is.null(x$predictor_funs)) {
+      newdata <- newdata %>% mutate_predictors(x$orig_predictor_cols, x$predictor_funs)
+    }
 
-    cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables_orig)
-    # Rename columns to the normalized ones used while learning.
-    colnames(cleaned_data) <- predictor_variables
+    y_value <- newdata[[y_name]] # TODO: Does this make sense for newdata case, where target variable values are generally unknown??
+
+    # create clean name data frame because the model learned by those names
+    # This select() also renames columns since predictor_variables_orig is a named vector.
+    cleaned_data <- newdata %>% dplyr::select(predictor_variables_orig)
 
     # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
     cleaned_data <- align_predictor_factor_levels(cleaned_data, x$df, predictor_variables)
@@ -861,15 +871,14 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
     # Inserting once removed NA rows
     predicted_value <- restore_na(predicted_label_nona, na_row_numbers)
 
-    predicted_value_col <- avoid_conflict(colnames(newdata), "predicted_value")
+    predicted_label_col <- avoid_conflict(colnames(newdata), "predicted_label")
     predicted_probability_col <- avoid_conflict(colnames(newdata), "predicted_probability")
 
     if(is.null(x$classification_type)){
       # just append predicted labels
-      newdata[[predicted_value_col]] <- predicted_value
-      newdata
+      newdata[[predicted_label_col]] <- predicted_value
     } else if (x$classification_type == "binary") {
-      newdata[[predicted_value_col]] <- predicted_value
+      newdata[[predicted_label_col]] <- predicted_value
       predictions <- pred_res$predictions
 
       # With ranger, 1st category always is the one to be considered "TRUE",
@@ -880,19 +889,17 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
       # Inserting once removed NA rows
       predicted_prob <- restore_na(predicted_prob, na_row_numbers)
       newdata[[predicted_probability_col]] <- predicted_prob
-      newdata
     } else if (x$classification_type == "multi") {
       # append predicted probability for each class, max and labels at max values
       # Inserting once removed NA rows
       predicted_prob <- restore_na(apply(pred_res$predictions, 1 , max), na_row_numbers)
-      newdata <- ranger.set_multi_predicted_values(newdata, pred_res$predictions, predicted_value, na_row_numbers)
-      newdata[[predicted_probability_col]] <- predicted_prob
-      newdata
+      newdata <- ranger.set_multi_predicted_values(newdata, pred_res$predictions, predicted_value, predicted_prob, na_row_numbers)
     }
-    newdata <- newdata %>% dplyr::rename(predicted_label = predicted_value_col) %>%
-                  dplyr::select(-predicted_label, everything(), predicted_label)
-
+    newdata
   } else if (!is.null(data)) {
+    if (!is.null(x$orig_target_col)) { # This is only for Analytics View.
+      data <- data %>% dplyr::relocate(!!rlang::sym(x$orig_target_col), .after = last_col()) # Bring the target column to the last so that it is next to the predicted value in the output.
+    }
     if (nrow(data) == 0) {
       # Handle the case where, for example, test_rate is 0 here,
       # rather than trying to make it pass through following code, which can be complex.
@@ -901,7 +908,7 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
     # create clean name data frame because the model learned by those names
     cleaned_data <- data
     y_value <- cleaned_data[[y_name]]
-    predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
+    predicted_label_col <- avoid_conflict(colnames(data), "predicted_label")
     predicted_probability_col <- avoid_conflict(colnames(data), "predicted_probability")
 
     switch(data_type,
@@ -940,27 +947,25 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
           predicted_prob_nona <- restore_na(predicted_prob_nona, attr(x$prediction_test, "unknown_category_rows_index"))
           predicted_prob <- restore_na(predicted_prob_nona, attr(x$prediction_test, "na.action"))
         })
-      data[[predicted_value_col]] <- predicted_value
+      data[[predicted_label_col]] <- predicted_value
       data[[predicted_probability_col]] <- predicted_prob
+      data
     } else if (x$classification_type == "multi"){
       switch(data_type,
         training = {
           # Inserting once removed NA rows
           predicted_prob <- restore_na(apply(x$prediction_training$predictions, 1 , max), x$na.action)
-          data <- ranger.set_multi_predicted_values(data, x$prediction_training$predictions, predicted_value, x$na.action)
+          data <- ranger.set_multi_predicted_values(data, x$prediction_training$predictions, predicted_value, predicted_prob, x$na.action)
         },
         test = {
           # Inserting once removed NA rows
           predicted_prob_nona <- apply(x$prediction_test$predictions, 1 , max)
           predicted_prob_nona <- restore_na(predicted_prob_nona, attr(x$prediction_test, "unknown_category_rows_index"))
           predicted_prob <- restore_na(predicted_prob_nona, attr(x$prediction_test, "na.action"))
-          data <- ranger.set_multi_predicted_values(data, x$prediction_test$predictions, predicted_value, attr(x$prediction_test, "na.action"), attr(x$prediction_test, "unknown_category_rows_index"))
+          data <- ranger.set_multi_predicted_values(data, x$prediction_test$predictions, predicted_value, predicted_prob, attr(x$prediction_test, "na.action"), attr(x$prediction_test, "unknown_category_rows_index"))
         })
-      data[[predicted_probability_col]] <- predicted_prob
+      data
     }
-    data %>% dplyr::rename(predicted_label = predicted_value_col) %>%
-             dplyr::select(-predicted_label, everything(), predicted_label)
-
   } else {
     stop("data or newdata have to be indicated.")
   }
@@ -974,12 +979,13 @@ augment.ranger.regression <- function(x, data = NULL, newdata = NULL, data_type 
   predictor_variables_orig <- x$terms_mapping[predictor_variables]
 
   if(!is.null(newdata)) {
-    # create clean name data frame because the model learned by those names
-    cleaned_data <- newdata
+    # Replay the mutations on predictors.
+    if(!is.null(x$predictor_funs)) {
+      newdata <- newdata %>% mutate_predictors(x$orig_predictor_cols, x$predictor_funs)
+    }
 
-    cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables_orig)
-    # Rename columns to the normalized ones used while learning.
-    colnames(cleaned_data) <- predictor_variables
+    # This select() also renames columns since predictor_variables_orig is a named vector.
+    cleaned_data <- newdata %>% dplyr::select(predictor_variables_orig)
 
     # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
     cleaned_data <- align_predictor_factor_levels(cleaned_data, x$df, predictor_variables)
@@ -997,6 +1003,9 @@ augment.ranger.regression <- function(x, data = NULL, newdata = NULL, data_type 
 
     newdata
   } else if (!is.null(data)) {
+    if (!is.null(x$orig_target_col)) { # This is only for Analytics View.
+      data <- data %>% dplyr::relocate(!!rlang::sym(x$orig_target_col), .after = last_col()) # Bring the target column to the last so that it is next to the predicted value in the output.
+    }
     switch(data_type,
       training = {
         predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
@@ -1056,13 +1065,17 @@ augment.rpart.classification <- function(x, data = NULL, newdata = NULL, data_ty
   }
 
   if (!is.null(newdata)) {
+    # Replay the mutations on predictors.
+    if(!is.null(x$predictor_funs)) {
+      newdata <- newdata %>% mutate_predictors(x$orig_predictor_cols, x$predictor_funs)
+    }
+
     # create clean name data frame because the model learned by those names
     cleaned_data <- newdata
-    y_value <- cleaned_data[[y_name]]
 
-    cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables_orig)
-    # Rename columns to the normalized ones used while learning.
-    colnames(cleaned_data) <- predictor_variables
+    # This select() also renames columns since predictor_variables_orig is a named vector.
+    # everything() is to keep the other columns in the output. #TODO: What if names of the other columns conflicts with our temporary name, c1_, c2_...?
+    cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables_orig, everything())
 
     # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
     cleaned_data <- align_predictor_factor_levels(cleaned_data, attr(x, "xlevels"), predictor_variables)
@@ -1077,16 +1090,17 @@ augment.rpart.classification <- function(x, data = NULL, newdata = NULL, data_ty
 
     predicted_label_nona <- ranger.predict_value_from_prob(attr(x, "ylevels"),
                                                            pred_res,
-                                                           y_value, threshold = threshold)
+                                                           NULL, # y_value
+                                                           threshold = threshold)
 
     # Inserting once removed NA rows
     predicted_value <- restore_na(predicted_label_nona, na_row_numbers)
 
-    predicted_value_col <- avoid_conflict(colnames(newdata), "predicted_value")
+    predicted_label_col <- avoid_conflict(colnames(newdata), "predicted_label")
     predicted_probability_col <- avoid_conflict(colnames(newdata), "predicted_probability")
 
     if (x$classification_type == "binary") {
-      newdata[[predicted_value_col]] <- predicted_value
+      newdata[[predicted_label_col]] <- predicted_value
 
       # Since now we consider only logical column as the tarted for binary classification, the label for "TRUE" class should be always "TRUE".
       predicted_prob <- pred_res[, "TRUE"]
@@ -1098,21 +1112,19 @@ augment.rpart.classification <- function(x, data = NULL, newdata = NULL, data_ty
       # append predicted probability for each class, max and labels at max values
       # Inserting once removed NA rows
       predicted_prob <- restore_na(apply(pred_res, 1 , max), na_row_numbers)
-      newdata <- ranger.set_multi_predicted_values(newdata, pred_res, predicted_value, na_row_numbers)
-      newdata[[predicted_probability_col]] <- predicted_prob
+      newdata <- ranger.set_multi_predicted_values(newdata, pred_res, predicted_value, predicted_prob, na_row_numbers)
       newdata
     }
-    newdata <- newdata %>% dplyr::rename(predicted_label = predicted_value_col) %>%
-                  dplyr::select(-predicted_label, everything(), predicted_label)
     newdata
   } else if (!is.null(data)) {
+    data <- data %>% dplyr::relocate(!!rlang::sym(x$orig_target_col), .after = last_col()) # Bring the target column to the last so that it is next to the predicted value in the output.
     if (nrow(data) == 0) {
       # Handle the case where, for example, test_rate is 0 here,
       # rather than trying to make it pass through following code, which can be complex.
       return (data)
     }
     y_value <- attributes(x)$ylevels[x$y]
-    predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
+    predicted_label_col <- avoid_conflict(colnames(data), "predicted_label")
     predicted_probability_col <- avoid_conflict(colnames(data), "predicted_probability")
     switch(data_type,
       training = {
@@ -1132,12 +1144,8 @@ augment.rpart.classification <- function(x, data = NULL, newdata = NULL, data_ty
         predicted_probability <- restore_na(predicted_probability_nona, x$na_row_numbers_test)
       })
 
-    data[[predicted_value_col]] <- predicted_value
+    data[[predicted_label_col]] <- predicted_value
     data[[predicted_probability_col]] <- predicted_probability
-    if (!is.null(data[[predicted_value_col]])) { # Avoid error in case data_type is 'test' and there is no test data.
-      data <- data %>% dplyr::rename(predicted_label = predicted_value_col) %>%
-             dplyr::select(-predicted_label, everything(), predicted_label)
-    }
     data
 
   } else {
@@ -1152,12 +1160,14 @@ augment.rpart.regression <- function(x, data = NULL, newdata = NULL, data_type =
   predictor_variables_orig <- x$terms_mapping[predictor_variables]
 
   if(!is.null(newdata)) {
-    # create clean name data frame because the model learned by those names
-    cleaned_data <- newdata
+    # Replay the mutations on predictors.
+    if(!is.null(x$predictor_funs)) {
+      newdata <- newdata %>% mutate_predictors(x$orig_predictor_cols, x$predictor_funs)
+    }
 
-    cleaned_data <- cleaned_data %>% dplyr::select(predictor_variables_orig)
-    # Rename columns to the normalized ones used while learning.
-    colnames(cleaned_data) <- predictor_variables
+    # create clean name data frame because the model learned by those names
+    # This select() also renames columns since predictor_variables_orig is a named vector.
+    cleaned_data <- newdata %>% dplyr::select(predictor_variables_orig)
 
     # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
     cleaned_data <- align_predictor_factor_levels(cleaned_data, attr(x, "xlevels"), predictor_variables)
@@ -1175,6 +1185,7 @@ augment.rpart.regression <- function(x, data = NULL, newdata = NULL, data_type =
 
     newdata
   } else if (!is.null(data)) {
+    data <- data %>% dplyr::relocate(!!rlang::sym(x$orig_target_col), .after = last_col()) # Bring the target column to the last so that it is next to the predicted value in the output.
     switch(data_type,
       training = {
         predicted_value_col <- avoid_conflict(colnames(data), "predicted_value")
@@ -1201,16 +1212,20 @@ augment.rpart.regression <- function(x, data = NULL, newdata = NULL, data_type =
 #' @param na_row_numbers - Numeric vector of which row of data has NA
 #' @param pred_prob_col - Column name suffix of predicted probability column for each class name
 #' @param pred_value_col - Column name for storing prediction class of multiclass classification
-ranger.set_multi_predicted_values <- function(data, predictions,
+ranger.set_multi_predicted_values <- function(data,
+                                              predictions,
                                               predicted_value,
+                                              predicted_prob,
                                               na_row_numbers,
                                               unknown_category_row_numbers=NULL,
-                                              pred_plob_col="predicted_probability",
-                                              pred_value_col="predicted_value") {
+                                              pred_prob_col="predicted_probability",
+                                              pred_value_col="predicted_label") {
+  data[[pred_value_col]] <- predicted_value
+  data[[pred_prob_col]] <- predicted_prob
   ret <- predictions
   for (i in 1:length(colnames(ret))) { # for each column
     # this is basically bind_cols with na_at taken into account.
-    colname <- stringr::str_c(pred_plob_col, colnames(ret)[i], sep="_")
+    colname <- stringr::str_c(pred_prob_col, colnames(ret)[i], sep="_")
 
     # Inserting once removed NA rows
     prob_data_bycol_nona <- ret[, i] # Do not add drop=FALSE since we want vector here.
@@ -1220,8 +1235,6 @@ ranger.set_multi_predicted_values <- function(data, predictions,
     prob_data_bycol <- restore_na(prob_data_bycol_nona, na_row_numbers)
     data[[colname]] <- prob_data_bycol
   }
-  data[[pred_value_col]] <- predicted_value
-
   data
 }
 
@@ -1255,16 +1268,25 @@ ranger.find_na_index <- function(variables, data) {
 #' @param y_value - Actual value to be predicted
 ranger.predict_value_from_prob <- function(levels_var, pred, y_value, threshold = NULL) {
   # We assume threshold is given only for binary case.
-  if (is.null(threshold)) { # multiclass case
-    same_type(levels_var[apply(pred, 1, which.max)], y_value)
+  if (is.null(threshold)) { # multiclass case. Return the value with maximum probability.
+    to_same_type(levels_var[apply(pred, 1, which.max)], y_value)
   }
   else { # binary case
+    true_index <- match("TRUE",colnames(pred)) # Find which index is TRUE
+    if (is.na(true_index)) { # For old analytics step that can take non-logical column for binary classification.
+      true_index <- 1
+    }
     predicted <- factor(levels_var[apply(pred, 1, function(x){
       if(is.na(x[2])){ # take care of the case where pred has only 1 column. possible when there are only one value in training data.
         1
       }
       else {
-        if(x[1]>threshold) 1 else 2
+        if (true_index == 1) {
+          if(x[1]>threshold) 1 else 2
+        }
+        else { # true_index == 2
+          if(x[2]>threshold) 2 else 1
+        }
       }
     })], levels=levels_var)
     predicted
@@ -2048,6 +2070,7 @@ importance_ranger <- function(model) {
     variable = names(imp),
     importance = imp
   ) %>% dplyr::arrange(-importance)
+  imp_df <- imp_df %>% dplyr::mutate(importance = pmax(importance, 0)) # Show 0 for negative importance, which can be caused by chance in case of permutation importance.
   imp_df
 }
 
@@ -2056,6 +2079,8 @@ importance_ranger <- function(model) {
 calc_feature_imp <- function(df,
                              target,
                              ...,
+                             target_fun = NULL,
+                             predictor_funs = NULL,
                              max_nrow = 50000, # Down from 200000 when we added partial dependence
                              max_sample_size = NULL, # Half of max_nrow. down from 100000 when we added partial dependence
                              ntree = 20,
@@ -2092,11 +2117,27 @@ calc_feature_imp <- function(df,
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
   target_col <- tidyselect::vars_select(names(df), !! rlang::enquo(target))
   # this evaluates select arguments like starts_with
-  selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
-  # Sort predictors so that the result of permutation importance is stable against change of column order.
-  selected_cols <- sort(selected_cols)
+  orig_selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
+
+  target_funs <- NULL
+  if (!is.null(target_fun)) {
+    target_funs <- list(target_fun)
+    names(target_funs) <- target_col
+    df <- df %>% mutate_predictors(target_col, target_funs)
+  }
+
+  if (!is.null(predictor_funs)) {
+    df <- df %>% mutate_predictors(orig_selected_cols, predictor_funs)
+    selected_cols <- names(unlist(predictor_funs))
+  }
+  else {
+    selected_cols <- orig_selected_cols
+  }
 
   grouped_cols <- grouped_by(df)
+
+  # Sort predictors so that the result of permutation importance is stable against change of column order.
+  selected_cols <- stringr::str_sort(selected_cols)
 
   # Remember if the target column was originally numeric or logical before converting type.
   is_target_logical_or_numeric <- is.numeric(df[[target_col]]) || is.logical(df[[target_col]])
@@ -2312,6 +2353,16 @@ calc_feature_imp <- function(df,
       model$df <- model_df
       model$formula_terms <- terms(fml)
       model$sampled_nrow <- clean_df_ret$sampled_nrow
+
+      model$orig_target_col <- target_col # Used for relocating columns as well as for applying function.
+      if (!is.null(target_funs)) {
+        model$target_funs <- target_funs
+      }
+      if (!is.null(predictor_funs)) {
+        model$orig_predictor_cols <- orig_selected_cols
+        model$predictor_funs <- predictor_funs
+      }
+
       list(model = model, test_index = test_index, source_data = source_data)
     }, error = function(e){
       if(length(grouped_cols) > 0) {
@@ -2856,6 +2907,8 @@ partial_dependence.rpart = function(fit, target, vars = colnames(data),
 exp_rpart <- function(df,
                       target,
                       ...,
+                      target_fun = NULL,
+                      predictor_funs = NULL,
                       max_nrow = 50000, # down from 200000 when we added partial dependence
                       target_n = 20,
                       predictor_n = 12, # so that at least months can fit in it.
@@ -2886,11 +2939,27 @@ exp_rpart <- function(df,
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
   target_col <- tidyselect::vars_select(names(df), !! rlang::enquo(target))
   # this evaluates select arguments like starts_with
-  selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
-  # Sort predictors so that the result of permutation importance is stable against change of column order.
-  selected_cols <- sort(selected_cols)
+  orig_selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
+
+  target_funs <- NULL
+  if (!is.null(target_fun)) {
+    target_funs <- list(target_fun)
+    names(target_funs) <- target_col
+    df <- df %>% mutate_predictors(target_col, target_funs)
+  }
+
+  if (!is.null(predictor_funs)) {
+    df <- df %>% mutate_predictors(orig_selected_cols, predictor_funs)
+    selected_cols <- names(unlist(predictor_funs))
+  }
+  else {
+    selected_cols <- orig_selected_cols
+  }
 
   grouped_cols <- grouped_by(df)
+
+  # Sort predictors so that the result of permutation importance is stable against change of column order.
+  selected_cols <- stringr::str_sort(selected_cols)
 
   # Remember if the target column was originally numeric or logical before converting type.
   is_target_logical_or_numeric <- is.numeric(df[[target_col]]) || is.logical(df[[target_col]])
@@ -3014,6 +3083,15 @@ exp_rpart <- function(df,
           model$predicted_class_test <- get_predicted_class_rpart(model, data_type = "test",
                                                                   binary_classification_threshold = binary_classification_threshold)
         }
+      }
+
+      model$orig_target_col <- target_col # Used for relocating columns as well as for applying function.
+      if (!is.null(target_funs)) {
+        model$target_funs <- target_funs
+      }
+      if (!is.null(predictor_funs)) {
+        model$orig_predictor_cols <- orig_selected_cols
+        model$predictor_funs <- predictor_funs
       }
 
       list(model = model, test_index = test_index, source_data = source_data)

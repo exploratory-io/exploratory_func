@@ -151,12 +151,14 @@ test_that("prediction with categorical columns", {
 
   model_data <- build_lm(test_data, CANCELLED ~ `Carrier Name` + CARRIER + DISTANCE, test_rate = 0.6)
 
-  ret <- prediction(model_data, data = "test", pretty.name = TRUE)
+  ret <- prediction(model_data, data = "test")
   expect_true(nrow(ret) > 0)
-  expect_equal(colnames(ret), c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE", "predicted_value",
-                                "conf_low", "conf_high",
-                                "standard_error",
-                                "residuals"))
+  expect_true(all(c("CANCELLED", 
+                    "Carrier Name", "CARRIER", "DISTANCE",
+                    "predicted_value",
+                    "conf_low", "conf_high",
+                    "standard_error",
+                    "residuals") %in% colnames(ret)))
 
   grouped <- test_data %>%
     dplyr::group_by(CARRIER)
@@ -232,7 +234,8 @@ test_that("prediction with glm family (binomial) and link (probit) with target c
   ret <- model_data %>% augment_rowwise(model)
 
   expect_true(nrow(ret) > 0)
-  expect_true(all(colnames(ret) %in% c("CANCELLED X", "logical col", "Carrier Name","CARRIER","DISTANCE",".fitted",".se.fit",".resid",".hat",".sigma",".cooksd",".std.resid")))
+  expect_true(all(c("CANCELLED X", "logical col", "Carrier Name","CARRIER","DISTANCE",".fitted",".se.fit",".resid",".hat",".sigma",".cooksd",".std.resid", "predicted_response", "predicted_label")
+                  %in% colnames(ret)))
 })
 
 test_that("prediction with glm family (negativebinomial) with target column name with space by build_lm.fast", {
@@ -255,11 +258,10 @@ test_that("prediction with glm family (negativebinomial) with target column name
                               model_type = "glm",
                               link = "log",
                               family="negativebinomial")
-  ret <- model_data %>% glance_rowwise(model)
+  ret <- model_data %>% glance_rowwise(model, pretty.name=TRUE)
   expect_equal(colnames(ret),
-               c("null.deviance", "df.null", "logLik",
-                 "AIC", "BIC", "deviance",
-                 "df.residual", "p.value", "n", "theta", "SE.theta"))
+               c("P Value", "Number of Rows", "Log Likelihood", "AIC", "BIC", "Residual Deviance", "Null Deviance", "DF for Null Model",
+                 "Residual DF", "Theta", "SE Theta", "VIF Max"))
   ret <- model_data %>% tidy_rowwise(model)
   expect_colnames <- c("term", "estimate", "std.error", "statistic", "p.value",
                        "conf.high", "conf.low", "base.level")
@@ -269,9 +271,10 @@ test_that("prediction with glm family (negativebinomial) with target column name
                 identical(colnames(ret), c(expect_colnames, "note")))
 
   ret <- model_data %>% augment_rowwise(model)
-  expect_equal(colnames(ret),
-               c("CANCELLED X", "logical col", "Carrier Name", "CARRIER", "DISTANCE",
-                 ".fitted", ".resid", ".std.resid", ".hat", ".sigma", ".cooksd"))
+  expect_true(all(colnames(ret) %in%
+                  c("CANCELLED X", 
+                    "logical col", "Carrier Name", "CARRIER", "DISTANCE",
+                    ".fitted", ".resid", ".std.resid", ".hat", ".sigma", ".cooksd", "predicted_response")))
 })
 
 if (Sys.info()["sysname"] != "Windows") {

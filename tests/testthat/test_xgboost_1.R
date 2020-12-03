@@ -24,10 +24,14 @@ if (!testdata_filename %in% list.files(testdata_dir)) {
 test_that("exp_xgboost(regression) evaluate training and test", {
   set.seed(1) # For stability of result.
   model_df <- flight %>%
-                exp_xgboost(`ARR DELAY`, `CAR RIER`, `ORI GIN`, `DEP DELAY`, `AIR TIME`,
+                exp_xgboost(`ARR DELAY`, `CAR RIER`, `ORI GIN`, `DEP DELAY`, `AIR TIME`, `FL DATE`,
+                            predictor_funs=list(`CAR RIER`="none", `ORI GIN`="none", `DEP DELAY`="none", `AIR TIME`="none", list(`FL DATE_y`="year", `FL DATE_m`="monname", `FL DATE_dom`="day", `FL DATE_dow`="wday")),
                                  test_rate = 0.3,
                                  test_split_type = "ordered", pd_with_bin_means = TRUE, # testing ordered split too.
                                  watchlist_rate = 0.1)
+  ret <- model_df %>% prediction(data="training_and_test", pretty.name=TRUE)
+
+  ret <- flight %>% select(-`ARR DELAY`) %>% add_prediction(model_df=model_df)
   ret <- model_df %>% prediction(data="newdata", data_frame=flight)
 
   ret <- model_df %>% tidy_rowwise(model, type="evaluation_log")
@@ -63,13 +67,18 @@ test_that("exp_xgboost(regression) evaluate training and test", {
   expect_equal(nrow(ret), 1) # 1 for train
 })
 
-test_that("exp_xgboost(binary) evaluate training and test", {
+test_that("exp_xgboost evaluate training and test - binary", {
   set.seed(1) # For stability of result.
   # `is delayed` is not logical for some reason.
   # To test binary prediction, need to cast it into logical.
-  model_df <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`)) %>%
-                exp_xgboost(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0.3, pd_with_bin_means = TRUE)
+  data <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`))
+  model_df <- data %>% exp_xgboost(is_delayed, `DIS TANCE`, `DEP TIME`,
+                            predictor_funs=list(`DIS TANCE`="none", `DEP TIME`="none"),
+                            test_rate = 0.3, pd_with_bin_means = TRUE)
 
+  ret1 <- data %>% select(-is_delayed) %>% add_prediction(model_df=model_df, binary_classification_threshold=0.5)
+  ret2 <- data %>% select(-is_delayed) %>% add_prediction(model_df=model_df, binary_classification_threshold=0.01)
+  expect_gt(sum(ret2$predicted_label==TRUE,na.rm=TRUE), sum(ret1$predicted_label==TRUE,na.rm=TRUE)) # Change of threshold should make difference.
   ret <- model_df %>% prediction(data="newdata", data_frame=flight)
 
   ret <- rf_evaluation_training_and_test(model_df, binary_classification_threshold = 0.5)
@@ -111,13 +120,17 @@ test_that("exp_xgboost(binary) evaluate training and test", {
   ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
 })
 
-test_that("exp_xgboost(factor(TRUE, FALSE)) evaluate training and test", { # This case should be treated as multi-class.
+test_that("exp_xgboost - factor of TRUE/FALSE - evaluate training and test", { # This case should be treated as multi-class.
   set.seed(1) # For stability of result.
   # `is delayed` is not logical for some reason.
   # To test binary prediction, need to cast it into logical.
-  model_df <- flight %>% dplyr::mutate(is_delayed = factor(as.logical(`is delayed`))) %>% filter(!is.na(is_delayed)) %>%
-                exp_xgboost(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0.3, pd_with_bin_means = TRUE)
+  data <- flight %>% dplyr::mutate(is_delayed = factor(as.logical(`is delayed`))) %>% filter(!is.na(is_delayed))
+  model_df <- data %>% exp_xgboost(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0.3, pd_with_bin_means = TRUE)
 
+  ret <- model_df %>% prediction(data="training_and_test", pretty.name=TRUE)
+
+  ret <- data %>% select(-is_delayed) %>% add_prediction(model_df=model_df)
+  expect_true(all(c("predicted_probability_FALSE","predicted_probability_TRUE","predicted_label","predicted_probability") %in% colnames(ret)))
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
   # expect_equal(nrow(test_ret), 1500) Fails now, since we filter numeric NA. Revive when we do not need to.

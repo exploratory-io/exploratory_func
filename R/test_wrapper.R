@@ -1,3 +1,65 @@
+
+# Generates data for t distribution probability density with critical section and statistic
+# to depict a result of a t-test.
+generate_ttest_density_data <- function(t, df, sig_level = 0.05, alternative = "two.sided") {
+  l <- max(5, abs(t)*1.1) # limit of x for the data we generate here.
+
+  x <- seq(from=-l,to=l,by=l/500 )
+  ret <- tibble::tibble(x=x, y=dt(x, df=df))
+
+  ret2 <- tibble::tibble(x=t, y=dt(x, df=df), statistic=TRUE)
+  ret <- bind_rows(ret, ret2)
+
+  if (alternative == "two.sided") {
+    tt <- qt(1-sig_level/2, df=df) # Threshold t for critical section.
+    ret <- ret %>% mutate(critical=(x>=tt|x<=-tt))
+  }
+  else if (alternative == "greater") {
+    tt <- qt(1-sig_level, df=df) # Threshold t for critical section.
+    ret <- ret %>% mutate(critical=(x>=tt))
+  }
+  else { # alternative == "less"
+    tt <- qt(sig_level, df=df) # Threshold t for critical section.
+    ret <- ret %>% mutate(critical=(x<=tt))
+  }
+  ret <- ret %>% mutate(df=df)
+  ret
+}
+
+# Generates data for chi-square distribution probability density with critical section and statistic
+# to depict a result of a chi-square test.
+generate_chisq_density_data <- function(stat, df, sig_level = 0.05) {
+  tx <- qchisq(1-sig_level, df=df) # The chisq value that corresponds to the significance level.
+  l <- max(df*3, stat*1.1, tx*1.1) # Making sure stat and tx are in the displayed range.
+
+  x <- seq(from=0, to=l, by=l/1000 )
+  ret <- tibble::tibble(x=x, y=dchisq(x, df=df))
+
+  ret2 <- tibble::tibble(x=stat, y=dchisq(x, df=df), statistic=TRUE)
+  ret <- bind_rows(ret, ret2)
+
+  ret <- ret %>% mutate(critical=x>=tx)
+  ret <- ret %>% mutate(df=df)
+  ret
+}
+
+# Generates data for F distribution probability density with critical section and statistic
+# to depict a result of a F test like one-way ANOVA.
+generate_ftest_density_data <- function(stat, df1, df2, sig_level = 0.05) {
+  tx <- qf(1-sig_level, df1=df1, df2=df2) # The chisq value that corresponds to the significance level.
+  l <- max(df1/df2*3, stat*1.1, tx*1.1) # Making sure stat and tx are in the displayed range.
+
+  x <- seq(from=0,to=l,by=l/1000 )
+  ret <- tibble::tibble(x=x, y=df(x, df1=df1, df2=df2))
+
+  ret2 <- tibble::tibble(x=stat, y=df(x, df1=df1, df2=df2), statistic=TRUE)
+  ret <- bind_rows(ret, ret2)
+
+  ret <- ret %>% mutate(critical=x>=tx)
+  ret <- ret %>% mutate(df1=df1, df2=df2)
+  ret
+}
+
 #' wrapper for t.test, which compares means
 #' @export
 do_t.test <- function(df, value, key=NULL, ...){
@@ -194,8 +256,11 @@ do_chisq.test_ <- function(df,
 }
 
 #' Chi-Square test wrapper for Analytics View
+#' @param test_sig_level - Significance level for the t-test ifself.
+#' @param sig.level - Significance level for power analysis.
 #' @export
-exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, fun.aggregate = sum, correct = FALSE, sig.level = 0.05, w = NULL, power = NULL, beta = NULL, ...) {
+exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, fun.aggregate = sum, correct = FALSE,
+                      test_sig_level = 0.05, sig.level = 0.05, w = NULL, power = NULL, beta = NULL, ...) {
   if (!is.null(power) && !is.null(beta) && (power + beta != 1.0)) {
     stop("Specify only one of Power or Probability of Type 2 Error, or they must add up to 1.0.")
   }
@@ -304,6 +369,7 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
     model$var2_class <- var2_class
     model$var1_levels <- var1_levels
     model$var2_levels <- var2_levels
+    model$test_sig_level <- test_sig_level
     model$sig.level <- sig.level
     model$cohens_w <- cohens_w
     model$cohens_w_to_detect <- cohens_w_to_detect
@@ -320,7 +386,7 @@ tidy.chisq_exploratory <- function(x, type = "observed") {
     ret <- as.data.frame(x$observed)
     ret <- ret %>% tibble::rownames_to_column(var = x$var1)
   }
-  if (type == "residuals") {
+  else if (type == "residuals") {
     obs_df <- as.data.frame(x$observed)
     obs_df <- obs_df %>% tibble::rownames_to_column(var = x$var1)
     obs_df <- obs_df %>% tidyr::gather(!!rlang::sym(x$var2), "observed", -!!rlang::sym(x$var1))
@@ -378,6 +444,10 @@ tidy.chisq_exploratory <- function(x, type = "observed") {
     else if ("numeric" %in% x$var2_class) {
       ret[[x$var2]] <- as.numeric(ret[[x$var2]])
     }
+  }
+  else { # type == "prob_dist"
+    ret <- generate_chisq_density_data(x$statistic, x$parameter, sig_level=x$test_sig_level)
+    ret
   }
   ret
 }
@@ -444,8 +514,10 @@ glance.chisq_exploratory <- function(x) {
 #' t-test wrapper for Analytics View
 #' @export
 #' @param conf.level - Level of confidence for confidence interval. Passed to t.test as part of ...
+#' @param test_sig_level - Significance level for the t-test ifself.
 #' @param sig.level - Significance level for power analysis.
-exp_ttest <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, d = NULL, common_sd = NULL, diff_to_detect = NULL, power = NULL, beta = NULL,
+exp_ttest <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
+                      sig.level = 0.05, d = NULL, common_sd = NULL, diff_to_detect = NULL, power = NULL, beta = NULL,
                       outlier_filter_type = NULL, outlier_filter_threshold = NULL,
                       ...) {
   if (!is.null(power) && !is.null(beta) && (power + beta != 1.0)) {
@@ -532,6 +604,7 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, d = NULL, 
       model$var1 <- var1_col
       model$var2 <- var2_col
       model$data <- df
+      model$test_sig_level <- test_sig_level
       model$sig.level <- sig.level
       model$cohens_d <- cohens_d # model$d seems to be already used for something.
       model$cohens_d_to_detect <- cohens_d_to_detect
@@ -592,7 +665,7 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
 
       ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
         dplyr::mutate(d=!!(x$cohens_d), power=!!power_val, beta=1.0-!!power_val) %>%
-        dplyr::rename(`t Ratio`=statistic,
+        dplyr::rename(`t Value`=statistic,
                       `P Value`=p.value,
                       `Degree of Freedom`=parameter,
                       Difference=estimate,
@@ -615,7 +688,7 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
       ret <- ret %>% dplyr::select(statistic, p.value, parameter, estimate, conf.high, conf.low) %>%
         dplyr::mutate(d=!!(x$cohens_d), power=!!(x$power), beta=1.0-!!(x$power)) %>%
         dplyr::mutate(current_sample_size=min(!!n1,!!n2), required_sample_size=required_sample_size) %>%
-        dplyr::rename(`t Ratio`=statistic,
+        dplyr::rename(`t Value`=statistic,
                       `P Value`=p.value,
                       `Degree of Freedom`=parameter,
                       Difference=estimate,
@@ -657,6 +730,10 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
                     `Std Deviation`,
                     `Minimum`,
                     `Maximum`)
+  }
+  else if (type == "prob_dist") {
+    ret <- generate_ttest_density_data(x$statistic, x$parameter, sig_level=x$test_sig_level, alternative=x$alternative)
+    ret
   }
   else { # type == "data"
     ret <- x$data
@@ -800,7 +877,10 @@ tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
 
 #' ANOVA wrapper for Analytics View
 #' @export
-exp_anova <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, f = NULL, power = NULL, beta = NULL,
+#' @param test_sig_level - Significance level for the t-test ifself.
+#' @param sig.level - Significance level for power analysis.
+exp_anova <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
+                      sig.level = 0.05, f = NULL, power = NULL, beta = NULL,
                       outlier_filter_type = NULL, outlier_filter_threshold = NULL,
                       ...) {
   if (!is.null(power) && !is.null(beta) && (power + beta != 1.0)) {
@@ -862,6 +942,7 @@ exp_anova <- function(df, var1, var2, func2 = NULL, sig.level = 0.05, f = NULL, 
       model$var1 <- var1_col
       model$var2 <- var2_col
       model$data <- df
+      model$test_sig_level <- test_sig_level
       model$sig.level <- sig.level
       model$power <- power
       model
@@ -893,10 +974,10 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
   if (type == "model") {
     note <- NULL
     ret <- broom:::tidy.aov(x)
-    # Term value from tidy.aov() can be garbled on Windows with multibyte column name. Overwrite with not-garled value.
-    if (!is.null(ret$term) && length(ret$term) > 0 && !is.null(x$xlevels) && length(x$xlevels) > 0) {
-      ret$term[[1]] <- names(x$xlevels)[[1]]
-    }
+    ret1 <- ret %>% dplyr::slice(1:1)
+    ret2 <- ret %>% dplyr::slice(2:2)
+    ret <- ret1 %>% mutate(resid.df=!!ret2$df, resid.sumsq=!!ret2$sumsq, resid.meansq=!!ret2$meansq)
+
     # Get number of groups (k) , and the minimum sample size amoung those groups (min_n_rows).
     data_summary <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
       dplyr::summarize(n_rows=length(!!rlang::sym(x$var1))) %>%
@@ -915,14 +996,16 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
         note <<- e$message
         power_val <<- NA_real_
       })
-      ret <- ret %>% dplyr::select(term, statistic, p.value, df, sumsq, meansq) %>%
-        dplyr::mutate(f=c(!!(x$cohens_f), NA_real_), power=c(!!power_val, NA_real_), beta=c(1.0-!!power_val, NA_real_)) %>%
-        dplyr::rename(Term=term,
-                      `F Ratio`=statistic,
+      ret <- ret %>% dplyr::select(statistic, p.value, df, resid.df, sumsq, resid.sumsq, meansq, resid.meansq) %>%
+        dplyr::mutate(f=c(!!(x$cohens_f)), power=c(!!power_val), beta=c(1.0-!!power_val)) %>%
+        dplyr::rename(`F Value`=statistic,
                       `P Value`=p.value,
                       `Degree of Freedom`=df,
+                      `Residual DF`=resid.df,
                       `Sum of Squares`=sumsq,
+                      `Residual Sum of Squares`=resid.sumsq,
                       `Mean Square`=meansq,
+                      `Residual Mean Square`=resid.meansq,
                       `Effect Size (Cohen's f)`=f,
                       `Power`=power,
                       `Probability of Type 2 Error`=beta)
@@ -936,15 +1019,17 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
         note <<- e$message
         required_sample_size <<- NA_real_
       })
-      ret <- ret %>% dplyr::select(term, statistic, p.value, df, sumsq, meansq) %>%
-        dplyr::mutate(f=c(!!(x$cohens_f), NA_real_), power=c(!!(x$power), NA_real_), beta=c(1.0-!!(x$power), NA_real_)) %>%
-        dplyr::mutate(current_sample_size=!!min_n_rows, required_sample_size=c(!!required_sample_size, NA_real_)) %>%
-        dplyr::rename(Term=term,
-                      `F Ratio`=statistic,
+      ret <- ret %>% dplyr::select(statistic, p.value, df, resid.df, sumsq, resid.sumsq, meansq, resid.meansq) %>%
+        dplyr::mutate(f=c(!!(x$cohens_f)), power=c(!!(x$power)), beta=c(1.0-!!(x$power))) %>%
+        dplyr::mutate(current_sample_size=!!min_n_rows, required_sample_size=c(!!required_sample_size)) %>%
+        dplyr::rename(`F Value`=statistic,
                       `P Value`=p.value,
                       `Degree of Freedom`=df,
+                      `Residual DF`=resid.df,
                       `Sum of Squares`=sumsq,
+                      `Residual Sum of Squares`=resid.sumsq,
                       `Mean Square`=meansq,
+                      `Residual Mean Square`=resid.meansq,
                       `Effect Size (Cohen's f)`=f,
                       `Target Power`=power,
                       `Target Probability of Type 2 Error`=beta,
@@ -978,6 +1063,11 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
                     `Std Deviation`,
                     `Minimum`,
                     `Maximum`)
+  }
+  else if (type == "prob_dist") {
+    ret0 <- broom:::tidy.aov(x)
+    ret <- generate_ftest_density_data(ret0$statistic[[1]], df1=ret0$df[[1]], df2=ret0$df[[2]], sig_level=x$test_sig_level)
+    ret
   }
   else { # type == "data"
     ret <- x$data

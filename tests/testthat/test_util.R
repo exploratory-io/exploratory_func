@@ -664,15 +664,15 @@ test_that("test pivot with group_by and dirty colum names", {
   expect_equal("group", grouped_by(grouped_pivoted))
 })
 
-test_that("test same_type for factor", {
+test_that("test to_same_type for factor", {
   original <- factor(c("bb", "bb", "aa"), levels = c("bb", "aa"))
 
   to_replace <- c("aa", "aa", "bb")
-  ret <- exploratory:::same_type(to_replace, original)
+  ret <- exploratory:::to_same_type(to_replace, original)
   expect_equal(ret, factor(c("aa", "aa", "bb"), levels = c("bb", "aa")))
 
   to_replace <- factor(c("aa", "aa", "bb"), levels = c("aa", "bb"))
-  ret <- exploratory:::same_type(to_replace, original)
+  ret <- exploratory:::to_same_type(to_replace, original)
   expect_equal(ret, factor(c("aa", "aa", "bb"), levels = c("bb", "aa")))
 })
 
@@ -971,4 +971,10 @@ test_that("calc_confint_ratio", {
   # prop_confint_radius is the base implementation.
   v <- 1:100 %% 3 ==0
   expect_equal(exploratory::prop_confint_radius(v), exploratory::calc_confint_ratio(sum(v)/length(v), length(v)))
+})
+
+test_that("mutate_predictors", {
+  df <- tibble::tibble(x=1, t=as.Date("2020-01-01"), y=4, z=8)
+  res <- df %>% exploratory:::mutate_predictors(c("x", "t", "y", "z"), list(x="log", list(t_mon="mon", t_wday="wday", t_week_of_quarter="week_of_quarter"), y="log2", z=function(x){log(x, base=2)}))
+  expect_true(all(c("x", "t_mon", "t_wday", "t_week_of_quarter", "y", "z") %in% colnames(res)))
 })
