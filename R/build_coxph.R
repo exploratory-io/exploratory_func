@@ -465,6 +465,7 @@ build_coxph.fast <- function(df,
       rhs <- paste0("`", c_cols, "`", collapse = " + ")
       fml <- as.formula(paste0("survival::Surv(`", clean_time_col, "`, `", clean_status_col, "`) ~ ", rhs))
       model <- survival::coxph(fml, data = df)
+
       # these attributes are used in tidy of randomForest TODO: is this good for lm too?
       model$terms_mapping <- names(name_map)
       names(model$terms_mapping) <- name_map
@@ -532,6 +533,10 @@ build_coxph.fast <- function(df,
         model$orig_predictor_cols <- orig_selected_cols
         model$predictor_funs <- predictor_funs
       }
+
+      # To avoid consuming a lot of disk space for rds file, strip environment.
+      attr(model$formula,".Environment") <- NULL
+      attr(model$terms,".Environment") <- NULL
 
       # add special lm_coxph class for adding extra info at glance().
       class(model) <- c("coxph_exploratory", class(model))
