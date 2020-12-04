@@ -2351,6 +2351,8 @@ calc_feature_imp <- function(df,
       names(model$terms_mapping) <- name_map
       model$y <- model.response(model_df)
       model$df <- model_df
+      # To avoid saving a huge environment when caching with RDS.
+      attr(attr(model$df, "terms"), ".Environment") <- NULL
       model$formula_terms <- terms(fml)
       # To avoid saving a huge environment when caching with RDS.
       attr(model$formula_terms,".Environment") <- NULL
