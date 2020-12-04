@@ -2351,7 +2351,11 @@ calc_feature_imp <- function(df,
       names(model$terms_mapping) <- name_map
       model$y <- model.response(model_df)
       model$df <- model_df
+      # To avoid saving a huge environment when caching with RDS.
+      attr(attr(model$df, "terms"), ".Environment") <- NULL
       model$formula_terms <- terms(fml)
+      # To avoid saving a huge environment when caching with RDS.
+      attr(model$formula_terms,".Environment") <- NULL
       model$sampled_nrow <- clean_df_ret$sampled_nrow
 
       model$orig_target_col <- target_col # Used for relocating columns as well as for applying function.
@@ -3039,6 +3043,8 @@ exp_rpart <- function(df,
       model$terms_mapping <- names(name_map)
       names(model$terms_mapping) <- name_map
       model$formula_terms <- terms(fml)
+      # To avoid saving a huge environment when caching with RDS.
+      attr(model$formula_terms,".Environment") <- NULL
       model$sampled_nrow <- clean_df_ret$sampled_nrow
 
       # Find list of important variables and run partial dependence on them.
@@ -3092,6 +3098,10 @@ exp_rpart <- function(df,
       if (!is.null(predictor_funs)) {
         model$orig_predictor_cols <- orig_selected_cols
         model$predictor_funs <- predictor_funs
+      }
+
+      if (!is.null(model$terms)) {
+        attr(model$terms,".Environment") <- NULL
       }
 
       list(model = model, test_index = test_index, source_data = source_data)

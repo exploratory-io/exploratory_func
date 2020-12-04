@@ -929,7 +929,7 @@ build_lm.fast <- function(df,
           model$permutation_importance <- error
         }
       }
-      else {
+      else { # model_type == "lm"
         # split training and test data
         source_data <- df
         test_index <- sample_df_index(source_data, rate = test_rate, ordered = (test_split_type == "ordered"))
@@ -978,6 +978,17 @@ build_lm.fast <- function(df,
           error <- simpleError("Variable importance requires two or more variables.")
           model$permutation_importance <- error
         }
+      }
+
+      # Strip environments to save rds size when cached.
+      if (!is.null(model$terms)) {
+        attr(model$terms,".Environment")<-NULL
+      }
+      if (!is.null(model$formula)) {
+        attr(model$formula,".Environment")<-NULL
+      }
+      if (!is.null(model$model) && !is.null(attr(model$model,"terms"))) {
+        attr(attr(model$model,"terms"),".Environment") <- NULL
       }
 
       tryCatch({
@@ -1184,6 +1195,7 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
   # calculate model p-value since glm does not provide it as is.
   # https://stats.stackexchange.com/questions/129958/glm-in-r-which-pvalue-represents-the-goodness-of-fit-of-entire-model
   f0 <- x$formula # copy formula as a basis for null model.
+  attr(f0,".Environment")<-environment() # Since we removed .Environment attribute for size reduction, add it back so that the following process works.
   lazyeval::f_rhs(f0) <- 1 # create null model formula.
   x0 <- glm(f0, x$model, family = x$family) # build null model. Use x$model rather than x$data since x$model seems to be the data after glm handled missingness.
   pvalue <- with(anova(x0,x),pchisq(Deviance,Df,lower.tail=FALSE)[2]) 
