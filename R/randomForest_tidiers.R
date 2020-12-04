@@ -3100,6 +3100,10 @@ exp_rpart <- function(df,
         model$predictor_funs <- predictor_funs
       }
 
+      if (!is.null(model$terms)) {
+        attr(model$terms,".Environment") <- NULL
+      }
+
       list(model = model, test_index = test_index, source_data = source_data)
     }, error = function(e){
       if(length(grouped_cols) > 0) {
