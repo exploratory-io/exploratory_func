@@ -36,6 +36,13 @@ setConnectionPoolMode <- function(val) {
         }, error = function(e) {
         })
         rm(list = key, envir = connection_pool)
+      } else if (startsWith(key, "dbiodbc")) {
+        tryCatch({ # try to close connection and ignore error
+          conn <- connection_pool[[key]]
+          DBI::dbDisconnect(conn)
+        }, warning = function(w) {
+        }, error = function(e) {
+        })
       }
     })
   }
@@ -245,7 +252,7 @@ js_glue_transformer <- function(expr, envir) {
 
   # Parse arguments part. e.g. 'quote=FALSE, escape=FALSE'
   if (length(tokens) > 1) {
-    args <- tokens[2:length(tokens)] # Index 1 that is eliminated is the name of the variable. 
+    args <- tokens[2:length(tokens)] # Index 1 that is eliminated is the name of the variable.
     args <- stringr::str_split(args, '=')
     args <- purrr::map(args, trimws)
     names <- purrr::map(args, function(x){x[1]})
@@ -886,6 +893,81 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         connection_pool[[key]] <- conn
       }
     }
+  } else if (type == "dbiodbc") {
+    # do those package loading only when we need to use odbc in this if statement,
+    # so that we will not have error at our server environment where odbc is not there.
+    if(!requireNamespace("odbc")){stop("package odbc must be installed.")}
+
+    loadNamespace("odbc")
+    hoststr = ""
+    if(!is.null(host)) {
+      hoststr = host;
+    }
+    key <- paste(type, dsn, hoststr, username, additionalParams, driver, sep = ":")
+    conn <- connection_pool[[key]]
+    conn <- NULL
+    if (!is.null(conn)){
+      tryCatch({
+        # test connection
+        result <- DBI::dbGetQuery(conn,"select 1")
+        if (!is.data.frame(result)) { # it can fail by returning NULL rather than throwing error.
+          tryCatch({ # try to close connection and ignore error
+            DBI::dbDisconnect(conn)
+          }, warning = function(w) {
+          }, error = function(e) {
+          })
+          conn <- NULL
+          # fall through to getting new connection.
+        } else if (!DBI::dbIsValid(conn)) {
+          tryCatch({ # try to close connection and ignore error
+            DBI::dbDisconnect(conn)
+          }, warning = function(w) {
+          }, error = function(e) {
+          })
+          conn <- NULL
+        }
+      }, error = function(err) {
+        tryCatch({ # try to close connection and ignore error
+          DBI::dbDisconnect(conn)
+        }, warning = function(w) {
+        }, error = function(e) {
+        })
+        conn <- NULL
+        # fall through to getting new connection.
+      })
+    }
+    connect <- function() {
+      if(dsn != ""){ #
+        connstr <- stringr::str_c("DBI::dbConnect(odbc::odbc(), dsn = '", dsn , "'")
+        if(username != ""){
+          connstr <- stringr::str_c(connstr, ", uid = '", username, "'")
+        }
+        if(password != ""){
+          connstr <- stringr::str_c(connstr, ", pwd = '", password, "'")
+        }
+        if(additionalParams == ""){
+          connstr <- stringr::str_c(connstr, ")")
+        } else {
+          connstr <- stringr::str_c(connstr, ",", additionalParams, ")")
+        }
+        conn <- eval(parse(text=connstr))
+      } else if (host != "") {
+        # TODO: Implement direct connect
+      }
+      if (is.null(conn)) {
+        # capture warning and throw error with the message.
+        # odbcConnect() returns -1 and does not stop execution even if connection fails.
+        # TODO capture.output() might cause error on windows with multibyte chars.
+        stop(paste("ODBC connection failed.", capture.output(warnings())))
+      }
+      conn
+    }
+    if (is.null(conn)) {
+      conn <- connect()
+      if (user_env$pool_connection) { # pool connection if connection pooling is on.
+        connection_pool[[key]] <- conn
+      }
+    }
   } else if (type == "mssqlserver") {# The type sqlserver is already used for RODBC based one and "mssqlserver" is passed from Exploratory Desktop.
 
     # If the platform is Linux, set the below predefined driver installed on Collaboration Server
@@ -946,7 +1028,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
 #' @export
 clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, username, catalog = "", schema = "", dsn="", additionalParams = "",
                               collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, connectionString = NULL) {
-  if (type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora")) { #TODO: implement for other types too
+  if (type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora", "dbiodbc")) { #TODO: implement for other types too
     if (type %in% c("mongodb")) {
       if(!is.na(connectionString) && connectionString != '') {
         # make sure to include collection as a key since connection varies per collection.
@@ -997,12 +1079,19 @@ clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, user
         })
       }
     }
-    else { # odbc
+    else if(type %in% c("odbc","dbiodbc")) { # odbc
       key <- paste("odbc", dsn, username, additionalParams, sep = ":")
+      if(type == "dbiodbc") {
+        key <- paste("dbiodbc", dsn, username, additionalParams, sep = ":")
+      }
       conn <- connection_pool[[key]]
       if (!is.null(conn)) {
         tryCatch({ # try to close connection and ignore error
-          RODBC::odbcClose(conn)
+          if(type == "dbiodbc") {
+            DBI::dbDisconnect(conn)
+          } else {
+            RODBC::odbcClose(conn)
+          }
         }, warning = function(w) {
         }, error = function(e) {
         })
@@ -1013,7 +1102,7 @@ clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, user
 }
 
 isConnecitonPoolEnabbled <- function(type){
-  type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora", "presto", "treasuredata", "mssqlserver")
+  type %in% c("dbiodbc", "odbc", "postgres", "redshift", "vertica", "mysql", "aurora", "presto", "treasuredata", "mssqlserver")
 }
 
 #' @export
@@ -1240,11 +1329,11 @@ queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows
     query <- glue_exploratory(query, .transformer=sql_glue_transformer, .envir = parent.frame())
     # now odbc package is used for MS SQL Server Data Source so use DBI APIs.
     # The type sqlserver is already used for RODBC based one so "mssqlserver" is passed from Exploratory Desktop.
-    if(type == "mssqlserver") {
+    if(type == "mssqlserver" || type == "dbiodbc") {
       if(!requireNamespace("odbc")){stop("package odbc must be installed.")}
       resultSet <- DBI::dbSendQuery(conn, query)
       df <- DBI::dbFetch(resultSet, n = numOfRows)
-    } else { # For RODBC based ODBC Data Soruces, use RODBC API.
+    } else if(type == "odbc") { # For RODBC based ODBC Data Soruces, use RODBC API.
       if(!requireNamespace("RODBC")){stop("package RODBC must be installed.")}
       df <- RODBC::sqlQuery(conn, query, as.is = as.is, max = numOfRows, stringsAsFactors=stringsAsFactors)
     }
@@ -1258,7 +1347,11 @@ queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows
     if (!user_env$pool_connection) {
       # close connection if not pooling.
       tryCatch({ # try to close connection and ignore error
-        RODBC::odbcClose(conn)
+        if(type == "odbc") {
+          RODBC::odbcClose(conn)
+        } else {
+          DBI::dbDisconnect(conn)
+        }
       }, warning = function(w) {
       }, error = function(e) {
       })
@@ -1273,7 +1366,7 @@ queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows
   # and it gets result set with DBI package.
   # So make sure to clear the result set.
   # For RDOBC based case, it does not use result set.
-  if(type == "mssqlserver") {
+  if(type == "mssqlserver" || type == "dbiodbc") {
     DBI::dbClearResult(resultSet)
   }
   df
@@ -1900,77 +1993,77 @@ statecode <- function(input = input, output_type = output_type) {
   return (as.character(state_name_id_map[[output_type]][match(input_normalized, state_name_id_map$normalized_name)]))
 }
 
-#' It can add 'longitude' and 'latitude' columns to a data frame which has 
-#' a column with US state 2-letter codes. 
-#' 
+#' It can add 'longitude' and 'latitude' columns to a data frame which has
+#' a column with US state 2-letter codes.
+#'
 #' Example:
 #' > exploratory::geocode_us_state(data.frame(state=c("CA", "NY")), "state")
 #' state  longitude latitude
 #' 1    CA -119.41793 36.77826
-#' 2    NY  -74.21793 43.29943 
-#' 
+#' 2    NY  -74.21793 43.29943
+#'
 geocode_us_state <- function(df, statecode_colname) {
-  mapping <- "state" 
+  mapping <- "state"
   names(mapping) <- statecode_colname
-  df %>% left_join(us_state_coordinates, by=mapping)  
+  df %>% left_join(us_state_coordinates, by=mapping)
 }
 
-#' It can add 'longitude' and 'latitude' columns to a data frame which has 
-#' a column with US state and county FIPS codes. 
-#' 
+#' It can add 'longitude' and 'latitude' columns to a data frame which has
+#' a column with US state and county FIPS codes.
+#'
 #' Example:
 #' > exploratory::geocode_us_county(data.frame(code=c("01003", "13005")), "code")
 #'    code longitude latitude
 #' 1 01003 -87.74607 30.65922
 #' 2 13005 -82.38786 31.56333
 geocode_us_county <- function(df, fipscode_colname) {
-  mapping <- "fips" 
+  mapping <- "fips"
   names(mapping) <- fipscode_colname
-  df %>% left_join(us_county_coordinates, by=mapping)  
+  df %>% left_join(us_county_coordinates, by=mapping)
 }
 
-#' It can add 'longitude' and 'latitude' columns to a data frame which has 
-#' a column with ISO 2-letter country codes. 
-#' 
+#' It can add 'longitude' and 'latitude' columns to a data frame which has
+#' a column with ISO 2-letter country codes.
+#'
 #' Example:
 #' > exploratory::geocode_world_country(data.frame(code=c("JP", "GB")), "code")
 #'   code  longitude latitude
 #' 1   JP 138.252924 36.20482
 #' 2   GB  -3.435973 55.37805
-#' 
+#'
 geocode_world_country <- function(df, countrycode_colname) {
-  mapping <- "iso2c" 
+  mapping <- "iso2c"
   names(mapping) <- countrycode_colname
-  df %>% left_join(world_country_coordinates, by=mapping)  
+  df %>% left_join(world_country_coordinates, by=mapping)
 }
 
-#' It can add 'longitude' and 'latitude' columns to a data frame which has 
+#' It can add 'longitude' and 'latitude' columns to a data frame which has
 #' a column with Japan prefecture names.
-#' 
+#'
 #' Example:
-#' 
+#'
 #' > exploratory::geocode_japan_prefecture(data.frame(name=c("東京","北海道")), "name")
 #'     name longitude latitude
 #' 1   東京  139.6917 35.68949
-#' 2 北海道  141.3468 43.06461 
-#' 
+#' 2 北海道  141.3468 43.06461
+#'
 geocode_japan_prefecture <- function(df, prefecture_colname) {
-  mapping <- "name" 
+  mapping <- "name"
   names(mapping) <- prefecture_colname
-  df %>% left_join(jp_prefecture_coordinates, by=mapping) 
+  df %>% left_join(jp_prefecture_coordinates, by=mapping)
 }
 
-#' Converts Japan prefecture names into various formats. 
-#' Currently, it can converts names into the short name format, 
-#' which has a name without the suffix such as "-to", "-ken". 
-#' 
+#' Converts Japan prefecture names into various formats.
+#' Currently, it can converts names into the short name format,
+#' which has a name without the suffix such as "-to", "-ken".
+#'
 #' Example:
 #' > prefecturecode(c("東京都", "京都", "Kanagawa-ken", "Iwate", "あいち", "Kōchi", "gunma"), output_type="name")
 #' [1] "東京"   "京都"   "神奈川" "岩手"   "愛知"   "高知"    "群馬"
 
 prefecturecode <- function(prefecture, output_type="name") {
   loadNamespace("stringr")
-  # TODO: support other output types. 
+  # TODO: support other output types.
   # Clean up the input.
   pref_normalized <- stringr::str_trim(tolower(prefecture))
   # Remove trailing "tofuken". Do not remove "do" from "Hokkaido" and "to" from "Kyoto" (in Japanese).
@@ -2371,10 +2464,10 @@ read_rds_file <- function(file, refhook = NULL){
 #' @export
 read_parquet_file <- function(file){
   loadNamespace("arrow")
-  
+
   is.win <- Sys.info()['sysname'] == 'Windows'
   tf <- NULL
-  
+
   # Backup the locale info and set English locale for reading parquet issue
   # on Windows https://issues.apache.org/jira/browse/ARROW-7288
   if (is.win) {
@@ -2382,21 +2475,21 @@ read_parquet_file <- function(file){
     lc.all<- Sys.getlocale("LC_ALL")
     lc.collate<- Sys.getlocale("LC_COLLATE")
     lc.ctype<- Sys.getlocale("LC_CTYPE")
-    lc.monetary<- Sys.getlocale("LC_MONETARY") 
+    lc.monetary<- Sys.getlocale("LC_MONETARY")
     lc.numeric<- Sys.getlocale("LC_NUMERIC")
-    # Set English. 
+    # Set English.
     Sys.setlocale("LC_ALL", "English")
   }
-  
+
   # Catch errors to guarantee restoring the locale info later.
   tryCatch({
-    
+
     if (stringr::str_detect(file, "^https://") ||
         stringr::str_detect(file, "^http://") ||
         stringr::str_detect(file, "^ftp://")) {
-      
+
       # Download the remote parquet file to the local temp file.
-      tf <- tempfile()  
+      tf <- tempfile()
       # Remove on exit.
       on.exit(unlink(tf))
       # mode="wb" for binary download
@@ -2408,7 +2501,7 @@ read_parquet_file <- function(file){
       res <- arrow::read_parquet(file)
     }
   }, error=function(e){
-        
+
   })
 
   # Restore the original locale info.
@@ -2416,7 +2509,7 @@ read_parquet_file <- function(file){
     Sys.setlocale("LC_ALL", lc.all)
     Sys.setlocale("LC_COLLATE", lc.collate)
     Sys.setlocale("LC_CTYPE", lc.ctype)
-    Sys.setlocale("LC_MONETARY", lc.monetary) 
+    Sys.setlocale("LC_MONETARY", lc.monetary)
     Sys.setlocale("LC_NUMERIC", lc.numeric)
   }
   res
