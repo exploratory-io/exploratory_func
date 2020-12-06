@@ -536,10 +536,7 @@ build_coxph.fast <- function(df,
 
       # To avoid consuming a lot of disk space for rds file, strip environment.
       attr(model$formula,".Environment") <- NULL
-      # For environment of terms, since df in it is used by survival::basehaz and survival::survfit called inside of it, it has to be kept.
-      terms_env <- new.env()
-      terms_env$df <- df
-      attr(model$terms,".Environment") <- terms_env
+      attr(model$terms,".Environment") <- NULL 
 
       # add special lm_coxph class for adding extra info at glance().
       class(model) <- c("coxph_exploratory", class(model))
@@ -800,6 +797,12 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
     ret <- data.frame(Note = x$message)
     return(ret)
   }
+  # basehaz returns base cumulative hazard.
+  # Since df in the environment of x$terms is used by survival::basehaz and survival::survfit called inside of it, it has to be set again before basehaz() is called. 
+  terms_env <- new.env()
+  terms_env$df <- x$training_data
+  attr(x$terms,".Environment") <- terms_env
+
   if(!is.null(newdata)) {
     # Replay the mutations on predictors.
     if(!is.null(x$predictor_funs)) {
@@ -847,7 +850,6 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
     pred_survival_time <- x$pred_survival_time
   }
 
-  # basehaz returns base cumulative hazard.
   bh <- survival::basehaz(x)
   # create a function to interpolate function that returns cumulative hazard.
   bh_fun <- approxfun(bh$time, bh$hazard)
