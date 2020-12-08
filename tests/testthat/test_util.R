@@ -973,6 +973,11 @@ test_that("calc_confint_ratio", {
   expect_equal(exploratory::prop_confint_radius(v), exploratory::calc_confint_ratio(sum(v)/length(v), length(v)))
 })
 
+test_that("map_platform_locale", {
+  ret <- exploratory:::map_platform_locale("Afrikaans_South Africa", from="windows", to="unix")
+  expect_equal(ret, "af_ZA")
+})
+
 test_that("mutate_predictors", {
   df <- tibble::tibble(x=1, t=as.Date("2020-01-01"), y=4, z=8, w=8)
   res <- df %>% exploratory:::mutate_predictors(c("x", "t", "y", "z", "w"), list(x="log", list(t_mon="mon", t_wday="wday", t_week_of_quarter="week_of_quarter"), y="log2", z=function(x){log(x, base=2)}, w=rlang::expr(log(., base=2))))

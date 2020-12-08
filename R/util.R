@@ -2247,6 +2247,18 @@ summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...){
   ret
 }
 
+map_platform_locale <- function(locale, from, to) {
+  if (from == "windows" && to == "unix") {
+    ret <- platform_locale_mapping$locale[platform_locale_mapping$locale_windows==locale & !is.na(platform_locale_mapping$locale_windows)]
+  }
+  else if (from == "unix" && to == "windows") {
+    ret <- platform_locale_mapping$locale_windows[platform_locale_mapping$locale==locale & !is.na(platform_locale_mapping$locale)]
+  }
+  else { # Handle same platform. No conversion is necessary.
+    ret <- locale
+  }
+  ret
+}
 
 # Mutate predictor columns for preprocessing before feeding to a model. Functions are expressed by tokens we use in our JSON metadata.
 # e.g. mutate_predictors(df, cols = c("col1","col2"), funs=list("col1"="log", list("col2_day"="day", "col2_mon"="month")))
@@ -2255,34 +2267,35 @@ mutate_predictors <- function(df, cols, funs) {
   orig_lubridate.week.start <- getOption("lubridate.week.start")
   model_LC_TIME <- attr(funs, "LC_TIME")
   model_lubridate.week.start <- attr(funs, "lubridate.week.start")
-  if (!is.null(model_LC_TIME)) {
-    Sys.setlocale("LC_TIME", model_LC_TIME)
-  }
-  if (!is.null(model_lubridate.week.start)) {
-    options(lubridate.week.start = model_lubridate.week.start)
-  }
+  tryCatch({
+    if (!is.null(model_LC_TIME)) {
+      Sys.setlocale("LC_TIME", model_LC_TIME)
+    }
+    if (!is.null(model_lubridate.week.start)) {
+      options(lubridate.week.start = model_lubridate.week.start)
+    }
 
-  missing_cols <- cols[cols %nin% colnames(df)]
-  if (length(missing_cols) > 0) {
-    stop(paste0("EXP-ANA-1 :: ", jsonlite::toJSON(paste0(missing_cols, collapse=", ")), " :: Columns are required for the model, but do not exist."))
-  }
-  mutate_args <- purrr::map2(funs, cols, function(func, cname) {
-    if (is.list(func)) {
-      purrr::map(func, function(func) {
+    missing_cols <- cols[cols %nin% colnames(df)]
+    if (length(missing_cols) > 0) {
+      stop(paste0("EXP-ANA-1 :: ", jsonlite::toJSON(paste0(missing_cols, collapse=", ")), " :: Columns are required for the model, but do not exist."))
+    }
+    mutate_args <- purrr::map2(funs, cols, function(func, cname) {
+      if (is.list(func)) {
+        purrr::map(func, function(func) {
+          column_mutate_quosure(func, cname)
+        })
+      }
+      else {
         column_mutate_quosure(func, cname)
-      })
-    }
-    else {
-      column_mutate_quosure(func, cname)
-    }
+      }
+    })
+    mutate_args <- unlist(mutate_args)
+    ret <- df %>% dplyr::mutate(!!!mutate_args)
+    ret
+  }, finally = {
+    Sys.setlocale("LC_TIME", orig_LC_TIME)
+    options(lubridate.week.start = orig_lubridate.week.start)
   })
-  mutate_args <- unlist(mutate_args)
-  ret <- df %>% dplyr::mutate(!!!mutate_args)
-
-  Sys.setlocale("LC_TIME", orig_LC_TIME)
-  options(lubridate.week.start = orig_lubridate.week.start)
-
-  ret
 }
 
 #' calc_feature_imp (Random Forest) or exp_rpart (Decision Tree) converts logical columns into factor
