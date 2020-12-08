@@ -2248,7 +2248,7 @@ summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...){
 }
 
 map_platform_locale <- function(locale, from, to) {
-  locale_lang <- str_split(locale, "\\.")[[1]][[1]] # Extract lang part of the locale. e.g. en_US from en_US.UTF-8, English_United States from English_United States.1252
+  locale_lang <- stringr::str_split(locale, "\\.")[[1]][[1]] # Extract lang part of the locale. e.g. en_US from en_US.UTF-8, English_United States from English_United States.1252
   if (from == "windows" && to == "unix") {
     ret <- platform_locale_mapping$locale[platform_locale_mapping$locale_windows==locale_lang & !is.na(platform_locale_mapping$locale_windows)]
     # We add .UTF-8, since Sys.setlocale() does not accept locale without encoding, unlike Mac or Windows.
@@ -2257,6 +2257,14 @@ map_platform_locale <- function(locale, from, to) {
   else if (from == "unix" && to == "windows") {
     ret <- platform_locale_mapping$locale_windows[platform_locale_mapping$locale==locale_lang & !is.na(platform_locale_mapping$locale)]
     # On Windows, we return lang without encoding since Sys.setlocale() accepts lang only, e.g. English_United States, as opposed to English_United States.1252.
+  }
+  else if (to == "unix") { # No need for locale conversion, but make sure to add .UTF-8, since Sys.setlocale() does not accept locale without encoding, unlike Mac or Windows.
+    if (length(stringr::str_split(locale, "\\.")[[1]]) == 1) { # Encoding is not included in the locale string. Add one so that it is accepted on linux.
+      ret <- paste0(locale, '.UTF-8')
+    }
+    else {
+      ret <- locale
+    }
   }
   else { # Handle same platform. No conversion is necessary.
     ret <- locale
