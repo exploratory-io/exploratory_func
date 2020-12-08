@@ -974,8 +974,14 @@ test_that("calc_confint_ratio", {
 })
 
 test_that("map_platform_locale", {
-  ret <- exploratory:::map_platform_locale("Afrikaans_South Africa", from="windows", to="unix")
-  expect_equal(ret, "af_ZA")
+  ret <- exploratory:::map_platform_locale("Japanese_Japan", from="windows", to="unix")
+  expect_equal(ret, "ja_JP")
+  ret <- exploratory:::map_platform_locale("ja_JP", from="unix", to="windows")
+  expect_equal(ret, "Japanese_Japan")
+  ret <- exploratory:::map_platform_locale("English_United States", from="windows", to="unix")
+  expect_equal(ret, "en_US")
+  ret <- exploratory:::map_platform_locale("en_US", from="unix", to="windows")
+  expect_equal(ret, "English_United States")
 })
 
 test_that("mutate_predictors", {
