@@ -2266,10 +2266,25 @@ mutate_predictors <- function(df, cols, funs) {
   orig_LC_TIME <- Sys.getlocale("LC_TIME")
   orig_lubridate.week.start <- getOption("lubridate.week.start")
   model_LC_TIME <- attr(funs, "LC_TIME")
+  model_sysname <- attr(funs, "sysname")
   model_lubridate.week.start <- attr(funs, "lubridate.week.start")
   tryCatch({
     if (!is.null(model_LC_TIME)) {
-      Sys.setlocale("LC_TIME", model_LC_TIME)
+      if (model_sysname == "Windows") {
+        model_platform <- "windows"
+      }
+      else {
+        model_platform <- "unix"
+      }
+      if (Sys.info()[["sysname"]] == "Windows") {
+        this_platform <- "windows"
+      }
+      else {
+        this_platform <- "unix"
+      }
+      model_locale_lang <- str_split(model_LC_TIME, "\\.")[[1]][[1]]
+      mapped_model_locale_lang <- map_platform_locale(model_locale_lang, from=model_platform, to=this_platform)
+      Sys.setlocale("LC_TIME", mapped_model_locale_lang)
     }
     if (!is.null(model_lubridate.week.start)) {
       options(lubridate.week.start = model_lubridate.week.start)
