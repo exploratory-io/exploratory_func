@@ -99,11 +99,11 @@ augment_rowwise_data <- function(df, model, data, ...) {
 
 #' tidy/glance/augment wrapper
 #' @export
-model_summary <- function(df, model, summary_type = "tidy", ...) {
-  if (summary_type == "glance") {
+model_summary <- function(df, model, output_type = "tidy", ...) {
+  if (output_type == "glance") {
     glance_rowwise(df, model, ...)
   }
-  else if (summary_type == "augment") {
+  else if (output_type == "augment") {
     augment_rowwise(df, model, ...)
   }
   else {
