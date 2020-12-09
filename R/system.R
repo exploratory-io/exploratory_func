@@ -951,7 +951,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
           # loc looks like "Japanese_Japan.932", so split it with dot ".".
           encoding <- stringr::str_split(loc, pattern = "\\.")
           if(length(encoding[[1]] == 2)) {
-            # like [1] "Japanese_Japan" "932" so check the second part exists or not.
+            # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
             connstr <- stringr::str_c(connstr, ", encoding = '", encoding[[1]][[2]], "'")
           }
         }
