@@ -2364,6 +2364,9 @@ calc_feature_imp <- function(df,
       }
       if (!is.null(predictor_funs)) {
         model$orig_predictor_cols <- orig_selected_cols
+        attr(predictor_funs, "LC_TIME") <- Sys.getlocale("LC_TIME")
+        attr(predictor_funs, "sysname") <- Sys.info()[["sysname"]] # Save platform name (e.g. Windows) since locale name might need conversion for the platform this model will be run on.
+        attr(predictor_funs, "lubridate.week.start") <- getOption("lubridate.week.start")
         model$predictor_funs <- predictor_funs
       }
 
@@ -3097,6 +3100,9 @@ exp_rpart <- function(df,
       }
       if (!is.null(predictor_funs)) {
         model$orig_predictor_cols <- orig_selected_cols
+        attr(predictor_funs, "LC_TIME") <- Sys.getlocale("LC_TIME")
+        attr(predictor_funs, "sysname") <- Sys.info()[["sysname"]] # Save platform name (e.g. Windows) since locale name might need conversion for the platform this model will be run on.
+        attr(predictor_funs, "lubridate.week.start") <- getOption("lubridate.week.start")
         model$predictor_funs <- predictor_funs
       }
 

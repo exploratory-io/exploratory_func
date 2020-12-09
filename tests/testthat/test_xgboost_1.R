@@ -67,6 +67,38 @@ test_that("exp_xgboost(regression) evaluate training and test", {
   expect_equal(nrow(ret), 1) # 1 for train
 })
 
+test_that("exp_xgboost - regression - evaluate training and test with locale conversion", {
+  set.seed(1) # For stability of result.
+  orig_locale <- Sys.getlocale("LC_TIME")
+  tryCatch({
+    if (Sys.info()[["sysname"]] == "Windows") {
+      Sys.setlocale("LC_TIME", "Japanese_Japan.932")
+    }
+    else {
+      Sys.setlocale("LC_TIME", "ja_JP.UTF-8")
+    }
+    model_df <- flight %>%
+                  exp_xgboost(`ARR DELAY`, `CAR RIER`, `ORI GIN`, `DEP DELAY`, `AIR TIME`, `FL DATE`,
+                              predictor_funs=list(`CAR RIER`="none", `ORI GIN`="none", `DEP DELAY`="none", `AIR TIME`="none", list(`FL DATE_y`="year", `FL DATE_m`="monname", `FL DATE_dom`="day", `FL DATE_dow`="wday")),
+                                   test_rate = 0.3,
+                                   test_split_type = "ordered", pd_with_bin_means = TRUE, # testing ordered split too.
+                                   watchlist_rate = 0.1)
+
+    if (Sys.info()[["sysname"]] == "Windows") {
+      Sys.setlocale("LC_TIME", "English_United States.1252")
+    }
+    else {
+      Sys.setlocale("LC_TIME", "en_US.UTF-8")
+    }
+
+    ret <- flight %>% select(-`ARR DELAY`) %>% add_prediction(model_df=model_df)
+    expect_equal(nrow(ret), 5000)
+  },
+  finally= {
+    Sys.setlocale("LC_TIME", orig_locale)
+  })
+})
+
 test_that("exp_xgboost evaluate training and test - binary", {
   set.seed(1) # For stability of result.
   # `is delayed` is not logical for some reason.
