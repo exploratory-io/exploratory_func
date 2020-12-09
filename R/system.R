@@ -948,8 +948,12 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         # For Windows, set encoding to make sure non-ascii data is handled properly.
         if(is.win <- Sys.info()['sysname'] == 'Windows'){
           loc <- Sys.getlocale(category = "LC_CTYPE")
-          encoding <- stringr::str_split(loc, pattern = "\\.")[[1]][[2]]
-          connstr <- stringr::str_c(connstr, ", encoding = '", encoding, "'")
+          # loc looks like "Japanese_Japan.932", so split it with dot ".".
+          encoding <- stringr::str_split(loc, pattern = "\\.")
+          if(length(encoding[[1]] == 2)) {
+            # like [1] "Japanese_Japan" "932" so check the second part exists or not.
+            connstr <- stringr::str_c(connstr, ", encoding = '", encoding[[1]][[2]], "'")
+          }
         }
         if(additionalParams == ""){
           connstr <- stringr::str_c(connstr, ")")
