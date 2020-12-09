@@ -945,6 +945,12 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         if(password != ""){
           connstr <- stringr::str_c(connstr, ", pwd = '", password, "'")
         }
+        # For Windows, set encoding to make sure non-ascii data is handled properly.
+        if(is.win <- Sys.info()['sysname'] == 'Windows'){
+          loc <- Sys.getlocale(category = "LC_CTYPE")
+          encoding <- stringr::str_split(loc, pattern = "\\.")[[1]][[2]]
+          connstr <- stringr::str_c(connstr, ", encoding = '", encoding, "'")
+        }
         if(additionalParams == ""){
           connstr <- stringr::str_c(connstr, ")")
         } else {
