@@ -97,6 +97,20 @@ augment_rowwise_data <- function(df, model, data, ...) {
   ret
 }
 
+#' tidy/glance/augment wrapper
+#' @export
+model_summary <- function(df, model, summary_type = "tidy", ...) {
+  if (summary_type == "glance") {
+    glance_rowwise(df, model, ...)
+  }
+  else if (summary_type == "augment") {
+    augment_rowwise(df, model, ...)
+  }
+  else {
+    tidy_rowwise(df, model, ...)
+  }
+}
+
 #' glance for lm
 #' @export
 glance_lm <- glance_rowwise
