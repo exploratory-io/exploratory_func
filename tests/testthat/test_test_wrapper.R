@@ -200,6 +200,11 @@ test_that("test exp_chisq", {
   mtcars2$cyl[[3]] <- NA
   ret <- exp_chisq(mtcars2 %>% mutate(gear=factor(gear)), gear, carb) # factor order should be kept in the model
   ret <- exp_chisq(mtcars2, gear, carb, value=cyl, fun.aggregate=sum)
+
+  # Test model_summary function.
+  observed <- ret %>% model_summary(model, summary_type="tidy", type="observed")
+  summary <- ret %>% model_summary(model, summary_type="glance")
+
   observed <- ret %>% tidy_rowwise(model, type="observed")
   summary <- ret %>% glance_rowwise(model)
   residuals <- ret %>% tidy_rowwise(model, type="residuals")
