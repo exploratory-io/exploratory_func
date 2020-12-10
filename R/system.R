@@ -945,6 +945,17 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         if(password != ""){
           connstr <- stringr::str_c(connstr, ", pwd = '", password, "'")
         }
+        # For Windows, set encoding to make sure non-ascii data is handled properly.
+        # ref: https://github.com/r-dbi/odbc/issues/153
+        if (is.win <- Sys.info()['sysname'] == 'Windows') {
+          loc <- Sys.getlocale(category = "LC_CTYPE")
+          # loc looks like "Japanese_Japan.932", so split it with dot ".".
+          encoding <- stringr::str_split(loc, pattern = "\\.")
+          if (length(encoding[[1]] == 2)) {
+            # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
+            connstr <- stringr::str_c(connstr, ", encoding = '", encoding[[1]][[2]], "'")
+          }
+        }
         if(additionalParams == ""){
           connstr <- stringr::str_c(connstr, ")")
         } else {
