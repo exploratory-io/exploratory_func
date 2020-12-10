@@ -201,9 +201,9 @@ test_that("test exp_chisq", {
   ret <- exp_chisq(mtcars2 %>% mutate(gear=factor(gear)), gear, carb) # factor order should be kept in the model
   ret <- exp_chisq(mtcars2, gear, carb, value=cyl, fun.aggregate=sum)
 
-  # Test model_summary function.
-  observed <- ret %>% model_summary(model, summary_type="tidy", type="observed")
-  summary <- ret %>% model_summary(model, summary_type="glance")
+  # Test model_info function.
+  observed <- ret %>% model_info(model, output="variables", type="observed")
+  summary <- ret %>% model_info(model, output="summary")
 
   observed <- ret %>% tidy_rowwise(model, type="observed")
   summary <- ret %>% glance_rowwise(model)
