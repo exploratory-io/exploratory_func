@@ -97,6 +97,23 @@ augment_rowwise_data <- function(df, model, data, ...) {
   ret
 }
 
+#' tidy/glance/augment wrapper
+#' @export
+model_info <- function(df, model, output = "summary", ...) {
+  if (output == "summary") {
+    glance_rowwise(df, model, ...)
+  }
+  else if (output == "variables") {
+    tidy_rowwise(df, model, ...)
+  }
+  else if (output == "data") {
+    augment_rowwise(df, model, ...)
+  }
+  else {
+    stop('output argument has to be "summary", "variables", or "data".')
+  }
+}
+
 #' glance for lm
 #' @export
 glance_lm <- glance_rowwise
