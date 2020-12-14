@@ -2244,7 +2244,8 @@ summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...){
       }
     }
   }
-  ret
+  # For integer columns (like # of rows, unique) change them to numeric for better usability.
+  ret %>% dplyr::mutate_if(is.integer, as.numeric)
 }
 
 # Maps locale across platforms. e.g. From Japanese_Japan.932 on Windows to ja_JP.UTF-8 on unix.
