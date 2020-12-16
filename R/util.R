@@ -2244,7 +2244,15 @@ summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...){
       }
     }
   }
-  # For integer columns (like # of rows, unique) change them to numeric for better usability.
+  # For integer columns (like # of rows, unique), change them to numeric columns for better usability.
+  # Without this, when the next transform step is a mutate using case_when that contains the # of rows as a condition,
+  # case_when command fails due to data type mismatch (integer vs numeric).
+  # For example, the below command fails with: Error : Problem with `mutate()` input `count`. must be a double vector, not an integer vector.
+  #
+  #   activities %>%
+  #      summarize_group(group_cols = c(`userid` = "userid"), group_funs = c("none"), count = n()) %>%
+  #         mutate(count = case_when(count > 10 ~ 10, TRUE ~ count))
+  #
   ret %>% dplyr::mutate_if(is.integer, as.numeric)
 }
 
