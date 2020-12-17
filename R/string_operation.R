@@ -28,14 +28,22 @@
 #' @return Logical vector if the token is in stop words or not.
 #' @export
 is_stopword <- function(token, lang = "english", include = c(), exclude = c(), hiragana_word_length_to_assume_stopword = 0, ...){
+  is_stopword_(token, get_stopwords(lang, include = include, exclude = exclude, ...), hiragana_word_length_to_assume_stopword)
+}
+
+#'
+#' Check if the token is in stopwords.
+#' @param token Character to be checked if it's stopword.
+#' @param stopwords stopwords.
+#'
+is_stopword_ <- function(token, stopwords, hiragana_word_length_to_assume_stopword = 0){
   if(hiragana_word_length_to_assume_stopword > 0) { # for Japanese, assume the token is stopword if it's one letter
-    result <- token %in% get_stopwords(lang, include = include, exclude = exclude, ...) | stringr::str_detect(token, stringr::str_c("^[\\\u3040-\\\u309f]{1,", hiragana_word_length_to_assume_stopword, "}$"))
+    result <- token %in%  stopwords | stringr::str_detect(token, stringr::str_c("^[\\\u3040-\\\u309f]{1,", hiragana_word_length_to_assume_stopword, "}$"))
   } else {
-    result <- token %in% get_stopwords(lang, include = include, exclude = exclude, ...)
+    result <- token %in% stopwords
   }
   result
 }
-
 #' Check if the word is digits.
 #' @param word Character to be checked if it's digits.
 #' @return Logical vector if the word is digits or not.
@@ -145,6 +153,7 @@ word_to_sentiment <- function(words, lexicon="bing"){
   ret
 }
 
+
 #' Tokenize text with ICU.
 #' @param df Data frame
 #' @param text Set a column of which you want to tokenize.
@@ -164,6 +173,7 @@ word_to_sentiment <- function(words, lexicon="bing"){
 #' @param hiragana_word_length_to_remove Length of a Hiragana word that needs to be excluded from the result.
 #' @param summary_level Either "row" or "all". If this is "all", it ignores document and summarizes the result by token.
 #' @param sort_by Either "count" or "name"
+#' @param ngrms - by default it's 1. Pass 2 for bigram, 3 for trigram.
 #' @return Data frame with tokenized column.
 #' @export
 do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
@@ -173,7 +183,7 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
                                  remove_symbols = TRUE, remove_twitter = TRUE,
                                  remove_url = TRUE, stopwords_lang = NULL,
                                  hiragana_word_length_to_remove = 2,
-                                 summary_level = "row", sort_by = "", ...){
+                                 summary_level = "row", sort_by = "", ngrams = 1L, ...){
 
   if(!requireNamespace("quanteda")){stop("package quanteda must be installed.")}
   if(!requireNamespace("dplyr")){stop("package dplyr must be installed.")}
@@ -195,13 +205,31 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
   orig_input_col <- col_name(substitute(text_col))
   textData <- df %>% dplyr::select(orig_input_col) %>% dplyr::rename("text" = orig_input_col)
   # Create a corpus from the text column then tokenize.
-  dfm <- quanteda::corpus(textData) %>%
+  tokens <- quanteda::corpus(textData) %>%
     quanteda::tokens(what = token, remove_punct = remove_punct, remove_numbers = remove_numbers,
                      remove_symbols = remove_symbols, remove_twitter = remove_twitter,
                      remove_hyphens = remove_hyphens, remove_separators = remove_separators,
                      remove_url = remove_url) %>%
-    quanteda::tokens_wordstem() %>%
-    quanteda::dfm()
+    quanteda::tokens_wordstem()
+
+  if(ngrams > 1) { # if ngram it needs to remove stop words before
+    tokens <- quanteda::tokens_ngrams(tokens, n = ngrams)
+    dfm <- tokens %>% quanteda::dfm()
+    feat <- quanteda::featnames(dfm)
+    # ngram is generate with "_" as a separator.
+    feat_split <- stringi::stri_split_fixed(feat, "_")
+    stopwords_for_ngrams = c("")
+    if(!is.null(stopwords_lang)) {
+      # when stopwords Language is set, use the stopwords to filter out the result.
+      stopwords_for_ngrams <- exploratory::get_stopwords(lang = stopwords_lang)
+    }
+    # Below feat_stop is to remove stopwords from ngram tokens.ref: https://github.com/quanteda/quanteda/issues/1018
+    feat_stop <- feat[sapply(feat_split, function(x) {any(is_stopword_(x, stopwords_for_ngrams, hiragana_word_length_to_assume_stopword = hiragana_word_length_to_remove))})]
+    dfm <- quanteda::dfm_remove(dfm, feat_stop)
+  } else {
+    dfm <- tokens %>% quanteda::dfm()
+  }
+
   # Now convert result dfm to a data frame
   resultTemp <- quanteda::convert(dfm, to = "data.frame")
   # The first column name returned by quanteda::convert is always "doc_id" so rename it to avoid it conflicts with other tokens
