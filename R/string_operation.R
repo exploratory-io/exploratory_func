@@ -212,23 +212,21 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
                      remove_url = remove_url) %>%
     quanteda::tokens_wordstem()
 
-  if(ngrams > 1) { # if ngrams is greater than 1, it needs to remove stopwords before hand.
-    tokens <- quanteda::tokens_ngrams(tokens, n = c(1:ngrams))
-    dfm <- tokens %>% quanteda::dfm()
-    feat <- quanteda::featnames(dfm)
-    # ngram is generate with "_" as a separator.
-    feat_split <- stringi::stri_split_fixed(feat, "_")
-    stopwords_for_ngrams = c("")
-    if(!is.null(stopwords_lang)) {
-      # when stopwords Language is set, use the stopwords to filter out the result.
-      stopwords_for_ngrams <- exploratory::get_stopwords(lang = stopwords_lang)
-    }
-    # Below feat_stop is to remove stopwords from ngram tokens. ref: https://github.com/quanteda/quanteda/issues/1018
-    feat_stop <- feat[sapply(feat_split, function(x) {any(is_stopword_(x, stopwords_for_ngrams, hiragana_word_length_to_assume_stopword = hiragana_word_length_to_remove))})]
-    dfm <- quanteda::dfm_remove(dfm, feat_stop)
-  } else {
-    dfm <- tokens %>% quanteda::dfm()
+
+  # when stopwords Language is set, use the stopwords to filter out the result.
+  if(!is.null(stopwords_lang)) {
+    stopwords_to_remove <- exploratory::get_stopwords(lang = stopwords_lang)
+    tokens <- tokens %>% quanteda::tokens_remove(stopwords_to_remove, valuetype = "fixed")
   }
+  # For remove Japanese Hiragana handling
+  if(hiragana_word_length_to_remove > 0) {
+    tokens <- tokens %>% quanteda::tokens_remove(stringr::str_c("^[\\\u3040-\\\u309f]{1,", hiragana_word_length_to_remove, "}$"), valuetype = "regex")
+  }
+  if(ngrams > 1) { # if ngrams is greater than 1, generate ngrams.
+    tokens <- quanteda::tokens_ngrams(tokens, n = 1:ngrams)
+  }
+  # convert tokens to dfm object
+  dfm <- tokens %>% quanteda::dfm()
 
   # Now convert result dfm to a data frame
   resultTemp <- quanteda::convert(dfm, to = "data.frame")
@@ -262,13 +260,6 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
   }
   if(!with_id) { # Drop the document_id column
     result <- result %>% dplyr::select(-document_id)
-  }
-  # if stopwords_lang is provided, remove the stopwords for the language.
-  if(!is.null(stopwords_lang)) {
-    result <- result %>% dplyr::filter(!is_stopword(!!rlang::sym(token_col), lang = stopwords_lang, hiragana_word_length_to_assume_stopword = hiragana_word_length_to_remove))
-  } else if(hiragana_word_length_to_remove > 0) { # for remove Japanese Hiragana handling
-    result <- result %>%
-      dplyr::filter(!stringr::str_detect(!!rlang::sym(token_col), stringr::str_c("^[\\\u3040-\\\u309f]{1,", hiragana_word_length_to_remove, "}$", sep = "")) )
   }
   # result column order should be document_id, <token_col>, <count_col> ...
   if(!with_id) {
