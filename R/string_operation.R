@@ -223,7 +223,7 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
       # when stopwords Language is set, use the stopwords to filter out the result.
       stopwords_for_ngrams <- exploratory::get_stopwords(lang = stopwords_lang)
     }
-    # Below feat_stop is to remove stopwords from ngram tokens.ref: https://github.com/quanteda/quanteda/issues/1018
+    # Below feat_stop is to remove stopwords from ngram tokens. ref: https://github.com/quanteda/quanteda/issues/1018
     feat_stop <- feat[sapply(feat_split, function(x) {any(is_stopword_(x, stopwords_for_ngrams, hiragana_word_length_to_assume_stopword = hiragana_word_length_to_remove))})]
     dfm <- quanteda::dfm_remove(dfm, feat_stop)
   } else {
