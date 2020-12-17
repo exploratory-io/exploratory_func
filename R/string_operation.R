@@ -213,7 +213,7 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
     quanteda::tokens_wordstem()
 
   if(ngrams > 1) { # if ngrams is greater than 1, it needs to remove stopwords before hand.
-    tokens <- quanteda::tokens_ngrams(tokens, n = ngrams)
+    tokens <- quanteda::tokens_ngrams(tokens, n = c(1:ngrams))
     dfm <- tokens %>% quanteda::dfm()
     feat <- quanteda::featnames(dfm)
     # ngram is generate with "_" as a separator.
