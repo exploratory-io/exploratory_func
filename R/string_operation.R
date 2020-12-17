@@ -28,22 +28,15 @@
 #' @return Logical vector if the token is in stop words or not.
 #' @export
 is_stopword <- function(token, lang = "english", include = c(), exclude = c(), hiragana_word_length_to_assume_stopword = 0, ...){
-  is_stopword_(token, get_stopwords(lang, include = include, exclude = exclude, ...), hiragana_word_length_to_assume_stopword)
-}
-
-#'
-#' Check if the token is in stopwords.
-#' @param token Character to be checked if it's stopword.
-#' @param stopwords stopwords.
-#'
-is_stopword_ <- function(token, stopwords, hiragana_word_length_to_assume_stopword = 0){
-  if(hiragana_word_length_to_assume_stopword > 0) { # for Japanese, assume the token is stopword if it's one letter
-    result <- token %in%  stopwords | stringr::str_detect(token, stringr::str_c("^[\\\u3040-\\\u309f]{1,", hiragana_word_length_to_assume_stopword, "}$"))
+  if(hiragana_word_length_to_assume_stopword > 0) {
+    # for Japanese, assume the token is stopword if it's one letter
+    result <- token %in% get_stopwords(lang, include = include, exclude = exclude, ...) | stringr::str_detect(token, stringr::str_c("^[\\\u3040-\\\u309f]{1,", hiragana_word_length_to_assume_stopword, "}$"))
   } else {
-    result <- token %in% stopwords
+    result <- token %in% get_stopwords(lang, include = include, exclude = exclude, ...)
   }
   result
 }
+
 #' Check if the word is digits.
 #' @param word Character to be checked if it's digits.
 #' @return Logical vector if the word is digits or not.
