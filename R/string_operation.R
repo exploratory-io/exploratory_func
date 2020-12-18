@@ -28,14 +28,14 @@
 #' @return Logical vector if the token is in stop words or not.
 #' @export
 is_stopword <- function(token, lang = "english", include = c(), exclude = c(), hiragana_word_length_to_assume_stopword = 0, ...){
-  if(hiragana_word_length_to_assume_stopword > 0) {
-    # for Japanese, assume the token is stopword if it's one letter
+  if(hiragana_word_length_to_assume_stopword > 0) { # for Japanese, assume the token is stopword if it's one letter
     result <- token %in% get_stopwords(lang, include = include, exclude = exclude, ...) | stringr::str_detect(token, stringr::str_c("^[\\\u3040-\\\u309f]{1,", hiragana_word_length_to_assume_stopword, "}$"))
   } else {
     result <- token %in% get_stopwords(lang, include = include, exclude = exclude, ...)
   }
   result
 }
+
 
 #' Check if the word is digits.
 #' @param word Character to be checked if it's digits.
