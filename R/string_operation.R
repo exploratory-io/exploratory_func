@@ -166,7 +166,7 @@ word_to_sentiment <- function(words, lexicon="bing"){
 #' @param hiragana_word_length_to_remove Length of a Hiragana word that needs to be excluded from the result.
 #' @param summary_level Either "row" or "all". If this is "all", it ignores document and summarizes the result by token.
 #' @param sort_by Either "count" or "name"
-#' @param ngrms - by default it's 1. Pass 2 for bigram, 3 for trigram.
+#' @param ngrams - by default it's 1. Pass 2 for bigram, 3 for trigram.
 #' @return Data frame with tokenized column.
 #' @export
 do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
@@ -211,7 +211,7 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
     stopwords_to_remove <- exploratory::get_stopwords(lang = stopwords_lang)
     tokens <- tokens %>% quanteda::tokens_remove(stopwords_to_remove, valuetype = "fixed")
   }
-  # For remove Japanese Hiragana handling
+  # Remove Japanese Hiragana word whose length is less than hiragana_word_length_to_remove
   if(hiragana_word_length_to_remove > 0) {
     tokens <- tokens %>% quanteda::tokens_remove(stringr::str_c("^[\\\u3040-\\\u309f]{1,", hiragana_word_length_to_remove, "}$"), valuetype = "regex")
   }
