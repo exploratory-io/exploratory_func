@@ -1,7 +1,7 @@
-exp_ts_cluster <- function(df) {
+exp_ts_cluster <- function(df, ..., centers = 3L) {
   model_df <- df %>% nest_by() %>% ungroup() %>%
     mutate(model = purrr::map(data, function(df) {
-      tsclust(t(as.matrix(df)), k = 4L, distance = "sdtw", centroid = "sdtw_cent")
+      tsclust(t(as.matrix(df)), k = centers, distance = "sdtw", centroid = "sdtw_cent")
     }))
   model_df <- model_df %>% rowwise()
   model_df
