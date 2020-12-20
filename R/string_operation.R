@@ -36,6 +36,7 @@ is_stopword <- function(token, lang = "english", include = c(), exclude = c(), h
   result
 }
 
+
 #' Check if the word is digits.
 #' @param word Character to be checked if it's digits.
 #' @return Logical vector if the word is digits or not.
@@ -145,6 +146,7 @@ word_to_sentiment <- function(words, lexicon="bing"){
   ret
 }
 
+
 #' Tokenize text with ICU.
 #' @param df Data frame
 #' @param text Set a column of which you want to tokenize.
@@ -164,6 +166,7 @@ word_to_sentiment <- function(words, lexicon="bing"){
 #' @param hiragana_word_length_to_remove Length of a Hiragana word that needs to be excluded from the result.
 #' @param summary_level Either "row" or "all". If this is "all", it ignores document and summarizes the result by token.
 #' @param sort_by Either "count" or "name"
+#' @param ngrams - by default it's 1. Pass 2 for bigram, 3 for trigram.
 #' @return Data frame with tokenized column.
 #' @export
 do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
@@ -173,7 +176,7 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
                                  remove_symbols = TRUE, remove_twitter = TRUE,
                                  remove_url = TRUE, stopwords_lang = NULL,
                                  hiragana_word_length_to_remove = 2,
-                                 summary_level = "row", sort_by = "", ...){
+                                 summary_level = "row", sort_by = "", ngrams = 1L, ...){
 
   if(!requireNamespace("quanteda")){stop("package quanteda must be installed.")}
   if(!requireNamespace("dplyr")){stop("package dplyr must be installed.")}
@@ -195,13 +198,29 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
   orig_input_col <- col_name(substitute(text_col))
   textData <- df %>% dplyr::select(orig_input_col) %>% dplyr::rename("text" = orig_input_col)
   # Create a corpus from the text column then tokenize.
-  dfm <- quanteda::corpus(textData) %>%
+  tokens <- quanteda::corpus(textData) %>%
     quanteda::tokens(what = token, remove_punct = remove_punct, remove_numbers = remove_numbers,
                      remove_symbols = remove_symbols, remove_twitter = remove_twitter,
                      remove_hyphens = remove_hyphens, remove_separators = remove_separators,
                      remove_url = remove_url) %>%
-    quanteda::tokens_wordstem() %>%
-    quanteda::dfm()
+    quanteda::tokens_wordstem()
+
+
+  # when stopwords Language is set, use the stopwords to filter out the result.
+  if(!is.null(stopwords_lang)) {
+    stopwords_to_remove <- exploratory::get_stopwords(lang = stopwords_lang)
+    tokens <- tokens %>% quanteda::tokens_remove(stopwords_to_remove, valuetype = "fixed")
+  }
+  # Remove Japanese Hiragana word whose length is less than hiragana_word_length_to_remove
+  if(hiragana_word_length_to_remove > 0) {
+    tokens <- tokens %>% quanteda::tokens_remove(stringr::str_c("^[\\\u3040-\\\u309f]{1,", hiragana_word_length_to_remove, "}$"), valuetype = "regex")
+  }
+  if(ngrams > 1) { # if ngrams is greater than 1, generate ngrams.
+    tokens <- quanteda::tokens_ngrams(tokens, n = 1:ngrams)
+  }
+  # convert tokens to dfm object
+  dfm <- tokens %>% quanteda::dfm()
+
   # Now convert result dfm to a data frame
   resultTemp <- quanteda::convert(dfm, to = "data.frame")
   # The first column name returned by quanteda::convert is always "doc_id" so rename it to avoid it conflicts with other tokens
@@ -234,13 +253,6 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
   }
   if(!with_id) { # Drop the document_id column
     result <- result %>% dplyr::select(-document_id)
-  }
-  # if stopwords_lang is provided, remove the stopwords for the language.
-  if(!is.null(stopwords_lang)) {
-    result <- result %>% dplyr::filter(!is_stopword(!!rlang::sym(token_col), lang = stopwords_lang, hiragana_word_length_to_assume_stopword = hiragana_word_length_to_remove))
-  } else if(hiragana_word_length_to_remove > 0) { # for remove Japanese Hiragana handling
-    result <- result %>%
-      dplyr::filter(!stringr::str_detect(!!rlang::sym(token_col), stringr::str_c("^[\\\u3040-\\\u309f]{1,", hiragana_word_length_to_remove, "}$", sep = "")) )
   }
   # result column order should be document_id, <token_col>, <count_col> ...
   if(!with_id) {
