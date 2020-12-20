@@ -7,6 +7,7 @@ exp_ts_cluster <- function(df) {
   model_df
 }
 
+#' @export
 tidy.PartitionalTSClusters <- function(x) {
   res <- as.data.frame(x@datalist)
   res <- res %>% mutate(time=row_number())
