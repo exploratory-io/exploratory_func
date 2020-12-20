@@ -11,7 +11,16 @@ tidy.PartitionalTSClusters <- function(x) {
   res <- as.data.frame(x@datalist)
   res <- res %>% mutate(time=row_number())
   cluster_map <- x@cluster
-  names(cluster_map) <- names(x@datalist)
+  cluster_map_names <- names(x@datalist)
+
+  for (i in 1:(x@k)) {
+    res <- res %>% mutate(!!rlang::sym(paste0("centroid",i)):=x@centroids[[i]])
+    cluster_map <- c(cluster_map, i)
+    cluster_map_names <- c(cluster_map_names, paste0("centroid",i))
+  }
+
+  names(cluster_map) <- cluster_map_names
+
   res <- res %>% pivot_longer(cols = -time)
   res <- res %>% mutate(cluster = cluster_map[name])
   res
