@@ -384,7 +384,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
       # TODO: Check if this would not have daylight saving days issue we had with anomaly detection.
       if (!is.null(na_fill_type) || !is.null(regressors_na_fill_type)) {
         # complete the date time with NA
-        aggregated_data <- aggregated_data %>% complete_data("ds", time_unit = time_unit)
+        aggregated_data <- aggregated_data %>% complete_date("ds", time_unit = time_unit)
         # fill NAs in y with zoo
         aggregated_data <- aggregated_data %>% dplyr::mutate(y = fill_ts_na(y, ds, type = na_fill_type, val = na_fill_value))
         for (regressor_col in regressor_output_cols) {
