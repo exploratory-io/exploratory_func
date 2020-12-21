@@ -16,7 +16,6 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
 
   model_df <- df %>% nest_by() %>% ungroup() %>%
     mutate(model = purrr::map(data, function(df) {
-      browser()
       # Floor date. The code is copied form do_prophet.
       df[[time_col]] <- if (time_unit %in% c("day", "week", "month", "quarter", "year")) {
         # Take care of issue that happened in anomaly detection here for prophet too.
@@ -63,21 +62,23 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
 }
 
 #' @export
-tidy.PartitionalTSClusters <- function(x) {
+tidy.PartitionalTSClusters <- function(x, with_centroids = TRUE) {
   res <- as.data.frame(x@datalist)
-  res <- res %>% mutate(time=row_number())
+  res <- res %>% dplyr::mutate(time=row_number())
   cluster_map <- x@cluster
   cluster_map_names <- names(x@datalist)
 
-  for (i in 1:(x@k)) {
-    res <- res %>% mutate(!!rlang::sym(paste0("centroid",i)):=x@centroids[[i]])
-    cluster_map <- c(cluster_map, i)
-    cluster_map_names <- c(cluster_map_names, paste0("centroid",i))
+  if (with_centroids) {
+    for (i in 1:(x@k)) {
+      res <- res %>% dplyr::mutate(!!rlang::sym(paste0("centroid",i)):=x@centroids[[i]])
+      cluster_map <- c(cluster_map, i)
+      cluster_map_names <- c(cluster_map_names, paste0("centroid",i))
+    }
   }
 
   names(cluster_map) <- cluster_map_names
 
-  res <- res %>% pivot_longer(cols = -time)
-  res <- res %>% mutate(cluster = cluster_map[name])
+  res <- res %>% tidyr::pivot_longer(cols = -time)
+  res <- res %>% dplyr::mutate(cluster = cluster_map[name])
   res
 }
