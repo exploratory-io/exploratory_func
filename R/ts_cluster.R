@@ -1,4 +1,4 @@
-exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.aggregate = sum, centers = 3L) {
+exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.aggregate = sum, na_fill_type = "previous", na_fill_value = 0, centers = 3L) {
   time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(time))
   value_col <- tidyselect::vars_select(names(df), !! rlang::enquo(value))
   category_col <- tidyselect::vars_select(names(df), !! rlang::enquo(category))
@@ -10,6 +10,9 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
   else if (time_unit == "sec") {
     time_unit <- "second"
   }
+
+  # remove rows with NA time
+  df <- df[!is.na(df[[time_col]]), ]
 
   model_df <- df %>% nest_by() %>% ungroup() %>%
     mutate(model = purrr::map(data, function(df) {
@@ -46,9 +49,12 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
         df <- grouped_df %>% 
           dplyr::summarise(value = fun.aggregate(value))
       }
-      # pivot wider
+      # Pivot wider
       df <- df %>% tidyr::pivot_wider(names_from="category", values_from="value")
-      # TODO: fill NAs
+      # Complete the time column.
+      df <- df %>% complete_date("time", time_unit = time_unit)
+      # Fill NAs in time series
+      df <- df %>% dplyr::mutate(across(-time, ~fill_ts_na(.x, time, type = na_fill_type, val = na_fill_value)))
       df <- df %>% dplyr::select(-time)
       dtwclust::tsclust(t(as.matrix(df)), k = centers, distance = "sdtw", centroid = "sdtw_cent")
     }))
