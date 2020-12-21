@@ -1,4 +1,4 @@
-exp_ts_cluster <- function(df, time, value, category, time_unit = "day", centers = 3L) {
+exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.aggregate = sum, centers = 3L) {
   time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(time))
   value_col <- tidyselect::vars_select(names(df), !! rlang::enquo(value))
   category_col <- tidyselect::vars_select(names(df), !! rlang::enquo(category))
@@ -25,9 +25,24 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", centers
       } else {
         lubridate::floor_date(df[[time_col]], unit = time_unit)
       }
-      # summarize
-      # fill NAs
+      # Summarize
+      grouped_df <- df %>%
+        dplyr::transmute(
+          time = UQ(rlang::sym(time_col)),
+          value = UQ(rlang::sym(value_col)),
+          category = UQ(rlang::sym(value_col))
+        ) %>%
+        # remove NA so that we do not pass data with NA, NaN, or 0 to prophet, which we are not very sure what would happen.
+        # we saw a case where rstan crashes with the last row with 0 y value.
+        # dplyr::filter(!is.na(value)) %>% # Commented out, since now we handle NAs with na.rm option of fun.aggregate. This way, extra regressor info for each period is preserved better.
+        dplyr::group_by(caterory, time)
+
+      df <- grouped_df %>% 
+        dplyr::summarise(value = fun.aggregate(value))
       # pivot wider
+      df <- df %>% tidyr::pivot_wider(names_from="category", values_from="value")
+      # TODO: fill NAs
+      df <- df %>% dplyr::select(-time)
       dtwclust::tsclust(t(as.matrix(df)), k = centers, distance = "sdtw", centroid = "sdtw_cent")
     }))
   model_df <- model_df %>% rowwise()
