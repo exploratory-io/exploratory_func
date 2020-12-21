@@ -1,20 +1,5 @@
 # Wrapper functions around prophet.
 
-# Our time_unit argument is based on floor_date, but we also need to
-# pass down the same info to seq.Date/seq.POSIXct, and to do so,
-# some values needs to be converted.
-to_time_unit_for_seq <- function(time_unit) {
-  if (time_unit == "minute") {
-    "min"
-  }
-  else if (time_unit == "second") {
-    "sec"
-  }
-  else {
-    time_unit
-  }
-}
-
 # Trim future part of pre-aggregation data, when it is with external regressors or holidays.
 trim_future <- function(df, time_col, value_col, periods, time_unit) {
   if (!is.null(value_col)) { # if value_col is there consider rows with values to be history data.
@@ -399,15 +384,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
       # TODO: Check if this would not have daylight saving days issue we had with anomaly detection.
       if (!is.null(na_fill_type) || !is.null(regressors_na_fill_type)) {
         # complete the date time with NA
-        aggregated_data <- if(inherits(aggregated_data$ds, "Date")){
-          aggregated_data %>%
-            tidyr::complete(ds = seq.Date(min(ds), max(ds), by = to_time_unit_for_seq(time_unit)))
-        } else if(inherits(aggregated_data$ds, "POSIXct")) {
-          aggregated_data %>%
-            tidyr::complete(ds = seq.POSIXt(min(ds), max(ds), by = to_time_unit_for_seq(time_unit)))
-        } else {
-          stop("time must be Date or POSIXct.")
-        }
+        aggregated_data <- aggregated_data %>% complete_data("ds", time_unit = time_unit)
         # fill NAs in y with zoo
         aggregated_data <- aggregated_data %>% dplyr::mutate(y = fill_ts_na(y, ds, type = na_fill_type, val = na_fill_value))
         for (regressor_col in regressor_output_cols) {

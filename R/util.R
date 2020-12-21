@@ -2424,3 +2424,31 @@ survival_auroc <- function(score, time, status, at, revert=FALSE) {
   df <- df %>% filter(!(time < !!at & !status)) %>% mutate(dead = time < !!at | (time == !!at & status))
   auroc(df$score, df$dead)
 }
+
+# Our time_unit argument is based on floor_date, but we also need to
+# pass down the same info to seq.Date/seq.POSIXct, and to do so,
+# some values needs to be converted.
+to_time_unit_for_seq <- function(time_unit) {
+  if (time_unit == "minute") {
+    "min"
+  }
+  else if (time_unit == "second") {
+    "sec"
+  }
+  else {
+    time_unit
+  }
+}
+
+complete_date <- function(df, date_col, time_unit = "day") {
+  if(inherits(df[[date_col]], "Date")){
+    ret <- df %>%
+      tidyr::complete(!!rlang::sym(date_col) := seq.Date(min(!!rlang::sym(date_col)), max(!!rlang::sym(date_col)), by = to_time_unit_for_seq(time_unit)))
+  } else if(inherits(df[[date_col]], "POSIXct")) {
+    ret <- df %>%
+      tidyr::complete(!!rlang::sym(date_col) := seq.POSIXt(min(!!rlang::sym(date_col)), max(!!rlang::sym(date_col)), by = to_time_unit_for_seq(time_unit)))
+  } else {
+    stop("time must be Date or POSIXct.")
+  }
+  ret
+}
