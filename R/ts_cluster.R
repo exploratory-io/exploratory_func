@@ -1,4 +1,5 @@
-exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.aggregate = sum, na_fill_type = "previous", na_fill_value = 0, centers = 3L, with_centroids = TRUE, output = "data") {
+exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.aggregate = sum, na_fill_type = "previous", na_fill_value = 0,
+                           centers = 3L, with_centroids = TRUE, distance = "sdtw", centroid = "sdtw_cent", output = "data") {
   time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(time))
   value_col <- tidyselect::vars_select(names(df), !! rlang::enquo(value))
   category_col <- tidyselect::vars_select(names(df), !! rlang::enquo(category))
@@ -55,7 +56,7 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
       # Fill NAs in time series
       df <- df %>% dplyr::mutate(across(-time, ~fill_ts_na(.x, time, type = na_fill_type, val = na_fill_value)))
       df <- df %>% dplyr::select(-time)
-      dtwclust::tsclust(t(as.matrix(df)), k = centers, distance = "sdtw", centroid = "sdtw_cent")
+      dtwclust::tsclust(t(as.matrix(df)), k = centers, distance = distance, centroid = centroid)
     }))
   model_df <- model_df %>% rowwise()
   if (output == "data") {
