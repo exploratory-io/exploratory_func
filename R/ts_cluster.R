@@ -38,8 +38,14 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
         # dplyr::filter(!is.na(value)) %>% # Commented out, since now we handle NAs with na.rm option of fun.aggregate. This way, extra regressor info for each period is preserved better.
         dplyr::group_by(category, time)
 
-      df <- grouped_df %>% 
-        dplyr::summarise(value = fun.aggregate(value))
+      if (is_na_rm_func(fun.aggregate)) {
+        df <- grouped_df %>% 
+          dplyr::summarise(value = fun.aggregate(value, na.rm=TRUE))
+      }
+      else {
+        df <- grouped_df %>% 
+          dplyr::summarise(value = fun.aggregate(value))
+      }
       # pivot wider
       df <- df %>% tidyr::pivot_wider(names_from="category", values_from="value")
       # TODO: fill NAs
