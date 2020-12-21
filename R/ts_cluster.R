@@ -13,6 +13,7 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
 
   model_df <- df %>% nest_by() %>% ungroup() %>%
     mutate(model = purrr::map(data, function(df) {
+      browser()
       # Floor date. The code is copied form do_prophet.
       df[[time_col]] <- if (time_unit %in% c("day", "week", "month", "quarter", "year")) {
         # Take care of issue that happened in anomaly detection here for prophet too.
@@ -30,12 +31,12 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
         dplyr::transmute(
           time = UQ(rlang::sym(time_col)),
           value = UQ(rlang::sym(value_col)),
-          category = UQ(rlang::sym(value_col))
+          category = UQ(rlang::sym(category_col))
         ) %>%
         # remove NA so that we do not pass data with NA, NaN, or 0 to prophet, which we are not very sure what would happen.
         # we saw a case where rstan crashes with the last row with 0 y value.
         # dplyr::filter(!is.na(value)) %>% # Commented out, since now we handle NAs with na.rm option of fun.aggregate. This way, extra regressor info for each period is preserved better.
-        dplyr::group_by(caterory, time)
+        dplyr::group_by(category, time)
 
       df <- grouped_df %>% 
         dplyr::summarise(value = fun.aggregate(value))
