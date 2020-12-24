@@ -75,7 +75,7 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
 
 #' @export
 tidy.PartitionalTSClusters <- function(x, with_centroids = TRUE) {
-  res <- as.data.frame(x@datalist)
+  res <- tibble::as_tibble(x@datalist)
   res <- res %>% dplyr::mutate(time=!!attr(x,"time_values"))
   cluster_map <- x@cluster
   cluster_map_names <- names(x@datalist)
