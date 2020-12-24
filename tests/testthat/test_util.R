@@ -989,3 +989,8 @@ test_that("mutate_predictors", {
   res <- df %>% exploratory:::mutate_predictors(c("x", "t", "y", "z", "w"), list(x="log", list(t_mon="mon", t_wday="wday", t_week_of_quarter="week_of_quarter"), y="log2", z=function(x){log(x, base=2)}, w=rlang::expr(log(., base=2))))
   expect_true(all(c("x", "t_mon", "t_wday", "t_week_of_quarter", "y", "z", "w") %in% colnames(res)))
 })
+
+test_that("cumsum_decayed", {
+  res <- cumsum_decayed(c(1,1,1,1), 0.5)
+  expect_equal(res, c(1, 1.5, 1.75, 1.875))
+})
