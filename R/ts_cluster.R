@@ -56,7 +56,11 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
       # Fill NAs in time series
       df <- df %>% dplyr::mutate(across(-time, ~fill_ts_na(.x, time, type = na_fill_type, val = na_fill_value)))
       df <- df %>% dplyr::select(-time)
-      dtwclust::tsclust(t(as.matrix(df)), k = centers, distance = distance, centroid = centroid)
+      model <- dtwclust::tsclust(t(as.matrix(df)), k = centers, distance = distance, centroid = centroid)
+      attr(model, "time_col") <- time_col
+      attr(model, "value_col") <- value_col
+      attr(model, "category_col") <- category_col
+      model
     }))
   model_df <- model_df %>% rowwise()
   if (output == "data") {
@@ -85,6 +89,9 @@ tidy.PartitionalTSClusters <- function(x, with_centroids = TRUE) {
   names(cluster_map) <- cluster_map_names
 
   res <- res %>% tidyr::pivot_longer(cols = -time)
-  res <- res %>% dplyr::mutate(cluster = cluster_map[name])
+  res <- res %>% dplyr::mutate(Cluster = cluster_map[name])
+  res <- res %>% dplyr::rename(!!rlang::sym(attr(x,"time_col")):=time,
+                               !!rlang::sym(attr(x,"value_col")):=value,
+                               !!rlang::sym(attr(x,"category_col")):=name)
   res
 }
