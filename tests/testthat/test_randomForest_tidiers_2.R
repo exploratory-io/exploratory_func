@@ -328,7 +328,7 @@ test_that("ranger.set_multi_predicted_values", {
   na_at <- exploratory:::ranger.find_na(c("x", "y"), df) 
   predicted_value <- exploratory:::restore_na(predicted_value_nona, na_at)
   predicted_prob_nona <- rep(0.5, length(predicted_value_nona)) # Dummy probability just to pass this test.
-  predicted_prob <- restore_na(predicted_prob_nona, na_at)
+  predicted_prob <- exploratory:::restore_na(predicted_prob_nona, na_at)
   ret <- exploratory:::ranger.set_multi_predicted_values(df, m_m$predictions, predicted_value, predicted_prob, na_at)
   expected_colnames <-  c("x", "y", "z",
                           "predicted_label",
