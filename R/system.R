@@ -1629,7 +1629,9 @@ executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 1
 #' API to get projects for current oauth token
 #' @export
 getGoogleBigQueryProjects <- function(tokenFileId=""){
-  if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
+  if (!requireNamespace("bigrquery")) {
+    stop("package bigrquery must be installed.")
+  }
   warningMessage <- NULL
   warningHandler <- function(w){
     warningMessage <<- w
@@ -1643,7 +1645,7 @@ getGoogleBigQueryProjects <- function(tokenFileId=""){
   # If the warning message contains "Unable to refresh token: invalid_client",
   # it means the OAuth token is not valid so raise the "OAuth token is not set for Google BigQuery" error that triggers
   # Exploratory Desktop OAuth token recovery process.
-  if(stringr::str_detect(warningMessage$message, "Unable to refresh token: invalid_client")) {
+  if (stringr::str_detect(warningMessage$message, "Unable to refresh token: invalid_client")) {
     stop("OAuth token is not set for Google BigQuery")
   }
   projects
@@ -1652,7 +1654,9 @@ getGoogleBigQueryProjects <- function(tokenFileId=""){
 #' API to get datasets for a project
 #' @export
 getGoogleBigQueryDataSets <- function(project, tokenFileId=""){
-  if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
+  if (!requireNamespace("bigrquery")) {
+    stop("package bigrquery must be installed.")
+  }
   warningMessage <- NULL
   warningHandler <- function(w){
     warningMessage <<- w
@@ -1668,7 +1672,7 @@ getGoogleBigQueryDataSets <- function(project, tokenFileId=""){
   # If the warning message contains "Unable to refresh token: invalid_client",
   # it means the OAuth token is not valid so raise the "OAuth token is not set for Google BigQuery" error that triggers
   # Exploratory Desktop OAuth token recovery process.
-  if(stringr::str_detect(warningMessage$message, "Unable to refresh token: invalid_client")) {
+  if (stringr::str_detect(warningMessage$message, "Unable to refresh token: invalid_client")) {
     stop("OAuth token is not set for Google BigQuery")
   }
   dataSets
@@ -1677,7 +1681,9 @@ getGoogleBigQueryDataSets <- function(project, tokenFileId=""){
 #' API to get tables for current project, data set
 #' @export
 getGoogleBigQueryTables <- function(project, dataset, tokenFileId=""){
-  if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
+  if (!requireNamespace("bigrquery")) {
+    stop("package bigrquery must be installed.")
+  }
   warningMessage <- NULL
   warningHandler <- function(w){
     warningMessage <<- w
@@ -1699,7 +1705,7 @@ getGoogleBigQueryTables <- function(project, dataset, tokenFileId=""){
   # If the warning message contains "Unable to refresh token: invalid_client",
   # it means the OAuth token is not valid so raise the "OAuth token is not set for Google BigQuery" error that triggers
   # Exploratory Desktop OAuth token recovery process.
-  if(stringr::str_detect(warningMessage$message, "Unable to refresh token: invalid_client")) {
+  if (stringr::str_detect(warningMessage$message, "Unable to refresh token: invalid_client")) {
     stop("OAuth token is not set for Google BigQuery")
   }
   tables
@@ -1708,7 +1714,9 @@ getGoogleBigQueryTables <- function(project, dataset, tokenFileId=""){
 #' API to get table info
 #' @export
 getGoogleBigQueryTable <- function(project, dataset, table, tokenFileId=""){
-  if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
+  if (!requireNamespace("bigrquery")) {
+    stop("package bigrquery must be installed.")
+  }
   warningMessage <- NULL
   warningHandler <- function(w){
     warningMessage <<- w
@@ -1723,7 +1731,7 @@ getGoogleBigQueryTable <- function(project, dataset, table, tokenFileId=""){
   # If the warning message contains "Unable to refresh token: invalid_client",
   # it means the OAuth token is not valid so raise the "OAuth token is not set for Google BigQuery" error that triggers
   # Exploratory Desktop OAuth token recovery process.
-  if(stringr::str_detect(warningMessage$message, "Unable to refresh token: invalid_client")) {
+  if (stringr::str_detect(warningMessage$message, "Unable to refresh token: invalid_client")) {
     stop("OAuth token is not set for Google BigQuery")
   }
   table
