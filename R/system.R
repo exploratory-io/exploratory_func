@@ -1634,7 +1634,6 @@ getGoogleBigQueryProjects <- function(tokenFileId=""){
   warningHandler <- function(w){
     warningMessage <<- w
   }
-  projects <- c("")
   main <- function(){
     token <- getGoogleTokenForBigQuery(tokenFileId);
     bigrquery::set_access_cred(token)
