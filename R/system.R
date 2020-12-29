@@ -1629,37 +1629,66 @@ executeGoogleBigQuery <- function(project, query, destinationTable, pageSize = 1
 #' API to get projects for current oauth token
 #' @export
 getGoogleBigQueryProjects <- function(tokenFileId=""){
-  if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
-  tryCatch({
+  if (!requireNamespace("bigrquery")) {
+    stop("package bigrquery must be installed.")
+  }
+  warningMessage <- NULL
+  warningHandler <- function(w){
+    warningMessage <<- w
+  }
+  main <- function(){
     token <- getGoogleTokenForBigQuery(tokenFileId);
     bigrquery::set_access_cred(token)
-    projects <- bigrquery::bq_projects(page_size = 100, max_pages = Inf, warn = TRUE)
-    projects
-  }, error = function(err){
-    c("")
-  })
+    bigrquery::bq_projects(page_size = 100, max_pages = Inf, warn = TRUE)
+  }
+  projects <- withCallingHandlers(main(), warning = warningHandler)
+  # If the warning message contains "Unable to refresh token: invalid_client",
+  # it means the OAuth token is not valid so raise the "OAuth token is not set for Google BigQuery" error that triggers
+  # Exploratory Desktop OAuth token recovery process.
+  if (stringr::str_detect(warningMessage$message, "Unable to refresh token: invalid_client")) {
+    stop("OAuth token is not set for Google BigQuery")
+  }
+  projects
 }
 
 #' API to get datasets for a project
 #' @export
 getGoogleBigQueryDataSets <- function(project, tokenFileId=""){
-  if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
-  tryCatch({
+  if (!requireNamespace("bigrquery")) {
+    stop("package bigrquery must be installed.")
+  }
+  warningMessage <- NULL
+  warningHandler <- function(w){
+    warningMessage <<- w
+  }
+  main <- function(){
     token <- getGoogleTokenForBigQuery(tokenFileId);
     bigrquery::set_access_cred(token)
     # make sure to pass max_pages as Inf to get all the datasets
     resultdatasets <- bigrquery::bq_project_datasets(project, page_size=1000, max_pages=Inf);
     lapply(resultdatasets, function(x){x$dataset})
-  }, error = function(err){
-     c("")
-  })
+  }
+  dataSets <- withCallingHandlers(main(), warning = warningHandler)
+  # If the warning message contains "Unable to refresh token: invalid_client",
+  # it means the OAuth token is not valid so raise the "OAuth token is not set for Google BigQuery" error that triggers
+  # Exploratory Desktop OAuth token recovery process.
+  if (stringr::str_detect(warningMessage$message, "Unable to refresh token: invalid_client")) {
+    stop("OAuth token is not set for Google BigQuery")
+  }
+  dataSets
 }
 
 #' API to get tables for current project, data set
 #' @export
 getGoogleBigQueryTables <- function(project, dataset, tokenFileId=""){
-  if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
-  tryCatch({
+  if (!requireNamespace("bigrquery")) {
+    stop("package bigrquery must be installed.")
+  }
+  warningMessage <- NULL
+  warningHandler <- function(w){
+    warningMessage <<- w
+  }
+  main <- function(){
     token <- getGoogleTokenForBigQuery(tokenFileId);
     bigrquery::set_access_cred(token)
     # if we do not pass max_results (via page_size argument), it only returnss 50 items. so explicitly set it.
@@ -1671,19 +1700,41 @@ getGoogleBigQueryTables <- function(project, dataset, tokenFileId=""){
     bqdataset <- bigrquery::bq_dataset(project = project, dataset = dataset)
     tables <- bigrquery::bq_dataset_tables(bqdataset, page_size = 10000);
     lapply(tables, function(x){x$table})
-  }, error = function(err){
-    c("")
-  })
+  }
+  tables <- withCallingHandlers(main(), warning = warningHandler)
+  # If the warning message contains "Unable to refresh token: invalid_client",
+  # it means the OAuth token is not valid so raise the "OAuth token is not set for Google BigQuery" error that triggers
+  # Exploratory Desktop OAuth token recovery process.
+  if (stringr::str_detect(warningMessage$message, "Unable to refresh token: invalid_client")) {
+    stop("OAuth token is not set for Google BigQuery")
+  }
+  tables
 }
 
 #' API to get table info
 #' @export
 getGoogleBigQueryTable <- function(project, dataset, table, tokenFileId=""){
-  if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
-  token <- getGoogleTokenForBigQuery(tokenFileId);
-  bigrquery::set_access_cred(token)
-  table <- bigrquery::bq_table(project = project, dataset = dataset, table = table)
-  table <- bigrquery::bq_table_meta(table);
+  if (!requireNamespace("bigrquery")) {
+    stop("package bigrquery must be installed.")
+  }
+  warningMessage <- NULL
+  warningHandler <- function(w){
+    warningMessage <<- w
+  }
+  main <- function(){
+    token <- getGoogleTokenForBigQuery(tokenFileId);
+    bigrquery::set_access_cred(token)
+    table <- bigrquery::bq_table(project = project, dataset = dataset, table = table)
+    bigrquery::bq_table_meta(table);
+  }
+  table <- withCallingHandlers(main(), warning = warningHandler)
+  # If the warning message contains "Unable to refresh token: invalid_client",
+  # it means the OAuth token is not valid so raise the "OAuth token is not set for Google BigQuery" error that triggers
+  # Exploratory Desktop OAuth token recovery process.
+  if (stringr::str_detect(warningMessage$message, "Unable to refresh token: invalid_client")) {
+    stop("OAuth token is not set for Google BigQuery")
+  }
+  table
 }
 
 #' API to get tables for current project, data set
