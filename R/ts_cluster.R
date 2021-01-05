@@ -1,3 +1,5 @@
+#' Time series clustering by dtwclust.
+#' @export
 exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.aggregate = sum, na_fill_type = "previous", na_fill_value = 0,
                            centers = 3L, with_centroids = TRUE, distance = "sdtw", centroid = "sdtw_cent", output = "data") {
   time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(time))
@@ -73,6 +75,8 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
   }
 }
 
+#' Extracts results from the model as a data frame.
+#' The output is original long-format set of time series with Cluster column.
 #' @export
 tidy.PartitionalTSClusters <- function(x, with_centroids = TRUE) {
   res <- tibble::as_tibble(x@datalist)
