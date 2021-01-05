@@ -2440,6 +2440,7 @@ to_time_unit_for_seq <- function(time_unit) {
   }
 }
 
+# Completes a Date/POSIXct column by inserting rows with the skipped Date/POSIXct values with the specified time unit.
 complete_date <- function(df, date_col, time_unit = "day") {
   if(inherits(df[[date_col]], "Date")){
     ret <- df %>%
