@@ -2425,6 +2425,35 @@ survival_auroc <- function(score, time, status, at, revert=FALSE) {
   auroc(df$score, df$dead)
 }
 
+# Our time_unit argument is based on floor_date, but we also need to
+# pass down the same info to seq.Date/seq.POSIXct, and to do so,
+# some values needs to be converted.
+to_time_unit_for_seq <- function(time_unit) {
+  if (time_unit == "minute") {
+    "min"
+  }
+  else if (time_unit == "second") {
+    "sec"
+  }
+  else {
+    time_unit
+  }
+}
+
+# Completes a Date/POSIXct column by inserting rows with the skipped Date/POSIXct values with the specified time unit.
+complete_date <- function(df, date_col, time_unit = "day") {
+  if(inherits(df[[date_col]], "Date")){
+    ret <- df %>%
+      tidyr::complete(!!rlang::sym(date_col) := seq.Date(min(!!rlang::sym(date_col)), max(!!rlang::sym(date_col)), by = to_time_unit_for_seq(time_unit)))
+  } else if(inherits(df[[date_col]], "POSIXct")) {
+    ret <- df %>%
+      tidyr::complete(!!rlang::sym(date_col) := seq.POSIXt(min(!!rlang::sym(date_col)), max(!!rlang::sym(date_col)), by = to_time_unit_for_seq(time_unit)))
+  } else {
+    stop("time must be Date or POSIXct.")
+  }
+  ret
+}
+
 # Caluculates cumulative sum of decaying effects.
 # It is same as cumsum when r is 1.
 #' @param r - After n periods, original effect a decays down to a*r^n.
