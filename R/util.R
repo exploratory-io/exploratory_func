@@ -2452,3 +2452,11 @@ complete_date <- function(df, date_col, time_unit = "day") {
   }
   ret
 }
+
+# Caluculates cumulative sum of decaying effects.
+# It is same as cumsum when r is 1.
+#' @param r - After n periods, original effect a decays down to a*r^n.
+#' @export
+cumsum_decayed <- function(x, r) {
+  purrr::accumulate(x, function(x, y){x*r + y})
+}
