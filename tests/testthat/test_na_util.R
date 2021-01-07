@@ -129,6 +129,17 @@ test_that("test impute_na with POSIXct", {
   expect_equal(ret[["filled_na"]], rep(as.POSIXct(as.Date(c("2013-01-01", "2014-01-01", "2015-01-01", "2013-01-01", "2016-01-01"))), 20))
 })
 
+test_that("fill_ts_na", {
+  test_data <- tibble::tibble(
+    time=as.Date(c("2021-01-01", "2021-01-02", "2021-01-03", "2021-01-04", "2021-01-05")),
+    value=c(NA, 2, NA, 3, NA))
+  ret <- test_data %>%
+    dplyr::mutate(filled_na = exploratory:::fill_ts_na(value, time))
+
+  expect_equal(ret$filled_na, c(0, 2, 2, 3, 3))
+
+})
+
 test_that("test impute_na with a column", {
   test_data <- data.frame(
     rep(c("2013-01-01", "2014-01-01", "2015-01-01", NA, "2016-01-01")),

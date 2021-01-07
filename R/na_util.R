@@ -179,7 +179,7 @@ fill_ts_na <- function(target, time, type = c("value", "previous", "extend"), va
     df_zoo <- zoo::na.fill(df_zoo, c(val_left, NA, val_right))
 
     # Then, fill intermediate values.
-    else if (type[2] == "spline") {
+    if (type[2] == "spline") {
       df_zoo <- zoo::na.spline(df_zoo)
     }
     else if (type[2] == "interpolate") {
