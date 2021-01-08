@@ -72,6 +72,9 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
       attr(model, "value_col") <- value_col
       attr(model, "category_col") <- category_col
       attr(model, "time_values") <- time_values
+      if (!need_summarize) { # If not summarized, pass original data, so that the output has unused original columns too.
+        attr(model, "orig_data") <- data
+      }
       model
     }))
   model_df <- model_df %>% rowwise()
