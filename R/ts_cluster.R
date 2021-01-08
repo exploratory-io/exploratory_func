@@ -1,6 +1,6 @@
 #' Time series clustering by dtwclust.
 #' @export
-exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.aggregate = sum, na_fill_type = "previous", na_fill_value = 0,
+exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.aggregate = sum, na_fill_type = "previous", na_fill_value = 0, max_category_na_ratio = 0.5,
                            centers = 3L, with_centroids = FALSE, distance = "sdtw", centroid = "sdtw_cent", output = "data") {
   time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(time))
   value_col <- tidyselect::vars_select(names(df), !! rlang::enquo(value))
@@ -64,6 +64,8 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
       df <- df %>% tidyr::pivot_wider(names_from="category", values_from="value")
       # Complete the time column.
       df <- df %>% complete_date("time", time_unit = time_unit)
+      # Drop columns (represents category) that has more NAs than max_category_na_ratio, considering them to have not enough data.
+      df <- df %>% dplyr::select_if(function(x){sum(is.na(x))/length(x) < max_category_na_ratio})
       # Fill NAs in time series
       df <- df %>% dplyr::mutate(across(-time, ~fill_ts_na(.x, time, type = na_fill_type, val = na_fill_value)))
       time_values <- df$time
