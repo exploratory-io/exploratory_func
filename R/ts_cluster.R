@@ -110,5 +110,10 @@ tidy.PartitionalTSClusters <- function(x, with_centroids = TRUE) {
   res <- res %>% dplyr::rename(!!rlang::sym(attr(x,"time_col")):=time,
                                !!rlang::sym(attr(x,"value_col")):=value,
                                !!rlang::sym(attr(x,"category_col")):=name)
+  if (!is.null(attr(x, "orig_data"))) {
+    orig_data <- attr(x, "orig_data")
+    orig_data <- orig_data %>% dplyr::select(-!!rlang::sym(attr(x,"value_col"))) # Drop value column from orig_data since res already has it.
+    res <- res %>% dplyr::left_join(orig_data, by=c(attr(x,"time_col"), attr(x,"category_col")))
+  }
   res
 }
