@@ -32,24 +32,32 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
         lubridate::floor_date(df[[time_col]], unit = time_unit)
       }
       # Summarize
-      grouped_df <- df %>%
+      renamed_df <- df %>%
         dplyr::transmute(
           time = UQ(rlang::sym(time_col)),
           value = UQ(rlang::sym(value_col)),
           category = UQ(rlang::sym(category_col))
-        ) %>%
+        )
         # remove NA so that we do not pass data with NA, NaN, or 0 to prophet, which we are not very sure what would happen.
         # we saw a case where rstan crashes with the last row with 0 y value.
         # dplyr::filter(!is.na(value)) %>% # Commented out, since now we handle NAs with na.rm option of fun.aggregate. This way, extra regressor info for each period is preserved better.
-        dplyr::group_by(category, time)
 
-      if (is_na_rm_func(fun.aggregate)) {
-        df <- grouped_df %>% 
-          dplyr::summarise(value = fun.aggregate(value, na.rm=TRUE))
+      # Check if time/category combination is unique.
+      need_summarize <- nrow(unique(renamed_df[c("time", "category")])) < nrow(renamed_df)
+      if (need_summarize) {
+        grouped_df <- renamed_df %>% dplyr::group_by(category, time)
+
+        if (is_na_rm_func(fun.aggregate)) {
+          df <- grouped_df %>% 
+            dplyr::summarise(value = fun.aggregate(value, na.rm=TRUE))
+        }
+        else {
+          df <- grouped_df %>% 
+            dplyr::summarise(value = fun.aggregate(value))
+        }
       }
       else {
-        df <- grouped_df %>% 
-          dplyr::summarise(value = fun.aggregate(value))
+        df <- renamed_df
       }
       # Pivot wider
       df <- df %>% tidyr::pivot_wider(names_from="category", values_from="value")
