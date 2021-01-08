@@ -27,3 +27,10 @@ test_that("exp_ts_cluster", {
   expect_equal(colnames(ret), c("FL DATE","CAR RIER","ARR DELAY","Cluster"))
   expect_equal(sort(unique(ret$Cluster)), c(1,2,3))
 })
+
+test_that("exp_ts_cluster without internal aggregation", {
+  flight_summarized <- flight %>% group_by(`CAR RIER`, `FL DATE`) %>% summarize(`ARR DELAY`=mean(`ARR DELAY`, na.rm=TRUE), `ORI GIN`=get_mode(`ORI GIN`,na.rm=TRUE)) %>% ungroup()
+  ret <- flight_summarized %>% exp_ts_cluster(`FL DATE`, `ARR DELAY`, `CAR RIER`)
+  expect_equal(colnames(ret), c("FL DATE","CAR RIER","ARR DELAY","Cluster","ORI GIN"))
+  expect_equal(sort(unique(ret$Cluster)), c(1,2,3))
+})
