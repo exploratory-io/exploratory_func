@@ -151,18 +151,23 @@ fill_between <- function(df, ..., .direction="down", value=NULL) {
 }
 
 #' Fill NAs in time series data. TODO: Merge into impute_na?
-#' @param type - Type of NA fill:
-#'                       "previous" - Fill with previous non-NA value.
-#'                       "value" - Fill with the value of na_fill_value.
-#'                       "interpolate" - Linear interpolation.
-#'                       "spline" - Spline interpolation.
-#'                       NULL - Skip NA fill. Use this only when you know there is no NA.
-#' @param val - Value to fill NA when na_fill_type is "value"
+#' @param type - 3 element character vector that specifies types of NA fill for NAs at the begining, in the middle, at the ending of the time series.
+#'               For the beginning and ending part:
+#'                 "extend" - Extend the first non-NA value (for the beginning), or the last non-NA value (for the ending) to fill the NAs.
+#'                 "value" - Fill the NAs with the value specified by val argument.
+#'               For the middle part:
+#'                 "previous" - Fill with previous non-NA value.
+#'                 "value" - Fill with the value of na_fill_value.
+#'                 "interpolate" - Linear interpolation.
+#'                 "spline" - Spline interpolation.
+#'                 NULL - Skip NA fill. Use this only when you know there is no NA.
+#' @param val - 3 element numeric vector that specified values to fill NAs at the begining, in the middle, at the ending of the time series when the corresponding type is "value".
+#' @export
 fill_ts_na <- function(target, time, type = c("value", "previous", "extend"), val = c(0, 0, 0)) {
-  if (length(type) == 1) {
+  if (length(type) == 1) { # If only a single type is given, use it for the mid-section, and fill the beginning and ending with the default types.
     type <- c("value", type, "extend")
   }
-  if (length(val) == 1) {
+  if (length(val) == 1) { # If only a single val is given, use it for the mid-section, and fill the beginning and ending with the default value. 
     val <- c(0, val, 0)
   }
 
