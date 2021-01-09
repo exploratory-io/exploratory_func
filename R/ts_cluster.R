@@ -19,7 +19,6 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
 
   model_df <- df %>% nest_by() %>% ungroup() %>%
     mutate(model = purrr::map(data, function(df) {
-      df_orig <- df
       # Floor date. The code is copied form do_prophet.
       df[[time_col]] <- if (time_unit %in% c("day", "week", "month", "quarter", "year")) {
         # Take care of issue that happened in anomaly detection here for prophet too.
@@ -43,23 +42,17 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
         # we saw a case where rstan crashes with the last row with 0 y value.
         # dplyr::filter(!is.na(value)) %>% # Commented out, since now we handle NAs with na.rm option of fun.aggregate. This way, extra regressor info for each period is preserved better.
 
-      # Check if time/category combination is unique.
-      need_summarize <- nrow(unique(renamed_df[c("time", "category")])) < nrow(renamed_df)
-      if (need_summarize) {
-        grouped_df <- renamed_df %>% dplyr::group_by(category, time)
+      grouped_df <- renamed_df %>% dplyr::group_by(category, time)
 
-        if (is_na_rm_func(fun.aggregate)) {
-          df <- grouped_df %>% 
-            dplyr::summarise(value = fun.aggregate(value, na.rm=TRUE))
-        }
-        else {
-          df <- grouped_df %>% 
-            dplyr::summarise(value = fun.aggregate(value))
-        }
+      if (is_na_rm_func(fun.aggregate)) {
+        df <- grouped_df %>% 
+          dplyr::summarise(value = fun.aggregate(value, na.rm=TRUE))
       }
       else {
-        df <- renamed_df
+        df <- grouped_df %>% 
+          dplyr::summarise(value = fun.aggregate(value))
       }
+      df_summarised <- df
       # Pivot wider
       df <- df %>% tidyr::pivot_wider(names_from="category", values_from="value")
       # Complete the time column.
@@ -75,9 +68,8 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
       attr(model, "value_col") <- value_col
       attr(model, "category_col") <- category_col
       attr(model, "time_values") <- time_values
-      if (!need_summarize) { # If not summarized, pass original data, so that the output has unused original columns too.
-        attr(model, "orig_data") <- df_orig
-      }
+      # Pass original data, so that the output has other variables too.
+      attr(model, "aggregated_data") <- df_summarised
       model
     }))
   model_df <- model_df %>% rowwise()
@@ -113,10 +105,10 @@ tidy.PartitionalTSClusters <- function(x, with_centroids = TRUE) {
   res <- res %>% dplyr::rename(!!rlang::sym(attr(x,"time_col")):=time,
                                !!rlang::sym(attr(x,"value_col")):=value,
                                !!rlang::sym(attr(x,"category_col")):=name)
-  if (!is.null(attr(x, "orig_data"))) {
-    orig_data <- attr(x, "orig_data")
-    orig_data <- orig_data %>% dplyr::select(-!!rlang::sym(attr(x,"value_col"))) # Drop value column from orig_data since res already has it.
-    res <- res %>% dplyr::left_join(orig_data, by=c(attr(x,"time_col"), attr(x,"category_col")))
+  if (!is.null(attr(x, "aggregated_data"))) {
+    aggregated_data <- attr(x, "aggregated_data")
+    aggregated_data <- aggregated_data %>% dplyr::select(-!!rlang::sym(attr(x,"value_col"))) # Drop value column from aggregated_data since res already has it.
+    res <- res %>% dplyr::left_join(aggregated_data, by=c(attr(x,"time_col"), attr(x,"category_col")))
   }
   res
 }
