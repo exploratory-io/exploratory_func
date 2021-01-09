@@ -1,6 +1,7 @@
 #' Time series clustering by dtwclust.
 #' @export
 exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.aggregate = sum, na_fill_type = "previous", na_fill_value = 0, max_category_na_ratio = 0.5,
+                           variables = NULL, funs.aggregate.variables = NULL,
                            centers = 3L, with_centroids = FALSE, distance = "sdtw", centroid = "sdtw_cent", output = "data") {
   time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(time))
   value_col <- tidyselect::vars_select(names(df), !! rlang::enquo(value))
@@ -16,6 +17,28 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
 
   # remove rows with NA time
   df <- df[!is.na(df[[time_col]]), ]
+
+  # Compose arguments to pass to dplyr::summarise.
+  summarise_args <- list() # default empty list
+  if (!is.null(variables) && !is.null(funs.aggregate.variables)) {
+    summarise_args <- purrr::map2(funs.aggregate.variables, variables, function(func, cname) {
+      # For common functions that require na.rm=TRUE to handle NA, add it.
+      if (is_na_rm_func(func)) {
+        quo(UQ(func)(UQ(rlang::sym(cname)), na.rm=TRUE))
+      }
+      else {
+        quo(UQ(func)(UQ(rlang::sym(cname))))
+      }
+    })
+
+    # Set final output column names.
+    if (!is.null(names(variables))) {
+      names(summarise_args) <- names(variables)
+    }
+    else {
+      names(summarise_args) <- variables
+    }
+  }
 
   model_df <- df %>% nest_by() %>% ungroup() %>%
     mutate(model = purrr::map(data, function(df) {
@@ -46,12 +69,13 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
 
       if (is_na_rm_func(fun.aggregate)) {
         df <- grouped_df %>% 
-          dplyr::summarise(value = fun.aggregate(value, na.rm=TRUE))
+          dplyr::summarise(value = fun.aggregate(value, na.rm=TRUE), !!!summarise_args)
       }
       else {
         df <- grouped_df %>% 
-          dplyr::summarise(value = fun.aggregate(value))
+          dplyr::summarise(value = fun.aggregate(value), !!!summarise_args)
       }
+      df <- df %>% dplyr::ungroup()
       df_summarised <- df
       # Pivot wider
       df <- df %>% tidyr::pivot_wider(names_from="category", values_from="value")
@@ -69,7 +93,9 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
       attr(model, "category_col") <- category_col
       attr(model, "time_values") <- time_values
       # Pass original data, so that the output has other variables too.
-      attr(model, "aggregated_data") <- df_summarised
+      if (!is.null(variables) && !is.null(funs.aggregate.variables)) {
+        attr(model, "aggregated_data") <- df_summarised
+      }
       model
     }))
   model_df <- model_df %>% rowwise()

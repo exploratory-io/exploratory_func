@@ -22,7 +22,7 @@ if (!testdata_filename %in% list.files(testdata_dir)) {
 }
 
 
-test_that("exp_ts_cluster", {
+test_that("exp_ts_cluster basic", {
   ret <- flight %>% exp_ts_cluster(`FL DATE`, `ARR DELAY`, `CAR RIER`)
   expect_equal(colnames(ret), c("FL DATE","CAR RIER","ARR DELAY","Cluster"))
   expect_equal(sort(unique(ret$Cluster)), c(1,2,3))
