@@ -54,9 +54,8 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
       } else {
         lubridate::floor_date(df[[time_col]], unit = time_unit)
       }
-      # Summarize
       renamed_df <- df %>%
-        dplyr::transmute(
+        dplyr::rename(
           time = UQ(rlang::sym(time_col)),
           value = UQ(rlang::sym(value_col)),
           category = UQ(rlang::sym(category_col))
@@ -65,8 +64,8 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
         # we saw a case where rstan crashes with the last row with 0 y value.
         # dplyr::filter(!is.na(value)) %>% # Commented out, since now we handle NAs with na.rm option of fun.aggregate. This way, extra regressor info for each period is preserved better.
 
+      # Summarize
       grouped_df <- renamed_df %>% dplyr::group_by(category, time)
-
       if (is_na_rm_func(fun.aggregate)) {
         df <- grouped_df %>% 
           dplyr::summarise(value = fun.aggregate(value, na.rm=TRUE), !!!summarise_args)
@@ -77,6 +76,7 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
       }
       df <- df %>% dplyr::ungroup()
       df_summarised <- df
+      df <- df %>% dplyr::select(time, value, category)
       # Pivot wider
       df <- df %>% tidyr::pivot_wider(names_from="category", values_from="value")
       # Complete the time column.
@@ -127,14 +127,14 @@ tidy.PartitionalTSClusters <- function(x, with_centroids = TRUE) {
   names(cluster_map) <- cluster_map_names
 
   res <- res %>% tidyr::pivot_longer(cols = -time)
+  if (!is.null(attr(x, "aggregated_data"))) {
+    aggregated_data <- attr(x, "aggregated_data")
+    aggregated_data <- aggregated_data %>% dplyr::select(-value) # Drop value column from aggregated_data since res already has it.
+    res <- res %>% dplyr::left_join(aggregated_data, by=c("time"="time", "name"="category"))
+  }
   res <- res %>% dplyr::mutate(Cluster = cluster_map[name])
   res <- res %>% dplyr::rename(!!rlang::sym(attr(x,"time_col")):=time,
                                !!rlang::sym(attr(x,"value_col")):=value,
                                !!rlang::sym(attr(x,"category_col")):=name)
-  if (!is.null(attr(x, "aggregated_data"))) {
-    aggregated_data <- attr(x, "aggregated_data")
-    aggregated_data <- aggregated_data %>% dplyr::select(-!!rlang::sym(attr(x,"value_col"))) # Drop value column from aggregated_data since res already has it.
-    res <- res %>% dplyr::left_join(aggregated_data, by=c(attr(x,"time_col"), attr(x,"category_col")))
-  }
   res
 }
