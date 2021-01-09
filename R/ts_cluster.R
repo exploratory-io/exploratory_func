@@ -1,7 +1,8 @@
 #' Time series clustering by dtwclust.
 #' @export
-exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.aggregate = sum, na_fill_type = "previous", na_fill_value = 0,
-                           centers = 3L, with_centroids = TRUE, distance = "sdtw", centroid = "sdtw_cent", output = "data") {
+exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.aggregate = sum, na_fill_type = "previous", na_fill_value = 0, max_category_na_ratio = 0.5,
+                           variables = NULL, funs.aggregate.variables = NULL,
+                           centers = 3L, with_centroids = FALSE, distance = "sdtw", centroid = "sdtw_cent", output = "data") {
   time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(time))
   value_col <- tidyselect::vars_select(names(df), !! rlang::enquo(value))
   category_col <- tidyselect::vars_select(names(df), !! rlang::enquo(category))
@@ -17,6 +18,28 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
   # remove rows with NA time
   df <- df[!is.na(df[[time_col]]), ]
 
+  # Compose arguments to pass to dplyr::summarise.
+  summarise_args <- list() # default empty list
+  if (!is.null(variables) && !is.null(funs.aggregate.variables)) {
+    summarise_args <- purrr::map2(funs.aggregate.variables, variables, function(func, cname) {
+      # For common functions that require na.rm=TRUE to handle NA, add it.
+      if (is_na_rm_func(func)) {
+        quo(UQ(func)(UQ(rlang::sym(cname)), na.rm=TRUE))
+      }
+      else {
+        quo(UQ(func)(UQ(rlang::sym(cname))))
+      }
+    })
+
+    # Set final output column names.
+    if (!is.null(names(variables))) {
+      names(summarise_args) <- names(variables)
+    }
+    else {
+      names(summarise_args) <- variables
+    }
+  }
+
   model_df <- df %>% nest_by() %>% ungroup() %>%
     mutate(model = purrr::map(data, function(df) {
       # Floor date. The code is copied form do_prophet.
@@ -31,30 +54,35 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
       } else {
         lubridate::floor_date(df[[time_col]], unit = time_unit)
       }
-      # Summarize
-      grouped_df <- df %>%
-        dplyr::transmute(
+      renamed_df <- df %>%
+        dplyr::rename(
           time = UQ(rlang::sym(time_col)),
           value = UQ(rlang::sym(value_col)),
           category = UQ(rlang::sym(category_col))
-        ) %>%
+        )
         # remove NA so that we do not pass data with NA, NaN, or 0 to prophet, which we are not very sure what would happen.
         # we saw a case where rstan crashes with the last row with 0 y value.
         # dplyr::filter(!is.na(value)) %>% # Commented out, since now we handle NAs with na.rm option of fun.aggregate. This way, extra regressor info for each period is preserved better.
-        dplyr::group_by(category, time)
 
+      # Summarize
+      grouped_df <- renamed_df %>% dplyr::group_by(category, time)
       if (is_na_rm_func(fun.aggregate)) {
         df <- grouped_df %>% 
-          dplyr::summarise(value = fun.aggregate(value, na.rm=TRUE))
+          dplyr::summarise(value = fun.aggregate(value, na.rm=TRUE), !!!summarise_args)
       }
       else {
         df <- grouped_df %>% 
-          dplyr::summarise(value = fun.aggregate(value))
+          dplyr::summarise(value = fun.aggregate(value), !!!summarise_args)
       }
+      df <- df %>% dplyr::ungroup()
+      df_summarised <- df
+      df <- df %>% dplyr::select(time, value, category)
       # Pivot wider
       df <- df %>% tidyr::pivot_wider(names_from="category", values_from="value")
       # Complete the time column.
       df <- df %>% complete_date("time", time_unit = time_unit)
+      # Drop columns (represents category) that has more NAs than max_category_na_ratio, considering them to have not enough data.
+      df <- df %>% dplyr::select_if(function(x){sum(is.na(x))/length(x) < max_category_na_ratio})
       # Fill NAs in time series
       df <- df %>% dplyr::mutate(across(-time, ~fill_ts_na(.x, time, type = na_fill_type, val = na_fill_value)))
       time_values <- df$time
@@ -64,6 +92,10 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
       attr(model, "value_col") <- value_col
       attr(model, "category_col") <- category_col
       attr(model, "time_values") <- time_values
+      # Pass original data, so that the output has other variables too.
+      if (!is.null(variables) && !is.null(funs.aggregate.variables)) {
+        attr(model, "aggregated_data") <- df_summarised
+      }
       model
     }))
   model_df <- model_df %>% rowwise()
@@ -95,6 +127,11 @@ tidy.PartitionalTSClusters <- function(x, with_centroids = TRUE) {
   names(cluster_map) <- cluster_map_names
 
   res <- res %>% tidyr::pivot_longer(cols = -time)
+  if (!is.null(attr(x, "aggregated_data"))) {
+    aggregated_data <- attr(x, "aggregated_data")
+    aggregated_data <- aggregated_data %>% dplyr::select(-value) # Drop value column from aggregated_data since res already has it.
+    res <- res %>% dplyr::left_join(aggregated_data, by=c("time"="time", "name"="category"))
+  }
   res <- res %>% dplyr::mutate(Cluster = cluster_map[name])
   res <- res %>% dplyr::rename(!!rlang::sym(attr(x,"time_col")):=time,
                                !!rlang::sym(attr(x,"value_col")):=value,

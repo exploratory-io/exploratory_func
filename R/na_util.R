@@ -151,39 +151,60 @@ fill_between <- function(df, ..., .direction="down", value=NULL) {
 }
 
 #' Fill NAs in time series data. TODO: Merge into impute_na?
-#' @param type - Type of NA fill:
-#'                       "previous" - Fill with previous non-NA value.
-#'                       "value" - Fill with the value of na_fill_value.
-#'                       "interpolate" - Linear interpolation.
-#'                       "spline" - Spline interpolation.
-#'                       NULL - Skip NA fill. Use this only when you know there is no NA.
-#' @param val - Value to fill NA when na_fill_type is "value"
-fill_ts_na <- function(target, time, type = "previous", val = 0) {
+#' @param type - 3 element character vector that specifies types of NA fill for NAs at the begining, in the middle, at the ending of the time series.
+#'               For the beginning and ending part:
+#'                 "extend" - Extend the first non-NA value (for the beginning), or the last non-NA value (for the ending) to fill the NAs.
+#'                 "value" - Fill the NAs with the value specified by val argument.
+#'               For the middle part:
+#'                 "previous" - Fill with previous non-NA value.
+#'                 "value" - Fill with the value of na_fill_value.
+#'                 "interpolate" - Linear interpolation.
+#'                 "spline" - Spline interpolation.
+#'                 NULL - Skip NA fill. Use this only when you know there is no NA.
+#' @param val - 3 element numeric vector that specified values to fill NAs at the begining, in the middle, at the ending of the time series when the corresponding type is "value".
+#' @export
+fill_ts_na <- function(target, time, type = c("value", "previous", "extend"), val = c(0, 0, 0)) {
+  if (length(type) == 1) { # If only a single type is given, use it for the mid-section, and fill the beginning and ending with the default types.
+    type <- c("value", type, "extend")
+  }
+  if (length(val) == 1) { # If only a single val is given, use it for the mid-section, and fill the beginning and ending with the default value. 
+    val <- c(0, val, 0)
+  }
+
   df_zoo <- zoo::zoo(target, time)
+
   if (is.null(type)) {
     # skip when it is NULL. this is for the case caller is confident that
     # there is no NA and want to skip overhead of checking for NA.
   }
-  else if (type == "spline") {
-    df_zoo <- zoo::na.spline(df_zoo)
-  }
-  else if (type == "interpolate") {
-    df_zoo <- zoo::na.approx(df_zoo)
-  }
-  else if (type == "previous") {
-    df_zoo <- zoo::na.locf(df_zoo)
-  }
-  # TODO: Getting this error with some input with na.StructTS().
-  #       Error in rowSums(tsSmooth(StructTS(y))[, -2]) : 'x' must be an array of at least two dimensions
-  #
-  # else if (type == "StructTS") {
-  #   df_zoo <- zoo::na.StructTS(df_zoo)
-  # }
-  else if (type == "value") {
-    df_zoo <- zoo::na.fill(df_zoo, val)
-  }
   else {
-    stop(paste0(type, " is not a valid option for NA fill type."))
+    # Fill right values and left values first.
+    val_left <- if (type[1] == "value") val[1] else "extend"
+    val_right <- if (type[3] == "value") val[3] else "extend"
+    df_zoo <- zoo::na.fill(df_zoo, c(val_left, NA, val_right))
+
+    # Then, fill intermediate values.
+    if (type[2] == "spline") {
+      df_zoo <- zoo::na.spline(df_zoo)
+    }
+    else if (type[2] == "interpolate") {
+      df_zoo <- zoo::na.approx(df_zoo)
+    }
+    else if (type[2] == "previous") {
+      df_zoo <- zoo::na.locf(df_zoo)
+    }
+    # TODO: Getting this error with some input with na.StructTS().
+    #       Error in rowSums(tsSmooth(StructTS(y))[, -2]) : 'x' must be an array of at least two dimensions
+    #
+    # else if (type == "StructTS") {
+    #   df_zoo <- zoo::na.StructTS(df_zoo)
+    # }
+    else if (type[2] == "value") {
+      df_zoo <- zoo::na.fill(df_zoo, val[2])
+    }
+    else {
+      stop(paste0(type[2], " is not a valid option for NA fill type."))
+    }
   }
   ret <- zoo::coredata(df_zoo)
   ret
