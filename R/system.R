@@ -1037,7 +1037,11 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     }
     if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
     if(!requireNamespace("odbc")){stop("package odbc must be installed.")}
-    key <- paste("snowflake", host, port, databaseName, username, sep = ":")
+    if (is.null(port) || port == "") {
+      port <- 443 # snowflake default port.
+    }
+
+    key <- paste("snowflake", host, port, databaseName, username, warehouse, port, sep = ":")
     conn <- connection_pool[[key]]
     if (!is.null(conn)){
       tryCatch({
@@ -1064,15 +1068,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     }
     # if the connection is null or the connection is invalid, create a new one.
     if (is.null(conn) || !DBI::dbIsValid(conn)) {
-      conn <- DBI::dbConnect(odbc::odbc(),
-                             drv = driver,
-                             Server = host,
-                             Database = databaseName,
-                             UID = username,
-                             PWD = password,
-                             port = port,
-                             Warehouse = warehouse,
-                             bigint = "numeric")
+      conn <- DBI::dbConnect(odbc::odbc(), Server = host,  warehouse = warehouse, port = port, UID = username, PWD = password, driver = driver, Database = databaseName)
       connection_pool[[key]] <- conn
     }
   }
