@@ -677,7 +677,7 @@ clearAmazonAthenaConnection <- function(driver = "", region = "", authentication
 #' If not, new connection is created and returned.
 #' @export
 getDBConnection <- function(type, host = NULL, port = "", databaseName = "", username = "", password = "", catalog = "", schema = "", dsn="", additionalParams = "",
-                            collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, timeout = NULL, connectionString = NULL, driver = NULL) {
+                            collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, timeout = NULL, connectionString = NULL, driver = NULL, warehouse = NULL, ...) {
 
   drv = NULL
   conn = NULL
@@ -1029,6 +1029,52 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
                              bigint = "numeric")
       connection_pool[[key]] <- conn
     }
+  } else if (type == "snowflake") {
+    # If the platform is Linux, set the below predefined driver installed on Collaboration Server
+    # so that this data source can be scheduled.
+    if(Sys.info()["sysname"]=="Linux"){
+      driver <-  ""; #TODO: check the driver for Linux.
+    }
+    if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
+    if(!requireNamespace("odbc")){stop("package odbc must be installed.")}
+    key <- paste("snowflake", host, port, databaseName, username, sep = ":")
+    conn <- connection_pool[[key]]
+    if (!is.null(conn)){
+      tryCatch({
+        # test connection
+        result <- DBI::dbGetQuery(conn,"select 1")
+        if (!is.data.frame(result)) { # it can fail by returning NULL rather than throwing error.
+          tryCatch({ # try to close connection and ignore error
+            DBI::dbDisconnect(conn)
+          }, warning = function(w) {
+          }, error = function(e) {
+          })
+          conn <- NULL
+          # fall through to getting new connection.
+        }
+      }, error = function(err) {
+        tryCatch({ # try to close connection and ignore error
+          DBI::dbDisconnect(conn)
+        }, warning = function(w) {
+        }, error = function(e) {
+        })
+        conn <- NULL
+        # fall through to getting new connection.
+      })
+    }
+    # if the connection is null or the connection is invalid, create a new one.
+    if (is.null(conn) || !DBI::dbIsValid(conn)) {
+      conn <- DBI::dbConnect(odbc::odbc(),
+                             drv = driver,
+                             Server = host,
+                             Database = databaseName,
+                             UID = username,
+                             PWD = password,
+                             port = port,
+                             Warehouse = warehouse,
+                             bigint = "numeric")
+      connection_pool[[key]] <- conn
+    }
   }
   conn
 }
@@ -1113,7 +1159,7 @@ clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, user
 }
 
 isConnecitonPoolEnabbled <- function(type){
-  type %in% c("dbiodbc", "odbc", "postgres", "redshift", "vertica", "mysql", "aurora", "presto", "treasuredata", "mssqlserver")
+  type %in% c("dbiodbc", "odbc", "postgres", "redshift", "vertica", "mysql", "aurora", "presto", "treasuredata", "mssqlserver", "snowflake")
 }
 
 #' @export
@@ -1328,19 +1374,20 @@ queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IA
 #' @param dataBaseName - For MS SQL Server - name of the SQL Database
 #' @param driver - For MS SQL Server - namme of the ODBC driver
 #' @param type - For MS SQL Server "mssqlserver" is passed as type. For others,"odbc" is passed as type.
+#' @Param warehouse - For snowflake
 #'
-queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows = 0, query, stringsAsFactors = FALSE, host="", port="", as.is = TRUE, databaseName="", driver = "", type = "", ...){
+queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows = 0, query, stringsAsFactors = FALSE, host="", port="", as.is = TRUE, databaseName="", driver = "", type = "", warehouse = "", ...){
   if(type == "") {
     type <- "odbc"
   }
-  conn <- getDBConnection(type = type, host = host, port = port, NULL, username = username, password = password, dsn = dsn, additionalParams = additionalParams, databaseName = databaseName, driver = driver)
+  conn <- getDBConnection(type = type, host = host, port = port, NULL, username = username, password = password, dsn = dsn, additionalParams = additionalParams, databaseName = databaseName, driver = driver, warehouse = warehouse)
   tryCatch({
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
     query <- glue_exploratory(query, .transformer=sql_glue_transformer, .envir = parent.frame())
     # now odbc package is used for MS SQL Server Data Source so use DBI APIs.
     # The type sqlserver is already used for RODBC based one so "mssqlserver" is passed from Exploratory Desktop.
-    if(type == "mssqlserver" || type == "dbiodbc") {
+    if(type == "mssqlserver" || type == "dbiodbc" || type == "snowflake") {
       if(!requireNamespace("odbc")){stop("package odbc must be installed.")}
       resultSet <- DBI::dbSendQuery(conn, query)
       df <- DBI::dbFetch(resultSet, n = numOfRows)
@@ -1377,7 +1424,7 @@ queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows
   # and it gets result set with DBI package.
   # So make sure to clear the result set.
   # For RDOBC based case, it does not use result set.
-  if(type == "mssqlserver" || type == "dbiodbc") {
+  if(type == "mssqlserver" || type == "dbiodbc" || type == "snowflake") {
     DBI::dbClearResult(resultSet)
   }
   df
