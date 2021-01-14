@@ -528,6 +528,9 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
         m <- prophet::prophet(training_data, fit = FALSE, growth = growth,
                               daily.seasonality = daily.seasonality, weekly.seasonality = weekly.seasonality,
                               yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
+        # Default Fourier order for yearly is 10, and weekly is 3. Picked 8 for quarterly.
+        # Picked 8 and 6 for quarterly and monthly so that they are inline with the above,
+        # in that roughly the square of the Fourier order is within the same order as the days in the period.
         if (quarterly.seasonality) {
           prophet::add_seasonality(m,
                           "quarterly",
