@@ -123,11 +123,11 @@ test_that("do_prophet with quarterly and monthly seasonality", {
   ts <- seq.Date(as.Date("2010-01-01"), as.Date("2013-01-01"), by="day")
   raw_data <- data.frame(timestamp=ts, data=runif(length(ts)))
   model_df <- raw_data %>%
-    do_prophet(timestamp, data, 10, time_unit = "day", quarterly.seasonality=TRUE, output="model")
+    do_prophet(timestamp, data, 10, time_unit = "day", quarterly.seasonality=TRUE, monthly.seasonality=TRUE, output="model")
   coef_df <- model_df %>% tidy_rowwise(model, type="coef")
   expect_equal(names(coef_df), c("Variable","Importance"))
   ret <- model_df %>% tidy_rowwise(model)
-  browser()
+  expect_true(all(c("quarterly","monthly") %in% names(ret)))
   # verify the last date with forecasted_value
   expect_equal(last((ret %>% filter(!is.na(forecasted_value)))$timestamp), as.Date("2013-01-11")) 
 })
