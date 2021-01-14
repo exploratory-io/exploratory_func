@@ -489,15 +489,16 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
         m <- prophet::prophet(training_data, fit = FALSE, growth = growth,
                               daily.seasonality = daily.seasonality, weekly.seasonality = weekly.seasonality,
                               yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
+        browser()
         if (quarterly.seasonality) {
-          prophet::add_seasonality(m,
+          m <- prophet::add_seasonality(m,
                           "quarterly",
                           365.25/4,
                           fourier.order=8
                           )
         }
         if (monthly.seasonality) {
-          prophet::add_seasonality(m,
+          m <- prophet::add_seasonality(m,
                           "monthly",
                           365.25/12,
                           fourier.order=6
@@ -531,15 +532,16 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
         # Default Fourier order for yearly is 10, and weekly is 3. Picked 8 for quarterly.
         # Picked 8 and 6 for quarterly and monthly so that they are inline with the above,
         # in that roughly the square of the Fourier order is within the same order as the days in the period.
+        browser()
         if (quarterly.seasonality) {
-          prophet::add_seasonality(m,
+          m <- prophet::add_seasonality(m,
                           "quarterly",
                           365.25/4,
                           fourier.order=8
                           )
         }
         if (monthly.seasonality) {
-          prophet::add_seasonality(m,
+          m <- prophet::add_seasonality(m,
                           "monthly",
                           365.25/12,
                           fourier.order=6
@@ -601,6 +603,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
         }
         forecast <- stats::predict(m, future)
       }
+      browser()
       # with prophet 0.2.1, now forecast$ds is POSIXct. Cast it to Date when necessary so that full_join works.
       if (lubridate::is.Date(aggregated_data$ds)) {
         forecast$ds <- as.Date(forecast$ds)
@@ -642,63 +645,16 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
         ret <- ret %>% dplyr::mutate(trend_change = NA_real_)
       }
   
+      browser()
       # adjust order of output columns
-      if ("cap.y" %in% colnames(ret)) { # cap.y exists only when cap is used.
-        if ("yearly_upper" %in% colnames(ret)) { # yearly_upper/lower exists only when yearly.seasonality is TRUE
-          if ("weekly_upper" %in% colnames(ret)) { # weekly_upper/lower exists only when weekly.seasonality is TRUE
-            ret <- ret %>% dplyr::select(ds, y, yhat, yhat_upper, yhat_lower, trend, trend_upper, trend_lower,
-                                         yearly, yearly_lower, yearly_upper,
-                                         weekly, weekly_lower, weekly_upper,
-                                         cap.y, cap.x,
-                                         dplyr::everything())
-          }
-          else {
-            ret <- ret %>% dplyr::select(ds, y, yhat, yhat_upper, yhat_lower, trend, trend_upper, trend_lower,
-                                         yearly, yearly_lower, yearly_upper,
-                                         cap.y, cap.x,
-                                         dplyr::everything())
-          }
-        }
-        else {
-          if ("weekly_upper" %in% colnames(ret)) { # weekly_upper/lower exists only when weekly.seasonality is TRUE
-            ret <- ret %>% dplyr::select(ds, y, yhat, yhat_upper, yhat_lower, trend, trend_upper, trend_lower,
-                                         weekly, weekly_lower, weekly_upper,
-                                         cap.y, cap.x,
-                                         dplyr::everything())
-          }
-          else {
-            ret <- ret %>% dplyr::select(ds, y, yhat, yhat_upper, yhat_lower, trend, trend_upper, trend_lower,
-                                         cap.y, cap.x,
-                                         dplyr::everything())
-          }
-        }
-      }
-      else {
-        if ("yearly_upper" %in% colnames(ret)) { # yearly_upper/lower exists only when yearly.seasonality is TRUE
-          if ("weekly_upper" %in% colnames(ret)) { # weekly_upper/lower exists only when weekly.seasonality is TRUE
-            ret <- ret %>% dplyr::select(ds, y, yhat, yhat_upper, yhat_lower, trend, trend_upper, trend_lower,
-                                         yearly, yearly_lower, yearly_upper,
-                                         weekly, weekly_lower, weekly_upper,
-                                         dplyr::everything())
-          }
-          else {
-            ret <- ret %>% dplyr::select(ds, y, yhat, yhat_upper, yhat_lower, trend, trend_upper, trend_lower,
-                                         yearly, yearly_lower, yearly_upper,
-                                         dplyr::everything())
-          }
-        }
-        else {
-          if ("weekly_upper" %in% colnames(ret)) { # weekly_upper/lower exists only when weekly.seasonality is TRUE
-            ret <- ret %>% dplyr::select(ds, y, yhat, yhat_upper, yhat_lower, trend, trend_upper, trend_lower,
-                                         weekly, weekly_lower, weekly_upper,
-                                         dplyr::everything())
-          }
-          else {
-            ret <- ret %>% dplyr::select(ds, y, yhat, yhat_upper, yhat_lower, trend, trend_upper, trend_lower,
-                                         dplyr::everything())
-          }
-        }
-      }
+      ret <- ret %>% dplyr::select(ds, y, yhat, yhat_upper, yhat_lower, trend, trend_upper, trend_lower,
+                                   matches('^yearly$'), matches('^yearly_lower$'), matches('^yearly_upper$'),
+                                   matches('^quarterly$'), matches('^quarterly_lower$'), matches('^quarterly_upper$'),
+                                   matches('^monthly$'), matches('^monthly_lower$'), matches('^monthly_upper$'),
+                                   matches('^weekly$'), matches('^weekly_lower$'), matches('^weekly_upper$'),
+                                   matches('^daily$'), matches('^daily_lower$'), matches('^daily_upper$'),
+                                   matches('^cap.y$'), matches('^cap.x$'),
+                                   dplyr::everything())
       if (test_mode) { # Bring is_test_data column to the last
         ret <- ret %>% dplyr::select(-is_test_data, is_test_data)
       }
