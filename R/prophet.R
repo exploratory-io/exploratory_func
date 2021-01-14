@@ -489,7 +489,6 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
         m <- prophet::prophet(training_data, fit = FALSE, growth = growth,
                               daily.seasonality = daily.seasonality, weekly.seasonality = weekly.seasonality,
                               yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
-        browser()
         if (quarterly.seasonality) {
           m <- prophet::add_seasonality(m,
                           "quarterly",
@@ -532,7 +531,6 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
         # Default Fourier order for yearly is 10, and weekly is 3. Picked 8 for quarterly.
         # Picked 8 and 6 for quarterly and monthly so that they are inline with the above,
         # in that roughly the square of the Fourier order is within the same order as the days in the period.
-        browser()
         if (quarterly.seasonality) {
           m <- prophet::add_seasonality(m,
                           "quarterly",
@@ -603,7 +601,6 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
         }
         forecast <- stats::predict(m, future)
       }
-      browser()
       # with prophet 0.2.1, now forecast$ds is POSIXct. Cast it to Date when necessary so that full_join works.
       if (lubridate::is.Date(aggregated_data$ds)) {
         forecast$ds <- as.Date(forecast$ds)
@@ -645,7 +642,6 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
         ret <- ret %>% dplyr::mutate(trend_change = NA_real_)
       }
   
-      browser()
       # adjust order of output columns
       ret <- ret %>% dplyr::select(ds, y, yhat, yhat_upper, yhat_lower, trend, trend_upper, trend_lower,
                                    matches('^yearly$'), matches('^yearly_lower$'), matches('^yearly_upper$'),
@@ -790,7 +786,7 @@ tidy.prophet_exploratory <- function(x, type="result") {
     # Calculate SDs of effects of regressors and seasonalities. For regressors, this equals to (absolute value of) beta by definition.
     # Reference: https://github.com/facebook/prophet/issues/928
     res <- res %>%
-      dplyr::select(matches('(_effect$|^yearly$|^weekly$|^daily$|^hourly$|^holidays$)'))
+      dplyr::select(matches('(_effect$|^yearly$|^quarterly$|^monthly$|^weekly$|^daily$|^hourly$|^holidays$)'))
 
     # Check if multiple columns are left before further calculation,
     # since no column would result in error, and importance for only one column would be rather pointless. 
@@ -799,7 +795,7 @@ tidy.prophet_exploratory <- function(x, type="result") {
       res <- res %>%
         dplyr::summarise_all(.funs=~sd(.,na.rm=TRUE)) %>%
         tidyr::pivot_longer(everything(), names_to='Variable', values_to='Importance') %>%
-        dplyr::mutate(Variable = dplyr::recode(Variable, yearly='Yearly', weekly='Weekly', daily='Daily', hourly='Hourly', holidays='Holidays')) %>%
+        dplyr::mutate(Variable = dplyr::recode(Variable, yearly='Yearly', quarterly='Quarterly', monthly='Monthly', weekly='Weekly', daily='Daily', hourly='Hourly', holidays='Holidays')) %>%
         dplyr::mutate(Variable = stringr::str_remove(Variable, '_effect$'))
     }
     else {
