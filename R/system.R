@@ -1032,7 +1032,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
   } else if (type == "snowflake") {
     # If the platform is Linux, set the below predefined driver installed on Collaboration Server
     # so that this data source can be scheduled.
-    if (Sys.info()["sysname"]=="Linux") {
+    if (Sys.info()["sysname"] == "Linux") {
       # ref: https://docs.snowflake.com/en/user-guide/odbc-linux.html
       driver <-  "/usr/lib64/snowflake/odbc/lib/libSnowflake.so";
     }
@@ -1434,7 +1434,7 @@ queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows
   # and it gets result set with DBI package.
   # So make sure to clear the result set.
   # For RDOBC based case, it does not use result set.
-  if(type == "mssqlserver" || type == "dbiodbc" || type == "snowflake") {
+  if (type == "mssqlserver" || type == "dbiodbc" || type == "snowflake") {
     DBI::dbClearResult(resultSet)
   }
   df
