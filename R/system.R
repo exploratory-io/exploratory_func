@@ -1068,7 +1068,14 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     }
     # if the connection is null or the connection is invalid, create a new one.
     if (is.null(conn) || !DBI::dbIsValid(conn)) {
-      conn <- DBI::dbConnect(odbc::odbc(), Server = host,  warehouse = warehouse, port = port, UID = username, PWD = password, driver = driver, Database = databaseName)
+      conn <- DBI::dbConnect(odbc::odbc(),
+                             Server = host,
+                             Warehouse = warehouse,
+                             port = port,
+                             UID = username,
+                             PWD = password,
+                             driver = driver,
+                             Database = databaseName)
       connection_pool[[key]] <- conn
     }
   }
@@ -1383,8 +1390,9 @@ queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows
     query <- glue_exploratory(query, .transformer=sql_glue_transformer, .envir = parent.frame())
     # now odbc package is used for MS SQL Server Data Source so use DBI APIs.
     # The type sqlserver is already used for RODBC based one so "mssqlserver" is passed from Exploratory Desktop.
-    if(type == "mssqlserver" || type == "dbiodbc" || type == "snowflake") {
+    if (type == "mssqlserver" || type == "dbiodbc" || type == "snowflake") {
       if(!requireNamespace("odbc")){stop("package odbc must be installed.")}
+      reset <- NULL
       resultSet <- DBI::dbSendQuery(conn, query)
       df <- DBI::dbFetch(resultSet, n = numOfRows)
     } else if(type == "odbc") { # For RODBC based ODBC Data Soruces, use RODBC API.
