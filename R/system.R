@@ -1032,19 +1032,24 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
   } else if (type == "snowflake") {
     # If the platform is Linux, set the below predefined driver installed on Collaboration Server
     # so that this data source can be scheduled.
-    if(Sys.info()["sysname"]=="Linux"){
+    if (Sys.info()["sysname"]=="Linux") {
       # ref: https://docs.snowflake.com/en/user-guide/odbc-linux.html
       driver <-  "/usr/lib64/snowflake/odbc/lib/libSnowflake.so";
     }
-    if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
-    if(!requireNamespace("odbc")){stop("package odbc must be installed.")}
+    if (!requireNamespace("DBI")) {
+      stop("package DBI must be installed.")
+    }
+    if (!requireNamespace("odbc")) {
+      stop("package odbc must be installed.")
+    }
     if (is.null(port) || port == "") {
+      # https://docs.snowflake.com/en/user-guide/odbc-parameters.html
       port <- 443 # snowflake default port.
     }
 
     key <- paste("snowflake", host, port, databaseName, username, warehouse, port, sep = ":")
     conn <- connection_pool[[key]]
-    if (!is.null(conn)){
+    if (!is.null(conn)) {
       tryCatch({
         # test connection
         result <- DBI::dbGetQuery(conn,"select 1")
