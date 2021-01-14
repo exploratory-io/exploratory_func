@@ -1033,7 +1033,8 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     # If the platform is Linux, set the below predefined driver installed on Collaboration Server
     # so that this data source can be scheduled.
     if(Sys.info()["sysname"]=="Linux"){
-      driver <-  ""; #TODO: check the driver for Linux.
+      # ref: https://docs.snowflake.com/en/user-guide/odbc-linux.html
+      driver <-  "/usr/lib64/snowflake/odbc/lib/libSnowflake.so";
     }
     if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
     if(!requireNamespace("odbc")){stop("package odbc must be installed.")}
