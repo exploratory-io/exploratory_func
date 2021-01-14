@@ -110,6 +110,7 @@ do_prophet <- function(df, time, value = NULL, periods = 10, holiday = NULL, ...
 do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit = "day", include_history = TRUE, test_mode = FALSE,
                         fun.aggregate = sum, na_fill_type = NULL, na_fill_value = 0,
                         cap = NULL, floor = NULL, growth = NULL, weekly.seasonality = TRUE, yearly.seasonality = TRUE,
+                        quarterly.seasonality = FALSE, monthly.seasonality = FALSE,
                         daily.seasonality = "auto",
                         holiday_col = NULL, holidays = NULL, holiday_country_names = NULL,
                         regressors = NULL, funs.aggregate.regressors = NULL, regressors_na_fill_type = NULL, regressors_na_fill_value = 0,
@@ -399,11 +400,30 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
         }
       }
   
-      if (time_unit %in% c("week", "month", "quarter", "year")) { # if time_unit is larger than day (the next level is week), having weekly.seasonality does not make sense.
+      # For example, if time_unit is month or larger, having monthly.seasonality or seasonalities of shorter periods does not make sense.
+      if (time_unit %in% c("year")) {
+        yearly.seasonality <- FALSE
+        quarterly.seasonality <- FALSE
+        monthly.seasonality <- FALSE
         weekly.seasonality <- FALSE
         daily.seasonality <- FALSE
       }
-      else if (time_unit %in% c("day")) { # if time_unit is larger than hour (the next level is day), having daily.seasonality does not make sense.
+      else if (time_unit %in% c("quarter")) {
+        quarterly.seasonality <- FALSE
+        monthly.seasonality <- FALSE
+        weekly.seasonality <- FALSE
+        daily.seasonality <- FALSE
+      }
+      else if (time_unit %in% c("month")) {
+        monthly.seasonality <- FALSE
+        weekly.seasonality <- FALSE
+        daily.seasonality <- FALSE
+      }
+      else if (time_unit %in% c("week")) {
+        weekly.seasonality <- FALSE
+        daily.seasonality <- FALSE
+      }
+      else if (time_unit %in% c("day")) {
         daily.seasonality <- FALSE
       }
       # disabling this logic for now, since setting yearly.seasonality FALSE disables weekly.seasonality too.
@@ -467,7 +487,22 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
           # if future data frame is without cap, use it just as a future data frame.
         }
         m <- prophet::prophet(training_data, fit = FALSE, growth = growth,
-                              daily.seasonality = daily.seasonality, weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
+                              daily.seasonality = daily.seasonality, weekly.seasonality = weekly.seasonality,
+                              yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
+        if (quarterly.seasonality) {
+          m <- prophet::add_seasonality(m,
+                          "quarterly",
+                          365.25/4,
+                          fourier.order=8
+                          )
+        }
+        if (monthly.seasonality) {
+          m <- prophet::add_seasonality(m,
+                          "monthly",
+                          365.25/12,
+                          fourier.order=6
+                          )
+        }
         # add regressors to the model.
         if (!is.null(regressor_output_cols)) {
           for (regressor in regressor_output_cols) {
@@ -491,7 +526,25 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
           growth <- "linear"
         }
         m <- prophet::prophet(training_data, fit = FALSE, growth = growth,
-                              daily.seasonality = daily.seasonality, weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
+                              daily.seasonality = daily.seasonality, weekly.seasonality = weekly.seasonality,
+                              yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
+        # Default Fourier order for yearly is 10, and weekly is 3. Picked 8 for quarterly.
+        # Picked 8 and 6 for quarterly and monthly so that they are inline with the above,
+        # in that roughly the square of the Fourier order is within the same order as the days in the period.
+        if (quarterly.seasonality) {
+          m <- prophet::add_seasonality(m,
+                          "quarterly",
+                          365.25/4,
+                          fourier.order=8
+                          )
+        }
+        if (monthly.seasonality) {
+          m <- prophet::add_seasonality(m,
+                          "monthly",
+                          365.25/12,
+                          fourier.order=6
+                          )
+        }
         if (!is.null(regressor_output_cols)) {
           for (regressor in regressor_output_cols) {
             m <- add_regressor(m, regressor)
@@ -590,62 +643,14 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
       }
   
       # adjust order of output columns
-      if ("cap.y" %in% colnames(ret)) { # cap.y exists only when cap is used.
-        if ("yearly_upper" %in% colnames(ret)) { # yearly_upper/lower exists only when yearly.seasonality is TRUE
-          if ("weekly_upper" %in% colnames(ret)) { # weekly_upper/lower exists only when weekly.seasonality is TRUE
-            ret <- ret %>% dplyr::select(ds, y, yhat, yhat_upper, yhat_lower, trend, trend_upper, trend_lower,
-                                         yearly, yearly_lower, yearly_upper,
-                                         weekly, weekly_lower, weekly_upper,
-                                         cap.y, cap.x,
-                                         dplyr::everything())
-          }
-          else {
-            ret <- ret %>% dplyr::select(ds, y, yhat, yhat_upper, yhat_lower, trend, trend_upper, trend_lower,
-                                         yearly, yearly_lower, yearly_upper,
-                                         cap.y, cap.x,
-                                         dplyr::everything())
-          }
-        }
-        else {
-          if ("weekly_upper" %in% colnames(ret)) { # weekly_upper/lower exists only when weekly.seasonality is TRUE
-            ret <- ret %>% dplyr::select(ds, y, yhat, yhat_upper, yhat_lower, trend, trend_upper, trend_lower,
-                                         weekly, weekly_lower, weekly_upper,
-                                         cap.y, cap.x,
-                                         dplyr::everything())
-          }
-          else {
-            ret <- ret %>% dplyr::select(ds, y, yhat, yhat_upper, yhat_lower, trend, trend_upper, trend_lower,
-                                         cap.y, cap.x,
-                                         dplyr::everything())
-          }
-        }
-      }
-      else {
-        if ("yearly_upper" %in% colnames(ret)) { # yearly_upper/lower exists only when yearly.seasonality is TRUE
-          if ("weekly_upper" %in% colnames(ret)) { # weekly_upper/lower exists only when weekly.seasonality is TRUE
-            ret <- ret %>% dplyr::select(ds, y, yhat, yhat_upper, yhat_lower, trend, trend_upper, trend_lower,
-                                         yearly, yearly_lower, yearly_upper,
-                                         weekly, weekly_lower, weekly_upper,
-                                         dplyr::everything())
-          }
-          else {
-            ret <- ret %>% dplyr::select(ds, y, yhat, yhat_upper, yhat_lower, trend, trend_upper, trend_lower,
-                                         yearly, yearly_lower, yearly_upper,
-                                         dplyr::everything())
-          }
-        }
-        else {
-          if ("weekly_upper" %in% colnames(ret)) { # weekly_upper/lower exists only when weekly.seasonality is TRUE
-            ret <- ret %>% dplyr::select(ds, y, yhat, yhat_upper, yhat_lower, trend, trend_upper, trend_lower,
-                                         weekly, weekly_lower, weekly_upper,
-                                         dplyr::everything())
-          }
-          else {
-            ret <- ret %>% dplyr::select(ds, y, yhat, yhat_upper, yhat_lower, trend, trend_upper, trend_lower,
-                                         dplyr::everything())
-          }
-        }
-      }
+      ret <- ret %>% dplyr::select(ds, y, yhat, yhat_upper, yhat_lower, trend, trend_upper, trend_lower,
+                                   matches('^yearly$'), matches('^yearly_lower$'), matches('^yearly_upper$'),
+                                   matches('^quarterly$'), matches('^quarterly_lower$'), matches('^quarterly_upper$'),
+                                   matches('^monthly$'), matches('^monthly_lower$'), matches('^monthly_upper$'),
+                                   matches('^weekly$'), matches('^weekly_lower$'), matches('^weekly_upper$'),
+                                   matches('^daily$'), matches('^daily_lower$'), matches('^daily_upper$'),
+                                   matches('^cap.y$'), matches('^cap.x$'),
+                                   dplyr::everything())
       if (test_mode) { # Bring is_test_data column to the last
         ret <- ret %>% dplyr::select(-is_test_data, is_test_data)
       }
@@ -781,7 +786,7 @@ tidy.prophet_exploratory <- function(x, type="result") {
     # Calculate SDs of effects of regressors and seasonalities. For regressors, this equals to (absolute value of) beta by definition.
     # Reference: https://github.com/facebook/prophet/issues/928
     res <- res %>%
-      dplyr::select(matches('(_effect$|^yearly$|^weekly$|^daily$|^hourly$|^holidays$)'))
+      dplyr::select(matches('(_effect$|^yearly$|^quarterly$|^monthly$|^weekly$|^daily$|^hourly$|^holidays$)'))
 
     # Check if multiple columns are left before further calculation,
     # since no column would result in error, and importance for only one column would be rather pointless. 
@@ -790,7 +795,7 @@ tidy.prophet_exploratory <- function(x, type="result") {
       res <- res %>%
         dplyr::summarise_all(.funs=~sd(.,na.rm=TRUE)) %>%
         tidyr::pivot_longer(everything(), names_to='Variable', values_to='Importance') %>%
-        dplyr::mutate(Variable = dplyr::recode(Variable, yearly='Yearly', weekly='Weekly', daily='Daily', hourly='Hourly', holidays='Holidays')) %>%
+        dplyr::mutate(Variable = dplyr::recode(Variable, yearly='Yearly', quarterly='Quarterly', monthly='Monthly', weekly='Weekly', daily='Daily', hourly='Hourly', holidays='Holidays')) %>%
         dplyr::mutate(Variable = stringr::str_remove(Variable, '_effect$'))
     }
     else {
