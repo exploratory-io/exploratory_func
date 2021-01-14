@@ -400,11 +400,30 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
         }
       }
   
-      if (time_unit %in% c("week", "month", "quarter", "year")) { # if time_unit is larger than day (the next level is week), having weekly.seasonality does not make sense.
+      # For example, if time_unit is month or larger, having monthly.seasonality or seasonalities of shorter periods does not make sense.
+      if (time_unit %in% c("year")) {
+        yearly.seasonality <- FALSE
+        quarterly.seasonality <- FALSE
+        monthly.seasonality <- FALSE
         weekly.seasonality <- FALSE
         daily.seasonality <- FALSE
       }
-      else if (time_unit %in% c("day")) { # if time_unit is larger than hour (the next level is day), having daily.seasonality does not make sense.
+      else if (time_unit %in% c("quarter")) {
+        quarterly.seasonality <- FALSE
+        monthly.seasonality <- FALSE
+        weekly.seasonality <- FALSE
+        daily.seasonality <- FALSE
+      }
+      else if (time_unit %in% c("month")) {
+        monthly.seasonality <- FALSE
+        weekly.seasonality <- FALSE
+        daily.seasonality <- FALSE
+      }
+      else if (time_unit %in% c("week")) {
+        weekly.seasonality <- FALSE
+        daily.seasonality <- FALSE
+      }
+      else if (time_unit %in% c("day")) {
         daily.seasonality <- FALSE
       }
       # disabling this logic for now, since setting yearly.seasonality FALSE disables weekly.seasonality too.
@@ -468,7 +487,22 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
           # if future data frame is without cap, use it just as a future data frame.
         }
         m <- prophet::prophet(training_data, fit = FALSE, growth = growth,
-                              daily.seasonality = daily.seasonality, weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
+                              daily.seasonality = daily.seasonality, weekly.seasonality = weekly.seasonality,
+                              yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
+        if (quarterly.seasonality) {
+          prophet::add_seasonality(m,
+                          "quarterly",
+                          365.25/4,
+                          fourier.order=8
+                          )
+        }
+        if (monthly.seasonality) {
+          prophet::add_seasonality(m,
+                          "monthly",
+                          365.25/12,
+                          fourier.order=6
+                          )
+        }
         # add regressors to the model.
         if (!is.null(regressor_output_cols)) {
           for (regressor in regressor_output_cols) {
@@ -492,7 +526,22 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
           growth <- "linear"
         }
         m <- prophet::prophet(training_data, fit = FALSE, growth = growth,
-                              daily.seasonality = daily.seasonality, weekly.seasonality = weekly.seasonality, yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
+                              daily.seasonality = daily.seasonality, weekly.seasonality = weekly.seasonality,
+                              yearly.seasonality = yearly.seasonality, holidays = holidays_df, ...)
+        if (quarterly.seasonality) {
+          prophet::add_seasonality(m,
+                          "quarterly",
+                          365.25/4,
+                          fourier.order=8
+                          )
+        }
+        if (monthly.seasonality) {
+          prophet::add_seasonality(m,
+                          "monthly",
+                          365.25/12,
+                          fourier.order=6
+                          )
+        }
         if (!is.null(regressor_output_cols)) {
           for (regressor in regressor_output_cols) {
             m <- add_regressor(m, regressor)
