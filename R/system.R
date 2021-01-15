@@ -1033,6 +1033,8 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     # If the platform is Linux, set the below predefined driver installed on Collaboration Server
     # so that this data source can be scheduled.
     if (Sys.info()["sysname"] == "Linux") {
+      # The driver is passed as an argument when the API is called from Exploratory Desktop,
+      # However, to make it work on Linux Server, it needs to override the library with the one for Linux.
       # ref: https://docs.snowflake.com/en/user-guide/odbc-linux.html
       driver <-  "/usr/lib64/snowflake/odbc/lib/libSnowflake.so";
     }
@@ -1167,7 +1169,7 @@ clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, user
   }
 }
 
-isConnecitonPoolEnabbled <- function(type){
+isConnecitonPoolEnabled <- function(type){
   type %in% c("dbiodbc", "odbc", "postgres", "redshift", "vertica", "mysql", "aurora", "presto", "treasuredata", "mssqlserver", "snowflake")
 }
 
@@ -1181,7 +1183,7 @@ getListOfTables <- function(type, host, port, databaseName = NULL, username, pas
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
     clearDBConnection(type, host, port, databaseName, username, catalog = catalog, schema = schema)
-    if (!isConnecitonPoolEnabbled(type)) { # only if conn pool is not used yet
+    if (!isConnecitonPoolEnabled(type)) { # only if conn pool is not used yet
       tryCatch({ # try to close connection and ignore error
         DBI::dbDisconnect(conn)
       }, warning = function(w) {
@@ -1190,7 +1192,7 @@ getListOfTables <- function(type, host, port, databaseName = NULL, username, pas
     }
     stop(err)
   })
-  if (!!isConnecitonPoolEnabbled(type)) { # only if conn pool is not used yet
+  if (!!isConnecitonPoolEnabled(type)) { # only if conn pool is not used yet
     tryCatch({ # try to close connection and ignore error
       DBI::dbDisconnect(conn)
     }, warning = function(w) {
@@ -1209,7 +1211,7 @@ getListOfColumns <- function(type, host, port, databaseName, username, password,
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
     clearDBConnection(type, host, port, databaseName, username)
-    if (!!isConnecitonPoolEnabbled(type)) { # only if conn pool is not used yet
+    if (!!isConnecitonPoolEnabled(type)) { # only if conn pool is not used yet
       tryCatch({ # try to close connection and ignore error
         DBI::dbDisconnect(conn)
       }, warning = function(w) {
@@ -1218,7 +1220,7 @@ getListOfColumns <- function(type, host, port, databaseName, username, password,
     }
     stop(err)
   })
-  if (!!isConnecitonPoolEnabbled(type)) { # only if conn pool is not used yet
+  if (!!isConnecitonPoolEnabled(type)) { # only if conn pool is not used yet
     tryCatch({ # try to close connection and ignore error
       DBI::dbDisconnect(conn)
     }, warning = function(w) {
@@ -1248,7 +1250,7 @@ executeGenericQuery <- function(type, host, port, databaseName, username, passwo
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
     clearDBConnection(type, host, port, databaseName, username, catalog = catalog, schema = schema)
-    if (!!isConnecitonPoolEnabbled(type)) { # only if conn pool is not used yet
+    if (!!isConnecitonPoolEnabled(type)) { # only if conn pool is not used yet
       tryCatch({ # try to close connection and ignore error
         DBI::dbDisconnect(conn)
       }, warning = function(w) {
@@ -1258,7 +1260,7 @@ executeGenericQuery <- function(type, host, port, databaseName, username, passwo
     stop(err)
   })
   DBI::dbClearResult(resultSet)
-  if (!!isConnecitonPoolEnabbled(type)) { # only if conn pool is not used yet
+  if (!!isConnecitonPoolEnabled(type)) { # only if conn pool is not used yet
     tryCatch({ # try to close connection and ignore error
       DBI::dbDisconnect(conn)
     }, warning = function(w) {
