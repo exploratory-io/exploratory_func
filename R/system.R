@@ -677,7 +677,7 @@ clearAmazonAthenaConnection <- function(driver = "", region = "", authentication
 #' If not, new connection is created and returned.
 #' @export
 getDBConnection <- function(type, host = NULL, port = "", databaseName = "", username = "", password = "", catalog = "", schema = "", dsn="", additionalParams = "",
-                            collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, timeout = NULL, connectionString = NULL, driver = NULL, warehouse = NULL, ...) {
+                            collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, timeout = NULL, connectionString = NULL, driver = NULL, ...) {
 
   drv = NULL
   conn = NULL
@@ -1047,7 +1047,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       port <- 443 # snowflake default port.
     }
 
-    key <- paste("snowflake", host, port, databaseName, username, warehouse, port, sep = ":")
+    key <- paste("snowflake", host, port, databaseName, username, port, sep = ":")
     conn <- connection_pool[[key]]
     if (!is.null(conn)) {
       tryCatch({
@@ -1076,7 +1076,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     if (is.null(conn) || !DBI::dbIsValid(conn)) {
       conn <- DBI::dbConnect(odbc::odbc(),
                              Server = host,
-                             Warehouse = warehouse,
+                             Warehouse = catalog,
                              port = port,
                              UID = username,
                              PWD = password,
@@ -1383,13 +1383,13 @@ queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IA
 #' @param dataBaseName - For MS SQL Server - name of the SQL Database
 #' @param driver - For MS SQL Server - namme of the ODBC driver
 #' @param type - For MS SQL Server "mssqlserver" is passed as type. For others,"odbc" is passed as type.
-#' @Param warehouse - For snowflake
+#' @param catalog - For Snowflake's Warehouse.
 #'
-queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows = 0, query, stringsAsFactors = FALSE, host="", port="", as.is = TRUE, databaseName="", driver = "", type = "", warehouse = "", ...){
+queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows = 0, query, stringsAsFactors = FALSE, host="", port="", as.is = TRUE, databaseName="", driver = "", type = "", catalog = "",...){
   if(type == "") {
     type <- "odbc"
   }
-  conn <- getDBConnection(type = type, host = host, port = port, NULL, username = username, password = password, dsn = dsn, additionalParams = additionalParams, databaseName = databaseName, driver = driver, warehouse = warehouse)
+  conn <- getDBConnection(type = type, host = host, port = port, NULL, username = username, password = password, dsn = dsn, additionalParams = additionalParams, databaseName = databaseName, driver = driver, catalog = catalog)
   tryCatch({
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
