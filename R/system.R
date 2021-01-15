@@ -1034,7 +1034,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     # so that this data source can be scheduled.
     if (Sys.info()["sysname"] == "Linux") {
       # The driver is passed as an argument when the API is called from Exploratory Desktop,
-      # However, to make it work on Linux Server, it needs to override the library with the one for Linux.
+      # However,it overwrites the value for desktop with the Linux driver when run on server.
       # ref: https://docs.snowflake.com/en/user-guide/odbc-linux.html
       driver <-  "/usr/lib64/snowflake/odbc/lib/libSnowflake.so";
     }
