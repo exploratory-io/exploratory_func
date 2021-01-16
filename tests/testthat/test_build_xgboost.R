@@ -285,7 +285,10 @@ test_that("test build_xgboost reg", {
       CARRIER = c("DL", "MQ", "AA", "DL", "MQ", "AA", "DL", "DL", "MQ", "AA", "AA", "WN", "US", "US", "DL", "EV", "9E", "EV", "DL", "DL"),
       DISTANCE = c(1587, 173, 646, 187, 273, 1062, 583, 240, 1123, 851, 852, 862, 361, 507, 1020, 1092, 342, 489, 1184, 545)), row.names = c(NA, -20L),
     class = c("tbl_df", "tbl", "data.frame"), .Names = c("CANCELLED", "Carrier Name", "CARRIER", "DISTANCE"))
-  test_data[["weight"]] <- c(seq(nrow(test_data) -1), NA)
+  # test_data[["weight"]] <- c(seq(nrow(test_data) -1), NA) # It seems that NA in weight is not allowed anymore.
+  # With xgboost 1.3.1.1, following error is retuned.
+  # "amalgamation/../src/data/data.cc:365: Check failed: valid: Weights must be positive values."
+  test_data[["weight"]] <- seq(nrow(test_data))
   test_data[["IS_AA"]] <- test_data$CARRIER == "AA"
   model_ret <- build_model(
     test_data,
