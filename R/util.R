@@ -1633,7 +1633,7 @@ extract_from_numeric <- function(x, type = "asdisc") {
 #' @param null_model_mean - Mean value the basis null model gives.
 #'                          To calculate R-Squared for test data, one from training data should be specified here.
 #' @export
-r_squared <- function (actual, predicted, null_model_mean=NULL) {
+r_squared <- function(actual, predicted, null_model_mean=NULL) {
   # https://stats.stackexchange.com/questions/230556/calculate-r-square-in-r-for-two-vectors
   # https://en.wikipedia.org/wiki/Coefficient_of_determination
   if (is.null(null_model_mean)) {
@@ -1641,6 +1641,11 @@ r_squared <- function (actual, predicted, null_model_mean=NULL) {
     null_model_mean <- mean(actual, na.rm=TRUE)
   }
   ret <- 1 - (sum((actual-predicted)^2, na.rm=TRUE)/sum((actual-null_model_mean)^2, na.rm=TRUE))
+  ret
+}
+
+adjusted_r_squared <- function(rsq, n_observations, df_residual) {
+  ret <- 1 - (1 - rsq) * (n_observations - 1) / df_residual
   ret
 }
 
