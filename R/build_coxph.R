@@ -670,13 +670,6 @@ tidy.coxph_exploratory <- function(x, pretty.name = FALSE, type = 'coefficients'
       # if it were kept as factor, when groups are bound, only the factor order from the first group would be respected.
       ret <- ret %>% dplyr::arrange(variable) %>% dplyr::mutate(variable = as.character(variable))
       ret <- ret %>% survival_pdp_sort_categorical()
-
-      # Get Coefficient/P value info to join.
-      ret2 <- broom:::tidy.coxph(x)
-      # Coefficient/P value info is joined only for predicted numeric variables. 
-      ret <- ret %>% dplyr::mutate(key=case_when(type=='Actual'~NA_character_,chart_type=='line'~variable, TRUE~NA_character_))  %>% dplyr::left_join(ret2, by = c(key="term"))
-      ret <- ret %>% dplyr::select(-key)
-
       ret <- ret %>% dplyr::mutate(variable = x$terms_mapping[variable]) # map variable names to original.
       ret
     },
