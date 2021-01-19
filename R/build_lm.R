@@ -1219,7 +1219,6 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
     }
   }
   
-  browser()
   if (x$family$family %in% c('gaussian')) { # only for gaussian, which is same as linear regression (if link function is identity). 
     root_mean_square_error <- rmse(x$fitted.values, x$y)
     rsq <- r_squared(x$y, x$fitted.values)
@@ -1773,7 +1772,6 @@ find_data.glm_exploratory <- function(model, env = parent.frame(), ...) {
 # Generates Summary table for Analytics View. It can handle Test Mode.
 # This is written for linear regression analytics view and GLM analytics views that makes numeric prediction.
 evaluate_lm_training_and_test <- function(df, pretty.name = FALSE){
-  browser()
   # Get the summary row for traninng data. Info is retrieved from model by glance()
   training_ret <- df %>% glance_rowwise(model, pretty.name = pretty.name)
   ret <- training_ret
@@ -1785,7 +1783,6 @@ evaluate_lm_training_and_test <- function(df, pretty.name = FALSE){
   if (purrr::some(df$.test_index, function(x){length(x)!=0})) {
     ret$is_test_data <- FALSE # Set is_test_data FALSE for training data. Add is_test_data column only when there are test data too.
     each_func <- function(df){
-      browser()
       # With the way this is called, df becomes list rather than data.frame.
       # Make it data.frame again so that prediction() can be applied on it.
       if (!is.data.frame(df)) {

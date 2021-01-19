@@ -274,14 +274,10 @@ test_that("GLM - Normal Destribution with test_rate", {
                        "predicted_response")
     expect_true(all(expected_cols %in% colnames(pred_test)))
 
-    browser()
     res <- ret %>% evaluate_lm_training_and_test(pretty.name=TRUE)
-    browser()
-    if(F){
     res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
     res <- ret %>% tidy_rowwise(model, type="permutation_importance")
-    }
-   })
+  })
 })
 
 test_that("Group GLM - Normal Destribution with test_rate", {
