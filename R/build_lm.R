@@ -1768,6 +1768,7 @@ find_data.glm_exploratory <- function(model, env = parent.frame(), ...) {
 # Generates Summary table for Analytics View. It can handle Test Mode.
 # This is written for linear regression analytics view and GLM analytics views that makes numeric prediction.
 evaluate_lm_training_and_test <- function(df, pretty.name = FALSE){
+  browser()
   # Get the summary row for traninng data. Info is retrieved from model by glance()
   training_ret <- df %>% glance_rowwise(model, pretty.name = pretty.name)
   ret <- training_ret
@@ -1779,6 +1780,7 @@ evaluate_lm_training_and_test <- function(df, pretty.name = FALSE){
   if (purrr::some(df$.test_index, function(x){length(x)!=0})) {
     ret$is_test_data <- FALSE # Set is_test_data FALSE for training data. Add is_test_data column only when there are test data too.
     each_func <- function(df){
+      browser()
       # With the way this is called, df becomes list rather than data.frame.
       # Make it data.frame again so that prediction() can be applied on it.
       if (!is.data.frame(df)) {
@@ -1809,7 +1811,7 @@ evaluate_lm_training_and_test <- function(df, pretty.name = FALSE){
         # https://en.wikipedia.org/wiki/Coefficient_of_determination
         n_observations <- nrow(df$model[[1]]$model)
         df_residual <- df$model[[1]]$df.residual
-        adj_rsq <- 1 - (1 - rsq) * (n_observations - 1) / df_residual
+        adj_rsq <- adjusted_r_squared(rsq, n_observations, df_residual)
 
         test_ret <- data.frame(
                           r.squared = rsq,
