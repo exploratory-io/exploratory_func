@@ -165,7 +165,7 @@ word_to_sentiment <- function(words, lexicon="bing"){
 #' @param stopwords_lang Language for the stopwords that need to be excluded from the result.
 #' @param hiragana_word_length_to_remove Length of a Hiragana word that needs to be excluded from the result.
 #' @param summary_level Either "row" or "all". If this is "all", it ignores document and summarizes the result by token.
-#' @param sort_by Either "count" or "name"
+#' @param sort_by Either "count" or "name" or "doc"
 #' @param ngrams - by default it's 1. Pass 2 for bigram, 3 for trigram.
 #' @return Data frame with tokenized column.
 #' @export
@@ -269,6 +269,8 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
     result <- result %>% arrange(desc(!!rlang::sym(count_col)))
   } else if (sort_by == "token"){ #if token is specified, sort by token alphabetically.
     result <- result %>% arrange(!!rlang::sym(token_col))
+  } else if (sort_by == "doc" &&  with_id) {
+    result <- result %>% arrange(document_id)
   }
   result
 }
