@@ -1295,7 +1295,7 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
       colnames(ret)[colnames(ret) == "r.squared"] <- "R Squared"
       colnames(ret)[colnames(ret) == "adj.r.squared"] <- "Adj R Squared"
 
-      ret <- ret %>% dplyr::select(matches("R Squared"), matches("Adj R Squared"), matches("RMSE"), `P Value`, `Number of Rows`, `Log Likelihood`, `AIC`, `BIC`, `Residual Deviance`, `Null Deviance`, `DF for Null Model`, everything())
+      ret <- ret %>% dplyr::select(matches("^R Squared$"), matches("^Adj R Squared$"), matches("^RMSE$"), `P Value`, `Number of Rows`, `Log Likelihood`, `AIC`, `BIC`, `Residual Deviance`, `Null Deviance`, `DF for Null Model`, everything())
     }
   }
   if (!is.null(ret$nobs)) { # glance.glm's newly added nobs seems to be same as Number of Rows. Suppressing it for now.
