@@ -19,6 +19,7 @@ test_that("build_coxph.fast basic", {
   expect_false("Data Type" %in% colnames(ret))
   ret <- model_df %>% tidy_rowwise(model, type='permutation_importance')
   ret <- model_df %>% tidy_rowwise(model, type='partial_dependence')
+  expect_true(all(c("estimate", "p.value") %in% colnames(ret))) # Make sure that estimate and p.value are joined to the result for hover on Prediction tab.
   ret <- model_df %>% tidy_rowwise(model, type='partial_dependence_survival_curve')
   ret <- model_df %>% tidy_rowwise(model, type='vif')
   ret <- model_df %>% tidy_rowwise(model)
