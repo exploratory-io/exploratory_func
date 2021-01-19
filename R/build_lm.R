@@ -1223,8 +1223,12 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
   if (x$family$family %in% c('gaussian')) { # only for gaussian, which is same as linear regression (if link function is identity). 
     root_mean_square_error <- rmse(x$fitted.values, x$y)
     rsq <- r_squared(x$y, x$fitted.values)
+    n_observations <- nrow(x$model)
+    df_residual <- x$df.residual
+    adj_rsq <- adjusted_r_squared(rsq, n_observations, df_residual)
     ret$rmse <- root_mean_square_error
     ret$r.squared <- rsq
+    ret$adj.r.squared <- adj_rsq
   }
   if (x$family$family %in% c('binomial', 'quasibinomial')) { # only for logistic regression.
     # Calculate F Score, Accuracy Rate, Misclassification Rate, Precision, Recall, Number of Rows 
@@ -1290,8 +1294,9 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
       colnames(ret)[colnames(ret) == "df.residual"] <- "Residual DF"
       colnames(ret)[colnames(ret) == "rmse"] <- "RMSE"
       colnames(ret)[colnames(ret) == "r.squared"] <- "R Squared"
+      colnames(ret)[colnames(ret) == "adj.r.squared"] <- "Adj R Squared"
 
-      ret <- ret %>% dplyr::select(matches("R Squared"), matches("RMSE"), `P Value`, `Number of Rows`, `Log Likelihood`, `AIC`, `BIC`, `Residual Deviance`, `Null Deviance`, `DF for Null Model`, everything())
+      ret <- ret %>% dplyr::select(matches("R Squared"), matches("Adj R Squared"), matches("RMSE"), `P Value`, `Number of Rows`, `Log Likelihood`, `AIC`, `BIC`, `Residual Deviance`, `Null Deviance`, `DF for Null Model`, everything())
     }
   }
   if (!is.null(ret$nobs)) { # glance.glm's newly added nobs seems to be same as Number of Rows. Suppressing it for now.
