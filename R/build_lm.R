@@ -1219,6 +1219,13 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
     }
   }
   
+  browser()
+  if (x$family$family %in% c('gaussian')) { # only for gaussian, which is same as linear regression (if link function is identity). 
+    root_mean_square_error <- rmse(x$fitted.values, x$y)
+    rsq <- r_squared(x$y, x$fitted.values)
+    ret$rmse <- root_mean_square_error
+    ret$r.squared <- rsq
+  }
   if (x$family$family %in% c('binomial', 'quasibinomial')) { # only for logistic regression.
     # Calculate F Score, Accuracy Rate, Misclassification Rate, Precision, Recall, Number of Rows 
     threshold_value <- if (is.numeric(binary_classification_threshold)) {
@@ -1252,8 +1259,14 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
 
   if(pretty.name) {
     if (x$family$family %in% c('binomial', 'quasibinomial')) { # for binomial regressions.
-      ret <- ret %>% dplyr::rename(`Null Deviance`=null.deviance, `DF for Null Model`=df.null, `Log Likelihood`=logLik, `Residual Deviance`=deviance, `Residual DF`=df.residual, `AUC`=auc) %>%
-        dplyr::select(AUC, `F Score`, `Accuracy Rate`, `Misclassification Rate`, `Precision`, `Recall`, `P Value`, `Number of Rows`, positives, negatives,  `Log Likelihood`, `AIC`, `BIC`, `Residual Deviance`, `Null Deviance`, `DF for Null Model`, everything())
+      colnames(ret)[colnames(ret) == "null.deviance"] <- "Null Deviance"
+      colnames(ret)[colnames(ret) == "df.null"] <- "DF for Null Model"
+      colnames(ret)[colnames(ret) == "logLik"] <- "Log Likelihood"
+      colnames(ret)[colnames(ret) == "deviance"] <- "Residual Deviance"
+      colnames(ret)[colnames(ret) == "df.residual"] <- "Residual DF"
+      colnames(ret)[colnames(ret) == "auc"] <- "AUC"
+      
+      ret <- ret %>% dplyr::select(AUC, `F Score`, `Accuracy Rate`, `Misclassification Rate`, `Precision`, `Recall`, `P Value`, `Number of Rows`, positives, negatives,  `Log Likelihood`, `AIC`, `BIC`, `Residual Deviance`, `Null Deviance`, `DF for Null Model`, everything())
       if (!is.null(x$orig_levels)) { 
         pos_label <- x$orig_levels[2]
         neg_label <- x$orig_levels[1]
@@ -1270,8 +1283,15 @@ glance.glm_exploratory <- function(x, pretty.name = FALSE, binary_classification
       colnames(ret)[colnames(ret) == "negatives"] <- paste0("Number of Rows for ", neg_label)
     }
     else { # for other numeric regressions.
-      ret <- ret %>% dplyr::rename(`Null Deviance`=null.deviance, `DF for Null Model`=df.null, `Log Likelihood`=logLik, `Residual Deviance`=deviance, `Residual DF`=df.residual) %>%
-        dplyr::select(`P Value`, `Number of Rows`, `Log Likelihood`, `AIC`, `BIC`, `Residual Deviance`, `Null Deviance`, `DF for Null Model`, everything())
+      colnames(ret)[colnames(ret) == "null.deviance"] <- "Null Deviance"
+      colnames(ret)[colnames(ret) == "df.null"] <- "DF for Null Model"
+      colnames(ret)[colnames(ret) == "logLik"] <- "Log Likelihood"
+      colnames(ret)[colnames(ret) == "deviance"] <- "Residual Deviance"
+      colnames(ret)[colnames(ret) == "df.residual"] <- "Residual DF"
+      colnames(ret)[colnames(ret) == "rmse"] <- "RMSE"
+      colnames(ret)[colnames(ret) == "r.squared"] <- "R Squared"
+
+      ret <- ret %>% dplyr::select(matches("R Squared"), matches("RMSE"), `P Value`, `Number of Rows`, `Log Likelihood`, `AIC`, `BIC`, `Residual Deviance`, `Null Deviance`, `DF for Null Model`, everything())
     }
   }
   if (!is.null(ret$nobs)) { # glance.glm's newly added nobs seems to be same as Number of Rows. Suppressing it for now.

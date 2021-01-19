@@ -274,7 +274,9 @@ test_that("GLM - Normal Destribution with test_rate", {
                        "predicted_response")
     expect_true(all(expected_cols %in% colnames(pred_test)))
 
+    browser()
     res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
+    browser()
     res <- ret %>% tidy_rowwise(model, type="permutation_importance")
    })
 })
