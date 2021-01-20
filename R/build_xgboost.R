@@ -1360,15 +1360,15 @@ glance.xgboost_exp.regression <- function(x, pretty.name, ...) {
   ret <- data.frame(
     # root_mean_square_error = sqrt(x$prediction.error),
     # r_squared = x$r.squared
-    root_mean_square_error = root_mean_square_error,
     r_squared = rsq,
+    root_mean_square_error = root_mean_square_error,
     n = n
   )
 
   if(pretty.name){
     map = list(
-      `RMSE` = as.symbol("root_mean_square_error"),
       `R Squared` = as.symbol("r_squared"),
+      `RMSE` = as.symbol("root_mean_square_error"),
       `Number of Rows` = as.symbol("n")
     )
     ret <- ret %>%
