@@ -208,9 +208,9 @@ test_that("test exp_chisq", {
   observed <- ret %>% tidy_rowwise(model, type="observed")
   summary <- ret %>% glance_rowwise(model)
   residuals <- ret %>% tidy_rowwise(model, type="residuals")
-  expect_equal(colnames(summary),
-               c("Chi-Square","Degree of Freedom","P Value","Effect Size (Cohen's w)","Power",
-                 "Probability of Type 2 Error","Number of Rows"))
+  expect_true(all(c("Chi-Square","Degree of Freedom","P Value","Effect Size (Cohen's w)",
+                    "Power", "Probability of Type 2 Error","Number of Rows") %in% colnames(summary)
+  ))
   prob_dist <- ret %>% tidy_rowwise(model, type="prob_dist")
 })
 
@@ -219,17 +219,17 @@ test_that("test exp_chisq with power", {
   ret <- model_df %>% glance_rowwise(model)
   model_df <- exp_chisq(mtcars, gear, carb, value=cyl, power = 0.8)
   ret <- model_df %>% glance_rowwise(model)
-  expect_equal(colnames(ret),
-               c("Chi-Square","Degree of Freedom","P Value","Effect Size (Cohen's w)",
-                 "Target Power","Target Probability of Type 2 Error","Current Sample Size","Required Sample Size"))
+  expect_true(all(c("Chi-Square","Degree of Freedom","P Value","Effect Size (Cohen's w)",
+                     "Target Power","Target Probability of Type 2 Error","Current Sample Size","Required Sample Size") %in% colnames(ret)
+  ))
 })
 
 test_that("test exp_chisq with grouping functions", {
   model_df <- exp_chisq(mtcars, disp, drat, func1="asintby10", func2="asint", value=mpg)
   ret <- model_df %>% glance_rowwise(model)
-  expect_equal(colnames(ret),
-               c("Chi-Square","Degree of Freedom","P Value","Effect Size (Cohen's w)","Power",
-                 "Probability of Type 2 Error","Number of Rows"))
+  expect_true(all(c("Chi-Square","Degree of Freedom","P Value","Effect Size (Cohen's w)","Power",
+                 "Probability of Type 2 Error","Number of Rows") %in% colnames(ret)
+  ))
 })
 
 test_that("test exp_chisq with logical", {
