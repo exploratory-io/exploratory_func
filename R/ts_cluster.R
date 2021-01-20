@@ -4,7 +4,12 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
                            variables = NULL, funs.aggregate.variables = NULL,
                            centers = 3L, with_centroids = FALSE, distance = "sdtw", centroid = "sdtw_cent", output = "data") {
   time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(time))
-  value_col <- tidyselect::vars_select(names(df), !! rlang::enquo(value))
+  value_col <- if (missing(value)) {
+    ""
+  }
+  else {
+    tidyselect::vars_select(names(df), !! rlang::enquo(value))
+  }
   category_col <- tidyselect::vars_select(names(df), !! rlang::enquo(category))
 
   # Copied from do_prophet.
@@ -54,19 +59,27 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
       } else {
         lubridate::floor_date(df[[time_col]], unit = time_unit)
       }
-      renamed_df <- df %>%
-        dplyr::rename(
-          time = UQ(rlang::sym(time_col)),
-          value = UQ(rlang::sym(value_col)),
-          category = UQ(rlang::sym(category_col))
-        )
-        # remove NA so that we do not pass data with NA, NaN, or 0 to prophet, which we are not very sure what would happen.
-        # we saw a case where rstan crashes with the last row with 0 y value.
-        # dplyr::filter(!is.na(value)) %>% # Commented out, since now we handle NAs with na.rm option of fun.aggregate. This way, extra regressor info for each period is preserved better.
+      renamed_df <- if (value_col != "") {
+        df %>% dplyr::rename(
+            time = UQ(rlang::sym(time_col)),
+            value = UQ(rlang::sym(value_col)),
+            category = UQ(rlang::sym(category_col))
+          )
+      }
+      else {
+        df %>% dplyr::rename(
+            time = UQ(rlang::sym(time_col)),
+            category = UQ(rlang::sym(category_col))
+          )
+      }
 
       # Summarize
       grouped_df <- renamed_df %>% dplyr::group_by(category, time)
-      if (is_na_rm_func(fun.aggregate)) {
+      if (value_col == "") {
+        df <- grouped_df %>% 
+          dplyr::summarise(value = n(), !!!summarise_args)
+      }
+      else if (is_na_rm_func(fun.aggregate)) {
         df <- grouped_df %>% 
           dplyr::summarise(value = fun.aggregate(value, na.rm=TRUE), !!!summarise_args)
       }
@@ -136,8 +149,16 @@ tidy.PartitionalTSClusters <- function(x, with_centroids = TRUE) {
     res <- res %>% dplyr::left_join(aggregated_data, by=c("time"="time", "name"="category"))
   }
   res <- res %>% dplyr::mutate(Cluster = cluster_map[name])
-  res <- res %>% dplyr::rename(!!rlang::sym(attr(x,"time_col")):=time,
-                               !!rlang::sym(attr(x,"value_col")):=value,
-                               !!rlang::sym(attr(x,"category_col")):=name)
+  value_col <- attr(x, "value_col")
+  if (value_col == "") {
+    res <- res %>% dplyr::rename(!!rlang::sym(attr(x,"time_col")):=time,
+                                 Count=value,
+                                 !!rlang::sym(attr(x,"category_col")):=name)
+  }
+  else {
+    res <- res %>% dplyr::rename(!!rlang::sym(attr(x,"time_col")):=time,
+                                 !!rlang::sym(value_col):=value,
+                                 !!rlang::sym(attr(x,"category_col")):=name)
+  }
   res
 }
