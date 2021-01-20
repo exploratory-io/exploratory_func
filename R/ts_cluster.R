@@ -104,7 +104,7 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
       # Drop columns (represents category) that has more NAs than max_category_na_ratio, considering them to have not enough data.
       df <- df %>% dplyr::select_if(function(x){sum(is.na(x))/length(x) < max_category_na_ratio})
       if (length(colnames(df)) <= centers) {
-        stop("There is not enough data left after removing high NA ratio data.")
+        stop("EXP-ANA-2 :: [] :: There is not enough data left after removing high NA ratio data.")
       }
       # Fill NAs in time series
       df <- df %>% dplyr::mutate(across(-time, ~fill_ts_na(.x, time, type = na_fill_type, val = na_fill_value)))
