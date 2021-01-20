@@ -719,7 +719,7 @@ glance_with_ts_metric <- function(df) {
 
   group_col <- grouped_by(ret1)
   if (length(group_col) > 0) { # Remove group_by column from ret1 before bind_cols to avoid column name conflict.
-    ret1 <- ret1 %>% ungroup() %>% select(-!!rlang::sym(group_col))
+    ret1 <- ret1 %>% dplyr::ungroup() %>% dplyr::select(-!!rlang::sym(group_col))
   }
 
   ret <- dplyr::bind_cols(ret2, ret1) # We show the model agnostic metrics first.
