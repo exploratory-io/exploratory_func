@@ -28,6 +28,18 @@ test_that("exp_ts_cluster basic", {
   expect_equal(sort(unique(ret$Cluster)), c(1,2,3))
 })
 
+test_that("exp_ts_cluster with aggregated number of rows by missing value column", {
+  ret <- flight %>% exp_ts_cluster(`FL DATE`, , `CAR RIER`)
+  expect_equal(colnames(ret), c("FL DATE","CAR RIER","Count","Cluster"))
+  expect_equal(sort(unique(ret$Cluster)), c(1,2,3))
+})
+
+test_that("exp_ts_cluster with aggregated number of rows by specifying NULL for value column", {
+  ret <- flight %>% exp_ts_cluster(`FL DATE`, NULL, `CAR RIER`)
+  expect_equal(colnames(ret), c("FL DATE","CAR RIER","Count","Cluster"))
+  expect_equal(sort(unique(ret$Cluster)), c(1,2,3))
+})
+
 test_that("exp_ts_cluster with other variables to aggregate", {
   ret <- flight %>% exp_ts_cluster(`FL DATE`, `ARR DELAY`, `CAR RIER`, variables=c(`ORI GIN_mode`="ORI GIN"), funs.aggregate.variables=c("get_mode"))
   expect_equal(colnames(ret), c("FL DATE", "CAR RIER", "ARR DELAY", "ORI GIN_mode", "Cluster"))

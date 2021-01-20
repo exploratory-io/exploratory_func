@@ -4,7 +4,7 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
                            variables = NULL, funs.aggregate.variables = NULL,
                            centers = 3L, with_centroids = FALSE, distance = "sdtw", centroid = "sdtw_cent", output = "data") {
   time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(time))
-  value_col <- if (missing(value) || is.null(value)) {
+  value_col <- if (missing(value)) {
     # Using empty string instead of NULL, because using NULL here would cause error from UQ(rlang::sym(value_col)),
     # which seems to be evaluated as soon as the parent function is called, which is before if-condition for it to be not NULL is evaluated.
     # (rlang::sym("") does not seem to throw error unlike rlang::sym(NULL).)
@@ -12,6 +12,10 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
   }
   else {
     tidyselect::vars_select(names(df), !! rlang::enquo(value))
+  }
+  # Handle the case where NULL was specified for value argument. We handle this case this way because is.null(value) throws error when value actuall has value.
+  if (length(value_col) == 0) {
+    value_col = ""
   }
   category_col <- tidyselect::vars_select(names(df), !! rlang::enquo(category))
 
