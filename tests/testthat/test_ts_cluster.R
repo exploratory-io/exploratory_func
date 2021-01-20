@@ -51,3 +51,9 @@ test_that("exp_ts_cluster with max_category_na_ratio", {
   expect_equal(colnames(ret), c("FL DATE","CAR RIER","ARR DELAY","Cluster"))
   expect_equal(sort(unique(ret$Cluster)), c(1,2,3))
 })
+
+test_that("exp_ts_cluster with max_category_na_ratio", {
+  expect_error({
+    ret <- flight %>% exp_ts_cluster(`FL DATE`, `ARR DELAY`, `CAR RIER`, max_category_na_ratio=0) # Setting zero max_category_na_ratio for test.
+  }, "Too few time series were left")
+})
