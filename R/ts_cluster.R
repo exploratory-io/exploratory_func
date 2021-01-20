@@ -159,7 +159,7 @@ tidy.PartitionalTSClusters <- function(x, with_centroids = TRUE) {
   value_col <- attr(x, "value_col")
   if (value_col == "") {
     res <- res %>% dplyr::rename(!!rlang::sym(attr(x,"time_col")):=time,
-                                 Count=value,
+                                 Number_of_Rows=value,
                                  !!rlang::sym(attr(x,"category_col")):=name)
   }
   else {

@@ -30,13 +30,13 @@ test_that("exp_ts_cluster basic", {
 
 test_that("exp_ts_cluster with aggregated number of rows by missing value column", {
   ret <- flight %>% exp_ts_cluster(`FL DATE`, , `CAR RIER`)
-  expect_equal(colnames(ret), c("FL DATE","CAR RIER","Count","Cluster"))
+  expect_equal(colnames(ret), c("FL DATE","CAR RIER","Number_of_Rows","Cluster"))
   expect_equal(sort(unique(ret$Cluster)), c(1,2,3))
 })
 
 test_that("exp_ts_cluster with aggregated number of rows by specifying NULL for value column", {
   ret <- flight %>% exp_ts_cluster(`FL DATE`, NULL, `CAR RIER`)
-  expect_equal(colnames(ret), c("FL DATE","CAR RIER","Count","Cluster"))
+  expect_equal(colnames(ret), c("FL DATE","CAR RIER","Number_of_Rows","Cluster"))
   expect_equal(sort(unique(ret$Cluster)), c(1,2,3))
 })
 
