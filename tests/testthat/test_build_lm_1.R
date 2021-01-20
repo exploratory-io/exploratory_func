@@ -685,6 +685,8 @@ test_that("Logistic Regression with test_rate", {
                        "predicted_response", "predicted_label")
     expect_true(all(expected_cols %in% colnames(pred_test)))
     res <- ret %>% tidy_rowwise(model, pretty.name=TRUE)
+    expected_cols <- c("Term", "Coefficient", "Std Error", "t Ratio", "P Value", "Conf High", "Conf Low", "Odds Ratio", "Base Level")
+    expect_true(all(expected_cols %in% colnames(res)))
     res <- ret %>% glance_rowwise(model, pretty.name=TRUE)
     res <- ret %>% evaluate_binary_training_and_test(`CANCELLED X`, threshold = 0.5, pretty.name=TRUE)
     expect_equal(nrow(res), 2) # 2 for training and test.
