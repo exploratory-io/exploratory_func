@@ -4,7 +4,19 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
                            variables = NULL, funs.aggregate.variables = NULL,
                            centers = 3L, with_centroids = FALSE, distance = "sdtw", centroid = "sdtw_cent", output = "data") {
   time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(time))
-  value_col <- tidyselect::vars_select(names(df), !! rlang::enquo(value))
+  value_col <- if (missing(value)) {
+    # Using empty string instead of NULL, because using NULL here would cause error from UQ(rlang::sym(value_col)),
+    # which seems to be evaluated as soon as the parent function is called, which is before if-condition for it to be not NULL is evaluated.
+    # (rlang::sym("") does not seem to throw error unlike rlang::sym(NULL).)
+    ""
+  }
+  else {
+    tidyselect::vars_select(names(df), !! rlang::enquo(value))
+  }
+  # Handle the case where NULL was specified for value argument. We handle this case this way because is.null(value) throws error when value actuall has value.
+  if (length(value_col) == 0) {
+    value_col = ""
+  }
   category_col <- tidyselect::vars_select(names(df), !! rlang::enquo(category))
 
   # Copied from do_prophet.
@@ -54,19 +66,27 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
       } else {
         lubridate::floor_date(df[[time_col]], unit = time_unit)
       }
-      renamed_df <- df %>%
-        dplyr::rename(
-          time = UQ(rlang::sym(time_col)),
-          value = UQ(rlang::sym(value_col)),
-          category = UQ(rlang::sym(category_col))
-        )
-        # remove NA so that we do not pass data with NA, NaN, or 0 to prophet, which we are not very sure what would happen.
-        # we saw a case where rstan crashes with the last row with 0 y value.
-        # dplyr::filter(!is.na(value)) %>% # Commented out, since now we handle NAs with na.rm option of fun.aggregate. This way, extra regressor info for each period is preserved better.
+      renamed_df <- if (value_col != "") {
+        df %>% dplyr::rename(
+            time = UQ(rlang::sym(time_col)),
+            value = UQ(rlang::sym(value_col)),
+            category = UQ(rlang::sym(category_col))
+          )
+      }
+      else {
+        df %>% dplyr::rename(
+            time = UQ(rlang::sym(time_col)),
+            category = UQ(rlang::sym(category_col))
+          )
+      }
 
       # Summarize
       grouped_df <- renamed_df %>% dplyr::group_by(category, time)
-      if (is_na_rm_func(fun.aggregate)) {
+      if (value_col == "") {
+        df <- grouped_df %>% 
+          dplyr::summarise(value = n(), !!!summarise_args)
+      }
+      else if (is_na_rm_func(fun.aggregate)) {
         df <- grouped_df %>% 
           dplyr::summarise(value = fun.aggregate(value, na.rm=TRUE), !!!summarise_args)
       }
@@ -83,6 +103,9 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
       df <- df %>% complete_date("time", time_unit = time_unit)
       # Drop columns (represents category) that has more NAs than max_category_na_ratio, considering them to have not enough data.
       df <- df %>% dplyr::select_if(function(x){sum(is.na(x))/length(x) < max_category_na_ratio})
+      if (length(colnames(df)) <= centers) {
+        stop("EXP-ANA-2 :: [] :: There is not enough data left after removing high NA ratio data.")
+      }
       # Fill NAs in time series
       df <- df %>% dplyr::mutate(across(-time, ~fill_ts_na(.x, time, type = na_fill_type, val = na_fill_value)))
       time_values <- df$time
@@ -133,8 +156,16 @@ tidy.PartitionalTSClusters <- function(x, with_centroids = TRUE) {
     res <- res %>% dplyr::left_join(aggregated_data, by=c("time"="time", "name"="category"))
   }
   res <- res %>% dplyr::mutate(Cluster = cluster_map[name])
-  res <- res %>% dplyr::rename(!!rlang::sym(attr(x,"time_col")):=time,
-                               !!rlang::sym(attr(x,"value_col")):=value,
-                               !!rlang::sym(attr(x,"category_col")):=name)
+  value_col <- attr(x, "value_col")
+  if (value_col == "") {
+    res <- res %>% dplyr::rename(!!rlang::sym(attr(x,"time_col")):=time,
+                                 Number_of_Rows=value,
+                                 !!rlang::sym(attr(x,"category_col")):=name)
+  }
+  else {
+    res <- res %>% dplyr::rename(!!rlang::sym(attr(x,"time_col")):=time,
+                                 !!rlang::sym(value_col):=value,
+                                 !!rlang::sym(attr(x,"category_col")):=name)
+  }
   res
 }
