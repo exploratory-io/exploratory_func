@@ -43,7 +43,7 @@ test_that("calc_feature_imp(regression) evaluate training and test", {
   # Test result of boruta.
   importance_res <- model_df %>% tidy_rowwise(model, type='boruta') %>% group_by(variable) %>% summarize(importance=mean(importance)) %>% arrange(-importance)
   expect_equal(as.character(importance_res$variable[[1]]), "DEP DELAY") # Most important should be dep delay.
-  expect_equal(as.character(importance_res$variable[[2]]), "CAR RIER") # 2nd most important should be carrier. 
+  # expect_equal(as.character(importance_res$variable[[2]]), "CAR RIER") # 2nd most important often is carrier, but commenting it out since it is not that stable. 
 
   ret <- rf_evaluation_training_and_test(model_df, pretty.name = TRUE)
   expect_equal(nrow(ret), 2) # 2 for train and test
