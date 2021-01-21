@@ -269,7 +269,7 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
     result <- result %>% arrange(desc(!!rlang::sym(count_col)))
   } else if (sort_by == "token"){ #if token is specified, sort by token alphabetically.
     result <- result %>% arrange(!!rlang::sym(token_col))
-  } else if (sort_by == "doc" &&  with_id) { # if document_id exists and sort by option is doc, sort by document_id.
+  } else if (sort_by == "doc" && with_id) { # if document_id exists and sort by option is doc, sort by document_id.
     result <- result %>% arrange(document_id)
   }
   result
