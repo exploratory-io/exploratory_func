@@ -293,7 +293,7 @@ test_that("exp_arima test mode with extra regressor", {
 })
 
 
-test_that("exp_arima grouped case", {
+test_that("exp_arima wrong grouping case", {
   data("raw_data", package = "AnomalyDetection")
   raw_data$timestamp <- as.POSIXct(raw_data$timestamp)
   expect_error({
@@ -307,6 +307,23 @@ test_that("exp_arima grouped case", {
       dplyr::group_by(count) %>%
       exp_arima(timestamp, count, 10)
   }, "count is grouped. Please ungroup it.")
+})
+
+test_that("exp_arima grouped case", {
+  data("raw_data", package = "AnomalyDetection")
+  raw_data$timestamp <- as.POSIXct(raw_data$timestamp)
+  raw_data1 <- raw_data
+  raw_data2 <- raw_data
+  raw_data1 <- raw_data1 %>% mutate(group='A')
+  raw_data2 <- raw_data2 %>% mutate(group='B')
+  raw_data3 <- raw_data1 %>% bind_rows(raw_data2) %>% group_by(group)
+
+  model_df <- raw_data3 %>%
+    exp_arima(timestamp, count, 10)
+  ret <- model_df %>% glance_with_ts_metric()
+  expect_true(all(c("group", "RMSE", "MAE", "MAPE", ".model", "AIC", "BIC", "AICc",
+                    "p", "d", "q", "P", "D", "Q", "Frequency", "Ljung-Box Test Statistic",
+                    "Ljung-Box Test P Value", "Number of Rows") %in% colnames(ret)))
 })
 
 test_that("exp_arima without value_col", {
