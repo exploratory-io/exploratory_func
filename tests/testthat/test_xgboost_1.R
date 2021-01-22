@@ -42,7 +42,7 @@ test_that("exp_xgboost(regression) evaluate training and test", {
   expect_gt(nrow(test_ret), 1400)
   train_ret <- ret %>% filter(is_test_data==FALSE)
   expect_lt(nrow(train_ret), 3500)
-  expect_gt(nrow(train_ret), 3400)
+  expect_gt(nrow(train_ret), 3300)
   # expect_equal(nrow(train_ret), 3500) Fails now, since we filter numeric NA. Revive when we do not need to.
 
   # Check result of variable importance 

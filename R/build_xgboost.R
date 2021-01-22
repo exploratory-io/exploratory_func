@@ -168,17 +168,26 @@ xgboost_multi <- function(data, formula, output_type = "softprob", eval_metric =
 
   # this is used to get back original values from predicted output
   label_levels <- if(is.logical(y_vals)) {
-    y_vals <- as.numeric(y_vals)
     c(FALSE, TRUE)
   } else if (is.factor(y_vals)) {
-    y_vals <- as.numeric(y_vals) - 1
     # this is sorted unique factor
     # will be used to re-construct factor from index vector with the same level
     sort(unique(data[[y_name]]))
   } else {
     factored <- as.factor(data[[y_name]])
-    y_vals <- as.numeric(factored) - 1
     to_same_type(levels(factored), data[[y_name]])
+  }
+
+  if(is.logical(y_vals)) {
+    y_vals <- as.numeric(y_vals)
+  } else if (is.factor(y_vals)) {
+    # Map the levels to integers from 0 to (number of levels - 1)
+    mapping <- 0:(length(label_levels)-1)
+    names(mapping) <- as.character(label_levels)
+    y_vals <- mapping[as.character(y_vals)]
+  } else {
+    factored <- as.factor(data[[y_name]])
+    y_vals <- as.numeric(factored) - 1
   }
 
   data[[y_name]] <- y_vals
