@@ -12,7 +12,6 @@
 fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_rate = 0, na.action = na.pass, sparse = NULL, ...) {
   term <- terms(formula, data = data)
   # do.call is used to substitute weights
-  browser()
   df_for_model_matrix <- tryCatch({
     do.call(model.frame, list(term, data = data, weights = substitute(weights), na.action = na.action))
   }, error = function(e){
@@ -183,7 +182,10 @@ xgboost_multi <- function(data, formula, output_type = "softprob", eval_metric =
   if(is.logical(y_vals)) {
     y_vals <- as.numeric(y_vals)
   } else if (is.factor(y_vals)) {
-    y_vals <- as.numeric(y_vals) - 1
+    # Map the levels to integers from 0 to (number of levels - 1)
+    mapping <- 0:(length(label_levels)-1)
+    names(mapping) <- as.character(label_levels)
+    y_vals <- mapping[as.character(y_vals)]
   } else {
     factored <- as.factor(data[[y_name]])
     y_vals <- as.numeric(factored) - 1
