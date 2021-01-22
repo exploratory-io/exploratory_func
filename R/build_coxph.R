@@ -556,6 +556,7 @@ build_coxph.fast <- function(df,
   # Pass down survival time used for prediction. This is for the post-processing for time-dependent ROC.
   attr(ret, "pred_survival_time") <- pred_survival_time
 
+  # Pass down time unit for prediction step UI.
   time_unit <- if (time_unit_days == 365.25) {
     "year"
   } else if (time_unit_days == 365.25/4) {
