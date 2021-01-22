@@ -12,6 +12,7 @@
 fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_rate = 0, na.action = na.pass, sparse = NULL, ...) {
   term <- terms(formula, data = data)
   # do.call is used to substitute weights
+  browser()
   df_for_model_matrix <- tryCatch({
     do.call(model.frame, list(term, data = data, weights = substitute(weights), na.action = na.action))
   }, error = function(e){
@@ -155,6 +156,7 @@ xgboost_binary <- function(data, formula, output_type = "logistic", eval_metric 
 #' The explanation is in https://www.r-bloggers.com/with-our-powers-combined-xgboost-and-pipelearner/
 #' @export
 xgboost_multi <- function(data, formula, output_type = "softprob", eval_metric = "merror", params = list(), ...) {
+  browser()
   # there can be more than 2 eval_metric
   # by creating eval_metric parameters in params list
   # but specify only one so that it is clear what is used for early stopping.
@@ -168,17 +170,23 @@ xgboost_multi <- function(data, formula, output_type = "softprob", eval_metric =
 
   # this is used to get back original values from predicted output
   label_levels <- if(is.logical(y_vals)) {
-    y_vals <- as.numeric(y_vals)
     c(FALSE, TRUE)
   } else if (is.factor(y_vals)) {
-    y_vals <- as.numeric(y_vals) - 1
     # this is sorted unique factor
     # will be used to re-construct factor from index vector with the same level
     sort(unique(data[[y_name]]))
   } else {
     factored <- as.factor(data[[y_name]])
-    y_vals <- as.numeric(factored) - 1
     to_same_type(levels(factored), data[[y_name]])
+  }
+
+  if(is.logical(y_vals)) {
+    y_vals <- as.numeric(y_vals)
+  } else if (is.factor(y_vals)) {
+    y_vals <- as.numeric(y_vals) - 1
+  } else {
+    factored <- as.factor(data[[y_name]])
+    y_vals <- as.numeric(factored) - 1
   }
 
   data[[y_name]] <- y_vals
