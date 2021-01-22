@@ -320,6 +320,7 @@ build_coxph.fast <- function(df,
   # ref: http://dplyr.tidyverse.org/articles/programming.html
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
   time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(time))
+  time_unit_days <- attr(df[[time_col]], "time_unit_days") # Preprocessor may attach time unit info as attribute of the time column.
   status_col <- tidyselect::vars_select(names(df), !! rlang::enquo(status))
   # this evaluates select arguments like starts_with
   orig_selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
@@ -554,6 +555,21 @@ build_coxph.fast <- function(df,
   ret <- do_on_each_group(clean_df, each_func, name = "model", with_unnest = FALSE)
   # Pass down survival time used for prediction. This is for the post-processing for time-dependent ROC.
   attr(ret, "pred_survival_time") <- pred_survival_time
+
+  time_unit <- if (time_unit_days == 365.25) {
+    "year"
+  } else if (time_unit_days == 365.25/4) {
+    "quarter"
+  } else if (time_unit_days == 365.25/12) {
+    "month"
+  } else if (time_unit_days == 7) {
+    "week"
+  } else if (time_unit_days == 1) {
+    "day"
+  } else {
+    NULL
+  }
+  attr(ret, "time_unit") <- time_unit
   ret
 }
 
