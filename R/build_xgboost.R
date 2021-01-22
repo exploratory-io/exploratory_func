@@ -155,7 +155,6 @@ xgboost_binary <- function(data, formula, output_type = "logistic", eval_metric 
 #' The explanation is in https://www.r-bloggers.com/with-our-powers-combined-xgboost-and-pipelearner/
 #' @export
 xgboost_multi <- function(data, formula, output_type = "softprob", eval_metric = "merror", params = list(), ...) {
-  browser()
   # there can be more than 2 eval_metric
   # by creating eval_metric parameters in params list
   # but specify only one so that it is clear what is used for early stopping.
