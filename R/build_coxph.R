@@ -296,6 +296,51 @@ calc_permutation_importance_coxph <- function(fit, time_col, status_col, vars, d
   importances_df
 }
 
+get_time_unit_days <- function(type="auto", x, y) {
+  # If the type is specified explicitly.  
+  if (type == "year") {
+    res <- 365.25
+  } else if (type == "quarter") {
+    res <- 365.25/4
+  } else if (type == "month") {
+    res <- 365.25/12
+  } else if (type == "week") {
+    res <- 7
+  } else if (type == "day") {
+    res <- 1
+  } else {
+    # type=="auto" case.  
+    # Pick the time unit automatically based on the date range of start/end date.
+    xy <- c(x, y)
+    a <- min(xy, na.rm = TRUE)
+    b <- max(xy, na.rm = TRUE);
+    timeinterval <- lubridate::interval(a, b)
+    # Year - default
+    res <- 365.25
+    type <- 'year'
+    
+    if (lubridate::time_length(timeinterval, "year") < 5) {
+      # Month unit if the range is less than 5 years.
+      res <- 365.25/12
+      type <- 'month'
+      
+      if (lubridate::time_length(timeinterval, "year") < 1) {
+        # Week unit if the range is less than 1 year.
+        res <- 7
+        type <- 'week'
+
+        if (lubridate::time_length(timeinterval, "day") <=31) {
+          # Day unit if the range is less than 1 month (less than or equal to 31 days).
+          res <- 1
+          type <- 'day'
+        }
+      }
+    }
+  }
+  attr(res, "label") <- type
+  res
+}
+
 #' builds cox model quickly by way of sampling or fct_lumn, for analytics view.
 #' @export
 build_coxph.fast <- function(df,
