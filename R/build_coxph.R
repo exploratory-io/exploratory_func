@@ -347,6 +347,9 @@ build_coxph.fast <- function(df,
                     time,
                     status,
                     ...,
+                    start_date = NULL,
+                    end_date = NULL,
+                    time_unit = "day",
                     predictor_funs = NULL,
                     max_nrow = 50000, # With 50000 rows, taking 6 to 7 seconds on late-2016 Macbook Pro.
                     predictor_n = 12, # so that at least months can fit in it.
@@ -365,7 +368,14 @@ build_coxph.fast <- function(df,
   # ref: http://dplyr.tidyverse.org/articles/programming.html
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
   time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(time))
-  time_unit_days <- attr(df[[time_col]], "time_unit_days") # Preprocessor may attach time unit info as attribute of the time column.
+  if (length(time_col) == 0) { # This means time was NULL
+    start_date_col <- tidyselect::vars_select(names(df), !! rlang::enquo(start_date))
+    end_date_col <- tidyselect::vars_select(names(df), !! rlang::enquo(end_date))
+    time_unit_days <- get_time_unit_days(time_unit, df[[start_date_col]], df[[end_date_col]])
+    df <- df %>% dplyr::mutate(.time = ceiling(as.numeric(!!rlang::sym(end_date_col) - !!rlang::sym(start_date_col), units = "days")/time_unit_days))
+    time_col <- ".time"
+  }
+    
   status_col <- tidyselect::vars_select(names(df), !! rlang::enquo(status))
   # this evaluates select arguments like starts_with
   orig_selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
