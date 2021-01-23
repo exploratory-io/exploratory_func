@@ -325,6 +325,8 @@ exp_survival_forest <- function(df,
   clean_status_col <- name_map[status_col]
   clean_time_col <- name_map[time_col]
   clean_cols <- name_map[cols]
+  clean_start_time_col <- NULL
+  clean_end_time_col <- NULL
   if (!is.null(start_time_col)) {
     clean_start_time_col <- name_map[start_time_col]
     clean_end_time_col <- name_map[end_time_col]
