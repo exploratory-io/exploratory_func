@@ -44,14 +44,14 @@ test_that("build_coxph.fast basic", {
   ret <- model_df %>% augment_rowwise(model)
 })
 
-test_that("build_coxph.fast with start_date and end_date", {
+test_that("build_coxph.fast with start_time and end_time", {
   df <- survival::lung # this data has NAs.
   df <- df %>% mutate(status = status==2)
   df <- df %>% mutate(start = as.Date("2021-01-01"), end = start + lubridate::days(time))
   df <- df %>% rename(`ti me`=time, `sta tus`=status, `a ge`=age, `se-x`=sex)
   df <- df %>% mutate(ph.ecog = factor(ph.ecog, ordered=TRUE)) # test handling of ordered factor
   df <- df %>% mutate(`se-x` = `se-x`==1) # test handling of logical
-  model_df <- df %>% build_coxph.fast(NULL, `sta tus`, `a ge`, `se-x`, ph.ecog, ph.karno, pat.karno, meal.cal, wt.loss, start_date=start, end_date=end, time_unit="auto", predictor_funs=list(`a ge`="none", `se-x`="none", ph.ecog="none", ph.karno="none", pat.karno="none", meal.cal="none", wt.loss="none"), predictor_n = 2)
+  model_df <- df %>% build_coxph.fast(NULL, `sta tus`, `a ge`, `se-x`, ph.ecog, ph.karno, pat.karno, meal.cal, wt.loss, start_time=start, end_time=end, time_unit="auto", predictor_funs=list(`a ge`="none", `se-x`="none", ph.ecog="none", ph.karno="none", pat.karno="none", meal.cal="none", wt.loss="none"), predictor_n = 2)
   ret <- model_df %>% prediction2(pretty.name=TRUE)
   ret <- df %>% select(-`ti me`, -`sta tus`) %>% add_prediction(model_df=model_df, pred_survival_time=5)
   expect_equal(class(model_df$model[[1]]), c("coxph_exploratory","coxph"))

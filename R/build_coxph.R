@@ -347,8 +347,8 @@ build_coxph.fast <- function(df,
                     time,
                     status,
                     ...,
-                    start_date = NULL,
-                    end_date = NULL,
+                    start_time = NULL,
+                    end_time = NULL,
                     time_unit = "day",
                     predictor_funs = NULL,
                     max_nrow = 50000, # With 50000 rows, taking 6 to 7 seconds on late-2016 Macbook Pro.
@@ -367,15 +367,16 @@ build_coxph.fast <- function(df,
   # using the new way of NSE column selection evaluation
   # ref: http://dplyr.tidyverse.org/articles/programming.html
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
+  browser()
   time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(time))
   if (length(time_col) == 0) { # This means time was NULL
-    start_date_col <- tidyselect::vars_select(names(df), !! rlang::enquo(start_date))
-    end_date_col <- tidyselect::vars_select(names(df), !! rlang::enquo(end_date))
-    time_unit_days <- get_time_unit_days(time_unit, df[[start_date_col]], df[[end_date_col]])
+    start_time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(start_time))
+    end_time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(end_time))
+    time_unit_days <- get_time_unit_days(time_unit, df[[start_time_col]], df[[end_time_col]])
     time_unit <- attr(time_unit_days, "label") # Get label like "day", "week".
     # We are ceiling survival time to make it integer in the specified time unit, just like we do for Survival Curve analytics view.
     # This is to make resulting survival curve to have integer data point in the specified time unit. TODO: Think if this really makes sense here for Cox and Survival Forest.
-    df <- df %>% dplyr::mutate(.time = ceiling(as.numeric(!!rlang::sym(end_date_col) - !!rlang::sym(start_date_col), units = "days")/time_unit_days))
+    df <- df %>% dplyr::mutate(.time = ceiling(as.numeric(!!rlang::sym(end_time_col) - !!rlang::sym(start_time_col), units = "days")/time_unit_days))
     time_col <- ".time"
   }
     
@@ -467,6 +468,7 @@ build_coxph.fast <- function(df,
 
   each_func <- function(df) {
     tryCatch({
+      browser()
       if(!is.null(seed)){
         set.seed(seed)
       }
