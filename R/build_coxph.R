@@ -372,6 +372,7 @@ build_coxph.fast <- function(df,
     start_date_col <- tidyselect::vars_select(names(df), !! rlang::enquo(start_date))
     end_date_col <- tidyselect::vars_select(names(df), !! rlang::enquo(end_date))
     time_unit_days <- get_time_unit_days(time_unit, df[[start_date_col]], df[[end_date_col]])
+    time_unit <- attr(time_unit_days, "label") # Get label like "day", "week".
     df <- df %>% dplyr::mutate(.time = ceiling(as.numeric(!!rlang::sym(end_date_col) - !!rlang::sym(start_date_col), units = "days")/time_unit_days))
     time_col <- ".time"
   }
@@ -612,19 +613,6 @@ build_coxph.fast <- function(df,
   attr(ret, "pred_survival_time") <- pred_survival_time
 
   # Pass down time unit for prediction step UI.
-  time_unit <- if (time_unit_days == 365.25) {
-    "year"
-  } else if (time_unit_days == 365.25/4) {
-    "quarter"
-  } else if (time_unit_days == 365.25/12) {
-    "month"
-  } else if (time_unit_days == 7) {
-    "week"
-  } else if (time_unit_days == 1) {
-    "day"
-  } else {
-    NULL
-  }
   attr(ret, "time_unit") <- time_unit
   ret
 }
