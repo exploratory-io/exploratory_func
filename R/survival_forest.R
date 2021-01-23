@@ -196,6 +196,9 @@ exp_survival_forest <- function(df,
                     time,
                     status,
                     ...,
+                    start_time = NULL,
+                    end_time = NULL,
+                    time_unit = "day",
                     predictor_funs = NULL,
                     max_nrow = 50000, # With 50000 rows, taking 6 to 7 seconds on late-2016 Macbook Pro.
                     max_sample_size = NULL, # Half of max_nrow.
@@ -225,6 +228,16 @@ exp_survival_forest <- function(df,
   # ref: http://dplyr.tidyverse.org/articles/programming.html
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
   time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(time))
+  if (length(time_col) == 0) { # This means time was NULL
+    start_time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(start_time))
+    end_time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(end_time))
+    time_unit_days <- get_time_unit_days(time_unit, df[[start_time_col]], df[[end_time_col]])
+    time_unit <- attr(time_unit_days, "label") # Get label like "day", "week".
+    # We are ceiling survival time to make it integer in the specified time unit, just like we do for Survival Curve analytics view.
+    # This is to make resulting survival curve to have integer data point in the specified time unit. TODO: Think if this really makes sense here for Cox and Survival Forest.
+    df <- df %>% dplyr::mutate(.time = ceiling(as.numeric(!!rlang::sym(end_time_col) - !!rlang::sym(start_time_col), units = "days")/time_unit_days))
+    time_col <- ".time"
+  }
   status_col <- tidyselect::vars_select(names(df), !! rlang::enquo(status))
   # this evaluates select arguments like starts_with
   orig_selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
@@ -475,6 +488,8 @@ exp_survival_forest <- function(df,
   ret <- do_on_each_group(clean_df, each_func, name = "model", with_unnest = FALSE)
   # Pass down survival time used for prediction. This is for the post-processing for time-dependent ROC.
   attr(ret, "pred_survival_time") <- pred_survival_time
+  # Pass down time unit for prediction step UI.
+  attr(ret, "time_unit") <- time_unit
   ret
 }
 
