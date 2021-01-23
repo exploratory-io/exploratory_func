@@ -209,6 +209,7 @@ exp_survival_forest <- function(df,
                     max_pd_vars = NULL,
                     pd_sample_size = 500,
                     pred_survival_time = NULL,
+                    pred_survival_threshold = 0.5,
                     predictor_outlier_filter_type = NULL,
                     predictor_outlier_filter_threshold = NULL,
                     seed = 1,
@@ -431,6 +432,7 @@ exp_survival_forest <- function(df,
       model$imp_vars <- imp_vars
       model$partial_dependence <- partial_dependence.ranger_survival_exploratory(model, clean_time_col, vars = imp_vars, n = c(9, min(nrow(df), pd_sample_size)), data = df) # grid of 9 is convenient for both PDP and survival curves.
       model$pred_survival_time <- pred_survival_time
+      model$pred_survival_threshold <- pred_survival_threshold
       model$survival_curves <- calc_survival_curves_with_strata(df, clean_time_col, clean_status_col, imp_vars)
 
       # Calculate concordance.
@@ -600,7 +602,7 @@ glance.ranger_survival_exploratory <- function(x, data_type = "training", ...) {
 }
 
 #' @export
-augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "training", pred_survival_time = NULL, ...) {
+augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "training", pred_survival_time = NULL, pred_survival_threshold = NULL, ...) {
   if ("error" %in% class(x)) {
     ret <- data.frame(Note = x$message)
     return(ret)
@@ -645,13 +647,19 @@ augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "
   if (is.null(pred_survival_time)) {
     pred_survival_time <- x$pred_survival_time
   }
+  if (is.null(pred_survival_threshold)) {
+    pred_survival_threshold <- x$pred_survival_threshold
+  }
+
   unique_death_times <- x$forest$unique.death.times
   survival_time <- max(unique_death_times[unique_death_times <= pred_survival_time])
   survival_time_index <- match(survival_time, unique_death_times)
-  predicted_survival <- pred$survival[,survival_time_index]
+  predicted_survival_rate <- pred$survival[,survival_time_index]
+  predicted_survival <- predicted_survival_rate > pred_survival_threshold
   ret <- data
   ret$`Survival Time for Prediction`<- pred_survival_time
-  ret$`Predicted Survival Rate`<- predicted_survival
+  ret$`Predicted Survival Rate`<- predicted_survival_rate
+  ret$`Predicted Survival`<- predicted_survival
 
   # Convert column names back to the original.
   for (i in 1:length(x$terms_mapping)) {
