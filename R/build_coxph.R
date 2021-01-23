@@ -356,6 +356,7 @@ build_coxph.fast <- function(df,
                     max_pd_vars = NULL,
                     pd_sample_size = 25, # Because of performance issue, this is kept small unlike other models for which we usually use 500.
                     pred_survival_time = NULL,
+                    pred_survival_threshold = 0.5,
                     predictor_outlier_filter_type = NULL,
                     predictor_outlier_filter_threshold = NULL,
                     seed = 1,
@@ -561,6 +562,7 @@ build_coxph.fast <- function(df,
       model$imp_vars <- imp_vars
       model$partial_dependence <- partial_dependence.coxph_exploratory(model, clean_time_col, vars = imp_vars, n = c(9, min(nrow(df), pd_sample_size)), data = df) # grid of 9 is convenient for both PDP and survival curves.
       model$pred_survival_time <- pred_survival_time
+      model$pred_survival_threshold <- pred_survival_threshold
       model$survival_curves <- calc_survival_curves_with_strata(df, clean_time_col, clean_status_col, imp_vars)
 
       tryCatch({
@@ -871,7 +873,7 @@ glance.coxph_exploratory <- function(x, data_type = "training", pretty.name = FA
 }
 
 #' @export
-augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training", pred_survival_time = NULL, ...) {
+augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training", pred_survival_time = NULL, pred_survival_threshold = NULL, ...) {
   if ("error" %in% class(x)) {
     ret <- data.frame(Note = x$message)
     return(ret)
@@ -922,6 +924,9 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
   if (is.null(pred_survival_time)) {
     pred_survival_time <- x$pred_survival_time
   }
+  if (is.null(pred_survival_threshold)) {
+    pred_survival_threshold <- x$pred_survival_threshold
+  }
 
   # basehaz returns base cumulative hazard.
   bh <- survival::basehaz(x)
@@ -930,18 +935,20 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
   cumhaz_base = bh_fun(pred_survival_time)
   # transform linear predictor (.fitted) into predicted_survival.
   ret <- ret %>% dplyr::mutate(time_for_prediction = pred_survival_time,
-                               predicted_survival = exp(-cumhaz_base * exp(.fitted)))
+                               predicted_survival_rate = exp(-cumhaz_base * exp(.fitted)),
+                               predicted_survival = predicted_survival_rate > pred_survival_threshold)
 
   if (!is.null(ret$.fitted)) {
     # Bring those columns as the first of the prediction result related additional columns.
-    ret <- ret %>% dplyr::relocate(any_of(c("time_for_prediction", "predicted_survival")), .before=.fitted)
+    ret <- ret %>% dplyr::relocate(any_of(c("time_for_prediction", "predicted_survival_rate", "predicted_survival")), .before=.fitted)
   }
   # Prettify names.
   colnames(ret)[colnames(ret) == ".fitted"] <- "Linear Predictor"
   colnames(ret)[colnames(ret) == ".se.fit"] <- "Std Error"
   colnames(ret)[colnames(ret) == ".resid"] <- "Residual"
   colnames(ret)[colnames(ret) == "time_for_prediction"] <- "Survival Time for Prediction"
-  colnames(ret)[colnames(ret) == "predicted_survival"] <- "Predicted Survival Rate"
+  colnames(ret)[colnames(ret) == "predicted_survival_rate"] <- "Predicted Survival Rate"
+  colnames(ret)[colnames(ret) == "predicted_survival"] <- "Predicted Survival"
 
   # Convert column names back to the original.
   for (i in 1:length(x$terms_mapping)) {
