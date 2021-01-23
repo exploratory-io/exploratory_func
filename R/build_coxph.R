@@ -373,6 +373,8 @@ build_coxph.fast <- function(df,
     end_date_col <- tidyselect::vars_select(names(df), !! rlang::enquo(end_date))
     time_unit_days <- get_time_unit_days(time_unit, df[[start_date_col]], df[[end_date_col]])
     time_unit <- attr(time_unit_days, "label") # Get label like "day", "week".
+    # We are ceiling survival time to make it integer in the specified time unit, just like we do for Survival Curve analytics view.
+    # This is to make resulting survival curve to have integer data point in the specified time unit. TODO: Think if this really makes sense here for Cox and Survival Forest.
     df <- df %>% dplyr::mutate(.time = ceiling(as.numeric(!!rlang::sym(end_date_col) - !!rlang::sym(start_date_col), units = "days")/time_unit_days))
     time_col <- ".time"
   }

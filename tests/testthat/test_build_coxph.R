@@ -47,7 +47,7 @@ test_that("build_coxph.fast basic", {
 test_that("build_coxph.fast with start_date and end_date", {
   df <- survival::lung # this data has NAs.
   df <- df %>% mutate(status = status==2)
-  df <- df %>% mutate(start = as.Date("2021-01-01"), end = start + days(time))
+  df <- df %>% mutate(start = as.Date("2021-01-01"), end = start + lubridate::days(time))
   df <- df %>% rename(`ti me`=time, `sta tus`=status, `a ge`=age, `se-x`=sex)
   df <- df %>% mutate(ph.ecog = factor(ph.ecog, ordered=TRUE)) # test handling of ordered factor
   df <- df %>% mutate(`se-x` = `se-x`==1) # test handling of logical
