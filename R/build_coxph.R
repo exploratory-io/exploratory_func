@@ -296,18 +296,67 @@ calc_permutation_importance_coxph <- function(fit, time_col, status_col, vars, d
   importances_df
 }
 
+get_time_unit_days <- function(type="auto", x, y) {
+  # If the type is specified explicitly.  
+  if (type == "year") {
+    res <- 365.25
+  } else if (type == "quarter") {
+    res <- 365.25/4
+  } else if (type == "month") {
+    res <- 365.25/12
+  } else if (type == "week") {
+    res <- 7
+  } else if (type == "day") {
+    res <- 1
+  } else {
+    # type=="auto" case.  
+    # Pick the time unit automatically based on the date range of start/end date.
+    xy <- c(x, y)
+    a <- min(xy, na.rm = TRUE)
+    b <- max(xy, na.rm = TRUE);
+    timeinterval <- lubridate::interval(a, b)
+    # Year - default
+    res <- 365.25
+    type <- 'year'
+    
+    if (lubridate::time_length(timeinterval, "year") < 5) {
+      # Month unit if the range is less than 5 years.
+      res <- 365.25/12
+      type <- 'month'
+      
+      if (lubridate::time_length(timeinterval, "year") < 1) {
+        # Week unit if the range is less than 1 year.
+        res <- 7
+        type <- 'week'
+
+        if (lubridate::time_length(timeinterval, "day") <=31) {
+          # Day unit if the range is less than 1 month (less than or equal to 31 days).
+          res <- 1
+          type <- 'day'
+        }
+      }
+    }
+  }
+  attr(res, "label") <- type
+  res
+}
+
 #' builds cox model quickly by way of sampling or fct_lumn, for analytics view.
 #' @export
 build_coxph.fast <- function(df,
                     time,
                     status,
                     ...,
+                    start_time = NULL,
+                    end_time = NULL,
+                    time_unit = "day",
                     predictor_funs = NULL,
                     max_nrow = 50000, # With 50000 rows, taking 6 to 7 seconds on late-2016 Macbook Pro.
                     predictor_n = 12, # so that at least months can fit in it.
                     max_pd_vars = NULL,
                     pd_sample_size = 25, # Because of performance issue, this is kept small unlike other models for which we usually use 500.
                     pred_survival_time = NULL,
+                    pred_survival_threshold = 0.5,
                     predictor_outlier_filter_type = NULL,
                     predictor_outlier_filter_threshold = NULL,
                     seed = 1,
@@ -320,6 +369,19 @@ build_coxph.fast <- function(df,
   # ref: http://dplyr.tidyverse.org/articles/programming.html
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
   time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(time))
+  start_time_col <- NULL
+  end_time_col <- NULL
+  if (length(time_col) == 0) { # This means time was NULL
+    start_time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(start_time))
+    end_time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(end_time))
+    time_unit_days <- get_time_unit_days(time_unit, df[[start_time_col]], df[[end_time_col]])
+    time_unit <- attr(time_unit_days, "label") # Get label like "day", "week".
+    # We are ceiling survival time to make it integer in the specified time unit, just like we do for Survival Curve analytics view.
+    # This is to make resulting survival curve to have integer data point in the specified time unit. TODO: Think if this really makes sense here for Cox and Survival Forest.
+    df <- df %>% dplyr::mutate(.time = ceiling(as.numeric(!!rlang::sym(end_time_col) - !!rlang::sym(start_time_col), units = "days")/time_unit_days))
+    time_col <- ".time"
+  }
+    
   status_col <- tidyselect::vars_select(names(df), !! rlang::enquo(status))
   # this evaluates select arguments like starts_with
   orig_selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
@@ -405,6 +467,12 @@ build_coxph.fast <- function(df,
   clean_status_col <- name_map[status_col]
   clean_time_col <- name_map[time_col]
   clean_cols <- name_map[cols]
+  clean_start_time_col <- NULL
+  clean_end_time_col <- NULL
+  if (!is.null(start_time_col)) {
+    clean_start_time_col <- name_map[start_time_col]
+    clean_end_time_col <- name_map[end_time_col]
+  }
 
   each_func <- function(df) {
     tryCatch({
@@ -442,7 +510,13 @@ build_coxph.fast <- function(df,
       # Temporarily remove unused columns for uniformity. TODO: Revive them when we do that across the product.
       c_cols_without_names <- c_cols
       names(c_cols_without_names) <- NULL # remove names to eliminate renaming effect of select.
-      df <- df %>% dplyr::select(!!!rlang::syms(c_cols_without_names), !!rlang::sym(clean_time_col), rlang::sym(clean_status_col))
+
+      if (is.null(clean_start_time_col)) {
+        df <- df %>% dplyr::select(!!!rlang::syms(c_cols_without_names), !!rlang::sym(clean_time_col), rlang::sym(clean_status_col))
+      }
+      else {
+        df <- df %>% dplyr::select(!!!rlang::syms(c_cols_without_names), !!rlang::sym(clean_start_time_col), !!rlang::sym(clean_end_time_col), !!rlang::sym(clean_time_col), rlang::sym(clean_status_col))
+      }
 
       df <- remove_outliers_for_regression_data(df, clean_time_col, c_cols,
                                                 NULL, #target_outlier_filter_type
@@ -490,6 +564,7 @@ build_coxph.fast <- function(df,
       model$imp_vars <- imp_vars
       model$partial_dependence <- partial_dependence.coxph_exploratory(model, clean_time_col, vars = imp_vars, n = c(9, min(nrow(df), pd_sample_size)), data = df) # grid of 9 is convenient for both PDP and survival curves.
       model$pred_survival_time <- pred_survival_time
+      model$pred_survival_threshold <- pred_survival_threshold
       model$survival_curves <- calc_survival_curves_with_strata(df, clean_time_col, clean_status_col, imp_vars)
 
       tryCatch({
@@ -554,6 +629,9 @@ build_coxph.fast <- function(df,
   ret <- do_on_each_group(clean_df, each_func, name = "model", with_unnest = FALSE)
   # Pass down survival time used for prediction. This is for the post-processing for time-dependent ROC.
   attr(ret, "pred_survival_time") <- pred_survival_time
+
+  # Pass down time unit for prediction step UI.
+  attr(ret, "time_unit") <- time_unit
   ret
 }
 
@@ -797,7 +875,7 @@ glance.coxph_exploratory <- function(x, data_type = "training", pretty.name = FA
 }
 
 #' @export
-augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training", pred_survival_time = NULL, ...) {
+augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training", pred_survival_time = NULL, pred_survival_threshold = NULL, ...) {
   if ("error" %in% class(x)) {
     ret <- data.frame(Note = x$message)
     return(ret)
@@ -848,6 +926,9 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
   if (is.null(pred_survival_time)) {
     pred_survival_time <- x$pred_survival_time
   }
+  if (is.null(pred_survival_threshold)) {
+    pred_survival_threshold <- x$pred_survival_threshold
+  }
 
   # basehaz returns base cumulative hazard.
   bh <- survival::basehaz(x)
@@ -856,18 +937,20 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
   cumhaz_base = bh_fun(pred_survival_time)
   # transform linear predictor (.fitted) into predicted_survival.
   ret <- ret %>% dplyr::mutate(time_for_prediction = pred_survival_time,
-                               predicted_survival = exp(-cumhaz_base * exp(.fitted)))
+                               predicted_survival_rate = exp(-cumhaz_base * exp(.fitted)),
+                               predicted_survival = predicted_survival_rate > pred_survival_threshold)
 
   if (!is.null(ret$.fitted)) {
     # Bring those columns as the first of the prediction result related additional columns.
-    ret <- ret %>% dplyr::relocate(any_of(c("time_for_prediction", "predicted_survival")), .before=.fitted)
+    ret <- ret %>% dplyr::relocate(any_of(c("time_for_prediction", "predicted_survival_rate", "predicted_survival")), .before=.fitted)
   }
   # Prettify names.
   colnames(ret)[colnames(ret) == ".fitted"] <- "Linear Predictor"
   colnames(ret)[colnames(ret) == ".se.fit"] <- "Std Error"
   colnames(ret)[colnames(ret) == ".resid"] <- "Residual"
   colnames(ret)[colnames(ret) == "time_for_prediction"] <- "Survival Time for Prediction"
-  colnames(ret)[colnames(ret) == "predicted_survival"] <- "Predicted Survival Rate"
+  colnames(ret)[colnames(ret) == "predicted_survival_rate"] <- "Predicted Survival Rate"
+  colnames(ret)[colnames(ret) == "predicted_survival"] <- "Predicted Survival"
 
   # Convert column names back to the original.
   for (i in 1:length(x$terms_mapping)) {

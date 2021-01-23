@@ -196,6 +196,9 @@ exp_survival_forest <- function(df,
                     time,
                     status,
                     ...,
+                    start_time = NULL,
+                    end_time = NULL,
+                    time_unit = "day",
                     predictor_funs = NULL,
                     max_nrow = 50000, # With 50000 rows, taking 6 to 7 seconds on late-2016 Macbook Pro.
                     max_sample_size = NULL, # Half of max_nrow.
@@ -206,6 +209,7 @@ exp_survival_forest <- function(df,
                     max_pd_vars = NULL,
                     pd_sample_size = 500,
                     pred_survival_time = NULL,
+                    pred_survival_threshold = 0.5,
                     predictor_outlier_filter_type = NULL,
                     predictor_outlier_filter_threshold = NULL,
                     seed = 1,
@@ -225,6 +229,18 @@ exp_survival_forest <- function(df,
   # ref: http://dplyr.tidyverse.org/articles/programming.html
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
   time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(time))
+  start_time_col <- NULL
+  end_time_col <- NULL
+  if (length(time_col) == 0) { # This means time was NULL
+    start_time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(start_time))
+    end_time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(end_time))
+    time_unit_days <- get_time_unit_days(time_unit, df[[start_time_col]], df[[end_time_col]])
+    time_unit <- attr(time_unit_days, "label") # Get label like "day", "week".
+    # We are ceiling survival time to make it integer in the specified time unit, just like we do for Survival Curve analytics view.
+    # This is to make resulting survival curve to have integer data point in the specified time unit. TODO: Think if this really makes sense here for Cox and Survival Forest.
+    df <- df %>% dplyr::mutate(.time = ceiling(as.numeric(!!rlang::sym(end_time_col) - !!rlang::sym(start_time_col), units = "days")/time_unit_days))
+    time_col <- ".time"
+  }
   status_col <- tidyselect::vars_select(names(df), !! rlang::enquo(status))
   # this evaluates select arguments like starts_with
   orig_selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
@@ -309,6 +325,12 @@ exp_survival_forest <- function(df,
   clean_status_col <- name_map[status_col]
   clean_time_col <- name_map[time_col]
   clean_cols <- name_map[cols]
+  clean_start_time_col <- NULL
+  clean_end_time_col <- NULL
+  if (!is.null(start_time_col)) {
+    clean_start_time_col <- name_map[start_time_col]
+    clean_end_time_col <- name_map[end_time_col]
+  }
 
   each_func <- function(df) {
     tryCatch({
@@ -342,7 +364,12 @@ exp_survival_forest <- function(df,
       # Temporarily remove unused columns for uniformity. TODO: Revive them when we do that across the product.
       clean_cols_without_names <- clean_cols
       names(clean_cols_without_names) <- NULL # remove names to eliminate renaming effect of select.
-      df <- df %>% dplyr::select(!!!rlang::syms(clean_cols_without_names), !!rlang::sym(clean_time_col), rlang::sym(clean_status_col))
+      if (is.null(clean_start_time_col)) {
+        df <- df %>% dplyr::select(!!!rlang::syms(clean_cols_without_names), !!rlang::sym(clean_time_col), rlang::sym(clean_status_col))
+      }
+      else {
+        df <- df %>% dplyr::select(!!!rlang::syms(clean_cols_without_names), !!rlang::sym(clean_start_time_col), !!rlang::sym(clean_end_time_col), !!rlang::sym(clean_time_col), rlang::sym(clean_status_col))
+      }
 
       df <- preprocess_regression_data_after_sample(df, clean_time_col, clean_cols, predictor_n = predictor_n, name_map = name_map)
       c_cols <- attr(df, 'predictors') # predictors are updated (added and/or removed) in preprocess_post_sample. Catch up with it.
@@ -407,6 +434,7 @@ exp_survival_forest <- function(df,
       model$imp_vars <- imp_vars
       model$partial_dependence <- partial_dependence.ranger_survival_exploratory(model, clean_time_col, vars = imp_vars, n = c(9, min(nrow(df), pd_sample_size)), data = df) # grid of 9 is convenient for both PDP and survival curves.
       model$pred_survival_time <- pred_survival_time
+      model$pred_survival_threshold <- pred_survival_threshold
       model$survival_curves <- calc_survival_curves_with_strata(df, clean_time_col, clean_status_col, imp_vars)
 
       # Calculate concordance.
@@ -475,6 +503,8 @@ exp_survival_forest <- function(df,
   ret <- do_on_each_group(clean_df, each_func, name = "model", with_unnest = FALSE)
   # Pass down survival time used for prediction. This is for the post-processing for time-dependent ROC.
   attr(ret, "pred_survival_time") <- pred_survival_time
+  # Pass down time unit for prediction step UI.
+  attr(ret, "time_unit") <- time_unit
   ret
 }
 
@@ -574,7 +604,7 @@ glance.ranger_survival_exploratory <- function(x, data_type = "training", ...) {
 }
 
 #' @export
-augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "training", pred_survival_time = NULL, ...) {
+augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "training", pred_survival_time = NULL, pred_survival_threshold = NULL, ...) {
   if ("error" %in% class(x)) {
     ret <- data.frame(Note = x$message)
     return(ret)
@@ -619,13 +649,19 @@ augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "
   if (is.null(pred_survival_time)) {
     pred_survival_time <- x$pred_survival_time
   }
+  if (is.null(pred_survival_threshold)) {
+    pred_survival_threshold <- x$pred_survival_threshold
+  }
+
   unique_death_times <- x$forest$unique.death.times
   survival_time <- max(unique_death_times[unique_death_times <= pred_survival_time])
   survival_time_index <- match(survival_time, unique_death_times)
-  predicted_survival <- pred$survival[,survival_time_index]
+  predicted_survival_rate <- pred$survival[,survival_time_index]
+  predicted_survival <- predicted_survival_rate > pred_survival_threshold
   ret <- data
   ret$`Survival Time for Prediction`<- pred_survival_time
-  ret$`Predicted Survival Rate`<- predicted_survival
+  ret$`Predicted Survival Rate`<- predicted_survival_rate
+  ret$`Predicted Survival`<- predicted_survival
 
   # Convert column names back to the original.
   for (i in 1:length(x$terms_mapping)) {
