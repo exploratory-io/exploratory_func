@@ -367,8 +367,9 @@ build_coxph.fast <- function(df,
   # using the new way of NSE column selection evaluation
   # ref: http://dplyr.tidyverse.org/articles/programming.html
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
-  browser()
   time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(time))
+  start_time_col <- NULL
+  end_time_col <- NULL
   if (length(time_col) == 0) { # This means time was NULL
     start_time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(start_time))
     end_time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(end_time))
@@ -465,10 +466,13 @@ build_coxph.fast <- function(df,
   clean_status_col <- name_map[status_col]
   clean_time_col <- name_map[time_col]
   clean_cols <- name_map[cols]
+  if (!is.null(start_time_col)) {
+    clean_start_time_col <- name_map[start_time_col]
+    clean_end_time_col <- name_map[end_time_col]
+  }
 
   each_func <- function(df) {
     tryCatch({
-      browser()
       if(!is.null(seed)){
         set.seed(seed)
       }
@@ -503,7 +507,13 @@ build_coxph.fast <- function(df,
       # Temporarily remove unused columns for uniformity. TODO: Revive them when we do that across the product.
       c_cols_without_names <- c_cols
       names(c_cols_without_names) <- NULL # remove names to eliminate renaming effect of select.
-      df <- df %>% dplyr::select(!!!rlang::syms(c_cols_without_names), !!rlang::sym(clean_time_col), rlang::sym(clean_status_col))
+
+      if (is.null(clean_start_time_col)) {
+        df <- df %>% dplyr::select(!!!rlang::syms(c_cols_without_names), !!rlang::sym(clean_time_col), rlang::sym(clean_status_col))
+      }
+      else {
+        df <- df %>% dplyr::select(!!!rlang::syms(c_cols_without_names), !!rlang::sym(clean_start_time_col), !!rlang::sym(clean_end_time_col), !!rlang::sym(clean_time_col), rlang::sym(clean_status_col))
+      }
 
       df <- remove_outliers_for_regression_data(df, clean_time_col, c_cols,
                                                 NULL, #target_outlier_filter_type
