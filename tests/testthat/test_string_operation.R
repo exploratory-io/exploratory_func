@@ -648,3 +648,31 @@ test_that("str_logical", {
   expect_equal(ret, c(NA, NA, NA, NA, NA, NA, NA, NA))
 })
 
+test_that("str_detect", {
+  ret <- exploratory::str_detect(c("Test", "test", "ATe"), "Te")
+  expect_equal(ret, c(TRUE, FALSE, TRUE))
+  ret <- exploratory::str_detect(c("Test", "test", "tEST", "abc"), "Te", ignore_case = TRUE)
+  expect_equal(ret, c(TRUE, TRUE, TRUE, FALSE))
+  # When pattern is empty string, it should always match.
+  ret <- exploratory::str_detect(c("Test", "test", "tEST", "abc"), "")
+  expect_equal(ret, c(TRUE, TRUE, TRUE, TRUE))
+  ret <- exploratory::str_detect(c("Test", "test", "tEST", "abc"), "", ignore_case = TRUE)
+  # below is the original tests from stringr::str_detect
+  expect_equal(ret, c(TRUE, TRUE, TRUE, TRUE))
+  expect_equal(exploratory::str_detect(NA, "x"), NA)
+  expect_equal(exploratory::str_detect(character(), "x"), logical())
+  expect_equal(exploratory::str_detect("ab", c("a", "b", "c")), c(T, T, F))
+  expect_equal(exploratory::str_detect(c("ca", "ab"), c("a", "c")), c(T, F))
+  # negation works
+  expect_equal(exploratory::str_detect("ab", c("a", "b", "c"), negate = TRUE), c(F, F, T))
+  expect_false(exploratory::str_detect("ab", "AB"))
+  expect_true(exploratory::str_detect("ab", stringr::regex("AB", TRUE)))
+
+  expect_true(exploratory::str_detect("abc", "ab[c]"))
+  expect_false(exploratory::str_detect("abc", stringr::fixed("ab[c]")))
+  expect_true(exploratory::str_detect("ab[c]", stringr::fixed("ab[c]")))
+  expect_true(exploratory::str_detect("ab[c]", stringr::coll("ab[c]")))
+
+  expect_true(exploratory::str_detect("abc", "(?x)a b c"))
+})
+

@@ -825,3 +825,26 @@ str_logical <- function(column, true_value = NULL) {
               ifelse(target %in%  c("false", "no", "0"), FALSE, NA))
    }
 }
+
+#' Function to detect pattern from a string.
+#' It's a wrapper function for stringr::str_detect and the wrapper function has ignore_case handling.
+#' @param string Input vector. Either a character vector, or something coercible to one.
+#' @param pattern Pattern to look for.
+#'
+#' The default interpretation is a regular expression, as described in stringi::stringi-search-regex. Control options with regex().
+#'
+#' Match a fixed string (i.e. by comparing only bytes), using fixed(). This is fast, but approximate. Generally, for matching human text, you'll want coll() which respects character matching rules for the specified locale.
+#' Match character, word, line and sentence boundaries with boundary(). An empty pattern, "", is equivalent to boundary("character").
+#'
+#' @param negate If TRUE, return non-matching elements.
+#' @param ignore_case If TRUE, detect the patter with case insensitive way.
+#' @export
+str_detect <- function(string, pattern, negate = FALSE, ignore_case = FALSE) {
+ if (ignore_case == TRUE) { # For case insensitive case
+   # When the pattern is empty string (""), stringr::regex throws warning for empty string matching, so use str_to_lower for both string and pattern for matching.
+   case_when(pattern == "" ~ stringr::str_detect(stringr::str_to_lower(string), stringr::str_to_lower(pattern), negate = negate),
+             TRUE ~ stringr::str_detect(string, stringr::regex(pattern, ignore_case = TRUE)))
+ } else {
+   stringr::str_detect(string, pattern, negate)
+ }
+}
