@@ -657,8 +657,11 @@ test_that("str_detect", {
   ret <- exploratory::str_detect(c("Test", "test", "tEST", "abc"), "")
   expect_equal(ret, c(TRUE, TRUE, TRUE, TRUE))
   ret <- exploratory::str_detect(c("Test", "test", "tEST", "abc"), "", ignore_case = TRUE)
-  # below is the original tests from stringr::str_detect
   expect_equal(ret, c(TRUE, TRUE, TRUE, TRUE))
+  ret <- exploratory::str_detect(c("Aabc", "baadd", "dddd"), stringr::regex(stringr::str_c("AA"), ignore_case=TRUE))
+  expect_equal(ret, c(TRUE, TRUE, FALSE))
+
+  # below is the original tests from stringr::str_detect
   expect_equal(exploratory::str_detect(NA, "x"), NA)
   expect_equal(exploratory::str_detect(character(), "x"), logical())
   expect_equal(exploratory::str_detect("ab", c("a", "b", "c")), c(T, T, F))
