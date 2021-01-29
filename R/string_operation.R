@@ -843,7 +843,7 @@ str_detect <- function(string, pattern, negate = FALSE, ignore_case = FALSE) {
  if (ignore_case == TRUE) { # For case insensitive case
    # When the pattern is empty string (""), stringr::regex throws warning for empty string matching, so use str_to_lower for both string and pattern for matching.
    case_when(pattern == "" ~ stringr::str_detect(stringr::str_to_lower(string), stringr::str_to_lower(pattern), negate = negate),
-             TRUE ~ stringr::str_detect(string, stringr::regex(pattern, ignore_case = TRUE)))
+             TRUE ~ stringr::str_detect(string, stringr::regex(pattern, ignore_case = TRUE), negate = negate))
  } else {
    stringr::str_detect(string, pattern, negate)
  }
