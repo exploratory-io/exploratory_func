@@ -840,11 +840,9 @@ str_logical <- function(column, true_value = NULL) {
 #' @param ignore_case If TRUE, detect the patter with case insensitive way.
 #' @export
 str_detect <- function(string, pattern, negate = FALSE, ignore_case = FALSE) {
- if (ignore_case == TRUE) { # For case insensitive case
-   # When the pattern is empty string (""), stringr::regex throws warning for empty string matching, so use str_to_lower for both string and pattern for matching.
-   case_when(pattern == "" ~ stringr::str_detect(stringr::str_to_lower(string), stringr::str_to_lower(pattern), negate = negate),
-             TRUE ~ stringr::str_detect(string, stringr::regex(pattern, ignore_case = TRUE), negate = negate))
- } else {
-   stringr::str_detect(string, pattern, negate)
- }
+  if (pattern != "" && ignore_case) { # if pattern is not empty string and case insensitive is specified, use regex to handle the case insensitive match.
+    stringr::str_detect(string, stringr::regex(pattern, ignore_case = TRUE), negate = negate)
+  } else { # if the pattern is empty string stringr::regexp throws warning, so simply use stringr::str_detect as is.
+    stringr::str_detect(string, pattern, negate)
+  }
 }
