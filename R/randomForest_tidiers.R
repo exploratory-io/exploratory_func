@@ -207,7 +207,7 @@ rangerCore <- function(data, formula, na.action = na.omit,
     if (is.logical(data[[target_col]])) {
       # Convert logical to factor to make it work with ranger.
       # For ranger, we consider the first level to be TRUE. So set levels that way.
-      # Keep this logic consistent with get_binary_predicted_value_from_probability and augment.ranger.classification
+      # Keep this logic consistent with ranger.predict_value_from_prob and augment.ranger.classification
       data[[target_col]] <- factor(data[[target_col]], levels=c("TRUE","FALSE"))
     }
     else {
@@ -884,7 +884,7 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
       # With ranger, 1st category always is the one to be considered "TRUE",
       # and the probability for it is the probability for the binary classification.
       # (For logistic regression, it is different, but here for ranger for now, for simplicity, we choose this behavior.)
-      # Keep this logic consistent with get_binary_predicted_value_from_probability
+      # Keep this logic consistent with ranger.predict_value_from_prob
       predicted_prob <- pred_res$predictions[, 1]
       # Inserting once removed NA rows
       predicted_prob <- restore_na(predicted_prob, na_row_numbers)
@@ -935,14 +935,14 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
           predictions <- x$prediction_training$predictions
           # With ranger, 1st category always is the one to be considered "TRUE",
           # and the probability for it is the probability for the binary classification.
-          # Keep this logic consistent with get_binary_predicted_value_from_probability
+          # Keep this logic consistent with ranger.predict_value_from_prob
           predicted_prob <- restore_na(predictions[, 1], x$na.action)
         },
         test = {
           predictions <- x$prediction_test$predictions
           # With ranger, 1st category always is the one to be considered "TRUE",
           # and the probability for it is the probability for the binary classification.
-          # Keep this logic consistent with get_binary_predicted_value_from_probability
+          # Keep this logic consistent with ranger.predict_value_from_prob
           predicted_prob_nona <- predictions[, 1]
           predicted_prob_nona <- restore_na(predicted_prob_nona, attr(x$prediction_test, "unknown_category_rows_index"))
           predicted_prob <- restore_na(predicted_prob_nona, attr(x$prediction_test, "na.action"))
@@ -2252,7 +2252,6 @@ calc_feature_imp <- function(df,
       # prediction result in the ranger model (ret$predictions) is for some reason different from and worse than
       # the prediction separately done with the same training data.
       # Make prediction with training data here and keep it, so that we can use this separate prediction for prediction, evaluation, etc.
-      browser()
       model$prediction_training <- predict(model, model_df)
 
       if (test_rate > 0) {
@@ -2503,25 +2502,6 @@ evaluate_classification <- function(actual, predicted, class, multi_class = TRUE
     }
   }
   ret
-}
-
-# with binary probability prediction model from ranger, take the level with bigger probability as the predicted value.
-#' @export
-# not really an external function but exposing for test. TODO: find better way.
-# TODO: Isn't this same thing as ranger.predict_value_from_prob? If so, consolidate.
-get_binary_predicted_value_from_probability <- function(x, threshold = 0.5) {
-  # x$predictions is 2-diminsional matrix with 2 columns for the 2 categories. values in the matrix is the probabilities.
-  # TODO: thought x$predictions was 3 dimensinal array with tree dimension from the doc and independently running ranger,
-  # but looks like it is already averaged? look into it.
-  predicted <- apply(x$prediction_training$predictions, 1, function(x){
-    if(is.na(x[2])){ # take care of the case where x$predictions has only 1 column. possible when there are only one value in training data.
-      1
-    }
-    else {
-      if(x[1]>threshold) 1 else 2
-    }
-  })
-  predicted
 }
 
 #' @export
