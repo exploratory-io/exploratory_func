@@ -88,7 +88,9 @@ test_that("calc_feature_imp(binary) evaluate training and test", {
   ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class")
   expect_equal(nrow(ret), 4) # 4 for train/test times TRUE/FALSE
 
+  browser()
   ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
+  browser()
   expect_equal(nrow(ret), 8) # 8 for train/test times predicted TRUE/FALSE times actual TRUE/FALSE
 
   model_df <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`)) %>%

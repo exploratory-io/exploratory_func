@@ -1272,16 +1272,29 @@ ranger.predict_value_from_prob <- function(levels_var, pred, y_value, threshold 
     to_same_type(levels_var[apply(pred, 1, which.max)], y_value)
   }
   else { # binary case
+    # pred (x$predictions) is 2-diminsional matrix with 2 columns for the 2 categories.
+    # Values in the matrix is the probabilities.
     true_index <- match("TRUE",colnames(pred)) # Find which index is TRUE
-    if (is.na(true_index)) { # For old analytics step that can take non-logical column for binary classification.
-      true_index <- 1
+    if (is.na(true_index)) {
+      false_index <- match("FALSE",colnames(pred)) # Find which index is FALSE 
+      if (is.na(false_index)) {
+        # For old analytics step that can take non-logical column for binary classification. Treat the first value as TRUE.
+        true_index <- 1
+      }
+      else {
+        # take care of the case where x$predictions has only 1 column and it is FALSE. possible when there are only one value in training data.
+        true_index <- 0
+      }
     }
     predicted <- apply(pred, 1, function(x){
       if (true_index == 1) {
-        x[1]>threshold
+        x[1] > threshold
+      }
+      else if (true_index == 0) { # FALSE only case explained above.
+        1 - x[1] > threshold
       }
       else { # true_index == 2
-        x[2]>threshold
+        x[2] > threshold
       }
     })
     predicted
@@ -2239,6 +2252,7 @@ calc_feature_imp <- function(df,
       # prediction result in the ranger model (ret$predictions) is for some reason different from and worse than
       # the prediction separately done with the same training data.
       # Make prediction with training data here and keep it, so that we can use this separate prediction for prediction, evaluation, etc.
+      browser()
       model$prediction_training <- predict(model, model_df)
 
       if (test_rate > 0) {
@@ -2494,18 +2508,19 @@ evaluate_classification <- function(actual, predicted, class, multi_class = TRUE
 # with binary probability prediction model from ranger, take the level with bigger probability as the predicted value.
 #' @export
 # not really an external function but exposing for test. TODO: find better way.
+# TODO: Isn't this same thing as ranger.predict_value_from_prob? If so, consolidate.
 get_binary_predicted_value_from_probability <- function(x, threshold = 0.5) {
   # x$predictions is 2-diminsional matrix with 2 columns for the 2 categories. values in the matrix is the probabilities.
   # TODO: thought x$predictions was 3 dimensinal array with tree dimension from the doc and independently running ranger,
   # but looks like it is already averaged? look into it.
-  predicted <- factor(x$forest$levels[apply(x$prediction_training$predictions, 1, function(x){
+  predicted <- apply(x$prediction_training$predictions, 1, function(x){
     if(is.na(x[2])){ # take care of the case where x$predictions has only 1 column. possible when there are only one value in training data.
       1
     }
     else {
       if(x[1]>threshold) 1 else 2
     }
-  })], levels=x$forest$levels)
+  })
   predicted
 }
 
