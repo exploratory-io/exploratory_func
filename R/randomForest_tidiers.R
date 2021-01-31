@@ -2618,7 +2618,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, binary_clas
         glance(x, pretty.name = pretty.name, ...)
       } else {
         if (x$classification_type == "binary") {
-          predicted <- get_binary_predicted_value_from_probability(x, threshold = binary_classification_threshold)
+          predicted <- ranger.predict_value_from_prob(NULL, x$prediction_training$predictions, NULL, threshold = binary_classification_threshold)
           predicted_probability <- x$prediction_training$predictions[,1]
           ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = pretty.name)
         }
@@ -2633,7 +2633,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, binary_clas
       # get evaluation scores from training data
       actual <- x$y
       if (x$classification_type == "binary") {
-        predicted <- get_binary_predicted_value_from_probability(x, threshold = binary_classification_threshold)
+        predicted <- ranger.predict_value_from_prob(NULL, x$prediction_training$predictions, NULL, threshold = binary_classification_threshold)
       }
       else {
         predicted <- ranger.predict_value_from_prob(x$forest$levels, x$prediction_training$predictions, x$y)
@@ -2648,7 +2648,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, binary_clas
     conf_mat = {
       # return confusion matrix
       if (x$classification_type == "binary") {
-        predicted <- get_binary_predicted_value_from_probability(x, threshold = binary_classification_threshold)
+        predicted <- ranger.predict_value_from_prob(NULL, x$prediction_training$predictions, NULL, threshold = binary_classification_threshold)
       }
       else {
         predicted <- ranger.predict_value_from_prob(x$forest$levels, x$prediction_training$predictions, x$y)
@@ -2660,7 +2660,7 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, binary_clas
     scatter = {
       # return actual and predicted value pairs
       if (x$classification_type == "binary") {
-        predicted <- get_binary_predicted_value_from_probability(x, threshold = binary_classification_threshold)
+        predicted <- ranger.predict_value_from_prob(NULL, x$prediction_training$predictions, NULL, threshold = binary_classification_threshold)
       }
       else if (x$classification_type == "mutli") {
         predicted <- ranger.predict_value_from_prob(x$forest$levels, x$prediction_training$predictions, x$y)
