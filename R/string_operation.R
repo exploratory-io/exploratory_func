@@ -830,14 +830,8 @@ str_logical <- function(column, true_value = NULL) {
 #' It's a wrapper function for stringr::str_detect and the wrapper function has ignore_case handling.
 #' @param string Input vector. Either a character vector, or something coercible to one.
 #' @param pattern Pattern to look for.
-#'
-#' The default interpretation is a regular expression, as described in stringi::stringi-search-regex. Control options with regex().
-#'
-#' Match a fixed string (i.e. by comparing only bytes), using fixed(). This is fast, but approximate. Generally, for matching human text, you'll want coll() which respects character matching rules for the specified locale.
-#' Match character, word, line and sentence boundaries with boundary(). An empty pattern, "", is equivalent to boundary("character").
-#'
 #' @param negate If TRUE, return non-matching elements.
-#' @param ignore_case If TRUE, detect the patter with case insensitive way.
+#' @param ignore_case If TRUE, detect the pattern with case insensitive way.
 #' @export
 str_detect <- function(string, pattern, negate = FALSE, ignore_case = FALSE) {
   if (pattern != "" && ignore_case) { # if pattern is not empty string and case insensitive is specified, use regex to handle the case insensitive match.
