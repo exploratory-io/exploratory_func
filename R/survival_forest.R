@@ -605,6 +605,9 @@ glance.ranger_survival_exploratory <- function(x, data_type = "training", ...) {
 
 #' @export
 augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "training", pred_survival_time = NULL, pred_survival_threshold = NULL, ...) {
+  # For predict() to find the prediction method, ranger needs to be loaded beforehand.
+  # This becomes necessary when the model was restored from rds, and model building has not been done in the R session yet.
+  loadNamespace("ranger")
   if ("error" %in% class(x)) {
     ret <- data.frame(Note = x$message)
     return(ret)
