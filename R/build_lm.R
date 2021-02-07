@@ -1663,9 +1663,9 @@ augment.lm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "
     predictor_variables <- all.vars(x$terms)[-1]
     predictor_variables_orig <- x$terms_mapping[predictor_variables]
 
-    # This select() also renames columns since predictor_variables_orig is a named vector.
-    # everything() is to keep the other columns in the output. #TODO: What if names of the other columns conflicts with our temporary name, c1_, c2_...?
-    cleaned_data <- newdata %>% dplyr::select(predictor_variables_orig, everything())
+    # Rename columns via predictor_variables_orig, which is a named vector.
+    # TODO: What if names of the other columns conflicts with our temporary name, c1_, c2_...?
+    cleaned_data <- newdata %>% dplyr::rename(predictor_variables_orig)
 
     # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
     cleaned_data <- align_predictor_factor_levels(cleaned_data, x$xlevels, predictor_variables)
@@ -1712,9 +1712,9 @@ augment.glm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = 
     predictor_variables <- all.vars(x$terms)[-1]
     predictor_variables_orig <- x$terms_mapping[predictor_variables]
 
-    # This select() also renames columns since predictor_variables_orig is a named vector.
-    # everything() is to keep the other columns in the output. #TODO: What if names of the other columns conflicts with our temporary name, c1_, c2_...?
-    cleaned_data <- newdata %>% dplyr::select(predictor_variables_orig, everything())
+    # Rename columns via predictor_variables_orig, which is a named vector.
+    # TODO: What if names of the other columns conflicts with our temporary name, c1_, c2_...?
+    cleaned_data <- newdata %>% dplyr::rename(predictor_variables_orig)
 
     # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
     cleaned_data <- align_predictor_factor_levels(cleaned_data, x$xlevels, predictor_variables)

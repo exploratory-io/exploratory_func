@@ -118,6 +118,11 @@ test_that("add_prediction with linear regression", {
                                      predictor_funs=list(ARR_TIME="log", DELAY_TIME="none", "Carrier Name"="none"),
                                      model_type = "lm")
   ret <- test_data %>% select(-DISTANCE) %>% add_prediction(model_df=model_df)
+
+  df2 <- test_data %>% select(-DISTANCE)
+  ret <- df2 %>% add_prediction(model_df=model_df)
+  expect_equal(colnames(df2), colnames(ret)[1:length(colnames(df2))]) # Check that the df2 column order is kept.
+
   expect_error({
     ret <- test_data %>% select(-DISTANCE, -ARR_TIME) %>% add_prediction(model_df=model_df)
   }, regexp=".*ARR_TIME.*Columns are required for the model, but do not exist.*")
