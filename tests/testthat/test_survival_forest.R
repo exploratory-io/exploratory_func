@@ -9,7 +9,11 @@ test_that("exp_survival_forest basic", {
   model_df <- df %>% exp_survival_forest(`ti me`, `sta tus`, `a ge`, `se-x`, ph.ecog, ph.karno, pat.karno, meal.cal, wt.loss,
                                          predictor_funs=list(`a ge`="none", `se-x`="none", ph.ecog=rlang::expr(forcats::fct_relevel(.,"1")), ph.karno="none", pat.karno="none", meal.cal="none", wt.loss="none"), predictor_n = 2)
   ret <- model_df %>% prediction2(pretty.name=TRUE)
-  ret <- df %>% select(-`ti me`, -`sta tus`) %>% add_prediction(model_df=model_df, pred_survival_time=5)
+
+  df2 <- df %>% select(-`ti me`, -`sta tus`)
+  ret <- df2 %>% add_prediction(model_df=model_df, pred_survival_time=5)
+  expect_equal(colnames(df2), colnames(ret)[1:length(colnames(df2))]) # Check that the df2 column order is kept.
+
   ret <- model_df %>% evaluation()
   expect_false("Data Type" %in% colnames(ret))
   ret <- model_df %>% prediction2()
