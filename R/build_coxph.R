@@ -925,6 +925,8 @@ augment.coxph_exploratory <- function(x, newdata = NULL, data_type = "training",
     data <- x$test_data
     ret <- broom:::augment.coxph(x, newdata = data, ...)
   }
+  # it seems it is possible that broom::augment.coxph adds .rownames. In such case, remove it.
+  ret$.rownames <- NULL
 
   if (is.null(pred_survival_time)) {
     pred_survival_time <- x$pred_survival_time
