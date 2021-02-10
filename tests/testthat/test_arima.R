@@ -13,6 +13,10 @@ test_that("exp_arima with aggregation", {
   model_df <- raw_data %>%
     exp_arima(`time stamp`, valueColumn=`cou nt`, periods=10, time_unit = "day", na_fill_type="value", test_mode=F)
 
+  # Test output columns for difference data frame.
+  ret <- model_df %>% dplyr::select(difference) %>% tidyr::unnest(difference)
+  expect_true(all(c('time stamp','cou nt','diff_order','seasonal_diff_order','seasonal_diff_period','p_value') %in% colnames(ret)))
+
   ret <- model_df %>% dplyr::select(residuals) %>% tidyr::unnest(residuals)
   ret <- model_df %>% dplyr::select(residual_acf) %>% tidyr::unnest() %>% rename(Lag=lag, ACF=acf)
   # No valueColumn (row number) case.
