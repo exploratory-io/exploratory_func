@@ -425,10 +425,10 @@ exp_arima <- function(df, time, valueColumn,
     }
     diff_df <- tibble::tibble(ds=training_data$ds[(length(training_data$ds)-length(diff_res)+1):length(training_data$ds)],
                               diff=diff_res,
-                              differences=differences) # Add order of differencing.
+                              diff_order=differences) # Add order of differencing.
     if (!is.null(seasonality_differences) && seasonality_differences > 0) {
       # Add order of seasonal differencing and seasonality lag.
-      diff_df <- diff_df %>% dplyr::mutate(seasonality_differences=seasonality_differences, seasonality_lag=seasonality_lag)
+      diff_df <- diff_df %>% dplyr::mutate(seasonal_diff_order=seasonality_differences, seasonal_diff_period=seasonality_lag)
     }
 
     # Run unit root test on the differentiated data.
