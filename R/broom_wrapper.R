@@ -1,6 +1,5 @@
 
 calc_conf_mat <- function(actual, predicted) {
-  browser()
   df <- data.frame(
     actual_value = actual,
     predicted_value = predicted
