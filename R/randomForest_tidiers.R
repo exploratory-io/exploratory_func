@@ -2722,6 +2722,9 @@ glance.ranger.regression <- function(x, pretty.name, ...) {
 glance.ranger.classification <- function(x, pretty.name, ...) {
   # Both actual and predicted have no NA values.
   actual <- x$y
+  # Without threshold specified, predict_value_from_prob here always assumes it is a multiclass classification,
+  # rather than binary classification, and just returns whichever has higher probability,
+  # but this is ok since we don't have threshold to specify here anyway for now.
   predicted <- predict_value_from_prob(x$forest$levels, x$prediction_training$predictions, x$y)
   levels(predicted) <- levels(actual)
 
