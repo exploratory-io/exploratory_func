@@ -2718,6 +2718,7 @@ glance.ranger.regression <- function(x, pretty.name, ...) {
 
 
 # This is used only for step, and not for Analytics View. TODO: We might want to unify the code.
+# For Analytics View, tidy.ranger(type="evaluation"), which is called from rf_evaluation_training_and_test() is used for the Summary table.
 #' @export
 glance.ranger.classification <- function(x, pretty.name, ...) {
   # Both actual and predicted have no NA values.
