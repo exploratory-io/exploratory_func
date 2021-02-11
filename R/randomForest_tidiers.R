@@ -3161,12 +3161,11 @@ exp_rpart <- function(df,
 get_binary_predicted_value_from_probability_rpart <- function(x, data_type = "training", threshold = 0.5) {
   if (class(x$y) == "logical") { # Note that this part is *not* used for rpart Analytics View since we convert logical to factor in exp_rpart().
     # predict(x) is numeric vector of probability of being TRUE.
-    ylevels <- c("TRUE", "FALSE")
     if (data_type == "training") {
-      predicted <- factor(predict(x) > threshold, levels=ylevels)
+      predicted <- predict(x) > threshold
     }
     else {
-      predicted <- factor(x$prediction_test > threshold, levels=ylevels)
+      predicted <- x$prediction_test > threshold
     }
   }
   else {
@@ -3181,10 +3180,10 @@ get_binary_predicted_value_from_probability_rpart <- function(x, data_type = "tr
     }
 
     if (data_type == "training") {
-      predicted <- factor(ylevels[apply(predict(x), 1, function(x){if(x[1] > threshold) 1 else 2})], levels=ylevels)
+      predicted <- apply(predict(x), 1, function(x){x[1] > threshold})
     }
     else {
-      predicted <- factor(ylevels[apply(x$prediction_test, 1, function(x){if(x[1] > threshold) 1 else 2})], levels=ylevels)
+      predicted <- apply(x$prediction_test, 1, function(x){x[1] > threshold})
     }
   }
   predicted
