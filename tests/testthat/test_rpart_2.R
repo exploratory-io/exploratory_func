@@ -117,7 +117,7 @@ test_that("exp_rpart(character(A,B)) evaluate training and test", { # This shoul
   train_ret <- ret %>% filter(is_test_data==FALSE)
   # expect_equal(nrow(train_ret), 3461) # Not very stable for some reason. Will revisit.
   expect_lt(nrow(train_ret), 3500)
-  expect_gt(nrow(train_ret), 3400)
+  expect_gt(nrow(train_ret), 3300)
 
   ret <- model_df %>% rf_evaluation_training_and_test()
   expect_equal(nrow(ret), 2) # 2 for train and test
@@ -150,7 +150,7 @@ test_that("exp_rpart(character(TRUE,FALSE)) with NAs evaluate training and test"
   train_ret <- ret %>% filter(is_test_data==FALSE)
   # expect_equal(nrow(train_ret), 3461) # Not very stable for some reason. Will revisit.
   expect_lt(nrow(train_ret), 3500)
-  expect_gt(nrow(train_ret), 3400)
+  expect_gt(nrow(train_ret), 3300)
 
   ret <- model_df %>% rf_evaluation_training_and_test()
   expect_equal(nrow(ret), 2) # 2 for train and test
@@ -182,7 +182,7 @@ test_that("exp_rpart(character(TRUE,FALSE)) without NAs evaluate training and te
   train_ret <- ret %>% filter(is_test_data==FALSE)
   # expect_equal(nrow(train_ret), 3461) # Not very stable for some reason. Will revisit.
   expect_lt(nrow(train_ret), 3500)
-  expect_gt(nrow(train_ret), 3400)
+  expect_gt(nrow(train_ret), 3300)
 
   ret <- model_df %>% rf_evaluation_training_and_test()
   expect_equal(nrow(ret), 2) # 2 for train and test
