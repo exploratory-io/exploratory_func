@@ -207,7 +207,7 @@ rangerCore <- function(data, formula, na.action = na.omit,
     if (is.logical(data[[target_col]])) {
       # Convert logical to factor to make it work with ranger.
       # For ranger, we consider the first level to be TRUE. So set levels that way.
-      # Keep this logic consistent with get_binary_predicted_value_from_probability and augment.ranger.classification
+      # Keep this logic consistent with predict_value_from_prob and augment.ranger.classification
       data[[target_col]] <- factor(data[[target_col]], levels=c("TRUE","FALSE"))
     }
     else {
@@ -865,7 +865,7 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
     # Run prediction.
     pred_res <- predict(x, cleaned_data)
 
-    predicted_label_nona <- ranger.predict_value_from_prob(x$forest$levels,
+    predicted_label_nona <- predict_value_from_prob(x$forest$levels,
                                                            pred_res$predictions,
                                                            y_value, threshold = threshold)
     # Inserting once removed NA rows
@@ -884,7 +884,7 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
       # With ranger, 1st category always is the one to be considered "TRUE",
       # and the probability for it is the probability for the binary classification.
       # (For logistic regression, it is different, but here for ranger for now, for simplicity, we choose this behavior.)
-      # Keep this logic consistent with get_binary_predicted_value_from_probability
+      # Keep this logic consistent with predict_value_from_prob
       predicted_prob <- pred_res$predictions[, 1]
       # Inserting once removed NA rows
       predicted_prob <- restore_na(predicted_prob, na_row_numbers)
@@ -913,15 +913,15 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
 
     switch(data_type,
       training = {
-        predicted_label_nona <- ranger.predict_value_from_prob(x$forest$levels,
-                                                               x$prediction_training$predictions,
-                                                               y_value, threshold = threshold)
+        predicted_label_nona <- predict_value_from_prob(x$forest$levels,
+                                                        x$prediction_training$predictions,
+                                                        y_value, threshold = threshold)
         predicted_value <- restore_na(predicted_label_nona, x$na.action)
       },
       test = {
-        predicted_label_nona <- ranger.predict_value_from_prob(x$forest$levels,
-                                                               x$prediction_test$predictions,
-                                                               y_value, threshold = threshold)
+        predicted_label_nona <- predict_value_from_prob(x$forest$levels,
+                                                        x$prediction_test$predictions,
+                                                        y_value, threshold = threshold)
         # Restore NAs for removed rows that had unknown categorical predictor values.
         # Note that this is necessary only for test data, and not for training data.
         predicted_label_nona <- restore_na(predicted_label_nona, attr(x$prediction_test, "unknown_category_rows_index"))
@@ -935,14 +935,14 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
           predictions <- x$prediction_training$predictions
           # With ranger, 1st category always is the one to be considered "TRUE",
           # and the probability for it is the probability for the binary classification.
-          # Keep this logic consistent with get_binary_predicted_value_from_probability
+          # Keep this logic consistent with predict_value_from_prob
           predicted_prob <- restore_na(predictions[, 1], x$na.action)
         },
         test = {
           predictions <- x$prediction_test$predictions
           # With ranger, 1st category always is the one to be considered "TRUE",
           # and the probability for it is the probability for the binary classification.
-          # Keep this logic consistent with get_binary_predicted_value_from_probability
+          # Keep this logic consistent with predict_value_from_prob
           predicted_prob_nona <- predictions[, 1]
           predicted_prob_nona <- restore_na(predicted_prob_nona, attr(x$prediction_test, "unknown_category_rows_index"))
           predicted_prob <- restore_na(predicted_prob_nona, attr(x$prediction_test, "na.action"))
@@ -1088,10 +1088,10 @@ augment.rpart.classification <- function(x, data = NULL, newdata = NULL, data_ty
     # Run prediction.
     pred_res <- predict(x, cleaned_data)
 
-    predicted_label_nona <- ranger.predict_value_from_prob(attr(x, "ylevels"),
-                                                           pred_res,
-                                                           NULL, # y_value
-                                                           threshold = threshold)
+    predicted_label_nona <- predict_value_from_prob(attr(x, "ylevels"),
+                                                    pred_res,
+                                                    NULL, # y_value
+                                                    threshold = threshold)
 
     # Inserting once removed NA rows
     predicted_value <- restore_na(predicted_label_nona, na_row_numbers)
@@ -1266,29 +1266,37 @@ ranger.find_na_index <- function(variables, data) {
 #' @param levels_var - Factor level of label to predict
 #' @param pred - Matrix of prediction probabilities
 #' @param y_value - Actual value to be predicted
-ranger.predict_value_from_prob <- function(levels_var, pred, y_value, threshold = NULL) {
+predict_value_from_prob <- function(levels_var, pred, y_value, threshold = NULL) {
   # We assume threshold is given only for binary case.
   if (is.null(threshold)) { # multiclass case. Return the value with maximum probability.
     to_same_type(levels_var[apply(pred, 1, which.max)], y_value)
   }
   else { # binary case
+    # pred (x$predictions) is 2-diminsional matrix with 2 columns for the 2 categories.
+    # Values in the matrix is the probabilities.
     true_index <- match("TRUE",colnames(pred)) # Find which index is TRUE
-    if (is.na(true_index)) { # For old analytics step that can take non-logical column for binary classification.
-      true_index <- 1
-    }
-    predicted <- factor(levels_var[apply(pred, 1, function(x){
-      if(is.na(x[2])){ # take care of the case where pred has only 1 column. possible when there are only one value in training data.
-        1
+    if (is.na(true_index)) {
+      false_index <- match("FALSE",colnames(pred)) # Find which index is FALSE 
+      if (is.na(false_index)) {
+        # For old analytics step that can take non-logical column for binary classification. Treat the first value as TRUE.
+        true_index <- 1
       }
       else {
-        if (true_index == 1) {
-          if(x[1]>threshold) 1 else 2
-        }
-        else { # true_index == 2
-          if(x[2]>threshold) 2 else 1
-        }
+        # take care of the case where x$predictions has only 1 column and it is FALSE. possible when there are only one value in training data.
+        true_index <- 0
       }
-    })], levels=levels_var)
+    }
+    predicted <- apply(pred, 1, function(x){
+      if (true_index == 1) {
+        x[1] > threshold
+      }
+      else if (true_index == 0) { # FALSE only case explained above.
+        1 - x[1] > threshold
+      }
+      else { # true_index == 2
+        x[2] > threshold
+      }
+    })
     predicted
   }
 }
@@ -2496,24 +2504,6 @@ evaluate_classification <- function(actual, predicted, class, multi_class = TRUE
   ret
 }
 
-# with binary probability prediction model from ranger, take the level with bigger probability as the predicted value.
-#' @export
-# not really an external function but exposing for test. TODO: find better way.
-get_binary_predicted_value_from_probability <- function(x, threshold = 0.5) {
-  # x$predictions is 2-diminsional matrix with 2 columns for the 2 categories. values in the matrix is the probabilities.
-  # TODO: thought x$predictions was 3 dimensinal array with tree dimension from the doc and independently running ranger,
-  # but looks like it is already averaged? look into it.
-  predicted <- factor(x$forest$levels[apply(x$prediction_training$predictions, 1, function(x){
-    if(is.na(x[2])){ # take care of the case where x$predictions has only 1 column. possible when there are only one value in training data.
-      1
-    }
-    else {
-      if(x[1]>threshold) 1 else 2
-    }
-  })], levels=x$forest$levels)
-  predicted
-}
-
 #' @export
 # not really an external function but exposing for sharing with rpart.R TODO: find better way.
 evaluate_binary_classification <- function(actual, predicted, predicted_probability, pretty.name = FALSE, is_rpart = FALSE) {
@@ -2608,12 +2598,12 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, binary_clas
         glance(x, pretty.name = pretty.name, ...)
       } else {
         if (x$classification_type == "binary") {
-          predicted <- get_binary_predicted_value_from_probability(x, threshold = binary_classification_threshold)
+          predicted <- predict_value_from_prob(NULL, x$prediction_training$predictions, NULL, threshold = binary_classification_threshold)
           predicted_probability <- x$prediction_training$predictions[,1]
           ret <- evaluate_binary_classification(actual, predicted, predicted_probability, pretty.name = pretty.name)
         }
         else {
-          predicted <- ranger.predict_value_from_prob(x$forest$levels, x$prediction_training$predictions, x$y)
+          predicted <- predict_value_from_prob(x$forest$levels, x$prediction_training$predictions, x$y)
           ret <- evaluate_multi_(data.frame(predicted=predicted, actual=actual), "predicted", "actual", pretty.name = pretty.name)
         }
         ret
@@ -2623,10 +2613,10 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, binary_clas
       # get evaluation scores from training data
       actual <- x$y
       if (x$classification_type == "binary") {
-        predicted <- get_binary_predicted_value_from_probability(x, threshold = binary_classification_threshold)
+        predicted <- predict_value_from_prob(NULL, x$prediction_training$predictions, NULL, threshold = binary_classification_threshold)
       }
       else {
-        predicted <- ranger.predict_value_from_prob(x$forest$levels, x$prediction_training$predictions, x$y)
+        predicted <- predict_value_from_prob(x$forest$levels, x$prediction_training$predictions, x$y)
       }
 
       per_level <- function(level) {
@@ -2638,10 +2628,10 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, binary_clas
     conf_mat = {
       # return confusion matrix
       if (x$classification_type == "binary") {
-        predicted <- get_binary_predicted_value_from_probability(x, threshold = binary_classification_threshold)
+        predicted <- predict_value_from_prob(NULL, x$prediction_training$predictions, NULL, threshold = binary_classification_threshold)
       }
       else {
-        predicted <- ranger.predict_value_from_prob(x$forest$levels, x$prediction_training$predictions, x$y)
+        predicted <- predict_value_from_prob(x$forest$levels, x$prediction_training$predictions, x$y)
       }
 
       ret <- calc_conf_mat(x$y, predicted)
@@ -2650,10 +2640,10 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, binary_clas
     scatter = {
       # return actual and predicted value pairs
       if (x$classification_type == "binary") {
-        predicted <- get_binary_predicted_value_from_probability(x, threshold = binary_classification_threshold)
+        predicted <- predict_value_from_prob(NULL, x$prediction_training$predictions, NULL, threshold = binary_classification_threshold)
       }
       else if (x$classification_type == "mutli") {
-        predicted <- ranger.predict_value_from_prob(x$forest$levels, x$prediction_training$predictions, x$y)
+        predicted <- predict_value_from_prob(x$forest$levels, x$prediction_training$predictions, x$y)
       } else {
         # classification type is regression
         predicted <- x$prediction_training$predictions
@@ -2728,11 +2718,15 @@ glance.ranger.regression <- function(x, pretty.name, ...) {
 
 
 # This is used only for step, and not for Analytics View. TODO: We might want to unify the code.
+# For Analytics View, tidy.ranger(type="evaluation"), which is called from rf_evaluation_training_and_test() is used for the Summary table.
 #' @export
 glance.ranger.classification <- function(x, pretty.name, ...) {
   # Both actual and predicted have no NA values.
   actual <- x$y
-  predicted <- ranger.predict_value_from_prob(x$forest$levels, x$prediction_training$predictions, x$y)
+  # Without threshold specified, predict_value_from_prob here always assumes it is a multiclass classification,
+  # rather than binary classification, and just returns whichever has higher probability,
+  # but this is ok since we don't have threshold to specify here anyway for now.
+  predicted <- predict_value_from_prob(x$forest$levels, x$prediction_training$predictions, x$y)
   levels(predicted) <- levels(actual)
 
   # Composes data.frame of binary classification evaluation summary.
@@ -3165,41 +3159,6 @@ exp_rpart <- function(df,
   ret
 }
 
-# with binary probability prediction model from ranger, take the level with bigger probability as the predicted value.
-#' @export
-# not really an external function but exposing for test. TODO: find better way.
-get_binary_predicted_value_from_probability_rpart <- function(x, data_type = "training", threshold = 0.5) {
-  if (class(x$y) == "logical") { # Note that this part is *not* used for rpart Analytics View since we convert logical to factor in exp_rpart().
-    # predict(x) is numeric vector of probability of being TRUE.
-    ylevels <- c("TRUE", "FALSE")
-    if (data_type == "training") {
-      predicted <- factor(predict(x) > threshold, levels=ylevels)
-    }
-    else {
-      predicted <- factor(x$prediction_test > threshold, levels=ylevels)
-    }
-  }
-  else {
-    # predict(x) is 2-diminsional matrix with 2 columns for the 2 categories. values in the matrix is the probabilities.
-    ylevels <- attr(x,"ylevels")
-
-    # We convert logical to factor with level of "FALSE", "TRUE". We had to keep this order not to mess up tree image for rpart.
-    # Since the threshold given here is meant to be the probability of being true, it needs to be reverted to work with the rest
-    # of the code here.
-    if (ylevels[[1]] == "FALSE" && ylevels[[2]] == "TRUE") {
-      threshold <- 1 - threshold
-    }
-
-    if (data_type == "training") {
-      predicted <- factor(ylevels[apply(predict(x), 1, function(x){if(x[1] > threshold) 1 else 2})], levels=ylevels)
-    }
-    else {
-      predicted <- factor(ylevels[apply(x$prediction_test, 1, function(x){if(x[1] > threshold) 1 else 2})], levels=ylevels)
-    }
-  }
-  predicted
-}
-
 get_binary_predicted_probability_rpart <- function(x, data_type = "training") {
   if (class(x$y) == "logical") {
     # predict(x) is numeric vector of probability of being TRUE.
@@ -3308,7 +3267,17 @@ get_class_levels_rpart <- function(x) {
 
 get_predicted_class_rpart <- function(x, data_type = "training", binary_classification_threshold = 0.5) {
   if (x$classification_type == "binary") {
-    predicted <- get_binary_predicted_value_from_probability_rpart(x, data_type = data_type, threshold = binary_classification_threshold)
+    ylevels <- attr(x,"ylevels")
+    if (data_type == "training") {
+      predicted <- predict_value_from_prob(ylevels,
+                                           predict(x),
+                                           NULL, threshold = binary_classification_threshold)
+    }
+    else {
+      predicted <- predict_value_from_prob(ylevels,
+                                           x$prediction_test,
+                                           NULL, threshold = binary_classification_threshold)
+    }
   }
   else {
     predicted <- get_multiclass_predicted_value_from_probability_rpart(x, data_type = data_type)

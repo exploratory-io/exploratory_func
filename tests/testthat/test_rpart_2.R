@@ -68,6 +68,7 @@ test_that("exp_rpart evaluate training and test - logical", {
   ret <- model_df %>% prediction(data="training_and_test", pretty.name=TRUE)
 
   ret1 <- data %>% select(-is_delayed) %>% add_prediction(model_df=model_df, binary_classification_threshold=0.5)
+  expect_equal(class(ret1$predicted_label), "logical")
   ret2 <- data %>% select(-is_delayed) %>% add_prediction(model_df=model_df, binary_classification_threshold=0.01)
   expect_gt(sum(ret2$predicted_label=="TRUE",na.rm=TRUE), sum(ret1$predicted_label=="TRUE",na.rm=TRUE)) # Change of threshold should make difference.
 
@@ -106,6 +107,7 @@ test_that("exp_rpart(character(A,B)) evaluate training and test", { # This shoul
   ret <- model_df %>% prediction(data="training_and_test", pretty.name=TRUE)
 
   ret <- data %>% select(-is_delayed) %>% add_prediction(model_df=model_df)
+  expect_equal(class(ret$predicted_label), "character")
   ret <- model_df %>% prediction(data="newdata", data_frame = flight)
   ret <-  model_df %>% rf_partial_dependence()
 
@@ -117,7 +119,7 @@ test_that("exp_rpart(character(A,B)) evaluate training and test", { # This shoul
   train_ret <- ret %>% filter(is_test_data==FALSE)
   # expect_equal(nrow(train_ret), 3461) # Not very stable for some reason. Will revisit.
   expect_lt(nrow(train_ret), 3500)
-  expect_gt(nrow(train_ret), 3400)
+  expect_gt(nrow(train_ret), 3300)
 
   ret <- model_df %>% rf_evaluation_training_and_test()
   expect_equal(nrow(ret), 2) # 2 for train and test
@@ -150,7 +152,7 @@ test_that("exp_rpart(character(TRUE,FALSE)) with NAs evaluate training and test"
   train_ret <- ret %>% filter(is_test_data==FALSE)
   # expect_equal(nrow(train_ret), 3461) # Not very stable for some reason. Will revisit.
   expect_lt(nrow(train_ret), 3500)
-  expect_gt(nrow(train_ret), 3400)
+  expect_gt(nrow(train_ret), 3300)
 
   ret <- model_df %>% rf_evaluation_training_and_test()
   expect_equal(nrow(ret), 2) # 2 for train and test
@@ -182,7 +184,7 @@ test_that("exp_rpart(character(TRUE,FALSE)) without NAs evaluate training and te
   train_ret <- ret %>% filter(is_test_data==FALSE)
   # expect_equal(nrow(train_ret), 3461) # Not very stable for some reason. Will revisit.
   expect_lt(nrow(train_ret), 3500)
-  expect_gt(nrow(train_ret), 3400)
+  expect_gt(nrow(train_ret), 3300)
 
   ret <- model_df %>% rf_evaluation_training_and_test()
   expect_equal(nrow(ret), 2) # 2 for train and test
@@ -201,6 +203,9 @@ test_that("exp_rpart(character(TRUE,FALSE)) without NAs evaluate training and te
 test_that("exp_rpart(binary) evaluate training and test with SMOTE", {
   model_df <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`)) %>%
                 exp_rpart(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0.3, smote = T)
+
+  ret <- flight %>% add_prediction(model_df=model_df)
+  expect_equal(class(ret$predicted_label), "logical")
 
   ret <- model_df %>% prediction(data="newdata", data_frame = flight)
   ret <- model_df %>% prediction(data="training_and_test")

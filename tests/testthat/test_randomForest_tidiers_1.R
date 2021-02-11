@@ -198,11 +198,6 @@ test_that("test calc_feature_imp predicting logical", {
                       num_2, predictor_n = 6, with_boruta=TRUE)
   conf_mat <- model_df %>% tidy_rowwise(model, type = "conf_mat", pretty.name = TRUE)
 
-  # test get_binary_predicted_value_from_probability
-  model <- (model_df %>% filter(!is.null(model)))$model[[1]]
-  predicted_values <- get_binary_predicted_value_from_probability(model)
-  expect_equal(levels(predicted_values), c("TRUE","FALSE"))
-
   # ret <- model_df %>% rf_importance() Skip this because Boruta is on
   ret <- model_df %>% rf_partial_dependence()
   ret <- model_df %>% rf_evaluation(pretty.name=TRUE) # TODO test that output is different from multiclass classification

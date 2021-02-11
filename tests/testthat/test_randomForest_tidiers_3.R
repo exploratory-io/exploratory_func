@@ -71,6 +71,7 @@ test_that("calc_feature_imp(binary) evaluate training and test", {
                 calc_feature_imp(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0.3, pd_with_bin_means = TRUE)
 
   ret <- flight %>% add_prediction(model_df=model_df)
+  expect_equal(class(ret$predicted_label), "logical")
   res_partial_dependence <- model_df %>% rf_partial_dependence()
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
@@ -189,6 +190,8 @@ test_that("calc_feature_map(binary) evaluate training and test with SMOTE", {
   model_df <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`)) %>%
                 calc_feature_imp(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0.3, smote=TRUE, pd_with_bin_means = TRUE)
 
+  ret <- flight %>% add_prediction(model_df=model_df)
+  expect_equal(class(ret$predicted_label), "logical")
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
   # expect_equal(nrow(test_ret), 1500) # Fails with SMOTE, which is expected.
