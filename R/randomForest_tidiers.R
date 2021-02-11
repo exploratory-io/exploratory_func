@@ -914,14 +914,14 @@ augment.ranger.classification <- function(x, data = NULL, newdata = NULL, data_t
     switch(data_type,
       training = {
         predicted_label_nona <- predict_value_from_prob(x$forest$levels,
-                                                               x$prediction_training$predictions,
-                                                               y_value, threshold = threshold)
+                                                        x$prediction_training$predictions,
+                                                        y_value, threshold = threshold)
         predicted_value <- restore_na(predicted_label_nona, x$na.action)
       },
       test = {
         predicted_label_nona <- predict_value_from_prob(x$forest$levels,
-                                                               x$prediction_test$predictions,
-                                                               y_value, threshold = threshold)
+                                                        x$prediction_test$predictions,
+                                                        y_value, threshold = threshold)
         # Restore NAs for removed rows that had unknown categorical predictor values.
         # Note that this is necessary only for test data, and not for training data.
         predicted_label_nona <- restore_na(predicted_label_nona, attr(x$prediction_test, "unknown_category_rows_index"))
@@ -1089,9 +1089,9 @@ augment.rpart.classification <- function(x, data = NULL, newdata = NULL, data_ty
     pred_res <- predict(x, cleaned_data)
 
     predicted_label_nona <- predict_value_from_prob(attr(x, "ylevels"),
-                                                           pred_res,
-                                                           NULL, # y_value
-                                                           threshold = threshold)
+                                                    pred_res,
+                                                    NULL, # y_value
+                                                    threshold = threshold)
 
     # Inserting once removed NA rows
     predicted_value <- restore_na(predicted_label_nona, na_row_numbers)
@@ -3270,13 +3270,13 @@ get_predicted_class_rpart <- function(x, data_type = "training", binary_classifi
     ylevels <- attr(x,"ylevels")
     if (data_type == "training") {
       predicted <- predict_value_from_prob(ylevels,
-                                                  predict(x),
-                                                  NULL, threshold = binary_classification_threshold)
+                                           predict(x),
+                                           NULL, threshold = binary_classification_threshold)
     }
     else {
       predicted <- predict_value_from_prob(ylevels,
-                                                  x$prediction_test,
-                                                  NULL, threshold = binary_classification_threshold)
+                                           x$prediction_test,
+                                           NULL, threshold = binary_classification_threshold)
     }
   }
   else {
