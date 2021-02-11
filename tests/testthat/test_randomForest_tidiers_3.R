@@ -71,6 +71,7 @@ test_that("calc_feature_imp(binary) evaluate training and test", {
                 calc_feature_imp(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0.3, pd_with_bin_means = TRUE)
 
   ret <- flight %>% add_prediction(model_df=model_df)
+  expect_equal(class(ret$predicted_label), "logical")
   res_partial_dependence <- model_df %>% rf_partial_dependence()
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
@@ -88,9 +89,7 @@ test_that("calc_feature_imp(binary) evaluate training and test", {
   ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class")
   expect_equal(nrow(ret), 4) # 4 for train/test times TRUE/FALSE
 
-  browser()
   ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
-  browser()
   expect_equal(nrow(ret), 8) # 8 for train/test times predicted TRUE/FALSE times actual TRUE/FALSE
 
   model_df <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`)) %>%
