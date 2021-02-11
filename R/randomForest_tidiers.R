@@ -3155,40 +3155,6 @@ exp_rpart <- function(df,
   ret
 }
 
-# with binary probability prediction model from ranger, take the level with bigger probability as the predicted value.
-#' @export
-# not really an external function but exposing for test. TODO: find better way.
-get_binary_predicted_value_from_probability_rpart <- function(x, data_type = "training", threshold = 0.5) {
-  if (class(x$y) == "logical") { # Note that this part is *not* used for rpart Analytics View since we convert logical to factor in exp_rpart().
-    # predict(x) is numeric vector of probability of being TRUE.
-    if (data_type == "training") {
-      predicted <- predict(x) > threshold
-    }
-    else {
-      predicted <- x$prediction_test > threshold
-    }
-  }
-  else {
-    # predict(x) is 2-diminsional matrix with 2 columns for the 2 categories. values in the matrix is the probabilities.
-    ylevels <- attr(x,"ylevels")
-
-    # We convert logical to factor with level of "FALSE", "TRUE". We had to keep this order not to mess up tree image for rpart.
-    # Since the threshold given here is meant to be the probability of being true, it needs to be reverted to work with the rest
-    # of the code here.
-    if (ylevels[[1]] == "FALSE" && ylevels[[2]] == "TRUE") {
-      threshold <- 1 - threshold
-    }
-
-    if (data_type == "training") {
-      predicted <- apply(predict(x), 1, function(x){x[1] > threshold})
-    }
-    else {
-      predicted <- apply(x$prediction_test, 1, function(x){x[1] > threshold})
-    }
-  }
-  predicted
-}
-
 get_binary_predicted_probability_rpart <- function(x, data_type = "training") {
   if (class(x$y) == "logical") {
     # predict(x) is numeric vector of probability of being TRUE.
