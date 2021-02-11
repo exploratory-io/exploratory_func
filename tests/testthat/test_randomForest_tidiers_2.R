@@ -291,7 +291,7 @@ test_that("ranger.find_na", {
 })
 
 
-test_that("ranger.predict_value_from_prob", {
+test_that("predict_value_from_prob", {
   df <- structure(
     list(x = 1:10, y = rep(TRUE, 10), z = c("A", "B", "C", "D", "D", "E", "F", "E", "A", "A")),
     row.names = c(NA, 10L),
@@ -301,7 +301,7 @@ test_that("ranger.predict_value_from_prob", {
   m_b <- build_model(df, model_func = rangerBinary, formula = y ~ x)$model[[1]]
   expected_values <- rep(TRUE, 10)
   expect_equal(
-    exploratory:::ranger.predict_value_from_prob(m_b$forest$levels, m_b$predictions, df[["y"]]),
+    exploratory:::predict_value_from_prob(m_b$forest$levels, m_b$predictions, df[["y"]]),
     expected_values
   )
 
@@ -309,7 +309,7 @@ test_that("ranger.predict_value_from_prob", {
   m_m <- build_model(df, model_func = rangerMulti, formula = z ~ x + y)$model[[1]]
 
   expected_values <- c("D", "A", "A", "A", "A", "A", "A", "A", "D", "A")
-  res <- exploratory:::ranger.predict_value_from_prob(m_m$forest$levels, m_m$predictions, df[["z"]])
+  res <- exploratory:::predict_value_from_prob(m_m$forest$levels, m_m$predictions, df[["z"]])
   expect_equal(typeof(res), typeof(df$z))
   expect_equal(length(res), length(df$z))
 })
@@ -322,7 +322,7 @@ test_that("ranger.set_multi_predicted_values", {
   )
   df[1, "x"] <- NA
   m_m <- build_model(df, model_func = rangerMulti, formula = z ~ x + y)$model[[1]]
-  predicted_value_nona <- exploratory:::ranger.predict_value_from_prob(m_m$forest$levels,
+  predicted_value_nona <- exploratory:::predict_value_from_prob(m_m$forest$levels,
                                                          m_m$predictions,
                                                          df[["z"]])
   na_at <- exploratory:::ranger.find_na(c("x", "y"), df) 
