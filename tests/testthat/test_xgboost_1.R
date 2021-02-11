@@ -109,6 +109,7 @@ test_that("exp_xgboost evaluate training and test - binary", {
                             test_rate = 0.3, pd_with_bin_means = TRUE)
 
   ret1 <- data %>% select(-is_delayed) %>% add_prediction(model_df=model_df, binary_classification_threshold=0.5)
+  expect_equal(class(ret1$predicted_label), "logical")
   ret2 <- data %>% select(-is_delayed) %>% add_prediction(model_df=model_df, binary_classification_threshold=0.01)
   expect_gt(sum(ret2$predicted_label==TRUE,na.rm=TRUE), sum(ret1$predicted_label==TRUE,na.rm=TRUE)) # Change of threshold should make difference.
   ret <- model_df %>% prediction(data="newdata", data_frame=flight)
