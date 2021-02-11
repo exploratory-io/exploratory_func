@@ -204,6 +204,9 @@ test_that("exp_rpart(binary) evaluate training and test with SMOTE", {
   model_df <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`)) %>%
                 exp_rpart(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0.3, smote = T)
 
+  ret <- flight %>% add_prediction(model_df=model_df)
+  expect_equal(class(ret$predicted_label), "logical")
+
   ret <- model_df %>% prediction(data="newdata", data_frame = flight)
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)
