@@ -1508,10 +1508,20 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
           ret <- ret %>% mutate(conf.low=exp(conf.low), conf.high=exp(conf.high))
           ret <- ret %>% select(term, odds_ratio, conf.high, conf.low, everything()) # Bring odds ratio upfront together with its confidence interval.
         }
+        else {
+          ret <- ret %>% select(term, estimate, conf.high, conf.low, everything()) # Bring coefficient upfront together with its confidence interval.
+        }
       }
       if (!is.null(x$marginal_effects)) {
         # Convert term from factor to character to remove warning at left_join.
         ret <- ret %>% dplyr::mutate(term=as.character(term)) %>% dplyr::left_join(x$marginal_effects, by="term")
+        # Adjust order of columns
+        if (!is.null(ret$ame)) {
+          ret <- ret %>% relocate(ame, .after=term)
+          if (!is.null(ret$ame_low)) {
+            ret <- ret %>% relocate(ame_high, ame_low, .after=ame)
+          }
+        }
       }
       base_level_table <- xlevels_to_base_level_table(x$xlevels)
       # Convert term from factor to character to remove warning at left_join.
@@ -1529,6 +1539,7 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
       # Map coefficient names back to original.
       ret$term <- map_terms_to_orig(ret$term, x$terms_mapping)
       if (pretty.name) {
+        # Rename to pretty names
         ret <- ret %>% rename(Term=term, Coefficient=estimate, `Std Error`=std.error,
                               `t Ratio`=statistic, `P Value`=p.value, `Conf Low`=conf.low, `Conf High`=conf.high,
                               `Base Level`=base.level)
@@ -1652,9 +1663,9 @@ augment.lm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = "
     predictor_variables <- all.vars(x$terms)[-1]
     predictor_variables_orig <- x$terms_mapping[predictor_variables]
 
-    # This select() also renames columns since predictor_variables_orig is a named vector.
-    # everything() is to keep the other columns in the output. #TODO: What if names of the other columns conflicts with our temporary name, c1_, c2_...?
-    cleaned_data <- newdata %>% dplyr::select(predictor_variables_orig, everything())
+    # Rename columns via predictor_variables_orig, which is a named vector.
+    # TODO: What if names of the other columns conflicts with our temporary name, c1_, c2_...?
+    cleaned_data <- newdata %>% dplyr::rename(predictor_variables_orig)
 
     # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
     cleaned_data <- align_predictor_factor_levels(cleaned_data, x$xlevels, predictor_variables)
@@ -1701,9 +1712,9 @@ augment.glm_exploratory <- function(x, data = NULL, newdata = NULL, data_type = 
     predictor_variables <- all.vars(x$terms)[-1]
     predictor_variables_orig <- x$terms_mapping[predictor_variables]
 
-    # This select() also renames columns since predictor_variables_orig is a named vector.
-    # everything() is to keep the other columns in the output. #TODO: What if names of the other columns conflicts with our temporary name, c1_, c2_...?
-    cleaned_data <- newdata %>% dplyr::select(predictor_variables_orig, everything())
+    # Rename columns via predictor_variables_orig, which is a named vector.
+    # TODO: What if names of the other columns conflicts with our temporary name, c1_, c2_...?
+    cleaned_data <- newdata %>% dplyr::rename(predictor_variables_orig)
 
     # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
     cleaned_data <- align_predictor_factor_levels(cleaned_data, x$xlevels, predictor_variables)

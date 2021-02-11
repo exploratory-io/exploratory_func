@@ -605,6 +605,9 @@ glance.ranger_survival_exploratory <- function(x, data_type = "training", ...) {
 
 #' @export
 augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "training", pred_survival_time = NULL, pred_survival_threshold = NULL, ...) {
+  # For predict() to find the prediction method, ranger needs to be loaded beforehand.
+  # This becomes necessary when the model was restored from rds, and model building has not been done in the R session yet.
+  loadNamespace("ranger")
   if ("error" %in% class(x)) {
     ret <- data.frame(Note = x$message)
     return(ret)
@@ -618,9 +621,9 @@ augment.ranger_survival_exploratory <- function(x, newdata = NULL, data_type = "
     predictor_variables <- attr(x$df,"predictors")
     predictor_variables_orig <- x$terms_mapping[predictor_variables]
 
-    # This select() also renames columns since predictor_variables_orig is a named vector.
-    # everything() is to keep the other columns in the output. #TODO: What if names of the other columns conflicts with our temporary name, c1_, c2_...?
-    cleaned_data <- newdata %>% dplyr::select(predictor_variables_orig, everything())
+    # Rename columns via predictor_variables_orig, which is a named vector.
+    #TODO: What if names of the other columns conflicts with our temporary name, c1_, c2_...?
+    cleaned_data <- newdata %>% dplyr::rename(predictor_variables_orig)
 
     # Align factor levels including Others and (Missing) to the model. TODO: factor level order can be different from the model training data. Is this ok?
     cleaned_data <- align_predictor_factor_levels(cleaned_data, x$xlevels, predictor_variables)
