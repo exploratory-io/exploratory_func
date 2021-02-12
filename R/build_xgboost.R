@@ -49,7 +49,7 @@ fml_xgboost <- function(data, formula, nrounds= 10, weights = NULL, watchlist_ra
           if (e$message == "fnames == names(mf) are not all TRUE"){
             # if there are not clean column names like including spaces or special characters,
             # Matrix::sparse.model.matrix causes this error
-            stop("Invalid column names are found. Please run clean_names function beforehand.")
+            stop("EXP-ANA-3 :: [] :: Invalid column names are found. Please run clean_names function beforehand.")
           }
           stop(e)
         })
