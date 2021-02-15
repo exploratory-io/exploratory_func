@@ -3,7 +3,10 @@
 #' @param type  Type of cluster. Currently, only kmeans is supported.
 #' @param n_cluster  Number of cluster.
 #' @export
-cluster <- function(..., type = "kmeans", n_cluster = 3) {
+cluster <- function(..., type = "kmeans", n_cluster = 3, seed = 1) {
+  if (!is.null(seed)) {
+    set.seed(seed)
+  }
   data <- list(...) %>% as.data.frame() %>% as.matrix()
   na_removed <- data %>% na.omit()
   if(nrow(na_removed) == 0) {
