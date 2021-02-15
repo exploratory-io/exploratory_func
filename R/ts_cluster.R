@@ -2,7 +2,13 @@
 #' @export
 exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.aggregate = sum, na_fill_type = "previous", na_fill_value = 0, max_category_na_ratio = 0.5,
                            variables = NULL, funs.aggregate.variables = NULL,
-                           centers = 3L, with_centroids = FALSE, distance = "sdtw", centroid = "sdtw_cent", output = "data") {
+                           centers = 3L, with_centroids = FALSE, distance = "sdtw", centroid = "sdtw_cent",
+                           seed = 1,
+                           output = "data") {
+  if(!is.null(seed)) {
+    set.seed(seed)
+  }
+
   time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(time))
   value_col <- if (missing(value)) {
     # Using empty string instead of NULL, because using NULL here would cause error from UQ(rlang::sym(value_col)),
