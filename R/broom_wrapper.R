@@ -100,14 +100,15 @@ augment_rowwise_data <- function(df, model, data, ...) {
 #' tidy/glance/augment wrapper
 #' @export
 model_info <- function(df, model, output = "summary", ...) {
+  model_col <- tidyselect::vars_select(names(df), !! rlang::enquo(model))
   if (output == "summary") {
-    glance_rowwise(df, model, ...)
+    glance_rowwise(df, !!rlang::sym(model_col), ...)
   }
   else if (output == "variables") {
-    tidy_rowwise(df, model, ...)
+    tidy_rowwise(df, !!rlang::sym(model_col), ...)
   }
   else if (output == "data") {
-    augment_rowwise(df, model, ...)
+    augment_rowwise(df, !!rlang::sym(model_col), ...)
   }
   else {
     stop('output argument has to be "summary", "variables", or "data".')
