@@ -202,8 +202,9 @@ test_that("test exp_chisq", {
   ret <- exp_chisq(mtcars2, gear, carb, value=cyl, fun.aggregate=sum)
 
   # Test model_info function.
-  observed <- ret %>% model_info(model, output="variables", type="observed")
-  summary <- ret %>% model_info(model, output="summary")
+  # Rename model column so that we test the case where the column name is not "model". There was an issue this case.
+  observed <- ret %>% rename(model1=model) %>% model_info(model1, output="variables", type="observed")
+  summary <- ret %>% rename(model1=model) %>% model_info(model1, output="summary")
 
   observed <- ret %>% tidy_rowwise(model, type="observed")
   summary <- ret %>% glance_rowwise(model)
