@@ -205,6 +205,7 @@ test_that("test exp_chisq", {
   # Rename model column so that we test the case where the column name is not "model". There was an issue this case.
   observed <- ret %>% rename(model1=model) %>% model_info(model1, output="variables", type="observed")
   summary <- ret %>% rename(model1=model) %>% model_info(model1, output="summary")
+  data <- ret %>% rename(model1=model) %>% model_info(model1, output="data")
 
   observed <- ret %>% tidy_rowwise(model, type="observed")
   summary <- ret %>% glance_rowwise(model)
