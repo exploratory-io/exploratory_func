@@ -32,7 +32,7 @@ get_riem_measures <- function(station = "SFO", date_start = "2020-01-01", date_e
   }
 }
 
-#' Wrapper API for riem_measure data soruces
+#' Wrapper API for riem_stations
 #' @export
 riem_stations_exp <- function(network = NULL) {
   df <- riem::riem_stations(network)
