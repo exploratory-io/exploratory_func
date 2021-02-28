@@ -17,8 +17,8 @@ impute_na <- function(target, type = mean, val = 0, ...) {
     target
   } else {
     switch(type, predict = {
-      if(val == 0 || length(val) != length(target)){
-        # this is when no predictor columns are chosen
+      # this is for when no predictor column is chosen. val == 0 does not work for this purpose well since it returns vector.
+      if(length(val) != length(target)) {
         stop("Please choose predictor columns")
       }
       # list(val, ...) is a list of vectors to predict NA values
