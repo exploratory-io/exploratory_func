@@ -154,11 +154,6 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
 #' The output is original long-format set of time series with Cluster column.
 #' @export
 tidy.PartitionalTSClusters <- function(x, with_centroids = TRUE) {
-  browser()
-  # res <- tibble::as_tibble(x@datalist)
-  res <- attr(x, "before_normalize_data")
-  res <- res %>% dplyr::mutate(time=!!attr(x,"time_values"))
-
   # Create map of time series names to clustering results
   cluster_map <- x@cluster
   cluster_map_names <- names(x@datalist)
@@ -170,14 +165,26 @@ tidy.PartitionalTSClusters <- function(x, with_centroids = TRUE) {
   }
   names(cluster_map) <- cluster_map_names
 
+  browser()
+  res <- tibble::as_tibble(x@datalist)
+  res <- res %>% dplyr::mutate(time=!!attr(x,"time_values"))
   # Add centroids data
   if (with_centroids) {
     for (i in 1:(x@k)) {
       res <- res %>% dplyr::mutate(!!rlang::sym(paste0("centroid",i)):=x@centroids[[i]])
     }
   }
-
   res <- res %>% tidyr::pivot_longer(cols = -time)
+
+  browser()
+  orig_df <- attr(x, "before_normalize_data")
+  if (!is.null(orig_df)) {
+    orig_df <- orig_df %>% dplyr::mutate(time=!!attr(x,"time_values"))
+    orig_df <- orig_df %>% tidyr::pivot_longer(cols = -time)
+    res <- res %>% dplyr::rename(value_normalized=value)
+    res <- res %>% dplyr::left_join(orig_df, by=c("time"="time", "name"="name"))
+  }
+
   if (!is.null(attr(x, "aggregated_data"))) {
     aggregated_data <- attr(x, "aggregated_data")
     aggregated_data <- aggregated_data %>% dplyr::select(-value) # Drop value column from aggregated_data since res already has it.
