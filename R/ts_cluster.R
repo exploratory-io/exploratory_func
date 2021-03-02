@@ -3,6 +3,7 @@
 exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.aggregate = sum, na_fill_type = "previous", na_fill_value = 0, max_category_na_ratio = 0.5,
                            variables = NULL, funs.aggregate.variables = NULL,
                            centers = 3L, with_centroids = FALSE, distance = "sdtw", centroid = "sdtw_cent",
+                           normalize = "none",
                            seed = 1,
                            output = "data") {
   if(!is.null(seed)) {
@@ -116,6 +117,17 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
       df <- df %>% dplyr::mutate(across(-time, ~fill_ts_na(.x, time, type = na_fill_type, val = na_fill_value)))
       time_values <- df$time
       df <- df %>% dplyr::select(-time)
+      switch (normalize,
+        center_and_scale = {
+          df <- df %>% dplyr::mutate(across(everything(), ~normalize(.x, center=TRUE, scale=TRUE)))
+        },
+        center = {
+          df <- df %>% dplyr::mutate(across(everything(), ~normalize(.x, center=TRUE, scale=FALSE)))
+        },
+        scale = {
+          df <- df %>% dplyr::mutate(across(everything(), ~normalize(.x, center=FALSE, scale=TRUE)))
+        }
+      )
       model <- dtwclust::tsclust(t(as.matrix(df)), k = centers, distance = distance, centroid = centroid)
       attr(model, "time_col") <- time_col
       attr(model, "value_col") <- value_col
