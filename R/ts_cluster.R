@@ -117,7 +117,9 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
       df <- df %>% dplyr::mutate(across(-time, ~fill_ts_na(.x, time, type = na_fill_type, val = na_fill_value)))
       time_values <- df$time
       df <- df %>% dplyr::select(-time)
-      df_before_normalize <- df
+      if (normalize != "none") {
+        df_before_normalize <- df
+      }
       switch (normalize,
         center_and_scale = {
           df <- df %>% dplyr::mutate(across(everything(), ~normalize(.x, center=TRUE, scale=TRUE)))
@@ -138,7 +140,9 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
       if (!is.null(variables) && !is.null(funs.aggregate.variables)) {
         attr(model, "aggregated_data") <- df_summarised
       }
-      attr(model, "before_normalize_data") <- df_before_normalize
+      if (normalize != "none") {
+        attr(model, "before_normalize_data") <- df_before_normalize
+      }
       model
     }))
   model_df <- model_df %>% rowwise()
@@ -165,7 +169,6 @@ tidy.PartitionalTSClusters <- function(x, with_centroids = TRUE) {
   }
   names(cluster_map) <- cluster_map_names
 
-  browser()
   res <- tibble::as_tibble(x@datalist)
   res <- res %>% dplyr::mutate(time=!!attr(x,"time_values"))
   # Add centroids data
@@ -176,7 +179,6 @@ tidy.PartitionalTSClusters <- function(x, with_centroids = TRUE) {
   }
   res <- res %>% tidyr::pivot_longer(cols = -time)
 
-  browser()
   orig_df <- attr(x, "before_normalize_data")
   if (!is.null(orig_df)) {
     orig_df <- orig_df %>% dplyr::mutate(time=!!attr(x,"time_values"))
