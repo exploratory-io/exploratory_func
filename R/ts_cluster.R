@@ -174,7 +174,7 @@ tidy.PartitionalTSClusters <- function(x, with_centroids = TRUE) {
   # Add centroids data
   if (with_centroids) {
     for (i in 1:(x@k)) {
-      res <- res %>% dplyr::mutate(!!rlang::sym(paste0("centroid",i)):=x@centroids[[i]])
+      res <- res %>% dplyr::mutate(!!rlang::sym(paste0("Centroid ",i)):=x@centroids[[i]])
     }
   }
   res <- res %>% tidyr::pivot_longer(cols = -time)
