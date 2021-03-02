@@ -154,21 +154,28 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
 #' The output is original long-format set of time series with Cluster column.
 #' @export
 tidy.PartitionalTSClusters <- function(x, with_centroids = TRUE) {
+  browser()
   # res <- tibble::as_tibble(x@datalist)
   res <- attr(x, "before_normalize_data")
   res <- res %>% dplyr::mutate(time=!!attr(x,"time_values"))
+
+  # Create map of time series names to clustering results
   cluster_map <- x@cluster
   cluster_map_names <- names(x@datalist)
-
   if (with_centroids) {
     for (i in 1:(x@k)) {
-      res <- res %>% dplyr::mutate(!!rlang::sym(paste0("centroid",i)):=x@centroids[[i]])
       cluster_map <- c(cluster_map, i)
       cluster_map_names <- c(cluster_map_names, paste0("centroid",i))
     }
   }
-
   names(cluster_map) <- cluster_map_names
+
+  # Add centroids data
+  if (with_centroids) {
+    for (i in 1:(x@k)) {
+      res <- res %>% dplyr::mutate(!!rlang::sym(paste0("centroid",i)):=x@centroids[[i]])
+    }
+  }
 
   res <- res %>% tidyr::pivot_longer(cols = -time)
   if (!is.null(attr(x, "aggregated_data"))) {
