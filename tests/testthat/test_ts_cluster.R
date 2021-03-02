@@ -30,7 +30,7 @@ test_that("exp_ts_cluster basic", {
 
 test_that("exp_ts_cluster with normalize", {
   ret <- flight %>% exp_ts_cluster(`FL DATE`, `ARR DELAY`, `CAR RIER`, normalize = "center_and_scale")
-  expect_equal(colnames(ret), c("FL DATE","CAR RIER","ARR DELAY","Cluster"))
+  expect_equal(colnames(ret), c("FL DATE","CAR RIER","ARR DELAY","ARR DELAY_normalized","Cluster"))
   expect_equal(sort(unique(ret$Cluster)), c(1,2,3))
 })
 

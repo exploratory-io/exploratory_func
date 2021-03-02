@@ -183,6 +183,7 @@ tidy.PartitionalTSClusters <- function(x, with_centroids = TRUE) {
     orig_df <- orig_df %>% tidyr::pivot_longer(cols = -time)
     res <- res %>% dplyr::rename(value_normalized=value)
     res <- res %>% dplyr::left_join(orig_df, by=c("time"="time", "name"="name"))
+    res <- res %>% dplyr::relocate(value, .before=value_normalized) # Adjust column order.
   }
 
   if (!is.null(attr(x, "aggregated_data"))) {
