@@ -34,6 +34,7 @@ test_that("exp_ts_cluster with normalize", {
   expect_equal(sort(unique(ret$Cluster)), c(1,2,3))
 
   ret <- flight %>% exp_ts_cluster(`FL DATE`, `ARR DELAY`, `CAR RIER`, normalize = "center_and_scale", with_centroids = TRUE) # Test with centroid output.
+  expect_equal((ret %>% dplyr::filter(`CAR RIER`=="Centroid 1"))$Cluster[[1]], 1) # Centroid 1 should belong to Cluster 1.
   expect_equal(colnames(ret), c("FL DATE","CAR RIER","ARR DELAY","ARR DELAY_normalized","Cluster"))
   expect_equal(sort(unique(ret$Cluster)), c(1,2,3))
 })

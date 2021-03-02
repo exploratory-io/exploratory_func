@@ -164,7 +164,7 @@ tidy.PartitionalTSClusters <- function(x, with_centroids = TRUE) {
   if (with_centroids) {
     for (i in 1:(x@k)) {
       cluster_map <- c(cluster_map, i)
-      cluster_map_names <- c(cluster_map_names, paste0("centroid",i))
+      cluster_map_names <- c(cluster_map_names, paste0("Centroid ",i))
     }
   }
   names(cluster_map) <- cluster_map_names
