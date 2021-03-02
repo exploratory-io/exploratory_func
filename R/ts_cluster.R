@@ -196,11 +196,17 @@ tidy.PartitionalTSClusters <- function(x, with_centroids = TRUE) {
     res <- res %>% dplyr::rename(!!rlang::sym(attr(x,"time_col")):=time,
                                  Number_of_Rows=value,
                                  !!rlang::sym(attr(x,"category_col")):=name)
+    if (!is.null(orig_df)) {
+      res <- res %>% dplyr::rename(Number_of_Rows_normalized=value_normalized)
+    }
   }
   else {
     res <- res %>% dplyr::rename(!!rlang::sym(attr(x,"time_col")):=time,
                                  !!rlang::sym(value_col):=value,
                                  !!rlang::sym(attr(x,"category_col")):=name)
+    if (!is.null(orig_df)) {
+      res <- res %>% dplyr::rename(!!rlang::sym(paste0(value_col,"_normalized")):=value_normalized)
+    }
   }
   res
 }
