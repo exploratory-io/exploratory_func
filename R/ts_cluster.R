@@ -117,6 +117,7 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
       df <- df %>% dplyr::mutate(across(-time, ~fill_ts_na(.x, time, type = na_fill_type, val = na_fill_value)))
       time_values <- df$time
       df <- df %>% dplyr::select(-time)
+      df_before_normalize <- df
       switch (normalize,
         center_and_scale = {
           df <- df %>% dplyr::mutate(across(everything(), ~normalize(.x, center=TRUE, scale=TRUE)))
@@ -137,6 +138,7 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
       if (!is.null(variables) && !is.null(funs.aggregate.variables)) {
         attr(model, "aggregated_data") <- df_summarised
       }
+      attr(model, "before_normalize_data") <- df_before_normalize
       model
     }))
   model_df <- model_df %>% rowwise()
@@ -152,7 +154,8 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
 #' The output is original long-format set of time series with Cluster column.
 #' @export
 tidy.PartitionalTSClusters <- function(x, with_centroids = TRUE) {
-  res <- tibble::as_tibble(x@datalist)
+  # res <- tibble::as_tibble(x@datalist)
+  res <- attr(x, "before_normalize_data")
   res <- res %>% dplyr::mutate(time=!!attr(x,"time_values"))
   cluster_map <- x@cluster
   cluster_map_names <- names(x@datalist)
