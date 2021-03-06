@@ -2088,7 +2088,7 @@ importance_firm <- function(pdp_data, target, vars) {
     dplyr::group_by(variable) %>%
     dplyr::summarise(sd=sd(!!rlang::sym(target)), max=max(!!rlang::sym(target)), min=min(!!rlang::sym(target)), class=first(class)) %>%
     dplyr::mutate(importance=ifelse(class=="numeric", sd, (max-min)/4))
-  imp_df <- imp_df %>% dplyr::select(variable, importance)
+  imp_df <- imp_df %>% dplyr::select(variable, importance) %>% dplyr::arrange(-importance)
   imp_df
 }
 
