@@ -2317,7 +2317,9 @@ calc_feature_imp <- function(df,
         if (is.null(max_pd_vars)) {
           max_pd_vars <- 20 # Number of most important variables to calculate partial dependences on. This used to be 12 but we decided it was a little too small.
         }
-        imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
+        # Skip inp_vars filtering for now for experimenting with FIRM.
+        # imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
+
         # code to separate numeric and categorical. keeping it for now for possibility of design change
         # imp_vars_tmp <- imp_df$variable
         # imp_vars <- character(0)
