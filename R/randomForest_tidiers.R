@@ -2082,6 +2082,16 @@ importance_ranger <- function(model) {
   imp_df
 }
 
+importance_firm <- function(pdp_data, target, vars) {
+  imp_df <- pdp_data %>% dplyr::mutate(across(!!vars, ~ifelse(is.na(.x), NA, class(.x)))) %>%
+    tidyr::pivot_longer(cols = !!vars, names_to="variable", values_to="class", values_drop_na=TRUE) %>%
+    dplyr::group_by(variable) %>%
+    dplyr::summarise(sd=sd(!!rlang::sym(target)), max=max(!!rlang::sym(target)), min=min(!!rlang::sym(target)), class=first(class)) %>%
+    dplyr::mutate(importance=ifelse(class=="numeric", sd, (max-min)/4))
+  imp_df <- imp_df %>% dplyr::select(variable, importance)
+  imp_df
+}
+
 #' Get feature importance for multi class classification using randomForest
 #' @export
 calc_feature_imp <- function(df,
@@ -2353,6 +2363,7 @@ calc_feature_imp <- function(df,
       else {
         model$partial_dependence <- NULL
       }
+      model$imp_df <- importance_firm(model$partial_dependence, "fml", imp_vars) #TODO: For some reason the target column name is "fml".
 
       # these attributes are used in tidy of randomForest
       model$classification_type <- classification_type
