@@ -2806,7 +2806,8 @@ glance.rpart <- function(x, pretty.name = FALSE, ...) {
 
 # Builds partial_dependency object for ranger. Originally from edarf:::partial_dependence.ranger.
 partial_dependence.ranger <- function(fit, vars = colnames(data),
-  n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)),
+  n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L),
+        nrow(data)), # entire given data is used by default, but this will override it when calling it.
   interaction = FALSE, uniform = TRUE, data, ...) {
 
   target = strsplit(strsplit(as.character(fit$call), "formula")[[2]], " ~")[[1]][[1]]
