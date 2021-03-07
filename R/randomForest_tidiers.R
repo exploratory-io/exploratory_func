@@ -2838,7 +2838,8 @@ partial_dependence.ranger <- function(fit, vars = colnames(data),
   points <- list()
   for (cname in vars) {
     if (is.numeric(data[[cname]])) {
-      points[[cname]] <- quantile(data[[cname]],probs=1:24/25)
+      coldata <- data[[cname]]
+      points[[cname]] <- quantile(coldata, probs=0:25/25)
     }
     else {
       points[[cname]] <- unique(data[[cname]])
