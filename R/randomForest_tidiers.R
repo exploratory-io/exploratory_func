@@ -2388,7 +2388,14 @@ calc_feature_imp <- function(df,
       else {
         model$partial_dependence <- NULL
       }
-      model$imp_df <- importance_firm(model$partial_dependence, "fml", imp_vars) #TODO: For some reason the target column name is "fml".
+
+      pdp_target_col <- if (classification_type == "binary") {
+        "TRUE"
+      }
+      else {
+        "fml" #TODO: For some reason the target column name is "fml".
+      }
+      model$imp_df <- importance_firm(model$partial_dependence, pdp_target_col, imp_vars)
       imp_vars <- model$imp_df$variable
       model$imp_vars <- imp_vars
       attr(model$partial_dependence, "vars") <- imp_vars
