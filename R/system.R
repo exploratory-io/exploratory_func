@@ -2334,6 +2334,42 @@ download_data_file <- function(url, type){
   }
 }
 
+#'Wrapper for read_excel_file
+#'@export
+read_excel_files <- function(files, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, ...) {
+  if (length(files) == 1) {
+    exploratory::read_excel_file(
+      path = files,
+      sheet = sheet,
+      col_names = col_names,
+      col_types = col_types,
+      na = na,
+      skip = skip,
+      trim_ws = trim_ws,
+      n_max = n_max,
+      use_readxl = use_readxl,
+      detectDates = detecDates,
+      skipEmptyRows = skipEmptyRows,
+      skipEmptyCols = skipEmptyCols,
+      check.names = check.names,
+      tzone = tzone)
+  } else {
+    sapply(files, exploratory::read_excel_file, sheet = sheet,
+           col_names = col_names,
+           col_types = col_types,
+           na = na,
+           skip = skip,
+           trim_ws = trim_ws,
+           n_max = n_max,
+           use_readxl = use_readxl,
+           detectDates = detecDates,
+           skipEmptyRows = skipEmptyRows,
+           skipEmptyCols = skipEmptyCols,
+           check.names = check.names,
+           tzone = tzone) %>% bind_rows(.id = "id") %>% mutate(id = basename(id))
+  }
+}
+
 #'Wrapper for openxlsx::read.xlsx (in case of .xlsx file) and readxl::read_excel (in case of old .xls file)
 #'Use openxlsx::read.xlsx since it's memory footprint is less than that of readxl::read_excel and this creates benefit for users with less memory like Windows 32 bit users.
 #'@export
@@ -2445,6 +2481,37 @@ get_excel_sheets <- function(path){
   }
 }
 
+#'API that load multiple files and merge it to a single data frame
+#'@export
+read_delim_files <- function(files, delim, quote = '"',
+                              escape_backslash = FALSE, escape_double = TRUE,
+                              col_names = TRUE, col_types = NULL,
+                              locale = readr::default_locale(),
+                              na = c("", "NA"), quoted_na = TRUE,
+                              comment = "", trim_ws = FALSE,
+                              skip = 0, n_max = Inf, guess_max = min(1000, n_max),
+                              progress = interactive(), with_api_key = FALSE) {
+  if (length(files) == 1) {
+    exploratory::read_delim_file(file = files, delim = delim, quote = quote,
+    escape_backslash = escape_backslash, escape_double = escape_double,
+    col_names = col_names, col_types = col_types,
+    locale = locale,
+    na = na, quoted_na = quoted_na,
+    comment = comment, trim_ws = trim_ws,
+    skip = skip, n_max = n_max, guess_max = guess_max,
+    progress = progress, with_api_key = with_api_key)
+  } else {
+    sapply(files, exploratory::read_delim_file, delim = delim, quote = quote,
+           escape_backslash = escape_backslash, escape_double = escape_double,
+           col_names = col_names, col_types = col_types,
+           locale = locale,
+           na = na, quoted_na = quoted_na,
+           comment = comment, trim_ws = trim_ws,
+           skip = skip, n_max = n_max, guess_max = guess_max,
+           progress = progress, with_api_key = with_api_key) %>% bind_rows(.id = "id") %>% mutate(id = basename(id))
+  }
+}
+
 #'Wrapper for readr::read_delim to support remote file
 #'@export
 read_delim_file <- function(file, delim, quote = '"',
@@ -2516,6 +2583,8 @@ read_delim_file <- function(file, delim, quote = '"',
         } else {
           stop(stringr::str_c("The encoding of the file may not be ", locale$encoding, ". Select other encoding and try again."));
         }
+      } else if (stringr::str_detect(stringr::str_to_lower(e$message), "cannot open the connection")) {
+        stop(paste0("EXP-IMPORT-1 :: Failed to read ", file));
       } else {
         stop(e);
       }
