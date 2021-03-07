@@ -2099,10 +2099,10 @@ importance_firm <- function(pdp_data, target, vars) {
   # Make it in long format, where variable names are in one "variable" column.
   imp_df <- imp_df %>% tidyr::pivot_longer(cols = !!vars, names_to="variable", values_to="class", values_drop_na=TRUE)
   # Add weight column to the data, so that it can be used to calculate FIRM with sd_with_weight.
-  imp_df <-  dplyr::nest_by(variable) %>%
-    dplyr::mutate(weight = list(as.numeric(table(points[[variable]])))) %>%
+  imp_df <- imp_df %>% dplyr::nest_by(variable) %>%
+    dplyr::mutate(points = list(as.numeric(table(points[[variable]])))) %>%
     ungroup() %>%
-    dplyr::mutate(data = purrr::map2(data, weight, function(x,y) {
+    dplyr::mutate(data = purrr::map2(data, points, function(x,y) {
       if (x$class[[1]]=="numeric") { # If numeric, remove 0 percentile and 100 percentile to avoid affected by outliers.
         y[[1]] <- y[[1]] - 1
         y[[length(y)]] <- y[[length(y)]] - 1
@@ -2389,6 +2389,8 @@ calc_feature_imp <- function(df,
         model$partial_dependence <- NULL
       }
       model$imp_df <- importance_firm(model$partial_dependence, "fml", imp_vars) #TODO: For some reason the target column name is "fml".
+      imp_vars <- model$imp_df$variable
+      attr(model$partial_dependence, "vars") <- imp_vars
 
       # these attributes are used in tidy of randomForest
       model$classification_type <- classification_type
@@ -2709,7 +2711,8 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, binary_clas
     },
     {
       stop(paste0("type ", type, " is not defined"))
-    })
+    }
+  )
 }
 
 # This is used from Analytics View only when classification type is regression.
