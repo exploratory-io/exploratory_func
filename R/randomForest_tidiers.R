@@ -2390,6 +2390,7 @@ calc_feature_imp <- function(df,
       }
       model$imp_df <- importance_firm(model$partial_dependence, "fml", imp_vars) #TODO: For some reason the target column name is "fml".
       imp_vars <- model$imp_df$variable
+      model$imp_vars <- imp_vars
       attr(model$partial_dependence, "vars") <- imp_vars
 
       # these attributes are used in tidy of randomForest
