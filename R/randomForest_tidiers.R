@@ -2878,6 +2878,7 @@ partial_dependence.ranger <- function(fit, vars = colnames(data),
   attr(pd, "interaction") = interaction == TRUE
   attr(pd, "target") = if (fit$treetype != "Classification") target else levels(fit$predictions)
   attr(pd, "vars") = vars
+  attr(pd, "points") = points
   pd
 }
 
