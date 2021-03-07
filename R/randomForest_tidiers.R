@@ -2083,6 +2083,7 @@ importance_ranger <- function(model) {
 }
 
 importance_firm <- function(pdp_data, target, vars) {
+  points <- attr(pdp_data, "points")
   imp_df <- pdp_data %>% dplyr::mutate(across(!!vars, ~ifelse(is.na(.x), NA, class(.x)))) %>%
     tidyr::pivot_longer(cols = !!vars, names_to="variable", values_to="class", values_drop_na=TRUE) %>%
     dplyr::group_by(variable) %>%
