@@ -2086,7 +2086,7 @@ importance_firm <- function(pdp_data, target, vars) {
   imp_df <- pdp_data %>% dplyr::mutate(across(!!vars, ~ifelse(is.na(.x), NA, class(.x)))) %>%
     tidyr::pivot_longer(cols = !!vars, names_to="variable", values_to="class", values_drop_na=TRUE) %>%
     dplyr::group_by(variable) %>%
-    dplyr::summarise(sd=sd(!!rlang::sym(target)), max=max(!!rlang::sym(target)), min=min(!!rlang::sym(target)), class=first(class)) %>%
+    dplyr::summarise(sd=sd(head(tail(!!rlang::sym(target), -1), -1)), max=max(!!rlang::sym(target)), min=min(!!rlang::sym(target)), class=first(class)) %>%
     dplyr::mutate(importance=ifelse(class=="numeric", sd, (max-min)/4))
   imp_df <- imp_df %>% dplyr::select(variable, importance) %>% dplyr::arrange(-importance)
   imp_df
