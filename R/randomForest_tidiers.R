@@ -2082,21 +2082,37 @@ importance_ranger <- function(model) {
   imp_df
 }
 
+# Standard deviation with weight by how many rows have the same value.
+# Using it to calculate FIRM while the PDP data has only single row even when multiple quantile-based grid points have a same value.
 sd_with_weight <- function(v, w) {
   sd(purrr::flatten_dbl(purrr::map2(v,w,function(x,y){rep(x,y)})))
 }
 
+# Caluculate FIRM variable importance.
+# References:
+#   https://arxiv.org/abs/1805.04755
+#   https://arxiv.org/abs/1904.03959
 importance_firm <- function(pdp_data, target, vars) {
   points <- attr(pdp_data, "points")
-  imp_df <- pdp_data %>% dplyr::mutate(across(!!vars, ~ifelse(is.na(.x), NA, class(.x)))) %>%
-    tidyr::pivot_longer(cols = !!vars, names_to="variable", values_to="class", values_drop_na=TRUE) %>%
-    dplyr::nest_by(variable) %>%
-    dplyr::mutate(points = list(as.numeric(table(points[[variable]])))) %>% ungroup() %>%
-    dplyr::mutate(data = purrr::map2(data,points, function(x,y){if(x$class[[1]]=="numeric"){y[[1]]<-y[[1]]-1;y[[length(y)]]<-y[[length(y)]]-1};x %>% mutate(weight=y)})) %>%
-    tidyr::unnest(data) %>%
-    dplyr::group_by(variable) %>%
-    dplyr::summarise(sd=sd_with_weight(!!rlang::sym(target), weight), max=max(!!rlang::sym(target)), min=min(!!rlang::sym(target)), class=first(class)) %>%
-    dplyr::mutate(importance=ifelse(class=="numeric", sd, (max-min)/4))
+  # Replace the grid values with the type of the column, e.g. "numeric", or "character".
+  imp_df <- pdp_data %>% dplyr::mutate(across(!!vars, ~ifelse(is.na(.x), NA, class(.x))))
+  # Make it in long format, where variable names are in one "variable" column.
+  imp_df <- imp_df %>% tidyr::pivot_longer(cols = !!vars, names_to="variable", values_to="class", values_drop_na=TRUE)
+  # Add weight column to the data, so that it can be used to calculate FIRM with sd_with_weight.
+  imp_df <-  dplyr::nest_by(variable) %>%
+    dplyr::mutate(weight = list(as.numeric(table(points[[variable]])))) %>%
+    ungroup() %>%
+    dplyr::mutate(data = purrr::map2(data, weight, function(x,y) {
+      if (x$class[[1]]=="numeric") { # If numeric, remove 0 percentile and 100 percentile to avoid affected by outliers.
+        y[[1]] <- y[[1]] - 1
+        y[[length(y)]] <- y[[length(y)]] - 1
+      }
+      x %>% mutate(weight = y)
+    })) %>%
+    tidyr::unnest(data)
+  imp_df <- imp_df %>% dplyr::group_by(variable) %>%
+    dplyr::summarise(sd = sd_with_weight(!!rlang::sym(target), weight), max = max(!!rlang::sym(target)), min = min(!!rlang::sym(target)), class = first(class)) %>%
+    dplyr::mutate(importance=ifelse(class=="numeric", sd, (max-min)/4)) # Get FIRM value based on whether the variable is categorical or not.
   imp_df <- imp_df %>% dplyr::select(variable, importance) %>% dplyr::arrange(-importance)
   imp_df
 }
