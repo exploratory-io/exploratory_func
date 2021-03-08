@@ -2334,27 +2334,12 @@ download_data_file <- function(url, type){
   }
 }
 
-#'Wrapper for read_excel_file
+#'API that imports multiple same structure Excel files and merge it to a single data frame
 #'@export
 read_excel_files <- function(files, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, ...) {
-  if (length(files) == 1) {
-    exploratory::read_excel_file(
-      path = files,
-      sheet = sheet,
-      col_names = col_names,
-      col_types = col_types,
-      na = na,
-      skip = skip,
-      trim_ws = trim_ws,
-      n_max = n_max,
-      use_readxl = use_readxl,
-      detectDates = detecDates,
-      skipEmptyRows = skipEmptyRows,
-      skipEmptyCols = skipEmptyCols,
-      check.names = check.names,
-      tzone = tzone)
-  } else {
-    sapply(files, exploratory::read_excel_file, sheet = sheet,
+    # set name to the files so that it can be used for the "id" column created by purrr::map_dfr.
+    files <- setNames(as.list(files), files)
+    purrr::map_dfr(files, exploratory::read_excel_file, sheet = sheet,
            col_names = col_names,
            col_types = col_types,
            na = na,
@@ -2366,8 +2351,7 @@ read_excel_files <- function(files, sheet = 1, col_names = TRUE, col_types = NUL
            skipEmptyRows = skipEmptyRows,
            skipEmptyCols = skipEmptyCols,
            check.names = check.names,
-           tzone = tzone) %>% bind_rows(.id = "id") %>% mutate(id = basename(id))
-  }
+           tzone = tzone, .id = "id") %>% mutate(id = basename(id)) # extract file name from full path with basename.
 }
 
 #'Wrapper for openxlsx::read.xlsx (in case of .xlsx file) and readxl::read_excel (in case of old .xls file)
@@ -2481,7 +2465,7 @@ get_excel_sheets <- function(path){
   }
 }
 
-#'API that load multiple files and merge it to a single data frame
+#'API that imports multiple same structure CSV files and merge it to a single data frame
 #'@export
 read_delim_files <- function(files, delim, quote = '"',
                               escape_backslash = FALSE, escape_double = TRUE,
@@ -2491,25 +2475,17 @@ read_delim_files <- function(files, delim, quote = '"',
                               comment = "", trim_ws = FALSE,
                               skip = 0, n_max = Inf, guess_max = min(1000, n_max),
                               progress = interactive(), with_api_key = FALSE) {
-  if (length(files) == 1) {
-    exploratory::read_delim_file(file = files, delim = delim, quote = quote,
-    escape_backslash = escape_backslash, escape_double = escape_double,
-    col_names = col_names, col_types = col_types,
-    locale = locale,
-    na = na, quoted_na = quoted_na,
-    comment = comment, trim_ws = trim_ws,
-    skip = skip, n_max = n_max, guess_max = guess_max,
-    progress = progress, with_api_key = with_api_key)
-  } else {
-    sapply(files, exploratory::read_delim_file, delim = delim, quote = quote,
-           escape_backslash = escape_backslash, escape_double = escape_double,
-           col_names = col_names, col_types = col_types,
-           locale = locale,
-           na = na, quoted_na = quoted_na,
-           comment = comment, trim_ws = trim_ws,
-           skip = skip, n_max = n_max, guess_max = guess_max,
-           progress = progress, with_api_key = with_api_key) %>% bind_rows(.id = "id") %>% mutate(id = basename(id))
-  }
+    # set name to the files so that it can be used for the "id" column created by purrr:map_dfr.
+    files <- setNames(as.list(files), files)
+    purrr::map_dfr(files, exploratory::read_delim_file,delim = delim, quote = quote,
+                   escape_backslash = escape_backslash, escape_double = escape_double,
+                   col_names = col_names, col_types = col_types,
+                   locale = locale,
+                   na = na, quoted_na = quoted_na,
+                   comment = comment, trim_ws = trim_ws,
+                   skip = skip, n_max = n_max, guess_max = guess_max,
+                   progress = progress, with_api_key = with_api_key, .id = "id") %>% mutate(id = basename(id)) # extract file name from full path with basename.
+
 }
 
 #'Wrapper for readr::read_delim to support remote file
