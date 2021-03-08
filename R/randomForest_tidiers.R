@@ -2393,7 +2393,7 @@ calc_feature_imp <- function(df,
         "TRUE"
       }
       else {
-        "fml" #TODO: For some reason the target column name is "fml".
+        attr(model$partial_dependence, "target")
       }
       model$imp_df <- importance_firm(model$partial_dependence, pdp_target_col, imp_vars)
       imp_vars <- model$imp_df$variable
