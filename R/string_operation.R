@@ -510,8 +510,14 @@ do_ngram <- function(df, token, sentence, document, maxn=2, sep="_"){
   document_col <- col_name(substitute(document))
 
   # this is executed for ngrams not to be connected over sentences
-  grouped <- df %>%
-    dplyr::group_by(!!!rlang::syms(c(document_col, sentence_col))) # convert the column name to symbol for colum names with backticks
+  grouped <- NULL
+  if (sentence_col != document_col) {
+    grouped <- df %>%
+      dplyr::group_by(!!!rlang::syms(c(document_col, sentence_col))) # convert the column name to symbol for colum names with backticks
+  } else {
+    grouped <- df %>%
+      dplyr::group_by(!!!rlang::syms(c(document_col))) # convert the column name to symbol for colum names with backticks
+  }
   prev_cname <- token_col
   # create ngram columns in this iteration
   for(n in seq(maxn)[-1]){
