@@ -928,14 +928,16 @@ build_lm.fast <- function(df,
           }
         }
         if (length(c_cols) > 1) { # Skip importance calculation if there is only one variable.
-          if (family == "binomial") {
-            model$imp_df <- calc_permutation_importance_binomial(model, clean_target_col, c_cols, df)
-          }
-          else if (family == "poisson" && (is.null(link) || link == "log")) {
-            model$imp_df <- calc_permutation_importance_poisson(model, clean_target_col, c_cols, df)
-          }
-          else if (family == "gaussian") {
-            model$imp_df <- calc_permutation_importance_gaussian(model, clean_target_col, c_cols, df)
+          if (importance_measure == "permutation") { # For firm case, we need to first calculate partial dependence.
+            if (family == "binomial") {
+              model$imp_df <- calc_permutation_importance_binomial(model, clean_target_col, c_cols, df)
+            }
+            else if (family == "poisson" && (is.null(link) || link == "log")) {
+              model$imp_df <- calc_permutation_importance_poisson(model, clean_target_col, c_cols, df)
+            }
+            else if (family == "gaussian") {
+              model$imp_df <- calc_permutation_importance_gaussian(model, clean_target_col, c_cols, df)
+            }
           }
         }
         else {
@@ -1639,12 +1641,12 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
       ret <- x$imp_df
       # Add p.value column.
       coef_df <- broom:::tidy.glm(x)
-      ret <- ret %>% dplyr::mutate(p.value=purrr::map(term, function(var) {
+      ret <- ret %>% dplyr::mutate(p.value=purrr::map(variable, function(var) {
         get_var_min_pvalue(var, coef_df, x)
       })) %>% dplyr::mutate(p.value=as.numeric(p.value)) # Make list into numeric vector.
       # Map variable names back to the original.
       # as.character is to be safe by converting from factor. With factor, reverse mapping result will be messed up.
-      ret$term <- x$terms_mapping[as.character(ret$term)]
+      ret$variable <- x$terms_mapping[as.character(ret$variable)]
       ret
     }
   )
