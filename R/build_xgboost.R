@@ -1278,12 +1278,7 @@ exp_xgboost <- function(df,
 
       if (importance_measure == "firm") { # If importance measure is FIRM, we calculate them now, after PDP is calculated.
         if (length(c_cols) > 1) { # Calculate importance only when there are multiple variables.
-          pdp_target_col <- if (classification_type == "binary") {
-            "TRUE"
-          }
-          else {
-            attr(model$partial_dependence, "target")
-          }
+          pdp_target_col <- attr(model$partial_dependence, "target")
           imp_df <- importance_firm(model$partial_dependence, pdp_target_col, imp_vars)
           model$imp_df <- imp_df
           imp_vars <- imp_df$variable
