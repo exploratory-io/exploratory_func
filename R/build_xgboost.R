@@ -888,6 +888,7 @@ partial_dependence.xgboost <- function(fit, vars = colnames(data),
   attr(pd, "interaction") = interaction == TRUE
   attr(pd, "target") = if (!classification) target else levels(fit$predictions)
   attr(pd, "vars") = vars
+  attr(pd, "points") = points
   pd
 }
 
@@ -1233,12 +1234,17 @@ exp_xgboost <- function(df,
           else {
             imp_df <- calc_permutation_importance_xgboost_multiclass(model, clean_target_col, c_cols, df)
           }
+          model$imp_df <- imp_df
         }
-        else { # "impurity". Use the importance from the xgboost package.
+        else if (importance_measure == "impurity") { # "impurity". Use the importance from the xgboost package.
           imp_df <- importance_xgboost(model)
+          model$imp_df <- imp_df
         }
-        model$imp_df <- imp_df
-        if ("error" %in% class(imp_df)) {
+
+        if (importance_measure == "firm") {
+          imp_vars <- c_cols # Just use c_cols as is for imp_vars to calculate partial dependence first before calculating FIRM.
+        }
+        else if ("error" %in% class(imp_df)) {
           imp_vars <- c_cols # Just use c_cols as is for imp_vars to calculate partial dependence anyway.
         }
         else {
@@ -1268,6 +1274,31 @@ exp_xgboost <- function(df,
       }
       else {
         model$partial_dependence <- NULL
+      }
+
+      if (importance_measure == "firm") { # If importance measure is FIRM, we calculate them now, after PDP is calculated.
+        if (length(c_cols) > 1) { # Calculate importance only when there are multiple variables.
+          pdp_target_col <- if (classification_type == "binary") {
+            "TRUE"
+          }
+          else {
+            attr(model$partial_dependence, "target")
+          }
+          imp_df <- importance_firm(model$partial_dependence, pdp_target_col, imp_vars)
+          model$imp_df <- imp_df
+          imp_vars <- imp_df$variable
+        }
+        else {
+          error <- simpleError("Variable importance requires two or more variables.")
+          model$imp_df <- error
+          imp_vars <- c_cols # Just use c_cols as is for imp_vars to calculate partial dependence anyway.
+        }
+
+        if (is.null(max_pd_vars)) {
+          max_pd_vars <- 20 # Number of most important variables to calculate partial dependences on. This used to be 12 but we decided it was a little too small.
+        }
+        imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
+        model$imp_vars <- imp_vars
       }
 
       # these attributes are used in tidy of randomForest
