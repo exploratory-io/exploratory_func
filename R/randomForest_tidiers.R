@@ -2149,7 +2149,7 @@ calc_feature_imp <- function(df,
                              smote_target_minority_perc = 40,
                              smote_max_synth_perc = 200,
                              smote_k = 5,
-                             importance_measure = "permutation", # "permutation" or "impurity".
+                             importance_measure = "permutation", # "permutation", "firm", or "impurity".
                              max_pd_vars = NULL,
                              # Number of most important variables to calculate partial dependences on. 
                              # By default, when Boruta is on, all Confirmed/Tentative variables.
@@ -2285,6 +2285,9 @@ calc_feature_imp <- function(df,
           length(c_cols) <= 1) { # Calculate importance only when there are multiple variables.
         ranger_importance_measure <- "none"
       }
+      else if (importance_measure == "firm") {
+        ranger_importance_measure <- "none"
+      }
       else {
         # "permutation" or "impurity".
         ranger_importance_measure <- importance_measure
@@ -2352,7 +2355,7 @@ calc_feature_imp <- function(df,
           imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
         }
       }
-      else {
+      else if (importance_measure %in% c("permutation", "impurity")) { # Make use of output from ranger in these cases.
         # return partial dependence
         if (length(c_cols) > 1) { # Calculate importance only when there are multiple variables.
           imp_df <- importance_ranger(model)
@@ -2367,8 +2370,11 @@ calc_feature_imp <- function(df,
         if (is.null(max_pd_vars)) {
           max_pd_vars <- 20 # Number of most important variables to calculate partial dependences on. This used to be 12 but we decided it was a little too small.
         }
-        # Skip inp_vars filtering for now for experimenting with FIRM.
-        # imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
+        imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
+      }
+      else {
+        # Skip inp_vars filtering for FIRM, since we need to calculate PDP for all variables to get FIRM for all variables.
+        imp_vars <- c_cols # Just use c_cols as is for imp_vars to calculate partial dependence.
       }
       imp_vars <- as.character(imp_vars) # for some reason imp_vars is converted to factor at this point. turn it back to character.
       model$imp_vars <- imp_vars
@@ -2384,15 +2390,31 @@ calc_feature_imp <- function(df,
         model$partial_dependence <- NULL
       }
 
-      pdp_target_col <- if (classification_type == "binary") {
-        "TRUE"
+      if (importance_measure == "firm") { # If importance measure is FIRM, we calculate them now, after PDP is calculated.
+        if (length(c_cols) > 1) { # Calculate importance only when there are multiple variables.
+          pdp_target_col <- if (classification_type == "binary") {
+            "TRUE"
+          }
+          else {
+            attr(model$partial_dependence, "target")
+          }
+          imp_df <- importance_firm(model$partial_dependence, pdp_target_col, imp_vars)
+          model$imp_df <- imp_df
+          imp_vars <- imp_df$variable
+        }
+        else {
+          error <- simpleError("Variable importance requires two or more variables.")
+          model$imp_df <- error
+          imp_vars <- c_cols # Just use c_cols as is for imp_vars to calculate partial dependence anyway.
+        }
+
+        if (is.null(max_pd_vars)) {
+          max_pd_vars <- 20 # Number of most important variables to calculate partial dependences on. This used to be 12 but we decided it was a little too small.
+        }
+        imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
+        model$imp_vars <- imp_vars
       }
-      else {
-        attr(model$partial_dependence, "target")
-      }
-      model$imp_df <- importance_firm(model$partial_dependence, pdp_target_col, imp_vars)
-      imp_vars <- model$imp_df$variable
-      model$imp_vars <- imp_vars
+
       attr(model$partial_dependence, "vars") <- imp_vars
 
       # these attributes are used in tidy of randomForest
