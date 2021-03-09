@@ -81,9 +81,10 @@ handle_partial_dependence <- function(x) {
     ret <- ret %>% dplyr::rename(Predicted=!!rlang::sym(target_col)) # Rename target column to Predicted to make comparison with Actual.
   }
   else if (!is.null(x$partial_binning)) { # For ranger/rpart, we calculate binning data at model building. Maybe we should do the same for glm/lm.
+    # Note that this case consists of only regression and binary classification, and not multiclass classification.
     actual_ret <- x$partial_binning
     ret <- actual_ret %>% dplyr::bind_rows(ret) # So that PDP is drawn over the binning, the bind_row order needs to be this way.
-    if (!is.null(ret[[target_col]])) {
+    if (length(target_col) == 1 && target_col != "TRUE" && !is.null(ret[[target_col]])) { # Regression case
       ret <- ret %>% dplyr::rename(Predicted=!!rlang::sym(target_col)) # Rename target column to Predicted to make comparison with Actual.
     }
     else if (!is.null(ret$`TRUE`)) { # Column with name that matches target_col is not there, but TRUE column is there. This must be a binary classification case.
