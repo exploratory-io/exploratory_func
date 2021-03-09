@@ -2906,7 +2906,7 @@ partial_dependence.ranger <- function(fit, vars = colnames(data),
 
   attr(pd, "class") = c("pd", "data.frame")
   attr(pd, "interaction") = interaction == TRUE
-  attr(pd, "target") = if (fit$treetype == "Regression") target else levels(fit$predictions)
+  attr(pd, "target") = if (fit$treetype == "Regression") target else colnames(fit$predictions)
   attr(pd, "vars") = vars
   attr(pd, "points") = points
   pd
