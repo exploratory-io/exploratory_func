@@ -2088,6 +2088,21 @@ sd_with_weight <- function(v, w) {
   sd(purrr::flatten_dbl(purrr::map2(v,w,function(x,y){rep(x,y)})))
 }
 
+calc_firm_from_pd <- function(..., weight, class) {
+  vectors <- list(...)
+  imps <- purrr::map(vectors, function(v) {
+    if (class[[1]] == "numeric") {
+      sd_with_weight(v, weight)
+    }
+    else {
+      (max(v, na.rm=TRUE) - min(v, na.rm=TRUE))/4
+    }
+  })
+  imps <- purrr::flatten_dbl(imps)
+  ret <- mean(imps, na.rm=TRUE)
+  ret
+}
+
 # Caluculate FIRM variable importance.
 # References:
 #   https://arxiv.org/abs/1805.04755
