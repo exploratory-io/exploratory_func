@@ -2369,26 +2369,6 @@ calc_feature_imp <- function(df,
         }
         # Skip inp_vars filtering for now for experimenting with FIRM.
         # imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
-
-        # code to separate numeric and categorical. keeping it for now for possibility of design change
-        # imp_vars_tmp <- imp_df$variable
-        # imp_vars <- character(0)
-        # if (var.type == "numeric") {
-        #   # keep only numeric variables from important ones
-        #   for (imp_var in imp_vars_tmp) {
-        #     if (is.numeric(model_df[[imp_var]])) {
-        #       imp_vars <- c(imp_vars, imp_var)
-        #     }
-        #   }
-        # }
-        # else {
-        #   # keep only non-numeric variables from important ones
-        #   for (imp_var in imp_vars_tmp) {
-        #     if (!is.numeric(model_df[[imp_var]])) {
-        #       imp_vars <- c(imp_vars, imp_var)
-        #     }
-        #   }
-        # }
       }
       imp_vars <- as.character(imp_vars) # for some reason imp_vars is converted to factor at this point. turn it back to character.
       model$imp_vars <- imp_vars
