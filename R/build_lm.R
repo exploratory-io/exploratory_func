@@ -72,17 +72,29 @@ partial_dependence.lm_exploratory <- function(fit, target, vars = colnames(data)
     c("preds" = mean(x))
   }
 
+  points <- list()
+  for (cname in vars) {
+    if (is.numeric(data[[cname]])) {
+      coldata <- data[[cname]]
+      points[[cname]] <- quantile(coldata, probs=0:25/25)
+    }
+    else {
+      points[[cname]] <- unique(data[[cname]])
+    }
+  }
+
   args = list(
     "data" = data,
     "vars" = vars,
     "n" = n,
     "model" = fit,
-    "uniform" = uniform,
+    #"uniform" = uniform,
+    "points" = points,
     "predict.fun" = predict.fun,
     "aggregate.fun" = aggregate.fun,
     ...
   )
-  
+
   if (length(vars) > 1L & !interaction) { # More than one variables are there. Iterate calling mmpf::marginalPrediction.
     pd = rbindlist(sapply(vars, function(x) {
       args$vars = x
@@ -102,6 +114,7 @@ partial_dependence.lm_exploratory <- function(fit, target, vars = colnames(data)
   attr(pd, "interaction") = interaction == TRUE
   attr(pd, "target") = target
   attr(pd, "vars") = vars
+  attr(pd, "points") = points
   pd
 }
 
