@@ -628,6 +628,7 @@ build_lm.fast <- function(df,
                     smote_target_minority_perc = 40,
                     smote_max_synth_perc = 200,
                     smote_k = 5,
+                    importance_measure = "firm", # "firm" or "permutation"
                     relimp = FALSE,
                     relimp_type = "first",
                     relimp_bootstrap_runs = 20,
@@ -928,18 +929,18 @@ build_lm.fast <- function(df,
         }
         if (length(c_cols) > 1) { # Skip importance calculation if there is only one variable.
           if (family == "binomial") {
-            model$permutation_importance <- calc_permutation_importance_binomial(model, clean_target_col, c_cols, df)
+            model$imp_df <- calc_permutation_importance_binomial(model, clean_target_col, c_cols, df)
           }
           else if (family == "poisson" && (is.null(link) || link == "log")) {
-            model$permutation_importance <- calc_permutation_importance_poisson(model, clean_target_col, c_cols, df)
+            model$imp_df <- calc_permutation_importance_poisson(model, clean_target_col, c_cols, df)
           }
           else if (family == "gaussian") {
-            model$permutation_importance <- calc_permutation_importance_gaussian(model, clean_target_col, c_cols, df)
+            model$imp_df <- calc_permutation_importance_gaussian(model, clean_target_col, c_cols, df)
           }
         }
         else {
           error <- simpleError("Variable importance requires two or more variables.")
-          model$permutation_importance <- error
+          model$imp_df <- error
         }
       }
       else { # model_type == "lm"
@@ -985,11 +986,11 @@ build_lm.fast <- function(df,
           })
         }
         if (length(c_cols) > 1) { # Skip importance calculation if there is only one variable.
-          model$permutation_importance <- calc_permutation_importance_linear(model, clean_target_col, c_cols, df)
+          model$imp_df <- calc_permutation_importance_linear(model, clean_target_col, c_cols, df)
         }
         else {
           error <- simpleError("Variable importance requires two or more variables.")
-          model$permutation_importance <- error
+          model$imp_df <- error
         }
       }
 
@@ -1051,8 +1052,8 @@ build_lm.fast <- function(df,
         imp_vars <- as.character((imp_df %>% arrange(-importance))$term)
         imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # Keep only max_pd_vars most important variables
       }
-      else if (!is.null(model$permutation_importance) && "error" %nin% class(model$permutation_importance)) { # if importance is available, show only max_pd_vars most important vars.
-        imp_df <- model$permutation_importance
+      else if (!is.null(model$imp_df) && "error" %nin% class(model$imp_df)) { # if importance is available, show only max_pd_vars most important vars.
+        imp_df <- model$imp_df
         imp_vars <- as.character((imp_df %>% arrange(-importance))$term)
         imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # Keep only max_pd_vars most important variables
       }
@@ -1473,14 +1474,14 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
     partial_dependence = {
       handle_partial_dependence(x)
     },
-    permutation_importance = {
-      if (is.null(x$permutation_importance) || "error" %in% class(x$permutation_importance)) {
+    importance = {
+      if (is.null(x$imp_df) || "error" %in% class(x$imp_df)) {
         # Permutation importance is not supported for the family and link function, or skipped because there is only one variable.
         # Return empty data.frame to avoid error.
         ret <- data.frame()
         return(ret)
       }
-      ret <- x$permutation_importance
+      ret <- x$imp_df
       # Add p.value column.
       # Since broom:::tidy.lm raises :Error: No tidy method for objects of class lm_exploratory",
       # always use broom:::tidy.glm which does not have this problem, and seems to return the same result,
@@ -1609,14 +1610,14 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
     partial_dependence = {
       handle_partial_dependence(x)
     },
-    permutation_importance = {
-      if (is.null(x$permutation_importance) || "error" %in% class(x$permutation_importance)) {
+    importance = {
+      if (is.null(x$imp_df) || "error" %in% class(x$imp_df)) {
         # Permutation importance is not supported for the family and link function, or skipped because there is only one variable.
         # Return empty data.frame to avoid error.
         ret <- data.frame()
         return(ret)
       }
-      ret <- x$permutation_importance
+      ret <- x$imp_df
       # Add p.value column.
       coef_df <- broom:::tidy.glm(x)
       ret <- ret %>% dplyr::mutate(p.value=purrr::map(term, function(var) {
