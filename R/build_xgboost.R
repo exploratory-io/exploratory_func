@@ -874,7 +874,6 @@ partial_dependence.xgboost <- function(fit, vars = colnames(data),
 
   attr(pd, "class") = c("pd", "data.frame")
   attr(pd, "interaction") = interaction == TRUE
-  #attr(pd, "target") = if (fit$treetype != "Classification") target else levels(fit$predictions)
   attr(pd, "target") = if (!classification) target else levels(fit$predictions)
   attr(pd, "vars") = vars
   pd
