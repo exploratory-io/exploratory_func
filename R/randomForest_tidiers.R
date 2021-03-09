@@ -2929,6 +2929,7 @@ partial_dependence.ranger <- function(fit, vars = colnames(data),
   pd
 }
 
+# TODO: Consolidate with partial_dependence.ranger.
 # Builds partial_dependency object for rpart with same structure (a data.frame with attributes.) as edarf::partial_dependence.
 partial_dependence.rpart = function(fit, target, vars = colnames(data),
   n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)), # Keeping same default of 25 as edarf::partial_dependence, although we usually overwrite from callers.
@@ -2944,12 +2945,24 @@ partial_dependence.rpart = function(fit, target, vars = colnames(data),
     ret
   }
 
+  points <- list()
+  for (cname in vars) {
+    if (is.numeric(data[[cname]])) {
+      coldata <- data[[cname]]
+      points[[cname]] <- quantile(coldata, probs=0:25/25)
+    }
+    else {
+      points[[cname]] <- unique(data[[cname]])
+    }
+  }
+
   args = list(
     "data" = data,
     "vars" = vars,
     "n" = n,
     "model" = fit,
-    "uniform" = uniform,
+    #"uniform" = uniform,
+    "points" = points,
     "predict.fun" = predict.fun,
     ...
   )
@@ -2975,6 +2988,7 @@ partial_dependence.rpart = function(fit, target, vars = colnames(data),
   attr(pd, "interaction") = interaction == TRUE
   attr(pd, "target") = if (fit$classification_type %in% c("regression", "binary")) target else attr(fit,"ylevels")
   attr(pd, "vars") = vars
+  attr(pd, "points") = points
   pd
 }
 
