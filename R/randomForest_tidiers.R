@@ -2091,6 +2091,7 @@ sd_with_weight <- function(v, w) {
 calc_firm_from_pd <- function(..., weight, class) {
   vectors <- list(...)
   imps <- purrr::map(vectors, function(v) {
+    # Get FIRM value based on whether the variable is categorical or not.
     if (class[[1]] == "numeric") {
       sd_with_weight(v, weight)
     }
@@ -2126,8 +2127,7 @@ importance_firm <- function(pdp_data, target, vars) {
     })) %>%
     tidyr::unnest(data)
   imp_df <- imp_df %>% dplyr::group_by(variable) %>%
-    dplyr::summarise(sd = sd_with_weight(!!rlang::sym(target), weight), max = max(!!rlang::sym(target)), min = min(!!rlang::sym(target)), class = first(class)) %>%
-    dplyr::mutate(importance=ifelse(class=="numeric", sd, (max-min)/4)) # Get FIRM value based on whether the variable is categorical or not.
+    dplyr::summarise(importance = calc_firm_from_pd(!!!rlang::syms(target), weight=weight, class=class))
   imp_df <- imp_df %>% dplyr::select(variable, importance) %>% dplyr::arrange(-importance)
   imp_df
 }
