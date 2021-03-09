@@ -2111,6 +2111,7 @@ calc_firm_from_pd <- function(..., weight, class) {
 importance_firm <- function(pdp_data, target, vars) {
   points <- attr(pdp_data, "points")
   # Replace the grid values with the type of the column, e.g. "numeric", or "character".
+  names(vars) <- NULL # Clean names, since it messes up following mutate step.
   imp_df <- pdp_data %>% dplyr::mutate(across(!!vars, ~ifelse(is.na(.x), NA, class(.x))))
   # Make it in long format, where variable names are in one "variable" column.
   imp_df <- imp_df %>% tidyr::pivot_longer(cols = !!vars, names_to="variable", values_to="class", values_drop_na=TRUE)

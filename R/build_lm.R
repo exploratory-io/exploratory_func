@@ -986,7 +986,9 @@ build_lm.fast <- function(df,
           })
         }
         if (length(c_cols) > 1) { # Skip importance calculation if there is only one variable.
-          model$imp_df <- calc_permutation_importance_linear(model, clean_target_col, c_cols, df)
+          if (importance_measure == "permutation") { # For firm case, we need to first calculate partial dependence.
+            model$imp_df <- calc_permutation_importance_linear(model, clean_target_col, c_cols, df)
+          }
         }
         else {
           error <- simpleError("Variable importance requires two or more variables.")
@@ -1057,6 +1059,9 @@ build_lm.fast <- function(df,
         imp_vars <- as.character((imp_df %>% arrange(-importance))$term)
         imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # Keep only max_pd_vars most important variables
       }
+      else if (importance_measure == "firm") {
+        imp_vars <- c_cols # For FIRM, we need to calculate partial dependence for all predictors first.
+      }
       else  {
         # Show only max_pd_vars most significant (ones with the smallest P values) vars.
         # For categorical, pick the smallest P value among all classes of it.
@@ -1088,6 +1093,20 @@ build_lm.fast <- function(df,
       }
       else {
         model$partial_dependence <- NULL
+      }
+
+      if (importance_measure == "firm") {
+        if (length(c_cols) > 1) { # Skip importance calculation if there is only one variable.
+          pdp_target_col <- attr(model$partial_dependence, "target")
+          imp_df <- importance_firm(model$partial_dependence, pdp_target_col, imp_vars)
+          model$imp_df <- imp_df
+          imp_vars <- imp_df$variable
+          model$imp_vars <- imp_vars
+        }
+        else {
+          error <- simpleError("Variable importance requires two or more variables.")
+          model$imp_df <- error
+        }
       }
 
       if (!is.null(target_funs)) {
