@@ -843,12 +843,24 @@ partial_dependence.xgboost <- function(fit, vars = colnames(data),
     }
   }
 
+  points <- list()
+  for (cname in vars) {
+    if (is.numeric(data[[cname]])) {
+      coldata <- data[[cname]]
+      points[[cname]] <- quantile(coldata, probs=0:25/25)
+    }
+    else {
+      points[[cname]] <- unique(data[[cname]])
+    }
+  }
+
   args = list(
     "data" = data,
     "vars" = vars,
     "n" = n,
     "model" = fit,
-    "uniform" = uniform,
+    #"uniform" = uniform,
+    "points" = points,
     "predict.fun" = predict.fun,
     ...
   )
