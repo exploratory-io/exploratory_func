@@ -8,7 +8,7 @@ calc_permutation_importance_binomial <- function(fit, target, vars, data) {
                                 loss.fun = function(x,y){-sum(log(1- abs(x - y)),na.rm = TRUE)})
   })
   importances <- purrr::flatten_dbl(importances)
-  importances_df <- tibble::tibble(term=vars, importance=pmax(importances, 0))
+  importances_df <- tibble::tibble(variable=vars, importance=pmax(importances, 0))
   importances_df
 }
 
@@ -22,7 +22,7 @@ calc_permutation_importance_linear <- function(fit, target, vars, data) {
                                 loss.fun = function(x,y){sum((x - y)^2, na.rm = TRUE)/length(x)})
   })
   importances <- purrr::flatten_dbl(importances)
-  importances_df <- tibble::tibble(term=vars, importance=pmax(importances, 0))
+  importances_df <- tibble::tibble(variable=vars, importance=pmax(importances, 0))
   importances_df
 }
 
@@ -37,7 +37,7 @@ calc_permutation_importance_gaussian <- function(fit, target, vars, data) {
                                 loss.fun = function(x,y){sum((x - y)^2, na.rm = TRUE)/length(x)})
   })
   importances <- purrr::flatten_dbl(importances)
-  importances_df <- tibble::tibble(term=vars, importance=pmax(importances, 0))
+  importances_df <- tibble::tibble(variable=vars, importance=pmax(importances, 0))
   importances_df
 }
 
@@ -54,7 +54,7 @@ calc_permutation_importance_poisson <- function(fit, target, vars, data) {
                                 loss.fun = function(x,y){-sum(y*x-exp(x), na.rm = TRUE)})
   })
   importances <- purrr::flatten_dbl(importances)
-  importances_df <- tibble::tibble(term=vars, importance=pmax(importances, 0))
+  importances_df <- tibble::tibble(variable=vars, importance=pmax(importances, 0))
   importances_df
 }
 
