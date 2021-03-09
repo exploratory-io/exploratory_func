@@ -1506,12 +1506,12 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
       # always use broom:::tidy.glm which does not have this problem, and seems to return the same result,
       # even for lm.
       coef_df <- broom:::tidy.glm(x)
-      ret <- ret %>% dplyr::mutate(p.value=purrr::map(term, function(var) {
+      ret <- ret %>% dplyr::mutate(p.value=purrr::map(variable, function(var) {
         get_var_min_pvalue(var, coef_df, x)
       })) %>% dplyr::mutate(p.value=as.numeric(p.value)) # Make list into numeric vector.
       # Map variable names back to the original.
       # as.character is to be safe by converting from factor. With factor, reverse mapping result will be messed up.
-      ret$term <- x$terms_mapping[as.character(ret$term)]
+      ret$variable <- x$terms_mapping[as.character(ret$variable)]
       ret
     }
   )
