@@ -88,7 +88,6 @@ partial_dependence.lm_exploratory <- function(fit, target, vars = colnames(data)
     "vars" = vars,
     "n" = n,
     "model" = fit,
-    #"uniform" = uniform,
     "points" = points,
     "predict.fun" = predict.fun,
     "aggregate.fun" = aggregate.fun,

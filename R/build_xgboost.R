@@ -859,7 +859,6 @@ partial_dependence.xgboost <- function(fit, vars = colnames(data),
     "vars" = vars,
     "n" = n,
     "model" = fit,
-    #"uniform" = uniform,
     "points" = points,
     "predict.fun" = predict.fun,
     ...
