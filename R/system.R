@@ -2339,7 +2339,7 @@ download_data_file <- function(url, type){
 read_excel_files <- function(files, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, ...) {
     # set name to the files so that it can be used for the "id" column created by purrr::map_dfr.
     files <- setNames(as.list(files), files)
-    purrr::map_dfr(files, exploratory::read_excel_file, sheet = sheet,
+    df <- purrr::map_dfr(files, exploratory::read_excel_file, sheet = sheet,
            col_names = col_names,
            col_types = col_types,
            na = na,
@@ -2351,7 +2351,12 @@ read_excel_files <- function(files, sheet = 1, col_names = TRUE, col_types = NUL
            skipEmptyRows = skipEmptyRows,
            skipEmptyCols = skipEmptyCols,
            check.names = check.names,
-           tzone = tzone, .id = "id") %>% mutate(id = basename(id)) # extract file name from full path with basename.
+           tzone = tzone, .id = "exp.file.id") %>% mutate(exp.file.id = basename(exp.file.id)) # extract file name from full path with basename.
+    id_col <- avoid_conflict(colnames(df), "id")
+    # copy internal exp.file.id to the id column.
+    df[[id_col]] <- df[["exp.file.id"]]
+    # drop internal column and move the id column to the very beginning.
+    df %>% dplyr::select(!!!rlang::syms(id_col), dplyr::everything(), -exp.file.id)
 }
 
 #'Wrapper for openxlsx::read.xlsx (in case of .xlsx file) and readxl::read_excel (in case of old .xls file)
@@ -2477,14 +2482,19 @@ read_delim_files <- function(files, delim, quote = '"',
                               progress = interactive(), with_api_key = FALSE) {
     # set name to the files so that it can be used for the "id" column created by purrr:map_dfr.
     files <- setNames(as.list(files), files)
-    purrr::map_dfr(files, exploratory::read_delim_file,delim = delim, quote = quote,
+    df <- purrr::map_dfr(files, exploratory::read_delim_file,delim = delim, quote = quote,
                    escape_backslash = escape_backslash, escape_double = escape_double,
                    col_names = col_names, col_types = col_types,
                    locale = locale,
                    na = na, quoted_na = quoted_na,
                    comment = comment, trim_ws = trim_ws,
                    skip = skip, n_max = n_max, guess_max = guess_max,
-                   progress = progress, with_api_key = with_api_key, .id = "id") %>% mutate(id = basename(id)) # extract file name from full path with basename.
+                   progress = progress, with_api_key = with_api_key, .id = "exp.file.id") %>% mutate(exp.file.id = basename(exp.file.id))  # extract file name from full path with basename and create file.id column.
+    id_col <- avoid_conflict(colnames(df), "id")
+    # copy internal exp.file.id to the id column.
+    df[[id_col]] <- df[["exp.file.id"]]
+    # drop internal column and move the id column to the very beginning.
+    df %>% dplyr::select(!!!rlang::syms(id_col), dplyr::everything(), -exp.file.id)
 
 }
 
