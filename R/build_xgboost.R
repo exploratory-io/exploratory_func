@@ -1267,10 +1267,6 @@ exp_xgboost <- function(df,
         model$partial_dependence <- partial_dependence.xgboost(model, vars=imp_vars, data=df,
                                                                n=c(pd_grid_resolution, min(nrow(df), pd_sample_size)),
                                                                classification=!(is_target_numeric||is_target_logical)) # We treat binary classification as a regression to predict probability here.
-        if (pd_with_bin_means && (is_target_logical || is_target_numeric)) {
-          # We calculate means of bins only for logical or numeric target to keep the visualization simple.
-          model$partial_binning <- calc_partial_binning_data(df, clean_target_col, imp_vars)
-        }
       }
       else {
         model$partial_dependence <- NULL
@@ -1294,6 +1290,15 @@ exp_xgboost <- function(df,
         }
         imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
         model$imp_vars <- imp_vars
+        # Shrink the partial dependence data keeping only the important variables.
+        model$partial_dependence <- shrink_partial_dependence_data(model$partial_dependence, imp_vars)
+      }
+
+      if (length(imp_vars) > 0) {
+        if (pd_with_bin_means && (is_target_logical || is_target_numeric)) {
+          # We calculate means of bins only for logical or numeric target to keep the visualization simple.
+          model$partial_binning <- calc_partial_binning_data(df, clean_target_col, imp_vars)
+        }
       }
 
       # these attributes are used in tidy of randomForest

@@ -2382,10 +2382,6 @@ calc_feature_imp <- function(df,
       # Second element of n argument needs to be less than or equal to sample size, to avoid error.
       if (length(imp_vars) > 0) {
         model$partial_dependence <- partial_dependence.ranger(model, vars=imp_vars, data=model_df, n=c(pd_grid_resolution, min(model$num.samples, pd_sample_size)))
-        if (pd_with_bin_means && is_target_logical_or_numeric) {
-          # We calculate means of bins only for logical or numeric target to keep the visualization simple.
-          model$partial_binning <- calc_partial_binning_data(model_df, clean_target_col, imp_vars)
-        }
       }
       else {
         model$partial_dependence <- NULL
@@ -2414,9 +2410,16 @@ calc_feature_imp <- function(df,
         }
         imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
         model$imp_vars <- imp_vars
+        # Shrink the partial dependence data keeping only the important variables.
+        model$partial_dependence <- shrink_partial_dependence_data(model$partial_dependence, imp_vars)
       }
 
-      attr(model$partial_dependence, "vars") <- imp_vars
+      if (length(imp_vars) > 0) {
+        if (pd_with_bin_means && is_target_logical_or_numeric) {
+          # We calculate means of bins only for logical or numeric target to keep the visualization simple.
+          model$partial_binning <- calc_partial_binning_data(model_df, clean_target_col, imp_vars)
+        }
+      }
 
       # these attributes are used in tidy of randomForest
       model$classification_type <- classification_type
