@@ -2283,10 +2283,8 @@ calc_feature_imp <- function(df,
       sample.fraction <- min(c(max_sample_size / max_nrow, 1))
 
       if (with_boruta || # Run only either Boruta or ranger::importance.
+          importance_measure == "firm" || # FIRM does not depend on importance result from ranger.
           length(c_cols) <= 1) { # Calculate importance only when there are multiple variables.
-        ranger_importance_measure <- "none"
-      }
-      else if (importance_measure == "firm") {
         ranger_importance_measure <- "none"
       }
       else {
