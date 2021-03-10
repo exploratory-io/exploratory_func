@@ -2323,7 +2323,7 @@ calc_feature_imp <- function(df,
         if (importance_measure == "impurity") {
           getImp <- Boruta::getImpRfGini
         }
-        else { # default to equivalent of "permutation".
+        else { # default to equivalent of "permutation". This includes the case where "firm" is specified.
           getImp <- Boruta::getImpRfZ
         }
         model$boruta <- Boruta::Boruta(
