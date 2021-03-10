@@ -2172,6 +2172,11 @@ calc_feature_imp <- function(df,
     stop("test_rate must be less than 1")
   }
 
+  # For now, if FIRM is specified with Boruta, which is not supported, we run Boruta with permutation importance instead.
+  if (with_boruta && importance_measure == "firm") {
+    importance_measure <- "permutation"
+  }
+
   # this seems to be the new way of NSE column selection evaluation
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
   target_col <- tidyselect::vars_select(names(df), !! rlang::enquo(target))
