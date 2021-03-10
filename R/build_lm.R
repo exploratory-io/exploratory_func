@@ -1109,6 +1109,11 @@ build_lm.fast <- function(df,
           error <- simpleError("Variable importance requires two or more variables.")
           model$imp_df <- error
         }
+
+        imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
+        model$imp_vars <- imp_vars
+        # Shrink the partial dependence data keeping only the important variables.
+        model$partial_dependence <- shrink_partial_dependence_data(model$partial_dependence, imp_vars)
       }
 
       if (!is.null(target_funs)) {
