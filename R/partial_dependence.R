@@ -44,11 +44,19 @@ calc_partial_binning_data <- function(df, target_col, var_cols) {
   ret
 }
 
+# Shrinks partial dependence data keeping only the specified important variables.
+shrink_partial_dependence_data <- function(pd, imp_vars) {
+  selected <- pd[setdiff(colnames(pd), setdiff(attr(pd ,"vars"), imp_vars))] # Keep only columns for important variables.
+  filtered <- selected[purrr::reduce(pd[imp_vars], function(x, y){x | !is.na(y)}, .init=FALSE),] # Filter out rows that became all NAs.
+  attr(filtered, "target") <- attr(pd, "target") # Target columns should be unchanged.
+  attr(filtered, "vars") <- imp_vars # Update the vars attribute with the important variables we still keep.
+  filtered
+}
+
 # Common utility function called for tidy with type "partial_dependence".
 # Used for ranger, rpart, lm, and glm.
 # TODO: Almost there, but make it completely model agnostic.
 handle_partial_dependence <- function(x) {
-  browser()
   if (is.null(x$partial_dependence)) {
     return(data.frame()) # Skip by returning empty data.frame.
   }

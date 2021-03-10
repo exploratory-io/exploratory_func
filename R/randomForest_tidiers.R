@@ -3185,11 +3185,8 @@ exp_rpart <- function(df,
         }
         imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
         model$imp_vars <- imp_vars
-        selected <- model$partial_dependence[setdiff(colnames(model$partial_dependence), setdiff(attr(model$partial_dependence,"vars"), imp_vars))]
-        filtered <- selected[purrr::reduce(model$partial_dependence[imp_vars], function(x, y){x | !is.na(y)}, .init=FALSE),]
-        attr(filtered, "target") <- attr(model$partial_dependence, "target")
-        attr(filtered, "vars") <- imp_vars
-        model$partial_dependence <- filtered
+        # Shrink the partial dependence data keeping only the important variables.
+        model$partial_dependence <- shrink_partial_dependence_data(model$partial_dependence, imp_vars)
       }
 
       if (pd_with_bin_means && is_target_logical_or_numeric) {
