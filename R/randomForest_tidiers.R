@@ -3007,6 +3007,7 @@ exp_rpart <- function(df,
                       smote_target_minority_perc = 40,
                       smote_max_synth_perc = 200,
                       smote_k = 5,
+                      importance_measure = "firm", # "firm", or "impurity".
                       max_pd_vars = 20,
                       pd_sample_size = 500,
                       pd_grid_resolution = 20,
@@ -3139,7 +3140,7 @@ exp_rpart <- function(df,
         model$imp_df <- error
         imp_vars <- c_cols
       }
-      else if (!is.null(model$variable.importance)) { # It is possible variable.importance is missing for example when no split happened.
+      else if (importance_measure == "impurity" && !is.null(model$variable.importance)) { # It is possible variable.importance is missing for example when no split happened.
         imp <- model$variable.importance
         imp_vars <- names(imp) # model$variable.importance is already sorted by importance.
         imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # Keep only max_pd_vars most important variables
@@ -3147,6 +3148,10 @@ exp_rpart <- function(df,
           variable = names(imp),
           importance = imp
         )
+      }
+      else if (importance_measure == "firm") {
+        # Skip inp_vars filtering for FIRM, since we need to calculate PDP for all variables to get FIRM for all variables.
+        imp_vars <- c_cols
       }
       else {
         error <- simpleError("Variable importance is not available because there is no split in the decision tree.")
@@ -3160,6 +3165,31 @@ exp_rpart <- function(df,
         model$partial_binning <- calc_partial_binning_data(df, clean_target_col, imp_vars)
       }
       model$imp_vars <- imp_vars # keep imp_vars in the model for ordering of charts based on the importance.
+
+      if (importance_measure == "firm") { # If importance measure is FIRM, we calculate them now, after PDP is calculated.
+        if (length(c_cols) > 1) { # Calculate importance only when there are multiple variables.
+          pdp_target_col <- if (classification_type == "binary") {
+            "TRUE"
+          }
+          else {
+            attr(model$partial_dependence, "target")
+          }
+          imp_df <- importance_firm(model$partial_dependence, pdp_target_col, imp_vars)
+          model$imp_df <- imp_df
+          imp_vars <- imp_df$variable
+        }
+        else {
+          error <- simpleError("Variable importance requires two or more variables.")
+          model$imp_df <- error
+          imp_vars <- c_cols # Just use c_cols as is for imp_vars to calculate partial dependence anyway.
+        }
+
+        if (is.null(max_pd_vars)) {
+          max_pd_vars <- 20 # Number of most important variables to calculate partial dependences on. This used to be 12 but we decided it was a little too small.
+        }
+        imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
+        model$imp_vars <- imp_vars
+      }
 
       if (test_rate > 0) {
         # Handle NA rows for test. For training, rpart seems to automatically handle it, and row numbers of
