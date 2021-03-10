@@ -1222,6 +1222,10 @@ exp_xgboost <- function(df,
         model$df_test <- df_test_clean
       }
 
+      if (is.null(max_pd_vars)) {
+        max_pd_vars <- 20 # Number of most important variables to calculate partial dependences on. This used to be 12 but we decided it was a little too small.
+      }
+
       # return partial dependence
       if (length(c_cols) > 1) { # Calculate importance only when there are multiple variables.
         if (importance_measure == "permutation") {
@@ -1246,18 +1250,17 @@ exp_xgboost <- function(df,
         }
         else if ("error" %in% class(imp_df)) {
           imp_vars <- c_cols # Just use c_cols as is for imp_vars to calculate partial dependence anyway.
+          imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # just take max_pd_vars first variables
         }
         else {
           imp_vars <- imp_df$variable
+          imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
         }
       }
       else {
         error <- simpleError("Variable importance requires two or more variables.")
         model$imp_df <- error
         imp_vars <- c_cols # Just use c_cols as is for imp_vars to calculate partial dependence anyway.
-      }
-      if (is.null(max_pd_vars)) {
-        max_pd_vars <- 20 # Number of most important variables to calculate partial dependences on. This used to be 12 but we decided it was a little too small.
       }
 
       imp_vars <- as.character(imp_vars) # for some reason imp_vars is converted to factor at this point. turn it back to character.
@@ -1285,9 +1288,6 @@ exp_xgboost <- function(df,
           imp_vars <- c_cols # Just use c_cols as is for imp_vars to calculate partial dependence anyway.
         }
 
-        if (is.null(max_pd_vars)) {
-          max_pd_vars <- 20 # Number of most important variables to calculate partial dependences on. This used to be 12 but we decided it was a little too small.
-        }
         imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
         model$imp_vars <- imp_vars
         # Shrink the partial dependence data keeping only the important variables.
