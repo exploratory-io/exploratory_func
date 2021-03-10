@@ -628,7 +628,7 @@ build_lm.fast <- function(df,
                     smote_target_minority_perc = 40,
                     smote_max_synth_perc = 200,
                     smote_k = 5,
-                    importance_measure = "firm", # "firm" or "permutation"
+                    importance_measure = "firm", # "firm", or "permutation" if available.
                     relimp = FALSE,
                     relimp_type = "first",
                     relimp_bootstrap_runs = 20,
@@ -1051,14 +1051,14 @@ build_lm.fast <- function(df,
       # Calculate partial dependencies.
       if (!is.null(model$relative_importance) && "error" %nin% class(model$relative_importance)) { # if importance is available, show only max_pd_vars most important vars.
         importance <- attr(model$relative_importance, model$relative_importance$type)
-        term <- model$relative_importance$namen[2:length(model$relative_importance$namen)]
-        imp_df <- data.frame(term = term, importance = importance)
-        imp_vars <- as.character((imp_df %>% arrange(-importance))$term)
+        variable <- model$relative_importance$namen[2:length(model$relative_importance$namen)]
+        imp_df <- data.frame(variable = variable, importance = importance)
+        imp_vars <- as.character((imp_df %>% arrange(-importance))$variable)
         imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # Keep only max_pd_vars most important variables
       }
       else if (!is.null(model$imp_df) && "error" %nin% class(model$imp_df)) { # if importance is available, show only max_pd_vars most important vars.
         imp_df <- model$imp_df
-        imp_vars <- as.character((imp_df %>% arrange(-importance))$term)
+        imp_vars <- as.character((imp_df %>% arrange(-importance))$variable)
         imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # Keep only max_pd_vars most important variables
       }
       else if (importance_measure == "firm") {
