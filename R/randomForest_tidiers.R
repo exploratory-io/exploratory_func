@@ -3160,10 +3160,6 @@ exp_rpart <- function(df,
       }
 
       model$partial_dependence <- partial_dependence.rpart(model, clean_target_col, vars=imp_vars, data=df, n=c(pd_grid_resolution, min(nrow(df), pd_sample_size)))
-      if (pd_with_bin_means && is_target_logical_or_numeric) {
-        # We calculate means of bins only for logical or numeric target to keep the visualization simple.
-        model$partial_binning <- calc_partial_binning_data(df, clean_target_col, imp_vars)
-      }
       model$imp_vars <- imp_vars # keep imp_vars in the model for ordering of charts based on the importance.
 
       if (importance_measure == "firm") { # If importance measure is FIRM, we calculate them now, after PDP is calculated.
@@ -3189,6 +3185,16 @@ exp_rpart <- function(df,
         }
         imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
         model$imp_vars <- imp_vars
+        selected <- model$partial_dependence[setdiff(colnames(model$partial_dependence), setdiff(attr(model$partial_dependence,"vars"), imp_vars))]
+        filtered <- selected[purrr::reduce(model$partial_dependence[imp_vars], function(x, y){x | !is.na(y)}, .init=FALSE),]
+        attr(filtered, "target") <- attr(model$partial_dependence, "target")
+        attr(filtered, "vars") <- imp_vars
+        model$partial_dependence <- filtered
+      }
+
+      if (pd_with_bin_means && is_target_logical_or_numeric) {
+        # We calculate means of bins only for logical or numeric target to keep the visualization simple.
+        model$partial_binning <- calc_partial_binning_data(df, clean_target_col, imp_vars)
       }
 
       if (test_rate > 0) {

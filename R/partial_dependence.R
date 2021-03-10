@@ -48,6 +48,7 @@ calc_partial_binning_data <- function(df, target_col, var_cols) {
 # Used for ranger, rpart, lm, and glm.
 # TODO: Almost there, but make it completely model agnostic.
 handle_partial_dependence <- function(x) {
+  browser()
   if (is.null(x$partial_dependence)) {
     return(data.frame()) # Skip by returning empty data.frame.
   }
