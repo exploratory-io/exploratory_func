@@ -1242,7 +1242,8 @@ exp_xgboost <- function(df,
           }
           model$imp_df <- imp_df
         }
-        else if (importance_measure == "impurity") { # "impurity". Use the importance from the xgboost package.
+        else if (importance_measure == "impurity" || # "impurity". Use the importance from the xgboost package.
+                 importance_measure == "xgboost") { # Because of an old bug in UI definition, it was specified as "xgboost" in pre-6.5 Desktop. Covering backward compatibility here. Remove it at appropriate timing.
           imp_df <- importance_xgboost(model)
           model$imp_df <- imp_df
         }
