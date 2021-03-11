@@ -670,13 +670,6 @@ build_lm.fast <- function(df,
     selected_cols <- orig_selected_cols
   }
 
-  # For backward compatibility, importance_measure defaults to "permutation",
-  # but these GLMs do not have permutation importance support. Fall back to FIRM.
-  if (importance_measure == "permutation" &&
-      model_type == "glm" && family %in% c("Gamma", "negativebinomial", "inverse.gaussian")) {
-    importance_measure <- "firm"
-  }
-
   grouped_cols <- grouped_by(df)
 
   if (!is.null(variable_metric)  && variable_metric == "ame") { # Special argument for integration with Analytics View.
@@ -687,6 +680,14 @@ build_lm.fast <- function(df,
     family <- "binomial" # default for glm is logistic regression.
     link <- "logit"
   }
+
+  # For backward compatibility, importance_measure defaults to "permutation",
+  # but these GLMs do not have permutation importance support. Fall back to FIRM.
+  if (importance_measure == "permutation" &&
+      model_type == "glm" && family %in% c("Gamma", "negativebinomial", "inverse.gaussian")) {
+    importance_measure <- "firm"
+  }
+
 
   if (model_type == "glm" && family == "binomial" && (is.null(link) || link == "logit")) {
     if (!is.logical(df[[target_col]]) && !is.numeric(df[[target_col]])) {
