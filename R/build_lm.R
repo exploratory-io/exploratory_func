@@ -1683,6 +1683,27 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
       # as.character is to be safe by converting from factor. With factor, reverse mapping result will be messed up.
       ret$variable <- x$terms_mapping[as.character(ret$variable)]
       ret
+    },
+    # This is copy of the code for "importance" with adjustment for output column name just for backward compatibility for pre-6.5.
+    # Remove at appropriate timing.
+    permutation_importance = {
+      if (is.null(x$imp_df) || "error" %in% class(x$imp_df)) {
+        # Permutation importance is not supported for the family and link function, or skipped because there is only one variable.
+        # Return empty data.frame to avoid error.
+        ret <- data.frame()
+        return(ret)
+      }
+      ret <- x$imp_df
+      # Add p.value column.
+      coef_df <- broom:::tidy.glm(x)
+      ret <- ret %>% dplyr::mutate(p.value=purrr::map(variable, function(var) {
+        get_var_min_pvalue(var, coef_df, x)
+      })) %>% dplyr::mutate(p.value=as.numeric(p.value)) # Make list into numeric vector.
+      # Map variable names back to the original.
+      # as.character is to be safe by converting from factor. With factor, reverse mapping result will be messed up.
+      ret$variable <- x$terms_mapping[as.character(ret$variable)]
+      ret <- ret %>% dplyr::rename(term=variable)
+      ret
     }
   )
 }
