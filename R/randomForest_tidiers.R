@@ -2123,8 +2123,11 @@ importance_firm <- function(pdp_data, target, vars) {
       if (x$class[[1]]=="numeric") { # If numeric, remove 0 percentile and 100 percentile to avoid affected by outliers.
         y[[1]] <- y[[1]] - 1
         y[[length(y)]] <- y[[length(y)]] - 1
+        x %>% mutate(weight = y)
       }
-      x %>% mutate(weight = y)
+      else { # For categorical, weight does not matter. Besides, adding y as weight throws error when there is unused factor level.
+        x
+      }
     })) %>%
     tidyr::unnest(data)
   imp_df <- imp_df %>% dplyr::group_by(variable) %>%
