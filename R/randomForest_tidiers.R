@@ -3017,7 +3017,7 @@ exp_rpart <- function(df,
                       smote_target_minority_perc = 40,
                       smote_max_synth_perc = 200,
                       smote_k = 5,
-                      importance_measure = "firm", # "firm", or "impurity".
+                      importance_measure = "impurity", # "firm", or "impurity". Defaulting to impurity for backward compatibility for pre-6.5.
                       max_pd_vars = 20,
                       pd_sample_size = 500,
                       pd_grid_resolution = 20,

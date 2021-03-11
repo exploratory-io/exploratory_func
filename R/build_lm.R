@@ -634,7 +634,7 @@ build_lm.fast <- function(df,
                     smote_target_minority_perc = 40,
                     smote_max_synth_perc = 200,
                     smote_k = 5,
-                    importance_measure = "firm", # "firm", or "permutation" if available.
+                    importance_measure = "permutation", # "firm", or "permutation" if available. Defaulting to permutation for backward compatibility for pre-6.5.
                     relimp = FALSE,
                     relimp_type = "first",
                     relimp_bootstrap_runs = 20,
@@ -668,6 +668,13 @@ build_lm.fast <- function(df,
   }
   else {
     selected_cols <- orig_selected_cols
+  }
+
+  # For backward compatibility, importance_measure defaults to "permutation",
+  # but these GLMs do not have permutation importance support. Fall back to FIRM.
+  if (importance_measure == "permutation" &&
+      model_type == "glm" && family %in% c("Gamma", "negativebinomial", "inverse.gaussian")) {
+    importance_measure <- "firm"
   }
 
   grouped_cols <- grouped_by(df)
