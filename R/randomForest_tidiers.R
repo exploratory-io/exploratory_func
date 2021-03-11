@@ -2877,6 +2877,7 @@ glance.rpart <- function(x, pretty.name = FALSE, ...) {
   ret
 }
 
+# TODO: Make this function model-agnostic and consolidate. There are similar code for lm/glm, ranger, rpart, and xgboost.
 # Builds partial_dependency object for ranger. Originally from edarf:::partial_dependence.ranger.
 partial_dependence.ranger <- function(fit, vars = colnames(data),
   n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L),
@@ -2889,6 +2890,7 @@ partial_dependence.ranger <- function(fit, vars = colnames(data),
     predict(object, data = newdata)$predictions
   }
 
+  # Generate grid points based on quantile, so that FIRM calculated based on it would make good sense even when there are some outliers.
   points <- list()
   for (cname in vars) {
     if (is.numeric(data[[cname]])) {
@@ -2935,7 +2937,7 @@ partial_dependence.ranger <- function(fit, vars = colnames(data),
   pd
 }
 
-# TODO: Consolidate with partial_dependence.ranger.
+# TODO: Make this function model-agnostic and consolidate. There are similar code for lm/glm, ranger, rpart, and xgboost.
 # Builds partial_dependency object for rpart with same structure (a data.frame with attributes.) as edarf::partial_dependence.
 partial_dependence.rpart = function(fit, target, vars = colnames(data),
   n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)), # Keeping same default of 25 as edarf::partial_dependence, although we usually overwrite from callers.
@@ -2951,6 +2953,7 @@ partial_dependence.rpart = function(fit, target, vars = colnames(data),
     ret
   }
 
+  # Generate grid points based on quantile, so that FIRM calculated based on it would make good sense even when there are some outliers.
   points <- list()
   for (cname in vars) {
     if (is.numeric(data[[cname]])) {

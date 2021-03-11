@@ -828,6 +828,8 @@ calc_permutation_importance_xgboost_multiclass <- function(fit, target, vars, da
 }
 
 
+# TODO: Make this function model-agnostic and consolidate. There are similar code for lm/glm, ranger, rpart, and xgboost.
+# Builds partial dependence data.
 partial_dependence.xgboost <- function(fit, vars = colnames(data),
   n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)),
   classification = FALSE, interaction = FALSE, uniform = TRUE, data, ...) {
@@ -843,6 +845,7 @@ partial_dependence.xgboost <- function(fit, vars = colnames(data),
     }
   }
 
+  # Generate grid points based on quantile, so that FIRM calculated based on it would make good sense even when there are some outliers.
   points <- list()
   for (cname in vars) {
     if (is.numeric(data[[cname]])) {

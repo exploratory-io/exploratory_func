@@ -58,7 +58,7 @@ calc_permutation_importance_poisson <- function(fit, target, vars, data) {
   importances_df
 }
 
-
+# TODO: Make this function model-agnostic and consolidate. There are similar code for lm/glm, ranger, rpart, and xgboost.
 # Builds partial_dependency object for lm/glm with same structure (a data.frame with attributes.) as edarf::partial_dependence.
 partial_dependence.lm_exploratory <- function(fit, target, vars = colnames(data),
   n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)), # Keeping same default of 25 as edarf::partial_dependence, although we usually overwrite from callers.
@@ -72,6 +72,7 @@ partial_dependence.lm_exploratory <- function(fit, target, vars = colnames(data)
     c("preds" = mean(x))
   }
 
+  # Generate grid points based on quantile, so that FIRM calculated based on it would make good sense even when there are some outliers.
   points <- list()
   for (cname in vars) {
     if (is.numeric(data[[cname]])) {
