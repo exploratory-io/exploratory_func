@@ -1037,7 +1037,7 @@ exp_xgboost <- function(df,
                         smote_target_minority_perc = 40,
                         smote_max_synth_perc = 200,
                         smote_k = 5,
-                        importance_measure = "permutation", # "permutation" or "impurity".
+                        importance_measure = "permutation", # "permutation", "impurity", or "firm".
                         max_pd_vars = NULL,
                         # Number of most important variables to calculate partial dependences on. 
                         # By default, when Boruta is on, all Confirmed/Tentative variables.
