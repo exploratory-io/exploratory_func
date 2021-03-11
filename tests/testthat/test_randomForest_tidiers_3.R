@@ -21,7 +21,45 @@ if (!testdata_filename %in% list.files(testdata_dir)) {
   write.csv(flight, testdata_file_path) # save sampled-down data for performance.
 }
 
-test_that("calc_feature_imp(regression) evaluate training and test", {
+test_that("calc_feature_imp(regression) evaluate training and test with FIRM importance", {
+  set.seed(1) # For stability of result.
+  model_df <- flight %>%
+                calc_feature_imp(`ARR DELAY`, `CAR RIER`, `ORI GIN`, `DEP DELAY`, `AIR TIME`,
+                                 test_rate = 0.3,
+                                 importance_measure = "firm",
+                                 test_split_type = "ordered", pd_with_bin_means = TRUE) # testing ordered split too.
+
+  ret <- flight %>% select(-`ARR DELAY`) %>% add_prediction(model_df=model_df)
+  ret <- model_df %>% prediction(data="newdata", data_frame=flight)
+  ret <- model_df %>% prediction(data="training_and_test")
+  test_ret <- ret %>% filter(is_test_data==TRUE)
+  # expect_equal(nrow(test_ret), 1500) Fails now, since we filter numeric NA. Revive when we do not need to.
+  expect_lt(nrow(test_ret), 1500)
+  expect_gt(nrow(test_ret), 1400)
+  train_ret <- ret %>% filter(is_test_data==FALSE)
+  expect_lt(nrow(train_ret), 3500)
+  expect_gt(nrow(train_ret), 3400)
+  # expect_equal(nrow(train_ret), 3500) Fails now, since we filter numeric NA. Revive when we do not need to.
+
+  ret <- rf_evaluation_training_and_test(model_df, pretty.name = TRUE)
+  expect_equal(nrow(ret), 2) # 2 for train and test
+
+  # retrieve partial dependence data.
+  ret <- model_df %>% rf_partial_dependence()
+  expect_equal(class(ret$conf_high), "numeric") # make sure that it is with conf int for actual binning data.
+
+  model_df <- flight %>%
+                calc_feature_imp(`FL NUM`, `DIS TANCE`, `DEP TIME`, test_rate = 0, pd_with_bin_means = TRUE)
+  ret <- model_df %>% prediction(data="training_and_test")
+  train_ret <- ret %>% filter(is_test_data==FALSE)
+  #expect_equal(nrow(train_ret), 4894) # Less than 5000 because of NAs in the target variable. Linux seems to have different result. Work around for now.
+  expect_lt(nrow(train_ret), 5000)
+
+  ret <- rf_evaluation_training_and_test(model_df)
+  expect_equal(nrow(ret), 1) # 1 for train
+})
+
+test_that("calc_feature_imp(regression) evaluate training and test with permutation importance", {
   set.seed(1) # For stability of result.
   model_df <- flight %>%
                 calc_feature_imp(`ARR DELAY`, `CAR RIER`, `ORI GIN`, `DEP DELAY`, `AIR TIME`,
@@ -63,7 +101,50 @@ test_that("calc_feature_imp(regression) evaluate training and test", {
   expect_equal(nrow(ret), 1) # 1 for train
 })
 
-test_that("calc_feature_imp(binary) evaluate training and test", {
+test_that("calc_feature_imp(binary) evaluate training and test with FIRM importance", {
+  set.seed(1) # For stability of result.
+  # `is delayed` is not logical for some reason.
+  # To test binary prediction, need to cast it into logical.
+  model_df <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`)) %>%
+                calc_feature_imp(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0.3, pd_with_bin_means = TRUE, importance_measure = "firm")
+
+  ret <- flight %>% add_prediction(model_df=model_df)
+  expect_equal(class(ret$predicted_label), "logical")
+  res_partial_dependence <- model_df %>% rf_partial_dependence()
+  ret <- model_df %>% prediction(data="training_and_test")
+  test_ret <- ret %>% filter(is_test_data==TRUE)
+  # expect_equal(nrow(test_ret), 1500) Fails now, since we filter numeric NA. Revive when we do not need to.
+  expect_lt(nrow(test_ret), 1500)
+  expect_gt(nrow(test_ret), 1400)
+  train_ret <- ret %>% filter(is_test_data==FALSE)
+  # expect_equal(nrow(train_ret), 3500) Fails now, since we filter numeric NA. Revive when we do not need to.
+  expect_lt(nrow(train_ret), 3500)
+  expect_gt(nrow(train_ret), 3400)
+
+  ret <- rf_evaluation_training_and_test(model_df)
+  expect_equal(nrow(ret), 2) # 2 for train and test
+
+  ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class")
+  expect_equal(nrow(ret), 4) # 4 for train/test times TRUE/FALSE
+
+  ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
+  expect_equal(nrow(ret), 8) # 8 for train/test times predicted TRUE/FALSE times actual TRUE/FALSE
+
+  model_df <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`)) %>%
+                calc_feature_imp(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0, pd_with_bin_means = TRUE)
+  ret <- model_df %>% prediction(data="training_and_test")
+  train_ret <- ret %>% filter(is_test_data==FALSE)
+  #expect_equal(nrow(train_ret), 4905) # Less than 5000 because of NAs in the target variable. Linux seems to have different result. Work around for now.
+  expect_lt(nrow(train_ret), 5000)
+
+  ret <- rf_evaluation_training_and_test(model_df)
+  expect_equal(nrow(ret), 1) # 1 for train
+
+  ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class")
+  ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
+})
+
+test_that("calc_feature_imp(binary) evaluate training and test with permutation importance", {
   set.seed(1) # For stability of result.
   # `is delayed` is not logical for some reason.
   # To test binary prediction, need to cast it into logical.
@@ -223,7 +304,39 @@ test_that("calc_feature_map(binary) evaluate training and test with SMOTE", {
   ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
 })
 
-test_that("calc_feature_map(multi) evaluate training and test", {
+test_that("calc_feature_imp(multi) evaluate training and test with FIRM importance", {
+  set.seed(1) # For stability of result.
+  model_df <- flight %>%
+                calc_feature_imp(`ORI GIN`, `DIS TANCE`, `DEP TIME`, test_rate = 0.3, pd_with_bin_means = TRUE, importance_measure = "firm")
+
+  ret <- model_df %>% prediction(data="training_and_test")
+  test_ret <- ret %>% filter(is_test_data==TRUE)
+  # expect_equal(nrow(test_ret), 1500) Fails now, since we filter numeric NA. Revive when we do not need to.
+  expect_lt(nrow(test_ret), 1500)
+  expect_gt(nrow(test_ret), 1400)
+  train_ret <- ret %>% filter(is_test_data==FALSE)
+  # expect_equal(nrow(train_ret), 3500) Fails now, since we filter numeric NA. Revive when we do not need to.
+  expect_lt(nrow(train_ret), 3500)
+  expect_gt(nrow(train_ret), 3400)
+
+  ret <- rf_evaluation_training_and_test(model_df)
+  expect_equal(nrow(ret), 2) # 2 for train and test
+
+  ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class")
+  ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
+
+  model_df <- flight %>%
+                calc_feature_imp(`ORI GIN`, `DIS TANCE`, `DEP TIME`, test_rate = 0, pd_with_bin_means = TRUE)
+  ret <- model_df %>% prediction(data="training_and_test")
+  train_ret <- ret %>% filter(is_test_data==FALSE)
+  #expect_equal(nrow(train_ret), 4944) # Linux seems to have different result. Work around for now.
+  expect_lt(nrow(train_ret), 5000)
+
+  ret <- rf_evaluation_training_and_test(model_df)
+  expect_equal(nrow(ret), 1) # 1 for train
+})
+
+test_that("calc_feature_imp(multi) evaluate training and test with permutation importance", {
   set.seed(1) # For stability of result.
   model_df <- flight %>%
                 calc_feature_imp(`ORI GIN`, `DIS TANCE`, `DEP TIME`, test_rate = 0.3, pd_with_bin_means = TRUE)
