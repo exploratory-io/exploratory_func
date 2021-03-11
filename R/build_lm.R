@@ -497,7 +497,9 @@ preprocess_regression_data_after_sample <- function(df, target_col, predictor_co
       # which we do not want for this function.
       # Reference: https://hlplab.wordpress.com/2008/01/28/the-mysterious-l-q-and-c/
       df[[wday_col]] <- factor(lubridate::wday(df[[col]], label=TRUE), ordered=FALSE)
-      df[[day_col]] <- lubridate::day(df[[col]])
+      # lubridate::day returns integer.
+      # Convert integer to numeric. mmpf::marginalPrediction we use for partial dependence throws assertion error, if the data is integer and specified grid points are not integer.
+      df[[day_col]] <- as.numeric(lubridate::day(df[[col]]))
       df[[yday_col]] <- lubridate::yday(df[[col]])
       # turn it into unordered factor for the same reason as wday.
       df[[month_col]] <- factor(lubridate::month(df[[col]], label=TRUE), ordered=FALSE)
