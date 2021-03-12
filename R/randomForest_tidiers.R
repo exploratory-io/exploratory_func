@@ -2088,6 +2088,10 @@ sd_with_weight <- function(v, w) {
   sd(purrr::flatten_dbl(purrr::map2(v,w,function(x,y){rep(x,y)})))
 }
 
+# ... is for vectors of partial dependence.
+# For regression or binary classification it should be just one vector.
+# For multiclass classification, there should be one vector for each category.
+# The output is a single number of the FIRM value for the variable.
 calc_firm_from_pd <- function(..., weight, class) {
   vectors <- list(...)
   imps <- purrr::map(vectors, function(v) {
@@ -2100,7 +2104,7 @@ calc_firm_from_pd <- function(..., weight, class) {
     }
   })
   imps <- purrr::flatten_dbl(imps)
-  ret <- mean(imps, na.rm=TRUE)
+  ret <- mean(imps, na.rm=TRUE) # For multiclass classification, use the mean as the FIRM value.
   ret
 }
 
