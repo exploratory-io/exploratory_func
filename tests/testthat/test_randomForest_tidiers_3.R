@@ -29,6 +29,10 @@ test_that("calc_feature_imp(regression) evaluate training and test with FIRM imp
                                  importance_measure = "firm",
                                  test_split_type = "ordered", pd_with_bin_means = TRUE) # testing ordered split too.
 
+  # Check variable importance output.
+  ret <- model_df %>% tidy_rowwise(model, type="importance")
+  expect_equal(colnames(ret), c("variable", "importance"))
+
   ret <- flight %>% select(-`ARR DELAY`) %>% add_prediction(model_df=model_df)
   ret <- model_df %>% prediction(data="newdata", data_frame=flight)
   ret <- model_df %>% prediction(data="training_and_test")
@@ -107,6 +111,10 @@ test_that("calc_feature_imp(binary) evaluate training and test with FIRM importa
   # To test binary prediction, need to cast it into logical.
   model_df <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`)) %>%
                 calc_feature_imp(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0.3, pd_with_bin_means = TRUE, importance_measure = "firm")
+
+  # Check variable importance output.
+  ret <- model_df %>% tidy_rowwise(model, type="importance")
+  expect_equal(colnames(ret), c("variable", "importance"))
 
   ret <- flight %>% add_prediction(model_df=model_df)
   expect_equal(class(ret$predicted_label), "logical")
@@ -308,6 +316,10 @@ test_that("calc_feature_imp(multi) evaluate training and test with FIRM importan
   set.seed(1) # For stability of result.
   model_df <- flight %>%
                 calc_feature_imp(`ORI GIN`, `DIS TANCE`, `DEP TIME`, test_rate = 0.3, pd_with_bin_means = TRUE, importance_measure = "firm")
+
+  # Check variable importance output.
+  ret <- model_df %>% tidy_rowwise(model, type="importance")
+  expect_equal(colnames(ret), c("variable", "importance"))
 
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)

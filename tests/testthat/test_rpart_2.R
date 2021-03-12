@@ -132,6 +132,11 @@ test_that("exp_rpart evaluate training and test with FIRM importance - logical",
   # Training only case
   model_df <- flight %>% dplyr::mutate(is_delayed = as.logical(`is delayed`)) %>%
                 exp_rpart(is_delayed, `DIS TANCE`, `DEP TIME`, test_rate = 0)
+
+  # Check variable importance output.
+  ret <- model_df %>% tidy_rowwise(model, type="importance")
+  expect_equal(colnames(ret), c("variable", "importance"))
+
   ret <- model_df %>% prediction(data="training_and_test")
   train_ret <- ret %>% filter(is_test_data==FALSE)
   # expect_equal(nrow(train_ret), 4944) # Not very stable for some reason. Will revisit.
@@ -316,6 +321,10 @@ test_that("exp_rpart(binary) evaluate training and test with SMOTE", {
 test_that("exp_rpart(multi) evaluate training and test with FIRM importance", {
   model_df <- flight %>%
                 exp_rpart(`ORI GIN`, `DIS TANCE`, `DEP TIME`, test_rate = 0.3, importance_measure = "firm")
+
+  # Check variable importance output.
+  ret <- model_df %>% tidy_rowwise(model, type="importance")
+  expect_equal(colnames(ret), c("variable", "importance"))
 
   ret <- model_df %>% prediction(data="newdata", data_frame = flight)
   ret <-  model_df %>% rf_partial_dependence()

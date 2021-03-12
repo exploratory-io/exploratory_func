@@ -156,6 +156,10 @@ test_that("exp_xgboost evaluate training and test with FIRM importance - binary"
                             test_rate = 0.3, pd_with_bin_means = TRUE,
                             importance_measure = "firm")
 
+  # Check variable importance output.
+  ret <- model_df %>% tidy_rowwise(model, type="importance")
+  expect_equal(colnames(ret), c("variable", "importance"))
+
   ret1 <- data %>% select(-is_delayed) %>% add_prediction(model_df=model_df, binary_classification_threshold=0.5)
   expect_equal(class(ret1$predicted_label), "logical")
   ret2 <- data %>% select(-is_delayed) %>% add_prediction(model_df=model_df, binary_classification_threshold=0.01)
@@ -170,7 +174,6 @@ test_that("exp_xgboost evaluate training and test with FIRM importance - binary"
   #ret <- model_df %>% glance_rowwise(model)
   ret <- model_df %>% tidy_rowwise(model, type="conf_mat")
   ret <- model_df %>% tidy_rowwise(model, type="partial_dependence")
-  ret <- model_df %>% tidy_rowwise(model, type="importance")
 
   res_partial_dependence <- model_df %>% rf_partial_dependence()
   ret <- model_df %>% prediction(data="training_and_test")
@@ -393,6 +396,10 @@ test_that("exp_xgboost(multi) evaluate training and test with FIRM importance", 
   model_df <- flight %>%
                 exp_xgboost(`ORI GIN`, `DIS TANCE`, `DEP TIME`, test_rate = 0.3, pd_with_bin_means = TRUE,
                             importance_measure = "firm")
+
+  # Check variable importance output.
+  ret <- model_df %>% tidy_rowwise(model, type="importance")
+  expect_equal(colnames(ret), c("variable", "importance"))
 
   ret <- model_df %>% prediction(data="training_and_test")
   test_ret <- ret %>% filter(is_test_data==TRUE)

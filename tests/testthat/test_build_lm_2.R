@@ -91,6 +91,10 @@ test_that("build_lm.fast (logistic regression(logical)) evaluate training and te
   model_df <- flight %>% mutate(`is delayed`=as.logical(`is delayed`)) %>%
                 build_lm.fast(`is delayed`, `DIS TANCE`, `DEP TIME`, model_type = "glm", test_rate = 0.3, importance_measure="firm")
 
+  # Check variable importance output.
+  ret <- model_df %>% tidy_rowwise(model, type="importance")
+  expect_equal(colnames(ret), c("variable", "importance"))
+
   ret <- model_df %>% prediction_binary(data="training_and_test", threshold = 0.5, pretty.name=TRUE)
   ret <- model_df %>% prediction_binary(data="training_and_test", threshold = 0.5)
   test_ret <- ret %>% filter(is_test_data==TRUE)
