@@ -93,7 +93,7 @@ test_that("build_lm.fast (logistic regression(logical)) evaluate training and te
 
   # Check variable importance output.
   ret <- model_df %>% tidy_rowwise(model, type="importance")
-  expect_equal(colnames(ret), c("variable", "importance"))
+  expect_equal(colnames(ret), c("variable", "importance", "p.value"))
 
   ret <- model_df %>% prediction_binary(data="training_and_test", threshold = 0.5, pretty.name=TRUE)
   ret <- model_df %>% prediction_binary(data="training_and_test", threshold = 0.5)
