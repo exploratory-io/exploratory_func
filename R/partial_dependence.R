@@ -44,6 +44,64 @@ calc_partial_binning_data <- function(df, target_col, var_cols) {
   ret
 }
 
+# Standard deviation with weight by how many rows have the same value.
+# Using it to calculate FIRM while the PDP data has only single row even when multiple quantile-based grid points have a same value.
+sd_with_weight <- function(v, w) {
+  sd(purrr::flatten_dbl(purrr::map2(v,w,function(x,y){rep(x,y)})))
+}
+
+# ... is for vectors of partial dependence.
+# For regression or binary classification it should be just one vector.
+# For multiclass classification, there should be one vector for each category.
+# The output is a single number of the FIRM value for the variable.
+calc_firm_from_pd <- function(..., weight, class) {
+  vectors <- list(...)
+  imps <- purrr::map(vectors, function(v) {
+    # Get FIRM value based on whether the variable is categorical or not.
+    if (class[[1]] == "numeric") {
+      sd_with_weight(v, weight)
+    }
+    else {
+      (max(v, na.rm=TRUE) - min(v, na.rm=TRUE))/4
+    }
+  })
+  imps <- purrr::flatten_dbl(imps)
+  ret <- mean(imps, na.rm=TRUE) # For multiclass classification, use the mean as the FIRM value.
+  ret
+}
+
+# Caluculate FIRM variable importance.
+# References:
+#   https://arxiv.org/abs/1805.04755
+#   https://arxiv.org/abs/1904.03959
+importance_firm <- function(pdp_data, target, vars) {
+  points <- attr(pdp_data, "points")
+  # Replace the grid values with the type of the column, e.g. "numeric", or "character".
+  names(vars) <- NULL # Clean names, since it messes up following mutate step.
+  imp_df <- pdp_data %>% dplyr::mutate(across(!!vars, ~ifelse(is.na(.x), NA_character_, class(.x))))
+  # Make it in long format, where variable names are in one "variable" column.
+  imp_df <- imp_df %>% tidyr::pivot_longer(cols = !!vars, names_to="variable", values_to="class", values_drop_na=TRUE)
+  # Add weight column to the data, so that it can be used to calculate FIRM with sd_with_weight.
+  imp_df <- imp_df %>% dplyr::nest_by(variable) %>%
+    dplyr::mutate(points = list(as.numeric(table(points[[variable]])))) %>%
+    ungroup() %>%
+    dplyr::mutate(data = purrr::map2(data, points, function(x,y) {
+      if (x$class[[1]]=="numeric") { # If numeric, remove 0 percentile and 100 percentile to avoid affected by outliers.
+        y[[1]] <- y[[1]] - 1
+        y[[length(y)]] <- y[[length(y)]] - 1
+        x %>% mutate(weight = y)
+      }
+      else { # For categorical, weight does not matter. Besides, adding y as weight throws error when there is unused factor level.
+        x
+      }
+    })) %>%
+    tidyr::unnest(data)
+  imp_df <- imp_df %>% dplyr::group_by(variable) %>%
+    dplyr::summarise(importance = calc_firm_from_pd(!!!rlang::syms(target), weight=weight, class=class))
+  imp_df <- imp_df %>% dplyr::select(variable, importance) %>% dplyr::arrange(-importance)
+  imp_df
+}
+
 # Shrinks partial dependence data keeping only the specified important variables.
 shrink_partial_dependence_data <- function(pd, imp_vars) {
   selected <- pd[setdiff(colnames(pd), setdiff(attr(pd ,"vars"), imp_vars))] # Keep only columns for important variables.
