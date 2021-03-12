@@ -828,6 +828,8 @@ calc_permutation_importance_xgboost_multiclass <- function(fit, target, vars, da
 }
 
 
+# TODO: Make this function model-agnostic and consolidate. There are similar code for lm/glm, ranger, rpart, and xgboost.
+# Builds partial dependence data.
 partial_dependence.xgboost <- function(fit, vars = colnames(data),
   n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)),
   classification = FALSE, interaction = FALSE, uniform = TRUE, data, ...) {
@@ -843,12 +845,24 @@ partial_dependence.xgboost <- function(fit, vars = colnames(data),
     }
   }
 
+  # Generate grid points based on quantile, so that FIRM calculated based on it would make good sense even when there are some outliers.
+  points <- list()
+  for (cname in vars) {
+    if (is.numeric(data[[cname]])) {
+      coldata <- data[[cname]]
+      points[[cname]] <- quantile(coldata, probs=0:25/25)
+    }
+    else {
+      points[[cname]] <- unique(data[[cname]])
+    }
+  }
+
   args = list(
     "data" = data,
     "vars" = vars,
     "n" = n,
     "model" = fit,
-    "uniform" = uniform,
+    "points" = points,
     "predict.fun" = predict.fun,
     ...
   )
@@ -874,9 +888,9 @@ partial_dependence.xgboost <- function(fit, vars = colnames(data),
 
   attr(pd, "class") = c("pd", "data.frame")
   attr(pd, "interaction") = interaction == TRUE
-  #attr(pd, "target") = if (fit$treetype != "Classification") target else levels(fit$predictions)
-  attr(pd, "target") = if (!classification) target else levels(fit$predictions)
+  attr(pd, "target") = if (!classification) target else levels(fit$y_levels)
   attr(pd, "vars") = vars
+  attr(pd, "points") = points
   pd
 }
 
@@ -1023,7 +1037,7 @@ exp_xgboost <- function(df,
                         smote_target_minority_perc = 40,
                         smote_max_synth_perc = 200,
                         smote_k = 5,
-                        importance_measure = "permutation", # "permutation" or "impurity".
+                        importance_measure = "permutation", # "permutation", "impurity", or "firm".
                         max_pd_vars = NULL,
                         # Number of most important variables to calculate partial dependences on. 
                         # By default, when Boruta is on, all Confirmed/Tentative variables.
@@ -1210,6 +1224,10 @@ exp_xgboost <- function(df,
         model$df_test <- df_test_clean
       }
 
+      if (is.null(max_pd_vars)) {
+        max_pd_vars <- 20 # Number of most important variables to calculate partial dependences on. This used to be 12 but we decided it was a little too small.
+      }
+
       # return partial dependence
       if (length(c_cols) > 1) { # Calculate importance only when there are multiple variables.
         if (importance_measure == "permutation") {
@@ -1222,25 +1240,30 @@ exp_xgboost <- function(df,
           else {
             imp_df <- calc_permutation_importance_xgboost_multiclass(model, clean_target_col, c_cols, df)
           }
+          model$imp_df <- imp_df
         }
-        else { # "impurity". Use the importance from the xgboost package.
+        else if (importance_measure == "impurity" || # "impurity". Use the importance from the xgboost package.
+                 importance_measure == "xgboost") { # Because of an old bug in UI definition, it was specified as "xgboost" in pre-6.5 Desktop. Covering backward compatibility here. Remove it at appropriate timing.
           imp_df <- importance_xgboost(model)
+          model$imp_df <- imp_df
         }
-        model$imp_df <- imp_df
-        if ("error" %in% class(imp_df)) {
+
+        if (importance_measure == "firm") {
+          imp_vars <- c_cols # Just use c_cols as is for imp_vars to calculate partial dependence first before calculating FIRM.
+        }
+        else if ("error" %in% class(imp_df)) {
           imp_vars <- c_cols # Just use c_cols as is for imp_vars to calculate partial dependence anyway.
+          imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # just take max_pd_vars first variables
         }
         else {
           imp_vars <- imp_df$variable
+          imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
         }
       }
       else {
         error <- simpleError("Variable importance requires two or more variables.")
         model$imp_df <- error
         imp_vars <- c_cols # Just use c_cols as is for imp_vars to calculate partial dependence anyway.
-      }
-      if (is.null(max_pd_vars)) {
-        max_pd_vars <- 20 # Number of most important variables to calculate partial dependences on. This used to be 12 but we decided it was a little too small.
       }
 
       imp_vars <- as.character(imp_vars) # for some reason imp_vars is converted to factor at this point. turn it back to character.
@@ -1250,13 +1273,35 @@ exp_xgboost <- function(df,
         model$partial_dependence <- partial_dependence.xgboost(model, vars=imp_vars, data=df,
                                                                n=c(pd_grid_resolution, min(nrow(df), pd_sample_size)),
                                                                classification=!(is_target_numeric||is_target_logical)) # We treat binary classification as a regression to predict probability here.
+      }
+      else {
+        model$partial_dependence <- NULL
+      }
+
+      if (importance_measure == "firm") { # If importance measure is FIRM, we calculate them now, after PDP is calculated.
+        if (length(c_cols) > 1) { # Calculate importance only when there are multiple variables.
+          pdp_target_col <- attr(model$partial_dependence, "target")
+          imp_df <- importance_firm(model$partial_dependence, pdp_target_col, imp_vars)
+          model$imp_df <- imp_df
+          imp_vars <- imp_df$variable
+        }
+        else {
+          error <- simpleError("Variable importance requires two or more variables.")
+          model$imp_df <- error
+          imp_vars <- c_cols # Just use c_cols as is for imp_vars to calculate partial dependence anyway.
+        }
+
+        imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
+        model$imp_vars <- imp_vars
+        # Shrink the partial dependence data keeping only the important variables.
+        model$partial_dependence <- shrink_partial_dependence_data(model$partial_dependence, imp_vars)
+      }
+
+      if (length(imp_vars) > 0) {
         if (pd_with_bin_means && (is_target_logical || is_target_numeric)) {
           # We calculate means of bins only for logical or numeric target to keep the visualization simple.
           model$partial_binning <- calc_partial_binning_data(df, clean_target_col, imp_vars)
         }
-      }
-      else {
-        model$partial_dependence <- NULL
       }
 
       # these attributes are used in tidy of randomForest

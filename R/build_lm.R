@@ -8,7 +8,7 @@ calc_permutation_importance_binomial <- function(fit, target, vars, data) {
                                 loss.fun = function(x,y){-sum(log(1- abs(x - y)),na.rm = TRUE)})
   })
   importances <- purrr::flatten_dbl(importances)
-  importances_df <- tibble::tibble(term=vars, importance=pmax(importances, 0))
+  importances_df <- tibble::tibble(variable=vars, importance=pmax(importances, 0))
   importances_df
 }
 
@@ -22,7 +22,7 @@ calc_permutation_importance_linear <- function(fit, target, vars, data) {
                                 loss.fun = function(x,y){sum((x - y)^2, na.rm = TRUE)/length(x)})
   })
   importances <- purrr::flatten_dbl(importances)
-  importances_df <- tibble::tibble(term=vars, importance=pmax(importances, 0))
+  importances_df <- tibble::tibble(variable=vars, importance=pmax(importances, 0))
   importances_df
 }
 
@@ -37,7 +37,7 @@ calc_permutation_importance_gaussian <- function(fit, target, vars, data) {
                                 loss.fun = function(x,y){sum((x - y)^2, na.rm = TRUE)/length(x)})
   })
   importances <- purrr::flatten_dbl(importances)
-  importances_df <- tibble::tibble(term=vars, importance=pmax(importances, 0))
+  importances_df <- tibble::tibble(variable=vars, importance=pmax(importances, 0))
   importances_df
 }
 
@@ -54,11 +54,11 @@ calc_permutation_importance_poisson <- function(fit, target, vars, data) {
                                 loss.fun = function(x,y){-sum(y*x-exp(x), na.rm = TRUE)})
   })
   importances <- purrr::flatten_dbl(importances)
-  importances_df <- tibble::tibble(term=vars, importance=pmax(importances, 0))
+  importances_df <- tibble::tibble(variable=vars, importance=pmax(importances, 0))
   importances_df
 }
 
-
+# TODO: Make this function model-agnostic and consolidate. There are similar code for lm/glm, ranger, rpart, and xgboost.
 # Builds partial_dependency object for lm/glm with same structure (a data.frame with attributes.) as edarf::partial_dependence.
 partial_dependence.lm_exploratory <- function(fit, target, vars = colnames(data),
   n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)), # Keeping same default of 25 as edarf::partial_dependence, although we usually overwrite from callers.
@@ -72,17 +72,29 @@ partial_dependence.lm_exploratory <- function(fit, target, vars = colnames(data)
     c("preds" = mean(x))
   }
 
+  # Generate grid points based on quantile, so that FIRM calculated based on it would make good sense even when there are some outliers.
+  points <- list()
+  for (cname in vars) {
+    if (is.numeric(data[[cname]])) {
+      coldata <- data[[cname]]
+      points[[cname]] <- quantile(coldata, probs=0:25/25)
+    }
+    else {
+      points[[cname]] <- unique(data[[cname]])
+    }
+  }
+
   args = list(
     "data" = data,
     "vars" = vars,
     "n" = n,
     "model" = fit,
-    "uniform" = uniform,
+    "points" = points,
     "predict.fun" = predict.fun,
     "aggregate.fun" = aggregate.fun,
     ...
   )
-  
+
   if (length(vars) > 1L & !interaction) { # More than one variables are there. Iterate calling mmpf::marginalPrediction.
     pd = rbindlist(sapply(vars, function(x) {
       args$vars = x
@@ -102,6 +114,7 @@ partial_dependence.lm_exploratory <- function(fit, target, vars = colnames(data)
   attr(pd, "interaction") = interaction == TRUE
   attr(pd, "target") = target
   attr(pd, "vars") = vars
+  attr(pd, "points") = points
   pd
 }
 
@@ -484,7 +497,9 @@ preprocess_regression_data_after_sample <- function(df, target_col, predictor_co
       # which we do not want for this function.
       # Reference: https://hlplab.wordpress.com/2008/01/28/the-mysterious-l-q-and-c/
       df[[wday_col]] <- factor(lubridate::wday(df[[col]], label=TRUE), ordered=FALSE)
-      df[[day_col]] <- lubridate::day(df[[col]])
+      # lubridate::day returns integer.
+      # Convert integer to numeric. mmpf::marginalPrediction we use for partial dependence throws assertion error, if the data is integer and specified grid points are not integer.
+      df[[day_col]] <- as.numeric(lubridate::day(df[[col]]))
       df[[yday_col]] <- lubridate::yday(df[[col]])
       # turn it into unordered factor for the same reason as wday.
       df[[month_col]] <- factor(lubridate::month(df[[col]], label=TRUE), ordered=FALSE)
@@ -529,6 +544,10 @@ preprocess_regression_data_after_sample <- function(df, target_col, predictor_co
       #    TODO: see if ties.method would make sense for calc_feature_imp.
       # 2. turn NA into (Missing) factor level so that lm will not drop all the rows.
       df[[col]] <- forcats::fct_explicit_na(forcats::fct_lump(forcats::fct_infreq(as.factor(df[[col]])), n=predictor_n, ties.method="first", other_level=other_level))
+    } else if(is.integer(df[[col]])) {
+      # Convert integer to numeric. mmpf::marginalPrediction we use for partial dependence throws assertion error, if the data is integer and specified grid points are not integer.
+      # To avoid something like that, we just convert integer to numeric before building predictive models.
+      df[[col]] <- as.numeric(df[[col]])
     }
   }
 
@@ -615,6 +634,7 @@ build_lm.fast <- function(df,
                     smote_target_minority_perc = 40,
                     smote_max_synth_perc = 200,
                     smote_k = 5,
+                    importance_measure = "permutation", # "firm", or "permutation" if available. Defaulting to permutation for backward compatibility for pre-6.5.
                     relimp = FALSE,
                     relimp_type = "first",
                     relimp_bootstrap_runs = 20,
@@ -660,6 +680,14 @@ build_lm.fast <- function(df,
     family <- "binomial" # default for glm is logistic regression.
     link <- "logit"
   }
+
+  # For backward compatibility, importance_measure defaults to "permutation",
+  # but these GLMs do not have permutation importance support. Fall back to FIRM.
+  if (importance_measure == "permutation" &&
+      model_type == "glm" && family %in% c("Gamma", "negativebinomial", "inverse.gaussian")) {
+    importance_measure <- "firm"
+  }
+
 
   if (model_type == "glm" && family == "binomial" && (is.null(link) || link == "logit")) {
     if (!is.logical(df[[target_col]]) && !is.numeric(df[[target_col]])) {
@@ -914,19 +942,21 @@ build_lm.fast <- function(df,
           }
         }
         if (length(c_cols) > 1) { # Skip importance calculation if there is only one variable.
-          if (family == "binomial") {
-            model$permutation_importance <- calc_permutation_importance_binomial(model, clean_target_col, c_cols, df)
-          }
-          else if (family == "poisson" && (is.null(link) || link == "log")) {
-            model$permutation_importance <- calc_permutation_importance_poisson(model, clean_target_col, c_cols, df)
-          }
-          else if (family == "gaussian") {
-            model$permutation_importance <- calc_permutation_importance_gaussian(model, clean_target_col, c_cols, df)
+          if (importance_measure == "permutation") { # For firm case, we need to first calculate partial dependence.
+            if (family == "binomial") {
+              model$imp_df <- calc_permutation_importance_binomial(model, clean_target_col, c_cols, df)
+            }
+            else if (family == "poisson" && (is.null(link) || link == "log")) {
+              model$imp_df <- calc_permutation_importance_poisson(model, clean_target_col, c_cols, df)
+            }
+            else if (family == "gaussian") {
+              model$imp_df <- calc_permutation_importance_gaussian(model, clean_target_col, c_cols, df)
+            }
           }
         }
         else {
           error <- simpleError("Variable importance requires two or more variables.")
-          model$permutation_importance <- error
+          model$imp_df <- error
         }
       }
       else { # model_type == "lm"
@@ -972,11 +1002,13 @@ build_lm.fast <- function(df,
           })
         }
         if (length(c_cols) > 1) { # Skip importance calculation if there is only one variable.
-          model$permutation_importance <- calc_permutation_importance_linear(model, clean_target_col, c_cols, df)
+          if (importance_measure == "permutation") { # For firm case, we need to first calculate partial dependence.
+            model$imp_df <- calc_permutation_importance_linear(model, clean_target_col, c_cols, df)
+          }
         }
         else {
           error <- simpleError("Variable importance requires two or more variables.")
-          model$permutation_importance <- error
+          model$imp_df <- error
         }
       }
 
@@ -1033,15 +1065,18 @@ build_lm.fast <- function(df,
       # Calculate partial dependencies.
       if (!is.null(model$relative_importance) && "error" %nin% class(model$relative_importance)) { # if importance is available, show only max_pd_vars most important vars.
         importance <- attr(model$relative_importance, model$relative_importance$type)
-        term <- model$relative_importance$namen[2:length(model$relative_importance$namen)]
-        imp_df <- data.frame(term = term, importance = importance)
-        imp_vars <- as.character((imp_df %>% arrange(-importance))$term)
+        variable <- model$relative_importance$namen[2:length(model$relative_importance$namen)]
+        imp_df <- data.frame(variable = variable, importance = importance)
+        imp_vars <- as.character((imp_df %>% arrange(-importance))$variable)
         imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # Keep only max_pd_vars most important variables
       }
-      else if (!is.null(model$permutation_importance) && "error" %nin% class(model$permutation_importance)) { # if importance is available, show only max_pd_vars most important vars.
-        imp_df <- model$permutation_importance
-        imp_vars <- as.character((imp_df %>% arrange(-importance))$term)
+      else if (!is.null(model$imp_df) && "error" %nin% class(model$imp_df)) { # if importance is available, show only max_pd_vars most important vars.
+        imp_df <- model$imp_df
+        imp_vars <- as.character((imp_df %>% arrange(-importance))$variable)
         imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # Keep only max_pd_vars most important variables
+      }
+      else if (importance_measure == "firm") {
+        imp_vars <- c_cols # For FIRM, we need to calculate partial dependence for all predictors first.
       }
       else  {
         # Show only max_pd_vars most significant (ones with the smallest P values) vars.
@@ -1074,6 +1109,25 @@ build_lm.fast <- function(df,
       }
       else {
         model$partial_dependence <- NULL
+      }
+
+      if (importance_measure == "firm") {
+        if (length(c_cols) > 1) { # Skip importance calculation if there is only one variable.
+          pdp_target_col <- attr(model$partial_dependence, "target")
+          imp_df <- importance_firm(model$partial_dependence, pdp_target_col, imp_vars)
+          model$imp_df <- imp_df
+          imp_vars <- imp_df$variable
+          model$imp_vars <- imp_vars
+        }
+        else {
+          error <- simpleError("Variable importance requires two or more variables.")
+          model$imp_df <- error
+        }
+
+        imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
+        model$imp_vars <- imp_vars
+        # Shrink the partial dependence data keeping only the important variables.
+        model$partial_dependence <- shrink_partial_dependence_data(model$partial_dependence, imp_vars)
       }
 
       if (!is.null(target_funs)) {
@@ -1460,25 +1514,49 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
     partial_dependence = {
       handle_partial_dependence(x)
     },
-    permutation_importance = {
-      if (is.null(x$permutation_importance) || "error" %in% class(x$permutation_importance)) {
+    importance = {
+      if (is.null(x$imp_df) || "error" %in% class(x$imp_df)) {
         # Permutation importance is not supported for the family and link function, or skipped because there is only one variable.
         # Return empty data.frame to avoid error.
         ret <- data.frame()
         return(ret)
       }
-      ret <- x$permutation_importance
+      ret <- x$imp_df
       # Add p.value column.
       # Since broom:::tidy.lm raises :Error: No tidy method for objects of class lm_exploratory",
       # always use broom:::tidy.glm which does not have this problem, and seems to return the same result,
       # even for lm.
       coef_df <- broom:::tidy.glm(x)
-      ret <- ret %>% dplyr::mutate(p.value=purrr::map(term, function(var) {
+      ret <- ret %>% dplyr::mutate(p.value=purrr::map(variable, function(var) {
         get_var_min_pvalue(var, coef_df, x)
       })) %>% dplyr::mutate(p.value=as.numeric(p.value)) # Make list into numeric vector.
       # Map variable names back to the original.
       # as.character is to be safe by converting from factor. With factor, reverse mapping result will be messed up.
-      ret$term <- x$terms_mapping[as.character(ret$term)]
+      ret$variable <- x$terms_mapping[as.character(ret$variable)]
+      ret
+    },
+    # This is copy of the code for "importance" with adjustment for output column name just for backward compatibility for pre-6.5.
+    # Remove at appropriate timing.
+    permutation_importance = {
+      if (is.null(x$imp_df) || "error" %in% class(x$imp_df)) {
+        # Permutation importance is not supported for the family and link function, or skipped because there is only one variable.
+        # Return empty data.frame to avoid error.
+        ret <- data.frame()
+        return(ret)
+      }
+      ret <- x$imp_df
+      # Add p.value column.
+      # Since broom:::tidy.lm raises :Error: No tidy method for objects of class lm_exploratory",
+      # always use broom:::tidy.glm which does not have this problem, and seems to return the same result,
+      # even for lm.
+      coef_df <- broom:::tidy.glm(x)
+      ret <- ret %>% dplyr::mutate(p.value=purrr::map(variable, function(var) {
+        get_var_min_pvalue(var, coef_df, x)
+      })) %>% dplyr::mutate(p.value=as.numeric(p.value)) # Make list into numeric vector.
+      # Map variable names back to the original.
+      # as.character is to be safe by converting from factor. With factor, reverse mapping result will be messed up.
+      ret$variable <- x$terms_mapping[as.character(ret$variable)]
+      ret <- ret %>% dplyr::rename(term=variable)
       ret
     }
   )
@@ -1596,22 +1674,43 @@ tidy.glm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, 
     partial_dependence = {
       handle_partial_dependence(x)
     },
-    permutation_importance = {
-      if (is.null(x$permutation_importance) || "error" %in% class(x$permutation_importance)) {
+    importance = {
+      if (is.null(x$imp_df) || "error" %in% class(x$imp_df)) {
         # Permutation importance is not supported for the family and link function, or skipped because there is only one variable.
         # Return empty data.frame to avoid error.
         ret <- data.frame()
         return(ret)
       }
-      ret <- x$permutation_importance
+      ret <- x$imp_df
       # Add p.value column.
       coef_df <- broom:::tidy.glm(x)
-      ret <- ret %>% dplyr::mutate(p.value=purrr::map(term, function(var) {
+      ret <- ret %>% dplyr::mutate(p.value=purrr::map(variable, function(var) {
         get_var_min_pvalue(var, coef_df, x)
       })) %>% dplyr::mutate(p.value=as.numeric(p.value)) # Make list into numeric vector.
       # Map variable names back to the original.
       # as.character is to be safe by converting from factor. With factor, reverse mapping result will be messed up.
-      ret$term <- x$terms_mapping[as.character(ret$term)]
+      ret$variable <- x$terms_mapping[as.character(ret$variable)]
+      ret
+    },
+    # This is copy of the code for "importance" with adjustment for output column name just for backward compatibility for pre-6.5.
+    # Remove at appropriate timing.
+    permutation_importance = {
+      if (is.null(x$imp_df) || "error" %in% class(x$imp_df)) {
+        # Permutation importance is not supported for the family and link function, or skipped because there is only one variable.
+        # Return empty data.frame to avoid error.
+        ret <- data.frame()
+        return(ret)
+      }
+      ret <- x$imp_df
+      # Add p.value column.
+      coef_df <- broom:::tidy.glm(x)
+      ret <- ret %>% dplyr::mutate(p.value=purrr::map(variable, function(var) {
+        get_var_min_pvalue(var, coef_df, x)
+      })) %>% dplyr::mutate(p.value=as.numeric(p.value)) # Make list into numeric vector.
+      # Map variable names back to the original.
+      # as.character is to be safe by converting from factor. With factor, reverse mapping result will be messed up.
+      ret$variable <- x$terms_mapping[as.character(ret$variable)]
+      ret <- ret %>% dplyr::rename(term=variable)
       ret
     }
   )

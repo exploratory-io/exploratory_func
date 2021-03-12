@@ -484,7 +484,8 @@ test_that("add_prediction with poisson regression", {
                                      `Carrier Name`,
                                      predictor_funs=list(ARR_TIME="log", DELAY_TIME="none", "Carrier Name"="none"),
                                      model_type = "glm",
-                                     family = "poisson")
+                                     family = "poisson",
+                                     importance_measure="firm")
   ret <- test_data %>% select(-DISTANCE) %>% add_prediction(model_df=model_df)
 })
 
@@ -495,7 +496,8 @@ test_that("GLM - poisson Destribution with test_rate", {
                                      `Carrier Name`,
                                      model_type = "glm",
                                      family = "poisson",
-                                     test_rate = 0.1)
+                                     test_rate = 0.1,
+                                     importance_measure="firm")
   expect_equal(colnames(ret), c("model", ".test_index", "source.data"))
   test_rownum <- length(ret$.test_index[[1]])
   training_rownum <- nrow(test_data) - test_rownum
