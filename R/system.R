@@ -2356,7 +2356,7 @@ read_excel_files <- function(files, sheet = 1, col_names = TRUE, col_types = NUL
     # copy internal exp.file.id to the id column.
     df[[id_col]] <- df[["exp.file.id"]]
     # drop internal column and move the id column to the very beginning.
-    df %>% dplyr::select(!!!rlang::syms(id_col), dplyr::everything(), -exp.file.id)
+    df %>% dplyr::select(!!rlang::sym(id_col), dplyr::everything(), -exp.file.id)
 }
 
 #'Wrapper for openxlsx::read.xlsx (in case of .xlsx file) and readxl::read_excel (in case of old .xls file)
@@ -2482,7 +2482,7 @@ read_delim_files <- function(files, delim, quote = '"',
                               progress = interactive(), with_api_key = FALSE) {
     # set name to the files so that it can be used for the "id" column created by purrr:map_dfr.
     files <- setNames(as.list(files), files)
-    df <- purrr::map_dfr(files, exploratory::read_delim_file,delim = delim, quote = quote,
+    df <- purrr::map_dfr(files, exploratory::read_delim_file, delim = delim, quote = quote,
                    escape_backslash = escape_backslash, escape_double = escape_double,
                    col_names = col_names, col_types = col_types,
                    locale = locale,
@@ -2494,7 +2494,7 @@ read_delim_files <- function(files, delim, quote = '"',
     # copy internal exp.file.id to the id column.
     df[[id_col]] <- df[["exp.file.id"]]
     # drop internal column and move the id column to the very beginning.
-    df %>% dplyr::select(!!!rlang::syms(id_col), dplyr::everything(), -exp.file.id)
+    df %>% dplyr::select(!!rlang::sym(id_col), dplyr::everything(), -exp.file.id)
 
 }
 
