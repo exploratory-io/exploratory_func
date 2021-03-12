@@ -2570,7 +2570,7 @@ read_delim_file <- function(file, delim, quote = '"',
           stop(stringr::str_c("The encoding of the file may not be ", locale$encoding, ". Select other encoding and try again."));
         }
       } else if (stringr::str_detect(stringr::str_to_lower(e$message), "cannot open the connection")) {
-        stop(paste0("EXP-IMPORT-1 :: ", jsonlite::toJSON(file), " ::  Failed to read file."))
+        stop(paste0("EXP-DATASRC-1 :: ", jsonlite::toJSON(file), " ::  Failed to read file."))
       } else {
         stop(e);
       }
