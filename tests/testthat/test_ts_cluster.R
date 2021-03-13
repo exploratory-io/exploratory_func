@@ -21,6 +21,15 @@ if (!testdata_filename %in% list.files(testdata_dir)) {
   write.csv(flight, testdata_file_path) # save sampled-down data for performance.
 }
 
+test_that("exp_ts_cluster model output", {
+  model_df <- flight %>% exp_ts_cluster(`FL DATE`, `ARR DELAY`, `CAR RIER`, output="model")
+  ret <- model_df %>% tidy_rowwise(model)
+  expect_equal(colnames(ret), c("FL DATE","CAR RIER","ARR DELAY","Cluster"))
+  expect_equal(sort(unique(ret$Cluster)), c(1,2,3))
+
+  ret <- model_df %>% tidy_rowwise(model, type="aggregated")
+  expect_equal(colnames(ret), c("category","time","value"))
+})
 
 test_that("exp_ts_cluster basic", {
   ret <- flight %>% exp_ts_cluster(`FL DATE`, `ARR DELAY`, `CAR RIER`)

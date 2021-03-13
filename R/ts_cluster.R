@@ -216,6 +216,9 @@ tidy.PartitionalTSClusters <- function(x, with_centroids = TRUE, type = "result"
           res <- res %>% dplyr::rename(!!rlang::sym(paste0(value_col,"_normalized")):=value_normalized)
         }
       }
+    },
+    aggregated = { # Return raw aggretated time series data before filling NAs and feeding to the clustering algorithm.
+      res <- attr(x, "aggregated_data")
     }
   )
   res
