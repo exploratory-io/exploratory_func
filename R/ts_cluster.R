@@ -157,59 +157,63 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
 #' Extracts results from the model as a data frame.
 #' The output is original long-format set of time series with Cluster column.
 #' @export
-tidy.PartitionalTSClusters <- function(x, with_centroids = TRUE) {
-  # Create map of time series names to clustering results
-  cluster_map <- x@cluster
-  cluster_map_names <- names(x@datalist)
-  if (with_centroids) {
-    for (i in 1:(x@k)) {
-      cluster_map <- c(cluster_map, i)
-      cluster_map_names <- c(cluster_map_names, paste0("Centroid ",i))
-    }
-  }
-  names(cluster_map) <- cluster_map_names
+tidy.PartitionalTSClusters <- function(x, with_centroids = TRUE, type = "result") {
+  switch(type,
+    result = {
+      # Create map of time series names to clustering results
+      cluster_map <- x@cluster
+      cluster_map_names <- names(x@datalist)
+      if (with_centroids) {
+        for (i in 1:(x@k)) {
+          cluster_map <- c(cluster_map, i)
+          cluster_map_names <- c(cluster_map_names, paste0("Centroid ",i))
+        }
+      }
+      names(cluster_map) <- cluster_map_names
 
-  res <- tibble::as_tibble(x@datalist)
-  res <- res %>% dplyr::mutate(time=!!attr(x,"time_values"))
-  # Add centroids data
-  if (with_centroids) {
-    for (i in 1:(x@k)) {
-      res <- res %>% dplyr::mutate(!!rlang::sym(paste0("Centroid ",i)):=x@centroids[[i]])
-    }
-  }
-  res <- res %>% tidyr::pivot_longer(cols = -time)
+      res <- tibble::as_tibble(x@datalist)
+      res <- res %>% dplyr::mutate(time=!!attr(x,"time_values"))
+      # Add centroids data
+      if (with_centroids) {
+        for (i in 1:(x@k)) {
+          res <- res %>% dplyr::mutate(!!rlang::sym(paste0("Centroid ",i)):=x@centroids[[i]])
+        }
+      }
+      res <- res %>% tidyr::pivot_longer(cols = -time)
 
-  orig_df <- attr(x, "before_normalize_data")
-  if (!is.null(orig_df)) {
-    orig_df <- orig_df %>% dplyr::mutate(time=!!attr(x,"time_values"))
-    orig_df <- orig_df %>% tidyr::pivot_longer(cols = -time)
-    res <- res %>% dplyr::rename(value_normalized=value)
-    res <- res %>% dplyr::left_join(orig_df, by=c("time"="time", "name"="name"))
-    res <- res %>% dplyr::relocate(value, .before=value_normalized) # Adjust column order.
-  }
+      orig_df <- attr(x, "before_normalize_data")
+      if (!is.null(orig_df)) {
+        orig_df <- orig_df %>% dplyr::mutate(time=!!attr(x,"time_values"))
+        orig_df <- orig_df %>% tidyr::pivot_longer(cols = -time)
+        res <- res %>% dplyr::rename(value_normalized=value)
+        res <- res %>% dplyr::left_join(orig_df, by=c("time"="time", "name"="name"))
+        res <- res %>% dplyr::relocate(value, .before=value_normalized) # Adjust column order.
+      }
 
-  if (!is.null(attr(x, "aggregated_data"))) {
-    aggregated_data <- attr(x, "aggregated_data")
-    aggregated_data <- aggregated_data %>% dplyr::select(-value) # Drop value column from aggregated_data since res already has it.
-    res <- res %>% dplyr::left_join(aggregated_data, by=c("time"="time", "name"="category"))
-  }
-  res <- res %>% dplyr::mutate(Cluster = cluster_map[name])
-  value_col <- attr(x, "value_col")
-  if (value_col == "") {
-    res <- res %>% dplyr::rename(!!rlang::sym(attr(x,"time_col")):=time,
-                                 Number_of_Rows=value,
-                                 !!rlang::sym(attr(x,"category_col")):=name)
-    if (!is.null(orig_df)) {
-      res <- res %>% dplyr::rename(Number_of_Rows_normalized=value_normalized)
+      if (!is.null(attr(x, "aggregated_data"))) {
+        aggregated_data <- attr(x, "aggregated_data")
+        aggregated_data <- aggregated_data %>% dplyr::select(-value) # Drop value column from aggregated_data since res already has it.
+        res <- res %>% dplyr::left_join(aggregated_data, by=c("time"="time", "name"="category"))
+      }
+      res <- res %>% dplyr::mutate(Cluster = cluster_map[name])
+      value_col <- attr(x, "value_col")
+      if (value_col == "") {
+        res <- res %>% dplyr::rename(!!rlang::sym(attr(x,"time_col")):=time,
+                                     Number_of_Rows=value,
+                                     !!rlang::sym(attr(x,"category_col")):=name)
+        if (!is.null(orig_df)) {
+          res <- res %>% dplyr::rename(Number_of_Rows_normalized=value_normalized)
+        }
+      }
+      else {
+        res <- res %>% dplyr::rename(!!rlang::sym(attr(x,"time_col")):=time,
+                                     !!rlang::sym(value_col):=value,
+                                     !!rlang::sym(attr(x,"category_col")):=name)
+        if (!is.null(orig_df)) {
+          res <- res %>% dplyr::rename(!!rlang::sym(paste0(value_col,"_normalized")):=value_normalized)
+        }
+      }
     }
-  }
-  else {
-    res <- res %>% dplyr::rename(!!rlang::sym(attr(x,"time_col")):=time,
-                                 !!rlang::sym(value_col):=value,
-                                 !!rlang::sym(attr(x,"category_col")):=name)
-    if (!is.null(orig_df)) {
-      res <- res %>% dplyr::rename(!!rlang::sym(paste0(value_col,"_normalized")):=value_normalized)
-    }
-  }
+  )
   res
 }
