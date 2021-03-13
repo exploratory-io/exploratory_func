@@ -136,10 +136,13 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
       attr(model, "value_col") <- value_col
       attr(model, "category_col") <- category_col
       attr(model, "time_values") <- time_values
-      # Pass original data, so that the output has other variables too.
-      if (!is.null(variables) && !is.null(funs.aggregate.variables)) {
-        attr(model, "aggregated_data") <- df_summarised
+      if (!is.null(variables)) {
+        attr(model, "variable_cols") <- variables 
       }
+      # Pass original data.
+      # - So that the output has other variables too.
+      # - So that we can generate diagnostic chart about where NAs are.
+      attr(model, "aggregated_data") <- df_summarised
       if (normalize != "none") {
         attr(model, "before_normalize_data") <- df_before_normalize
       }
@@ -190,7 +193,7 @@ tidy.PartitionalTSClusters <- function(x, with_centroids = TRUE, type = "result"
         res <- res %>% dplyr::relocate(value, .before=value_normalized) # Adjust column order.
       }
 
-      if (!is.null(attr(x, "aggregated_data"))) {
+      if (!is.null(attr(x, "variable_cols"))) { # If there are other columns to keep in the result, join them.
         aggregated_data <- attr(x, "aggregated_data")
         aggregated_data <- aggregated_data %>% dplyr::select(-value) # Drop value column from aggregated_data since res already has it.
         res <- res %>% dplyr::left_join(aggregated_data, by=c("time"="time", "name"="category"))
