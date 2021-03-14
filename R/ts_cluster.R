@@ -139,6 +139,7 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
         }
       )
       model <- dtwclust::tsclust(t(as.matrix(df)), k = centers, distance = distance, centroid = centroid)
+      model <- list(model = model)
       attr(model, "time_col") <- time_col
       attr(model, "value_col") <- value_col
       attr(model, "category_col") <- category_col
@@ -153,6 +154,7 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
       if (normalize != "none") {
         attr(model, "before_normalize_data") <- df_before_normalize
       }
+      class(model) <- "PartitionalTSClusters_exploratory"
       model
     }))
   model_df <- model_df %>% rowwise()
@@ -167,26 +169,27 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
 #' Extracts results from the model as a data frame.
 #' The output is original long-format set of time series with Cluster column.
 #' @export
-tidy.PartitionalTSClusters <- function(x, with_centroids = TRUE, type = "result", with_before_normalize_data = TRUE) {
+tidy.PartitionalTSClusters_exploratory <- function(x, with_centroids = TRUE, type = "result", with_before_normalize_data = TRUE) {
+  model <- x$model
   switch(type,
     result = {
       # Create map of time series names to clustering results
-      cluster_map <- x@cluster
-      cluster_map_names <- names(x@datalist)
+      cluster_map <- model@cluster
+      cluster_map_names <- names(model@datalist)
       if (with_centroids) {
-        for (i in 1:(x@k)) {
+        for (i in 1:(model@k)) {
           cluster_map <- c(cluster_map, i)
           cluster_map_names <- c(cluster_map_names, paste0("Centroid ",i))
         }
       }
       names(cluster_map) <- cluster_map_names
 
-      res <- tibble::as_tibble(x@datalist)
+      res <- tibble::as_tibble(model@datalist)
       res <- res %>% dplyr::mutate(time=!!attr(x,"time_values"))
       # Add centroids data
       if (with_centroids) {
-        for (i in 1:(x@k)) {
-          res <- res %>% dplyr::mutate(!!rlang::sym(paste0("Centroid ",i)):=x@centroids[[i]])
+        for (i in 1:(model@k)) {
+          res <- res %>% dplyr::mutate(!!rlang::sym(paste0("Centroid ",i)):=model@centroids[[i]])
         }
       }
       res <- res %>% tidyr::pivot_longer(cols = -time)
