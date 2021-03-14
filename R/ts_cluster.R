@@ -139,7 +139,7 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
         }
       )
       model <- dtwclust::tsclust(t(as.matrix(df)), k = centers, distance = distance, centroid = centroid)
-      model <- list(model = model)
+      model <- list(model = model) # Since the original model is S4 object, we create an S3 object that wraps it.
       attr(model, "time_col") <- time_col
       attr(model, "value_col") <- value_col
       attr(model, "category_col") <- category_col
