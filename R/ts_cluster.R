@@ -160,7 +160,7 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
 #' Extracts results from the model as a data frame.
 #' The output is original long-format set of time series with Cluster column.
 #' @export
-tidy.PartitionalTSClusters <- function(x, with_centroids = TRUE, type = "result") {
+tidy.PartitionalTSClusters <- function(x, with_centroids = TRUE, type = "result", with_before_normalize_data = TRUE) {
   switch(type,
     result = {
       # Create map of time series names to clustering results
@@ -185,7 +185,7 @@ tidy.PartitionalTSClusters <- function(x, with_centroids = TRUE, type = "result"
       res <- res %>% tidyr::pivot_longer(cols = -time)
 
       orig_df <- attr(x, "before_normalize_data")
-      if (!is.null(orig_df)) { # If normalization was done.
+      if (!is.null(orig_df) && with_before_normalize_data) { # If normalization was done and we want to show the result with before-normalize data.
         orig_df <- orig_df %>% dplyr::mutate(time=!!attr(x,"time_values"))
         orig_df <- orig_df %>% tidyr::pivot_longer(cols = -time)
         res <- res %>% dplyr::rename(value_normalized=value) # The value we have now in res is normalized one. Rename it, and get the one without normalization from orig_df.
@@ -204,7 +204,7 @@ tidy.PartitionalTSClusters <- function(x, with_centroids = TRUE, type = "result"
         res <- res %>% dplyr::rename(!!rlang::sym(attr(x,"time_col")):=time,
                                      Number_of_Rows=value,
                                      !!rlang::sym(attr(x,"category_col")):=name)
-        if (!is.null(orig_df)) { # If normalization was done.
+        if (!is.null(orig_df) && with_before_normalize_data) { # If normalization was done and we want to show the result with before-normalize data.
           res <- res %>% dplyr::rename(Number_of_Rows_normalized=value_normalized)
         }
       }
@@ -212,7 +212,7 @@ tidy.PartitionalTSClusters <- function(x, with_centroids = TRUE, type = "result"
         res <- res %>% dplyr::rename(!!rlang::sym(attr(x,"time_col")):=time,
                                      !!rlang::sym(value_col):=value,
                                      !!rlang::sym(attr(x,"category_col")):=name)
-        if (!is.null(orig_df)) { # If normalization was done.
+        if (!is.null(orig_df) && with_before_normalize_data) { # If normalization was done and we want to show the result with before-normalize data.
           res <- res %>% dplyr::rename(!!rlang::sym(paste0(value_col,"_normalized")):=value_normalized)
         }
       }
