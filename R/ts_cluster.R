@@ -121,6 +121,7 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
         # Pass original data.
         # - So that we can generate diagnostic chart about where NAs are.
         attr(model, "aggregated_data") <- df_summarised
+        attr(model, "error") <- "There is not enough data left after removing high NA ratio data."
         class(model) <- "PartitionalTSClusters_exploratory"
         return(model)
       }
