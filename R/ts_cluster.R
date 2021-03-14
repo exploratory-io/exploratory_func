@@ -3,6 +3,7 @@
 exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.aggregate = sum, na_fill_type = "previous", na_fill_value = 0, max_category_na_ratio = 0.5,
                            variables = NULL, funs.aggregate.variables = NULL,
                            centers = 3L, with_centroids = FALSE, distance = "sdtw", centroid = "sdtw_cent",
+                           roll_mean_window = NULL,
                            normalize = "none",
                            seed = 1,
                            output = "data") {
@@ -115,6 +116,12 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
       }
       # Fill NAs in time series
       df <- df %>% dplyr::mutate(across(-time, ~fill_ts_na(.x, time, type = na_fill_type, val = na_fill_value)))
+
+      if (!is.null(roll_mean_window) && roll_mean_window > 1) {
+        df <- df %>% dplyr::mutate(across(-time, ~RcppRoll::roll_mean(.x, n = roll_mean_window, fill = NA, align="right")))
+        df <- df %>% tail(-(roll_mean_window - 1)) # Remove NA rows created at the beginning of df.
+      }
+
       time_values <- df$time
       df <- df %>% dplyr::select(-time)
       if (normalize != "none") {
