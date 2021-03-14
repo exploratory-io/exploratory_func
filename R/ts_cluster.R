@@ -6,7 +6,8 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
                            roll_mean_window = NULL,
                            normalize = "none",
                            seed = 1,
-                           output = "data") {
+                           output = "data",
+                           stop_for_no_data = TRUE) {
   if(!is.null(seed)) {
     set.seed(seed)
   }
@@ -112,7 +113,16 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
       # Drop columns (represents category) that has more NAs than max_category_na_ratio, considering them to have not enough data.
       df <- df %>% dplyr::select_if(function(x){sum(is.na(x))/length(x) < max_category_na_ratio})
       if (length(colnames(df)) <= centers) {
-        stop("EXP-ANA-2 :: [] :: There is not enough data left after removing high NA ratio data.")
+        if (stop_for_no_data) {
+          stop("EXP-ANA-2 :: [] :: There is not enough data left after removing high NA ratio data.")
+        }
+        # For Analytics View, keep going to show at least the diagnostic chart to show where NAs are.
+        model <- list(model = model) # Since the original model is S4 object, we create an S3 object that wraps it.
+        # Pass original data.
+        # - So that we can generate diagnostic chart about where NAs are.
+        attr(model, "aggregated_data") <- df_summarised
+        class(model) <- "PartitionalTSClusters_exploratory"
+        return(model)
       }
       # Fill NAs in time series
       df <- df %>% dplyr::mutate(across(-time, ~fill_ts_na(.x, time, type = na_fill_type, val = na_fill_value)))
@@ -173,6 +183,9 @@ tidy.PartitionalTSClusters_exploratory <- function(x, with_centroids = TRUE, typ
   model <- x$model
   switch(type,
     result = {
+      if (is.null(model)) {
+        return(tibble::tibble()) # Return empty data frame to show "No Data" screen.
+      }
       # Create map of time series names to clustering results
       cluster_map <- model@cluster
       cluster_map_names <- names(model@datalist)
@@ -227,7 +240,7 @@ tidy.PartitionalTSClusters_exploratory <- function(x, with_centroids = TRUE, typ
         }
       }
     },
-    aggregated = { # Return raw aggretated time series data before filling NAs and feeding to the clustering algorithm.
+    aggregated = { # Return raw aggretated time series data before filling NAs and feeding to the clustering algorithm. This is for Data Validation tab.
       res <- attr(x, "aggregated_data")
     }
   )
