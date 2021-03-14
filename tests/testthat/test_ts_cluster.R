@@ -78,8 +78,13 @@ test_that("exp_ts_cluster with max_category_na_ratio", {
   expect_equal(sort(unique(ret$Cluster)), c(1,2,3))
 })
 
-test_that("exp_ts_cluster with max_category_na_ratio", {
+test_that("exp_ts_cluster with max_category_na_ratio for step", {
   expect_error({
     ret <- flight %>% exp_ts_cluster(`FL DATE`, `ARR DELAY`, `CAR RIER`, max_category_na_ratio=0) # Setting zero max_category_na_ratio for test.
   }, "There is not enough data left")
+})
+
+test_that("exp_ts_cluster with max_category_na_ratio for analytics view", {
+  model_df <- flight %>% exp_ts_cluster(`FL DATE`, `ARR DELAY`, `CAR RIER`, max_category_na_ratio=0, stop_for_no_data=FALSE, output="model") # Setting zero max_category_na_ratio for test.
+  expect_true("data.frame" %in% class(attr(model_df$model[[1]],"aggregated_data")))
 })

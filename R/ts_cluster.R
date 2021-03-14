@@ -117,7 +117,7 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
           stop("EXP-ANA-2 :: [] :: There is not enough data left after removing high NA ratio data.")
         }
         # For Analytics View, keep going to show at least the diagnostic chart to show where NAs are.
-        model <- list(model = model) # Since the original model is S4 object, we create an S3 object that wraps it.
+        model <- list()
         # Pass original data.
         # - So that we can generate diagnostic chart about where NAs are.
         attr(model, "aggregated_data") <- df_summarised
