@@ -514,9 +514,11 @@ do_ngram <- function(df, token, sentence, document, maxn=2, sep="_"){
   if (sentence_col != document_col) {
     grouped <- df %>%
       dplyr::group_by(!!!rlang::syms(c(document_col, sentence_col))) # convert the column name to symbol for column names with backticks
-  } else { # if document_col and sentence_col are identical, just group the data frame by the document_col.If you group by with identical columns, group_by throws an error.
+  } else {
+    # If document_col and sentence_col are identical, just group the data frame by the document_col.
+    # NOTE: If you group_by the data frame with identical columns, group_by throws an error.
     grouped <- df %>%
-      dplyr::group_by(!!!rlang::syms(c(document_col))) # convert the column name to symbol for column names with backticks
+      dplyr::group_by(!!rlang::sym(document_col)) # convert the column name to symbol for column names with backticks
   }
   prev_cname <- token_col
   # create ngram columns in this iteration
