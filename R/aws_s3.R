@@ -18,15 +18,6 @@ download_data_file_fromS3 <- function(region, bucket, key, secret, fileName, as 
     filepath
   } else {
     ext <- stringr::str_to_lower(tools::file_ext(fileName))
-    # if no extension, assume the file extension as xlsx
-    if(ext == ""){
-      if(type == "excel"){
-        ext = "xlsx"
-      } else if (type == "csv") {
-        ext = "csv"
-      }
-    }
-
     tmp <- tempfile(fileext = stringr::str_c(".", ext))
 
     # In case of using Rserve on linux, somehow it doesn't create a temporary
@@ -42,8 +33,8 @@ download_data_file_fromS3 <- function(region, bucket, key, secret, fileName, as 
     # http://stackoverflow.com/questions/4216753/check-existence-of-directory-and-create-if-doesnt-exist
     dir.create(tempdir(), showWarnings = FALSE)
 
-    # download file to tempoprary location
-    aws.s3::save_object(fileName, bucket = "exploratoryiobucket", as = as, region = region, key = key, secret = secret, file = tmp)
+    # download file to temporary location
+    aws.s3::save_object(fileName, bucket = bucket, as = as, region = region, key = key, secret = secret, file = tmp)
     # cache file
     if(!is.null(shouldCacheFile) && isTRUE(shouldCacheFile)){
       assign(hash, tmp, envir = .GlobalEnv)
@@ -52,7 +43,7 @@ download_data_file_fromS3 <- function(region, bucket, key, secret, fileName, as 
   }
 }
 
-#'Wrapper for readr::guess_encoding to support remote file
+#'Wrapper for readr::guess_encoding to support aws s3 csv file
 #'@export
 guessFileEncodingForS3File <- function(region, bucket, key, secret, fileName, n_max = 1e4, threshold = 0.20){
   loadNamespace("readr")
@@ -62,9 +53,9 @@ guessFileEncodingForS3File <- function(region, bucket, key, secret, fileName, n_
 }
 
 
-#'API that imports a CSV file
+#'API that imports a CSV file from AWS S3.
 #'@export
-getCSVFileFromS3 <- function(region, username, password, bucket, fileName, delim, quote = '"',
+getCSVFileFromS3 <- function(fileName, region, username, password, bucket, delim, quote = '"',
                              escape_backslash = FALSE, escape_double = TRUE,
                              col_names = TRUE, col_types = NULL,
                              locale = readr::default_locale(),
@@ -95,14 +86,14 @@ getCSVFilesFromS3 <- function(files, region, username, password, bucket, fileNam
                              progress = interactive()) {
   # set name to the files so that it can be used for the "id" column created by purrr:map_dfr.
   files <- setNames(as.list(files), files)
-  df <- purrr::map_dfr(files, exploratory::getCSVFilesFromS3, delim = delim, quote = quote,
+  df <- purrr::map_dfr(files, exploratory::getCSVFileFromS3, region = region, username = username, password = password, bucket = bucket, delim = delim, quote = quote,
                        escape_backslash = escape_backslash, escape_double = escape_double,
                        col_names = col_names, col_types = col_types,
                        locale = locale,
                        na = na, quoted_na = quoted_na,
                        comment = comment, trim_ws = trim_ws,
                        skip = skip, n_max = n_max, guess_max = guess_max,
-                       progress = progress, with_api_key = with_api_key, .id = "exp.file.id") %>% mutate(exp.file.id = basename(exp.file.id))  # extract file name from full path with basename and create file.id column.
+                       progress = progress, .id = "exp.file.id") %>% mutate(exp.file.id = basename(exp.file.id))  # extract file name from full path with basename and create file.id column.
   id_col <- avoid_conflict(colnames(df), "id")
   # copy internal exp.file.id to the id column.
   df[[id_col]] <- df[["exp.file.id"]]
@@ -110,7 +101,34 @@ getCSVFilesFromS3 <- function(files, region, username, password, bucket, fileNam
   df %>% dplyr::select(!!rlang::sym(id_col), dplyr::everything(), -exp.file.id)
 }
 
-getExcelFileFromS3 <- function(region, username, password, bucket, fileName) {
+#'API that imports a Excel file from AWS S3.
+#'@export
+getExcelFileFromS3 <- function(fileName, region, username, password, bucket, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, ...) {
+  filePath <- download_data_file_fromS3(region = region, bucket = bucket, key = username, secret = password, fileName = fileName, as = "raw")
+  exploratory::read_excel_file(path = filePath, sheet = sheet, col_names = col_names, col_types = col_types, na = na, skip = skip, trim_ws = trim_ws, n_max = n_max, use_readxl = use_readxl, detectDates = detectDates, skipEmptyRows =  skipEmptyRows, skipEmptyCols = skipEmptyCols, check.names = FALSE, tzone = tzone, ...)
+}
 
-  exploratory::read_delim_file(aws.s3::get_object(fileName, bucket = "exploratoryiobucket", as = "text", region = region, key = username, secret = password), delim = delim)
+
+#'API that imports a Excel files from AWS S3.
+#'@export
+getExcelFilesFromS3 <- function(files, region, username, password, bucket, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, ...) {
+  # set name to the files so that it can be used for the "id" column created by purrr:map_dfr.
+  files <- setNames(as.list(files), files)
+  df <- purrr::map_dfr(files, exploratory::getExcelFileFromS3, region = region, username = username, password = password, bucket = bucket, sheet = sheet,
+                       col_names = col_names, col_types = col_types, na = na, skip = skip, trim_ws = trim_ws, n_max = n_max, use_readxl = use_readxl,
+                       detectDates = detectDates, skipEmptyRows =  skipEmptyRows, skipEmptyCols = skipEmptyCols, check.names = FALSE,
+                       tzone = tzone, .id = "exp.file.id") %>% mutate(exp.file.id = basename(exp.file.id))  # extract file name from full path with basename and create file.id column.
+  id_col <- avoid_conflict(colnames(df), "id")
+  # copy internal exp.file.id to the id column.
+  df[[id_col]] <- df[["exp.file.id"]]
+  # drop internal column and move the id column to the very beginning.
+  df %>% dplyr::select(!!rlang::sym(id_col), dplyr::everything(), -exp.file.id)
+}
+
+#'Wrapper for readxl::excel_sheets to support AWS S3 Excel file
+#'@export
+getExcelSheetsFromS3ExcelFile <- function(fileName, region, username, password, bucket){
+  filePath <- download_data_file_fromS3(region = region, bucket = bucket, key = username, secret = password, fileName = fileName, as = "raw")
+  # If it's local file without multibyte path, simply call readxl::read_sheets.
+  readxl::excel_sheets(filePath)
 }
