@@ -1,4 +1,4 @@
-#' API to download remote data file (excel, csv) from  Amazon S3 and cache it if necessary
+#' API to download remote data file (excel, csv) from Amazon S3 and cache it if necessary
 #' it uses tempfile https://stat.ethz.ch/R-manual/R-devel/library/base/html/tempfile.html
 #' and a R variable with name of hashed region, bucket, key, secret, fileName are  assigned to the path given by tempfile.
 downloadDataFileFromS3 <- function(region, bucket, key, secret, fileName, as = "text"){
@@ -8,11 +8,11 @@ downloadDataFileFromS3 <- function(region, bucket, key, secret, fileName, as = "
   tryCatch({
     filepath <- eval(as.name(hash))
   }, error = function(e){
-    # if url hash is not set as global vaiarlbe yet, it raises error that says object not found
+    # if filePath hash is not set as global variable yet, it raises error that says object not found
     # which can be ignored
     filepath <- NULL
   })
-  # Check if cached excel filepath exists for the URL
+  # Check if cached excel/csv exists for the filepath
   if(!is.null(shouldCacheFile) && isTRUE(shouldCacheFile) && !is.null(filepath)){
     filepath
   } else {
