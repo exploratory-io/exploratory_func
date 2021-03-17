@@ -212,9 +212,13 @@ do_cor.cols <- function(df, ..., use="pairwise.complete.obs", method="pearson", 
       dim <- length(select_dots)
       pvalue_mat <- matrix(NA, dim, dim)
       for (i in 1:dim) {
-        for (j in 1:dim) {
+        for (j in 1:(i-1)) {
           pvalue_mat[i, j] <- cor.test(mat[,i], mat[,j], method = method)$p.value
+          pvalue_mat[j, i] <- pvalue_mat[i, j]
         }
+      }
+      for (i in 1:dim) { # For i=j case, P value should be always 0.
+        pvalue_mat[i, i] <- 0
       }
       colnames(pvalue_mat) <- select_dots
       rownames(pvalue_mat) <- select_dots
