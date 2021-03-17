@@ -218,15 +218,17 @@ do_cor.cols <- function(df, ..., use="pairwise.complete.obs", method="pearson", 
       }
       colnames(pvalue_mat) <- select_dots
       rownames(pvalue_mat) <- select_dots
-      if(distinct){
+      output_cols <- avoid_conflict(grouped_col, c("pair.name.x", "pair.name.y", "p_value"))
+      if (distinct) {
         p_value_ret <- upper_gather(pvalue_mat, diag=diag, cnames=output_cols, zero.rm=FALSE)
       } else {
         p_value_ret <- mat_to_df(pvalue_mat, cnames=output_cols, diag=diag, zero.rm=FALSE)
       }
+      ret <- ret %>% dplyr::left_join(p_value_ret, by=output_cols[1:2]) # Join by pair.name.x and pair.name.y.
 
       # Return cor_exploratory model, which is a set of correlation data frame and the original data.
       # We use the original data for scatter matrix on Analytics View.
-      ret <- list(cor = ret, p_value = p_value_ret, data = df)
+      ret <- list(cor = ret, data = df)
       class(ret) <- c("cor_exploratory", class(ret))
       ret
     }
@@ -247,9 +249,6 @@ do_cor.cols <- function(df, ..., use="pairwise.complete.obs", method="pearson", 
 tidy.cor_exploratory <- function(x, type = "cor", ...) { #TODO: add test
   if (type == "cor") {
     x$cor
-  }
-  else if (type == "p_value") {
-    x$p_value
   }
   else {
     x$data
