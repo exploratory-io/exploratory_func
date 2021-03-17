@@ -129,6 +129,9 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
       df <- df %>% dplyr::mutate(across(-time, ~fill_ts_na(.x, time, type = na_fill_type, val = na_fill_value)))
 
       if (!is.null(roll_mean_window) && roll_mean_window > 1) {
+        if (nrow(df) - (roll_mean_window - 1) < 1) {
+          stop("EXP-ANA-4 :: [] :: The window size of moving average is too long for this data.")
+        }
         df <- df %>% dplyr::mutate(across(-time, ~RcppRoll::roll_mean(.x, n = roll_mean_window, fill = NA, align="right")))
         df <- df %>% tail(-(roll_mean_window - 1)) # Remove NA rows created at the beginning of df.
       }
