@@ -219,9 +219,9 @@ do_cor.cols <- function(df, ..., use="pairwise.complete.obs", method="pearson", 
       colnames(pvalue_mat) <- select_dots
       rownames(pvalue_mat) <- select_dots
       if(distinct){
-        p_value_ret <- upper_gather(cor_mat, diag=diag, cnames=output_cols, zero.rm=FALSE)
+        p_value_ret <- upper_gather(pvalue_mat, diag=diag, cnames=output_cols, zero.rm=FALSE)
       } else {
-        p_value_ret <- mat_to_df(cor_mat, cnames=output_cols, diag=diag, zero.rm=FALSE)
+        p_value_ret <- mat_to_df(pvalue_mat, cnames=output_cols, diag=diag, zero.rm=FALSE)
       }
 
       # Return cor_exploratory model, which is a set of correlation data frame and the original data.
@@ -247,6 +247,9 @@ do_cor.cols <- function(df, ..., use="pairwise.complete.obs", method="pearson", 
 tidy.cor_exploratory <- function(x, type = "cor", ...) { #TODO: add test
   if (type == "cor") {
     x$cor
+  }
+  else if (type == "p_value") {
+    x$p_value
   }
   else {
     x$data
