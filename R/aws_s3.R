@@ -108,7 +108,7 @@ getExcelFileFromS3 <- function(fileName, region, username, password, bucket, she
 }
 
 
-#'API that imports a Excel files from AWS S3.
+#'API that imports multiple Excel files from AWS S3.
 #'@export
 getExcelFilesFromS3 <- function(files, region, username, password, bucket, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, ...) {
   # set name to the files so that it can be used for the "id" column created by purrr:map_dfr.
