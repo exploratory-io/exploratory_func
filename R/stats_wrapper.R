@@ -208,9 +208,25 @@ do_cor.cols <- function(df, ..., use="pairwise.complete.obs", method="pearson", 
       ret # Return correlation data frame as is.
     }
     else {
+      # Create a matrix of P-values for Analytics View case.
+      dim <- length(select_dots)
+      pvalue_mat <- matrix(NA, dim, dim)
+      for (i in 1:dim) {
+        for (j in 1:dim) {
+          pvalue_mat[i, j] <- cor.test(mat[,i], mat[,j], method = method)$p.value
+        }
+      }
+      colnames(pvalue_mat) <- select_dots
+      rownames(pvalue_mat) <- select_dots
+      if(distinct){
+        p_value_ret <- upper_gather(cor_mat, diag=diag, cnames=output_cols, zero.rm=FALSE)
+      } else {
+        p_value_ret <- mat_to_df(cor_mat, cnames=output_cols, diag=diag, zero.rm=FALSE)
+      }
+
       # Return cor_exploratory model, which is a set of correlation data frame and the original data.
       # We use the original data for scatter matrix on Analytics View.
-      ret <- list(cor = ret, data = df)
+      ret <- list(cor = ret, p_value = p_value_ret, data = df)
       class(ret) <- c("cor_exploratory", class(ret))
       ret
     }
