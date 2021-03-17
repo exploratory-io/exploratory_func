@@ -211,7 +211,7 @@ do_cor.cols <- function(df, ..., use="pairwise.complete.obs", method="pearson", 
       # Create a matrix of P-values for Analytics View case.
       dim <- length(select_dots)
       pvalue_mat <- matrix(NA, dim, dim)
-      for (i in 1:dim) {
+      for (i in 2:dim) {
         for (j in 1:(i-1)) {
           pvalue_mat[i, j] <- cor.test(mat[,i], mat[,j], method = method)$p.value
           pvalue_mat[j, i] <- pvalue_mat[i, j]
