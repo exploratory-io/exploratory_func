@@ -1,8 +1,7 @@
-#' API to download remote data file (excel, csv) from URL and cache it if necessary
+#' API to download remote data file (excel, csv) from  Amazon S3 and cache it if necessary
 #' it uses tempfile https://stat.ethz.ch/R-manual/R-devel/library/base/html/tempfile.html
-#' and a R variable with name of hashed url is assigned to the path given by tempfile.
-#' @param url
-download_data_file_fromS3 <- function(region, bucket, key, secret, fileName, as = "text"){
+#' and a R variable with name of hashed region, bucket, key, secret, fileName are  assigned to the path given by tempfile.
+downloadDataFileFromS3 <- function(region, bucket, key, secret, fileName, as = "text"){
   shouldCacheFile <- getOption("tam.should.cache.datafile")
   filepath <- NULL
   hash <- digest::digest(stringr::str_c(region, bucket, key, secret, fileName, sep = ":"), "md5", serialize = FALSE)
@@ -47,7 +46,7 @@ download_data_file_fromS3 <- function(region, bucket, key, secret, fileName, as 
 #'@export
 guessFileEncodingForS3File <- function(region, bucket, key, secret, fileName, n_max = 1e4, threshold = 0.20){
   loadNamespace("readr")
-  filePath <- download_data_file_fromS3(region = region, bucket = bucket, key = username, secret = password, fileName = fileName, as = "text")
+  filePath <- downloadDataFileFromS3(region = region, bucket = bucket, key = key, secret = secret, fileName = fileName, as = "text")
   readr::guess_encoding(filePath, n_max, threshold)
 
 }
@@ -63,7 +62,7 @@ getCSVFileFromS3 <- function(fileName, region, username, password, bucket, delim
                              comment = "", trim_ws = FALSE,
                              skip = 0, n_max = Inf, guess_max = min(1000, n_max),
                              progress = interactive()) {
-  filePath <- download_data_file_fromS3(region = region, bucket = bucket, key = username, secret = password, fileName = fileName, as = "text")
+  filePath <- downloadDataFileFromS3(region = region, bucket = bucket, key = username, secret = password, fileName = fileName, as = "text")
   exploratory::read_delim_file(filePath, delim = delim, quote = quote,
                                escape_backslash = escape_backslash, escape_double = escape_double,
                                col_names = col_names, col_types = col_types,
@@ -104,7 +103,7 @@ getCSVFilesFromS3 <- function(files, region, username, password, bucket, fileNam
 #'API that imports a Excel file from AWS S3.
 #'@export
 getExcelFileFromS3 <- function(fileName, region, username, password, bucket, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, ...) {
-  filePath <- download_data_file_fromS3(region = region, bucket = bucket, key = username, secret = password, fileName = fileName, as = "raw")
+  filePath <- downloadDataFileFromS3(region = region, bucket = bucket, key = username, secret = password, fileName = fileName, as = "raw")
   exploratory::read_excel_file(path = filePath, sheet = sheet, col_names = col_names, col_types = col_types, na = na, skip = skip, trim_ws = trim_ws, n_max = n_max, use_readxl = use_readxl, detectDates = detectDates, skipEmptyRows =  skipEmptyRows, skipEmptyCols = skipEmptyCols, check.names = FALSE, tzone = tzone, ...)
 }
 
@@ -128,7 +127,6 @@ getExcelFilesFromS3 <- function(files, region, username, password, bucket, sheet
 #'Wrapper for readxl::excel_sheets to support AWS S3 Excel file
 #'@export
 getExcelSheetsFromS3ExcelFile <- function(fileName, region, username, password, bucket){
-  filePath <- download_data_file_fromS3(region = region, bucket = bucket, key = username, secret = password, fileName = fileName, as = "raw")
-  # If it's local file without multibyte path, simply call readxl::read_sheets.
+  filePath <- downloadDataFileFromS3(region = region, bucket = bucket, key = username, secret = password, fileName = fileName, as = "raw")
   readxl::excel_sheets(filePath)
 }
