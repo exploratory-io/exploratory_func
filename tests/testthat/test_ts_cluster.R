@@ -21,9 +21,24 @@ if (!testdata_filename %in% list.files(testdata_dir)) {
   write.csv(flight, testdata_file_path) # save sampled-down data for performance.
 }
 
+test_that("exp_ts_cluster model output", {
+  model_df <- flight %>% exp_ts_cluster(`FL DATE`, `ARR DELAY`, `CAR RIER`, output="model")
+  ret <- model_df %>% tidy_rowwise(model)
+  expect_equal(colnames(ret), c("FL DATE","CAR RIER","ARR DELAY","Cluster"))
+  expect_equal(sort(unique(ret$Cluster)), c(1,2,3))
+
+  ret <- model_df %>% tidy_rowwise(model, type="aggregated")
+  expect_equal(colnames(ret), c("category","time","value"))
+})
 
 test_that("exp_ts_cluster basic", {
   ret <- flight %>% exp_ts_cluster(`FL DATE`, `ARR DELAY`, `CAR RIER`)
+  expect_equal(colnames(ret), c("FL DATE","CAR RIER","ARR DELAY","Cluster"))
+  expect_equal(sort(unique(ret$Cluster)), c(1,2,3))
+})
+
+test_that("exp_ts_cluster with moving average", {
+  ret <- flight %>% exp_ts_cluster(`FL DATE`, `ARR DELAY`, `CAR RIER`, roll_mean_window=3)
   expect_equal(colnames(ret), c("FL DATE","CAR RIER","ARR DELAY","Cluster"))
   expect_equal(sort(unique(ret$Cluster)), c(1,2,3))
 })
@@ -63,8 +78,13 @@ test_that("exp_ts_cluster with max_category_na_ratio", {
   expect_equal(sort(unique(ret$Cluster)), c(1,2,3))
 })
 
-test_that("exp_ts_cluster with max_category_na_ratio", {
+test_that("exp_ts_cluster with max_category_na_ratio for step", {
   expect_error({
     ret <- flight %>% exp_ts_cluster(`FL DATE`, `ARR DELAY`, `CAR RIER`, max_category_na_ratio=0) # Setting zero max_category_na_ratio for test.
   }, "There is not enough data left")
+})
+
+test_that("exp_ts_cluster with max_category_na_ratio for analytics view", {
+  model_df <- flight %>% exp_ts_cluster(`FL DATE`, `ARR DELAY`, `CAR RIER`, max_category_na_ratio=0, stop_for_no_data=FALSE, output="model") # Setting zero max_category_na_ratio for test.
+  expect_true("data.frame" %in% class(attr(model_df$model[[1]],"aggregated_data")))
 })
