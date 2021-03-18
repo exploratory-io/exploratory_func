@@ -207,7 +207,7 @@ test_that("test do_cor.cols for grouped df with model output", {
     %>%  do_cor.cols(dplyr::starts_with("var"), return_type = "model"))
 
   result_cor <- result %>% tidy_rowwise(model)
-  expect_equal(dim(result_cor), c(4, 4))
+  expect_equal(dim(result_cor), c(4, 5))
   result_data <- result %>% tidy_rowwise(model, type = "data")
   expect_equal(colnames(result_data), c("group", "var1", "var2"))
 })
