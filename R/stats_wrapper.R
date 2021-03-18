@@ -169,7 +169,6 @@ do_cor.kv_ <- function(df,
 #' @export
 do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearson",
                         distinct = FALSE, diag = FALSE,
-                        distinct_p_value = FALSE, diag_p_value = FALSE,
                         return_type = "data.frame") {
   validate_empty_data(df)
 
@@ -227,10 +226,10 @@ do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearso
       colnames(pvalue_mat) <- sorted_colnames
       rownames(pvalue_mat) <- sorted_colnames
       output_cols <- avoid_conflict(grouped_col, c("pair.name.x", "pair.name.y", "p_value"))
-      if (distinct_p_value) {
-        p_value_ret <- upper_gather(pvalue_mat, diag=diag_p_value, cnames=output_cols, zero.rm=FALSE)
+      if (distinct) {
+        p_value_ret <- upper_gather(pvalue_mat, diag=diag, cnames=output_cols, zero.rm=FALSE)
       } else {
-        p_value_ret <- mat_to_df(pvalue_mat, cnames=output_cols, diag=diag_p_value, zero.rm=FALSE)
+        p_value_ret <- mat_to_df(pvalue_mat, cnames=output_cols, diag=diag, zero.rm=FALSE)
       }
       ret <- ret %>% dplyr::left_join(p_value_ret, by=output_cols[1:2]) # Join by pair.name.x and pair.name.y.
 
