@@ -216,7 +216,18 @@ do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearso
       pvalue_mat <- matrix(NA, dim, dim)
       for (i in 2:dim) {
         for (j in 1:(i-1)) {
-          pvalue_mat[i, j] <- cor.test(mat[,i], mat[,j], method = method)$p.value
+          pvalue_mat[i, j] <- tryCatch({
+            cor.test(mat[,i], mat[,j], method = method)$p.value
+          }, error = function(e) {
+            if (e$message == "not enough finite observations") {
+              # This is the error cor.test returns when there is not enough non-NA data.
+              # Rather than stopping, set NA as the result, and we will handle it as a not-significant case on the UI.
+              NA
+            }
+            else {
+              stop(e)
+            }
+          })
           pvalue_mat[j, i] <- pvalue_mat[i, j]
         }
       }
