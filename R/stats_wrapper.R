@@ -195,7 +195,8 @@ do_cor.cols <- function(df, ..., use="pairwise.complete.obs", method="pearson", 
     mat <- dplyr::select(df, !!!select_dots) %>%  as.matrix()
     # sort the column name so that the output of pair.name.1 and pair.name.2 will be sorted
     # it's better to be sorted so that heatmap in exploratory can be triangle if distinct is TRUE
-    mat <- mat[,sort(colnames(mat))]
+    sorted_colnames <- sort(colnames(mat))
+    mat <- mat[,sorted_colnames]
 
     cor_mat <- cor(mat, use = use, method = method)
     if(distinct){
@@ -209,7 +210,7 @@ do_cor.cols <- function(df, ..., use="pairwise.complete.obs", method="pearson", 
     }
     else {
       # Create a matrix of P-values for Analytics View case.
-      dim <- length(select_dots)
+      dim <- length(sorted_colnames)
       pvalue_mat <- matrix(NA, dim, dim)
       for (i in 2:dim) {
         for (j in 1:(i-1)) {
@@ -220,8 +221,8 @@ do_cor.cols <- function(df, ..., use="pairwise.complete.obs", method="pearson", 
       for (i in 1:dim) { # For i=j case, P value should be always 0.
         pvalue_mat[i, i] <- 0
       }
-      colnames(pvalue_mat) <- select_dots
-      rownames(pvalue_mat) <- select_dots
+      colnames(pvalue_mat) <- sorted_colnames
+      rownames(pvalue_mat) <- sorted_colnames
       output_cols <- avoid_conflict(grouped_col, c("pair.name.x", "pair.name.y", "p_value"))
       if (distinct) {
         p_value_ret <- upper_gather(pvalue_mat, diag=diag, cnames=output_cols, zero.rm=FALSE)
