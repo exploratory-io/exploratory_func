@@ -4,7 +4,9 @@
 #' @param path - This should be ID of the folder since searching with folder name doesn't always work as expected.
 #' @param type - object type that you want to include in your query result.
 listItemsInGoogleDrive <- function(teamDriveId = NULL, path = NULL, type =  c("csv", "tsv", "txt", "folder", "xls", "xlsx")){
-  if(!requireNamespace("googledrive")){stop("package googledrive must be installed.")}
+  if (!requireNamespace("googledrive")) {
+    stop("package googledrive must be installed.")
+  }
   token = getGoogleTokenForDrive()
   googledrive::drive_set_token(token)
   if (!is.null(path)) {
@@ -21,7 +23,9 @@ listItemsInGoogleDrive <- function(teamDriveId = NULL, path = NULL, type =  c("c
 #' API to get a folder details in Google Drive
 #' @export
 getGoogleDriveFolderDetails <- function(teamDriveId = NULL , path = NULL) {
-  if(!requireNamespace("googledrive")){stop("package googledrive must be installed.")}
+  if(!requireNamespace("googledrive")) {
+    stop("package googledrive must be installed.")
+    }
   token = getGoogleTokenForDrive()
   googledrive::drive_set_token(token)
   if (!is.null(path)) {
@@ -145,7 +149,7 @@ downloadDataFileFromGoogleDrive <- function(fileId, type = "csv"){
     filepath <- NULL
   })
   # Check if cached excel/csv exists for the filepath
-  if(!is.null(shouldCacheFile) && isTRUE(shouldCacheFile) && !is.null(filepath)){
+  if (!is.null(shouldCacheFile) && isTRUE(shouldCacheFile) && !is.null(filepath)) {
     filepath
   } else {
     tmp <- tempfile(fileext = stringr::str_c(".", type))
@@ -166,7 +170,7 @@ downloadDataFileFromGoogleDrive <- function(fileId, type = "csv"){
     # download file to temporary location
     googledrive::drive_download(googledrive::as_id(fileId), overwrite = TRUE, path = tmp)
     # cache file
-    if(!is.null(shouldCacheFile) && isTRUE(shouldCacheFile)){
+    if (!is.null(shouldCacheFile) && isTRUE(shouldCacheFile)) {
       assign(hash, tmp, envir = .GlobalEnv)
     }
     tmp

@@ -13,7 +13,7 @@ downloadDataFileFromS3 <- function(region, bucket, key, secret, fileName, as = "
     filepath <- NULL
   })
   # Check if cached excel/csv exists for the filepath
-  if(!is.null(shouldCacheFile) && isTRUE(shouldCacheFile) && !is.null(filepath)){
+  if (!is.null(shouldCacheFile) && isTRUE(shouldCacheFile) && !is.null(filepath)) {
     filepath
   } else {
     ext <- stringr::str_to_lower(tools::file_ext(fileName))
