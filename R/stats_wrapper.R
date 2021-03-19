@@ -167,7 +167,9 @@ do_cor.kv_ <- function(df,
 #' @param method Method of calculation. This can be one of "pearson", "kendall", or "spearman".
 #' @return correlations between pairs of columns
 #' @export
-do_cor.cols <- function(df, ..., use="pairwise.complete.obs", method="pearson", distinct=FALSE, diag=FALSE, return_type="data.frame"){
+do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearson",
+                        distinct = FALSE, diag = FALSE,
+                        return_type = "data.frame") {
   validate_empty_data(df)
 
   loadNamespace("dplyr")
@@ -195,7 +197,8 @@ do_cor.cols <- function(df, ..., use="pairwise.complete.obs", method="pearson", 
     mat <- dplyr::select(df, !!!select_dots) %>%  as.matrix()
     # sort the column name so that the output of pair.name.1 and pair.name.2 will be sorted
     # it's better to be sorted so that heatmap in exploratory can be triangle if distinct is TRUE
-    mat <- mat[,sort(colnames(mat))]
+    sorted_colnames <- sort(colnames(mat))
+    mat <- mat[,sorted_colnames]
 
     cor_mat <- cor(mat, use = use, method = method)
     if(distinct){
@@ -208,6 +211,39 @@ do_cor.cols <- function(df, ..., use="pairwise.complete.obs", method="pearson", 
       ret # Return correlation data frame as is.
     }
     else {
+      # Create a matrix of P-values for Analytics View case.
+      dim <- length(sorted_colnames)
+      pvalue_mat <- matrix(NA, dim, dim)
+      for (i in 2:dim) {
+        for (j in 1:(i-1)) {
+          pvalue_mat[i, j] <- tryCatch({
+            cor.test(mat[,i], mat[,j], method = method)$p.value
+          }, error = function(e) {
+            if (e$message == "not enough finite observations") {
+              # This is the error cor.test returns when there is not enough non-NA data.
+              # Rather than stopping, set NA as the result, and we will handle it as a not-significant case on the UI.
+              NA
+            }
+            else {
+              stop(e)
+            }
+          })
+          pvalue_mat[j, i] <- pvalue_mat[i, j]
+        }
+      }
+      for (i in 1:dim) { # For i=j case, P value should be always 0.
+        pvalue_mat[i, i] <- 0
+      }
+      colnames(pvalue_mat) <- sorted_colnames
+      rownames(pvalue_mat) <- sorted_colnames
+      output_cols <- avoid_conflict(grouped_col, c("pair.name.x", "pair.name.y", "p_value"))
+      if (distinct) {
+        p_value_ret <- upper_gather(pvalue_mat, diag=diag, cnames=output_cols, zero.rm=FALSE)
+      } else {
+        p_value_ret <- mat_to_df(pvalue_mat, cnames=output_cols, diag=diag, zero.rm=FALSE)
+      }
+      ret <- ret %>% dplyr::left_join(p_value_ret, by=output_cols[1:2]) # Join by pair.name.x and pair.name.y.
+
       # Return cor_exploratory model, which is a set of correlation data frame and the original data.
       # We use the original data for scatter matrix on Analytics View.
       ret <- list(cor = ret, data = df)
