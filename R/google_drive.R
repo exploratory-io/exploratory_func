@@ -171,3 +171,19 @@ downloadDataFileFromGoogleDrive <- function(fileId, type = "csv"){
   }
 }
 
+#' API to clear Google Drive cache file
+#' @param fileId
+#' @param type
+#' @export
+clearGoogleDriveCacheFile <- function(fileId, type = "csv"){
+  options(tam.should.cache.datafile = FALSE)
+  hash <- digest::digest(stringr::str_c(fileId, type), "md5", serialize = FALSE)
+  tryCatch({
+    filepath <- eval(as.name(hash))
+    do.call(rm, c(as.name(hash)),envir = .GlobalEnv)
+    unlink(filepath)
+  }, error = function(e){
+  })
+}
+
+

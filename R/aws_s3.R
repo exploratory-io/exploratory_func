@@ -4,7 +4,7 @@
 downloadDataFileFromS3 <- function(region, bucket, key, secret, fileName, as = "text"){
   shouldCacheFile <- getOption("tam.should.cache.datafile")
   filepath <- NULL
-  hash <- digest::digest(stringr::str_c(region, bucket, key, secret, fileName, sep = ":"), "md5", serialize = FALSE)
+  hash <- digest::digest(stringr::str_c(region, bucket, fileName, sep = ":"), "md5", serialize = FALSE)
   tryCatch({
     filepath <- eval(as.name(hash))
   }, error = function(e){
@@ -40,6 +40,22 @@ downloadDataFileFromS3 <- function(region, bucket, key, secret, fileName, as = "
     }
     tmp
   }
+}
+
+#' API to clear S3 cache file
+#' @param region
+#' @param bucket
+#' @param filenName
+#' @export
+clearS3CacheFile <- function(region, bucket, fileName){
+  options(tam.should.cache.datafile = FALSE)
+  hash <- digest::digest(stringr::str_c(region, bucket, fileName, sep = ":"), "md5", serialize = FALSE)
+  tryCatch({
+    filepath <- eval(as.name(hash))
+    do.call(rm, c(as.name(hash)),envir = .GlobalEnv)
+    unlink(filepath)
+  }, error = function(e){
+  })
 }
 
 #'Wrapper for readr::guess_encoding to support aws s3 csv file
