@@ -18,7 +18,7 @@ listItemsInGoogleDrive <- function(teamDriveId = "", path = NULL, type =  c("csv
 
 #' API to get a folder details in Google Drive
 #' @export
-getGoogleDriveFolderName <- function(teamDriveId = "", path = NULL) {
+getGoogleDriveFolderDetails <- function(teamDriveId = "", path = NULL) {
   if(!requireNamespace("googledrive")){stop("package googledrive must be installed.")}
   token = getGoogleTokenForDrive()
   googledrive::drive_set_token(token)
@@ -112,14 +112,21 @@ getExcelFilesFromGoogleDrive <- function(fileIds, fileNames, sheet = 1, col_name
   df %>% dplyr::select(!!rlang::sym(id_col), dplyr::everything(), -exp.file.id)
 }
 
-#'Wrapper for readxl::excel_sheets to support AWS S3 Excel file
+#'Wrapper for readxl::excel_sheets to support Google Drive Excel file
 #'@export
 getExcelSheetsFromGoogleDriveExcelFile <- function(fileId){
   filePath <- downloadDataFileFromGoogleDrive(fileId = fileId, type = "xlsx")
   readxl::excel_sheets(filePath)
 }
 
-#' API to download remote data file (excel, csv) from Amazon S3 and cache it if necessary
+#'Wrapper for readr::guess_encoding to support Google Drive csv file
+#'@export
+guessFileEncodingForGoogleDriveFile <- function(fileId, n_max = 1e4, threshold = 0.20){
+  filePath <- downloadDataFileFromGoogleDrive(fileId = fileId, type = "csv")
+  readr::guess_encoding(filePath, n_max, threshold)
+}
+
+#' API to download remote data file (excel, csv) from Google Drive and cache it if necessary
 #' it uses tempfile https://stat.ethz.ch/R-manual/R-devel/library/base/html/tempfile.html
 #' and a R variable with name of hashed region, bucket, key, secret, fileName are  assigned to the path given by tempfile.
 downloadDataFileFromGoogleDrive <- function(fileId, type = "csv"){
