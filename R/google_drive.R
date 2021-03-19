@@ -1,24 +1,26 @@
 #' API to get a list of files in Google Drive
 #' @export
-listItemsInGoogleDrive <- function(teamDriveId = "", path = NULL, type =  c("csv", "tsv", "txt", "folder", "xls", "xlsx")){
+#' @param teamDriveId - in case you want to search for team drive
+#' @param path - This should be ID of the folder since searching with folder name doesn't always work as expected.
+#' @param type - object type that you want to include in your query result.
+listItemsInGoogleDrive <- function(teamDriveId = NULL, path = NULL, type =  c("csv", "tsv", "txt", "folder", "xls", "xlsx")){
   if(!requireNamespace("googledrive")){stop("package googledrive must be installed.")}
   token = getGoogleTokenForDrive()
   googledrive::drive_set_token(token)
   if (!is.null(path)) {
     path = googledrive::as_id(path)
   }
-  #if team id is provided search documents within the team.
-  if(teamDriveId != "" && !is.null(teamDriveId)) {
-    # To improve performance, only get id, name, mimeType, modifiedTime,  size, parents for each file.
-    googledrive::drive_ls(path = path, type = type, team_drive=googledrive::as_id(teamDriveId) ,pageSize=1000, fields="files/id, files/name, files/mimeType, files/modifiedTime, files/size, files/parents, nextPageToken")
-  } else {
-    googledrive::drive_ls(path = path, type = type, pageSize=1000, fields="files/id, files/name, files/mimeType, files/modifiedTime, files/size, files/parents, nextPageToken")
+  # If team id is provided search documents within the team.
+  if (teamDriveId != "" && !is.null(teamDriveId)) {
+    teamDriveId = googledrive::as_id(teamDriveId)
   }
+  # To improve performance, only get id, name, mimeType, modifiedTime, size, parents for each file.
+  googledrive::drive_ls(path = path, type = type, team_drive=teamDriveId ,pageSize=1000, fields="files/id, files/name, files/mimeType, files/modifiedTime, files/size, files/parents, nextPageToken")
 }
 
 #' API to get a folder details in Google Drive
 #' @export
-getGoogleDriveFolderDetails <- function(teamDriveId = "", path = NULL) {
+getGoogleDriveFolderDetails <- function(teamDriveId = NULL , path = NULL) {
   if(!requireNamespace("googledrive")){stop("package googledrive must be installed.")}
   token = getGoogleTokenForDrive()
   googledrive::drive_set_token(token)
@@ -27,11 +29,11 @@ getGoogleDriveFolderDetails <- function(teamDriveId = "", path = NULL) {
   }
   df <- NULL
   #if team id is provided search documents within the team.
-  if(teamDriveId != "" && !is.null(teamDriveId)) {
-    df <- googledrive::drive_get(team_drive = googledrive::as_id(teamDriveId), id = path)
-  } else {
-    df <- googledrive::drive_get(id = path)
+  # If team id is provided search documents within the team.
+  if (teamDriveId != "" && !is.null(teamDriveId)) {
+    teamDriveId = googledrive::as_id(teamDriveId)
   }
+  df <- googledrive::drive_get(team_drive = googledrive::as_id(teamDriveId), id = path)
   dfdetails <- NULL
   if (nrow(df) == 1) {
     dfdetails <- df %>% googledrive::drive_reveal("path")

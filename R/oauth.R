@@ -130,12 +130,10 @@ refreshGoogleTokenForSheet <- function(tokenFileId){
 
 #' @export
 getGoogleTokenForDrive <- function(tokenFileId = "", useCache=TRUE){
-  # As per Kan, this can be hard coded since Google limits acces per ViewID (tableID) and
-  # not by clientID
   appName = "google"
   # retrieve token info from environment
   # main purpose is to enable server refresh
-  token_info <- getTokenInfo("googledrive") # this should be googlesheets but our plunin is already named googledrive
+  token_info <- getTokenInfo("googledrive")
   if(!is.null(token_info)){
     HttrOAuthToken2.0$new(
       authorize = "https://accounts.google.com/o/oauth2/auth",

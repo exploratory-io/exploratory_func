@@ -119,10 +119,10 @@ getGoogleSheetWorkSheetList <- function(tokenFileId = "", title, id = NULL){
   googlesheets4::sheets_sheets(sheet)
 }
 
-getTeamDrives <- function(tokenFileId = "", useGoogleSheetToken = TRUE){
+getTeamDrives <- function(tokenFileId = "", useGoogleSheetsToken = TRUE){
   if(!requireNamespace("googledrive")){stop("package googledrive must be installed.")}
   token <- NULL
-  if (useGoogleSheetToken) {
+  if (useGoogleSheetsToken) {
     token <- getGoogleTokenForSheet(tokenFileId)
   } else {
     token <- getGoogleTokenForDrive(tokenFileId)
