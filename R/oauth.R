@@ -122,11 +122,42 @@ getGoogleTokenForSheet <- function(tokenFileId="", useCache=TRUE){
   }
 }
 
-
 #' API to refresh token
 #' @export
 refreshGoogleTokenForSheet <- function(tokenFileId){
   getGoogleTokenForSheet(tokenFileId, FALSE)
+}
+
+#' @export
+getGoogleTokenForDrive <- function(tokenFileId = "", useCache=TRUE){
+  appName = "google"
+  # retrieve token info from environment
+  # main purpose is to enable server refresh
+  token_info <- getTokenInfo("googledrive")
+  if(!is.null(token_info)){
+    HttrOAuthToken2.0$new(
+      authorize = "https://accounts.google.com/o/oauth2/auth",
+      access = "https://accounts.google.com/o/oauth2/token",
+      validate = "https://www.googleapis.com/oauth2/v1/tokeninfo",
+      revoke = "https://accounts.google.com/o/oauth2/revoke",
+      appname = appName,
+      credentials = list(
+        access_token = token_info$access_token,
+        refresh_token = token_info$refresh_token,
+        token_type = token_info$token_type,
+        expires_in = token_info$expires_in
+      )
+    )
+  } else {
+    stop("OAuth token is not set for Google Drive")
+  }
+}
+
+
+#' API to refresh token
+#' @export
+refreshGoogleTokenForDrive <- function(tokenFileId = ""){
+  getGoogleTokenForDrive(tokenFileId = tokenFileId, FALSE)
 }
 
 #' tokenFileId is a unique value per data farme and is used to create a token cache file
