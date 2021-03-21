@@ -1564,7 +1564,8 @@ extract_from_date <- function(x, type = "fltoyear") {
       ret <- exploratory::week(x, unit="quarter")
     },
     day = {
-      ret <- lubridate::day(x)
+      # Convert integer to numeric. mmpf::marginalPrediction we use for partial dependence throws assertion error, if the data is integer and specified grid points are not integer.
+      ret <- as.numeric(lubridate::day(x))
     },
     # This key is required by Exploratory Desktop for Summarize Group Dialog
     dayofyear = {

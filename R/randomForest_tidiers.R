@@ -2099,7 +2099,7 @@ calc_feature_imp <- function(df,
                              smote_target_minority_perc = 40,
                              smote_max_synth_perc = 200,
                              smote_k = 5,
-                             importance_measure = "permutation", # "permutation" or "impurity".
+                             importance_measure = "permutation", # "permutation", "firm", or "impurity".
                              max_pd_vars = NULL,
                              # Number of most important variables to calculate partial dependences on. 
                              # By default, when Boruta is on, all Confirmed/Tentative variables.
@@ -2119,6 +2119,11 @@ calc_feature_imp <- function(df,
     stop("test_rate must be between 0 and 1")
   } else if (test_rate == 1){
     stop("test_rate must be less than 1")
+  }
+
+  # For now, if FIRM is specified with Boruta, which is not supported, we run Boruta with permutation importance instead.
+  if (with_boruta && importance_measure == "firm") {
+    importance_measure <- "permutation"
   }
 
   # this seems to be the new way of NSE column selection evaluation
@@ -2232,6 +2237,7 @@ calc_feature_imp <- function(df,
       sample.fraction <- min(c(max_sample_size / max_nrow, 1))
 
       if (with_boruta || # Run only either Boruta or ranger::importance.
+          importance_measure == "firm" || # FIRM does not depend on importance result from ranger.
           length(c_cols) <= 1) { # Calculate importance only when there are multiple variables.
         ranger_importance_measure <- "none"
       }
@@ -2271,7 +2277,7 @@ calc_feature_imp <- function(df,
         if (importance_measure == "impurity") {
           getImp <- Boruta::getImpRfGini
         }
-        else { # default to equivalent of "permutation".
+        else { # default to equivalent of "permutation". This includes the case where "firm" is specified.
           getImp <- Boruta::getImpRfZ
         }
         model$boruta <- Boruta::Boruta(
@@ -2302,7 +2308,7 @@ calc_feature_imp <- function(df,
           imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
         }
       }
-      else {
+      else if (importance_measure %in% c("permutation", "impurity")) { # Make use of output from ranger in these cases.
         # return partial dependence
         if (length(c_cols) > 1) { # Calculate importance only when there are multiple variables.
           imp_df <- importance_ranger(model)
@@ -2318,38 +2324,53 @@ calc_feature_imp <- function(df,
           max_pd_vars <- 20 # Number of most important variables to calculate partial dependences on. This used to be 12 but we decided it was a little too small.
         }
         imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
-        # code to separate numeric and categorical. keeping it for now for possibility of design change
-        # imp_vars_tmp <- imp_df$variable
-        # imp_vars <- character(0)
-        # if (var.type == "numeric") {
-        #   # keep only numeric variables from important ones
-        #   for (imp_var in imp_vars_tmp) {
-        #     if (is.numeric(model_df[[imp_var]])) {
-        #       imp_vars <- c(imp_vars, imp_var)
-        #     }
-        #   }
-        # }
-        # else {
-        #   # keep only non-numeric variables from important ones
-        #   for (imp_var in imp_vars_tmp) {
-        #     if (!is.numeric(model_df[[imp_var]])) {
-        #       imp_vars <- c(imp_vars, imp_var)
-        #     }
-        #   }
-        # }
+      }
+      else {
+        # Skip inp_vars filtering for FIRM, since we need to calculate PDP for all variables to get FIRM for all variables.
+        imp_vars <- c_cols # Just use c_cols as is for imp_vars to calculate partial dependence.
       }
       imp_vars <- as.character(imp_vars) # for some reason imp_vars is converted to factor at this point. turn it back to character.
       model$imp_vars <- imp_vars
       # Second element of n argument needs to be less than or equal to sample size, to avoid error.
       if (length(imp_vars) > 0) {
         model$partial_dependence <- partial_dependence.ranger(model, vars=imp_vars, data=model_df, n=c(pd_grid_resolution, min(model$num.samples, pd_sample_size)))
+      }
+      else {
+        model$partial_dependence <- NULL
+      }
+
+      if (importance_measure == "firm") { # If importance measure is FIRM, we calculate them now, after PDP is calculated.
+        if (length(c_cols) > 1) { # Calculate importance only when there are multiple variables.
+          pdp_target_col <- if (classification_type == "binary") {
+            "TRUE"
+          }
+          else {
+            attr(model$partial_dependence, "target")
+          }
+          imp_df <- importance_firm(model$partial_dependence, pdp_target_col, imp_vars)
+          model$imp_df <- imp_df
+          imp_vars <- imp_df$variable
+        }
+        else {
+          error <- simpleError("Variable importance requires two or more variables.")
+          model$imp_df <- error
+          imp_vars <- c_cols # Just use c_cols as is for imp_vars to calculate partial dependence anyway.
+        }
+
+        if (is.null(max_pd_vars)) {
+          max_pd_vars <- 20 # Number of most important variables to calculate partial dependences on. This used to be 12 but we decided it was a little too small.
+        }
+        imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
+        model$imp_vars <- imp_vars
+        # Shrink the partial dependence data keeping only the important variables.
+        model$partial_dependence <- shrink_partial_dependence_data(model$partial_dependence, imp_vars)
+      }
+
+      if (length(imp_vars) > 0) {
         if (pd_with_bin_means && is_target_logical_or_numeric) {
           # We calculate means of bins only for logical or numeric target to keep the visualization simple.
           model$partial_binning <- calc_partial_binning_data(model_df, clean_target_col, imp_vars)
         }
-      }
-      else {
-        model$partial_dependence <- NULL
       }
 
       # these attributes are used in tidy of randomForest
@@ -2671,7 +2692,8 @@ tidy.ranger <- function(x, type = "importance", pretty.name = FALSE, binary_clas
     },
     {
       stop(paste0("type ", type, " is not defined"))
-    })
+    }
+  )
 }
 
 # This is used from Analytics View only when classification type is regression.
@@ -2804,21 +2826,29 @@ glance.rpart <- function(x, pretty.name = FALSE, ...) {
   ret
 }
 
+# TODO: Make this function model-agnostic and consolidate. There are similar code for lm/glm, ranger, rpart, and xgboost.
 # Builds partial_dependency object for ranger. Originally from edarf:::partial_dependence.ranger.
 partial_dependence.ranger <- function(fit, vars = colnames(data),
-  n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)),
+  n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L),
+        nrow(data)), # entire given data is used by default, but this will override it when calling it.
   interaction = FALSE, uniform = TRUE, data, ...) {
 
   target = strsplit(strsplit(as.character(fit$call), "formula")[[2]], " ~")[[1]][[1]]
 
   predict.fun = function(object, newdata) {
-    if (object$treetype != "Classification") {
-      predict(object, data = newdata)$predictions
-    } else {
-      t(apply(predict(object, data = newdata, predict.all = TRUE)$predictions, 1,
-        function(x) table(factor(x, seq_len(length(unique(data[[target]]))),
-          levels(data[[target]]))) / length(x)))
-      }
+    predict(object, data = newdata)$predictions
+  }
+
+  # Generate grid points based on quantile, so that FIRM calculated based on it would make good sense even when there are some outliers.
+  points <- list()
+  for (cname in vars) {
+    if (is.numeric(data[[cname]])) {
+      coldata <- data[[cname]]
+      points[[cname]] <- quantile(coldata, probs=0:25/25)
+    }
+    else {
+      points[[cname]] <- unique(data[[cname]])
+    }
   }
 
   args = list(
@@ -2826,7 +2856,7 @@ partial_dependence.ranger <- function(fit, vars = colnames(data),
     "vars" = vars,
     "n" = n,
     "model" = fit,
-    "uniform" = uniform,
+    "points" = points,
     "predict.fun" = predict.fun,
     ...
   )
@@ -2850,11 +2880,13 @@ partial_dependence.ranger <- function(fit, vars = colnames(data),
 
   attr(pd, "class") = c("pd", "data.frame")
   attr(pd, "interaction") = interaction == TRUE
-  attr(pd, "target") = if (fit$treetype != "Classification") target else levels(fit$predictions)
+  attr(pd, "target") = if (fit$treetype == "Regression") target else colnames(fit$predictions)
   attr(pd, "vars") = vars
+  attr(pd, "points") = points
   pd
 }
 
+# TODO: Make this function model-agnostic and consolidate. There are similar code for lm/glm, ranger, rpart, and xgboost.
 # Builds partial_dependency object for rpart with same structure (a data.frame with attributes.) as edarf::partial_dependence.
 partial_dependence.rpart = function(fit, target, vars = colnames(data),
   n = c(min(nrow(unique(data[, vars, drop = FALSE])), 25L), nrow(data)), # Keeping same default of 25 as edarf::partial_dependence, although we usually overwrite from callers.
@@ -2870,12 +2902,24 @@ partial_dependence.rpart = function(fit, target, vars = colnames(data),
     ret
   }
 
+  # Generate grid points based on quantile, so that FIRM calculated based on it would make good sense even when there are some outliers.
+  points <- list()
+  for (cname in vars) {
+    if (is.numeric(data[[cname]])) {
+      coldata <- data[[cname]]
+      points[[cname]] <- quantile(coldata, probs=0:25/25)
+    }
+    else {
+      points[[cname]] <- unique(data[[cname]])
+    }
+  }
+
   args = list(
     "data" = data,
     "vars" = vars,
     "n" = n,
     "model" = fit,
-    "uniform" = uniform,
+    "points" = points,
     "predict.fun" = predict.fun,
     ...
   )
@@ -2901,6 +2945,7 @@ partial_dependence.rpart = function(fit, target, vars = colnames(data),
   attr(pd, "interaction") = interaction == TRUE
   attr(pd, "target") = if (fit$classification_type %in% c("regression", "binary")) target else attr(fit,"ylevels")
   attr(pd, "vars") = vars
+  attr(pd, "points") = points
   pd
 }
 
@@ -2918,6 +2963,7 @@ exp_rpart <- function(df,
                       smote_target_minority_perc = 40,
                       smote_max_synth_perc = 200,
                       smote_k = 5,
+                      importance_measure = "impurity", # "firm", or "impurity". Defaulting to impurity for backward compatibility for pre-6.5.
                       max_pd_vars = 20,
                       pd_sample_size = 500,
                       pd_grid_resolution = 20,
@@ -3050,7 +3096,7 @@ exp_rpart <- function(df,
         model$imp_df <- error
         imp_vars <- c_cols
       }
-      else if (!is.null(model$variable.importance)) { # It is possible variable.importance is missing for example when no split happened.
+      else if (importance_measure == "impurity" && !is.null(model$variable.importance)) { # It is possible variable.importance is missing for example when no split happened.
         imp <- model$variable.importance
         imp_vars <- names(imp) # model$variable.importance is already sorted by importance.
         imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # Keep only max_pd_vars most important variables
@@ -3059,6 +3105,10 @@ exp_rpart <- function(df,
           importance = imp
         )
       }
+      else if (importance_measure == "firm") {
+        # Skip inp_vars filtering for FIRM, since we need to calculate PDP for all variables to get FIRM for all variables.
+        imp_vars <- c_cols
+      }
       else {
         error <- simpleError("Variable importance is not available because there is no split in the decision tree.")
         model$imp_df <- error
@@ -3066,11 +3116,39 @@ exp_rpart <- function(df,
       }
 
       model$partial_dependence <- partial_dependence.rpart(model, clean_target_col, vars=imp_vars, data=df, n=c(pd_grid_resolution, min(nrow(df), pd_sample_size)))
+      model$imp_vars <- imp_vars # keep imp_vars in the model for ordering of charts based on the importance.
+
+      if (importance_measure == "firm") { # If importance measure is FIRM, we calculate them now, after PDP is calculated.
+        if (length(c_cols) > 1) { # Calculate importance only when there are multiple variables.
+          pdp_target_col <- if (classification_type == "binary") {
+            "TRUE"
+          }
+          else {
+            attr(model$partial_dependence, "target")
+          }
+          imp_df <- importance_firm(model$partial_dependence, pdp_target_col, imp_vars)
+          model$imp_df <- imp_df
+          imp_vars <- imp_df$variable
+        }
+        else {
+          error <- simpleError("Variable importance requires two or more variables.")
+          model$imp_df <- error
+          imp_vars <- c_cols # Just use c_cols as is for imp_vars to calculate partial dependence anyway.
+        }
+
+        if (is.null(max_pd_vars)) {
+          max_pd_vars <- 20 # Number of most important variables to calculate partial dependences on. This used to be 12 but we decided it was a little too small.
+        }
+        imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # take max_pd_vars most important variables
+        model$imp_vars <- imp_vars
+        # Shrink the partial dependence data keeping only the important variables.
+        model$partial_dependence <- shrink_partial_dependence_data(model$partial_dependence, imp_vars)
+      }
+
       if (pd_with_bin_means && is_target_logical_or_numeric) {
         # We calculate means of bins only for logical or numeric target to keep the visualization simple.
         model$partial_binning <- calc_partial_binning_data(df, clean_target_col, imp_vars)
       }
-      model$imp_vars <- imp_vars # keep imp_vars in the model for ordering of charts based on the importance.
 
       if (test_rate > 0) {
         # Handle NA rows for test. For training, rpart seems to automatically handle it, and row numbers of

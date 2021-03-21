@@ -7,18 +7,18 @@
 #' @param ... Additional vectors to be used to pridict NA when type is lm_predict
 #' @export
 impute_na <- function(target, type = mean, val = 0, ...) {
-  if(typeof(type) == "closure"){
+  if (typeof(type) == "closure") {
     # type is function in this case
     val <- type(target[!is.na(target)])
-    if(length(val) != 1){
+    if (length(val) != 1){
       stop("type function must return one value")
     }
     target[is.na(target)] <- val
     target
   } else {
     switch(type, predict = {
-      if(val == 0 || length(val) != length(target)){
-        # this is when no predictor columns are chosen
+      # this is for when no predictor column is chosen. val == 0 does not work for this purpose well since it returns vector.
+      if (length(val) != length(target)) {
         stop("Please choose predictor columns")
       }
       # list(val, ...) is a list of vectors to predict NA values
@@ -45,9 +45,9 @@ impute_na <- function(target, type = mean, val = 0, ...) {
       target[is.na(target)] <- val
       target
     }, value = {
-      if(length(val) == 1){
+      if (length(val) == 1){
         # if val is length 1, na is filled with the value
-        if(is.factor(target)) {
+        if (is.factor(target)) {
           # if target is factor, val should be added as target level
           # otherwise, it doesn't replace NA.
           # val might be already in the level but
@@ -58,7 +58,7 @@ impute_na <- function(target, type = mean, val = 0, ...) {
       } else {
         # if val is not length 1,
         # NA in target is replaced with the value in the same position
-        if(is.factor(target)){
+        if (is.factor(target)){
           # if target is factor, val should be added as target level
           # otherwise, it doesn't replace NA.
           # val might be already in the level but

@@ -17,7 +17,7 @@ test_that("test impute_na with factor with values already included in original f
   expect_equal(ret, as.factor(c(letters[1:5], "a", letters[1:5], "a")))
 })
 
-test_that("test impute_na", {
+test_that("test impute_na with predict type", {
   test_data <- data.frame(
     rep(c(NA, NA, seq(7), NA), 10),
     rep(c(10, seq(8), NA), 10),
@@ -27,6 +27,7 @@ test_that("test impute_na", {
     letters[rep(seq(4), each = 25)]
   )
   colnames(test_data) <- c("col 1", "col-2", "col_3", "chars", "group1", "group2")
+
   ret1 <- test_data %>%
     dplyr::group_by(group1) %>%
     dplyr::mutate(filled_na = impute_na(`col 1`, `col-2`, col_3, chars, type = "predict"))
@@ -39,6 +40,12 @@ test_that("test impute_na", {
 
   # result should be changed by group_by
   expect_true(any(ret1[["filled_na"]][!is.na(ret1[["filled_na"]])] != ret2[["filled_na"]][!is.na(ret2[["filled_na"]])]))
+
+  # Test the case where no predictor is specified.
+  expect_error({
+    ret3 <- test_data %>%
+      dplyr::mutate(filled_na = impute_na(`col 1`, type = "predict"))
+  }, "Please choose predictor columns")
 })
 
 test_that("test impute_na", {

@@ -3,8 +3,11 @@
 exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.aggregate = sum, na_fill_type = "previous", na_fill_value = 0, max_category_na_ratio = 0.5,
                            variables = NULL, funs.aggregate.variables = NULL,
                            centers = 3L, with_centroids = FALSE, distance = "sdtw", centroid = "sdtw_cent",
+                           roll_mean_window = NULL,
+                           normalize = "none",
                            seed = 1,
-                           output = "data") {
+                           output = "data",
+                           stop_for_no_data = TRUE) {
   if(!is.null(seed)) {
     set.seed(seed)
   }
@@ -110,21 +113,62 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
       # Drop columns (represents category) that has more NAs than max_category_na_ratio, considering them to have not enough data.
       df <- df %>% dplyr::select_if(function(x){sum(is.na(x))/length(x) < max_category_na_ratio})
       if (length(colnames(df)) <= centers) {
-        stop("EXP-ANA-2 :: [] :: There is not enough data left after removing high NA ratio data.")
+        if (stop_for_no_data) {
+          stop("EXP-ANA-2 :: [] :: There is not enough data left after removing high NA ratio data.")
+        }
+        # For Analytics View, keep going to show at least the diagnostic chart to show where NAs are.
+        model <- list()
+        # Pass original data.
+        # - So that we can generate diagnostic chart about where NAs are.
+        attr(model, "aggregated_data") <- df_summarised
+        attr(model, "error") <- "There is not enough data left after removing high NA ratio data."
+        class(model) <- "PartitionalTSClusters_exploratory"
+        return(model)
       }
       # Fill NAs in time series
       df <- df %>% dplyr::mutate(across(-time, ~fill_ts_na(.x, time, type = na_fill_type, val = na_fill_value)))
+
+      if (!is.null(roll_mean_window) && roll_mean_window > 1) {
+        if (nrow(df) - (roll_mean_window - 1) < 1) {
+          stop("EXP-ANA-4 :: [] :: The window size of moving average is too long for this data.")
+        }
+        df <- df %>% dplyr::mutate(across(-time, ~RcppRoll::roll_mean(.x, n = roll_mean_window, fill = NA, align="right")))
+        df <- df %>% tail(-(roll_mean_window - 1)) # Remove NA rows created at the beginning of df.
+      }
+
       time_values <- df$time
       df <- df %>% dplyr::select(-time)
+      if (normalize != "none") {
+        df_before_normalize <- df
+      }
+      switch (normalize,
+        center_and_scale = {
+          df <- df %>% dplyr::mutate(across(everything(), ~normalize(.x, center=TRUE, scale=TRUE)))
+        },
+        center = {
+          df <- df %>% dplyr::mutate(across(everything(), ~normalize(.x, center=TRUE, scale=FALSE)))
+        },
+        scale = {
+          df <- df %>% dplyr::mutate(across(everything(), ~normalize(.x, center=FALSE, scale=TRUE)))
+        }
+      )
       model <- dtwclust::tsclust(t(as.matrix(df)), k = centers, distance = distance, centroid = centroid)
+      model <- list(model = model) # Since the original model is S4 object, we create an S3 object that wraps it.
       attr(model, "time_col") <- time_col
       attr(model, "value_col") <- value_col
       attr(model, "category_col") <- category_col
       attr(model, "time_values") <- time_values
-      # Pass original data, so that the output has other variables too.
-      if (!is.null(variables) && !is.null(funs.aggregate.variables)) {
-        attr(model, "aggregated_data") <- df_summarised
+      if (!is.null(variables)) {
+        attr(model, "variable_cols") <- variables 
       }
+      # Pass original data.
+      # - So that the output has other variables too.
+      # - So that we can generate diagnostic chart about where NAs are.
+      attr(model, "aggregated_data") <- df_summarised
+      if (normalize != "none") {
+        attr(model, "before_normalize_data") <- df_before_normalize
+      }
+      class(model) <- "PartitionalTSClusters_exploratory"
       model
     }))
   model_df <- model_df %>% rowwise()
@@ -139,39 +183,70 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
 #' Extracts results from the model as a data frame.
 #' The output is original long-format set of time series with Cluster column.
 #' @export
-tidy.PartitionalTSClusters <- function(x, with_centroids = TRUE) {
-  res <- tibble::as_tibble(x@datalist)
-  res <- res %>% dplyr::mutate(time=!!attr(x,"time_values"))
-  cluster_map <- x@cluster
-  cluster_map_names <- names(x@datalist)
+tidy.PartitionalTSClusters_exploratory <- function(x, with_centroids = TRUE, type = "result", with_before_normalize_data = TRUE) {
+  model <- x$model
+  switch(type,
+    result = {
+      if (is.null(model)) {
+        return(tibble::tibble()) # Return empty data frame to show "No Data" screen.
+      }
+      # Create map of time series names to clustering results
+      cluster_map <- model@cluster
+      cluster_map_names <- names(model@datalist)
+      if (with_centroids) {
+        for (i in 1:(model@k)) {
+          cluster_map <- c(cluster_map, i)
+          cluster_map_names <- c(cluster_map_names, paste0("Centroid ",i))
+        }
+      }
+      names(cluster_map) <- cluster_map_names
 
-  if (with_centroids) {
-    for (i in 1:(x@k)) {
-      res <- res %>% dplyr::mutate(!!rlang::sym(paste0("centroid",i)):=x@centroids[[i]])
-      cluster_map <- c(cluster_map, i)
-      cluster_map_names <- c(cluster_map_names, paste0("centroid",i))
+      res <- tibble::as_tibble(model@datalist)
+      res <- res %>% dplyr::mutate(time=!!attr(x,"time_values"))
+      # Add centroids data
+      if (with_centroids) {
+        for (i in 1:(model@k)) {
+          res <- res %>% dplyr::mutate(!!rlang::sym(paste0("Centroid ",i)):=model@centroids[[i]])
+        }
+      }
+      res <- res %>% tidyr::pivot_longer(cols = -time)
+
+      orig_df <- attr(x, "before_normalize_data")
+      if (!is.null(orig_df) && with_before_normalize_data) { # If normalization was done and we want to show the result with before-normalize data.
+        orig_df <- orig_df %>% dplyr::mutate(time=!!attr(x,"time_values"))
+        orig_df <- orig_df %>% tidyr::pivot_longer(cols = -time)
+        res <- res %>% dplyr::rename(value_normalized=value) # The value we have now in res is normalized one. Rename it, and get the one without normalization from orig_df.
+        res <- res %>% dplyr::left_join(orig_df, by=c("time"="time", "name"="name"))
+        res <- res %>% dplyr::relocate(value, .before=value_normalized) # Adjust column order.
+      }
+
+      if (!is.null(attr(x, "variable_cols"))) { # If there are other columns to keep in the result, join them.
+        aggregated_data <- attr(x, "aggregated_data")
+        aggregated_data <- aggregated_data %>% dplyr::select(-value) # Drop value column from aggregated_data since res already has it.
+        res <- res %>% dplyr::left_join(aggregated_data, by=c("time"="time", "name"="category"))
+      }
+      res <- res %>% dplyr::mutate(Cluster = cluster_map[name])
+      value_col <- attr(x, "value_col")
+      if (value_col == "") {
+        res <- res %>% dplyr::rename(!!rlang::sym(attr(x,"time_col")):=time,
+                                     Number_of_Rows=value,
+                                     !!rlang::sym(attr(x,"category_col")):=name)
+        if (!is.null(orig_df) && with_before_normalize_data) { # If normalization was done and we want to show the result with before-normalize data.
+          res <- res %>% dplyr::rename(Number_of_Rows_normalized=value_normalized)
+        }
+      }
+      else {
+        res <- res %>% dplyr::rename(!!rlang::sym(attr(x,"time_col")):=time,
+                                     !!rlang::sym(value_col):=value,
+                                     !!rlang::sym(attr(x,"category_col")):=name)
+        if (!is.null(orig_df) && with_before_normalize_data) { # If normalization was done and we want to show the result with before-normalize data.
+          res <- res %>% dplyr::rename(!!rlang::sym(paste0(value_col,"_normalized")):=value_normalized)
+        }
+      }
+    },
+    aggregated = { # Return raw aggretated time series data before filling NAs and feeding to the clustering algorithm. This is for Data Validation tab.
+      res <- attr(x, "aggregated_data")
     }
-  }
-
-  names(cluster_map) <- cluster_map_names
-
-  res <- res %>% tidyr::pivot_longer(cols = -time)
-  if (!is.null(attr(x, "aggregated_data"))) {
-    aggregated_data <- attr(x, "aggregated_data")
-    aggregated_data <- aggregated_data %>% dplyr::select(-value) # Drop value column from aggregated_data since res already has it.
-    res <- res %>% dplyr::left_join(aggregated_data, by=c("time"="time", "name"="category"))
-  }
-  res <- res %>% dplyr::mutate(Cluster = cluster_map[name])
-  value_col <- attr(x, "value_col")
-  if (value_col == "") {
-    res <- res %>% dplyr::rename(!!rlang::sym(attr(x,"time_col")):=time,
-                                 Number_of_Rows=value,
-                                 !!rlang::sym(attr(x,"category_col")):=name)
-  }
-  else {
-    res <- res %>% dplyr::rename(!!rlang::sym(attr(x,"time_col")):=time,
-                                 !!rlang::sym(value_col):=value,
-                                 !!rlang::sym(attr(x,"category_col")):=name)
-  }
+  )
   res
 }
