@@ -60,7 +60,7 @@ test_that("test do_roc with 2 numeric values", {
   )
   predicted <- prediction(model_data)
 
-  predicted[["CANCELLED"]] <- c(2, 4, 4, 2, 2, 4, 4, 2, 2, 2, 2, 4, 2, NA, 2)
+  predicted[["CANCELLED"]] <- c(NA, 4, 4, 2, 2, 4, 4, 2, 2, 2, 2, 4, 2, NA, 2) # Testing the case where the data starts with NA, which used to mess up filtering NAs in do_roc.
   ret <- do_roc(predicted, predicted_response, CANCELLED)
   expect_true(any(!ret[["false_positive_rate"]] %in% c(0, 1)))
 
