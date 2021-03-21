@@ -2411,6 +2411,9 @@ week <- function(date, unit="year") {
 #' @export
 #' Reference: https://blog.mbq.me/augh-roc/
 auroc <- function(score, bool) {
+  not_na <- !(is.na(score) | is.na(bool)) # Index to filter out score-bool pairs with NA in either of them.
+  bool <- bool[not_na]
+  score <- score[not_na]
   n1 <- sum(!bool)
   n2 <- sum(bool)
   U  <- sum(rank(score)[!bool]) - n1 * (n1 + 1) / 2
