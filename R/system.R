@@ -2446,6 +2446,7 @@ read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL,
   # by default the convertDataTypeToChar is set as TRUE to covert the resulting data frame columns' data type as character.
   # This is required to make sure that merging the Excel based data frames doesn't error out due to column data types mismatch.
   # Once the data frames merging is done, readr::type_convert is called from Exploratory Desktop to restore the column data types.
+  # We don't want to reply on readxl::read_excel's col_types argument "text" since this option converts Date or POSIXct column data as number instead of "2021-01-01" style text.
   if(convertDataTypeToChar) {
     df <- df %>% dplyr::mutate(dplyr::across(dplyr::everything(), as.character));
   }
