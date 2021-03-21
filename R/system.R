@@ -2474,7 +2474,7 @@ get_excel_sheets <- function(path){
 #'@export
 read_delim_files <- function(files, delim, quote = '"',
                               escape_backslash = FALSE, escape_double = TRUE,
-                              col_names = TRUE, col_types = NULL,
+                              col_names = TRUE, col_types = readr::cols(.default = readr::col_character()),
                               locale = readr::default_locale(),
                               na = c("", "NA"), quoted_na = TRUE,
                               comment = "", trim_ws = FALSE,

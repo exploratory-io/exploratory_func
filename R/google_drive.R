@@ -71,7 +71,7 @@ getCSVFileFromGoogleDrive <- function(fileId, delim, quote = '"',
 #'@export
 getCSVFilesFromGoogleDrive <- function(fileIds, fileNames, region, username, password, bucket, fileName, delim, quote = '"',
                               escape_backslash = FALSE, escape_double = TRUE,
-                              col_names = TRUE, col_types = NULL,
+                              col_names = TRUE, col_types = readr::cols(.default = readr::col_character()),
                               locale = readr::default_locale(),
                               na = c("", "NA"), quoted_na = TRUE,
                               comment = "", trim_ws = FALSE,
