@@ -68,6 +68,10 @@ getCSVFileFromGoogleDrive <- function(fileId, delim, quote = '"',
 }
 
 #'API that imports multiple same structure CSV files and merge it to a single data frame
+#'
+#'For col_types parameter, by default it forces character to make sure that merging the CSV based data frames doesn't error out due to column data types mismatch.
+# Once the data frames merging is done, readr::type_convert is called from Exploratory Desktop to restore the column data types.
+
 #'@export
 getCSVFilesFromGoogleDrive <- function(fileIds, fileNames, region, username, password, bucket, fileName, delim, quote = '"',
                               escape_backslash = FALSE, escape_double = TRUE,

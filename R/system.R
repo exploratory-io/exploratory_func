@@ -2442,7 +2442,10 @@ read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL,
   if(!is.null(tzone)) { # if timezone is specified, apply the timezeon to POSIXct columns
     df <- df %>% dplyr::mutate_if(lubridate::is.POSIXct, funs(lubridate::force_tz(., tzone=tzone)))
   }
-  # for .xlsx file extension, since openxlsx::read.xlsx does not have parameter for data types, explicitly sets as data types as text if col_types is set as text.
+  # When this API is called from getExcelFilesFromS3, getExcelFilesFromGoogleDrive, and read_excel_files,
+  # by default the convertDataTypeToChar is set as TRUE to covert the resulting data frame columns' data type as character.
+  # This is required to make sure that merging the Excel based data frames doesn't error out due to column data types mismatch.
+  # Once the data frames merging is done, readr::type_convert is called from Exploratory Desktop to restore the column data types.
   if(convertDataTypeToChar) {
     df <- df %>% dplyr::mutate(dplyr::across(dplyr::everything(), as.character));
   }
@@ -2476,6 +2479,10 @@ get_excel_sheets <- function(path){
 }
 
 #'API that imports multiple same structure CSV files and merge it to a single data frame
+#'
+#'For col_types parameter, by default it forces character to make sure that merging the CSV based data frames doesn't error out due to column data types mismatch.
+# Once the data frames merging is done, readr::type_convert is called from Exploratory Desktop to restore the column data types.
+
 #'@export
 read_delim_files <- function(files, delim, quote = '"',
                               escape_backslash = FALSE, escape_double = TRUE,
