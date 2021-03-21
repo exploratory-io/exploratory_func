@@ -2336,7 +2336,7 @@ download_data_file <- function(url, type){
 
 #'API that imports multiple same structure Excel files and merge it to a single data frame
 #'@export
-read_excel_files <- function(files, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, ...) {
+read_excel_files <- function(files, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...) {
     # set name to the files so that it can be used for the "id" column created by purrr::map_dfr.
     files <- setNames(as.list(files), files)
     df <- purrr::map_dfr(files, exploratory::read_excel_file, sheet = sheet,
@@ -2351,7 +2351,8 @@ read_excel_files <- function(files, sheet = 1, col_names = TRUE, col_types = NUL
            skipEmptyRows = skipEmptyRows,
            skipEmptyCols = skipEmptyCols,
            check.names = check.names,
-           tzone = tzone, .id = "exp.file.id") %>% mutate(exp.file.id = basename(exp.file.id)) # extract file name from full path with basename.
+           tzone = tzone, convertDataTypeToChar = convertDataTypeToChar,
+           .id = "exp.file.id") %>% mutate(exp.file.id = basename(exp.file.id)) # extract file name from full path with basename.
     id_col <- avoid_conflict(colnames(df), "id")
     # copy internal exp.file.id to the id column.
     df[[id_col]] <- df[["exp.file.id"]]
@@ -2362,7 +2363,7 @@ read_excel_files <- function(files, sheet = 1, col_names = TRUE, col_types = NUL
 #'Wrapper for openxlsx::read.xlsx (in case of .xlsx file) and readxl::read_excel (in case of old .xls file)
 #'Use openxlsx::read.xlsx since it's memory footprint is less than that of readxl::read_excel and this creates benefit for users with less memory like Windows 32 bit users.
 #'@export
-read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, ...){
+read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = FALSE, ...){
   loadNamespace("openxlsx")
   loadNamespace('readxl')
   loadNamespace('stringr')
@@ -2387,7 +2388,7 @@ read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL,
       } else {
         df <- openxlsx::read.xlsx(xlsxFile = new_path, sheet = sheet, colNames = col_names, startRow = skip+1, na.strings = na, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols, check.names = check.names, detectDates = detectDates)
       }
-      # Preserve original column name for backward comaptibility (ref: https://github.com/awalker89/openxlsx/issues/102)
+      # Preserve original column name for backward compatibility (ref: https://github.com/awalker89/openxlsx/issues/102)
       # Calling read.xlsx again looks inefficient, but it seems this is the only solution suggested in the above issue page.
       colnames(df) <- openxlsx::read.xlsx(xlsxFile = new_path, sheet = sheet, rows = (skip+1), check.names = FALSE, colNames = FALSE) %>% as.character()
       file.remove(new_path)
@@ -2440,6 +2441,10 @@ read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL,
   }
   if(!is.null(tzone)) { # if timezone is specified, apply the timezeon to POSIXct columns
     df <- df %>% dplyr::mutate_if(lubridate::is.POSIXct, funs(lubridate::force_tz(., tzone=tzone)))
+  }
+  # for .xlsx file extension, since openxlsx::read.xlsx does not have parameter for data types, explicitly sets as data types as text if col_types is set as text.
+  if(convertDataTypeToChar) {
+    df <- df %>% dplyr::mutate(dplyr::across(dplyr::everything(), as.character));
   }
   df
 }
