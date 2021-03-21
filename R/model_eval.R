@@ -26,7 +26,7 @@ do_roc_ <- function(df, pred_prob_col, actual_val_col, grid = NULL, with_auc = F
 
   do_roc_each <- function(df){
     # filter out NAs upfront.
-    df <- df %>% dplyr::filter(!is.na(!!rlang::sym(pred_prob_col)) && !is.na(!!rlang::sym(actual_val_col)))
+    df <- df %>% dplyr::filter(!is.na(!!rlang::sym(pred_prob_col)) & !is.na(!!rlang::sym(actual_val_col)))
     df[[actual_val_col]] <- binary_label(df[[actual_val_col]])
 
     if (with_auc) { # Calculate AUC.

@@ -994,3 +994,10 @@ test_that("cumsum_decayed", {
   res <- cumsum_decayed(c(1,1,1,1), 0.5)
   expect_equal(res, c(1, 1.5, 1.75, 1.875))
 })
+
+test_that("auroc", {
+  res <- auroc(c(0.1, 0.2, 0.3, 0.4), c(F, T, F, T))
+  expect_equal(res, 0.75)
+  res <- auroc(c(0.1, 0.2, 0.3, 0.4, NA, 0.6), c(F, T, F, T, F, NA))
+  expect_equal(res, 0.75)
+})
