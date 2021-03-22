@@ -2262,6 +2262,16 @@ summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...) {
   ret %>% dplyr::mutate_if(is.integer, as.numeric)
 }
 
+# Wrapper function around apply to apply aggregation function across columns for each row.
+# Example Usage:
+# airquality %>% mutate(total = summarize_row(across(where(is.numeric)), median, na.rm=TRUE))
+#' @param x - data frame
+#' @param f - function
+#' @export
+summarize_row <- function(x, f, ...) {
+  apply(x, 1, f, ...)
+}
+
 # Maps locale across platforms. e.g. From Japanese_Japan.932 on Windows to ja_JP.UTF-8 on unix.
 # We keep LC_TIME locale with models created by Analytics View, so that preprocessor function like wday
 # should produce the same results as when the model was created, when the model is used for prediction with new data.
