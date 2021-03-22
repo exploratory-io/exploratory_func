@@ -1,7 +1,7 @@
 #' Column name parser
 #' This function is from https://github.com/tidyverse/broom/blob/master/R/utilities.R
 #' @export
-col_name <- function(x, default = stop("Please supply column name", call. = FALSE)){
+col_name <- function(x, default = stop("Please supply column name", call. = FALSE)) {
   if (is.character(x))
     return(x)
   if (identical(x, quote(expr = )))
@@ -24,25 +24,25 @@ col_name <- function(x, default = stop("Please supply column name", call. = FALS
 #' @param time_unit Unit of time to aggregate key_col if key_col is Date or POSIXct#' @param time_unit Unit of time to aggregate key_col if key_col is Date or POSIXct. NULL doesn't aggregate.
 #' @param na.rm If NA in val should be removed
 #' @export
-simple_cast <- function(data, row, col, val=NULL, fun.aggregate=mean, fill=0, time_unit=NULL, na.rm = FALSE){
+simple_cast <- function(data, row, col, val=NULL, fun.aggregate=mean, fill=0, time_unit=NULL, na.rm = FALSE) {
   loadNamespace("reshape2")
   loadNamespace("tidyr")
 
 
-  if(!row %in% colnames(data)){
+  if (!row %in% colnames(data)) {
     stop(paste0(row, " is not in column names"))
   }
 
-  if(!col %in% colnames(data)){
+  if (!col %in% colnames(data)) {
     stop(paste0(col, " is not in column names"))
   }
 
   # noraml na causes error in reshape2::acast so it has to be NA_real_
-  if(is.na(fill)){
+  if (is.na(fill)) {
     fill <- NA_real_
   }
 
-  if(!is.null(val) && na.rm){
+  if (!is.null(val) && na.rm) {
     data <- data %>%
       dplyr::filter(!is.na(!!as.symbol(val)))
   }
@@ -61,19 +61,19 @@ simple_cast <- function(data, row, col, val=NULL, fun.aggregate=mean, fill=0, ti
   uniq_col <- unique(data[[col]], na.rm=TRUE)
   suppressWarnings({
     # length(uniq_row)*length(uniq_col) become NA if it exceeds 2^31
-    if(is.na(length(uniq_row)*length(uniq_col))){
+    if (is.na(length(uniq_row)*length(uniq_col))) {
       # The number of data is supported under 2^31 by reshape2::acast
       stop("Data is too large to make a matrix for calculation.")
     }
   })
 
   fml <- as.formula(paste0("`", row, "`~`", col, "`"))
-  if(is.null(val)){
+  if (is.null(val)) {
     # use sparse = TRUE and as.matrix because xtabs returns table object with occurance and it causes error in kmeans
     mat <- xtabs(as.formula(paste0("~", "`", row , "`", "+", "`", col, "`")), data = data, sparse = TRUE) %>%  as.matrix()
     mat[mat == 0] <- fill
     mat
-  }else{
+  } else {
     if(!val %in% colnames(data)){
       stop(paste0(val, " is not in column names"))
     }
@@ -93,7 +93,7 @@ simple_cast <- function(data, row, col, val=NULL, fun.aggregate=mean, fill=0, ti
 #' Cast data to sparse matrix by choosing row and column from a data frame
 #' @param count If val is NULL and count is TRUE, the value becomes count of the row and col set. Otherwise, it's binary data of row and col set.
 #' @export
-sparse_cast <- function(data, row, col, val=NULL, fun.aggregate=sum, count = FALSE){
+sparse_cast <- function(data, row, col, val=NULL, fun.aggregate=sum, count = FALSE) {
   loadNamespace("dplyr")
   loadNamespace("tidyr")
   loadNamespace("Matrix")
@@ -123,7 +123,7 @@ sparse_cast <- function(data, row, col, val=NULL, fun.aggregate=sum, count = FAL
         dimnames = list(levels(row_fact), levels(col_fact))
         )
     }
-  }else{
+  } else {
     if(!val %in% colnames(data)){
       stop(paste0(val, " is not in column names"))
     }
@@ -162,9 +162,9 @@ sparse_cast <- function(data, row, col, val=NULL, fun.aggregate=sum, count = FAL
 
 #' as.matrix from select argument or cast by three columns
 #' @export
-to_matrix <- function(df, select_dots, by_col=NULL, key_col=NULL, value_col=NULL, fill=0, fun.aggregate=mean){
+to_matrix <- function(df, select_dots, by_col=NULL, key_col=NULL, value_col=NULL, fill=0, fun.aggregate=mean) {
   should_cast <- !(is.null(by_col) & is.null(key_col) & is.null(value_col))
-  if(should_cast){
+  if(should_cast) {
     if(is.null(by_col) | is.null(key_col) | is.null(value_col)){
       stop("all by, key and value should be defined")
     }
@@ -191,7 +191,7 @@ to_matrix <- function(df, select_dots, by_col=NULL, key_col=NULL, value_col=NULL
 #' @param na.rm If NA should be removed from the result
 #' @param zero.rm If 0 should be removed from the result
 #' @export
-upper_gather <- function(mat, names=NULL, diag=NULL, cnames = c("Var1", "Var2", "value"), na.rm = TRUE, zero.rm = TRUE){
+upper_gather <- function(mat, names=NULL, diag=NULL, cnames = c("Var1", "Var2", "value"), na.rm = TRUE, zero.rm = TRUE) {
   loadNamespace("Matrix")
   if(is.vector(mat)){
     # This is basically for dist function
@@ -219,7 +219,7 @@ upper_gather <- function(mat, names=NULL, diag=NULL, cnames = c("Var1", "Var2", 
       trimat[row(trimat)==col(trimat)] = rep(diag, length(names))
     }
     mat_to_df(t(trimat), na.rm=na.rm, cnames=cnames, zero.rm = zero.rm)
-  }else{
+  } else {
     # diag can be NULL or FALSE
     if(is.null(diag)){
       diag <- FALSE
@@ -281,7 +281,7 @@ upper_gather <- function(mat, names=NULL, diag=NULL, cnames = c("Var1", "Var2", 
 
 #' prevent conflict of 2 character vectors and avoid it by adding .new to elements in the second
 #' @export
-avoid_conflict <- function(origin, new, suffix = ".new"){
+avoid_conflict <- function(origin, new, suffix = ".new") {
   conflict <- new %in% origin
   while(any(conflict)){
     new[conflict] <- paste(new[conflict], suffix, sep="")
@@ -303,7 +303,7 @@ grouped_by <- function(df){
 #' @param zero.rm If 0 should be removed from the result
 #' @param diag If diagonal values should be returned
 #' @export
-mat_to_df <- function(mat, cnames=NULL, na.rm=TRUE, zero.rm = TRUE, diag=TRUE){
+mat_to_df <- function(mat, cnames=NULL, na.rm=TRUE, zero.rm = TRUE, diag=TRUE) {
   loadNamespace("reshape2")
   df <- reshape2::melt(t(mat), na.rm=na.rm)
 
@@ -333,11 +333,11 @@ mat_to_df <- function(mat, cnames=NULL, na.rm=TRUE, zero.rm = TRUE, diag=TRUE){
 }
 
 #' Cast the vector to the same type as the original.
-to_same_type <- function(vector, original){
+to_same_type <- function(vector, original) {
   if(is.null(original)){
     vector
   }
-  else if(is.factor(original)){
+  else if(is.factor(original)) {
     if(all(vector[!is.na(vector)] %in% levels(original))){
       # if original is factor and vector has all values,
       # should return factor with same levels
@@ -345,7 +345,7 @@ to_same_type <- function(vector, original){
     } else {
       as.factor(vector)
     }
-  } else if(is.integer(original)){
+  } else if(is.integer(original)) {
     as.integer(vector)
   } else if(inherits(original, "Date")) {
     # when original data is Date.
@@ -357,7 +357,7 @@ to_same_type <- function(vector, original){
                 vector
               }
     )
-  } else if(inherits(original, "POSIXct")){
+  } else if(inherits(original, "POSIXct")) {
     # when original data is POSIXct
     # if the column is wrapped with lubridate function, it's possible that data is converted to numeric like year
     # and character like month name. For these cases, it fails with "character string is not in a standard unambiguous format" error
@@ -367,7 +367,7 @@ to_same_type <- function(vector, original){
                vector
              }
     )
-  } else if (is.numeric(original)){
+  } else if (is.numeric(original)) {
     as.numeric(vector)
   } else if(is.character(original)) {
     as.character(vector)
@@ -383,13 +383,13 @@ to_same_type <- function(vector, original){
 
 #' get number of elements in list data type column for each row
 #' @export
-list_n <- function(column){
+list_n <- function(column) {
   sapply(column, length)
 }
 
 #' extract elements from each row of list type column or data frame type column
 #' @export
-list_extract <- function(column, position = 1, rownum = 1){
+list_extract <- function(column, position = 1, rownum = 1) {
 
   if(position==0){
     stop("position 0 is not supported")
@@ -397,9 +397,9 @@ list_extract <- function(column, position = 1, rownum = 1){
 
   if(is.data.frame(column[[1]])){
     if(position<0){
-      sapply(column, function(column){
+      sapply(column, function(column) {
         index <- ncol(column) + position + 1
-        if(is.null(column[rownum, index]) | index <= 0){
+        if(is.null(column[rownum, index]) | index <= 0) {
           # column[rownum, position] still returns data frame if it's minus, so position < 0 should be caught here
           NA
         } else {
@@ -407,8 +407,8 @@ list_extract <- function(column, position = 1, rownum = 1){
         }
       })
     } else {
-      sapply(column, function(column){
-        if(is.null(column[rownum, position])){
+      sapply(column, function(column) {
+        if(is.null(column[rownum, position])) {
           NA
         } else {
           column[rownum, position][[1]]
@@ -417,7 +417,7 @@ list_extract <- function(column, position = 1, rownum = 1){
     }
   } else {
     if(position<0){
-      sapply(column, function(column){
+      sapply(column, function(column) {
         index <- length(column) + position + 1
         if(index <= 0){
           # column[rownum, position] still returns data frame if it's minus, so position < 0 should be caught here
@@ -427,7 +427,7 @@ list_extract <- function(column, position = 1, rownum = 1){
         }
       })
     } else {
-      sapply(column, function(column){
+      sapply(column, function(column) {
         column[position]
       })
     }
@@ -436,7 +436,7 @@ list_extract <- function(column, position = 1, rownum = 1){
 
 #' convert list column into text column
 #' @export
-list_to_text <- function(column, sep = ", "){
+list_to_text <- function(column, sep = ", ") {
   loadNamespace("stringr")
   ret <- sapply(column, function(x) {
     ret <- stringr::str_c(stringr::str_replace_na(x), collapse = sep)
@@ -452,7 +452,7 @@ list_to_text <- function(column, sep = ", "){
 
 #' concatinate vectors in a list
 #' @export
-list_concat <- function(..., collapse = FALSE){
+list_concat <- function(..., collapse = FALSE) {
   lists <- list(...)
 
   # size of each list
@@ -462,7 +462,7 @@ list_concat <- function(..., collapse = FALSE){
 
   max_index <- which.max(lengths)
 
-  ret <- lapply(seq(lengths[[max_index]]), function(index){
+  ret <- lapply(seq(lengths[[max_index]]), function(index) {
     val <- unlist(lapply(lists, function(arg){
       arg[[index]]
     }))
@@ -490,7 +490,7 @@ sample_rows <- function(df, size, seed = NULL, ...) {
     nested <- df %>% tidyr::nest(.temp.data=everything()) # Without .temp.data=everything(), warning is displayed.
   }
 
-  ret <- nested %>% dplyr::mutate(.temp.data = purrr::map(.temp.data, function(df){
+  ret <- nested %>% dplyr::mutate(.temp.data = purrr::map(.temp.data, function(df) {
     if (!is.null(size) && nrow(df) > size) {
       slice_sample(df, n = size, ...)
     }
@@ -524,10 +524,10 @@ str_clean <- function(words){
 
 #' count word patterns
 #' @export
-str_count_all <- function(text, patterns, remove.zero = TRUE){
+str_count_all <- function(text, patterns, remove.zero = TRUE) {
   # string count for each pattern list
-  lapply(text, function(text_elem){
-    countList <- lapply(patterns, function(pattern){
+  lapply(text, function(text_elem) {
+    countList <- lapply(patterns, function(pattern) {
       stringr::str_count(text_elem, pattern)
     })
     count <- as.numeric(countList)
@@ -540,13 +540,13 @@ str_count_all <- function(text, patterns, remove.zero = TRUE){
 #' Normalize characters in the text according to Unicode Normalization Forms.
 #' This is a wrapper around stringi::stri_trans_nfkc to give it a user-friendly name.
 #' @export
-str_normalize <- function(text){
+str_normalize <- function(text) {
   stringi::stri_trans_nfkc(text)
 }
 
 #' convert df to numeric matrix
 #' @param colnames Vector of column names or lazy dot for select arg. ex:lazyeval::lazy_dots(...)
-as_numeric_matrix_ <- function(df, columns){
+as_numeric_matrix_ <- function(df, columns) {
   loadNamespace("dplyr")
 
   orig_mat <- df[,columns] %>%
@@ -564,7 +564,7 @@ as_numeric_matrix_ <- function(df, columns){
 #' @param dots Lazy dot for select arg. ex:lazyeval::lazy_dots(...)
 #' @param excluded Excluded column names
 #' @export
-evaluate_select <- function(df, .dots, excluded = NULL){
+evaluate_select <- function(df, .dots, excluded = NULL) {
   loadNamespace("dplyr")
   tryCatch({
     ret <- setdiff(colnames(dplyr::select_(df, .dots=.dots)), excluded)
@@ -574,7 +574,7 @@ evaluate_select <- function(df, .dots, excluded = NULL){
     ret
   }, error = function(e){
     loadNamespace("stringr")
-    if(stringr::str_detect(e$message, "not found")){
+    if(stringr::str_detect(e$message, "not found")) {
       stop("undefined columns selected")
     }
     stop(e$message)
@@ -585,14 +585,14 @@ evaluate_select <- function(df, .dots, excluded = NULL){
 #' @param call This expects returned value from match.call()
 #' @param exclude Argument names that should be excluded for expansion
 #' @export
-expand_args <- function(call, exclude = c()){
+expand_args <- function(call, exclude = c()) {
   excluded <- call[!names(call) %in% exclude]
   args <- excluded[-1]
   if (is.null(args)) {
     ""
   } else {
     names(args) <- names(excluded[-1])
-    arg_char <- paste(vapply(seq(length(args)) , function(index){
+    arg_char <- paste(vapply(seq(length(args)) , function(index) {
       arg_name <- names(args)[[index]]
       arg_value <- if(is.character(args[[index]])) paste0('"', as.character(args[index]), '"') else as.character(args[index])
       if(is.null(arg_name)) {
@@ -609,7 +609,7 @@ expand_args <- function(call, exclude = c()){
 
 #' get sampled indice from data frame
 #' @export
-sample_df_index <- function(df, rate, seed = NULL, ordered = FALSE){
+sample_df_index <- function(df, rate, seed = NULL, ordered = FALSE) {
   if (!ordered) {
     if(!is.null(seed)){
       set.seed(seed)
@@ -624,7 +624,7 @@ sample_df_index <- function(df, rate, seed = NULL, ordered = FALSE){
 
 #' slice of 2 dimensional data that can handle empty vector
 #' @export
-safe_slice <- function(data, index, remove = FALSE){
+safe_slice <- function(data, index, remove = FALSE) {
   ret <- if(remove){
     if(is.null(index)){
       data
@@ -656,7 +656,7 @@ safe_slice <- function(data, index, remove = FALSE){
 #' @param data Data frame to augment (expected to have ".fitted" column augmented by broom::augment)
 #' @param model model that has $family$linkinv attribute (normally glm model)
 #' @param response_label column to be augmented as fitted response values
-add_response <- function(data, model, response_label = "predicted_response"){
+add_response <- function(data, model, response_label = "predicted_response") {
   # fitted values are converted to response values through inverse link function
   # for example, inverse of logit function is used for logistic regression
   if (!is.null(data$.fitted)) {
@@ -674,7 +674,7 @@ add_response <- function(data, model, response_label = "predicted_response"){
 #' @param cname Column name to be moved
 #' @param position Column index to move to
 #' @export
-move_col <- function(df, cname, position){
+move_col <- function(df, cname, position) {
   # get column index to move
   cname_posi = which(colnames(df) == cname)
   if(length(cname_posi) == 0){
@@ -716,7 +716,7 @@ move_col <- function(df, cname, position){
       c((n+1):m, n)
     }
 
-    end <- if( n == length(vec) | m == length(vec)){
+    end <- if( n == length(vec) | m == length(vec)) {
       # end should be empty in this case
       c()
     } else {
@@ -779,7 +779,7 @@ get_score <- function(act_label, pred_label) {
 }
 
 # get optimized binary prediction scores
-get_optimized_score <- function(actual_val, pred_prob, threshold = "f_score"){
+get_optimized_score <- function(actual_val, pred_prob, threshold = "f_score") {
   # accracy was changed to accuracy_rate, so should work with both
   if (threshold == "accuracy") {
     threshold <- "accuracy_rate"
@@ -817,7 +817,7 @@ get_optimized_score <- function(actual_val, pred_prob, threshold = "f_score"){
 }
 
 #' Put prefix and suffix to column names
-append_colnames <- function(df, prefix = "", suffix = ""){
+append_colnames <- function(df, prefix = "", suffix = "") {
   colnames(df) <- avoid_conflict(colnames(df), stringr::str_c(prefix, colnames(df), suffix, sep = ""))
   df
 }
@@ -943,7 +943,7 @@ pivot <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fun
     df <- df[!is.na(df[[var]]), ]
   }
 
-  if(!is.null(value_col) && (is.null(fill) || is.na(fill))){
+  if(!is.null(value_col) && (is.null(fill) || is.na(fill))) {
     # in this case, values in data frame is aggregated values
     # , so default is NA and fill must be NA of the same type
     # with returned values from aggregate function
@@ -956,7 +956,7 @@ pivot <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fun
       # NA_real_ is regarded as numeric
       fill <- NA_real_
     }
-  } else if (is.null(fill)){
+  } else if (is.null(fill)) {
     # this case is counting row col pairs and default is 0
     fill <- 0
   } else if (is.na(fill)) {
@@ -1016,7 +1016,7 @@ pivot <- function(df, row_cols = NULL, col_cols = NULL, row_funs = NULL, col_fun
   }
 
   # grouping should be kept
-  if(length(grouped_col) != 0){
+  if(length(grouped_col) != 0) {
     ret <- dplyr::group_by(ret, !!!rlang::syms(grouped_col))
   }
   ret
@@ -1053,7 +1053,7 @@ binary_label <- function(val) {
 }
 
 #' function to find column names that can be numeric values
-quantifiable_cols <- function(data){
+quantifiable_cols <- function(data) {
   ret <- c()
   for (colname in colnames(data)) {
     if(is.numeric(data[[colname]])){
@@ -1066,7 +1066,7 @@ quantifiable_cols <- function(data){
 }
 
 #' get multinomial predicted value results
-get_multi_predicted_values <- function(prob_mat, actual_vals = NULL){
+get_multi_predicted_values <- function(prob_mat, actual_vals = NULL) {
   prob_label <- colnames(prob_mat)[max.col(prob_mat)]
   if(!is.null(actual_vals)){
     prob_label <- to_same_type(prob_label, actual_vals)
@@ -1085,7 +1085,7 @@ get_multi_predicted_values <- function(prob_mat, actual_vals = NULL){
 #' @param indice Indice where the values should be placed in the output vector.
 #' @param values Vector to be filled with NA.
 #' @param max_index The size of output vector
-fill_vec_NA <- function(indice, values, max_index = max(indice, na.rm = TRUE)){
+fill_vec_NA <- function(indice, values, max_index = max(indice, na.rm = TRUE)) {
   ret <- to_same_type(rep(NA, max_index), values)
   ret[indice] <- values
   ret
@@ -1095,7 +1095,7 @@ fill_vec_NA <- function(indice, values, max_index = max(indice, na.rm = TRUE)){
 #' @param indice Row indice where the values should be placed in the output vector.
 #' @param mat Matrix to be filled with NA.
 #' @param max_index The row size of output matrix
-fill_mat_NA <- function(indice, mat, max_index = max(indice, na.rm = TRUE)){
+fill_mat_NA <- function(indice, mat, max_index = max(indice, na.rm = TRUE)) {
   if(nrow(mat) != length(indice)) {
     stop("matrix must have the same length of indice")
   }
@@ -1107,11 +1107,11 @@ fill_mat_NA <- function(indice, mat, max_index = max(indice, na.rm = TRUE)){
 }
 
 # get data type to distinguish more than typeof function
-get_data_type <- function(data){
+get_data_type <- function(data) {
   if (is.factor(data)){
     # factor is regarded as integer by typeof
     "factor"
-  } else if (inherits(data, "Date")){
+  } else if (inherits(data, "Date")) {
     # Date is regarded as double by typeof
     "Date"
   } else if (inherits(data, "POSIXct")) {
@@ -1130,10 +1130,10 @@ get_data_type <- function(data){
 # confidence interval assuming normal distribution, so that we can calculate it
 # without having to know sample size.
 # https://en.wikipedia.org/wiki/Student%27s_t-test#Slope_of_a_regression_line
-add_confint <- function(data, conf_int){
+add_confint <- function(data, conf_int) {
   # add confidence interval if conf_int is not null and there are .fitted and .se.fit
   if (!is.null(conf_int) & ".se.fit" %in% colnames(data) & ".fitted" %in% colnames(data)) {
-    if (conf_int < 0 | conf_int > 1){
+    if (conf_int < 0 | conf_int > 1) {
       stop("conf_int must be between 0 and 1")
     }
     conf_low_colname <- avoid_conflict(colnames(data), "conf_low")
@@ -1153,7 +1153,7 @@ add_confint <- function(data, conf_int){
 #' validate data type of newdata for prediction
 #' @param types Named vector. Values are data types and names are column names
 #' @param data new data to predict
-validate_data <- function(types, data){
+validate_data <- function(types, data) {
   if(!is.null(types)){
     message <- vapply(names(types), function(name){
       original_type <- types[[name]]
@@ -1175,7 +1175,7 @@ validate_data <- function(types, data){
       }
     }, FUN.VALUE = "")
 
-    if(any(!is.na(message))){
+    if(any(!is.na(message))) {
       stop(paste0("Data type mismatch detected for ", paste0(message[!is.na(message)], collapse = ", ")))
     }
   }
@@ -1208,7 +1208,7 @@ factorize_data <- function(flevels, data) {
 #   types = c(col1 = "numeric", col2 = "character"),
 #   terms = res ~ col1 + col2
 # )
-create_model_meta <- function(df, formula){
+create_model_meta <- function(df, formula) {
   ret <- list()
   tryCatch({
     md_frame <- model.frame(formula, data = df)
@@ -1242,14 +1242,14 @@ create_model_meta <- function(df, formula){
 
 #' NSE version of unnest_without_empty_
 #' @export
-unnest_without_empty <- function(data, nested){
+unnest_without_empty <- function(data, nested) {
   nested_col <- col_name(substitute(nested))
   unnest_without_empty_(data, nested_col)
 }
 
 #' unnest with removing NULL or empty list
 #' @export
-unnest_without_empty_ <- function(data, nested_col){
+unnest_without_empty_ <- function(data, nested_col) {
   validate_empty_data(data)
   empty <- list_n(data[[nested_col]]) == 0
   without_empty <- data[!empty, ]
@@ -1265,84 +1265,84 @@ unnest_without_empty_ <- function(data, nested_col){
 #' Count TRUE in a vector
 #' @param x vector
 #' @export
-true_count <- function(x){
+true_count <- function(x) {
   sum(x, na.rm = TRUE)
 }
 
 #' Count FALSE in a vector
 #' @param x vector
 #' @export
-false_count <- function(x){
+false_count <- function(x) {
   sum(!x, na.rm = TRUE)
 }
 
 #' Percentage of TRUE in a vector
 #' @param x vector
 #' @export
-true_pct <- function(x){
+true_pct <- function(x) {
   sum(x, na.rm =!all(is.na(x))) / length(x) * 100
 }
 
 #' Percentage of FALSE in a vector
 #' @param x vector
 #' @export
-false_pct <- function(x){
+false_pct <- function(x) {
   sum(!x, na.rm =!all(is.na(x))) / length(x) * 100
 }
 
 #' Count NA in a vector
 #' @param x vector
 #' @export
-na_count <- function(x){
+na_count <- function(x) {
   sum(is.na(x))
 }
 
 #' Count Non NA in a vector
 #' @param x vector
 #' @export
-non_na_count <- function(x){
+non_na_count <- function(x) {
   sum(!is.na(x))
 }
 
 #' Percentage of NA in a vector
 #' @param x vector
 #' @export
-na_pct <- function(x){
+na_pct <- function(x) {
   sum(is.na(x)) / length(x) * 100
 }
 
 #' Percentage of Non NA in a vector
 #' @param x vector
 #' @export
-non_na_pct <- function(x){
+non_na_pct <- function(x) {
   sum(!is.na(x)) / length(x) * 100
 }
 
 #' Ratio of NA in a vector
 #' @param x vector
 #' @export
-na_ratio <- function(x){
+na_ratio <- function(x) {
   sum(is.na(x)) / length(x)
 }
 
 #' Ratio of TRUE in a vector
 #' @param x vector
 #' @export
-true_ratio <- function(x){
+true_ratio <- function(x) {
   sum(x, na.rm =!all(is.na(x))) / length(x)
 }
 
 #' Ratio of FALSE in a vector
 #' @param x vector
 #' @export
-false_ratio <- function(x){
+false_ratio <- function(x) {
   sum(!x, na.rm =!all(is.na(x))) / length(x)
 }
 
 #' Ratio of Non NA in a vector
 #' @param x vector
 #' @export
-non_na_ratio <- function(x){
+non_na_ratio <- function(x) {
   sum(!is.na(x)) / length(x)
 }
 
@@ -1355,7 +1355,7 @@ non_na_ratio <- function(x){
 #' if unnesting the specified columns requires the
 #' rows to be duplicated because of more than
 #' 2 rows data frames for example.
-unnest_with_drop <- function(df, ...){
+unnest_with_drop <- function(df, ...) {
   ret <- df %>% dplyr::select_if(function(x){!is.list(x)}) %>% dplyr::bind_cols(df %>% dplyr::ungroup() %>% dplyr::select(...)) %>% tidyr::unnest(...)
   ret
 }
@@ -1371,7 +1371,7 @@ validate_empty_data <- function(df) {
 #' @param func Function to execute
 #' @param params Parameters for func
 #' @export
-do_on_each_group <- function(df, func, params = quote(list()), name = "tmp", with_unnest = TRUE){
+do_on_each_group <- function(df, func, params = quote(list()), name = "tmp", with_unnest = TRUE) {
   name <- avoid_conflict(colnames(df), name)
   # This is a list of arguments in do clause
   args <- append(list(quote(.)), rlang::call_args(params))
@@ -1916,7 +1916,7 @@ set_operation_with_force_character <- function(func, x, y, ...) {
 
 #'Wrapper function for dplyr::union to support ignoring data type difference.
 #'@export
-union <- function(x, y, force_data_type = FALSE, ...){
+union <- function(x, y, force_data_type = FALSE, ...) {
   if(!is.na(force_data_type) && class(force_data_type) ==  "logical" && force_data_type == FALSE)  {
     dplyr::union(x, y, ...)
   } else {
@@ -1926,7 +1926,7 @@ union <- function(x, y, force_data_type = FALSE, ...){
 
 #'Wrapper function for dplyr::union_all to support ignoring data type difference.
 #'@export
-union_all <- function(x, y, force_data_type = FALSE, ...){
+union_all <- function(x, y, force_data_type = FALSE, ...) {
   if(!is.na(force_data_type) && class(force_data_type) ==  "logical" && force_data_type == FALSE)  {
     dplyr::union_all(x, y, ...)
   } else {
@@ -1936,7 +1936,7 @@ union_all <- function(x, y, force_data_type = FALSE, ...){
 
 #'Wrapper function for dplyr::intersect to support ignoring data type difference.
 #'@export
-intersect <- function(x, y, force_data_type = FALSE, ...){
+intersect <- function(x, y, force_data_type = FALSE, ...) {
   if(!is.na(force_data_type) && class(force_data_type) ==  "logical" && force_data_type == FALSE)  {
     dplyr::intersect(x, y, ...)
   } else {
@@ -1946,7 +1946,7 @@ intersect <- function(x, y, force_data_type = FALSE, ...){
 
 #'Wrapper function for dplyr::setdiff to support ignoring data type difference.
 #'@export
-setdiff <- function(x, y, force_data_type = FALSE, ...){
+setdiff <- function(x, y, force_data_type = FALSE, ...) {
   if(!is.na(force_data_type) && class(force_data_type) ==  "logical" && force_data_type == FALSE)  {
     dplyr::setdiff(x, y, ...)
   } else {
@@ -1956,7 +1956,7 @@ setdiff <- function(x, y, force_data_type = FALSE, ...){
 
 #'Wrapper function for dplyr::recode to workaround encoding info getting lost.
 #'@export
-recode <- function(x, ...){
+recode <- function(x, ...) {
   ret <- dplyr::recode(x, ...)
   # Workaround for the issue that Encoding of recoded values becomes 'unknown' on Windows.
   # Such values are displayed fine on the spot, but later if bind_row is applied,
@@ -1977,7 +1977,7 @@ recode <- function(x, ...){
 
 #'Wrapper function for dplyr::case_when to workaround encoding info getting lost.
 #'@export
-case_when <- function(x, ...){
+case_when <- function(x, ...) {
   ret <- dplyr::case_when(x, ...)
   # Workaround for the issue that Encoding of recoded values becomes 'unknown' on Windows.
   # Such values are displayed fine on the spot, but later if bind_row is applied,
@@ -2122,7 +2122,7 @@ get_unknown_category_rows_index_vector <- function(df, training_df) {
 
 # Converts logical vector such as the output from get_unknown_category_rows_index_vector into
 # vector of index integer of TRUE rows.
-get_row_numbers_from_index_vector <- function(index_vector)  {
+get_row_numbers_from_index_vector <- function(index_vector) {
   seq(length(index_vector))[index_vector]
 }
 
@@ -2219,7 +2219,7 @@ column_mutate_quosure <- function(func, cname) {
 #' @param group_funs - Functions to apply to group_by columns
 #' @param ... - Name-value pairs of summary functions. The name will be the name of the variable in the result. The value should be an expression that returns a single value like min(x), n(), or sum(is.na(y)).
 #' @export
-summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...){
+summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...) {
   ret <- if(length(group_cols) == 0) {
     .data %>% dplyr::summarize(...)
   } else {
@@ -2260,6 +2260,16 @@ summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...){
   #         mutate(count = case_when(count > 10 ~ 10, TRUE ~ count))
   #
   ret %>% dplyr::mutate_if(is.integer, as.numeric)
+}
+
+# Wrapper function around apply to apply aggregation function across columns for each row.
+# Example Usage:
+# airquality %>% mutate(total = summarize_row(across(where(is.numeric)), median, na.rm=TRUE))
+#' @param x - data frame
+#' @param f - function
+#' @export
+summarize_row <- function(x, f, ...) {
+  apply(x, 1, f, ...)
 }
 
 # Maps locale across platforms. e.g. From Japanese_Japan.932 on Windows to ja_JP.UTF-8 on unix.
