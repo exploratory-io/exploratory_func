@@ -2336,7 +2336,7 @@ download_data_file <- function(url, type){
 
 #'API that imports multiple same structure Excel files and merge it to a single data frame
 #'@export
-read_excel_files <- function(files, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, ...) {
+read_excel_files <- function(files, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...) {
     # set name to the files so that it can be used for the "id" column created by purrr::map_dfr.
     files <- setNames(as.list(files), files)
     df <- purrr::map_dfr(files, exploratory::read_excel_file, sheet = sheet,
@@ -2351,7 +2351,8 @@ read_excel_files <- function(files, sheet = 1, col_names = TRUE, col_types = NUL
            skipEmptyRows = skipEmptyRows,
            skipEmptyCols = skipEmptyCols,
            check.names = check.names,
-           tzone = tzone, .id = "exp.file.id") %>% mutate(exp.file.id = basename(exp.file.id)) # extract file name from full path with basename.
+           tzone = tzone, convertDataTypeToChar = convertDataTypeToChar,
+           .id = "exp.file.id") %>% mutate(exp.file.id = basename(exp.file.id)) # extract file name from full path with basename.
     id_col <- avoid_conflict(colnames(df), "id")
     # copy internal exp.file.id to the id column.
     df[[id_col]] <- df[["exp.file.id"]]
@@ -2362,7 +2363,7 @@ read_excel_files <- function(files, sheet = 1, col_names = TRUE, col_types = NUL
 #'Wrapper for openxlsx::read.xlsx (in case of .xlsx file) and readxl::read_excel (in case of old .xls file)
 #'Use openxlsx::read.xlsx since it's memory footprint is less than that of readxl::read_excel and this creates benefit for users with less memory like Windows 32 bit users.
 #'@export
-read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, ...){
+read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = FALSE, ...){
   loadNamespace("openxlsx")
   loadNamespace('readxl')
   loadNamespace('stringr')
@@ -2387,7 +2388,7 @@ read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL,
       } else {
         df <- openxlsx::read.xlsx(xlsxFile = new_path, sheet = sheet, colNames = col_names, startRow = skip+1, na.strings = na, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols, check.names = check.names, detectDates = detectDates)
       }
-      # Preserve original column name for backward comaptibility (ref: https://github.com/awalker89/openxlsx/issues/102)
+      # Preserve original column name for backward compatibility (ref: https://github.com/awalker89/openxlsx/issues/102)
       # Calling read.xlsx again looks inefficient, but it seems this is the only solution suggested in the above issue page.
       colnames(df) <- openxlsx::read.xlsx(xlsxFile = new_path, sheet = sheet, rows = (skip+1), check.names = FALSE, colNames = FALSE) %>% as.character()
       file.remove(new_path)
@@ -2441,6 +2442,14 @@ read_excel_file <- function(path, sheet = 1, col_names = TRUE, col_types = NULL,
   if(!is.null(tzone)) { # if timezone is specified, apply the timezeon to POSIXct columns
     df <- df %>% dplyr::mutate_if(lubridate::is.POSIXct, funs(lubridate::force_tz(., tzone=tzone)))
   }
+  # When this API is called from getExcelFilesFromS3, getExcelFilesFromGoogleDrive, and read_excel_files,
+  # by default the convertDataTypeToChar is set as TRUE to covert the resulting data frame columns' data type as character.
+  # This is required to make sure that merging the Excel based data frames doesn't error out due to column data types mismatch.
+  # Once the data frames merging is done, readr::type_convert is called from Exploratory Desktop to restore the column data types.
+  # We don't want to rely on readxl::read_excel's col_types argument "text" since this option converts Date or POSIXct column data as number instead of "2021-01-01" style text.
+  if (convertDataTypeToChar) {
+    df <- df %>% dplyr::mutate(dplyr::across(dplyr::everything(), as.character));
+  }
   df
 }
 
@@ -2471,10 +2480,14 @@ get_excel_sheets <- function(path){
 }
 
 #'API that imports multiple same structure CSV files and merge it to a single data frame
+#'
+#'For col_types parameter, by default it forces character to make sure that merging the CSV based data frames doesn't error out due to column data types mismatch.
+# Once the data frames merging is done, readr::type_convert is called from Exploratory Desktop to restore the column data types.
+
 #'@export
 read_delim_files <- function(files, delim, quote = '"',
                               escape_backslash = FALSE, escape_double = TRUE,
-                              col_names = TRUE, col_types = NULL,
+                              col_names = TRUE, col_types = readr::cols(.default = readr::col_character()),
                               locale = readr::default_locale(),
                               na = c("", "NA"), quoted_na = TRUE,
                               comment = "", trim_ws = FALSE,

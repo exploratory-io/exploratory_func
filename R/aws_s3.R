@@ -90,10 +90,14 @@ getCSVFileFromS3 <- function(fileName, region, username, password, bucket, delim
 }
 
 #'API that imports multiple same structure CSV files and merge it to a single data frame
+#'
+#'For col_types parameter, by default it forces character to make sure that merging the CSV based data frames doesn't error out due to column data types mismatch.
+# Once the data frames merging is done, readr::type_convert is called from Exploratory Desktop to restore the column data types.
+
 #'@export
 getCSVFilesFromS3 <- function(files, region, username, password, bucket, fileName, delim, quote = '"',
                              escape_backslash = FALSE, escape_double = TRUE,
-                             col_names = TRUE, col_types = NULL,
+                             col_names = TRUE, col_types = readr::cols(.default = readr::col_character()),
                              locale = readr::default_locale(),
                              na = c("", "NA"), quoted_na = TRUE,
                              comment = "", trim_ws = FALSE,
@@ -118,21 +122,21 @@ getCSVFilesFromS3 <- function(files, region, username, password, bucket, fileNam
 
 #'API that imports a Excel file from AWS S3.
 #'@export
-getExcelFileFromS3 <- function(fileName, region, username, password, bucket, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, ...) {
+getExcelFileFromS3 <- function(fileName, region, username, password, bucket, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = FALSE, ...) {
   filePath <- downloadDataFileFromS3(region = region, bucket = bucket, key = username, secret = password, fileName = fileName, as = "raw")
-  exploratory::read_excel_file(path = filePath, sheet = sheet, col_names = col_names, col_types = col_types, na = na, skip = skip, trim_ws = trim_ws, n_max = n_max, use_readxl = use_readxl, detectDates = detectDates, skipEmptyRows =  skipEmptyRows, skipEmptyCols = skipEmptyCols, check.names = FALSE, tzone = tzone, ...)
+  exploratory::read_excel_file(path = filePath, sheet = sheet, col_names = col_names, col_types = col_types, na = na, skip = skip, trim_ws = trim_ws, n_max = n_max, use_readxl = use_readxl, detectDates = detectDates, skipEmptyRows =  skipEmptyRows, skipEmptyCols = skipEmptyCols, check.names = check.names, tzone = tzone, convertDataTypeToChar = convertDataTypeToChar, ...)
 }
 
 
 #'API that imports multiple Excel files from AWS S3.
 #'@export
-getExcelFilesFromS3 <- function(files, region, username, password, bucket, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, ...) {
+getExcelFilesFromS3 <- function(files, region, username, password, bucket, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...) {
   # set name to the files so that it can be used for the "id" column created by purrr:map_dfr.
   files <- setNames(as.list(files), files)
   df <- purrr::map_dfr(files, exploratory::getExcelFileFromS3, region = region, username = username, password = password, bucket = bucket, sheet = sheet,
                        col_names = col_names, col_types = col_types, na = na, skip = skip, trim_ws = trim_ws, n_max = n_max, use_readxl = use_readxl,
-                       detectDates = detectDates, skipEmptyRows =  skipEmptyRows, skipEmptyCols = skipEmptyCols, check.names = FALSE,
-                       tzone = tzone, .id = "exp.file.id") %>% mutate(exp.file.id = basename(exp.file.id))  # extract file name from full path with basename and create file.id column.
+                       detectDates = detectDates, skipEmptyRows =  skipEmptyRows, skipEmptyCols = skipEmptyCols, check.names = check.names,
+                       tzone = tzone, convertDataTypeToChar = convertDataTypeToChar, .id = "exp.file.id") %>% mutate(exp.file.id = basename(exp.file.id))  # extract file name from full path with basename and create file.id column.
   id_col <- avoid_conflict(colnames(df), "id")
   # copy internal exp.file.id to the id column.
   df[[id_col]] <- df[["exp.file.id"]]
