@@ -927,6 +927,11 @@ test_that("summarize_group", {
  expect_equal(nrow(df2),1)
 })
 
+test_that("summarize_row", {
+ df <- airquality %>% mutate(total = summarize_row(across(where(is.numeric)), mean, na.rm=TRUE))
+ expect_equal(colnames(df), c("Ozone", "Solar.R", "Wind", "Temp", "Month", "Day", "total"))
+})
+
 test_that("revert_factor_cols_to_logical", {
   df <- data.frame(col1 = I(factor(c(TRUE, FALSE, NA))),
                    col2 = I(forcats::fct_rev(factor(c(TRUE,FALSE,NA)))),
