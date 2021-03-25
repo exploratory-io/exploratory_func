@@ -192,7 +192,7 @@ test_that("test do_cor.cols for grouped df", {
     test_df
     %>%  dplyr::group_by(group)
     %>%  do_cor.cols(dplyr::starts_with("var")))
-  expect_equal(dim(result), c(4, 4))
+  expect_equal(dim(result), c(4, 5))
 })
 
 test_that("test do_cor.cols for grouped df with model output", {
