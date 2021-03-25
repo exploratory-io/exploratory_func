@@ -243,55 +243,7 @@ do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearso
     sorted_colnames <- sort(colnames(mat))
     mat <- mat[,sorted_colnames]
 
-    cor_mat <- cor(mat, use = use, method = method)
-    if(distinct){
-      ret <- upper_gather(
-        cor_mat,
-        diag=diag,
-        cnames=output_cols,
-        zero.rm=FALSE
-      )
-    } else {
-      ret <- mat_to_df(cor_mat,
-                       cnames=output_cols,
-                       diag=diag,
-                       zero.rm=FALSE)
-    }
-
-    output_cols <- avoid_conflict(grouped_col,
-                                  c("pair.name.x", "pair.name.y", "p_value"))
-
-    # Create a matrix of P-values for Analytics View case.
-    dim <- length(sorted_colnames)
-    pvalue_mat <- matrix(NA, dim, dim)
-    for (i in 2:dim) {
-      for (j in 1:(i-1)) {
-        pvalue_mat[i, j] <- tryCatch({
-          cor.test(mat[,i], mat[,j], method = method)$p.value
-        }, error = function(e) {
-          if (e$message == "not enough finite observations") {
-            # This is the error cor.test returns when there is not enough non-NA data.
-            # Rather than stopping, set NA as the result, and we will handle it as a not-significant case on the UI.
-            NA
-          }
-          else {
-            stop(e)
-          }
-        })
-        pvalue_mat[j, i] <- pvalue_mat[i, j]
-      }
-    }
-    for (i in 1:dim) { # For i=j case, P value should be always 0.
-      pvalue_mat[i, i] <- 0
-    }
-    colnames(pvalue_mat) <- sorted_colnames
-    rownames(pvalue_mat) <- sorted_colnames
-    if (distinct) {
-      p_value_ret <- upper_gather(pvalue_mat, diag=diag, cnames=output_cols, zero.rm=FALSE)
-    } else {
-      p_value_ret <- mat_to_df(pvalue_mat, cnames=output_cols, diag=diag, zero.rm=FALSE)
-    }
-    ret <- ret %>% dplyr::left_join(p_value_ret, by=output_cols[1:2]) # Join by pair.name.x and pair.name.y.
+    ret <- do_cor_internal(mat, use, method, distinct, diag, output_cols, sorted_colnames, grouped_col)
 
     if (return_type == "data.frame") {
       ret # Return correlation data frame as is.
@@ -314,6 +266,60 @@ do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearso
   else {
     do_on_each_group(df, do_cor_each, name = "model", with_unnest = FALSE)
   }
+}
+
+
+do_cor_internal <- function(mat, use, method, distinct, diag, output_cols, sorted_colnames, grouped_col) {
+  cor_mat <- cor(mat, use = use, method = method)
+  if(distinct){
+    ret <- upper_gather(
+      cor_mat,
+      diag=diag,
+      cnames=output_cols,
+      zero.rm=FALSE
+    )
+  } else {
+    ret <- mat_to_df(cor_mat,
+                     cnames=output_cols,
+                     diag=diag,
+                     zero.rm=FALSE)
+  }
+
+  output_cols <- avoid_conflict(grouped_col,
+                                c("pair.name.x", "pair.name.y", "p_value"))
+
+  # Create a matrix of P-values for Analytics View case.
+  dim <- length(sorted_colnames)
+  pvalue_mat <- matrix(NA, dim, dim)
+  for (i in 2:dim) {
+    for (j in 1:(i-1)) {
+      pvalue_mat[i, j] <- tryCatch({
+        cor.test(mat[,i], mat[,j], method = method)$p.value
+      }, error = function(e) {
+        if (e$message == "not enough finite observations") {
+          # This is the error cor.test returns when there is not enough non-NA data.
+          # Rather than stopping, set NA as the result, and we will handle it as a not-significant case on the UI.
+          NA
+        }
+        else {
+          stop(e)
+        }
+      })
+      pvalue_mat[j, i] <- pvalue_mat[i, j]
+    }
+  }
+  for (i in 1:dim) { # For i=j case, P value should be always 0.
+    pvalue_mat[i, i] <- 0
+  }
+  colnames(pvalue_mat) <- sorted_colnames
+  rownames(pvalue_mat) <- sorted_colnames
+  if (distinct) {
+    p_value_ret <- upper_gather(pvalue_mat, diag=diag, cnames=output_cols, zero.rm=FALSE)
+  } else {
+    p_value_ret <- mat_to_df(pvalue_mat, cnames=output_cols, diag=diag, zero.rm=FALSE)
+  }
+  ret <- ret %>% dplyr::left_join(p_value_ret, by=output_cols[1:2]) # Join by pair.name.x and pair.name.y.
+  ret
 }
 
 #' @export
