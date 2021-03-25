@@ -76,7 +76,7 @@ test_that("build_lm.fast (logistic regression) evaluate training and test FIRM i
 
   # Check variable importance output.
   ret <- model_df %>% tidy_rowwise(model, type="importance")
-  expect_equal(colnames(ret), c("CAR RIER", "variable", "importance", "p.value")) # TODO: This fails. Look into it.
+  expect_equal(colnames(ret), c("CAR RIER", "variable", "importance", "p.value"))
 
   ret <- model_df %>% tidy_rowwise(model, converged_only=TRUE) # Test converged_only
   ret <- model_df %>% prediction_binary(data="training_and_test", threshold = 0.5)
