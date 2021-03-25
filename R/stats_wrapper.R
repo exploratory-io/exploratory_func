@@ -91,7 +91,7 @@ do_cor.kv_ <- function(df,
   # column names are "{subject}.x", "{subject}.y", "value"
   output_cols <- avoid_conflict(grouped_col,
                                 c(paste0(col, c(".x", ".y")), # We use paste0 since str_c garbles multibyte column names here for some reason.
-                                  "value", "p_value"))
+                                  "correlation", "p_value"))
 
   do_cor_each <- function(df){
     mat <- simple_cast(
@@ -169,7 +169,7 @@ do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearso
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
   select_dots <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
   grouped_col <- grouped_by(df)
-  output_cols <- avoid_conflict(grouped_col, c("pair.name.x", "pair.name.y", "value", "p_value"))
+  output_cols <- avoid_conflict(grouped_col, c("pair.name.x", "pair.name.y", "correlation", "p_value"))
   # check if the df's grouped
   do_cor_each <- function(df){
     if (nrow(df) < 2) {
