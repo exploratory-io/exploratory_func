@@ -90,10 +90,8 @@ do_cor.kv_ <- function(df,
   }
   # column names are "{subject}.x", "{subject}.y", "value"
   output_cols <- avoid_conflict(grouped_col,
-                           c(paste0(col, c(".x", ".y")), # We use paste0 since str_c garbles multibyte column names here for some reason.
-                             "value")
-  )
-
+                                c(paste0(col, c(".x", ".y")), # We use paste0 since str_c garbles multibyte column names here for some reason.
+                                  "value", "p_value"))
 
   do_cor_each <- function(df){
     mat <- simple_cast(
@@ -119,59 +117,7 @@ do_cor.kv_ <- function(df,
     }
     sorted_colnames <- colnames(mat)
 
-    cor_mat <- cor(mat, use = use, method = method)
-    if(distinct){
-      ret <- upper_gather(
-        cor_mat,
-        diag=diag,
-        cnames=output_cols,
-        na.rm = FALSE,
-        zero.rm = FALSE
-      )
-    } else {
-      ret <- mat_to_df(cor_mat,
-                       cnames=output_cols,
-                       diag=diag,
-                       na.rm = FALSE,
-                       zero.rm=FALSE)
-    }
-
-    # column names are "{subject}.x", "{subject}.y", "value"
-    output_cols <- avoid_conflict(grouped_col,
-                                  c(paste0(col, c(".x", ".y")), # We use paste0 since str_c garbles multibyte column names here for some reason.
-                                    "p_value"))
-
-    # Create a matrix of P-values for Analytics View case.
-    dim <- length(sorted_colnames)
-    pvalue_mat <- matrix(NA, dim, dim)
-    for (i in 2:dim) {
-      for (j in 1:(i-1)) {
-        pvalue_mat[i, j] <- tryCatch({
-          cor.test(mat[,i], mat[,j], method = method)$p.value
-        }, error = function(e) {
-          if (e$message == "not enough finite observations") {
-            # This is the error cor.test returns when there is not enough non-NA data.
-            # Rather than stopping, set NA as the result, and we will handle it as a not-significant case on the UI.
-            NA
-          }
-          else {
-            stop(e)
-          }
-        })
-        pvalue_mat[j, i] <- pvalue_mat[i, j]
-      }
-    }
-    for (i in 1:dim) { # For i=j case, P value should be always 0.
-      pvalue_mat[i, i] <- 0
-    }
-    colnames(pvalue_mat) <- sorted_colnames
-    rownames(pvalue_mat) <- sorted_colnames
-    if (distinct) {
-      p_value_ret <- upper_gather(pvalue_mat, diag=diag, cnames=output_cols, zero.rm=FALSE)
-    } else {
-      p_value_ret <- mat_to_df(pvalue_mat, cnames=output_cols, diag=diag, zero.rm=FALSE)
-    }
-    ret <- ret %>% dplyr::left_join(p_value_ret, by=output_cols[1:2]) # Join by pair.name.x and pair.name.y.
+    ret <- do_cor_internal(mat, use, method, distinct, diag, output_cols, sorted_colnames, na.rm=FALSE)
 
     if (return_type == "data.frame") {
       ret # Return correlation data frame as is.
@@ -243,7 +189,7 @@ do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearso
     sorted_colnames <- sort(colnames(mat))
     mat <- mat[,sorted_colnames]
 
-    ret <- do_cor_internal(mat, use, method, distinct, diag, output_cols, sorted_colnames)
+    ret <- do_cor_internal(mat, use, method, distinct, diag, output_cols, sorted_colnames, na.rm=TRUE)
 
     if (return_type == "data.frame") {
       ret # Return correlation data frame as is.
@@ -269,19 +215,21 @@ do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearso
 }
 
 
-do_cor_internal <- function(mat, use, method, distinct, diag, output_cols, sorted_colnames) {
+do_cor_internal <- function(mat, use, method, distinct, diag, output_cols, sorted_colnames, na.rm) {
   cor_mat <- cor(mat, use = use, method = method)
   if(distinct){
     ret <- upper_gather(
       cor_mat,
       diag=diag,
       cnames=output_cols[1:3],
+      na.rm=na.rm,
       zero.rm=FALSE
     )
   } else {
     ret <- mat_to_df(cor_mat,
                      cnames=output_cols[1:3],
                      diag=diag,
+                     na.rm=na.rm,
                      zero.rm=FALSE)
   }
 
