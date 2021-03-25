@@ -118,6 +118,7 @@ do_cor.kv_ <- function(df,
       }
     }
     sorted_colnames <- colnames(mat)
+
     cor_mat <- cor(mat, use = use, method = method)
     if(distinct){
       ret <- upper_gather(
@@ -128,14 +129,17 @@ do_cor.kv_ <- function(df,
         zero.rm = FALSE
       )
     } else {
-      ret <- mat_to_df(cor_mat, cnames=output_cols, diag=diag, na.rm = FALSE, zero.rm=FALSE)
+      ret <- mat_to_df(cor_mat,
+                       cnames=output_cols,
+                       diag=diag,
+                       na.rm = FALSE,
+                       zero.rm=FALSE)
     }
 
     # column names are "{subject}.x", "{subject}.y", "value"
     output_cols <- avoid_conflict(grouped_col,
-                             c(paste0(col, c(".x", ".y")), # We use paste0 since str_c garbles multibyte column names here for some reason.
-                               "p_value")
-    )
+                                  c(paste0(col, c(".x", ".y")), # We use paste0 since str_c garbles multibyte column names here for some reason.
+                                    "p_value"))
 
     # Create a matrix of P-values for Analytics View case.
     dim <- length(sorted_colnames)
@@ -241,10 +245,21 @@ do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearso
 
     cor_mat <- cor(mat, use = use, method = method)
     if(distinct){
-      ret <- upper_gather(cor_mat, diag=diag, cnames=output_cols, zero.rm=FALSE)
+      ret <- upper_gather(
+        cor_mat,
+        diag=diag,
+        cnames=output_cols,
+        zero.rm=FALSE
+      )
     } else {
-      ret <- mat_to_df(cor_mat, cnames=output_cols, diag=diag, zero.rm=FALSE)
+      ret <- mat_to_df(cor_mat,
+                       cnames=output_cols,
+                       diag=diag,
+                       zero.rm=FALSE)
     }
+
+    output_cols <- avoid_conflict(grouped_col,
+                                  c("pair.name.x", "pair.name.y", "p_value"))
 
     # Create a matrix of P-values for Analytics View case.
     dim <- length(sorted_colnames)
@@ -271,7 +286,6 @@ do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearso
     }
     colnames(pvalue_mat) <- sorted_colnames
     rownames(pvalue_mat) <- sorted_colnames
-    output_cols <- avoid_conflict(grouped_col, c("pair.name.x", "pair.name.y", "p_value"))
     if (distinct) {
       p_value_ret <- upper_gather(pvalue_mat, diag=diag, cnames=output_cols, zero.rm=FALSE)
     } else {
