@@ -223,7 +223,7 @@ do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearso
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
   select_dots <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
   grouped_col <- grouped_by(df)
-  output_cols <- avoid_conflict(grouped_col, c("pair.name.x", "pair.name.y", "value"))
+  output_cols <- avoid_conflict(grouped_col, c("pair.name.x", "pair.name.y", "value", "p_value"))
   # check if the df's grouped
   do_cor_each <- function(df){
     if (nrow(df) < 2) {
@@ -243,7 +243,7 @@ do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearso
     sorted_colnames <- sort(colnames(mat))
     mat <- mat[,sorted_colnames]
 
-    ret <- do_cor_internal(mat, use, method, distinct, diag, output_cols, sorted_colnames, grouped_col)
+    ret <- do_cor_internal(mat, use, method, distinct, diag, output_cols, sorted_colnames)
 
     if (return_type == "data.frame") {
       ret # Return correlation data frame as is.
@@ -269,24 +269,21 @@ do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearso
 }
 
 
-do_cor_internal <- function(mat, use, method, distinct, diag, output_cols, sorted_colnames, grouped_col) {
+do_cor_internal <- function(mat, use, method, distinct, diag, output_cols, sorted_colnames) {
   cor_mat <- cor(mat, use = use, method = method)
   if(distinct){
     ret <- upper_gather(
       cor_mat,
       diag=diag,
-      cnames=output_cols,
+      cnames=output_cols[1:3],
       zero.rm=FALSE
     )
   } else {
     ret <- mat_to_df(cor_mat,
-                     cnames=output_cols,
+                     cnames=output_cols[1:3],
                      diag=diag,
                      zero.rm=FALSE)
   }
-
-  output_cols <- avoid_conflict(grouped_col,
-                                c("pair.name.x", "pair.name.y", "p_value"))
 
   # Create a matrix of P-values for Analytics View case.
   dim <- length(sorted_colnames)
@@ -314,9 +311,9 @@ do_cor_internal <- function(mat, use, method, distinct, diag, output_cols, sorte
   colnames(pvalue_mat) <- sorted_colnames
   rownames(pvalue_mat) <- sorted_colnames
   if (distinct) {
-    p_value_ret <- upper_gather(pvalue_mat, diag=diag, cnames=output_cols, zero.rm=FALSE)
+    p_value_ret <- upper_gather(pvalue_mat, diag=diag, cnames=output_cols[c(1,2,4)], zero.rm=FALSE)
   } else {
-    p_value_ret <- mat_to_df(pvalue_mat, cnames=output_cols, diag=diag, zero.rm=FALSE)
+    p_value_ret <- mat_to_df(pvalue_mat, cnames=output_cols[c(1,2,4)], diag=diag, zero.rm=FALSE)
   }
   ret <- ret %>% dplyr::left_join(p_value_ret, by=output_cols[1:2]) # Join by pair.name.x and pair.name.y.
   ret
