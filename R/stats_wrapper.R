@@ -117,6 +117,7 @@ do_cor.kv_ <- function(df,
         stop("More than 1 aggregated measures per category are required to calculate correlations.")
       }
     }
+    sorted_colnames <- colnames(mat)
     cor_mat <- cor(mat, use = use, method = method)
     if(distinct){
       ret <- upper_gather(
@@ -129,6 +130,44 @@ do_cor.kv_ <- function(df,
     } else {
       ret <- mat_to_df(cor_mat, cnames=output_cols, diag=diag, na.rm = FALSE, zero.rm=FALSE)
     }
+
+    # column names are "{subject}.x", "{subject}.y", "value"
+    output_cols <- avoid_conflict(grouped_col,
+                             c(paste0(col, c(".x", ".y")), # We use paste0 since str_c garbles multibyte column names here for some reason.
+                               "p_value")
+    )
+
+    # Create a matrix of P-values for Analytics View case.
+    dim <- length(sorted_colnames)
+    pvalue_mat <- matrix(NA, dim, dim)
+    for (i in 2:dim) {
+      for (j in 1:(i-1)) {
+        pvalue_mat[i, j] <- tryCatch({
+          cor.test(mat[,i], mat[,j], method = method)$p.value
+        }, error = function(e) {
+          if (e$message == "not enough finite observations") {
+            # This is the error cor.test returns when there is not enough non-NA data.
+            # Rather than stopping, set NA as the result, and we will handle it as a not-significant case on the UI.
+            NA
+          }
+          else {
+            stop(e)
+          }
+        })
+        pvalue_mat[j, i] <- pvalue_mat[i, j]
+      }
+    }
+    for (i in 1:dim) { # For i=j case, P value should be always 0.
+      pvalue_mat[i, i] <- 0
+    }
+    colnames(pvalue_mat) <- sorted_colnames
+    rownames(pvalue_mat) <- sorted_colnames
+    if (distinct) {
+      p_value_ret <- upper_gather(pvalue_mat, diag=diag, cnames=output_cols, zero.rm=FALSE)
+    } else {
+      p_value_ret <- mat_to_df(pvalue_mat, cnames=output_cols, diag=diag, zero.rm=FALSE)
+    }
+    ret <- ret %>% dplyr::left_join(p_value_ret, by=output_cols[1:2]) # Join by pair.name.x and pair.name.y.
 
     if (return_type == "data.frame") {
       ret # Return correlation data frame as is.

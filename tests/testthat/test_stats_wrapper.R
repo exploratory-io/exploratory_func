@@ -214,7 +214,7 @@ test_that("test do_cor.cols for grouped df with model output", {
 
 test_that("test do_cor.kv for duplicated pair", {
   result <- tidy_test_df %>%  do_cor.kv(cat, dim, val)
-  expect_equal(ncol(result), 3)
+  expect_equal(ncol(result), 4)
   expect_equal(result[["cat.x"]], c("cat1", "cat2"))
   expect_equal(result[["cat.y"]], c("cat2", "cat1"))
   expect_equal(result[["value"]], replicate(2, 1))
@@ -223,7 +223,7 @@ test_that("test do_cor.kv for duplicated pair", {
 test_that("test do_cor.kv with model output", {
   result <- tidy_test_df %>%  do_cor.kv(cat, dim, val, return_type = "model")
   result_cor <- result %>% tidy_rowwise(model, type = "cor")
-  expect_equal(ncol(result_cor), 3)
+  expect_equal(ncol(result_cor), 4)
   expect_equal(result_cor[["cat.x"]], c("cat1", "cat2"))
   expect_equal(result_cor[["cat.y"]], c("cat2", "cat1"))
   expect_equal(result_cor[["value"]], replicate(2, 1))
@@ -234,7 +234,7 @@ test_that("test do_cor.kv with model output", {
 test_that("test do_cor.kv with group_by with model output", {
   result <- tidy_group_test_df %>% group_by(grp) %>% do_cor.kv(cat, dim, val, return_type = "model")
   result_cor <- result %>% tidy_rowwise(model, type = "cor")
-  expect_equal(ncol(result_cor), 4)
+  expect_equal(ncol(result_cor), 5)
   expect_equal(result_cor[["grp"]], c("A", "A", "B", "B"))
   expect_equal(result_cor[["cat.x"]], c("cat1", "cat2", "cat1", "cat2"))
   expect_equal(result_cor[["cat.y"]], c("cat2", "cat1", "cat2", "cat1"))
