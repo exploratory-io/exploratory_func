@@ -117,7 +117,7 @@ do_cor.kv_ <- function(df,
     }
     sorted_colnames <- colnames(mat)
 
-    ret <- do_cor_internal(mat, use, method, distinct, diag, output_cols, sorted_colnames, na.rm=FALSE)
+    ret <- do_cor_internal(mat, use, method, distinct, diag, output_cols, sorted_colnames, na.rm=FALSE) # TODO: Why was na.rm explicitly set to TRUE for do_cor.kv_ but not for do_cor.cols?
 
     if (return_type == "data.frame") {
       ret # Return correlation data frame as is.
