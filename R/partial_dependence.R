@@ -47,7 +47,11 @@ calc_partial_binning_data <- function(df, target_col, var_cols) {
 # Standard deviation with weight by how many rows have the same value.
 # Using it to calculate FIRM while the PDP data has only single row even when multiple quantile-based grid points have a same value.
 sd_with_weight <- function(v, w) {
-  sd(purrr::flatten_dbl(purrr::map2(v,w,function(x,y){rep(x,y)})))
+  # na.rm is in case some of the predicted values in the partial dependence data are NaN.
+  # It can happen for example in inverse gaussian regression with inverse square link function,
+  # when linear predictor is negative.
+  # In such case, we ignore that part of PDP and calculate sd from the rest.
+  sd(purrr::flatten_dbl(purrr::map2(v,w,function(x,y){rep(x,y)})), na.rm=TRUE)
 }
 
 # ... is for vectors of partial dependence.

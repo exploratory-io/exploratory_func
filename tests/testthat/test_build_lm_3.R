@@ -72,11 +72,11 @@ test_that("build_lm.fast (linear regression) evaluate training and test with per
 
 test_that("build_lm.fast (logistic regression) evaluate training and test FIRM importance", {
   model_df <- flight %>%
-                build_lm.fast(`is delayed`, `DIS TANCE`, `DEP TIME`, model_type = "glm", test_rate = 0.3, importance_measure="FIRM")
+                build_lm.fast(`is delayed`, `DIS TANCE`, `DEP TIME`, model_type = "glm", test_rate = 0.3, importance_measure="firm")
 
   # Check variable importance output.
   ret <- model_df %>% tidy_rowwise(model, type="importance")
-  # expect_equal(colnames(ret), c("CAR RIER", "variable", "importance", "p.value")) # TODO: This fails. Look into it.
+  expect_equal(colnames(ret), c("CAR RIER", "variable", "importance", "p.value"))
 
   ret <- model_df %>% tidy_rowwise(model, converged_only=TRUE) # Test converged_only
   ret <- model_df %>% prediction_binary(data="training_and_test", threshold = 0.5)
