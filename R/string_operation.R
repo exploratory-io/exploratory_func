@@ -813,6 +813,28 @@ str_remove_emoji <- function(column, position = "any"){
  })
 }
 
+#'Function to remove range of text.
+#'export
+str_remove_range <- function(column, start, end = NULL){
+  tryCatch({
+    stringr::str_remove(column, stringr::str_sub(column, start = start, end = end))
+  }, error = function(e){
+    # if the str_sub result is empty, ignore the "empty search patterns are not supported".
+  })
+}
+
+#'Function to remove range of text.
+#'export
+str_replace_range <- function(column, start, end = NULL, replaceWith = ""){
+  tryCatch({
+    stringr::str_replace(column, stringr::str_sub(column, start = start, end = end), replacement = replaceWith)
+  }, error = function(e){
+    # if the str_sub result is empty, ignore the "empty search patterns are not supported".
+  })
+}
+
+
+
 #'Function to extract logical value from the specified column.
 #'If true_value is provided, use it to decide TRUE or FALSE.
 #'If true_value is not provided, "true", "yes", "1", and 1 are treated as TRUE.
