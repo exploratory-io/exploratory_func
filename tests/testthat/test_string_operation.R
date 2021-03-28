@@ -681,22 +681,20 @@ test_that("str_detect", {
   expect_true(exploratory::str_detect("abc", "(?x)a b c"))
 })
 
-test_that("str_remove_range: negative index", {
+test_that("str_remove_range", {
   ret <- exploratory::str_remove_range(c("Aaron Bergman", "Justin Ritter", "Craig Reiter"), -4, -3)
   expect_equal(ret, c("Aaron Beran", "Justin Rier", "Craig Reer"))
-})
-
-test_that("str_remove_range: positive index", {
-  ret <- exploratory::str_remove_range(c("Aaron Bergman", "Justin Ritter", "Craig Reiter"), 1, 3)
-  expect_equal(ret, c("on Bergman", "tin Ritter", "ig Reiter"))
+  ret2 <- exploratory::str_remove_range(c("Aaron Bergman", "Justin Ritter", "Craig Reiter"), 1, 3)
+  expect_equal(ret2, c("on Bergman", "tin Ritter", "ig Reiter"))
+  ret2 <- exploratory::str_remove_range(c("Aaron Bergman", "Justin Ritter", "Craig Reiter"), -3, -9)
+  expect_equal(ret2, c("Aaron Bergman", "Justin Ritter", "Craig Reiter"))
 })
 
 test_that("str_replace_range: negative index", {
   ret <- exploratory::str_replace_range(c("Aaron Bergman", "Justin Ritter", "Craig Reiter"), -4, -3, "AAA")
   expect_equal(ret, c("Aaron BerAAAan", "Justin RiAAAer", "Craig ReAAAer"))
-})
-
-test_that("str_replace_range: positive index", {
-  ret <- exploratory::str_replace_range(c("Aaron Bergman", "Justin Ritter", "Craig Reiter"), 1, 3, "AAA")
-  expect_equal(ret, c("AAAon Bergman", "AAAtin Ritter", "AAAig Reiter"))
+  ret2 <- exploratory::str_replace_range(c("Aaron Bergman", "Justin Ritter", "Craig Reiter"), 1, 3, "AAA")
+  expect_equal(ret2, c("AAAon Bergman", "AAAtin Ritter", "AAAig Reiter"))
+  ret <- exploratory::str_replace_range(c("Aaron Bergman", "Justin Ritter", "Craig Reiter"), -3, -9, "AAA")
+  expect_equal(ret, c("Aaron Bergman", "Justin Ritter", "Craig Reiter"))
 })

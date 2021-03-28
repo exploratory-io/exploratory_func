@@ -816,21 +816,29 @@ str_remove_emoji <- function(column, position = "any"){
 #'Function to remove range of text.
 #'export
 str_remove_range <- function(column, start, end = NULL){
-  tryCatch({
-    stringr::str_remove(column, stringr::str_sub(column, start = start, end = end))
-  }, error = function(e){
-    # if the str_sub result is empty, ignore the "empty search patterns are not supported".
+  patterns <- stringr::str_sub(column, start = start, end = end);
+  patterns <- sapply(patterns, function(pattern) {
+    if (pattern == "") { # To prevent the "empty search patterns are not supported" error, use any (i.e. (.*?))
+      "(.*?)"
+    } else {
+      pattern
+    }
   })
+  stringr::str_remove(column, pattern = patterns)
 }
 
 #'Function to replace range of text.
 #'export
 str_replace_range <- function(column, start, end = NULL, replaceWith = ""){
-  tryCatch({
-    stringr::str_replace(column, stringr::str_sub(column, start = start, end = end), replacement = replaceWith)
-  }, error = function(e){
-    # if the str_sub result is empty, ignore the "empty search patterns are not supported".
+  patterns <- stringr::str_sub(column, start = start, end = end);
+  patterns <- sapply(patterns, function(pattern) {
+    if (pattern == "") { # To prevent the "empty search patterns are not supported" error, use any (i.e. (.*?))
+      "(.*?)"
+    } else {
+      pattern
+    }
   })
+  stringr::str_replace(column, pattern = patterns, replacement = replaceWith)
 }
 
 
