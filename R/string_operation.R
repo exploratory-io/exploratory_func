@@ -818,8 +818,8 @@ str_remove_emoji <- function(column, position = "any"){
 str_remove_range <- function(column, start, end = NULL){
   patterns <- stringr::str_sub(column, start = start, end = end);
   patterns <- sapply(patterns, function(pattern) {
-    if (pattern == "") { # To prevent the "empty search patterns are not supported" error, use any (i.e. (.*?))
-      "(.*?)"
+    if (pattern == "") { # To prevent the "empty search patterns are not supported" error, use regEx that does not math anything.
+      "\\b\\B" # this matches nothing.
     } else {
       pattern
     }
@@ -832,8 +832,8 @@ str_remove_range <- function(column, start, end = NULL){
 str_replace_range <- function(column, start, end = NULL, replaceWith = ""){
   patterns <- stringr::str_sub(column, start = start, end = end);
   patterns <- sapply(patterns, function(pattern) {
-    if (pattern == "") { # To prevent the "empty search patterns are not supported" error, use any (i.e. (.*?))
-      "(.*?)"
+    if (pattern == "") { # To prevent the "empty search patterns are not supported" error, use regEx that does not math anything.
+      "\\b\\B" # this matches nothing.
     } else {
       pattern
     }
