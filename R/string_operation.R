@@ -823,7 +823,7 @@ str_remove_range <- function(column, start, end = NULL){
   })
 }
 
-#'Function to remove range of text.
+#'Function to replace range of text.
 #'export
 str_replace_range <- function(column, start, end = NULL, replaceWith = ""){
   tryCatch({
