@@ -109,7 +109,7 @@ do_prophet <- function(df, time, value = NULL, periods = 10, holiday = NULL, ...
 #' @export
 do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit = "day", include_history = TRUE, test_mode = FALSE,
                         fun.aggregate = sum, na_fill_type = NULL, na_fill_value = 0,
-                        cap = NULL, floor = NULL, growth = NULL, weekly.seasonality = TRUE, yearly.seasonality = TRUE,
+                        cap = NULL, floor = NULL, growth = NULL, weekly.seasonality = "auto", yearly.seasonality = "auto",
                         quarterly.seasonality = FALSE, monthly.seasonality = FALSE,
                         daily.seasonality = "auto",
                         holiday_col = NULL, holidays = NULL, holiday_country_names = NULL,
@@ -137,6 +137,9 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
   # which does not look convincing.
   # since there seems to be cases where 'auto' on yearly.seasonality triggers this situation, we are using TRUE as default.
   # we have not seen any issue on 'auto' on weekly.seasonality, but are not using it for now just to be careful.
+  # Update on 2021/03 - We have been using Analytics View with "auto" for yearly as well as weekly, set by JS command generator layer,
+  # but haven't seen any obvious issues. Setting them back to auto, since now we rather see problem with yearly seasonality enabled
+  # for less than 2 years of data.
 
   loadNamespace("dplyr")
   # For some reason this needs to be library() instead of loadNamespace() to avoid error.
