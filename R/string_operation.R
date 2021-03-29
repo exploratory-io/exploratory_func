@@ -814,15 +814,29 @@ str_remove_emoji <- function(column, position = "any"){
 }
 
 #'Function to remove range of text.
+#'
 #'export
-str_remove_range <- function(column, start, end = NULL){
+str_remove_range <- function(column, start, end = -1){
+  # Pass empty string "", to remove the range of text.
   str_replace_range(column, start = start, end = end, replacement = "")
 }
 
 #'Function to replace range of text.
+#'
+#'It uses stringi::stri_sub_replace under the hood, but it does additional parameter validation.
+#'For validation deltation, see comment below.
+#'
 #'export
-str_replace_range <- function(column, start, end = NULL, replacement = ""){
-  stringi::stri_sub_replace(column, from = start, to = end, replacement = replacement)
+str_replace_range <- function(column, start, end = -1, replacement = ""){
+  # To make the behavior consistent with extract case (i.e. str_sub),
+  # if both start and end are negative, end should be greater than or equal to start.
+  # For example, stringi::stri_sub("Aaron Bergman", -3, -4) returns "" since it doesn't match.
+  # However, stringi::stri_sub_replace("Aaron Bergman", -3, -4, replacement = "A") returns "Aaron BergAman" where it should return "Aaron Bergman"
+  if (!is.null(start) && !is.null(end) && start < 0 && end < 0 && start > end) {
+    column
+  } else {
+    stringi::stri_sub_replace(column, from = start, to = end, replacement = replacement)
+  }
 }
 
 
