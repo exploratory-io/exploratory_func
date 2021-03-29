@@ -168,7 +168,8 @@ tidy_group_test_df <- dplyr::bind_rows(tidy_test_df, tidy_test_df) %>% dplyr::mu
 test_that("test do_cor.cols", {
   result <- spread_test_df %>%
     do_cor.cols(dplyr::starts_with("var"))
-  expect_equal(result[["value"]], rep(1, 2))
+  expect_equal(result[["correlation"]], rep(1, 2))
+  expect_equal(result[["p_value"]], c(0, 0))
 })
 
 test_that("test do_cor.cols with model output", {
@@ -176,7 +177,7 @@ test_that("test do_cor.cols with model output", {
     do_cor.cols(dplyr::starts_with("var"), return_type = "model")
   expect_equal(colnames(result), "model")
   result_cor <- result %>% tidy_rowwise(model, type = "cor")
-  expect_equal(result_cor[["value"]], rep(1, 2))
+  expect_equal(result_cor[["correlation"]], rep(1, 2))
   expect_equal(result_cor[["p_value"]], rep(0, 2))
   result_data <- result %>% tidy_rowwise(model, type = "data")
   expect_equal(colnames(result_data), c("var1", "var2"))
@@ -192,7 +193,7 @@ test_that("test do_cor.cols for grouped df", {
     test_df
     %>%  dplyr::group_by(group)
     %>%  do_cor.cols(dplyr::starts_with("var")))
-  expect_equal(dim(result), c(4, 4))
+  expect_equal(dim(result), c(4, 5))
 })
 
 test_that("test do_cor.cols for grouped df with model output", {
@@ -214,19 +215,21 @@ test_that("test do_cor.cols for grouped df with model output", {
 
 test_that("test do_cor.kv for duplicated pair", {
   result <- tidy_test_df %>%  do_cor.kv(cat, dim, val)
-  expect_equal(ncol(result), 3)
+  expect_equal(ncol(result), 4)
   expect_equal(result[["cat.x"]], c("cat1", "cat2"))
   expect_equal(result[["cat.y"]], c("cat2", "cat1"))
-  expect_equal(result[["value"]], replicate(2, 1))
+  expect_equal(result[["correlation"]], replicate(2, 1))
+  expect_equal(result[["p_value"]], c(0, 0))
 })
 
 test_that("test do_cor.kv with model output", {
   result <- tidy_test_df %>%  do_cor.kv(cat, dim, val, return_type = "model")
   result_cor <- result %>% tidy_rowwise(model, type = "cor")
-  expect_equal(ncol(result_cor), 3)
+  expect_equal(ncol(result_cor), 4)
   expect_equal(result_cor[["cat.x"]], c("cat1", "cat2"))
   expect_equal(result_cor[["cat.y"]], c("cat2", "cat1"))
-  expect_equal(result_cor[["value"]], replicate(2, 1))
+  expect_equal(result_cor[["correlation"]], replicate(2, 1))
+  expect_equal(result_cor[["p_value"]], c(0, 0))
   result_data <- result %>% tidy_rowwise(model, type = "data")
   expect_equal(colnames(result_data), c("cat", "dim", "val", "dim_na"))
 })
@@ -234,11 +237,12 @@ test_that("test do_cor.kv with model output", {
 test_that("test do_cor.kv with group_by with model output", {
   result <- tidy_group_test_df %>% group_by(grp) %>% do_cor.kv(cat, dim, val, return_type = "model")
   result_cor <- result %>% tidy_rowwise(model, type = "cor")
-  expect_equal(ncol(result_cor), 4)
+  expect_equal(ncol(result_cor), 5)
   expect_equal(result_cor[["grp"]], c("A", "A", "B", "B"))
   expect_equal(result_cor[["cat.x"]], c("cat1", "cat2", "cat1", "cat2"))
   expect_equal(result_cor[["cat.y"]], c("cat2", "cat1", "cat2", "cat1"))
-  expect_equal(result_cor[["value"]], replicate(4, 1))
+  expect_equal(result_cor[["correlation"]], replicate(4, 1))
+  expect_equal(result_cor[["p_value"]], c(0, 0, 0, 0))
   result_data <- result %>% tidy_rowwise(model, type = "data")
   expect_equal(colnames(result_data), c("grp", "cat", "dim", "val", "dim_na")) # TODO: group column comes as the last column, but it might be easier to understand if it comes first.
 })
