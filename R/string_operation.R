@@ -832,6 +832,7 @@ str_replace_range <- function(column, start, end = -1, replacement = ""){
   # if both start and end are negative, end should be greater than or equal to start.
   # For example, stringi::stri_sub("Aaron Bergman", -3, -4) returns "" since it doesn't match.
   # However, stringi::stri_sub_replace("Aaron Bergman", -3, -4, replacement = "A") returns "Aaron BergAman" where it should return "Aaron Bergman"
+  # So to make the behavior of the stringi::stri_sub_replace as same as the stringi::stri_sub, if the below condition met, just return the value as is.
   if (!is.null(start) && !is.null(end) && start < 0 && end < 0 && start > end) {
     column
   } else {
