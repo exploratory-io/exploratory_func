@@ -814,6 +814,7 @@ str_remove_emoji <- function(column, position = "any"){
 }
 
 #'Function to remove range of text.
+#'This uses exploratory::str_replae_range under the hood and pass empty string as replacement to remove it.
 #'
 #'export
 str_remove_range <- function(column, start, end = -1){
