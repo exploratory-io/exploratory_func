@@ -428,6 +428,45 @@ test_that("exp_xgboost(multi) evaluate training and test with FIRM importance", 
   expect_equal(nrow(ret), 1) # 1 for train
 })
 
+test_that("exp_xgboost(multi) evaluate training and test with FIRM importance with groups", {
+  set.seed(1) # For stability of result.
+  # By grouping with `is UA or AA`, and using `DEST STATE ABR`, testing the case where there are unused target factor levels within groups. #965
+  flight <- flight %>% group_by(`is UA or AA`)
+  model_df <- flight %>%
+                exp_xgboost(`DEST STATE ABR`, `DIS TANCE`, `DEP TIME`, `ORIGIN STATE ABR`, test_rate = 0.3, pd_with_bin_means = TRUE,
+                            importance_measure = "firm")
+
+  # Check variable importance output.
+  ret <- model_df %>% tidy_rowwise(model, type="importance")
+  expect_equal(colnames(ret), c("is UA or AA", "variable", "importance"))
+
+  ret <- model_df %>% prediction(data="training_and_test")
+  test_ret <- ret %>% filter(is_test_data==TRUE)
+  # expect_equal(nrow(test_ret), 1500) Fails now, since we filter numeric NA. Revive when we do not need to.
+  expect_lt(nrow(test_ret), 1500)
+  expect_gt(nrow(test_ret), 1400)
+  train_ret <- ret %>% filter(is_test_data==FALSE)
+  # expect_equal(nrow(train_ret), 3500) Fails now, since we filter numeric NA. Revive when we do not need to.
+  expect_lt(nrow(train_ret), 3500)
+  expect_gt(nrow(train_ret), 3400)
+
+  ret <- rf_evaluation_training_and_test(model_df)
+  expect_equal(nrow(ret), 6) # 2 for train and test * 3 groups
+
+  #ret <- rf_evaluation_training_and_test(model_df, type = "evaluation_by_class") # Not implemented.
+  ret <- rf_evaluation_training_and_test(model_df, type = "conf_mat")
+
+  model_df <- flight %>%
+                exp_xgboost(`DEST STATE ABR`, `DIS TANCE`, `DEP TIME`, `ORIGIN STATE ABR`, test_rate = 0, pd_with_bin_means = TRUE)
+  ret <- model_df %>% prediction(data="training_and_test")
+  train_ret <- ret %>% filter(is_test_data==FALSE)
+  #expect_equal(nrow(train_ret), 4944) # Linux seems to have different result. Work around for now.
+  expect_lt(nrow(train_ret), 5000)
+
+  ret <- rf_evaluation_training_and_test(model_df)
+  expect_equal(nrow(ret), 3) # 1 for train * 3 groups
+})
+
 test_that("exp_xgboost(multi) evaluate training and test with permutation importance", {
   set.seed(1) # For stability of result.
   model_df <- flight %>%
