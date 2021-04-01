@@ -78,6 +78,9 @@ calc_firm_from_pd <- function(..., weight, class) {
 # References:
 #   https://arxiv.org/abs/1805.04755
 #   https://arxiv.org/abs/1904.03959
+# pdp_data - data.frame of partial dependence data.
+# target - character vector. For regression, name of the target column. For classification, vector of names of classes, which are column names of pdp_data.
+# vars - character vector of names of predictor variables, which are also column names of pdp_data.
 importance_firm <- function(pdp_data, target, vars) {
   points <- attr(pdp_data, "points")
   # Replace the grid values with the type of the column, e.g. "numeric", or "character".

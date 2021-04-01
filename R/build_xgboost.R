@@ -888,7 +888,8 @@ partial_dependence.xgboost <- function(fit, vars = colnames(data),
 
   attr(pd, "class") = c("pd", "data.frame")
   attr(pd, "interaction") = interaction == TRUE
-  attr(pd, "target") = if (!classification) target else levels(fit$y_levels)
+  # Since levels(fit$y_levels) returns unused levels, it has to be as.character(fit$y_levels).
+  attr(pd, "target") = if (!classification) target else as.character(fit$y_levels)
   attr(pd, "vars") = vars
   attr(pd, "points") = points
   pd
