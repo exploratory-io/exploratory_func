@@ -20,20 +20,7 @@ test_that("test build_lm summary output ", {
   ret <- model_df %>% prediction(data = "training") # Test prediction with training data when the training data predictors has NAs.
 })
 
-test_that("test relative importance", {
-  test_df = data.frame(
-    num1 = runif(20),
-    num2 = runif(20),
-    num3 = runif(20),
-    num4 = runif(20),
-    cat1 = c(rep("A",5),rep("B",5),rep("C",10))
-  )
-  model_df <- test_df %>% build_lm.fast(num1, num2, num3, num4, cat1, relimp = TRUE, relimp_type = "first")
-  ret <- model_df %>% tidy_rowwise(model, type="relative_importance")
-  expect_equal(colnames(ret), c("term", "importance", "importance.high", "importance.low", "p.value"))
-})
-
-test_that("test relative importance", {
+test_that("Test invalid predictors - only one unique value", {
   expect_error({
     test_df = data.frame(
       num1 = runif(20),

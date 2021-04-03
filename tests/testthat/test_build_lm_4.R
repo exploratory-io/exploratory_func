@@ -35,7 +35,7 @@ test_that("build_lm.fast (logistic regression) with marginal effect with NA Date
 
 test_that("build_lm.fast (linear regression) with single predictor should skip relative importance", {
   model_df <- flight %>%
-                build_lm.fast(`ARR DELAY`, `CAR RIER`, test_rate = 0.3, seed=1, relimp = TRUE, relimp_type = "first", relimp_bootstrap_type = "perc")
+                build_lm.fast(`ARR DELAY`, `CAR RIER`, test_rate = 0.3, seed=1)
 
   # Just run prediction for sanity.
   ret <- model_df %>% prediction(data="training_and_test")
