@@ -117,8 +117,8 @@ test_that("build_lm with evaluation", {
                                       "conf_low", "conf_high",
                                       "standard_error",
                                       "residuals",
-                                      "standardised_residuals",
-                                      "hat", "residual_standard_deviation", "cooks_distance"
+                                      "hat", "residual_standard_deviation", "cooks_distance",
+                                      "standardised_residuals"
                                       ))
 
 })
@@ -181,7 +181,7 @@ test_that("prediction with target column name with space by build_lm.fast", {
   ret <- model_data %>% augment_rowwise(model)
 
   expect_true(nrow(ret) > 0)
-  expect_equal(colnames(ret), c("CANCELLED:X", "Carrier-Name","DISTANCE","logical col", ".fitted",".se.fit",".resid",".std.resid",".hat",".sigma",".cooksd"))
+  expect_equal(colnames(ret), c("CANCELLED:X", "Carrier-Name","DISTANCE","logical col", ".fitted",".se.fit",".resid",".hat",".sigma",".cooksd",".std.resid"))
 })
 
 test_that("prediction with glm family (binomial) and link (probit) with target column name with space by build_lm.fast", {
