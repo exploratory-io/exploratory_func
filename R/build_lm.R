@@ -604,13 +604,6 @@ remove_outliers_for_regression_data <- function(df, target_col, predictor_cols,
 }
 
 #' builds lm model quickly for analytics view.
-#' @param relimp - Whether to enable relative importance by relaimpo.
-#' @param relimp_type - Passed down to boot.relimp, but "lmg" seems to be the recommended option, but is very slow. default is "first".
-#' @param relimp_bootstrap_runs - Number of bootstrap iterations. Default 20.
-#' @param relimp_bootstrap_type - Type of bootstrapping, passed down to boot package from inside relaimpo package.
-#'                                Can be "basic", "perc", "bca", or "norm".
-#' @param relimp_conf_level - Confidence level for confidence interval of relative importance values. Default is 0.95.
-#' @param relimp_relative - When TRUE, relative importance values add up to 1. When FALSE they add up to R-Squared.
 #' @param seed - Random seed to control data sampling, SMOTE, and bootstrapping for confidence interval of relative importance.
 #' @param test_rate Ratio of test data
 #' @export
@@ -635,12 +628,6 @@ build_lm.fast <- function(df,
                     smote_max_synth_perc = 200,
                     smote_k = 5,
                     importance_measure = "permutation", # "firm", or "permutation" if available. Defaulting to permutation for backward compatibility for pre-6.5.
-                    relimp = FALSE,
-                    relimp_type = "first",
-                    relimp_bootstrap_runs = 20,
-                    relimp_bootstrap_type = "perc",
-                    relimp_conf_level = 0.95,
-                    relimp_relative = TRUE,
                     with_marginal_effects = FALSE,
                     with_marginal_effects_confint = FALSE,
                     variable_metric = NULL,
@@ -760,7 +747,6 @@ build_lm.fast <- function(df,
   # We avoid following known issues by this.
   # - Column name issue for marginal_effects(). Space is not handled well.
   #   ()"' are known to be ok as of version 5.5.2.
-  # - Column name issue for relaimpo. - is not handled well.
   # - Column name issue for mmpf::marginalPrediction (for partial dependence). Comma is not handled well.
   # Note that the data frames in source_data column are with the replaced column names for simplicity,
   # rather than the original column names, unlike what we do for ranger or rpart. (Maybe we should do it for ranger or rpart.)
@@ -969,38 +955,6 @@ build_lm.fast <- function(df,
         }
 
         model <- stats::lm(fml, data = df) 
-        if (relimp && length(c_cols) > 1) { # relimp seems to work only when there are multiple predictors, which makes sense since it is "relative".
-          tryCatch({
-            # Calculate relative importance.
-            model$relative_importance <- relaimpo::booteval.relimp(relaimpo::boot.relimp(model, type = relimp_type,
-                                                                                      b = relimp_bootstrap_runs,
-                                                                                      rela = relimp_relative,
-                                                                                      rank = FALSE,
-                                                                                      diff = FALSE),
-                                                                bty = relimp_bootstrap_type, level = relimp_conf_level)
-          }, error = function(e){
-            # This can fail when columns are not linearly independent. Record error and keep going.
-            # in case of perfect multicollinearity, relaimpo throws error with following message.
-            # "covg must be \n a positive definite covariance matrix \n or a data matrix / data frame with linearly independent columns."
-            # Check if it is the case. If coef() includes NA, corresponding variable is causing perfect multicollinearity.
-            # TODO: Consolidate code with vif case.
-            coef_vec <- coef(model)
-            na_coef_vec <- coef_vec[is.na(coef_vec)]
-            if (length(na_coef_vec) > 0) {
-              na_coef_names <- names(na_coef_vec)
-              na_coef_names <- map_terms_to_orig(na_coef_names, terms_mapping) # Map column names in the message back to original.
-              message <- paste(na_coef_names, collapse = ", ")
-              message <- paste0("Variables causing perfect collinearity : ", message)
-              e$message <- message
-            }
-            else if (e$message == "covg must be \n a positive definite covariance matrix \n or a data matrix / data frame with linearly independent columns.") {
-              # We have seen cases where above check on coef passes, but still this error is thrown for some reason.
-              # Just tell that this means perfect multicollinearity.
-              e$message <- "Calculation of variable importance failed most likely due to perfect multicollinearity."
-            }
-            model$relative_importance <<- e
-          })
-        }
         if (length(c_cols) > 1) { # Skip importance calculation if there is only one variable.
           if (importance_measure == "permutation") { # For firm case, we need to first calculate partial dependence.
             model$imp_df <- calc_permutation_importance_linear(model, clean_target_col, c_cols, df)
@@ -1062,15 +1016,8 @@ build_lm.fast <- function(df,
       else {
         class(model) <- c("lm_exploratory", class(model))
       }
-      # Calculate partial dependencies.
-      if (!is.null(model$relative_importance) && "error" %nin% class(model$relative_importance)) { # if importance is available, show only max_pd_vars most important vars.
-        importance <- attr(model$relative_importance, model$relative_importance$type)
-        variable <- model$relative_importance$namen[2:length(model$relative_importance$namen)]
-        imp_df <- data.frame(variable = variable, importance = importance)
-        imp_vars <- as.character((imp_df %>% arrange(-importance))$variable)
-        imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # Keep only max_pd_vars most important variables
-      }
-      else if (!is.null(model$imp_df) && "error" %nin% class(model$imp_df)) { # if importance is available, show only max_pd_vars most important vars.
+      # Calculate variable importances. 
+      if (!is.null(model$imp_df) && "error" %nin% class(model$imp_df)) { # if importance is available, show only max_pd_vars most important vars.
         imp_df <- model$imp_df
         imp_vars <- as.character((imp_df %>% arrange(-importance))$variable)
         imp_vars <- imp_vars[1:min(length(imp_vars), max_pd_vars)] # Keep only max_pd_vars most important variables
@@ -1221,13 +1168,6 @@ glance.lm_exploratory <- function(x, pretty.name = FALSE, ...) { #TODO: add test
   ret <- ret %>% dplyr::mutate(rmse=!!rmse_val, n=!!sample_size)
   # Drop sigma in favor of rmse.
   ret <- ret %>% dplyr::select(r.squared, adj.r.squared, rmse, statistic, p.value, n, everything(), -sigma)
-
-  # We are checking if it is of error class, since in build_lm.fast, if calculation of relative importance fails, we set the returned error
-  # so that we can report the error in Summary table (return from tidy()).
-  if (!is.null(x$relative_importance) && "error" %in% class(x$relative_importance)) {
-    note <- x$relative_importance$message
-    ret <- ret %>% dplyr::mutate(note=note)
-  }
 
   if(pretty.name) {
     ret <- ret %>% dplyr::rename(`R Squared`=r.squared, `Adj R Squared`=adj.r.squared, `RMSE`=rmse, `F Ratio`=statistic, `P Value`=p.value, `Degree of Freedom`=df, `Log Likelihood`=logLik, `Residual Deviance`=deviance, `Residual DF`=df.residual, `Number of Rows`=n)
@@ -1465,42 +1405,6 @@ tidy.lm_exploratory <- function(x, type = "coefficients", pretty.name = FALSE, .
                               `Base Level`=base.level)
       }
       ret
-    },
-    relative_importance = {
-      # We are checking if it is of error class, since in build_lm.fast, if calculation of relative importance fails, we set the returned error
-      # so that we can report the error in Summary table (return from tidy()).
-      if (!is.null(x$relative_importance) && "error" %nin% class(x$relative_importance)) {
-        # Add columns for relative importance. NA for the first row is for the row for intercept.
-        term <- x$relative_importance$namen[2:length(x$relative_importance$namen)] # Skip first element, which is the target variable name.
-        importance <- attr(x$relative_importance, x$relative_importance$type)
-        importance.high <- attr(x$relative_importance, paste0(x$relative_importance$type, ".upper"))[1,] # Following naming convention of other columns.
-        importance.low <- attr(x$relative_importance, paste0(x$relative_importance$type, ".lower"))[1,] # Following naming convention of other columns.
-        ret <- data.frame(term = term, importance = importance, importance.high = importance.high, importance.low = importance.low)
-        # Reorder factor by the value of relative importance (lmg).
-        ret <- ret %>% dplyr::mutate(term = forcats::fct_reorder(term, importance, .fun = sum, .desc = TRUE))
-        # Since broom:::tidy.lm raises :Error: No tidy method for objects of class lm_exploratory",
-        # always use broom:::tidy.glm which does not have this problem, and seems to return the same result,
-        # even for lm.
-        coef_df <- broom:::tidy.glm(x)
-        ret <- ret %>% mutate(p.value=purrr::map(term, function(var) {
-          get_var_min_pvalue(var, coef_df, x)
-        }))
-        # Map variable names back to the original.
-        # as.character is to be safe by converting from factor. With factor, reverse mapping result will be messed up.
-        ret$term <- x$terms_mapping[as.character(ret$term)]
-        if (pretty.name) {
-          ret <- ret %>% rename(`Variable` = term,
-                                `Relative Importance` = importance,
-                                `Relative Importance High` = importance.high,
-                                `Relative Importance Low` = importance.low,
-                                `P Value` = p.value)
-        }
-        ret
-      }
-      else {
-        ret <- data.frame() # Skip output for this group.
-        ret
-      }
     },
     vif = {
       if (!is.null(x$vif) && "error" %nin% class(x$vif)) {
