@@ -500,8 +500,9 @@ test_that("test prediction(data='training_and_test') by glm", {
                      "predicted_value",
                      "conf_low", "conf_high", 
                      "standard_error", 
-                     "residuals", "standardised_residuals", "hat",
+                     "residuals", "hat",
                      "residual_standard_deviation", "cooks_distance",
+                     "standardised_residuals",
                      "is_test_data")
   expect_equal(colnames(ret), expected_cols)
   grp_model_ret <- test_data %>% dplyr::group_by(klass) %>%
@@ -521,8 +522,9 @@ test_that("test prediction(data='training_and_test') by glm", {
                      "conf_low", "conf_high",
                      "standard_error",
                      "residuals",
-                     "standardised_residuals", "hat", "residual_standard_deviation",
+                     "hat", "residual_standard_deviation",
                      "cooks_distance",
+                     "standardised_residuals",
                      "is_test_data")
   expected_cols_2 <- c("klass", "Carrier Name",
                      "ARR_TIME", "DERAY_TIME",
