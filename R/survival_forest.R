@@ -7,7 +7,7 @@ extract_survival_rate_at <- function(survival, unique_death_times, at) {
   survival[, index]
 }
 
-# Calculate mean survival time from predicted survival curve. 
+# Calculate weighted mean survival time from predicted survival curve.
 calc_mean_survival <- function(survival, unique_death_times) {
   # If the survival rate at the last unique death time is not 0,
   # we assume that the survivers lived one more term, just so that we can calculate the finite mean.
@@ -23,8 +23,8 @@ calc_permutation_importance_ranger_survival <- function(fit, time_col, status_co
     mmpf::permutationImportance(data, vars=var, y=time_col, model=fit, nperm=5, # Since the result seems too unstable with nperm=1, where we use elsewhere, here we use 5.
                                 predict.fun = function(object, newdata) {
                                   predicted <- predict(object,data=newdata)
+                                  # Use the weighted mean predicted survival time as the predicted value. To evaluate prediction performance, we will later calcualte concordance based on it.
                                   mean_survival <- calc_mean_survival(predicted$survival, predicted$unique.death.times)
-                                  # Use the sum of predicted survival probability as predicted survival time. TODO: Adding weight to adjust for different intervals.
                                   tibble::tibble(x=mean_survival,status=newdata[[status_col]])
                                 },
                                 loss.fun = function(x,y){ # Use 1 - concordance as loss function.
