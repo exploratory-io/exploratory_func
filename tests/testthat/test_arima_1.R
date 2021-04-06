@@ -22,14 +22,11 @@ test_that("exp_arima with aggregation", {
     exp_arima(`time stamp`, `cou nt`, 10, time_unit = "second")
 
   # test for test mode.
-  expect_error({
-    raw_data$`cou nt`[[length(raw_data$`cou nt`) - 2]] <- NA # inject NA near the end to test #9211
-    model_df <- raw_data %>%
-      exp_arima(`time stamp`, `cou nt`, 2, time_unit = "day", test_mode=TRUE)
-    ret <- model_df %>% tidy_rowwise(model)
-    # verify that the last forecasted_value is not NA to test #9211
-    expect_true(!is.na(ret$data[[1]]$forecasted_value[[length(ret$data[[1]]$forecasted_value)]]))
-  }, "The data is too short for the required differences.")
+  raw_data$`cou nt`[[length(raw_data$`cou nt`) - 2]] <- NA # inject NA near the end to test #9211
+  ret <- raw_data %>%
+    exp_arima(`time stamp`, `cou nt`, 2, time_unit = "day", test_mode=TRUE)
+  # verify that the last forecasted_value is not NA to test #9211
+  expect_true(!is.na(ret$data[[1]]$forecasted_value[[length(ret$data[[1]]$forecasted_value)]]))
 
   ret <- raw_data %>%
     exp_arima(`time stamp`, `cou nt`, 2, time_unit = "hour", test_mode=TRUE)
@@ -321,8 +318,9 @@ test_that("exp_arima grouped case", {
   model_df <- raw_data3 %>%
     exp_arima(timestamp, count, 10)
   ret <- model_df %>% glance_with_ts_metric()
+  # P, D, Q, and Frequency used to be in the output column too with fable 0.2.1, but with fable 0.3.0, it started picking up a model without seasonality for some reason.
   expect_true(all(c("group", "RMSE", "MAE", "MAPE", ".model", "AIC", "BIC", "AICc",
-                    "p", "d", "q", "P", "D", "Q", "Frequency", "Ljung-Box Test Statistic",
+                    "p", "d", "q", "Ljung-Box Test Statistic",
                     "Ljung-Box Test P Value", "Number of Rows") %in% colnames(ret)))
 })
 

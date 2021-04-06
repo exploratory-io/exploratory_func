@@ -42,7 +42,7 @@ test_that("build_lm.fast (linear regression) evaluate training and test with FIR
 
   # Test univariate case handling
   model_df <- flight %>%
-                build_lm.fast(`ARR DELAY`, `DIS TANCE`, relimp = TRUE, relimp_type = "first", test_rate = 0.3, seed=1)
+                build_lm.fast(`ARR DELAY`, `DIS TANCE`, test_rate = 0.3, seed=1)
   ret <- model_df %>% tidy_rowwise(model, type="importance")
   expect_equal(nrow(ret), 0)
 })
@@ -67,7 +67,7 @@ test_that("build_lm.fast (linear regression) evaluate training and test with per
 
   # Test univariate case handling
   model_df <- flight %>%
-                build_lm.fast(`ARR DELAY`, `DIS TANCE`, relimp = TRUE, relimp_type = "first", test_rate = 0.3, seed=1)
+                build_lm.fast(`ARR DELAY`, `DIS TANCE`, test_rate = 0.3, seed=1)
   ret <- model_df %>% tidy_rowwise(model, type="permutation_importance")
   expect_equal(nrow(ret), 0)
 })
