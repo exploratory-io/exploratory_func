@@ -311,6 +311,10 @@ add_prediction <- function(df, model_df, conf_int = 0.95, ...){
   colnames(ret)[colnames(ret) == ".fitted"] <- avoid_conflict(colnames(ret), "predicted_value")
   colnames(ret)[colnames(ret) == ".se.fit"] <- avoid_conflict(colnames(ret), "standard_error")
   colnames(ret)[colnames(ret) == ".resid"] <- avoid_conflict(colnames(ret), "residual")
+  # For Analytics View for GLM binomial (including logistic regression), rename predicted_response to predicted_probability.
+  if ("glm_exploratory" %in% class(model_df$model[[1]]) && model_df$model[[1]]$family$family == "binomial") {
+    colnames(ret)[colnames(ret) == "predicted_response"] <- avoid_conflict(colnames(ret), "predicted_probability")
+  }
 
   ret
 }
