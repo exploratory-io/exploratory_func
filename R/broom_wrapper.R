@@ -312,6 +312,10 @@ add_prediction <- function(df, model_df, conf_int = 0.95, ...){
   colnames(ret)[colnames(ret) == ".se.fit"] <- avoid_conflict(colnames(ret), "standard_error")
   colnames(ret)[colnames(ret) == ".resid"] <- avoid_conflict(colnames(ret), "residual")
   # For Analytics View for GLM binomial (including logistic regression), rename predicted_response to predicted_probability.
+  # Since we keep the output column name from augment predicted_response and adjust the column name in prediction_binary for training/test,
+  # we do the same kind of layering here for new data prediction too, and do the renaming here at the caller of the augment function,
+  # rather than inside the augment function.
+  # For prediction by Analytics Step, we also use prediction_binary, and the column renaming is done there.
   if ("glm_exploratory" %in% class(model_df$model[[1]]) && model_df$model[[1]]$family$family == "binomial") {
     colnames(ret)[colnames(ret) == "predicted_response"] <- avoid_conflict(colnames(ret), "predicted_probability")
   }
