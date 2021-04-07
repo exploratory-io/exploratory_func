@@ -339,7 +339,7 @@ js_glue_transformer <- function(expr, envir) {
     }
   }
 
-  if (is.null(val)) { # NULL in R is same as empty vector. Print empty string.
+  if (length(val) == 0) { # Empty vector case. NULL in R is same as empty vector, but since is.null(as.character(c(0))) returns FALSE, this has to be done my length().
     val <- ""
   }
   else if (is.numeric(val)) {
@@ -469,7 +469,8 @@ sql_glue_transformer_internal <- function(expr, envir, bigquery=FALSE) {
     }
   }
 
-  if (is.null(val)) { # NULL in R is same as empty vector. Print empty string.
+  if (length(val) == 0) { # Empty vector case. NULL in R is same as empty vector, but since is.null(as.character(c(0))) returns FALSE, this has to be done my length().
+    # Print "NULL" string.
     val <- "NULL" # With PostgreSQL, "IN (NULL)" is valid while "IN ()" is syntax error. TODO: Test other databases.
   }
   else if (is.numeric(val)) {

@@ -154,6 +154,11 @@ test_that("js_glue_transformer", {
   res <- exploratory:::glue_exploratory("@{v}", .transformer=exploratory:::js_glue_transformer)
   expect_equal(as.character(res), "true, false, null")
 
+  # Empty vector case.
+  exploratory_env$v <- as.character(c())
+  res <- exploratory:::glue_exploratory("@{v}", .transformer=exploratory:::js_glue_transformer)
+  expect_equal(as.character(res), "")
+
   exploratory_env$v <- 1
   exploratory_env$w <- 2
   exploratory_env$x <- 1000000
@@ -194,7 +199,7 @@ test_that("sql_glue_transformer", {
   res <- exploratory:::glue_exploratory("select * from emp where deptname in (@{dept_names}) and empid > @{empid_above}", .transformer=exploratory:::sql_glue_transformer)
   expect_equal(as.character(res), "select * from emp where deptname in ('Sales', 'HR', 'CEO''s secretary', 'Data Science\\Statistics') and empid > 1100")
 
-  exploratory_env$dept_names <- c()
+  exploratory_env$dept_names <- as.character(c())
   res <- exploratory:::glue_exploratory("select * from emp where deptname in (@{dept_names}) and empid > @{empid_above}", .transformer=exploratory:::sql_glue_transformer)
   expect_equal(as.character(res), "select * from emp where deptname in (NULL) and empid > 1100")
 
@@ -222,7 +227,7 @@ test_that("bigquery_glue_transformer", {
   res <- exploratory:::glue_exploratory("select * from emp where deptname in (@{dept_names}) and empid > @{empid_above}", .transformer=exploratory:::bigquery_glue_transformer)
   expect_equal(as.character(res), "select * from emp where deptname in ('Sales', 'HR', 'CEO\\'s secretary', 'Data Science\\\\Statistics') and empid > 1100")
 
-  exploratory_env$dept_names <- c()
+  exploratory_env$dept_names <- as.character(c())
   res <- exploratory:::glue_exploratory("select * from emp where deptname in (@{dept_names}) and empid > @{empid_above}", .transformer=exploratory:::bigquery_glue_transformer)
   expect_equal(as.character(res), "select * from emp where deptname in (NULL) and empid > 1100")
 
