@@ -199,6 +199,9 @@ refreshTwitterToken <- function(tokenFileId){
 #' @export
 getGoogleTokenForBigQuery <- function(tokenFileId="", useCache=TRUE){
   if(!requireNamespace("bigrquery")){stop("package bigrquery must be installed.")}
+  # To workaround Error in the HTTP2 framing layer
+  # set below config (see https://github.com/jeroen/curl/issues/156)
+  httr::set_config(httr::config(http_version = 0))
 
   appName = "google"
   # retrieve token info from environment
