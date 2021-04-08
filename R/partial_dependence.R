@@ -74,6 +74,10 @@ calc_firm_from_pd <- function(..., weight, class) {
   ret
 }
 
+get_aligned_table <- function(v, v_all) {
+  table(c(v_all, v)) - table(v_all)
+}
+
 # Caluculate FIRM variable importance.
 # References:
 #   https://arxiv.org/abs/1805.04755
@@ -83,6 +87,7 @@ calc_firm_from_pd <- function(..., weight, class) {
 # vars - character vector of names of predictor variables, which are also column names of pdp_data.
 importance_firm <- function(pdp_data, target, vars) {
   points <- attr(pdp_data, "points")
+  quantile_points <- attr(pdp_data, "quantile_points")
   # Replace the grid values with the type of the column, e.g. "numeric", or "character".
   names(vars) <- NULL # Clean names, since it messes up following mutate step.
   imp_df <- pdp_data %>% dplyr::mutate(across(!!vars, ~ifelse(is.na(.x), NA_character_, class(.x))))
@@ -90,12 +95,10 @@ importance_firm <- function(pdp_data, target, vars) {
   imp_df <- imp_df %>% tidyr::pivot_longer(cols = !!vars, names_to="variable", values_to="class", values_drop_na=TRUE)
   # Add weight column to the data, so that it can be used to calculate FIRM with sd_with_weight.
   imp_df <- imp_df %>% dplyr::nest_by(variable) %>%
-    dplyr::mutate(points = list(as.numeric(table(points[[variable]])))) %>%
+    dplyr::mutate(points = list(as.numeric(get_aligned_table(quantile_points[[variable]], points[[variable]])))) %>%
     ungroup() %>%
     dplyr::mutate(data = purrr::map2(data, points, function(x,y) {
       if (x$class[[1]]=="numeric") { # If numeric, remove 0 percentile and 100 percentile to avoid affected by outliers.
-        y[[1]] <- y[[1]] - 1
-        y[[length(y)]] <- y[[length(y)]] - 1
         x %>% mutate(weight = y)
       }
       else { # For categorical, weight does not matter. Besides, adding y as weight throws error when there is unused factor level.
