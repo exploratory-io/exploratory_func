@@ -77,7 +77,10 @@ partial_dependence.lm_exploratory <- function(fit, target, vars = colnames(data)
   for (cname in vars) {
     if (is.numeric(data[[cname]])) {
       coldata <- data[[cname]]
-      points[[cname]] <- quantile(coldata, probs=0:25/25)
+      minv <- min(coldata, na.rm=TRUE)
+      maxv <- max(coldata, na.rm=TRUE)
+      grid <- minv + (0:10)/10 * (maxv-minv) 
+      points[[cname]] <- sort(c(grid, quantile(coldata, probs=0:25/25)))
     }
     else {
       points[[cname]] <- unique(data[[cname]])
