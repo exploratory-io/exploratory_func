@@ -52,6 +52,14 @@ exp_kmeans <- function(df, ...,
     sampled_nrow <- max_nrow
     df <- df %>% sample_rows(max_nrow)
   }
+  # list and difftime etc. causes error in tidy_rowwise(model, type="biplot").
+  # For now, we are removing them upfront.
+  df <- df %>% dplyr::select(-where(is.list),
+                             -where(lubridate::is.difftime),
+                             -where(lubridate::is.duration),
+                             -where(lubridate::is.interval),
+                             -where(lubridate::is.period))
+
   if (!elbow_method_mode) {
     kmeans_model_df <- df %>% build_kmeans.cols(...,
                                                 centers=centers,

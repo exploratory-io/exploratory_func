@@ -14,6 +14,14 @@ do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, allow_singl
     stop("Repeat-By column cannot be used as a variable column.")
   }
 
+  # list and difftime etc. causes error in tidy_rowwise(model, type="biplot").
+  # For now, we are removing them upfront.
+  df <- df %>% dplyr::select(-where(is.list),
+                             -where(lubridate::is.difftime),
+                             -where(lubridate::is.duration),
+                             -where(lubridate::is.interval),
+                             -where(lubridate::is.period))
+
   if(!is.null(seed)) { # Set seed before starting to call sample_n.
     set.seed(seed)
   }
