@@ -74,6 +74,14 @@ calc_firm_from_pd <- function(..., weight, class) {
   ret
 }
 
+# Returns tabulation of vector v with entries for all the values that appear in v_all.
+# Tolerates NULL for v.
+# e.g.
+# v:     c(2,3,3,4)
+# v_all: c(1,2,3,4,5)
+# output table object:
+# 1 2 3 4 5 
+# 0 1 2 1 0 
 get_aligned_table <- function(v, v_all) {
   table(c(v_all, v)) - table(v_all)
 }
@@ -98,7 +106,7 @@ importance_firm <- function(pdp_data, target, vars) {
     dplyr::mutate(points = list(as.numeric(get_aligned_table(quantile_points[[variable]], points[[variable]])))) %>%
     ungroup() %>%
     dplyr::mutate(data = purrr::map2(data, points, function(x,y) {
-      if (x$class[[1]]=="numeric") { # If numeric, remove 0 percentile and 100 percentile to avoid affected by outliers.
+      if (x$class[[1]]=="numeric") { # If numeric, use weight from quantile points only, ignoring other grid points added just for better visuallization result.
         x %>% mutate(weight = y)
       }
       else { # For categorical, weight does not matter. Besides, adding y as weight throws error when there is unused factor level.
