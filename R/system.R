@@ -2490,6 +2490,8 @@ get_excel_sheets <- function(path){
   }
 }
 
+#'API that search and imports multiple same structure CSV files and merge it to a single data frame
+#'@export
 search_and_read_delim_files <- function(folder, pattern, delim, quote = '"',
                                         escape_backslash = FALSE, escape_double = TRUE,
                                         col_names = TRUE, col_types = readr::cols(.default = readr::col_character()),
