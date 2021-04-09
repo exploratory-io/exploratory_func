@@ -24,9 +24,9 @@ test_that("exp_kmeans with strange column name", {
   # Add list column and difftime column etc. which used to cause error until we removed it as preprocessing.
   df <- df %>% mutate(posix1=lubridate::ymd_hm("2021-01-01 00:00"),
                       posix2=lubridate::ymd_hm("2021-01-02 00:00"),
-                      difftime = posix2-posix1, dur = as.duration(difftime),
-                      intv = as.interval(posix1, posix2),
-                      period = as.period(intv),
+                      difftime = posix2-posix1, dur = lubridate::as.duration(difftime),
+                      intv = lubridate::as.interval(posix1, posix2),
+                      period = lubridate::as.period(intv),
                       str="a,b,c",
                       list=stringr::str_split(str,","))
   df <- df %>% select(-posix1, -posix2, -str) # Remove POSIXct column and character column we used to create those special columns.
