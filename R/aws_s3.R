@@ -135,9 +135,9 @@ searchAndGetCSVFilesFromS3 <- function(searchKeyword, region, username, password
                               skip = 0, n_max = Inf, guess_max = min(1000, n_max),
                               progress = interactive()) {
 
+  # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
   files <- aws.s3::get_bucket_df(region = region, bucket = bucket, key = username, secret = password, max= Inf) %>%
     filter(str_detect(Key, stringr::str_c("(?i)", searchKeyword)))
-  # set name to the files so that it can be used for the "id" column created by purrr:map_dfr.
   getCSVFilesFromS3(files = files$Key, region = region, username = username, password = password, bucket = bucket, fileName = fileName, delim = delim, quote = quote,
                     col_names = col_names, col_types = col_types, locale = locale, na = na, quoted_na = quoted_na, comment = comment, trim_ws = trim_ws,
                     skip = skip, n_max = n_max, guess_max = guess_max, progress = progress)
@@ -158,6 +158,8 @@ getExcelFileFromS3 <- function(fileName, region, username, password, bucket, she
 
 #'@export
 searchAndGetExcelFilesFromS3 <- function(searchKeyword, region, username, password, bucket, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...){
+
+  # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
   files <- aws.s3::get_bucket_df(region = region, bucket = bucket, key = username, secret = password, max= Inf) %>%
     filter(str_detect(Key, stringr::str_c("(?i)", searchKeyword)))
   exploratory::getExcelFilesFromS3(files = files$Key, region = region, username = username, password = password, bucket = bucket, sheet = sheet,

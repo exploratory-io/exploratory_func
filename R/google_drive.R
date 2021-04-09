@@ -109,6 +109,7 @@ searchAndGetCSVFilesFromGoogleDrive <- function(folderId = NULL, searchKeyword =
                                        progress = interactive()) {
   items <- exploratory::listItemsInGoogleDrive(path = folderId, type =  c("csv", "tsv", "txt"))
   if (searchKeyword != "") {
+    # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
     items <- items %>% filter(stringr::str_detect(name, stringr::str_c("(?i)", searchKeyword)))
   }
   exploratory::getCSVFilesFromGoogleDrive(items$id, items$name, delim = delim, quote = quote, escape_backslash = escape_backslash, escape_double = escape_double, col_names = col_names,
@@ -151,6 +152,7 @@ searchAndGetExcelFilesFromGoogleDrive <- function(folderId = NULL, searchKeyword
   # set name to the files so that it can be used for the "id" column created by purrr:map_dfr.
   items <- exploratory::listItemsInGoogleDrive(path = folderId, type = c("xls", "xlsx"))
   if (searchKeyword != "") {
+    # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
     items <- items %>% filter(stringr::str_detect(name, stringr::str_c("(?i)", searchKeyword)))
   }
   exploratory::getExcelFilesFromGoogleDrive(items$id, items$name, sheet = sheet, col_names = col_names, col_types = col_types, na = na, skip = skip,
