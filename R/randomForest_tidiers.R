@@ -2850,7 +2850,7 @@ partial_dependence.ranger <- function(fit, vars = colnames(data),
       grid <- minv + (0:20)/20 * (maxv - minv)
       quantile_grid <- quantile(coldata, probs=1:24/25)
       quantile_points[[cname]] <- quantile_grid
-      points[[cname]] <- sort(c(grid, quantile_grid))
+      points[[cname]] <- sort(unique(c(grid, quantile_grid)))
     }
     else {
       points[[cname]] <- unique(data[[cname]])

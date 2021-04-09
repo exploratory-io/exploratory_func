@@ -92,6 +92,17 @@ get_aligned_table <- function(v, v_all) {
   }
 }
 
+count_occurrences <- function(v, v_all) {
+  if (is.numeric(v_all)) {
+    purrr::flatten_dbl(purrr::map(v_all,function(x){
+      sum(v == x)
+    }))
+  }
+  else {
+    as.numeric(c())
+  }
+}
+
 # Caluculate FIRM variable importance.
 # References:
 #   https://arxiv.org/abs/1805.04755
@@ -109,7 +120,7 @@ importance_firm <- function(pdp_data, target, vars) {
   imp_df <- imp_df %>% tidyr::pivot_longer(cols = !!vars, names_to="variable", values_to="class", values_drop_na=TRUE)
   # Add weight column to the data, so that it can be used to calculate FIRM with sd_with_weight.
   imp_df <- imp_df %>% dplyr::nest_by(variable) %>%
-    dplyr::mutate(points = list(as.numeric(get_aligned_table(quantile_points[[variable]], points[[variable]])))) %>%
+    dplyr::mutate(points = list(count_occurrences(quantile_points[[variable]], points[[variable]]))) %>%
     ungroup() %>%
     dplyr::mutate(data = purrr::map2(data, points, function(x,y) {
       if (x$class[[1]]=="numeric") { # If numeric, use weight from quantile points only, ignoring other grid points added just for better visuallization result.
