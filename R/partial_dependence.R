@@ -76,22 +76,15 @@ calc_firm_from_pd <- function(..., weight, class) {
 
 # Returns tabulation of vector v with entries for all the values that appear in v_all.
 # Tolerates NULL for v.
-# If v_all is not numeric, empty table object is returned. This is to avoid error while calculating FIRM for categorical variable
+# If v_all is not numeric, empty numeric vector is returned. This is to avoid error while calculating FIRM for categorical variable
 # e.g.
 # v:     c(2,3,3,4)
 # v_all: c(1,2,3,4,5)
-# output table object:
-# 1 2 3 4 5 
+# output numeric vector:
 # 0 1 2 1 0 
-get_aligned_table <- function(v, v_all) {
-  if (is.numeric(v_all)) {
-    table(c(v_all, v)) - table(v_all)
-  }
-  else {
-    table(as.numeric(c()))
-  }
-}
-
+#
+# table() can do similar thing, but equality between numbers used in it is based on how the numbers are expressed in string,
+# and that differene from == caused some errors, and we ended up writing this function.
 count_occurrences <- function(v, v_all) {
   if (is.numeric(v_all)) {
     purrr::flatten_dbl(purrr::map(v_all,function(x){
