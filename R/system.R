@@ -2337,8 +2337,8 @@ download_data_file <- function(url, type){
 
 #'API that search and imports multiple same structure Excel files and merge it to a single data frame
 #'@export
-search_and_read_excel_files <- function(folder, pattern, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...) {
-  files <- list.files(path = folder, pattern = stringr::str_c("(?i)", pattern, ".*\\.(xls|xlsx)$"), full.names = T)
+search_and_read_excel_files <- function(folder, pattern = "", sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...) {
+  files <- list.files(path = folder, pattern = stringr::str_c("(?i)", pattern), full.names = T)
   exploratory::read_excel_files(files = files, sheet = sheet, col_names = col_names, col_types = col_types, na = na, skip = skip, trim_ws = trim_ws, n_max = n_max,
                                 use_readxl = use_readxl, detectDates = detectDates, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols, check.names = check.names,
                                 tzone = tzone, convertDataTypeToChar = convertDataTypeToChar)
@@ -2492,7 +2492,7 @@ get_excel_sheets <- function(path){
 
 #'API that search and imports multiple same structure CSV files and merge it to a single data frame
 #'@export
-search_and_read_delim_files <- function(folder, pattern, delim, quote = '"',
+search_and_read_delim_files <- function(folder, pattern = "", delim, quote = '"',
                                         escape_backslash = FALSE, escape_double = TRUE,
                                         col_names = TRUE, col_types = readr::cols(.default = readr::col_character()),
                                         locale = readr::default_locale(),
@@ -2500,7 +2500,7 @@ search_and_read_delim_files <- function(folder, pattern, delim, quote = '"',
                                         comment = "", trim_ws = FALSE,
                                         skip = 0, n_max = Inf, guess_max = min(1000, n_max),
                                         progress = interactive(), with_api_key = FALSE) {
-  files <- list.files(path = folder, pattern = stringr::str_c("(?i)", pattern, ".*\\.(csv|tsv|text|tab|txt)$"), full.names = T)
+  files <- list.files(path = folder, pattern = stringr::str_c("(?i)", pattern), full.names = T)
   exploratory::read_delim_files(files = files, delim = delim, quote = quote,
                                 escape_backslash = escape_backslash, escape_double = escape_double,
                                 col_names = col_names, col_types = readr::cols(.default = readr::col_character()),
