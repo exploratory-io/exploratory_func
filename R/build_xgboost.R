@@ -847,10 +847,16 @@ partial_dependence.xgboost <- function(fit, vars = colnames(data),
 
   # Generate grid points based on quantile, so that FIRM calculated based on it would make good sense even when there are some outliers.
   points <- list()
+  quantile_points <- list()
   for (cname in vars) {
     if (is.numeric(data[[cname]])) {
       coldata <- data[[cname]]
-      points[[cname]] <- quantile(coldata, probs=0:25/25)
+      minv <- min(coldata, na.rm=TRUE)
+      maxv <- max(coldata, na.rm=TRUE)
+      grid <- minv + (0:20)/20 * (maxv - minv)
+      quantile_grid <- quantile(coldata, probs=1:24/25)
+      quantile_points[[cname]] <- quantile_grid
+      points[[cname]] <- sort(c(grid, quantile_grid))
     }
     else {
       points[[cname]] <- unique(data[[cname]])
@@ -892,6 +898,7 @@ partial_dependence.xgboost <- function(fit, vars = colnames(data),
   attr(pd, "target") = if (!classification) target else as.character(fit$y_levels)
   attr(pd, "vars") = vars
   attr(pd, "points") = points
+  attr(pd, "quantile_points") = quantile_points
   pd
 }
 
