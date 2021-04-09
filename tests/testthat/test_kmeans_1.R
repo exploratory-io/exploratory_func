@@ -20,6 +20,17 @@ test_that("exp_kmeans with strange column name", {
   df <- mtcars %>%
     rename(`Cy l` = cyl) %>%
     mutate(new_col = c(rep("A", n() - 10), rep("B", 10)))
+
+  # Add list column and difftime column etc. which used to cause error until we removed it as preprocessing.
+  df <- df %>% mutate(posix1=lubridate::ymd_hm("2021-01-01 00:00"),
+                      posix2=lubridate::ymd_hm("2021-01-02 00:00"),
+                      difftime = posix2-posix1, dur = lubridate::as.duration(difftime),
+                      intv = lubridate::as.interval(posix1, posix2),
+                      period = lubridate::as.period(intv),
+                      str="a,b,c",
+                      list=stringr::str_split(str,","))
+  df <- df %>% select(-posix1, -posix2, -str) # Remove POSIXct column and character column we used to create those special columns.
+
   model_df <- exp_kmeans(df, `Cy l`, mpg, hp)
   model_df %>% tidy_rowwise(model, type="variances")
   model_df %>% tidy_rowwise(model, type="loadings")

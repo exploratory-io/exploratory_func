@@ -653,7 +653,8 @@ test_that("add_prediction with logistic regression", {
                                      `DERAY_TIME`,
                                      `Carrier Name`,
                                      predictor_funs=list(ARR_TIME="log", DELAY_TIME="none", "Carrier Name"="none"),
-                                     model_type = "glm")
+                                     model_type = "glm",
+                                     importance_measure="firm")
   ret <- test_data %>% select(-`CANCELLED X`) %>% add_prediction(model_df=model_df)
   expect_true(all(c("predicted_probability", "predicted_value","predicted_label") %in% colnames(ret)))
 })
