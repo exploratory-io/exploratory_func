@@ -2337,7 +2337,7 @@ download_data_file <- function(url, type){
 
 #'API that search and imports multiple same structure Excel files and merge it to a single data frame
 #'@export
-search_and_read_excel_files <- function(folder, pattern = "", sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...) {
+searchAndReadExcelFiles <- function(folder, pattern = "", sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...) {
   # search condition is case insensitive.
   files <- list.files(path = folder, pattern = stringr::str_c("(?i)", pattern), full.names = T)
   exploratory::read_excel_files(files = files, sheet = sheet, col_names = col_names, col_types = col_types, na = na, skip = skip, trim_ws = trim_ws, n_max = n_max,
@@ -2493,7 +2493,7 @@ get_excel_sheets <- function(path){
 
 #'API that search and imports multiple same structure CSV files and merge it to a single data frame
 #'@export
-search_and_read_delim_files <- function(folder, pattern = "", delim, quote = '"',
+searchAndReadDelimFiles <- function(folder, pattern = "", delim, quote = '"',
                                         escape_backslash = FALSE, escape_double = TRUE,
                                         col_names = TRUE, col_types = readr::cols(.default = readr::col_character()),
                                         locale = readr::default_locale(),
