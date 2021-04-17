@@ -9,7 +9,8 @@ listItemsInGoogleDrive <- function(teamDriveId = NULL, path = NULL, type =  c("c
   }
   token = getGoogleTokenForDrive()
   googledrive::drive_set_token(token)
-  if (!is.null(path)) {
+  # "~/" is special case for listing under My Drive so do not call googledriev::as_id for "~/".
+  if (!is.null(path) && path != "~/") {
     path = googledrive::as_id(path)
   }
   # If team id is provided search documents within the team.
