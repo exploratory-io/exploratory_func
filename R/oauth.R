@@ -130,6 +130,10 @@ refreshGoogleTokenForSheet <- function(tokenFileId){
 
 #' @export
 getGoogleTokenForDrive <- function(tokenFileId = "", useCache=TRUE){
+  # To workaround Error in the HTTP2 framing layer
+  # set below config (see https://github.com/jeroen/curl/issues/156)
+  httr::set_config(httr::config(http_version = 0))
+
   appName = "google"
   # retrieve token info from environment
   # main purpose is to enable server refresh
