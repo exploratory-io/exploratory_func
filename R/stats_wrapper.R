@@ -183,7 +183,10 @@ do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearso
         stop("More than 1 row are required to calculate correlations.")
       }
     }
-    mat <- dplyr::select(df, !!!select_dots) %>%  as.matrix()
+    mat <- dplyr::select(df, !!!select_dots) %>%
+      # Convert logical to numeric explicitly, since implicit conversion by as.matrix does not happen if all the columns are logical.
+      dplyr::mutate(across(where(is.logical), as.numeric)) %>%
+      as.matrix()
     # sort the column name so that the output of pair.name.1 and pair.name.2 will be sorted
     # it's better to be sorted so that heatmap in exploratory can be triangle if distinct is TRUE
     sorted_colnames <- sort(colnames(mat))
