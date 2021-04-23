@@ -1,3 +1,46 @@
+#' API to get top level folder names for the S3 Bucket
+#' @param region
+#' @param bucket
+#' @param filenName
+#' @export
+getS3TopLevelFolders <- function(bucket, ...) {
+  # 1000 is limit per call.
+  max <- 1000
+  query <- list(prefix = NULL, delimiter = "/", "max-keys" = max, marker = NULL)
+  r <- aws.s3::s3HTTP(verb = "GET", bucket = bucket, query = query, parse_response = TRUE, ...)
+  # Handle pagination for large result set.
+  while (
+    r[["IsTruncated"]] == "true" &&
+    !is.null(max) &&
+    as.integer(r[["MaxKeys"]]) < max
+  ) {
+    query <- list(
+      prefix = NULL,
+      delimiter = "/",
+      "max-keys" = as.integer(pmin(max - as.integer(r[["MaxKeys"]]), max)),
+      marker = tail(r, 1)[["Contents"]][["Key"]]
+    )
+    extra <- aws.s3::s3HTTP(verb = "GET", bucket = bucket, query = query, parse_response = TRUE, ...)
+    new_r <- c(r, tail(extra, -5))
+    new_r[["MaxKeys"]] <- as.character(as.integer(r[["MaxKeys"]]) + as.integer(extra[["MaxKeys"]]))
+    new_r[["IsTruncated"]] <- extra[["IsTruncated"]]
+    r <- new_r
+  }
+  # Top Level Folders are stored under CommonPrefixes
+  df <- data.frame(r[names(r) == "CommonPrefixes"])
+
+  # The data frame looks like this so gather columns and keep only "folder" column.
+  #   CommonPrefixes CommonPrefixes.1 CommonPrefixes.2
+  # 1          data/           data2/           data3/
+  if (nrow(df) > 0) {
+    df %>% tidyr::gather(key="key", value="folder") %>% select("folder")
+  } else { # if not top leve folder is found
+    df <- data.frame(c(""))
+    colnames(df) <- c("folder")
+  }
+}
+
+
 #' API to download remote data file (excel, csv) from Amazon S3 and cache it if necessary
 #' it uses tempfile https://stat.ethz.ch/R-manual/R-devel/library/base/html/tempfile.html
 #' and a R variable with name of hashed region, bucket, key, secret, fileName are  assigned to the path given by tempfile.
