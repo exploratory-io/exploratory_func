@@ -3,10 +3,10 @@
 #' @param bucket
 #' @param filenName
 #' @export
-getS3TopLevelFolders <- function(bucket, ...) {
+getS3Folders <- function(bucket, prefix = NULL, ...) {
   # 1000 is limit per call.
   max <- 1000
-  query <- list(prefix = NULL, delimiter = "/", "max-keys" = max, marker = NULL)
+  query <- list(prefix = prefix, delimiter = "/", "max-keys" = max, marker = NULL)
   r <- aws.s3::s3HTTP(verb = "GET", bucket = bucket, query = query, parse_response = TRUE, ...)
   # Handle pagination for large result set.
   while (
@@ -15,7 +15,7 @@ getS3TopLevelFolders <- function(bucket, ...) {
     as.integer(r[["MaxKeys"]]) < max
   ) {
     query <- list(
-      prefix = NULL,
+      prefix = prefix,
       delimiter = "/",
       "max-keys" = as.integer(pmin(max - as.integer(r[["MaxKeys"]]), max)),
       marker = tail(r, 1)[["Contents"]][["Key"]]
@@ -35,8 +35,7 @@ getS3TopLevelFolders <- function(bucket, ...) {
   if (nrow(df) > 0) {
     df %>% tidyr::gather(key="key", value="folder") %>% select("folder")
   } else { # if not top leve folder is found
-    df <- data.frame(c(""))
-    colnames(df) <- c("folder")
+    data.frame()
   }
 }
 
