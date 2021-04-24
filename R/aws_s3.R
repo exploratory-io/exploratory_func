@@ -1,7 +1,6 @@
-#' API to get top level folder names for the S3 Bucket
-#' @param region
+#' API to get folder names for the S3 Bucket
 #' @param bucket
-#' @param filenName
+#' @param prefix
 #' @export
 getS3Folders <- function(bucket, prefix = NULL, ...) {
   # 1000 is limit per call.
