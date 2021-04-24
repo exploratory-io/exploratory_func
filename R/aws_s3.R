@@ -5,8 +5,9 @@
 #' @export
 getS3Folders <- function(bucket, prefix = NULL, ...) {
   # 1000 is limit per call.
-  max <- 1000
-  query <- list(prefix = prefix, delimiter = "/", "max-keys" = max, marker = NULL)
+  max <- Inf
+  limit <- 1000
+  query <- list(prefix = prefix, delimiter = "/", "max-keys" = as.integer(pmin(limit, max)), marker = NULL)
   r <- aws.s3::s3HTTP(verb = "GET", bucket = bucket, query = query, parse_response = TRUE, ...)
   # Handle pagination for large result set.
   while (
@@ -17,7 +18,7 @@ getS3Folders <- function(bucket, prefix = NULL, ...) {
     query <- list(
       prefix = prefix,
       delimiter = "/",
-      "max-keys" = as.integer(pmin(max - as.integer(r[["MaxKeys"]]), max)),
+      "max-keys" = as.integer(pmin(max - as.integer(r[["MaxKeys"]]), limit)),
       marker = tail(r, 1)[["Contents"]][["Key"]]
     )
     extra <- aws.s3::s3HTTP(verb = "GET", bucket = bucket, query = query, parse_response = TRUE, ...)
