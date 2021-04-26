@@ -130,7 +130,6 @@ refreshGoogleTokenForSheet <- function(tokenFileId){
 
 #' @export
 getGoogleTokenForDrive <- function(tokenFileId = "", useCache=TRUE){
-
   appName = "google"
   # retrieve token info from environment
   # main purpose is to enable server refresh
