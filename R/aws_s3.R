@@ -26,7 +26,7 @@ getS3Folders <- function(bucket, prefix = NULL, ...) {
     new_r[["IsTruncated"]] <- extra[["IsTruncated"]]
     r <- new_r
   }
-  # Top Level Folders are stored under CommonPrefixes
+  # Folders are stored under CommonPrefixes
   df <- data.frame(r[names(r) == "CommonPrefixes"])
 
   # The data frame looks like this so gather columns and keep only "folder" column.
@@ -34,7 +34,7 @@ getS3Folders <- function(bucket, prefix = NULL, ...) {
   # 1          data/           data2/           data3/
   if (nrow(df) > 0) {
     df %>% tidyr::gather(key="key", value="folder") %>% select("folder")
-  } else { # if not top leve folder is found
+  } else { # if nofolder is found, return empty data frame.
     data.frame()
   }
 }
