@@ -133,13 +133,13 @@ getCSVFileFromS3 <- function(fileName, region, username, password, bucket, delim
 
 #'@export
 getCSVFilesFromS3 <- function(files, region, username, password, bucket, fileName, delim, quote = '"',
-                              escape_backslash = FALSE, escape_double = TRUE,
-                              col_names = TRUE, col_types = readr::cols(.default = readr::col_character()),
-                              locale = readr::default_locale(),
-                              na = c("", "NA"), quoted_na = TRUE,
-                              comment = "", trim_ws = FALSE,
-                              skip = 0, n_max = Inf, guess_max = min(1000, n_max),
-                              progress = interactive()) {
+                             escape_backslash = FALSE, escape_double = TRUE,
+                             col_names = TRUE, col_types = readr::cols(.default = readr::col_character()),
+                             locale = readr::default_locale(),
+                             na = c("", "NA"), quoted_na = TRUE,
+                             comment = "", trim_ws = FALSE,
+                             skip = 0, n_max = Inf, guess_max = min(1000, n_max),
+                             progress = interactive()) {
   # set name to the files so that it can be used for the "id" column created by purrr:map_dfr.
   files <- setNames(as.list(files), files)
   df <- purrr::map_dfr(files, exploratory::getCSVFileFromS3, region = region, username = username, password = password, bucket = bucket, delim = delim, quote = quote,
@@ -164,13 +164,13 @@ getCSVFilesFromS3 <- function(files, region, username, password, bucket, fileNam
 
 #'@export
 searchAndGetCSVFilesFromS3 <- function(searchKeyword, region, username, password, bucket, fileName, delim, quote = '"',
-                                       escape_backslash = FALSE, escape_double = TRUE,
-                                       col_names = TRUE, col_types = readr::cols(.default = readr::col_character()),
-                                       locale = readr::default_locale(),
-                                       na = c("", "NA"), quoted_na = TRUE,
-                                       comment = "", trim_ws = FALSE,
-                                       skip = 0, n_max = Inf, guess_max = min(1000, n_max),
-                                       progress = interactive()) {
+                              escape_backslash = FALSE, escape_double = TRUE,
+                              col_names = TRUE, col_types = readr::cols(.default = readr::col_character()),
+                              locale = readr::default_locale(),
+                              na = c("", "NA"), quoted_na = TRUE,
+                              comment = "", trim_ws = FALSE,
+                              skip = 0, n_max = Inf, guess_max = min(1000, n_max),
+                              progress = interactive()) {
 
   # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
   files <- aws.s3::get_bucket_df(region = region, bucket = bucket, key = username, secret = password, max= Inf) %>%
