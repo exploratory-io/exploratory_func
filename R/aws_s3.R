@@ -1,3 +1,40 @@
+#' API to get folder names for the S3 Bucket
+#' @param bucket
+#' @param prefix
+#' @export
+getS3Folders <- function(bucket, prefix = NULL, ...) {
+  # To get all folders, pass Inf.
+  max <- Inf
+  # 1000 is limit per call.
+  limit <- 1000
+  query <- list(prefix = prefix, delimiter = "/", "max-keys" = limit, marker = NULL)
+  result <- aws.s3::s3HTTP(verb = "GET", bucket = bucket, query = query, parse_response = TRUE, ...)
+  # Handle pagination for large result set.
+  while (result[["IsTruncated"]] == "true") { # if IsTruncted is true, need to send another request to get the remaining result.
+    # Get the last row from the result and check the Key and pass that as a new marker to make the pagination works.
+    nextMarker =  tail(result, 1)[["Contents"]][["Key"]]
+    query <- list(prefix = prefix, delimiter = "/", "max-keys" = 1000, marker = nextMarker)
+    # Send another query to get remaining.
+    additionalResult <- aws.s3::s3HTTP(verb = "GET", bucket = bucket, query = query, parse_response = TRUE, ...)
+    # Append additional query result
+    combinedResult <- c(result, additionalResult)
+    combinedResult[["IsTruncated"]] <- additionalResult[["IsTruncated"]]
+    result <- combinedResult
+  }
+  # Folders are stored under CommonPrefixes
+  df <- data.frame(result[names(result) == "CommonPrefixes"])
+
+  # The data frame looks like this so gather columns and keep only "folder" column.
+  #   CommonPrefixes CommonPrefixes.1 CommonPrefixes.2
+  # 1          data/           data2/           data3/
+  if (nrow(df) > 0) {
+    df %>% tidyr::gather(key="key", value="folder") %>% select("folder")
+  } else { # if no folder is found, return empty data frame.
+    data.frame()
+  }
+}
+
+
 #' API to download remote data file (excel, csv) from Amazon S3 and cache it if necessary
 #' it uses tempfile https://stat.ethz.ch/R-manual/R-devel/library/base/html/tempfile.html
 #' and a R variable with name of hashed region, bucket, key, secret, fileName are  assigned to the path given by tempfile.
