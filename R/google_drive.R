@@ -237,7 +237,7 @@ downloadDataFileFromGoogleDrive <- function(fileId, type = "csv"){
     dir.create(tempdir(), showWarnings = FALSE)
 
     # download file to temporary location
-    try ({
+    tryCatch ({
       googledrive::drive_download(googledrive::as_id(fileId), overwrite = TRUE, path = tmp)
     }, error = function(e) {
       stop(e)
