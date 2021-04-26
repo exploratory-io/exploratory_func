@@ -34,7 +34,7 @@ getS3Folders <- function(bucket, prefix = NULL, ...) {
   # 1          data/           data2/           data3/
   if (nrow(df) > 0) {
     df %>% tidyr::gather(key="key", value="folder") %>% select("folder")
-  } else { # if nofolder is found, return empty data frame.
+  } else { # if no folder is found, return empty data frame.
     data.frame()
   }
 }
