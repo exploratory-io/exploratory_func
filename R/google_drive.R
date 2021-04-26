@@ -7,7 +7,12 @@ listItemsInGoogleDrive <- function(teamDriveId = NULL, path = NULL, type =  c("c
   if (!requireNamespace("googledrive")) {
     stop("package googledrive must be installed.")
   }
+  # Remember the previous config
   currentConfig <- getOption("httr_config")
+  # To workaround Error in the HTTP2 framing layer
+  # set below config (see https://github.com/jeroen/curl/issues/156)
+  httr::set_config(httr::config(http_version = 0))
+
   token = getGoogleTokenForDrive()
   googledrive::drive_set_token(token)
   # "~/" is special case for listing under My Drive so do not call googledriev::as_id for "~/".
@@ -39,7 +44,11 @@ getGoogleDriveFolderDetails <- function(teamDriveId = NULL , path = NULL) {
   if(!requireNamespace("googledrive")) {
     stop("package googledrive must be installed.")
   }
+  # Remember the previous config
   currentConfig <- getOption("httr_config")
+  # To workaround Error in the HTTP2 framing layer
+  # set below config (see https://github.com/jeroen/curl/issues/156)
+  httr::set_config(httr::config(http_version = 0))
 
   token = getGoogleTokenForDrive()
   googledrive::drive_set_token(token)
@@ -203,8 +212,12 @@ guessFileEncodingForGoogleDriveFile <- function(fileId, n_max = 1e4, threshold =
 #' it uses tempfile https://stat.ethz.ch/R-manual/R-devel/library/base/html/tempfile.html
 #' and a R variable with name of hashed region, bucket, key, secret, fileName are  assigned to the path given by tempfile.
 downloadDataFileFromGoogleDrive <- function(fileId, type = "csv"){
-  token <- exploratory::getGoogleTokenForDrive()
+  # Remember the previous config
   currentConfig <- getOption("httr_config")
+  # To workaround Error in the HTTP2 framing layer
+  # set below config (see https://github.com/jeroen/curl/issues/156)
+  httr::set_config(httr::config(http_version = 0))
+  token <- exploratory::getGoogleTokenForDrive()
 
   googledrive::drive_set_token(token)
   shouldCacheFile <- getOption("tam.should.cache.datafile")
