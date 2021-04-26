@@ -7,6 +7,7 @@ listItemsInGoogleDrive <- function(teamDriveId = NULL, path = NULL, type =  c("c
   if (!requireNamespace("googledrive")) {
     stop("package googledrive must be installed.")
   }
+  currentConfig <- getOption("httr_config")
   token = getGoogleTokenForDrive()
   googledrive::drive_set_token(token)
   # "~/" is special case for listing under My Drive so do not call googledriev::as_id for "~/".
@@ -17,8 +18,19 @@ listItemsInGoogleDrive <- function(teamDriveId = NULL, path = NULL, type =  c("c
   if (teamDriveId != "" && !is.null(teamDriveId)) {
     teamDriveId = googledrive::as_id(teamDriveId)
   }
-  # To improve performance, only get id, name, mimeType, modifiedTime, size, parents for each file.
-  googledrive::drive_ls(path = path, type = type, team_drive = teamDriveId, pageSize = 1000, fields = "files/id, files/name, files/mimeType, files/modifiedTime, files/size, files/parents, nextPageToken")
+  result <- tryCatch({
+    # To improve performance, only get id, name, mimeType, modifiedTime, size, parents for each file.
+    googledrive::drive_ls(path = path, type = type, team_drive = teamDriveId, pageSize = 1000, fields = "files/id, files/name, files/mimeType, files/modifiedTime, files/size, files/parents, nextPageToken")
+  }, error = function(e) {
+    stop(e)
+  }, finally = {
+    if (is.null(currentConfig)) {
+      httr::reset_config()
+    } else {
+      httr::set_config(currentConfig)
+    }
+  })
+  result
 }
 
 #' API to get a folder details in Google Drive
@@ -26,7 +38,9 @@ listItemsInGoogleDrive <- function(teamDriveId = NULL, path = NULL, type =  c("c
 getGoogleDriveFolderDetails <- function(teamDriveId = NULL , path = NULL) {
   if(!requireNamespace("googledrive")) {
     stop("package googledrive must be installed.")
-    }
+  }
+  currentConfig <- getOption("httr_config")
+
   token = getGoogleTokenForDrive()
   googledrive::drive_set_token(token)
   if (!is.null(path)) {
@@ -38,7 +52,17 @@ getGoogleDriveFolderDetails <- function(teamDriveId = NULL , path = NULL) {
   if (teamDriveId != "" && !is.null(teamDriveId)) {
     teamDriveId = googledrive::as_id(teamDriveId)
   }
-  df <- googledrive::drive_get(team_drive = teamDriveId, id = path)
+  df <- tryCatch({
+    googledrive::drive_get(team_drive = teamDriveId, id = path)
+  }, error = function(e) {
+    stop(e)
+  }, finally = {
+    if (is.null(currentConfig)) {
+      httr::reset_config()
+    } else {
+      httr::set_config(currentConfig)
+    }
+  })
   dfdetails <- NULL
   if (nrow(df) == 1) {
     dfdetails <- df %>% googledrive::drive_reveal("path")
@@ -180,6 +204,8 @@ guessFileEncodingForGoogleDriveFile <- function(fileId, n_max = 1e4, threshold =
 #' and a R variable with name of hashed region, bucket, key, secret, fileName are  assigned to the path given by tempfile.
 downloadDataFileFromGoogleDrive <- function(fileId, type = "csv"){
   token <- exploratory::getGoogleTokenForDrive()
+  currentConfig <- getOption("httr_config")
+
   googledrive::drive_set_token(token)
   shouldCacheFile <- getOption("tam.should.cache.datafile")
   filepath <- NULL
@@ -211,7 +237,17 @@ downloadDataFileFromGoogleDrive <- function(fileId, type = "csv"){
     dir.create(tempdir(), showWarnings = FALSE)
 
     # download file to temporary location
-    googledrive::drive_download(googledrive::as_id(fileId), overwrite = TRUE, path = tmp)
+    try ({
+      googledrive::drive_download(googledrive::as_id(fileId), overwrite = TRUE, path = tmp)
+    }, error = function(e) {
+      stop(e)
+    }, finally = {
+      if (is.null(currentConfig)) {
+        httr::reset_config()
+      } else {
+        httr::set_config(currentConfig)
+      }
+    })
     # cache file
     if (!is.null(shouldCacheFile) && isTRUE(shouldCacheFile)) {
       assign(hash, tmp, envir = .GlobalEnv)
