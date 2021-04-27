@@ -2268,7 +2268,7 @@ summarize_group <- function(.data, group_cols = NULL, group_funs = NULL, ...) {
 #' @param x - data frame
 #' @param f - function
 #' @export
-summarize_row <- function(x, f, ...) {
+summarize_row <- function(x, f = mean, ...) {
   apply(x, 1, f, ...)
 }
 
