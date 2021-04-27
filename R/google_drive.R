@@ -7,18 +7,34 @@ listItemsInGoogleDrive <- function(teamDriveId = NULL, path = NULL, type =  c("c
   if (!requireNamespace("googledrive")) {
     stop("package googledrive must be installed.")
   }
-  token = getGoogleTokenForDrive()
-  googledrive::drive_set_token(token)
-  # "~/" is special case for listing under My Drive so do not call googledriev::as_id for "~/".
-  if (!is.null(path) && path != "~/") {
-    path = googledrive::as_id(path)
-  }
-  # If team id is provided search documents within the team.
-  if (teamDriveId != "" && !is.null(teamDriveId)) {
-    teamDriveId = googledrive::as_id(teamDriveId)
-  }
-  # To improve performance, only get id, name, mimeType, modifiedTime, size, parents for each file.
-  googledrive::drive_ls(path = path, type = type, team_drive = teamDriveId, pageSize = 1000, fields = "files/id, files/name, files/mimeType, files/modifiedTime, files/size, files/parents, nextPageToken")
+  # Remember the current config
+  currentConfig <- getOption("httr_config")
+  # To workaround Error in the HTTP2 framing layer
+  # set below config (see https://github.com/jeroen/curl/issues/156)
+  httr::set_config(httr::config(http_version = 0))
+  result <- tryCatch({
+    token = getGoogleTokenForDrive()
+    googledrive::drive_set_token(token)
+    # "~/" is special case for listing under My Drive so do not call googledriev::as_id for "~/".
+    if (!is.null(path) && path != "~/") {
+      path = googledrive::as_id(path)
+    }
+    # If team id is provided search documents within the team.
+    if (teamDriveId != "" && !is.null(teamDriveId)) {
+      teamDriveId = googledrive::as_id(teamDriveId)
+    }
+    # To improve performance, only get id, name, mimeType, modifiedTime, size, parents for each file.
+    googledrive::drive_ls(path = path, type = type, team_drive = teamDriveId, pageSize = 1000, fields = "files/id, files/name, files/mimeType, files/modifiedTime, files/size, files/parents, nextPageToken")
+  }, error = function(e) {
+    stop(e)
+  }, finally = {
+    if (is.null(currentConfig)) {
+      httr::reset_config()
+    } else {
+      httr::set_config(currentConfig)
+    }
+  })
+  result
 }
 
 #' API to get a folder details in Google Drive
@@ -26,25 +42,40 @@ listItemsInGoogleDrive <- function(teamDriveId = NULL, path = NULL, type =  c("c
 getGoogleDriveFolderDetails <- function(teamDriveId = NULL , path = NULL) {
   if(!requireNamespace("googledrive")) {
     stop("package googledrive must be installed.")
+  }
+  # Remember the current config
+  currentConfig <- getOption("httr_config")
+  # To workaround Error in the HTTP2 framing layer
+  # set below config (see https://github.com/jeroen/curl/issues/156)
+  httr::set_config(httr::config(http_version = 0))
+  result <- tryCatch({
+    token = getGoogleTokenForDrive()
+    googledrive::drive_set_token(token)
+    if (!is.null(path)) {
+      path = googledrive::as_id(path)
     }
-  token = getGoogleTokenForDrive()
-  googledrive::drive_set_token(token)
-  if (!is.null(path)) {
-    path = googledrive::as_id(path)
-  }
-  df <- NULL
-  #if team id is provided search documents within the team.
-  # If team id is provided search documents within the team.
-  if (teamDriveId != "" && !is.null(teamDriveId)) {
-    teamDriveId = googledrive::as_id(teamDriveId)
-  }
-  df <- googledrive::drive_get(team_drive = teamDriveId, id = path)
-  dfdetails <- NULL
-  if (nrow(df) == 1) {
-    dfdetails <- df %>% googledrive::drive_reveal("path")
-  }
-  dfdetails
-
+    df <- NULL
+    #if team id is provided search documents within the team.
+    # If team id is provided search documents within the team.
+    if (teamDriveId != "" && !is.null(teamDriveId)) {
+      teamDriveId = googledrive::as_id(teamDriveId)
+    }
+    googledrive::drive_get(team_drive = teamDriveId, id = path)
+    dfdetails <- NULL
+    if (nrow(df) == 1) {
+      dfdetails <- df %>% googledrive::drive_reveal("path")
+    }
+    dfdetails
+  }, error = function(e) {
+    stop(e)
+  }, finally = {
+    if (is.null(currentConfig)) {
+      httr::reset_config()
+    } else {
+      httr::set_config(currentConfig)
+    }
+  })
+  result
 }
 
 #'API that imports a CSV file from Google Drive.
@@ -179,45 +210,62 @@ guessFileEncodingForGoogleDriveFile <- function(fileId, n_max = 1e4, threshold =
 #' it uses tempfile https://stat.ethz.ch/R-manual/R-devel/library/base/html/tempfile.html
 #' and a R variable with name of hashed region, bucket, key, secret, fileName are  assigned to the path given by tempfile.
 downloadDataFileFromGoogleDrive <- function(fileId, type = "csv"){
-  token <- exploratory::getGoogleTokenForDrive()
-  googledrive::drive_set_token(token)
-  shouldCacheFile <- getOption("tam.should.cache.datafile")
-  filepath <- NULL
-  hash <- digest::digest(stringr::str_c(fileId, type), "md5", serialize = FALSE)
-  tryCatch({
-    filepath <- eval(as.name(hash))
-  }, error = function(e){
-    # if filePath hash is not set as global variable yet, it raises error that says object not found
-    # which can be ignored
+  # Remember the current config
+  currentConfig <- getOption("httr_config")
+  # To workaround Error in the HTTP2 framing layer
+  # set below config (see https://github.com/jeroen/curl/issues/156)
+  httr::set_config(httr::config(http_version = 0))
+  result <- tryCatch ({
+    token <- exploratory::getGoogleTokenForDrive()
+
+    googledrive::drive_set_token(token)
+    shouldCacheFile <- getOption("tam.should.cache.datafile")
     filepath <- NULL
-  })
-  # Check if cached excel/csv exists for the filepath
-  if (!is.null(shouldCacheFile) && isTRUE(shouldCacheFile) && !is.null(filepath)) {
-    filepath
-  } else {
-    tmp <- tempfile(fileext = stringr::str_c(".", type))
+    hash <- digest::digest(stringr::str_c(fileId, type), "md5", serialize = FALSE)
+    tryCatch({
+      filepath <- eval(as.name(hash))
+    }, error = function(e){
+      # if filePath hash is not set as global variable yet, it raises error that says object not found
+      # which can be ignored
+      filepath <- NULL
+    })
+    # Check if cached excel/csv exists for the filepath
+    if (!is.null(shouldCacheFile) && isTRUE(shouldCacheFile) && !is.null(filepath)) {
+      filepath
+    } else {
+      tmp <- tempfile(fileext = stringr::str_c(".", type))
 
-    # In case of using Rserve on linux, somehow it doesn't create a temporary
-    # directory specified by tempdir() which is used as a part of temp file
-    # path generated by tempfile(). So if you try to use that temp file path,
-    # dump some data into it for example, it will fail because no such path
-    # found. This function fails with the same reason at download.file below.
-    #
-    # It works fine from the R command line on linux, and it works
-    # fine all the time on Mac and Windows regardless Rserv or not.
-    #
-    # The following command is harmless even if you have the directory already.
-    # http://stackoverflow.com/questions/4216753/check-existence-of-directory-and-create-if-doesnt-exist
-    dir.create(tempdir(), showWarnings = FALSE)
+      # In case of using Rserve on linux, somehow it doesn't create a temporary
+      # directory specified by tempdir() which is used as a part of temp file
+      # path generated by tempfile(). So if you try to use that temp file path,
+      # dump some data into it for example, it will fail because no such path
+      # found. This function fails with the same reason at download.file below.
+      #
+      # It works fine from the R command line on linux, and it works
+      # fine all the time on Mac and Windows regardless Rserv or not.
+      #
+      # The following command is harmless even if you have the directory already.
+      # http://stackoverflow.com/questions/4216753/check-existence-of-directory-and-create-if-doesnt-exist
+      dir.create(tempdir(), showWarnings = FALSE)
 
-    # download file to temporary location
-    googledrive::drive_download(googledrive::as_id(fileId), overwrite = TRUE, path = tmp)
-    # cache file
-    if (!is.null(shouldCacheFile) && isTRUE(shouldCacheFile)) {
-      assign(hash, tmp, envir = .GlobalEnv)
+      # download file to temporary location
+      googledrive::drive_download(googledrive::as_id(fileId), overwrite = TRUE, path = tmp)
+      # cache file
+      if (!is.null(shouldCacheFile) && isTRUE(shouldCacheFile)) {
+        assign(hash, tmp, envir = .GlobalEnv)
+      }
+      tmp
     }
-    tmp
-  }
+  }, error = function(e) {
+    stop(e)
+  }, finally = {
+    if (is.null(currentConfig)) {
+      httr::reset_config()
+    } else {
+      httr::set_config(currentConfig)
+    }
+  })
+  result
 }
 
 #' API to clear Google Drive cache file
