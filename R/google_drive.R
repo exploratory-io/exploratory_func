@@ -215,7 +215,7 @@ downloadDataFileFromGoogleDrive <- function(fileId, type = "csv"){
   # To workaround Error in the HTTP2 framing layer
   # set below config (see https://github.com/jeroen/curl/issues/156)
   httr::set_config(httr::config(http_version = 0))
-  tmp <- tryCatch ({
+  result <- tryCatch ({
     token <- exploratory::getGoogleTokenForDrive()
 
     googledrive::drive_set_token(token)
@@ -265,7 +265,7 @@ downloadDataFileFromGoogleDrive <- function(fileId, type = "csv"){
       httr::set_config(currentConfig)
     }
   })
-  tmp
+  result
 }
 
 #' API to clear Google Drive cache file
