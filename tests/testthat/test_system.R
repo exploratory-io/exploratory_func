@@ -276,7 +276,7 @@ test_that("read_parquet_file", {
   expect_equal(TRUE, is.data.frame(df))
 })
 
-test_that("read_parquet_file can read the parquet file that arrow3 cannot read.", {
+test_that("read_parquet_file can read the parquet file that arrow v3 fails to read.", {
   df <- read_parquet_file("https://dl.dropbox.com/s/5v4xhjhunl7v58g/21331_Source1.parquet")
   expect_equal(TRUE, is.data.frame(df))
 })
