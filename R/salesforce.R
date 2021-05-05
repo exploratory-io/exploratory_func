@@ -5,14 +5,17 @@
 #' @param password - Salesforce login password
 #' @param securityToken - (optional) security token if required
 #' This API
-loginToSalesforce <- function(server = "https://login.salesforce.com", username, password, securityToken = ""){
+loginToSalesforce <- function(server = NULL, username, password, securityToken = NULL){
   if (!requireNamespace("salesforcer")) {
     stop("package salesforcer must be installed.")
   }
-  if (securityToken != "") {
-    salesforcer::sf_auth(login_url = server, username = username, password = password, security_token = securityToken, cache = FALSE)
-  } else {
+  if (is.null(server)) { # if login server was not provided, try it with the default login server.
+    server = "https://login.salesforce.com"
+  }
+  if (is.null(securityToken)) {
     salesforcer::sf_auth(login_url = server, username = username, password = password, cache = FALSE)
+  } else {
+    salesforcer::sf_auth(login_url = server, username = username, password = password, security_token = securityToken, cache = FALSE)
   }
 }
 
@@ -22,11 +25,11 @@ loginToSalesforce <- function(server = "https://login.salesforce.com", username,
 #' @param username - Salesforce login user name
 #' @param password - Salesforce login password
 #' @param securityToken - (optional) security token if required
-querySaleseforceMetadata <- function(server, username, password, securityToken = ""){
+querySaleseforceMetadata <- function(server = NULL, username, password, securityToken = NULL){
   if (!requireNamespace("salesforcer")) {
     stop("package salesforcer must be installed.")
   }
-  loginToSalesforce(server, username = username, password = password, securityToken = securityToken)
+  loginToSalesforce(server = server, username = username, password = password, securityToken = securityToken)
   my_queries <- list(list(type='CustomObject'))
   metadata_info <- salesforcer::sf_list_metadata(queries=my_queries)
   metadata_info
@@ -39,7 +42,7 @@ querySaleseforceMetadata <- function(server, username, password, securityToken =
 #' @param password - Salesforce login password
 #' @param securityToken - (optional) security token if required
 #' @param table - name of the table that you want to get details.
-querySaleseforceTableDetails <- function(server, username, password, securityToken = "", table){
+querySaleseforceTableDetails <- function(server = NULL, username, password, securityToken = NULL, table){
   if (!requireNamespace("salesforcer")) {
     stop("package salesforcer must be installed.")
   }
@@ -54,10 +57,11 @@ querySaleseforceTableDetails <- function(server, username, password, securityTok
 #' @param password - Salesforce login password
 #' @param securityToken - (optional) security token to login
 #' @param query - SOQL query.
-querySalesforceData <- function(server, username, password, securityToken = "", query){
+querySalesforceData <- function(server = NULL, username, password, securityToken = NULL, query, pageSize = 2000, guessType = TRUE){
   if (!requireNamespace("salesforcer")) {
     stop("package salesforcer must be installed.")
   }
+  queryControl <- salesforcer::sf_control(QueryOptions = list(batchSize = pageSize))
   loginToSalesforce(server = server, username = username, password = password, securityToken = securityToken)
-  salesforcer::sf_auth(login_url = server, username = username, password = password, security_token = securityToken, cache = FALSE)
+  salesforcer::sf_query(soql = query, control = queryControl, guess_types = guessType)
 }
