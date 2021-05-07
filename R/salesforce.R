@@ -57,11 +57,12 @@ querySaleseforceTableDetails <- function(server = NULL, username, password, secu
 #' @param password - Salesforce login password
 #' @param securityToken - (optional) security token to login
 #' @param query - SOQL query.
-querySalesforceData <- function(server = NULL, username, password, securityToken = NULL, query, pageSize = 2000, guessType = TRUE){
+querySalesforceData <- function(server = NULL, username, password, securityToken = NULL, query = "", guessType = TRUE){
   if (!requireNamespace("salesforcer")) {
     stop("package salesforcer must be installed.")
   }
-  queryControl <- salesforcer::sf_control(QueryOptions = list(batchSize = pageSize))
+  # increase batch size to improve peformance
+  queryControl <- salesforcer::sf_control(QueryOptions = list(batchSize = 2000))
   loginToSalesforce(server = server, username = username, password = password, securityToken = securityToken)
   salesforcer::sf_query(soql = query, control = queryControl, guess_types = guessType)
 }
