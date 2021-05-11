@@ -240,7 +240,6 @@ test_that("do_tfidf", {
   expect_equal(result$tfidf[c(1,5)], c(2/(sqrt(2^2*3)), 2/(sqrt(2^2*4))))
 })
 
-
 test_that("do_tfidf with bach tick arg", {
   test_df <- setNames(data.frame(rep(c(1,2), 5), c("this", "this", "this", letters[1:7])), c("id", "cname with space"))
   result <- (
@@ -312,6 +311,16 @@ test_that("do_tfidf tf_weight=binary", {
   )
   ret <- (result %>%  dplyr::group_by(id)  %>%  dplyr::summarize(l=sqrt(sum(tfidf^2))))
   expect_true(all(ret$l==1))
+})
+
+test_that("do_tfidf count column", {
+  loadNamespace("dplyr")
+  test_df <- data.frame(id=rep(c(1,2, 3, 4, 5), 2), word=c("this", "this", "this", "this", "this", letters[1:5]), count = c(1,2,3,4,5,6,7,8,9,10))
+  result <- (
+    test_df %>%
+      do_tfidf(id, word, tf_weight="binary", count = count)
+  )
+  expect_true(max(result$count_per_doc)==10)
 })
 
 test_that("do_ngram", {
