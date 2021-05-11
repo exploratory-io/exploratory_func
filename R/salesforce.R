@@ -61,7 +61,7 @@ querySalesforceData <- function(server = NULL, username, password, securityToken
   if (!requireNamespace("salesforcer")) {
     stop("package salesforcer must be installed.")
   }
-  # increase batch size to improve peformance
+  # increase batch size to improve performance
   queryControl <- salesforcer::sf_control(QueryOptions = list(batchSize = 2000))
   loginToSalesforce(server = server, username = username, password = password, securityToken = securityToken)
   salesforcer::sf_query(soql = query, control = queryControl, guess_types = guessType)
