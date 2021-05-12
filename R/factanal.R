@@ -77,11 +77,15 @@ exp_factanal <- function(df, ..., max_nrow = NULL, seed = NULL) { # TODO: write 
 #' @export
 #' @param n_sample Sample number for biplot. Default 5000, which is the default of our scatter plot.
 #'        we use it for gathered_data for parallel coordinates too. sampling is applied before gather.
-tidy.factanal_exploratory <- function(x, type="summary", n_sample=NULL, pretty.name=FALSE, ...) { #TODO: add test
+tidy.factanal_exploratory <- function(x, type="screeplot", n_sample=NULL, pretty.name=FALSE, ...) { #TODO: add test
   browser()
   if (type == "summary") {
     browser()
     res <- broom:::glance.factanal(x)
+  }
+  else if (type == "screeplot") {
+    eigen_res <- eigen(x$correlation, only.values = TRUE) # Cattell's scree plot is eigenvalues of correlation/covariance matrix.
+    res <- tibble::tibble(factors=1:length(eigen_res$values), eigenvalue=eigen_res$values)
   }
   else if (type == "variances") {
     res <- as.data.frame(x$sdev*x$sdev) # square it to make it variance
