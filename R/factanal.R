@@ -73,17 +73,17 @@ exp_factanal <- function(df, ..., max_nrow = NULL, seed = NULL) { # TODO: write 
   do_on_each_group(df, each_func, name = "model", with_unnest = FALSE)
 }
 
+glance.factanal_exploratory <- function(x, pretty.name = FALSE, ...) {
+  res <- broom:::glance.factanal(x)
+  res
+}
+
 #' extracts results from prcomp as a dataframe
 #' @export
 #' @param n_sample Sample number for biplot. Default 5000, which is the default of our scatter plot.
 #'        we use it for gathered_data for parallel coordinates too. sampling is applied before gather.
 tidy.factanal_exploratory <- function(x, type="biplot", n_sample=NULL, pretty.name=FALSE, ...) { #TODO: add test
-  browser()
-  if (type == "summary") {
-    browser()
-    res <- broom:::glance.factanal(x)
-  }
-  else if (type == "screeplot") {
+  if (type == "screeplot") {
     eigen_res <- eigen(x$correlation, only.values = TRUE) # Cattell's scree plot is eigenvalues of correlation/covariance matrix.
     res <- tibble::tibble(factors=1:length(eigen_res$values), eigenvalue=eigen_res$values)
   }
@@ -100,7 +100,6 @@ tidy.factanal_exploratory <- function(x, type="biplot", n_sample=NULL, pretty.na
     }
   }
   else if (type == "loadings") {
-    browser()
     res <- broom:::tidy.factanal(x)
     res <- res %>% tidyr::pivot_longer(cols=c(starts_with("fl"), "uniqueness"), names_to="factor", values_to="value")
 
@@ -108,7 +107,6 @@ tidy.factanal_exploratory <- function(x, type="biplot", n_sample=NULL, pretty.na
     # res <- res %>% dplyr::mutate(value = value^2) # square it to make it squared cosine. the original value is cosine.
   }
   else if (type == "biplot") {
-    browser()
     scores_df <- broom:::augment.factanal(x)
     loadings_df <- broom:::tidy.factanal(x)
 
@@ -147,7 +145,7 @@ tidy.factanal_exploratory <- function(x, type="biplot", n_sample=NULL, pretty.na
     max_abs_score <- max(abs(c(res$.fs1, res$.fs2)))
     scale_ratio <- max_abs_score/max_abs_loading
 
-    res <- res %>% dplyr::rename(Observations=.fs2) # name to appear at legend for dots in scatter plot.
+    res <- res %>% dplyr::rename(Observations=.fs2, fl1=.fs1) # name to appear at legend for dots in scatter plot.
     # scale loading_matrix so that the scale of measures and data points matches in the scatter plot.
     loadings_df <- loadings_df %>% dplyr::mutate(fl1=fl1*scale_ratio, fl2=fl2*scale_ratio)
     loadings_df <- loadings_df %>% dplyr::rename(Measures=fl2) # use different column name for PC2 of measures.
