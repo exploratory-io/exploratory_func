@@ -77,7 +77,7 @@ exp_factanal <- function(df, ..., max_nrow = NULL, seed = NULL) { # TODO: write 
 #' @export
 #' @param n_sample Sample number for biplot. Default 5000, which is the default of our scatter plot.
 #'        we use it for gathered_data for parallel coordinates too. sampling is applied before gather.
-tidy.factanal_exploratory <- function(x, type="screeplot", n_sample=NULL, pretty.name=FALSE, ...) { #TODO: add test
+tidy.factanal_exploratory <- function(x, type="biplot", n_sample=NULL, pretty.name=FALSE, ...) { #TODO: add test
   browser()
   if (type == "summary") {
     browser()
@@ -110,13 +110,13 @@ tidy.factanal_exploratory <- function(x, type="screeplot", n_sample=NULL, pretty
   else if (type == "biplot") {
     browser()
     scores_df <- broom:::augment.factanal(x)
+    loadings_df <- broom:::tidy.factanal(x)
 
     if (is.null(n_sample)) { # set default of 5000 for biplot case.
       n_sample = 5000
     }
     # sum of number of loading rows times 2 (because it is line between 2 points) and number of score rows should fit in n_sample.
-    #score_n_sample <- n_sample - nrow(loadings_matrix)*2
-    score_n_sample <- n_sample
+    score_n_sample <- n_sample - nrow(loadings_df)*2
 
     # table of observations. bind original data so that color can be used later.
     res <- x$df
@@ -141,21 +141,21 @@ tidy.factanal_exploratory <- function(x, type="screeplot", n_sample=NULL, pretty
 
     res <- res %>% sample_rows(score_n_sample)
 
-    # # calculate scale ratio for displaying loadings on the same chart as scores.
-    # max_abs_loading <- max(abs(loadings_matrix))
-    # max_abs_score <- max(abs(c(res$PC1, res$PC2)))
-    # scale_ratio <- max_abs_score/max_abs_loading
+    # calculate scale ratio for displaying loadings on the same chart as scores.
+    loadings_matrix <- as.matrix(loadings_df %>% dplyr::select(fl1, fl2))
+    max_abs_loading <- max(abs(loadings_matrix))
+    max_abs_score <- max(abs(c(res$.fs1, res$.fs2)))
+    scale_ratio <- max_abs_score/max_abs_loading
 
-    # res <- res %>% rename(Observations=PC2) # name to appear at legend for dots in scatter plot.
-    # # scale loading_matrix so that the scale of measures and data points matches in the scatter plot.
-    # loadings_matrix <- loadings_matrix * scale_ratio
-    # loadings_df <- tibble::rownames_to_column(as.data.frame(loadings_matrix), var="measure_name") #TODO: what if name conflicts?
-    # loadings_df <- loadings_df %>% dplyr::rename(Measures=PC2) # use different column name for PC2 of measures.
-    # loadings_df0 <- loadings_df %>% dplyr::mutate(PC1=0, Measures=0) # create df for origin of coordinates.
-    # loadings_df <- loadings_df0 %>% dplyr::bind_rows(loadings_df)
-    # res <- res %>% dplyr::bind_rows(loadings_df)
-    # # fill group_by column so that Repeat By on chart works fine. loadings_df does not have values for the group_by column.
-    # res <- res %>% tidyr::fill(x$grouped_cols)
+    res <- res %>% dplyr::rename(Observations=.fs2) # name to appear at legend for dots in scatter plot.
+    # scale loading_matrix so that the scale of measures and data points matches in the scatter plot.
+    loadings_df <- loadings_df %>% dplyr::mutate(fl1=fl1*scale_ratio, fl2=fl2*scale_ratio)
+    loadings_df <- loadings_df %>% dplyr::rename(Measures=fl2) # use different column name for PC2 of measures.
+    loadings_df0 <- loadings_df %>% dplyr::mutate(fl1=0, Measures=0) # create df for origin of coordinates.
+    loadings_df <- loadings_df0 %>% dplyr::bind_rows(loadings_df)
+    res <- res %>% dplyr::bind_rows(loadings_df)
+    # fill group_by column so that Repeat By on chart works fine. loadings_df does not have values for the group_by column.
+    res <- res %>% tidyr::fill(x$grouped_cols)
     res
   }
   else { # should be data
