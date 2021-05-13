@@ -1,6 +1,6 @@
 #' do PCA
 #' @export
-exp_factanal <- function(df, ..., max_nrow = NULL, seed = NULL) { # TODO: write test
+exp_factanal <- function(df, ..., factors = 2, max_nrow = NULL, seed = NULL) { # TODO: write test
   # this evaluates select arguments like starts_with
   selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
 
@@ -62,7 +62,7 @@ exp_factanal <- function(df, ..., max_nrow = NULL, seed = NULL) { # TODO: write 
       }
     }
     # "scale." is an argument name. There is no such operator like ".=". 
-    fit <- factanal(cleaned_df, factors=2, scores="regression")
+    fit <- factanal(cleaned_df, factors=factors, scores="regression")
     fit$df <- filtered_df # add filtered df to model so that we can bind_col it for output. It needs to be the filtered one to match row number.
     fit$grouped_cols <- grouped_cols
     fit$sampled_nrow <- sampled_nrow
@@ -83,29 +83,16 @@ glance.factanal_exploratory <- function(x, pretty.name = FALSE, ...) {
 #' @export
 #' @param n_sample Sample number for biplot. Default 5000, which is the default of our scatter plot.
 #'        we use it for gathered_data for parallel coordinates too. sampling is applied before gather.
-tidy.factanal_exploratory <- function(x, type="biplot", n_sample=NULL, pretty.name=FALSE, ...) { #TODO: add test
+tidy.factanal_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=FALSE, ...) { #TODO: add test
   if (type == "screeplot") {
     eigen_res <- eigen(x$correlation, only.values = TRUE) # Cattell's scree plot is eigenvalues of correlation/covariance matrix.
     res <- tibble::tibble(factors=1:length(eigen_res$values), eigenvalue=eigen_res$values)
-  }
-  else if (type == "variances") {
-    res <- as.data.frame(x$sdev*x$sdev) # square it to make it variance
-    colnames(res)[1] <- "variance"
-    res <- tibble::rownames_to_column(res, var="component") %>% # square it to make it variance
-      mutate(component = forcats::fct_inorder(component)) # fct_inorder is to make order on chart right, e.g. PC2 before PC10
-    total_variance = sum(res$variance)
-    res <- res %>% dplyr::mutate(cum_pct_variance = cumsum(variance), cum_pct_variance = cum_pct_variance/total_variance*100)
-    res <- res %>% dplyr::mutate(pct_variance = variance/total_variance*100)
-    if (pretty.name) {
-      res <- res %>% dplyr::rename(`% Variance`=pct_variance, `Cummulated % Variance`=cum_pct_variance)
-    }
   }
   else if (type == "loadings") {
     res <- broom:::tidy.factanal(x)
     res <- res %>% tidyr::pivot_longer(cols=c(starts_with("fl"), "uniqueness"), names_to="factor", values_to="value")
     res <- res %>% dplyr::mutate(factor = case_when(factor=="uniqueness"~"Uniqueness", TRUE~stringr::str_replace(factor,"^fl","Factor ")))
     res <- res %>% dplyr::mutate(factor = forcats::fct_inorder(factor)) # fct_inorder is to make order on chart right, e.g. Factor 2 before Factor 10
-    # res <- res %>% dplyr::mutate(value = value^2) # square it to make it squared cosine. the original value is cosine.
   }
   else if (type == "biplot") {
     scores_df <- broom:::augment.factanal(x)
@@ -159,6 +146,8 @@ tidy.factanal_exploratory <- function(x, type="biplot", n_sample=NULL, pretty.na
   }
   else { # should be data
     scores_df <- broom:::augment.factanal(x)
+    scores_df <- scores_df %>% select(-.rownames) # augment.factanal seems to always return row names in .rownames column.
+    scores_df <- scores_df %>% rename_with(function(x){stringr::str_replace(x,"^\\.fs", "Factor ")}, starts_with(".fs"))
 
     # table of observations. bind original data so that color can be used later.
     res <- x$df
