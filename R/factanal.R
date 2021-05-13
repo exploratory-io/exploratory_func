@@ -103,8 +103,8 @@ tidy.factanal_exploratory <- function(x, type="biplot", n_sample=NULL, pretty.na
   else if (type == "loadings") {
     res <- broom:::tidy.factanal(x)
     res <- res %>% tidyr::pivot_longer(cols=c(starts_with("fl"), "uniqueness"), names_to="factor", values_to="value")
-
-    res <- res %>% dplyr::mutate(factor = forcats::fct_inorder(factor)) # fct_inorder is to make order on chart right, e.g. fl2 before fl10
+    res <- res %>% dplyr::mutate(factor = case_when(factor=="uniqueness"~"Uniqueness", TRUE~stringr::str_replace(factor,"^fl","Factor ")))
+    res <- res %>% dplyr::mutate(factor = forcats::fct_inorder(factor)) # fct_inorder is to make order on chart right, e.g. Factor 2 before Factor 10
     # res <- res %>% dplyr::mutate(value = value^2) # square it to make it squared cosine. the original value is cosine.
   }
   else if (type == "biplot") {
@@ -146,11 +146,11 @@ tidy.factanal_exploratory <- function(x, type="biplot", n_sample=NULL, pretty.na
     max_abs_score <- max(abs(c(res$.fs1, res$.fs2)))
     scale_ratio <- max_abs_score/max_abs_loading
 
-    res <- res %>% dplyr::rename(Observations=.fs2, fl1=.fs1) # name to appear at legend for dots in scatter plot.
+    res <- res %>% dplyr::rename(Observations=.fs2, `Factor 1`=.fs1) # name to appear at legend for dots in scatter plot.
     # scale loading_matrix so that the scale of measures and data points matches in the scatter plot.
     loadings_df <- loadings_df %>% dplyr::mutate(fl1=fl1*scale_ratio, fl2=fl2*scale_ratio)
-    loadings_df <- loadings_df %>% dplyr::rename(Measures=fl2) # use different column name for PC2 of measures.
-    loadings_df0 <- loadings_df %>% dplyr::mutate(fl1=0, Measures=0) # create df for origin of coordinates.
+    loadings_df <- loadings_df %>% dplyr::rename(`Factor 1`=fl1, Measures=fl2, Uniqueness=uniqueness) # use different column name for PC2 of measures.
+    loadings_df0 <- loadings_df %>% dplyr::mutate(`Factor 1`=0, Measures=0) # create df for origin of coordinates.
     loadings_df <- loadings_df0 %>% dplyr::bind_rows(loadings_df)
     res <- res %>% dplyr::bind_rows(loadings_df)
     # fill group_by column so that Repeat By on chart works fine. loadings_df does not have values for the group_by column.
