@@ -74,7 +74,8 @@ exp_factanal <- function(df, ..., max_nrow = NULL, seed = NULL) { # TODO: write 
 }
 
 glance.factanal_exploratory <- function(x, pretty.name = FALSE, ...) {
-  res <- broom:::glance.factanal(x)
+  res <- broom:::glance.factanal(x) %>% dplyr::select(-n)
+  res <- res %>% dplyr::rename(`Factors`=n.factors, `Total Variance`=total.variance, `Chi-Square`=statistic, `P Value`=p.value, `Degree of Freedom`=df, `Method`=method, `Converged`=converged, `Number of Rows`=nobs)
   res
 }
 
