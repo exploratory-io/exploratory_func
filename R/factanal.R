@@ -1,6 +1,6 @@
 #' do PCA
 #' @export
-exp_factanal <- function(df, ..., factors = 2, scores = "regression", rotation = "none", max_nrow = NULL, seed = NULL) { # TODO: write test
+exp_factanal <- function(df, ..., factors = 2, scores = "regression", rotate = "none", max_nrow = NULL, seed = NULL) { # TODO: write test
   # this evaluates select arguments like starts_with
   selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
 
@@ -62,18 +62,19 @@ exp_factanal <- function(df, ..., factors = 2, scores = "regression", rotation =
       }
     }
     # "scale." is an argument name. There is no such operator like ".=". 
-    fit <- factanal(cleaned_df, factors=factors, scores=scores, rotation=rotation)
+    browser()
+    fit <- psych::fa(cleaned_df, nfactors=factors, scores=scores, rotate=rotate)
     fit$df <- filtered_df # add filtered df to model so that we can bind_col it for output. It needs to be the filtered one to match row number.
     fit$grouped_cols <- grouped_cols
     fit$sampled_nrow <- sampled_nrow
-    class(fit) <- c("factanal_exploratory", class(fit))
+    class(fit) <- c("fa_exploratory", class(fit))
     fit
   }
 
   do_on_each_group(df, each_func, name = "model", with_unnest = FALSE)
 }
 
-glance.factanal_exploratory <- function(x, pretty.name = FALSE, ...) {
+glance.fa_exploratory <- function(x, pretty.name = FALSE, ...) {
   res <- broom:::glance.factanal(x) %>% dplyr::select(-n)
   res <- res %>% dplyr::rename(`Factors`=n.factors, `Total Variance`=total.variance, `Chi-Square`=statistic, `P Value`=p.value, `Degree of Freedom`=df, `Method`=method, `Converged`=converged, `Number of Rows`=nobs)
   res
@@ -83,15 +84,16 @@ glance.factanal_exploratory <- function(x, pretty.name = FALSE, ...) {
 #' @export
 #' @param n_sample Sample number for biplot. Default 5000, which is the default of our scatter plot.
 #'        we use it for gathered_data for parallel coordinates too. sampling is applied before gather.
-tidy.factanal_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=FALSE, ...) { #TODO: add test
+tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=FALSE, ...) { #TODO: add test
   if (type == "screeplot") {
     eigen_res <- eigen(x$correlation, only.values = TRUE) # Cattell's scree plot is eigenvalues of correlation/covariance matrix.
     res <- tibble::tibble(factors=1:length(eigen_res$values), eigenvalue=eigen_res$values)
   }
   else if (type == "loadings") {
-    res <- broom:::tidy.factanal(x)
-    res <- res %>% tidyr::pivot_longer(cols=c(starts_with("fl"), "uniqueness"), names_to="factor", values_to="value")
-    res <- res %>% dplyr::mutate(factor = case_when(factor=="uniqueness"~"Uniqueness", TRUE~stringr::str_replace(factor,"^fl","Factor ")))
+    browser()
+    res <- broom:::tidy.factanal(x) # TODO: This just happens to work. Revisit.
+    res <- res %>% tidyr::pivot_longer(cols=c(starts_with("MR"), "uniqueness"), names_to="factor", values_to="value")
+    res <- res %>% dplyr::mutate(factor = case_when(factor=="uniqueness"~"Uniqueness", TRUE~stringr::str_replace(factor,"^MR","Factor ")))
     res <- res %>% dplyr::mutate(factor = forcats::fct_inorder(factor)) # fct_inorder is to make order on chart right, e.g. Factor 2 before Factor 10
   }
   else if (type == "biplot") {
