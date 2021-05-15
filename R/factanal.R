@@ -97,6 +97,7 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
   }
   else if (type == "biplot") {
     scores_df <- broom:::augment.factanal(x)
+    scores_df <- scores_df %>% select(-.rownames) # augment.factanal seems to always return row names in .rownames column.
     loadings_df <- broom:::tidy.factanal(x)
 
     if (is.null(n_sample)) { # set default of 5000 for biplot case.
@@ -129,15 +130,15 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
     res <- res %>% sample_rows(score_n_sample)
 
     # calculate scale ratio for displaying loadings on the same chart as scores.
-    loadings_matrix <- as.matrix(loadings_df %>% dplyr::select(fl1, fl2))
+    loadings_matrix <- as.matrix(loadings_df %>% dplyr::select(MR1, MR2))
     max_abs_loading <- max(abs(loadings_matrix))
-    max_abs_score <- max(abs(c(res$.fs1, res$.fs2)))
+    max_abs_score <- max(abs(c(res$MR1, res$MR2)))
     scale_ratio <- max_abs_score/max_abs_loading
 
-    res <- res %>% dplyr::rename(Observations=.fs2, `Factor 1`=.fs1) # name to appear at legend for dots in scatter plot.
+    res <- res %>% dplyr::rename(Observations=MR2, `Factor 1`=MR1) # name to appear at legend for dots in scatter plot.
     # scale loading_matrix so that the scale of measures and data points matches in the scatter plot.
-    loadings_df <- loadings_df %>% dplyr::mutate(fl1=fl1*scale_ratio, fl2=fl2*scale_ratio)
-    loadings_df <- loadings_df %>% dplyr::rename(`Factor 1`=fl1, Measures=fl2, Uniqueness=uniqueness) # use different column name for PC2 of measures.
+    loadings_df <- loadings_df %>% dplyr::mutate(MR1=MR1*scale_ratio, MR2=MR2*scale_ratio)
+    loadings_df <- loadings_df %>% dplyr::rename(`Factor 1`=MR1, Measures=MR2, Uniqueness=uniqueness) # use different column name for PC2 of measures.
     loadings_df0 <- loadings_df %>% dplyr::mutate(`Factor 1`=0, Measures=0) # create df for origin of coordinates.
     loadings_df <- loadings_df0 %>% dplyr::bind_rows(loadings_df)
     res <- res %>% dplyr::bind_rows(loadings_df)
@@ -146,7 +147,7 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
     res
   }
   else { # should be data
-    scores_df <- broom:::augment.factanal(x)
+    scores_df <- broom:::augment.factanal(x) # This happens to work. Revisit.
     scores_df <- scores_df %>% select(-.rownames) # augment.factanal seems to always return row names in .rownames column.
     scores_df <- scores_df %>% rename_with(function(x){stringr::str_replace(x,"^\\MR", "Factor ")}, starts_with("MR")) #TODO: Make string match condition stricter.
 
