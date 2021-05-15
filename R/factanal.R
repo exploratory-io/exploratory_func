@@ -62,8 +62,8 @@ exp_factanal <- function(df, ..., factors = 2, scores = "regression", rotate = "
       }
     }
     # "scale." is an argument name. There is no such operator like ".=". 
-    browser()
     fit <- psych::fa(cleaned_df, nfactors=factors, scores=scores, rotate=rotate)
+    fit$correlation <- cor(cleaned_df) # For creating scree plot later.
     fit$df <- filtered_df # add filtered df to model so that we can bind_col it for output. It needs to be the filtered one to match row number.
     fit$grouped_cols <- grouped_cols
     fit$sampled_nrow <- sampled_nrow
@@ -90,7 +90,6 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
     res <- tibble::tibble(factors=1:length(eigen_res$values), eigenvalue=eigen_res$values)
   }
   else if (type == "loadings") {
-    browser()
     res <- broom:::tidy.factanal(x) # TODO: This just happens to work. Revisit.
     res <- res %>% tidyr::pivot_longer(cols=c(starts_with("MR"), "uniqueness"), names_to="factor", values_to="value")
     res <- res %>% dplyr::mutate(factor = case_when(factor=="uniqueness"~"Uniqueness", TRUE~stringr::str_replace(factor,"^MR","Factor ")))
