@@ -112,21 +112,22 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
     # table of observations. bind original data so that color can be used later.
     res <- x$df
 
-    # orig_cols <- colnames(res)
-    # for (orig_col in orig_cols) {
-    #   if (!is.numeric(res[[orig_col]])) {
-    #     if (!is.logical(res[[orig_col]])) {
-    #       # make categorical columns into factor with NA level, so that legend will show NA.
-    #       # if we leave them as real NA, legend for NA would not be shown on biplot chart,
-    #       # since we supress it not to show NAs from the lines for measures.
-    #       res[[orig_col]] <- forcats::fct_explicit_na(as.factor(res[[orig_col]]), na_level="(NA)")
-    #     }
-    #     else {
-    #       # make logical columns into factor with NA level, so that legend will show NA.
-    #       res[[orig_col]] <- forcats::fct_explicit_na(factor(res[[orig_col]], levels = c("TRUE","FALSE")), na_level="(NA)")
-    #     }
-    #   }
-    # }
+    # Adjust types of other columns that can be used for color or label.
+    orig_cols <- colnames(res)
+    for (orig_col in orig_cols) {
+      if (!is.numeric(res[[orig_col]])) {
+        if (!is.logical(res[[orig_col]])) {
+          # make categorical columns into factor with NA level, so that legend will show NA.
+          # if we leave them as real NA, legend for NA would not be shown on biplot chart,
+          # since we supress it not to show NAs from the lines for measures.
+          res[[orig_col]] <- forcats::fct_explicit_na(as.factor(res[[orig_col]]), na_level="(NA)")
+        }
+        else {
+          # make logical columns into factor with NA level, so that legend will show NA.
+          res[[orig_col]] <- forcats::fct_explicit_na(factor(res[[orig_col]], levels = c("TRUE","FALSE")), na_level="(NA)")
+        }
+      }
+    }
 
     res <- res %>% dplyr::bind_cols(scores_df)
 
