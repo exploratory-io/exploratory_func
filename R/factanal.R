@@ -88,7 +88,7 @@ glance.fa_exploratory <- function(x, pretty.name = FALSE, ...) {
 tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=FALSE, ...) { #TODO: add test
   if (type == "screeplot") {
     eigen_res <- eigen(x$correlation, only.values = TRUE) # Cattell's scree plot is eigenvalues of correlation/covariance matrix.
-    res <- tibble::tibble(factors=1:length(eigen_res$values), eigenvalue=eigen_res$values)
+    res <- tibble::tibble(factor=1:length(eigen_res$values), eigenvalue=eigen_res$values)
   }
   else if (type == "variances") {
     res <- as.tibble(t(x$Vaccounted)) %>% mutate(Factor=as.factor(1:n()), `% Variance`=100*`Proportion Var`, `Cummulated % Variance`=100*`Cumulative Var`)
