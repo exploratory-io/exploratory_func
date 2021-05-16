@@ -1,6 +1,6 @@
 #' do PCA
 #' @export
-exp_factanal <- function(df, ..., factors = 2, scores = "regression", rotate = "none", max_nrow = NULL, seed = NULL) { # TODO: write test
+exp_factanal <- function(df, ..., nfactors = 2, fm = "minres", scores = "regression", rotate = "none", max_nrow = NULL, seed = NULL) { # TODO: write test
   # this evaluates select arguments like starts_with
   selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
 
@@ -62,7 +62,7 @@ exp_factanal <- function(df, ..., factors = 2, scores = "regression", rotate = "
       }
     }
     # "scale." is an argument name. There is no such operator like ".=". 
-    fit <- psych::fa(cleaned_df, nfactors=factors, scores=scores, rotate=rotate)
+    fit <- psych::fa(cleaned_df, nfactors = nfactors, fm = fm, scores = scores, rotate = rotate)
     fit$correlation <- cor(cleaned_df) # For creating scree plot later.
     fit$df <- filtered_df # add filtered df to model so that we can bind_col it for output. It needs to be the filtered one to match row number.
     fit$grouped_cols <- grouped_cols
