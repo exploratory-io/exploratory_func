@@ -139,7 +139,7 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
     max_abs_score <- max(abs(c(res$MR1, res$MR2)))
     scale_ratio <- max_abs_score/max_abs_loading
 
-    res <- res %>% dplyr::rename(.factor_2_observation=MR2, .factor_1=MR1) # name to appear at legend for dots in scatter plot.
+    res <- res %>% dplyr::rename(.factor_2=MR2, .factor_1=MR1) # name to appear at legend for dots in scatter plot.
 
     # loadings_df is for the variable lines in biplot. It will be later merged (bind_rows) with res.
     # It shares x-axis column .factor_1 with res, and has separate y-axis column .factor_2_variable.
