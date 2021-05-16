@@ -1,6 +1,6 @@
 #' Function for Factor Analysis Analytics View
 #' @export
-exp_factanal <- function(df, ..., nfactors = 2, fm = "minres", scores = "regression", rotate = "none", max_nrow = NULL, seed = NULL) { # TODO: write test
+exp_factanal <- function(df, ..., nfactors = 2, fm = "minres", scores = "regression", rotate = "none", max_nrow = NULL, seed = NULL) {
   # this evaluates select arguments like starts_with
   selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
 
@@ -85,7 +85,7 @@ glance.fa_exploratory <- function(x, pretty.name = FALSE, ...) {
 #' @export
 #' @param n_sample Sample number for biplot. Default 5000, which is the default of our scatter plot.
 #'        we use it for gathered_data for parallel coordinates too. sampling is applied before gather.
-tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=FALSE, ...) { #TODO: add test
+tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=FALSE, ...) {
   if (type == "screeplot") {
     eigen_res <- eigen(x$correlation, only.values = TRUE) # Cattell's scree plot is eigenvalues of correlation/covariance matrix.
     res <- tibble::tibble(factor=1:length(eigen_res$values), eigenvalue=eigen_res$values)

@@ -1,7 +1,7 @@
 #' do PCA
 #' allow_single_column - Do not throw error and go ahead with PCA even if only one column is left after preprocessing. For K-means.
 #' @export
-do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, allow_single_column = FALSE, seed = NULL) { # TODO: write test
+do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, allow_single_column = FALSE, seed = NULL) {
   # this evaluates select arguments like starts_with
   selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
 
@@ -83,7 +83,7 @@ do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, allow_singl
 #' @export
 #' @param n_sample Sample number for biplot. Default 5000, which is the default of our scatter plot.
 #'        we use it for gathered_data for parallel coordinates too. sampling is applied before gather.
-tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.name=FALSE, normalize_data=FALSE, ...) { #TODO: add test
+tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.name=FALSE, normalize_data=FALSE, ...) {
   if (type == "variances") {
     res <- as.data.frame(x$sdev*x$sdev) # square it to make it variance
     colnames(res)[1] <- "variance"
