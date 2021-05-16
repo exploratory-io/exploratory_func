@@ -130,7 +130,6 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
     }
 
     res <- res %>% dplyr::bind_cols(scores_df)
-
     res <- res %>% sample_rows(score_n_sample)
 
     # calculate scale ratio for displaying loadings on the same chart as scores.
@@ -140,11 +139,15 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
     scale_ratio <- max_abs_score/max_abs_loading
 
     res <- res %>% dplyr::rename(Observations=MR2, `Factor 1`=MR1) # name to appear at legend for dots in scatter plot.
+
+    # loadings_df is for the variable lines in biplot. It will be later merged (bind_rows) with res.
+    # It shares x-axis column `Factor 1` with res, and has separate y-axsis column `Measures`.
     # scale loading_matrix so that the scale of measures and data points matches in the scatter plot.
     loadings_df <- loadings_df %>% dplyr::mutate(MR1=MR1*scale_ratio, MR2=MR2*scale_ratio)
     loadings_df <- loadings_df %>% dplyr::rename(`Factor 1`=MR1, Measures=MR2, Uniqueness=uniqueness) # use different column name for PC2 of measures.
-    loadings_df0 <- loadings_df %>% dplyr::mutate(`Factor 1`=0, Measures=0) # create df for origin of coordinates.
+    loadings_df0 <- loadings_df %>% dplyr::mutate(`Factor 1`=0, Measures=0) # Create rows for origin of coordinates.
     loadings_df <- loadings_df0 %>% dplyr::bind_rows(loadings_df)
+
     res <- res %>% dplyr::bind_rows(loadings_df)
     # fill group_by column so that Repeat By on chart works fine. loadings_df does not have values for the group_by column.
     res <- res %>% tidyr::fill(x$grouped_cols)
