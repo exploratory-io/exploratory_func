@@ -1,4 +1,4 @@
-#' do PCA
+#' Function for Factor Analysis Analytics View
 #' @export
 exp_factanal <- function(df, ..., nfactors = 2, fm = "minres", scores = "regression", rotate = "none", max_nrow = NULL, seed = NULL) { # TODO: write test
   # this evaluates select arguments like starts_with
@@ -81,7 +81,7 @@ glance.fa_exploratory <- function(x, pretty.name = FALSE, ...) {
   res
 }
 
-#' extracts results from prcomp as a dataframe
+#' extracts results from psych::fa object as a dataframe
 #' @export
 #' @param n_sample Sample number for biplot. Default 5000, which is the default of our scatter plot.
 #'        we use it for gathered_data for parallel coordinates too. sampling is applied before gather.
