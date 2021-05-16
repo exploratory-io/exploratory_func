@@ -404,7 +404,7 @@ calc_tf <- function(df, group, term, ...){
 }
 
 #' @rdname calc_tf
-calc_tf_ <- function(df, group_col, term_col, weight="ratio"){
+calc_tf_ <- function(df, group_col, term_col, weight="ratio", count_col = NULL){
   loadNamespace("dplyr")
   loadNamespace("tidyr")
 
@@ -424,12 +424,18 @@ calc_tf_ <- function(df, group_col, term_col, weight="ratio"){
     val
   }
 
-  ret <- (df[,colnames(df) == group_col | colnames(df)==term_col] %>%
-            dplyr::group_by(!!!rlang::syms(c(group_col, term_col))) %>% # convert the column name to symbol for colum names with backticks
-            dplyr::summarise(!!rlang::sym(cnames[[1]]) := n()) %>%
-            dplyr::mutate(!!rlang::sym(cnames[[2]]) := calc_weight(!!rlang::sym(cnames[[1]]))) %>%
-            dplyr::ungroup()
-  )
+  if (!is.null(count_col)) {
+    ret <- df[,colnames(df) == group_col | colnames(df)==term_col | colnames(df)==count_col] %>%
+      dplyr::group_by(!!!rlang::syms(c(group_col, term_col))) %>% # convert the column name to symbol for column names with backticks
+      dplyr::summarise(!!rlang::sym(cnames[[1]]) := sum(!!rlang::sym(count_col), na.rm = TRUE))
+  } else {
+    ret <- df[,colnames(df) == group_col | colnames(df)==term_col] %>%
+      dplyr::group_by(!!!rlang::syms(c(group_col, term_col))) %>% # convert the column name to symbol for column names with backticks
+      dplyr::summarise(!!rlang::sym(cnames[[1]]) := n())
+  }
+  ret %>% dplyr::mutate(!!rlang::sym(cnames[[2]]) := calc_weight(!!rlang::sym(cnames[[1]]))) %>%
+  dplyr::ungroup()
+
 }
 
 #' Calculate tfidf, which shows how much particular the token is in a group.
@@ -439,7 +445,7 @@ calc_tf_ <- function(df, group_col, term_col, weight="ratio"){
 #' @param [DEPRECATED] idf_log_scale
 #' Function to scale IDF. 'log' function is always applied to IDF. Setting other functions is ignored
 #' @export
-do_tfidf <- function(df, group, term, idf_log_scale = log, tf_weight="raw", norm="l2"){
+do_tfidf <- function(df, group, term, idf_log_scale = log, tf_weight="raw", norm="l2", count = NULL){
   validate_empty_data(df)
 
   loadNamespace("tidytext")
@@ -455,13 +461,17 @@ do_tfidf <- function(df, group, term, idf_log_scale = log, tf_weight="raw", norm
 
   group_col <- col_name(substitute(group))
   term_col <- col_name(substitute(term))
+  count_col <- NULL
+  if (!is.null(count)) {
+    count_col <- col_name(substitute(count))
+  }
 
   # remove NA from group and term column to avoid error
   df <- tidyr::drop_na(df, !!rlang::sym(group_col), !!rlang::sym(term_col))
 
   cnames <- avoid_conflict(c(group_col, term_col), c("count_of_docs", "tfidf", "tf"))
 
-  count_tbl <- calc_tf_(df, group_col, term_col, weight=tf_weight)
+  count_tbl <- calc_tf_(df, group_col, term_col, weight=tf_weight, count_col = count_col)
   tfidf <- calc_idf(count_tbl[[group_col]], count_tbl[[term_col]], smooth_idf = FALSE)
   count_tbl[[cnames[[1]]]] <- tfidf$.df
   count_tbl[[cnames[[2]]]] <- tfidf$.idf * count_tbl[[cnames[[3]]]]

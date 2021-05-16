@@ -276,6 +276,11 @@ test_that("read_parquet_file", {
   expect_equal(TRUE, is.data.frame(df))
 })
 
+test_that("read_parquet_file can read the parquet file that arrow v3 fails to read.", {
+  df <- read_parquet_file("https://dl.dropbox.com/s/5v4xhjhunl7v58g/21331_Source1.parquet")
+  expect_equal(TRUE, is.data.frame(df))
+})
+
 test_that("test filter_cascade",{
   library(stringr)
   df <- readRDS(url("https://www.dropbox.com/s/p2vmd79ly1zugh9/airbnb_nyc_filter_7.rds?dl=1"))

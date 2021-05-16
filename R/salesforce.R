@@ -57,12 +57,41 @@ querySaleseforceTableDetails <- function(server = NULL, username, password, secu
 #' @param password - Salesforce login password
 #' @param securityToken - (optional) security token to login
 #' @param query - SOQL query.
-querySalesforceData <- function(server = NULL, username, password, securityToken = NULL, query = "", guessType = TRUE){
+querySalesforceDataWithQuery <- function(server = NULL, username, password, securityToken = NULL, query = "", guessType = TRUE){
   if (!requireNamespace("salesforcer")) {
     stop("package salesforcer must be installed.")
   }
   # increase batch size to improve performance
   queryControl <- salesforcer::sf_control(QueryOptions = list(batchSize = 2000))
   loginToSalesforce(server = server, username = username, password = password, securityToken = securityToken)
+  query <- glue_exploratory(query, .transformer=sql_glue_transformer, .envir = parent.frame())
   salesforcer::sf_query(soql = query, control = queryControl, guess_types = guessType)
+}
+
+#' API to execute Salesforce Object Query Language (SOQL)
+#' export
+#' @param sever - (optional) login server
+#' @param username - Salesforce login user name
+#' @param password - Salesforce login password
+#' @param securityToken - (optional) security token to login
+#' @param table - The table you want to get data
+#' @param columns - list of columns that you want to get data from the table.
+querySalesforceDataFromTable <- function(server = NULL, username, password, securityToken = NULL, table = NULL, columns = NULL, guessType = TRUE, conditions = NULL, limit = NULL){
+  if (!requireNamespace("salesforcer")) {
+    stop("package salesforcer must be installed.")
+  }
+  if (is.null(table)) {
+    stop("Please set table.")
+  }
+  if (is.null(columns)) {
+    stop("Please set columns.")
+  }
+  query <- stringr::str_c("SELECT ", stringr::str_c(columns, collapse = ", "), " FROM ", table)
+  if (!is.null(conditions)) {
+    query <- stringr::str_c(query, " ", conditions)
+  }
+  if (!is.null(limit)) {
+    query <- stringr::str_c(query, " LIMIT ", limit)
+  }
+  querySalesforceDataWithQuery(server = server, username = username, password = password, securityToken = securityToken, query = query)
 }
