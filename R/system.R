@@ -513,6 +513,7 @@ sql_glue_transformer_internal <- function(expr, envir, bigquery=FALSE, salesforc
   }
   else if (lubridate::is.POSIXt(val)) {
     if (salesforce) { # Need to format it as YYYY-MM-DDThh:mm:ssZ
+      # ref https://developer.salesforce.com/docs/atlas.en-us.soql_sosl.meta/soql_sosl/sforce_api_calls_soql_select_dateformats.htm
       val <- format(val, "%Y-%m-%dT%H:%M:%S%z")
     } else {
       val <- as.character(val)
