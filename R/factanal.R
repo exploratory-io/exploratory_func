@@ -1,7 +1,6 @@
-#' do PCA
-#' allow_single_column - Do not throw error and go ahead with PCA even if only one column is left after preprocessing. For K-means.
+#' Function for Factor Analysis Analytics View
 #' @export
-do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, allow_single_column = FALSE, seed = NULL) {
+exp_factanal <- function(df, ..., nfactors = 2, fm = "minres", scores = "regression", rotate = "none", max_nrow = NULL, seed = NULL) {
   # this evaluates select arguments like starts_with
   selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
 
@@ -51,12 +50,7 @@ do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, allow_singl
         cleaned_df <- cleaned_df[colnames(cleaned_df) != col]
       }
     }
-    if (allow_single_column) { # This is when exp_kmeans calling this function wants to go ahead even with single column.
-      min_ncol <- 1
-    }
-    else {
-      min_ncol <- 2
-    }
+    min_ncol <- 2
     if (length(colnames(cleaned_df)) < min_ncol) {
       if (length(grouped_cols) < 1) {
         # If without group_by, throw error to display message.
@@ -68,56 +62,58 @@ do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, allow_singl
       }
     }
     # "scale." is an argument name. There is no such operator like ".=". 
-    fit <- prcomp(cleaned_df, scale.=normalize_data)
+    fit <- psych::fa(cleaned_df, nfactors = nfactors, fm = fm, scores = scores, rotate = rotate)
+    fit$correlation <- cor(cleaned_df) # For creating scree plot later.
     fit$df <- filtered_df # add filtered df to model so that we can bind_col it for output. It needs to be the filtered one to match row number.
     fit$grouped_cols <- grouped_cols
     fit$sampled_nrow <- sampled_nrow
-    class(fit) <- c("prcomp_exploratory", class(fit))
+    class(fit) <- c("fa_exploratory", class(fit))
     fit
   }
 
   do_on_each_group(df, each_func, name = "model", with_unnest = FALSE)
 }
 
-#' extracts results from prcomp as a dataframe
+# TODO: This is a code that worked with factanal. Need to update it for psych::fa to use if for Summary tab again.
+glance.fa_exploratory <- function(x, pretty.name = FALSE, ...) {
+  res <- broom:::glance.factanal(x) %>% dplyr::select(-n)
+  res <- res %>% dplyr::rename(`Factors`=n.factors, `Total Variance`=total.variance, `Chi-Square`=statistic, `P Value`=p.value, `Degree of Freedom`=df, `Method`=method, `Converged`=converged, `Number of Rows`=nobs)
+  res
+}
+
+#' extracts results from psych::fa object as a dataframe
 #' @export
 #' @param n_sample Sample number for biplot. Default 5000, which is the default of our scatter plot.
 #'        we use it for gathered_data for parallel coordinates too. sampling is applied before gather.
-tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.name=FALSE, normalize_data=FALSE, ...) {
-  if (type == "variances") {
-    res <- as.data.frame(x$sdev*x$sdev) # square it to make it variance
-    colnames(res)[1] <- "variance"
-    res <- tibble::rownames_to_column(res, var="component") %>% # square it to make it variance
-      mutate(component = forcats::fct_inorder(component)) # fct_inorder is to make order on chart right, e.g. PC2 before PC10
-    total_variance = sum(res$variance)
-    res <- res %>% dplyr::mutate(cum_pct_variance = cumsum(variance), cum_pct_variance = cum_pct_variance/total_variance*100)
-    res <- res %>% dplyr::mutate(pct_variance = variance/total_variance*100)
-    if (pretty.name) {
-      res <- res %>% dplyr::rename(`% Variance`=pct_variance, `Cummulated % Variance`=cum_pct_variance)
-    }
+tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=FALSE, ...) {
+  if (type == "screeplot") {
+    eigen_res <- eigen(x$correlation, only.values = TRUE) # Cattell's scree plot is eigenvalues of correlation/covariance matrix.
+    res <- tibble::tibble(factor=1:length(eigen_res$values), eigenvalue=eigen_res$values)
+  }
+  else if (type == "variances") {
+    res <- tibble::as_tibble(t(x$Vaccounted)) %>% dplyr::mutate(Factor=as.factor(1:n()), `% Variance`=100*`Proportion Var`, `Cummulated % Variance`=100*`Cumulative Var`)
   }
   else if (type == "loadings") {
-    res <- tibble::rownames_to_column(as.data.frame(x$rotation[,]), var="measure")
-    res <- res %>% tidyr::gather(component, value, dplyr::starts_with("PC"), na.rm = TRUE, convert = TRUE)
-    res <- res %>% dplyr::mutate(component = forcats::fct_inorder(component)) # fct_inorder is to make order on chart right, e.g. PC2 before PC10
-    res <- res %>% dplyr::mutate(value = value^2) # square it to make it squared cosine. the original value is cosine.
+    res <- broom:::tidy.factanal(x) # TODO: This just happens to work. Revisit.
+    res <- res %>% tidyr::pivot_longer(cols=c(starts_with("MR"), "uniqueness"), names_to="factor", values_to="value")
+    res <- res %>% dplyr::mutate(factor = case_when(factor=="uniqueness"~"Uniqueness", TRUE~stringr::str_replace(factor,"^MR","Factor "))) # e.g. replaces "MR2" with "Factor 2"
+    res <- res %>% dplyr::mutate(factor = forcats::fct_inorder(factor)) # fct_inorder is to make order on chart right, e.g. Factor 2 before Factor 10
   }
   else if (type == "biplot") {
-    # prepare loadings matrix
-    loadings_matrix <- x$rotation[,1:2] # keep only PC1 and PC2 for biplot
-
-    # prepare scores matrix
-    scores_matrix <- x$x[,1:2] # keep only PC1 and PC2 for biplot
+    scores_df <- broom:::augment.factanal(x)
+    scores_df <- scores_df %>% select(-.rownames) # augment.factanal seems to always return row names in .rownames column.
+    loadings_df <- broom:::tidy.factanal(x)
 
     if (is.null(n_sample)) { # set default of 5000 for biplot case.
       n_sample = 5000
     }
     # sum of number of loading rows times 2 (because it is line between 2 points) and number of score rows should fit in n_sample.
-    score_n_sample <- n_sample - nrow(loadings_matrix)*2
+    score_n_sample <- n_sample - nrow(loadings_df)*2
 
     # table of observations. bind original data so that color can be used later.
     res <- x$df
 
+    # Adjust types of other columns that can be used for color or label.
     orig_cols <- colnames(res)
     for (orig_col in orig_cols) {
       if (!is.numeric(res[[orig_col]])) {
@@ -134,58 +130,39 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
       }
     }
 
-    res <- res %>% dplyr::bind_cols(as.data.frame(scores_matrix))
-
-    if (!is.null(x$kmeans)) { # add cluster column if with kmeans.
-      # res <- res %>% dplyr::mutate(cluster=factor(x$kmeans$cluster)) # this caused error when input had column x.
-      res$cluster <- factor(x$kmeans$cluster)
-    }
-
+    res <- res %>% dplyr::bind_cols(scores_df)
     res <- res %>% sample_rows(score_n_sample)
 
     # calculate scale ratio for displaying loadings on the same chart as scores.
+    loadings_matrix <- as.matrix(loadings_df %>% dplyr::select(MR1, MR2))
     max_abs_loading <- max(abs(loadings_matrix))
-    max_abs_score <- max(abs(c(res$PC1, res$PC2)))
+    max_abs_score <- max(abs(c(res$MR1, res$MR2)))
     scale_ratio <- max_abs_score/max_abs_loading
 
-    res <- res %>% rename(Observations=PC2) # name to appear at legend for dots in scatter plot.
+    res <- res %>% dplyr::rename(.factor_2=MR2, .factor_1=MR1) # name to appear at legend for dots in scatter plot.
+
+    # loadings_df is for the variable lines in biplot. It will be later merged (bind_rows) with res.
+    # It shares x-axis column .factor_1 with res, and has separate y-axis column .factor_2_variable.
     # scale loading_matrix so that the scale of measures and data points matches in the scatter plot.
-    loadings_matrix <- loadings_matrix * scale_ratio
-    loadings_df <- tibble::rownames_to_column(as.data.frame(loadings_matrix), var="measure_name") #TODO: what if name conflicts?
-    loadings_df <- loadings_df %>% dplyr::rename(Measures=PC2) # use different column name for PC2 of measures.
-    loadings_df0 <- loadings_df %>% dplyr::mutate(PC1=0, Measures=0) # create df for origin of coordinates.
+    loadings_df <- loadings_df %>% dplyr::mutate(MR1=MR1*scale_ratio, MR2=MR2*scale_ratio)
+    loadings_df <- loadings_df %>% dplyr::select(-uniqueness) # uniqueness column is not necessary for biplot. Remove it to avoid name conflict as much as possible.
+    loadings_df <- loadings_df %>% dplyr::rename(.factor_1=MR1, .factor_2_variable=MR2, .variable=variable) # use different column name for PC2 of measures.
+    loadings_df0 <- loadings_df %>% dplyr::mutate(.factor_1=0, .factor_2_variable=0) # Create rows for origin of coordinates.
     loadings_df <- loadings_df0 %>% dplyr::bind_rows(loadings_df)
+
     res <- res %>% dplyr::bind_rows(loadings_df)
     # fill group_by column so that Repeat By on chart works fine. loadings_df does not have values for the group_by column.
     res <- res %>% tidyr::fill(x$grouped_cols)
     res
   }
-  else { # should be data or gathered_data
+  else { # should be data
+    scores_df <- broom:::augment.factanal(x) # This happens to work. Revisit.
+    scores_df <- scores_df %>% select(-.rownames) # augment.factanal seems to always return row names in .rownames column.
+    scores_df <- scores_df %>% rename_with(function(x){stringr::str_replace(x,"^\\MR", "Factor ")}, starts_with("MR")) #TODO: Make string match condition stricter.
+
+    # table of observations. bind original data so that color can be used later.
     res <- x$df
-    if (!is.null(x$kmeans)) {
-      # res <- res %>% dplyr::mutate(cluster=factor(x$kmeans$cluster)) # this caused error when input had column x.
-      res$cluster <- factor(x$kmeans$cluster)
-    }
-    res <- res %>% dplyr::bind_cols(as.data.frame(x$x))
-    column_names <- attr(x$rotation, "dimname")[[1]] 
-    if (normalize_data) {
-      res <- res %>% dplyr::mutate_at(column_names, exploratory::normalize)
-    }
-
-    if (!is.null(n_sample)) { # default is no sampling.
-      # limit n_sample so that no more dots are created than the max that can be plotted on scatter plot, which is 5000.
-      n_sample <- min(n_sample, floor(5000 / length(column_names)))
-      res <- res %>% sample_rows(n_sample)
-    }
-
-    if (type == "gathered_data") { # for boxplot and parallel coordinates. this is only when with kmeans.
-      # We used to drop columns other than cluster and ones used for clustering like this commented out line,
-      # to keep only the data we use, but since we are showing Subject Column value
-      # on parallel coordinates, we need to keep other columns, which would include Subject Column.
-      # res <- res %>% dplyr::select(!!c(column_names,"cluster"))
-      res <- res %>% dplyr::mutate(row_id=seq(n())) # row_id for line representation.
-      res <- res %>% tidyr::gather(key="key",value="value",!!column_names)
-    }
+    res <- res %>% dplyr::bind_cols(scores_df)
   }
   res
 }
