@@ -512,8 +512,10 @@ sql_glue_transformer_internal <- function(expr, envir, bigquery=FALSE, salesforc
     }
   }
   else if (lubridate::is.POSIXt(val)) {
-    val <- as.character(val)
-    if (salesforce == FALSE) { # for Salesforce, POSIXct should not be quoted.
+    if (salesforce) { # Need to format it as YYYY-MM-DDThh:mm:ssZ
+      val <- format(val, "%Y-%m-%dT%H:%M:%S%z")
+    } else {
+      val <- as.character(val)
       val <- paste0(quote, val, quote) # Athena and PostgreSQL quotes timestamp with single quote. e.g. '2019-01-01 00:00:00'
     }
   }
