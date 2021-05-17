@@ -64,7 +64,7 @@ querySalesforceDataWithQuery <- function(server = NULL, username, password, secu
   # increase batch size to improve performance
   queryControl <- salesforcer::sf_control(QueryOptions = list(batchSize = 2000))
   loginToSalesforce(server = server, username = username, password = password, securityToken = securityToken)
-  query <- glue_exploratory(query, .transformer=sql_glue_transformer, .envir = parent.frame())
+  query <- glue_exploratory(query, .transformer=salesforce_glue_transformer, .envir = parent.frame())
   salesforcer::sf_query(soql = query, control = queryControl, guess_types = guessType)
 }
 
