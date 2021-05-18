@@ -3,8 +3,8 @@
 context("test text analysis function, exp_textanal")
 
 test_that("exp_factanal", {
-  df <- mtcars %>% mutate(new_col = c(rep("A", n() - 10), rep("B", 10)))
-  model_df <- exp_textanal(df)
+  df <- tibble::tibble(text="すもももももももものうち")
+  model_df <- df %>% exp_textanal(text)
   res <- model_df %>% tidy_rowwise(model, type="x")
   expect_equal(colnames(res),
                c("x"))
