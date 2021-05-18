@@ -39,9 +39,11 @@ exp_textanal <- function(df, text, token = "word", keep_cols = FALSE,
     }
     # convert tokens to dfm object
     dfm <- tokens %>% quanteda::dfm()
+    fcm <- quanteda::fcm(tokens, context = "window", tri = TRUE)
 
     model <- list()
     model$dfm <- dfm
+    model$fcm <- fcm
     class(model) <- 'textanal_exploratory'
     model
   }
@@ -57,8 +59,22 @@ tidy.textanal_exploratory <- function(x, type="word_count", ...) {
     feats <- quanteda::featfreq(x$dfm)
     res <- tibble(word=names(feats), count=feats)
   }
-  else if (type == "y") {
-    res <- tibble::tibble(y=1)
+  else if (type == "word_pairs") {
+    row_idx <- x$fcm@i
+    col_idx_compressed <- x$fcm@p
+    # fcm is in CSR (Compressed Sparse Row) format.
+    # Uncompress column index.
+    col_idx <- c()
+    for (j in 1:(length(col_idx_compressed)-1)) {
+      cur_idx <- col_idx_compressed[j]
+      next_idx <- col_idx_compressed[j+1]
+      rep_num <- next_idx - cur_idx
+      col_idx <- c(col_idx, rep(j-1, rep_num))
+    }
+    col_feats <- x$fcm@Dimnames$features[col_idx+1]
+    row_feats <- x$fcm@Dimnames$features[row_idx+1]
+    counts <- x$fcm@x
+    res <- tibble::tibble(word_1=col_feats, word_2=row_feats, count=counts)
   }
   res
 }
