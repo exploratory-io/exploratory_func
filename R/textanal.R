@@ -52,9 +52,10 @@ exp_textanal <- function(df, text, token = "word", keep_cols = FALSE,
 #' extracts results from textanal_exploratory object as a dataframe
 #' @export
 #' @param type - Type of output.
-tidy.textanal_exploratory <- function(x, type="x", ...) {
-  if (type == "x") {
-    res <- tibble::tibble(x=1)
+tidy.textanal_exploratory <- function(x, type="word_count", ...) {
+  if (type == "word_count") {
+    feats <- featfreq(x$dfm)
+    res <- tibble(word=names(feats), count=feats)
   }
   else if (type == "y") {
     res <- tibble::tibble(y=1)
