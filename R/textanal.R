@@ -54,7 +54,7 @@ exp_textanal <- function(df, text, token = "word", keep_cols = FALSE,
 #' @param type - Type of output.
 tidy.textanal_exploratory <- function(x, type="word_count", ...) {
   if (type == "word_count") {
-    feats <- featfreq(x$dfm)
+    feats <- quanteda::featfreq(x$dfm)
     res <- tibble(word=names(feats), count=feats)
   }
   else if (type == "y") {
