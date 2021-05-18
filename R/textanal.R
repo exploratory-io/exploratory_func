@@ -73,8 +73,8 @@ tidy.textanal_exploratory <- function(x, type="word_count", ...) {
     }
     col_feats <- x$fcm@Dimnames$features[col_idx+1]
     row_feats <- x$fcm@Dimnames$features[row_idx+1]
-    counts <- x$fcm@x
-    res <- tibble::tibble(word_1=col_feats, word_2=row_feats, count=counts)
+    value <- x$fcm@x
+    res <- tibble::tibble(token.x=col_feats, token.y=row_feats, value=value)
   }
   res
 }
