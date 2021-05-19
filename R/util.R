@@ -2480,3 +2480,20 @@ complete_date <- function(df, date_col, time_unit = "day") {
 cumsum_decayed <- function(x, r) {
   purrr::accumulate(x, function(x, y){x*r + y})
 }
+
+intra_group_population_var <- function(population_vars, sizes) {
+  weighted.mean(population_vars, sizes)
+}
+
+inter_group_population_var <- function(means, sizes) {
+  tot_mean <- weighted.mean(means, sizes)
+  weighted.mean((means - tot_mean)^2, sizes)
+}
+
+merge_vars <- function(vars, means, sizes) {
+  tot_size <- sum(sizes)
+  population_vars <- vars * (sizes - 1) / sizes
+  population_var <- intra_group_population_var(population_vars, sizes) + inter_group_population_var(means, sizes)
+  res <- population_var * tot_size / (tot_size - 1)
+  res
+}

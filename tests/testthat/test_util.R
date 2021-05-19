@@ -1009,3 +1009,11 @@ test_that("auroc", {
   res <- auroc(c(0.1, 0.2, 0.3, 0.4, NA, 0.6), c(F, T, F, T, F, NA))
   expect_equal(res, 0.75)
 })
+
+test_that("merge_vars", {
+  a <- c(1,2,3)
+  b <- c(2,3,4,5)
+  var1 <- var(c(a,b))
+  var2 <- merge_vars(c(var(a), var(b)), c(mean(a), mean(b)), c(length(a), length(b)))
+  expect_equal(var1, var2)
+})
