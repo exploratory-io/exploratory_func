@@ -71,6 +71,7 @@ fcm_to_df <- function(fcm) {
   row_feats <- fcm@Dimnames$features[row_idx+1]
   value <- fcm@x
   res <- tibble::tibble(token.x=col_feats, token.y=row_feats, value=value)
+  res
 }
 
 #' extracts results from textanal_exploratory object as a dataframe
