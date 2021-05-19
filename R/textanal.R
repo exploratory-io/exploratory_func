@@ -41,7 +41,7 @@ exp_textanal <- function(df, text, token = "word", keep_cols = FALSE,
     dfm <- tokens %>% quanteda::dfm()
     fcm <- quanteda::fcm(tokens, context = "window", tri = TRUE)
 
-    feats <- names(quanteda::topfeatures(fcmat, 30))
+    feats <- names(quanteda::topfeatures(fcm, 30))
     fcm_selected <- fcm_select(fcm, pattern = feats)
 
     model <- list()
