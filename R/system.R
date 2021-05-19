@@ -373,7 +373,7 @@ js_glue_transformer <- function(expr, envir) {
 }
 
 # Common routine for sql_glue_transformer and bigquery_glue_transformer.
-sql_glue_transformer_internal <- function(expr, envir, bigquery=FALSE) {
+sql_glue_transformer_internal <- function(expr, envir, bigquery=FALSE, salesforce=FALSE) {
   tokens <- stringr::str_split(expr, ',')
   tokens <- tokens[[1]]
   name <- tokens[1]
@@ -507,11 +507,18 @@ sql_glue_transformer_internal <- function(expr, envir, bigquery=FALSE) {
   }
   else if (lubridate::is.Date(val)) {
     val <- as.character(val)
-    val <- paste0(quote, val, quote) # Athena and PostgreSQL quotes date with single quote. e.g. '2019-01-01'
+    if (salesforce == FALSE) { # for salesforce, date should not be quoted.
+      val <- paste0(quote, val, quote) # Athena and PostgreSQL quotes date with single quote. e.g. '2019-01-01'
+    }
   }
   else if (lubridate::is.POSIXt(val)) {
-    val <- as.character(val)
-    val <- paste0(quote, val, quote) # Athena and PostgreSQL quotes timestamp with single quote. e.g. '2019-01-01 00:00:00'
+    if (salesforce) { # Need to format it as YYYY-MM-DDThh:mm:ssZ
+      # ref https://developer.salesforce.com/docs/atlas.en-us.soql_sosl.meta/soql_sosl/sforce_api_calls_soql_select_dateformats.htm
+      val <- format(val, "%Y-%m-%dT%H:%M:%S%z")
+    } else {
+      val <- as.character(val)
+      val <- paste0(quote, val, quote) # Athena and PostgreSQL quotes timestamp with single quote. e.g. '2019-01-01 00:00:00'
+    }
   }
 
   # TODO: How should we handle logical?
@@ -527,6 +534,10 @@ sql_glue_transformer <- function(expr, envir) {
 
 bigquery_glue_transformer <- function(expr, envir) {
   sql_glue_transformer_internal(expr, envir, bigquery=TRUE)
+}
+
+salesforce_glue_transformer <- function(expr, envir) {
+  sql_glue_transformer_internal(expr, envir, salesforce=TRUE)
 }
 
 #' @export
