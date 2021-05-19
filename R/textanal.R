@@ -39,10 +39,10 @@ exp_textanal <- function(df, text, token = "word", keep_cols = FALSE,
     }
     # convert tokens to dfm object
     dfm <- tokens %>% quanteda::dfm()
-    fcm <- quanteda::fcm(tokens, context = "window", tri = TRUE)
+    fcm <- quanteda::fcm(tokens, context = "window", window=2, tri = TRUE)
 
-    feats <- names(quanteda::topfeatures(fcm, 30))
-    fcm_selected <- fcm_select(fcm, pattern = feats)
+    feats <- names(quanteda::topfeatures(fcm, 50))
+    fcm_selected <- quanteda::fcm_select(fcm, pattern = feats)
 
     model <- list()
     model$dfm <- dfm
