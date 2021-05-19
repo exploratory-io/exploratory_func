@@ -4,7 +4,7 @@
 #' @param username - Salesforce login user name
 #' @param password - Salesforce login password
 #' @param securityToken - (optional) security token if required
-#' This API
+#' This API takes care of Salesforce authentication and should be called before calling any Salesforce related APIs.
 loginToSalesforce <- function(server = NULL, username, password, securityToken = NULL){
   if (!requireNamespace("salesforcer")) {
     stop("package salesforcer must be installed.")
@@ -30,6 +30,8 @@ querySaleseforceMetadata <- function(server = NULL, username, password, security
     stop("package salesforcer must be installed.")
   }
   loginToSalesforce(server = server, username = username, password = password, securityToken = securityToken)
+  # Standard Objects are implementation of CustomObjects, so pass CustomObjects as the type to get both Standard Objects and Custom Objects.
+  # ref: https://github.com/StevenMMortimer/salesforcer#using-the-metadata-api
   my_queries <- list(list(type='CustomObject'))
   metadata_info <- salesforcer::sf_list_metadata(queries=my_queries)
   metadata_info
