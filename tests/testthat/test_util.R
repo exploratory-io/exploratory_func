@@ -1017,3 +1017,11 @@ test_that("merge_vars", {
   var2 <- merge_vars(c(var(a), var(b)), c(mean(a), mean(b)), c(length(a), length(b)))
   expect_equal(var1, var2)
 })
+
+test_that("merge_sds", {
+  a <- c(1,2,3)
+  b <- c(2,3,4,5)
+  sd1 <- sd(c(a,b))
+  sd2 <- merge_sds(c(sd(a), sd(b)), c(mean(a), mean(b)), c(length(a), length(b)))
+  expect_equal(sd1, sd2)
+})

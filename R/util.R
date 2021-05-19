@@ -2497,3 +2497,10 @@ merge_vars <- function(vars, means, sizes) {
   res <- population_var * tot_size / (tot_size - 1)
   res
 }
+
+merge_sds <- function(sds, means, sizes) {
+  vars <- sds^2
+  var_merged <- merge_vars(vars, means, sizes)
+  res <- sqrt(var_merged)
+  res
+}
