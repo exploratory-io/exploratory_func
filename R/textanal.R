@@ -55,6 +55,24 @@ exp_textanal <- function(df, text, token = "word", keep_cols = FALSE,
   do_on_each_group(df, each_func, name = "model", with_unnest = FALSE)
 }
 
+fcm_to_df <- function(fcm) {
+  row_idx <- fcm@i
+  col_idx_compressed <- fcm@p
+  # fcm is in CSR (Compressed Sparse Row) format.
+  # Uncompress column index.
+  col_idx <- c()
+  for (j in 1:(length(col_idx_compressed)-1)) {
+    cur_idx <- col_idx_compressed[j]
+    next_idx <- col_idx_compressed[j+1]
+    rep_num <- next_idx - cur_idx
+    col_idx <- c(col_idx, rep(j-1, rep_num))
+  }
+  col_feats <- fcm@Dimnames$features[col_idx+1]
+  row_feats <- fcm@Dimnames$features[row_idx+1]
+  value <- fcm@x
+  res <- tibble::tibble(token.x=col_feats, token.y=row_feats, value=value)
+}
+
 #' extracts results from textanal_exploratory object as a dataframe
 #' @export
 #' @param type - Type of output.
@@ -64,21 +82,7 @@ tidy.textanal_exploratory <- function(x, type="word_count", ...) {
     res <- tibble(word=names(feats), count=feats)
   }
   else if (type == "word_pairs") {
-    row_idx <- x$fcm@i
-    col_idx_compressed <- x$fcm@p
-    # fcm is in CSR (Compressed Sparse Row) format.
-    # Uncompress column index.
-    col_idx <- c()
-    for (j in 1:(length(col_idx_compressed)-1)) {
-      cur_idx <- col_idx_compressed[j]
-      next_idx <- col_idx_compressed[j+1]
-      rep_num <- next_idx - cur_idx
-      col_idx <- c(col_idx, rep(j-1, rep_num))
-    }
-    col_feats <- x$fcm@Dimnames$features[col_idx+1]
-    row_feats <- x$fcm@Dimnames$features[row_idx+1]
-    value <- x$fcm@x
-    res <- tibble::tibble(token.x=col_feats, token.y=row_feats, value=value)
+    res <- fcm_to_df(x$fcm)
   }
   res
 }
