@@ -38,21 +38,42 @@ exp_textanal <- function(df, text, token = "word", keep_cols = FALSE,
       tokens <- quanteda::tokens_ngrams(tokens, n = 1:ngrams)
     }
     # convert tokens to dfm object
-    dfm <- tokens %>% quanteda::dfm()
-    fcm <- quanteda::fcm(tokens, context = "window", window=2, tri = TRUE)
+    dfm_res <- tokens %>% quanteda::dfm()
+    fcm_res <- quanteda::fcm(tokens, context = "window", window=2, tri = TRUE)
 
-    feats <- names(quanteda::topfeatures(fcm, 50))
-    fcm_selected <- quanteda::fcm_select(fcm, pattern = feats)
+    feats <- names(quanteda::topfeatures(fcm_res, 50))
+    fcm_selected <- quanteda::fcm_select(fcm_res, pattern = feats)
+    dfm_tfidf_res <- quanteda::dfm_tfidf(dfm_res)
 
     model <- list()
-    model$dfm <- dfm
-    model$fcm <- fcm
+    model$dfm <- dfm_res
+    model$fcm <- fcm_res
     model$fcm_selected <- fcm_selected
+    model$dfm_tfidf <- dfm_tfidf_res
     class(model) <- 'textanal_exploratory'
     model
   }
 
   do_on_each_group(df, each_func, name = "model", with_unnest = FALSE)
+}
+
+dfm_to_df <- function(dfm) {
+  row_idx <- dfm@i
+  col_idx_compressed <- dfm@p
+  # dfm is in CSR (Compressed Sparse Row) format.
+  # Uncompress column index.
+  col_idx <- c()
+  for (j in 1:(length(col_idx_compressed)-1)) {
+    cur_idx <- col_idx_compressed[j]
+    next_idx <- col_idx_compressed[j+1]
+    rep_num <- next_idx - cur_idx
+    col_idx <- c(col_idx, rep(j-1, rep_num))
+  }
+  col_feats <- dfm@Dimnames$features[col_idx+1]
+  row_docs <- dfm@Dimnames$docs[row_idx+1]
+  value <- dfm@x
+  res <- tibble::tibble(document=row_docs, token=col_feats, value=value)
+  res
 }
 
 fcm_to_df <- function(fcm) {
