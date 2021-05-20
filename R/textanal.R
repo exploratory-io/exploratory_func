@@ -49,13 +49,13 @@ exp_textanal <- function(df, text, token = "word", keep_cols = FALSE,
     tfidf_df <- dfm_to_df(dfm_tfidf_res)
     tfidf_df <- tfidf_df %>% dplyr::rename(tfidf=value)
     tfidf_reduced <- tfidf_df %>% do_svd(skv = c("document", "token", "tfidf"), n_component = 4) #TODO: Make n_component configurable
-    tfidf_reduced_wide <- tfidf_reduced %>% spread(new.dimension, value)
+    tfidf_reduced_wide <- tfidf_reduced %>% tidyr::spread(new.dimension, value)
     clustered_df <- tfidf_reduced_wide %>% build_kmeans(`1`, `2`, `3`, `4`, centers=5) #TODO: Make centers configurable
     cluster_res <- clustered_df$cluster # Clustering result
 
     # Run tf-idf treating each cluster as a document.
-    dfm_clustered <- dfm_group(dfm_res, cluster_res)
-    dfm_clustered_tfidf <- dfm_tfidf(dfm_clustered)
+    dfm_clustered <- quanteda::dfm_group(dfm_res, cluster_res)
+    dfm_clustered_tfidf <- quanteda::dfm_tfidf(dfm_clustered)
     clustered_tfidf <- dfm_to_df(dfm_clustered_tfidf)
 
     model <- list()
