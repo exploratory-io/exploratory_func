@@ -2480,3 +2480,47 @@ complete_date <- function(df, date_col, time_unit = "day") {
 cumsum_decayed <- function(x, r) {
   purrr::accumulate(x, function(x, y){x*r + y})
 }
+
+# Caluculates intra group population variance. Used by merge_vars.
+#' @param population_vars 
+#' @param sizes 
+#' @return variance
+intra_group_population_var <- function(population_vars, sizes) {
+  weighted.mean(population_vars, sizes)
+}
+                             
+# Caluculates inter group population variance. Used by merge_vars.
+#' @param means 
+#' @param sizes 
+#' @return variance
+inter_group_population_var <- function(means, sizes) {
+  tot_mean <- weighted.mean(means, sizes)
+  weighted.mean((means - tot_mean)^2, sizes)
+}
+
+# Caluculates a variance by merging variances from multiple groups.
+#' @param vars - Variances of groups.
+#' @param means - Means of groups.
+#' @param sizes - Sizes of groups.
+#' @return Variance
+#' @export
+merge_vars <- function(vars, means, sizes) {
+  tot_size <- sum(sizes)
+  population_vars <- vars * (sizes - 1) / sizes
+  population_var <- intra_group_population_var(population_vars, sizes) + inter_group_population_var(means, sizes)
+  res <- population_var * tot_size / (tot_size - 1)
+  res
+}
+
+# Caluculates an SD by merging SDs from multiple groups.
+#' @param sds - SDs of groups.
+#' @param means - Means of groups.
+#' @param sizes - Sizes of groups.
+#' @return SD
+#' @export
+merge_sds <- function(sds, means, sizes) {
+  vars <- sds^2
+  var_merged <- merge_vars(vars, means, sizes)
+  res <- sqrt(var_merged)
+  res
+}
