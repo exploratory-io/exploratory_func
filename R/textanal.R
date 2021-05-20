@@ -128,5 +128,12 @@ tidy.textanal_exploratory <- function(x, type="word_count", ...) {
     res <- x$df
     res <- res %>% dplyr::mutate(cluster = !!x$cluster)
   }
+  else if (type == "doc_cluster_words") {
+    res <- dfm_to_df(x$dfm_cluster_tfidf)
+    res <- res %>% dplyr::group_by(document) %>%
+      dplyr::slice_max(value, n=5) %>%
+      dplyr::ungroup()
+    res
+  }
   res
 }
