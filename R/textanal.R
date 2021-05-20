@@ -56,7 +56,8 @@ exp_textanal <- function(df, text, token = "word", keep_cols = FALSE,
     model$fcm <- fcm_res
     model$fcm_selected <- fcm_selected
     model$dfm_tfidf <- dfm_tfidf_res
-    model$cluster <- clusterd_df$cluster # Clustering result
+    model$cluster <- clustered_df$cluster # Clustering result
+    model$df <- df # Keep original df for showing it with clustering result.
     class(model) <- 'textanal_exploratory'
     model
   }
@@ -113,6 +114,10 @@ tidy.textanal_exploratory <- function(x, type="word_count", ...) {
   }
   else if (type == "word_pairs") {
     res <- fcm_to_df(x$fcm)
+  }
+  else if (type == "doc_cluster") {
+    res <- x$df
+    res <- res %>% dplyr::mutate(cluster = !!x$cluster)
   }
   res
 }
