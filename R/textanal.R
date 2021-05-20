@@ -45,18 +45,27 @@ exp_textanal <- function(df, text, token = "word", keep_cols = FALSE,
     fcm_selected <- quanteda::fcm_select(fcm_res, pattern = feats)
     dfm_tfidf_res <- quanteda::dfm_tfidf(dfm_res)
 
+    # Cluster documents with k-means.
     tfidf_df <- dfm_to_df(dfm_tfidf_res)
     tfidf_df <- tfidf_df %>% dplyr::rename(tfidf=value)
     tfidf_reduced <- tfidf_df %>% do_svd(skv = c("document", "token", "tfidf"), n_component = 4) #TODO: Make n_component configurable
     tfidf_reduced_wide <- tfidf_reduced %>% spread(new.dimension, value)
     clustered_df <- tfidf_reduced_wide %>% build_kmeans(`1`, `2`, `3`, `4`, centers=5) #TODO: Make centers configurable
+    cluster_res <- clustered_df$cluster # Clustering result
+
+    # Run tf-idf treating each cluster as a document.
+    dfm_clustered <- dfm_group(dfm_res, cluster_res)
+    dfm_clustered_tfidf <- dfm_tfidf(dfm_clustered)
+    clustered_tfidf <- dfm_to_df(dfm_clustered_tfidf)
 
     model <- list()
     model$dfm <- dfm_res
     model$fcm <- fcm_res
     model$fcm_selected <- fcm_selected
     model$dfm_tfidf <- dfm_tfidf_res
-    model$cluster <- clustered_df$cluster # Clustering result
+    model$cluster <- clustered_df$cluster
+    model$dfm_cluster <- dfm_clustered
+    model$dfm_cluster_tfidf <- dfm_clustered_tfidf
     model$df <- df # Keep original df for showing it with clustering result.
     class(model) <- 'textanal_exploratory'
     model
