@@ -4,8 +4,10 @@ context("test text analysis function, exp_textanal")
 
 test_that("exp_textanal", {
   df <- tibble::tibble(text=c("すもももももももものうち","隣の客はよく柿食う客だ。","赤巻紙青巻紙黄巻紙"))
-  model_df <- df %>% exp_textanal(text)
+  model_df <- df %>% exp_textanal(text, compound_tokens=c("赤 巻紙"))
+  browser()
   res <- model_df %>% tidy_rowwise(model, type="word_count")
+  browser()
 
   # Test for plotting
   edges <- exploratory:::fcm_to_df(model_df$model[[1]]$fcm_selected) %>% rename(from=token.x,to=token.y) %>% filter(from!=to)

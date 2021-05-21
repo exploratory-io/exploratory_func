@@ -7,7 +7,8 @@ exp_textanal <- function(df, text, token = "word", keep_cols = FALSE,
                                  remove_symbols = TRUE, remove_twitter = TRUE,
                                  remove_url = TRUE, stopwords_lang = NULL,
                                  hiragana_word_length_to_remove = 2,
-                                 summary_level = "row", sort_by = "", ngrams = 1L, ...){
+                                 summary_level = "row", sort_by = "", ngrams = 1L,
+                                 compound_tokens = NULL, ...){
 
   # Always put document_id to know what document the tokens are from
   text_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(text))
@@ -24,6 +25,9 @@ exp_textanal <- function(df, text, token = "word", keep_cols = FALSE,
                        remove_url = remove_url) %>%
       quanteda::tokens_wordstem()
 
+    if (!is.null(compound_tokens)) { # This probably should be kept before removing stopwords not to break compoint tokens that includes stopwords.
+      tokens <- tokens %>% quanteda::tokens_compound(pattern = phrase(compound_tokens), concatenator = ' ')
+    }
 
     # when stopwords Language is set, use the stopwords to filter out the result.
     if(!is.null(stopwords_lang)) {
@@ -45,27 +49,27 @@ exp_textanal <- function(df, text, token = "word", keep_cols = FALSE,
     fcm_selected <- quanteda::fcm_select(fcm_res, pattern = feats)
     dfm_tfidf_res <- quanteda::dfm_tfidf(dfm_res)
 
-    # Cluster documents with k-means.
-    tfidf_df <- dfm_to_df(dfm_tfidf_res)
-    tfidf_df <- tfidf_df %>% dplyr::rename(tfidf=value)
-    tfidf_reduced <- tfidf_df %>% do_svd(skv = c("document", "token", "tfidf"), n_component = 4) #TODO: Make n_component configurable
-    tfidf_reduced_wide <- tfidf_reduced %>% tidyr::spread(new.dimension, value)
-    clustered_df <- tfidf_reduced_wide %>% build_kmeans(`1`, `2`, `3`, `4`, centers=5) #TODO: Make centers configurable
-    cluster_res <- clustered_df$cluster # Clustering result
+    # # Cluster documents with k-means.
+    # tfidf_df <- dfm_to_df(dfm_tfidf_res)
+    # tfidf_df <- tfidf_df %>% dplyr::rename(tfidf=value)
+    # tfidf_reduced <- tfidf_df %>% do_svd(skv = c("document", "token", "tfidf"), n_component = 4) #TODO: Make n_component configurable
+    # tfidf_reduced_wide <- tfidf_reduced %>% tidyr::spread(new.dimension, value)
+    # clustered_df <- tfidf_reduced_wide %>% build_kmeans(`1`, `2`, `3`, `4`, centers=5) #TODO: Make centers configurable
+    # cluster_res <- clustered_df$cluster # Clustering result
 
-    # Run tf-idf treating each cluster as a document.
-    dfm_clustered <- quanteda::dfm_group(dfm_res, cluster_res)
-    dfm_clustered_tfidf <- quanteda::dfm_tfidf(dfm_clustered)
-    clustered_tfidf <- dfm_to_df(dfm_clustered_tfidf)
+    # # Run tf-idf treating each cluster as a document.
+    # dfm_clustered <- quanteda::dfm_group(dfm_res, cluster_res)
+    # dfm_clustered_tfidf <- quanteda::dfm_tfidf(dfm_clustered)
+    # clustered_tfidf <- dfm_to_df(dfm_clustered_tfidf)
 
     model <- list()
     model$dfm <- dfm_res
     model$fcm <- fcm_res
     model$fcm_selected <- fcm_selected
     model$dfm_tfidf <- dfm_tfidf_res
-    model$cluster <- clustered_df$cluster
-    model$dfm_cluster <- dfm_clustered
-    model$dfm_cluster_tfidf <- dfm_clustered_tfidf
+    # model$cluster <- clustered_df$cluster
+    # model$dfm_cluster <- dfm_clustered
+    # model$dfm_cluster_tfidf <- dfm_clustered_tfidf
     model$df <- df # Keep original df for showing it with clustering result.
     class(model) <- 'textanal_exploratory'
     model
