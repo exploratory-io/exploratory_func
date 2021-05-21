@@ -8,7 +8,10 @@ exp_textanal <- function(df, text, token = "word", keep_cols = FALSE,
                                  remove_url = TRUE, stopwords_lang = NULL,
                                  hiragana_word_length_to_remove = 2,
                                  summary_level = "row", sort_by = "", ngrams = 1L,
-                                 compound_tokens = NULL, ...){
+                                 compound_tokens = NULL,
+                                 cooccurrence_context = "window", # "document" or "window"
+                                 cooccurrence_window = 2,
+                                 ...){
 
   # Always put document_id to know what document the tokens are from
   text_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(text))
@@ -43,7 +46,7 @@ exp_textanal <- function(df, text, token = "word", keep_cols = FALSE,
     }
     # convert tokens to dfm object
     dfm_res <- tokens %>% quanteda::dfm()
-    fcm_res <- quanteda::fcm(tokens, context = "window", window=2, tri = TRUE)
+    fcm_res <- quanteda::fcm(tokens, context = cooccurrence_context, window = cooccurrence_window, tri = TRUE)
 
     feats <- names(quanteda::topfeatures(fcm_res, 50))
     fcm_selected <- quanteda::fcm_select(fcm_res, pattern = feats)
