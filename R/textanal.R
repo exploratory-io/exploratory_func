@@ -17,16 +17,23 @@ exp_textanal <- function(df, text, token = "word", keep_cols = FALSE,
   text_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(text))
   doc_id <- avoid_conflict(colnames(df), "document_id")
   each_func <- function(df) {
+    # <Tokenizing code with quoanteda's default tokenizer.>
+    #
     # This is SE version of dplyr::mutate(df, doc_id = row_number())
-    df <- dplyr::mutate_(df, .dots=setNames(list(~row_number()),doc_id))
-    textData <- df %>% dplyr::select(!!rlang::sym(text_col)) %>% dplyr::rename("text" = !!rlang::sym(text_col))
-    # Create a corpus from the text column then tokenize.
-    tokens <- quanteda::corpus(textData) %>%
-      quanteda::tokens(what = token, remove_punct = remove_punct, remove_numbers = remove_numbers,
-                       remove_symbols = remove_symbols, remove_twitter = remove_twitter,
-                       remove_hyphens = remove_hyphens, remove_separators = remove_separators,
-                       remove_url = remove_url) %>%
-      quanteda::tokens_wordstem()
+    # df <- dplyr::mutate_(df, .dots=setNames(list(~row_number()),doc_id))
+    #
+    # textData <- df %>% dplyr::select(!!rlang::sym(text_col)) %>% dplyr::rename("text" = !!rlang::sym(text_col))
+    # # Create a corpus from the text column then tokenize.
+    # tokens <- quanteda::corpus(textData) %>%
+    #   quanteda::tokens(what = token, remove_punct = remove_punct, remove_numbers = remove_numbers,
+    #                    remove_symbols = remove_symbols, remove_twitter = remove_twitter,
+    #                    remove_hyphens = remove_hyphens, remove_separators = remove_separators,
+    #                    remove_url = remove_url) %>%
+    #   quanteda::tokens_wordstem()
+
+    tokenized <- tokenizers::tokenize_words(df[[text_col]], lowercase = TRUE, stopwords = NULL, strip_punct = TRUE, strip_numeric = FALSE, simplify = FALSE)
+    names(tokenized) <- paste0("text", 1:length(tokenized)) # Add unique names so the list so that it can be passed to quanteda::tokens().
+    tokens <- quanteda::tokens(tokenized)
 
     if (!is.null(compound_tokens)) { # This probably should be kept before removing stopwords not to break compoint tokens that includes stopwords.
       tokens <- tokens %>% quanteda::tokens_compound(pattern = phrase(compound_tokens), concatenator = ' ')
