@@ -552,6 +552,13 @@ test_that("unixtime_to_datetime", {
   unix_ans <- as.POSIXct(data, origin="1970-01-01", tz = "GMT")
   expect_equal(unix_ret, unix_ans)
 
+  data <- c("300", "900", NA)
+
+  unix_ret <- unixtime_to_datetime(data)
+  unix_ans <- as.POSIXct(as.numeric(data), origin="1970-01-01", tz = "GMT")
+  expect_equal(unix_ret, unix_ans)
+
+
 })
 
 test_that("append_colnames", {
@@ -855,6 +862,9 @@ test_that("excel_numeric_to_date", {
 test_that("excel_numeric_to_datetime", {
   res <- exploratory::excel_numeric_to_datetime(42370.5, tz = "GMT")
   expect_equal(res, as.POSIXct("2016-01-01 12:00:00",tz = "GMT"))
+  res <- exploratory::excel_numeric_to_datetime("42370.5", tz = "GMT")
+  expect_equal(res, as.POSIXct("2016-01-01 12:00:00",tz = "GMT"))
+
 })
 
 test_that("one_hot", {
@@ -951,7 +961,7 @@ test_that("is_integer", {
 })
 
 test_that("week", {
-  dates <- lubridate::ymd(c(20190101,20190107,20190108,20190131,20190201,20190207,20190208,20190701,20190707,20190708,20190731,20191201,20191207,20191208,20191231)) 
+  dates <- lubridate::ymd(c(20190101,20190107,20190108,20190131,20190201,20190207,20190208,20190701,20190707,20190708,20190731,20191201,20191207,20191208,20191231))
   expect_equal(exploratory::week(dates), c(1,1,2,5,5,6,6,26,27,27,31,48,49,49,53))
   expect_equal(exploratory::week(dates, unit="quarter"), c(1,1,2,5,5,6,6,1,1,2,5,9,10,10,14))
   expect_equal(exploratory::week(dates, unit="month"), c(1,1,2,5,1,1,2,1,1,2,5,1,1,2,5))
