@@ -5,7 +5,7 @@ exp_textanal <- function(df, text, token = "word", keep_cols = FALSE,
                                  remove_punct = TRUE, remove_numbers = TRUE,
                                  remove_hyphens = FALSE, remove_separators = TRUE,
                                  remove_symbols = TRUE, remove_twitter = TRUE,
-                                 remove_url = TRUE, stopwords_lang = NULL,
+                                 remove_url = TRUE, stopwords_lang = NULL, stopwords = c(),
                                  hiragana_word_length_to_remove = 2,
                                  summary_level = "row", sort_by = "", ngrams = 1L,
                                  compound_tokens = NULL,
@@ -34,7 +34,7 @@ exp_textanal <- function(df, text, token = "word", keep_cols = FALSE,
 
     # when stopwords Language is set, use the stopwords to filter out the result.
     if(!is.null(stopwords_lang)) {
-      stopwords_to_remove <- exploratory::get_stopwords(lang = stopwords_lang)
+      stopwords_to_remove <- exploratory::get_stopwords(lang = stopwords_lang, include = stopwords)
       tokens <- tokens %>% quanteda::tokens_remove(stopwords_to_remove, valuetype = "fixed")
     }
     # Remove Japanese Hiragana word whose length is less than hiragana_word_length_to_remove
