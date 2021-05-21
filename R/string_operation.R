@@ -366,9 +366,13 @@ do_tokenize <- function(df, input, token = "words", keep_cols = FALSE,  drop = T
   ret
 }
 
-#' Input: vector of documents and vector terms with the same length.
+#' Input:
+#' group - vector of documents
+#' term - vector terms with the same length as group.
+#' tf - vector of tf with the same length as group. It can be after weight function is applied,
+#'      in which case, we assume that group-term combination in the input is unique, and summing up at the sparseMatrix would not happen. 
 #' Output: data.frame of document frequency and tf-idf. The number of rows are the same as the input vectors.
-calc_tfidf <- function(group, term, smooth_idf = FALSE){
+calc_tfidf <- function(group, term, tf, smooth_idf = FALSE){
   loadNamespace("Matrix")
   loadNamespace("text2vec")
   if(length(group)!=length(term)){
@@ -377,7 +381,7 @@ calc_tfidf <- function(group, term, smooth_idf = FALSE){
   doc_fact <- as.factor(group)
   term_fact <- as.factor(term)
   # x=1 is so that the count is summed up in the sparse matrix. Without it, we would get a TRUE/FALSE matrix.
-  sparseMat <- Matrix::sparseMatrix(i = as.numeric(doc_fact), j = as.numeric(term_fact), x = 1)
+  sparseMat <- Matrix::sparseMatrix(i = as.numeric(doc_fact), j = as.numeric(term_fact), x = tf)
 
   m_tfidf <- text2vec::TfIdf$new(smooth_idf = smooth_idf, norm = "none")
   result_tfidf <- m_tfidf$fit_transform(sparseMat)
@@ -406,6 +410,13 @@ calc_tf <- function(df, group, term, ...){
   calc_tf_(df, group_col, term_col, ...)
 }
 
+#' @param group_col - Document ID column
+#' @param term_col - Term column
+#' Output: data.frame with the following column.
+#' - document_id
+#' - token - Term
+#' - count_per_doc - Count of term occurrence per document
+#' - tf - count_per_doc with weight function applied.
 #' @rdname calc_tf
 calc_tf_ <- function(df, group_col, term_col, weight="ratio", count_col = NULL){
   loadNamespace("dplyr")
@@ -475,7 +486,7 @@ do_tfidf <- function(df, group, term, idf_log_scale = log, tf_weight="raw", norm
   cnames <- avoid_conflict(c(group_col, term_col), c("count_of_docs", "tfidf", "tf"))
 
   count_tbl <- calc_tf_(df, group_col, term_col, weight=tf_weight, count_col = count_col)
-  tfidf <- calc_tfidf(count_tbl[[group_col]], count_tbl[[term_col]], smooth_idf = FALSE)
+  tfidf <- calc_tfidf(count_tbl[[group_col]], count_tbl[[term_col]], count_tbl[[cnames[[3]]]], smooth_idf = FALSE)
   count_tbl[[cnames[[1]]]] <- tfidf$.df
   count_tbl[[cnames[[2]]]] <- tfidf$.tfidf
   count_tbl[[cnames[[3]]]] <- NULL
