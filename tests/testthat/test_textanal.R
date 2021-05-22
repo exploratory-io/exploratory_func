@@ -7,6 +7,7 @@ test_that("exp_textanal", {
   model_df <- df %>% exp_textanal(text, compound_tokens=c("赤 巻紙"))
   browser()
   res <- model_df %>% tidy_rowwise(model, type="word_count")
+  res <- model_df %>% tidy_rowwise(model, type="word_pairs")
   browser()
 
   # Test for plotting
