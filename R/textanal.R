@@ -138,7 +138,8 @@ tidy.textanal_exploratory <- function(x, type="word_count", ...) {
   else if (type == "word_pairs") {
     res <- fcm_to_df(x$fcm) %>%
       dplyr::filter(token.x != token.y) %>%
-      dplyr::mutate(token.x = stringr::str_to_title(token.x), token.y = stringr::str_to_title(token.y))
+      dplyr::mutate(token.x = stringr::str_to_title(token.x), token.y = stringr::str_to_title(token.y)) %>%
+      dplyr::rename(word.1 = token.x, word.2 = token.y, count=value)
   }
   else if (type == "doc_cluster") {
     res <- x$df
