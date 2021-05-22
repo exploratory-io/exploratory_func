@@ -36,7 +36,7 @@ exp_textanal <- function(df, text, token = "word", keep_cols = FALSE,
     tokens <- quanteda::tokens(tokenized)
 
     if (!is.null(compound_tokens)) { # This probably should be kept before removing stopwords not to break compoint tokens that includes stopwords.
-      tokens <- tokens %>% quanteda::tokens_compound(pattern = phrase(compound_tokens), concatenator = ' ')
+      tokens <- tokens %>% quanteda::tokens_compound(pattern = quanteda::phrase(compound_tokens), concatenator = ' ')
     }
 
     # when stopwords Language is set, use the stopwords to filter out the result.
