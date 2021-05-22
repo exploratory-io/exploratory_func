@@ -11,12 +11,21 @@ exp_textanal <- function(df, text, token = "word", keep_cols = FALSE,
                                  compound_tokens = NULL,
                                  cooccurrence_context = "window", # "document" or "window"
                                  cooccurrence_window = 2,
+                                 max_nrow = 50000,
                                  ...){
 
   # Always put document_id to know what document the tokens are from
   text_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(text))
   doc_id <- avoid_conflict(colnames(df), "document_id")
   each_func <- function(df) {
+    # sample the data for performance if data size is too large.
+    sampled_nrow <- NULL
+    if (!is.null(max_nrow) && nrow(df) > max_nrow) {
+      # Record that sampling happened.
+      sampled_nrow <- max_nrow
+      df <- df %>% sample_rows(max_nrow)
+    }
+
     # <Tokenizing code with quoanteda's default tokenizer.>
     #
     # This is SE version of dplyr::mutate(df, doc_id = row_number())
@@ -81,6 +90,7 @@ exp_textanal <- function(df, text, token = "word", keep_cols = FALSE,
     # model$dfm_cluster <- dfm_clustered
     # model$dfm_cluster_tfidf <- dfm_clustered_tfidf
     model$df <- df # Keep original df for showing it with clustering result.
+    model$sampled_nrow <- sampled_nrow
     class(model) <- 'textanal_exploratory'
     model
   }
