@@ -1,18 +1,14 @@
 #' Function for Text Analysis Analytics View
 #' @export
-exp_textanal <- function(df, text, token = "word", keep_cols = FALSE,
-                                 drop = TRUE, with_id = TRUE, output = token,
-                                 remove_punct = TRUE, remove_numbers = TRUE,
-                                 remove_hyphens = FALSE, remove_separators = TRUE,
-                                 remove_symbols = TRUE, remove_twitter = TRUE,
-                                 remove_url = TRUE, stopwords_lang = NULL, stopwords = c(),
-                                 hiragana_word_length_to_remove = 2,
-                                 summary_level = "row", sort_by = "", ngrams = 1L,
-                                 compound_tokens = NULL,
-                                 cooccurrence_context = "window", # "document" or "window"
-                                 cooccurrence_window = 2,
-                                 max_nrow = 50000,
-                                 ...){
+exp_textanal <- function(df, text,
+                         remove_punct = TRUE, remove_numbers = TRUE,
+                         stopwords_lang = NULL, stopwords = c(),
+                         hiragana_word_length_to_remove = 2,
+                         compound_tokens = NULL,
+                         cooccurrence_context = "window", # "document" or "window"
+                         cooccurrence_window = 5, # 5 is quanteda's default
+                         max_nrow = 50000,
+                         ...){
 
   # Always put document_id to know what document the tokens are from
   text_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(text))
@@ -40,7 +36,7 @@ exp_textanal <- function(df, text, token = "word", keep_cols = FALSE,
     #                    remove_url = remove_url) %>%
     #   quanteda::tokens_wordstem()
 
-    tokenized <- tokenizers::tokenize_words(df[[text_col]], lowercase = TRUE, stopwords = NULL, strip_punct = TRUE, strip_numeric = FALSE, simplify = FALSE)
+    tokenized <- tokenizers::tokenize_words(df[[text_col]], lowercase = TRUE, stopwords = NULL, strip_punct = remove_punct, strip_numeric = remove_numbers, simplify = FALSE)
     names(tokenized) <- paste0("text", 1:length(tokenized)) # Add unique names so the list so that it can be passed to quanteda::tokens().
     tokens <- quanteda::tokens(tokenized)
 
@@ -56,9 +52,6 @@ exp_textanal <- function(df, text, token = "word", keep_cols = FALSE,
     # Remove Japanese Hiragana word whose length is less than hiragana_word_length_to_remove
     if(hiragana_word_length_to_remove > 0) {
       tokens <- tokens %>% quanteda::tokens_remove(stringr::str_c("^[\\\u3040-\\\u309f]{1,", hiragana_word_length_to_remove, "}$"), valuetype = "regex")
-    }
-    if(ngrams > 1) { # if ngrams is greater than 1, generate ngrams.
-      tokens <- quanteda::tokens_ngrams(tokens, n = 1:ngrams)
     }
     # convert tokens to dfm object
     dfm_res <- tokens %>% quanteda::dfm()
