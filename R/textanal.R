@@ -114,9 +114,9 @@ exp_textanal <- function(df, text,
     dfm_res <- tokens %>% quanteda::dfm()
     fcm_res <- quanteda::fcm(tokens, context = cooccurrence_context, window = cooccurrence_window, tri = TRUE)
 
-    feats <- names(quanteda::topfeatures(fcm_res, 50))
-    fcm_selected <- quanteda::fcm_select(fcm_res, pattern = feats)
-    dfm_tfidf_res <- quanteda::dfm_tfidf(dfm_res)
+    # feats <- names(quanteda::topfeatures(fcm_res, 50))
+    # fcm_selected <- quanteda::fcm_select(fcm_res, pattern = feats)
+    # dfm_tfidf_res <- quanteda::dfm_tfidf(dfm_res)
 
     # # Cluster documents with k-means.
     # tfidf_df <- dfm_to_df(dfm_tfidf_res)
@@ -134,8 +134,8 @@ exp_textanal <- function(df, text,
     model <- list()
     model$dfm <- dfm_res
     model$fcm <- fcm_res
-    model$fcm_selected <- fcm_selected
-    model$dfm_tfidf <- dfm_tfidf_res
+    # model$fcm_selected <- fcm_selected
+    # model$dfm_tfidf <- dfm_tfidf_res
     # model$cluster <- clustered_df$cluster
     # model$dfm_cluster <- dfm_clustered
     # model$dfm_cluster_tfidf <- dfm_clustered_tfidf
