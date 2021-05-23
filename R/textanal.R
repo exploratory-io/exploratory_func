@@ -1,3 +1,55 @@
+
+lang_code_mapping <- c(
+  en="english",
+  ar="arabic",
+  ca="catalan",
+  cs="czech",
+  zh="chinese",
+  da="danish",
+  nl="dutch",
+  et="estonian",
+  fi="finnish",
+  fr="french",
+  de="german",
+  el="greek",
+  he="hebrew",
+  hi="hindi",
+  hu="hungarian",
+  id="indonesian",
+  it="italian",
+  ja="japanese",
+  ko="korean",
+  lv="latvian",
+  nb="norwegian",
+  nn="norwegian",
+  no="norwegian",
+  pl="polish",
+  pt="portuguese",
+  ro="romanian",
+  ru="russian",
+  sk="slovak",
+  sl="slovenian",
+  es="spanish",
+  sv="swedish",
+  ta="tamil",
+  tr="turkish",
+  uk="ukrainian",
+  vi="vietnamese")
+
+guess_lang_for_stopwords <- function(text) {
+  text <- head(text, 10)
+  lang_code <- get_mode(cld3::detect_language(text))
+  if (is.na(lang_code)) {
+    return("english")
+  }
+  lang_name <- lang_code_mapping[lang_code]
+  if (is.na(lang_name)) {
+    return("english")
+  }
+  names(lang_name) <- NULL # Strip name
+  lang_name
+}
+
 #' Function for Text Analysis Analytics View
 #' @export
 exp_textanal <- function(df, text,
