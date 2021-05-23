@@ -9,7 +9,7 @@ test_that("exp_textanal", {
   lang_res <- guess_lang_for_stopwords(df$text)
   browser()
 
-  model_df <- df %>% exp_textanal(text, compound_tokens=c("赤 巻紙"))
+  model_df <- df %>% exp_textanal(text, stopwords_lang = "auto", compound_tokens=c("赤 巻紙"))
   browser()
   res <- model_df %>% tidy_rowwise(model, type="word_count")
   res <- model_df %>% tidy_rowwise(model, type="word_pairs")

@@ -100,6 +100,9 @@ exp_textanal <- function(df, text,
 
     # when stopwords Language is set, use the stopwords to filter out the result.
     if(!is.null(stopwords_lang)) {
+      if (stopwords_lang == "auto") {
+        stopwords_lang <- guess_lang_for_stopwords(df[[text_col]])
+      }
       stopwords_to_remove <- exploratory::get_stopwords(lang = stopwords_lang, include = stopwords)
       tokens <- tokens %>% quanteda::tokens_remove(stopwords_to_remove, valuetype = "fixed")
     }
