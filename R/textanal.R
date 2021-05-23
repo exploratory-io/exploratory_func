@@ -1,4 +1,6 @@
 
+# Based on https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes
+# and list of supported stopword language values from our UI definition (exp_textanal.json).
 lang_code_mapping <- c(
   en="english",
   ar="arabic",
