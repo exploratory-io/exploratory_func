@@ -3,17 +3,17 @@
 context("test text analysis function, exp_textanal")
 
 test_that("exp_textanal", {
-  df <- tibble::tibble(text=c("すもももももももものうち", "隣の客はよく柿食う客だ。", "隣の客はよく柿食う客だ。", "赤巻紙青巻紙黄巻紙"))
+  df <- tibble::tibble(text=c(
+    "Jack and Jill went up the hill",
+    "To fetch a pail of water",
+    "Jack fell down and broke his crown",
+    "And Jill came tumbling after"))
 
-  browser()
   lang_res <- guess_lang_for_stopwords(df$text)
-  browser()
 
   model_df <- df %>% exp_textanal(text, stopwords_lang = "auto", compound_tokens=c("赤 巻紙"))
-  browser()
   res <- model_df %>% tidy_rowwise(model, type="word_count")
   res <- model_df %>% tidy_rowwise(model, type="word_pairs")
-  browser()
 
   # Test for plotting
   # edges <- exploratory:::fcm_to_df(model_df$model[[1]]$fcm_selected) %>% rename(from=token.x,to=token.y) %>% filter(from!=to)
