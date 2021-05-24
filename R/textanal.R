@@ -1,4 +1,5 @@
 
+# Mapping table for mapping cld3 result to the input language name for get_stopwords().
 # Based on https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes
 # and list of supported stopword language values from our UI definition (exp_textanal.json).
 lang_code_mapping <- c(
@@ -38,15 +39,17 @@ lang_code_mapping <- c(
   uk="ukrainian",
   vi="vietnamese")
 
+# Guess language of the text based on the first 10 rows of it.
+# Used to give default for get_stopwords().
 guess_lang_for_stopwords <- function(text) {
   text <- head(text, 10)
   lang_code <- get_mode(cld3::detect_language(text))
-  if (is.na(lang_code)) {
-    return("english")
+  if (is.na(lang_code)) { # cld3 could not guess language.
+    return("english") # Default to English
   }
   lang_name <- lang_code_mapping[lang_code]
-  if (is.na(lang_name)) {
-    return("english")
+  if (is.na(lang_name)) { # The language cld3 returned is not supported by get_stopwords().
+    return("english") # Default to English
   }
   names(lang_name) <- NULL # Strip name
   lang_name
@@ -76,7 +79,7 @@ exp_textanal <- function(df, text,
       df <- df %>% sample_rows(max_nrow)
     }
 
-    # <Tokenizing code with quoanteda's default tokenizer.>
+    # <Tokenizing code with quoanteda's default tokenizer.> TODO: Remove it when there is no need to keep it as a reference.
     #
     # This is SE version of dplyr::mutate(df, doc_id = row_number())
     # df <- dplyr::mutate_(df, .dots=setNames(list(~row_number()),doc_id))
@@ -114,6 +117,8 @@ exp_textanal <- function(df, text,
     dfm_res <- tokens %>% quanteda::dfm()
     fcm_res <- quanteda::fcm(tokens, context = cooccurrence_context, window = cooccurrence_window, tri = TRUE)
 
+    # Document clustering code below is temporarily commented out. TODO: Revive it.
+
     # feats <- names(quanteda::topfeatures(fcm_res, 50))
     # fcm_selected <- quanteda::fcm_select(fcm_res, pattern = feats)
     # dfm_tfidf_res <- quanteda::dfm_tfidf(dfm_res)
@@ -134,6 +139,7 @@ exp_textanal <- function(df, text,
     model <- list()
     model$dfm <- dfm_res
     model$fcm <- fcm_res
+    # Co-occurrence network / document clustering related code below is temporarily commented out. TODO: Revive it.
     # model$fcm_selected <- fcm_selected
     # model$dfm_tfidf <- dfm_tfidf_res
     # model$cluster <- clustered_df$cluster
@@ -148,6 +154,7 @@ exp_textanal <- function(df, text,
   do_on_each_group(df, each_func, name = "model", with_unnest = FALSE)
 }
 
+# Uncompresses compressed index in CSR (Compressed Sparse Row) format.
 uncompress_csr_index <- function(idx_compressed) {
   tot_length <- idx_compressed[length(idx_compressed)]
   idx_uncompressed <- c(NA, tot_length) # Allocate space first to avoid repeated allocation.
@@ -162,6 +169,7 @@ uncompress_csr_index <- function(idx_compressed) {
   idx_uncompressed
 }
 
+# Extracts data as a long-format data.frame from quanteda::dfm.
 dfm_to_df <- function(dfm) {
   row_idx <- dfm@i
   col_idx_compressed <- dfm@p
@@ -176,6 +184,7 @@ dfm_to_df <- function(dfm) {
   res
 }
 
+# Extracts data as a long-format data.frame from quanteda::fcm.
 fcm_to_df <- function(fcm) {
   row_idx <- fcm@i
   col_idx_compressed <- fcm@p
