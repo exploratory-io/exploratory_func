@@ -60,7 +60,7 @@ exp_textanal <- function(df, text,
                          hiragana_word_length_to_remove = 2,
                          compound_tokens = NULL,
                          cooccurrence_context = "window", # "document" or "window"
-                         cooccurrence_window = 5, # 5 is quanteda's default
+                         cooccurrence_window = 1, # 5 is the quanteda's default, but narrowing it for speed of default run. 
                          max_nrow = 50000,
                          ...){
 
