@@ -94,9 +94,9 @@ exp_textanal <- function(df, text,
     #   quanteda::tokens_wordstem()
 
     tokenized <- tokenizers::tokenize_words(df[[text_col]], lowercase = TRUE, stopwords = NULL, strip_punct = remove_punct, strip_numeric = remove_numbers, simplify = FALSE)
-    names(tokenized) <- paste0("text", 1:length(tokenized)) # Add unique names so the list so that it can be passed to quanteda::tokens().
+    names(tokenized) <- paste0("text", 1:length(tokenized)) # Add unique names to the list so that it can be passed to quanteda::tokens().
     tokens <- quanteda::tokens(tokenized)
-    # tokens <- tokens %>% quanteda::tokens_wordstem() # TODO: Revive stemming and expose as option.
+    # tokens <- tokens %>% quanteda::tokens_wordstem() # TODO: Revive stemming and expose as an option.
 
     if (!is.null(compound_tokens)) { # This probably should be kept before removing stopwords not to break compoint tokens that includes stopwords.
       tokens <- tokens %>% quanteda::tokens_compound(pattern = quanteda::phrase(compound_tokens), concatenator = ' ')
