@@ -736,7 +736,7 @@ move_col <- function(df, cname, position) {
 #' @export
 unixtime_to_datetime <- function(data){
   # referred from http://stackoverflow.com/questions/27408131/convert-unix-timestamp-into-datetime-in-r
-  as.POSIXct(data, origin="1970-01-01", tz='GMT')
+  as.POSIXct(as.numeric(data), origin="1970-01-01", tz='GMT')
 }
 
 # get binary prediction scores
@@ -1753,7 +1753,7 @@ excel_numeric_to_date <- function(date_num, date_system = "modern",
 
 #' @export
 excel_numeric_to_datetime <- function(datetime_num, tz = "", ...) {
-  res <- openxlsx::convertToDateTime(datetime_num, tz = tz, ...)
+  res <- openxlsx::convertToDateTime(as.numeric(datetime_num), tz = tz, ...)
   # Convert output timezone to the specified tz, in addition to reading the number with the tz.
   res <- lubridate::with_tz(res, tz = tz)
   res
