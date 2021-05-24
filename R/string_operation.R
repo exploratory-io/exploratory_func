@@ -381,14 +381,14 @@ calc_tfidf <- function(group, term, tf, count_per_doc, smooth_idf = FALSE){
   }
   doc_fact <- as.factor(group)
   term_fact <- as.factor(term)
-  sparseMat <- Matrix::sparseMatrix(i = as.numeric(doc_fact), j = as.numeric(term_fact), x = tf) # With weight function applied. To calculate tfidf.
-  sparseMatForCount <- Matrix::sparseMatrix(i = as.numeric(doc_fact), j = as.numeric(term_fact), x = count_per_doc) # Without weight function applied. To calculate df.
+  sparse_mat <- Matrix::sparseMatrix(i = as.numeric(doc_fact), j = as.numeric(term_fact), x = tf) # With weight function applied. To calculate tfidf.
+  sparse_mat_for_count <- Matrix::sparseMatrix(i = as.numeric(doc_fact), j = as.numeric(term_fact), x = count_per_doc) # Without weight function applied. To calculate df.
 
   m_tfidf <- text2vec::TfIdf$new(smooth_idf = smooth_idf, norm = "none")
-  result_tfidf <- m_tfidf$fit_transform(sparseMat)
+  result_tfidf <- m_tfidf$fit_transform(sparse_mat)
 
   tfidf <- purrr::flatten_dbl(purrr::map2(as.integer(doc_fact), as.integer(term_fact), function(x,y){result_tfidf[x,y]}))
-  df <- Matrix::colSums(sparseMatForCount)[term_fact]
+  df <- Matrix::colSums(sparse_mat_for_count)[term_fact]
 
   data.frame(.df=df, .tfidf=tfidf)
 }
