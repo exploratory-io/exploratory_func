@@ -288,7 +288,10 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
 #' @param remove_numbers Whether it should remove numbers.
 #' @return Data frame with tokenized column
 #' @export
-do_tokenize <- function(df, input, token = "words", keep_cols = FALSE,  drop = TRUE, with_id = TRUE, output = token, stopwords_lang = NULL, remove_punct = TRUE, remove_numbers = TRUE, ...){
+do_tokenize <- function(df, input, token = "words", keep_cols = FALSE,
+                        drop = TRUE, with_id = TRUE, output = token,
+                        remove_punct = TRUE, remove_numbers = TRUE,
+                        stopwords_lang = NULL, ...){
   validate_empty_data(df)
 
   loadNamespace("tidytext")
