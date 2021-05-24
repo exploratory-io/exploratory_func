@@ -173,12 +173,15 @@ fcm_to_df <- function(fcm) {
   col_idx_compressed <- fcm@p
   # fcm is in CSR (Compressed Sparse Row) format.
   # Uncompress column index.
-  col_idx <- c()
+  tot_length <- col_idx_compressed[length(col_idx_compressed)]
+  col_idx <- c(NA, tot_length) # Allocate space first to avoid repeated allocation.
   for (j in 1:(length(col_idx_compressed)-1)) {
     cur_idx <- col_idx_compressed[j]
     next_idx <- col_idx_compressed[j+1]
     rep_num <- next_idx - cur_idx
-    col_idx <- c(col_idx, rep(j-1, rep_num))
+    if (rep_num > 0) {
+      col_idx[(cur_idx+1):next_idx] <- rep(j-1, rep_num)
+    }
   }
   col_feats <- fcm@Dimnames$features[col_idx+1]
   row_feats <- fcm@Dimnames$features[row_idx+1]
