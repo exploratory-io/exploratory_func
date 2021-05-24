@@ -202,12 +202,12 @@ test_that("do_tokenize should work with output", {
   expect_equal(result$sentence[[2]], "this is a data frame for test")
 })
 
-test_that("calc_idf", {
+test_that("calc_tfidf", {
   loadNamespace("dplyr")
   test_df <- data.frame(id=rep(c(1,2), 5), word=c("this", "this", letters[1:8]))
-  result <- exploratory:::calc_idf(test_df$id, test_df$word)
+  result <- exploratory:::calc_tfidf(test_df$id, test_df$word)
   expect_equal(head(result$.df,2), c(2, 2))
-  expect_equal(head(result$.idf,2), c(0, 0))
+  expect_equal(head(result$.tfidf,2), c(0, 0))
 })
 
 test_that("calc_tf weight binary", {
@@ -221,11 +221,11 @@ test_that("calc_tf weight binary", {
   expect_equal(colnames(result)[[4]], "tf")
 })
 
-test_that("calc_idf smooth_idf FALSE", {
+test_that("calc_tfidf smooth_idf FALSE", {
   loadNamespace("dplyr")
   test_df <- data.frame(id=rep(c(1,2), 5), word=c("this", "this", letters[1:8]))
-  result <- result <- exploratory:::calc_idf(test_df$id, test_df$word)
-  expect_equal(head(result$.idf,2), c(0, 0))
+  result <- exploratory:::calc_tfidf(test_df$id, test_df$word)
+  expect_equal(head(result$.tfidf,2), c(0, 0))
 })
 
 test_that("do_tfidf", {
