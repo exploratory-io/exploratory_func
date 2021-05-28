@@ -60,8 +60,8 @@ getGoogleDriveFolderDetails <- function(teamDriveId = NULL , path = NULL) {
     if (teamDriveId != "" && !is.null(teamDriveId)) {
       teamDriveId = googledrive::as_id(teamDriveId)
     }
-    googledrive::drive_get(team_drive = teamDriveId, id = path)
-    dfdetails <- NULL
+    df <- googledrive::drive_get(team_drive = teamDriveId, id = path)
+    details <- NULL
     if (nrow(df) == 1) {
       dfdetails <- df %>% googledrive::drive_reveal("path")
     }
