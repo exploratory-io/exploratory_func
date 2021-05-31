@@ -250,6 +250,7 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
         }
       }
   
+      orig_tz <- lubridate::tz(df[[time_col]]) # Keep original time zone for units smaller than day to set it back right before final output.
       df[[time_col]] <- if (time_unit %in% c("day", "week", "month", "quarter", "year")) {
         # Take care of issue that happened in anomaly detection here for prophet too.
         # In this case, convert (possibly) from POSIXct to Date first.
@@ -259,7 +260,10 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
         # based on that timezone.
         lubridate::floor_date(as.Date(df[[time_col]], tz = lubridate::tz(df[[time_col]])), unit = time_unit)
       } else {
-        lubridate::floor_date(df[[time_col]], unit = time_unit)
+        # Set timezone to GMT once.
+        # prophet (at 1.0) seems to force timezone info on the time info in the model into GMT.
+        # Without this, processing after creating model, such as inner_join with external regressor data are messed up while dealing with different timezones.
+        lubridate::with_tz(lubridate::floor_date(df[[time_col]], unit = time_unit), tz="GMT")
       }
   
       # extract holiday df from main df
@@ -643,6 +647,10 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
       else {
         # there is no changepoint.
         ret <- ret %>% dplyr::mutate(trend_change = NA_real_)
+      }
+
+      if (time_unit %in% c("hour", "minute", "second")) { # Set original timezone back.
+        ret <- ret %>% dplyr::mutate(ds = lubridate::with_tz(ds, tz = orig_tz))
       }
   
       # adjust order of output columns
