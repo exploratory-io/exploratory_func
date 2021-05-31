@@ -637,9 +637,9 @@ getMongoCollectionNumberOfRows <- function(host = NULL, port = "", database = ""
 #' Returns a Amazon Athena connection.
 #' @export
 getAmazonAthenaConnection <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", ...) {
-  loadNamespace("RODBC")
+  loadNamespace("odbc")
   loadNamespace("stringr")
-  if(!requireNamespace("RODBC")){stop("package RODBC must be installed.")}
+  if(!requireNamespace("odbc")){stop("package odbc must be installed.")}
   if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
 
   # if platform is Linux use predefined one
@@ -658,7 +658,16 @@ getAmazonAthenaConnection <- function(driver = "", region = "", authenticationTy
   if (is.null(conn)) {
     #https://www.rdocumentation.org/packages/RODBC/versions/1.3-15/topics/odbcConnect
     #For better performance, set max value (i.e. 1024) for rows_at_time
-    conn <- RODBC::odbcDriverConnect(connection = connectionString, rows_at_time = 1024)
+    conn <- DBI::dbConnect(
+      odbc::odbc(),
+      Driver             = driver,
+      S3OutputLocation   = s3OutputLocation,
+      AwsRegion          = region,
+      AuthenticationType = "IAM Credentials",
+      UID                = user,
+      PWD                = password
+    )
+    # conn <- RODBC::odbcDriverConnect(connection = connectionString, rows_at_time = 1024)
     if (user_env$pool_connection) { # pool connection if connection pooling is on.
       connection_pool[[connectionString]] <- conn
     }
@@ -677,7 +686,7 @@ clearAmazonAthenaConnection <- function(driver = "", region = "", authentication
   conn <- connection_pool[[key]]
   if (!is.null(conn)) {
     tryCatch({ # try to close connection and ignore error
-      RODBC::odbcClose(conn)
+      DBI::dbDisconnect(conn)
     }, warning = function(w) {
     }, error = function(e) {
     })
@@ -1347,15 +1356,15 @@ queryPostgres <- function(host, port, databaseName, username, password, numOfRow
 }
 
 #' @export
-queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", query = "", numOfRows = 0, stringsAsFactors = FALSE, as.is = TRUE, ...){
-  if(!requireNamespace("RODBC")){stop("package RODBC must be installed.")}
+queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", query = "", numOfRows = -1, stringsAsFactors = FALSE, as.is = TRUE, ...){
+  if(!requireNamespace("odbc")){stop("package RODBC must be installed.")}
   conn <- getAmazonAthenaConnection(driver = driver, region = region, authenticationType = authenticationType, s3OutputLocation = s3OutputLocation, user = user, password = password, additionalParams = additionalParams)
   tryCatch({
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
     query <- glue_exploratory(query, .transformer=sql_glue_transformer, .envir = parent.frame())
-    df <- RODBC::sqlQuery(conn, query, as.is = as.is,
-                          max = numOfRows, stringsAsFactors=stringsAsFactors)
+    resultSet <- DBI::dbSendQuery(conn, query)
+    df <- DBI::dbFetch(resultSet, n = numOfRows)
     if (!is.data.frame(df)) {
       # when it is error, RODBC::sqlQuery() does not stop() (throw) with error most of the cases.
       # in such cases, df is a character vecter rather than a data.frame.
@@ -1366,7 +1375,7 @@ queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IA
     if (!user_env$pool_connection) {
       # close connection if not pooling.
       tryCatch({ # try to close connection and ignore error
-        RODBC::odbcClose(conn)
+        DBI::dbDisconnect(conn)
       }, warning = function(w) {
       }, error = function(e) {
       })
@@ -1378,6 +1387,7 @@ queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IA
                        user = user, password = password, additionalParams = additionalParams)
     stop(err)
   })
+  DBI::dbClearResult(resultSet)
   df
 }
 
