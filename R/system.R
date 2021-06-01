@@ -1360,6 +1360,10 @@ queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IA
   if(!requireNamespace("odbc")){stop("package RODBC must be installed.")}
   conn <- getAmazonAthenaConnection(driver = driver, region = region, authenticationType = authenticationType, s3OutputLocation = s3OutputLocation, user = user, password = password, additionalParams = additionalParams)
   tryCatch({
+    # For backwawrd compatibility, if 0 is passed as numOfRows, change it to -1.
+    if (numOfRows == 0) {
+      numOfRows = -1;
+    }
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
     query <- glue_exploratory(query, .transformer=sql_glue_transformer, .envir = parent.frame())
