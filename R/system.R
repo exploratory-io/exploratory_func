@@ -234,6 +234,15 @@ glue_exploratory <- function(text, .transformer, .envir = parent.frame()) {
   ret
 }
 
+# Wrapper around glue::glue() to resolve our ${} notation used for Salesforce Filter.
+glue_salesforce <- function(text) {
+  # Internally, replace ${ and } with <<< and >>>.
+  text <- stringr::str_replace_all(text, "\\$\\{([^\\}]+)\\}", "<<<\\1>>>")
+  # Then, call glue::glue().
+  ret <- glue::glue(text, .transformer = glue_salesforce_internal, .open = "<<<", .close = ">>>")
+  ret
+}
+
 # Get variable's configured default value.
 get_variable_config <- function(variable_name, config_name, envir) {
   code <- paste0("if(is.null(exploratory_env$.config$`", variable_name, "`)){NULL}else{exploratory_env$.config$`", variable_name, "`$`", config_name, "`}")
@@ -369,6 +378,11 @@ js_glue_transformer <- function(expr, envir) {
   val <- ifelse(is.na(val), "null", val)
 
   # for numeric it should work as is. expression like 1e+10 works on js too.
+  glue::glue_collapse(val, sep=", ")
+}
+
+glue_salesforce_internal <- function(expr, envir){
+  val <- eval(parse(text = expr))
   glue::glue_collapse(val, sep=", ")
 }
 

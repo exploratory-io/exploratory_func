@@ -78,7 +78,7 @@ querySalesforceDataWithQuery <- function(server = NULL, username, password, secu
 #' @param securityToken - (optional) security token to login
 #' @param table - The table you want to get data
 #' @param columns - list of columns that you want to get data from the table.
-querySalesforceDataFromTable <- function(server = NULL, username, password, securityToken = NULL, table = NULL, columns = NULL, guessType = TRUE, conditions = NULL, limit = NULL){
+querySalesforceDataFromTable <- function(server = NULL, username, password, securityToken = NULL, table = NULL, columns = NULL, dataTypes = NULL, guessType = TRUE, conditions = NULL, limit = NULL, logicalOperator = "AND"){
   if (!requireNamespace("salesforcer")) {
     stop("package salesforcer must be installed.")
   }
@@ -90,10 +90,50 @@ querySalesforceDataFromTable <- function(server = NULL, username, password, secu
   }
   query <- stringr::str_c("SELECT ", stringr::str_c(columns, collapse = ", "), " FROM ", table)
   if (!is.null(conditions)) {
-    query <- stringr::str_c(query, " ", conditions)
+    conditionLength = length(conditions)
+    conditionCount <- 0
+    whereClause <- ""
+    for(i in 1:conditionLength) {
+      hasParameter = stringr::str_detect(conditions[i], "\\@\\{([^\\}]+)\\}")
+      condition <- glue_exploratory(conditions[i], .transformer=salesforce_glue_transformer, .envir = parent.frame())
+      # When the IN (NULL) condition is detected, remove the condition to support "ALL" option.
+      # NOTE: IN (@{PARA}) became IN (NULL) when nothing is selected.
+      if (hasParameter && stringr::str_detect(condition, "IN \\(NULL\\)")) {
+        # do not append
+      } else {
+        whereClause <- stringr::str_c(whereClause, " ", condition)
+        conditionCount = conditionCount + 1;
+        if (i != conditionLength) {
+          whereClause <- stringr::str_c(whereClause, " ", logicalOperator)
+        }
+      }
+    }
+    if (conditionCount > 0) {
+      query <- stringr::str_c(query, " WHERE ", whereClause)
+    }
   }
+
   if (!is.null(limit)) {
     query <- stringr::str_c(query, " LIMIT ", limit)
   }
-  querySalesforceDataWithQuery(server = server, username = username, password = password, securityToken = securityToken, query = query)
+  df <- querySalesforceDataWithQuery(server = server, username = username, password = password, securityToken = securityToken, query = query)
+  resultNames <- colnames(df)
+  coldiff <- setdiff(columns, resultNames)
+  colLength <- length(coldiff)
+  for(i in 1:colLength) {
+    col <- coldiff[i]
+    dataType <- dataTypes[which(columns == col)]
+    if (dataType == "character") {
+      df[col] <- as.character(NA)
+    } else if (dataType == "numeric") {
+      df[col] <- as.numeric(NA)
+    } else if (dataType == "Date") {
+      df[col] <- as.Date(NA)
+    } else if (dataType == "POSIXct") {
+      df[col] <- as.POSIXct(NA)
+    } else {
+      df[col] <- NA
+    }
+  }
+  df %>% select(columns)
 }
