@@ -103,12 +103,14 @@ querySalesforceDataFromTable <- function(server = NULL, username, password, secu
       hasParameter <- stringr::str_detect(conditions[i], "\\@\\{([^\\}]+)\\}")
       # make sure to resolve parameter
       condition <- glue_exploratory(conditions[i], .transformer=salesforce_glue_transformer, .envir = parent.frame())
+      # make sure to resolve ${} syntax.
+      condition <- glue_salesforce(condition)
       # When the IN (NULL) condition is detected after resolving parameter, remove the condition to support select "ALL" option.
       # NOTE: IN (@{PARAM}) became IN (NULL) when nothing is selected from UI and Salesforce SOQL does not allow using IS_NULL function,
       # so remove the "Column IN (NULL)" condition.
       if (hasParameter && stringr::str_detect(condition, "IN \\(NULL\\)")) {
         # do not append the condition.
-      } else {
+      } else if (!is_empty(condition)){
         whereClause <- stringr::str_c(whereClause, " ", condition)
         conditionCount = conditionCount + 1;
         if (i != conditionLength) {
