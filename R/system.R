@@ -233,7 +233,7 @@ glue_exploratory <- function(text, .transformer, .envir = parent.frame()) {
   ret <- glue::glue(text, .transformer = .transformer, .open = "<<<", .close = ">>>", .envir = .envir)
   ret
 }
-
+# This assumes that @{} parameter notation is already resolved before calling the glue_salesforce.
 # Wrapper around glue::glue() to resolve our ${} notation used for Salesforce Filter.
 glue_salesforce <- function(text) {
   # Internally, replace ${ and } with <<< and >>>.
