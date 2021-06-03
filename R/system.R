@@ -154,8 +154,8 @@ getGithubIssues <- function(username, password, owner, repository, ...){
   i <- 1
   while(is_next){
     res <- httr::GET(endpoint,
-               query = list(state = "all", per_page = 100, page = i),
-               httr::authenticate(username, password))
+                     query = list(state = "all", per_page = 100, page = i),
+                     httr::authenticate(username, password))
     jsondata <- httr::content(res, type = "text", encoding = "UTF-8")
     github_df <- jsonlite::fromJSON(jsondata, flatten = TRUE)
     pages[[i]] <- github_df
@@ -231,6 +231,15 @@ glue_exploratory <- function(text, .transformer, .envir = parent.frame()) {
   text <- stringr::str_replace_all(text, "\\@\\{([^\\}]+)\\}", "<<<\\1>>>")
   # Then, call glue::glue().
   ret <- glue::glue(text, .transformer = .transformer, .open = "<<<", .close = ">>>", .envir = .envir)
+  ret
+}
+# This assumes that @{} parameter notation is already resolved before calling the glue_salesforce.
+# Wrapper around glue::glue() to resolve our ${} notation used for Salesforce Filter.
+glue_salesforce <- function(text) {
+  # Internally, replace ${ and } with <<< and >>>.
+  text <- stringr::str_replace_all(text, "\\$\\{([^\\}]+)\\}", "<<<\\1>>>")
+  # Then, call glue::glue().
+  ret <- glue::glue(text, .transformer = glue_salesforce_internal, .open = "<<<", .close = ">>>")
   ret
 }
 
@@ -369,6 +378,11 @@ js_glue_transformer <- function(expr, envir) {
   val <- ifelse(is.na(val), "null", val)
 
   # for numeric it should work as is. expression like 1e+10 works on js too.
+  glue::glue_collapse(val, sep=", ")
+}
+
+glue_salesforce_internal <- function(expr, envir){
+  val <- eval(parse(text = expr))
   glue::glue_collapse(val, sep=", ")
 }
 
@@ -762,7 +776,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     if (is.null(conn) || !DBI::dbIsValid(conn)) {
       # To avoid integer64 handling issues in charts, etc., use numeric as the R type to receive bigint data rather than default integer64 by specifying bigint argument.
       conn = RMariaDB::dbConnect(RMariaDB::MariaDB(), dbname = databaseName, username = username,
-                               password = password, host = host, port = port, bigint = "numeric")
+                                 password = password, host = host, port = port, bigint = "numeric")
       connection_pool[[key]] <- conn
     }
   } else if (type == "postgres" || type == "redshift" || type == "vertica") {
@@ -799,7 +813,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     if (is.null(conn) || !DBI::dbIsValid(conn)) {
       drv <- RPostgres::Postgres()
       conn <- RPostgres::dbConnect(drv, dbname=databaseName, user = username,
-                                     password = password, host = host, port = port, bigint = "numeric")
+                                   password = password, host = host, port = port, bigint = "numeric")
       connection_pool[[key]] <- conn
     }
   } else if (type == "presto" || type == "treasuredata") {
@@ -841,7 +855,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         httr::add_headers("X-Presto-User"=username)
       )
       conn <- RPresto::dbConnect(drv, user = username,
-                               password = password, host = host, port = port, schema = schema, catalog = catalog, session.timezone = Sys.timezone(location = TRUE))
+                                 password = password, host = host, port = port, schema = schema, catalog = catalog, session.timezone = Sys.timezone(location = TRUE))
       connection_pool[[key]] <- conn
     }
   } else if (type == "odbc") {
@@ -1360,7 +1374,7 @@ queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IA
       # when it is error, RODBC::sqlQuery() does not stop() (throw) with error most of the cases.
       # in such cases, df is a character vecter rather than a data.frame.
       clearAmazonAthenaConnection(driver = driver, region = region, authenticationType = authenticationType, s3OutputLocation = s3OutputLocation,
-                        user = user, password = password, additionalParams = additionalParams)
+                                  user = user, password = password, additionalParams = additionalParams)
       stop(paste(df, collapse = "\n"))
     }
     if (!user_env$pool_connection) {
@@ -1375,7 +1389,7 @@ queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IA
     # for some cases like conn not being an open connection, sqlQuery still throws error. handle it here.
     # clear connection in pool so that new connection will be used for the next try
     clearAmazonAthenaConnection(driver = driver, region = region, authenticationType = authenticationType, s3OutputLocation = s3OutputLocation,
-                       user = user, password = password, additionalParams = additionalParams)
+                                user = user, password = password, additionalParams = additionalParams)
     stop(err)
   })
   df
@@ -2117,7 +2131,7 @@ checkSourceConflict <- function(files, encoding="UTF-8"){
 statecode <- function(input = input, output_type = output_type) {
   output_types <- c("alpha_code", "num_code", "name", "division", "region")
   if (!output_type %in% output_types) {
-     stop("Output type not supported")
+    stop("Output type not supported")
   }
   # lower case and get rid of space, period, apostrophe, and hiphen to normalize inputs.
   input_normalized <- gsub("[ \\.\\'\\-]", "", tolower(input))
@@ -2360,27 +2374,27 @@ searchAndReadExcelFiles <- function(folder, pattern = "", sheet = 1, col_names =
 #'API that imports multiple same structure Excel files and merge it to a single data frame
 #'@export
 read_excel_files <- function(files, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...) {
-    # set name to the files so that it can be used for the "id" column created by purrr::map_dfr.
-    files <- setNames(as.list(files), files)
-    df <- purrr::map_dfr(files, exploratory::read_excel_file, sheet = sheet,
-           col_names = col_names,
-           col_types = col_types,
-           na = na,
-           skip = skip,
-           trim_ws = trim_ws,
-           n_max = n_max,
-           use_readxl = use_readxl,
-           detectDates = detecDates,
-           skipEmptyRows = skipEmptyRows,
-           skipEmptyCols = skipEmptyCols,
-           check.names = check.names,
-           tzone = tzone, convertDataTypeToChar = convertDataTypeToChar,
-           .id = "exp.file.id") %>% mutate(exp.file.id = basename(exp.file.id)) # extract file name from full path with basename.
-    id_col <- avoid_conflict(colnames(df), "id")
-    # copy internal exp.file.id to the id column.
-    df[[id_col]] <- df[["exp.file.id"]]
-    # drop internal column and move the id column to the very beginning.
-    df %>% dplyr::select(!!rlang::sym(id_col), dplyr::everything(), -exp.file.id)
+  # set name to the files so that it can be used for the "id" column created by purrr::map_dfr.
+  files <- setNames(as.list(files), files)
+  df <- purrr::map_dfr(files, exploratory::read_excel_file, sheet = sheet,
+                       col_names = col_names,
+                       col_types = col_types,
+                       na = na,
+                       skip = skip,
+                       trim_ws = trim_ws,
+                       n_max = n_max,
+                       use_readxl = use_readxl,
+                       detectDates = detecDates,
+                       skipEmptyRows = skipEmptyRows,
+                       skipEmptyCols = skipEmptyCols,
+                       check.names = check.names,
+                       tzone = tzone, convertDataTypeToChar = convertDataTypeToChar,
+                       .id = "exp.file.id") %>% mutate(exp.file.id = basename(exp.file.id)) # extract file name from full path with basename.
+  id_col <- avoid_conflict(colnames(df), "id")
+  # copy internal exp.file.id to the id column.
+  df[[id_col]] <- df[["exp.file.id"]]
+  # drop internal column and move the id column to the very beginning.
+  df %>% dplyr::select(!!rlang::sym(id_col), dplyr::everything(), -exp.file.id)
 }
 
 #'Wrapper for openxlsx::read.xlsx (in case of .xlsx file) and readxl::read_excel (in case of old .xls file)
@@ -2505,13 +2519,13 @@ get_excel_sheets <- function(path){
 #'API that search and imports multiple same structure CSV files and merge it to a single data frame
 #'@export
 searchAndReadDelimFiles <- function(folder, pattern = "", delim, quote = '"',
-                                        escape_backslash = FALSE, escape_double = TRUE,
-                                        col_names = TRUE, col_types = readr::cols(.default = readr::col_character()),
-                                        locale = readr::default_locale(),
-                                        na = c("", "NA"), quoted_na = TRUE,
-                                        comment = "", trim_ws = FALSE,
-                                        skip = 0, n_max = Inf, guess_max = min(1000, n_max),
-                                        progress = interactive(), with_api_key = FALSE) {
+                                    escape_backslash = FALSE, escape_double = TRUE,
+                                    col_names = TRUE, col_types = readr::cols(.default = readr::col_character()),
+                                    locale = readr::default_locale(),
+                                    na = c("", "NA"), quoted_na = TRUE,
+                                    comment = "", trim_ws = FALSE,
+                                    skip = 0, n_max = Inf, guess_max = min(1000, n_max),
+                                    progress = interactive(), with_api_key = FALSE) {
   # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
   files <- list.files(path = folder, pattern = stringr::str_c("(?i)", pattern), full.names = T)
   exploratory::read_delim_files(files = files, delim = delim, quote = quote,
@@ -2531,28 +2545,28 @@ searchAndReadDelimFiles <- function(folder, pattern = "", delim, quote = '"',
 
 #'@export
 read_delim_files <- function(files, delim, quote = '"',
-                              escape_backslash = FALSE, escape_double = TRUE,
-                              col_names = TRUE, col_types = readr::cols(.default = readr::col_character()),
-                              locale = readr::default_locale(),
-                              na = c("", "NA"), quoted_na = TRUE,
-                              comment = "", trim_ws = FALSE,
-                              skip = 0, n_max = Inf, guess_max = min(1000, n_max),
-                              progress = interactive(), with_api_key = FALSE) {
-    # set name to the files so that it can be used for the "id" column created by purrr:map_dfr.
-    files <- setNames(as.list(files), files)
-    df <- purrr::map_dfr(files, exploratory::read_delim_file, delim = delim, quote = quote,
-                   escape_backslash = escape_backslash, escape_double = escape_double,
-                   col_names = col_names, col_types = col_types,
-                   locale = locale,
-                   na = na, quoted_na = quoted_na,
-                   comment = comment, trim_ws = trim_ws,
-                   skip = skip, n_max = n_max, guess_max = guess_max,
-                   progress = progress, with_api_key = with_api_key, .id = "exp.file.id") %>% mutate(exp.file.id = basename(exp.file.id))  # extract file name from full path with basename and create file.id column.
-    id_col <- avoid_conflict(colnames(df), "id")
-    # copy internal exp.file.id to the id column.
-    df[[id_col]] <- df[["exp.file.id"]]
-    # drop internal column and move the id column to the very beginning.
-    df %>% dplyr::select(!!rlang::sym(id_col), dplyr::everything(), -exp.file.id)
+                             escape_backslash = FALSE, escape_double = TRUE,
+                             col_names = TRUE, col_types = readr::cols(.default = readr::col_character()),
+                             locale = readr::default_locale(),
+                             na = c("", "NA"), quoted_na = TRUE,
+                             comment = "", trim_ws = FALSE,
+                             skip = 0, n_max = Inf, guess_max = min(1000, n_max),
+                             progress = interactive(), with_api_key = FALSE) {
+  # set name to the files so that it can be used for the "id" column created by purrr:map_dfr.
+  files <- setNames(as.list(files), files)
+  df <- purrr::map_dfr(files, exploratory::read_delim_file, delim = delim, quote = quote,
+                       escape_backslash = escape_backslash, escape_double = escape_double,
+                       col_names = col_names, col_types = col_types,
+                       locale = locale,
+                       na = na, quoted_na = quoted_na,
+                       comment = comment, trim_ws = trim_ws,
+                       skip = skip, n_max = n_max, guess_max = guess_max,
+                       progress = progress, with_api_key = with_api_key, .id = "exp.file.id") %>% mutate(exp.file.id = basename(exp.file.id))  # extract file name from full path with basename and create file.id column.
+  id_col <- avoid_conflict(colnames(df), "id")
+  # copy internal exp.file.id to the id column.
+  df[[id_col]] <- df[["exp.file.id"]]
+  # drop internal column and move the id column to the very beginning.
+  df %>% dplyr::select(!!rlang::sym(id_col), dplyr::everything(), -exp.file.id)
 
 }
 
@@ -2754,7 +2768,7 @@ read_parquet_file <- function(file){
 #'It does not align with the other readr functions that uses Inf for all the data but we have to follow existing read_lines behavior.
 #'@export
 read_raw_lines <- function(file, locale = readr::default_locale(), na = character(),
-                            skip = 0, n_max = -1L, progress = FALSE){
+                           skip = 0, n_max = -1L, progress = FALSE){
   loadNamespace("readr")
   line <- readr::read_lines(file, locale = locale, na = na, skip = skip, n_max = n_max, progress = progress)
   # use line as column name
