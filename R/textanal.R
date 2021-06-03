@@ -120,8 +120,8 @@ exp_textanal <- function(df, text,
 
     # Document clustering code below is temporarily commented out. TODO: Revive it.
 
-    # feats <- names(quanteda::topfeatures(fcm_res, 50))
-    # fcm_selected <- quanteda::fcm_select(fcm_res, pattern = feats)
+    feats <- names(quanteda::topfeatures(fcm_res, 50))
+    fcm_selected <- quanteda::fcm_select(fcm_res, pattern = feats)
     # dfm_tfidf_res <- quanteda::dfm_tfidf(dfm_res)
 
     # # Cluster documents with k-means.
@@ -141,7 +141,7 @@ exp_textanal <- function(df, text,
     model$dfm <- dfm_res
     model$fcm <- fcm_res
     # Co-occurrence network / document clustering related code below is temporarily commented out. TODO: Revive it.
-    # model$fcm_selected <- fcm_selected
+    model$fcm_selected <- fcm_selected
     # model$dfm_tfidf <- dfm_tfidf_res
     # model$cluster <- clustered_df$cluster
     # model$dfm_cluster <- dfm_clustered
