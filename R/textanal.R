@@ -118,10 +118,11 @@ exp_textanal <- function(df, text,
     dfm_res <- tokens %>% quanteda::dfm()
     fcm_res <- quanteda::fcm(tokens, context = cooccurrence_context, window = cooccurrence_window, tri = TRUE)
 
-    # Document clustering code below is temporarily commented out. TODO: Revive it.
+    feats_selected <- quanteda::topfeatures(fcm_res, 50)
+    feat_names <- names(feats_selected)
+    fcm_selected <- quanteda::fcm_select(fcm_res, pattern = feat_names)
 
-    feats <- names(quanteda::topfeatures(fcm_res, 50))
-    fcm_selected <- quanteda::fcm_select(fcm_res, pattern = feats)
+    # Document clustering code below is temporarily commented out. TODO: Revive it.
     # dfm_tfidf_res <- quanteda::dfm_tfidf(dfm_res)
 
     # # Cluster documents with k-means.
@@ -141,6 +142,7 @@ exp_textanal <- function(df, text,
     model$dfm <- dfm_res
     model$fcm <- fcm_res
     # Co-occurrence network / document clustering related code below is temporarily commented out. TODO: Revive it.
+    model$feats_selected <- feats_selected
     model$fcm_selected <- fcm_selected
     # model$dfm_tfidf <- dfm_tfidf_res
     # model$cluster <- clustered_df$cluster
@@ -229,10 +231,22 @@ tidy.textanal_exploratory <- function(x, type="word_count", ...) {
 }
 
 get_cooccurrence_graph_data <- function(model_df) {
+  # Prepare edges data
   edges <- exploratory:::fcm_to_df(model_df$model[[1]]$fcm_selected) %>% rename(from=token.x,to=token.y) %>% filter(from!=to)
-  ret <- list(edges=edges, vertices=NULL) # TODO: Add vertices data.
+  edges <- edges %>% mutate(width=log(value+1))
+  # Set edge colors based on number of co-occurrence.
+  c_scale <- grDevices::colorRamp(c("white","red"))
+  edges <- edges %>% mutate(color=apply(c_scale((log(value)+1)/max(log(value)+1)), 1, function(x) rgb(x[1]/255,x[2]/255,x[3]/255, alpha=0.8)))
+
+  # Prepare vertices data
+  feat_names <- names(model_df$model[[1]]$feats_selected)
+  feat_counts <- model_df$model[[1]]$feats_selected
+  names(feat_counts) <- NULL
+  vertices <- tibble::tibble(name=feat_names, size=log(feat_counts)*3)
+
+  ret <- list(edges=edges, vertices=vertices) # TODO: Add vertices data.
   ret <- data.frame(model=I(list(ret))) # return as data.frame. TODO: handle group_by
-  class(ret$model) <- c("list", ".model", ".model.arules_graph")
+  class(ret$model) <- c("list", "exp_coocurrence_graph")
   ret
 }
 
