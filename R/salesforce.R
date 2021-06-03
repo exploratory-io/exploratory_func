@@ -78,7 +78,12 @@ querySalesforceDataWithQuery <- function(server = NULL, username, password, secu
 #' @param securityToken - (optional) security token to login
 #' @param table - The table you want to get data
 #' @param columns - list of columns that you want to get data from the table.
-querySalesforceDataFromTable <- function(server = NULL, username, password, securityToken = NULL, table = NULL, columns = NULL, guessType = TRUE, conditions = NULL, limit = NULL){
+#' @param dataType - list of column data types for the above columns parameter
+#' @param guessType - flag to tell that dataType should be detected. If FALSE is passed, all the data types become character.
+#' @param conditions - (optional) SOQL where conditions.
+#' @param limit - number of rows to return.
+#' @param logicalOperator (optional) - required if the conditions are set. By default it uses "and" logical operator to construction SOQL where clause. It also supports "or" operator.
+querySalesforceDataFromTable <- function(server = NULL, username, password, securityToken = NULL, table = NULL, columns = NULL, dataTypes = NULL, guessType = TRUE, conditions = NULL, limit = NULL, logicalOperator = "and"){
   if (!requireNamespace("salesforcer")) {
     stop("package salesforcer must be installed.")
   }
@@ -90,10 +95,60 @@ querySalesforceDataFromTable <- function(server = NULL, username, password, secu
   }
   query <- stringr::str_c("SELECT ", stringr::str_c(columns, collapse = ", "), " FROM ", table)
   if (!is.null(conditions)) {
-    query <- stringr::str_c(query, " ", conditions)
+    conditionLength = length(conditions)
+    conditionCount <- 0
+    whereClause <- ""
+    for(i in 1:conditionLength) {
+      # Check if the filter condition uses parameter (i.e. detect @{param})
+      hasParameter <- stringr::str_detect(conditions[i], "\\@\\{([^\\}]+)\\}")
+      # make sure to resolve parameter @{} syntax.
+      condition <- glue_exploratory(conditions[i], .transformer=salesforce_glue_transformer, .envir = parent.frame())
+      # make sure to resolve ${} syntax for Salesforce filter.
+      condition <- glue_salesforce(condition)
+      # When the IN (NULL) condition is detected after resolving parameter, remove the condition to support select "ALL" option.
+      # NOTE: IN (@{PARAM}) became IN (NULL) when nothing is selected from UI and Salesforce SOQL does not allow using IS_NULL function,
+      # so remove the "Column IN (NULL)" condition.
+      if (hasParameter && stringr::str_detect(condition, "IN \\(NULL\\)$")) {
+        # do not append the condition.
+      } else if (!exploratory::is_empty(condition)){ # if it's not empty string (i.e. ""), append the condition.
+        if (i == 1) {
+          whereClause <-condition
+        } else {
+          # At this point whereClause looks like WHERE Col = 'A', so append the next condtion (e.g. Col2 = 'B') and make it as WHERE Col = 'A' AND Col2 = 'B'
+          whereClause <- stringr::str_c(whereClause, " ", logicalOperator, " ", condition)
+        }
+        conditionCount = conditionCount + 1;
+      }
+    }
+    if (conditionCount > 0) {
+      query <- stringr::str_c(query, " WHERE ", whereClause)
+    }
   }
+
   if (!is.null(limit)) {
     query <- stringr::str_c(query, " LIMIT ", limit)
   }
-  querySalesforceDataWithQuery(server = server, username = username, password = password, securityToken = securityToken, query = query)
+  df <- querySalesforceDataWithQuery(server = server, username = username, password = password, securityToken = securityToken, query = query)
+  resultNames <- colnames(df)
+  # Check if there are any columns dropped from the query result.
+  coldiff <- setdiff(columns, resultNames)
+  colLength <- length(coldiff)
+  # Bring back the dropped column by adding it with all NA.
+  for(i in 1:colLength) {
+    col <- coldiff[i]
+    dataType <- dataTypes[which(columns == col)]
+    if (dataType == "character") {
+      df[col] <- as.character(NA)
+    } else if (dataType == "numeric") {
+      df[col] <- as.numeric(NA)
+    } else if (dataType == "Date") {
+      df[col] <- as.Date(NA)
+    } else if (dataType == "POSIXct") {
+      df[col] <- as.POSIXct(NA)
+    } else {
+      df[col] <- NA
+    }
+  }
+  # Make sure resulting column order is as same as column order selected in UI.
+  df %>% dplyr::select(columns)
 }

@@ -32,13 +32,13 @@ test_that("test parse_html_tables with japanese shift_jis table",{
 })
 
 if (FALSE) { # Disabled for now since this test is susceptible to webpage change and unstable.
-test_that("test scrape_html_table",{
-  result <- scrape_html_table('https://www.cbinsights.com/research-unicorn-companies', 1, TRUE)
-  expect_equal(ncol(result), 6)
-  # may change if the web page is updated
-  # seems it changes quite often, excluding this check.
-  #expect_equal(nrow(result), 166)
-})
+  test_that("test scrape_html_table",{
+    result <- scrape_html_table('https://www.cbinsights.com/research-unicorn-companies', 1, TRUE)
+    expect_equal(ncol(result), 6)
+    # may change if the web page is updated
+    # seems it changes quite often, excluding this check.
+    #expect_equal(nrow(result), 166)
+  })
 }
 
 
@@ -146,7 +146,7 @@ test_that("js_glue_transformer", {
   exploratory_env$.config$v <- new.env()
   exploratory_env$.config$v$quote <- "" # Made the default no quote.
   res <- exploratory:::glue_exploratory("@{`v`}", .transformer=exploratory:::js_glue_transformer)
-  expect_equal(as.character(res), "a\", b', c") # No quote result 
+  expect_equal(as.character(res), "a\", b', c") # No quote result
 
   rm("v", envir=exploratory_env$.config) # clear config.
 
@@ -238,17 +238,29 @@ test_that("bigquery_glue_transformer", {
 
 })
 
+test_that("glue_salesforce", {
+  res <- exploratory:::glue_salesforce("${1+1}")
+  expect_equal(as.character(res), "2")
+
+  exploratory_env <- new.env()
+  exploratory_env$.config <- new.env()
+  exploratory_env$number_limit <- 1
+
+  res <- glue_salesforce(glue_exploratory("${1+1 + @{number_limit}}", .transformer=salesforce_glue_transformer))
+  expect_equal(as.character(res), "3")
+
+})
 
 test_that("prefecturecode", {
-  
+
   df <- readRDS(url("https://www.dropbox.com/s/eygfwy9mo7xn9xb/prefecturecode_testdata.rds?raw=1"))
-  
+
   res <- exploratory::prefecturecode(df$hiragana, output_type="name")
   expect_equal(FALSE, any(is.na(res)))
-  
+
   res <- exploratory::prefecturecode(df$kanji.with.todofuken, output_type="name")
   expect_equal(FALSE, any(is.na(res)))
-  
+
   res <- exploratory::prefecturecode(df$kanji, output_type="name")
   expect_equal(FALSE, any(is.na(res)))
 
