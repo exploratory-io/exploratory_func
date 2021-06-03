@@ -111,7 +111,7 @@ querySalesforceDataFromTable <- function(server = NULL, username, password, secu
       if (hasParameter && stringr::str_detect(condition, "IN \\(NULL\\)$")) {
         # do not append the condition.
       } else if (!exploratory::is_empty(condition)){ # if it's not empty string (i.e. ""), append the condition.
-        if (i == 1) {
+        if (conditionCount == 0) {
           whereClause <-condition
         } else {
           # At this point whereClause looks like WHERE Col = 'A', so append the next condtion (e.g. Col2 = 'B') and make it as WHERE Col = 'A' AND Col2 = 'B'
