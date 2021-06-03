@@ -227,3 +227,12 @@ tidy.textanal_exploratory <- function(x, type="word_count", ...) {
   }
   res
 }
+
+get_cooccurrence_graph_data <- function(model_df) {
+  edges <- exploratory:::fcm_to_df(model_df$model[[1]]$fcm_selected) %>% rename(from=token.x,to=token.y) %>% filter(from!=to)
+  ret <- list(edges=edges, vertices=NULL) # TODO: Add vertices data.
+  ret <- data.frame(model=I(list(ret))) # return as data.frame. TODO: handle group_by
+  class(ret$model) <- c("list", ".model", ".model.arules_graph")
+  ret
+}
+
