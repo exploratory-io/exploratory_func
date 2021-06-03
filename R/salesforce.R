@@ -82,8 +82,8 @@ querySalesforceDataWithQuery <- function(server = NULL, username, password, secu
 #' @param guessType - flag to tell that dataType should be detected. If FALSE is passed, all the data types become character.
 #' @param conditions - (optional) SOQL where conditions.
 #' @param limit - number of rows to return.
-#' @param logicalOperator (optional) - required if the conditions are set. By default it uses "AND" logical operator to construction SOQL where clause.
-querySalesforceDataFromTable <- function(server = NULL, username, password, securityToken = NULL, table = NULL, columns = NULL, dataTypes = NULL, guessType = TRUE, conditions = NULL, limit = NULL, logicalOperator = "AND"){
+#' @param logicalOperator (optional) - required if the conditions are set. By default it uses "and" logical operator to construction SOQL where clause. It also supports "or" operator.
+querySalesforceDataFromTable <- function(server = NULL, username, password, securityToken = NULL, table = NULL, columns = NULL, dataTypes = NULL, guessType = TRUE, conditions = NULL, limit = NULL, logicalOperator = "and"){
   if (!requireNamespace("salesforcer")) {
     stop("package salesforcer must be installed.")
   }
@@ -108,14 +108,16 @@ querySalesforceDataFromTable <- function(server = NULL, username, password, secu
       # When the IN (NULL) condition is detected after resolving parameter, remove the condition to support select "ALL" option.
       # NOTE: IN (@{PARAM}) became IN (NULL) when nothing is selected from UI and Salesforce SOQL does not allow using IS_NULL function,
       # so remove the "Column IN (NULL)" condition.
-      if (hasParameter && stringr::str_detect(condition, "IN \\(NULL\\)")) {
+      if (hasParameter && stringr::str_detect(condition, "IN \\(NULL\\)$")) {
         # do not append the condition.
-      } else if (!is_empty(condition)){
-        whereClause <- stringr::str_c(whereClause, " ", condition)
-        conditionCount = conditionCount + 1;
-        if (i != conditionLength) {
-          whereClause <- stringr::str_c(whereClause, " ", logicalOperator)
+      } else if (!exploratory::is_empty(condition)){ # if it's not empty string (i.e. ""), append the condition.
+        if (i == 1) {
+          whereClause <-condition
+        } else {
+          # At this point whereClause looks like WHERE Col = 'A', so append the next condtion (e.g. Col2 = 'B') and make it as WHERE Col = 'A' AND Col2 = 'B'
+          whereClause <- stringr::str_c(whereClause, " ", logicalOperator, " ", condition)
         }
+        conditionCount = conditionCount + 1;
       }
     }
     if (conditionCount > 0) {
@@ -148,5 +150,5 @@ querySalesforceDataFromTable <- function(server = NULL, username, password, secu
     }
   }
   # Make sure resulting column order is as same as column order selected in UI.
-  df %>% select(columns)
+  df %>% dplyr::select(columns)
 }
