@@ -2780,7 +2780,8 @@ read_raw_lines <- function(file, locale = readr::default_locale(), na = characte
 #
 #'@export
 filter_cascade <- function(.data, ...){
-  dots <- dplyr:::check_filter(enquos(...))
+  dots <- dplyr:::dplyr_quosures(...)
+  dplyr:::check_filter(dots)
   df <- .data
   for(i in 1:length(dots)) {
     expr <- rlang::quo_get_expr(dots[[i]])
