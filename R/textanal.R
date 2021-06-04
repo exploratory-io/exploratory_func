@@ -234,6 +234,7 @@ tidy.textanal_exploratory <- function(x, type="word_count", ...) {
 get_cooccurrence_graph_data <- function(model_df, max_vertex_size = 25, vertex_size_method = "equal_length") { # "equal_freq"
   # Prepare edges data
   edges <- exploratory:::fcm_to_df(model_df$model[[1]]$fcm_selected) %>% rename(from=token.x,to=token.y) %>% filter(from!=to)
+  edges <- edges %>% mutate(from = stringr::str_to_title(from), to = stringr::str_to_title(to))
   edges <- edges %>% mutate(width=log(value+1))
   # Set edge colors based on number of co-occurrence.
   c_scale <- grDevices::colorRamp(c("white","red"))
@@ -244,6 +245,7 @@ get_cooccurrence_graph_data <- function(model_df, max_vertex_size = 25, vertex_s
 
   # Prepare vertices data
   feat_names <- names(model_df$model[[1]]$feats_selected)
+  feat_names <- stringr::str_to_title(feat_names)
   feat_counts <- model_df$model[[1]]$feats_selected
   names(feat_counts) <- NULL
   if (vertex_size_method == "equal_length") {
