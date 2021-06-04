@@ -64,6 +64,7 @@ exp_textanal <- function(df, text,
                          compound_tokens = NULL,
                          cooccurrence_context = "window", # "document" or "window"
                          cooccurrence_window = 1, # 5 is the quanteda's default, but narrowing it for speed of default run. 
+                         cooccurrence_network_num_words = 50,
                          max_nrow = 50000,
                          ...){
 
@@ -118,7 +119,7 @@ exp_textanal <- function(df, text,
     dfm_res <- tokens %>% quanteda::dfm()
     fcm_res <- quanteda::fcm(tokens, context = cooccurrence_context, window = cooccurrence_window, tri = TRUE)
 
-    feats_selected <- quanteda::topfeatures(dfm_res, 50)
+    feats_selected <- quanteda::topfeatures(dfm_res, cooccurrence_network_num_words)
     feat_names <- names(feats_selected)
     fcm_selected <- quanteda::fcm_select(fcm_res, pattern = feat_names)
 
