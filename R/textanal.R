@@ -118,7 +118,7 @@ exp_textanal <- function(df, text,
     dfm_res <- tokens %>% quanteda::dfm()
     fcm_res <- quanteda::fcm(tokens, context = cooccurrence_context, window = cooccurrence_window, tri = TRUE)
 
-    feats_selected <- quanteda::topfeatures(fcm_res, 50)
+    feats_selected <- quanteda::topfeatures(dfm_res, 50)
     feat_names <- names(feats_selected)
     fcm_selected <- quanteda::fcm_select(fcm_res, pattern = feat_names)
 
@@ -237,6 +237,9 @@ get_cooccurrence_graph_data <- function(model_df) {
   # Set edge colors based on number of co-occurrence.
   c_scale <- grDevices::colorRamp(c("white","red"))
   edges <- edges %>% mutate(color=apply(c_scale((log(value)+1)/max(log(value)+1)), 1, function(x) rgb(x[1]/255,x[2]/255,x[3]/255, alpha=0.8)))
+  weights=log(1+edges$value)
+  weights <- 5*weights/max(weights)
+  edges <- edges %>% mutate(weights=weights)
 
   # Prepare vertices data
   feat_names <- names(model_df$model[[1]]$feats_selected)
