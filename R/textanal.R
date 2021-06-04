@@ -242,9 +242,11 @@ get_cooccurrence_graph_data <- function(model_df) {
   feat_names <- names(model_df$model[[1]]$feats_selected)
   feat_counts <- model_df$model[[1]]$feats_selected
   names(feat_counts) <- NULL
-  vertices <- tibble::tibble(name=feat_names, size=log(feat_counts)*3)
+  vertice_sizes = feat_counts
+  vertice_sizes = vertice_sizes/max(vertice_sizes)*25
+  vertices <- tibble::tibble(name=feat_names, size=vertice_sizes)
 
-  ret <- list(edges=edges, vertices=vertices) # TODO: Add vertices data.
+  ret <- list(edges=edges, vertices=vertices)
   ret <- data.frame(model=I(list(ret))) # return as data.frame. TODO: handle group_by
   class(ret$model) <- c("list", "exp_coocurrence_graph")
   ret
