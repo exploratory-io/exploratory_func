@@ -369,7 +369,6 @@ tidy.text_cluster_exploratory <- function(x, type="word_count", ...) {
   if (type == "doc_cluster") {
     res <- x$df
     res <- res %>% dplyr::bind_cols(x$cluster)
-    res <- res %>% dplyr::group_by(cluster) %>% mutate(document_id = row_number()) %>% ungroup()
   }
   else if (type == "doc_cluster_words") {
     res <- dfm_to_df(x$dfm_cluster_tfidf)
