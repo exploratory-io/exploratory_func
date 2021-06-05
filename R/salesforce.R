@@ -12,7 +12,10 @@ loginToSalesforce <- function(server = NULL, username, password, securityToken =
   if (is.null(server)) { # if login server was not provided, try it with the default login server.
     server = "https://login.salesforce.com"
   }
-  if (is.null(securityToken)) {
+  token <- exploratory::getSalesforceToken()
+  if (!is.null(token)) {
+    salesforcer::sf_auth(login_url = server, token = token, cache = FALSE)
+  } else if (is.null(securityToken)) {
     salesforcer::sf_auth(login_url = server, username = username, password = password, cache = FALSE)
   } else {
     salesforcer::sf_auth(login_url = server, username = username, password = password, security_token = securityToken, cache = FALSE)
