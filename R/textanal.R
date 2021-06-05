@@ -55,6 +55,37 @@ guess_lang_for_stopwords <- function(text) {
   lang_name
 }
 
+tokenize_with_postprocess <- function(text, 
+                                      remove_punct = TRUE, remove_numbers = TRUE,
+                                      stopwords_lang = NULL, stopwords = c(),
+                                      hiragana_word_length_to_remove = 2,
+                                      compound_tokens = NULL
+                                      ) {
+  tokenized <- tokenizers::tokenize_words(text, lowercase = TRUE, stopwords = NULL, strip_punct = remove_punct, strip_numeric = remove_numbers, simplify = FALSE)
+  names(tokenized) <- paste0("text", 1:length(tokenized)) # Add unique names to the list so that it can be passed to quanteda::tokens().
+  tokens <- quanteda::tokens(tokenized)
+  # tokens <- tokens %>% quanteda::tokens_wordstem() # TODO: Revive stemming and expose as an option.
+
+  if (!is.null(compound_tokens)) { # This probably should be kept before removing stopwords not to break compoint tokens that includes stopwords.
+    tokens <- tokens %>% quanteda::tokens_compound(pattern = quanteda::phrase(compound_tokens), concatenator = ' ')
+  }
+
+  # when stopwords Language is set, use the stopwords to filter out the result.
+  if(!is.null(stopwords_lang)) {
+    if (stopwords_lang == "auto") {
+      stopwords_lang <- guess_lang_for_stopwords(text)
+    }
+    stopwords_to_remove <- exploratory::get_stopwords(lang = stopwords_lang, include = stopwords)
+    tokens <- tokens %>% quanteda::tokens_remove(stopwords_to_remove, valuetype = "fixed")
+  }
+  # Remove Japanese Hiragana word whose length is less than hiragana_word_length_to_remove
+  if(hiragana_word_length_to_remove > 0) {
+    tokens <- tokens %>% quanteda::tokens_remove(stringr::str_c("^[\\\u3040-\\\u309f]{1,", hiragana_word_length_to_remove, "}$"), valuetype = "regex")
+  }
+  tokens
+}
+
+
 #' Function for Text Analysis Analytics View
 #' @export
 exp_textanal <- function(df, text,
@@ -94,27 +125,12 @@ exp_textanal <- function(df, text,
     #                    remove_url = remove_url) %>%
     #   quanteda::tokens_wordstem()
 
-    tokenized <- tokenizers::tokenize_words(df[[text_col]], lowercase = TRUE, stopwords = NULL, strip_punct = remove_punct, strip_numeric = remove_numbers, simplify = FALSE)
-    names(tokenized) <- paste0("text", 1:length(tokenized)) # Add unique names to the list so that it can be passed to quanteda::tokens().
-    tokens <- quanteda::tokens(tokenized)
-    # tokens <- tokens %>% quanteda::tokens_wordstem() # TODO: Revive stemming and expose as an option.
+    tokens <- tokenize_with_postprocess(df[[text_col]],
+                                        remove_punct = remove_punct, remove_numbers = remove_numbers,
+                                        stopwords_lang = stopwords_lang, stopwords = stopwords,
+                                        hiragana_word_length_to_remove = hiragana_word_length_to_remove,
+                                        compound_tokens = compound_tokens)
 
-    if (!is.null(compound_tokens)) { # This probably should be kept before removing stopwords not to break compoint tokens that includes stopwords.
-      tokens <- tokens %>% quanteda::tokens_compound(pattern = quanteda::phrase(compound_tokens), concatenator = ' ')
-    }
-
-    # when stopwords Language is set, use the stopwords to filter out the result.
-    if(!is.null(stopwords_lang)) {
-      if (stopwords_lang == "auto") {
-        stopwords_lang <- guess_lang_for_stopwords(df[[text_col]])
-      }
-      stopwords_to_remove <- exploratory::get_stopwords(lang = stopwords_lang, include = stopwords)
-      tokens <- tokens %>% quanteda::tokens_remove(stopwords_to_remove, valuetype = "fixed")
-    }
-    # Remove Japanese Hiragana word whose length is less than hiragana_word_length_to_remove
-    if(hiragana_word_length_to_remove > 0) {
-      tokens <- tokens %>% quanteda::tokens_remove(stringr::str_c("^[\\\u3040-\\\u309f]{1,", hiragana_word_length_to_remove, "}$"), valuetype = "regex")
-    }
     # convert tokens to dfm object
     dfm_res <- tokens %>% quanteda::dfm()
     fcm_res <- quanteda::fcm(tokens, context = cooccurrence_context, window = cooccurrence_window, tri = TRUE)
