@@ -287,3 +287,86 @@ get_cooccurrence_graph_data <- function(model_df, max_vertex_size = 25, vertex_s
   ret
 }
 
+#' Function for Text Clustering Analytics View
+#' @export
+exp_text_cluster <- function(df, text,
+                         remove_punct = TRUE, remove_numbers = TRUE,
+                         stopwords_lang = NULL, stopwords = c(),
+                         hiragana_word_length_to_remove = 2,
+                         compound_tokens = NULL,
+                         max_nrow = 50000,
+                         ...){
+
+  # Always put document_id to know what document the tokens are from
+  text_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(text))
+  doc_id <- avoid_conflict(colnames(df), "document_id")
+  each_func <- function(df) {
+    # sample the data for performance if data size is too large.
+    sampled_nrow <- NULL
+    if (!is.null(max_nrow) && nrow(df) > max_nrow) {
+      # Record that sampling happened.
+      sampled_nrow <- max_nrow
+      df <- df %>% sample_rows(max_nrow)
+    }
+
+    tokens <- tokenize_with_postprocess(df[[text_col]],
+                                        remove_punct = remove_punct, remove_numbers = remove_numbers,
+                                        stopwords_lang = stopwords_lang, stopwords = stopwords,
+                                        hiragana_word_length_to_remove = hiragana_word_length_to_remove,
+                                        compound_tokens = compound_tokens)
+
+    # convert tokens to dfm object
+    dfm_res <- tokens %>% quanteda::dfm()
+
+    # Document clustering code below is temporarily commented out.
+    dfm_tfidf_res <- quanteda::dfm_tfidf(dfm_res)
+
+    # Cluster documents with k-means.
+    tfidf_df <- dfm_to_df(dfm_tfidf_res)
+    tfidf_df <- tfidf_df %>% dplyr::rename(tfidf=value)
+    tfidf_reduced <- tfidf_df %>% do_svd(skv = c("document", "token", "tfidf"), n_component = 4) #TODO: Make n_component configurable
+    tfidf_reduced_wide <- tfidf_reduced %>% tidyr::spread(new.dimension, value)
+    clustered_df <- tfidf_reduced_wide %>% build_kmeans(`1`, `2`, `3`, `4`, centers=5) #TODO: Make centers configurable
+    cluster_res <- clustered_df$cluster # Clustering result
+
+    # Run tf-idf treating each cluster as a document.
+    dfm_clustered <- quanteda::dfm_group(dfm_res, cluster_res)
+    dfm_clustered_tfidf <- quanteda::dfm_tfidf(dfm_clustered)
+    clustered_tfidf <- dfm_to_df(dfm_clustered_tfidf)
+
+    model <- list()
+    model$dfm <- dfm_res
+
+    model$dfm_tfidf <- dfm_tfidf_res
+    model$cluster <- clustered_df$cluster
+    model$dfm_cluster <- dfm_clustered
+    model$dfm_cluster_tfidf <- dfm_clustered_tfidf
+
+    model$df <- df # Keep original df for showing it with clustering result.
+    model$sampled_nrow <- sampled_nrow
+    class(model) <- 'text_cluster_exploratory'
+    model
+  }
+
+  do_on_each_group(df, each_func, name = "model", with_unnest = FALSE)
+}
+
+#' extracts results from textanal_exploratory object as a dataframe
+#' @export
+#' @param type - Type of output.
+tidy.text_cluster_exploratory <- function(x, type="word_count", ...) {
+  if (type == "doc_cluster") {
+    res <- x$df
+    res <- res %>% dplyr::mutate(cluster = !!x$cluster)
+    res <- res %>% dplyr::group_by(cluster) %>% mutate(document_id = row_number()) %>% ungroup()
+  }
+  else if (type == "doc_cluster_words") {
+    res <- dfm_to_df(x$dfm_cluster_tfidf)
+    res <- res %>% dplyr::group_by(document) %>%
+      dplyr::slice_max(value, n=5) %>%
+      dplyr::ungroup() %>%
+      dplyr::rename(cluster = document)
+    res
+  }
+  res
+}
