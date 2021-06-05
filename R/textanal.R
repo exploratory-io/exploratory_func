@@ -123,21 +123,21 @@ exp_textanal <- function(df, text,
     feat_names <- names(feats_selected)
     fcm_selected <- quanteda::fcm_select(fcm_res, pattern = feat_names)
 
-    # Document clustering code below is temporarily commented out.
-    dfm_tfidf_res <- quanteda::dfm_tfidf(dfm_res)
+    # # Document clustering code below is temporarily commented out.
+    # dfm_tfidf_res <- quanteda::dfm_tfidf(dfm_res)
 
-    # Cluster documents with k-means.
-    tfidf_df <- dfm_to_df(dfm_tfidf_res)
-    tfidf_df <- tfidf_df %>% dplyr::rename(tfidf=value)
-    tfidf_reduced <- tfidf_df %>% do_svd(skv = c("document", "token", "tfidf"), n_component = 4) #TODO: Make n_component configurable
-    tfidf_reduced_wide <- tfidf_reduced %>% tidyr::spread(new.dimension, value)
-    clustered_df <- tfidf_reduced_wide %>% build_kmeans(`1`, `2`, `3`, `4`, centers=5) #TODO: Make centers configurable
-    cluster_res <- clustered_df$cluster # Clustering result
+    # # Cluster documents with k-means.
+    # tfidf_df <- dfm_to_df(dfm_tfidf_res)
+    # tfidf_df <- tfidf_df %>% dplyr::rename(tfidf=value)
+    # tfidf_reduced <- tfidf_df %>% do_svd(skv = c("document", "token", "tfidf"), n_component = 4) #TODO: Make n_component configurable
+    # tfidf_reduced_wide <- tfidf_reduced %>% tidyr::spread(new.dimension, value)
+    # clustered_df <- tfidf_reduced_wide %>% build_kmeans(`1`, `2`, `3`, `4`, centers=5) #TODO: Make centers configurable
+    # cluster_res <- clustered_df$cluster # Clustering result
 
-    # Run tf-idf treating each cluster as a document.
-    dfm_clustered <- quanteda::dfm_group(dfm_res, cluster_res)
-    dfm_clustered_tfidf <- quanteda::dfm_tfidf(dfm_clustered)
-    clustered_tfidf <- dfm_to_df(dfm_clustered_tfidf)
+    # # Run tf-idf treating each cluster as a document.
+    # dfm_clustered <- quanteda::dfm_group(dfm_res, cluster_res)
+    # dfm_clustered_tfidf <- quanteda::dfm_tfidf(dfm_clustered)
+    # clustered_tfidf <- dfm_to_df(dfm_clustered_tfidf)
 
     model <- list()
     model$dfm <- dfm_res
@@ -146,10 +146,10 @@ exp_textanal <- function(df, text,
     model$feats_selected <- feats_selected
     model$fcm_selected <- fcm_selected
 
-    model$dfm_tfidf <- dfm_tfidf_res
-    model$cluster <- clustered_df$cluster
-    model$dfm_cluster <- dfm_clustered
-    model$dfm_cluster_tfidf <- dfm_clustered_tfidf
+    # model$dfm_tfidf <- dfm_tfidf_res
+    # model$cluster <- clustered_df$cluster
+    # model$dfm_cluster <- dfm_clustered
+    # model$dfm_cluster_tfidf <- dfm_clustered_tfidf
 
     model$df <- df # Keep original df for showing it with clustering result.
     model$sampled_nrow <- sampled_nrow
@@ -221,6 +221,7 @@ tidy.textanal_exploratory <- function(x, type="word_count", ...) {
   else if (type == "doc_cluster") {
     res <- x$df
     res <- res %>% dplyr::mutate(cluster = !!x$cluster)
+    res <- res %>% dplyr::group_by(cluster) %>% mutate(document_id = row_number()) %>% ungroup()
   }
   else if (type == "doc_cluster_words") {
     res <- dfm_to_df(x$dfm_cluster_tfidf)
