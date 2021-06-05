@@ -349,7 +349,7 @@ exp_text_cluster <- function(df, text,
     model$dfm <- dfm_res
 
     model$dfm_tfidf <- dfm_tfidf_res
-    model$cluster <- clustered_df$cluster
+    model$cluster <- clustered_df # SVD result and cluster result
     model$dfm_cluster <- dfm_clustered
     model$dfm_cluster_tfidf <- dfm_clustered_tfidf
 
@@ -368,7 +368,7 @@ exp_text_cluster <- function(df, text,
 tidy.text_cluster_exploratory <- function(x, type="word_count", ...) {
   if (type == "doc_cluster") {
     res <- x$df
-    res <- res %>% dplyr::mutate(cluster = !!x$cluster)
+    res <- res %>% dplyr::bind_cols(x$cluster)
     res <- res %>% dplyr::group_by(cluster) %>% mutate(document_id = row_number()) %>% ungroup()
   }
   else if (type == "doc_cluster_words") {
