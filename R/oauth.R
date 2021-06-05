@@ -181,7 +181,8 @@ getSalesforceToken <- function(tokenFileId = "", useCache=TRUE){
         instance_url = token_info$instance_url,
         id = token_info$id,
         token_type = token_info$token_type,
-        issued_at = token_info$issued_at
+        # Salesforcer uses issued_at and it forces refresh if it's became old.So set the the current time.
+        issued_at = as.character(as.numeric(Sys.time()) * 10)
       )
     )
   } else {
