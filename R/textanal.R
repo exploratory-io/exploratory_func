@@ -294,6 +294,8 @@ exp_text_cluster <- function(df, text,
                          stopwords_lang = NULL, stopwords = c(),
                          hiragana_word_length_to_remove = 2,
                          compound_tokens = NULL,
+                         svd_dim=5,
+                         num_clusters=3,
                          max_nrow = 50000,
                          ...){
 
@@ -332,12 +334,12 @@ exp_text_cluster <- function(df, text,
       x = as.numeric(tfidf_df$tfidf),
       dims = dim(dfm_tfidf_res)
       )
-    # SVD
-    svd_res <- irlba::irlba(tfidf_sparse_mat)
+    # SVD by irlba. nu defaults to nv. TODO: Look into if reducing nv affects performance positively without negative impact on the result.
+    svd_res <- irlba::irlba(tfidf_sparse_mat, nv=svd_dim)
     # Make it a data frame (a row represents a document)
     tfidf_reduced_wide <- as.data.frame(svd_res$u)
     # Cluster documents.
-    clustered_df <- tfidf_reduced_wide %>% build_kmeans(`V1`, `V2`, `V3`, `V4`, `V5`, centers=5) #TODO: Make centers configurable
+    clustered_df <- tfidf_reduced_wide %>% build_kmeans.cols(everything(), centers=num_clusters) #TODO: Expose arguments for kmeans.
     cluster_res <- clustered_df$cluster # Clustering result
 
     # Run tf-idf treating each cluster as a document.
