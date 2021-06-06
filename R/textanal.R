@@ -296,6 +296,7 @@ exp_text_cluster <- function(df, text,
                          compound_tokens = NULL,
                          svd_dim=5,
                          num_clusters=3,
+                         mds_sample_size=200,
                          max_nrow = 50000,
                          ...){
 
@@ -345,7 +346,12 @@ exp_text_cluster <- function(df, text,
     cluster_res <- clustered_df$cluster # Clustering result
 
 
-    docs_sample_index <- sample(nrow(docs_reduced_df), size=200)
+    docs_sample_index <- if (nrow(docs_reduced_df) > mds_sample_size) {
+      sample(nrow(docs_reduced_df), size=mds_sample_size)
+    }
+    else {
+      1:nrow(docs_reduced_df)
+    }
     docs_reduced_sampled <- docs_reduced[docs_sample_index,]
     docs_dist_mat <- dist(docs_reduced_sampled)
     docs_coordinates <- cmdscale(docs_dist_mat)
