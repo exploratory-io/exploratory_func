@@ -336,11 +336,20 @@ exp_text_cluster <- function(df, text,
       )
     # SVD by irlba. nu defaults to nv. TODO: Look into if reducing nv affects performance positively without negative impact on the result.
     svd_res <- irlba::irlba(tfidf_sparse_mat, nv=svd_dim)
+    docs_reduced <- svd_res$u
+
     # Make it a data frame (a row represents a document)
-    tfidf_reduced_wide <- as.data.frame(svd_res$u)
+    docs_reduced_df <- as.data.frame(docs_reduced)
     # Cluster documents.
-    clustered_df <- tfidf_reduced_wide %>% build_kmeans.cols(everything(), centers=num_clusters) #TODO: Expose arguments for kmeans.
+    clustered_df <- docs_reduced_df %>% build_kmeans.cols(everything(), centers=num_clusters) #TODO: Expose arguments for kmeans.
     cluster_res <- clustered_df$cluster # Clustering result
+
+
+    docs_sample_index <- sample(nrow(docs_reduced_df), size=200)
+    docs_reduced_sampled <- docs_reduced[docs_sample_index,]
+    docs_dist_mat <- dist(docs_reduced_sampled)
+    docs_coordinates <- cmdscale(docs_dist_mat)
+
 
     # Run tf-idf treating each cluster as a document.
     dfm_clustered <- quanteda::dfm_group(dfm_res, cluster_res)
@@ -355,6 +364,8 @@ exp_text_cluster <- function(df, text,
     model$dfm_cluster <- dfm_clustered
     model$dfm_cluster_tfidf <- dfm_clustered_tfidf
 
+    model$docs_coordinates <- docs_coordinates # MDS result for scatter plot
+    model$docs_sample_index <- docs_sample_index
     model$df <- df # Keep original df for showing it with clustering result.
     model$sampled_nrow <- sampled_nrow
     class(model) <- 'text_cluster_exploratory'
@@ -371,6 +382,13 @@ tidy.text_cluster_exploratory <- function(x, type="word_count", ...) {
   if (type == "doc_cluster") {
     res <- x$df
     res <- res %>% dplyr::bind_cols(x$cluster)
+  }
+  else if (type == "doc_cluster_mds") {
+    res <- x$df[x$docs_sample_index,]
+    cluster_res_sampled <- x$cluster$cluster[x$docs_sample_index]
+    res <- res %>% dplyr::mutate(cluster = !!cluster_res_sampled)
+    docs_coordinates_df <- as.data.frame(x$docs_coordinates)
+    res <- res %>% dplyr::bind_cols(docs_coordinates_df)
   }
   else if (type == "doc_cluster_words") {
     res <- dfm_to_df(x$dfm_cluster_tfidf)
