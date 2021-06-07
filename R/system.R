@@ -233,6 +233,15 @@ glue_exploratory <- function(text, .transformer, .envir = parent.frame()) {
   ret <- glue::glue(text, .transformer = .transformer, .open = "<<<", .close = ">>>", .envir = .envir)
   ret
 }
+# This assumes that @{} parameter notation is already resolved before calling the glue_salesforce.
+# Wrapper around glue::glue() to resolve our ${} notation used for Salesforce Filter.
+glue_salesforce <- function(text) {
+  # Internally, replace ${ and } with <<< and >>>.
+  text <- stringr::str_replace_all(text, "\\$\\{([^\\}]+)\\}", "<<<\\1>>>")
+  # Then, call glue::glue().
+  ret <- glue::glue(text, .transformer = glue_salesforce_internal, .open = "<<<", .close = ">>>")
+  ret
+}
 
 # Get variable's configured default value.
 get_variable_config <- function(variable_name, config_name, envir) {
@@ -369,6 +378,11 @@ js_glue_transformer <- function(expr, envir) {
   val <- ifelse(is.na(val), "null", val)
 
   # for numeric it should work as is. expression like 1e+10 works on js too.
+  glue::glue_collapse(val, sep=", ")
+}
+
+glue_salesforce_internal <- function(expr, envir){
+  val <- eval(parse(text = expr))
   glue::glue_collapse(val, sep=", ")
 }
 
@@ -2780,7 +2794,9 @@ read_raw_lines <- function(file, locale = readr::default_locale(), na = characte
 #
 #'@export
 filter_cascade <- function(.data, ...){
-  dots <- dplyr:::check_filter(enquos(...))
+  # ref: https://github.com/tidyverse/dplyr/blob/5d23cb8d87111ead96a09deb43154610263e7854/R/filter.R#L119
+  dots <- dplyr:::dplyr_quosures(...)
+  dplyr:::check_filter(dots)
   df <- .data
   for(i in 1:length(dots)) {
     expr <- rlang::quo_get_expr(dots[[i]])
