@@ -293,7 +293,7 @@ get_cooccurrence_graph_data <- function(model_df, max_vertex_size = 25, vertex_s
   else { # "equal_freq"
     vertex_sizes <- floor((dplyr::min_rank(feat_counts)-1)/(length(feat_counts)/5)) + 1
   }
-  vertex_sizes = vertex_sizes/max(vertex_sizes) * max_vertex_size
+  vertex_sizes <- vertex_sizes/max(vertex_sizes) * max_vertex_size
   vertices <- tibble::tibble(name=feat_names, size=vertex_sizes)
 
   ret <- list(edges=edges, vertices=vertices)
