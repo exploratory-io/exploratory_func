@@ -1361,6 +1361,7 @@ queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IA
   conn <- getAmazonAthenaConnection(driver = driver, region = region, authenticationType = authenticationType, s3OutputLocation = s3OutputLocation, user = user, password = password, additionalParams = additionalParams)
   tryCatch({
     # For backwawrd compatibility, if 0 is passed as numOfRows, change it to -1.
+    # Previously with RODBC package, passing 0 means getting all rows. With odbc package, it needs to be -1 to get all rows.
     if (numOfRows == 0) {
       numOfRows = -1;
     }
