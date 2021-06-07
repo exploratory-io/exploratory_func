@@ -223,16 +223,32 @@ fcm_to_df <- function(fcm) {
 #' extracts results from textanal_exploratory object as a dataframe
 #' @export
 #' @param type - Type of output.
-tidy.textanal_exploratory <- function(x, type="word_count", ...) {
+tidy.textanal_exploratory <- function(x, type="word_count", max_words=NULL, max_word_pairs=NULL, ...) {
   if (type == "word_count") {
     feats <- quanteda::featfreq(x$dfm)
-    res <- tibble(word=stringr::str_to_title(names(feats)), count=feats)
+    res <- tibble::tibble(word=stringr::str_to_title(names(feats)), count=feats)
+    if (!is.null(max_words)) { # This means it is for bar chart.
+      if (max_words < 100) {
+        res <- res %>% dplyr::slice_max(count, n=max_words, with_ties=TRUE) %>% slice_max(count, n=100, with_ties=FALSE) # Set hard limit of 100 even with ties.
+      }
+      else {
+        res <- res %>% dplyr::slice_max(count, n=max_words, with_ties=FALSE) # Set hard limit even with ties.
+      }
+    }
   }
   else if (type == "word_pairs") {
     res <- fcm_to_df(x$fcm) %>%
       dplyr::filter(token.x != token.y) %>%
       dplyr::mutate(token.x = stringr::str_to_title(token.x), token.y = stringr::str_to_title(token.y)) %>%
       dplyr::rename(word.1 = token.x, word.2 = token.y, count=value)
+    if (!is.null(max_word_pairs)) { # This means it is for bar chart.
+      if (max_word_pairs < 100) {
+        res <- res %>% dplyr::slice_max(count, n=max_word_pairs, with_ties=TRUE) %>% slice_max(count, n=100, with_ties=FALSE) # Set hard limit of 100 even with ties.
+      }
+      else {
+        res <- res %>% dplyr::slice_max(count, n=max_word_pairs, with_ties=FALSE) # Set hard limit even with ties.
+      }
+    }
   }
   else if (type == "doc_cluster") {
     res <- x$df
