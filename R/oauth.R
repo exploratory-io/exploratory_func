@@ -182,8 +182,8 @@ getSalesforceToken <- function(tokenFileId = "", useCache=TRUE){
         id = token_info$id,
         token_type = token_info$token_type,
         # Salesforcer uses issued_at and it forces refresh if it's became old.
-        # Since we manage OAuth token in server side, set the the current time to prevent unwanted OAuth token refresh triggered from R.
-        issued_at = as.character(as.numeric(Sys.time()) * 10)
+        # Since we manage OAuth token in server side, set the the future (10 years from now) time to prevent unwanted OAuth token refresh triggered from R.
+        issued_at = as.character(as.numeric(lubridate::now() + lubridate::years(10)) * 10)
       )
     )
   } else {
