@@ -160,6 +160,44 @@ refreshGoogleTokenForDrive <- function(tokenFileId = ""){
   getGoogleTokenForDrive(tokenFileId = tokenFileId, FALSE)
 }
 
+#' @export
+getSalesforceToken <- function(tokenFileId = "", useCache=TRUE){
+  appName = "salesforce"
+  # retrieve token info from environment
+  # main purpose is to enable server refresh
+  token_info <- getTokenInfo("salesforce")
+  if(!is.null(token_info)){
+    HttrOAuthToken2.0$new(
+      authorize = "https://login.salesforce.com/services/oauth2/authorize",
+      access = "https://login.salesforce.com/services/oauth2/token",
+      revoke = "https://login.salesforce.com/services/oauth2/revoke",
+      appname = appName,
+      credentials = list(
+        access_token = token_info$access_token,
+        refresh_token = token_info$refresh_token,
+        signature = token_info$signature,
+        scope = token_info$scope,
+        id_token = token_info$id_token,
+        instance_url = token_info$instance_url,
+        id = token_info$id,
+        token_type = token_info$token_type,
+        # Salesforcer uses issued_at and it forces refresh if it's became old.
+        # Since we manage OAuth token in server side, set the the future (10 years from now) time to prevent unwanted OAuth token refresh triggered from R.
+        issued_at = as.character(as.numeric(lubridate::now() + lubridate::years(10)) * 10)
+      )
+    )
+  } else {
+    stop("OAuth token is not set for Salesforce")
+  }
+}
+
+
+#' API to refresh token
+#' @export
+refreshSalesforceToken <- function(tokenFileId = ""){
+  getSalesforceToken(tokenFileId = tokenFileId, FALSE)
+}
+
 #' tokenFileId is a unique value per data farme and is used to create a token cache file
 #' @export
 getTwitterToken <- function(tokenFileId="", useCache=TRUE){

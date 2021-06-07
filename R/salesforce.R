@@ -12,7 +12,20 @@ loginToSalesforce <- function(server = NULL, username, password, securityToken =
   if (is.null(server)) { # if login server was not provided, try it with the default login server.
     server = "https://login.salesforce.com"
   }
-  if (is.null(securityToken)) {
+  token <- NULL
+  tryCatch({
+    token <- exploratory::getSalesforceToken()
+  },error = function(e){
+    # Since it returns error when the token is not set from Exploratory Desktop, ignore the error.
+    if (e$message == "OAuth token is not set for Salesforce") {
+      # ignore
+    } else {
+      stop(e$message);
+    }
+  })
+  if (!is.null(token)) {
+    salesforcer::sf_auth(login_url = server, token = token, cache = FALSE)
+  } else if (is.null(securityToken)) {
     salesforcer::sf_auth(login_url = server, username = username, password = password, cache = FALSE)
   } else {
     salesforcer::sf_auth(login_url = server, username = username, password = password, security_token = securityToken, cache = FALSE)
@@ -111,13 +124,13 @@ querySalesforceDataFromTable <- function(server = NULL, username, password, secu
       if (hasParameter && stringr::str_detect(condition, "IN \\(NULL\\)$")) {
         # do not append the condition.
       } else if (!exploratory::is_empty(condition)){ # if it's not empty string (i.e. ""), append the condition.
+        conditionCount = conditionCount + 1;
         if (conditionCount == 1) {
           whereClause <-condition
         } else {
           # At this point whereClause looks like WHERE Col = 'A', so append the next condtion (e.g. Col2 = 'B') and make it as WHERE Col = 'A' AND Col2 = 'B'
           whereClause <- stringr::str_c(whereClause, " ", logicalOperator, " ", condition)
         }
-        conditionCount = conditionCount + 1;
       }
     }
     if (conditionCount > 0) {
