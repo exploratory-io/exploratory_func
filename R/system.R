@@ -671,7 +671,6 @@ getAmazonAthenaConnection <- function(driver = "", region = "", authenticationTy
     conn <- connection_pool[[connectionString]]
   }
   if (is.null(conn)) {
-    #
     conn <- DBI::dbConnect(
       odbc::odbc(),
       Driver             = driver,
