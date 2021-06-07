@@ -55,6 +55,37 @@ guess_lang_for_stopwords <- function(text) {
   lang_name
 }
 
+tokenize_with_postprocess <- function(text, 
+                                      remove_punct = TRUE, remove_numbers = TRUE,
+                                      stopwords_lang = NULL, stopwords = c(),
+                                      hiragana_word_length_to_remove = 2,
+                                      compound_tokens = NULL
+                                      ) {
+  tokenized <- tokenizers::tokenize_words(text, lowercase = TRUE, stopwords = NULL, strip_punct = remove_punct, strip_numeric = remove_numbers, simplify = FALSE)
+  names(tokenized) <- paste0("text", 1:length(tokenized)) # Add unique names to the list so that it can be passed to quanteda::tokens().
+  tokens <- quanteda::tokens(tokenized)
+  # tokens <- tokens %>% quanteda::tokens_wordstem() # TODO: Revive stemming and expose as an option.
+
+  if (!is.null(compound_tokens)) { # This probably should be kept before removing stopwords not to break compoint tokens that includes stopwords.
+    tokens <- tokens %>% quanteda::tokens_compound(pattern = quanteda::phrase(compound_tokens), concatenator = ' ')
+  }
+
+  # when stopwords Language is set, use the stopwords to filter out the result.
+  if(!is.null(stopwords_lang)) {
+    if (stopwords_lang == "auto") {
+      stopwords_lang <- guess_lang_for_stopwords(text)
+    }
+    stopwords_to_remove <- exploratory::get_stopwords(lang = stopwords_lang, include = stopwords)
+    tokens <- tokens %>% quanteda::tokens_remove(stopwords_to_remove, valuetype = "fixed")
+  }
+  # Remove Japanese Hiragana word whose length is less than hiragana_word_length_to_remove
+  if(hiragana_word_length_to_remove > 0) {
+    tokens <- tokens %>% quanteda::tokens_remove(stringr::str_c("^[\\\u3040-\\\u309f]{1,", hiragana_word_length_to_remove, "}$"), valuetype = "regex")
+  }
+  tokens
+}
+
+
 #' Function for Text Analysis Analytics View
 #' @export
 exp_textanal <- function(df, text,
@@ -64,6 +95,7 @@ exp_textanal <- function(df, text,
                          compound_tokens = NULL,
                          cooccurrence_context = "window", # "document" or "window"
                          cooccurrence_window = 1, # 5 is the quanteda's default, but narrowing it for speed of default run. 
+                         cooccurrence_network_num_words = 50,
                          max_nrow = 50000,
                          ...){
 
@@ -93,35 +125,21 @@ exp_textanal <- function(df, text,
     #                    remove_url = remove_url) %>%
     #   quanteda::tokens_wordstem()
 
-    tokenized <- tokenizers::tokenize_words(df[[text_col]], lowercase = TRUE, stopwords = NULL, strip_punct = remove_punct, strip_numeric = remove_numbers, simplify = FALSE)
-    names(tokenized) <- paste0("text", 1:length(tokenized)) # Add unique names to the list so that it can be passed to quanteda::tokens().
-    tokens <- quanteda::tokens(tokenized)
-    # tokens <- tokens %>% quanteda::tokens_wordstem() # TODO: Revive stemming and expose as an option.
+    tokens <- tokenize_with_postprocess(df[[text_col]],
+                                        remove_punct = remove_punct, remove_numbers = remove_numbers,
+                                        stopwords_lang = stopwords_lang, stopwords = stopwords,
+                                        hiragana_word_length_to_remove = hiragana_word_length_to_remove,
+                                        compound_tokens = compound_tokens)
 
-    if (!is.null(compound_tokens)) { # This probably should be kept before removing stopwords not to break compoint tokens that includes stopwords.
-      tokens <- tokens %>% quanteda::tokens_compound(pattern = quanteda::phrase(compound_tokens), concatenator = ' ')
-    }
-
-    # when stopwords Language is set, use the stopwords to filter out the result.
-    if(!is.null(stopwords_lang)) {
-      if (stopwords_lang == "auto") {
-        stopwords_lang <- guess_lang_for_stopwords(df[[text_col]])
-      }
-      stopwords_to_remove <- exploratory::get_stopwords(lang = stopwords_lang, include = stopwords)
-      tokens <- tokens %>% quanteda::tokens_remove(stopwords_to_remove, valuetype = "fixed")
-    }
-    # Remove Japanese Hiragana word whose length is less than hiragana_word_length_to_remove
-    if(hiragana_word_length_to_remove > 0) {
-      tokens <- tokens %>% quanteda::tokens_remove(stringr::str_c("^[\\\u3040-\\\u309f]{1,", hiragana_word_length_to_remove, "}$"), valuetype = "regex")
-    }
     # convert tokens to dfm object
     dfm_res <- tokens %>% quanteda::dfm()
     fcm_res <- quanteda::fcm(tokens, context = cooccurrence_context, window = cooccurrence_window, tri = TRUE)
 
-    # Document clustering code below is temporarily commented out. TODO: Revive it.
+    feats_selected <- quanteda::topfeatures(dfm_res, cooccurrence_network_num_words)
+    feat_names <- names(feats_selected)
+    fcm_selected <- quanteda::fcm_select(fcm_res, pattern = feat_names)
 
-    # feats <- names(quanteda::topfeatures(fcm_res, 50))
-    # fcm_selected <- quanteda::fcm_select(fcm_res, pattern = feats)
+    # # Document clustering code below is temporarily commented out.
     # dfm_tfidf_res <- quanteda::dfm_tfidf(dfm_res)
 
     # # Cluster documents with k-means.
@@ -141,11 +159,14 @@ exp_textanal <- function(df, text,
     model$dfm <- dfm_res
     model$fcm <- fcm_res
     # Co-occurrence network / document clustering related code below is temporarily commented out. TODO: Revive it.
-    # model$fcm_selected <- fcm_selected
+    model$feats_selected <- feats_selected
+    model$fcm_selected <- fcm_selected
+
     # model$dfm_tfidf <- dfm_tfidf_res
     # model$cluster <- clustered_df$cluster
     # model$dfm_cluster <- dfm_clustered
     # model$dfm_cluster_tfidf <- dfm_clustered_tfidf
+
     model$df <- df # Keep original df for showing it with clustering result.
     model$sampled_nrow <- sampled_nrow
     class(model) <- 'textanal_exploratory'
@@ -181,7 +202,7 @@ dfm_to_df <- function(dfm) {
   # row_docs <- dfm@Dimnames$docs[row_idx+1] # This is id generated by quanteda. e.g. "text1".
   row_docs <- row_idx+1 # Use number id instead for now so that it is sorted better by subsequent process.
   value <- dfm@x
-  res <- tibble::tibble(document=row_docs, token=col_feats, value=value)
+  res <- tibble::tibble(document=row_docs, token=col_feats, token_id=col_idx+1, value=value)
   res
 }
 
@@ -202,25 +223,199 @@ fcm_to_df <- function(fcm) {
 #' extracts results from textanal_exploratory object as a dataframe
 #' @export
 #' @param type - Type of output.
-tidy.textanal_exploratory <- function(x, type="word_count", ...) {
+tidy.textanal_exploratory <- function(x, type="word_count", max_words=NULL, max_word_pairs=NULL, ...) {
   if (type == "word_count") {
     feats <- quanteda::featfreq(x$dfm)
-    res <- tibble(word=stringr::str_to_title(names(feats)), count=feats)
+    res <- tibble::tibble(word=stringr::str_to_title(names(feats)), count=feats)
+    if (!is.null(max_words)) { # This means it is for bar chart.
+      if (max_words < 100) {
+        res <- res %>% dplyr::slice_max(count, n=max_words, with_ties=TRUE) %>% slice_max(count, n=100, with_ties=FALSE) # Set hard limit of 100 even with ties.
+      }
+      else {
+        res <- res %>% dplyr::slice_max(count, n=max_words, with_ties=FALSE) # Set hard limit even with ties.
+      }
+    }
   }
   else if (type == "word_pairs") {
     res <- fcm_to_df(x$fcm) %>%
       dplyr::filter(token.x != token.y) %>%
       dplyr::mutate(token.x = stringr::str_to_title(token.x), token.y = stringr::str_to_title(token.y)) %>%
       dplyr::rename(word.1 = token.x, word.2 = token.y, count=value)
+    if (!is.null(max_word_pairs)) { # This means it is for bar chart.
+      if (max_word_pairs < 100) {
+        res <- res %>% dplyr::slice_max(count, n=max_word_pairs, with_ties=TRUE) %>% slice_max(count, n=100, with_ties=FALSE) # Set hard limit of 100 even with ties.
+      }
+      else {
+        res <- res %>% dplyr::slice_max(count, n=max_word_pairs, with_ties=FALSE) # Set hard limit even with ties.
+      }
+    }
   }
   else if (type == "doc_cluster") {
     res <- x$df
     res <- res %>% dplyr::mutate(cluster = !!x$cluster)
+    res <- res %>% dplyr::group_by(cluster) %>% mutate(document_id = row_number()) %>% ungroup()
   }
   else if (type == "doc_cluster_words") {
     res <- dfm_to_df(x$dfm_cluster_tfidf)
     res <- res %>% dplyr::group_by(document) %>%
       dplyr::slice_max(value, n=5) %>%
+      dplyr::ungroup() %>%
+      dplyr::rename(cluster = document)
+    res
+  }
+  res
+}
+
+# vertex_size_method - "equal_length" or "equal_freq"
+get_cooccurrence_graph_data <- function(model_df, max_vertex_size = 25, vertex_size_method = "equal_length", max_edge_width=8, font_size_ratio=1.0) {
+  # Prepare edges data
+  edges <- exploratory:::fcm_to_df(model_df$model[[1]]$fcm_selected) %>% rename(from=token.x,to=token.y) %>% filter(from!=to)
+  edges <- edges %>% mutate(from = stringr::str_to_title(from), to = stringr::str_to_title(to))
+
+  edges <- edges %>% mutate(width=log(value+1)) # +1 to avoid 0 width.
+  edges <- edges %>% mutate(width=max_edge_width*width/max(width))
+
+  # Set edge colors based on number of co-occurrence.
+  c_scale <- grDevices::colorRamp(c("white","#4A90E2"))
+  edges <- edges %>% mutate(color=apply(c_scale((log(value)+1)/max(log(value)+1)), 1, function(x) rgb(x[1]/255,x[2]/255,x[3]/255, alpha=0.8)))
+  weights=log(1+edges$value)
+  weights <- 5*weights/max(weights)
+  edges <- edges %>% mutate(weights=weights)
+
+  # Prepare vertices data
+  feat_names <- names(model_df$model[[1]]$feats_selected)
+  feat_names <- stringr::str_to_title(feat_names)
+  feat_counts <- model_df$model[[1]]$feats_selected
+  names(feat_counts) <- NULL
+  if (vertex_size_method == "equal_length") {
+    vertex_sizes <- as.numeric(cut(feat_counts,5)) # equal_length
+  }
+  else { # "equal_freq"
+    vertex_sizes <- floor((dplyr::min_rank(feat_counts)-1)/(length(feat_counts)/5)) + 1
+  }
+  vertex_sizes <- vertex_sizes/max(vertex_sizes) * max_vertex_size
+  vertices <- tibble::tibble(name=feat_names, size=vertex_sizes)
+
+  ret <- list(edges=edges, vertices=vertices)
+  attr(ret, "font_size_factor") <- font_size_ratio
+  ret <- data.frame(model=I(list(ret))) # return as data.frame. TODO: handle group_by
+  class(ret$model) <- c("list", "exp_coocurrence_graph")
+  ret
+}
+
+#' Function for Text Clustering Analytics View
+#' @export
+exp_text_cluster <- function(df, text,
+                         remove_punct = TRUE, remove_numbers = TRUE,
+                         stopwords_lang = NULL, stopwords = c(),
+                         hiragana_word_length_to_remove = 2,
+                         compound_tokens = NULL,
+                         svd_dim=5,
+                         num_clusters=3,
+                         mds_sample_size=200,
+                         max_nrow = 50000,
+                         ...){
+
+  # Always put document_id to know what document the tokens are from
+  text_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(text))
+  doc_id <- avoid_conflict(colnames(df), "document_id")
+  each_func <- function(df) {
+    # sample the data for performance if data size is too large.
+    sampled_nrow <- NULL
+    if (!is.null(max_nrow) && nrow(df) > max_nrow) {
+      # Record that sampling happened.
+      sampled_nrow <- max_nrow
+      df <- df %>% sample_rows(max_nrow)
+    }
+
+    tokens <- tokenize_with_postprocess(df[[text_col]],
+                                        remove_punct = remove_punct, remove_numbers = remove_numbers,
+                                        stopwords_lang = stopwords_lang, stopwords = stopwords,
+                                        hiragana_word_length_to_remove = hiragana_word_length_to_remove,
+                                        compound_tokens = compound_tokens)
+
+    # convert tokens to dfm object
+    dfm_res <- tokens %>% quanteda::dfm()
+
+    # Document clustering code below is temporarily commented out.
+    dfm_tfidf_res <- quanteda::dfm_tfidf(dfm_res)
+
+    # Cluster documents with k-means.
+    tfidf_df <- dfm_to_df(dfm_tfidf_res)
+    tfidf_df <- tfidf_df %>% dplyr::rename(tfidf=value)
+
+    # Convert to sparse matrix
+    tfidf_sparse_mat <- Matrix::sparseMatrix(
+      i = as.integer(tfidf_df$document),
+      j = as.integer(tfidf_df$token_id),
+      x = as.numeric(tfidf_df$tfidf),
+      dims = dim(dfm_tfidf_res)
+      )
+    # SVD by irlba. nu defaults to nv. TODO: Look into if reducing nv affects performance positively without negative impact on the result.
+    svd_res <- irlba::irlba(tfidf_sparse_mat, nv=svd_dim)
+    docs_reduced <- svd_res$u
+
+    # Make it a data frame (a row represents a document)
+    docs_reduced_df <- as.data.frame(docs_reduced)
+    # Cluster documents.
+    clustered_df <- docs_reduced_df %>% build_kmeans.cols(everything(), centers=num_clusters) #TODO: Expose arguments for kmeans.
+    cluster_res <- clustered_df$cluster # Clustering result
+
+
+    docs_sample_index <- if (nrow(docs_reduced_df) > mds_sample_size) {
+      sample(nrow(docs_reduced_df), size=mds_sample_size)
+    }
+    else {
+      1:nrow(docs_reduced_df)
+    }
+    docs_reduced_sampled <- docs_reduced[docs_sample_index,]
+    docs_dist_mat <- dist(docs_reduced_sampled)
+    docs_coordinates <- cmdscale(docs_dist_mat)
+
+
+    # Run tf-idf treating each cluster as a document.
+    dfm_clustered <- quanteda::dfm_group(dfm_res, cluster_res)
+    dfm_clustered_tfidf <- quanteda::dfm_tfidf(dfm_clustered)
+    clustered_tfidf <- dfm_to_df(dfm_clustered_tfidf)
+
+    model <- list()
+    model$dfm <- dfm_res
+
+    model$dfm_tfidf <- dfm_tfidf_res
+    model$cluster <- clustered_df # SVD result and cluster result
+    model$dfm_cluster <- dfm_clustered
+    model$dfm_cluster_tfidf <- dfm_clustered_tfidf
+
+    model$docs_coordinates <- docs_coordinates # MDS result for scatter plot
+    model$docs_sample_index <- docs_sample_index
+    model$df <- df # Keep original df for showing it with clustering result.
+    model$sampled_nrow <- sampled_nrow
+    class(model) <- 'text_cluster_exploratory'
+    model
+  }
+
+  do_on_each_group(df, each_func, name = "model", with_unnest = FALSE)
+}
+
+#' extracts results from textanal_exploratory object as a dataframe
+#' @export
+#' @param type - Type of output.
+tidy.text_cluster_exploratory <- function(x, type="word_count", num_top_words=5, ...) {
+  if (type == "doc_cluster") {
+    res <- x$df
+    res <- res %>% dplyr::bind_cols(x$cluster)
+  }
+  else if (type == "doc_cluster_mds") {
+    res <- x$df[x$docs_sample_index,]
+    cluster_res_sampled <- x$cluster$cluster[x$docs_sample_index]
+    res <- res %>% dplyr::mutate(cluster = !!cluster_res_sampled)
+    docs_coordinates_df <- as.data.frame(x$docs_coordinates)
+    res <- res %>% dplyr::bind_cols(docs_coordinates_df)
+  }
+  else if (type == "doc_cluster_words") {
+    res <- dfm_to_df(x$dfm_cluster_tfidf)
+    res <- res %>% dplyr::group_by(document) %>%
+      dplyr::slice_max(value, n=num_top_words) %>%
       dplyr::ungroup() %>%
       dplyr::rename(cluster = document)
     res
