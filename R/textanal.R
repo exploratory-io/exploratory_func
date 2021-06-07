@@ -260,7 +260,7 @@ get_cooccurrence_graph_data <- function(model_df, max_vertex_size = 25, vertex_s
   edges <- edges %>% mutate(width=max_edge_width*width/max(width))
 
   # Set edge colors based on number of co-occurrence.
-  c_scale <- grDevices::colorRamp(c("white","red"))
+  c_scale <- grDevices::colorRamp(c("white","#4A90E2"))
   edges <- edges %>% mutate(color=apply(c_scale((log(value)+1)/max(log(value)+1)), 1, function(x) rgb(x[1]/255,x[2]/255,x[3]/255, alpha=0.8)))
   weights=log(1+edges$value)
   weights <- 5*weights/max(weights)
@@ -384,7 +384,7 @@ exp_text_cluster <- function(df, text,
 #' extracts results from textanal_exploratory object as a dataframe
 #' @export
 #' @param type - Type of output.
-tidy.text_cluster_exploratory <- function(x, type="word_count", ...) {
+tidy.text_cluster_exploratory <- function(x, type="word_count", num_top_words=5, ...) {
   if (type == "doc_cluster") {
     res <- x$df
     res <- res %>% dplyr::bind_cols(x$cluster)
@@ -399,7 +399,7 @@ tidy.text_cluster_exploratory <- function(x, type="word_count", ...) {
   else if (type == "doc_cluster_words") {
     res <- dfm_to_df(x$dfm_cluster_tfidf)
     res <- res %>% dplyr::group_by(document) %>%
-      dplyr::slice_max(value, n=5) %>%
+      dplyr::slice_max(value, n=num_top_words) %>%
       dplyr::ungroup() %>%
       dplyr::rename(cluster = document)
     res
