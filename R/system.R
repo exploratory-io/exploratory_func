@@ -646,6 +646,7 @@ getAmazonAthenaConnection <- function(driver = "", region = "", authenticationTy
   if(Sys.info()["sysname"]=="Linux"){
     driver <-  "/opt/simba/athenaodbc/lib/64/libathenaodbc_sb64.so";
   }
+  # Generate connection string as a key to pool conneciton.
   connectionString <- stringr::str_c("AwsRegion=",  region, ";AuthenticationType=", authenticationType, ";uid=", user,
                                      ";pwd=", password, ";S3OutputLocation=", s3OutputLocation, ";driver=", driver)
   if(additionalParams != "") {
@@ -656,18 +657,16 @@ getAmazonAthenaConnection <- function(driver = "", region = "", authenticationTy
     conn <- connection_pool[[connectionString]]
   }
   if (is.null(conn)) {
-    #https://www.rdocumentation.org/packages/RODBC/versions/1.3-15/topics/odbcConnect
-    #For better performance, set max value (i.e. 1024) for rows_at_time
+    #
     conn <- DBI::dbConnect(
       odbc::odbc(),
       Driver             = driver,
       S3OutputLocation   = s3OutputLocation,
       AwsRegion          = region,
-      AuthenticationType = "IAM Credentials",
+      AuthenticationType = authenticationType,
       UID                = user,
       PWD                = password
     )
-    # conn <- RODBC::odbcDriverConnect(connection = connectionString, rows_at_time = 1024)
     if (user_env$pool_connection) { # pool connection if connection pooling is on.
       connection_pool[[connectionString]] <- conn
     }
@@ -1360,7 +1359,7 @@ queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IA
   if(!requireNamespace("odbc")){stop("package RODBC must be installed.")}
   conn <- getAmazonAthenaConnection(driver = driver, region = region, authenticationType = authenticationType, s3OutputLocation = s3OutputLocation, user = user, password = password, additionalParams = additionalParams)
   tryCatch({
-    # For backwawrd compatibility, if 0 is passed as numOfRows, change it to -1.
+    # For backward compatibility, if 0 is passed as numOfRows, change it to -1.
     # Previously with RODBC package, passing 0 means getting all rows. With odbc package, it needs to be -1 to get all rows.
     if (numOfRows == 0) {
       numOfRows = -1;
