@@ -288,9 +288,10 @@ test_that("read_parquet_file", {
   expect_equal(TRUE, is.data.frame(df))
 })
 
-test_that("read_parquet_file can read the parquet file that arrow v3 fails to read.", {
-  df <- read_parquet_file("https://dl.dropbox.com/s/5v4xhjhunl7v58g/21331_Source1.parquet")
-  expect_equal(TRUE, is.data.frame(df))
+test_that("read_parquet_file fails read the parquet file that contains non-UTF8 character in a UTF-8 column.", {
+  # It will throw an error. "Invalid UTF-8 payload".
+  # We keep this test to detect the arrow behavior change in the future.
+  expect_error(read_parquet_file("https://dl.dropbox.com/s/5v4xhjhunl7v58g/21331_Source1.parquet"))
 })
 
 test_that("test filter_cascade",{
