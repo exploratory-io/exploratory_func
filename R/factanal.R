@@ -22,7 +22,7 @@ preprocess_factanal_data_before_sample <- function(df, predictor_cols) {
     df <- df %>% dplyr::filter(!is.na(!!rlang::sym(col)) & !is.infinite(!!rlang::sym(col)))
   }
   if (nrow(df) == 0) {
-    stop("No row is left after removing NA/Inf from numeric, Date, or POSIXct columns.")
+    stop("No row is left after removing rows with NA/Inf.")
   }
   attr(df, 'predictors') <- cols
   df
