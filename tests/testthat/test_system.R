@@ -246,7 +246,7 @@ test_that("glue_salesforce", {
   exploratory_env$.config <- new.env()
   exploratory_env$number_limit <- 1
 
-  res <- exploratory:::glue_salesforce(glue_exploratory("${1+1 + @{number_limit}}", .transformer=exploratory:::salesforce_glue_transformer))
+  res <- exploratory:::glue_salesforce(exploratory:::glue_exploratory("${1+1 + @{number_limit}}", .transformer=exploratory:::salesforce_glue_transformer))
   expect_equal(as.character(res), "3")
 
 })
