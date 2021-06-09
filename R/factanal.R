@@ -1,3 +1,33 @@
+
+# Simplified preprocess_regression_data_before_sample for factanal. TODO: Consider using it for PCA and k-means too.
+preprocess_factanal_data_before_sample <- function(df, predictor_cols) {
+  # Remove all-NA-or-Inf columns.
+  # NOTE: This has to be done bofore filtering predictor numeric NAs. Otherwise, all the rows could be filtered out.
+  cols <- predictor_cols
+  for (col in predictor_cols) {
+    if(all(is.na(df[[col]]) | is.infinite(df[[col]]))){
+      # remove columns if they are all NA or Inf
+      cols <- setdiff(cols, col)
+      df[[col]] <- NULL # drop the column so that SMOTE will not see it. 
+    }
+  }
+  if (length(cols) == 0) {
+    stop("No column is left after removing columns with only NA or Inf values.")
+  }
+
+  # To avoid unused factor level that causes margins::marginal_effects() to fail, filtering operation has
+  # to be done before factor level adjustments.
+  # This is done before sampling so that we will end up with more valid rows in the end.
+  for (col in cols) {
+    df <- df %>% dplyr::filter(!is.na(!!rlang::sym(col)) & !is.infinite(!!rlang::sym(col)))
+  }
+  if (nrow(df) == 0) {
+    stop("No row is left after removing NA/Inf from numeric, Date, or POSIXct columns.")
+  }
+  attr(df, 'predictors') <- cols
+  df
+}
+
 #' Function for Factor Analysis Analytics View
 #' @export
 exp_factanal <- function(df, ..., nfactors = 2, fm = "minres", scores = "regression", rotate = "none", max_nrow = NULL, seed = 1) {
@@ -26,10 +56,9 @@ exp_factanal <- function(df, ..., nfactors = 2, fm = "minres", scores = "regress
   }
 
   each_func <- function(df) {
-    filtered_df <- df %>% tidyr::drop_na(!!!rlang::syms(selected_cols)) # TODO: take care of the case where values of a column are mostly NA
-    if (nrow(filtered_df) == 0) { # skip this group if no row is left.
-      return(NULL)
-    }
+    filtered_df <- preprocess_factanal_data_before_sample(df, selected_cols)
+    selected_cols <- attr(filtered_df, 'predictors') # predictors are updated (removed) in preprocess_factanal_data_before_sample. Sync with it.
+
     # sample the data for quicker turn around on UI,
     # if data size is larger than specified max_nrow.
     sampled_nrow <- NULL
