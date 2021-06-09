@@ -1,5 +1,5 @@
 
-# Simplified preprocess_regression_data_before_sample for factanal. TODO: Consider using it for PCA and k-means too.
+# Simplified preprocess_regression_data_before_sample for factor analysis (exp_factanal) PCA (do_prcomp). TODO: Consider using it for k-means too.
 preprocess_factanal_data_before_sample <- function(df, predictor_cols) {
   # Remove all-NA-or-Inf columns.
   # NOTE: This has to be done bofore filtering predictor numeric NAs. Otherwise, all the rows could be filtered out.
