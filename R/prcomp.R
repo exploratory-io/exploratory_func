@@ -27,10 +27,8 @@ do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, allow_singl
   }
 
   each_func <- function(df) {
-    filtered_df <- df %>% tidyr::drop_na(!!!rlang::syms(selected_cols)) # TODO: take care of the case where values of a column are mostly NA
-    if (nrow(filtered_df) == 0) { # skip this group if no row is left.
-      return(NULL)
-    }
+    filtered_df <- preprocess_factanal_data_before_sample(df, selected_cols)
+    selected_cols <- attr(filtered_df, 'predictors') # predictors are updated (removed) in preprocess_factanal_data_before_sample. Sync with it.
     # sample the data for quicker turn around on UI,
     # if data size is larger than specified max_nrow.
     sampled_nrow <- NULL
