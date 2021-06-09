@@ -147,19 +147,21 @@ querySalesforceDataFromTable <- function(server = NULL, username, password, secu
   coldiff <- setdiff(columns, resultNames)
   colLength <- length(coldiff)
   # Bring back the dropped column by adding it with all NA.
-  for(i in 1:colLength) {
-    col <- coldiff[i]
-    dataType <- dataTypes[which(columns == col)]
-    if (dataType == "character") {
-      df[col] <- as.character(NA)
-    } else if (dataType == "numeric") {
-      df[col] <- as.numeric(NA)
-    } else if (dataType == "Date") {
-      df[col] <- as.Date(NA)
-    } else if (dataType == "POSIXct") {
-      df[col] <- as.POSIXct(NA)
-    } else {
-      df[col] <- NA
+  if (colLength > 0) { # Check if there is missing column.
+    for(i in 1:colLength) {
+      col <- coldiff[i]
+      dataType <- dataTypes[which(columns == col)]
+      if (dataType == "character") {
+        df[col] <- as.character(NA)
+      } else if (dataType == "numeric") {
+        df[col] <- as.numeric(NA)
+      } else if (dataType == "Date") {
+        df[col] <- as.Date(NA)
+      } else if (dataType == "POSIXct") {
+        df[col] <- as.POSIXct(NA)
+      } else {
+        df[col] <- NA
+      }
     }
   }
   # Make sure resulting column order is as same as column order selected in UI.
