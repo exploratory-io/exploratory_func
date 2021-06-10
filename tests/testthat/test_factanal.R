@@ -22,11 +22,12 @@ test_that("exp_factanal", {
                c("mpg","cyl","disp","hp","drat","wt","qsec","vs","am","gear","carb","new_col","Factor 1","Factor 2"))
 })
 
-test_that("exp_factanal with strange column name", {
+test_that("exp_factanal with strange column name and all-NA column", {
   df <- mtcars %>%
     rename(`Cy l` = cyl) %>%
-    mutate(new_col = c(rep("A", n() - 10), rep("B", 10)))
-  model_df <- exp_factanal(df, `Cy l`, mpg, hp)
+    mutate(new_col = c(rep("A", n() - 10), rep("B", 10))) %>%
+    mutate(na_col = NA)
+  model_df <- exp_factanal(df, `Cy l`, mpg, hp, na_col)
   res <- model_df %>% tidy_rowwise(model, type="variances")
   expect_equal(colnames(res),
                c("SS loadings", "Proportion Var", "Cumulative Var", "Proportion Explained", "Cumulative Proportion", "Factor", "% Variance", "Cummulated % Variance"))
