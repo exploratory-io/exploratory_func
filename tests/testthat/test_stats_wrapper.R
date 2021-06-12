@@ -110,11 +110,23 @@ test_that("test do_svd.kv with fill", {
 
 })
 
-test_that("test normalize", {
+test_that("normalize", {
   test_vec <- c(seq(10), NA, 10 - seq(10))
   ans <- scale(test_vec) %>% as.numeric()
   ret <- normalize(ans)
   expect_equal(ans, ret)
+})
+
+test_that("normalize with constant data", {
+  test_vec <- rep(0, 10)
+  ret <- normalize(test_vec, center=TRUE, scale=TRUE)
+  expect_equal(ret, rep(0, 10))
+  ret <- normalize(test_vec, center=TRUE, scale=FALSE)
+  expect_equal(ret, rep(0, 10))
+  ret <- normalize(test_vec, center=FALSE, scale=TRUE)
+  expect_equal(ret, rep(0, 10))
+  ret <- normalize(test_vec, center=FALSE, scale=FALSE)
+  expect_equal(ret, rep(0, 10))
 })
 
 test_that("do_cor with NA values", {
