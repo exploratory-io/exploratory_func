@@ -3,11 +3,21 @@
 
 #' scale wrapper that returns a vector as a result
 #' @export
-normalize <- function(...) {
-  # scale returns a matrix even if the input is a vector
-  # it should be converted to a numeric vector by as.numeric
-  ret <- scale(...)
-  as.numeric(ret)
+normalize <- function(x, center = TRUE, scale = TRUE) {
+  if (scale && (center || (x[1] == 0)) &&
+      min(x, na.rm = TRUE) == max(x, na.rm = TRUE)) {
+    # If input is constant and scaling is on, and centering is on or values in the first place were 0,
+    # return vector of zeros.
+    # scale() does not behave well here, like returning NaN or numbers very close to 0.
+    # We handle this case ourselves. 
+    rep(0, length(x))
+  }
+  else {
+    ret <- scale(x, center = center, scale = scale)
+    # scale returns a matrix even if the input is a vector.
+    # Convert from a matrix to a numeric vector.
+    as.numeric(ret)
+  }
 }
 
 #' integrated do_cor
