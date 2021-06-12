@@ -118,7 +118,7 @@ test_that("normalize", {
 })
 
 test_that("normalize with constant data", {
-  test_vec <- rep(0, 10)
+  test_vec <- rep(0, 10) # zero constant input
   ret <- normalize(test_vec, center=TRUE, scale=TRUE)
   expect_equal(ret, rep(0, 10))
   ret <- normalize(test_vec, center=TRUE, scale=FALSE)
@@ -127,6 +127,17 @@ test_that("normalize with constant data", {
   expect_equal(ret, rep(0, 10))
   ret <- normalize(test_vec, center=FALSE, scale=FALSE)
   expect_equal(ret, rep(0, 10))
+
+  test_vec <- rep(1, 10) # non-zero constant input
+  ret <- normalize(test_vec, center=TRUE, scale=TRUE)
+  expect_equal(ret, rep(0, 10))
+  ret <- normalize(test_vec, center=TRUE, scale=FALSE)
+  expect_equal(ret, rep(0, 10))
+  ret <- normalize(test_vec, center=FALSE, scale=TRUE)
+  ans <- scale(test_vec, center=FALSE, scale=TRUE) %>% as.numeric()
+  expect_equal(ans, ret)
+  ret <- normalize(test_vec, center=FALSE, scale=FALSE)
+  expect_equal(ret, rep(1, 10))
 })
 
 test_that("do_cor with NA values", {
