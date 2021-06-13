@@ -67,7 +67,24 @@ tokenize_with_postprocess <- function(text,
   # tokens <- tokens %>% quanteda::tokens_wordstem() # TODO: Revive stemming and expose as an option.
 
   if (!is.null(compound_tokens)) { # This probably should be kept before removing stopwords not to break compoint tokens that includes stopwords.
-    tokens <- tokens %>% quanteda::tokens_compound(pattern = quanteda::phrase(compound_tokens), concatenator = ' ')
+    # Split compound_tokens into ones separated by space and ones that are not.
+    with_space_idx <- str_detect(compound_tokens, ' ')
+    compound_tokens_with_space <- compound_tokens[with_space_idx]
+    compound_tokens_without_space <- compound_tokens[!with_space_idx]
+
+    # Handle ones separated by spaces.
+    if (length(compound_tokens_with_space) > 0) {
+      tokens <- tokens %>% quanteda::tokens_compound(pattern = quanteda::phrase(compound_tokens_with_space), concatenator = ' ')
+    }
+
+    # Handle ones that are not separated by spaces.
+    if (length(compound_tokens_without_space) > 0) {
+      # Tokenize those words with the same options with the original tokinizing, to know where such word would have been splitted.
+      compound_tokens_list <- tokenizers::tokenize_words(compound_tokens_without_space, lowercase = TRUE, stopwords = NULL, strip_punct = remove_punct, strip_numeric = remove_numbers, simplify = FALSE)
+      # Create space-separated expression of the word, which can be used with quanteda::tokens_compound.
+      compound_tokens_with_space_inserted <- purrr::flatten_chr(purrr::map(compound_tokens_list, function(x){stringr::str_c(x, collapse=' ')}))
+      tokens <- tokens %>% quanteda::tokens_compound(pattern = quanteda::phrase(compound_tokens_with_space_inserted), concatenator = '')
+    }
   }
 
   # when stopwords Language is set, use the stopwords to filter out the result.
