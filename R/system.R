@@ -1430,6 +1430,11 @@ queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows
   if(type == "") {
     type <- "odbc"
   }
+  # if the type is dbiodbc (i.e. odbc package) and numOfRows is 0, it means it's migrated from RODBC
+  # To fetch the all rows, odbc expects -1 instead of 0. So update the numOfRows as -1.
+  if (type == "dbiodbc" && numOfRows == 0) {
+    numOfRows = -1;
+  }
   conn <- getDBConnection(type = type, host = host, port = port, NULL, username = username, password = password, dsn = dsn, additionalParams = additionalParams, databaseName = databaseName, driver = driver, catalog = catalog)
   tryCatch({
     query <- convertUserInputToUtf8(query)
