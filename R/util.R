@@ -321,11 +321,11 @@ mat_to_df <- function(mat, cnames=NULL, na.rm=TRUE, zero.rm = TRUE, diag=TRUE) {
     colnames(df) <- cnames
   }
 
-  if(is.factor(df[,1])){
+  if (!is.character(df[,1])) { # Can be a factor. Also can be integer if the origin column name was number.
     df[,1] <- as.character(df[,1])
   }
 
-  if(is.factor(df[,2])){
+  if (!is.character(df[,2])) { # Can be a factor. Also can be integer if the origin column name was number.
     df[,2] <- as.character(df[,2])
   }
 
