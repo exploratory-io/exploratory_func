@@ -345,6 +345,21 @@ test_that("test mat_to_df", {
   expect_true(!is.unsorted(ret[,1]))
 })
 
+test_that("test mat_to_df with column names with numeric characters only", {
+  nc <- 4
+  nr <- 5
+  mat <- matrix(seq(nc*nr), ncol=nc, nrow=nr)
+
+  # Set numeric-character-only column names for test.
+  colnames(mat) <- as.character(seq(nc))
+  rownames(mat) <- as.character(seq(nr))
+
+  ret <- mat_to_df(mat, c("aa", "bb", "value"))
+  expect_true(is.character(ret[,1]))
+  expect_true(is.character(ret[,2]))
+  expect_true(!is.unsorted(ret[,1]))
+})
+
 test_that("test %nin%", {
   ret <- c(1,3,NA,2) %nin% c(3, NA)
   expect_equal(ret, c(T,F,F,T))
