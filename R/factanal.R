@@ -103,10 +103,10 @@ exp_factanal <- function(df, ..., nfactors = 2, fm = "minres", scores = "regress
   do_on_each_group(df, each_func, name = "model", with_unnest = FALSE)
 }
 
-# TODO: This is a code that worked with factanal. Need to update it for psych::fa to use if for Summary tab again.
 glance.fa_exploratory <- function(x, pretty.name = FALSE, ...) {
-  res <- broom:::glance.factanal(x) %>% dplyr::select(-n)
-  res <- res %>% dplyr::rename(`Factors`=n.factors, `Total Variance`=total.variance, `Chi-Square`=statistic, `P Value`=p.value, `Degree of Freedom`=df, `Method`=method, `Converged`=converged, `Number of Rows`=nobs)
+  # glance.factanal works on psych::fa due to compatibility kept to some degree. TODO: Extract and output more info from psych::fa
+  res <- broom:::glance.factanal(x) %>% dplyr::select(-n, -converged, -method) # But converged is NULL.
+  res <- res %>% dplyr::rename(`Number of Factors`=n.factors, `Total Variance`=total.variance, `Chi-Square`=statistic, `P Value`=p.value, `Degree of Freedom`=df, `Number of Rows`=nobs)
   res
 }
 
