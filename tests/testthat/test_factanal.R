@@ -5,6 +5,9 @@ context("test factor analysis function, exp_factanal")
 test_that("exp_factanal", {
   df <- mtcars %>% mutate(new_col = c(rep("A", n() - 10), rep("B", 10)))
   model_df <- exp_factanal(df, cyl, mpg, hp, max_nrow=30)
+  res <- model_df %>% glance_rowwise(model, pretty.name=TRUE)
+  expect_equal(colnames(res),
+               c("Number of Factors", "Total Variance", "Chi-Square", "P Value", "Degree of Freedom", "Number of Rows"))
   res <- model_df %>% tidy_rowwise(model, type="variances")
   expect_equal(colnames(res),
                c("SS loadings", "Proportion Var", "Cumulative Var", "Proportion Explained", "Cumulative Proportion", "Factor", "% Variance", "Cummulated % Variance"))
@@ -28,6 +31,9 @@ test_that("exp_factanal with strange column name and all-NA column", {
     mutate(new_col = c(rep("A", n() - 10), rep("B", 10))) %>%
     mutate(na_col = NA)
   model_df <- exp_factanal(df, `Cy l`, mpg, hp, na_col)
+  res <- model_df %>% glance_rowwise(model, pretty.name=TRUE)
+  expect_equal(colnames(res),
+               c("Number of Factors", "Total Variance", "Chi-Square", "P Value", "Degree of Freedom", "Number of Rows"))
   res <- model_df %>% tidy_rowwise(model, type="variances")
   expect_equal(colnames(res),
                c("SS loadings", "Proportion Var", "Cumulative Var", "Proportion Explained", "Cumulative Proportion", "Factor", "% Variance", "Cummulated % Variance"))
