@@ -9,7 +9,7 @@ test_that("exp_textanal", {
     "Jack fell down and broke his crown",
     "And Jill came tumbling after"))
 
-  lang_res <- guess_lang_for_stopwords(df$text) #TODO: revive test after cld3 is added to the test docker image.
+  lang_res <- exploratory:::guess_lang_for_stopwords(df$text) #TODO: revive test after cld3 is added to the test docker image.
 
   model_df <- df %>% exp_textanal(text, stopwords_lang = "english", compound_tokens=c("Jack and jill")) # Testing both lower and upper case for compound_token.
   res <- model_df %>% tidy_rowwise(model, type="word_count")
