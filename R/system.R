@@ -2550,7 +2550,7 @@ searchAndReadDelimFiles <- function(folder, pattern = "", delim, quote = '"',
                                 escape_backslash = escape_backslash, escape_double = escape_double,
                                 col_names = col_names, col_types = col_types,
                                 locale = locale,
-                                na = na, quoted_na = quoated_na,
+                                na = na, quoted_na = quoted_na,
                                 comment = comment, trim_ws = trim_ws,
                                 skip = skip, n_max = n_max, guess_max = guess_max,
                                 progress = progress, with_api_key = with_api_key)
