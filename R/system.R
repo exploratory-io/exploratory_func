@@ -2548,12 +2548,12 @@ searchAndReadDelimFiles <- function(folder, pattern = "", delim, quote = '"',
   files <- list.files(path = folder, pattern = stringr::str_c("(?i)", pattern), full.names = T)
   exploratory::read_delim_files(files = files, delim = delim, quote = quote,
                                 escape_backslash = escape_backslash, escape_double = escape_double,
-                                col_names = col_names, col_types = readr::cols(.default = readr::col_character()),
-                                locale = readr::default_locale(),
-                                na = c("", "NA"), quoted_na = TRUE,
-                                comment = "", trim_ws = FALSE,
-                                skip = 0, n_max = Inf, guess_max = min(1000, n_max),
-                                progress = interactive(), with_api_key = FALSE)
+                                col_names = col_names, col_types = col_types,
+                                locale = locale,
+                                na = na, quoted_na = quoted_na,
+                                comment = comment, trim_ws = trim_ws,
+                                skip = skip, n_max = n_max, guess_max = guess_max,
+                                progress = progress, with_api_key = with_api_key)
 
 }
 #'API that imports multiple same structure CSV files and merge it to a single data frame
