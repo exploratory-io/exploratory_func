@@ -2369,7 +2369,15 @@ download_data_file <- function(url, type){
     dir.create(tempdir(), showWarnings = FALSE)
 
     # download file to tempoprary location
+    # get current timeout sec
+    originalTimeout <- options("timeout")
+    # if it's less than 10 minutes, set timeout as 10 minutes.(By default it's 1 minute)
+    if (originalTimeout < 600) {
+      options("timeout" = 600)
+    }
     download.file(url, destfile = tmp, mode = "wb")
+    # Set the original timeout
+    options("timeout" = originalTimeout)
     # cache file
     if(!is.null(shouldCacheFile) && isTRUE(shouldCacheFile)){
       assign(hash, tmp, envir = .GlobalEnv)
