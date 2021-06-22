@@ -2368,16 +2368,20 @@ download_data_file <- function(url, type){
     # http://stackoverflow.com/questions/4216753/check-existence-of-directory-and-create-if-doesnt-exist
     dir.create(tempdir(), showWarnings = FALSE)
 
-    # download file to tempoprary location
-    # get current timeout sec
-    originalTimeout <- options("timeout")
-    # if it's less than 10 minutes, set timeout as 10 minutes.(By default it's 1 minute)
-    if (originalTimeout < 600) {
+    tryCatch({
+      # download file to tempoprary location
+      # get current timeout sec. Default is 60 sec.
+      originalTimeout <- options("timeout")
+      # Increater timeout to 10 minutes (600 sec)
       options("timeout" = 600)
+      download.file(url, destfile = tmp, mode = "wb")
+    }, error = function(cond){
+       stop(cond)
     }
-    download.file(url, destfile = tmp, mode = "wb")
-    # Set the original timeout
-    options("timeout" = originalTimeout)
+    ,finally = {
+      # Set the original timeout
+      options("timeout" = originalTimeout)
+    })
     # cache file
     if(!is.null(shouldCacheFile) && isTRUE(shouldCacheFile)){
       assign(hash, tmp, envir = .GlobalEnv)
