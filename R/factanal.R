@@ -122,7 +122,7 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
                                     wls="WLS",
                                     gls="GLS",
                                     minchi="MC",
-                                    minrank="MR",
+                                    minrank="MRFA",
                                     alpha="MR")
   factor_loading_prefix <- factor_loading_prefix_mapping[x$fm]
   names(factor_loading_prefix) <- NULL
@@ -134,7 +134,7 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
                                    wls="WLS",
                                    gls="GLS",
                                    minchi="MC",
-                                   minrank="MR",
+                                   minrank="MRFA",
                                    alpha="MR")
   factor_score_prefix <- factor_score_prefix_mapping[x$fm]
   names(factor_score_prefix) <- NULL
