@@ -115,7 +115,7 @@ glance.fa_exploratory <- function(x, pretty.name = FALSE, ...) {
 #' @param n_sample Sample number for biplot. Default 5000, which is the default of our scatter plot.
 #'        we use it for gathered_data for parallel coordinates too. sampling is applied before gather.
 tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=FALSE, ...) {
-  factor_output_prefix_mapping <- c(minres="MR",
+  factor_loading_prefix_mapping <- c(minres="MR",
                                     ml="ML",
                                     pa="MR",
                                     ols="X",
@@ -124,8 +124,20 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
                                     minchi="MC",
                                     minrank="MR",
                                     alpha="MR")
-  factor_output_prefix <- factor_output_prefix_mapping[x$fm]
-  names(factor_output_prefix) <- NULL
+  factor_loading_prefix <- factor_loading_prefix_mapping[x$fm]
+  names(factor_loading_prefix) <- NULL
+
+  factor_score_prefix_mapping <- c(minres="MR",
+                                   ml="ML",
+                                   pa="MR",
+                                   ols="V",
+                                   wls="WLS",
+                                   gls="GLS",
+                                   minchi="MC",
+                                   minrank="MR",
+                                   alpha="MR")
+  factor_score_prefix <- factor_score_prefix_mapping[x$fm]
+  names(factor_score_prefix) <- NULL
 
   if (type == "screeplot") {
     eigen_res <- eigen(x$correlation, only.values = TRUE) # Cattell's scree plot is eigenvalues of correlation/covariance matrix.
@@ -136,13 +148,15 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
   }
   else if (type == "loadings") {
     res <- broom:::tidy.factanal(x) # TODO: This just happens to work. Revisit.
-    res <- res %>% tidyr::pivot_longer(cols=c(starts_with(factor_output_prefix), "uniqueness"), names_to="factor", values_to="value")
-    res <- res %>% dplyr::mutate(factor = case_when(factor=="uniqueness"~"Uniqueness", TRUE~stringr::str_replace(factor,paste0("^", !!factor_output_prefix),"Factor "))) # e.g. replaces "MR2" with "Factor 2"
+    res <- res %>% tidyr::pivot_longer(cols=c(starts_with(factor_loading_prefix), "uniqueness"), names_to="factor", values_to="value")
+    res <- res %>% dplyr::mutate(factor = case_when(factor=="uniqueness"~"Uniqueness", TRUE~stringr::str_replace(factor,paste0("^", !!factor_loading_prefix),"Factor "))) # e.g. replaces "MR2" with "Factor 2"
     res <- res %>% dplyr::mutate(factor = forcats::fct_inorder(factor)) # fct_inorder is to make order on chart right, e.g. Factor 2 before Factor 10
   }
   else if (type == "biplot") {
-    factor_1_col <- paste0(factor_output_prefix, "1")
-    factor_2_col <- paste0(factor_output_prefix, "2")
+    factor_1_loading_col <- paste0(factor_loading_prefix, "1")
+    factor_2_loading_col <- paste0(factor_loading_prefix, "2")
+    factor_1_score_col <- paste0(factor_score_prefix, "1")
+    factor_2_score_col <- paste0(factor_score_prefix, "2")
     scores_df <- broom:::augment.factanal(x)
     scores_df <- scores_df %>% select(-.rownames) # augment.factanal seems to always return row names in .rownames column.
     loadings_df <- broom:::tidy.factanal(x)
@@ -177,18 +191,18 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
     res <- res %>% sample_rows(score_n_sample)
 
     # calculate scale ratio for displaying loadings on the same chart as scores.
-    loadings_matrix <- as.matrix(loadings_df %>% dplyr::select(!!rlang::sym(factor_1_col), !!rlang::sym(factor_2_col)))
+    loadings_matrix <- as.matrix(loadings_df %>% dplyr::select(!!rlang::sym(factor_1_loading_col), !!rlang::sym(factor_2_loading_col)))
     max_abs_loading <- max(abs(loadings_matrix))
-    max_abs_score <- max(abs(c(res[[factor_1_col]], res[[factor_2_col]])))
+    max_abs_score <- max(abs(c(res[[factor_1_score_col]], res[[factor_2_score_col]])))
     scale_ratio <- max_abs_score/max_abs_loading
 
-    res <- res %>% dplyr::rename(.factor_2=!!factor_2_col, .factor_1=!!factor_1_col) # name to appear at legend for dots in scatter plot.
+    res <- res %>% dplyr::rename(.factor_2=!!factor_2_score_col, .factor_1=!!factor_1_score_col) # name to appear at legend for dots in scatter plot.
 
     # loadings_df is for the variable lines in biplot. It will be later merged (bind_rows) with res.
     # It shares x-axis column .factor_1 with res, and has separate y-axis column .factor_2_variable.
     # scale loading_matrix so that the scale of measures and data points matches in the scatter plot.
     loadings_df <- loadings_df %>% dplyr::select(-uniqueness) # uniqueness column is not necessary for biplot. Remove it to avoid name conflict as much as possible.
-    loadings_df <- loadings_df %>% dplyr::rename(.factor_1=!!factor_1_col, .factor_2_variable=!!factor_2_col, .variable=variable) # use different column name for PC2 of measures.
+    loadings_df <- loadings_df %>% dplyr::rename(.factor_1=!!factor_1_loading_col, .factor_2_variable=!!factor_2_loading_col, .variable=variable) # use different column name for PC2 of measures.
     loadings_df <- loadings_df %>% dplyr::mutate(.factor_1=.factor_1*scale_ratio, .factor_2_variable=.factor_2_variable*scale_ratio)
     loadings_df0 <- loadings_df %>% dplyr::mutate(.factor_1=0, .factor_2_variable=0) # Create rows for origin of coordinates.
     loadings_df <- loadings_df0 %>% dplyr::bind_rows(loadings_df)
@@ -201,7 +215,7 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
   else { # should be data
     scores_df <- broom:::augment.factanal(x) # This happens to work. Revisit.
     scores_df <- scores_df %>% select(-.rownames) # augment.factanal seems to always return row names in .rownames column.
-    scores_df <- scores_df %>% rename_with(function(x){stringr::str_replace(x,paste0("^", factor_output_prefix), "Factor ")}, starts_with(factor_output_prefix)) #TODO: Make string match condition stricter.
+    scores_df <- scores_df %>% rename_with(function(x){stringr::str_replace(x,paste0("^", factor_score_prefix), "Factor ")}, starts_with(factor_score_prefix)) #TODO: Make string match condition stricter.
 
     # table of observations. bind original data so that color can be used later.
     res <- x$df
