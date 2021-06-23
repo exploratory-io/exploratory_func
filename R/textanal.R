@@ -120,6 +120,9 @@ exp_textanal <- function(df, text,
   text_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(text))
   doc_id <- avoid_conflict(colnames(df), "document_id")
   each_func <- function(df) {
+    # Filter out NAs before sampling. We keep empty string, since we will anyway have to work with the case where no token was found in a doc.
+    df <- df %>% dplyr::filter(!is.na(!!rlang::sym(text_col)))
+
     # sample the data for performance if data size is too large.
     sampled_nrow <- NULL
     if (!is.null(max_nrow) && nrow(df) > max_nrow) {
@@ -133,6 +136,7 @@ exp_textanal <- function(df, text,
                                         stopwords_lang = stopwords_lang, stopwords = stopwords,
                                         hiragana_word_length_to_remove = hiragana_word_length_to_remove,
                                         compound_tokens = compound_tokens)
+    # It is possible that character(0) is returned for document that did not have any tokens, but this still can be handled in subsequent process.
 
     # convert tokens to dfm object
     dfm_res <- tokens %>% quanteda::dfm()

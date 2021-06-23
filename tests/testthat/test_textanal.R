@@ -6,6 +6,8 @@ test_that("exp_textanal", {
   df <- tibble::tibble(text=c(
     "Jack and Jill went up the hill",
     "To fetch a pail of water",
+    NA,
+    "",
     "Jack fell down and broke his crown",
     "And Jill came tumbling after"))
 
@@ -14,6 +16,7 @@ test_that("exp_textanal", {
   model_df <- df %>% exp_textanal(text, stopwords_lang = "english", compound_tokens=c("Jack and jill")) # Testing both lower and upper case for compound_token.
   res <- model_df %>% tidy_rowwise(model, type="words")
   expect_equal(colnames(res), c("document", "word"))
+  expect_equal(length(unique(res$document)), 5) # NA should be filtered, but empty string should be kept.
   res <- model_df %>% tidy_rowwise(model, type="word_count")
   expect_true("Jack And Jill" %in% res$word)
   res <- model_df %>% tidy_rowwise(model, type="word_pairs")
