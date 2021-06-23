@@ -173,6 +173,7 @@ exp_textanal <- function(df, text,
     # clustered_tfidf <- dfm_to_df(dfm_clustered_tfidf)
 
     model <- list()
+    model$tokens <- tokens
     model$dfm <- dfm_res
     model$fcm <- fcm_res
     # Co-occurrence network / document clustering related code below is temporarily commented out. TODO: Revive it.
@@ -241,6 +242,10 @@ fcm_to_df <- function(fcm) {
 #' @export
 #' @param type - Type of output.
 tidy.textanal_exploratory <- function(x, type="word_count", max_words=NULL, max_word_pairs=NULL, ...) {
+  if (type == "words") {
+    res <- tibble::tibble(document=seq(length(as.list(x$tokens))), lst=as.list(x$tokens))
+    res <- res %>% tidyr::unnest_longer(lst, values_to = "word") %>% dplyr::mutate(word = stringr::str_to_title(word))
+  }
   if (type == "word_count") {
     feats <- quanteda::featfreq(x$dfm)
     res <- tibble::tibble(word=stringr::str_to_title(names(feats)), count=feats)
