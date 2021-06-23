@@ -201,7 +201,7 @@ tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=F
   else { # should be data
     scores_df <- broom:::augment.factanal(x) # This happens to work. Revisit.
     scores_df <- scores_df %>% select(-.rownames) # augment.factanal seems to always return row names in .rownames column.
-    scores_df <- scores_df %>% rename_with(function(x){stringr::str_replace(x,paste0("^\\", factor_output_prefix), "Factor ")}, starts_with(factor_output_prefix)) #TODO: Make string match condition stricter.
+    scores_df <- scores_df %>% rename_with(function(x){stringr::str_replace(x,paste0("^", factor_output_prefix), "Factor ")}, starts_with(factor_output_prefix)) #TODO: Make string match condition stricter.
 
     # table of observations. bind original data so that color can be used later.
     res <- x$df
