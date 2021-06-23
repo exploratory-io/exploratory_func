@@ -128,20 +128,6 @@ exp_textanal <- function(df, text,
       df <- df %>% sample_rows(max_nrow)
     }
 
-    # <Tokenizing code with quoanteda's default tokenizer.> TODO: Remove it when there is no need to keep it as a reference.
-    #
-    # This is SE version of dplyr::mutate(df, doc_id = row_number())
-    # df <- dplyr::mutate_(df, .dots=setNames(list(~row_number()),doc_id))
-    #
-    # textData <- df %>% dplyr::select(!!rlang::sym(text_col)) %>% dplyr::rename("text" = !!rlang::sym(text_col))
-    # # Create a corpus from the text column then tokenize.
-    # tokens <- quanteda::corpus(textData) %>%
-    #   quanteda::tokens(what = token, remove_punct = remove_punct, remove_numbers = remove_numbers,
-    #                    remove_symbols = remove_symbols, remove_twitter = remove_twitter,
-    #                    remove_hyphens = remove_hyphens, remove_separators = remove_separators,
-    #                    remove_url = remove_url) %>%
-    #   quanteda::tokens_wordstem()
-
     tokens <- tokenize_with_postprocess(df[[text_col]],
                                         remove_punct = remove_punct, remove_numbers = remove_numbers,
                                         stopwords_lang = stopwords_lang, stopwords = stopwords,
