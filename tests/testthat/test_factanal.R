@@ -30,8 +30,8 @@ test_that("exp_factanal", {
   check_output(model_df)
   model_df <- exp_factanal(df, cyl, mpg, hp, max_nrow=30, fm="ml")
   check_output(model_df)
-  #model_df <- exp_factanal(df, cyl, mpg, hp, max_nrow=30, fm="pa")
-  #check_output(model_df)
+  # model_df <- exp_factanal(df, cyl, mpg, hp, max_nrow=30, fm="pa") # TODO: This gives error "NaNs produced"
+  # check_output(model_df)
   model_df <- exp_factanal(df, cyl, mpg, hp, max_nrow=30, fm="ols")
   check_output(model_df)
   model_df <- exp_factanal(df, cyl, mpg, hp, max_nrow=30, fm="wls")
@@ -42,8 +42,8 @@ test_that("exp_factanal", {
   check_output(model_df)
   model_df <- exp_factanal(df, cyl, mpg, hp, max_nrow=30, fm="minrank")
   check_output(model_df)
-  #model_df <- exp_factanal(df, cyl, mpg, hp, max_nrow=30, fm="alpha")
-  #check_output(model_df)
+  # model_df <- exp_factanal(df, cyl, mpg, hp, max_nrow=30, fm="alpha") # TODO: This gives error "NaNs produced"
+  # check_output(model_df)
 })
 
 test_that("exp_factanal with strange column name and all-NA column", {
