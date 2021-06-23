@@ -2369,11 +2369,11 @@ download_data_file <- function(url, type){
     dir.create(tempdir(), showWarnings = FALSE)
 
     tryCatch({
-      # Download file to tempoprary location
       # Get current timeout sec. Default is 60 sec.
       originalTimeout <- options("timeout")
       # Increase timeout to 10 minutes (600 sec)
       options("timeout" = 600)
+      # Download file to tempoprary location
       download.file(url, destfile = tmp, mode = "wb")
     }, error = function(cond){
        stop(cond)
