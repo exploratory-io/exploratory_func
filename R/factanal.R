@@ -115,18 +115,20 @@ glance.fa_exploratory <- function(x, pretty.name = FALSE, ...) {
 #' @param n_sample Sample number for biplot. Default 5000, which is the default of our scatter plot.
 #'        we use it for gathered_data for parallel coordinates too. sampling is applied before gather.
 tidy.fa_exploratory <- function(x, type="loadings", n_sample=NULL, pretty.name=FALSE, ...) {
+  # Mapping from factorization method and prefix of loading output column name, e.g. MR1, MR2...
   factor_loading_prefix_mapping <- c(minres="MR",
-                                    ml="ML",
-                                    pa="MR",
-                                    ols="X",
-                                    wls="WLS",
-                                    gls="GLS",
-                                    minchi="MC",
-                                    minrank="MRFA",
-                                    alpha="MR")
+                                     ml="ML",
+                                     pa="MR",
+                                     ols="X",
+                                     wls="WLS",
+                                     gls="GLS",
+                                     minchi="MC",
+                                     minrank="MRFA",
+                                     alpha="MR")
   factor_loading_prefix <- factor_loading_prefix_mapping[x$fm]
   names(factor_loading_prefix) <- NULL
 
+  # Mapping from factorization method and prefix of score output column name, e.g. MR1, MR2...
   factor_score_prefix_mapping <- c(minres="MR",
                                    ml="ML",
                                    pa="MR",
