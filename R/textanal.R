@@ -120,6 +120,9 @@ exp_textanal <- function(df, text,
   text_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(text))
   doc_id <- avoid_conflict(colnames(df), "document_id")
   each_func <- function(df) {
+    # Filter out NAs before sampling. We keep empty string, since we will anyway have to work with the case where no token was found in a doc.
+    df <- df %>% dplyr::filter(!is.na(!!rlang::sym(text_col)))
+
     # sample the data for performance if data size is too large.
     sampled_nrow <- NULL
     if (!is.null(max_nrow) && nrow(df) > max_nrow) {
@@ -128,25 +131,12 @@ exp_textanal <- function(df, text,
       df <- df %>% sample_rows(max_nrow)
     }
 
-    # <Tokenizing code with quoanteda's default tokenizer.> TODO: Remove it when there is no need to keep it as a reference.
-    #
-    # This is SE version of dplyr::mutate(df, doc_id = row_number())
-    # df <- dplyr::mutate_(df, .dots=setNames(list(~row_number()),doc_id))
-    #
-    # textData <- df %>% dplyr::select(!!rlang::sym(text_col)) %>% dplyr::rename("text" = !!rlang::sym(text_col))
-    # # Create a corpus from the text column then tokenize.
-    # tokens <- quanteda::corpus(textData) %>%
-    #   quanteda::tokens(what = token, remove_punct = remove_punct, remove_numbers = remove_numbers,
-    #                    remove_symbols = remove_symbols, remove_twitter = remove_twitter,
-    #                    remove_hyphens = remove_hyphens, remove_separators = remove_separators,
-    #                    remove_url = remove_url) %>%
-    #   quanteda::tokens_wordstem()
-
     tokens <- tokenize_with_postprocess(df[[text_col]],
                                         remove_punct = remove_punct, remove_numbers = remove_numbers,
                                         stopwords_lang = stopwords_lang, stopwords = stopwords,
                                         hiragana_word_length_to_remove = hiragana_word_length_to_remove,
                                         compound_tokens = compound_tokens)
+    # It is possible that character(0) is returned for document that did not have any tokens, but this still can be handled in subsequent process.
 
     # convert tokens to dfm object
     dfm_res <- tokens %>% quanteda::dfm()
@@ -156,33 +146,13 @@ exp_textanal <- function(df, text,
     feat_names <- names(feats_selected)
     fcm_selected <- quanteda::fcm_select(fcm_res, pattern = feat_names)
 
-    # # Document clustering code below is temporarily commented out.
-    # dfm_tfidf_res <- quanteda::dfm_tfidf(dfm_res)
-
-    # # Cluster documents with k-means.
-    # tfidf_df <- dfm_to_df(dfm_tfidf_res)
-    # tfidf_df <- tfidf_df %>% dplyr::rename(tfidf=value)
-    # tfidf_reduced <- tfidf_df %>% do_svd(skv = c("document", "token", "tfidf"), n_component = 4) #TODO: Make n_component configurable
-    # tfidf_reduced_wide <- tfidf_reduced %>% tidyr::spread(new.dimension, value)
-    # clustered_df <- tfidf_reduced_wide %>% build_kmeans(`1`, `2`, `3`, `4`, centers=5) #TODO: Make centers configurable
-    # cluster_res <- clustered_df$cluster # Clustering result
-
-    # # Run tf-idf treating each cluster as a document.
-    # dfm_clustered <- quanteda::dfm_group(dfm_res, cluster_res)
-    # dfm_clustered_tfidf <- quanteda::dfm_tfidf(dfm_clustered)
-    # clustered_tfidf <- dfm_to_df(dfm_clustered_tfidf)
-
     model <- list()
+    model$tokens <- tokens
     model$dfm <- dfm_res
     model$fcm <- fcm_res
     # Co-occurrence network / document clustering related code below is temporarily commented out. TODO: Revive it.
     model$feats_selected <- feats_selected
     model$fcm_selected <- fcm_selected
-
-    # model$dfm_tfidf <- dfm_tfidf_res
-    # model$cluster <- clustered_df$cluster
-    # model$dfm_cluster <- dfm_clustered
-    # model$dfm_cluster_tfidf <- dfm_clustered_tfidf
 
     model$df <- df # Keep original df for showing it with clustering result.
     model$sampled_nrow <- sampled_nrow
@@ -241,6 +211,10 @@ fcm_to_df <- function(fcm) {
 #' @export
 #' @param type - Type of output.
 tidy.textanal_exploratory <- function(x, type="word_count", max_words=NULL, max_word_pairs=NULL, ...) {
+  if (type == "words") {
+    res <- tibble::tibble(document=seq(length(as.list(x$tokens))), lst=as.list(x$tokens))
+    res <- res %>% tidyr::unnest_longer(lst, values_to = "word") %>% dplyr::mutate(word = stringr::str_to_title(word))
+  }
   if (type == "word_count") {
     feats <- quanteda::featfreq(x$dfm)
     res <- tibble::tibble(word=stringr::str_to_title(names(feats)), count=feats)
@@ -266,19 +240,6 @@ tidy.textanal_exploratory <- function(x, type="word_count", max_words=NULL, max_
         res <- res %>% dplyr::slice_max(count, n=max_word_pairs, with_ties=FALSE) # Set hard limit even with ties.
       }
     }
-  }
-  else if (type == "doc_cluster") {
-    res <- x$df
-    res <- res %>% dplyr::mutate(cluster = !!x$cluster)
-    res <- res %>% dplyr::group_by(cluster) %>% mutate(document_id = row_number()) %>% ungroup()
-  }
-  else if (type == "doc_cluster_words") {
-    res <- dfm_to_df(x$dfm_cluster_tfidf)
-    res <- res %>% dplyr::group_by(document) %>%
-      dplyr::slice_max(value, n=5) %>%
-      dplyr::ungroup() %>%
-      dplyr::rename(cluster = document)
-    res
   }
   res
 }
