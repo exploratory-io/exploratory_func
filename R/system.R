@@ -1206,6 +1206,30 @@ isConnecitonPoolEnabled <- function(type){
   type %in% c("dbiodbc", "odbc", "postgres", "redshift", "vertica", "mysql", "aurora", "presto", "treasuredata", "mssqlserver", "snowflake", "teradata")
 }
 
+getListOfTablesWithODBC <- function(conn){
+  topLevels <- odbc::odbcListObjects(conn)
+  schemas <- NULL
+  check <- topLevels %>% dplyr::distinct(type) == c("catalog")
+  if (check == TRUE){
+    # create a flat schema list
+    schemas <- purrr::map_dfr(topLevels$name, function(x){odbc::odbcListObjects(conn, catalog = x)}) %>% dplyr::distinct(name, type)
+  } else {
+    schemas <- topLevels
+  }
+  tables <- purrr::map_dfr(schemas$name, function(x){
+    tryCatch({
+      df <- data.frame(table_name = odbc::dbListTables(conn, schema = x))
+      df <- df %>% mutate("schema_name" = x)
+      df
+    }, error=function(condition){
+      # If the user does not have access permission, some database throws an error
+      # if this is the case, just ignore.
+      data.frame()
+    })
+  })
+  tables
+}
+
 #' @export
 getListOfTables <- function(type, host, port, databaseName = NULL, username, password, catalog = "", schema = ""){
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
