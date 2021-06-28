@@ -298,6 +298,9 @@ exp_text_cluster <- function(df, text,
   text_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(text))
   doc_id <- avoid_conflict(colnames(df), "document_id")
   each_func <- function(df) {
+    # Filter out NAs before sampling. We keep empty string, since we will anyway have to work with the case where no token was found in a doc.
+    df <- df %>% dplyr::filter(!is.na(!!rlang::sym(text_col)))
+
     # sample the data for performance if data size is too large.
     sampled_nrow <- NULL
     if (!is.null(max_nrow) && nrow(df) > max_nrow) {
@@ -399,4 +402,53 @@ tidy.text_cluster_exploratory <- function(x, type="word_count", num_top_words=5,
     res
   }
   res
+}
+
+#' Function for Topic Model Analytics View
+#' @export
+exp_topic_model <- function(df, text,
+                            remove_punct = TRUE, remove_numbers = TRUE,
+                            stopwords_lang = NULL, stopwords = c(),
+                            hiragana_word_length_to_remove = 2,
+                            compound_tokens = NULL,
+                            num_topics = 3,
+                            max_nrow = 50000,
+                            ...){
+
+  # Always put document_id to know what document the tokens are from
+  text_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(text))
+  doc_id <- avoid_conflict(colnames(df), "document_id")
+  each_func <- function(df) {
+    # Filter out NAs before sampling. We keep empty string, since we will anyway have to work with the case where no token was found in a doc.
+    df <- df %>% dplyr::filter(!is.na(!!rlang::sym(text_col)))
+
+    # sample the data for performance if data size is too large.
+    sampled_nrow <- NULL
+    if (!is.null(max_nrow) && nrow(df) > max_nrow) {
+      # Record that sampling happened.
+      sampled_nrow <- max_nrow
+      df <- df %>% sample_rows(max_nrow)
+    }
+
+    tokens <- tokenize_with_postprocess(df[[text_col]],
+                                        remove_punct = remove_punct, remove_numbers = remove_numbers,
+                                        stopwords_lang = stopwords_lang, stopwords = stopwords,
+                                        hiragana_word_length_to_remove = hiragana_word_length_to_remove,
+                                        compound_tokens = compound_tokens)
+
+    # convert tokens to dfm object
+    dfm_res <- tokens %>% quanteda::dfm()
+
+    lda_model <- seededlda::textmodel_lda(dfm_res, k = num_topics)
+
+    model <- list()
+    model$model <- lda_model
+    model$dfm <- dfm_res # TODO: See if we actually need it.
+    model$df <- df # Keep original df for showing it with LDA result.
+    model$sampled_nrow <- sampled_nrow
+    class(model) <- 'textmodel_lda_exploratory'
+    model
+  }
+
+  do_on_each_group(df, each_func, name = "model", with_unnest = FALSE)
 }
