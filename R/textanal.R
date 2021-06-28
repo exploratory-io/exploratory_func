@@ -452,3 +452,17 @@ exp_topic_model <- function(df, text,
 
   do_on_each_group(df, each_func, name = "model", with_unnest = FALSE)
 }
+
+#' extracts results from textmodel_lda_exploratory object as a dataframe
+#' @export
+#' @param type - Type of output.
+tidy.textmodel_lda_exploratory <- function(x, type="doc_topics", num_top_words=5, ...) {
+  if (type == "doc_topics") {
+    res <- x$df
+    res <- res %>% dplyr::bind_cols(as.data.frame(x$model$theta))
+  }
+  else if (type == "topic_words") {
+    res <- as.data.frame(seededlda::terms(x$model))
+  }
+  res
+}
