@@ -350,8 +350,9 @@ exp_text_cluster <- function(df, text,
     # Make it a data frame (a row represents a document)
     docs_reduced_df <- as.data.frame(docs_reduced)
     # Cluster documents.
-    clustered_df <- docs_reduced_df %>% build_kmeans.cols(everything(), centers=num_clusters) #TODO: Expose arguments for kmeans.
-    cluster_res <- clustered_df$cluster # Clustering result
+    model_df <- docs_reduced_df %>% build_kmeans.cols(everything(), centers=num_clusters, augment=FALSE) #TODO: Expose arguments for kmeans.
+    kmeans_res <- model_df$model[[1]]
+    cluster_res <- kmeans_res$cluster # Clustering result
 
 
     docs_sample_index <- if (nrow(docs_reduced_df) > mds_sample_size) {
@@ -374,7 +375,7 @@ exp_text_cluster <- function(df, text,
     model$dfm <- dfm_res
 
     model$dfm_tfidf <- dfm_tfidf_res
-    model$cluster <- clustered_df # SVD result and cluster result
+    model$kmeans <- kmeans_res
     model$dfm_cluster <- dfm_clustered
     model$dfm_cluster_tfidf <- dfm_clustered_tfidf
 
@@ -393,13 +394,16 @@ exp_text_cluster <- function(df, text,
 #' @export
 #' @param type - Type of output.
 tidy.text_cluster_exploratory <- function(x, type="word_count", num_top_words=5, ...) {
-  if (type == "doc_cluster") {
+  if (type == "clusters") {
+    res <- tibble(cluster=seq(length(x$kmeans$size)), size=x$kmeans$size, withinss=x$kmeans$withinss)
+  }
+  else if (type == "doc_cluster") {
     res <- x$df
-    res <- res %>% dplyr::bind_cols(x$cluster)
+    res <- res %>% dplyr::mutate(cluster=!!x$kmeans$cluster)
   }
   else if (type == "doc_cluster_mds") {
     res <- x$df[x$docs_sample_index,]
-    cluster_res_sampled <- x$cluster$cluster[x$docs_sample_index]
+    cluster_res_sampled <- x$kmeans$cluster[x$docs_sample_index]
     res <- res %>% dplyr::mutate(cluster = !!cluster_res_sampled)
     docs_coordinates_df <- as.data.frame(x$docs_coordinates)
     res <- res %>% dplyr::bind_cols(docs_coordinates_df)
