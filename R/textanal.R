@@ -288,6 +288,12 @@ exp_text_cluster <- function(df, text,
                          stopwords_lang = NULL, stopwords = c(),
                          hiragana_word_length_to_remove = 2,
                          compound_tokens = NULL,
+                         tf_scheme = "logcount",
+                         idf_scheme = "unary",
+                         tfidf_base = 10
+                         idf_smoothing = 0,
+                         idf_k = 0,
+                         idf_threshold = 0,
                          svd_dim=5,
                          num_clusters=3,
                          mds_sample_size=200,
@@ -318,8 +324,13 @@ exp_text_cluster <- function(df, text,
     # convert tokens to dfm object
     dfm_res <- tokens %>% quanteda::dfm()
 
-    # Document clustering code below is temporarily commented out.
-    dfm_tfidf_res <- quanteda::dfm_tfidf(dfm_res)
+    dfm_tfidf_res <- quanteda::dfm_tfidf(dfm_res,
+                                         scheme_tf = tf_scheme,
+                                         scheme_df = idf_scheme,
+                                         base = tfidf_base,
+                                         smoothing = idf_smoothing,
+                                         k = idf_k,
+                                         threshold = idf_threshold)
 
     # Cluster documents with k-means.
     tfidf_df <- dfm_to_df(dfm_tfidf_res)
