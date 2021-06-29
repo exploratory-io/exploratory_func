@@ -290,7 +290,7 @@ exp_text_cluster <- function(df, text,
                          compound_tokens = NULL,
                          tf_scheme = "logcount",
                          idf_scheme = "unary",
-                         tfidf_base = 10
+                         tfidf_base = 10,
                          idf_smoothing = 0,
                          idf_k = 0,
                          idf_threshold = 0,
