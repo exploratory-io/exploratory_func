@@ -410,10 +410,20 @@ tidy.text_cluster_exploratory <- function(x, type="word_count", num_top_words=5,
   }
   else if (type == "doc_cluster_words") {
     res <- dfm_to_df(x$dfm_cluster_tfidf)
-    res <- res %>% dplyr::group_by(document) %>%
-      dplyr::slice_max(value, n=num_top_words) %>%
-      dplyr::ungroup() %>%
+    res <- res %>% dplyr::group_by(document)
+
+    # Set hard-limit of 100 words even with ties, unless the limit is explicitly set above 100.
+    # If the limit is set above 100, ties above the limit is not shown.
+    if (num_top_words < 100) {
+      res <- res %>% dplyr::slice_max(value, n=num_top_words, with_ties=TRUE) %>% slice_max(value, n=100, with_ties=FALSE) # Set hard limit of 100 even with ties.
+    }
+    else {
+      res <- res %>% dplyr::slice_max(value, n=num_top_words, with_ties=FALSE) # Set hard limit even with ties.
+    }
+
+    res <- res %>% dplyr::ungroup() %>%
       dplyr::rename(cluster = document)
+
     # Extract count of words in each cluster from dfm_cluster.
     res <- res %>% dplyr::nest_by(cluster) %>% ungroup() %>%
       dplyr::mutate(data=purrr::map2(data, cluster, function(y, clstr){y %>%
