@@ -66,7 +66,7 @@ tokenize_with_postprocess <- function(text,
   tokens <- quanteda::tokens(tokenized)
   # tokens <- tokens %>% quanteda::tokens_wordstem() # TODO: Revive stemming and expose as an option.
 
-  if (!is.null(compound_tokens)) { # This probably should be kept before removing stopwords not to break compoint tokens that includes stopwords.
+  if (!is.null(compound_tokens)) { # This probably should be kept before removing stopwords not to break compound tokens that includes stopwords.
     # Split compound_tokens into ones separated by space and ones that are not.
     with_space_idx <- str_detect(compound_tokens, ' ')
     compound_tokens_with_space <- compound_tokens[with_space_idx]
