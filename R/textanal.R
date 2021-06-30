@@ -414,6 +414,10 @@ tidy.text_cluster_exploratory <- function(x, type="word_count", num_top_words=5,
       dplyr::slice_max(value, n=num_top_words) %>%
       dplyr::ungroup() %>%
       dplyr::rename(cluster = document)
+    # Extract count of words in each cluster from dfm_cluster.
+    res <- res %>% dplyr::nest_by(cluster) %>% ungroup() %>%
+      dplyr::mutate(data=purrr::map2(data, cluster, function(y, clstr){y %>%
+                                     dplyr::mutate(count=as.numeric(x$dfm_cluster[clstr,token_id]))})) %>% tidyr::unnest(data)
     res
   }
   res
