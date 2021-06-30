@@ -441,6 +441,7 @@ exp_topic_model <- function(df, text,
                             hiragana_word_length_to_remove = 2,
                             compound_tokens = NULL,
                             num_topics = 3,
+                            mds_sample_size=200,
                             max_nrow = 50000,
                             ...){
 
@@ -469,10 +470,24 @@ exp_topic_model <- function(df, text,
     dfm_res <- tokens %>% quanteda::dfm()
 
     lda_model <- seededlda::textmodel_lda(dfm_res, k = num_topics)
+    docs_topics <- lda_model$theta
 
+    docs_sample_index <- if (nrow(docs_topics) > mds_sample_size) {
+      sample(nrow(docs_topics), size=mds_sample_size)
+    }
+    else {
+      1:nrow(docs_topics)
+    }
+
+    docs_topics_sampled <- docs_topics[docs_sample_index,]
+    docs_dist_mat <- dist(docs_topics_sampled)
+    docs_coordinates <- cmdscale(docs_dist_mat)
     model <- list()
     model$model <- lda_model
     model$dfm <- dfm_res # TODO: See if we actually need it.
+
+    model$docs_coordinates <- docs_coordinates # MDS result for scatter plot
+    model$docs_sample_index <- docs_sample_index
     model$df <- df # Keep original df for showing it with LDA result.
     model$sampled_nrow <- sampled_nrow
     class(model) <- 'textmodel_lda_exploratory'
@@ -489,6 +504,15 @@ tidy.textmodel_lda_exploratory <- function(x, type="doc_topics", num_top_words=5
   if (type == "doc_topics") {
     res <- x$df
     res <- res %>% dplyr::bind_cols(as.data.frame(x$model$theta))
+  }
+  else if (type == "doc_topics_mds") {
+    res <- x$df[x$docs_sample_index,]
+    docs_topics_sampled <- x$model$theta[x$docs_sample_index,]
+    docs_topics_df <- as.data.frame(docs_topics_sampled)
+    docs_topics_df <- docs_topics_df %>% dplyr::mutate(max_topic=summarize_row(across(starts_with("topic")), which.max))
+    res <- res %>% dplyr::bind_cols(docs_topics_df)
+    docs_coordinates_df <- as.data.frame(x$docs_coordinates)
+    res <- res %>% dplyr::bind_cols(docs_coordinates_df)
   }
   else if (type == "topic_words") {
     res <- as.data.frame(seededlda::terms(x$model))
