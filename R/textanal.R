@@ -503,7 +503,9 @@ exp_topic_model <- function(df, text,
 tidy.textmodel_lda_exploratory <- function(x, type="doc_topics", num_top_words=5, ...) {
   if (type == "doc_topics") {
     res <- x$df
-    res <- res %>% dplyr::bind_cols(as.data.frame(x$model$theta))
+    docs_topics_df <- as.data.frame(x$model$theta)
+    docs_topics_df <- docs_topics_df %>% dplyr::mutate(max_topic=summarize_row(across(starts_with("topic")), which.max), topic_max=summarize_row(across(starts_with("topic")), max))
+    res <- res %>% dplyr::bind_cols(docs_topics_df)
   }
   else if (type == "doc_topics_mds") {
     res <- x$df[x$docs_sample_index,]
