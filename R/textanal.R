@@ -501,7 +501,15 @@ exp_topic_model <- function(df, text,
 #' @export
 #' @param type - Type of output.
 tidy.textmodel_lda_exploratory <- function(x, type="doc_topics", num_top_words=5, ...) {
-  if (type == "doc_topics") {
+  if (type == "word_topics") {
+    terms_max_proportion <- apply(x$model$phi, 2, max)
+    terms_max_proportion_df <- tibble::tibble(id=seq(length(terms_max_proportion)),proportion=terms_max_proportion)
+    top_terms_max_proportion_df <- terms_max_proportion_df %>% slice_max(proportion, n=100)
+    top_terms_topics_df <- as.data.frame(t(x$model$phi[,top_terms_max_proportion_df$id]))
+    top_terms <- rownames(top_terms_topics_df)
+    res <- tibble::tibble(word=top_terms) %>% dplyr::bind_cols(top_terms_topics_df)
+  }
+  else if (type == "doc_topics") {
     res <- x$df
     docs_topics_df <- as.data.frame(x$model$theta)
     docs_topics_df <- docs_topics_df %>% dplyr::mutate(max_topic=summarize_row(across(starts_with("topic")), which.max), topic_max=summarize_row(across(starts_with("topic")), max))
