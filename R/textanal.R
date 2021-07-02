@@ -502,12 +502,17 @@ exp_topic_model <- function(df, text,
 #' @param type - Type of output.
 tidy.textmodel_lda_exploratory <- function(x, type="doc_topics", num_top_words=5, ...) {
   if (type == "word_topics") {
-    terms_max_proportion <- apply(x$model$phi, 2, max)
-    terms_max_proportion_df <- tibble::tibble(id=seq(length(terms_max_proportion)),proportion=terms_max_proportion)
-    top_terms_max_proportion_df <- terms_max_proportion_df %>% slice_max(proportion, n=100)
-    top_terms_topics_df <- as.data.frame(t(x$model$phi[,top_terms_max_proportion_df$id]))
-    top_terms <- rownames(top_terms_topics_df)
-    res <- tibble::tibble(word=top_terms) %>% dplyr::bind_cols(top_terms_topics_df)
+    terms_topics_df <- as.data.frame(t(x$model$phi))
+    terms <- rownames(terms_topics_df)
+    terms_topics_df <- terms_topics_df %>% dplyr::mutate(max_topic=summarize_row(across(starts_with("topic")), which.max), topic_max=summarize_row(across(starts_with("topic")), max))
+    res <- tibble::tibble(word=terms) %>% dplyr::bind_cols(terms_topics_df)
+  }
+  else if (type == "topic_words") { # Similar to the above but this is pivotted and sampled. TODO: Organize.
+    terms_topics_df <- as.data.frame(t(x$model$phi))
+    words <- rownames(terms_topics_df)
+    terms_topics_df <- terms_topics_df %>% dplyr::mutate(word=words)
+    terms_topics_df <- terms_topics_df %>% tidyr::pivot_longer(names_to='topic', values_to='probability', matches('^topic[0-9]+$'))
+    res <- terms_topics_df %>% dplyr::group_by(topic) %>% dplyr::slice_max(probability, n=10, with_ties = FALSE) %>% ungroup()
   }
   else if (type == "doc_topics") {
     res <- x$df
@@ -523,9 +528,6 @@ tidy.textmodel_lda_exploratory <- function(x, type="doc_topics", num_top_words=5
     res <- res %>% dplyr::bind_cols(docs_topics_df)
     docs_coordinates_df <- as.data.frame(x$docs_coordinates)
     res <- res %>% dplyr::bind_cols(docs_coordinates_df)
-  }
-  else if (type == "topic_words") {
-    res <- as.data.frame(seededlda::terms(x$model))
   }
   res
 }
