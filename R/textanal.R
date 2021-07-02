@@ -298,11 +298,18 @@ exp_text_cluster <- function(df, text,
                          num_clusters=3,
                          mds_sample_size=200,
                          max_nrow = 50000,
+                         seed = 1,
                          ...){
 
   # Always put document_id to know what document the tokens are from
   text_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(text))
   doc_id <- avoid_conflict(colnames(df), "document_id")
+
+  # Set seed just once.
+  if(!is.null(seed)) {
+    set.seed(seed)
+  }
+
   each_func <- function(df) {
     # Filter out NAs before sampling. We keep empty string, since we will anyway have to work with the case where no token was found in a doc.
     df <- df %>% dplyr::filter(!is.na(!!rlang::sym(text_col)))
@@ -349,8 +356,8 @@ exp_text_cluster <- function(df, text,
 
     # Make it a data frame (a row represents a document)
     docs_reduced_df <- as.data.frame(docs_reduced)
-    # Cluster documents.
-    model_df <- docs_reduced_df %>% build_kmeans.cols(everything(), centers=num_clusters, augment=FALSE) #TODO: Expose arguments for kmeans.
+    # Cluster documents. #TODO: Expose arguments for kmeans.
+    model_df <- docs_reduced_df %>% build_kmeans.cols(everything(), centers=num_clusters, augment=FALSE, seed=NULL) # seed is NULL since we already set it.
     kmeans_res <- model_df$model[[1]]
     cluster_res <- kmeans_res$cluster # Clustering result
 
@@ -443,11 +450,18 @@ exp_topic_model <- function(df, text,
                             num_topics = 3,
                             mds_sample_size=200,
                             max_nrow = 50000,
+                            seed = 1,
                             ...){
 
   # Always put document_id to know what document the tokens are from
   text_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(text))
   doc_id <- avoid_conflict(colnames(df), "document_id")
+
+  # Set seed just once.
+  if(!is.null(seed)) {
+    set.seed(seed)
+  }
+
   each_func <- function(df) {
     # Filter out NAs before sampling. We keep empty string, since we will anyway have to work with the case where no token was found in a doc.
     df <- df %>% dplyr::filter(!is.na(!!rlang::sym(text_col)))
