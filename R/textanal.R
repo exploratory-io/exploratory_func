@@ -512,7 +512,7 @@ tidy.textmodel_lda_exploratory <- function(x, type="doc_topics", num_top_words=5
     words <- rownames(terms_topics_df)
     terms_topics_df <- terms_topics_df %>% dplyr::mutate(word=words)
     terms_topics_df <- terms_topics_df %>% tidyr::pivot_longer(names_to='topic', values_to='probability', matches('^topic[0-9]+$'))
-    res <- terms_topics_df %>% dplyr::group_by(topic) %>% dplyr::slice_max(probability, n=10, with_ties = FALSE) %>% ungroup()
+    res <- terms_topics_df %>% dplyr::group_by(topic) %>% dplyr::slice_max(probability, n=10, with_ties = FALSE) %>% dplyr::ungroup()
   }
   else if (type == "doc_topics") {
     res <- x$df
