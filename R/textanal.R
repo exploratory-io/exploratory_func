@@ -432,10 +432,10 @@ tidy.text_cluster_exploratory <- function(x, type="word_count", num_top_words=5,
       dplyr::rename(cluster = document)
 
     # Extract count of words in each cluster from dfm_cluster.
-    res <- res %>% dplyr::nest_by(cluster) %>% ungroup() %>%
-      dplyr::mutate(data=purrr::map2(data, cluster, function(y, clstr){y %>%
-                                     dplyr::mutate(count=as.numeric(x$dfm_cluster[clstr,token_id]))})) %>% tidyr::unnest(data)
-    res
+    res <- res %>% dplyr::nest_by(cluster) %>% dplyr::ungroup() %>%
+      dplyr::mutate(data=purrr::map2(data, cluster, function(y, clstr) {
+        y %>% dplyr::mutate(count=as.numeric(x$dfm_cluster[clstr,token_id]))
+      })) %>% tidyr::unnest(data)
   }
   res
 }
@@ -484,7 +484,7 @@ exp_topic_model <- function(df, text,
     dfm_res <- tokens %>% quanteda::dfm()
 
     lda_model <- seededlda::textmodel_lda(dfm_res, k = num_topics)
-    docs_topics <- lda_model$theta
+    docs_topics <- lda_model$theta # theta is the documents-topics matrix.
 
     docs_sample_index <- if (nrow(docs_topics) > mds_sample_size) {
       sample(nrow(docs_topics), size=mds_sample_size)
@@ -493,12 +493,13 @@ exp_topic_model <- function(df, text,
       1:nrow(docs_topics)
     }
 
+    # Prepare data for MDS. We use sampled-down data.
     docs_topics_sampled <- docs_topics[docs_sample_index,]
     docs_dist_mat <- dist(docs_topics_sampled)
     docs_coordinates <- cmdscale(docs_dist_mat)
+
     model <- list()
     model$model <- lda_model
-
     model$docs_coordinates <- docs_coordinates # MDS result for scatter plot
     model$docs_sample_index <- docs_sample_index
     model$df <- df # Keep original df for showing it with LDA result.
