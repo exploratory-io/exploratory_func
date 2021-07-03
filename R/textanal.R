@@ -498,7 +498,6 @@ exp_topic_model <- function(df, text,
     docs_coordinates <- cmdscale(docs_dist_mat)
     model <- list()
     model$model <- lda_model
-    model$dfm <- dfm_res # TODO: See if we actually need it.
 
     model$docs_coordinates <- docs_coordinates # MDS result for scatter plot
     model$docs_sample_index <- docs_sample_index
