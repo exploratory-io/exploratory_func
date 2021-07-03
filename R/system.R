@@ -1091,7 +1091,6 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         encoding <- stringr::str_split(loc, pattern = "\\.")
         if (length(encoding[[1]] == 2)) {
           # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
-          connstr <- stringr::str_c(connstr, ", encoding = '", encoding[[1]][[2]], "'")
           conn <- DBI::dbConnect(odbc::odbc(),
                                  Driver = driver,
                                  Server = host,
@@ -1176,7 +1175,6 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         encoding <- stringr::str_split(loc, pattern = "\\.")
         if (length(encoding[[1]] == 2)) {
           # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
-          connstr <- stringr::str_c(connstr, ", encoding = '", encoding[[1]][[2]], "'")
           conn <- DBI::dbConnect(odbc::odbc(),
                                  Driver = driver,
                                  Server = host,
