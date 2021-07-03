@@ -671,15 +671,46 @@ getAmazonAthenaConnection <- function(driver = "", region = "", authenticationTy
     conn <- connection_pool[[connectionString]]
   }
   if (is.null(conn)) {
-    conn <- DBI::dbConnect(
-      odbc::odbc(),
-      Driver             = driver,
-      S3OutputLocation   = s3OutputLocation,
-      AwsRegion          = region,
-      AuthenticationType = authenticationType,
-      UID                = user,
-      PWD                = password
-    )
+    # For Windows, set encoding to make sure non-ascii data is handled properly.
+    # ref: https://github.com/r-dbi/odbc/issues/153
+    if (is.win <- Sys.info()['sysname'] == 'Windows') {
+      loc <- Sys.getlocale(category = "LC_CTYPE")
+      # loc looks like "Japanese_Japan.932", so split it with dot ".".
+      encoding <- stringr::str_split(loc, pattern = "\\.")
+      if (length(encoding[[1]] == 2)) {
+        # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
+        conn <- DBI::dbConnect(
+          odbc::odbc(),
+          Driver             = driver,
+          S3OutputLocation   = s3OutputLocation,
+          AwsRegion          = region,
+          AuthenticationType = authenticationType,
+          encoding           = encoding[[1]][[2]],
+          UID                = user,
+          PWD                = password
+        )
+      } else {
+        conn <- DBI::dbConnect(
+          odbc::odbc(),
+          Driver             = driver,
+          S3OutputLocation   = s3OutputLocation,
+          AwsRegion          = region,
+          AuthenticationType = authenticationType,
+          UID                = user,
+          PWD                = password
+        )
+      }
+    } else {
+      conn <- DBI::dbConnect(
+        odbc::odbc(),
+        Driver             = driver,
+        S3OutputLocation   = s3OutputLocation,
+        AwsRegion          = region,
+        AuthenticationType = authenticationType,
+        UID                = user,
+        PWD                = password
+      )
+    }
     if (user_env$pool_connection) { # pool connection if connection pooling is on.
       connection_pool[[connectionString]] <- conn
     }
@@ -1052,14 +1083,44 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     }
     # if the connection is null or the connection is invalid, create a new one.
     if (is.null(conn) || !DBI::dbIsValid(conn)) {
-      conn <- DBI::dbConnect(odbc::odbc(),
-                             Driver = driver,
-                             Server = host,
-                             Database = databaseName,
-                             UID = username,
-                             PWD = password,
-                             Port = port,
-                             bigint = "numeric")
+      # For Windows, set encoding to make sure non-ascii data is handled properly.
+      # ref: https://github.com/r-dbi/odbc/issues/153
+      if (is.win <- Sys.info()['sysname'] == 'Windows') {
+        loc <- Sys.getlocale(category = "LC_CTYPE")
+        # loc looks like "Japanese_Japan.932", so split it with dot ".".
+        encoding <- stringr::str_split(loc, pattern = "\\.")
+        if (length(encoding[[1]] == 2)) {
+          # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
+          connstr <- stringr::str_c(connstr, ", encoding = '", encoding[[1]][[2]], "'")
+          conn <- DBI::dbConnect(odbc::odbc(),
+                                 Driver = driver,
+                                 Server = host,
+                                 Database = databaseName,
+                                 UID = username,
+                                 PWD = password,
+                                 Port = port,
+                                 encoding = encoding[[1]][[2]],
+                                 bigint = "numeric")
+        } else {
+          conn <- DBI::dbConnect(odbc::odbc(),
+                                 Driver = driver,
+                                 Server = host,
+                                 Database = databaseName,
+                                 UID = username,
+                                 PWD = password,
+                                 Port = port,
+                                 bigint = "numeric")
+        }
+      } else {
+        conn <- DBI::dbConnect(odbc::odbc(),
+                               Driver = driver,
+                               Server = host,
+                               Database = databaseName,
+                               UID = username,
+                               PWD = password,
+                               Port = port,
+                               bigint = "numeric")
+      }
       connection_pool[[key]] <- conn
     }
   } else if (type == "snowflake") {
@@ -1109,14 +1170,42 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     }
     # if the connection is null or the connection is invalid, create a new one.
     if (is.null(conn) || !DBI::dbIsValid(conn)) {
-      conn <- DBI::dbConnect(odbc::odbc(),
-                             Server = host,
-                             Warehouse = catalog,
-                             port = port,
-                             UID = username,
-                             PWD = password,
-                             driver = driver,
-                             Database = databaseName)
+      if (is.win <- Sys.info()['sysname'] == 'Windows') {
+        loc <- Sys.getlocale(category = "LC_CTYPE")
+        # loc looks like "Japanese_Japan.932", so split it with dot ".".
+        encoding <- stringr::str_split(loc, pattern = "\\.")
+        if (length(encoding[[1]] == 2)) {
+          # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
+          connstr <- stringr::str_c(connstr, ", encoding = '", encoding[[1]][[2]], "'")
+          conn <- DBI::dbConnect(odbc::odbc(),
+                                 Driver = driver,
+                                 Server = host,
+                                 Database = databaseName,
+                                 UID = username,
+                                 PWD = password,
+                                 Port = port,
+                                 encoding = encoding[[1]][[2]],
+                                 bigint = "numeric")
+        } else {
+          conn <- DBI::dbConnect(odbc::odbc(),
+                                 Driver = driver,
+                                 Server = host,
+                                 Database = databaseName,
+                                 UID = username,
+                                 PWD = password,
+                                 Port = port,
+                                 bigint = "numeric")
+        }
+      } else {
+        conn <- DBI::dbConnect(odbc::odbc(),
+                               Server = host,
+                               Warehouse = catalog,
+                               port = port,
+                               UID = username,
+                               PWD = password,
+                               driver = driver,
+                               Database = databaseName)
+      }
       connection_pool[[key]] <- conn
     }
   }
