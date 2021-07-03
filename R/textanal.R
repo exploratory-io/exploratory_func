@@ -516,7 +516,7 @@ exp_topic_model <- function(df, text,
 #' @param type - Type of output.
 tidy.textmodel_lda_exploratory <- function(x, type="doc_topics", num_top_words=5, ...) {
   if (type == "word_topics") {
-    terms_topics_df <- as.data.frame(t(x$model$phi))
+    terms_topics_df <- as.data.frame(t(x$model$phi)) # phi is the topics-terms matrix. This needs to be transposed to make it a terms-topics matrix.
     terms <- rownames(terms_topics_df)
     terms_topics_df <- terms_topics_df %>% dplyr::mutate(max_topic=summarize_row(across(starts_with("topic")), which.max), topic_max=summarize_row(across(starts_with("topic")), max))
     res <- tibble::tibble(word=terms) %>% dplyr::bind_cols(terms_topics_df)
