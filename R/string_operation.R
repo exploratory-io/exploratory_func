@@ -118,6 +118,7 @@ get_stopwords <- function(lang = "english", include = c(), exclude = c(), is_twi
   # if lang is not in below special cases, append stopwords from tidystopwords package because tidystopwords provides
   # wide range of stopwords such as http and https which are not inclued in tm package.
   if (lang %nin% c(
+    "japanese", # Avoid this for Japanese too. We are going for minimum set of stopwords for Japanese for now.
     "english_snowball",
     "english_onix",
     "english_smart")){
