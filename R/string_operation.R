@@ -87,10 +87,11 @@ get_stopwords <- function(lang = "english", include = c(), exclude = c(), is_twi
   stopwords <- if (lang %in% c(
     "english_snowball",
     "english_onix",
-    "english_smart",
-    "japanese")){
+    "english_smart")){
     # these data are created from data-raw/create_internal_data.R
     get(paste0("stopwords_", lang))
+  } else if(lang == "japanese") {
+    stopwords_japanese_minimum
   } else if(lang %in% c( # tm only supports these language for stopwords
     "danish",
     "dutch",
