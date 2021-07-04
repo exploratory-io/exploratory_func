@@ -13,10 +13,6 @@ stopwords_english_smart <- readRDS("data-raw/stopwords_smart.rds")
 stopwords_english_onix <- readRDS("data-raw/stopwords_onix.rds")
 stopwords_english_snowball <- readRDS("data-raw/stopwords_snowball.rds")
 
-if(all(!stopwords_japanese %in% c("あなた", "いくつ", "いろいろ", "おまえ"))){
-  stop("stopwords_japanese seems strange")
-}
-
 usethis::use_data(
   exploratory_stopwords,
   stopwords_japanese,
