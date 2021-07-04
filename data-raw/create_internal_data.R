@@ -23,6 +23,8 @@ res <- httr::GET("http://svn.sourceforge.jp/svnroot/slothlib/CSharp/Version1/Slo
 stopwords_japanese <- httr::content(res) %>% stringr::str_split("\r\n")
 # ja_stopwrods is a list whose length is 1
 stopwords_japanese <- stopwords_japanese[[1]][!is_empty(stopwords_japanese[[1]])]
+# Keep only hiragana-only words and single-character kanji words. We believe multi-character kanji words here are too much for stopwords.
+stopwords_japanese <- stopwords_japanese[str_detect(stopwords_japanese, "^[\\u3040-\\u309f]+$") | str_length(stopwords_japanese)==1]
 stopwords_english_smart <- readRDS("data-raw/stopwords_smart.rds")
 stopwords_english_onix <- readRDS("data-raw/stopwords_onix.rds")
 stopwords_english_snowball <- readRDS("data-raw/stopwords_snowball.rds")

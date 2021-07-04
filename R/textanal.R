@@ -66,7 +66,7 @@ tokenize_with_postprocess <- function(text,
   tokens <- quanteda::tokens(tokenized)
   # tokens <- tokens %>% quanteda::tokens_wordstem() # TODO: Revive stemming and expose as an option.
 
-  if (!is.null(compound_tokens)) { # This probably should be kept before removing stopwords not to break compoint tokens that includes stopwords.
+  if (!is.null(compound_tokens)) { # This probably should be kept before removing stopwords not to break compound tokens that includes stopwords.
     # Split compound_tokens into ones separated by space and ones that are not.
     with_space_idx <- str_detect(compound_tokens, ' ')
     compound_tokens_with_space <- compound_tokens[with_space_idx]
@@ -288,16 +288,32 @@ exp_text_cluster <- function(df, text,
                          stopwords_lang = NULL, stopwords = c(),
                          hiragana_word_length_to_remove = 2,
                          compound_tokens = NULL,
+                         tf_scheme = "logcount",
+                         idf_scheme = "unary",
+                         tfidf_base = 10,
+                         idf_smoothing = 0,
+                         idf_k = 0,
+                         idf_threshold = 0,
                          svd_dim=5,
                          num_clusters=3,
                          mds_sample_size=200,
                          max_nrow = 50000,
+                         seed = 1,
                          ...){
 
   # Always put document_id to know what document the tokens are from
   text_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(text))
   doc_id <- avoid_conflict(colnames(df), "document_id")
+
+  # Set seed just once.
+  if(!is.null(seed)) {
+    set.seed(seed)
+  }
+
   each_func <- function(df) {
+    # Filter out NAs before sampling. We keep empty string, since we will anyway have to work with the case where no token was found in a doc.
+    df <- df %>% dplyr::filter(!is.na(!!rlang::sym(text_col)))
+
     # sample the data for performance if data size is too large.
     sampled_nrow <- NULL
     if (!is.null(max_nrow) && nrow(df) > max_nrow) {
@@ -315,8 +331,13 @@ exp_text_cluster <- function(df, text,
     # convert tokens to dfm object
     dfm_res <- tokens %>% quanteda::dfm()
 
-    # Document clustering code below is temporarily commented out.
-    dfm_tfidf_res <- quanteda::dfm_tfidf(dfm_res)
+    dfm_tfidf_res <- quanteda::dfm_tfidf(dfm_res,
+                                         scheme_tf = tf_scheme,
+                                         scheme_df = idf_scheme,
+                                         base = tfidf_base,
+                                         smoothing = idf_smoothing,
+                                         k = idf_k,
+                                         threshold = idf_threshold)
 
     # Cluster documents with k-means.
     tfidf_df <- dfm_to_df(dfm_tfidf_res)
@@ -335,9 +356,10 @@ exp_text_cluster <- function(df, text,
 
     # Make it a data frame (a row represents a document)
     docs_reduced_df <- as.data.frame(docs_reduced)
-    # Cluster documents.
-    clustered_df <- docs_reduced_df %>% build_kmeans.cols(everything(), centers=num_clusters) #TODO: Expose arguments for kmeans.
-    cluster_res <- clustered_df$cluster # Clustering result
+    # Cluster documents. #TODO: Expose arguments for kmeans.
+    model_df <- docs_reduced_df %>% build_kmeans.cols(everything(), centers=num_clusters, augment=FALSE, seed=NULL) # seed is NULL since we already set it.
+    kmeans_res <- model_df$model[[1]]
+    cluster_res <- kmeans_res$cluster # Clustering result
 
 
     docs_sample_index <- if (nrow(docs_reduced_df) > mds_sample_size) {
@@ -360,7 +382,7 @@ exp_text_cluster <- function(df, text,
     model$dfm <- dfm_res
 
     model$dfm_tfidf <- dfm_tfidf_res
-    model$cluster <- clustered_df # SVD result and cluster result
+    model$kmeans <- kmeans_res
     model$dfm_cluster <- dfm_clustered
     model$dfm_cluster_tfidf <- dfm_clustered_tfidf
 
@@ -379,24 +401,147 @@ exp_text_cluster <- function(df, text,
 #' @export
 #' @param type - Type of output.
 tidy.text_cluster_exploratory <- function(x, type="word_count", num_top_words=5, ...) {
-  if (type == "doc_cluster") {
+  if (type == "clusters") {
+    res <- tibble(cluster=seq(length(x$kmeans$size)), size=x$kmeans$size, withinss=x$kmeans$withinss)
+  }
+  else if (type == "doc_cluster") {
     res <- x$df
-    res <- res %>% dplyr::bind_cols(x$cluster)
+    res <- res %>% dplyr::mutate(cluster=!!x$kmeans$cluster)
   }
   else if (type == "doc_cluster_mds") {
     res <- x$df[x$docs_sample_index,]
-    cluster_res_sampled <- x$cluster$cluster[x$docs_sample_index]
+    cluster_res_sampled <- x$kmeans$cluster[x$docs_sample_index]
     res <- res %>% dplyr::mutate(cluster = !!cluster_res_sampled)
     docs_coordinates_df <- as.data.frame(x$docs_coordinates)
     res <- res %>% dplyr::bind_cols(docs_coordinates_df)
   }
   else if (type == "doc_cluster_words") {
     res <- dfm_to_df(x$dfm_cluster_tfidf)
-    res <- res %>% dplyr::group_by(document) %>%
-      dplyr::slice_max(value, n=num_top_words) %>%
-      dplyr::ungroup() %>%
+    res <- res %>% dplyr::group_by(document)
+
+    # Set hard-limit of 100 words even with ties, unless the limit is explicitly set above 100.
+    # If the limit is set above 100, ties above the limit is not shown.
+    if (num_top_words < 100) {
+      res <- res %>% dplyr::slice_max(value, n=num_top_words, with_ties=TRUE) %>% slice_max(value, n=100, with_ties=FALSE) # Set hard limit of 100 even with ties.
+    }
+    else {
+      res <- res %>% dplyr::slice_max(value, n=num_top_words, with_ties=FALSE) # Set hard limit even with ties.
+    }
+
+    res <- res %>% dplyr::ungroup() %>%
       dplyr::rename(cluster = document)
-    res
+
+    # Extract count of words in each cluster from dfm_cluster.
+    res <- res %>% dplyr::nest_by(cluster) %>% dplyr::ungroup() %>%
+      dplyr::mutate(data=purrr::map2(data, cluster, function(y, clstr) {
+        y %>% dplyr::mutate(count=as.numeric(x$dfm_cluster[clstr,token_id]))
+      })) %>% tidyr::unnest(data)
+  }
+  res
+}
+
+#' Function for Topic Model Analytics View
+#' @export
+exp_topic_model <- function(df, text,
+                            remove_punct = TRUE, remove_numbers = TRUE,
+                            stopwords_lang = NULL, stopwords = c(),
+                            hiragana_word_length_to_remove = 2,
+                            compound_tokens = NULL,
+                            num_topics = 3,
+                            mds_sample_size=200,
+                            max_nrow = 50000,
+                            seed = 1,
+                            ...){
+
+  # Always put document_id to know what document the tokens are from
+  text_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(text))
+  doc_id <- avoid_conflict(colnames(df), "document_id")
+
+  # Set seed just once.
+  if(!is.null(seed)) {
+    set.seed(seed)
+  }
+
+  each_func <- function(df) {
+    # Filter out NAs before sampling. We keep empty string, since we will anyway have to work with the case where no token was found in a doc.
+    df <- df %>% dplyr::filter(!is.na(!!rlang::sym(text_col)))
+
+    # sample the data for performance if data size is too large.
+    sampled_nrow <- NULL
+    if (!is.null(max_nrow) && nrow(df) > max_nrow) {
+      # Record that sampling happened.
+      sampled_nrow <- max_nrow
+      df <- df %>% sample_rows(max_nrow)
+    }
+
+    tokens <- tokenize_with_postprocess(df[[text_col]],
+                                        remove_punct = remove_punct, remove_numbers = remove_numbers,
+                                        stopwords_lang = stopwords_lang, stopwords = stopwords,
+                                        hiragana_word_length_to_remove = hiragana_word_length_to_remove,
+                                        compound_tokens = compound_tokens)
+
+    # convert tokens to dfm object
+    dfm_res <- tokens %>% quanteda::dfm()
+
+    lda_model <- seededlda::textmodel_lda(dfm_res, k = num_topics)
+    docs_topics <- lda_model$theta # theta is the documents-topics matrix.
+
+    docs_sample_index <- if (nrow(docs_topics) > mds_sample_size) {
+      sample(nrow(docs_topics), size=mds_sample_size)
+    }
+    else {
+      1:nrow(docs_topics)
+    }
+
+    # Prepare data for MDS. We use sampled-down data.
+    docs_topics_sampled <- docs_topics[docs_sample_index,]
+    docs_dist_mat <- dist(docs_topics_sampled)
+    docs_coordinates <- cmdscale(docs_dist_mat)
+
+    model <- list()
+    model$model <- lda_model
+    model$docs_coordinates <- docs_coordinates # MDS result for scatter plot
+    model$docs_sample_index <- docs_sample_index
+    model$df <- df # Keep original df for showing it with LDA result.
+    model$sampled_nrow <- sampled_nrow
+    class(model) <- 'textmodel_lda_exploratory'
+    model
+  }
+
+  do_on_each_group(df, each_func, name = "model", with_unnest = FALSE)
+}
+
+#' extracts results from textmodel_lda_exploratory object as a dataframe
+#' @export
+#' @param type - Type of output.
+tidy.textmodel_lda_exploratory <- function(x, type="doc_topics", num_top_words=5, ...) {
+  if (type == "word_topics") {
+    terms_topics_df <- as.data.frame(t(x$model$phi)) # phi is the topics-terms matrix. This needs to be transposed to make it a terms-topics matrix.
+    terms <- rownames(terms_topics_df)
+    terms_topics_df <- terms_topics_df %>% dplyr::mutate(max_topic=summarize_row(across(starts_with("topic")), which.max), topic_max=summarize_row(across(starts_with("topic")), max))
+    res <- tibble::tibble(word=terms) %>% dplyr::bind_cols(terms_topics_df)
+  }
+  else if (type == "topic_words") { # Similar to the above but this is pivotted and sampled. TODO: Organize.
+    terms_topics_df <- as.data.frame(t(x$model$phi))
+    words <- rownames(terms_topics_df)
+    terms_topics_df <- terms_topics_df %>% dplyr::mutate(word=words)
+    terms_topics_df <- terms_topics_df %>% tidyr::pivot_longer(names_to='topic', values_to='probability', matches('^topic[0-9]+$'))
+    res <- terms_topics_df %>% dplyr::group_by(topic) %>% dplyr::slice_max(probability, n=10, with_ties = FALSE) %>% dplyr::ungroup()
+  }
+  else if (type == "doc_topics") {
+    res <- x$df
+    docs_topics_df <- as.data.frame(x$model$theta)
+    docs_topics_df <- docs_topics_df %>% dplyr::mutate(max_topic=summarize_row(across(starts_with("topic")), which.max), topic_max=summarize_row(across(starts_with("topic")), max))
+    res <- res %>% dplyr::bind_cols(docs_topics_df)
+  }
+  else if (type == "doc_topics_mds") {
+    res <- x$df[x$docs_sample_index,]
+    docs_topics_sampled <- x$model$theta[x$docs_sample_index,]
+    docs_topics_df <- as.data.frame(docs_topics_sampled)
+    docs_topics_df <- docs_topics_df %>% dplyr::mutate(max_topic=summarize_row(across(starts_with("topic")), which.max))
+    res <- res %>% dplyr::bind_cols(docs_topics_df)
+    docs_coordinates_df <- as.data.frame(x$docs_coordinates)
+    res <- res %>% dplyr::bind_cols(docs_coordinates_df)
   }
   res
 }
