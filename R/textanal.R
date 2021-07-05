@@ -92,6 +92,8 @@ tokenize_with_postprocess <- function(text,
     if (stopwords_lang == "auto") {
       stopwords_lang <- guess_lang_for_stopwords(text)
     }
+    stopwords <- stringr::str_to_lower(stopwords)
+    stopwords_to_remove <- stringr::str_to_lower(stopwords_to_remove)
     stopwords_final <- exploratory::get_stopwords(lang = stopwords_lang, include = stopwords, exclude = stopwords_to_remove)
     tokens <- tokens %>% quanteda::tokens_remove(stopwords_final, valuetype = "fixed")
   }

@@ -13,12 +13,13 @@ test_that("exp_textanal", {
 
   lang_res <- exploratory:::guess_lang_for_stopwords(df$text) #TODO: revive test after cld3 is added to the test docker image.
 
-  model_df <- df %>% exp_textanal(text, stopwords_lang = "english", compound_tokens=c("Jack and jill")) # Testing both lower and upper case for compound_token.
+  model_df <- df %>% exp_textanal(text, stopwords_lang = "english", compound_tokens=c("Jack and jill"), stopwords_to_remove=c("And")) # Testing both lower and upper case for compound_token.
   res <- model_df %>% tidy_rowwise(model, type="words")
   expect_equal(colnames(res), c("document", "word"))
   expect_equal(length(unique(res$document)), 5) # NA should be filtered, but empty string should be kept.
   res <- model_df %>% tidy_rowwise(model, type="word_count")
   expect_true("Jack And Jill" %in% res$word)
+  expect_true("And" %in% res$word) # Test stopwords_to_remove.
   res <- model_df %>% tidy_rowwise(model, type="word_pairs")
 
   # Test for plotting
