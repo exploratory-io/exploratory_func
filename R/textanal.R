@@ -57,7 +57,7 @@ guess_lang_for_stopwords <- function(text) {
 
 tokenize_with_postprocess <- function(text, 
                                       remove_punct = TRUE, remove_numbers = TRUE,
-                                      stopwords_lang = NULL, stopwords = c(),
+                                      stopwords_lang = NULL, stopwords = c(), stopwords_to_remove = c(),
                                       hiragana_word_length_to_remove = 2,
                                       compound_tokens = NULL
                                       ) {
@@ -92,8 +92,8 @@ tokenize_with_postprocess <- function(text,
     if (stopwords_lang == "auto") {
       stopwords_lang <- guess_lang_for_stopwords(text)
     }
-    stopwords_to_remove <- exploratory::get_stopwords(lang = stopwords_lang, include = stopwords)
-    tokens <- tokens %>% quanteda::tokens_remove(stopwords_to_remove, valuetype = "fixed")
+    stopwords_final <- exploratory::get_stopwords(lang = stopwords_lang, include = stopwords, exclude = stopwords_to_remove)
+    tokens <- tokens %>% quanteda::tokens_remove(stopwords_final, valuetype = "fixed")
   }
   # Remove Japanese Hiragana word whose length is less than hiragana_word_length_to_remove
   if(hiragana_word_length_to_remove > 0) {
@@ -107,7 +107,7 @@ tokenize_with_postprocess <- function(text,
 #' @export
 exp_textanal <- function(df, text,
                          remove_punct = TRUE, remove_numbers = TRUE,
-                         stopwords_lang = NULL, stopwords = c(),
+                         stopwords_lang = NULL, stopwords = c(), stopwords_to_remove = c(),
                          hiragana_word_length_to_remove = 2,
                          compound_tokens = NULL,
                          cooccurrence_context = "window", # "document" or "window"
@@ -133,7 +133,7 @@ exp_textanal <- function(df, text,
 
     tokens <- tokenize_with_postprocess(df[[text_col]],
                                         remove_punct = remove_punct, remove_numbers = remove_numbers,
-                                        stopwords_lang = stopwords_lang, stopwords = stopwords,
+                                        stopwords_lang = stopwords_lang, stopwords = stopwords, stopwords_to_remove = stopwords_to_remove,
                                         hiragana_word_length_to_remove = hiragana_word_length_to_remove,
                                         compound_tokens = compound_tokens)
     # It is possible that character(0) is returned for document that did not have any tokens, but this still can be handled in subsequent process.
@@ -285,7 +285,7 @@ get_cooccurrence_graph_data <- function(model_df, max_vertex_size = 25, vertex_s
 #' @export
 exp_text_cluster <- function(df, text,
                          remove_punct = TRUE, remove_numbers = TRUE,
-                         stopwords_lang = NULL, stopwords = c(),
+                         stopwords_lang = NULL, stopwords = c(), stopwords_to_remove = c(),
                          hiragana_word_length_to_remove = 2,
                          compound_tokens = NULL,
                          tf_scheme = "logcount",
@@ -324,7 +324,7 @@ exp_text_cluster <- function(df, text,
 
     tokens <- tokenize_with_postprocess(df[[text_col]],
                                         remove_punct = remove_punct, remove_numbers = remove_numbers,
-                                        stopwords_lang = stopwords_lang, stopwords = stopwords,
+                                        stopwords_lang = stopwords_lang, stopwords = stopwords, stopwords_to_remove = stopwords_to_remove,
                                         hiragana_word_length_to_remove = hiragana_word_length_to_remove,
                                         compound_tokens = compound_tokens)
 
@@ -444,7 +444,7 @@ tidy.text_cluster_exploratory <- function(x, type="word_count", num_top_words=5,
 #' @export
 exp_topic_model <- function(df, text,
                             remove_punct = TRUE, remove_numbers = TRUE,
-                            stopwords_lang = NULL, stopwords = c(),
+                            stopwords_lang = NULL, stopwords = c(), stopwords_to_remove = c(),
                             hiragana_word_length_to_remove = 2,
                             compound_tokens = NULL,
                             num_topics = 3,
@@ -476,7 +476,7 @@ exp_topic_model <- function(df, text,
 
     tokens <- tokenize_with_postprocess(df[[text_col]],
                                         remove_punct = remove_punct, remove_numbers = remove_numbers,
-                                        stopwords_lang = stopwords_lang, stopwords = stopwords,
+                                        stopwords_lang = stopwords_lang, stopwords = stopwords, stopwords_to_remove = stopwords_to_remove,
                                         hiragana_word_length_to_remove = hiragana_word_length_to_remove,
                                         compound_tokens = compound_tokens)
 
