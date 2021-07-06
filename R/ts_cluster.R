@@ -108,6 +108,11 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
       df <- df %>% dplyr::select(time, value, category)
       # Pivot wider
       df <- df %>% tidyr::pivot_wider(names_from="category", values_from="value")
+
+      # If there is columns like "Centroid 1" in the input, which would mess up the process from here, silently delete them.
+      # TODO: When we have the ability to show warning without stopping the entire process, show this.
+      df <- df %>% dplyr::select(-matches("^Centroid [0-9]+$"))
+
       # Complete the time column.
       df <- df %>% complete_date("time", time_unit = time_unit)
       # Drop columns (represents category) that has more NAs than max_category_na_ratio, considering them to have not enough data.
