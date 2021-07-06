@@ -108,6 +108,14 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
       df <- df %>% dplyr::select(time, value, category)
       # Pivot wider
       df <- df %>% tidyr::pivot_wider(names_from="category", values_from="value")
+
+      if (any(str_detect(colnames(df),"^Centroid [0-9]+$"))) {
+        # In case we want to show more info on this case.
+        # matches <- str_match(colnames(df),"^Centroid [0-9]+$")
+        # first_match <- matches[!is.na(matches)][1]
+        stop("EXP-ANA-4 :: [] :: Please remove or rename groups named \"Centroid <Number>\".")
+      }
+
       # Complete the time column.
       df <- df %>% complete_date("time", time_unit = time_unit)
       # Drop columns (represents category) that has more NAs than max_category_na_ratio, considering them to have not enough data.
