@@ -109,12 +109,9 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
       # Pivot wider
       df <- df %>% tidyr::pivot_wider(names_from="category", values_from="value")
 
-      if (any(str_detect(colnames(df),"^Centroid [0-9]+$"))) {
-        # In case we want to show more info on this case.
-        # matches <- str_match(colnames(df),"^Centroid [0-9]+$")
-        # first_match <- matches[!is.na(matches)][1]
-        stop("EXP-ANA-4 :: [] :: Please remove or rename groups named \"Centroid <Number>\".")
-      }
+      # If there is columns like "Centroid 1" in the input, which would mess up the process from here, silently delete them.
+      # TODO: When we have the ability to show warning without stopping the entire process, show this.
+      df <- df %>% dplyr::select(-matches("^Centroid [0-9]+$"))
 
       # Complete the time column.
       df <- df %>% complete_date("time", time_unit = time_unit)
