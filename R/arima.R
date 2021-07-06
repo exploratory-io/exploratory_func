@@ -238,8 +238,12 @@ exp_arima <- function(df, time, valueColumn,
     }
 
     if (seasonal && !is.null(seasonal_periods)) {
+      # If 1 is added to the formula, e.g. y ~ 1 + PDQ(period=7), model with constant term is fitted.
+      # If 0 is added to the formula, model without constant term is fitted.
+      # If it is left out in the formula, inclusion of a constant term is determined by minimizing ic.
+      # Here, we are leaving it out so that the both models are considered.
       if (auto && seasonal_auto) {
-        formula_str <- paste0("y ~ 0 + PDQ(period=", seasonal_periods, ")")
+        formula_str <- paste0("y ~ PDQ(period=", seasonal_periods, ")")
       }
       else if (seasonal_auto) { # p, d, q are set manually. For P, D, Q, automatically search them.
         formula_str <- paste0("y ~ pdq(", p, ",", d, ",", q, ") + PDQ(period=", seasonal_periods, ")")
