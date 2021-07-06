@@ -650,7 +650,7 @@ getMongoCollectionNumberOfRows <- function(host = NULL, port = "", database = ""
 
 #' Returns a Amazon Athena connection.
 #' @export
-getAmazonAthenaConnection <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", timezone = "", ...) {
+getAmazonAthenaConnection <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", ...) {
   loadNamespace("odbc")
   loadNamespace("stringr")
   if(!requireNamespace("odbc")){stop("package odbc must be installed.")}
@@ -665,9 +665,6 @@ getAmazonAthenaConnection <- function(driver = "", region = "", authenticationTy
                                      ";pwd=", password, ";S3OutputLocation=", s3OutputLocation, ";driver=", driver)
   if(additionalParams != "") {
     connectionString <- stringr::str_c(connectionString,";", additionalParams)
-  }
-  if(timezone != "") {
-    connectionString <- stringr::str_c(connectionString,";", timezone)
   }
 
   conn <- NULL
@@ -693,8 +690,6 @@ getAmazonAthenaConnection <- function(driver = "", region = "", authenticationTy
           AwsRegion          = region,
           AuthenticationType = authenticationType,
           encoding           = encoding[[1]][[2]],
-          timezone           = timezone,
-          timezone_out       = timezone,
           UID                = user,
           PWD                = password
         )
@@ -705,8 +700,6 @@ getAmazonAthenaConnection <- function(driver = "", region = "", authenticationTy
           S3OutputLocation   = s3OutputLocation,
           AwsRegion          = region,
           AuthenticationType = authenticationType,
-          timezone           = timezone,
-          timezone_out       = timezone,
           UID                = user,
           PWD                = password
         )
@@ -719,9 +712,7 @@ getAmazonAthenaConnection <- function(driver = "", region = "", authenticationTy
         AwsRegion          = region,
         AuthenticationType = authenticationType,
         UID                = user,
-        PWD                = password,
-        timezone           = timezone,
-        timezone_out       = timezone,
+        PWD                = password
       )
     }
     if (user_env$pool_connection) { # pool connection if connection pooling is on.
@@ -1532,9 +1523,9 @@ queryPostgres <- function(host, port, databaseName, username, password, numOfRow
 }
 
 #' @export
-queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", query = "", numOfRows = -1, stringsAsFactors = FALSE, as.is = TRUE, timezone = "", ...){
+queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", query = "", numOfRows = -1, stringsAsFactors = FALSE, as.is = TRUE, ...){
   if(!requireNamespace("odbc")){stop("package RODBC must be installed.")}
-  conn <- getAmazonAthenaConnection(driver = driver, region = region, authenticationType = authenticationType, s3OutputLocation = s3OutputLocation, user = user, password = password, additionalParams = additionalParams, timezone = timezone)
+  conn <- getAmazonAthenaConnection(driver = driver, region = region, authenticationType = authenticationType, s3OutputLocation = s3OutputLocation, user = user, password = password, additionalParams = additionalParams)
   tryCatch({
     # For backward compatibility, if 0 is passed as numOfRows, change it to -1.
     # Previously with RODBC package, passing 0 means getting all rows. With odbc package, it needs to be -1 to get all rows.
