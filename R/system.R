@@ -1318,7 +1318,7 @@ getListOfTablesWithODBC <- function(conn){
   schemas <- NULL
   df <- topLevels %>% dplyr::distinct(type)
   check <- df$type == c("catalog")
-  if (check == TRUE){
+  if (all(check) == TRUE){
     # Desktop side shows only Schema and Tables so ignore the catalog and create a flat schema list.
     schemas <- purrr::map_dfr(topLevels$name, function(x){odbc::odbcListObjects(conn, catalog = x)}) %>% dplyr::distinct(name, type)
   } else {
