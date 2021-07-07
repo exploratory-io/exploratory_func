@@ -279,7 +279,7 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
 
 #' Tokenize text and unnest
 #' @param df Data frame
-#' @param input Set a column of which you want to split the text or tokenize.
+#' @param text Set a column of which you want to split the text or tokenize.
 #' @param token Select the unit of token from "characters", "words", "sentences", "lines", "paragraphs", and "regex".
 #' @param keep_cols Whether existing columns should be kept or not
 #' @param drop Whether input column should be removed.
@@ -290,7 +290,25 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
 #' @param remove_numbers Whether it should remove numbers.
 #' @return Data frame with tokenized column
 #' @export
-do_tokenize <- function(df, input, token = "words", keep_cols = FALSE,
+do_tokenize <- function(df, text, token = "words", keep_cols = FALSE,
+                        drop = TRUE, with_id = TRUE, output = token,
+                        remove_punct = TRUE, remove_numbers = TRUE,
+                        stopwords_lang = NULL, stopwords = c(), stopwords_to_remove = c(),
+                        hiragana_word_length_to_remove = 2,
+                        compound_tokens = NULL, ...) {
+  text_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(text))
+  # Handle NA
+  tokens <- tokenize_with_postprocess(df[[text_col]],
+                                      remove_punct = remove_punct, remove_numbers = remove_numbers,
+                                      stopwords_lang = stopwords_lang, stopwords = stopwords, stopwords_to_remove = stopwords_to_remove,
+                                      hiragana_word_length_to_remove = hiragana_word_length_to_remove,
+                                      compound_tokens = compound_tokens)
+  res <- tibble::tibble(document=seq(length(as.list(tokens))), lst=as.list(tokens))
+  res <- res %>% tidyr::unnest_longer(lst, values_to = "word") %>% dplyr::mutate(word = stringr::str_to_title(word))
+  res
+}
+
+do_tokenize_x <- function(df, input, token = "words", keep_cols = FALSE,
                         drop = TRUE, with_id = TRUE, output = token,
                         remove_punct = TRUE, remove_numbers = TRUE,
                         stopwords_lang = NULL, ...){
