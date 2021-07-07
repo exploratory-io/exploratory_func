@@ -116,11 +116,8 @@ exp_textanal <- function(df, text,
                          cooccurrence_window = 1, # 5 is the quanteda's default, but narrowing it for speed of default run. 
                          cooccurrence_network_num_words = 50,
                          max_nrow = 50000,
-                         ...){
-
-  # Always put document_id to know what document the tokens are from
+                         ...) {
   text_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(text))
-  doc_id <- avoid_conflict(colnames(df), "document_id")
   each_func <- function(df) {
     # Filter out NAs before sampling. We keep empty string, since we will anyway have to work with the case where no token was found in a doc.
     df <- df %>% dplyr::filter(!is.na(!!rlang::sym(text_col)))
@@ -301,11 +298,8 @@ exp_text_cluster <- function(df, text,
                          mds_sample_size=200,
                          max_nrow = 50000,
                          seed = 1,
-                         ...){
-
-  # Always put document_id to know what document the tokens are from
+                         ...) {
   text_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(text))
-  doc_id <- avoid_conflict(colnames(df), "document_id")
 
   # Set seed just once.
   if(!is.null(seed)) {
@@ -453,11 +447,8 @@ exp_topic_model <- function(df, text,
                             mds_sample_size=200,
                             max_nrow = 50000,
                             seed = 1,
-                            ...){
-
-  # Always put document_id to know what document the tokens are from
+                            ...) {
   text_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(text))
-  doc_id <- avoid_conflict(colnames(df), "document_id")
 
   # Set seed just once.
   if(!is.null(seed)) {
