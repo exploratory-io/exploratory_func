@@ -650,7 +650,7 @@ getMongoCollectionNumberOfRows <- function(host = NULL, port = "", database = ""
 
 #' Returns a Amazon Athena connection.
 #' @export
-getAmazonAthenaConnection <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", ...) {
+getAmazonAthenaConnection <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", timezone = "", ...) {
   loadNamespace("odbc")
   loadNamespace("stringr")
   if(!requireNamespace("odbc")){stop("package odbc must be installed.")}
@@ -660,26 +660,58 @@ getAmazonAthenaConnection <- function(driver = "", region = "", authenticationTy
   if(Sys.info()["sysname"]=="Linux"){
     driver <-  "/opt/simba/athenaodbc/lib/64/libathenaodbc_sb64.so";
   }
-  # Generate connection string as a key to pool conneciton.
+  # Generate connection string as a key to pool connection.
   connectionString <- stringr::str_c("AwsRegion=",  region, ";AuthenticationType=", authenticationType, ";uid=", user,
                                      ";pwd=", password, ";S3OutputLocation=", s3OutputLocation, ";driver=", driver)
   if(additionalParams != "") {
-    connectionString <- stringr::str_c(connectionString,";", additionalParams)
+    connectionString <- stringr::str_c(connectionString, ";", additionalParams)
   }
+  if(timezone != "") {
+    connectionString <- stringr::str_c(connectionString, ";", timezone)
+  }
+
   conn <- NULL
   if (user_env$pool_connection) {
     conn <- connection_pool[[connectionString]]
   }
   if (is.null(conn)) {
-    conn <- DBI::dbConnect(
-      odbc::odbc(),
-      Driver             = driver,
-      S3OutputLocation   = s3OutputLocation,
-      AwsRegion          = region,
-      AuthenticationType = authenticationType,
-      UID                = user,
-      PWD                = password
-    )
+    if (timezone == "") {
+      timezone <- "UTC" # if timezone is not provided use UTC as default timezone. This is also the default for odbc::dbConnect.
+    }
+
+    loc <- Sys.getlocale(category = "LC_CTYPE")
+    # loc looks like "Japanese_Japan.932", so split it with dot ".".
+    encoding <- stringr::str_split(loc, pattern = "\\.")
+
+    # For Windows, set encoding to make sure non-ascii data is handled properly.
+    # ref: https://github.com/r-dbi/odbc/issues/153
+    if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2) {
+        # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
+        conn <- DBI::dbConnect(
+          odbc::odbc(),
+          Driver             = driver,
+          S3OutputLocation   = s3OutputLocation,
+          AwsRegion          = region,
+          AuthenticationType = authenticationType,
+          encoding           = encoding[[1]][[2]],
+          timezone           = timezone,
+          timezone_out       = timezone,
+          UID                = user,
+          PWD                = password
+        )
+    } else { # without encoding case.
+        conn <- DBI::dbConnect(
+          odbc::odbc(),
+          Driver             = driver,
+          S3OutputLocation   = s3OutputLocation,
+          AwsRegion          = region,
+          AuthenticationType = authenticationType,
+          timezone           = timezone,
+          timezone_out       = timezone,
+          UID                = user,
+          PWD                = password
+        )
+    }
     if (user_env$pool_connection) { # pool connection if connection pooling is on.
       connection_pool[[connectionString]] <- conn
     }
@@ -689,9 +721,12 @@ getAmazonAthenaConnection <- function(driver = "", region = "", authenticationTy
 
 #' Clears AWS Athena Connection.
 #' @export
-clearAmazonAthenaConnection <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", ...){
+clearAmazonAthenaConnection <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", timezone = "", ...){
   key <- stringr::str_c("AwsRegion=",  region, ";AuthenticationType=", authenticationType, ";uid=", user,
                         ";pwd=", password, ";S3OutputLocation=", s3OutputLocation, ";driver=", driver)
+  if (timezone != "") {
+    key <- stringr::str_c(key,";", timezone)
+  }
   if(additionalParams != "") {
     key <- stringr::str_c(key,";", additionalParams)
   }
@@ -710,7 +745,7 @@ clearAmazonAthenaConnection <- function(driver = "", region = "", authentication
 #' If not, new connection is created and returned.
 #' @export
 getDBConnection <- function(type, host = NULL, port = "", databaseName = "", username = "", password = "", catalog = "", schema = "", dsn="", additionalParams = "",
-                            collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, timeout = NULL, connectionString = NULL, driver = NULL) {
+                            collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, timeout = NULL, connectionString = NULL, driver = NULL, timezone = "") {
 
   drv = NULL
   conn = NULL
@@ -754,7 +789,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     if(!requireNamespace("RMariaDB")){stop("package RMariaDB must be installed.")}
     # use same key "mysql" for aurora too, since it uses
     # queryMySQL() too, which uses the key "mysql"
-    key <- paste("mysql", host, port, databaseName, username, sep = ":")
+    key <- paste("mysql", host, port, databaseName, username, timezone, sep = ":")
     conn <- connection_pool[[key]]
     if (!is.null(conn)){
       tryCatch({
@@ -782,8 +817,13 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     # if the connection is null or the connection is invalid, create a new one.
     if (is.null(conn) || !DBI::dbIsValid(conn)) {
       # To avoid integer64 handling issues in charts, etc., use numeric as the R type to receive bigint data rather than default integer64 by specifying bigint argument.
-      conn = RMariaDB::dbConnect(RMariaDB::MariaDB(), dbname = databaseName, username = username,
-                               password = password, host = host, port = port, bigint = "numeric")
+      if (timezone != "") {# if Timezone is set use it for timezone and timezone_out
+        conn = RMariaDB::dbConnect(RMariaDB::MariaDB(), dbname = databaseName, username = username, timezone = timezone, timezone_out = timezone,
+                                   password = password, host = host, port = port, bigint = "numeric")
+      } else {
+        conn = RMariaDB::dbConnect(RMariaDB::MariaDB(), dbname = databaseName, username = username,
+                                   password = password, host = host, port = port, bigint = "numeric")
+      }
       connection_pool[[key]] <- conn
     }
   } else if (type == "postgres" || type == "redshift" || type == "vertica") {
@@ -791,7 +831,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     if(!requireNamespace("RPostgres")){stop("package RPostgres must be installed.")}
     # use same key "postgres" for redshift and vertica too, since they use
     # queryPostgres() too, which uses the key "postgres"
-    key <- paste("postgres", host, port, databaseName, username, sep = ":")
+    key <- paste("postgres", host, port, databaseName, username, timezone, sep = ":")
     conn <- connection_pool[[key]]
     if (!is.null(conn)){
       tryCatch({
@@ -819,15 +859,20 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     # if the connection is null or the connection is invalid, create a new one.
     if (is.null(conn) || !DBI::dbIsValid(conn)) {
       drv <- RPostgres::Postgres()
-      conn <- RPostgres::dbConnect(drv, dbname=databaseName, user = username,
+      if (timezone != "") { # if Timezone is set, use it for timezone and timezone_out arguments.
+        conn <- RPostgres::dbConnect(drv, dbname=databaseName, user = username, timezone = timezone, timezone_out = timezone,
                                      password = password, host = host, port = port, bigint = "numeric")
+      } else {
+        conn <- RPostgres::dbConnect(drv, dbname=databaseName, user = username,
+                                     password = password, host = host, port = port, bigint = "numeric")
+      }
       connection_pool[[key]] <- conn
     }
   } else if (type == "presto" || type == "treasuredata") {
     if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
     if(!requireNamespace("RPresto")){stop("package Presto must be installed.")}
     # use the same key "presto" for presto and treasuredata since they both use "presto".
-    key <- paste("presto", host, port, catalog, schema, username, sep = ":")
+    key <- paste("presto", host, port, catalog, schema, username, timezone, sep = ":")
     conn <- connection_pool[[key]]
     if (!is.null(conn)){
       tryCatch({
@@ -861,13 +906,18 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       httr::set_config(
         httr::add_headers("X-Presto-User"=username)
       )
-      conn <- RPresto::dbConnect(drv, user = username,
-                               password = password, host = host, port = port, schema = schema, catalog = catalog, session.timezone = Sys.timezone(location = TRUE))
+      if (timezone != "") { #if timezone is set, use it for session.timezone.
+        conn <- RPresto::dbConnect(drv, user = username,
+                                   password = password, host = host, port = port, schema = schema, catalog = catalog, session.timezone = timezone)
+      } else {
+        conn <- RPresto::dbConnect(drv, user = username,
+                                   password = password, host = host, port = port, schema = schema, catalog = catalog, session.timezone = Sys.timezone(location = TRUE))
+      }
       connection_pool[[key]] <- conn
     }
   } else if (type == "odbc") {
     # do those package loading only when we need to use odbc in this if statement,
-    # so that we will not have error at our server environemnt where RODBC is not there.
+    # so that we will not have error at our server environmemnt where RODBC is not there.
     if(!requireNamespace("RODBC")){stop("package RODBC must be installed.")}
 
     loadNamespace("RODBC")
@@ -936,7 +986,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     if(!is.null(host)) {
       hoststr = host;
     }
-    key <- paste(type, dsn, hoststr, username, additionalParams, driver, sep = ":")
+    key <- paste(type, dsn, hoststr, username, additionalParams, driver, timezone, sep = ":")
     conn <- connection_pool[[key]]
     conn <- NULL
     if (!is.null(conn)){
@@ -978,16 +1028,20 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
         if(password != ""){
           connstr <- stringr::str_c(connstr, ", pwd = '", password, "'")
         }
+
+        loc <- Sys.getlocale(category = "LC_CTYPE")
+        # loc looks like "Japanese_Japan.932", so split it with dot ".".
+        encoding <- stringr::str_split(loc, pattern = "\\.")
+
         # For Windows, set encoding to make sure non-ascii data is handled properly.
         # ref: https://github.com/r-dbi/odbc/issues/153
-        if (is.win <- Sys.info()['sysname'] == 'Windows') {
-          loc <- Sys.getlocale(category = "LC_CTYPE")
-          # loc looks like "Japanese_Japan.932", so split it with dot ".".
-          encoding <- stringr::str_split(loc, pattern = "\\.")
-          if (length(encoding[[1]] == 2)) {
+        if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2) {
             # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
             connstr <- stringr::str_c(connstr, ", encoding = '", encoding[[1]][[2]], "'")
-          }
+        }
+        if (timezone != "") { # if timezone is set, use it for timezone and timezone_out arguments.
+          connstr <- stringr::str_c(connstr, ", timezone = '", timezone, "'")
+          connstr <- stringr::str_c(connstr, ", timezone_out = '", timezone, "'")
         }
         if(additionalParams == ""){
           connstr <- stringr::str_c(connstr, ")")
@@ -1025,7 +1079,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     # So make sure odbc package is installed.
     if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
     if(!requireNamespace("odbc")){stop("package odbc must be installed.")}
-    key <- paste("mssqlserver", host, port, databaseName, username, sep = ":")
+    key <- paste("mssqlserver", host, port, databaseName, username, timezone, sep = ":")
     conn <- connection_pool[[key]]
     if (!is.null(conn)){
       tryCatch({
@@ -1052,14 +1106,41 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     }
     # if the connection is null or the connection is invalid, create a new one.
     if (is.null(conn) || !DBI::dbIsValid(conn)) {
-      conn <- DBI::dbConnect(odbc::odbc(),
-                             Driver = driver,
-                             Server = host,
-                             Database = databaseName,
-                             UID = username,
-                             PWD = password,
-                             Port = port,
-                             bigint = "numeric")
+      # For Windows, set encoding to make sure non-ascii data is handled properly.
+      # ref: https://github.com/r-dbi/odbc/issues/153
+      if (timezone == "") {
+        timezone <- "UTC" # if timezone is not provided use UTC as default timezone. This is also the default for odbc::dbConnect.
+      }
+
+      loc <- Sys.getlocale(category = "LC_CTYPE")
+      # loc looks like "Japanese_Japan.932", so split it with dot ".".
+      encoding <- stringr::str_split(loc, pattern = "\\.")
+
+      if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2) {
+          # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
+          conn <- DBI::dbConnect(odbc::odbc(),
+                                 Driver = driver,
+                                 Server = host,
+                                 Database = databaseName,
+                                 UID = username,
+                                 PWD = password,
+                                 Port = port,
+                                 encoding = encoding[[1]][[2]],
+                                 timezone = timezone,
+                                 timezone_out = timezone,
+                                 bigint = "numeric")
+      } else { # Without encoding
+          conn <- DBI::dbConnect(odbc::odbc(),
+                                 Driver = driver,
+                                 Server = host,
+                                 Database = databaseName,
+                                 UID = username,
+                                 PWD = password,
+                                 Port = port,
+                                 timezone = timezone,
+                                 timezone_out = timezone,
+                                 bigint = "numeric")
+      }
       connection_pool[[key]] <- conn
     }
   } else if (type == "snowflake") {
@@ -1081,8 +1162,11 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       # https://docs.snowflake.com/en/user-guide/odbc-parameters.html
       port <- 443 # snowflake default port.
     }
+    if (timezone == "") {
+      timezone <- "UTC" # if timezone is not provided use UTC as default timezone. This is also the default for odbc::dbConnect.
+    }
 
-    key <- paste("snowflake", host, port, databaseName, username, port, sep = ":")
+    key <- paste("snowflake", host, port, databaseName, username, port, timezone, sep = ":")
     conn <- connection_pool[[key]]
     if (!is.null(conn)) {
       tryCatch({
@@ -1109,14 +1193,36 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
     }
     # if the connection is null or the connection is invalid, create a new one.
     if (is.null(conn) || !DBI::dbIsValid(conn)) {
-      conn <- DBI::dbConnect(odbc::odbc(),
-                             Server = host,
-                             Warehouse = catalog,
-                             port = port,
-                             UID = username,
-                             PWD = password,
-                             driver = driver,
-                             Database = databaseName)
+
+      loc <- Sys.getlocale(category = "LC_CTYPE")
+      # loc looks like "Japanese_Japan.932", so split it with dot ".".
+      encoding <- stringr::str_split(loc, pattern = "\\.")
+
+      if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2) {
+          # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
+          conn <- DBI::dbConnect(odbc::odbc(),
+                                 Driver = driver,
+                                 Server = host,
+                                 Database = databaseName,
+                                 UID = username,
+                                 PWD = password,
+                                 Port = port,
+                                 encoding = encoding[[1]][[2]],
+                                 timezone = timezone,
+                                 timezone_out = timezone,
+                                 bigint = "numeric")
+      } else { # Without encoding
+          conn <- DBI::dbConnect(odbc::odbc(),
+                                 Driver = driver,
+                                 Server = host,
+                                 Database = databaseName,
+                                 UID = username,
+                                 PWD = password,
+                                 Port = port,
+                                 timezone = timezone,
+                                 timezone_out = timezone,
+                                 bigint = "numeric")
+      }
       connection_pool[[key]] <- conn
     }
   }
@@ -1128,7 +1234,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
 #' would return a newly created connection.
 #' @export
 clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, username, catalog = "", schema = "", dsn="", additionalParams = "",
-                              collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, connectionString = NULL) {
+                              collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, connectionString = NULL, timezone = "") {
   if (type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora", "dbiodbc", "teradata")) { #TODO: implement for other types too
     if (type %in% c("mongodb")) {
       if(!is.na(connectionString) && connectionString != '') {
@@ -1146,7 +1252,7 @@ clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, user
     }
     else if (type %in% c("postgres", "redshift", "vertica")) {
       # they use common key "postgres"
-      key <- paste("postgres", host, port, databaseName, username, sep = ":")
+      key <- paste("postgres", host, port, databaseName, username, timezone, sep = ":")
       conn <- connection_pool[[key]]
       if (!is.null(conn)) {
         tryCatch({ # try to close connection and ignore error
@@ -1158,7 +1264,7 @@ clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, user
     }
     else if (type %in% c("mysql", "aurora")) {
       # they use common key "mysql"
-      key <- paste("mysql", host, port, databaseName, username, sep = ":")
+      key <- paste("mysql", host, port, databaseName, username, timezone, sep = ":")
       conn <- connection_pool[[key]]
       if (!is.null(conn)) {
         tryCatch({ # try to close connection and ignore error
@@ -1170,7 +1276,7 @@ clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, user
     }
     else if (type %in% c("presto", "treasuredata")) {
       # they use common key "presto"
-      key <- paste("presto", host, port, catalog, schema, username, sep = ":")
+      key <- paste("presto", host, port, catalog, schema, username, timezone, sep = ":")
       conn <- connection_pool[[key]]
       if (!is.null(conn)) {
         tryCatch({ # try to close connection and ignore error
@@ -1181,9 +1287,10 @@ clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, user
       }
     }
     else if(type %in% c("odbc","dbiodbc", "teradata")) { # odbc
-      key <- paste("odbc", dsn, username, additionalParams, sep = ":")
       if(type == "dbiodbc" || type == "teradata") {
-        key <- paste(type, dsn, username, additionalParams, sep = ":")
+        key <- paste(type, dsn, username, additionalParams, timezone, sep = ":")
+      } else {
+        key <- paste("odbc", dsn, username, additionalParams, timezone, sep = ":")
       }
       conn <- connection_pool[[key]]
       if (!is.null(conn)) {
@@ -1204,6 +1311,31 @@ clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, user
 
 isConnecitonPoolEnabled <- function(type){
   type %in% c("dbiodbc", "odbc", "postgres", "redshift", "vertica", "mysql", "aurora", "presto", "treasuredata", "mssqlserver", "snowflake", "teradata")
+}
+
+getListOfTablesWithODBC <- function(conn){
+  topLevels <- odbc::odbcListObjects(conn)
+  schemas <- NULL
+  df <- topLevels %>% dplyr::distinct(type)
+  check <- df$type == c("catalog")
+  if (all(check) == TRUE){
+    # Desktop side shows only Schema and Tables so ignore the catalog and create a flat schema list.
+    schemas <- purrr::map_dfr(topLevels$name, function(x){odbc::odbcListObjects(conn, catalog = x)}) %>% dplyr::distinct(name, type)
+  } else {
+    schemas <- topLevels
+  }
+  tables <- purrr::map_dfr(schemas$name, function(x){
+    tryCatch({
+      df <- data.frame(table_name = odbc::dbListTables(conn, schema = x))
+      df <- df %>% mutate(schema_name = x)
+      df
+    }, error=function(condition){
+      # If the user does not have access permission, some database throws an error
+      # if this is the case, just ignore.
+      data.frame()
+    })
+  })
+  tables
 }
 
 #' @export
@@ -1265,16 +1397,16 @@ getListOfColumns <- function(type, host, port, databaseName, username, password,
 
 #' API to execute a query that can be handled with DBI
 #' @export
-executeGenericQuery <- function(type, host, port, databaseName, username, password, query, catalog = "", schema = "", numOfRows = -1){
+executeGenericQuery <- function(type, host, port, databaseName, username, password, query, catalog = "", schema = "", numOfRows = -1, timezone = ""){
   if (type %in% c("mysql", "aurora")) { # In case of MySQL, just use queryMySQL, since it has workaround to read multibyte column names without getting garbled.
-    df <- queryMySQL(host, port, databaseName, username, password, numOfRows = numOfRows, query)
+    df <- queryMySQL(host, port, databaseName, username, password, numOfRows = numOfRows, query, timezone = timezone)
     df <- readr::type_convert(df)
     # It is hackish, but to read multibyte character data correctly, type_convert helps for some reason.
     # There is small chance of column getting converted to unwanted type, but for our usage, that is unlikely, and being able to read multibyte outweighs the potential drawback.
     return(df)
   }
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
-  conn <- getDBConnection(type, host, port, databaseName, username, password, catalog = catalog, schema = schema)
+  conn <- getDBConnection(type, host, port, databaseName, username, password, catalog = catalog, schema = schema, timezone = timezone)
   tryCatch({
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
@@ -1282,7 +1414,7 @@ executeGenericQuery <- function(type, host, port, databaseName, username, passwo
     df <- DBI::dbFetch(resultSet, n = numOfRows)
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
-    clearDBConnection(type, host, port, databaseName, username, catalog = catalog, schema = schema)
+    clearDBConnection(type, host, port, databaseName, username, catalog = catalog, schema = schema, timezone = timezone)
     if (!!isConnecitonPoolEnabled(type)) { # only if conn pool is not used yet
       tryCatch({ # try to close connection and ignore error
         DBI::dbDisconnect(conn)
@@ -1324,11 +1456,11 @@ queryNeo4j <- function(host, port,  username, password, query, isSSL = FALSE, ..
 
 
 #' @export
-queryMySQL <- function(host, port, databaseName, username, password, numOfRows = -1, query, ...){
+queryMySQL <- function(host, port, databaseName, username, password, numOfRows = -1, query, timezone = "", ...){
   if(!requireNamespace("RMariaDB")){stop("package RMariaDB must be installed.")}
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
 
-  conn <- getDBConnection("mysql", host, port, databaseName, username, password)
+  conn <- getDBConnection(type = "mysql", host = host, port = port, databaseName = databaseName, username = username, password = password, timezone = timezone)
   tryCatch({
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
@@ -1336,7 +1468,7 @@ queryMySQL <- function(host, port, databaseName, username, password, numOfRows =
     df <- RMariaDB::dbFetch(resultSet, n = numOfRows)
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
-    clearDBConnection("mysql", host, port, databaseName, username)
+    clearDBConnection("mysql", host, port, databaseName, username, timezone = timezone)
     stop(err)
   })
   RMariaDB::dbClearResult(resultSet)
@@ -1345,11 +1477,11 @@ queryMySQL <- function(host, port, databaseName, username, password, numOfRows =
 }
 
 #' @export
-queryPostgres <- function(host, port, databaseName, username, password, numOfRows = -1, query, ...){
+queryPostgres <- function(host, port, databaseName, username, password, numOfRows = -1, query, timezone = "", ...){
   if(!requireNamespace("RPostgres")){stop("package RPostgres must be installed.")}
   if(!requireNamespace("DBI")){stop("package DBI must be installed.")}
 
-  conn <- getDBConnection("postgres", host, port, databaseName, username, password)
+  conn <- getDBConnection(type = "postgres", host = host, port = port, databaseName = databaseName, username = username, password = password, timezone = timezone)
 
   tryCatch({
     query <- convertUserInputToUtf8(query)
@@ -1360,7 +1492,7 @@ queryPostgres <- function(host, port, databaseName, username, password, numOfRow
     df <- DBI::dbFetch(resultSet, n = numOfRows)
   }, error = function(err) {
     # clear connection in pool so that new connection will be used for the next try
-    clearDBConnection("postgres", host, port, databaseName, username)
+    clearDBConnection("postgres", host, port, databaseName, username, timezone = timezone)
     stop(err)
   })
   RPostgres::dbClearResult(resultSet)
@@ -1368,9 +1500,9 @@ queryPostgres <- function(host, port, databaseName, username, password, numOfRow
 }
 
 #' @export
-queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", query = "", numOfRows = -1, stringsAsFactors = FALSE, as.is = TRUE, ...){
+queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", query = "", numOfRows = -1, stringsAsFactors = FALSE, as.is = TRUE, timezone = "", ...){
   if(!requireNamespace("odbc")){stop("package RODBC must be installed.")}
-  conn <- getAmazonAthenaConnection(driver = driver, region = region, authenticationType = authenticationType, s3OutputLocation = s3OutputLocation, user = user, password = password, additionalParams = additionalParams)
+  conn <- getAmazonAthenaConnection(driver = driver, region = region, authenticationType = authenticationType, s3OutputLocation = s3OutputLocation, user = user, password = password, additionalParams = additionalParams, timezone = timezone)
   tryCatch({
     # For backward compatibility, if 0 is passed as numOfRows, change it to -1.
     # Previously with RODBC package, passing 0 means getting all rows. With odbc package, it needs to be -1 to get all rows.
@@ -1425,8 +1557,9 @@ queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IA
 #' @param driver - For MS SQL Server - namme of the ODBC driver
 #' @param type - For MS SQL Server "mssqlserver" is passed as type. For others,"odbc" is passed as type.
 #' @param catalog - For Snowflake's Warehouse.
+#' @param timezone - For database session timezone.
 #'
-queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows = 0, query, stringsAsFactors = FALSE, host="", port="", as.is = TRUE, databaseName="", driver = "", type = "", catalog = "",...){
+queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows = 0, query, stringsAsFactors = FALSE, host="", port="", as.is = TRUE, databaseName="", driver = "", type = "", catalog = "", timezone = "", ...){
   if(type == "") {
     type <- "odbc"
   }
@@ -1435,7 +1568,7 @@ queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows
   if (type == "dbiodbc" && numOfRows == 0) {
     numOfRows = -1;
   }
-  conn <- getDBConnection(type = type, host = host, port = port, NULL, username = username, password = password, dsn = dsn, additionalParams = additionalParams, databaseName = databaseName, driver = driver, catalog = catalog)
+  conn <- getDBConnection(type = type, host = host, port = port, NULL, username = username, password = password, dsn = dsn, additionalParams = additionalParams, databaseName = databaseName, driver = driver, catalog = catalog, timezone = timezone)
   tryCatch({
     query <- convertUserInputToUtf8(query)
     # set envir = parent.frame() to get variables from users environment, not papckage environment
