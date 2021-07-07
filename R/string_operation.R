@@ -291,7 +291,7 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
 #' @return Data frame with tokenized column
 #' @export
 do_tokenize <- function(df, text, token = "words", keep_cols = FALSE,
-                        drop = TRUE, with_id = TRUE, output = token,
+                        drop = TRUE, with_id = TRUE, output = "token",
                         remove_punct = TRUE, remove_numbers = TRUE,
                         stopwords_lang = NULL, stopwords = c(), stopwords_to_remove = c(),
                         hiragana_word_length_to_remove = 2,
