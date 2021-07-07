@@ -298,14 +298,18 @@ do_tokenize <- function(df, text, token = "words", keep_cols = FALSE,
                         compound_tokens = NULL, ...) {
   text_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(text))
   # Replace NAs with empty string. quanteda::tokens() cannot handle NA, but can handle empty string.
-  df[[text_col]] <- ifelse(is.na(df[[text_col]]), "", df[[text_col]])
-  tokens <- tokenize_with_postprocess(df[[text_col]],
+  text_v <- ifelse(is.na(df[[text_col]]), "", df[[text_col]])
+  tokens <- tokenize_with_postprocess(text_v,
                                       remove_punct = remove_punct, remove_numbers = remove_numbers,
                                       stopwords_lang = stopwords_lang, stopwords = stopwords, stopwords_to_remove = stopwords_to_remove,
                                       hiragana_word_length_to_remove = hiragana_word_length_to_remove,
                                       compound_tokens = compound_tokens)
-  res <- tibble::tibble(document=seq(length(as.list(tokens))), lst=as.list(tokens))
-  res <- res %>% tidyr::unnest_longer(lst, values_to = "word") %>% dplyr::mutate(word = stringr::str_to_title(word))
+  res <- tibble::tibble(document_id = seq(length(as.list(tokens))), .tokens_list = as.list(tokens))
+  if (drop) {
+    df <- df %>% dplyr::select(-rlang::sym(text_col))
+  }
+  res <- df %>% dplyr::bind_cols(res)
+  res <- res %>% tidyr::unnest_longer(.tokens_list, values_to = "token") # %>% dplyr::mutate(token = stringr::str_to_title(token))
   res
 }
 
