@@ -187,7 +187,7 @@ test_that("do_tokenize with remove_numbers", {
   result <- test_df %>%
     do_tokenize(input, drop=FALSE, keep_cols = TRUE, remove_numbers = TRUE)
   expect_equal(result$token[[1]], "aaa")
-  # expect_equal(result$token[[2]], "12aabb33") # It seems tokenizer(strip_numeric=TRUE) only looks at the last digit. TODO: Shall we strip numeric ourselves?
+  expect_equal(result$token[[2]], "12aabb33")
 })
 
 test_that("do_tokenize with remove_punct", {

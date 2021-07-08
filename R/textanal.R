@@ -61,7 +61,7 @@ tokenize_with_postprocess <- function(text,
                                       hiragana_word_length_to_remove = 2,
                                       compound_tokens = NULL
                                       ) {
-  tokenized <- tokenizers::tokenize_words(text, lowercase = TRUE, stopwords = NULL, strip_punct = remove_punct, strip_numeric = remove_numbers, simplify = FALSE)
+  tokenized <- tokenizers::tokenize_words(text, lowercase = TRUE, stopwords = NULL, strip_punct = remove_punct, simplify = FALSE)
   names(tokenized) <- paste0("text", 1:length(tokenized)) # Add unique names to the list so that it can be passed to quanteda::tokens().
   tokens <- quanteda::tokens(tokenized)
   # tokens <- tokens %>% quanteda::tokens_wordstem() # TODO: Revive stemming and expose as an option.
@@ -80,7 +80,7 @@ tokenize_with_postprocess <- function(text,
     # Handle ones that are not separated by spaces.
     if (length(compound_tokens_without_space) > 0) {
       # Tokenize those words with the same options with the original tokinizing, to know where such word would have been splitted.
-      compound_tokens_list <- tokenizers::tokenize_words(compound_tokens_without_space, lowercase = TRUE, stopwords = NULL, strip_punct = remove_punct, strip_numeric = remove_numbers, simplify = FALSE)
+      compound_tokens_list <- tokenizers::tokenize_words(compound_tokens_without_space, lowercase = TRUE, stopwords = NULL, strip_punct = remove_punct, simplify = FALSE)
       # Create space-separated expression of the word, which can be used with quanteda::tokens_compound.
       compound_tokens_with_space_inserted <- purrr::flatten_chr(purrr::map(compound_tokens_list, function(x){stringr::str_c(x, collapse=' ')}))
       tokens <- tokens %>% quanteda::tokens_compound(pattern = quanteda::phrase(compound_tokens_with_space_inserted), concatenator = '')
@@ -88,7 +88,7 @@ tokenize_with_postprocess <- function(text,
   }
 
   # when stopwords Language is set, use the stopwords to filter out the result.
-  if(!is.null(stopwords_lang)) {
+  if (!is.null(stopwords_lang)) {
     if (stopwords_lang == "auto") {
       stopwords_lang <- guess_lang_for_stopwords(text)
     }
@@ -98,8 +98,12 @@ tokenize_with_postprocess <- function(text,
     tokens <- tokens %>% quanteda::tokens_remove(stopwords_final, valuetype = "fixed")
   }
   # Remove Japanese Hiragana word whose length is less than hiragana_word_length_to_remove
-  if(hiragana_word_length_to_remove > 0) {
+  if (hiragana_word_length_to_remove > 0) {
     tokens <- tokens %>% quanteda::tokens_remove(stringr::str_c("^[\\\u3040-\\\u309f]{1,", hiragana_word_length_to_remove, "}$"), valuetype = "regex")
+  }
+  if (remove_numbers) {
+    # Since tokenize_words(strip_numeric=TRUE) seems to look at only the last char of token and strip too much words, we do it ourselves here instead.
+    tokens <- tokens %>% quanteda::tokens_remove("^[0-9]+$", valuetype = "regex")
   }
   tokens
 }
