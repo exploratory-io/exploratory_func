@@ -283,7 +283,7 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
 #' @param token Select the unit of token from "characters", "words", "sentences", "lines", "paragraphs", and "regex".
 #' @param keep_cols Whether existing columns should be kept or not
 #' @param drop Whether input column should be removed.
-#' @param with_id Whether output should contain original document id and sentence id in each document.
+#' @param with_sentence_id Whether output should contain sentence id in each document.
 #' @param output Set a column name for the new column to store the tokenized values.
 #' @param stopwords_lang Language for the stopwords that need to be excluded from the result.
 #' @param remove_punct Whether it should remove punctuations.
