@@ -318,6 +318,8 @@ do_tokenize <- function(df, text, token = "words", keep_cols = FALSE,
 
     df <- res
     text_col <- ".sentence"
+    # Replace NAs with empty string again. As a result of this tokenization, NAs can be introduced.
+    df[[text_col]] <- ifelse(is.na(df[[text_col]]), "", df[[text_col]])
   }
 
   if (token == "words") {
