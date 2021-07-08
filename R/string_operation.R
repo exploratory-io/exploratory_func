@@ -280,7 +280,7 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
 #' Tokenize text and unnest
 #' @param df Data frame
 #' @param text Set a column of which you want to split the text or tokenize.
-#' @param token Select the unit of token from "characters", "words", "sentences", "lines", "paragraphs", and "regex".
+#' @param token Select the unit of token from "words", or "sentences".
 #' @param keep_cols Whether existing columns should be kept or not
 #' @param drop Whether input column should be removed.
 #' @param with_sentence_id Whether output should contain sentence id in each document.
@@ -301,7 +301,8 @@ do_tokenize <- function(df, text, token = "words", keep_cols = FALSE,
   # Replace NAs with empty string. quanteda::tokens() cannot handle NA, but can handle empty string.
   df[[text_col]] <- ifelse(is.na(df[[text_col]]), "", df[[text_col]])
 
-  if (with_sentence_id) {
+  # As pre-processing, split text into sentences, if sentence_id is needed or the final output should be sentences.
+  if (with_sentence_id || token == "sentences") {
     text_v <- df[[text_col]]
     sentences_list <- tokenizers::tokenize_sentences(text_v)
     res <- tibble::tibble(document_id = seq(length(sentences_list)), .tokens_list = sentences_list)
@@ -315,27 +316,33 @@ do_tokenize <- function(df, text, token = "words", keep_cols = FALSE,
     text_col <- ".sentence"
   }
 
-  text_v <- df[[text_col]]
-  tokens <- tokenize_with_postprocess(text_v,
-                                      remove_punct = remove_punct, remove_numbers = remove_numbers,
-                                      stopwords_lang = stopwords_lang, stopwords = stopwords, stopwords_to_remove = stopwords_to_remove,
-                                      hiragana_word_length_to_remove = hiragana_word_length_to_remove,
-                                      compound_tokens = compound_tokens)
-  tokens_list <- as.list(tokens)
-  res <- tibble::tibble(document_id = seq(length(tokens_list)), .tokens_list = tokens_list) #TODO: adjust between sentence case and word case
-  if (with_sentence_id) {
-    res <- res %>% dplyr::rename(sentence_id = document_id)
+  if (token == "words") {
+    text_v <- df[[text_col]]
+    tokens <- tokenize_with_postprocess(text_v,
+                                        remove_punct = remove_punct, remove_numbers = remove_numbers,
+                                        stopwords_lang = stopwords_lang, stopwords = stopwords, stopwords_to_remove = stopwords_to_remove,
+                                        hiragana_word_length_to_remove = hiragana_word_length_to_remove,
+                                        compound_tokens = compound_tokens)
+    tokens_list <- as.list(tokens)
+    res <- tibble::tibble(document_id = seq(length(tokens_list)), .tokens_list = tokens_list) #TODO: adjust between sentence case and word case
+    if (with_sentence_id) {
+      res <- res %>% dplyr::rename(sentence_id = document_id)
+    }
+    if (drop || with_sentence_id) {
+      df <- df %>% dplyr::select(-rlang::sym(text_col))
+    }
+    res <- df %>% dplyr::bind_cols(res)
+    res <- res %>% tidyr::unnest_longer(.tokens_list, values_to = output)
+    if (output_case == "title") {
+      res <- res %>% dplyr::mutate(!!rlang::sym(output) := stringr::str_to_title(!!rlang::sym(output)))
+    }
+    else if (output_case == "upper") {
+      res <- res %>% dplyr::mutate(!!rlang::sym(output) := stringr::str_to_upper(!!rlang::sym(output)))
+    }
   }
-  if (drop) {
-    df <- df %>% dplyr::select(-rlang::sym(text_col))
-  }
-  res <- df %>% dplyr::bind_cols(res)
-  res <- res %>% tidyr::unnest_longer(.tokens_list, values_to = output)
-  if (output_case == "title") {
-    res <- res %>% dplyr::mutate(!!rlang::sym(output) := stringr::str_to_title(!!rlang::sym(output)))
-  }
-  else if (output_case == "upper") {
-    res <- res %>% dplyr::mutate(!!rlang::sym(output) := stringr::str_to_upper(!!rlang::sym(output)))
+  else { # This means token == "sentences"
+    # Just rename the output column from the pre-processing.
+    res <- res %>% dplyr::rename(!!rlang::sym(output) := !!rlang::sym(text_col))
   }
   res
 }
