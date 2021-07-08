@@ -299,12 +299,25 @@ do_tokenize <- function(df, text, token = "words", keep_cols = FALSE,
   text_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(text))
   # Replace NAs with empty string. quanteda::tokens() cannot handle NA, but can handle empty string.
   text_v <- ifelse(is.na(df[[text_col]]), "", df[[text_col]])
+  sentences_list <- tokenizers::tokenize_sentences(text_v)
+  res <- tibble::tibble(document_id = seq(length(sentences_list)), .tokens_list = sentences_list)
+  if (drop) {
+    df <- df %>% dplyr::select(-rlang::sym(text_col))
+  }
+  res <- df %>% dplyr::bind_cols(res)
+  res <- res %>% tidyr::unnest_longer(.tokens_list, values_to = ".sentence")
+
+  df <- res
+  text_col <- ".sentence"
+
+
+  text_v <- ifelse(is.na(df[[text_col]]), "", df[[text_col]])
   tokens <- tokenize_with_postprocess(text_v,
                                       remove_punct = remove_punct, remove_numbers = remove_numbers,
                                       stopwords_lang = stopwords_lang, stopwords = stopwords, stopwords_to_remove = stopwords_to_remove,
                                       hiragana_word_length_to_remove = hiragana_word_length_to_remove,
                                       compound_tokens = compound_tokens)
-  res <- tibble::tibble(document_id = seq(length(as.list(tokens))), .tokens_list = as.list(tokens))
+  res <- tibble::tibble(sentence_id = seq(length(as.list(tokens))), .tokens_list = as.list(tokens)) #TODO: adjust between sentence case and word case
   if (drop) {
     df <- df %>% dplyr::select(-rlang::sym(text_col))
   }
