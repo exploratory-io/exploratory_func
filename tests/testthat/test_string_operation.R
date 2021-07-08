@@ -86,12 +86,40 @@ test_that("test word_to_sentiment to groupd_df", {
   expect_true(is.character(ret[["sent"]]))
 })
 
+test_that("do_tokenize with with_sentence_id=FALSE", {
+  result <- test_df %>%
+    do_tokenize(input, with_sentence_id=F)
+  expect_equal(colnames(result), c("document_id", "token"))
+})
+
 test_that("do_tokenize with drop=FALSE", {
   result <- test_df %>%
     do_tokenize(input, drop=F)
   expect_equal(result$token[[1]], "hello")
   expect_equal(ncol(result), 4)
 })
+
+test_that("do_tokenize with compound_tokens", {
+  test_df <- data.frame(
+    input = c("Hello world!", "This is a data frame for test. This is second sentence."),
+    extra_col = seq(2),
+    stringsAsFactors = FALSE)
+  result <- test_df %>%
+    do_tokenize(input, compound_tokens=c("Hello world", "data frame"))
+  expect_equal(c("hello world", "data frame") %in% result$token, c(T, T))
+})
+
+test_that("do_tokenize with stopwords and stopwords_to_remove", {
+  test_df <- data.frame(
+    input = c("Hello world!", "This is a data frame for test. This is second sentence."),
+    extra_col = seq(2),
+    stringsAsFactors = FALSE)
+  result <- test_df %>%
+    do_tokenize(input, stopwords_lang="english", stopwords=c("World"), stopwords_to_remove=c("is", "hello"))
+  expect_equal(c("is", "hello") %in% result$token, c(T, T))
+  expect_equal(c("world") %in% result$token, c(F))
+})
+
 
 test_that("do_tokenize with keep_cols = TRUE", {
   test_df <- data.frame(
