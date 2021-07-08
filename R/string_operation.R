@@ -291,34 +291,40 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
 #' @return Data frame with tokenized column
 #' @export
 do_tokenize <- function(df, text, token = "words", keep_cols = FALSE,
-                        drop = TRUE, with_id = TRUE, output = "token",
+                        drop = TRUE, with_sentence_id = TRUE, output = "token",
                         remove_punct = TRUE, remove_numbers = TRUE,
                         stopwords_lang = NULL, stopwords = c(), stopwords_to_remove = c(),
                         hiragana_word_length_to_remove = 2,
                         compound_tokens = NULL, ...) {
   text_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(text))
   # Replace NAs with empty string. quanteda::tokens() cannot handle NA, but can handle empty string.
-  text_v <- ifelse(is.na(df[[text_col]]), "", df[[text_col]])
-  sentences_list <- tokenizers::tokenize_sentences(text_v)
-  res <- tibble::tibble(document_id = seq(length(sentences_list)), .tokens_list = sentences_list)
-  if (drop) {
-    df <- df %>% dplyr::select(-rlang::sym(text_col))
+  df[[text_col]] <- ifelse(is.na(df[[text_col]]), "", df[[text_col]])
+
+  if (with_sentence_id) {
+    text_v <- df[[text_col]]
+    sentences_list <- tokenizers::tokenize_sentences(text_v)
+    res <- tibble::tibble(document_id = seq(length(sentences_list)), .tokens_list = sentences_list)
+    if (drop) {
+      df <- df %>% dplyr::select(-rlang::sym(text_col))
+    }
+    res <- df %>% dplyr::bind_cols(res)
+    res <- res %>% tidyr::unnest_longer(.tokens_list, values_to = ".sentence")
+
+    df <- res
+    text_col <- ".sentence"
   }
-  res <- df %>% dplyr::bind_cols(res)
-  res <- res %>% tidyr::unnest_longer(.tokens_list, values_to = ".sentence")
 
-  df <- res
-  text_col <- ".sentence"
-
-
-  text_v <- ifelse(is.na(df[[text_col]]), "", df[[text_col]])
+  text_v <- df[[text_col]]
   tokens <- tokenize_with_postprocess(text_v,
                                       remove_punct = remove_punct, remove_numbers = remove_numbers,
                                       stopwords_lang = stopwords_lang, stopwords = stopwords, stopwords_to_remove = stopwords_to_remove,
                                       hiragana_word_length_to_remove = hiragana_word_length_to_remove,
                                       compound_tokens = compound_tokens)
   tokens_list <- as.list(tokens)
-  res <- tibble::tibble(sentence_id = seq(length(tokens_list)), .tokens_list = tokens_list) #TODO: adjust between sentence case and word case
+  res <- tibble::tibble(document_id = seq(length(tokens_list)), .tokens_list = tokens_list) #TODO: adjust between sentence case and word case
+  if (with_sentence_id) {
+    res <- res %>% dplyr::rename(sentence_id = document_id)
+  }
   if (drop) {
     df <- df %>% dplyr::select(-rlang::sym(text_col))
   }
