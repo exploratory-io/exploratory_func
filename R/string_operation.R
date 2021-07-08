@@ -288,6 +288,10 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
 #' @param stopwords_lang Language for the stopwords that need to be excluded from the result.
 #' @param remove_punct Whether it should remove punctuations.
 #' @param remove_numbers Whether it should remove numbers.
+#' @param stopwords Additional stopwords.
+#' @param stopwords_to_remove Words to be removed from the set of stopwords.
+#' @param hiragana_word_length_to_remove Length of a Hiragana word that needs to be excluded from the result.
+#' @param compound_tokens Sequence of words that should be treated as one word.
 #' @return Data frame with tokenized column
 #' @export
 do_tokenize <- function(df, text, token = "words", keep_cols = FALSE,
