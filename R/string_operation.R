@@ -291,7 +291,8 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
 #' @return Data frame with tokenized column
 #' @export
 do_tokenize <- function(df, text, token = "words", keep_cols = FALSE,
-                        drop = TRUE, with_sentence_id = TRUE, output = "token",
+                        drop = TRUE, with_sentence_id = TRUE,
+                        output = "token", output_case = "lower",
                         remove_punct = TRUE, remove_numbers = TRUE,
                         stopwords_lang = NULL, stopwords = c(), stopwords_to_remove = c(),
                         hiragana_word_length_to_remove = 2,
@@ -329,7 +330,13 @@ do_tokenize <- function(df, text, token = "words", keep_cols = FALSE,
     df <- df %>% dplyr::select(-rlang::sym(text_col))
   }
   res <- df %>% dplyr::bind_cols(res)
-  res <- res %>% tidyr::unnest_longer(.tokens_list, values_to = "token") # %>% dplyr::mutate(token = stringr::str_to_title(token))
+  res <- res %>% tidyr::unnest_longer(.tokens_list, values_to = output)
+  if (output_case == "title") {
+    res <- res %>% dplyr::mutate(!!rlang::sym(output) := stringr::str_to_title(!!rlang::sym(output)))
+  }
+  else if (output_case == "upper") {
+    res <- res %>% dplyr::mutate(!!rlang::sym(output) := stringr::str_to_upper(!!rlang::sym(output)))
+  }
   res
 }
 
