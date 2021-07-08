@@ -298,6 +298,10 @@ do_tokenize <- function(df, text, token = "words", keep_cols = FALSE,
                         hiragana_word_length_to_remove = 2,
                         compound_tokens = NULL, ...) {
   text_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(text))
+  if (!keep_cols) {
+    # Keep only the column to tokenize
+    df <- df[text_col]
+  }
   # Replace NAs with empty string. quanteda::tokens() cannot handle NA, but can handle empty string.
   df[[text_col]] <- ifelse(is.na(df[[text_col]]), "", df[[text_col]])
 
