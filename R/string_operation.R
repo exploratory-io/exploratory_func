@@ -317,7 +317,8 @@ do_tokenize <- function(df, text, token = "words", keep_cols = FALSE,
                                       stopwords_lang = stopwords_lang, stopwords = stopwords, stopwords_to_remove = stopwords_to_remove,
                                       hiragana_word_length_to_remove = hiragana_word_length_to_remove,
                                       compound_tokens = compound_tokens)
-  res <- tibble::tibble(sentence_id = seq(length(as.list(tokens))), .tokens_list = as.list(tokens)) #TODO: adjust between sentence case and word case
+  tokens_list <- as.list(tokens)
+  res <- tibble::tibble(sentence_id = seq(length(tokens_list)), .tokens_list = tokens_list) #TODO: adjust between sentence case and word case
   if (drop) {
     df <- df %>% dplyr::select(-rlang::sym(text_col))
   }
