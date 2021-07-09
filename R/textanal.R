@@ -450,6 +450,9 @@ exp_topic_model <- function(df, text,
                             hiragana_word_length_to_remove = 2,
                             compound_tokens = NULL,
                             num_topics = 3,
+                            max_iter = 2000,
+                            alpha = NULL,
+                            beta = NULL,
                             mds_sample_size=200,
                             max_nrow = 50000,
                             seed = 1,
@@ -485,7 +488,7 @@ exp_topic_model <- function(df, text,
     # convert tokens to dfm object
     dfm_res <- tokens %>% quanteda::dfm()
 
-    lda_model <- seededlda::textmodel_lda(dfm_res, k = num_topics)
+    lda_model <- seededlda::textmodel_lda(dfm_res, k = num_topics, max_iter=max_iter, alpha=alpha, beta=beta)
     docs_topics <- lda_model$theta # theta is the documents-topics matrix.
 
     docs_sample_index <- if (nrow(docs_topics) > mds_sample_size) {
