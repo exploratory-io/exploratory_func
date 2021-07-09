@@ -519,31 +519,31 @@ exp_topic_model <- function(df, text,
 #' extracts results from textmodel_lda_exploratory object as a dataframe
 #' @export
 #' @param type - Type of output.
-tidy.textmodel_lda_exploratory <- function(x, type="doc_topics", num_top_words=5, ...) {
+tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words = 10, ...) {
   if (type == "word_topics") {
     terms_topics_df <- as.data.frame(t(x$model$phi)) # phi is the topics-terms matrix. This needs to be transposed to make it a terms-topics matrix.
     terms <- rownames(terms_topics_df)
-    terms_topics_df <- terms_topics_df %>% dplyr::mutate(max_topic=summarize_row(across(starts_with("topic")), which.max), topic_max=summarize_row(across(starts_with("topic")), max))
+    terms_topics_df <- terms_topics_df %>% dplyr::mutate(max_topic = summarize_row(across(starts_with("topic")), which.max), topic_max = summarize_row(across(starts_with("topic")), max))
     res <- tibble::tibble(word=terms) %>% dplyr::bind_cols(terms_topics_df)
   }
   else if (type == "topic_words") { # Similar to the above but this is pivotted and sampled. TODO: Organize.
     terms_topics_df <- as.data.frame(t(x$model$phi))
     words <- rownames(terms_topics_df)
-    terms_topics_df <- terms_topics_df %>% dplyr::mutate(word=words)
-    terms_topics_df <- terms_topics_df %>% tidyr::pivot_longer(names_to='topic', values_to='probability', matches('^topic[0-9]+$'))
-    res <- terms_topics_df %>% dplyr::group_by(topic) %>% dplyr::slice_max(probability, n=10, with_ties = FALSE) %>% dplyr::ungroup()
+    terms_topics_df <- terms_topics_df %>% dplyr::mutate(word = words)
+    terms_topics_df <- terms_topics_df %>% tidyr::pivot_longer(names_to = 'topic', values_to = 'probability', matches('^topic[0-9]+$'))
+    res <- terms_topics_df %>% dplyr::group_by(topic) %>% dplyr::slice_max(probability, n = num_top_words, with_ties = FALSE) %>% dplyr::ungroup()
   }
   else if (type == "doc_topics") {
     res <- x$df
     docs_topics_df <- as.data.frame(x$model$theta)
-    docs_topics_df <- docs_topics_df %>% dplyr::mutate(max_topic=summarize_row(across(starts_with("topic")), which.max), topic_max=summarize_row(across(starts_with("topic")), max))
+    docs_topics_df <- docs_topics_df %>% dplyr::mutate(max_topic = summarize_row(across(starts_with("topic")), which.max), topic_max = summarize_row(across(starts_with("topic")), max))
     res <- res %>% dplyr::bind_cols(docs_topics_df)
   }
   else if (type == "doc_topics_mds") {
     res <- x$df[x$docs_sample_index,]
     docs_topics_sampled <- x$model$theta[x$docs_sample_index,]
     docs_topics_df <- as.data.frame(docs_topics_sampled)
-    docs_topics_df <- docs_topics_df %>% dplyr::mutate(max_topic=summarize_row(across(starts_with("topic")), which.max))
+    docs_topics_df <- docs_topics_df %>% dplyr::mutate(max_topic = summarize_row(across(starts_with("topic")), which.max))
     res <- res %>% dplyr::bind_cols(docs_topics_df)
     docs_coordinates_df <- as.data.frame(x$docs_coordinates)
     res <- res %>% dplyr::bind_cols(docs_coordinates_df)
