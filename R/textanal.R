@@ -491,22 +491,23 @@ exp_topic_model <- function(df, text,
     lda_model <- seededlda::textmodel_lda(dfm_res, k = num_topics, max_iter=max_iter, alpha=alpha, beta=beta)
     docs_topics <- lda_model$theta # theta is the documents-topics matrix.
 
-    docs_sample_index <- if (nrow(docs_topics) > mds_sample_size) {
-      sample(nrow(docs_topics), size=mds_sample_size)
-    }
-    else {
-      1:nrow(docs_topics)
-    }
-
-    # Prepare data for MDS. We use sampled-down data.
-    docs_topics_sampled <- docs_topics[docs_sample_index,]
-    docs_dist_mat <- dist(docs_topics_sampled)
-    docs_coordinates <- cmdscale(docs_dist_mat)
+    # MDS for scatter plot. Commented out for now.
+    # docs_sample_index <- if (nrow(docs_topics) > mds_sample_size) {
+    #   sample(nrow(docs_topics), size=mds_sample_size)
+    # }
+    # else {
+    #   1:nrow(docs_topics)
+    # }
+    #
+    # # Prepare data for MDS. We use sampled-down data.
+    # docs_topics_sampled <- docs_topics[docs_sample_index,]
+    # docs_dist_mat <- dist(docs_topics_sampled)
+    # docs_coordinates <- cmdscale(docs_dist_mat)
 
     model <- list()
     model$model <- lda_model
-    model$docs_coordinates <- docs_coordinates # MDS result for scatter plot
-    model$docs_sample_index <- docs_sample_index
+    # model$docs_coordinates <- docs_coordinates # MDS result for scatter plot
+    # model$docs_sample_index <- docs_sample_index
     model$df <- df # Keep original df for showing it with LDA result.
     model$sampled_nrow <- sampled_nrow
     class(model) <- 'textmodel_lda_exploratory'
