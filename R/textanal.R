@@ -286,7 +286,7 @@ get_cooccurrence_graph_data <- function(model_df, max_vertex_size = 20, vertex_s
                  infomap = igraph::cluster_infomap(g, e.weights=edges$value),
                  edge_betweenness = igraph::cluster_edge_betweenness(g, weights=edges$value),
                  label_prop = igraph::cluster_label_prop(g, weights=edges$value),
-                 walk_trap = igraph::cluster_walk_trap(g, weights=edges$value)
+                 walktrap = igraph::cluster_walktrap(g, weights=edges$value)
     )
     cluster <- as.numeric(igraph::membership(lc))
     vertices <- vertices %>% dplyr::mutate(cluster=!!cluster)
