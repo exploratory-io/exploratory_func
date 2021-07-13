@@ -247,7 +247,7 @@ tidy.textanal_exploratory <- function(x, type="word_count", max_words=NULL, max_
 }
 
 # vertex_size_method - "equal_length" or "equal_freq"
-get_cooccurrence_graph_data <- function(model_df, max_vertex_size = 20, vertex_size_method = "equal_length", max_edge_width=8, font_size_ratio=1.0, area_factor=50, vertex_opacity=0.8) {
+get_cooccurrence_graph_data <- function(model_df, max_vertex_size = 20, vertex_size_method = "equal_length", max_edge_width=8, font_size_ratio=1.0, area_factor=50, vertex_opacity=0.8, cluster_method="louvain") {
   # Prepare edges data
   edges <- exploratory:::fcm_to_df(model_df$model[[1]]$fcm_selected) %>% rename(from=token.x,to=token.y) %>% filter(from!=to)
   edges <- edges %>% mutate(from = stringr::str_to_title(from), to = stringr::str_to_title(to))
@@ -275,6 +275,21 @@ get_cooccurrence_graph_data <- function(model_df, max_vertex_size = 20, vertex_s
   }
   vertex_sizes <- vertex_sizes/max(vertex_sizes) * max_vertex_size
   vertices <- tibble::tibble(name=feat_names, size=vertex_sizes)
+
+  if (cluster_method != "none") {
+    g <- igraph::graph.data.frame(edges, directed=FALSE, vertices=vertices) # Temporary graph object just to calculate cluster membership.
+    lc <- switch(cluster_method,
+                 louvain = igraph::cluster_louvain(g),
+                 leading_eigen = igraph::cluster_leading_eigen(g),
+                 fast_greedy = igraph::cluster_fast_greedy(g),
+                 spinglass = igraph::cluster_spinglass(g),
+                 infomap = igraph::cluster_infomap(g),
+                 edge_betweenness = igraph::cluster_edge_betweenness(g),
+                 label_prop = igraph::cluster_label_prop(g)
+    )
+    cluster <- as.numeric(igraph::membership(lc))
+    vertices <- vertices %>% dplyr::mutate(cluster=!!cluster)
+  }
 
   ret <- list(edges=edges, vertices=vertices)
   attr(ret, "font_size_factor") <- font_size_ratio
