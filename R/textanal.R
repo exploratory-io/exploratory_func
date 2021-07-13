@@ -283,9 +283,10 @@ get_cooccurrence_graph_data <- function(model_df, max_vertex_size = 20, vertex_s
                  leading_eigen = igraph::cluster_leading_eigen(g, weights=edges$value),
                  fast_greedy = igraph::cluster_fast_greedy(g, weights=edges$value),
                  spinglass = igraph::cluster_spinglass(g, weights=edges$value),
-                 infomap = igraph::cluster_infomap(g, weights=edges$value),
+                 infomap = igraph::cluster_infomap(g, e.weights=edges$value),
                  edge_betweenness = igraph::cluster_edge_betweenness(g, weights=edges$value),
-                 label_prop = igraph::cluster_label_prop(g, weights=edges$value)
+                 label_prop = igraph::cluster_label_prop(g, weights=edges$value),
+                 walk_trap = igraph::cluster_walk_trap(g, weights=edges$value)
     )
     cluster <- as.numeric(igraph::membership(lc))
     vertices <- vertices %>% dplyr::mutate(cluster=!!cluster)
