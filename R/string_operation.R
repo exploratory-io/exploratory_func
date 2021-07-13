@@ -375,7 +375,7 @@ do_tokenize <- function(df, input, token = "words", keep_cols = FALSE,
 #' group - vector of documents
 #' term - vector terms with the same length as group.
 #' tf - vector of tf with the same length as group. It can be after weight function is applied,
-#'      in which case, we assume that group-term combination in the input is unique, and summing up at the sparseMatrix would not happen. 
+#'      in which case, we assume that group-term combination in the input is unique, and summing up at the sparseMatrix would not happen.
 #' count_per_doc - vector of word count per doc. It is tf before weight function is applied.
 #' Output: data.frame of document frequency and tf-idf. The number of rows are the same as the input vectors.
 calc_tfidf <- function(group, term, tf, count_per_doc, smooth_idf = FALSE){
@@ -742,6 +742,27 @@ str_replace_inside <- function(column, begin = "(", end = ")", rep = "", all = F
     stringr::str_replace(column, exp, rep)
   }
 }
+
+#' Wrapper function for stringr::str_remove.
+#' When remove_extra_space argument is TRUE, it applies str_squish on top of the stringr::str_remove result.
+str_remove <- function(string, pattern, remove_extra_space = FALSE) {
+  res <- stringr::str_remove(string, pattern)
+  if (remove_extra_space) {
+    res <- stringr::str_squish(res)
+  }
+  res
+}
+
+#' Wrapper function for stringr::str_remove_all.
+#' When remove_extra_space argument is TRUE, it applies str_squish on top of the stringr::str_remove_all result.
+str_remove_all <- function(string, pattern, remove_extra_space = FALSE) {
+  res <- stringr::str_remove_all(string, pattern)
+  if (remove_extra_space) {
+    res <- stringr::str_squish(res)
+  }
+  res
+}
+
 #'Function to remove URL from the text
 #'@export
 str_remove_url <- function(text, position = "any"){
