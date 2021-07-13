@@ -247,7 +247,7 @@ tidy.textanal_exploratory <- function(x, type="word_count", max_words=NULL, max_
 }
 
 # vertex_size_method - "equal_length" or "equal_freq"
-get_cooccurrence_graph_data <- function(model_df, max_vertex_size = 25, vertex_size_method = "equal_length", max_edge_width=8, font_size_ratio=1.0) {
+get_cooccurrence_graph_data <- function(model_df, max_vertex_size = 20, vertex_size_method = "equal_length", max_edge_width=8, font_size_ratio=1.0) {
   # Prepare edges data
   edges <- exploratory:::fcm_to_df(model_df$model[[1]]$fcm_selected) %>% rename(from=token.x,to=token.y) %>% filter(from!=to)
   edges <- edges %>% mutate(from = stringr::str_to_title(from), to = stringr::str_to_title(to))
