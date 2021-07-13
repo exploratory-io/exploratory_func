@@ -279,13 +279,13 @@ get_cooccurrence_graph_data <- function(model_df, max_vertex_size = 20, vertex_s
   if (cluster_method != "none") {
     g <- igraph::graph.data.frame(edges, directed=FALSE, vertices=vertices) # Temporary graph object just to calculate cluster membership.
     lc <- switch(cluster_method,
-                 louvain = igraph::cluster_louvain(g),
-                 leading_eigen = igraph::cluster_leading_eigen(g),
-                 fast_greedy = igraph::cluster_fast_greedy(g),
-                 spinglass = igraph::cluster_spinglass(g),
-                 infomap = igraph::cluster_infomap(g),
-                 edge_betweenness = igraph::cluster_edge_betweenness(g),
-                 label_prop = igraph::cluster_label_prop(g)
+                 louvain = igraph::cluster_louvain(g, weights=edges$value),
+                 leading_eigen = igraph::cluster_leading_eigen(g, weights=edges$value),
+                 fast_greedy = igraph::cluster_fast_greedy(g, weights=edges$value),
+                 spinglass = igraph::cluster_spinglass(g, weights=edges$value),
+                 infomap = igraph::cluster_infomap(g, weights=edges$value),
+                 edge_betweenness = igraph::cluster_edge_betweenness(g, weights=edges$value),
+                 label_prop = igraph::cluster_label_prop(g, weights=edges$value)
     )
     cluster <- as.numeric(igraph::membership(lc))
     vertices <- vertices %>% dplyr::mutate(cluster=!!cluster)
