@@ -247,7 +247,7 @@ tidy.textanal_exploratory <- function(x, type="word_count", max_words=NULL, max_
 }
 
 # vertex_size_method - "equal_length" or "equal_freq"
-get_cooccurrence_graph_data <- function(model_df, max_vertex_size = 20, vertex_size_method = "equal_length", max_edge_width=8, font_size_ratio=1.0) {
+get_cooccurrence_graph_data <- function(model_df, max_vertex_size = 20, vertex_size_method = "equal_length", max_edge_width=8, font_size_ratio=1.0, area_factor=50, vertex_opacity=0.8) {
   # Prepare edges data
   edges <- exploratory:::fcm_to_df(model_df$model[[1]]$fcm_selected) %>% rename(from=token.x,to=token.y) %>% filter(from!=to)
   edges <- edges %>% mutate(from = stringr::str_to_title(from), to = stringr::str_to_title(to))
@@ -278,6 +278,8 @@ get_cooccurrence_graph_data <- function(model_df, max_vertex_size = 20, vertex_s
 
   ret <- list(edges=edges, vertices=vertices)
   attr(ret, "font_size_factor") <- font_size_ratio
+  attr(ret, "area_factor") <- area_factor
+  attr(ret, "vertex_opacity") <- vertex_opacity
   ret <- data.frame(model=I(list(ret))) # return as data.frame. TODO: handle group_by
   class(ret$model) <- c("list", "exp_coocurrence_graph")
   ret
