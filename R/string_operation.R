@@ -288,6 +288,8 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
 #' @param stopwords_lang Language for the stopwords that need to be excluded from the result.
 #' @param remove_punct Whether it should remove punctuations.
 #' @param remove_numbers Whether it should remove numbers.
+#' @param remove_url Whether it should remove URLs. 
+#' @param remove_twitter Whether it should remove Twitter social tags. 
 #' @param stopwords Additional stopwords.
 #' @param stopwords_to_remove Words to be removed from the set of stopwords.
 #' @param hiragana_word_length_to_remove Length of a Hiragana word that needs to be excluded from the result.
@@ -298,6 +300,7 @@ do_tokenize <- function(df, text, token = "words", keep_cols = FALSE,
                         drop = TRUE, with_sentence_id = TRUE,
                         output = "token", output_case = "lower",
                         remove_punct = TRUE, remove_numbers = TRUE,
+                        remove_url = TRUE, remove_twitter = TRUE,
                         stopwords_lang = NULL, stopwords = c(), stopwords_to_remove = c(),
                         hiragana_word_length_to_remove = 2,
                         compound_tokens = NULL, ...) {
@@ -330,6 +333,7 @@ do_tokenize <- function(df, text, token = "words", keep_cols = FALSE,
     text_v <- df[[text_col]]
     tokens <- tokenize_with_postprocess(text_v,
                                         remove_punct = remove_punct, remove_numbers = remove_numbers,
+                                        remove_url = remove_url, remove_twitter = remove_twitter,
                                         stopwords_lang = stopwords_lang, stopwords = stopwords, stopwords_to_remove = stopwords_to_remove,
                                         hiragana_word_length_to_remove = hiragana_word_length_to_remove,
                                         compound_tokens = compound_tokens)
