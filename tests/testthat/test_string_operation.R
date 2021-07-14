@@ -179,6 +179,16 @@ test_that("do_tokenize_icu with summary_level = all", {
   expect_equal(nrow(result), 11)
 })
 
+test_that("do_tokenize with URLs and twitter social tags", {
+  test_df <- data.frame(
+    input = c("@ExploratoryData and #rstats see: https://cran.r-project.org"))
+  result <- test_df %>%
+    do_tokenize(input, remove_url = FALSE, remove_twitter = FALSE)
+  expect_equal(result$token, c("@ExploratoryData", "and", "#rstats", "see", "https://cran.r-project.org"))
+  result <- test_df %>% do_tokenize(input)
+  expect_equal(result$token, c("and", "see"))
+})
+
 test_that("do_tokenize with remove_numbers", {
   test_df <- data.frame(
     input = c("12345 aaa", "12aabb33", "123456 34567 88999"),
