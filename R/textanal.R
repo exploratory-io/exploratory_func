@@ -120,6 +120,7 @@ tokenize_with_postprocess <- function(text,
 #' @export
 exp_textanal <- function(df, text,
                          remove_punct = TRUE, remove_numbers = TRUE,
+                         remove_url = TRUE, remove_twitter = TRUE,
                          stopwords_lang = NULL, stopwords = c(), stopwords_to_remove = c(),
                          hiragana_word_length_to_remove = 2,
                          compound_tokens = NULL,
@@ -143,6 +144,7 @@ exp_textanal <- function(df, text,
 
     tokens <- tokenize_with_postprocess(df[[text_col]],
                                         remove_punct = remove_punct, remove_numbers = remove_numbers,
+                                        remove_url = remove_url, remove_twitter = remove_twitter,
                                         stopwords_lang = stopwords_lang, stopwords = stopwords, stopwords_to_remove = stopwords_to_remove,
                                         hiragana_word_length_to_remove = hiragana_word_length_to_remove,
                                         compound_tokens = compound_tokens)
@@ -295,6 +297,7 @@ get_cooccurrence_graph_data <- function(model_df, max_vertex_size = 25, vertex_s
 #' @export
 exp_text_cluster <- function(df, text,
                          remove_punct = TRUE, remove_numbers = TRUE,
+                         remove_url = TRUE, remove_twitter = TRUE,
                          stopwords_lang = NULL, stopwords = c(), stopwords_to_remove = c(),
                          hiragana_word_length_to_remove = 2,
                          compound_tokens = NULL,
@@ -331,6 +334,7 @@ exp_text_cluster <- function(df, text,
 
     tokens <- tokenize_with_postprocess(df[[text_col]],
                                         remove_punct = remove_punct, remove_numbers = remove_numbers,
+                                        remove_url = remove_url, remove_twitter = remove_twitter,
                                         stopwords_lang = stopwords_lang, stopwords = stopwords, stopwords_to_remove = stopwords_to_remove,
                                         hiragana_word_length_to_remove = hiragana_word_length_to_remove,
                                         compound_tokens = compound_tokens)
@@ -451,6 +455,7 @@ tidy.text_cluster_exploratory <- function(x, type="word_count", num_top_words=5,
 #' @export
 exp_topic_model <- function(df, text,
                             remove_punct = TRUE, remove_numbers = TRUE,
+                            remove_url = TRUE, remove_twitter = TRUE,
                             stopwords_lang = NULL, stopwords = c(), stopwords_to_remove = c(),
                             hiragana_word_length_to_remove = 2,
                             compound_tokens = NULL,
@@ -483,6 +488,7 @@ exp_topic_model <- function(df, text,
 
     tokens <- tokenize_with_postprocess(df[[text_col]],
                                         remove_punct = remove_punct, remove_numbers = remove_numbers,
+                                        remove_url = remove_url, remove_twitter = remove_twitter,
                                         stopwords_lang = stopwords_lang, stopwords = stopwords, stopwords_to_remove = stopwords_to_remove,
                                         hiragana_word_length_to_remove = hiragana_word_length_to_remove,
                                         compound_tokens = compound_tokens)
