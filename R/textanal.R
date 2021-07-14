@@ -108,6 +108,10 @@ tokenize_with_postprocess <- function(text,
     # Since tokenize_words(strip_numeric=TRUE) seems to look at only the last char of token and strip too much words, we do it ourselves here instead.
     tokens <- tokens %>% quanteda::tokens_remove("^[0-9]+$", valuetype = "regex")
   }
+  if (remove_twitter) {
+    # Remove twitter social tags with the same regex as in tokenizers::tokenize_twitter.
+    tokens <- tokens %>% quanteda::tokens_remove("^#[A-Za-z]+\\w*|^@\\w+", valuetype = "regex")
+  }
   tokens
 }
 
