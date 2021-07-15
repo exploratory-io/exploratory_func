@@ -316,12 +316,16 @@ do_tokenize <- function(df, text, token = "words", keep_cols = FALSE,
   if (with_sentence_id || token == "sentences") {
     text_v <- df[[text_col]]
     sentences_list <- tokenizers::tokenize_sentences(text_v)
-    res <- tibble::tibble(document_id = seq(length(sentences_list)), .tokens_list = sentences_list)
-    if (drop) {
-      df <- df %>% dplyr::select(-rlang::sym(text_col))
+    if (drop && !keep_cols) { # To avoid expensive unnest_longer call in the default behavior, use base R functions like unlist here.
+      res <- tibble::tibble(document_id = unlist(mapply(function(tokens,index) {rep(index,length(tokens))},
+                                                      sentences_list, seq_along(sentences_list))),
+                            .sentence = unlist(sentences_list))
     }
-    res <- df %>% dplyr::bind_cols(res)
-    res <- res %>% tidyr::unnest_longer(.tokens_list, values_to = ".sentence")
+    else {
+      res <- tibble::tibble(document_id = seq_along(sentences_list), .tokens_list = sentences_list)
+      res <- df %>% dplyr::bind_cols(res)
+      res <- res %>% tidyr::unnest_longer(.tokens_list, values_to = ".sentence")
+    }
 
     df <- res
     text_col <- ".sentence"
@@ -338,15 +342,26 @@ do_tokenize <- function(df, text, token = "words", keep_cols = FALSE,
                                         hiragana_word_length_to_remove = hiragana_word_length_to_remove,
                                         compound_tokens = compound_tokens)
     tokens_list <- as.list(tokens)
-    res <- tibble::tibble(document_id = seq(length(tokens_list)), .tokens_list = tokens_list) #TODO: adjust between sentence case and word case
-    if (with_sentence_id) {
-      res <- res %>% dplyr::rename(sentence_id = document_id)
+    if (drop && !keep_cols && with_sentence_id) { # To avoid expensive unnest_longer call in the default behavior, use base R functions like unlist here.
+      res <- tibble::tibble(document_id = unlist(mapply(function(tokens,index){rep(index,length(tokens))}, tokens_list, df$document_id)),
+                            sentence_id = unlist(mapply(function(tokens,index){rep(index,length(tokens))}, tokens_list, seq_along(tokens_list))))
+      res <- res %>% dplyr::mutate(!!rlang::sym(output) := unlist(tokens_list))
     }
-    if (drop || with_sentence_id) {
-      df <- df %>% dplyr::select(-rlang::sym(text_col))
+    else if (drop && !keep_cols) { # with_sentence_id is FALSE
+      res <- tibble::tibble(document_id = unlist(mapply(function(tokens,index){rep(index,length(tokens))}, tokens_list, seq_along(tokens_list))))
+      res <- res %>% dplyr::mutate(!!rlang::sym(output) := unlist(tokens_list))
     }
-    res <- df %>% dplyr::bind_cols(res)
-    res <- res %>% tidyr::unnest_longer(.tokens_list, values_to = output)
+    else {
+      res <- tibble::tibble(document_id = seq(length(tokens_list)), .tokens_list = tokens_list)
+      if (with_sentence_id) {
+        res <- res %>% dplyr::rename(sentence_id = document_id)
+      }
+      if (drop || with_sentence_id) {
+        df <- df %>% dplyr::select(-rlang::sym(text_col))
+      }
+      res <- df %>% dplyr::bind_cols(res)
+      res <- res %>% tidyr::unnest_longer(.tokens_list, values_to = output)
+    }
     if (output_case == "title") {
       res <- res %>% dplyr::mutate(!!rlang::sym(output) := stringr::str_to_title(!!rlang::sym(output)))
     }
