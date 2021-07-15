@@ -45,7 +45,7 @@ getGoogleAnayticsSegmentList <- function(){
 #' @param startDate - When dateRangeType is "since", specify start date
 #' @param endDate - When dateRangeType is "since", you can provide end date. "today" will be used if it's not provided.
 #' @param tzone - timezone applied to POSIXct column (force_tz)
-#' @param tzonForDisplay - timezone for displaing POSIXct column (with_tz)
+#' @param tzonForDisplay - timezone for displaying POSIXct column (with_tz)
 getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tokenFileId = NULL,
                                paginate_query=FALSE, segments = NULL, dateRangeType = "lastNDays",
                                lastN = NULL, startDate = NULL, endDate = NULL, tzone = NULL, tzoneForDisplay = NULL,...){
