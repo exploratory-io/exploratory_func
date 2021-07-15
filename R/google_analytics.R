@@ -14,6 +14,7 @@ getGoogleProfile <- function(tokenFileId = ""){
     argList <- list(accountId, webPropertyId, viewId)
     # Get timezone for each viewId
     newdf <- purrr::pmap_dfr(argList, function(accountId, webPropertyId, viewId){
+      # Timezone info is set for COLLABORATE,EDIT, MANAGE_USERS, and READ_AND_ANALYZE but we only need timezone for READ_AND_ANALYZE.
       data.frame(googleAnalyticsR::ga_view(accountId, webPropertyId, viewId)) %>% dplyr::filter(effective == "READ_AND_ANALYZE") %>% dplyr::select(id, accountId, webPropertyId, timezone)
     })
     # Join the timezone column to the original data frame.
