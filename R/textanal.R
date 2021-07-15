@@ -57,13 +57,20 @@ guess_lang_for_stopwords <- function(text) {
 
 tokenize_with_postprocess <- function(text, 
                                       remove_punct = TRUE, remove_numbers = TRUE,
+                                      tokenize_tweets = FALSE,
                                       remove_url = TRUE, remove_twitter = TRUE,
                                       stopwords_lang = NULL, stopwords = c(), stopwords_to_remove = c(),
                                       hiragana_word_length_to_remove = 2,
                                       compound_tokens = NULL
                                       ) {
-  tokenized <- tokenizers::tokenize_tweets(text, lowercase = TRUE, stopwords = NULL,
-                                           strip_punct = remove_punct, strip_url = remove_url, simplify = FALSE)
+  if (tokenize_tweets) {
+    tokenized <- tokenizers::tokenize_tweets(text, lowercase = TRUE, stopwords = NULL,
+                                             strip_punct = remove_punct, strip_url = remove_url, simplify = FALSE)
+  }
+  else {
+    tokenized <- tokenizers::tokenize_words(text, lowercase = TRUE, stopwords = NULL,
+                                            strip_punct = remove_punct, simplify = FALSE)
+  }
   names(tokenized) <- paste0("text", 1:length(tokenized)) # Add unique names to the list so that it can be passed to quanteda::tokens().
   tokens <- quanteda::tokens(tokenized)
   # tokens <- tokens %>% quanteda::tokens_wordstem() # TODO: Revive stemming and expose as an option.
@@ -108,7 +115,7 @@ tokenize_with_postprocess <- function(text,
     # Since tokenize_words(strip_numeric=TRUE) seems to look at only the last char of token and strip too much words, we do it ourselves here instead.
     tokens <- tokens %>% quanteda::tokens_remove("^[0-9]+$", valuetype = "regex")
   }
-  if (remove_twitter) {
+  if (tokenize_tweets && remove_twitter) {
     # Remove twitter social tags with the same regex as in tokenizers::tokenize_twitter.
     tokens <- tokens %>% quanteda::tokens_remove("^#[A-Za-z]+\\w*|^@\\w+", valuetype = "regex")
   }
