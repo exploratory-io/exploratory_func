@@ -323,6 +323,9 @@ do_tokenize <- function(df, text, token = "words", keep_cols = FALSE,
     }
     else {
       res <- tibble::tibble(document_id = seq_along(sentences_list), .tokens_list = sentences_list)
+      if (drop) {
+        df <- df %>% dplyr::select(-rlang::sym(text_col))
+      }
       res <- df %>% dplyr::bind_cols(res)
       res <- res %>% tidyr::unnest_longer(.tokens_list, values_to = ".sentence")
     }
