@@ -317,9 +317,9 @@ do_tokenize <- function(df, text, token = "words", keep_cols = FALSE,
     text_v <- df[[text_col]]
     sentences_list <- tokenizers::tokenize_sentences(text_v)
     if (drop && !keep_cols) { # To avoid expensive unnest_longer call in the default behavior, use base R functions like unlist here.
-      res <- tibble::tibble(document_id = unlist(mapply(function(tokens,index) {rep(index,length(tokens))},
-                                                      sentences_list, seq_along(sentences_list))),
-                            .sentence = unlist(sentences_list))
+      res <- tibble::tibble(document_id = as.integer(unlist(mapply(function(tokens,index) {rep(index,length(tokens))},
+                                                      sentences_list, seq_along(sentences_list)))),
+                            .sentence = unname(unlist(sentences_list)))
     }
     else {
       res <- tibble::tibble(document_id = seq_along(sentences_list), .tokens_list = sentences_list)
@@ -343,13 +343,13 @@ do_tokenize <- function(df, text, token = "words", keep_cols = FALSE,
                                         compound_tokens = compound_tokens)
     tokens_list <- as.list(tokens)
     if (drop && !keep_cols && with_sentence_id) { # To avoid expensive unnest_longer call in the default behavior, use base R functions like unlist here.
-      res <- tibble::tibble(document_id = unlist(mapply(function(tokens,index){rep(index,length(tokens))}, tokens_list, df$document_id)),
-                            sentence_id = unlist(mapply(function(tokens,index){rep(index,length(tokens))}, tokens_list, seq_along(tokens_list))))
-      res <- res %>% dplyr::mutate(!!rlang::sym(output) := unlist(tokens_list))
+      res <- tibble::tibble(document_id = as.integer(unlist(mapply(function(tokens,index){rep(index,length(tokens))}, tokens_list, df$document_id))),
+                            sentence_id = as.integer(unlist(mapply(function(tokens,index){rep(index,length(tokens))}, tokens_list, seq_along(tokens_list)))))
+      res <- res %>% dplyr::mutate(!!rlang::sym(output) := unname(unlist(tokens_list)))
     }
     else if (drop && !keep_cols) { # with_sentence_id is FALSE
-      res <- tibble::tibble(document_id = unlist(mapply(function(tokens,index){rep(index,length(tokens))}, tokens_list, seq_along(tokens_list))))
-      res <- res %>% dplyr::mutate(!!rlang::sym(output) := unlist(tokens_list))
+      res <- tibble::tibble(document_id = as.integer(unlist(mapply(function(tokens,index){rep(index,length(tokens))}, tokens_list, seq_along(tokens_list)))))
+      res <- res %>% dplyr::mutate(!!rlang::sym(output) := unname(unlist(tokens_list)))
     }
     else {
       res <- tibble::tibble(document_id = seq(length(tokens_list)), .tokens_list = tokens_list)
