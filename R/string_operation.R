@@ -843,9 +843,7 @@ str_remove_emoji <- function(column, position = "any"){
  } else if (position == "end") {
    regexp = stringr::str_c("(", regexp, ")$", sep = "")
  }
- lapply(column, function(text){
-  stringi::stri_replace_all(text, regex = regexp, "")
- })
+ stringi::stri_replace_all(column, regex = regexp, "")
 }
 
 #'Function to remove range of text.

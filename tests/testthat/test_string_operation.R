@@ -635,7 +635,7 @@ test_that("str_remove_emoji", {
   # Smile Face and Thumbs Up.
   text = c("\uD83D\uDE00", "\uD83D\uDC4D")
   ret <- exploratory::str_remove_emoji(text)
-  expect_equal(ret, list("",""))
+  expect_equal(ret, c("",""))
 })
 
 test_that("str_remove_word", {
