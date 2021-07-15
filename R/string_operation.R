@@ -363,7 +363,7 @@ do_tokenize <- function(df, text, token = "words", keep_cols = FALSE,
   }
 
   # Filter out rows with NA token. This happens if a sentence's tokens were all removed.
-  res <- res %>% dplyr::filter(!is.na(!!rlang::sym(output))
+  res <- res %>% dplyr::filter(!is.na(!!rlang::sym(output)))
 
   # Put back other columns if necessary.
   if (!drop || keep_cols) {
