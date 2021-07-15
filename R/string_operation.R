@@ -839,15 +839,15 @@ get_emoji_regex <- function() {
 
 #'Function to remove emoji from a list of characters.
 str_remove_emoji <- function(column, position = "any"){
- regexp <- get_emoji_regex()
- if(position == "any") {
-   regexp = stringr::str_c("(", regexp, ")", sep = "")
- } else if(position == "start") {
-   regexp = stringr::str_c("^(", regexp, ")", sep = "")
- } else if (position == "end") {
-   regexp = stringr::str_c("(", regexp, ")$", sep = "")
- }
- stringi::stri_replace_all(column, regex = regexp, "")
+  regexp <- get_emoji_regex()
+  if(position == "any") {
+    regexp = stringr::str_c("(", regexp, ")", sep = "")
+  } else if(position == "start") {
+    regexp = stringr::str_c("^(", regexp, ")", sep = "")
+  } else if (position == "end") {
+    regexp = stringr::str_c("(", regexp, ")$", sep = "")
+  }
+  stringi::stri_replace_all(column, regex = regexp, "")
 }
 
 #'Function to remove range of text.
