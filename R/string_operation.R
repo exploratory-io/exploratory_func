@@ -311,25 +311,16 @@ do_tokenize <- function(df, text, token = "words", keep_cols = FALSE,
   }
   # Replace NAs with empty string. quanteda::tokens() cannot handle NA, but can handle empty string.
   df[[text_col]] <- ifelse(is.na(df[[text_col]]), "", df[[text_col]])
+  df_orig <- df
 
   # As pre-processing, split text into sentences, if sentence_id is needed or the final output should be sentences.
   if (with_sentence_id || token == "sentences") {
     text_v <- df[[text_col]]
     sentences_list <- tokenizers::tokenize_sentences(text_v)
-    if (drop && !keep_cols) { # To avoid expensive unnest_longer call in the default behavior, use base R functions like unlist here.
-      res <- tibble::tibble(document_id = as.integer(unlist(mapply(function(tokens,index) {rep(index,length(tokens))},
-                                                      sentences_list, seq_along(sentences_list)))),
-                            .sentence = unname(unlist(sentences_list)))
-    }
-    else {
-      res <- tibble::tibble(document_id = seq_along(sentences_list), .tokens_list = sentences_list)
-      if (drop) {
-        df <- df %>% dplyr::select(-rlang::sym(text_col))
-      }
-      res <- df %>% dplyr::bind_cols(res)
-      res <- res %>% tidyr::unnest_longer(.tokens_list, values_to = ".sentence")
-    }
-
+    # To avoid expensive unnest_longer call, use base R functions like unlist here.
+    res <- tibble::tibble(document_id = as.integer(unlist(mapply(function(tokens,index) {rep(index,length(tokens))},
+                                                                 sentences_list, seq_along(sentences_list)))),
+                          .sentence = unname(unlist(sentences_list)))
     df <- res
     text_col <- ".sentence"
     # Replace NAs with empty string again. As a result of this tokenization, NAs can be introduced.
@@ -345,25 +336,14 @@ do_tokenize <- function(df, text, token = "words", keep_cols = FALSE,
                                         hiragana_word_length_to_remove = hiragana_word_length_to_remove,
                                         compound_tokens = compound_tokens)
     tokens_list <- as.list(tokens)
-    if (drop && !keep_cols && with_sentence_id) { # To avoid expensive unnest_longer call in the default behavior, use base R functions like unlist here.
+    if (with_sentence_id) { # To avoid expensive unnest_longer call in the default behavior, use base R functions like unlist here.
       res <- tibble::tibble(document_id = as.integer(unlist(mapply(function(tokens,index){rep(index,length(tokens))}, tokens_list, df$document_id))),
                             sentence_id = as.integer(unlist(mapply(function(tokens,index){rep(index,length(tokens))}, tokens_list, seq_along(tokens_list)))))
       res <- res %>% dplyr::mutate(!!rlang::sym(output) := unname(unlist(tokens_list)))
     }
-    else if (drop && !keep_cols) { # with_sentence_id is FALSE
+    else { # with_sentence_id is FALSE
       res <- tibble::tibble(document_id = as.integer(unlist(mapply(function(tokens,index){rep(index,length(tokens))}, tokens_list, seq_along(tokens_list)))))
       res <- res %>% dplyr::mutate(!!rlang::sym(output) := unname(unlist(tokens_list)))
-    }
-    else {
-      res <- tibble::tibble(document_id = seq(length(tokens_list)), .tokens_list = tokens_list)
-      if (with_sentence_id) {
-        res <- res %>% dplyr::rename(sentence_id = document_id)
-      }
-      if (drop || with_sentence_id) {
-        df <- df %>% dplyr::select(-rlang::sym(text_col))
-      }
-      res <- df %>% dplyr::bind_cols(res)
-      res <- res %>% tidyr::unnest_longer(.tokens_list, values_to = output)
     }
     if (output_case == "title") {
       res <- res %>% dplyr::mutate(!!rlang::sym(output) := stringr::str_to_title(!!rlang::sym(output)))
@@ -375,6 +355,12 @@ do_tokenize <- function(df, text, token = "words", keep_cols = FALSE,
   else { # This means token == "sentences"
     # Just rename the output column from the pre-processing.
     res <- res %>% dplyr::rename(!!rlang::sym(output) := !!rlang::sym(text_col))
+  }
+
+  # Put back other columns if necessary.
+  if (!drop || keep_cols) {
+    df_orig <- df_orig %>% dplyr::mutate(document_id=seq(n()))
+    res <- res %>% dplyr::left_join(df_orig, by="document_id")
   }
   res
 }
