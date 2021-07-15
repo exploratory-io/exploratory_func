@@ -311,7 +311,10 @@ do_tokenize <- function(df, text, token = "words", keep_cols = FALSE,
   }
   # Replace NAs with empty string. quanteda::tokens() cannot handle NA, but can handle empty string.
   df[[text_col]] <- ifelse(is.na(df[[text_col]]), "", df[[text_col]])
+  # Preserve df and text_col at this point before modifying them while tokenizing into sentences,
+  # for the purpose of adding them back to the output.
   df_orig <- df
+  text_col_orig <- text_col
 
   # As pre-processing, split text into sentences, if sentence_id is needed or the final output should be sentences.
   if (with_sentence_id || token == "sentences") {
@@ -359,7 +362,10 @@ do_tokenize <- function(df, text, token = "words", keep_cols = FALSE,
 
   # Put back other columns if necessary.
   if (!drop || keep_cols) {
-    df_orig <- df_orig %>% dplyr::mutate(document_id=seq(n()))
+    if (drop) {
+      df_orig <- df_orig %>% select(-!!rlang::sym(text_col_orig))
+    }
+    df_orig <- df_orig %>% dplyr::mutate(document_id=seq(n())) # If document_id is in the input, it is overwritten.
     res <- res %>% dplyr::left_join(df_orig, by="document_id")
   }
   res
