@@ -223,9 +223,8 @@ test_that("do_tokenize when names conflict", {
   result <- df %>%
     do_tokenize(input, token="words", keep_cols = TRUE)
   expect_equal(result$token[[1]], "hello")
-  expect_equal(ncol(result), 4)
-  expect_equal(colnames(result)[[1]],"document_id...1")
-  expect_equal(colnames(result)[[2]],"document_id...2")
+  expect_equal(ncol(result), 3)
+  expect_equal(colnames(result)[[1]],"document_id") # If document_id is in the input, it is overwritten.
 })
 
 test_that("do_tokenize with token=sentence", {
