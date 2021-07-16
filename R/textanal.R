@@ -57,11 +57,20 @@ guess_lang_for_stopwords <- function(text) {
 
 tokenize_with_postprocess <- function(text, 
                                       remove_punct = TRUE, remove_numbers = TRUE,
+                                      tokenize_tweets = FALSE,
+                                      remove_url = TRUE, remove_twitter = TRUE,
                                       stopwords_lang = NULL, stopwords = c(), stopwords_to_remove = c(),
                                       hiragana_word_length_to_remove = 2,
                                       compound_tokens = NULL
                                       ) {
-  tokenized <- tokenizers::tokenize_words(text, lowercase = TRUE, stopwords = NULL, strip_punct = remove_punct, strip_numeric = remove_numbers, simplify = FALSE)
+  if (tokenize_tweets) {
+    tokenized <- tokenizers::tokenize_tweets(text, lowercase = TRUE, stopwords = NULL,
+                                             strip_punct = remove_punct, strip_url = remove_url, simplify = FALSE)
+  }
+  else {
+    tokenized <- tokenizers::tokenize_words(text, lowercase = TRUE, stopwords = NULL,
+                                            strip_punct = remove_punct, simplify = FALSE)
+  }
   names(tokenized) <- paste0("text", 1:length(tokenized)) # Add unique names to the list so that it can be passed to quanteda::tokens().
   tokens <- quanteda::tokens(tokenized)
   # tokens <- tokens %>% quanteda::tokens_wordstem() # TODO: Revive stemming and expose as an option.
@@ -80,7 +89,8 @@ tokenize_with_postprocess <- function(text,
     # Handle ones that are not separated by spaces.
     if (length(compound_tokens_without_space) > 0) {
       # Tokenize those words with the same options with the original tokinizing, to know where such word would have been splitted.
-      compound_tokens_list <- tokenizers::tokenize_words(compound_tokens_without_space, lowercase = TRUE, stopwords = NULL, strip_punct = remove_punct, strip_numeric = remove_numbers, simplify = FALSE)
+      compound_tokens_list <- tokenizers::tokenize_tweets(compound_tokens_without_space, lowercase = TRUE, stopwords = NULL,
+                                                          strip_punct = remove_punct, strip_url = remove_url, simplify = FALSE)
       # Create space-separated expression of the word, which can be used with quanteda::tokens_compound.
       compound_tokens_with_space_inserted <- purrr::flatten_chr(purrr::map(compound_tokens_list, function(x){stringr::str_c(x, collapse=' ')}))
       tokens <- tokens %>% quanteda::tokens_compound(pattern = quanteda::phrase(compound_tokens_with_space_inserted), concatenator = '')
@@ -88,7 +98,7 @@ tokenize_with_postprocess <- function(text,
   }
 
   # when stopwords Language is set, use the stopwords to filter out the result.
-  if(!is.null(stopwords_lang)) {
+  if (!is.null(stopwords_lang)) {
     if (stopwords_lang == "auto") {
       stopwords_lang <- guess_lang_for_stopwords(text)
     }
@@ -98,8 +108,22 @@ tokenize_with_postprocess <- function(text,
     tokens <- tokens %>% quanteda::tokens_remove(stopwords_final, valuetype = "fixed")
   }
   # Remove Japanese Hiragana word whose length is less than hiragana_word_length_to_remove
-  if(hiragana_word_length_to_remove > 0) {
+  if (hiragana_word_length_to_remove > 0) {
     tokens <- tokens %>% quanteda::tokens_remove(stringr::str_c("^[\\\u3040-\\\u309f]{1,", hiragana_word_length_to_remove, "}$"), valuetype = "regex")
+  }
+  if (remove_numbers) {
+    # Since tokenize_words(strip_numeric=TRUE) seems to look at only the last char of token and strip too much words, we do it ourselves here instead.
+    tokens <- tokens %>% quanteda::tokens_remove("^[0-9\uff10-\uff19]+$", valuetype = "regex")
+  }
+  # Results from tokenizers::tokenize_tweets seems to include emojis unlike tokenizers::tokenize_words.
+  # For now, strip all-emoji-tokens here since they can't be displayed on word cloud.
+  if (tokenize_tweets) {
+    emoji_regex <- get_emoji_regex()
+    tokens <- tokens %>% quanteda::tokens_remove(paste0("^(", emoji_regex, ")+$"), valuetype = "regex")
+  }
+  if (tokenize_tweets && remove_twitter) {
+    # Remove twitter social tags with the same regex as in tokenizers::tokenize_twitter.
+    tokens <- tokens %>% quanteda::tokens_remove("^#[A-Za-z]+\\w*|^@\\w+", valuetype = "regex")
   }
   tokens
 }
@@ -109,6 +133,8 @@ tokenize_with_postprocess <- function(text,
 #' @export
 exp_textanal <- function(df, text,
                          remove_punct = TRUE, remove_numbers = TRUE,
+                         tokenize_tweets = FALSE,
+                         remove_url = TRUE, remove_twitter = TRUE,
                          stopwords_lang = NULL, stopwords = c(), stopwords_to_remove = c(),
                          hiragana_word_length_to_remove = 2,
                          compound_tokens = NULL,
@@ -116,11 +142,8 @@ exp_textanal <- function(df, text,
                          cooccurrence_window = 1, # 5 is the quanteda's default, but narrowing it for speed of default run. 
                          cooccurrence_network_num_words = 50,
                          max_nrow = 50000,
-                         ...){
-
-  # Always put document_id to know what document the tokens are from
+                         ...) {
   text_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(text))
-  doc_id <- avoid_conflict(colnames(df), "document_id")
   each_func <- function(df) {
     # Filter out NAs before sampling. We keep empty string, since we will anyway have to work with the case where no token was found in a doc.
     df <- df %>% dplyr::filter(!is.na(!!rlang::sym(text_col)))
@@ -135,6 +158,8 @@ exp_textanal <- function(df, text,
 
     tokens <- tokenize_with_postprocess(df[[text_col]],
                                         remove_punct = remove_punct, remove_numbers = remove_numbers,
+                                        tokenize_tweets = tokenize_tweets,
+                                        remove_url = remove_url, remove_twitter = remove_twitter,
                                         stopwords_lang = stopwords_lang, stopwords = stopwords, stopwords_to_remove = stopwords_to_remove,
                                         hiragana_word_length_to_remove = hiragana_word_length_to_remove,
                                         compound_tokens = compound_tokens)
@@ -305,6 +330,8 @@ get_cooccurrence_graph_data <- function(model_df, max_vertex_size = 20, vertex_s
 #' @export
 exp_text_cluster <- function(df, text,
                          remove_punct = TRUE, remove_numbers = TRUE,
+                         tokenize_tweets = FALSE,
+                         remove_url = TRUE, remove_twitter = TRUE,
                          stopwords_lang = NULL, stopwords = c(), stopwords_to_remove = c(),
                          hiragana_word_length_to_remove = 2,
                          compound_tokens = NULL,
@@ -319,11 +346,8 @@ exp_text_cluster <- function(df, text,
                          mds_sample_size=200,
                          max_nrow = 50000,
                          seed = 1,
-                         ...){
-
-  # Always put document_id to know what document the tokens are from
+                         ...) {
   text_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(text))
-  doc_id <- avoid_conflict(colnames(df), "document_id")
 
   # Set seed just once.
   if(!is.null(seed)) {
@@ -344,6 +368,8 @@ exp_text_cluster <- function(df, text,
 
     tokens <- tokenize_with_postprocess(df[[text_col]],
                                         remove_punct = remove_punct, remove_numbers = remove_numbers,
+                                        tokenize_tweets = tokenize_tweets,
+                                        remove_url = remove_url, remove_twitter = remove_twitter,
                                         stopwords_lang = stopwords_lang, stopwords = stopwords, stopwords_to_remove = stopwords_to_remove,
                                         hiragana_word_length_to_remove = hiragana_word_length_to_remove,
                                         compound_tokens = compound_tokens)
@@ -464,6 +490,8 @@ tidy.text_cluster_exploratory <- function(x, type="word_count", num_top_words=5,
 #' @export
 exp_topic_model <- function(df, text,
                             remove_punct = TRUE, remove_numbers = TRUE,
+                            tokenize_tweets = FALSE,
+                            remove_url = TRUE, remove_twitter = TRUE,
                             stopwords_lang = NULL, stopwords = c(), stopwords_to_remove = c(),
                             hiragana_word_length_to_remove = 2,
                             compound_tokens = NULL,
@@ -474,11 +502,8 @@ exp_topic_model <- function(df, text,
                             mds_sample_size=200,
                             max_nrow = 50000,
                             seed = 1,
-                            ...){
-
-  # Always put document_id to know what document the tokens are from
+                            ...) {
   text_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(text))
-  doc_id <- avoid_conflict(colnames(df), "document_id")
 
   # Set seed just once.
   if(!is.null(seed)) {
@@ -499,6 +524,8 @@ exp_topic_model <- function(df, text,
 
     tokens <- tokenize_with_postprocess(df[[text_col]],
                                         remove_punct = remove_punct, remove_numbers = remove_numbers,
+                                        tokenize_tweets = tokenize_tweets,
+                                        remove_url = remove_url, remove_twitter = remove_twitter,
                                         stopwords_lang = stopwords_lang, stopwords = stopwords, stopwords_to_remove = stopwords_to_remove,
                                         hiragana_word_length_to_remove = hiragana_word_length_to_remove,
                                         compound_tokens = compound_tokens)
