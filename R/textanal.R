@@ -272,7 +272,7 @@ tidy.textanal_exploratory <- function(x, type="word_count", max_words=NULL, max_
 }
 
 # vertex_size_method - "equal_length" or "equal_freq"
-get_cooccurrence_graph_data <- function(model_df, max_vertex_size = 25, vertex_size_method = "equal_length", max_edge_width=8, font_size_ratio=1.0) {
+get_cooccurrence_graph_data <- function(model_df, max_vertex_size = 20, vertex_size_method = "equal_length", max_edge_width=8, font_size_ratio=1.0, area_factor=50, vertex_opacity=0.8, cluster_method="louvain") {
   # Prepare edges data
   edges <- exploratory:::fcm_to_df(model_df$model[[1]]$fcm_selected) %>% rename(from=token.x,to=token.y) %>% filter(from!=to)
   edges <- edges %>% mutate(from = stringr::str_to_title(from), to = stringr::str_to_title(to))
@@ -301,8 +301,26 @@ get_cooccurrence_graph_data <- function(model_df, max_vertex_size = 25, vertex_s
   vertex_sizes <- vertex_sizes/max(vertex_sizes) * max_vertex_size
   vertices <- tibble::tibble(name=feat_names, size=vertex_sizes)
 
+  if (cluster_method != "none") {
+    g <- igraph::graph.data.frame(edges, directed=FALSE, vertices=vertices) # Temporary graph object just to calculate cluster membership.
+    lc <- switch(cluster_method,
+                 louvain = igraph::cluster_louvain(g, weights=edges$value),
+                 leading_eigen = igraph::cluster_leading_eigen(g, weights=edges$value),
+                 fast_greedy = igraph::cluster_fast_greedy(g, weights=edges$value),
+                 spinglass = igraph::cluster_spinglass(g, weights=edges$value),
+                 infomap = igraph::cluster_infomap(g, e.weights=edges$value),
+                 edge_betweenness = igraph::cluster_edge_betweenness(g, weights=edges$value),
+                 label_prop = igraph::cluster_label_prop(g, weights=edges$value),
+                 walktrap = igraph::cluster_walktrap(g, weights=edges$value)
+    )
+    cluster <- as.numeric(igraph::membership(lc))
+    vertices <- vertices %>% dplyr::mutate(cluster=!!cluster)
+  }
+
   ret <- list(edges=edges, vertices=vertices)
   attr(ret, "font_size_factor") <- font_size_ratio
+  attr(ret, "area_factor") <- area_factor
+  attr(ret, "vertex_opacity") <- vertex_opacity
   ret <- data.frame(model=I(list(ret))) # return as data.frame. TODO: handle group_by
   class(ret$model) <- c("list", "exp_coocurrence_graph")
   ret

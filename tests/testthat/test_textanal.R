@@ -22,6 +22,19 @@ test_that("exp_textanal", {
   expect_true("And" %in% res$word) # Test stopwords_to_remove.
   res <- model_df %>% tidy_rowwise(model, type="word_pairs")
 
+  # Test network clustering.
+  graph_data_res <- model_df %>% get_cooccurrence_graph_data(cluster_method="louvain")
+  expect_equal(length(graph_data_res$model[[1]]$vertices$cluster), 14)
+  graph_data_res <- model_df %>% get_cooccurrence_graph_data(cluster_method="leading_eigen")
+  expect_equal(length(graph_data_res$model[[1]]$vertices$cluster), 14)
+  graph_data_res <- model_df %>% get_cooccurrence_graph_data(cluster_method="fast_greedy")
+  expect_equal(length(graph_data_res$model[[1]]$vertices$cluster), 14)
+  # Commented out due to this error with this toy data - Error: At clustertool.cpp:286 : Cannot work with unconnected graph, Invalid value
+  # graph_data_res <- model_df %>% get_cooccurrence_graph_data(cluster_method="spinglass")
+  # expect_equal(length(graph_data_res$model[[1]]$vertices$cluster), 14)
+  graph_data_res <- model_df %>% get_cooccurrence_graph_data(cluster_method="none")
+  expect_true(is.null(graph_data_res$model[[1]]$vertices$cluster))
+
   # Test for plotting
   # edges <- exploratory:::fcm_to_df(model_df$model[[1]]$fcm_selected) %>% rename(from=token.x,to=token.y) %>% filter(from!=to)
   # g <- igraph::graph.data.frame(edges, directed=FALSE)

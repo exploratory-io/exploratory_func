@@ -6,7 +6,22 @@ getGoogleProfile <- function(tokenFileId = ""){
 
   token <- getGoogleTokenForAnalytics(tokenFileId);
   googleAuthR::gar_auth(token = token, skip_fetch = TRUE)
-  googleAnalyticsR::ga_account_list()
+  df <- googleAnalyticsR::ga_account_list()
+  # For each view, we want to get a timezone so iterate the result of the googleAnalyticsR::ga_account_list().
+  if (nrow(df) > 0) {
+    accountId <- df$accountId
+    webPropertyId <- df$webPropertyId
+    viewId <- df$viewId
+    argList <- list(accountId, webPropertyId, viewId)
+    # Get timezone for each viewId
+    newdf <- purrr::pmap_dfr(argList, function(accountId, webPropertyId, viewId){
+      # Timezone info is set for COLLABORATE,EDIT, MANAGE_USERS, and READ_AND_ANALYZE but we only need timezone for READ_AND_ANALYZE.
+      data.frame(googleAnalyticsR::ga_view(accountId, webPropertyId, viewId)) %>% dplyr::filter(effective == "READ_AND_ANALYZE") %>% dplyr::select(id, accountId, webPropertyId, timezone)
+    })
+    # Join the timezone column to the original data frame.
+    df <- df %>% dplyr::left_join(newdf, by = c("accountId" = "accountId", "webPropertyId" = "webPropertyId", "viewId" = "id"))
+  }
+  df
 }
 
 getGoogleAnayticsSegmentList <- function(){
@@ -30,10 +45,11 @@ getGoogleAnayticsSegmentList <- function(){
 #' @param lastN - Corresponding numeric value for the lastNxx duration.
 #' @param startDate - When dateRangeType is "since", specify start date
 #' @param endDate - When dateRangeType is "since", you can provide end date. "today" will be used if it's not provided.
-#' @param tzone - timezone applied to POSIXct column
+#' @param tzone - timezone applied to POSIXct column (force_tz)
+#' @param tzonForDisplay - timezone for displaying POSIXct column (with_tz)
 getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tokenFileId = NULL,
                                paginate_query=FALSE, segments = NULL, dateRangeType = "lastNDays",
-                               lastN = NULL, startDate = NULL, endDate = NULL, tzone = NULL, ...){
+                               lastN = NULL, startDate = NULL, endDate = NULL, tzone = NULL, tzoneForDisplay = NULL,...){
   if(!requireNamespace("RGoogleAnalytics")){stop("package RGoogleAnalytics must be installed.")}
   loadNamespace("lubridate")
   # if segment is not null and empty string, pass it as NULL
@@ -189,6 +205,9 @@ getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tok
   }
   if(!is.null(tzone)) { # if timezone is specified, apply the timezeon to POSIXct columns
     ga.data <- ga.data %>% dplyr::mutate_if(lubridate::is.POSIXct, funs(lubridate::force_tz(., tzone=tzone)))
+  }
+  if (!is.null(tzoneForDisplay)) {# if timezone for display is specified, convert the timezeon with with_tz
+    ga.data <- ga.data %>% dplyr::mutate_if(lubridate::is.POSIXct, funs(lubridate::with_tz(., tzone=tzoneForDisplay)))
   }
 
   ga.data

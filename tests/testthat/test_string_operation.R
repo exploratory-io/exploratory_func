@@ -494,6 +494,16 @@ test_that("str_extract_inside", {
 
 })
 
+test_that("str_remove", {
+  ret <- exploratory::str_remove("test group", "group", remove_extra_space = TRUE)
+  expect_equal(ret, "test")
+})
+
+test_that("str_remove_all", {
+  ret <- exploratory::str_remove_all("test capital group", "group|capital", remove_extra_space = TRUE)
+  expect_equal(ret, "test")
+})
+
 test_that("str_remove_inside", {
   # bracket ()
   ret <- exploratory::str_remove_inside("abc(defgh)ijk", begin = "(", end =")")
