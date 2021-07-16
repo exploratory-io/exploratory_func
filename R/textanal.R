@@ -113,7 +113,7 @@ tokenize_with_postprocess <- function(text,
   }
   if (remove_numbers) {
     # Since tokenize_words(strip_numeric=TRUE) seems to look at only the last char of token and strip too much words, we do it ourselves here instead.
-    tokens <- tokens %>% quanteda::tokens_remove("^[0-9]+$", valuetype = "regex")
+    tokens <- tokens %>% quanteda::tokens_remove("^[0-9\uff10-\uff19]+$", valuetype = "regex")
   }
   # Results from tokenizers::tokenize_tweets seems to include emojis unlike tokenizers::tokenize_words.
   # For now, strip all-emoji-tokens here since they can't be displayed on word cloud.
