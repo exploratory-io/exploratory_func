@@ -279,103 +279,112 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
 
 #' Tokenize text and unnest
 #' @param df Data frame
-#' @param input Set a column of which you want to split the text or tokenize.
-#' @param token Select the unit of token from "characters", "words", "sentences", "lines", "paragraphs", and "regex".
+#' @param text Set a column of which you want to split the text or tokenize.
+#' @param token Select the unit of token from "words", or "sentences".
 #' @param keep_cols Whether existing columns should be kept or not
 #' @param drop Whether input column should be removed.
-#' @param with_id Whether output should contain original document id and sentence id in each document.
+#' @param with_sentence_id Whether output should contain sentence id in each document.
 #' @param output Set a column name for the new column to store the tokenized values.
 #' @param stopwords_lang Language for the stopwords that need to be excluded from the result.
 #' @param remove_punct Whether it should remove punctuations.
 #' @param remove_numbers Whether it should remove numbers.
+#' @param remove_url Whether it should remove URLs. 
+#' @param remove_twitter Whether it should remove Twitter social tags. 
+#' @param stopwords Additional stopwords.
+#' @param stopwords_to_remove Words to be removed from the set of stopwords.
+#' @param hiragana_word_length_to_remove Length of a Hiragana word that needs to be excluded from the result.
+#' @param compound_tokens Sequence of words that should be treated as one word.
 #' @return Data frame with tokenized column
 #' @export
-do_tokenize <- function(df, input, token = "words", keep_cols = FALSE,
-                        drop = TRUE, with_id = TRUE, output = token,
+do_tokenize <- function(df, text, token = "words", keep_cols = FALSE,
+                        drop = TRUE, with_sentence_id = TRUE,
+                        output = "token", output_case = "lower",
                         remove_punct = TRUE, remove_numbers = TRUE,
-                        stopwords_lang = NULL, ...){
-  validate_empty_data(df)
+                        tokenize_tweets = FALSE,
+                        remove_url = TRUE, remove_twitter = TRUE,
+                        stopwords_lang = NULL, stopwords = c(), stopwords_to_remove = c(),
+                        hiragana_word_length_to_remove = 2,
+                        compound_tokens = NULL, ...) {
+  text_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(text))
+  if (!keep_cols) {
+    # Keep only the column to tokenize
+    df <- df[text_col]
+  }
+  # Replace NAs with empty string. quanteda::tokens() cannot handle NA, but can handle empty string.
+  df[[text_col]] <- ifelse(is.na(df[[text_col]]), "", df[[text_col]])
+  # Preserve df and text_col at this point before modifying them while tokenizing into sentences,
+  # for the purpose of adding them back to the output.
+  df_orig <- df
+  text_col_orig <- text_col
 
-  loadNamespace("tidytext")
-  loadNamespace("stringr")
-
-  orig_input_col <- col_name(substitute(input))
-  input_col <- avoid_conflict(colnames(df), "input")
-  # since unnest_tokens_ does not handle column with space well, rename column name temporarily.
-  # the following does not work with error that says := is unknown. do it base-R way.
-  # df <- dplyr::rename(!!rlang::sym(input_col) := !!rlang::sym(orig_input_col))
-  colnames(df)[colnames(df) == orig_input_col] <- input_col
-
-  output_col <- avoid_conflict(colnames(df), col_name(substitute(output)))
-  # This is to prevent encoding error
-  df[[input_col]] <- stringr::str_conv(df[[input_col]], "utf-8")
-
-  if(!keep_cols){
-    # keep only a column to tokenize
-    df <- df[input_col]
+  # As pre-processing, split text into sentences, if sentence_id is needed or the final output should be sentences.
+  if (with_sentence_id || token == "sentences") {
+    text_v <- df[[text_col]]
+    sentences_list <- tokenizers::tokenize_sentences(text_v)
+    # Create a data.frame, where one row represents one sentence. document_id is the document the sentence belongs (row number in the original df.)
+    # .sentence is the text of the sentence.
+    # To avoid expensive unnest_longer call, we use base R functions like unlist() instead here. 
+    # as.integer() is there to convert the matrix unlist() returns there into an integer vector.
+    # unname() is there to unname the named vector unlist returns.
+    res <- tibble::tibble(document_id = as.integer(unlist(mapply(function(tokens,index) {rep(index,length(tokens))},
+                                                                 sentences_list, seq_along(sentences_list)))),
+                          .sentence = unname(unlist(sentences_list)))
+    df <- res
+    text_col <- ".sentence"
+    # Replace NAs with empty string again. As a result of this tokenization, NAs can be introduced.
+    df[[text_col]] <- ifelse(is.na(df[[text_col]]), "", df[[text_col]])
   }
 
-  if(with_id){
-    # always put document_id to know what document the tokens are from
-    doc_id <- avoid_conflict(colnames(df), "document_id")
-    # this is SE version of dplyr::mutate(df, doc_id = row_number())
-    df <- dplyr::mutate_(df, .dots=setNames(list(~row_number()),doc_id))
-  }
-
-  if(token %in% c("words", "characters") && with_id){
-    # get sentence_id too in this case for each token
-
-    loadNamespace("dplyr")
-
-    # split into sentences
-    func <- get("unnest_tokens_", asNamespace("tidytext"))
-
-    # use unnest_token only with document_id and input_col,
-    # so that it won't duplicate other columns,
-    # which will be joined later
-    tokenize_df <- df[,c(doc_id, input_col)]
-    sentences <- tidytext::unnest_tokens(tokenize_df, !!rlang::sym(output_col), !!rlang::sym(input_col), token="sentences", drop=TRUE, strip_punct = remove_punct, ...)
-
-    # as.symbol is used for colum names with backticks
-    grouped <- dplyr::group_by(sentences, !!!rlang::syms(doc_id))
-
-    # put sentence_id
-    sentence_id <- avoid_conflict(colnames(df), "sentence_id")
-    tokenize_df <- dplyr::mutate_(grouped, .dots=setNames(list(~row_number()), sentence_id))
-
-    # split into tokens
-    tokenize_df <- dplyr::ungroup(tokenize_df)
-    tokenized <- tidytext::unnest_tokens(tokenize_df, !!rlang::sym(output_col), !!rlang::sym(output_col), token=token, strip_punct=remove_punct, drop=TRUE, ...)
-
-    if(drop){
-      df[[input_col]] <- NULL
+  if (token == "words") {
+    text_v <- df[[text_col]]
+    tokens <- tokenize_with_postprocess(text_v,
+                                        remove_punct = remove_punct, remove_numbers = remove_numbers,
+                                        tokenize_tweets = tokenize_tweets,
+                                        remove_url = remove_url, remove_twitter = remove_twitter,
+                                        stopwords_lang = stopwords_lang, stopwords = stopwords, stopwords_to_remove = stopwords_to_remove,
+                                        hiragana_word_length_to_remove = hiragana_word_length_to_remove,
+                                        compound_tokens = compound_tokens)
+    tokens_list <- as.list(tokens)
+    if (with_sentence_id) { # To avoid expensive unnest_longer call in the default behavior, use base R functions like unlist here.
+      res <- tibble::tibble(document_id = as.integer(unlist(mapply(function(tokens,index){rep(index,length(tokens))}, tokens_list, df$document_id))),
+                            sentence_id = as.integer(unlist(mapply(function(tokens,index){rep(index,length(tokens))}, tokens_list, seq_along(tokens_list)))))
+      res <- res %>% dplyr::mutate(!!rlang::sym(output) := unname(unlist(tokens_list)))
     }
-
-    ret <- dplyr::right_join(df, tokenized, by=doc_id)
-  } else {
-    ret <- tidytext::unnest_tokens(df, !!rlang::sym(output_col), !!rlang::sym(input_col), token=token, strip_punct=remove_punct, drop=drop, ...)
+    else { # with_sentence_id is FALSE
+      res <- tibble::tibble(document_id = as.integer(unlist(mapply(function(tokens,index){rep(index,length(tokens))}, tokens_list, seq_along(tokens_list)))))
+      res <- res %>% dplyr::mutate(!!rlang::sym(output) := unname(unlist(tokens_list)))
+    }
+    if (output_case == "title") {
+      res <- res %>% dplyr::mutate(!!rlang::sym(output) := stringr::str_to_title(!!rlang::sym(output)))
+    }
+    else if (output_case == "upper") {
+      res <- res %>% dplyr::mutate(!!rlang::sym(output) := stringr::str_to_upper(!!rlang::sym(output)))
+    }
+  }
+  else { # This means token == "sentences"
+    # Just rename the output column from the pre-processing.
+    res <- res %>% dplyr::rename(!!rlang::sym(output) := !!rlang::sym(text_col))
   }
 
-  # set the column name to original.
-  # the following does not work with error that says := is unknown. do it base-R way.
-  # ret <- ret %>% dplyr::rename(!!rlang::sym(orig_input_col) := !!rlang::sym(input_col))
-  colnames(ret)[colnames(ret) == input_col] <- orig_input_col
-  # if stopwords_lang is provided, remove the stopwords for the language.
-  if(!is.null(stopwords_lang)) {
-    ret <- ret %>% dplyr::filter(!is_stopword(!!rlang::sym(output_col), lang = stopwords_lang))
+  # Filter out rows with NA token. This happens if a sentence's tokens were all removed.
+  res <- res %>% dplyr::filter(!is.na(!!rlang::sym(output)))
+
+  # Put back other columns if necessary.
+  if (!drop || keep_cols) {
+    if (drop) {
+      df_orig <- df_orig %>% select(-!!rlang::sym(text_col_orig))
+    }
+    df_orig <- df_orig %>% dplyr::mutate(document_id=seq(n())) # If document_id is in the input, it is overwritten.
+    res <- res %>% dplyr::left_join(df_orig, by="document_id")
   }
-  if(remove_numbers) {
-    # remove if the token is all number characters.
-    ret <- ret %>% dplyr::filter(!stringr::str_detect(!!rlang::sym(output_col), '^[:digit:]+$'))
-  }
-  ret
+  res
 }
 
 #' Input:
 #' group - vector of documents
 #' term - vector terms with the same length as group.
 #' tf - vector of tf with the same length as group. It can be after weight function is applied,
-#'      in which case, we assume that group-term combination in the input is unique, and summing up at the sparseMatrix would not happen. 
+#'      in which case, we assume that group-term combination in the input is unique, and summing up at the sparseMatrix would not happen.
 #' count_per_doc - vector of word count per doc. It is tf before weight function is applied.
 #' Output: data.frame of document frequency and tf-idf. The number of rows are the same as the input vectors.
 calc_tfidf <- function(group, term, tf, count_per_doc, smooth_idf = FALSE){
@@ -742,6 +751,27 @@ str_replace_inside <- function(column, begin = "(", end = ")", rep = "", all = F
     stringr::str_replace(column, exp, rep)
   }
 }
+
+#' Wrapper function for stringr::str_remove.
+#' When remove_extra_space argument is TRUE, it applies str_squish on top of the stringr::str_remove result.
+str_remove <- function(string, pattern, remove_extra_space = FALSE) {
+  res <- stringr::str_remove(string, pattern)
+  if (remove_extra_space) {
+    res <- stringr::str_squish(res)
+  }
+  res
+}
+
+#' Wrapper function for stringr::str_remove_all.
+#' When remove_extra_space argument is TRUE, it applies str_squish on top of the stringr::str_remove_all result.
+str_remove_all <- function(string, pattern, remove_extra_space = FALSE) {
+  res <- stringr::str_remove_all(string, pattern)
+  if (remove_extra_space) {
+    res <- stringr::str_squish(res)
+  }
+  res
+}
+
 #'Function to remove URL from the text
 #'@export
 str_remove_url <- function(text, position = "any"){
@@ -819,28 +849,30 @@ str_replace_word <- function(string, start = 1L, end = start, sep = fixed(" "), 
   }
 }
 
+get_emoji_regex <- function() {
+  regexp = "\\p{EMOJI}|\\p{EMOJI_PRESENTATION}|\\p{EMOJI_MODIFIER_BASE}|\\p{EMOJI_MODIFIER}\\p{EMOJI_COMPONENT}";
+  # it seems above condition does not cover all emojis.
+  # So we will manually add below emojis. (ref: https://github.com/gagolews/stringi/issues/279)
+  regexp = stringr::str_c(regexp, "|\U0001f970|\U0001f975|\U0001f976|\U0001f973|\U0001f974|\U0001f97a|\U0001f9b8|\U0001f9b9|\U0001f9b5|\U0001f9b6|\U0001f9b0|\U0001f9b1|\U0001f9b2", sep = "")
+  regexp = stringr::str_c(regexp, "|\U0001f9b3|\U0001f9b4|\U0001f9b7|\U0001f97d|\U0001f97c|\U0001f97e|\U0001f97f|\U0001f99d|\U0001f999|\U0001f99b|\U0001f998|\U0001f9a1|\U0001f9a2", sep = "")
+  regexp = stringr::str_c(regexp, "|\U0001f99a|\U0001f99c|\U0001f99e|\U0001f99f|\U0001f9a0|\U0001f96d|\U0001f96c|\U0001f96f|\U0001f9c2|\U0001f96e|\U0001f9c1|\U0001f9ed|\U0001f9f1", sep = "")
+  regexp = stringr::str_c(regexp, "|\U0001f6f9|\U0001f9f3|\U0001f9e8|\U0001f9e7|\U0001f94e|\U0001f94f|\U0001f94d|\U0001f9ff|\U0001f9e9|\U0001f9f8|\U0001f9f5|\U0001f9f6|\U0001f9ee", sep = "")
+  regexp = stringr::str_c(regexp, "|\U0001f9fe|\U0001f9f0|\U0001f9f2|\U0001f9ea|\U0001f9eb|\U0001f9ec|\U0001f9f4|\U0001f9f7|\U0001f9f9|\U0001f9fa|\U0001f9fb|\U0001f9fc|\U0001f9fd", sep = "")
+  regexp = stringr::str_c(regexp, "|\U0001f9ef|\u267e",  sep = "")
+  regexp
+}
+
 #'Function to remove emoji from a list of characters.
 str_remove_emoji <- function(column, position = "any"){
- regexp = "\\p{EMOJI}|\\p{EMOJI_PRESENTATION}|\\p{EMOJI_MODIFIER_BASE}|\\p{EMOJI_MODIFIER}\\p{EMOJI_COMPONENT}";
- # it seems above condition does not cover all emojis.
- # So we will manually add below emojis. (ref: https://github.com/gagolews/stringi/issues/279)
- regexp = stringr::str_c(regexp, "|\U0001f970|\U0001f975|\U0001f976|\U0001f973|\U0001f974|\U0001f97a|\U0001f9b8|\U0001f9b9|\U0001f9b5|\U0001f9b6|\U0001f9b0|\U0001f9b1|\U0001f9b2", sep = "")
- regexp = stringr::str_c(regexp, "|\U0001f9b3|\U0001f9b4|\U0001f9b7|\U0001f97d|\U0001f97c|\U0001f97e|\U0001f97f|\U0001f99d|\U0001f999|\U0001f99b|\U0001f998|\U0001f9a1|\U0001f9a2", sep = "")
- regexp = stringr::str_c(regexp, "|\U0001f99a|\U0001f99c|\U0001f99e|\U0001f99f|\U0001f9a0|\U0001f96d|\U0001f96c|\U0001f96f|\U0001f9c2|\U0001f96e|\U0001f9c1|\U0001f9ed|\U0001f9f1", sep = "")
- regexp = stringr::str_c(regexp, "|\U0001f6f9|\U0001f9f3|\U0001f9e8|\U0001f9e7|\U0001f94e|\U0001f94f|\U0001f94d|\U0001f9ff|\U0001f9e9|\U0001f9f8|\U0001f9f5|\U0001f9f6|\U0001f9ee", sep = "")
- regexp = stringr::str_c(regexp, "|\U0001f9fe|\U0001f9f0|\U0001f9f2|\U0001f9ea|\U0001f9eb|\U0001f9ec|\U0001f9f4|\U0001f9f7|\U0001f9f9|\U0001f9fa|\U0001f9fb|\U0001f9fc|\U0001f9fd", sep = "")
- regexp = stringr::str_c(regexp, "|\U0001f9ef|\u267e",  sep = "")
-
- if(position == "any") {
-   regexp = stringr::str_c("(", regexp, ")", sep = "")
- } else if(position == "start") {
-   regexp = stringr::str_c("^(", regexp, ")", sep = "")
- } else if (position == "end") {
-   regexp = stringr::str_c("(", regexp, ")$", sep = "")
- }
- lapply(column, function(text){
-  stringi::stri_replace_all(text, regex = regexp, "")
- })
+  regexp <- get_emoji_regex()
+  if(position == "any") {
+    regexp = stringr::str_c("(", regexp, ")", sep = "")
+  } else if(position == "start") {
+    regexp = stringr::str_c("^(", regexp, ")", sep = "")
+  } else if (position == "end") {
+    regexp = stringr::str_c("(", regexp, ")$", sep = "")
+  }
+  stringi::stri_replace_all(column, regex = regexp, "")
 }
 
 #'Function to remove range of text.

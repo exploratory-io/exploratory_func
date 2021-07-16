@@ -86,12 +86,40 @@ test_that("test word_to_sentiment to groupd_df", {
   expect_true(is.character(ret[["sent"]]))
 })
 
+test_that("do_tokenize with with_sentence_id=FALSE", {
+  result <- test_df %>%
+    do_tokenize(input, with_sentence_id=F)
+  expect_equal(colnames(result), c("document_id", "token"))
+})
+
 test_that("do_tokenize with drop=FALSE", {
   result <- test_df %>%
     do_tokenize(input, drop=F)
   expect_equal(result$token[[1]], "hello")
   expect_equal(ncol(result), 4)
 })
+
+test_that("do_tokenize with compound_tokens", {
+  test_df <- data.frame(
+    input = c("Hello world!", "This is a data frame for test. This is second sentence."),
+    extra_col = seq(2),
+    stringsAsFactors = FALSE)
+  result <- test_df %>%
+    do_tokenize(input, compound_tokens=c("Hello world", "data frame"))
+  expect_equal(c("hello world", "data frame") %in% result$token, c(T, T))
+})
+
+test_that("do_tokenize with stopwords and stopwords_to_remove", {
+  test_df <- data.frame(
+    input = c("Hello world!", "This is a data frame for test. This is second sentence."),
+    extra_col = seq(2),
+    stringsAsFactors = FALSE)
+  result <- test_df %>%
+    do_tokenize(input, stopwords_lang="english", stopwords=c("World"), stopwords_to_remove=c("is", "hello"))
+  expect_equal(c("is", "hello") %in% result$token, c(T, T))
+  expect_equal(c("world") %in% result$token, c(F))
+})
+
 
 test_that("do_tokenize with keep_cols = TRUE", {
   test_df <- data.frame(
@@ -111,7 +139,7 @@ test_that("do_tokenize with keep_cols = TRUE with sentences", {
     stringsAsFactors = FALSE)
   result <- test_df %>%
     do_tokenize(input, drop=FALSE, token = "sentences", keep_cols = TRUE)
-  expect_equal(result$token[[1]], "hello world")
+  expect_equal(result$token[[1]], "Hello world!")
   expect_equal(ncol(result), 4)
 })
 
@@ -151,6 +179,17 @@ test_that("do_tokenize_icu with summary_level = all", {
   expect_equal(nrow(result), 11)
 })
 
+test_that("do_tokenize with URLs and twitter social tags", {
+  test_df <- data.frame(
+    input = c("@ExploratoryData and #rstats see: https://cran.r-project.org \uff10\uff11\uff12")) # With test to strip full-width number.
+  result <- test_df %>% do_tokenize(input, tokenize_tweets = TRUE, remove_url = FALSE, remove_twitter = FALSE)
+  expect_equal(result$token, c("@ExploratoryData", "and", "#rstats", "see", "https://cran.r-project.org"))
+  result <- test_df %>% do_tokenize(input, tokenize_tweets = TRUE)
+  expect_equal(result$token, c("and", "see"))
+  result <- test_df %>% do_tokenize(input) # By default, tokenize_words rather than tokenize_tweets is used for speed.
+  expect_equal(result$token, c("exploratorydata", "and", "rstats", "see", "https", "cran.r", "project.org"))
+})
+
 test_that("do_tokenize with remove_numbers", {
   test_df <- data.frame(
     input = c("12345 aaa", "12aabb33", "123456 34567 88999"),
@@ -185,21 +224,21 @@ test_that("do_tokenize when names conflict", {
   result <- df %>%
     do_tokenize(input, token="words", keep_cols = TRUE)
   expect_equal(result$token[[1]], "hello")
-  expect_equal(ncol(result), 4)
-  expect_equal(colnames(result)[[2]],"document_id.new")
+  expect_equal(ncol(result), 3)
+  expect_equal(colnames(result)[[1]],"document_id") # If document_id is in the input, it is overwritten.
 })
 
 test_that("do_tokenize with token=sentence", {
   result <- test_df %>%
     do_tokenize(input, token="sentences")
-  expect_equal(result$token[[1]], "hello world")
+  expect_equal(result$token[[1]], "Hello world!")
   expect_equal(ncol(result), 2)
 })
 
 test_that("do_tokenize should work with output", {
   result <- test_df %>%
-    do_tokenize(input, output=sentence, token="sentences")
-  expect_equal(result$sentence[[2]], "this is a data frame for test")
+    do_tokenize(input, output="sentence", token="sentences")
+  expect_equal(result$sentence[[2]], "This is a data frame for test.")
 })
 
 test_that("calc_tfidf", {
@@ -455,6 +494,16 @@ test_that("str_extract_inside", {
 
 })
 
+test_that("str_remove", {
+  ret <- exploratory::str_remove("test group", "group", remove_extra_space = TRUE)
+  expect_equal(ret, "test")
+})
+
+test_that("str_remove_all", {
+  ret <- exploratory::str_remove_all("test capital group", "group|capital", remove_extra_space = TRUE)
+  expect_equal(ret, "test")
+})
+
 test_that("str_remove_inside", {
   # bracket ()
   ret <- exploratory::str_remove_inside("abc(defgh)ijk", begin = "(", end =")")
@@ -596,7 +645,7 @@ test_that("str_remove_emoji", {
   # Smile Face and Thumbs Up.
   text = c("\uD83D\uDE00", "\uD83D\uDC4D")
   ret <- exploratory::str_remove_emoji(text)
-  expect_equal(ret, list("",""))
+  expect_equal(ret, c("",""))
 })
 
 test_that("str_remove_word", {
