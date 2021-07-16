@@ -321,7 +321,11 @@ do_tokenize <- function(df, text, token = "words", keep_cols = FALSE,
   if (with_sentence_id || token == "sentences") {
     text_v <- df[[text_col]]
     sentences_list <- tokenizers::tokenize_sentences(text_v)
-    # To avoid expensive unnest_longer call, use base R functions like unlist here.
+    # Create a data.frame, where one row represents one sentence. document_id is the document the sentence belongs (row number in the original df.)
+    # .sentence is the text of the sentence.
+    # To avoid expensive unnest_longer call, we use base R functions like unlist() instead here. 
+    # as.integer() is there to convert the matrix unlist() returns there into an integer vector.
+    # unname() is there to unname the named vector unlist returns.
     res <- tibble::tibble(document_id = as.integer(unlist(mapply(function(tokens,index) {rep(index,length(tokens))},
                                                                  sentences_list, seq_along(sentences_list)))),
                           .sentence = unname(unlist(sentences_list)))
