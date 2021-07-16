@@ -7,6 +7,7 @@ getGoogleProfile <- function(tokenFileId = ""){
   token <- getGoogleTokenForAnalytics(tokenFileId);
   googleAuthR::gar_auth(token = token, skip_fetch = TRUE)
   df <- googleAnalyticsR::ga_account_list()
+  # For each view, we want to get a timezone so iterate the result of the googleAnalyticsR::ga_account_list().
   if (nrow(df) > 0) {
     accountId <- df$accountId
     webPropertyId <- df$webPropertyId
