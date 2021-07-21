@@ -19,9 +19,37 @@ getGoogleProfile <- function(tokenFileId = ""){
       data.frame(googleAnalyticsR::ga_view(accountId, webPropertyId, viewId)) %>% dplyr::filter(effective == "READ_AND_ANALYZE") %>% dplyr::select(id, accountId, webPropertyId, timezone)
     })
     # Join the timezone column to the original data frame.
-    df <- df %>% dplyr::left_join(newdf, by = c("accountId" = "accountId", "webPropertyId" = "webPropertyId", "viewId" = "id"))
+    df <- df %>% dplyr::left_join(newdf, by = c("accountId" = "accountId", "webPropertyId" = "webPropertyId", "viewId" = "id")) %>% dplyr::select(accountId, accountName, webPropertyId, webPropertyName, viewId, viewName, timezone)
+  }
+  # get V4 Account
+  v4df <- googleAnalyticsR::ga_account_list("ga4")
+  if (nrow(v4df) > 0) {
+    v4newdf <- purrr::map_dfr(v4df$accountId, function(id){
+      getGoogleAnalyticsV4Property(id) %>% mutate(accountId = stringr::str_replace(parent, "accounts/", ""), webPropertyId = stringr::str_replace(name, "properties/", ""))
+    })
+    v4newdf <- v4newdf %>% dplyr::distinct(accountId, name, .keep_all = T)
+    v4df <- v4df %>% dplyr::left_join(v4newdf, by = c("accountId" = "accountId", "propertyId" = "webPropertyId")) %>% mutate(viewId = "", viewName = "") %>% dplyr::select(accountId, account_name, propertyId, property_name, viewId, viewName, timeZone) %>% dplyr::rename(webPropertyId = propertyId, webPropertyName = property_name, accountName = account_name, timezone = timeZone)
+    df <- df %>% dplyr::bind_rows(v4df)
   }
   df
+}
+
+parse_webproperty_list <- function(x) {
+  x$properties
+}
+
+getGoogleAnalyticsV4Property <- function(accountId){
+  accountId <- as.character(accountId)
+  filterStr <- stringr::str_c("parent:accounts/", accountId)
+  url <- "https://analyticsadmin.googleapis.com/v1alpha/properties"
+  web_prop <- googleAuthR:::gar_api_generator(url,
+                                              "GET",
+                                              pars_args = list(
+                                                filter = filterStr
+                                              ),
+                                              data_parse_function = parse_webproperty_list)
+
+  web_prop()
 }
 
 getGoogleAnayticsSegmentList <- function(){
@@ -49,7 +77,7 @@ getGoogleAnayticsSegmentList <- function(){
 #' @param tzonForDisplay - timezone for displaying POSIXct column (with_tz)
 getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tokenFileId = NULL,
                                paginate_query=FALSE, segments = NULL, dateRangeType = "lastNDays",
-                               lastN = NULL, startDate = NULL, endDate = NULL, tzone = NULL, tzoneForDisplay = NULL,...){
+                               lastN = NULL, startDate = NULL, endDate = NULL, tzone = NULL, tzoneForDisplay = NULL, isV4 = FALSE, ...){
   if(!requireNamespace("RGoogleAnalytics")){stop("package RGoogleAnalytics must be installed.")}
   loadNamespace("lubridate")
   # if segment is not null and empty string, pass it as NULL
@@ -60,6 +88,7 @@ getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tok
     segments = NULL
   }
   token <- getGoogleTokenForAnalytics(tokenFileId)
+  googleAuthR::gar_auth(token = token, skip_fetch = TRUE)
 
   # When calculating startDate, to avoid the result becomes NA like below two cases,
   # use %m-% instead of - for years and months.
@@ -163,16 +192,40 @@ getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tok
     endDate <- as.character(lubridate::today())
   }
 
-  query.list <- RGoogleAnalytics::Init(start.date = startDate,
-                                       end.date = endDate,
-                                       dimensions = dimensions,
-                                       metrics = metrics,
-                                       segments = segments,
-                                       max.results = 10000,
-                                       table.id = tableId)
+  if (isV4) {
+    # dimension/metrics are passed as ga:country, ga:dateHour so we want to convert it as c("country", "dateHour")
+    metrics <- unlist(strsplit(stringr::str_replace_all(metrics, "ga:", ""), split = ","))
+    dimensions = unlist(strsplit(stringr::str_replace_all(dimensions, "ga:", ""), split = ","))
+    if (is.null(segments)) {
+      ga.data <- googleAnalyticsR::ga_data(
+        tableId,
+        date_range = c(startDate, endDate),
+        metrics = metrics,
+        dimensions = dimensions,
+        limit = -1
+      )
+    } else { # if segments is defined
+      ga.data <- googleAnalyticsR::ga_data(
+        tableId,
+        date_range = c(startDate, endDate),
+        metrics = metrics,
+        dimensions = dimensions,
+        limit = -1,
+        segments = googleAnalyticsR::segment_ga4("V4", segment_id = segments)
+      )
+    }
+  } else {
+    query.list <- RGoogleAnalytics::Init(start.date = startDate,
+                                         end.date = endDate,
+                                         dimensions = dimensions,
+                                         metrics = metrics,
+                                         segments = segments,
+                                         max.results = 10000,
+                                         table.id = tableId)
 
-  ga.query <- RGoogleAnalytics::QueryBuilder(query.list)
-  ga.data <- RGoogleAnalytics::GetReportData(ga.query, token, paginate_query = paginate_query)
+    ga.query <- RGoogleAnalytics::QueryBuilder(query.list)
+    ga.data <- RGoogleAnalytics::GetReportData(ga.query, token, paginate_query = paginate_query)
+  }
 
   if("date" %in% colnames(ga.data)){
     # modify date column to Date object from integer like 20140101
