@@ -196,24 +196,13 @@ getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tok
     # dimension/metrics are passed as ga:country, ga:dateHour so we want to convert it as c("country", "dateHour")
     metrics <- unlist(strsplit(stringr::str_replace_all(metrics, "ga:", ""), split = ","))
     dimensions = unlist(strsplit(stringr::str_replace_all(dimensions, "ga:", ""), split = ","))
-    if (is.null(segments)) {
-      ga.data <- googleAnalyticsR::ga_data(
-        tableId,
-        date_range = c(startDate, endDate),
-        metrics = metrics,
-        dimensions = dimensions,
-        limit = -1
-      )
-    } else { # if segments is defined
-      ga.data <- googleAnalyticsR::ga_data(
-        tableId,
-        date_range = c(startDate, endDate),
-        metrics = metrics,
-        dimensions = dimensions,
-        limit = -1,
-        segments = googleAnalyticsR::segment_ga4("V4", segment_id = segments)
-      )
-    }
+    ga.data <- googleAnalyticsR::ga_data(
+      tableId,
+      date_range = c(startDate, endDate),
+      metrics = metrics,
+      dimensions = dimensions,
+      limit = -1
+    )
   } else {
     query.list <- RGoogleAnalytics::Init(start.date = startDate,
                                          end.date = endDate,
