@@ -841,9 +841,9 @@ confint_radius <- function(x, level=0.95) {
 confint_mean <- confint_radius
 
 #' Calculate the confidence interval range (half-width of confidence interval)
-#' from a sample size and an sd values of a group. 
+#' from a sample size and an sd values of a group.
 #' See the confint_radius for the implementation detail.
-#' 
+#'
 #` @param sd - standard deviation of the group.
 #` @param n - sample size of the group.
 calc_confint_mean <- function (sd, n, level=0.95) {
@@ -870,9 +870,9 @@ prop_confint_radius <- function(x, level=0.95) {
 confint_ratio <- prop_confint_radius
 
 #' Calculate the confidence interval range (half-width of confidence interval)
-#' of a population proportion from a size and a target ratio of a group. 
+#' of a population proportion from a size and a target ratio of a group.
 #' See the prop_confint_radius for the implementation detail.
-#' 
+#'
 #` @param ratio - target ratio (0-1) of the group.
 #` @param n - sample size of the group.
 calc_confint_ratio <- function (ratio, n, level=0.95) {
@@ -1798,8 +1798,8 @@ bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_da
   dataframes_updated <- list()
   # Create a list of data frames from arguments passed to bind_rows.
   dataframes <- list()
-  # In order to avoid unexpected data structure change by flattening, 
-  # we call dots_values here instead of dots_list. 
+  # In order to avoid unexpected data structure change by flattening,
+  # we call dots_values here instead of dots_list.
   # Since return from dots_values can be a nested list, let's flatten it here.
   purrr::map(rlang::dots_values(...), function(x) {
     if ('data.frame' %in% class(x)) {
@@ -1807,7 +1807,7 @@ bind_rows <- function(..., id_column_name = NULL, current_df_name = '', force_da
       dataframes <<- c(dataframes, list(x))
     }
     else {
-      # Here we assume that x is a list of data frames. 
+      # Here we assume that x is a list of data frames.
       dataframes <<- c(dataframes, x)
     }
   })
@@ -2419,28 +2419,28 @@ week <- function(date, unit="year") {
 
 
 #' API to calculate duration between the start_date and the end_date in the provided time unit.
-time_since <- function(start_date, end_date=lubridate::today(), unit = "years") {
+time_between <- function(start_date, end_date=lubridate::today(), unit = "years") {
   lubridate::time_length(lubridate::interval(as.Date(start_date), as.Date(end_date)), unit = unit)
 }
 
 #' API to calculate duration between the start_date and the end_date in years.
-years_since <- function(start_date, end_date=lubridate::today()) {
-  time_since(start_date, end_date)
+years_between <- function(start_date, end_date=lubridate::today()) {
+  time_between(start_date, end_date)
 }
 
 #' API to calculate duration between the start_date and the end_date in months.
-months_since <- function(start_date, end_date=lubridate::today()) {
-  time_since(start_date, end_date, unit = "months")
+months_between <- function(start_date, end_date=lubridate::today()) {
+  time_between(start_date, end_date, unit = "months")
 }
 
 #' API to calculate duration between the start_date and the end_date in weeks.
-weeks_since <- function(start_date, end_date=lubridate::today()) {
-  time_since(start_date, end_date, unit = "weeks")
+weeks_between <- function(start_date, end_date=lubridate::today()) {
+  time_between(start_date, end_date, unit = "weeks")
 }
 
 #' API to calculate duration between the start_date and the end_date in days.
-days_since <- function(start_date, end_date=lubridate::today()) {
-  time_since(start_date, end_date, unit = "days")
+days_between <- function(start_date, end_date=lubridate::today()) {
+  time_between(start_date, end_date, unit = "days")
 }
 
 #' Calculates area under ROC. (AUC)
@@ -2508,16 +2508,16 @@ cumsum_decayed <- function(x, r) {
 }
 
 # Caluculates intra group population variance. Used by merge_vars.
-#' @param population_vars 
-#' @param sizes 
+#' @param population_vars
+#' @param sizes
 #' @return variance
 intra_group_population_var <- function(population_vars, sizes) {
   weighted.mean(population_vars, sizes)
 }
-                             
+
 # Caluculates inter group population variance. Used by merge_vars.
-#' @param means 
-#' @param sizes 
+#' @param means
+#' @param sizes
 #' @return variance
 inter_group_population_var <- function(means, sizes) {
   tot_mean <- weighted.mean(means, sizes)
