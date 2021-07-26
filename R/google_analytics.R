@@ -238,7 +238,7 @@ getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tok
   }
 
   if("firstSessionDate" %in% colnames(ga.data)){
-    # modify date column to POSIXct object from integer like 2014010101
+    # modify date column to Date object from integer like 20140101
     loadNamespace("lubridate")
     ga.data <- ga.data %>% dplyr::mutate( firstSessionDate = lubridate::ymd(firstSessionDate) )
   }
