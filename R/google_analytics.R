@@ -200,6 +200,7 @@ getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tok
     # dimension/metrics are passed as ga:country, ga:dateHour so we want to convert it as c("country", "dateHour")
     metrics <- unlist(strsplit(stringr::str_replace_all(metrics, "ga:", ""), split = ","))
     dimensions = unlist(strsplit(stringr::str_replace_all(dimensions, "ga:", ""), split = ","))
+    # ref: https://code.markedmondson.me/googleAnalyticsR/articles/reporting-ga4.html
     ga.data <- googleAnalyticsR::ga_data(
       tableId,
       date_range = c(startDate, endDate),
