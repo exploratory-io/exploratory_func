@@ -2420,7 +2420,7 @@ week <- function(date, unit="year") {
 
 #' API to calculate duration between the start_date and the end_date in the provided time unit.
 time_between <- function(start_date, end_date=lubridate::today(), unit = "years") {
-  lubridate::time_length(lubridate::interval(as.Date(start_date), as.Date(end_date)), unit = unit)
+  lubridate::time_length(lubridate::interval(start_date, end_date), unit = unit)
 }
 
 #' API to calculate duration between the start_date and the end_date in years.
@@ -2441,6 +2441,21 @@ weeks_between <- function(start_date, end_date=lubridate::today()) {
 #' API to calculate duration between the start_date and the end_date in days.
 days_between <- function(start_date, end_date=lubridate::today()) {
   time_between(start_date, end_date, unit = "days")
+}
+
+#' API to calculate duration between the start_date and the end_date in hours
+hours_between <- function(start_date, end_date=lubridate::today()) {
+  time_between(start_date, end_date, unit = "hours")
+}
+
+#' API to calculate duration between the start_date and the end_date in minutes
+minutes_between <- function(start_date, end_date=lubridate::today()) {
+  time_between(start_date, end_date, unit = "minutes")
+}
+
+#' API to calculate duration between the start_date and the end_date in seconds
+seconds_between <- function(start_date, end_date=lubridate::today()) {
+  time_between(start_date, end_date, unit = "seconds")
 }
 
 #' Calculates area under ROC. (AUC)
