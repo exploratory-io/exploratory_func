@@ -1050,3 +1050,24 @@ test_that("merge_sds", {
   sd2 <- merge_sds(c(sd(a), sd(b)), c(mean(a), mean(b)), c(length(a), length(b)))
   expect_equal(sd1, sd2)
 })
+
+test_that("years_since", {
+  age <- years_since(lubridate::ymd_hms("2000-01-01 13:00:00"), lubridate::ymd("2001-01-01"))
+  expect_equal(age, 1)
+})
+
+test_that("months_since", {
+  age <- months_since(lubridate::ymd_hms("2000-01-01 13:00:00"), lubridate::ymd("2001-01-01"))
+  expect_equal(age, 12)
+})
+
+test_that("weeks_since", {
+  age <- weeks_since(lubridate::ymd_hms("2000-01-01 13:00:00"), lubridate::ymd("2001-01-01"))
+  expect_equal(age, 52.2857142857143)
+})
+
+test_that("days_since", {
+  age <- days_since(lubridate::ymd_hms("2000-01-01 13:00:00"), lubridate::ymd("2001-01-01"))
+  expect_equal(age, 366)
+})
+
