@@ -25,6 +25,7 @@ getGoogleProfile <- function(tokenFileId = ""){
   v4df <- googleAnalyticsR::ga_account_list("ga4")
   if (nrow(v4df) > 0) {
     v4newdf <- purrr::map_dfr(v4df$accountId, function(id){
+      # account looks like accounts/123456 so get rid of accounts/ to get account ID part. As for property, it looks like properties/123345 so remove properties/ to get property id.
       getGoogleAnalyticsV4Property(id) %>% mutate(accountId = stringr::str_replace(parent, "accounts/", ""), webPropertyId = stringr::str_replace(name, "properties/", ""))
     })
     v4newdf <- v4newdf %>% dplyr::distinct(accountId, name, .keep_all = T)
@@ -33,11 +34,12 @@ getGoogleProfile <- function(tokenFileId = ""){
   }
   df
 }
-
+#' Helper API to get properites from response.
 parse_webproperty_list <- function(x) {
   x$properties
 }
-
+#' API to get V4 property
+#'
 getGoogleAnalyticsV4Property <- function(accountId){
   accountId <- as.character(accountId)
   filterStr <- stringr::str_c("parent:accounts/", accountId)
