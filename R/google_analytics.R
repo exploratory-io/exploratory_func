@@ -39,6 +39,8 @@ parse_webproperty_list <- function(x) {
   x$properties
 }
 #' API to get V4 property
+#' ref: https://developers.google.com/analytics/devguides/config/admin/v1/rest/v1alpha/properties/list
+#' @param accountId - account id.
 #'
 getGoogleAnalyticsV4Property <- function(accountId){
   accountId <- as.character(accountId)
