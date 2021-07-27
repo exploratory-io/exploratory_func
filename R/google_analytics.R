@@ -18,7 +18,7 @@ getGoogleProfile <- function(tokenFileId = ""){
       # Timezone info is set for COLLABORATE,EDIT, MANAGE_USERS, and READ_AND_ANALYZE but we only need timezone for READ_AND_ANALYZE.
       data.frame(googleAnalyticsR::ga_view(accountId, webPropertyId, viewId)) %>% dplyr::filter(effective == "READ_AND_ANALYZE") %>% dplyr::select(id, accountId, webPropertyId, timezone)
     })
-    # Join the timezone column to the original data frame.
+    # Join the timezone column to the original data frame and only select the columns required for Exploratory Desktop UI.
     df <- df %>% dplyr::left_join(newdf, by = c("accountId" = "accountId", "webPropertyId" = "webPropertyId", "viewId" = "id")) %>% dplyr::select(accountId, accountName, webPropertyId, webPropertyName, viewId, viewName, timezone)
   }
   # get V4 Account
@@ -26,10 +26,10 @@ getGoogleProfile <- function(tokenFileId = ""){
   if (nrow(v4df) > 0) {
     v4newdf <- purrr::map_dfr(v4df$accountId, function(id){
       # account looks like accounts/123456 so get rid of accounts/ to get account ID part. As for property, it looks like properties/123345 so remove properties/ to get property id.
-      getGoogleAnalyticsV4Property(id) %>% mutate(accountId = stringr::str_replace(parent, "accounts/", ""), webPropertyId = stringr::str_replace(name, "properties/", ""))
+      getGoogleAnalyticsV4Property(id) %>% dplyr::mutate(accountId = stringr::str_replace(parent, "accounts/", ""), webPropertyId = stringr::str_replace(name, "properties/", ""))
     })
     v4newdf <- v4newdf %>% dplyr::distinct(accountId, name, .keep_all = T)
-    v4df <- v4df %>% dplyr::left_join(v4newdf, by = c("accountId" = "accountId", "propertyId" = "webPropertyId")) %>% mutate(viewId = "", viewName = "") %>% dplyr::select(accountId, account_name, propertyId, property_name, viewId, viewName, timeZone) %>% dplyr::rename(webPropertyId = propertyId, webPropertyName = property_name, accountName = account_name, timezone = timeZone)
+    v4df <- v4df %>% dplyr::left_join(v4newdf, by = c("accountId" = "accountId", "propertyId" = "webPropertyId")) %>% dplyr::select(accountId, account_name, propertyId, property_name, timeZone) %>% dplyr::rename(webPropertyId = propertyId, webPropertyName = property_name, accountName = account_name, timezone = timeZone)
     df <- df %>% dplyr::bind_rows(v4df)
   }
   df
@@ -92,7 +92,6 @@ getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tok
     segments = NULL
   }
   token <- getGoogleTokenForAnalytics(tokenFileId)
-  googleAuthR::gar_auth(token = token, skip_fetch = TRUE)
 
   # When calculating startDate, to avoid the result becomes NA like below two cases,
   # use %m-% instead of - for years and months.
@@ -197,6 +196,7 @@ getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tok
   }
 
   if (isV4) {
+    googleAuthR::gar_auth(token = token, skip_fetch = TRUE)
     # dimension/metrics are passed as ga:country, ga:dateHour so we want to convert it as c("country", "dateHour")
     metrics <- unlist(strsplit(stringr::str_replace_all(metrics, "ga:", ""), split = ","))
     dimensions = unlist(strsplit(stringr::str_replace_all(dimensions, "ga:", ""), split = ","))
@@ -223,26 +223,22 @@ getGoogleAnalytics <- function(tableId, lastNDays = 30, dimensions, metrics, tok
 
   if("date" %in% colnames(ga.data)){
     # modify date column to Date object from integer like 20140101
-    loadNamespace("lubridate")
     ga.data <- ga.data %>% dplyr::mutate( date = lubridate::ymd(date) )
   }
 
   if("dateHour" %in% colnames(ga.data)){
     # modify date column to POSIXct object from integer like 2014010101
-    loadNamespace("lubridate")
     ga.data <- ga.data %>% dplyr::mutate( dateHour = lubridate::ymd_h(dateHour) )
   }
 
 
   if("dateHourMinute" %in% colnames(ga.data)){
     # modify date column to POSIXct object from integer like 202001210000
-    loadNamespace("lubridate")
     ga.data <- ga.data %>% dplyr::mutate( dateHourMinute = lubridate::ymd_hms(dateHourMinute, truncated = 1) )
   }
 
   if("firstSessionDate" %in% colnames(ga.data)){
     # modify date column to Date object from integer like 20140101
-    loadNamespace("lubridate")
     ga.data <- ga.data %>% dplyr::mutate( firstSessionDate = lubridate::ymd(firstSessionDate) )
   }
 
