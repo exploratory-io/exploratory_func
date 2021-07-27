@@ -2419,7 +2419,7 @@ week <- function(date, unit="year") {
 
 
 #' API to calculate duration between the start_date and the end_date in the provided time unit.
-time_between <- function(start_date, end_date=lubridate::today(), unit = "years") {
+time_between <- function(start_date, end_date, unit = "years") {
   lubridate::time_length(lubridate::interval(start_date, end_date), unit = unit)
 }
 
@@ -2444,17 +2444,17 @@ days_between <- function(start_date, end_date=lubridate::today()) {
 }
 
 #' API to calculate duration between the start_date and the end_date in hours
-hours_between <- function(start_date, end_date=lubridate::today()) {
+hours_between <- function(start_date, end_date=lubridate::now()) {
   time_between(start_date, end_date, unit = "hours")
 }
 
 #' API to calculate duration between the start_date and the end_date in minutes
-minutes_between <- function(start_date, end_date=lubridate::today()) {
+minutes_between <- function(start_date, end_date=lubridate::now()) {
   time_between(start_date, end_date, unit = "minutes")
 }
 
 #' API to calculate duration between the start_date and the end_date in seconds
-seconds_between <- function(start_date, end_date=lubridate::today()) {
+seconds_between <- function(start_date, end_date=lubridate::now()) {
   time_between(start_date, end_date, unit = "seconds")
 }
 
