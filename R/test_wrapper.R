@@ -811,9 +811,10 @@ exp_wilcox <- function(df, var1, var2, func2 = NULL, ...) {
       model
     }, error = function(e){
       if(length(grouped_cols) > 0) {
-        # Ignore the error if it is caused by subset of grouped data frame to show result of data frames that succeed.
-        # For example, error can happen if one of the groups does not have both values (e.g. both TRUE and FALSE) of var2.
-        NULL
+        # In repeat-by case, we report group-specific error in the Summary table,
+        # so that analysis on other groups can go on.
+        class(e) <- c("wilcox_exploratory", class(e))
+        e
       } else {
         stop(e)
       }
@@ -825,6 +826,11 @@ exp_wilcox <- function(df, var1, var2, func2 = NULL, ...) {
 #' @export
 tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
   if (type == "model") {
+    if ("error" %in% class(x)) {
+      ret <- tibble::tibble(Note = x$message)
+      return(ret)
+    }
+
     note <- NULL
     ret <- broom:::tidy.htest(x)
     if (!is.null(x$estimate)) { # Result is with estimate and confidence interval
@@ -870,6 +876,10 @@ tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
     }
   }
   else if (type == "data_summary") { #TODO consolidate with code in tidy.anova_exploratory
+    if ("error" %in% class(x)) {
+      ret <- tibble::tibble()
+      return(ret)
+    }
     conf_threshold = 1 - (1 - conf_level)/2
     ret <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
       dplyr::summarize(`Number of Rows`=length(!!rlang::sym(x$var1)),
@@ -894,6 +904,10 @@ tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
                     `Maximum`)
   }
   else { # type == "data"
+    if ("error" %in% class(x)) {
+      ret <- tibble::tibble()
+      return(ret)
+    }
     ret <- x$data
   }
   ret
