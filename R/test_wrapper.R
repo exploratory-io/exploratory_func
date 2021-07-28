@@ -614,9 +614,10 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
       model
     }, error = function(e){
       if(length(grouped_cols) > 0) {
-        # Ignore the error if it is caused by subset of grouped data frame to show result of data frames that succeed.
-        # For example, error can happen if one of the groups does not have both values (e.g. both TRUE and FALSE) of var2.
-        NULL
+        # In repeat-by case, we report group-specific error in the Summary table,
+        # so that analysis on other groups can go on.
+        class(e) <- c("ttest_exploratory", class(e))
+        e
       } else {
         stop(e)
       }
@@ -627,6 +628,10 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
 
 #' @export
 glance.ttest_exploratory <- function(x) {
+  if ("error" %in% class(x)) {
+    ret <- tibble::tibble(Note = x$message)
+    return(ret)
+  }
   ret <- broom:::glance.htest(x) # for t-test. the returned content is same as tidy.
   ret
 }
@@ -634,6 +639,11 @@ glance.ttest_exploratory <- function(x) {
 #' @export
 tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
   if (type == "model") {
+    if ("error" %in% class(x)) {
+      ret <- tibble::tibble(Note = x$message)
+      return(ret)
+    }
+
     note <- NULL
     ret <- broom:::tidy.htest(x)
     if (is.null(ret$estimate)) { # estimate is empty when var.equal = TRUE.
@@ -710,6 +720,10 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
     }
   }
   else if (type == "data_summary") { #TODO consolidate with code in tidy.anova_exploratory
+    if ("error" %in% class(x)) {
+      ret <- tibble::tibble()
+      return(ret)
+    }
     conf_threshold = 1 - (1 - conf_level)/2
     ret <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
       dplyr::summarize(`Number of Rows`=length(!!rlang::sym(x$var1)),
@@ -734,10 +748,18 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
                     `Maximum`)
   }
   else if (type == "prob_dist") {
+    if ("error" %in% class(x)) {
+      ret <- tibble::tibble()
+      return(ret)
+    }
     ret <- generate_ttest_density_data(x$statistic, x$parameter, sig_level=x$test_sig_level, alternative=x$alternative)
     ret
   }
   else { # type == "data"
+    if ("error" %in% class(x)) {
+      ret <- tibble::tibble()
+      return(ret)
+    }
     ret <- x$data
   }
   ret
