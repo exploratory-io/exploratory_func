@@ -958,15 +958,15 @@ exp_anova <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
       df$.is.outlier <- NULL
     }
 
-    if(length(grouped_cols) > 0) {
-      # Check n_distinct again within group after handling outliers.
-      # Group with NA and another category does not seem to work well with aov. Eliminating such case too. TODO: We could replace NA with an explicit level.
-      n_distinct_res_each <- n_distinct(df[[var2_col]], na.rm=TRUE)
-      if (n_distinct_res_each < 2) {
-        return(NULL)
-      }
-    }
     tryCatch({
+      if(length(grouped_cols) > 0) {
+        # Check n_distinct again within group after handling outliers.
+        # Group with NA and another category does not seem to work well with aov. Eliminating such case too. TODO: We could replace NA with an explicit level.
+        n_distinct_res_each <- n_distinct(df[[var2_col]], na.rm=TRUE)
+        if (n_distinct_res_each < 2) {
+          stop(paste0("Variable Column (", var2_col, ") has to have 2 or more kinds of values."))
+        }
+      }
       model <- aov(formula, data = df, ...)
       # calculate Cohen's f from actual data
       model$cohens_f <- calculate_cohens_f(df[[var1_col]], df[[var2_col]])
@@ -986,9 +986,10 @@ exp_anova <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
       model
     }, error = function(e){
       if(length(grouped_cols) > 0) {
-        # Ignore the error if it is caused by subset of grouped data frame to show result of data frames that succeed.
-        # For example, error can happen if one of the groups has only one unique value in its set of var2.
-        NULL
+        # In repeat-by case, we report group-specific error in the Summary table,
+        # so that analysis on other groups can go on.
+        class(e) <- c("anova_exploratory", class(e))
+        e
       } else {
         stop(e)
       }
@@ -999,6 +1000,10 @@ exp_anova <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
 
 #' @export
 glance.anova_exploratory <- function(x) {
+  if ("error" %in% class(x)) {
+    ret <- tibble::tibble(Note = x$message)
+    return(ret)
+  }
   ret <- broom:::tidy.aov(x) %>% slice(1:1) # there is no glance.aov. take first row of tidy.aov.
   # Term value from tidy.aov() can be garbled on Windows with multibyte column name. Overwrite with not-garled value.
   if (!is.null(ret$term) && length(ret$term) > 0 && !is.null(x$xlevels) && length(x$xlevels) > 0) {
@@ -1010,6 +1015,10 @@ glance.anova_exploratory <- function(x) {
 #' @export
 tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
   if (type == "model") {
+    if ("error" %in% class(x)) {
+      ret <- tibble::tibble(Note = x$message)
+      return(ret)
+    }
     note <- NULL
     ret <- broom:::tidy.aov(x)
     ret1 <- ret %>% dplyr::slice(1:1)
@@ -1079,6 +1088,10 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
     }
   }
   else if (type == "data_summary") { #TODO consolidate with code in tidy.ttest_exploratory
+    if ("error" %in% class(x)) {
+      ret <- tibble::tibble()
+      return(ret)
+    }
     conf_threshold = 1 - (1 - conf_level)/2
     ret <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
       dplyr::summarize(`Number of Rows`=length(!!rlang::sym(x$var1)),
@@ -1103,11 +1116,19 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
                     `Maximum`)
   }
   else if (type == "prob_dist") {
+    if ("error" %in% class(x)) {
+      ret <- tibble::tibble()
+      return(ret)
+    }
     ret0 <- broom:::tidy.aov(x)
     ret <- generate_ftest_density_data(ret0$statistic[[1]], df1=ret0$df[[1]], df2=ret0$df[[2]], sig_level=x$test_sig_level)
     ret
   }
   else { # type == "data"
+    if ("error" %in% class(x)) {
+      ret <- tibble::tibble()
+      return(ret)
+    }
     ret <- x$data
   }
   ret
