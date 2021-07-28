@@ -27,7 +27,12 @@ getGoogleProfile <- function(tokenFileId = ""){
     # googleAnalyticsR::ga_account_list("ga4") throws an error if the google account only has access to V3 accounts so surround it with tryCatch
     v4df <- googleAnalyticsR::ga_account_list("ga4")
   }, error = function(err) {
-    # do nothing.
+    # if we detect "API Data failed to parse" message, we can ignore it.
+    if (stringr::str_detect(err$message, 'Error : API Data failed to parse')){
+      # do nothing.
+    } else {
+      stop(err)
+    }
   })
   if (nrow(v4df) > 0) {
     v4newdf <- purrr::map_dfr(v4df$accountId, function(id){
