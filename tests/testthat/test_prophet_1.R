@@ -84,6 +84,16 @@ test_that("do_prophet test mode with month as time units", {
   expect_true(!is.na(ret$forecasted_value[[length(ret$forecasted_value)]]))
 })
 
+test_that("do_prophet with 2 year worth of monthly data with auto yearly seasonality", {
+  ts <- seq.Date(as.Date("2010-01-01"), as.Date("2011-12-01"), by="month")
+  raw_data <- data.frame(timestamp=ts, data=runif(length(ts))) %>% dplyr::rename(`time stamp`=timestamp, `da ta`=data)
+  ret <- raw_data %>%
+    do_prophet(`time stamp`, `da ta`, 10, time_unit = "month", yearly.seasonality="auto")
+  # Verify that yearly seasonality was enabled by "auto" for 2 years worth of monthly data,
+  # even though its duration is a little shorter than 2 years.
+  expect_true(!is.null(ret$yearly))
+})
+
 test_that("do_prophet test mode with quarter as time units", {
   ts <- seq.Date(as.Date("2010-01-01"), as.Date("2030-01-01"), by="quarter")
   raw_data <- data.frame(timestamp=ts, data=runif(length(ts))) %>% dplyr::rename(`time stamp`=timestamp, `da ta`=data)
