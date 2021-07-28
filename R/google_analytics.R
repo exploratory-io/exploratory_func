@@ -22,7 +22,18 @@ getGoogleProfile <- function(tokenFileId = ""){
     df <- df %>% dplyr::left_join(newdf, by = c("accountId" = "accountId", "webPropertyId" = "webPropertyId", "viewId" = "id")) %>% dplyr::select(accountId, accountName, webPropertyId, webPropertyName, viewId, viewName, timezone)
   }
   # get V4 Account
-  v4df <- googleAnalyticsR::ga_account_list("ga4")
+  v4df <- data.frame()
+  tryCatch({
+    # googleAnalyticsR::ga_account_list("ga4") throws an error if the google account only has access to V3 accounts so surround it with tryCatch
+    v4df <- googleAnalyticsR::ga_account_list("ga4")
+  }, error = function(err) {
+    # if we detect "API Data failed to parse" message, we can ignore it.
+    if (stringr::str_detect(err$message, 'Error : API Data failed to parse')){
+      # do nothing.
+    } else {
+      stop(err)
+    }
+  })
   if (nrow(v4df) > 0) {
     v4newdf <- purrr::map_dfr(v4df$accountId, function(id){
       # account looks like accounts/123456 so get rid of accounts/ to get account ID part. As for property, it looks like properties/123345 so remove properties/ to get property id.
@@ -32,6 +43,7 @@ getGoogleProfile <- function(tokenFileId = ""){
     v4df <- v4df %>% dplyr::left_join(v4newdf, by = c("accountId" = "accountId", "propertyId" = "webPropertyId")) %>% dplyr::select(accountId, account_name, propertyId, property_name, timeZone) %>% dplyr::rename(webPropertyId = propertyId, webPropertyName = property_name, accountName = account_name, timezone = timeZone)
     df <- df %>% dplyr::bind_rows(v4df)
   }
+
   df
 }
 #' Helper API to get properites from response.
