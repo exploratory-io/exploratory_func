@@ -482,6 +482,33 @@ do_prophet_ <- function(df, time_col, value_col = NULL, periods = 10, time_unit 
       if (nrow(training_data) < 2) {
         stop("The aggregated training data has less than 2 rows.")
       }
+
+      # Since we aggregate input time series data with time unit, duration for 2 years worth of training data
+      # is a little shorter than 2 years, which makes "auto" yearly seasonality of prophet to decide to turn off yearly seasonality.
+      # For this reason, we enable yearly seasonality a little more leniently.
+      if (yearly.seasonality == "auto") {
+        training_days <- as.numeric(difftime(max(training_data$ds), min(training_data$ds), unit="days"))
+        if (time_unit %in% c("quarter")) {
+          if (training_days + 31*3 >= 365*2) {
+            yearly.seasonality <- TRUE
+          }
+        }
+        else if (time_unit %in% c("month")) {
+          if (training_days + 31 >= 365*2) {
+            yearly.seasonality <- TRUE
+          }
+        }
+        else if (time_unit %in% c("week")) {
+          if (training_days + 7 >= 365*2) {
+            yearly.seasonality <- TRUE
+          }
+        }
+        else if (time_unit %in% c("day")) {
+          if (training_days + 1 >= 365*2) {
+            yearly.seasonality <- TRUE
+          }
+        }
+      }
   
       if (!is.null(cap) && is.data.frame(cap)) {
         # in this case, cap is the future data frame with cap, specified by user.
