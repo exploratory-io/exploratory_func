@@ -37,6 +37,13 @@ test_that("exp_ts_cluster basic", {
   expect_equal(sort(unique(ret$Cluster)), c(1,2,3))
 })
 
+# This currently fails. Look into it.
+# test_that("exp_ts_cluster with dtw2 and sdtw_cent.", {
+#   ret <- flight %>% exp_ts_cluster(`FL DATE`, `ARR DELAY`, `CAR RIER`, distance="dtw2", centroid="sdtw_cent")
+#   expect_equal(colnames(ret), c("FL DATE","CAR RIER","ARR DELAY","Cluster"))
+#   expect_equal(sort(unique(ret$Cluster)), c(1,2,3))
+# })
+
 test_that("exp_ts_cluster with dtw_lb, where we set default window.size internally.", {
   ret <- flight %>% exp_ts_cluster(`FL DATE`, `ARR DELAY`, `CAR RIER`, distance="dtw_lb")
   expect_equal(colnames(ret), c("FL DATE","CAR RIER","ARR DELAY","Cluster"))
