@@ -275,7 +275,7 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
   var1_col <- col_name(substitute(var1))
   var2_col <- col_name(substitute(var2))
   value_col <- col_name(substitute(value))
-  grouped_col <- grouped_by(df)
+  grouped_cols <- grouped_by(df)
 
   if (!is.null(func1)) {
     if (lubridate::is.Date(df[[var1_col]]) || lubridate::is.POSIXct(df[[var1_col]])) {
@@ -318,70 +318,86 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
   formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
 
   chisq.test_each <- function(df) {
-    # If there is only one class of category in this class, skip it.
-    # This is effectively for multiple group case, since for single group case, it is already checked before this loop.
-    if (n_distinct(df[[var1_col]], na.rm=TRUE) < 2) {
-      return(NULL)
-    }
-    if (n_distinct(df[[var2_col]], na.rm=TRUE) < 2) {
-      return(NULL)
-    }
-    # TODO: For now, we are filtering out NA categories, but we should include them and display them cleanly.
-    df <- df %>% dplyr::filter(!is.na(!!rlang::sym(var1_col)) & !is.na(!!rlang::sym(var2_col)))
-    df <- df %>% dplyr::group_by(!!rlang::sym(var1_col), !!rlang::sym(var2_col))
-    if (is.null(value_col)) {
-      df <- df %>% dplyr::summarize(.temp_value_col=n())
-    }
-    else {
-      #TODO: handle name conflict with .temp_value_col and group cols.
-      if (identical(sum, fun.aggregate)) {
-        df <- df %>% dplyr::summarize(.temp_value_col=fun.aggregate(!!rlang::sym(value_col), na.rm=TRUE))
+    tryCatch({
+      # If there is only one class of category in this class, skip it.
+      # This is effectively for multiple group case, since for single group case, it is already checked before this loop.
+      if (n_distinct(df[[var1_col]], na.rm=TRUE) < 2) {
+        stop(paste0("Variable Column (", var1_col, ") has to have 2 or more kinds of values."))
+      }
+      if (n_distinct(df[[var2_col]], na.rm=TRUE) < 2) {
+        stop(paste0("Variable Column (", var2_col, ") has to have 2 or more kinds of values."))
+      }
+      # TODO: For now, we are filtering out NA categories, but we should include them and display them cleanly.
+      df <- df %>% dplyr::filter(!is.na(!!rlang::sym(var1_col)) & !is.na(!!rlang::sym(var2_col)))
+      df <- df %>% dplyr::group_by(!!rlang::sym(var1_col), !!rlang::sym(var2_col))
+      if (is.null(value_col)) {
+        df <- df %>% dplyr::summarize(.temp_value_col=n())
       }
       else {
-        # Possible fun.aggregate are, length, n_distinct, false_count (count for TRUE is done by sum),
-        # na_count, non_na_count. They can/should be run without na.rm=TRUE.
-        df <- df %>% dplyr::summarize(.temp_value_col=fun.aggregate(!!rlang::sym(value_col)))
+        #TODO: handle name conflict with .temp_value_col and group cols.
+        if (identical(sum, fun.aggregate)) {
+          df <- df %>% dplyr::summarize(.temp_value_col=fun.aggregate(!!rlang::sym(value_col), na.rm=TRUE))
+        }
+        else {
+          # Possible fun.aggregate are, length, n_distinct, false_count (count for TRUE is done by sum),
+          # na_count, non_na_count. They can/should be run without na.rm=TRUE.
+          df <- df %>% dplyr::summarize(.temp_value_col=fun.aggregate(!!rlang::sym(value_col)))
+        }
       }
-    }
-    # TODO: spread creates column named "<NA>". For consistency on UI, we want "(NA)".
-    # Note that this issue is currently avoided by filtering out rows with NA categories in the first place. 
-    df <- df %>% dplyr::ungroup() %>% tidyr::spread(key = !!rlang::sym(var2_col), value = .temp_value_col, fill=0)
-    # na_leves is set to "(NA)" for consistency on UI.
-    # Note that this issue is currently avoided by filtering out rows with NA categories in the first place. 
-    df <- df %>% dplyr::mutate(!!rlang::sym(var1_col):=forcats::fct_explicit_na(as.factor(!!rlang::sym(var1_col)), na_level = "(NA)"))
+      # TODO: spread creates column named "<NA>". For consistency on UI, we want "(NA)".
+      # Note that this issue is currently avoided by filtering out rows with NA categories in the first place. 
+      df <- df %>% dplyr::ungroup() %>% tidyr::spread(key = !!rlang::sym(var2_col), value = .temp_value_col, fill=0)
+      # na_leves is set to "(NA)" for consistency on UI.
+      # Note that this issue is currently avoided by filtering out rows with NA categories in the first place. 
+      df <- df %>% dplyr::mutate(!!rlang::sym(var1_col):=forcats::fct_explicit_na(as.factor(!!rlang::sym(var1_col)), na_level = "(NA)"))
 
-    df <- df %>% tibble::column_to_rownames(var=var1_col)
-    x <- df %>% as.matrix()
-    model <- chisq.test(x = x, correct = correct, ...)
-    # Calculate Cohen's w from actual data.
-    cohens_w <- calculate_cohens_w(model$statistic, sum(x))
-    if (is.null(w)) {
-      # If w is not specified, use the one calculated from data.
-      cohens_w_to_detect <- cohens_w
-    }
-    else {
-      cohens_w_to_detect <- w
-    }
-    # add variable name info to the model
-    model$var1 <- var1_col
-    model$var2 <- var2_col
-    model$var1_class <- var1_class
-    model$var2_class <- var2_class
-    model$var1_levels <- var1_levels
-    model$var2_levels <- var2_levels
-    model$test_sig_level <- test_sig_level
-    model$sig.level <- sig.level
-    model$cohens_w <- cohens_w
-    model$cohens_w_to_detect <- cohens_w_to_detect
-    model$power <- power
-    class(model) <- c("chisq_exploratory", class(model))
-    model
+      df <- df %>% tibble::column_to_rownames(var=var1_col)
+      x <- df %>% as.matrix()
+      model <- chisq.test(x = x, correct = correct, ...)
+      # Calculate Cohen's w from actual data.
+      cohens_w <- calculate_cohens_w(model$statistic, sum(x))
+      if (is.null(w)) {
+        # If w is not specified, use the one calculated from data.
+        cohens_w_to_detect <- cohens_w
+      }
+      else {
+        cohens_w_to_detect <- w
+      }
+      # add variable name info to the model
+      model$var1 <- var1_col
+      model$var2 <- var2_col
+      model$var1_class <- var1_class
+      model$var2_class <- var2_class
+      model$var1_levels <- var1_levels
+      model$var2_levels <- var2_levels
+      model$test_sig_level <- test_sig_level
+      model$sig.level <- sig.level
+      model$cohens_w <- cohens_w
+      model$cohens_w_to_detect <- cohens_w_to_detect
+      model$power <- power
+      class(model) <- c("chisq_exploratory", class(model))
+      model
+    }, error = function(e){
+      if (length(grouped_cols) > 0) {
+        # In repeat-by case, we report group-specific error in the Summary table,
+        # so that analysis on other groups can go on.
+        class(e) <- c("chisq_exploratory", class(e))
+        e
+      } else {
+        stop(e)
+      }
+    })
   }
   do_on_each_group(df, chisq.test_each, name = "model", with_unnest = FALSE)
 }
 
 #' @export
 tidy.chisq_exploratory <- function(x, type = "observed") {
+  if ("error" %in% class(x)) {
+    ret <- tibble::tibble()
+    return(ret)
+  }
+
   if (type == "observed") {
     ret <- as.data.frame(x$observed)
     ret <- ret %>% tibble::rownames_to_column(var = x$var1)
@@ -454,6 +470,10 @@ tidy.chisq_exploratory <- function(x, type = "observed") {
 
 #' @export
 glance.chisq_exploratory <- function(x) {
+  if ("error" %in% class(x)) {
+    ret <- tibble::tibble(Note = x$message)
+    return(ret)
+  }
   # ret <- x %>% broom:::glance.htest() # for some reason this does not work. just do it like following.
   ret <- data.frame(statistic=x$statistic, parameter=x$parameter, p.value=x$p.value)
   N <- sum(x$observed) # Total number of observations (rows).
