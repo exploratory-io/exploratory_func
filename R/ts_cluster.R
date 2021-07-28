@@ -157,7 +157,17 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
           df <- df %>% dplyr::mutate(across(everything(), ~normalize(.x, center=FALSE, scale=TRUE)))
         }
       )
-      model <- dtwclust::tsclust(t(as.matrix(df)), k = centers, distance = distance, centroid = centroid)
+      if (distance %in% c("dtw_lb", "lbk", "lbi")) { # Distance algorithms that require window.size.
+        window_size <- as.integer(nrow(df) * 0.1) # Let's use 10% of length of data as the default window size.
+        if (window_size < 1) { # window.size should be at least 1.
+          window_size <- 1L
+        }
+        model <- dtwclust::tsclust(t(as.matrix(df)), k = centers, distance = distance, centroid = centroid,
+                                   args = dtwclust::tsclust_args(dist = list(window.size = window_size)))
+      }
+      else {
+        model <- dtwclust::tsclust(t(as.matrix(df)), k = centers, distance = distance, centroid = centroid)
+      }
       model <- list(model = model) # Since the original model is S4 object, we create an S3 object that wraps it.
       attr(model, "time_col") <- time_col
       attr(model, "value_col") <- value_col
