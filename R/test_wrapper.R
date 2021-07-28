@@ -1169,9 +1169,10 @@ exp_kruskal <- function(df, var1, var2, func2 = NULL, ...) {
       model
     }, error = function(e){
       if(length(grouped_cols) > 0) {
-        # Ignore the error if it is caused by subset of grouped data frame to show result of data frames that succeed.
-        # For example, error can happen if one of the groups has only one unique value in its set of var2.
-        NULL
+        # In repeat-by case, we report group-specific error in the Summary table,
+        # so that analysis on other groups can go on.
+        class(e) <- c("kruskal_exploratory", class(e))
+        e
       } else {
         stop(e)
       }
@@ -1182,6 +1183,10 @@ exp_kruskal <- function(df, var1, var2, func2 = NULL, ...) {
 
 tidy.kruskal_exploratory <- function(x, type="model", conf_level=0.95) {
   if (type == "model") {
+    if ("error" %in% class(x)) {
+      ret <- tibble::tibble(Note = x$message)
+      return(ret)
+    }
     note <- NULL
     ret <- broom:::tidy.htest(x)
     ret <- ret %>% dplyr::select(statistic, p.value) # Removed method since it is always "Kruskal-Wallis rank sum test" here.
@@ -1194,6 +1199,10 @@ tidy.kruskal_exploratory <- function(x, type="model", conf_level=0.95) {
     }
   }
   else if (type == "data_summary") { #TODO consolidate with code in tidy.ttest_exploratory
+    if ("error" %in% class(x)) {
+      ret <- tibble::tibble()
+      return(ret)
+    }
     conf_threshold = 1 - (1 - conf_level)/2
     ret <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
       dplyr::summarize(`Number of Rows`=length(!!rlang::sym(x$var1)),
@@ -1218,6 +1227,10 @@ tidy.kruskal_exploratory <- function(x, type="model", conf_level=0.95) {
                     `Maximum`)
   }
   else { # type == "data"
+    if ("error" %in% class(x)) {
+      ret <- tibble::tibble()
+      return(ret)
+    }
     ret <- x$data
   }
   ret
