@@ -1080,11 +1080,12 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
     # Get number of groups (k) , and the minimum sample size amoung those groups (min_n_rows).
     data_summary <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
       dplyr::summarize(n_rows=length(!!rlang::sym(x$var1))) %>%
-      dplyr::summarize(min_n_rows=min(n_rows), k=n())
+      dplyr::summarize(min_n_rows=min(n_rows), tot_n_rows=sum(n_rows), k=n())
     k <- data_summary$k
     # Using minimum group sample size as the sample size for power calculation.
     # Reference: https://www.theanalysisfactor.com/when-unequal-sample-sizes-are-and-are-not-a-problem-in-anova/
     min_n_rows <- data_summary$min_n_rows
+    tot_n_rows <- data_summary$tot_n_rows
 
     if (is.null(x$power)) {
       # If power is not specified in the arguments, estimate current power.
@@ -1096,7 +1097,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
         power_val <<- NA_real_
       })
       ret <- ret %>% dplyr::select(statistic, p.value, df, resid.df, sumsq, resid.sumsq, meansq, resid.meansq) %>%
-        dplyr::mutate(f=c(!!(x$cohens_f)), power=c(!!power_val), beta=c(1.0-!!power_val)) %>%
+        dplyr::mutate(f=c(!!(x$cohens_f)), power=c(!!power_val), beta=c(1.0-!!power_val), n=!!tot_n_rows) %>%
         dplyr::rename(`F Value`=statistic,
                       `P Value`=p.value,
                       `Degree of Freedom`=df,
@@ -1107,7 +1108,8 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
                       `Residual Mean Square`=resid.meansq,
                       `Effect Size (Cohen's f)`=f,
                       `Power`=power,
-                      `Probability of Type 2 Error`=beta)
+                      `Probability of Type 2 Error`=beta,
+                      `Number of Rows`=n)
     }
     else {
       # If required power is specified in the arguments, estimate required sample size. 
@@ -1120,7 +1122,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
       })
       ret <- ret %>% dplyr::select(statistic, p.value, df, resid.df, sumsq, resid.sumsq, meansq, resid.meansq) %>%
         dplyr::mutate(f=c(!!(x$cohens_f)), power=c(!!(x$power)), beta=c(1.0-!!(x$power))) %>%
-        dplyr::mutate(current_sample_size=!!min_n_rows, required_sample_size=c(!!required_sample_size)) %>%
+        dplyr::mutate(current_sample_size=!!min_n_rows, required_sample_size=c(!!required_sample_size), n=!!tot_n_rows) %>%
         dplyr::rename(`F Value`=statistic,
                       `P Value`=p.value,
                       `Degree of Freedom`=df,
@@ -1133,7 +1135,8 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
                       `Target Power`=power,
                       `Target Probability of Type 2 Error`=beta,
                       `Current Sample Size (Each Group)`=current_sample_size,
-                      `Required Sample Size (Each Group)`=required_sample_size)
+                      `Required Sample Size (Each Group)`=required_sample_size,
+                      `Number of Rows`=n)
     }
     if (!is.null(note)) { # Add Note column, if there was an error from pwr function.
       ret <- ret %>% dplyr::mutate(Note=!!note)
