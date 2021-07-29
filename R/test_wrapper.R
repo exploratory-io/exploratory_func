@@ -574,7 +574,7 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
       df <- df %>% dplyr::filter(!is.na(!!rlang::sym(var2_col)))
     }
     else {
-      stop(paste0("Variable Column (", var2_col, ") has to have 2 kinds of values."))
+      stop("The explanatory variable needs to have 2 unique values.")
     }
   }
 
@@ -592,35 +592,36 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
       df$.is.outlier <- NULL
     }
 
-    if(length(grouped_cols) > 0) {
-      n_distinct_res_each <- n_distinct(df[[var2_col]]) # check n_distinct again within group after handling outlier.
-      if (n_distinct_res_each != 2) {
-        return(NULL)
-      }
-    }
-    # Calculate Cohen's d from data.
-    cohens_d <- calculate_cohens_d(df[[var1_col]], df[[var2_col]])
-    # Get size of Cohen's d to detect for power analysis.
-    # If neither d nor diff_to_detect is specified, use the one calculated from data.
-    if (is.null(d)) {
-      if (is.null(diff_to_detect)) {
-        # If neither d nor diff_to_detect is specified, calculate Cohen's d from data.
-        cohens_d_to_detect <- cohens_d
-      }
-      else { # diff_to_detect is specified.
-        if (is.null(common_sd)) {
-          # If common SD is not specified, estimate from data, and use it to calculate Cohen's d
-          cohens_d_to_detect <- diff_to_detect/calculate_common_sd(df[[var1_col]], df[[var2_col]])
-        }
-        else {
-          cohens_d_to_detect <- diff_to_detect/common_sd
-        }
-      }
-    }
-    else {
-      cohens_d_to_detect <- d
-    }
     tryCatch({
+      if(length(grouped_cols) > 0) {
+        n_distinct_res_each <- n_distinct(df[[var2_col]]) # check n_distinct again within group after handling outlier.
+        if (n_distinct_res_each != 2) {
+          stop("The explanatory variable needs to have 2 unique values.")
+        }
+      }
+      # Calculate Cohen's d from data.
+      cohens_d <- calculate_cohens_d(df[[var1_col]], df[[var2_col]])
+      # Get size of Cohen's d to detect for power analysis.
+      # If neither d nor diff_to_detect is specified, use the one calculated from data.
+      if (is.null(d)) {
+        if (is.null(diff_to_detect)) {
+          # If neither d nor diff_to_detect is specified, calculate Cohen's d from data.
+          cohens_d_to_detect <- cohens_d
+        }
+        else { # diff_to_detect is specified.
+          if (is.null(common_sd)) {
+            # If common SD is not specified, estimate from data, and use it to calculate Cohen's d
+            cohens_d_to_detect <- diff_to_detect/calculate_common_sd(df[[var1_col]], df[[var2_col]])
+          }
+          else {
+            cohens_d_to_detect <- diff_to_detect/common_sd
+          }
+        }
+      }
+      else {
+        cohens_d_to_detect <- d
+      }
+
       model <- t.test(formula, data = df, ...)
       class(model) <- c("ttest_exploratory", class(model))
       model$var1 <- var1_col
