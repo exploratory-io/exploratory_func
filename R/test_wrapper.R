@@ -275,7 +275,7 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
   var1_col <- col_name(substitute(var1))
   var2_col <- col_name(substitute(var2))
   value_col <- col_name(substitute(value))
-  grouped_col <- grouped_by(df)
+  grouped_cols <- grouped_by(df)
 
   if (!is.null(func1)) {
     if (lubridate::is.Date(df[[var1_col]]) || lubridate::is.POSIXct(df[[var1_col]])) {
@@ -297,10 +297,10 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
   # Check each category column has multiple classes. 
   # Currently, we filter out NA categories later. So, counting non-NA categories only.
   if (n_distinct(df[[var1_col]], na.rm=TRUE) < 2) {
-    stop(paste0("Variable Column (", var1_col, ") has to have 2 or more kinds of values."))
+    stop(paste0("The explanatory variable needs to have 2 or more unique values."))
   }
   if (n_distinct(df[[var2_col]], na.rm=TRUE) < 2) {
-    stop(paste0("Variable Column (", var2_col, ") has to have 2 or more kinds of values."))
+    stop(paste0("The target variable needs to have 2 or more unique values."))
   }
 
   var1_levels <- NULL
@@ -318,70 +318,86 @@ exp_chisq <- function(df, var1, var2, value = NULL, func1 = NULL, func2 = NULL, 
   formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
 
   chisq.test_each <- function(df) {
-    # If there is only one class of category in this class, skip it.
-    # This is effectively for multiple group case, since for single group case, it is already checked before this loop.
-    if (n_distinct(df[[var1_col]], na.rm=TRUE) < 2) {
-      return(NULL)
-    }
-    if (n_distinct(df[[var2_col]], na.rm=TRUE) < 2) {
-      return(NULL)
-    }
-    # TODO: For now, we are filtering out NA categories, but we should include them and display them cleanly.
-    df <- df %>% dplyr::filter(!is.na(!!rlang::sym(var1_col)) & !is.na(!!rlang::sym(var2_col)))
-    df <- df %>% dplyr::group_by(!!rlang::sym(var1_col), !!rlang::sym(var2_col))
-    if (is.null(value_col)) {
-      df <- df %>% dplyr::summarize(.temp_value_col=n())
-    }
-    else {
-      #TODO: handle name conflict with .temp_value_col and group cols.
-      if (identical(sum, fun.aggregate)) {
-        df <- df %>% dplyr::summarize(.temp_value_col=fun.aggregate(!!rlang::sym(value_col), na.rm=TRUE))
+    tryCatch({
+      # If there is only one class of category in this class, skip it.
+      # This is effectively for multiple group case, since for single group case, it is already checked before this loop.
+      if (n_distinct(df[[var1_col]], na.rm=TRUE) < 2) {
+        stop(paste0("The explanatory variable needs to have 2 or more unique values."))
+      }
+      if (n_distinct(df[[var2_col]], na.rm=TRUE) < 2) {
+        stop(paste0("The target variable needs to have 2 or more unique values."))
+      }
+      # TODO: For now, we are filtering out NA categories, but we should include them and display them cleanly.
+      df <- df %>% dplyr::filter(!is.na(!!rlang::sym(var1_col)) & !is.na(!!rlang::sym(var2_col)))
+      df <- df %>% dplyr::group_by(!!rlang::sym(var1_col), !!rlang::sym(var2_col))
+      if (is.null(value_col)) {
+        df <- df %>% dplyr::summarize(.temp_value_col=n())
       }
       else {
-        # Possible fun.aggregate are, length, n_distinct, false_count (count for TRUE is done by sum),
-        # na_count, non_na_count. They can/should be run without na.rm=TRUE.
-        df <- df %>% dplyr::summarize(.temp_value_col=fun.aggregate(!!rlang::sym(value_col)))
+        #TODO: handle name conflict with .temp_value_col and group cols.
+        if (identical(sum, fun.aggregate)) {
+          df <- df %>% dplyr::summarize(.temp_value_col=fun.aggregate(!!rlang::sym(value_col), na.rm=TRUE))
+        }
+        else {
+          # Possible fun.aggregate are, length, n_distinct, false_count (count for TRUE is done by sum),
+          # na_count, non_na_count. They can/should be run without na.rm=TRUE.
+          df <- df %>% dplyr::summarize(.temp_value_col=fun.aggregate(!!rlang::sym(value_col)))
+        }
       }
-    }
-    # TODO: spread creates column named "<NA>". For consistency on UI, we want "(NA)".
-    # Note that this issue is currently avoided by filtering out rows with NA categories in the first place. 
-    df <- df %>% dplyr::ungroup() %>% tidyr::spread(key = !!rlang::sym(var2_col), value = .temp_value_col, fill=0)
-    # na_leves is set to "(NA)" for consistency on UI.
-    # Note that this issue is currently avoided by filtering out rows with NA categories in the first place. 
-    df <- df %>% dplyr::mutate(!!rlang::sym(var1_col):=forcats::fct_explicit_na(as.factor(!!rlang::sym(var1_col)), na_level = "(NA)"))
+      # TODO: spread creates column named "<NA>". For consistency on UI, we want "(NA)".
+      # Note that this issue is currently avoided by filtering out rows with NA categories in the first place. 
+      df <- df %>% dplyr::ungroup() %>% tidyr::spread(key = !!rlang::sym(var2_col), value = .temp_value_col, fill=0)
+      # na_leves is set to "(NA)" for consistency on UI.
+      # Note that this issue is currently avoided by filtering out rows with NA categories in the first place. 
+      df <- df %>% dplyr::mutate(!!rlang::sym(var1_col):=forcats::fct_explicit_na(as.factor(!!rlang::sym(var1_col)), na_level = "(NA)"))
 
-    df <- df %>% tibble::column_to_rownames(var=var1_col)
-    x <- df %>% as.matrix()
-    model <- chisq.test(x = x, correct = correct, ...)
-    # Calculate Cohen's w from actual data.
-    cohens_w <- calculate_cohens_w(model$statistic, sum(x))
-    if (is.null(w)) {
-      # If w is not specified, use the one calculated from data.
-      cohens_w_to_detect <- cohens_w
-    }
-    else {
-      cohens_w_to_detect <- w
-    }
-    # add variable name info to the model
-    model$var1 <- var1_col
-    model$var2 <- var2_col
-    model$var1_class <- var1_class
-    model$var2_class <- var2_class
-    model$var1_levels <- var1_levels
-    model$var2_levels <- var2_levels
-    model$test_sig_level <- test_sig_level
-    model$sig.level <- sig.level
-    model$cohens_w <- cohens_w
-    model$cohens_w_to_detect <- cohens_w_to_detect
-    model$power <- power
-    class(model) <- c("chisq_exploratory", class(model))
-    model
+      df <- df %>% tibble::column_to_rownames(var=var1_col)
+      x <- df %>% as.matrix()
+      model <- chisq.test(x = x, correct = correct, ...)
+      # Calculate Cohen's w from actual data.
+      cohens_w <- calculate_cohens_w(model$statistic, sum(x))
+      if (is.null(w)) {
+        # If w is not specified, use the one calculated from data.
+        cohens_w_to_detect <- cohens_w
+      }
+      else {
+        cohens_w_to_detect <- w
+      }
+      # add variable name info to the model
+      model$var1 <- var1_col
+      model$var2 <- var2_col
+      model$var1_class <- var1_class
+      model$var2_class <- var2_class
+      model$var1_levels <- var1_levels
+      model$var2_levels <- var2_levels
+      model$test_sig_level <- test_sig_level
+      model$sig.level <- sig.level
+      model$cohens_w <- cohens_w
+      model$cohens_w_to_detect <- cohens_w_to_detect
+      model$power <- power
+      class(model) <- c("chisq_exploratory", class(model))
+      model
+    }, error = function(e){
+      if (length(grouped_cols) > 0) {
+        # In repeat-by case, we report group-specific error in the Summary table,
+        # so that analysis on other groups can go on.
+        class(e) <- c("chisq_exploratory", class(e))
+        e
+      } else {
+        stop(e)
+      }
+    })
   }
   do_on_each_group(df, chisq.test_each, name = "model", with_unnest = FALSE)
 }
 
 #' @export
 tidy.chisq_exploratory <- function(x, type = "observed") {
+  if ("error" %in% class(x)) {
+    ret <- tibble::tibble()
+    return(ret)
+  }
+
   if (type == "observed") {
     ret <- as.data.frame(x$observed)
     ret <- ret %>% tibble::rownames_to_column(var = x$var1)
@@ -454,6 +470,10 @@ tidy.chisq_exploratory <- function(x, type = "observed") {
 
 #' @export
 glance.chisq_exploratory <- function(x) {
+  if ("error" %in% class(x)) {
+    ret <- tibble::tibble(Note = x$message)
+    return(ret)
+  }
   # ret <- x %>% broom:::glance.htest() # for some reason this does not work. just do it like following.
   ret <- data.frame(statistic=x$statistic, parameter=x$parameter, p.value=x$p.value)
   N <- sum(x$observed) # Total number of observations (rows).
@@ -554,7 +574,7 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
       df <- df %>% dplyr::filter(!is.na(!!rlang::sym(var2_col)))
     }
     else {
-      stop(paste0("Variable Column (", var2_col, ") has to have 2 kinds of values."))
+      stop("The explanatory variable needs to have 2 unique values.")
     }
   }
 
@@ -572,35 +592,49 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
       df$.is.outlier <- NULL
     }
 
-    if(length(grouped_cols) > 0) {
-      n_distinct_res_each <- n_distinct(df[[var2_col]]) # check n_distinct again within group after handling outlier.
-      if (n_distinct_res_each != 2) {
-        return(NULL)
-      }
-    }
-    # Calculate Cohen's d from data.
-    cohens_d <- calculate_cohens_d(df[[var1_col]], df[[var2_col]])
-    # Get size of Cohen's d to detect for power analysis.
-    # If neither d nor diff_to_detect is specified, use the one calculated from data.
-    if (is.null(d)) {
-      if (is.null(diff_to_detect)) {
-        # If neither d nor diff_to_detect is specified, calculate Cohen's d from data.
-        cohens_d_to_detect <- cohens_d
-      }
-      else { # diff_to_detect is specified.
-        if (is.null(common_sd)) {
-          # If common SD is not specified, estimate from data, and use it to calculate Cohen's d
-          cohens_d_to_detect <- diff_to_detect/calculate_common_sd(df[[var1_col]], df[[var2_col]])
-        }
-        else {
-          cohens_d_to_detect <- diff_to_detect/common_sd
-        }
-      }
-    }
-    else {
-      cohens_d_to_detect <- d
-    }
     tryCatch({
+      if(length(grouped_cols) > 0) {
+        n_distinct_res_each <- n_distinct(df[[var2_col]]) # check n_distinct again within group after handling outlier.
+        if (n_distinct_res_each != 2) {
+          stop("The explanatory variable needs to have 2 unique values.")
+        }
+      }
+      # It seems that each group has to have at least 2 rows to avoid "not enough 'x' observations" error.
+      # Check it here, rather than handling it later.
+      count_df <- df %>% group_by(!!rlang::sym(var2_col)) %>% summarize(n=n())
+      min_n <- min(count_df$n, na.rm=TRUE)
+      if (min_n <= 1) {
+        e <- simpleError("Not enough data.")
+        class(e) <- c("ttest_exploratory", class(e))
+        e$v1 <- count_df[[1]][1] 
+        e$n1 <- count_df$n[1]
+        e$v2 <- count_df[[1]][2] 
+        e$n2 <- count_df$n[2]
+        return(e)
+      }
+      # Calculate Cohen's d from data.
+      cohens_d <- calculate_cohens_d(df[[var1_col]], df[[var2_col]])
+      # Get size of Cohen's d to detect for power analysis.
+      # If neither d nor diff_to_detect is specified, use the one calculated from data.
+      if (is.null(d)) {
+        if (is.null(diff_to_detect)) {
+          # If neither d nor diff_to_detect is specified, calculate Cohen's d from data.
+          cohens_d_to_detect <- cohens_d
+        }
+        else { # diff_to_detect is specified.
+          if (is.null(common_sd)) {
+            # If common SD is not specified, estimate from data, and use it to calculate Cohen's d
+            cohens_d_to_detect <- diff_to_detect/calculate_common_sd(df[[var1_col]], df[[var2_col]])
+          }
+          else {
+            cohens_d_to_detect <- diff_to_detect/common_sd
+          }
+        }
+      }
+      else {
+        cohens_d_to_detect <- d
+      }
+
       model <- t.test(formula, data = df, ...)
       class(model) <- c("ttest_exploratory", class(model))
       model$var1 <- var1_col
@@ -614,9 +648,10 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
       model
     }, error = function(e){
       if(length(grouped_cols) > 0) {
-        # Ignore the error if it is caused by subset of grouped data frame to show result of data frames that succeed.
-        # For example, error can happen if one of the groups does not have both values (e.g. both TRUE and FALSE) of var2.
-        NULL
+        # In repeat-by case, we report group-specific error in the Summary table,
+        # so that analysis on other groups can go on.
+        class(e) <- c("ttest_exploratory", class(e))
+        e
       } else {
         stop(e)
       }
@@ -627,6 +662,10 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
 
 #' @export
 glance.ttest_exploratory <- function(x) {
+  if ("error" %in% class(x)) {
+    ret <- tibble::tibble(Note = x$message)
+    return(ret)
+  }
   ret <- broom:::glance.htest(x) # for t-test. the returned content is same as tidy.
   ret
 }
@@ -634,6 +673,18 @@ glance.ttest_exploratory <- function(x) {
 #' @export
 tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
   if (type == "model") {
+    if ("error" %in% class(x)) {
+      if (!is.null(x$v1) && !is.null(x$v2) && !is.null(x$n1) && !is.null(x$n2)) {
+        ret <- tibble::tibble(`Number of Rows`=x$n1+x$n2, n1=x$n1, n2=x$n2, Note = x$message)
+        ret <- ret %>% dplyr::rename(!!rlang::sym(paste0("Number of Rows for ", x$v1)):=n1)
+        ret <- ret %>% dplyr::rename(!!rlang::sym(paste0("Number of Rows for ", x$v2)):=n2)
+      }
+      else {
+        ret <- tibble::tibble(Note = x$message)
+      }
+      return(ret)
+    }
+
     note <- NULL
     ret <- broom:::tidy.htest(x)
     if (is.null(ret$estimate)) { # estimate is empty when var.equal = TRUE.
@@ -710,6 +761,10 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
     }
   }
   else if (type == "data_summary") { #TODO consolidate with code in tidy.anova_exploratory
+    if ("error" %in% class(x)) {
+      ret <- tibble::tibble()
+      return(ret)
+    }
     conf_threshold = 1 - (1 - conf_level)/2
     ret <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
       dplyr::summarize(`Number of Rows`=length(!!rlang::sym(x$var1)),
@@ -734,10 +789,18 @@ tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
                     `Maximum`)
   }
   else if (type == "prob_dist") {
+    if ("error" %in% class(x)) {
+      ret <- tibble::tibble()
+      return(ret)
+    }
     ret <- generate_ttest_density_data(x$statistic, x$parameter, sig_level=x$test_sig_level, alternative=x$alternative)
     ret
   }
   else { # type == "data"
+    if ("error" %in% class(x)) {
+      ret <- tibble::tibble()
+      return(ret)
+    }
     ret <- x$data
   }
   ret
@@ -773,7 +836,7 @@ exp_wilcox <- function(df, var1, var2, func2 = NULL, ...) {
       df <- df %>% dplyr::filter(!is.na(!!rlang::sym(var2_col)))
     }
     else {
-      stop(paste0("Variable Column (", var2_col, ") has to have 2 kinds of values."))
+      stop("The explanatory variable needs to have 2 unique values.")
     }
   }
 
@@ -781,6 +844,12 @@ exp_wilcox <- function(df, var1, var2, func2 = NULL, ...) {
 
   each_func <- function(df) {
     tryCatch({
+      if(length(grouped_cols) > 0) {
+        n_distinct_res_each <- n_distinct(df[[var2_col]]) # check n_distinct again within group after handling outlier.
+        if (n_distinct_res_each != 2) {
+          stop("The explanatory variable needs to have 2 unique values.")
+        }
+      }
       model <- wilcox.test(formula, data = df, ...)
       class(model) <- c("wilcox_exploratory", class(model))
       model$var1 <- var1_col
@@ -789,9 +858,10 @@ exp_wilcox <- function(df, var1, var2, func2 = NULL, ...) {
       model
     }, error = function(e){
       if(length(grouped_cols) > 0) {
-        # Ignore the error if it is caused by subset of grouped data frame to show result of data frames that succeed.
-        # For example, error can happen if one of the groups does not have both values (e.g. both TRUE and FALSE) of var2.
-        NULL
+        # In repeat-by case, we report group-specific error in the Summary table,
+        # so that analysis on other groups can go on.
+        class(e) <- c("wilcox_exploratory", class(e))
+        e
       } else {
         stop(e)
       }
@@ -803,6 +873,11 @@ exp_wilcox <- function(df, var1, var2, func2 = NULL, ...) {
 #' @export
 tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
   if (type == "model") {
+    if ("error" %in% class(x)) {
+      ret <- tibble::tibble(Note = x$message)
+      return(ret)
+    }
+
     note <- NULL
     ret <- broom:::tidy.htest(x)
     if (!is.null(x$estimate)) { # Result is with estimate and confidence interval
@@ -821,10 +896,10 @@ tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
     v2 <- data_summary[[x$var2]][[2]] # value for 2nd class
 
     # Switch the name of statistic based on the type of performed test.
-    if (stringr::str_detect(ret$method[[1]], "signed rank test")) {
+    if (stringr::str_detect(ret$method[[1]], "signed rank")) {
       ret <- ret %>% dplyr::rename(`W Statistic`=statistic)
     }
-    else if (stringr::str_detect(ret$method[[1]], "rank sum test")) {
+    else if (stringr::str_detect(ret$method[[1]], "rank sum")) { # Intentionally matching with just "rank sum" to match "Wilcoxon rank sum exact test" too.
       ret <- ret %>% dplyr::rename(`U Statistic`=statistic)
     }
 
@@ -848,6 +923,10 @@ tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
     }
   }
   else if (type == "data_summary") { #TODO consolidate with code in tidy.anova_exploratory
+    if ("error" %in% class(x)) {
+      ret <- tibble::tibble()
+      return(ret)
+    }
     conf_threshold = 1 - (1 - conf_level)/2
     ret <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
       dplyr::summarize(`Number of Rows`=length(!!rlang::sym(x$var1)),
@@ -872,6 +951,10 @@ tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
                     `Maximum`)
   }
   else { # type == "data"
+    if ("error" %in% class(x)) {
+      ret <- tibble::tibble()
+      return(ret)
+    }
     ret <- x$data
   }
   ret
@@ -905,7 +988,7 @@ exp_anova <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
   }
   
   if (n_distinct(df[[var2_col]]) < 2) {
-    stop(paste0("Variable Column (", var2_col, ") has to have 2 or more kinds of values."))
+    stop(paste0("The explanatory variable needs to have 2 or more unique values."))
   }
 
   formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
@@ -922,15 +1005,23 @@ exp_anova <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
       df$.is.outlier <- NULL
     }
 
-    if(length(grouped_cols) > 0) {
-      # Check n_distinct again within group after handling outliers.
-      # Group with NA and another category does not seem to work well with aov. Eliminating such case too. TODO: We could replace NA with an explicit level.
-      n_distinct_res_each <- n_distinct(df[[var2_col]], na.rm=TRUE)
-      if (n_distinct_res_each < 2) {
-        return(NULL)
-      }
-    }
     tryCatch({
+      if(length(grouped_cols) > 0) {
+        # Check n_distinct again within group after handling outliers.
+        # Group with NA and another category does not seem to work well with aov. Eliminating such case too. TODO: We could replace NA with an explicit level.
+        n_distinct_res_each <- n_distinct(df[[var2_col]], na.rm=TRUE)
+        if (n_distinct_res_each < 2) {
+          stop(paste0("The explanatory variable needs to have 2 or more unique values."))
+        }
+      }
+      # It seems that the 2nd row of broom:::tidy.aov(x) is missed, if no group has more than 1 row. Check it here, rather than handling it later.
+      count_df <- df %>% group_by(!!rlang::sym(var2_col)) %>% summarize(n=n()) %>% summarize(max_n=max(n),tot_n=sum(n))
+      if (count_df$max_n <= 1) {
+        e <- simpleError("At least one group needs to have 2 or more rows.")
+        class(e) <- c("anova_exploratory", class(e))
+        e$n <- count_df$tot_n
+        return(e)
+      }
       model <- aov(formula, data = df, ...)
       # calculate Cohen's f from actual data
       model$cohens_f <- calculate_cohens_f(df[[var1_col]], df[[var2_col]])
@@ -950,9 +1041,10 @@ exp_anova <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
       model
     }, error = function(e){
       if(length(grouped_cols) > 0) {
-        # Ignore the error if it is caused by subset of grouped data frame to show result of data frames that succeed.
-        # For example, error can happen if one of the groups has only one unique value in its set of var2.
-        NULL
+        # In repeat-by case, we report group-specific error in the Summary table,
+        # so that analysis on other groups can go on.
+        class(e) <- c("anova_exploratory", class(e))
+        e
       } else {
         stop(e)
       }
@@ -963,6 +1055,10 @@ exp_anova <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
 
 #' @export
 glance.anova_exploratory <- function(x) {
+  if ("error" %in% class(x)) {
+    ret <- tibble::tibble(Note = x$message)
+    return(ret)
+  }
   ret <- broom:::tidy.aov(x) %>% slice(1:1) # there is no glance.aov. take first row of tidy.aov.
   # Term value from tidy.aov() can be garbled on Windows with multibyte column name. Overwrite with not-garled value.
   if (!is.null(ret$term) && length(ret$term) > 0 && !is.null(x$xlevels) && length(x$xlevels) > 0) {
@@ -974,6 +1070,15 @@ glance.anova_exploratory <- function(x) {
 #' @export
 tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
   if (type == "model") {
+    if ("error" %in% class(x)) {
+      if (!is.null(x$n)) {
+        ret <- tibble::tibble(`Number of Rows`=x$n, Note = x$message)
+      }
+      else {
+        ret <- tibble::tibble(Note = x$message)
+      }
+      return(ret)
+    }
     note <- NULL
     ret <- broom:::tidy.aov(x)
     ret1 <- ret %>% dplyr::slice(1:1)
@@ -983,11 +1088,12 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
     # Get number of groups (k) , and the minimum sample size amoung those groups (min_n_rows).
     data_summary <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
       dplyr::summarize(n_rows=length(!!rlang::sym(x$var1))) %>%
-      dplyr::summarize(min_n_rows=min(n_rows), k=n())
+      dplyr::summarize(min_n_rows=min(n_rows), tot_n_rows=sum(n_rows), k=n())
     k <- data_summary$k
     # Using minimum group sample size as the sample size for power calculation.
     # Reference: https://www.theanalysisfactor.com/when-unequal-sample-sizes-are-and-are-not-a-problem-in-anova/
     min_n_rows <- data_summary$min_n_rows
+    tot_n_rows <- data_summary$tot_n_rows
 
     if (is.null(x$power)) {
       # If power is not specified in the arguments, estimate current power.
@@ -999,7 +1105,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
         power_val <<- NA_real_
       })
       ret <- ret %>% dplyr::select(statistic, p.value, df, resid.df, sumsq, resid.sumsq, meansq, resid.meansq) %>%
-        dplyr::mutate(f=c(!!(x$cohens_f)), power=c(!!power_val), beta=c(1.0-!!power_val)) %>%
+        dplyr::mutate(f=c(!!(x$cohens_f)), power=c(!!power_val), beta=c(1.0-!!power_val), n=!!tot_n_rows) %>%
         dplyr::rename(`F Value`=statistic,
                       `P Value`=p.value,
                       `Degree of Freedom`=df,
@@ -1010,7 +1116,8 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
                       `Residual Mean Square`=resid.meansq,
                       `Effect Size (Cohen's f)`=f,
                       `Power`=power,
-                      `Probability of Type 2 Error`=beta)
+                      `Probability of Type 2 Error`=beta,
+                      `Number of Rows`=n)
     }
     else {
       # If required power is specified in the arguments, estimate required sample size. 
@@ -1023,7 +1130,7 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
       })
       ret <- ret %>% dplyr::select(statistic, p.value, df, resid.df, sumsq, resid.sumsq, meansq, resid.meansq) %>%
         dplyr::mutate(f=c(!!(x$cohens_f)), power=c(!!(x$power)), beta=c(1.0-!!(x$power))) %>%
-        dplyr::mutate(current_sample_size=!!min_n_rows, required_sample_size=c(!!required_sample_size)) %>%
+        dplyr::mutate(current_sample_size=!!min_n_rows, required_sample_size=c(!!required_sample_size), n=!!tot_n_rows) %>%
         dplyr::rename(`F Value`=statistic,
                       `P Value`=p.value,
                       `Degree of Freedom`=df,
@@ -1036,13 +1143,18 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
                       `Target Power`=power,
                       `Target Probability of Type 2 Error`=beta,
                       `Current Sample Size (Each Group)`=current_sample_size,
-                      `Required Sample Size (Each Group)`=required_sample_size)
+                      `Required Sample Size (Each Group)`=required_sample_size,
+                      `Number of Rows`=n)
     }
     if (!is.null(note)) { # Add Note column, if there was an error from pwr function.
       ret <- ret %>% dplyr::mutate(Note=!!note)
     }
   }
   else if (type == "data_summary") { #TODO consolidate with code in tidy.ttest_exploratory
+    if ("error" %in% class(x)) {
+      ret <- tibble::tibble()
+      return(ret)
+    }
     conf_threshold = 1 - (1 - conf_level)/2
     ret <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
       dplyr::summarize(`Number of Rows`=length(!!rlang::sym(x$var1)),
@@ -1067,11 +1179,19 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
                     `Maximum`)
   }
   else if (type == "prob_dist") {
+    if ("error" %in% class(x)) {
+      ret <- tibble::tibble()
+      return(ret)
+    }
     ret0 <- broom:::tidy.aov(x)
     ret <- generate_ftest_density_data(ret0$statistic[[1]], df1=ret0$df[[1]], df2=ret0$df[[2]], sig_level=x$test_sig_level)
     ret
   }
   else { # type == "data"
+    if ("error" %in% class(x)) {
+      ret <- tibble::tibble()
+      return(ret)
+    }
     ret <- x$data
   }
   ret
@@ -1094,13 +1214,19 @@ exp_kruskal <- function(df, var1, var2, func2 = NULL, ...) {
   }
   
   if (n_distinct(df[[var2_col]]) < 2) {
-    stop(paste0("Variable Column (", var2_col, ") has to have 2 or more kinds of values."))
+    stop(paste0("The explanatory variable needs to have 2 or more unique values."))
   }
 
   formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
 
   each_func <- function(df) {
     tryCatch({
+      if(length(grouped_cols) > 0) {
+        # Check n_distinct again within group after handling outliers.
+        if (n_distinct(df[[var2_col]]) < 2) {
+          stop(paste0("The explanatory variable needs to have 2 or more unique values."))
+        }
+      }
       model <- kruskal.test(formula, data = df, ...)
       N <- nrow(df)
       epsilon_squared <- calculate_epsilon_squared(model, N)
@@ -1112,9 +1238,10 @@ exp_kruskal <- function(df, var1, var2, func2 = NULL, ...) {
       model
     }, error = function(e){
       if(length(grouped_cols) > 0) {
-        # Ignore the error if it is caused by subset of grouped data frame to show result of data frames that succeed.
-        # For example, error can happen if one of the groups has only one unique value in its set of var2.
-        NULL
+        # In repeat-by case, we report group-specific error in the Summary table,
+        # so that analysis on other groups can go on.
+        class(e) <- c("kruskal_exploratory", class(e))
+        e
       } else {
         stop(e)
       }
@@ -1125,18 +1252,28 @@ exp_kruskal <- function(df, var1, var2, func2 = NULL, ...) {
 
 tidy.kruskal_exploratory <- function(x, type="model", conf_level=0.95) {
   if (type == "model") {
+    if ("error" %in% class(x)) {
+      ret <- tibble::tibble(Note = x$message)
+      return(ret)
+    }
+    tot_n_rows <- nrow(x$data)
     note <- NULL
     ret <- broom:::tidy.htest(x)
     ret <- ret %>% dplyr::select(statistic, p.value) # Removed method since it is always "Kruskal-Wallis rank sum test" here.
-    ret <- ret %>% dplyr::mutate(epsilon_squared=!!x$epsilon_squared)
+    ret <- ret %>% dplyr::mutate(epsilon_squared=!!x$epsilon_squared, n=!!tot_n_rows)
     ret <- ret %>% dplyr::rename(`H Statistic` = statistic,
                                  `P Value`=p.value,
-                                 `Effect Size (Epsilon Squared)`=epsilon_squared)
+                                 `Effect Size (Epsilon Squared)`=epsilon_squared,
+                                 `Number of Rows`=n)
     if (!is.null(note)) { # Add Note column, if there was an error from pwr function.
       ret <- ret %>% dplyr::mutate(Note=!!note)
     }
   }
   else if (type == "data_summary") { #TODO consolidate with code in tidy.ttest_exploratory
+    if ("error" %in% class(x)) {
+      ret <- tibble::tibble()
+      return(ret)
+    }
     conf_threshold = 1 - (1 - conf_level)/2
     ret <- x$data %>% dplyr::group_by(!!rlang::sym(x$var2)) %>%
       dplyr::summarize(`Number of Rows`=length(!!rlang::sym(x$var1)),
@@ -1161,6 +1298,10 @@ tidy.kruskal_exploratory <- function(x, type="model", conf_level=0.95) {
                     `Maximum`)
   }
   else { # type == "data"
+    if ("error" %in% class(x)) {
+      ret <- tibble::tibble()
+      return(ret)
+    }
     ret <- x$data
   }
   ret

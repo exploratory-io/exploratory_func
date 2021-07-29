@@ -21,3 +21,12 @@ test_that("test exp_kruskal with group_by", {
                  "Minimum","Maximum"))
 })
 
+test_that("test exp_kruskal with group-level error", {
+  df <- tibble::tibble(group=c(1,1,2,2),category=c("a","a","b","b"),value=c(1,2,1,2))
+  model_df <- df %>% dplyr::group_by(`group`) %>% exp_kruskal(`value`, `category`)
+  ret <- model_df %>% tidy_rowwise(model, type='model')
+  expect_equal(colnames(ret),
+               c("group","Note"))
+  ret <- model_df %>% tidy_rowwise(model, type='prob_dist')
+  expect_equal(nrow(ret), 0)
+})
