@@ -599,6 +599,12 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
           stop("The explanatory variable needs to have 2 unique values.")
         }
       }
+      # It seems that each group has to have at least 2 rows to avoid "not enough 'x' observations" error.
+      # Check it here, rather than handling it later.
+      min_n <- (df %>% group_by(!!rlang::sym(var2_col)) %>% summarize(n=n()) %>% summarize(min_n=min(n, na.rm=TRUE)))$min_n
+      if (min_n <= 1) {
+        stop("Not enough data.")
+      }
       # Calculate Cohen's d from data.
       cohens_d <- calculate_cohens_d(df[[var1_col]], df[[var2_col]])
       # Get size of Cohen's d to detect for power analysis.
