@@ -269,7 +269,7 @@ test_that("test exp_chisq with group_by with single class category in one of the
   ret <- mtcars %>% filter(vs!=1 | gear==4) %>% group_by(vs) %>% exp_chisq(gear, carb, value=cyl)
   observed <- ret %>% tidy_rowwise(model, type="observed")
   summary <- ret %>% glance_rowwise(model)
-  expect_equal(nrow(summary), 1) # summary for only one group should be shown.
+  expect_equal(nrow(summary), 2) # summary for 2 groups, one of which is a row with Note, should be shown.
   residuals <- ret %>% tidy_rowwise(model, type="residuals")
 })
 
@@ -410,6 +410,16 @@ test_that("test exp_ttest with outlier filter", {
   expect_equal(colnames(ret),
                c("vs","am","Number of Rows","Mean","Conf Low","Conf High","Std Error of Mean","Std Deviation",
                  "Minimum","Maximum"))
+})
+
+test_that("test exp_ttest with group-level error", {
+  df <- tibble::tibble(group=c(1,1,2,2),category=c("a","a","b","b"),value=c(1,2,1,2))
+  model_df <- df %>% dplyr::group_by(`group`) %>% exp_ttest(`value`, `category`)
+  ret <- model_df %>% tidy_rowwise(model, type='model')
+  expect_equal(colnames(ret),
+               c("group","Note"))
+  ret <- model_df %>% tidy_rowwise(model, type='prob_dist')
+  expect_equal(nrow(ret), 0)
 })
 
 test_that("test exp_anova", {
