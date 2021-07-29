@@ -49,12 +49,7 @@ exp_kmeans <- function(df, ...,
   if(!is.null(seed)) { # Set seed before starting to call sample_n.
     set.seed(seed)
   }
-  sampled_nrow <- NULL
-  if (!is.null(max_nrow) && nrow(df) > max_nrow) {
-    # Record that sampling happened.
-    sampled_nrow <- max_nrow
-    df <- df %>% sample_rows(max_nrow)
-  }
+
   # list and difftime etc. causes error in tidy_rowwise(model, type="biplot").
   # For now, we are removing them upfront.
   df <- df %>% dplyr::select(-where(is.list),
@@ -63,6 +58,15 @@ exp_kmeans <- function(df, ...,
                              -where(lubridate::is.interval),
                              -where(lubridate::is.period))
 
+  filtered_df <- preprocess_factanal_data_before_sample(df, selected_cols)
+  selected_cols <- attr(filtered_df, 'predictors') # predictors are updated (removed) in preprocess_factanal_data_before_sample. Sync with it.
+
+  sampled_nrow <- NULL
+  if (!is.null(max_nrow) && nrow(df) > max_nrow) {
+    # Record that sampling happened.
+    sampled_nrow <- max_nrow
+    df <- df %>% sample_rows(max_nrow)
+  }
   if (!elbow_method_mode) {
     kmeans_model_df <- df %>% build_kmeans.cols(!!!rlang::syms(selected_cols),
                                                 centers=centers,
