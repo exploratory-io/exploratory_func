@@ -436,6 +436,16 @@ test_that("test exp_anova", {
   ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
 })
 
+test_that("test exp_anova with group-level error", {
+  df <- tibble::tibble(group=c(1,1,2,2),category=c("a","a","b","b"),value=c(1,2,1,2))
+  model_df <- df %>% dplyr::group_by(`group`) %>% exp_anova(`value`, `category`)
+  ret <- model_df %>% tidy_rowwise(model, type='model')
+  expect_equal(colnames(ret),
+               c("group","Note"))
+  ret <- model_df %>% tidy_rowwise(model, type='prob_dist')
+  expect_equal(nrow(ret), 0)
+})
+
 test_that("test exp_anova with outlier filter", {
   model_df <- exp_anova(mtcars, mpg, am, outlier_filter_type="percentile", outlier_filter_threshold=0.9)
   ret <- model_df %>% tidy_rowwise(model, type="model")
