@@ -60,6 +60,7 @@ exp_kmeans <- function(df, ...,
 
   filtered_df <- preprocess_factanal_data_before_sample(df, selected_cols)
   selected_cols <- attr(filtered_df, 'predictors') # predictors are updated (removed) in preprocess_factanal_data_before_sample. Sync with it.
+  df <- filtered_df
 
   sampled_nrow <- NULL
   if (!is.null(max_nrow) && nrow(df) > max_nrow) {
