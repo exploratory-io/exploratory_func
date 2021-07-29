@@ -1015,9 +1015,12 @@ exp_anova <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
         }
       }
       # It seems that the 2nd row of broom:::tidy.aov(x) is missed, if no group has more than 1 row. Check it here, rather than handling it later.
-      max_n <- (df %>% group_by(!!rlang::sym(var2_col)) %>% summarize(n=n()) %>% summarize(max_n=max(n)))$max_n
-      if (max_n <= 1) {
-        stop("At least one group needs to have 2 or more rows.")
+      count_df <- df %>% group_by(!!rlang::sym(var2_col)) %>% summarize(n=n()) %>% summarize(max_n=max(n),tot_n=sum(n))
+      if (count_df$max_n <= 1) {
+        e <- simpleError("At least one group needs to have 2 or more rows.")
+        class(e) <- c("anova_exploratory", class(e))
+        e$n <- count_df$tot_n
+        return(e)
       }
       model <- aov(formula, data = df, ...)
       # calculate Cohen's f from actual data
@@ -1068,7 +1071,12 @@ glance.anova_exploratory <- function(x) {
 tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
   if (type == "model") {
     if ("error" %in% class(x)) {
-      ret <- tibble::tibble(Note = x$message)
+      if (!is.null(x$n)) {
+        ret <- tibble::tibble(`Number of Rows`=x$n, Note = x$message)
+      }
+      else {
+        ret <- tibble::tibble(Note = x$message)
+      }
       return(ret)
     }
     note <- NULL
