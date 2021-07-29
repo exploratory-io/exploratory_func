@@ -610,7 +610,6 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
         e$n1 <- count_df$n[1]
         e$v2 <- count_df[[1]][2] 
         e$n2 <- count_df$n[2]
-        browser()
         return(e)
       }
       # Calculate Cohen's d from data.
