@@ -816,7 +816,7 @@ exp_wilcox <- function(df, var1, var2, func2 = NULL, ...) {
       df <- df %>% dplyr::filter(!is.na(!!rlang::sym(var2_col)))
     }
     else {
-      stop(paste0("Variable Column (", var2_col, ") has to have 2 kinds of values."))
+      stop("The explanatory variable needs to have 2 unique values.")
     }
   }
 
@@ -824,6 +824,12 @@ exp_wilcox <- function(df, var1, var2, func2 = NULL, ...) {
 
   each_func <- function(df) {
     tryCatch({
+      if(length(grouped_cols) > 0) {
+        n_distinct_res_each <- n_distinct(df[[var2_col]]) # check n_distinct again within group after handling outlier.
+        if (n_distinct_res_each != 2) {
+          stop("The explanatory variable needs to have 2 unique values.")
+        }
+      }
       model <- wilcox.test(formula, data = df, ...)
       class(model) <- c("wilcox_exploratory", class(model))
       model$var1 <- var1_col
