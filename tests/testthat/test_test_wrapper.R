@@ -412,12 +412,22 @@ test_that("test exp_ttest with outlier filter", {
                  "Minimum","Maximum"))
 })
 
-test_that("test exp_ttest with group-level error", {
+test_that("test exp_ttest with group-level error (lack of unique values)", {
   df <- tibble::tibble(group=c(1,1,2,2),category=c("a","a","b","b"),value=c(1,2,1,2))
   model_df <- df %>% dplyr::group_by(`group`) %>% exp_ttest(`value`, `category`)
   ret <- model_df %>% tidy_rowwise(model, type='model')
   expect_equal(colnames(ret),
                c("group","Note"))
+  ret <- model_df %>% tidy_rowwise(model, type='prob_dist')
+  expect_equal(nrow(ret), 0)
+})
+
+test_that("test exp_ttest with group-level error (not eough data)", {
+  df <- tibble::tibble(group=c(1,1,2,2),category=c("a","b","a","b"),value=c(1,2,1,2))
+  model_df <- df %>% dplyr::group_by(`group`) %>% exp_ttest(`value`, `category`)
+  ret <- model_df %>% tidy_rowwise(model, type='model')
+  expect_equal(colnames(ret),
+               c("group", "Number of Rows", "Number of Rows for a", "Number of Rows for b", "Note"))
   ret <- model_df %>% tidy_rowwise(model, type='prob_dist')
   expect_equal(nrow(ret), 0)
 })
@@ -436,12 +446,22 @@ test_that("test exp_anova", {
   ret <- model_df %>% tidy_rowwise(model, type="prob_dist")
 })
 
-test_that("test exp_anova with group-level error", {
+test_that("test exp_anova with group-level error (lack of unique values)", {
   df <- tibble::tibble(group=c(1,1,2,2),category=c("a","a","b","b"),value=c(1,2,1,2))
   model_df <- df %>% dplyr::group_by(`group`) %>% exp_anova(`value`, `category`)
   ret <- model_df %>% tidy_rowwise(model, type='model')
   expect_equal(colnames(ret),
                c("group","Note"))
+  ret <- model_df %>% tidy_rowwise(model, type='prob_dist')
+  expect_equal(nrow(ret), 0)
+})
+
+test_that("test exp_anova with group-level error (not enought data)", {
+  df <- tibble::tibble(group=c(1,1,2,2),category=c("a","b","a","b"),value=c(1,2,1,2))
+  model_df <- df %>% dplyr::group_by(`group`) %>% exp_anova(`value`, `category`)
+  ret <- model_df %>% tidy_rowwise(model, type='model')
+  expect_equal(colnames(ret),
+               c("group","Number of Rows", "Note"))
   ret <- model_df %>% tidy_rowwise(model, type='prob_dist')
   expect_equal(nrow(ret), 0)
 })
