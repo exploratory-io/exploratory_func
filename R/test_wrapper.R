@@ -896,10 +896,10 @@ tidy.wilcox_exploratory <- function(x, type="model", conf_level=0.95) {
     v2 <- data_summary[[x$var2]][[2]] # value for 2nd class
 
     # Switch the name of statistic based on the type of performed test.
-    if (stringr::str_detect(ret$method[[1]], "signed rank test")) {
+    if (stringr::str_detect(ret$method[[1]], "signed rank")) {
       ret <- ret %>% dplyr::rename(`W Statistic`=statistic)
     }
-    else if (stringr::str_detect(ret$method[[1]], "rank sum test")) {
+    else if (stringr::str_detect(ret$method[[1]], "rank sum")) { # Intentionally matching with just "rank sum" to match "Wilcoxon rank sum exact test" too.
       ret <- ret %>% dplyr::rename(`U Statistic`=statistic)
     }
 
