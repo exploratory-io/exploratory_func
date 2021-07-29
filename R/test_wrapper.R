@@ -968,7 +968,7 @@ exp_anova <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
   }
   
   if (n_distinct(df[[var2_col]]) < 2) {
-    stop(paste0("Variable Column (", var2_col, ") has to have 2 or more kinds of values."))
+    stop(paste0("The explanatory variable needs to have 2 or more unique values."))
   }
 
   formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
@@ -991,7 +991,7 @@ exp_anova <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
         # Group with NA and another category does not seem to work well with aov. Eliminating such case too. TODO: We could replace NA with an explicit level.
         n_distinct_res_each <- n_distinct(df[[var2_col]], na.rm=TRUE)
         if (n_distinct_res_each < 2) {
-          stop(paste0("Variable Column (", var2_col, ") has to have 2 or more kinds of values."))
+          stop(paste0("The explanatory variable needs to have 2 or more unique values."))
         }
       }
       model <- aov(formula, data = df, ...)
@@ -1178,12 +1178,18 @@ exp_kruskal <- function(df, var1, var2, func2 = NULL, ...) {
   }
   
   if (n_distinct(df[[var2_col]]) < 2) {
-    stop(paste0("Variable Column (", var2_col, ") has to have 2 or more kinds of values."))
+    stop(paste0("The explanatory variable needs to have 2 or more unique values."))
   }
 
   formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
 
   each_func <- function(df) {
+    if(length(grouped_cols) > 0) {
+      # Check n_distinct again within group after handling outliers.
+      if (n_distinct(df[[var2_col]]) < 2) {
+        stop(paste0("The explanatory variable needs to have 2 or more unique values."))
+      }
+    }
     tryCatch({
       model <- kruskal.test(formula, data = df, ...)
       N <- nrow(df)
