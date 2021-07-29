@@ -1050,6 +1050,9 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
     ret <- broom:::tidy.aov(x)
     ret1 <- ret %>% dplyr::slice(1:1)
     ret2 <- ret %>% dplyr::slice(2:2)
+    if (nrow(ret2) == 0) { # It seems that the 2nd row is missed if all groups have only 1 row.
+      return(tibble::tibble(Note = "At least one group needs to have 2 or more rows."))
+    }
     ret <- ret1 %>% mutate(resid.df=!!ret2$df, resid.sumsq=!!ret2$sumsq, resid.meansq=!!ret2$meansq)
 
     # Get number of groups (k) , and the minimum sample size amoung those groups (min_n_rows).
