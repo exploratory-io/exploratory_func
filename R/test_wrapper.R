@@ -1184,13 +1184,13 @@ exp_kruskal <- function(df, var1, var2, func2 = NULL, ...) {
   formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
 
   each_func <- function(df) {
-    if(length(grouped_cols) > 0) {
-      # Check n_distinct again within group after handling outliers.
-      if (n_distinct(df[[var2_col]]) < 2) {
-        stop(paste0("The explanatory variable needs to have 2 or more unique values."))
-      }
-    }
     tryCatch({
+      if(length(grouped_cols) > 0) {
+        # Check n_distinct again within group after handling outliers.
+        if (n_distinct(df[[var2_col]]) < 2) {
+          stop(paste0("The explanatory variable needs to have 2 or more unique values."))
+        }
+      }
       model <- kruskal.test(formula, data = df, ...)
       N <- nrow(df)
       epsilon_squared <- calculate_epsilon_squared(model, N)
