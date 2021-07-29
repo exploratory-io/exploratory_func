@@ -994,6 +994,11 @@ exp_anova <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
           stop(paste0("The explanatory variable needs to have 2 or more unique values."))
         }
       }
+      # It seems that the 2nd row of broom:::tidy.aov(x) is missed, if no group has more than 1 row. Check it here, rather than handling it later.
+      max_n <- (df %>% group_by(!!rlang::sym(var2_col)) %>% summarize(n=n()) %>% summarize(max_n=max(n)))$max_n
+      if (max_n <= 1) {
+        stop("At least one group needs to have 2 or more rows.")
+      }
       model <- aov(formula, data = df, ...)
       # calculate Cohen's f from actual data
       model$cohens_f <- calculate_cohens_f(df[[var1_col]], df[[var2_col]])
@@ -1050,9 +1055,6 @@ tidy.anova_exploratory <- function(x, type="model", conf_level=0.95) {
     ret <- broom:::tidy.aov(x)
     ret1 <- ret %>% dplyr::slice(1:1)
     ret2 <- ret %>% dplyr::slice(2:2)
-    if (nrow(ret2) == 0) { # It seems that the 2nd row is missed if all groups have only 1 row.
-      return(tibble::tibble(Note = "At least one group needs to have 2 or more rows."))
-    }
     ret <- ret1 %>% mutate(resid.df=!!ret2$df, resid.sumsq=!!ret2$sumsq, resid.meansq=!!ret2$meansq)
 
     # Get number of groups (k) , and the minimum sample size amoung those groups (min_n_rows).
