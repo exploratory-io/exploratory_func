@@ -28,7 +28,7 @@ getGoogleProfile <- function(tokenFileId = ""){
     v4df <- googleAnalyticsR::ga_account_list("ga4")
   }, error = function(err) {
     # if we detect "API Data failed to parse" message, we can ignore it.
-    if (stringr::str_detect(err$message, 'Error : API Data failed to parse')){
+    if (stringr::str_detect(err$message, 'API Data failed to parse')){
       # do nothing.
     } else {
       stop(err)
