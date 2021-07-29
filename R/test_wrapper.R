@@ -601,10 +601,16 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
       }
       # It seems that each group has to have at least 2 rows to avoid "not enough 'x' observations" error.
       # Check it here, rather than handling it later.
-      min_n <- (df %>% group_by(!!rlang::sym(var2_col)) %>% summarize(n=n()) %>% summarize(min_n=min(n, na.rm=TRUE)))$min_n
+      count_df <- df %>% group_by(!!rlang::sym(var2_col)) %>% summarize(n=n())
+      min_n <- min(count_df$n, na.rm=TRUE)
       if (min_n <= 1) {
         e <- simpleError("Not enough data.")
         class(e) <- c("ttest_exploratory", class(e))
+        e$v1 <- count_df[[1]][1] 
+        e$n1 <- count_df$n[1]
+        e$v2 <- count_df[[1]][2] 
+        e$n2 <- count_df$n[2]
+        browser()
         return(e)
       }
       # Calculate Cohen's d from data.
@@ -669,7 +675,14 @@ glance.ttest_exploratory <- function(x) {
 tidy.ttest_exploratory <- function(x, type="model", conf_level=0.95) {
   if (type == "model") {
     if ("error" %in% class(x)) {
-      ret <- tibble::tibble(Note = x$message)
+      if (!is.null(x$v1) && !is.null(x$v2) && !is.null(x$n1) && !is.null(x$n2)) {
+        ret <- tibble::tibble(`Number of Rows`=x$n1+x$n2, n1=x$n1, n2=x$n2, Note = x$message)
+        ret <- ret %>% dplyr::rename(!!rlang::sym(paste0("Number of Rows for ", x$v1)):=n1)
+        ret <- ret %>% dplyr::rename(!!rlang::sym(paste0("Number of Rows for ", x$v2)):=n2)
+      }
+      else {
+        ret <- tibble::tibble(Note = x$message)
+      }
       return(ret)
     }
 
