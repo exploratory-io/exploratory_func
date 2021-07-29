@@ -603,7 +603,9 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
       # Check it here, rather than handling it later.
       min_n <- (df %>% group_by(!!rlang::sym(var2_col)) %>% summarize(n=n()) %>% summarize(min_n=min(n, na.rm=TRUE)))$min_n
       if (min_n <= 1) {
-        stop("Not enough data.")
+        e <- simpleError("Not enough data.")
+        class(e) <- c("ttest_exploratory", class(e))
+        return(e)
       }
       # Calculate Cohen's d from data.
       cohens_d <- calculate_cohens_d(df[[var1_col]], df[[var2_col]])
