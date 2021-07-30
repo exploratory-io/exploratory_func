@@ -86,7 +86,9 @@ exp_kmeans <- function(df, ...,
     # This is about how UI-side is done, but it can handle single column case, only if it is single column from the beginnig.
     # Check that and pass that info to do_prcomp() as allow_single_column.
     allow_single_column <- length(selected_cols) == 1
-    ret <- do_prcomp(df, normalize_data = normalize_data, allow_single_column = allow_single_column, seed = NULL, !!!rlang::syms(selected_cols))
+    ret <- do_prcomp(df, normalize_data = normalize_data, allow_single_column = allow_single_column, seed = NULL,
+                     na.rm = FALSE, # Skip NA filtering since it is already done.
+                     !!!rlang::syms(selected_cols))
     ret <- dplyr::ungroup(ret) # ungroup once so that the following mutate with purrr::map2 works.
     ret <- ret %>% dplyr::mutate(model = purrr::map2(model, !!kmeans_model_df$model, function(x, y) {
       x$kmeans <- y # Might need to be more careful on guaranteeing x and y are from same group, but we are not supporting group_by on UI at this point.
