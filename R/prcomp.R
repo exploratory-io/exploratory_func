@@ -27,20 +27,21 @@ do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, allow_singl
   }
 
   each_func <- function(df) {
+    # sample the data for quicker turn around on UI,
+    # if data size is larger than specified max_nrow.
+    sampled_nrow <- NULL
+    if (!is.null(max_nrow) && nrow(df) > max_nrow) {
+      # Record that sampling happened.
+      sampled_nrow <- max_nrow
+      df <- df %>% sample_rows(max_nrow)
+    }
+
     if (na.rm) { # Do NA preprocessing under this if statement, so that it can be skipped if it is already done. For exp_kmeans.
       filtered_df <- preprocess_factanal_data_before_sample(df, selected_cols)
       selected_cols <- attr(filtered_df, 'predictors') # predictors are updated (removed) in preprocess_factanal_data_before_sample. Sync with it.
     }
     else {
       filtered_df <- df
-    }
-    # sample the data for quicker turn around on UI,
-    # if data size is larger than specified max_nrow.
-    sampled_nrow <- NULL
-    if (!is.null(max_nrow) && nrow(filtered_df) > max_nrow) {
-      # Record that sampling happened.
-      sampled_nrow <- max_nrow
-      filtered_df <- filtered_df %>% sample_rows(max_nrow)
     }
 
     # select_ was not able to handle space in target_col. let's do it in base R way.

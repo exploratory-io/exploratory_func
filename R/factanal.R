@@ -56,17 +56,17 @@ exp_factanal <- function(df, ..., nfactors = 2, fm = "minres", scores = "regress
   }
 
   each_func <- function(df) {
-    filtered_df <- preprocess_factanal_data_before_sample(df, selected_cols)
-    selected_cols <- attr(filtered_df, 'predictors') # predictors are updated (removed) in preprocess_factanal_data_before_sample. Sync with it.
-
     # sample the data for quicker turn around on UI,
     # if data size is larger than specified max_nrow.
     sampled_nrow <- NULL
-    if (!is.null(max_nrow) && nrow(filtered_df) > max_nrow) {
+    if (!is.null(max_nrow) && nrow(df) > max_nrow) {
       # Record that sampling happened.
       sampled_nrow <- max_nrow
-      filtered_df <- filtered_df %>% sample_rows(max_nrow)
+      df <- df %>% sample_rows(max_nrow)
     }
+
+    filtered_df <- preprocess_factanal_data_before_sample(df, selected_cols)
+    selected_cols <- attr(filtered_df, 'predictors') # predictors are updated (removed) in preprocess_factanal_data_before_sample. Sync with it.
 
     # select_ was not able to handle space in target_col. let's do it in base R way.
     cleaned_df <- filtered_df[,colnames(filtered_df) %in% selected_cols, drop=FALSE]
