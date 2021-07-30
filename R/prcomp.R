@@ -1,7 +1,7 @@
 #' do PCA
 #' allow_single_column - Do not throw error and go ahead with PCA even if only one column is left after preprocessing. For K-means.
 #' @export
-do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, allow_single_column = FALSE, seed = 1) {
+do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, allow_single_column = FALSE, seed = 1, na.rm = TRUE) {
   # this evaluates select arguments like starts_with
   selected_cols <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
 
@@ -27,15 +27,24 @@ do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, allow_singl
   }
 
   each_func <- function(df) {
-    filtered_df <- preprocess_factanal_data_before_sample(df, selected_cols)
-    selected_cols <- attr(filtered_df, 'predictors') # predictors are updated (removed) in preprocess_factanal_data_before_sample. Sync with it.
     # sample the data for quicker turn around on UI,
     # if data size is larger than specified max_nrow.
     sampled_nrow <- NULL
-    if (!is.null(max_nrow) && nrow(filtered_df) > max_nrow) {
+    if (!is.null(max_nrow) && nrow(df) > max_nrow) {
       # Record that sampling happened.
       sampled_nrow <- max_nrow
-      filtered_df <- filtered_df %>% sample_rows(max_nrow)
+      df <- df %>% sample_rows(max_nrow)
+    }
+
+    # As the name suggests, this preprocessing function was originally designed to be done
+    # before sampling, but we found that for this PCA function, that makes the
+    # process as a whole slower in the cases we tried. So, we are doing this after sampling.
+    if (na.rm) { # Do NA preprocessing under this if statement, so that it can be skipped if it is already done. For exp_kmeans.
+      filtered_df <- preprocess_factanal_data_before_sample(df, selected_cols)
+      selected_cols <- attr(filtered_df, 'predictors') # predictors are updated (removed) in preprocess_factanal_data_before_sample. Sync with it.
+    }
+    else {
+      filtered_df <- df
     }
 
     # select_ was not able to handle space in target_col. let's do it in base R way.
