@@ -160,7 +160,8 @@ build_kmeans.cols <- function(df, ...,
                             normalize_data = TRUE,
                             keep.source = TRUE,
                             seed = 1,
-                            augment=TRUE
+                            augment = TRUE,
+                            na.rm = TRUE
                             ){
   validate_empty_data(df)
 
@@ -178,12 +179,16 @@ build_kmeans.cols <- function(df, ...,
   # this gets a vector of column names which are selected by dots argument
   selected_column <- tidyselect::vars_select(names(df), !!! rlang::quos(...), .exclude=grouped_column)
 
-  omit_df <- df[,selected_column, drop=FALSE] %>% # drop=FALSE to avoid getting converted to vector
-    as_numeric_matrix_(selected_column) %>%
-    na.omit()
-  omit_row <- attr(omit_df, "na.action")
-  if(!is.null(omit_row)){
-    df <- df[setdiff(seq(nrow(df)), omit_row),] # For row filtering like this, drop=FALSE is not necessary.
+  # Filter NA under this if statement, so that we can skip this when used for Analytics View,
+  # where NA filtering is already done.
+  if (na.rm) {
+    omit_df <- df[,selected_column, drop=FALSE] %>% # drop=FALSE to avoid getting converted to vector
+      as_numeric_matrix_(selected_column) %>%
+      na.omit()
+    omit_row <- attr(omit_df, "na.action")
+    if(!is.null(omit_row)){
+      df <- df[setdiff(seq(nrow(df)), omit_row),] # For row filtering like this, drop=FALSE is not necessary.
+    }
   }
 
   build_kmeans_each <- function(df){
