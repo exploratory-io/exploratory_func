@@ -65,6 +65,9 @@ exp_factanal <- function(df, ..., nfactors = 2, fm = "minres", scores = "regress
       df <- df %>% sample_rows(max_nrow)
     }
 
+    # As the name suggests, this preprocessing function was originally designed to be done
+    # before sampling, but we found that for this factor analysis function, that makes the
+    # process as a whole slower in the cases we tried. So, we are doing this after sampling.
     filtered_df <- preprocess_factanal_data_before_sample(df, selected_cols)
     selected_cols <- attr(filtered_df, 'predictors') # predictors are updated (removed) in preprocess_factanal_data_before_sample. Sync with it.
 

@@ -36,6 +36,9 @@ do_prcomp <- function(df, ..., normalize_data=TRUE, max_nrow = NULL, allow_singl
       df <- df %>% sample_rows(max_nrow)
     }
 
+    # As the name suggests, this preprocessing function was originally designed to be done
+    # before sampling, but we found that for this PCA function, that makes the
+    # process as a whole slower in the cases we tried. So, we are doing this after sampling.
     if (na.rm) { # Do NA preprocessing under this if statement, so that it can be skipped if it is already done. For exp_kmeans.
       filtered_df <- preprocess_factanal_data_before_sample(df, selected_cols)
       selected_cols <- attr(filtered_df, 'predictors') # predictors are updated (removed) in preprocess_factanal_data_before_sample. Sync with it.
