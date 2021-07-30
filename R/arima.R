@@ -153,7 +153,7 @@ exp_arima <- function(df, time, valueColumn,
       df <- df[, !colnames(df) %in% grouped_col]
     }
 
-    aggregated_data <- if (!is.null(value_col)){
+    aggregated_data <- if (!is.null(value_col)){ # TODO: Make aggregation logic a common function among time series analysis functions.
       grouped_df <- df %>% dplyr::select(ds=time_col, value=value_col, unname(regressors)) %>% # unname is necessary to avoid error when regressors is named vector.
         dplyr::arrange(ds) %>%
         dplyr::group_by(ds)
