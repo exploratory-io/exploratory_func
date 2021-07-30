@@ -59,16 +59,20 @@ exp_kmeans <- function(df, ...,
                              -where(lubridate::is.interval),
                              -where(lubridate::is.period))
 
-  filtered_df <- preprocess_factanal_data_before_sample(df, selected_cols)
-  selected_cols <- attr(filtered_df, 'predictors') # predictors are updated (removed) in preprocess_factanal_data_before_sample. Sync with it.
-  df <- filtered_df
-
   sampled_nrow <- NULL
   if (!is.null(max_nrow) && nrow(df) > max_nrow) {
     # Record that sampling happened.
     sampled_nrow <- max_nrow
     df <- df %>% sample_rows(max_nrow)
   }
+
+  # As the name suggests, this preprocessing function was originally designed to be done
+  # before sampling, but we found that for this k-means function, that makes the
+  # process as a whole slower in the cases we tried. So, we are doing this after sampling.
+  filtered_df <- preprocess_factanal_data_before_sample(df, selected_cols)
+  selected_cols <- attr(filtered_df, 'predictors') # predictors are updated (removed) in preprocess_factanal_data_before_sample. Sync with it.
+  df <- filtered_df
+
   if (!elbow_method_mode) {
     kmeans_model_df <- df %>% build_kmeans.cols(!!!rlang::syms(selected_cols),
                                                 centers = centers,
