@@ -70,15 +70,16 @@ exp_kmeans <- function(df, ...,
   }
   if (!elbow_method_mode) {
     kmeans_model_df <- df %>% build_kmeans.cols(!!!rlang::syms(selected_cols),
-                                                centers=centers,
+                                                centers = centers,
                                                 iter.max = iter.max,
                                                 nstart = nstart,
                                                 algorithm = algorithm,
                                                 trace = trace,
                                                 normalize_data = normalize_data,
-                                                keep.source=FALSE,
-                                                augment=FALSE,
-                                                seed=NULL) # Seed is already done. Skip it.
+                                                keep.source = FALSE,
+                                                augment = FALSE,
+                                                seed = NULL, # Seed is already done. Skip it.
+                                                na.rm = FALSE) # NA filtering is already done. Skip it to save time. 
   }
 
   if (!elbow_method_mode) {
