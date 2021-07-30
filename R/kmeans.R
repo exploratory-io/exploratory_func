@@ -19,7 +19,8 @@ iterate_kmeans <- function(df, max_centers = 10,
                                          normalize_data = normalize_data,
                                          seed=seed,
                                          keep.source=FALSE,
-                                         augment=FALSE)
+                                         augment=FALSE,
+                                         na.rm = FALSE) # NA filtering is already done. Skip it to save time. 
     ret <- model_df$model[[1]]
     ret
   }))
