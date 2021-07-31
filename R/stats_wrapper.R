@@ -179,7 +179,7 @@ do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearso
   # ref: https://github.com/tidyverse/tidyr/blob/3b0f946d507f53afb86ea625149bbee3a00c83f6/R/spread.R
   select_dots <- tidyselect::vars_select(names(df), !!! rlang::quos(...))
   grouped_col <- grouped_by(df)
-  output_cols <- avoid_conflict(grouped_col, c("pair.name.x", "pair.name.y", "correlation", "p_value"))
+  output_cols <- avoid_conflict(grouped_col, c("pair.name.x", "pair.name.y", "correlation", "p_value", "statistic"))
   # check if the df's grouped
   do_cor_each <- function(df){
     if (nrow(df) < 2) {
@@ -249,34 +249,45 @@ do_cor_internal <- function(mat, use, method, distinct, diag, output_cols, sorte
   # Create a matrix of P-values for Analytics View case.
   dim <- length(sorted_colnames)
   pvalue_mat <- matrix(NA, dim, dim)
+  tvalue_mat <- matrix(NA, dim, dim)
   for (i in 2:dim) {
     for (j in 1:(i-1)) {
-      pvalue_mat[i, j] <- tryCatch({
-        cor.test(mat[,i], mat[,j], method = method)$p.value
+      tryCatch({
+        cor_test_res <- cor.test(mat[,i], mat[,j], method = method)
+        pvalue_mat[i, j] <- cor_test_res$p.value
+        tvalue_mat[i, j] <- cor_test_res$statistic
       }, error = function(e) {
         if (e$message == "not enough finite observations") {
           # This is the error cor.test returns when there is not enough non-NA data.
           # Rather than stopping, set NA as the result, and we will handle it as a not-significant case on the UI.
-          NA
+          pvalue_mat[i, j] <- NA
+          tvalue_mat[i, j] <- NA
         }
         else {
           stop(e)
         }
       })
       pvalue_mat[j, i] <- pvalue_mat[i, j]
+      tvalue_mat[j, i] <- tvalue_mat[i, j]
     }
   }
-  for (i in 1:dim) { # For i=j case, P value should be always 0.
+  for (i in 1:dim) { # For i=j case, P value should be always 0 and t statistic should be Inf.
     pvalue_mat[i, i] <- 0
+    tvalue_mat[i, i] <- Inf
   }
   colnames(pvalue_mat) <- sorted_colnames
   rownames(pvalue_mat) <- sorted_colnames
+  colnames(tvalue_mat) <- sorted_colnames
+  rownames(tvalue_mat) <- sorted_colnames
   if (distinct) {
     p_value_ret <- upper_gather(pvalue_mat, diag=diag, cnames=output_cols[c(1,2,4)], zero.rm=FALSE)
+    t_value_ret <- upper_gather(tvalue_mat, diag=diag, cnames=output_cols[c(1,2,5)], zero.rm=FALSE)
   } else {
     p_value_ret <- mat_to_df(pvalue_mat, cnames=output_cols[c(1,2,4)], diag=diag, zero.rm=FALSE)
+    t_value_ret <- mat_to_df(tvalue_mat, cnames=output_cols[c(1,2,5)], diag=diag, zero.rm=FALSE)
   }
   ret <- ret %>% dplyr::left_join(p_value_ret, by=output_cols[1:2]) # Join by pair.name.x and pair.name.y.
+  ret <- ret %>% dplyr::left_join(t_value_ret, by=output_cols[1:2]) # Join by pair.name.x and pair.name.y.
   ret
 }
 
