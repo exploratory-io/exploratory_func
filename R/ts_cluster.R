@@ -12,6 +12,11 @@ exp_ts_cluster <- function(df, time, value, category, time_unit = "day", fun.agg
     set.seed(seed)
   }
 
+  if (centroid == "sdtw_cent" && distance == "dtw2") {
+    # This combination throws error "x and y must be of same type". TODO: Look into it.
+    stop("'Soft-DTW Centroids' is not supported with 'DTW with L2 Norm'. Please select other methods.")
+  }
+
   time_col <- tidyselect::vars_select(names(df), !! rlang::enquo(time))
   value_col <- if (missing(value)) {
     # Using empty string instead of NULL, because using NULL here would cause error from UQ(rlang::sym(value_col)),
