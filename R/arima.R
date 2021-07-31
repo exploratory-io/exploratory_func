@@ -153,16 +153,18 @@ exp_arima <- function(df, time, valueColumn,
       df <- df[, !colnames(df) %in% grouped_col]
     }
 
-    aggregated_data <- if (!is.null(value_col)){
-      # remove rows with NA value_col
-      df <- df[!is.na(df[[value_col]]), ]
-
-      df %>% dplyr::select(ds=time_col, value=value_col, unname(regressors)) %>% # unname is necessary to avoid error when regressors is named vector.
-
+    aggregated_data <- if (!is.null(value_col)){ # TODO: Make aggregation logic a common function among time series analysis functions.
+      grouped_df <- df %>% dplyr::select(ds=time_col, value=value_col, unname(regressors)) %>% # unname is necessary to avoid error when regressors is named vector.
         dplyr::arrange(ds) %>%
-        dplyr::filter(!is.na(value)) %>% # remove NA so that we do not pass data with NA, NaN, or 0 to arima
-        dplyr::group_by(ds) %>%
-        dplyr::summarise(y = fun.aggregate(value), !!!summarise_args)
+        dplyr::group_by(ds)
+      if (is_na_rm_func(fun.aggregate)) {
+        grouped_df %>%
+          dplyr::summarise(y = fun.aggregate(value, na.rm=TRUE), !!!summarise_args)
+      }
+      else {
+        grouped_df %>%
+          dplyr::summarise(y = fun.aggregate(value), !!!summarise_args)
+      }
     } else {
       grouped_df <- df %>% dplyr::select(ds=time_col, unname(regressors)) %>% dplyr::arrange(ds) %>% dplyr::group_by(ds)
 
