@@ -332,3 +332,13 @@ test_that("exp_arima without value_col", {
   # verify that the last forecasted_value is not NA to test #9211
   expect_true(!is.na(ret$data[[1]]$forecasted_value[[length(ret$data[[1]]$forecasted_value)]]))
 })
+
+test_that("exp_arima with all-NA value col", {
+  data("raw_data", package = "AnomalyDetection")
+  raw_data$timestamp <- as.POSIXct(raw_data$timestamp)
+  data <- raw_data %>% mutate(count=NA) # Make the count column all-NA.
+  ret <- data %>%
+    exp_arima(timestamp, count, 10)
+  # verify that the last forecasted_value is at least not NA.
+  expect_true(!is.na(ret$data[[1]]$forecasted_value[[length(ret$data[[1]]$forecasted_value)]]))
+})
