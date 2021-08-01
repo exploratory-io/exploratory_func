@@ -226,7 +226,7 @@ glance.survdiff_exploratory <- function(x, ...) {
     }
     colnames(ret)[colnames(ret) == "statistic"] <- "Chi-Square"
     colnames(ret)[colnames(ret) == "df"] <- "Degree of Freedom"
-    colnames(ret)[colnames(ret) == "p.value"] <- "Log-Rank Test P Value"
+    colnames(ret)[colnames(ret) == "p.value"] <- "P Value (Log-Rank Test)"
     colnames(ret)[colnames(ret) == "n"] <- "Number of Rows"
     colnames(ret)[colnames(ret) == "nevent"] <- "Number of Events"
   }
