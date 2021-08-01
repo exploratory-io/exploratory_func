@@ -221,6 +221,9 @@ glance.survdiff_exploratory <- function(x, ...) {
   if (is.null(x$error)) {
     ret <- broom:::glance.survdiff(x, ...)
     ret <- ret %>% dplyr::mutate(n = !!sum(x$n, rm.na=TRUE), nevent = !!sum(x$obs, rm.na=TRUE))
+    if ("df" %in% colnames(ret) && "p.value" %in% colnames(ret)) {
+      ret <- ret %>% relocate(df, .after=p.value) # Adjust order just to be consistent with other Analytics Views.
+    }
     colnames(ret)[colnames(ret) == "statistic"] <- "Chi-Square"
     colnames(ret)[colnames(ret) == "df"] <- "Degree of Freedom"
     colnames(ret)[colnames(ret) == "p.value"] <- "Log-Rank Test P Value"
