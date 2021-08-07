@@ -292,7 +292,7 @@ test_that("read_parquet_file should be to read the parquet file with an invalid 
   # Make sure that the current arrow version (5.0) can read this parquet file. 
   # arrow 3.0/4.0, cannot read this parquet file and throw an error 
   # "Invalid UTF-8 payload" but it is fixed in 5.0. 
-  df <- expect_error(read_parquet_file("https://dl.dropbox.com/s/9yp6yk1jjnd8dz0/invalid_utf8_payload_test.parquet"))
+  df <- read_parquet_file("https://dl.dropbox.com/s/9yp6yk1jjnd8dz0/invalid_utf8_payload_test.parquet")
   expect_equal(FALSE, is.na(df))
 })
 
