@@ -344,6 +344,7 @@ do_dist.cols <- function(df,
 
     # sort the column name so that the output of pair.name.1 and pair.name.2 will be sorted
     # it's better to be sorted so that heatmap in exploratory can be triangle if distinct is TRUE
+    # We use stringr::str_sort() as opposed to base sort() so that the result is consistent on Windows too.
     sortedNames <- stringr::str_sort(colnames(mat))
     mat <- t(mat)
     mat <- mat[sortedNames, ]
