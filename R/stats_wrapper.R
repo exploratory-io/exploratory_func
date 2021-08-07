@@ -198,8 +198,9 @@ do_cor.cols <- function(df, ..., use = "pairwise.complete.obs", method = "pearso
       dplyr::mutate(across(where(is.logical), as.numeric)) %>%
       as.matrix()
     # sort the column name so that the output of pair.name.1 and pair.name.2 will be sorted
-    # it's better to be sorted so that heatmap in exploratory can be triangle if distinct is TRUE
-    sorted_colnames <- sort(colnames(mat))
+    # it's better to be sorted so that heatmap in exploratory can be triangle if distinct is TRUE.
+    # We use stringr::str_sort() as opposed to base sort() so that the result is consistent on Windows too.
+    sorted_colnames <- stringr::str_sort(colnames(mat))
     mat <- mat[,sorted_colnames]
 
     ret <- do_cor_internal(mat, use, method, distinct, diag, output_cols, sorted_colnames, na.rm=TRUE)
