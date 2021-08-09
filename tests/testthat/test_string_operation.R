@@ -652,10 +652,10 @@ test_that("str_replace_inside", {
 })
 
 test_that("str_remove_emoji", {
-  # Smile Face and Thumbs Up.
-  text = c("\uD83D\uDE00", "\uD83D\uDC4D")
+  # Smile Face, Thumbs Up, and exclamation mark with variation selector (\ufe0f).
+  text = c("Hello\uD83D\uDE00", "Hello\uD83D\uDC4D", "Hello\u2757\ufe0f")
   ret <- exploratory::str_remove_emoji(text)
-  expect_equal(ret, c("",""))
+  expect_equal(ret, c("Hello", "Hello", "Hello"))
 })
 
 test_that("str_remove_word", {
