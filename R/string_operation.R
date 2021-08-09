@@ -859,18 +859,19 @@ get_emoji_regex <- function() {
   regexp = stringr::str_c(regexp, "|\U0001f6f9|\U0001f9f3|\U0001f9e8|\U0001f9e7|\U0001f94e|\U0001f94f|\U0001f94d|\U0001f9ff|\U0001f9e9|\U0001f9f8|\U0001f9f5|\U0001f9f6|\U0001f9ee", sep = "")
   regexp = stringr::str_c(regexp, "|\U0001f9fe|\U0001f9f0|\U0001f9f2|\U0001f9ea|\U0001f9eb|\U0001f9ec|\U0001f9f4|\U0001f9f7|\U0001f9f9|\U0001f9fa|\U0001f9fb|\U0001f9fc|\U0001f9fd", sep = "")
   regexp = stringr::str_c(regexp, "|\U0001f9ef|\u267e",  sep = "")
+  # Handle zero-width joiner (\u200d) prefixing another emoji. https://en.wikipedia.org/wiki/Zero-width_joiner
+  # Also handle variation selector (\ufe0e, \ufe0f) suffixing emoji. https://en.wikipedia.org/wiki/Variation_Selectors_(Unicode_block)
+  regexp = stringr::str_c("\u200d?(", regexp, ")(\ufe0e|\ufe0f)?",  sep = "")
   regexp
 }
 
 #'Function to remove emoji from a list of characters.
 str_remove_emoji <- function(column, position = "any"){
   regexp <- get_emoji_regex()
-  if(position == "any") {
-    regexp = stringr::str_c("(", regexp, ")", sep = "")
-  } else if(position == "start") {
-    regexp = stringr::str_c("^(", regexp, ")", sep = "")
+  if (position == "start") {
+    regexp = stringr::str_c("^(", regexp, ")+", sep = "")
   } else if (position == "end") {
-    regexp = stringr::str_c("(", regexp, ")$", sep = "")
+    regexp = stringr::str_c("(", regexp, ")+$", sep = "")
   }
   stringi::stri_replace_all(column, regex = regexp, "")
 }
