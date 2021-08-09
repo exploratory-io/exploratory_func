@@ -10,6 +10,7 @@ exploratory_stopwords <- c("http", "https", "t.co", "amp")
 # We removed many words that we thought shoulb be kept outside of stopwords from there.
 # It is named stopwords_japanese_minimum to avoid conflict with old stopwords_japanese still stored in R/sysdata.rda.
 stopwords_japanese_minimum <- read.table("data-raw/stopwords_japanese.txt")$V1
+Encoding(stopwords_japanese_minimum) <- "UTF-8" # This is needed to make it work on Windows.
 stopwords_english_smart <- readRDS("data-raw/stopwords_smart.rds")
 stopwords_english_onix <- readRDS("data-raw/stopwords_onix.rds")
 stopwords_english_snowball <- readRDS("data-raw/stopwords_snowball.rds")
