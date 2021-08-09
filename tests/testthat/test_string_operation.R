@@ -109,6 +109,16 @@ test_that("do_tokenize with compound_tokens", {
   expect_equal(c("hello world", "data frame") %in% result$token, c(T, T))
 })
 
+test_that("do_tokenize with Japanese stopwords", {
+  test_df <- data.frame(
+    input = c('\u9ce5\u304c\u98DB\u3076'), # Tori-ga-tobu - Bird flies
+    hiragana_word_length_to_remove = 0) # To really test the default stopwords, removal of short hiragane has to be disabled.
+  result <- test_df %>%
+    do_tokenize(input, stopwords_lang="japanese")
+  expect_equal(c('\u9ce5','\u98DB\u3076'), # 'Tori', 'tobu' - Stop word 'ga' should be removed.
+               result$token)
+})
+
 test_that("do_tokenize with stopwords and stopwords_to_remove", {
   test_df <- data.frame(
     input = c("Hello world!", "This is a data frame for test. This is second sentence."),
