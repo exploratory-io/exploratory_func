@@ -2694,6 +2694,9 @@ searchAndReadDelimFiles <- function(folder, pattern = "", delim, quote = '"',
                                         progress = interactive(), with_api_key = FALSE) {
   # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
   files <- list.files(path = folder, pattern = stringr::str_c("(?i)", pattern), full.names = T)
+  if (length(files) == 0) {
+    stop("No files are found.")
+  }
   exploratory::read_delim_files(files = files, delim = delim, quote = quote,
                                 escape_backslash = escape_backslash, escape_double = escape_double,
                                 col_names = col_names, col_types = col_types,
