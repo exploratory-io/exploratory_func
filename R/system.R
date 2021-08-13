@@ -2527,9 +2527,12 @@ download_data_file <- function(url, type){
 #'@export
 searchAndReadExcelFiles <- function(folder, pattern = "", sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...) {
   # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
+  if (!dir.exists(folder)) {
+    stop(paste0('EXP-DATASRC-2 :: ["', folder, '"] :: The folder does not exist.')) # TODO: escape folder name.
+  }
   files <- list.files(path = folder, pattern = stringr::str_c("(?i)", pattern), full.names = T)
   if (length(files) == 0) {
-    stop("No files are found.")
+    stop(paste0('EXP-DATASRC-3 :: ["', folder, '"] :: There is no file that matches the condition in the folder.')) # TODO: escape folder name.
   }
   exploratory::read_excel_files(files = files, sheet = sheet, col_names = col_names, col_types = col_types, na = na, skip = skip, trim_ws = trim_ws, n_max = n_max,
                                 use_readxl = use_readxl, detectDates = detectDates, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols, check.names = check.names,
@@ -2698,12 +2701,7 @@ searchAndReadDelimFiles <- function(folder, pattern = "", delim, quote = '"',
   }
   files <- list.files(path = folder, pattern = stringr::str_c("(?i)", pattern), full.names = T)
   if (length(files) == 0) {
-    if (pattern == "") {
-      stop(paste0('EXP-DATASRC-3 :: ["', folder, '"] :: The folder is empty.')) # TODO: escape folder name.
-    }
-    else {
-      stop(paste0('EXP-DATASRC-4 :: ["', folder, '"] :: There is no file that matches the specified pattern in the folder.')) # TODO: escape folder name.
-    }
+    stop(paste0('EXP-DATASRC-3 :: ["', folder, '"] :: There is no file that matches the condition in the folder.')) # TODO: escape folder name.
   }
   exploratory::read_delim_files(files = files, delim = delim, quote = quote,
                                 escape_backslash = escape_backslash, escape_double = escape_double,
