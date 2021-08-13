@@ -581,18 +581,22 @@ exp_ttest <- function(df, var1, var2, func2 = NULL, test_sig_level = 0.05,
   formula = as.formula(paste0('`', var1_col, '`~`', var2_col, '`'))
 
   ttest_each <- function(df) {
-    if (!is.null(outlier_filter_type)) {
-      is_outlier <- function(x) {
-        res <- detect_outlier(x, type=outlier_filter_type, threshold=outlier_filter_threshold) %in% c("Lower", "Upper")
-        res
-      }
-      df$.is.outlier <- FALSE #TODO: handle possibility of name conflict.
-      df$.is.outlier <- df$.is.outlier | is_outlier(df[[var1_col]])
-      df <- df %>% dplyr::filter(!.is.outlier)
-      df$.is.outlier <- NULL
-    }
-
     tryCatch({
+      df <- df %>% dplyr::filter(!is.na(!!rlang::sym(var1_col))) # Remove NA from the target column.
+      if (nrow(df) == 0) {
+        stop("There is no data left after removing NA.")
+      }
+      if (!is.null(outlier_filter_type)) {
+        is_outlier <- function(x) {
+          res <- detect_outlier(x, type=outlier_filter_type, threshold=outlier_filter_threshold) %in% c("Lower", "Upper")
+          res
+        }
+        df$.is.outlier <- FALSE #TODO: handle possibility of name conflict.
+        df$.is.outlier <- df$.is.outlier | is_outlier(df[[var1_col]])
+        df <- df %>% dplyr::filter(!.is.outlier)
+        df$.is.outlier <- NULL
+      }
+
       if(length(grouped_cols) > 0) {
         n_distinct_res_each <- n_distinct(df[[var2_col]]) # check n_distinct again within group after handling outlier.
         if (n_distinct_res_each != 2) {
@@ -844,6 +848,10 @@ exp_wilcox <- function(df, var1, var2, func2 = NULL, ...) {
 
   each_func <- function(df) {
     tryCatch({
+      df <- df %>% dplyr::filter(!is.na(!!rlang::sym(var1_col))) # Remove NA from the target column.
+      if (nrow(df) == 0) {
+        stop("There is no data left after removing NA.")
+      }
       if(length(grouped_cols) > 0) {
         n_distinct_res_each <- n_distinct(df[[var2_col]]) # check n_distinct again within group after handling outlier.
         if (n_distinct_res_each != 2) {
@@ -1225,6 +1233,10 @@ exp_kruskal <- function(df, var1, var2, func2 = NULL, ...) {
 
   each_func <- function(df) {
     tryCatch({
+      df <- df %>% dplyr::filter(!is.na(!!rlang::sym(var1_col))) # Remove NA from the target column.
+      if (nrow(df) == 0) {
+        stop("There is no data left after removing NA.")
+      }
       if(length(grouped_cols) > 0) {
         # Check n_distinct again within group after handling outliers.
         if (n_distinct(df[[var2_col]]) < 2) {
