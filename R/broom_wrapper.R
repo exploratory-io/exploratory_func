@@ -238,7 +238,7 @@ add_prediction <- function(df, model_df, conf_int = 0.95, ...){
     # because ... can't be passed to a function inside mutate directly.
     model_class_name <- class(model_df$model[[1]])[1]
     if (!exists(paste0('augment.', model_class_name))) {
-      stop("This is not a prediction model.")
+      stop("EXP-ANA-4 :: [] :: This is not a prediction model.")
     }
     aug_fml <- if(aug_args == ""){
       "broom::augment(m, newdata = df)"
