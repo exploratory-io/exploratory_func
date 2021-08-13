@@ -2693,6 +2693,9 @@ searchAndReadDelimFiles <- function(folder, pattern = "", delim, quote = '"',
                                         skip = 0, n_max = Inf, guess_max = min(1000, n_max),
                                         progress = interactive(), with_api_key = FALSE) {
   # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
+  if (!dir.exists(folder)) {
+    stop("EXP-DATASRC-2 :: [] :: The folder does not exist.")
+  }
   files <- list.files(path = folder, pattern = stringr::str_c("(?i)", pattern), full.names = T)
   if (length(files) == 0) {
     stop("No files are found.")
