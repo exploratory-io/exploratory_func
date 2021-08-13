@@ -2694,11 +2694,16 @@ searchAndReadDelimFiles <- function(folder, pattern = "", delim, quote = '"',
                                         progress = interactive(), with_api_key = FALSE) {
   # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
   if (!dir.exists(folder)) {
-    stop("EXP-DATASRC-2 :: [] :: The folder does not exist.")
+    stop(paste0('EXP-DATASRC-2 :: ["', folder, '"] :: The folder does not exist.')) # TODO: escape folder name.
   }
   files <- list.files(path = folder, pattern = stringr::str_c("(?i)", pattern), full.names = T)
   if (length(files) == 0) {
-    stop("No files are found.")
+    if (pattern == "") {
+      stop(paste0('EXP-DATASRC-3 :: ["', folder, '"] :: The folder is empty.')) # TODO: escape folder name.
+    }
+    else {
+      stop(paste0('EXP-DATASRC-4 :: ["', folder, '"] :: There is no file that matches the specified pattern in the folder.')) # TODO: escape folder name.
+    }
   }
   exploratory::read_delim_files(files = files, delim = delim, quote = quote,
                                 escape_backslash = escape_backslash, escape_double = escape_double,
