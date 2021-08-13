@@ -70,6 +70,13 @@ test_that("do_cor with zero correlations", {
   expect_equal(nrow(res), 9) # Make sure rows for all 9 combinations are there even though some have 0 correlation values.
 })
 
+test_that("add_prediction with do_cor should throw error", {
+  # Steps to produce the output
+  df <- data.frame(x=c(1,1,0,0),y=c(1,0,1,0),z=c(T,T,F,F))
+  model_df <- df %>% do_cor(`x`, `y`, `z`, method = "pearson", distinct = FALSE, diag = TRUE, return_type = "model")
+  expect_error({ret <- df %>% add_prediction(model_df=model_df)}, "EXP\\-ANA\\-4 :: \\[\\] :: This is not a prediction model.")
+})
+
 test_that("do_cor with Spearman method", {
   # Steps to produce the output
   df <- data.frame(x=c(1,1,0,0),y=c(1,0,1,0),z=c(T,T,F,F))
