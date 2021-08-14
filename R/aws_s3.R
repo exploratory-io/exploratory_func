@@ -175,6 +175,9 @@ searchAndGetCSVFilesFromS3 <- function(searchKeyword, region, username, password
   # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
   files <- aws.s3::get_bucket_df(region = region, bucket = bucket, key = username, secret = password, max= Inf) %>%
     filter(str_detect(Key, stringr::str_c("(?i)", searchKeyword)))
+  if (nrow(files) == 0) {
+    stop(paste0('EXP-DATASRC-4 :: ["', bucket, '"] :: There is no file in the bucket that matches with the specified condition.')) # TODO: escape bucket name.
+  }
   getCSVFilesFromS3(files = files$Key, region = region, username = username, password = password, bucket = bucket, fileName = fileName, delim = delim, quote = quote,
                     col_names = col_names, col_types = col_types, locale = locale, na = na, quoted_na = quoted_na, comment = comment, trim_ws = trim_ws,
                     skip = skip, n_max = n_max, guess_max = guess_max, progress = progress)
@@ -199,6 +202,9 @@ searchAndGetExcelFilesFromS3 <- function(searchKeyword, region, username, passwo
   # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
   files <- aws.s3::get_bucket_df(region = region, bucket = bucket, key = username, secret = password, max= Inf) %>%
     filter(str_detect(Key, stringr::str_c("(?i)", searchKeyword)))
+  if (nrow(files) == 0) {
+    stop(paste0('EXP-DATASRC-4 :: ["', bucket, '"] :: There is no file in the bucket that matches with the specified condition.')) # TODO: escape bucket name.
+  }
   exploratory::getExcelFilesFromS3(files = files$Key, region = region, username = username, password = password, bucket = bucket, sheet = sheet,
                                    col_names = col_names, col_types = col_types, na = na, skip = skip, trim_ws = trim_ws, n_max = n_max,
                                    use_readxl = use_readxl, detectDates = detectDates, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols,
