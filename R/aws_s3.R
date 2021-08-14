@@ -115,7 +115,19 @@ getCSVFileFromS3 <- function(fileName, region, username, password, bucket, delim
                              comment = "", trim_ws = FALSE,
                              skip = 0, n_max = Inf, guess_max = min(1000, n_max),
                              progress = interactive()) {
-  filePath <- downloadDataFileFromS3(region = region, bucket = bucket, key = username, secret = password, fileName = fileName, as = "text")
+  tryCatch({
+    filePath <- downloadDataFileFromS3(region = region, bucket = bucket, key = username, secret = password, fileName = fileName, as = "text")
+  }, error = function(e) {
+    if (stringr::str_detect(e$message, "(Not Found|Moved Permanently)")) {
+      # Looking for error that looks like "Error in parse_aws_s3_response(r, Sig, verbose = verbose) :\n Moved Permanently (HTTP 301).",
+      # or "Not Found (HTTP 404).".
+      # This seems to be returned when the bucket itself does not exist.
+      stop(paste0('EXP-DATASRC-8 :: ["', bucket, '","', fileName, '"] :: There is no such file in the AWS S3 bucket.'))
+    }
+    else {
+      stop(e)
+    }
+  })
   exploratory::read_delim_file(filePath, delim = delim, quote = quote,
                                escape_backslash = escape_backslash, escape_double = escape_double,
                                col_names = col_names, col_types = col_types,
