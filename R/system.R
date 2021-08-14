@@ -2953,3 +2953,21 @@ filter_cascade <- function(.data, ...){
   }
   df
 }
+
+#
+#'@export
+load_fred <- function(series_id, date_start = "", date_end = NULL, password) {
+  loadNamespace("fredr")
+  fredr::fredr_set_key(password)
+  if (is.null(date_end)) {
+    date_end <- lubridate::today()
+  } else {
+    date_end <- lubridate::ymd(date_end)
+  }
+  fredr::fredr(
+    series_id = series_id,
+    observation_start = lubridate::ymd(date_start),
+    observation_end = date_end
+  )
+}
+
