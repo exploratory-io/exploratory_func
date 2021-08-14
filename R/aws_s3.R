@@ -177,8 +177,9 @@ searchAndGetCSVFilesFromS3 <- function(searchKeyword, region, username, password
     files <- aws.s3::get_bucket_df(region = region, bucket = bucket, key = username, secret = password, max= Inf) %>%
       filter(str_detect(Key, stringr::str_c("(?i)", searchKeyword)))
   }, error = function(e) {
-    if (stringr::str_detect(e$message, "Moved Permanently")) {
-      # Looking for error that looks like "Error in parse_aws_s3_response(r, Sig, verbose = verbose) :\n Moved Permanently (HTTP 301).".
+    if (stringr::str_detect(e$message, "(Not Found|Moved Permanently)")) {
+      # Looking for error that looks like "Error in parse_aws_s3_response(r, Sig, verbose = verbose) :\n Moved Permanently (HTTP 301).",
+      # or "Not Found (HTTP 404).".
       # This seems to be returned when the bucket itself does not exist.
       stop(paste0('EXP-DATASRC-7 :: ["', bucket, '"] :: The specified AWS S3 bucket does not exist.'))
     }
@@ -215,8 +216,9 @@ searchAndGetExcelFilesFromS3 <- function(searchKeyword, region, username, passwo
     files <- aws.s3::get_bucket_df(region = region, bucket = bucket, key = username, secret = password, max= Inf) %>%
       filter(str_detect(Key, stringr::str_c("(?i)", searchKeyword)))
   }, error = function(e) {
-    if (stringr::str_detect(e$message, "Moved Permanently")) {
-      # Looking for error that looks like "Error in parse_aws_s3_response(r, Sig, verbose = verbose) :\n Moved Permanently (HTTP 301).".
+    if (stringr::str_detect(e$message, "(Not Found|Moved Permanently)")) {
+      # Looking for error that looks like "Error in parse_aws_s3_response(r, Sig, verbose = verbose) :\n Moved Permanently (HTTP 301).",
+      # or "Not Found (HTTP 404).".
       # This seems to be returned when the bucket itself does not exist.
       stop(paste0('EXP-DATASRC-7 :: ["', bucket, '"] :: The specified AWS S3 bucket does not exist.'))
     }
