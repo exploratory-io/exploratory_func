@@ -180,7 +180,7 @@ searchAndGetCSVFilesFromS3 <- function(searchKeyword, region, username, password
     if (stringr::str_detect(e$message, "Moved Permanently")) {
       # Looking for error that looks like "Error in parse_aws_s3_response(r, Sig, verbose = verbose) :\n Moved Permanently (HTTP 301).".
       # This seems to be returned when the bucket itself does not exist.
-      stop(paste0('EXP-DATASRC-7 :: [] :: The specified AWS S3 bucket does not exist.'))
+      stop(paste0('EXP-DATASRC-7 :: ["', bucket, '"] :: The specified AWS S3 bucket does not exist.'))
     }
     else {
       stop(e)
@@ -218,7 +218,7 @@ searchAndGetExcelFilesFromS3 <- function(searchKeyword, region, username, passwo
     if (stringr::str_detect(e$message, "Moved Permanently")) {
       # Looking for error that looks like "Error in parse_aws_s3_response(r, Sig, verbose = verbose) :\n Moved Permanently (HTTP 301).".
       # This seems to be returned when the bucket itself does not exist.
-      stop(paste0('EXP-DATASRC-7 :: [] :: The specified AWS S3 bucket does not exist.'))
+      stop(paste0('EXP-DATASRC-7 :: ["', bucket, '"] :: The specified AWS S3 bucket does not exist.'))
     }
     else {
       stop(e)
