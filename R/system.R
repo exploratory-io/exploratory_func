@@ -2532,7 +2532,7 @@ searchAndReadExcelFiles <- function(folder, pattern = "", sheet = 1, col_names =
   }
   files <- list.files(path = folder, pattern = stringr::str_c("(?i)", pattern), full.names = T)
   if (length(files) == 0) {
-    stop(paste0('EXP-DATASRC-3 :: ["', folder, '"] :: There is no file that matches the condition in the folder.')) # TODO: escape folder name.
+    stop(paste0('EXP-DATASRC-3 :: ["', folder, '"] :: There is no file in the folder that matches with the specified condition.')) # TODO: escape folder name.
   }
   exploratory::read_excel_files(files = files, sheet = sheet, col_names = col_names, col_types = col_types, na = na, skip = skip, trim_ws = trim_ws, n_max = n_max,
                                 use_readxl = use_readxl, detectDates = detectDates, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols, check.names = check.names,
@@ -2701,7 +2701,7 @@ searchAndReadDelimFiles <- function(folder, pattern = "", delim, quote = '"',
   }
   files <- list.files(path = folder, pattern = stringr::str_c("(?i)", pattern), full.names = T)
   if (length(files) == 0) {
-    stop(paste0('EXP-DATASRC-3 :: ["', folder, '"] :: There is no file that matches the condition in the folder.')) # TODO: escape folder name.
+    stop(paste0('EXP-DATASRC-3 :: ["', folder, '"] :: There is no file in the folder that matches with the specified condition.')) # TODO: escape folder name.
   }
   exploratory::read_delim_files(files = files, delim = delim, quote = quote,
                                 escape_backslash = escape_backslash, escape_double = escape_double,
