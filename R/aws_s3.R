@@ -173,10 +173,21 @@ searchAndGetCSVFilesFromS3 <- function(searchKeyword, region, username, password
                               progress = interactive()) {
 
   # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
-  files <- aws.s3::get_bucket_df(region = region, bucket = bucket, key = username, secret = password, max= Inf) %>%
-    filter(str_detect(Key, stringr::str_c("(?i)", searchKeyword)))
+  tryCatch({
+    files <- aws.s3::get_bucket_df(region = region, bucket = bucket, key = username, secret = password, max= Inf) %>%
+      filter(str_detect(Key, stringr::str_c("(?i)", searchKeyword)))
+  }, error = function(e) {
+    if (stringr::str_detect(e$message, "Moved Permanently")) {
+      # Looking for error that looks like "Error in parse_aws_s3_response(r, Sig, verbose = verbose) :\n Moved Permanently (HTTP 301).".
+      # This seems to be returned when the bucket itself does not exist.
+      stop(paste0('EXP-DATASRC-7 :: [] :: The specified AWS S3 bucket does not exist.'))
+    }
+    else {
+      stop(e)
+    }
+  })
   if (nrow(files) == 0) {
-    stop(paste0('EXP-DATASRC-4 :: ["', bucket, '"] :: There is no file in the bucket that matches with the specified condition.')) # TODO: escape bucket name.
+    stop(paste0('EXP-DATASRC-4 :: ["', bucket, '"] :: There is no file in the AWS S3 bucket that matches with the specified condition.')) # TODO: escape bucket name.
   }
   getCSVFilesFromS3(files = files$Key, region = region, username = username, password = password, bucket = bucket, fileName = fileName, delim = delim, quote = quote,
                     col_names = col_names, col_types = col_types, locale = locale, na = na, quoted_na = quoted_na, comment = comment, trim_ws = trim_ws,
@@ -200,10 +211,21 @@ getExcelFileFromS3 <- function(fileName, region, username, password, bucket, she
 searchAndGetExcelFilesFromS3 <- function(searchKeyword, region, username, password, bucket, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...){
 
   # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
-  files <- aws.s3::get_bucket_df(region = region, bucket = bucket, key = username, secret = password, max= Inf) %>%
-    filter(str_detect(Key, stringr::str_c("(?i)", searchKeyword)))
+  tryCatch({
+    files <- aws.s3::get_bucket_df(region = region, bucket = bucket, key = username, secret = password, max= Inf) %>%
+      filter(str_detect(Key, stringr::str_c("(?i)", searchKeyword)))
+  }, error = function(e) {
+    if (stringr::str_detect(e$message, "Moved Permanently")) {
+      # Looking for error that looks like "Error in parse_aws_s3_response(r, Sig, verbose = verbose) :\n Moved Permanently (HTTP 301).".
+      # This seems to be returned when the bucket itself does not exist.
+      stop(paste0('EXP-DATASRC-7 :: [] :: The specified AWS S3 bucket does not exist.'))
+    }
+    else {
+      stop(e)
+    }
+  })
   if (nrow(files) == 0) {
-    stop(paste0('EXP-DATASRC-4 :: ["', bucket, '"] :: There is no file in the bucket that matches with the specified condition.')) # TODO: escape bucket name.
+    stop(paste0('EXP-DATASRC-4 :: ["', bucket, '"] :: There is no file in the AWS S3 bucket that matches with the specified condition.')) # TODO: escape bucket name.
   }
   exploratory::getExcelFilesFromS3(files = files$Key, region = region, username = username, password = password, bucket = bucket, sheet = sheet,
                                    col_names = col_names, col_types = col_types, na = na, skip = skip, trim_ws = trim_ws, n_max = n_max,
