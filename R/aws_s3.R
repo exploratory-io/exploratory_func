@@ -122,7 +122,7 @@ getCSVFileFromS3 <- function(fileName, region, username, password, bucket, delim
       # Looking for error that looks like "Error in parse_aws_s3_response(r, Sig, verbose = verbose) :\n Moved Permanently (HTTP 301).",
       # or "Not Found (HTTP 404).".
       # This seems to be returned when the bucket itself does not exist.
-      stop(paste0('EXP-DATASRC-8 :: ["', bucket, '","', fileName, '"] :: There is no such file in the AWS S3 bucket.'))
+      stop(paste0('EXP-DATASRC-8 :: ', jsonlite::toJSON(c(bucket, fileName)), ' :: There is no such file in the AWS S3 bucket.'))
     }
     else {
       stop(e)
@@ -193,14 +193,14 @@ searchAndGetCSVFilesFromS3 <- function(searchKeyword, region, username, password
       # Looking for error that looks like "Error in parse_aws_s3_response(r, Sig, verbose = verbose) :\n Moved Permanently (HTTP 301).",
       # or "Not Found (HTTP 404).".
       # This seems to be returned when the bucket itself does not exist.
-      stop(paste0('EXP-DATASRC-7 :: ["', bucket, '"] :: The specified AWS S3 bucket does not exist.'))
+      stop(paste0('EXP-DATASRC-7 :: ', jsonlite::toJSON(bucket), ' :: The specified AWS S3 bucket does not exist.'))
     }
     else {
       stop(e)
     }
   })
   if (nrow(files) == 0) {
-    stop(paste0('EXP-DATASRC-4 :: ["', bucket, '"] :: There is no file in the AWS S3 bucket that matches with the specified condition.')) # TODO: escape bucket name.
+    stop(paste0('EXP-DATASRC-4 :: ', jsonlite::toJSON(bucket), ' :: There is no file in the AWS S3 bucket that matches with the specified condition.')) # TODO: escape bucket name.
   }
   getCSVFilesFromS3(files = files$Key, region = region, username = username, password = password, bucket = bucket, fileName = fileName, delim = delim, quote = quote,
                     col_names = col_names, col_types = col_types, locale = locale, na = na, quoted_na = quoted_na, comment = comment, trim_ws = trim_ws,
@@ -218,7 +218,7 @@ getExcelFileFromS3 <- function(fileName, region, username, password, bucket, she
       # Looking for error that looks like "Error in parse_aws_s3_response(r, Sig, verbose = verbose) :\n Moved Permanently (HTTP 301).",
       # or "Not Found (HTTP 404).".
       # This seems to be returned when the bucket itself does not exist.
-      stop(paste0('EXP-DATASRC-8 :: ["', bucket, '","', fileName, '"] :: There is no such file in the AWS S3 bucket.'))
+      stop(paste0('EXP-DATASRC-8 :: ', jsonlite::toJSON(c(bucket, fileName)), ' :: There is no such file in the AWS S3 bucket.'))
     }
     else {
       stop(e)
@@ -244,14 +244,14 @@ searchAndGetExcelFilesFromS3 <- function(searchKeyword, region, username, passwo
       # Looking for error that looks like "Error in parse_aws_s3_response(r, Sig, verbose = verbose) :\n Moved Permanently (HTTP 301).",
       # or "Not Found (HTTP 404).".
       # This seems to be returned when the bucket itself does not exist.
-      stop(paste0('EXP-DATASRC-7 :: ["', bucket, '"] :: The specified AWS S3 bucket does not exist.'))
+      stop(paste0('EXP-DATASRC-7 :: ', jsonlite::toJSON(bucket), ' :: The specified AWS S3 bucket does not exist.'))
     }
     else {
       stop(e)
     }
   })
   if (nrow(files) == 0) {
-    stop(paste0('EXP-DATASRC-4 :: ["', bucket, '"] :: There is no file in the AWS S3 bucket that matches with the specified condition.')) # TODO: escape bucket name.
+    stop(paste0('EXP-DATASRC-4 :: ', jsonlite::toJSON(bucket), ' :: There is no file in the AWS S3 bucket that matches with the specified condition.')) # TODO: escape bucket name.
   }
   exploratory::getExcelFilesFromS3(files = files$Key, region = region, username = username, password = password, bucket = bucket, sheet = sheet,
                                    col_names = col_names, col_types = col_types, na = na, skip = skip, trim_ws = trim_ws, n_max = n_max,
