@@ -211,7 +211,19 @@ searchAndGetCSVFilesFromS3 <- function(searchKeyword, region, username, password
 #'API that imports a Excel file from AWS S3.
 #'@export
 getExcelFileFromS3 <- function(fileName, region, username, password, bucket, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = FALSE, ...) {
-  filePath <- downloadDataFileFromS3(region = region, bucket = bucket, key = username, secret = password, fileName = fileName, as = "raw")
+  tryCatch({
+    filePath <- downloadDataFileFromS3(region = region, bucket = bucket, key = username, secret = password, fileName = fileName, as = "raw")
+  }, error = function(e) {
+    if (stringr::str_detect(e$message, "(Not Found|Moved Permanently)")) {
+      # Looking for error that looks like "Error in parse_aws_s3_response(r, Sig, verbose = verbose) :\n Moved Permanently (HTTP 301).",
+      # or "Not Found (HTTP 404).".
+      # This seems to be returned when the bucket itself does not exist.
+      stop(paste0('EXP-DATASRC-8 :: ["', bucket, '","', fileName, '"] :: There is no such file in the AWS S3 bucket.'))
+    }
+    else {
+      stop(e)
+    }
+  })
   exploratory::read_excel_file(path = filePath, sheet = sheet, col_names = col_names, col_types = col_types, na = na, skip = skip, trim_ws = trim_ws, n_max = n_max, use_readxl = use_readxl, detectDates = detectDates, skipEmptyRows =  skipEmptyRows, skipEmptyCols = skipEmptyCols, check.names = check.names, tzone = tzone, convertDataTypeToChar = convertDataTypeToChar, ...)
 }
 
