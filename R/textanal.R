@@ -566,7 +566,12 @@ exp_topic_model <- function(df, text,
 #' @export
 #' @param type - Type of output.
 tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words = 10, ...) {
-  if (type == "word_topics") {
+  if (type == "topics_summary") { # Count number of documents that "belongs to" each topic.
+    docs_topics_df <- as.data.frame(x$model$theta)
+    docs_topics_df <- docs_topics_df %>% dplyr::mutate(topic = summarize_row(across(starts_with("topic")), which.max))
+    res <- docs_topics_df %>% select(topic) %>% group_by(topic) %>% summarize(n=n())
+  }
+  else if (type == "word_topics") {
     terms_topics_df <- as.data.frame(t(x$model$phi)) # phi is the topics-terms matrix. This needs to be transposed to make it a terms-topics matrix.
     terms <- rownames(terms_topics_df)
     terms_topics_df <- terms_topics_df %>% dplyr::mutate(max_topic = summarize_row(across(starts_with("topic")), which.max), topic_max = summarize_row(across(starts_with("topic")), max))

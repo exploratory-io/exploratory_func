@@ -12,6 +12,8 @@ test_that("exp_topic_model", {
     "And Jill came tumbling after"))
 
   model_df <- df %>% exp_topic_model(text, stopwords_lang = "english", compound_tokens=c("Jack and jill")) # Testing both lower and upper case for compound_token.
+  res <- model_df %>% tidy_rowwise(model, type="topics_summary")
+  expect_equal(colnames(res), c("topic", "n"))
   res <- model_df %>% tidy_rowwise(model, type="doc_topics")
   expect_equal(colnames(res), c("text", "topic1", "topic2", "topic3", "max_topic", "topic_max"))
   expect_equal(nrow(res), 5) # NA should be filtered, but empty string should be kept.
