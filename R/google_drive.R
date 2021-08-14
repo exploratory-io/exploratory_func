@@ -285,7 +285,14 @@ downloadDataFileFromGoogleDrive <- function(fileId, type = "csv"){
       tmp
     }
   }, error = function(e) {
-    stop(e)
+    if (stringr::str_detect(e$message, "File not found")) {
+      # Looking for error that looks like "Client error: (404) Not Found\nFile not found: ...".
+      # This means the folder with the folderId does not exist.
+      stop(paste0('EXP-DATASRC-9 :: [] :: The specified Google Drive file does not exist.'))
+    }
+    else {
+      stop(e)
+    }
   }, finally = {
     if (is.null(currentConfig)) {
       httr::reset_config()
