@@ -2956,8 +2956,8 @@ filter_cascade <- function(.data, ...){
 
 #'API to load economic data from FRED (Federal Reserve Bank Economic Data)
 #'@param series_id - e.g. UNRATE
-#'@param date_start - star date for the query.
-#'@param date_end - end date for the query. By default it's today.
+#'@param date_start - Start Date for the query.
+#'@param date_end - End Date for the query. By default it's today.
 #'@export
 load_fred <- function(series_id, date_start = "", date_end = "", password) {
   loadNamespace("fredr")
