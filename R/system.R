@@ -2954,12 +2954,16 @@ filter_cascade <- function(.data, ...){
   df
 }
 
-#
+#'API to load economic data from FRED (Federal Reserve Bank Economic Data)
+#'@param series_id - e.g. UNRATE
+#'@param date_start - star date for the query.
+#'@param date_end - end date for the query. By default it's today.
 #'@export
-load_fred <- function(series_id, date_start = "", date_end = NULL, password) {
+load_fred <- function(series_id, date_start = "", date_end = "", password) {
   loadNamespace("fredr")
   fredr::fredr_set_key(password)
-  if (is.null(date_end)) {
+  # Desktop passes empty string if end date is not selected. For this case fallback to today.
+  if (date_end == "") {
     date_end <- lubridate::today()
   } else {
     date_end <- lubridate::ymd(date_end)
