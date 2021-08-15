@@ -141,7 +141,7 @@ exp_textanal <- function(df, text,
                          cooccurrence_context = "window", # "document" or "window"
                          cooccurrence_window = 1, # 5 is the quanteda's default, but narrowing it for speed of default run. 
                          cooccurrence_network_num_words = 50,
-                         max_nrow = 50000,
+                         max_nrow = 5000,
                          ...) {
   text_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(text))
   each_func <- function(df) {
@@ -344,7 +344,7 @@ exp_text_cluster <- function(df, text,
                          svd_dim=5,
                          num_clusters=3,
                          mds_sample_size=200,
-                         max_nrow = 50000,
+                         max_nrow = 5000,
                          seed = 1,
                          ...) {
   text_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(text))
@@ -500,7 +500,7 @@ exp_topic_model <- function(df, text,
                             alpha = NULL,
                             beta = NULL,
                             mds_sample_size=200,
-                            max_nrow = 50000,
+                            max_nrow = 5000,
                             seed = 1,
                             ...) {
   text_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(text))
