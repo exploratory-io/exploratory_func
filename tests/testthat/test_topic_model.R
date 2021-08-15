@@ -38,3 +38,15 @@ test_that("exp_topic_model", {
   res <- model_df %>% tidy_rowwise(model, type="word_topics")
   expect_equal(colnames(res), c("word", "topic1", "topic2", "topic3", "max_topic", "topic_max"))
 })
+
+test_that("tidy.textmodel_lda_exploratory to complete topic with no document belonging to it.", {
+  # Create a dummy model_df. We haven't seen this situation from real data yet.
+  theta <- matrix(c(0.9, 0.9, 0.1, 0.1), 2, 2, dimnames=list(c('text1','text2'),c('topic1','topic2')))
+  model <- list(theta=theta, k=2)
+  x <- list(model=model)
+  class(x) <- "textmodel_lda_exploratory"
+  model_df <- tibble::tibble(model = list(x))
+  res <- model_df %>% tidy_rowwise(model, type="topics_summary")
+  expect_equal(res$topic, c(1,2))
+  expect_equal(res$n, c(2,0))
+})
