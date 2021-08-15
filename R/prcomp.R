@@ -165,7 +165,9 @@ tidy.prcomp_exploratory <- function(x, type="variances", n_sample=NULL, pretty.n
     res <- res %>% dplyr::bind_rows(loadings_df)
     # fill group_by column so that Repeat By on chart works fine. loadings_df does not have values for the group_by column.
     res <- res %>% tidyr::fill(x$grouped_cols)
-    res
+  }
+  else if (type == "summary") { # This is only for kmeans case. TODO: We might want to separate PCA code and k-means code.
+    res <- broom::tidy(x$kmeans)
   }
   else { # should be data or gathered_data
     res <- x$df

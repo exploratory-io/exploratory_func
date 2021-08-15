@@ -141,7 +141,7 @@ exp_textanal <- function(df, text,
                          cooccurrence_context = "window", # "document" or "window"
                          cooccurrence_window = 1, # 5 is the quanteda's default, but narrowing it for speed of default run. 
                          cooccurrence_network_num_words = 50,
-                         max_nrow = 50000,
+                         max_nrow = 5000,
                          ...) {
   text_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(text))
   each_func <- function(df) {
@@ -344,7 +344,7 @@ exp_text_cluster <- function(df, text,
                          svd_dim=5,
                          num_clusters=3,
                          mds_sample_size=200,
-                         max_nrow = 50000,
+                         max_nrow = 5000,
                          seed = 1,
                          ...) {
   text_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(text))
@@ -500,7 +500,7 @@ exp_topic_model <- function(df, text,
                             alpha = NULL,
                             beta = NULL,
                             mds_sample_size=200,
-                            max_nrow = 50000,
+                            max_nrow = 5000,
                             seed = 1,
                             ...) {
   text_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(text))
@@ -566,7 +566,14 @@ exp_topic_model <- function(df, text,
 #' @export
 #' @param type - Type of output.
 tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words = 10, ...) {
-  if (type == "word_topics") {
+  if (type == "topics_summary") { # Count number of documents that "belongs to" each topic.
+    docs_topics_df <- as.data.frame(x$model$theta)
+    docs_topics_df <- docs_topics_df %>% dplyr::mutate(topic = summarize_row(across(starts_with("topic")), which.max))
+    res <- docs_topics_df %>% dplyr::select(topic) %>% dplyr::group_by(topic) %>% dplyr::summarize(n=n())
+    # In case some topic do not have any doc that "belongs to" it, we still want to show a row for the topic with n with 0 value.
+    res <- res %>% tidyr::complete(topic = 1:x$model$k, fill = list(n=0))
+  }
+  else if (type == "word_topics") {
     terms_topics_df <- as.data.frame(t(x$model$phi)) # phi is the topics-terms matrix. This needs to be transposed to make it a terms-topics matrix.
     terms <- rownames(terms_topics_df)
     terms_topics_df <- terms_topics_df %>% dplyr::mutate(max_topic = summarize_row(across(starts_with("topic")), which.max), topic_max = summarize_row(across(starts_with("topic")), max))
