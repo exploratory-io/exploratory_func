@@ -569,7 +569,8 @@ tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words
   if (type == "topics_summary") { # Count number of documents that "belongs to" each topic.
     docs_topics_df <- as.data.frame(x$model$theta)
     docs_topics_df <- docs_topics_df %>% dplyr::mutate(topic = summarize_row(across(starts_with("topic")), which.max))
-    res <- docs_topics_df %>% select(topic) %>% group_by(topic) %>% summarize(n=n())
+    res <- docs_topics_df %>% dplyr::select(topic) %>% dplyr::group_by(topic) %>% dplyr::summarize(n=n())
+    res <- res %>% tidyr::complete(topic = 1:x$model$k, fill = list(n=0)) # In case some topic do not have any doc that "belongs to" it.
   }
   else if (type == "word_topics") {
     terms_topics_df <- as.data.frame(t(x$model$phi)) # phi is the topics-terms matrix. This needs to be transposed to make it a terms-topics matrix.
