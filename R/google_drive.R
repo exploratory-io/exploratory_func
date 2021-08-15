@@ -139,10 +139,24 @@ searchAndGetCSVFilesFromGoogleDrive <- function(folderId = NULL, searchKeyword =
                                        comment = "", trim_ws = FALSE,
                                        skip = 0, n_max = Inf, guess_max = min(1000, n_max),
                                        progress = interactive()) {
-  items <- exploratory::listItemsInGoogleDrive(path = folderId, type =  c("csv", "tsv", "txt"))
+  tryCatch({
+    items <- exploratory::listItemsInGoogleDrive(path = folderId, type =  c("csv", "tsv", "txt"))
+  }, error = function(e) {
+    if (stringr::str_detect(e$message, "File not found")) {
+      # Looking for error that looks like "Client error: (404) Not Found\nFile not found: ...".
+      # This means the folder with the folderId does not exist.
+      stop(paste0('EXP-DATASRC-6 :: [] :: The specified Google Drive folder does not exist.'))
+    }
+    else {
+      stop(e)
+    }
+  })
   if (searchKeyword != "") {
     # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
     items <- items %>% filter(stringr::str_detect(name, stringr::str_c("(?i)", searchKeyword)))
+  }
+  if (nrow(items) == 0) {
+    stop(paste0('EXP-DATASRC-5 :: [] :: There is no file in the Google Drive folder that matches with the specified condition.'))
   }
   exploratory::getCSVFilesFromGoogleDrive(items$id, items$name, delim = delim, quote = quote, escape_backslash = escape_backslash, escape_double = escape_double, col_names = col_names,
                                           col_types = col_types, locale = locale, na = na, quoted_na = quoted_na, comment = comment, trim_ws = trim_ws, skip = skip, n_max = n_max,
@@ -182,10 +196,24 @@ getExcelFilesFromGoogleDrive <- function(fileIds, fileNames, sheet = 1, col_name
 #'@export
 searchAndGetExcelFilesFromGoogleDrive <- function(folderId = NULL, searchKeyword = "", sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, convertDataTypeToChar = TRUE, tzone = NULL, ...) {
   # set name to the files so that it can be used for the "id" column created by purrr:map_dfr.
-  items <- exploratory::listItemsInGoogleDrive(path = folderId, type = c("xls", "xlsx"))
+  tryCatch({
+    items <- exploratory::listItemsInGoogleDrive(path = folderId, type = c("xls", "xlsx"))
+  }, error = function(e) {
+    if (stringr::str_detect(e$message, "File not found")) {
+      # Looking for error that looks like "Client error: (404) Not Found\nFile not found: ...".
+      # This means the folder with the folderId does not exist.
+      stop(paste0('EXP-DATASRC-6 :: [] :: The specified Google Drive folder does not exist.'))
+    }
+    else {
+      stop(e)
+    }
+  })
   if (searchKeyword != "") {
     # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
     items <- items %>% filter(stringr::str_detect(name, stringr::str_c("(?i)", searchKeyword)))
+  }
+  if (nrow(items) == 0) {
+    stop(paste0('EXP-DATASRC-5 :: [] :: There is no file in the Google Drive folder that matches with the specified condition.'))
   }
   exploratory::getExcelFilesFromGoogleDrive(items$id, items$name, sheet = sheet, col_names = col_names, col_types = col_types, na = na, skip = skip,
                                             trim_ws = trim_ws, n_max = n_max, use_readxl = use_readxl, detectDates = detectDates, skipEmptyRows = skipEmptyRows,
@@ -257,7 +285,14 @@ downloadDataFileFromGoogleDrive <- function(fileId, type = "csv"){
       tmp
     }
   }, error = function(e) {
-    stop(e)
+    if (stringr::str_detect(e$message, "File not found")) {
+      # Looking for error that looks like "Client error: (404) Not Found\nFile not found: ...".
+      # This means the folder with the folderId does not exist.
+      stop(paste0('EXP-DATASRC-9 :: [] :: The specified Google Drive file does not exist.'))
+    }
+    else {
+      stop(e)
+    }
   }, finally = {
     if (is.null(currentConfig)) {
       httr::reset_config()
