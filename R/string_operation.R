@@ -834,7 +834,7 @@ str_replace_word <- function(string, start = 1L, end = start, sep = fixed(" "), 
   ret <- stringr::str_split(string, pattern = sep_)
   sapply(ret, function(x){
     len <- length(x) # get number of words
-    if(end == 1) { # It means the first word.
+    if (end == 1) { # It means the first word.
       if (rep == "") { # for remove case
         x[1] = rep # replace first word with the replace text.
         if (len > 1) { # trim the white space of the second word's left side
@@ -846,7 +846,7 @@ str_replace_word <- function(string, start = 1L, end = start, sep = fixed(" "), 
         x[1] = rep # replace the first word with the replace text.
         stringr::str_c(x, collapse = sep_)
       }
-    } else if (end == -1){ # It means the last word.
+    } else if (end == -1) { # It means the last word.
       if (rep == "") { # for Remove Case
         if (len > 1) {# Trim the white space of the second word from the end.
           x[len - 1] = stringr::str_trim(x[len - 1], side = "right")
