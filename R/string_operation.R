@@ -288,8 +288,8 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
 #' @param stopwords_lang Language for the stopwords that need to be excluded from the result.
 #' @param remove_punct Whether it should remove punctuations.
 #' @param remove_numbers Whether it should remove numbers.
-#' @param remove_url Whether it should remove URLs. 
-#' @param remove_twitter Whether it should remove Twitter social tags. 
+#' @param remove_url Whether it should remove URLs.
+#' @param remove_twitter Whether it should remove Twitter social tags.
 #' @param stopwords Additional stopwords.
 #' @param stopwords_to_remove Words to be removed from the set of stopwords.
 #' @param hiragana_word_length_to_remove Length of a Hiragana word that needs to be excluded from the result.
@@ -323,7 +323,7 @@ do_tokenize <- function(df, text, token = "words", keep_cols = FALSE,
     sentences_list <- tokenizers::tokenize_sentences(text_v)
     # Create a data.frame, where one row represents one sentence. document_id is the document the sentence belongs (row number in the original df.)
     # .sentence is the text of the sentence.
-    # To avoid expensive unnest_longer call, we use base R functions like unlist() instead here. 
+    # To avoid expensive unnest_longer call, we use base R functions like unlist() instead here.
     # as.integer() is there to convert the matrix unlist() returns there into an integer vector.
     # unname() is there to unname the named vector unlist returns.
     res <- tibble::tibble(document_id = as.integer(unlist(mapply(function(tokens,index) {rep(index,length(tokens))},
@@ -836,13 +836,15 @@ str_replace_word <- function(string, start = 1L, end = start, sep = fixed(" "), 
     if(rep != "") {
       rep <- stringr::str_c(rep, sep_, sep="")
     }
-    stringr::str_replace(string, stringr::str_c("^", ret, sep, ""), rep)
+    # Placing characters between \\Q and \\E makes the regular expression engine treat them literally rather than as regular expressions.
+    stringr::str_replace(string, stringr::str_c("^", "\\Q", ret, "\\E", sep, ""), rep)
   } else if (end == -1){
     ret <- stringr::word(string, start = start, end = end, sep = sep)
     if(rep != "") {
       rep <- stringr::str_c(sep_, rep, sep="")
     }
-    stringr::str_replace(string, stringr::str_c(sep, ret, "$"), rep)
+    # Placing characters between \\Q and \\E makes the regular expression engine treat them literally rather than as regular expressions.
+    stringr::str_replace(string, stringr::str_c(sep, "\\Q", ret, "\\E$"), rep)
   } else {
     ## TODO: Implement other cases
     string
