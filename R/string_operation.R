@@ -837,26 +837,26 @@ str_replace_word <- function(string, start = 1L, end = start, sep = fixed(" "), 
     if(end == 1) { # It means the first word.
       if (rep == "") { # for remove case
         x[1] = rep # replace first word with the replace text.
-        if (len > 1) { # trim the white space of the second element's left side
+        if (len > 1) { # trim the white space of the second word's left side
           x[2] = stringr::str_trim(x[2], side = "left")
         }
-        # join back the string using the normalized separator.
+        # join back the words using the normalized separator.
         stringr::str_c(x[-1], collapse = sep_)
       } else {
-        x[1] = rep
+        x[1] = rep # replace the first word with the replace text.
         stringr::str_c(x, collapse = sep_)
       }
     } else if (end == -1){ # It means the last word.
       if (rep == "") { # for Remove Case
-        if (len > 1) {# trim the white space of the second element from the end
+        if (len > 1) {# Trim the white space of the second word from the end.
           x[len - 1] = stringr::str_trim(x[len - 1], side = "right")
         }
-        # drop the last element from list then collapse with the separator.
+        # drop the last word from list then collapse with the separator.
         stringr::str_c(x[-1 * len], collapse = sep_)
       } else {
-        # replace the last element with the replace string.
+        # replace the last word with the replace string.
         x[len] = rep
-        # join back the string using the normalized separator.
+        # join back the words using the normalized separator.
         stringr::str_c(x, collapse = sep_)
       }
     } else {
