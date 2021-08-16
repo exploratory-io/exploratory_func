@@ -813,7 +813,7 @@ str_replace_word <- function(string, start = 1L, end = start, sep = fixed(" "), 
   # Below is the list of predefined separators passed from Exploratory Desktop in a regular expression format.
   # Changed it back to the original separator.
   if(sep == "\\s*\\,\\s*") {
-    sep_ <- ", "
+    sep_ <- ","
   } else if (sep == "\\s+") {
     sep_ <- " "
   } else if (sep == "\\s*\\;\\s*") {
@@ -831,24 +831,39 @@ str_replace_word <- function(string, start = 1L, end = start, sep = fixed(" "), 
   } else if (sep == "\\s*\\@\\s*") {
     sep_ <- "@"
   }
-  if(end == 1) {
-    ret <- stringr::word(string, start = start, end = end, sep = sep)
-    if(rep != "") {
-      rep <- stringr::str_c(rep, sep_, sep="")
+  ret <- stringr::str_split(string, pattern = sep_)
+  sapply(ret, function(x){
+    len <- length(x) # get number of words
+    if(end == 1) { # It means the first word.
+      if (rep == "") { # for remove case
+        x[1] = rep # replace first word with the replace text.
+        if (len > 1) { # trim the white space of the second element's left side
+          x[2] = stringr::str_trim(x[2], side = "left")
+        }
+        # join back the string using the normalized separator.
+        stringr::str_c(x[-1], collapse = sep_)
+      } else {
+        x[1] = rep
+        stringr::str_c(x, collapse = sep_)
+      }
+    } else if (end == -1){ # It means the last word.
+      if (rep == "") { # for Remove Case
+        if (len > 1) {# trim the white space of the second element from the end
+          x[len - 1] = stringr::str_trim(x[len - 1], side = "right")
+        }
+        # drop the last element from list then collapse with the separator.
+        stringr::str_c(x[-1 * len], collapse = sep_)
+      } else {
+        # replace the last element with the replace string.
+        x[len] = rep
+        # join back the string using the normalized separator.
+        stringr::str_c(x, collapse = sep_)
+      }
+    } else {
+      ## TODO: Implement other cases
+      x
     }
-    # Placing characters between \\Q and \\E makes the regular expression engine treat them literally rather than as regular expressions.
-    stringr::str_replace(string, stringr::str_c("^", "\\Q", ret, "\\E", sep, ""), rep)
-  } else if (end == -1){
-    ret <- stringr::word(string, start = start, end = end, sep = sep)
-    if(rep != "") {
-      rep <- stringr::str_c(sep_, rep, sep="")
-    }
-    # Placing characters between \\Q and \\E makes the regular expression engine treat them literally rather than as regular expressions.
-    stringr::str_replace(string, stringr::str_c(sep, "\\Q", ret, "\\E$"), rep)
-  } else {
-    ## TODO: Implement other cases
-    string
-  }
+  })
 }
 
 get_emoji_regex <- function() {
