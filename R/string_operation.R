@@ -855,7 +855,11 @@ str_replace_word <- function(string, start = 1L, end = start, sep = fixed(" "), 
         stringr::str_c(x[-1 * len], collapse = sep_)
       } else {
         # replace the last word with the replace string.
-        x[len] = rep
+        if (sep_ == ",") { # if the separator is "," add " " as a prefix it to make it look better.
+          x[len] = stringr::str_c(" ", rep)
+        } else {
+          x[len] = rep
+        }
         # join back the words using the normalized separator.
         stringr::str_c(x, collapse = sep_)
       }
