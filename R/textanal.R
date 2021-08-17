@@ -142,12 +142,16 @@ exp_textanal <- function(df, text,
                          cooccurrence_window = 1, # 5 is the quanteda's default, but narrowing it for speed of default run. 
                          cooccurrence_network_num_words = 50,
                          max_nrow = 5000,
+                         seed = 1,
                          ...) {
   text_col <- tidyselect::vars_pull(names(df), !! rlang::enquo(text))
   each_func <- function(df) {
     # Filter out NAs before sampling. We keep empty string, since we will anyway have to work with the case where no token was found in a doc.
     df <- df %>% dplyr::filter(!is.na(!!rlang::sym(text_col)))
 
+    if (!is.null(seed)) {
+      set.seed(seed)
+    }
     # sample the data for performance if data size is too large.
     sampled_nrow <- NULL
     if (!is.null(max_nrow) && nrow(df) > max_nrow) {
