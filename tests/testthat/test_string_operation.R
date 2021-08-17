@@ -666,6 +666,9 @@ test_that("str_remove_word", {
   expect_equal(ret, c("Sequoia Capital China, Qiming Venture Partners"))
   ret <- exploratory::str_remove_word("Sequoia Capital China, Qiming Venture Partners, Tencent Holdings", 1, sep = "\\s*\\,\\s*")
   expect_equal(ret, c("Qiming Venture Partners, Tencent Holdings"))
+  ret <- exploratory::str_remove_word("Sequoia Capital, Qiming Venture Partners, Tencent Holdings (China Space)", -1, sep = "\\s+")
+  expect_equal(ret, c("Sequoia Capital, Qiming Venture Partners, Tencent Holdings (China"))
+
 })
 
 test_that("str_replace_word", {

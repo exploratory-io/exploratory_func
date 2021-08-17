@@ -288,8 +288,8 @@ do_tokenize_icu <- function(df, text_col, token = "word", keep_cols = FALSE,
 #' @param stopwords_lang Language for the stopwords that need to be excluded from the result.
 #' @param remove_punct Whether it should remove punctuations.
 #' @param remove_numbers Whether it should remove numbers.
-#' @param remove_url Whether it should remove URLs. 
-#' @param remove_twitter Whether it should remove Twitter social tags. 
+#' @param remove_url Whether it should remove URLs.
+#' @param remove_twitter Whether it should remove Twitter social tags.
 #' @param stopwords Additional stopwords.
 #' @param stopwords_to_remove Words to be removed from the set of stopwords.
 #' @param hiragana_word_length_to_remove Length of a Hiragana word that needs to be excluded from the result.
@@ -323,7 +323,7 @@ do_tokenize <- function(df, text, token = "words", keep_cols = FALSE,
     sentences_list <- tokenizers::tokenize_sentences(text_v)
     # Create a data.frame, where one row represents one sentence. document_id is the document the sentence belongs (row number in the original df.)
     # .sentence is the text of the sentence.
-    # To avoid expensive unnest_longer call, we use base R functions like unlist() instead here. 
+    # To avoid expensive unnest_longer call, we use base R functions like unlist() instead here.
     # as.integer() is there to convert the matrix unlist() returns there into an integer vector.
     # unname() is there to unname the named vector unlist returns.
     res <- tibble::tibble(document_id = as.integer(unlist(mapply(function(tokens,index) {rep(index,length(tokens))},
@@ -813,7 +813,7 @@ str_replace_word <- function(string, start = 1L, end = start, sep = fixed(" "), 
   # Below is the list of predefined separators passed from Exploratory Desktop in a regular expression format.
   # Changed it back to the original separator.
   if(sep == "\\s*\\,\\s*") {
-    sep_ <- ", "
+    sep_ <- ","
   } else if (sep == "\\s+") {
     sep_ <- " "
   } else if (sep == "\\s*\\;\\s*") {
@@ -831,22 +831,43 @@ str_replace_word <- function(string, start = 1L, end = start, sep = fixed(" "), 
   } else if (sep == "\\s*\\@\\s*") {
     sep_ <- "@"
   }
-  if(end == 1) {
-    ret <- stringr::word(string, start = start, end = end, sep = sep)
-    if(rep != "") {
-      rep <- stringr::str_c(rep, sep_, sep="")
+  ret <- stringr::str_split(string, pattern = sep_)
+  sapply(ret, function(x){
+    len <- length(x) # get number of words
+    if (end == 1) { # It means the first word.
+      if (rep == "") { # for remove case
+        if (len > 1) { # trim the white space of the second word's left side
+          x[2] = stringr::str_trim(x[2], side = "left")
+        }
+        # remove the first word and join back the words using the normalized separator.
+        stringr::str_c(x[-1], collapse = sep_)
+      } else {
+        x[1] = rep # replace the first word with the replace text.
+        # join back the words using the normalized separator.
+        stringr::str_c(x, collapse = sep_)
+      }
+    } else if (end == -1) { # It means the last word.
+      if (rep == "") { # for Remove Case
+        if (len > 1) {# Trim the white space of the second word from the end.
+          x[len - 1] = stringr::str_trim(x[len - 1], side = "right")
+        }
+        # remove the last word from list then collapse with the separator.
+        stringr::str_c(x[-1 * len], collapse = sep_)
+      } else {
+        # replace the last word with the replace string.
+        if (sep_ == ",") { # if the separator is "," add " " as a prefix it to make it look better.
+          x[len] = stringr::str_c(" ", rep)
+        } else {
+          x[len] = rep
+        }
+        # join back the words using the normalized separator.
+        stringr::str_c(x, collapse = sep_)
+      }
+    } else {
+      ## TODO: Implement other cases
+      x
     }
-    stringr::str_replace(string, stringr::str_c("^", ret, sep, ""), rep)
-  } else if (end == -1){
-    ret <- stringr::word(string, start = start, end = end, sep = sep)
-    if(rep != "") {
-      rep <- stringr::str_c(sep_, rep, sep="")
-    }
-    stringr::str_replace(string, stringr::str_c(sep, ret, "$"), rep)
-  } else {
-    ## TODO: Implement other cases
-    string
-  }
+  })
 }
 
 get_emoji_regex <- function() {
