@@ -2,7 +2,7 @@ context("test string operation functions")
 
 # Small data for easier deterministic result checking.
 test_df_small <- data.frame(input = c("Hello world!", "This is a data frame for test. This is second sentence.", NA), stringsAsFactors = FALSE)
-# Data from twitter search.
+# Data from twitter search. This happens to include invalid UTF-8 byte sequences too.
 test_df <- exploratory::read_delim_file("https://www.dropbox.com/s/w1fh7j8iq6g36ry/Twitter_No_Spectator_Olympics_Ja.csv?dl=1", delim = ",", quote = "\"", skip = 0 , col_names = TRUE , na = c('','NA') , locale=readr::locale(encoding = "UTF-8", decimal_mark = ".", tz = "America/Los_Angeles", grouping_mark = "," ), trim_ws = TRUE , progress = FALSE)
 test_df <- test_df %>% rename(input=text) # Rename so that it has same column name as test_df_small.
 
@@ -88,6 +88,18 @@ test_that("test word_to_sentiment to groupd_df", {
     dplyr::group_by(group) %>%
     dplyr::mutate(sent = word_to_sentiment(text))
   expect_true(is.character(ret[["sent"]]))
+})
+
+test_that("do_tokenize with tokenize_tweets=TRUE and with_sentence_id=TRUE", {
+  result <- test_df %>%
+    do_tokenize(input, tokenize_tweets=T, with_sentence_id=T)
+  expect_equal(colnames(result), c("document_id", "sentence_id", "token"))
+})
+
+test_that("do_tokenize with tokenize_tweets=TRUE and with_sentence_id=FALSE", {
+  result <- test_df %>%
+    do_tokenize(input, tokenize_tweets=T, with_sentence_id=F)
+  expect_equal(colnames(result), c("document_id", "token"))
 })
 
 test_that("do_tokenize with with_sentence_id=FALSE", {
