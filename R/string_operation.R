@@ -320,7 +320,19 @@ do_tokenize <- function(df, text, token = "words", keep_cols = FALSE,
   # As pre-processing, split text into sentences, if sentence_id is needed or the final output should be sentences.
   if (with_sentence_id || token == "sentences") {
     text_v <- df[[text_col]]
-    sentences_list <- tokenizers::tokenize_sentences(text_v)
+    tryCatch({
+      sentences_list <- tokenizers::tokenize_sentences(text_v)
+    }, error = function(e) {
+      # tokenize_sentences can return error about invalid UTF-8 characters.
+      # Try to recover from it by fixing the input with stri_enc_toutf8.
+      if (stringr::str_detect(e$message, "invalid UTF-8 byte sequence detected")) {
+        text_v <- stringi::stri_enc_toutf8(text_v, validate = TRUE) # validate=TRUE replaces invalid characters with replacement character.
+        sentences_list <<- tokenizers::tokenize_sentences(text_v)
+      }
+      else {
+        stop(e)
+      }
+    })
     # Create a data.frame, where one row represents one sentence. document_id is the document the sentence belongs (row number in the original df.)
     # .sentence is the text of the sentence.
     # To avoid expensive unnest_longer call, we use base R functions like unlist() instead here.
