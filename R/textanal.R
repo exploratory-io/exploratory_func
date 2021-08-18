@@ -64,8 +64,23 @@ tokenize_with_postprocess <- function(text,
                                       compound_tokens = NULL
                                       ) {
   if (tokenize_tweets) {
-    tokenized <- tokenizers::tokenize_tweets(text, lowercase = TRUE, stopwords = NULL,
-                                             strip_punct = remove_punct, strip_url = remove_url, simplify = FALSE)
+    tryCatch({
+      tokenized <- tokenizers::tokenize_tweets(text, lowercase = TRUE, stopwords = NULL,
+                                               strip_punct = remove_punct, strip_url = remove_url, simplify = FALSE)
+    }, error = function(e) {
+      # tokenize_tweets can throw error about invalid UTF-8 characters.
+      # Try to recover from it by fixing the input with stri_enc_toutf8.
+      if (stringr::str_detect(e$message, "invalid UTF-8 byte sequence detected")) {
+        # validate=TRUE replaces invalid characters with replacement character.
+        # Since text is fed to guess_lang_for_stopwords() later, use <<- rather than <- here.
+        text <<- stringi::stri_enc_toutf8(text, validate = TRUE)
+        tokenized <<- tokenizers::tokenize_tweets(text, lowercase = TRUE, stopwords = NULL,
+                                                  strip_punct = remove_punct, strip_url = remove_url, simplify = FALSE)
+      }
+      else {
+        stop(e)
+      }
+    })
   }
   else {
     tokenized <- tokenizers::tokenize_words(text, lowercase = TRUE, stopwords = NULL,

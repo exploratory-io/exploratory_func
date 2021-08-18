@@ -323,7 +323,7 @@ do_tokenize <- function(df, text, token = "words", keep_cols = FALSE,
     tryCatch({
       sentences_list <- tokenizers::tokenize_sentences(text_v)
     }, error = function(e) {
-      # tokenize_sentences can return error about invalid UTF-8 characters.
+      # tokenize_sentences can throw error about invalid UTF-8 characters.
       # Try to recover from it by fixing the input with stri_enc_toutf8.
       if (stringr::str_detect(e$message, "invalid UTF-8 byte sequence detected")) {
         text_v <- stringi::stri_enc_toutf8(text_v, validate = TRUE) # validate=TRUE replaces invalid characters with replacement character.
