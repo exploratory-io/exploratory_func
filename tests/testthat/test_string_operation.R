@@ -1,6 +1,10 @@
 context("test string operation functions")
 
-test_df <- data.frame(input = c("Hello world!", "This is a data frame for test. This is second sentence.", NA), stringsAsFactors = FALSE)
+# Small data for easier deterministic result checking.
+test_df_small <- data.frame(input = c("Hello world!", "This is a data frame for test. This is second sentence.", NA), stringsAsFactors = FALSE)
+# Data from twitter search. This happens to include invalid UTF-8 byte sequences too.
+test_df <- exploratory::read_delim_file("https://www.dropbox.com/s/w1fh7j8iq6g36ry/Twitter_No_Spectator_Olympics_Ja.csv?dl=1", delim = ",", quote = "\"", skip = 0 , col_names = TRUE , na = c('','NA') , locale=readr::locale(encoding = "UTF-8", decimal_mark = ".", tz = "America/Los_Angeles", grouping_mark = "," ), trim_ws = TRUE , progress = FALSE)
+test_df <- test_df %>% rename(input=text) # Rename so that it has same column name as test_df_small.
 
 test_that("is_stopword", {
   test_vec <- c("the", "yourself", "Test", "test")
@@ -86,6 +90,18 @@ test_that("test word_to_sentiment to groupd_df", {
   expect_true(is.character(ret[["sent"]]))
 })
 
+test_that("do_tokenize with tokenize_tweets=TRUE and with_sentence_id=TRUE", {
+  result <- test_df %>%
+    do_tokenize(input, tokenize_tweets=T, with_sentence_id=T)
+  expect_equal(colnames(result), c("document_id", "sentence_id", "token"))
+})
+
+test_that("do_tokenize with tokenize_tweets=TRUE and with_sentence_id=FALSE", {
+  result <- test_df %>%
+    do_tokenize(input, tokenize_tweets=T, with_sentence_id=F)
+  expect_equal(colnames(result), c("document_id", "token"))
+})
+
 test_that("do_tokenize with with_sentence_id=FALSE", {
   result <- test_df %>%
     do_tokenize(input, with_sentence_id=F)
@@ -95,7 +111,7 @@ test_that("do_tokenize with with_sentence_id=FALSE", {
 test_that("do_tokenize with drop=FALSE", {
   result <- test_df %>%
     do_tokenize(input, drop=F)
-  expect_equal(result$token[[1]], "hello")
+  expect_equal(result$token[[1]], "\u30AA\u30EA\u30F3\u30D4\u30C3\u30AF")
   expect_equal(ncol(result), 4)
 })
 
@@ -224,8 +240,8 @@ test_that("do_tokenize with remove_punct", {
 test_that("do_tokenize with token=words", {
   result <- test_df %>%
     do_tokenize(input, token="words", keep_cols = TRUE)
-  expect_equal(result$token[[1]], "hello")
-  expect_equal(ncol(result), 3)
+  expect_equal(result$token[[1]], "\u30AA\u30EA\u30F3\u30D4\u30C3\u30AF")
+  expect_equal(ncol(result), 6)
 })
 
 test_that("do_tokenize when names conflict", {
@@ -233,13 +249,19 @@ test_that("do_tokenize when names conflict", {
   df$document_id <- seq(nrow(df))
   result <- df %>%
     do_tokenize(input, token="words", keep_cols = TRUE)
-  expect_equal(result$token[[1]], "hello")
-  expect_equal(ncol(result), 3)
+  expect_equal(result$token[[1]], "\u30AA\u30EA\u30F3\u30D4\u30C3\u30AF")
+  expect_equal(ncol(result), 6)
   expect_equal(colnames(result)[[1]],"document_id") # If document_id is in the input, it is overwritten.
 })
 
 test_that("do_tokenize with token=sentence", {
   result <- test_df %>%
+    do_tokenize(input, token="sentences")
+  expect_equal(ncol(result), 2)
+})
+
+test_that("do_tokenize with token=sentence (with content check)", {
+  result <- test_df_small %>%
     do_tokenize(input, token="sentences")
   expect_equal(result$token[[1]], "Hello world!")
   expect_equal(ncol(result), 2)
@@ -247,6 +269,12 @@ test_that("do_tokenize with token=sentence", {
 
 test_that("do_tokenize should work with output", {
   result <- test_df %>%
+    do_tokenize(input, output="sentence", token="sentences")
+  expect_equal(ncol(result), 2)
+})
+
+test_that("do_tokenize should work with output (with content check)", {
+  result <- test_df_small %>%
     do_tokenize(input, output="sentence", token="sentences")
   expect_equal(result$sentence[[2]], "This is a data frame for test.")
 })
