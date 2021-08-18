@@ -1,8 +1,10 @@
 context("test string operation functions")
 
+# Small data for easier deterministic result checking.
 test_df_small <- data.frame(input = c("Hello world!", "This is a data frame for test. This is second sentence.", NA), stringsAsFactors = FALSE)
+# Data from twitter search.
 test_df <- exploratory::read_delim_file("https://www.dropbox.com/s/w1fh7j8iq6g36ry/Twitter_No_Spectator_Olympics_Ja.csv?dl=1", delim = ",", quote = "\"", skip = 0 , col_names = TRUE , na = c('','NA') , locale=readr::locale(encoding = "UTF-8", decimal_mark = ".", tz = "America/Los_Angeles", grouping_mark = "," ), trim_ws = TRUE , progress = FALSE)
-test_df <- test_df %>% rename(input=text)
+test_df <- test_df %>% rename(input=text) # Rename so that it has same column name as test_df_small.
 
 test_that("is_stopword", {
   test_vec <- c("the", "yourself", "Test", "test")
