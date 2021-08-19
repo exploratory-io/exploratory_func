@@ -2981,10 +2981,18 @@ load_fred <- function(series_id, date_start = "", date_end = "", password) {
   } else {
     date_end <- lubridate::ymd(date_end)
   }
-  fredr::fredr(
-    series_id = series_id,
-    observation_start = lubridate::ymd(date_start),
-    observation_end = date_end
-  )
+  # date_start is an optional parameter, so if it's not specified, execute the query without the start_date.
+  if (date_start == "") {
+    fredr::fredr(
+      series_id = series_id,
+      observation_end = date_end
+    )
+  } else {
+    fredr::fredr(
+      series_id = series_id,
+      observation_start = lubridate::ymd(date_start),
+      observation_end = date_end
+    )
+  }
 }
 
