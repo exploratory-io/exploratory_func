@@ -15,32 +15,33 @@ test_that("exp_factanal", {
     res <- model_df %>% tidy_rowwise(model, type="loadings")
     expect_equal(colnames(res),
                  c("variable", "factor", "value"))
+    expect_equal(levels(res$factor), c("Factor 1", "Factor 2", "Factor 3", "Uniqueness")) # Verify that order of factor levels are in order.
     res <- model_df %>% tidy_rowwise(model, type="biplot")
-    expect_equal(colnames(res),
-                 c("mpg", "cyl", "disp", "hp", "drat", "wt", "qsec", "vs", "am", "gear", "carb", "new_col", ".factor_1", ".factor_2", ".variable", ".factor_2_variable"))
+    # Factor 3 can be various column names like "MR3" here.
+    expect_true(all(c("mpg", "cyl", "disp", "hp", "drat", "wt", "qsec", "vs", "am", "gear", "carb", "new_col", ".factor_1", ".factor_2", ".variable", ".factor_2_variable") %in% colnames(res)))
     res <- model_df %>% tidy_rowwise(model, type="screeplot")
     expect_equal(colnames(res),
                  c("factor", "eigenvalue"))
     res <- model_df %>% tidy_rowwise(model, type="data")
     expect_equal(colnames(res),
-                 c("mpg","cyl","disp","hp","drat","wt","qsec","vs","am","gear","carb","new_col","Factor 1","Factor 2"))
+                 c("mpg","cyl","disp","hp","drat","wt","qsec","vs","am","gear","carb","new_col","Factor 1","Factor 2","Factor 3"))
   }
 
-  model_df <- exp_factanal(df, cyl, mpg, hp, max_nrow=30, fm="minres") 
+  model_df <- exp_factanal(df, cyl, mpg, hp, max_nrow=30, nfactors=3, fm="minres") 
   check_output(model_df)
-  model_df <- exp_factanal(df, cyl, mpg, hp, max_nrow=30, fm="ml")
+  model_df <- exp_factanal(df, cyl, mpg, hp, max_nrow=30, nfactors=3, fm="ml")
   check_output(model_df)
   # model_df <- exp_factanal(df, cyl, mpg, hp, max_nrow=30, fm="pa") # TODO: This gives error "NaNs produced"
   # check_output(model_df)
-  model_df <- exp_factanal(df, cyl, mpg, hp, max_nrow=30, fm="ols")
+  model_df <- exp_factanal(df, cyl, mpg, hp, max_nrow=30, nfactors=3, fm="ols")
   check_output(model_df)
-  model_df <- exp_factanal(df, cyl, mpg, hp, max_nrow=30, fm="wls")
+  model_df <- exp_factanal(df, cyl, mpg, hp, max_nrow=30, nfactors=3, fm="wls")
   check_output(model_df)
-  model_df <- exp_factanal(df, cyl, mpg, hp, max_nrow=30, fm="gls")
+  model_df <- exp_factanal(df, cyl, mpg, hp, max_nrow=30, nfactors=3, fm="gls")
   check_output(model_df)
-  model_df <- exp_factanal(df, cyl, mpg, hp, max_nrow=30, fm="minchi")
+  model_df <- exp_factanal(df, cyl, mpg, hp, max_nrow=30, nfactors=3, fm="minchi")
   check_output(model_df)
-  model_df <- exp_factanal(df, cyl, mpg, hp, max_nrow=30, fm="minrank")
+  model_df <- exp_factanal(df, cyl, mpg, hp, max_nrow=30, nfactors=3, fm="minrank")
   check_output(model_df)
   # model_df <- exp_factanal(df, cyl, mpg, hp, max_nrow=30, fm="alpha") # TODO: This gives error "NaNs produced"
   # check_output(model_df)
