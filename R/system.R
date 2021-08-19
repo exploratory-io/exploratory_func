@@ -2968,8 +2968,7 @@ filter_cascade <- function(.data, ...){
 
 #'API to load economic data from FRED (Federal Reserve Bank Economic Data)
 #'@param series_id - e.g. UNRATE
-#'@param date_start - Start Date for the query. This is required field.
-#'                    When it's called from Exploratory Desktop, this date_start is always passed since it has required input field validation.
+#'@param date_start - Start Date for the query. This is optional field.
 #'@param date_end - End Date for the query. By default it's today.
 #'@export
 load_fred <- function(series_id, date_start = "", date_end = "", password) {
@@ -2981,10 +2980,18 @@ load_fred <- function(series_id, date_start = "", date_end = "", password) {
   } else {
     date_end <- lubridate::ymd(date_end)
   }
-  fredr::fredr(
-    series_id = series_id,
-    observation_start = lubridate::ymd(date_start),
-    observation_end = date_end
-  )
+  # date_start is an optional parameter, so if it's not specified, execute the query without the start_date.
+  if (date_start == "") {
+    fredr::fredr(
+      series_id = series_id,
+      observation_end = date_end
+    )
+  } else {
+    fredr::fredr(
+      series_id = series_id,
+      observation_start = lubridate::ymd(date_start),
+      observation_end = date_end
+    )
+  }
 }
 
