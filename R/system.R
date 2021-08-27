@@ -1247,7 +1247,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
 clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, username, catalog = "", schema = "", dsn="", additionalParams = "",
                               collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, connectionString = NULL, timezone = "",
                               sslClientCertKey = "") {
-  if (type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora", "dbiodbc", "teradata")) { #TODO: implement for other types too
+  if (type %in% c("mongodb", "odbc", "postgres", "redshift", "vertica", "mysql", "aurora", "presto", "treasuredata", "dbiodbc", "teradata")) { #TODO: implement for other types too
     if (type %in% c("mongodb")) {
       if(!is.na(connectionString) && connectionString != '') {
         # make sure to include collection as a key since connection varies per collection.
