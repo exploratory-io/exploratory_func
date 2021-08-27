@@ -557,13 +557,13 @@ salesforce_glue_transformer <- function(expr, envir) {
 #' @export
 queryMongoDB <- function(host = NULL, port = "", database, collection, username, password, query = "{}", flatten,
                          limit=100, isSSL=FALSE, authSource=NULL, fields="{}", sort="{}",
-                         skip=0, queryType = "find", pipeline="{}", cluster = NULL, timeout = NULL, additionalParamas = NULL, connectionString = NULL, sslClientCertKey = NULL, ...){
+                         skip=0, queryType = "find", pipeline="{}", cluster = NULL, timeout = NULL, additionalParams = NULL, connectionString = NULL, sslClientCertKey = NULL, ...){
   if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
   loadNamespace("jsonlite")
 
   # read stored password
   # get connection from connection pool
-  con <- getDBConnection("mongodb", host, port, database, username, password, collection = collection, isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParamas, timeout = timeout, connectionString = connectionString )
+  con <- getDBConnection("mongodb", host, port, database, username, password, collection = collection, isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParams, timeout = timeout, connectionString = connectionString )
   if(fields == ""){
     fields = "{}"
   }
