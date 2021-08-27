@@ -563,7 +563,7 @@ queryMongoDB <- function(host = NULL, port = "", database, collection, username,
 
   # read stored password
   # get connection from connection pool
-  con <- getDBConnection("mongodb", host, port, database, username, password, collection = collection, isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParams, timeout = timeout, connectionString = connectionString )
+  con <- getDBConnection("mongodb", host, port, database, username, password, collection = collection, isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParams, timeout = timeout, connectionString = connectionString, sslClientCertKey = sslClientCertKey)
   if(fields == ""){
     fields = "{}"
   }
@@ -592,7 +592,7 @@ queryMongoDB <- function(host = NULL, port = "", database, collection, username,
       data <- con$find(query = query, limit=limit, fields=fields, sort = sort, skip = skip)
     }
   }, error = function(err) {
-    clearDBConnection("mongodb", host, port, database, username, collection = collection, isSSL = isSSL, authSource = authSource, connectionString = connectionString)
+    clearDBConnection("mongodb", host, port, database, username, collection = collection, isSSL = isSSL, authSource = authSource, connectionString = connectionString, sslClientCertKey = sslClientCertKey)
     stop(err)
   })
   result <-data
@@ -601,7 +601,7 @@ queryMongoDB <- function(host = NULL, port = "", database, collection, username,
   }
   if (nrow(result)==0) {
     # possibly this is an error. clear connection once.
-    clearDBConnection("mongodb", host, port, database, username, collection = collection, isSSL = isSSL, authSource = authSource, connectionString = connectionString)
+    clearDBConnection("mongodb", host, port, database, username, collection = collection, isSSL = isSSL, authSource = authSource, connectionString = connectionString, sslClientCertKey = sslClientCertKey)
     stop("No Data Found");
   } else {
     result
@@ -611,17 +611,17 @@ queryMongoDB <- function(host = NULL, port = "", database, collection, username,
 #' Returns a data frame that has names of the collections in its "name" column.
 #' @export
 getMongoCollectionNames <- function(host = "", port = "", database = "", username = "",
-                                    password ="", isSSL=FALSE, authSource=NULL, cluster = NULL, timeout = "", additionalParams = "", connectionString = NULL, ...){
+                                    password ="", isSSL=FALSE, authSource=NULL, cluster = NULL, timeout = "", additionalParams = "", connectionString = NULL, sslClientCertKey = sslClientCertKey, ...){
   collection = "test" # dummy collection name. mongo command seems to work even if the collection does not exist.
   loadNamespace("jsonlite")
   if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
-  con <- getDBConnection("mongodb", host, port, database, username, password, collection = collection, isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParams, timeout = timeout, connectionString = connectionString)
+  con <- getDBConnection("mongodb", host, port, database, username, password, collection = collection, isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParams, timeout = timeout, connectionString = connectionString, sslClientCertKey = sslClientCertKey)
   # command to list collections.
   # con$command is our addition in our mongolite fork.
   result <- con$run(command = '{"listCollections":1}')
   # need to check existence of ok column of result dataframe first to avoid error in error check.
   if (!("ok" %in% names(result)) || !result$ok) {
-    clearDBConnection("mongodb", host, port, database, username, collection = collection, isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParams, connectionString = connectionString)
+    clearDBConnection("mongodb", host, port, database, username, collection = collection, isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParams, connectionString = connectionString, sslClientCertKey = sslClientCertKey)
     stop("listCollections command failed");
   }
   # TODO: does "firstBatch" mean it is possible there are more?
@@ -635,14 +635,14 @@ getMongoCollectionNames <- function(host = "", port = "", database = "", usernam
 getMongoCollectionNumberOfRows <- function(host = NULL, port = "", database = "",
                                            username = "", password = "", collection = "",
                                            isSSL=FALSE, authSource=NULL, cluster = NULL, additionalParams = "",
-                                           timeout = NULL, connectionString = NULL, ...){
+                                           timeout = NULL, connectionString = NULL, sslClientCertKey = sslClientCertKey, ...){
   loadNamespace("jsonlite")
   if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
-  con <- getDBConnection("mongodb", host, port, database, username, password, collection = collection, isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParams, timeout = timeout, connectionString = connectionString)
+  con <- getDBConnection("mongodb", host, port, database, username, password, collection = collection, isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParams, timeout = timeout, connectionString = connectionString, sslClientCertKey = sslClientCertKey)
   tryCatch({
     result <- con$count()
   }, error = function(err) {
-    clearDBConnection("mongodb", host, port, database, username, collection = collection, isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParams, connectionString = connectionString)
+    clearDBConnection("mongodb", host, port, database, username, collection = collection, isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParams, connectionString = connectionString, sslClientCertKey = sslClientCertKey)
     stop(err)
   })
   return(result)
