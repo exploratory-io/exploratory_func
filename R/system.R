@@ -1247,78 +1247,76 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
 clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, username, catalog = "", schema = "", dsn="", additionalParams = "",
                               collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, connectionString = NULL, timezone = "",
                               sslClientCertKey = "") {
-  if (type %in% c("mongodb", "odbc", "postgres", "redshift", "vertica", "mysql", "aurora", "presto", "treasuredata", "dbiodbc", "teradata")) { #TODO: implement for other types too
-    if (type %in% c("mongodb")) {
-      if(!is.na(connectionString) && connectionString != '') {
-        # make sure to include collection as a key since connection varies per collection.
-        key <- paste(connectionString, collection, sep = ":")
-      } else if(!is.na(host) && host != ''){
-        key <- paste("mongodb", host, port, databaseName, collection, username, toString(isSSL), authSource, additionalParams, sep = ":")
-      } else if (!is.na(cluster) && cluster != '') {
-        key <- paste("mongodb", cluster, databaseName, collection, username, toString(isSSL), authSource, additionalParams, sep = ":")
-      }
-      conn <- connection_pool[[key]]
-      if (!is.null(conn)) {
-        rm(conn)
-      }
+  if (type %in% c("mongodb")) {
+    if(!is.na(connectionString) && connectionString != '') {
+      # make sure to include collection as a key since connection varies per collection.
+      key <- paste(connectionString, collection, sep = ":")
+    } else if(!is.na(host) && host != ''){
+      key <- paste("mongodb", host, port, databaseName, collection, username, toString(isSSL), authSource, additionalParams, sep = ":")
+    } else if (!is.na(cluster) && cluster != '') {
+      key <- paste("mongodb", cluster, databaseName, collection, username, toString(isSSL), authSource, additionalParams, sep = ":")
     }
-    else if (type %in% c("postgres", "redshift", "vertica")) {
-      # they use common key "postgres"
-      key <- paste("postgres", host, port, databaseName, username, timezone, sep = ":")
-      conn <- connection_pool[[key]]
-      if (!is.null(conn)) {
-        tryCatch({ # try to close connection and ignore error
-          DBI::dbDisconnect(conn)
-        }, warning = function(w) {
-        }, error = function(e) {
-        })
-      }
+    conn <- connection_pool[[key]]
+    if (!is.null(conn)) {
+      rm(conn)
     }
-    else if (type %in% c("mysql", "aurora")) {
-      # they use common key "mysql"
-      key <- paste("mysql", host, port, databaseName, username, timezone, sep = ":")
-      conn <- connection_pool[[key]]
-      if (!is.null(conn)) {
-        tryCatch({ # try to close connection and ignore error
-          DBI::dbDisconnect(conn)
-        }, warning = function(w) {
-        }, error = function(e) {
-        })
-      }
-    }
-    else if (type %in% c("presto", "treasuredata")) {
-      # they use common key "presto"
-      key <- paste("presto", host, port, catalog, schema, username, timezone, sep = ":")
-      conn <- connection_pool[[key]]
-      if (!is.null(conn)) {
-        tryCatch({ # try to close connection and ignore error
-          RPresto::dbDisconnect(conn)
-        }, warning = function(w) {
-        }, error = function(e) {
-        })
-      }
-    }
-    else if(type %in% c("odbc","dbiodbc", "teradata")) { # odbc
-      if(type == "dbiodbc" || type == "teradata") {
-        key <- paste(type, dsn, username, additionalParams, timezone, sep = ":")
-      } else {
-        key <- paste("odbc", dsn, username, additionalParams, timezone, sep = ":")
-      }
-      conn <- connection_pool[[key]]
-      if (!is.null(conn)) {
-        tryCatch({ # try to close connection and ignore error
-          if(type == "dbiodbc" || type == "teradata") {
-            DBI::dbDisconnect(conn)
-          } else {
-            RODBC::odbcClose(conn)
-          }
-        }, warning = function(w) {
-        }, error = function(e) {
-        })
-      }
-    }
-    rm(list = key, envir = connection_pool)
   }
+  else if (type %in% c("postgres", "redshift", "vertica")) {
+    # they use common key "postgres"
+    key <- paste("postgres", host, port, databaseName, username, timezone, sep = ":")
+    conn <- connection_pool[[key]]
+    if (!is.null(conn)) {
+      tryCatch({ # try to close connection and ignore error
+        DBI::dbDisconnect(conn)
+      }, warning = function(w) {
+      }, error = function(e) {
+      })
+    }
+  }
+  else if (type %in% c("mysql", "aurora")) {
+    # they use common key "mysql"
+    key <- paste("mysql", host, port, databaseName, username, timezone, sep = ":")
+    conn <- connection_pool[[key]]
+    if (!is.null(conn)) {
+      tryCatch({ # try to close connection and ignore error
+        DBI::dbDisconnect(conn)
+      }, warning = function(w) {
+      }, error = function(e) {
+      })
+    }
+  }
+  else if (type %in% c("presto", "treasuredata")) {
+    # they use common key "presto"
+    key <- paste("presto", host, port, catalog, schema, username, timezone, sep = ":")
+    conn <- connection_pool[[key]]
+    if (!is.null(conn)) {
+      tryCatch({ # try to close connection and ignore error
+        RPresto::dbDisconnect(conn)
+      }, warning = function(w) {
+      }, error = function(e) {
+      })
+    }
+  }
+  else if(type %in% c("odbc","dbiodbc", "teradata")) { # odbc
+    if(type == "dbiodbc" || type == "teradata") {
+      key <- paste(type, dsn, username, additionalParams, timezone, sep = ":")
+    } else {
+      key <- paste("odbc", dsn, username, additionalParams, timezone, sep = ":")
+    }
+    conn <- connection_pool[[key]]
+    if (!is.null(conn)) {
+      tryCatch({ # try to close connection and ignore error
+        if(type == "dbiodbc" || type == "teradata") {
+          DBI::dbDisconnect(conn)
+        } else {
+          RODBC::odbcClose(conn)
+        }
+      }, warning = function(w) {
+      }, error = function(e) {
+      })
+    }
+  }
+  rm(list = key, envir = connection_pool) # Even if there is no matching key, this is harmless.
 }
 
 isConnecitonPoolEnabled <- function(type){
