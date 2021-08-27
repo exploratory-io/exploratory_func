@@ -557,7 +557,7 @@ salesforce_glue_transformer <- function(expr, envir) {
 #' @export
 queryMongoDB <- function(host = NULL, port = "", database, collection, username, password, query = "{}", flatten,
                          limit=100, isSSL=FALSE, authSource=NULL, fields="{}", sort="{}",
-                         skip=0, queryType = "find", pipeline="{}", cluster = NULL, timeout = NULL, additionalParamas = NULL, connectionString = NULL, ...){
+                         skip=0, queryType = "find", pipeline="{}", cluster = NULL, timeout = NULL, additionalParamas = NULL, connectionString = NULL, sslClientCertKey = NULL, ...){
   if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
   loadNamespace("jsonlite")
 
@@ -745,7 +745,8 @@ clearAmazonAthenaConnection <- function(driver = "", region = "", authentication
 #' If not, new connection is created and returned.
 #' @export
 getDBConnection <- function(type, host = NULL, port = "", databaseName = "", username = "", password = "", catalog = "", schema = "", dsn="", additionalParams = "",
-                            collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, timeout = NULL, connectionString = NULL, driver = NULL, timezone = "") {
+                            collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, timeout = NULL, connectionString = NULL, driver = NULL, timezone = "",
+                            sslClientCertKey = "") {
 
   drv = NULL
   conn = NULL
@@ -757,9 +758,9 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       # make sure to include collection as a key since connection varies per collection.
       key <- paste(connectionString, collection, sep = ":")
     } else if(!is.null(host) && host != ''){
-      key <- paste("mongodb", host, port, databaseName, collection, username, toString(isSSL), authSource, additionalParams, sep = ":")
+      key <- paste("mongodb", host, port, databaseName, collection, username, toString(isSSL), authSource, additionalParams, sslClientCertKey, sep = ":")
     } else if (!is.null(cluster) && cluster != '') {
-      key <- paste("mongodb", cluster, databaseName, collection, username, toString(isSSL), authSource, additionalParams, sep = ":")
+      key <- paste("mongodb", cluster, databaseName, collection, username, toString(isSSL), authSource, additionalParams, sslClientCertKey, sep = ":")
     }
 
     conn <- connection_pool[[key]]
@@ -781,7 +782,17 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       } else {
         url <- getMongoURL(host = host, port = port, database = databaseName, username = username, pass = password, isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParams, timeout = timeout)
       }
-      conn <- mongolite::mongo(collection, url = url)
+      if(!is.null(sslClientCertKey) && sslClientCertKey != '') { # Connect with ssl client cert.
+        if (file.exists(sslClientCertKey)) {
+          conn <- mongolite::mongo(collection, url = url, options = ssl_options(cert = sslClientCertKey))
+        }
+        else { # If cert/key file is missing, which can happen especially on the server, just try connecting without it.
+          conn <- mongolite::mongo(collection, url = url)
+        }
+      }
+      else {
+        conn <- mongolite::mongo(collection, url = url)
+      }
       connection_pool[[key]] <- conn
     }
   } else if(type == "mysql" || type == "aurora") {
@@ -1234,7 +1245,8 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
 #' would return a newly created connection.
 #' @export
 clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, username, catalog = "", schema = "", dsn="", additionalParams = "",
-                              collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, connectionString = NULL, timezone = "") {
+                              collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, connectionString = NULL, timezone = "",
+                              sslClientCertKey = "") {
   if (type %in% c("odbc", "postgres", "redshift", "vertica", "mysql", "aurora", "dbiodbc", "teradata")) { #TODO: implement for other types too
     if (type %in% c("mongodb")) {
       if(!is.na(connectionString) && connectionString != '') {
