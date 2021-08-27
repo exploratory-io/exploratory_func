@@ -1252,9 +1252,9 @@ clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, user
       # make sure to include collection as a key since connection varies per collection.
       key <- paste(connectionString, collection, sep = ":")
     } else if(!is.na(host) && host != ''){
-      key <- paste("mongodb", host, port, databaseName, collection, username, toString(isSSL), authSource, additionalParams, sep = ":")
+      key <- paste("mongodb", host, port, databaseName, collection, username, toString(isSSL), authSource, additionalParams, sslClientCertKey, sep = ":")
     } else if (!is.na(cluster) && cluster != '') {
-      key <- paste("mongodb", cluster, databaseName, collection, username, toString(isSSL), authSource, additionalParams, sep = ":")
+      key <- paste("mongodb", cluster, databaseName, collection, username, toString(isSSL), authSource, additionalParams, sslClientCertKey, sep = ":")
     }
     conn <- connection_pool[[key]]
     if (!is.null(conn)) {
