@@ -785,7 +785,8 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       if(!is.null(sslClientCertKey) && sslClientCertKey != '') { # Connect with ssl client cert.
         if (file.exists(sslClientCertKey)) {
           cert <- openssl::read_cert(sslClientCertKey) # Extract the cert from the pem file.
-          key <- openssl::read_pem(sslClientCertKey)$`RSA PRIVATE KEY` # Extract the key from the pem file.
+          # Extract the key from the pem file. Just passing the file path of the pem that includes both cert and key to mongolite::ssl_options() causes error.
+          key <- openssl::read_pem(sslClientCertKey)$`RSA PRIVATE KEY`
           if (is.null(key)) stop("Cannot find private key in the pem file.")
           key <- openssl::read_key(key)
           conn <- mongolite::mongo(collection, url = url, options = mongolite::ssl_options(cert = cert, key = key))
