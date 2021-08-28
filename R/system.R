@@ -784,7 +784,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       }
       if(!is.null(sslClientCertKey) && sslClientCertKey != '') { # Connect with ssl client cert.
         if (file.exists(sslClientCertKey)) {
-          conn <- mongolite::mongo(collection, url = url, options = ssl_options(cert = sslClientCertKey))
+          conn <- mongolite::mongo(collection, url = url, options = mongolite::ssl_options(cert = sslClientCertKey))
         }
         else { # If cert/key file is missing, which can happen especially on the server, just try connecting without it.
           conn <- mongolite::mongo(collection, url = url)
