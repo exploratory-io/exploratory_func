@@ -557,13 +557,15 @@ salesforce_glue_transformer <- function(expr, envir) {
 #' @export
 queryMongoDB <- function(host = NULL, port = "", database, collection, username, password, query = "{}", flatten,
                          limit=100, isSSL=FALSE, authSource=NULL, fields="{}", sort="{}",
-                         skip=0, queryType = "find", pipeline="{}", cluster = NULL, timeout = NULL, additionalParams = NULL, connectionString = NULL, sslClientCertKey = NULL, ...){
+                         skip=0, queryType = "find", pipeline="{}", cluster = NULL, timeout = NULL, additionalParams = NULL, connectionString = NULL, sslClientCertKey = NULL, subType = NULL, ...){
   if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
   loadNamespace("jsonlite")
 
   # read stored password
   # get connection from connection pool
-  con <- getDBConnection("mongodb", host, port, database, username, password, collection = collection, isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParams, timeout = timeout, connectionString = connectionString, sslClientCertKey = sslClientCertKey)
+  con <- getDBConnection("mongodb", host, port, database, username, password, collection = collection,
+                         isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParams,
+                         timeout = timeout, connectionString = connectionString, sslClientCertKey = sslClientCertKey, subType = subType)
   if(fields == ""){
     fields = "{}"
   }
@@ -611,11 +613,13 @@ queryMongoDB <- function(host = NULL, port = "", database, collection, username,
 #' Returns a data frame that has names of the collections in its "name" column.
 #' @export
 getMongoCollectionNames <- function(host = "", port = "", database = "", username = "",
-                                    password ="", isSSL=FALSE, authSource=NULL, cluster = NULL, timeout = "", additionalParams = "", connectionString = NULL, sslClientCertKey = sslClientCertKey, ...){
+                                    password ="", isSSL=FALSE, authSource=NULL, cluster = NULL, timeout = "", additionalParams = "", connectionString = NULL, sslClientCertKey = NULL, subType = NULL, ...){
   collection = "test" # dummy collection name. mongo command seems to work even if the collection does not exist.
   loadNamespace("jsonlite")
   if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
-  con <- getDBConnection("mongodb", host, port, database, username, password, collection = collection, isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParams, timeout = timeout, connectionString = connectionString, sslClientCertKey = sslClientCertKey)
+  con <- getDBConnection("mongodb", host, port, database, username, password, collection = collection,
+                         isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParams,
+                         timeout = timeout, connectionString = connectionString, sslClientCertKey = sslClientCertKey, subType = subType)
   # command to list collections.
   # con$command is our addition in our mongolite fork.
   result <- con$run(command = '{"listCollections":1}')
@@ -635,10 +639,12 @@ getMongoCollectionNames <- function(host = "", port = "", database = "", usernam
 getMongoCollectionNumberOfRows <- function(host = NULL, port = "", database = "",
                                            username = "", password = "", collection = "",
                                            isSSL=FALSE, authSource=NULL, cluster = NULL, additionalParams = "",
-                                           timeout = NULL, connectionString = NULL, sslClientCertKey = sslClientCertKey, ...){
+                                           timeout = NULL, connectionString = NULL, sslClientCertKey = NULL, subType = NULL, ...){
   loadNamespace("jsonlite")
   if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
-  con <- getDBConnection("mongodb", host, port, database, username, password, collection = collection, isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParams, timeout = timeout, connectionString = connectionString, sslClientCertKey = sslClientCertKey)
+  con <- getDBConnection("mongodb", host, port, database, username, password, collection = collection,
+                         isSSL = isSSL, authSource = authSource, cluster = cluster, additionalParams = additionalParams,
+                         timeout = timeout, connectionString = connectionString, sslClientCertKey = sslClientCertKey, subType = subType)
   tryCatch({
     result <- con$count()
   }, error = function(err) {
@@ -746,7 +752,7 @@ clearAmazonAthenaConnection <- function(driver = "", region = "", authentication
 #' @export
 getDBConnection <- function(type, host = NULL, port = "", databaseName = "", username = "", password = "", catalog = "", schema = "", dsn="", additionalParams = "",
                             collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, timeout = NULL, connectionString = NULL, driver = NULL, timezone = "",
-                            sslClientCertKey = "") {
+                            subType = NULL, sslClientCertKey = "") {
 
   drv = NULL
   conn = NULL
@@ -754,7 +760,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
   if(type == "mongodb") {
     if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
     loadNamespace("jsonlite")
-    if(!is.null(connectionString) && connectionString != '') {
+    if(!is.null(connectionString) && connectionString != '' && (is.null(subType) || subType == '' || subType == 'connectionString')) {
       # make sure to include collection as a key since connection varies per collection.
       key <- paste(connectionString, collection, sep = ":")
     } else if(!is.null(host) && host != ''){
@@ -776,7 +782,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       }
     }
     if (is.null(conn)) {
-      if(!is.null(connectionString) && connectionString != '') {
+      if(!is.null(connectionString) && connectionString != '' && (is.null(subType) || subType == '' || subType == 'connectionString')) {
         # if connection string is provided, use it for the url.
         url <- connectionString
       } else {
