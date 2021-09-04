@@ -14,9 +14,9 @@ getS3Folders <- function(bucket, prefix = NULL, ...) {
   # Handle pagination for large result set.
   while (result[["IsTruncated"]] == "true" & !shouldStop) { # if IsTruncted is true, need to send another request to get the remaining result.
     # Get the last row from the result and check the Key and pass that as a new marker to make the pagination works.
-    if (is.null(tail(result, 1)[["Contents"]])) {
+    if (is.null(tail(result, 1)[["Contents"]])) {# if result does not have Contents, stop here.
       shouldStop <- TRUE
-    } else if (tail(result, 1)[["Contents"]][["Key"]] == nextMarker) {
+    } else if (tail(result, 1)[["Contents"]][["Key"]] == nextMarker) { # if nextMarker is same as the current one, stop here.
       shouldStop <- TRUE
     } else {
       nextMarker <-  tail(result, 1)[["Contents"]][["Key"]]
@@ -56,10 +56,11 @@ get_s3_bucket <- function(bucket, prefix = NULL, delimiter = NULL, max = NULL, m
   if (isTRUE(parse_response)) {
     shouldStop <- FALSE
     nextMarker <- ""
+    # make sure if we can keep submitting a HTTP request by checking "shouldStop" variable.
     while (!shouldStop && result[["IsTruncated"]] == "true" && !is.null(max) && as.integer(result[["MaxKeys"]]) < max) {
-      if (is.null(tail(result, 1)[["Contents"]])) {
+      if (is.null(tail(result, 1)[["Contents"]])) { # if result does not have Contents, stop here.
         shouldStop <- TRUE
-      } else if (tail(result, 1)[["Contents"]][["Key"]] == nextMarker) {
+      } else if (tail(result, 1)[["Contents"]][["Key"]] == nextMarker) { # if nextMarker is same as the current one, stop here.
         shouldStop <- TRUE
       } else {
         nextMarker <- tail(result, 1)[["Contents"]][["Key"]]
