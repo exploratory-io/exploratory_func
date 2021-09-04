@@ -9,17 +9,25 @@ getS3Folders <- function(bucket, prefix = NULL, ...) {
   limit <- 1000
   query <- list(prefix = prefix, delimiter = "/", "max-keys" = limit, marker = NULL)
   result <- aws.s3::s3HTTP(verb = "GET", bucket = bucket, query = query, parse_response = TRUE, ...)
+  shouldStop <- FALSE
+  nextMarker <- ""
   # Handle pagination for large result set.
-  while (result[["IsTruncated"]] == "true") { # if IsTruncted is true, need to send another request to get the remaining result.
+  while (result[["IsTruncated"]] == "true" & !shouldStop) { # if IsTruncted is true, need to send another request to get the remaining result.
     # Get the last row from the result and check the Key and pass that as a new marker to make the pagination works.
-    nextMarker =  tail(result, 1)[["Contents"]][["Key"]]
-    query <- list(prefix = prefix, delimiter = "/", "max-keys" = 1000, marker = nextMarker)
-    # Send another query to get remaining.
-    additionalResult <- aws.s3::s3HTTP(verb = "GET", bucket = bucket, query = query, parse_response = TRUE, ...)
-    # Append additional query result
-    combinedResult <- c(result, additionalResult)
-    combinedResult[["IsTruncated"]] <- additionalResult[["IsTruncated"]]
-    result <- combinedResult
+    if (is.null(tail(result, 1)[["Contents"]])) {
+      shouldStop <- TRUE
+    } else if (tail(result, 1)[["Contents"]][["Key"]] == nextMarker) {
+      shouldStop <- TRUE
+    } else {
+      nextMarker <-  tail(result, 1)[["Contents"]][["Key"]]
+      query <- list(prefix = prefix, delimiter = "/", "max-keys" = 1000, marker = nextMarker)
+      # Send another query to get remaining.
+      additionalResult <- aws.s3::s3HTTP(verb = "GET", bucket = bucket, query = query, parse_response = TRUE, ...)
+      # Append additional query result
+      combinedResult <- c(result, additionalResult)
+      combinedResult[["IsTruncated"]] <- additionalResult[["IsTruncated"]]
+      result <- combinedResult
+    }
   }
   # Folders are stored under CommonPrefixes
   df <- data.frame(result[names(result) == "CommonPrefixes"])
@@ -33,6 +41,78 @@ getS3Folders <- function(bucket, prefix = NULL, ...) {
     data.frame()
   }
 }
+
+#' API to get a items inside S3 bucket.
+#'
+#' @export
+get_s3_bucket <- function(bucket, prefix = NULL, delimiter = NULL, max = NULL, marker = NULL, parse_response = TRUE, ...) {
+  if (is.null(max)) {
+    query <- list(prefix = prefix, delimiter = delimiter, "max-keys" = NULL, marker = marker)
+  } else {
+    query <- list(prefix = prefix, delimiter = delimiter, "max-keys" = as.integer(pmin(1000, max)), marker = marker)
+  }
+  result <- aws.s3::s3HTTP(verb = "GET", bucket = bucket, query = query, parse_response = parse_response, ...)
+
+  if (isTRUE(parse_response)) {
+    shouldStop <- FALSE
+    nextMarker <- ""
+    while (!shouldStop && result[["IsTruncated"]] == "true" && !is.null(max) && as.integer(result[["MaxKeys"]]) < max) {
+      if (is.null(tail(result, 1)[["Contents"]])) {
+        shouldStop <- TRUE
+      } else if (tail(result, 1)[["Contents"]][["Key"]] == nextMarker) {
+        shouldStop <- TRUE
+      } else {
+        nextMarker <- tail(result, 1)[["Contents"]][["Key"]]
+      }
+      query <- list(
+        prefix = prefix,
+        delimiter = delimiter,
+        "max-keys" = as.integer(pmin(max - as.integer(result[["MaxKeys"]]), 1000)),
+        marker = nextMarker
+      )
+      extra <- aws.s3::s3HTTP(verb = "GET", bucket = bucket, query = query, parse_response = parse_response, ...)
+      additionalResult <- c(result, tail(extra, -5))
+      additionalResult[["MaxKeys"]] <- as.character(as.integer(result[["MaxKeys"]]) + as.integer(extra[["MaxKeys"]]))
+      additionalResult[["IsTruncated"]] <- extra[["IsTruncated"]]
+      attr(additionalResult, "x-amz-id-2") <- attr(result, "x-amz-id-2")
+      attr(additionalResult, "x-amz-request-id") <- attr(result, "x-amz-request-id")
+      attr(additionalResult, "date") <- attr(result, "date")
+      attr(additionalResult, "x-amz-bucket-region") <- attr(result, "x-amz-bucket-region")
+      attr(additionalResult, "content-type") <- attr(result, "content-type")
+      attr(additionalResult, "transfer-encoding") <- attr(result, "transfer-encoding")
+      attr(additionalResult, "server") <- attr(result, "server")
+      result <- additionalResult
+    }
+  } else {
+    return(result)
+  }
+
+  for (i in which(names(result) == "Contents")) {
+    result[[i]][["Bucket"]] <- aws.s3::get_bucketname(bucket)
+    result[[i]][["Size"]] <- as.numeric(result[[i]][["Size"]])
+    attr(result[[i]], "class") <- "s3_object"
+  }
+  att <- result[names(result) != "Contents"]
+  result[names(result) != "Contents"] <- NULL
+
+  # collapse CommonPrefixes elements
+  cp <- att[names(att) == "CommonPrefixes"]
+  att[names(att) == "CommonPrefixes"] <- NULL
+  att[["CommonPrefixes"]] <- as.character(cp)
+
+  # return value
+  out <- structure(result, class = "s3_bucket")
+  attributes(out) <- c(attributes(out), att)
+  out
+}
+
+#' Wrapper function to exploratory::get_bucket and it returns a data frame.
+#' @export
+get_s3_bucket_df <-function(bucket, prefix = NULL, delimiter = NULL, max = NULL, marker = NULL, ...) {
+    result <- exploratory:::get_s3_bucket(bucket = bucket, prefix = prefix, delimiter = delimiter,
+                    max = max, marker = marker, parse_response = TRUE, ...)
+    as.data.frame(result)
+  }
 
 
 #' API to download remote data file (excel, csv) from Amazon S3 and cache it if necessary
