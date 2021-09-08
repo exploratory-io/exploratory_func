@@ -16,13 +16,15 @@ test_that("test clean_data_frame",{
   expect_equal(colnames(result2), c("country  year"))
 
   # Make sure clean_data_frame drops row names.
-  # mtcars has row names.
+  # Use mtcars for the test because it has row names.
   df3a <- mtcars
-  df3b <- mtcars
   df3a <- clean_data_frame(df3a)
+  df3b <- mtcars
   row.names(df3b) <- NULL
+  # Compare the row names between data frames. 
+  # One data frame is processed by clean_data_frame.
+  # The other one is processed manually.
   expect_equal(row.names(df3a), row.names(df3b))
-
 })
 
 test_that("test parse_html_tables",{
