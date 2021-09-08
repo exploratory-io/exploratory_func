@@ -14,6 +14,15 @@ test_that("test clean_data_frame",{
   colnames(df2)<-c("country \\ year")
   result2 <- clean_data_frame(df2)
   expect_equal(colnames(result2), c("country  year"))
+
+  # Make sure clean_data_frame drops row names.
+  # mtcars has row names.
+  df3a <- mtcars
+  df3b <- mtcars
+  df3a <- clean_data_frame(df3a)
+  row.names(df3b) <- NULL
+  expect_equal(row.names(df3a), row.names(df3b))
+
 })
 
 test_that("test parse_html_tables",{
