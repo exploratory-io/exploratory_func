@@ -654,14 +654,8 @@ getMongoCollectionNumberOfRows <- function(host = NULL, port = "", database = ""
   return(result)
 }
 
-#' Returns a Amazon Athena connection.
-#' @export
-getAmazonAthenaConnection <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", timezone = "", endpointOverride = "", ...) {
-  loadNamespace("odbc")
+createAmazonAthenaConnectionString <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", timezone = "", endpointOverride = "", ...) {
   loadNamespace("stringr")
-  if(!requireNamespace("odbc")){stop("package odbc must be installed.")}
-  if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
-
   # if platform is Linux use predefined one
   if(Sys.info()["sysname"]=="Linux"){
     driver <-  "/opt/simba/athenaodbc/lib/64/libathenaodbc_sb64.so";
@@ -679,7 +673,7 @@ getAmazonAthenaConnection <- function(driver = "", region = "", authenticationTy
   connectionString <- stringr::str_c(connectionString, ";timezone_out=", timezone)
 
   if (endpointOverride != "") {
-    connectionString <- stringr::str_c(connectionString, ";EndPointOverride=", endpointOverride)
+    connectionString <- stringr::str_c(connectionString, ";EndpointOverride=", endpointOverride)
   }
 
   # For Windows, set encoding to make sure non-ascii data is handled properly.
@@ -692,6 +686,26 @@ getAmazonAthenaConnection <- function(driver = "", region = "", authenticationTy
       connectionString <- stringr::str_c(connectionString, ";encoding=", encoding[[1]][[2]])
     }
   }
+  connectionString
+}
+
+#' Returns a Amazon Athena connection.
+#' @export
+getAmazonAthenaConnection <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", timezone = "", endpointOverride = "", ...) {
+  loadNamespace("odbc")
+  loadNamespace("stringr")
+  if(!requireNamespace("odbc")){stop("package odbc must be installed.")}
+  if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
+
+  connectionString <- createAmazonAthenaConnectionString(driver = driver,
+                                                         region = region,
+                                                         authenticationType = authenticationType,
+                                                         s3OutputLocation = s3OutputLocation,
+                                                         user = user,
+                                                         password = password,
+                                                         additionalParams = additionalParams,
+                                                         timezone = timezone,
+                                                         endpointOverride = endpointOverride)
 
   conn <- NULL
   if (user_env$pool_connection) {
@@ -709,17 +723,16 @@ getAmazonAthenaConnection <- function(driver = "", region = "", authenticationTy
 #' Clears AWS Athena Connection.
 #' @export
 clearAmazonAthenaConnection <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", timezone = "", endpointOverride = "", ...){
-  key <- stringr::str_c("AwsRegion=",  region, ";AuthenticationType=", authenticationType, ";uid=", user,
-                        ";pwd=", password, ";S3OutputLocation=", s3OutputLocation, ";driver=", driver)
-  if (additionalParams != "") {
-    key <- stringr::str_c(key,";", additionalParams)
-  }
-  if (timezone != "") {
-    key <- stringr::str_c(key,";", timezone)
-  }
-  if (endpointOverride != "") {
-    key <- stringr::str_c(key,";", endpointOverride)
-  }
+
+  key <- createAmazonAthenaConnectionString(driver = driver,
+                                                         region = region,
+                                                         authenticationType = authenticationType,
+                                                         s3OutputLocation = s3OutputLocation,
+                                                         user = user,
+                                                         password = password,
+                                                         additionalParams = additionalParams,
+                                                         timezone = timezone,
+                                                         endpointOverride = endpointOverride)
 
   conn <- connection_pool[[key]]
   if (!is.null(conn)) {
