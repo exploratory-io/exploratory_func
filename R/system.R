@@ -672,11 +672,25 @@ getAmazonAthenaConnection <- function(driver = "", region = "", authenticationTy
   if(additionalParams != "") {
     connectionString <- stringr::str_c(connectionString, ";", additionalParams)
   }
-  if(timezone != "") {
-    connectionString <- stringr::str_c(connectionString, ";", timezone)
+  if (timezone == "") {
+    timezone <- "UTC" # if timezone is not provided use UTC as default timezone. This is also the default for odbc::dbConnect.
   }
+  connectionString <- stringr::str_c(connectionString, ";timezone=", timezone)
+  connectionString <- stringr::str_c(connectionString, ";timezone_out=", timezone)
+
   if (endpointOverride != "") {
-    connectionString <- stringr::str_c(connectionString, ";", endpointOverride)
+    connectionString <- stringr::str_c(connectionString, ";EndPointOverride=", endpointOverride)
+  }
+
+  # For Windows, set encoding to make sure non-ascii data is handled properly.
+  # ref: https://github.com/r-dbi/odbc/issues/153
+  if (is.win <- Sys.info()['sysname'] == 'Windows') {
+    loc <- Sys.getlocale(category = "LC_CTYPE")
+    # loc looks like "Japanese_Japan.932", so split it with dot ".".
+    encoding <- stringr::str_split(loc, pattern = "\\.")
+    if (length(encoding[[1]]) == 2) {
+      connectionString <- stringr::str_c(connectionString, ";encoding=", encoding[[1]][[2]])
+    }
   }
 
   conn <- NULL
@@ -684,45 +698,7 @@ getAmazonAthenaConnection <- function(driver = "", region = "", authenticationTy
     conn <- connection_pool[[connectionString]]
   }
   if (is.null(conn)) {
-    if (timezone == "") {
-      timezone <- "UTC" # if timezone is not provided use UTC as default timezone. This is also the default for odbc::dbConnect.
-    }
-
-    loc <- Sys.getlocale(category = "LC_CTYPE")
-    # loc looks like "Japanese_Japan.932", so split it with dot ".".
-    encoding <- stringr::str_split(loc, pattern = "\\.")
-
-    # For Windows, set encoding to make sure non-ascii data is handled properly.
-    # ref: https://github.com/r-dbi/odbc/issues/153
-    if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2) {
-        # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
-        conn <- DBI::dbConnect(
-          odbc::odbc(),
-          Driver             = driver,
-          S3OutputLocation   = s3OutputLocation,
-          AwsRegion          = region,
-          AuthenticationType = authenticationType,
-          encoding           = encoding[[1]][[2]],
-          timezone           = timezone,
-          timezone_out       = timezone,
-          UID                = user,
-          PWD                = password,
-          EndpointOverride   = endpointOverride
-        )
-    } else { # without encoding case.
-        conn <- DBI::dbConnect(
-          odbc::odbc(),
-          Driver             = driver,
-          S3OutputLocation   = s3OutputLocation,
-          AwsRegion          = region,
-          AuthenticationType = authenticationType,
-          timezone           = timezone,
-          timezone_out       = timezone,
-          UID                = user,
-          PWD                = password,
-          EndpointOverride   = endpointOverride
-        )
-    }
+    conn <- DBI::dbConnect(odbc::odbc(), .connection_string = connectionString)
     if (user_env$pool_connection) { # pool connection if connection pooling is on.
       connection_pool[[connectionString]] <- conn
     }
