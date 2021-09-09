@@ -732,15 +732,19 @@ getAmazonAthenaConnection <- function(driver = "", region = "", authenticationTy
 
 #' Clears AWS Athena Connection.
 #' @export
-clearAmazonAthenaConnection <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", timezone = "", ...){
+clearAmazonAthenaConnection <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", timezone = "", endpointOverride = "", ...){
   key <- stringr::str_c("AwsRegion=",  region, ";AuthenticationType=", authenticationType, ";uid=", user,
                         ";pwd=", password, ";S3OutputLocation=", s3OutputLocation, ";driver=", driver)
+  if (additionalParams != "") {
+    key <- stringr::str_c(key,";", additionalParams)
+  }
   if (timezone != "") {
     key <- stringr::str_c(key,";", timezone)
   }
-  if(additionalParams != "") {
-    key <- stringr::str_c(key,";", additionalParams)
+  if (endpointOverride != "") {
+    key <- stringr::str_c(key,";", endpointOverride)
   }
+
   conn <- connection_pool[[key]]
   if (!is.null(conn)) {
     tryCatch({ # try to close connection and ignore error
@@ -1544,7 +1548,7 @@ queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IA
       # when it is error, RODBC::sqlQuery() does not stop() (throw) with error most of the cases.
       # in such cases, df is a character vecter rather than a data.frame.
       clearAmazonAthenaConnection(driver = driver, region = region, authenticationType = authenticationType, s3OutputLocation = s3OutputLocation,
-                        user = user, password = password, additionalParams = additionalParams)
+                        user = user, password = password, additionalParams = additionalParams, endpointOverride = endpointOverride)
       stop(paste(df, collapse = "\n"))
     }
     if (!user_env$pool_connection) {
