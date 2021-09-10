@@ -712,7 +712,30 @@ getAmazonAthenaConnection <- function(driver = "", region = "", authenticationTy
     conn <- connection_pool[[connectionString]]
   }
   if (is.null(conn)) {
-    conn <- DBI::dbConnect(odbc::odbc(), .connection_string = connectionString)
+    if (timezone == "") {
+      timezone <- "UTC" # if timezone is not provided use UTC as default timezone. This is also the default for odbc::dbConnect.
+    }
+
+    loc <- Sys.getlocale(category = "LC_CTYPE")
+    # loc looks like "Japanese_Japan.932", so split it with dot ".".
+    encoding <- stringr::str_split(loc, pattern = "\\.")
+
+    # For Windows, set encoding to make sure non-ascii data is handled properly.
+    # ref: https://github.com/r-dbi/odbc/issues/153
+    if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2) {
+      # Encoding and Timezone are need to be passed as a explict argument.
+      conn <- DBI::dbConnect(odbc::odbc(),
+                             encoding           = encoding[[1]][[2]],
+                             timezone           = timezone,
+                             timezone_out       = timezone,
+                             .connection_string = connectionString)
+    } else {
+      # Encoding and Timezone are need to be passed as a explict argument.
+      conn <- DBI::dbConnect(odbc::odbc(),
+                             timezone           = timezone,
+                             timezone_out       = timezone,
+                             .connection_string = connectionString)
+    }
     if (user_env$pool_connection) { # pool connection if connection pooling is on.
       connection_pool[[connectionString]] <- conn
     }
@@ -725,14 +748,14 @@ getAmazonAthenaConnection <- function(driver = "", region = "", authenticationTy
 clearAmazonAthenaConnection <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", timezone = "", endpointOverride = "", ...){
 
   key <- createAmazonAthenaConnectionString(driver = driver,
-                                                         region = region,
-                                                         authenticationType = authenticationType,
-                                                         s3OutputLocation = s3OutputLocation,
-                                                         user = user,
-                                                         password = password,
-                                                         additionalParams = additionalParams,
-                                                         timezone = timezone,
-                                                         endpointOverride = endpointOverride)
+                                            region = region,
+                                            authenticationType = authenticationType,
+                                            s3OutputLocation = s3OutputLocation,
+                                            user = user,
+                                            password = password,
+                                            additionalParams = additionalParams,
+                                            timezone = timezone,
+                                            endpointOverride = endpointOverride)
 
   conn <- connection_pool[[key]]
   if (!is.null(conn)) {
