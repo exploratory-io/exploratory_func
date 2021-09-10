@@ -654,14 +654,8 @@ getMongoCollectionNumberOfRows <- function(host = NULL, port = "", database = ""
   return(result)
 }
 
-#' Returns a Amazon Athena connection.
-#' @export
-getAmazonAthenaConnection <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", timezone = "", endpointOverride = "", ...) {
-  loadNamespace("odbc")
+createAmazonAthenaConnectionString <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", timezone = "", endpointOverride = "", ...) {
   loadNamespace("stringr")
-  if(!requireNamespace("odbc")){stop("package odbc must be installed.")}
-  if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
-
   # if platform is Linux use predefined one
   if(Sys.info()["sysname"]=="Linux"){
     driver <-  "/opt/simba/athenaodbc/lib/64/libathenaodbc_sb64.so";
@@ -672,12 +666,46 @@ getAmazonAthenaConnection <- function(driver = "", region = "", authenticationTy
   if(additionalParams != "") {
     connectionString <- stringr::str_c(connectionString, ";", additionalParams)
   }
-  if(timezone != "") {
-    connectionString <- stringr::str_c(connectionString, ";", timezone)
+  if (timezone == "") {
+    timezone <- "UTC" # if timezone is not provided use UTC as default timezone. This is also the default for odbc::dbConnect.
   }
+  connectionString <- stringr::str_c(connectionString, ";timezone=", timezone)
+  connectionString <- stringr::str_c(connectionString, ";timezone_out=", timezone)
+
   if (endpointOverride != "") {
-    connectionString <- stringr::str_c(connectionString, ";", endpointOverride)
+    connectionString <- stringr::str_c(connectionString, ";EndpointOverride=", endpointOverride)
   }
+
+  # For Windows, set encoding to make sure non-ascii data is handled properly.
+  # ref: https://github.com/r-dbi/odbc/issues/153
+  if (is.win <- Sys.info()['sysname'] == 'Windows') {
+    loc <- Sys.getlocale(category = "LC_CTYPE")
+    # loc looks like "Japanese_Japan.932", so split it with dot ".".
+    encoding <- stringr::str_split(loc, pattern = "\\.")
+    if (length(encoding[[1]]) == 2) {
+      connectionString <- stringr::str_c(connectionString, ";encoding=", encoding[[1]][[2]])
+    }
+  }
+  connectionString
+}
+
+#' Returns a Amazon Athena connection.
+#' @export
+getAmazonAthenaConnection <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", timezone = "", endpointOverride = "", ...) {
+  loadNamespace("odbc")
+  loadNamespace("stringr")
+  if(!requireNamespace("odbc")){stop("package odbc must be installed.")}
+  if(!requireNamespace("stringr")){stop("package stringr must be installed.")}
+
+  connectionString <- createAmazonAthenaConnectionString(driver = driver,
+                                                         region = region,
+                                                         authenticationType = authenticationType,
+                                                         s3OutputLocation = s3OutputLocation,
+                                                         user = user,
+                                                         password = password,
+                                                         additionalParams = additionalParams,
+                                                         timezone = timezone,
+                                                         endpointOverride = endpointOverride)
 
   conn <- NULL
   if (user_env$pool_connection) {
@@ -695,33 +723,18 @@ getAmazonAthenaConnection <- function(driver = "", region = "", authenticationTy
     # For Windows, set encoding to make sure non-ascii data is handled properly.
     # ref: https://github.com/r-dbi/odbc/issues/153
     if (is.win <- Sys.info()['sysname'] == 'Windows' && length(encoding[[1]]) == 2) {
-        # encoding looks like: [1] "Japanese_Japan" "932" so check the second part exists or not.
-        conn <- DBI::dbConnect(
-          odbc::odbc(),
-          Driver             = driver,
-          S3OutputLocation   = s3OutputLocation,
-          AwsRegion          = region,
-          AuthenticationType = authenticationType,
-          encoding           = encoding[[1]][[2]],
-          timezone           = timezone,
-          timezone_out       = timezone,
-          UID                = user,
-          PWD                = password,
-          EndpointOverride   = endpointOverride
-        )
-    } else { # without encoding case.
-        conn <- DBI::dbConnect(
-          odbc::odbc(),
-          Driver             = driver,
-          S3OutputLocation   = s3OutputLocation,
-          AwsRegion          = region,
-          AuthenticationType = authenticationType,
-          timezone           = timezone,
-          timezone_out       = timezone,
-          UID                = user,
-          PWD                = password,
-          EndpointOverride   = endpointOverride
-        )
+      # Encoding and Timezone are need to be passed as a explict argument.
+      conn <- DBI::dbConnect(odbc::odbc(),
+                             encoding           = encoding[[1]][[2]],
+                             timezone           = timezone,
+                             timezone_out       = timezone,
+                             .connection_string = connectionString)
+    } else {
+      # Encoding and Timezone are need to be passed as a explict argument.
+      conn <- DBI::dbConnect(odbc::odbc(),
+                             timezone           = timezone,
+                             timezone_out       = timezone,
+                             .connection_string = connectionString)
     }
     if (user_env$pool_connection) { # pool connection if connection pooling is on.
       connection_pool[[connectionString]] <- conn
@@ -733,17 +746,16 @@ getAmazonAthenaConnection <- function(driver = "", region = "", authenticationTy
 #' Clears AWS Athena Connection.
 #' @export
 clearAmazonAthenaConnection <- function(driver = "", region = "", authenticationType = "IAM Credentials", s3OutputLocation = "", user = "", password = "", additionalParams = "", timezone = "", endpointOverride = "", ...){
-  key <- stringr::str_c("AwsRegion=",  region, ";AuthenticationType=", authenticationType, ";uid=", user,
-                        ";pwd=", password, ";S3OutputLocation=", s3OutputLocation, ";driver=", driver)
-  if (additionalParams != "") {
-    key <- stringr::str_c(key,";", additionalParams)
-  }
-  if (timezone != "") {
-    key <- stringr::str_c(key,";", timezone)
-  }
-  if (endpointOverride != "") {
-    key <- stringr::str_c(key,";", endpointOverride)
-  }
+
+  key <- createAmazonAthenaConnectionString(driver = driver,
+                                            region = region,
+                                            authenticationType = authenticationType,
+                                            s3OutputLocation = s3OutputLocation,
+                                            user = user,
+                                            password = password,
+                                            additionalParams = additionalParams,
+                                            timezone = timezone,
+                                            endpointOverride = endpointOverride)
 
   conn <- connection_pool[[key]]
   if (!is.null(conn)) {
