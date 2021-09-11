@@ -927,7 +927,6 @@ str_extract_after <- function(column, sep = "\\,", include_sep = TRUE){
   if (include_sep){
     stringr::str_extract(column, stringr::str_c(sep, ".*"))
   } else {
-    #(?<=あ)(.*)
     stringr::str_extract(column, stringr::str_c("(?<=", sep, ")(.*)"))
   }
 }
