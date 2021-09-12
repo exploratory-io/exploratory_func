@@ -933,7 +933,7 @@ str_extract_after <- function(column, sep = "\\,", include_sep = TRUE){
 #'Function to replace text before the separator.
 #'
 #'export
-str_replace_before <- function(column, sep = ",", rep = "", include_sep = TRUE) {
+str_replace_before <- function(column, sep = "\\,", rep = "", include_sep = TRUE) {
   if (include_sep) {
     stringr::str_replace(column, stringr::str_c(".*", sep), rep)
   } else {
