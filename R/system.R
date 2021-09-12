@@ -2287,6 +2287,8 @@ clean_data_frame <- function(x) {
   # Remove tab, new line, carriage return, and backslash from column names
   clean_names <- original_names  %>% gsub("[\r\n\t\\]", "", .)
   names(df) <- clean_names
+  # Remove row names.
+  row.names(df) <- NULL
   df
 }
 
