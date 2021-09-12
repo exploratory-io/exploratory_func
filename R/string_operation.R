@@ -912,7 +912,7 @@ str_remove_emoji <- function(column, position = "any"){
 #'Function to extract text before the separator.
 #'
 #'export
-str_extract_before <- function(column, sep = "\\,", include_sep = TRUE) {
+str_extract_before <- function(column, sep = "\\,", include_sep = FALSE) {
   if (include_sep) {
     stringr::str_extract(column, stringr::str_c(".*", sep))
   } else {
@@ -923,7 +923,7 @@ str_extract_before <- function(column, sep = "\\,", include_sep = TRUE) {
 #'Function to extract text after the separator.
 #'
 #'export
-str_extract_after <- function(column, sep = "\\,", include_sep = TRUE){
+str_extract_after <- function(column, sep = "\\,", include_sep = FALSE){
   if (include_sep){
     stringr::str_extract(column, stringr::str_c(sep, ".*"))
   } else {
