@@ -909,6 +909,62 @@ str_remove_emoji <- function(column, position = "any"){
   stringi::stri_replace_all(column, regex = regexp, "")
 }
 
+#'Function to extract text before the separator.
+#'
+#'export
+str_extract_before <- function(column, sep = "\\,", include_sep = FALSE) {
+  if (include_sep) {
+    stringr::str_extract(column, stringr::str_c(".*", sep))
+  } else {
+    stringr::str_extract(column, stringr::str_c("(.*)(?=", sep, ")"))
+  }
+}
+
+#'Function to extract text after the separator.
+#'
+#'export
+str_extract_after <- function(column, sep = "\\,", include_sep = FALSE){
+  if (include_sep){
+    stringr::str_extract(column, stringr::str_c(sep, ".*"))
+  } else {
+    stringr::str_extract(column, stringr::str_c("(?<=", sep, ")(.*)"))
+  }
+}
+#'Function to replace text before the separator.
+#'
+#'export
+str_replace_before <- function(column, sep = "\\,", rep = "", include_sep = TRUE) {
+  if (include_sep) {
+    stringr::str_replace(column, stringr::str_c(".*", sep), rep)
+  } else {
+    stringr::str_replace(column, stringr::str_c("(.*)(?=", sep, ")"), rep)
+  }
+}
+
+#'Function to replace text after the separator.
+#'
+#'export
+str_replace_after <- function(column, sep = "\\,", rep = "", include_sep = TRUE){
+  if (include_sep) {
+    stringr::str_replace(column, stringr::str_c(sep, ".*"), rep)
+  } else {
+    stringr::str_replace(column, stringr::str_c("(?<=", sep, ")(.*)"), rep)
+  }
+}
+#'Function to remove text before the separator.
+#'
+#'export
+str_remove_before <- function(column, sep = "\\,", include_sep = TRUE) {
+  exploratory::str_replace_before(column, sep = sep, include_sep = include_sep)
+}
+
+#'Function to remove text after the separator.
+#'
+#'export
+str_remove_after <- function(column, sep = "\\,", include_sep = TRUE){
+  exploratory::str_replace_after(column, sep = sep, include_sep = include_sep)
+}
+
 #'Function to remove range of text.
 #'This uses exploratory::str_replace_range under the hood and pass empty string as replacement to remove it.
 #'

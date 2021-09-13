@@ -800,3 +800,49 @@ test_that("str_replace_range: negative index", {
   ret <- exploratory::str_replace_range(c("Aaron Bergman", "Justin Ritter", "Craig Reiter"), -3, -9, "AAA")
   expect_equal(ret, c("Aaron Bergman", "Justin Ritter", "Craig Reiter"))
 })
+
+
+test_that("str_remove_before", {
+  ret <- exploratory::str_remove_before(c("kei@exploratory.io", "hideaki@exploratory.io", "hide@exploratory.io"), sep = "@")
+  expect_equal(ret, c("exploratory.io", "exploratory.io", "exploratory.io"))
+  ret <- exploratory::str_remove_before(c("kei@exploratory.io", "hideaki@exploratory.io", "hide@exploratory.io"), sep = "@", include_sep = FALSE)
+  expect_equal(ret, c("@exploratory.io", "@exploratory.io", "@exploratory.io"))
+})
+
+test_that("str_remove_after", {
+  ret <- exploratory::str_remove_after(c("kei@exploratory.io", "hideaki@exploratory.io", "hide@exploratory.io"), sep = "@")
+  expect_equal(ret, c("kei", "hideaki", "hide"))
+  ret <- exploratory::str_remove_after(c("kei@exploratory.io", "hideaki@exploratory.io", "hide@exploratory.io"), sep = "@", include_sep = FALSE)
+  expect_equal(ret, c("kei@", "hideaki@", "hide@"))
+})
+
+test_that("str_replace_before", {
+  ret <- exploratory::str_replace_before(c("kei@exploratory.io", "hideaki@exploratory.io", "hide@exploratory.io"), sep = "@", rep = "dev")
+  expect_equal(ret, c("devexploratory.io", "devexploratory.io", "devexploratory.io"))
+  ret <- exploratory::str_replace_before(c("kei@exploratory.io", "hideaki@exploratory.io", "hide@exploratory.io"), sep = "@", rep = "dev", include_sep = FALSE)
+  expect_equal(ret, c("dev@exploratory.io", "dev@exploratory.io", "dev@exploratory.io"))
+})
+
+test_that("str_replace_after", {
+  ret <- exploratory::str_replace_after(c("kei@exploratory.io", "hideaki@exploratory.io", "hide@exploratory.io"), sep = "@", rep = "test")
+  expect_equal(ret, c("keitest", "hideakitest", "hidetest"))
+  ret <- exploratory::str_replace_after(c("kei@exploratory.io", "hideaki@exploratory.io", "hide@exploratory.io"), sep = "@", rep = "test", include_sep = FALSE)
+  expect_equal(ret, c("kei@test", "hideaki@test", "hide@test"))
+})
+
+test_that("str_extract_before", {
+  ret <- exploratory::str_extract_before(c("kei@exploratory.io", "hideaki@exploratory.io", "hide@exploratory.io"), sep = "@", include_sep = TRUE)
+  expect_equal(ret, c("kei@", "hideaki@", "hide@"))
+  ret <- exploratory::str_extract_before(c("kei@exploratory.io", "hideaki@exploratory.io", "hide@exploratory.io"), sep = "@")
+  expect_equal(ret, c("kei", "hideaki", "hide"))
+
+})
+
+test_that("str_extract_after", {
+  ret <- exploratory::str_extract_after(c("kei@exploratory.io", "hideaki@exploratory.io", "hide@exploratory.io"), sep = "@", include_sep = TRUE)
+  expect_equal(ret, c("@exploratory.io", "@exploratory.io", "@exploratory.io"))
+  ret <- exploratory::str_extract_after(c("kei@exploratory.io", "hideaki@exploratory.io", "hide@exploratory.io"), sep = "@")
+  expect_equal(ret, c("exploratory.io", "exploratory.io", "exploratory.io"))
+
+})
+
