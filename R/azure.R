@@ -17,14 +17,16 @@ getAzureContainer <- function(url = "", sas = "", container = "") {
 listAzureContainers <- function(url = "", sas = ""){
   endpoint <- getAzureEndPoint(url = url, sas = sas)
   containers <- AzureStor::list_storage_containers(endpoint)
-  df <- data.frame(matrix(unlist(containers), nrow=length(containers), byrow=TRUE))
+  df <- data.frame(matrix(unlist(containers), nrow = length(containers), byrow = TRUE))
   colnames(df) <- c("name", "endpoint", "sas", "version")
   df
 }
 #' @param url
 #' @param sas
+#' @param container
+#' @param dir
 #' export
-listItemsInAzure <- function(url = "", sas = "", container = ""){
-  container <- getAzureContainer(url = url, sas = sas, container = container)
+listItemsInAzure <- function(url = "", sas = "", container = "", dir = ""){
+  container <- getAzureContainer(url = url, sas = sas, container = container, dir = dir)
   AzureStor::list_storage_files(container)
 }
