@@ -24,9 +24,9 @@ listAzureContainers <- function(host = "", securityToken = ""){
 #' @param host
 #' @param sas
 #' @param container
-#' @param dir
+#' @param folder
 #' export
-listItemsInAzure <- function(host = "", securityToken = "", container = "", dir = ""){
-  container <- getAzureContainer(host = host, securityToken = securityToken, container = container, dir = dir)
-  AzureStor::list_storage_files(container)
+listItemsInAzure <- function(host = "", securityToken = "", container = "", folder = ""){
+  container <- getAzureContainer(host = host, securityToken = securityToken, container = container)
+  AzureStor::list_storage_files(container, dir = folder, info = "all")
 }
