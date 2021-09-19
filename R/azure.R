@@ -1,32 +1,32 @@
-#' @param url
-#' @param sas
+#' @param host
+#' @param password
 #' export
-getAzureEndPoint <- function(url = "", sas = ""){
-  AzureStor::storage_endpoint(endpoint = url, sas = sas)
+getAzureEndPoint <- function(host = "", securityToken = ""){
+  AzureStor::storage_endpoint(endpoint = host, sas = securityToken)
 }
-#' @param url
+#' @param host
 #' @param sas
 #' export
-getAzureContainer <- function(url = "", sas = "", container = "") {
-  endpoint <- getAzureEndPoint(url = url, sas = sas)
+getAzureContainer <- function(host = "", securityToken = "", container = "") {
+  endpoint <- getAzureEndPoint(host = host, securityToken = securityToken)
   AzureStor::storage_container(endpoint, container)
 }
-#' @param url
+#' @param host
 #' @param sas
 #' export
-listAzureContainers <- function(url = "", sas = ""){
-  endpoint <- getAzureEndPoint(url = url, sas = sas)
+listAzureContainers <- function(host = "", securityToken = ""){
+  endpoint <- getAzureEndPoint(host = host, securityToken = securityToken)
   containers <- AzureStor::list_storage_containers(endpoint)
   df <- data.frame(matrix(unlist(containers), nrow = length(containers), byrow = TRUE))
   colnames(df) <- c("name", "endpoint", "sas", "version")
   df
 }
-#' @param url
+#' @param host
 #' @param sas
 #' @param container
 #' @param dir
 #' export
-listItemsInAzure <- function(url = "", sas = "", container = "", dir = ""){
-  container <- getAzureContainer(url = url, sas = sas, container = container, dir = dir)
+listItemsInAzure <- function(host = "", securityToken = "", container = "", dir = ""){
+  container <- getAzureContainer(host = host, securityToken = securityToken, container = container, dir = dir)
   AzureStor::list_storage_files(container)
 }
