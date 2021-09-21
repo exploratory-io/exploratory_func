@@ -1209,7 +1209,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
       timezone <- "UTC" # if timezone is not provided use UTC as default timezone. This is also the default for odbc::dbConnect.
     }
 
-    key <- paste("snowflake", host, port, databaseName, username, port, timezone, sep = ":")
+    key <- paste("snowflake", host, port, databaseName, username, timezone, sep = ":")
     conn <- connection_pool[[key]]
     if (!is.null(conn)) {
       tryCatch({
@@ -1347,6 +1347,19 @@ clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, user
       }, error = function(e) {
       })
     }
+  }
+  else if (type %in% c("mssqlserver")) {
+    key <- paste("mssqlserver", host, port, databaseName, username, timezone, sep = ":")
+  }
+  else if (type %in% c("snowflake")) {
+    if (is.null(port) || port == "") {
+      # https://docs.snowflake.com/en/user-guide/odbc-parameters.html
+      port <- 443 # snowflake default port.
+    }
+    if (timezone == "") {
+      timezone <- "UTC" # if timezone is not provided use UTC as default timezone. This is also the default for odbc::dbConnect.
+    }
+    key <- paste("snowflake", host, port, databaseName, username, timezone, sep = ":")
   }
   rm(list = key, envir = connection_pool) # Even if there is no matching key, this is harmless.
 }
