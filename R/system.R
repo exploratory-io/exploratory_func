@@ -3052,3 +3052,77 @@ load_fred <- function(series_id, date_start = "", date_end = "", password) {
   }
 }
 
+tam_read_parquet.workaround_applied <- FALSE # To make sure we only apply the workaround explained below once.
+
+read_parquet_file <- function(file) {
+  loadNamespace("arrow")
+  is.win <- Sys.info()['sysname'] == 'Windows'
+
+  # Backup the locale info and set English locale for reading parquet issue
+  # on Windows https://issues.apache.org/jira/browse/ARROW-7288
+  # Also, we do it just once in an R session, since it seems to be enough,
+  # and reqd_parquet under English locale has problem in reading from a path with multibyte chars,
+  # which is unavoidable when repository is on Google Drive on Japanese Windows, even through a symbolic link.
+  if (is.win && !tam_read_parquet.workaround_applied) {
+    # Backup the current locale info.
+    lc.all<- Sys.getlocale("LC_ALL")
+    lc.collate<- Sys.getlocale("LC_COLLATE")
+    lc.ctype<- Sys.getlocale("LC_CTYPE")
+    lc.monetary<- Sys.getlocale("LC_MONETARY")
+    lc.numeric<- Sys.getlocale("LC_NUMERIC")
+    lc.time <- Sys.getlocale("LC_TIME")
+    # Set English.
+    Sys.setlocale("LC_ALL", "English")
+
+    # Catch errors to guarantee restoring the locale info later.
+    tryCatch({ # This tryCatch is just for restoring locale. Note that we do not catch errors here.
+      tf0 <- tempfile()
+      on.exit(unlink(tf0))
+      df <- tibble::tibble(x=1)
+      arrow::write_parquet(df, tf0, compression="uncompressed");
+      arrow::read_parquet(tf0)
+      tam_read_parquet.workaround_applied <<- TRUE
+    }, finally = {
+      # Restore the original locale info.
+      Sys.setlocale("LC_ALL", lc.all)
+      Sys.setlocale("LC_COLLATE", lc.collate)
+      Sys.setlocale("LC_CTYPE", lc.ctype)
+      Sys.setlocale("LC_MONETARY", lc.monetary)
+      Sys.setlocale("LC_NUMERIC", lc.numeric)
+      Sys.setlocale("LC_TIME", lc.time);
+    })
+  }
+
+  tf <- NULL
+  res <- NULL
+  if (stringr::str_detect(file, "^https://") ||
+      stringr::str_detect(file, "^http://") ||
+      stringr::str_detect(file, "^ftp://")) {
+
+    # Download the remote parquet file to the local temp file.
+    tf <- tempfile()
+    # Remove on exit.
+    on.exit(unlink(tf))
+    # mode="wb" for binary download
+    utils::download.file(file, tf, mode = "wb")
+    # Read the local parquet file.
+    res <- read_parquet_internal(tf)
+
+  } else {
+    res <- read_parquet_internal(file)
+  }
+  res
+}
+
+# Wrapper around arrow::read_parquet to work around #22609 by applying group_by column stored in the parquet file
+# as one of the class names by the above _tam_write_parquet_internal.
+read_parquet_file_internal <- function(filepath) {
+  res <- arrow::read_parquet(filepath)
+  if (stringr::str_starts(class(res)[1], '...grouped_by_')) {
+    group_col <- stringr::str_remove(class(res)[1], '^\\.\\.\\.grouped_by_')
+    res <- res %>% dplyr::group_by(!!rlang::sym(group_col)) # applying group_by seems to remove the ...grouped_by_... class.
+  }
+  res
+}
+
+
