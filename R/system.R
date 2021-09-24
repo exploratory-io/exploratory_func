@@ -2942,6 +2942,34 @@ read_rds_file <- function(file, refhook = NULL){
 
 tam_read_parquet.workaround_applied <- FALSE # To make sure we only apply the workaround explained below once.
 
+#'API that search and imports multiple same structure parquet files and merge it to a single data frame
+#'@export
+searchAndReadParquetFiles <- function(folder, pattern, files, col_select = NULL){
+  # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
+  if (!dir.exists(folder)) {
+    stop(paste0('EXP-DATASRC-2 :: ', jsonlite::toJSON(folder), ' :: The folder does not exist.')) # TODO: escape folder name.
+  }
+  files <- list.files(path = folder, pattern = stringr::str_c("(?i)", pattern), full.names = T)
+  if (length(files) == 0) {
+    stop(paste0('EXP-DATASRC-3 :: ', jsonlite::toJSON(folder), ' :: There is no file in the folder that matches with the specified condition.')) # TODO: escape folder name.
+  }
+  read_parquet_files(files, col_select = col_select)
+}
+
+#'API that imports multiple same structure parquet files and merge it to a single data frame
+#'@export
+read_parquet_files <- function(files, col_select = NULL) {
+  # set name to the files so that it can be used for the "id" column created by purrr:map_dfr.
+  files <- setNames(as.list(files), files)
+  df <- purrr::map_dfr(files, exploratory::read_parquet_file, col_select = col_select, .id = "exp.file.id") %>% mutate(exp.file.id = basename(exp.file.id))  # extract file name from full path with basename and create file.id column.
+  id_col <- avoid_conflict(colnames(df), "id")
+  # copy internal exp.file.id to the id column.
+  df[[id_col]] <- df[["exp.file.id"]]
+  # drop internal column and move the id column to the very beginning.
+  df %>% dplyr::select(!!rlang::sym(id_col), dplyr::everything(), -exp.file.id)
+}
+
+
 #' Wrapper for read_parquet to support remote file.
 #' @export
 read_parquet_file <- function(file, col_select = NULL) {
