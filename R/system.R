@@ -3038,7 +3038,7 @@ read_parquet_file <- function(file, col_select = NULL) {
   res
 }
 
-# Wrapper around arrow::read_parquet to work around https://github.com/exploratory-io/tam/issues/22609 by applying group_by column stored in the parquet file
+# Wrapper around arrow::read_parquet to work around https://issues.apache.org/jira/browse/ARROW-13860 by applying group_by column stored in the parquet file
 # as one of the class names.
 read_parquet_file_internal <- function(filepath, col_select = NULL) {
   res <- NULL
