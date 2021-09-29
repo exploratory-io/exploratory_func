@@ -3038,8 +3038,8 @@ read_parquet_file <- function(file, col_select = NULL) {
   res
 }
 
-# Wrapper around arrow::read_parquet to work around #22609 by applying group_by column stored in the parquet file
-# as one of the class names by the above _tam_write_parquet_internal.
+# Wrapper around arrow::read_parquet to work around https://github.com/exploratory-io/tam/issues/22609 by applying group_by column stored in the parquet file
+# as one of the class names.
 read_parquet_file_internal <- function(filepath, col_select = NULL) {
   res <- NULL
   if (is.null(col_select)) {
