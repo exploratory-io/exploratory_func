@@ -2,6 +2,9 @@
 #' @param securityToken
 #' export
 getAzureEndPoint <- function(host = "", securityToken = ""){
+  # To prevent "The AzureR packages can save your authentication credentials in the directory:" blocks loading Azure Packages,
+  # Set current working directory to workaround it. Since we always authenticate, we don't cache anything on the directory.
+  Sys.setenv("R_AZURE_DATA_DIR" = getwd())
   AzureStor::storage_endpoint(endpoint = host, sas = securityToken)
 }
 #' @param host
