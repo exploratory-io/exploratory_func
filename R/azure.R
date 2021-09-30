@@ -110,7 +110,7 @@ getCSVFileFromAzure <- function(fileName, host, securityToken, container, delim,
                                progress = progress)
 }
 
-getParquetFileFromAzure <- function(host = "", securityToken = "", container = "", fileName = "", col_select = NULL) {
+getParquetFileFromAzure <- function(fileName = "", host = "", securityToken = "", container = "",  col_select = NULL) {
   tryCatch({
     filePath <- donwloadDataFileFromAzure(host = host, securityToken = securityToken, container = container, fileName = fileName)
   }, error = function(e) {
@@ -127,15 +127,39 @@ getParquetFileFromAzure <- function(host = "", securityToken = "", container = "
   exploratory::read_parquet_file(filePath, col_select = col_select)
 }
 
-getParquetFilesFromAzure <- function(host = "", securityToken = "", container = "", files = "", col_select = NULL) {
+getParquetFilesFromAzure <- function(files = "", host = "", securityToken = "", container = "",  col_select = NULL) {
   files <- setNames(as.list(files), files)
-  df <- purrr::map_dfr(files, exploratory::getParquetFileFromAzure, col_select = col_select, .id = "exp.file.id") %>% mutate(exp.file.id = basename(exp.file.id))  # extract file name from full path with basename and create file.id column.
+  df <- purrr::map_dfr(files, exploratory::getParquetFileFromAzure, host = host, securityToken = securityToken, container = container, col_select = col_select, .id = "exp.file.id") %>% mutate(exp.file.id = basename(exp.file.id))  # extract file name from full path with basename and create file.id column.
   id_col <- avoid_conflict(colnames(df), "id")
   # copy internal exp.file.id to the id column.
   df[[id_col]] <- df[["exp.file.id"]]
   # drop internal column and move the id column to the very beginning.
   df %>% dplyr::select(!!rlang::sym(id_col), dplyr::everything(), -exp.file.id)
 }
+
+#'@export
+searchAndGetParquetFilesFromAzure <- function(searchKeyword = "", host = "", securityToken = "", container = "", folder = "", col_select = NULL) {
+
+  # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
+  tryCatch({
+    files <- exploratory::listItemsInAzure(host = host, securityToken = securityToken, container = container, folder = folder) %>%
+      dplyr::filter(!isdir & str_detect(name, stringr::str_c("(?i)", searchKeyword))) %>% dplyr::select(name)
+  }, error = function(e) {
+    if (stringr::str_detect(e$message, "(Not Found|Moved Permanently)")) {
+      stop(paste0('EXP-DATASRC-8 :: ', jsonlite::toJSON(container), ' :: The specified AWS S3 bucket does not exist.'))
+    }
+    else {
+      stop(e)
+    }
+  })
+  if (nrow(files) == 0) {
+    stop(paste0('EXP-DATASRC-4 :: ', jsonlite::toJSON(container), ' :: There is no file in the AWS S3 bucket that matches with the specified condition.')) # TODO: escape bucket name.
+  }
+  getParquetFilesFromAzure(files = files$name, host = host, securityToken = securityToken, container = container, col_select = col_select)
+
+}
+
+
 
 
 
