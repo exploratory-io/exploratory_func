@@ -91,10 +91,9 @@ getCSVFileFromAzure <- function(fileName, host, securityToken, container, delim,
     filePath <- donwloadDataFileFromAzure(host = host, securityToken = securityToken, container = container, fileName = fileName)
   }, error = function(e) {
     if (stringr::str_detect(e$message, "(Not Found|Moved Permanently)")) {
-      # Looking for error that looks like "Error in parse_aws_s3_response(r, Sig, verbose = verbose) :\n Moved Permanently (HTTP 301).",
-      # or "Not Found (HTTP 404).".
+      # Looking for error that looks like "Not Found (HTTP 404). Failed to complete Storage Services operation. Message:\n.".
       # This seems to be returned when the bucket itself does not exist.
-      stop(paste0('EXP-DATASRC-8 :: ', jsonlite::toJSON(c(bucket, fileName)), ' :: There is no such file in the Azure Container.'))
+      stop(paste0('EXP-DATASRC-12 :: ', jsonlite::toJSON(c(container, fileName)), ' :: There is no such file in the Azure Container.'))
     }
     else {
       stop(e)
@@ -115,10 +114,9 @@ getParquetFileFromAzure <- function(fileName = "", host = "", securityToken = ""
     filePath <- donwloadDataFileFromAzure(host = host, securityToken = securityToken, container = container, fileName = fileName)
   }, error = function(e) {
     if (stringr::str_detect(e$message, "(Not Found|Moved Permanently)")) {
-      # Looking for error that looks like "Error in parse_aws_s3_response(r, Sig, verbose = verbose) :\n Moved Permanently (HTTP 301).",
-      # or "Not Found (HTTP 404).".
+      # Looking for error that looks like "Not Found (HTTP 404). Failed to complete Storage Services operation. Message:\n.".
       # This seems to be returned when the bucket itself does not exist.
-      stop(paste0('EXP-DATASRC-8 :: ', jsonlite::toJSON(c(bucket, fileName)), ' :: There is no such file in the Azure Container.'))
+      stop(paste0('EXP-DATASRC-12 :: ', jsonlite::toJSON(c(container, fileName)), ' :: There is no such file in the Azure Container.'))
     }
     else {
       stop(e)
@@ -145,15 +143,19 @@ searchAndGetParquetFilesFromAzure <- function(searchKeyword = "", host = "", sec
     files <- exploratory::listItemsInAzure(host = host, securityToken = securityToken, container = container, folder = folder) %>%
       dplyr::filter(!isdir & str_detect(name, stringr::str_c("(?i)", searchKeyword))) %>% dplyr::select(name)
   }, error = function(e) {
-    if (stringr::str_detect(e$message, "(Not Found|Moved Permanently)")) {
-      stop(paste0('EXP-DATASRC-8 :: ', jsonlite::toJSON(container), ' :: The specified AWS S3 bucket does not exist.'))
+    # if container does not exist, below error is raised:
+    # Error in list_adls_files(container, ...) :
+    #  Not Found (HTTP 404). Failed to complete Storage Services operation. Message:
+    #  The specified filesystem does not exist.
+    if (stringr::str_detect(e$message, "The specified filesystem does not exist.")) {
+      stop(paste0('EXP-DATASRC-11 :: ', jsonlite::toJSON(container), ' :: The specified Azure container does not exist.'))
     }
     else {
       stop(e)
     }
   })
   if (nrow(files) == 0) {
-    stop(paste0('EXP-DATASRC-4 :: ', jsonlite::toJSON(container), ' :: There is no file in the AWS S3 bucket that matches with the specified condition.')) # TODO: escape bucket name.
+    stop(paste0('EXP-DATASRC-10 :: ', jsonlite::toJSON(container), ' :: There is no file in the Azure container that matches with the specified condition.')) # TODO: escape bucket name.
   }
   getParquetFilesFromAzure(files = files$name, host = host, securityToken = securityToken, container = container, col_select = col_select)
 
