@@ -38,7 +38,7 @@ listItemsInAzure <- function(host = "", securityToken = "", container = "", fold
 #' @param container
 #' @param folder
 #' export
-donwloadDataFileFromAzure <- function(host = "", securityToken = "", container = "", fileName = ""){
+downloadDataFileFromAzure <- function(host = "", securityToken = "", container = "", fileName = ""){
   shouldCacheFile <- getOption("tam.should.cache.datafile")
   filepath <- NULL
   hash <- digest::digest(stringr::str_c(host, container, fileName, sep = ":"), "md5", serialize = FALSE)
@@ -91,7 +91,7 @@ getCSVFileFromAzure <- function(fileName, host, securityToken, container, delim,
                              skip = 0, n_max = Inf, guess_max = min(1000, n_max),
                              progress = interactive()) {
   tryCatch({
-    filePath <- donwloadDataFileFromAzure(host = host, securityToken = securityToken, container = container, fileName = fileName)
+    filePath <- downloadDataFileFromAzure(host = host, securityToken = securityToken, container = container, fileName = fileName)
   }, error = function(e) {
     if (stringr::str_detect(e$message, "(Not Found|Moved Permanently)")) {
       # Looking for error that looks like "Not Found (HTTP 404). Failed to complete Storage Services operation. Message:\n.".
@@ -143,6 +143,8 @@ getCSVFilesFromAzure <- function(files, host, securityToken, container, folder =
   df %>% dplyr::select(!!rlang::sym(id_col), dplyr::everything(), -exp.file.id)
 }
 
+#'API that search then imports CSV Files from Azure.
+#'@export
 searchAndGetCSVFilesFromAzure <- function(searchKeyword, host, securityToken, container, folder, delim, quote = '"',
                                           escape_backslash = FALSE, escape_double = TRUE,
                                           col_names = TRUE, col_types = readr::cols(.default = readr::col_character()),
@@ -177,9 +179,11 @@ searchAndGetCSVFilesFromAzure <- function(searchKeyword, host, securityToken, co
 
 }
 
+#'API that imports a Parquet file from Azure.
+#'@export
 getParquetFileFromAzure <- function(fileName = "", host = "", securityToken = "", container = "",  col_select = NULL) {
   tryCatch({
-    filePath <- donwloadDataFileFromAzure(host = host, securityToken = securityToken, container = container, fileName = fileName)
+    filePath <- downloadDataFileFromAzure(host = host, securityToken = securityToken, container = container, fileName = fileName)
   }, error = function(e) {
     if (stringr::str_detect(e$message, "(Not Found|Moved Permanently)")) {
       # Looking for error that looks like "Not Found (HTTP 404). Failed to complete Storage Services operation. Message:\n.".
@@ -193,6 +197,8 @@ getParquetFileFromAzure <- function(fileName = "", host = "", securityToken = ""
   exploratory::read_parquet_file(filePath, col_select = col_select)
 }
 
+#'API that imports Parquet Files from Azure.
+#'@export
 getParquetFilesFromAzure <- function(files = "", host = "", securityToken = "", container = "",  col_select = NULL) {
   files <- setNames(as.list(files), files)
   df <- purrr::map_dfr(files, exploratory::getParquetFileFromAzure, host = host, securityToken = securityToken, container = container, col_select = col_select, .id = "exp.file.id") %>% mutate(exp.file.id = basename(exp.file.id))  # extract file name from full path with basename and create file.id column.
@@ -228,6 +234,81 @@ searchAndGetParquetFilesFromAzure <- function(searchKeyword = "", host = "", sec
   getParquetFilesFromAzure(files = files$name, host = host, securityToken = securityToken, container = container, col_select = col_select)
 
 }
+
+#'API that imports a Excel file from Azure.
+#'@export
+getExcelFileFromAzure <- function(fileName, host, securityToken, container, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = FALSE, ...) {
+  tryCatch({
+    filePath <- downloadDataFileFromAzure(host = host, securityToken = securityToken, container = container, fileName = fileName)
+  }, error = function(e) {
+    if (stringr::str_detect(e$message, "(Not Found|Moved Permanently)")) {
+      # Looking for error that looks like "Not Found (HTTP 404). Failed to complete Storage Services operation. Message:\n.".
+      # This seems to be returned when the bucket itself does not exist.
+      stop(paste0('EXP-DATASRC-12 :: ', jsonlite::toJSON(c(container, fileName)), ' :: There is no such file in the Azure Container.'))
+    }
+    else {
+      stop(e)
+    }
+  })
+  exploratory::read_excel_file(path = filePath, sheet = sheet, col_names = col_names, col_types = col_types, na = na, skip = skip, trim_ws = trim_ws, n_max = n_max, use_readxl = use_readxl, detectDates = detectDates, skipEmptyRows =  skipEmptyRows, skipEmptyCols = skipEmptyCols, check.names = check.names, tzone = tzone, convertDataTypeToChar = convertDataTypeToChar, ...)
+}
+
+#'API that search files by search keyword then imports multiple same structure Excel files and merge it to a single data frame
+#'
+#'For col_types parameter, by default it forces character to make sure that merging the Excel based data frames doesn't error out due to column data types mismatch.
+# Once the data frames merging is done, readr::type_convert is called from Exploratory Desktop to restore the column data types.
+
+#'@export
+searchAndGetExcelFilesFromAzure <- function(searchKeyword, host, securityToken, container, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...){
+
+  # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
+  tryCatch({
+    files <- exploratory::listItemsInAzure(host = host, securityToken = securityToken, container = container, folder = folder) %>%
+      dplyr::filter(!isdir & str_detect(name, stringr::str_c("(?i)", searchKeyword))) %>% dplyr::select(name)
+  }, error = function(e) {
+    # if container does not exist, below error is raised:
+    # Error in list_adls_files(container, ...) :
+    #  Not Found (HTTP 404). Failed to complete Storage Services operation. Message:
+    #  The specified filesystem does not exist.
+    if (stringr::str_detect(e$message, "The specified filesystem does not exist.")) {
+      stop(paste0('EXP-DATASRC-11 :: ', jsonlite::toJSON(container), ' :: The specified Azure container does not exist.'))
+    }
+    else {
+      stop(e)
+    }
+  })
+  if (nrow(files) == 0) {
+    stop(paste0('EXP-DATASRC-4 :: ', jsonlite::toJSON(bucket), ' :: There is no file in the AWS S3 bucket that matches with the specified condition.')) # TODO: escape bucket name.
+  }
+  exploratory::getExcelFilesFromAzure(files = files$name, host = host, securityToken = securityToken, container = container, sheet = sheet,
+                                   col_names = col_names, col_types = col_types, na = na, skip = skip, trim_ws = trim_ws, n_max = n_max,
+                                   use_readxl = use_readxl, detectDates = detectDates, skipEmptyRows = skipEmptyRows, skipEmptyCols = skipEmptyCols,
+                                   check.names = check.names, tzone = tzone, convertDataTypeToChar = convertDataTypeToChar, ...)
+}
+
+#'API that imports multiple Excel files from Azure
+#'@export
+getExcelFilesFromAzure <- function(files, host, securityToken, container, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...) {
+  # set name to the files so that it can be used for the "id" column created by purrr:map_dfr.
+  files <- setNames(as.list(files), files)
+  df <- purrr::map_dfr(files, exploratory::getExcelFileFromAzure, host = host, securityToken = securityToken, container = container, sheet = sheet,
+                       col_names = col_names, col_types = col_types, na = na, skip = skip, trim_ws = trim_ws, n_max = n_max, use_readxl = use_readxl,
+                       detectDates = detectDates, skipEmptyRows =  skipEmptyRows, skipEmptyCols = skipEmptyCols, check.names = check.names,
+                       tzone = tzone, convertDataTypeToChar = convertDataTypeToChar, .id = "exp.file.id") %>% mutate(exp.file.id = basename(exp.file.id))  # extract file name from full path with basename and create file.id column.
+  id_col <- avoid_conflict(colnames(df), "id")
+  # copy internal exp.file.id to the id column.
+  df[[id_col]] <- df[["exp.file.id"]]
+  # drop internal column and move the id column to the very beginning.
+  df %>% dplyr::select(!!rlang::sym(id_col), dplyr::everything(), -exp.file.id)
+}
+
+#'Wrapper for readxl::excel_sheets to support Azure Excel file
+#'@export
+getExcelSheetsFromAzureExcelFile <- function(fileName, host, securityToken, container){
+  filePath <- downloadDataFileFromAzure(host = host, securtyToken = securityToken, container =container, fileName = fileName)
+  readxl::excel_sheets(filePath)
+}
+
 
 
 
