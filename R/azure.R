@@ -112,6 +112,71 @@ getCSVFileFromAzure <- function(fileName, host, securityToken, container, delim,
                                progress = progress)
 }
 
+#'API that imports multiple same structure CSV files and merge it to a single data frame
+#'
+#'For col_types parameter, by default it forces character to make sure that merging the CSV based data frames doesn't error out due to column data types mismatch.
+# Once the data frames merging is done, readr::type_convert is called from Exploratory Desktop to restore the column data types.
+
+#'@export
+getCSVFilesFromAzure <- function(files, host, securityToken, container, folder = folder, delim, quote = '"',
+                                 escape_backslash = FALSE, escape_double = TRUE,
+                                 col_names = TRUE, col_types = NULL,
+                                 locale = readr::default_locale(),
+                                 na = c("", "NA"), quoted_na = TRUE,
+                                 comment = "", trim_ws = FALSE,
+                                 skip = 0, n_max = Inf, guess_max = min(1000, n_max),
+                                 progress = interactive()) {
+  # set name to the files so that it can be used for the "id" column created by purrr:map_dfr.
+  files <- setNames(as.list(files), files)
+  df <- purrr::map_dfr(files, exploratory::getCSVFileFromAzure, host = host, securityToken = securityToken, container = container, delim = delim, quote = quote,
+                       escape_backslash = escape_backslash, escape_double = escape_double,
+                       col_names = col_names, col_types = col_types,
+                       locale = locale,
+                       na = na, quoted_na = quoted_na,
+                       comment = comment, trim_ws = trim_ws,
+                       skip = skip, n_max = n_max, guess_max = guess_max,
+                       progress = progress, .id = "exp.file.id") %>% mutate(exp.file.id = basename(exp.file.id))  # extract file name from full path with basename and create file.id column.
+  id_col <- avoid_conflict(colnames(df), "id")
+  # copy internal exp.file.id to the id column.
+  df[[id_col]] <- df[["exp.file.id"]]
+  # drop internal column and move the id column to the very beginning.
+  df %>% dplyr::select(!!rlang::sym(id_col), dplyr::everything(), -exp.file.id)
+}
+
+searchAndGetCSVFilesFromAzure <- function(searchKeyword, host, securityToken, container, folder, delim, quote = '"',
+                                          escape_backslash = FALSE, escape_double = TRUE,
+                                          col_names = TRUE, col_types = readr::cols(.default = readr::col_character()),
+                                          locale = readr::default_locale(),
+                                          na = c("", "NA"), quoted_na = TRUE,
+                                          comment = "", trim_ws = FALSE,
+                                          skip = 0, n_max = Inf, guess_max = min(1000, n_max),
+                                          progress = interactive()) {
+  # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
+  tryCatch({
+    files <- exploratory::listItemsInAzure(host = host, securityToken = securityToken, container = container, folder = folder) %>%
+      dplyr::filter(!isdir & str_detect(name, stringr::str_c("(?i)", searchKeyword))) %>% dplyr::select(name)
+  }, error = function(e) {
+    # if container does not exist, below error is raised:
+    # Error in list_adls_files(container, ...) :
+    #  Not Found (HTTP 404). Failed to complete Storage Services operation. Message:
+    #  The specified filesystem does not exist.
+    if (stringr::str_detect(e$message, "The specified filesystem does not exist.")) {
+      stop(paste0('EXP-DATASRC-11 :: ', jsonlite::toJSON(container), ' :: The specified Azure container does not exist.'))
+    }
+    else {
+      stop(e)
+    }
+  })
+  if (nrow(files) == 0) {
+    stop(paste0('EXP-DATASRC-10 :: ', jsonlite::toJSON(container), ' :: There is no file in the Azure container that matches with the specified condition.')) # TODO: escape bucket name.
+  }
+  getCSVFilesFromAzure(files = files$name, host = host, securityToken = securityToken, container = container, delim = delim, quote = quote,
+                    col_names = col_names, col_types = col_types, locale = locale, na = na, quoted_na = quoted_na, comment = comment, trim_ws = trim_ws,
+                    skip = skip, n_max = n_max, guess_max = guess_max, progress = progress)
+
+
+}
+
 getParquetFileFromAzure <- function(fileName = "", host = "", securityToken = "", container = "",  col_select = NULL) {
   tryCatch({
     filePath <- donwloadDataFileFromAzure(host = host, securityToken = securityToken, container = container, fileName = fileName)
