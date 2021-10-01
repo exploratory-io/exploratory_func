@@ -2940,8 +2940,6 @@ read_rds_file <- function(file, refhook = NULL){
   }
 }
 
-tam_read_parquet.workaround_applied <- FALSE # To make sure we only apply the workaround explained below once.
-
 #'API that search and imports multiple same structure parquet files and merge it to a single data frame
 #'@export
 searchAndReadParquetFiles <- function(folder, pattern, files, col_select = NULL){
