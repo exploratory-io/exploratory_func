@@ -259,7 +259,7 @@ getExcelFileFromAzure <- function(fileName, host, securityToken, container, shee
 # Once the data frames merging is done, readr::type_convert is called from Exploratory Desktop to restore the column data types.
 
 #'@export
-searchAndGetExcelFilesFromAzure <- function(searchKeyword, host, securityToken, container, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...){
+searchAndGetExcelFilesFromAzure <- function(searchKeyword, host, securityToken, container, folder, sheet = 1, col_names = TRUE, col_types = NULL, na = "", skip = 0, trim_ws = TRUE, n_max = Inf, use_readxl = NULL, detectDates = FALSE, skipEmptyRows = FALSE, skipEmptyCols = FALSE, check.names = FALSE, tzone = NULL, convertDataTypeToChar = TRUE, ...){
 
   # search condition is case insensitive. (ref: https://www.regular-expressions.info/modifiers.html, https://stackoverflow.com/questions/5671719/case-insensitive-search-of-a-list-in-r)
   tryCatch({
@@ -278,7 +278,7 @@ searchAndGetExcelFilesFromAzure <- function(searchKeyword, host, securityToken, 
     }
   })
   if (nrow(files) == 0) {
-    stop(paste0('EXP-DATASRC-4 :: ', jsonlite::toJSON(bucket), ' :: There is no file in the AWS S3 bucket that matches with the specified condition.')) # TODO: escape bucket name.
+    stop(paste0('EXP-DATASRC-10 :: ', jsonlite::toJSON(container), ' :: There is no file in the Azure container that matches with the specified condition.')) # TODO: escape bucket name.
   }
   exploratory::getExcelFilesFromAzure(files = files$name, host = host, securityToken = securityToken, container = container, sheet = sheet,
                                    col_names = col_names, col_types = col_types, na = na, skip = skip, trim_ws = trim_ws, n_max = n_max,
