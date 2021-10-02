@@ -305,7 +305,7 @@ getExcelFilesFromAzure <- function(files, host, securityToken, container, sheet 
 #'Wrapper for readxl::excel_sheets to support Azure Excel file
 #'@export
 getExcelSheetsFromAzureExcelFile <- function(fileName, host, securityToken, container){
-  filePath <- downloadDataFileFromAzure(host = host, securtyToken = securityToken, container =container, fileName = fileName)
+  filePath <- downloadDataFileFromAzure(host = host, securityToken = securityToken, container =container, fileName = fileName)
   readxl::excel_sheets(filePath)
 }
 
