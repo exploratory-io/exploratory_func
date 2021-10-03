@@ -778,7 +778,11 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
   drv = NULL
   conn = NULL
   key = NULL
-  if(type == "mongodb") {
+  if (type == "access") { # if type is access, treat it as dbiodbc
+    type = "dbiodbc";
+  }
+
+  if (type == "mongodb") {
     if(!requireNamespace("mongolite")){stop("package mongolite must be installed.")}
     loadNamespace("jsonlite")
     if(!is.null(connectionString) && connectionString != '' && (is.null(subType) || subType == '' || subType == 'connectionString')) {
@@ -1617,6 +1621,8 @@ queryAmazonAthena <- function(driver = "", region = "", authenticationType = "IA
 queryODBC <- function(dsn="", username, password, additionalParams="", numOfRows = 0, query, stringsAsFactors = FALSE, host="", port="", as.is = TRUE, databaseName="", driver = "", type = "", catalog = "", timezone = "", ...){
   if(type == "") {
     type <- "odbc"
+  } else if (type == "access") {
+    type <- "dbiodbc"
   }
   # if the type is dbiodbc (i.e. odbc package) and numOfRows is 0, it means it's migrated from RODBC
   # To fetch the all rows, odbc expects -1 instead of 0. So update the numOfRows as -1.
