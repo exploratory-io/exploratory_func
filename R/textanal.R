@@ -629,6 +629,18 @@ tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words
     words_to_tag_df <- words_to_tag_df %>% dplyr::mutate(max_topic = summarize_row(across(starts_with("topic")), which.max), topic_max = summarize_row(across(starts_with("topic")), max))
     words_to_tag_df <- words_to_tag_df %>% dplyr::group_by(document) %>% dplyr::slice_max(topic_max, prop=0.3) %>% dplyr::ungroup() # Filter per document.
     browser()
+    tag_df <- words_to_tag_df %>% dplyr::nest_by(document) %>% ungroup()
+    res <- x$df %>% mutate(doc_id=row_number()) %>% left_join(tag_df, by=c("doc_id"="document"))
+    browser()
+    res <- res %>% mutate(tagged_text=purrr::flatten_chr(purrr::map2(text, data, function(txt,dat) {
+      if (!is.null(dat)) {
+        stringr::str_replace_all(txt,dat$word[1],stringr::str_c('<tag topic="1">', dat$word[1], '</tag>'))
+      }
+      else {
+        txt
+      }
+    })))
+    browser()
   }
   else if (type == "doc_topics_mds") {
     res <- x$df[x$docs_sample_index,]
