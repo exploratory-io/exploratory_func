@@ -615,12 +615,12 @@ tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words
   else if (type == "doc_word_topics") {
     browser()
     doc_word_df <- tibble::tibble(document=seq(length(as.list(x$tokens))), lst=as.list(x$tokens))
-    doc_word_df <- doc_word_df %>% tidyr::unnest_longer(lst, values_to = "word") %>% dplyr::mutate(word = stringr::str_to_title(word))
+    doc_word_df <- doc_word_df %>% tidyr::unnest_longer(lst, values_to = "word")
     browser()
     feat_names <- attr(x$model$data, "Dimnames")$features
     feats_index <- 1:length(feat_names)
     names(feats_index) <- feat_names
-    word_ids <- feats_index[stringr::str_to_lower(doc_word_df$word)] # TODO: Normalize the words better than just str_to_lower.
+    word_ids <- feats_index[doc_word_df$word] # TODO: Normalize the words better than just str_to_lower.
     browser()
 
     res <- t(x$model$phi[,word_ids]) * x$model$theta[doc_word_df$document]
