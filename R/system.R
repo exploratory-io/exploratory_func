@@ -1331,7 +1331,7 @@ clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, user
       })
     }
   }
-  else if(type %in% c("odbc","dbiodbc", "teradata", "access")) { # odbc
+  else if(type %in% c("odbc","dbiodbc", "teradata")) { # odbc
     if(type == "dbiodbc" || type == "teradata") {
       key <- paste(type, dsn, username, additionalParams, timezone, sep = ":")
     } else {
