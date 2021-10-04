@@ -623,11 +623,11 @@ tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words
     word_ids <- feats_index[doc_word_df$word] # TODO: Normalize the words better than just str_to_lower.
     browser()
 
-    res <- t(x$model$phi[,word_ids]) * x$model$theta[doc_word_df$document]
-    res <- dplyr::bind_cols(doc_word_df, tibble::as_tibble(res))
+    words_to_tag_df <- t(x$model$phi[,word_ids]) * x$model$theta[doc_word_df$document]
+    words_to_tag_df <- dplyr::bind_cols(doc_word_df, tibble::as_tibble(words_to_tag_df))
     browser()
-    res <- res %>% dplyr::mutate(max_topic = summarize_row(across(starts_with("topic")), which.max), topic_max = summarize_row(across(starts_with("topic")), max))
-    res <- res %>% dplyr::group_by(document) %>% dplyr::slice_max(topic_max, prop=0.3) %>% dplyr::ungroup() # Filter per document.
+    words_to_tag_df <- words_to_tag_df %>% dplyr::mutate(max_topic = summarize_row(across(starts_with("topic")), which.max), topic_max = summarize_row(across(starts_with("topic")), max))
+    words_to_tag_df <- words_to_tag_df %>% dplyr::group_by(document) %>% dplyr::slice_max(topic_max, prop=0.3) %>% dplyr::ungroup() # Filter per document.
     browser()
   }
   else if (type == "doc_topics_mds") {
