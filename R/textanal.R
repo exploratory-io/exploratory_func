@@ -613,25 +613,19 @@ tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words
     res <- res %>% dplyr::bind_cols(docs_topics_df)
   }
   else if (type == "doc_word_topics") {
-    browser()
     doc_word_df <- tibble::tibble(document=seq(length(as.list(x$tokens))), lst=as.list(x$tokens))
     doc_word_df <- doc_word_df %>% tidyr::unnest_longer(lst, values_to = "word")
-    browser()
     feat_names <- attr(x$model$data, "Dimnames")$features
     feats_index <- 1:length(feat_names)
     names(feats_index) <- feat_names
     word_ids <- feats_index[doc_word_df$word] # TODO: Normalize the words better than just str_to_lower.
-    browser()
 
     words_to_tag_df <- t(x$model$phi[,word_ids]) * x$model$theta[doc_word_df$document]
     words_to_tag_df <- dplyr::bind_cols(doc_word_df, tibble::as_tibble(words_to_tag_df))
-    browser()
     words_to_tag_df <- words_to_tag_df %>% dplyr::mutate(max_topic = summarize_row(across(starts_with("topic")), which.max), topic_max = summarize_row(across(starts_with("topic")), max))
     words_to_tag_df <- words_to_tag_df %>% dplyr::group_by(document) %>% dplyr::slice_max(topic_max, prop=0.3) %>% dplyr::ungroup() # Filter per document.
-    browser()
     tag_df <- words_to_tag_df %>% dplyr::nest_by(document) %>% ungroup()
     res <- x$df %>% mutate(doc_id=row_number()) %>% left_join(tag_df, by=c("doc_id"="document"))
-    browser()
     res <- res %>% mutate(tagged_text=purrr::flatten_chr(purrr::map2(text, data, function(txt,dat) {
       if (!is.null(dat)) {
         for (i in 1:nrow(dat)) {
@@ -643,7 +637,10 @@ tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words
         txt
       }
     })))
-    browser()
+    # Add topics of documents.
+    docs_topics_df <- as.data.frame(x$model$theta)
+    docs_topics_df <- docs_topics_df %>% dplyr::mutate(max_topic = summarize_row(across(starts_with("topic")), which.max), topic_max = summarize_row(across(starts_with("topic")), max))
+    res <- res %>% dplyr::bind_cols(docs_topics_df)
   }
   else if (type == "doc_topics_mds") {
     res <- x$df[x$docs_sample_index,]
