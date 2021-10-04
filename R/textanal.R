@@ -634,7 +634,10 @@ tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words
     browser()
     res <- res %>% mutate(tagged_text=purrr::flatten_chr(purrr::map2(text, data, function(txt,dat) {
       if (!is.null(dat)) {
-        stringr::str_replace_all(txt,dat$word[1],stringr::str_c('<tag topic="1">', dat$word[1], '</tag>'))
+        for (i in 1:nrow(dat)) {
+          txt <- stringr::str_replace_all(txt, dat$word[i], stringr::str_c('<tag topic="', dat$max_topic[i], '">', dat$word[i], '</tag>'))
+        }
+        txt
       }
       else {
         txt
