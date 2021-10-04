@@ -1283,6 +1283,7 @@ getDBConnection <- function(type, host = NULL, port = "", databaseName = "", use
 clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, username, catalog = "", schema = "", dsn="", additionalParams = "",
                               collection = "", isSSL = FALSE, authSource = NULL, cluster = NULL, connectionString = NULL, timezone = "",
                               sslClientCertKey = "") {
+  key <- ""
   if (type %in% c("mongodb")) {
     if(!is.na(connectionString) && connectionString != '') {
       # make sure to include collection as a key since connection varies per collection.
@@ -1333,8 +1334,8 @@ clearDBConnection <- function(type, host = NULL, port = NULL, databaseName, user
       })
     }
   }
-  else if(type %in% c("odbc","dbiodbc", "teradata")) { # odbc
-    if(type == "dbiodbc" || type == "teradata") {
+  else if(type %in% c("odbc","dbiodbc", "teradata", "access")) { # odbc
+    if(type == "dbiodbc" || type == "teradata" || type == "access") {
       key <- paste(type, dsn, username, additionalParams, timezone, sep = ":")
     } else {
       key <- paste("odbc", dsn, username, additionalParams, timezone, sep = ":")
