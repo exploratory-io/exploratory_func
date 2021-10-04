@@ -574,6 +574,7 @@ exp_topic_model <- function(df, text,
     # model$docs_sample_index <- docs_sample_index
     model$df <- df # Keep original df for showing it with LDA result.
     model$sampled_nrow <- sampled_nrow
+    model$tokens <- tokens
     class(model) <- 'textmodel_lda_exploratory'
     model
   }
@@ -610,6 +611,24 @@ tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words
     docs_topics_df <- as.data.frame(x$model$theta)
     docs_topics_df <- docs_topics_df %>% dplyr::mutate(max_topic = summarize_row(across(starts_with("topic")), which.max), topic_max = summarize_row(across(starts_with("topic")), max))
     res <- res %>% dplyr::bind_cols(docs_topics_df)
+  }
+  else if (type == "doc_word_topics") {
+    browser()
+    doc_word_df <- tibble::tibble(document=seq(length(as.list(x$tokens))), lst=as.list(x$tokens))
+    doc_word_df <- doc_word_df %>% tidyr::unnest_longer(lst, values_to = "word") %>% dplyr::mutate(word = stringr::str_to_title(word))
+    browser()
+    feat_names <- attr(x$model$data, "Dimnames")$features
+    feats_index <- 1:length(feat_names)
+    names(feats_index) <- feat_names
+    word_ids <- feats_index[stringr::str_to_lower(doc_word_df$word)] # TODO: Normalize the words better than just str_to_lower.
+    browser()
+
+    res <- t(x$model$phi[,word_ids]) * x$model$theta[doc_word_df$document]
+    res <- dplyr::bind_cols(doc_word_df, tibble::as_tibble(res))
+    browser()
+    res <- res %>% dplyr::mutate(max_topic = summarize_row(across(starts_with("topic")), which.max), topic_max = summarize_row(across(starts_with("topic")), max))
+    res <- res %>% dplyr::group_by(document) %>% dplyr::slice_max(topic_max, prop=0.3) %>% dplyr::ungroup() # Filter per document.
+    browser()
   }
   else if (type == "doc_topics_mds") {
     res <- x$df[x$docs_sample_index,]

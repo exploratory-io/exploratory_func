@@ -6,6 +6,9 @@ twitter_df <- exploratory::read_delim_file("https://www.dropbox.com/s/w1fh7j8iq6
 
 test_that("exp_topic_model with Japanese twitter data", {
   model_df <- twitter_df %>% exp_topic_model(text, stopwords_lang = "japanese")
+  browser()
+  res <- model_df %>% tidy_rowwise(model, type="doc_word_topics")
+  browser()
   res <- model_df %>% tidy_rowwise(model, type="topics_summary")
   expect_equal(colnames(res), c("topic", "n"))
   expect_equal(sum(res$n), 5000)
