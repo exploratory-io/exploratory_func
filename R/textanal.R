@@ -84,6 +84,9 @@ tokenize_with_postprocess <- function(text,
     })
   }
   else {
+    if (remove_url) { # For tokenizers::tokenize_words, we remove urls ourselves beforehand.
+      text <- str_remove_url(text)
+    }
     tokenized <- tokenizers::tokenize_words(text, lowercase = TRUE, stopwords = NULL,
                                             strip_punct = remove_punct, simplify = FALSE)
   }
