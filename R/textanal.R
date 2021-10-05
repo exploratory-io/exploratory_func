@@ -57,6 +57,7 @@ guess_lang_for_stopwords <- function(text) {
 
 tokenize_with_postprocess <- function(text, 
                                       remove_punct = TRUE, remove_numbers = TRUE,
+                                      remove_alphanum = FALSE,
                                       tokenize_tweets = FALSE,
                                       remove_url = TRUE, remove_twitter = TRUE,
                                       stopwords_lang = NULL, stopwords = c(), stopwords_to_remove = c(),
@@ -130,6 +131,9 @@ tokenize_with_postprocess <- function(text,
     # Since tokenize_words(strip_numeric=TRUE) seems to look at only the last char of token and strip too much words, we do it ourselves here instead.
     tokens <- tokens %>% quanteda::tokens_remove("^[0-9\uff10-\uff19]+$", valuetype = "regex")
   }
+  if (remove_alphanum) {
+    tokens <- tokens %>% quanteda::tokens_remove("^[a-zA-Z0-9\uff10-\uff19]+$", valuetype = "regex")
+  }
   # Results from tokenizers::tokenize_tweets seems to include emojis unlike tokenizers::tokenize_words.
   # For now, strip all-emoji-tokens here since they can't be displayed on word cloud.
   if (tokenize_tweets) {
@@ -148,6 +152,7 @@ tokenize_with_postprocess <- function(text,
 #' @export
 exp_textanal <- function(df, text,
                          remove_punct = TRUE, remove_numbers = TRUE,
+                         remove_alphanum = FALSE,
                          tokenize_tweets = FALSE,
                          remove_url = TRUE, remove_twitter = TRUE,
                          stopwords_lang = NULL, stopwords = c(), stopwords_to_remove = c(),
@@ -177,6 +182,7 @@ exp_textanal <- function(df, text,
 
     tokens <- tokenize_with_postprocess(df[[text_col]],
                                         remove_punct = remove_punct, remove_numbers = remove_numbers,
+                                        remove_alphanum = remove_alphanum,
                                         tokenize_tweets = tokenize_tweets,
                                         remove_url = remove_url, remove_twitter = remove_twitter,
                                         stopwords_lang = stopwords_lang, stopwords = stopwords, stopwords_to_remove = stopwords_to_remove,
@@ -349,6 +355,7 @@ get_cooccurrence_graph_data <- function(model_df, max_vertex_size = 20, vertex_s
 #' @export
 exp_text_cluster <- function(df, text,
                          remove_punct = TRUE, remove_numbers = TRUE,
+                         remove_alphanum = FALSE,
                          tokenize_tweets = FALSE,
                          remove_url = TRUE, remove_twitter = TRUE,
                          stopwords_lang = NULL, stopwords = c(), stopwords_to_remove = c(),
@@ -387,6 +394,7 @@ exp_text_cluster <- function(df, text,
 
     tokens <- tokenize_with_postprocess(df[[text_col]],
                                         remove_punct = remove_punct, remove_numbers = remove_numbers,
+                                        remove_alphanum = remove_alphanum,
                                         tokenize_tweets = tokenize_tweets,
                                         remove_url = remove_url, remove_twitter = remove_twitter,
                                         stopwords_lang = stopwords_lang, stopwords = stopwords, stopwords_to_remove = stopwords_to_remove,
@@ -509,6 +517,7 @@ tidy.text_cluster_exploratory <- function(x, type="word_count", num_top_words=5,
 #' @export
 exp_topic_model <- function(df, text,
                             remove_punct = TRUE, remove_numbers = TRUE,
+                            remove_alphanum = FALSE,
                             tokenize_tweets = FALSE,
                             remove_url = TRUE, remove_twitter = TRUE,
                             stopwords_lang = NULL, stopwords = c(), stopwords_to_remove = c(),
@@ -543,6 +552,7 @@ exp_topic_model <- function(df, text,
 
     tokens <- tokenize_with_postprocess(df[[text_col]],
                                         remove_punct = remove_punct, remove_numbers = remove_numbers,
+                                        remove_alphanum = remove_alphanum,
                                         tokenize_tweets = tokenize_tweets,
                                         remove_url = remove_url, remove_twitter = remove_twitter,
                                         stopwords_lang = stopwords_lang, stopwords = stopwords, stopwords_to_remove = stopwords_to_remove,
