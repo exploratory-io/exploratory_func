@@ -105,8 +105,14 @@ tokenize_with_postprocess <- function(text,
     # Handle ones that are not separated by spaces.
     if (length(compound_tokens_without_space) > 0) {
       # Tokenize those words with the same options with the original tokinizing, to know where such word would have been splitted.
-      compound_tokens_list <- tokenizers::tokenize_tweets(compound_tokens_without_space, lowercase = TRUE, stopwords = NULL,
-                                                          strip_punct = remove_punct, strip_url = remove_url, simplify = FALSE)
+      if (tokenize_tweets) {
+        compound_tokens_list <- tokenizers::tokenize_tweets(compound_tokens_without_space, lowercase = TRUE, stopwords = NULL,
+                                                            strip_punct = remove_punct, strip_url = remove_url, simplify = FALSE)
+      }
+      else {
+        compound_tokens_list <- tokenizers::tokenize_words(compound_tokens_without_space, lowercase = TRUE, stopwords = NULL,
+                                                           strip_punct = remove_punct, simplify = FALSE)
+      }
       # Create space-separated expression of the word, which can be used with quanteda::tokens_compound.
       compound_tokens_with_space_inserted <- purrr::flatten_chr(purrr::map(compound_tokens_list, function(x){stringr::str_c(x, collapse=' ')}))
       tokens <- tokens %>% quanteda::tokens_compound(pattern = quanteda::phrase(compound_tokens_with_space_inserted), concatenator = '')
