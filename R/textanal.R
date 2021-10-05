@@ -634,7 +634,7 @@ tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words
           txt <- stringr::str_replace_all(txt, dat$word[i], stringr::str_c('_____', i, '_____'))
         }
         for (i in 1:nrow(dat)) {
-          txt <- stringr::str_replace_all(txt, stringr::str_c('_____', i, '_____'), stringr::str_c('<tag topic="', dat$max_topic[i], '">', dat$word[i], '</tag>'))
+          txt <- stringr::str_replace_all(txt, stringr::str_c('_____', i, '_____'), stringr::str_c('<span topic="', dat$max_topic[i], '">', dat$word[i], '</span>'))
         }
         txt
       }
