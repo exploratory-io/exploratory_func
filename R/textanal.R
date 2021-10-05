@@ -573,6 +573,7 @@ exp_topic_model <- function(df, text,
     # model$docs_coordinates <- docs_coordinates # MDS result for scatter plot
     # model$docs_sample_index <- docs_sample_index
     model$df <- df # Keep original df for showing it with LDA result.
+    model$text_col <- text_col
     model$sampled_nrow <- sampled_nrow
     model$tokens <- tokens
     class(model) <- 'textmodel_lda_exploratory'
@@ -628,7 +629,7 @@ tidy.textmodel_lda_exploratory <- function(x, type = "doc_topics", num_top_words
     words_to_tag_df <- words_to_tag_df %>% dplyr::mutate(max_topic = summarize_row(across(starts_with("topic")), which.max), topic_max = summarize_row(across(starts_with("topic")), max))
     words_to_tag_df <- words_to_tag_df %>% dplyr::group_by(document) %>% dplyr::slice_max(topic_max, prop=0.3) %>% dplyr::ungroup() # Filter per document.
     tag_df <- words_to_tag_df %>% dplyr::nest_by(document) %>% ungroup()
-    res <- x$df %>% mutate(doc_id=row_number()) %>% left_join(tag_df, by=c("doc_id"="document"))
+    res <- x$df %>% rename(text=!!x$text_col) %>% mutate(doc_id=row_number()) %>% left_join(tag_df, by=c("doc_id"="document"))
     res <- res %>% mutate(tagged_text=purrr::flatten_chr(purrr::map2(text, data, function(txt,dat) {
       if (!is.null(dat)) {
         for (i in 1:nrow(dat)) {
