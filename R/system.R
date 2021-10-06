@@ -3,6 +3,9 @@ user_env <- new.env()
 # environment to keep values to create connection
 user_env$token_info <- new.env()
 
+# environment to keep downloaded remote files
+user_env$downloads <- new.env()
+
 #' get oauth token info from key
 #' @export
 getTokenInfo <- function(token_key){
@@ -13,6 +16,14 @@ getTokenInfo <- function(token_key){
 #' @export
 setTokenInfo <- function(token_key, value) {
   user_env$token_info[[token_key]] <- value
+}
+
+setDownloadedFilePath <- function(hash, filePath){
+  user_env$downloads[[hash]] <- filePath
+}
+
+getDownloadedFilePath <- function(hash){
+ user_env$downloads[[hash]]
 }
 
 # hashmap in which we keep active connections to databases etc.
