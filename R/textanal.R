@@ -139,6 +139,7 @@ tokenize_with_postprocess <- function(text,
   if (remove_numbers) {
     # Since tokenize_words(strip_numeric=TRUE) seems to look at only the last char of token and strip too much words, we do it ourselves here instead.
     if (remove_alphabets) { # Remove alphanumeric words.
+      # \uff10-\uff19 are fullwidth numbers. https://en.wikipedia.org/wiki/Halfwidth_and_Fullwidth_Forms_(Unicode_block)
       tokens <- tokens %>% quanteda::tokens_remove("^[a-zA-Z0-9\uff10-\uff19]+$", valuetype = "regex")
     }
     else { # Remove only numeric words.
